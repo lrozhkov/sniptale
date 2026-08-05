@@ -90,6 +90,30 @@ it('does not overwrite malformed or future storage', async () => {
   expect(mocks.set).not.toHaveBeenCalled();
 });
 
+it('does not overwrite storage with malformed connector attachments', async () => {
+  const owner = await import('./index');
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  state.stored = {
+    userPresets: [
+      {
+        id: 'user-malformed-attachment',
+        name: 'Malformed attachment',
+        placement: {
+          ...preset.placement,
+          connectorAttachments: { block: { mode: 'unknown' }, frame: { mode: 'auto' } },
+        },
+        style: preset.style,
+      },
+    ],
+  };
+
+  await expect(owner.setDefaultCalloutPreset('system-callout-card')).resolves.toEqual({
+    outcome: 'rejected',
+    reason: 'unsafe-storage',
+  });
+  expect(mocks.set).not.toHaveBeenCalled();
+});
+
 it('keeps the cached snapshot unchanged on write failure and allows a retry', async () => {
   const owner = await import('./index');
   const before = await owner.loadCalloutPresetCatalog();

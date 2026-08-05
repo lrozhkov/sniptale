@@ -232,6 +232,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/step-badge-presets",
+      "ownerId": "persistence.step-badge-presets",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/command-palette",
       "ownerId": "persistence.command-palette",
       "ownerClass": "persistence"
@@ -381,6 +386,11 @@
     {
       "id": "callout-presets",
       "path": "apps/extension/src/composition/persistence/callout-presets",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "step-badge-presets",
+      "path": "apps/extension/src/composition/persistence/step-badge-presets",
       "stateKind": "authoritative-durable"
     },
     {

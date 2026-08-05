@@ -95,9 +95,14 @@ describe('useCalloutSettingsPopoverState', () => {
 
     expect(latestState?.localSettings.placement).toEqual({
       anchor: 'bottom-right',
+      connectorAttachments: {
+        block: { mode: 'auto' },
+        frame: { mode: 'auto' },
+      },
       connectorBasePosition: undefined,
       connectorBaseWidth: undefined,
       connectorFramePosition: undefined,
+      connectorWaypoint: undefined,
       manualPlacement: undefined,
       side: 'bottom',
     });
@@ -135,10 +140,15 @@ describe('useCalloutSettingsPopoverState', () => {
       settings: {
         placement: {
           side: 'right',
+          connectorAttachments: {
+            block: { mode: 'auto' },
+            frame: { mode: 'auto' },
+          },
           manualPlacement: undefined,
           connectorBasePosition: undefined,
           connectorBaseWidth: undefined,
           connectorFramePosition: undefined,
+          connectorWaypoint: undefined,
         },
       },
     });
@@ -168,9 +178,14 @@ describe('useCalloutSettingsPopoverState', () => {
       frameId: 'frame-1',
       settings: {
         placement: {
+          connectorAttachments: {
+            block: { mode: 'auto' },
+            frame: { mode: 'auto' },
+          },
           connectorBasePosition: undefined,
           connectorBaseWidth: undefined,
           connectorFramePosition: undefined,
+          connectorWaypoint: undefined,
         },
         sourcePresetId: undefined,
         style: { connector: { kind: 'wedge' } },

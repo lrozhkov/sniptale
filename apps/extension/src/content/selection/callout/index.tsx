@@ -1,7 +1,11 @@
 import React from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import { useResolvedPortalTheme } from '@sniptale/ui/theme/safe-portal';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutAttachment,
+  CalloutCurveSettings,
+  CalloutSettings,
+} from '@sniptale/runtime-contracts/highlighter/callout';
 import { CalloutBody } from './body';
 import { resolveCalloutThemeOwner } from './dom';
 import { useCalloutEditing } from './editing';
@@ -31,8 +35,9 @@ interface CalloutProps {
     placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
     behavior: CalloutDragBehavior
   ) => void;
-  onTailBaseRangeChange: (position: number, width: number) => void;
-  onTailFramePositionChange: (position: number) => void;
+  onTailBaseRangeChange: (position: number, width: number, attachment?: CalloutAttachment) => void;
+  onTailFramePositionChange: (position: number, attachment?: CalloutAttachment) => void;
+  onCurveChange: (curve: CalloutCurveSettings) => void;
   onWaypointChange: (waypoint: CalloutSettings['placement']['connectorWaypoint']) => void;
   onWidthChange: (
     maxWidth: number,
@@ -64,6 +69,7 @@ export const Callout: React.FC<CalloutProps> = ({
   onPositionChange,
   onTailBaseRangeChange,
   onTailFramePositionChange,
+  onCurveChange,
   onWaypointChange,
   onWidthChange,
   settingsAnchorRef,
@@ -92,6 +98,7 @@ export const Callout: React.FC<CalloutProps> = ({
     onPositionChange,
     onTailBaseRangeChange,
     onTailFramePositionChange,
+    onCurveChange,
     onWaypointChange,
     onWidthChange,
     settings,
@@ -102,24 +109,18 @@ export const Callout: React.FC<CalloutProps> = ({
   return (
     <CalloutBody
       {...createCalloutBodyProps({
-        drag: interaction.drag,
         editing,
         frameId,
+        interaction,
         isEditing,
         isFrameEditing,
         isSettingsOpen,
-        layout: interaction.layout,
         onSettingsClick,
         onTitleChange,
         portalTheme,
         settings: interaction.effectiveSettings,
         settingsAnchorRef,
         showSettingsHandle,
-        tailBaseEndDrag: interaction.tailBaseEndDrag,
-        tailBaseStartDrag: interaction.tailBaseStartDrag,
-        tailFrameDrag: interaction.tailFrameDrag,
-        waypointDrag: interaction.waypointDrag,
-        widthResize: interaction.widthResize,
       })}
       wrapperRef={wrapperRef}
     />
@@ -132,15 +133,9 @@ type CalloutBodyPropsArgs = {
   isEditing: boolean;
   isFrameEditing: boolean;
   isSettingsOpen: boolean;
-  layout: ReturnType<typeof useCalloutInteractionLayout>['layout'];
+  interaction: ReturnType<typeof useCalloutInteractionLayout>;
   portalTheme: ReturnType<typeof useResolvedPortalTheme>;
   settings: CalloutSettings;
-  drag: ReturnType<typeof useCalloutInteractionLayout>['drag'];
-  tailBaseStartDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseStartDrag'];
-  tailBaseEndDrag: ReturnType<typeof useCalloutInteractionLayout>['tailBaseEndDrag'];
-  tailFrameDrag: ReturnType<typeof useCalloutInteractionLayout>['tailFrameDrag'];
-  waypointDrag: ReturnType<typeof useCalloutInteractionLayout>['waypointDrag'];
-  widthResize: ReturnType<typeof useCalloutInteractionLayout>['widthResize'];
   onSettingsClick: () => void;
   onTitleChange: (titleText: string) => void;
   settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -149,37 +144,57 @@ type CalloutBodyPropsArgs = {
 
 function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
   const tailBaseStartPoint =
-    args.layout.dynamicTail?.kind === 'line'
-      ? args.layout.dynamicTail.attachment.bubbleEdgePoint
-      : args.layout.dynamicTail?.attachment.baseEdgeA;
+    args.interaction.layout.dynamicTail?.kind === 'line'
+      ? args.interaction.layout.dynamicTail.attachment.bubbleEdgePoint
+      : args.interaction.layout.dynamicTail?.attachment.baseEdgeA;
   const tailBaseEndPoint =
-    args.layout.dynamicTail?.kind === 'wedge'
-      ? args.layout.dynamicTail.attachment.baseEdgeB
+    args.interaction.layout.dynamicTail?.kind === 'wedge'
+      ? args.interaction.layout.dynamicTail.attachment.baseEdgeB
       : undefined;
-  const tailFramePoint = args.layout.dynamicTail?.attachment.tipPoint;
+  const tailFramePoint = args.interaction.layout.dynamicTail?.attachment.tipPoint;
   return {
+    curveStartHandleStyle:
+      args.interaction.layout.dynamicTail?.kind === 'line' &&
+      args.interaction.layout.dynamicTail.curveHandles
+        ? {
+            position: 'fixed' as const,
+            left: args.interaction.layout.dynamicTail.curveHandles.start.x - 6,
+            top: args.interaction.layout.dynamicTail.curveHandles.start.y - 6,
+            zIndex: args.interaction.layout.effectiveZIndex + 1,
+          }
+        : null,
+    curveEndHandleStyle:
+      args.interaction.layout.dynamicTail?.kind === 'line' &&
+      args.interaction.layout.dynamicTail.curveHandles
+        ? {
+            position: 'fixed' as const,
+            left: args.interaction.layout.dynamicTail.curveHandles.end.x - 6,
+            top: args.interaction.layout.dynamicTail.curveHandles.end.y - 6,
+            zIndex: args.interaction.layout.effectiveZIndex + 1,
+          }
+        : null,
     dragHandleStyle: {
       position: 'fixed' as const,
-      left: args.layout.calloutPos.x + args.editing.dimensions.width + 6,
-      top: args.layout.calloutPos.y - 30,
-      zIndex: args.layout.effectiveZIndex + 1,
+      left: args.interaction.layout.calloutPos.x + args.editing.dimensions.width + 6,
+      top: args.interaction.layout.calloutPos.y - 30,
+      zIndex: args.interaction.layout.effectiveZIndex + 1,
     },
     settingsHandleStyle: {
       position: 'fixed' as const,
-      left: args.layout.calloutPos.x + args.editing.dimensions.width + 36,
-      top: args.layout.calloutPos.y - 30,
-      zIndex: args.layout.effectiveZIndex + 1,
+      left: args.interaction.layout.calloutPos.x + args.editing.dimensions.width + 36,
+      top: args.interaction.layout.calloutPos.y - 30,
+      zIndex: args.interaction.layout.effectiveZIndex + 1,
     },
     tailHandleCursor:
-      args.layout.dynamicTail?.kind === 'line'
+      args.interaction.layout.dynamicTail?.kind === 'line'
         ? 'grab'
-        : getCalloutTailDragCursor(args.layout.dynamicTail?.side ?? null),
+        : getCalloutTailDragCursor(args.interaction.layout.dynamicTail?.side ?? null),
     tailHandleStyle: tailBaseStartPoint
       ? {
           position: 'fixed' as const,
           left: tailBaseStartPoint.x - 6,
           top: tailBaseStartPoint.y - 6,
-          zIndex: args.layout.effectiveZIndex + 1,
+          zIndex: args.interaction.layout.effectiveZIndex + 1,
         }
       : null,
     tailBaseEndHandleStyle: tailBaseEndPoint
@@ -187,7 +202,7 @@ function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
           position: 'fixed' as const,
           left: tailBaseEndPoint.x - 6,
           top: tailBaseEndPoint.y - 6,
-          zIndex: args.layout.effectiveZIndex + 1,
+          zIndex: args.interaction.layout.effectiveZIndex + 1,
         }
       : null,
     tailFrameHandleStyle: tailFramePoint
@@ -195,38 +210,47 @@ function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
           position: 'fixed' as const,
           left: tailFramePoint.x - 6,
           top: tailFramePoint.y - 6,
-          zIndex: args.layout.effectiveZIndex + 1,
+          zIndex: args.interaction.layout.effectiveZIndex + 1,
         }
       : null,
     waypointHandleStyle:
-      args.layout.dynamicTail?.kind === 'line' && args.layout.dynamicTail.routeControlPoint
+      args.interaction.layout.dynamicTail?.kind === 'line' &&
+      args.interaction.layout.dynamicTail.routeControlPoint
         ? {
             position: 'fixed' as const,
-            left: args.layout.dynamicTail.routeControlPoint.x - 6,
-            top: args.layout.dynamicTail.routeControlPoint.y - 6,
-            zIndex: args.layout.effectiveZIndex + 1,
+            left: args.interaction.layout.dynamicTail.routeControlPoint.x - 6,
+            top: args.interaction.layout.dynamicTail.routeControlPoint.y - 6,
+            zIndex: args.interaction.layout.effectiveZIndex + 1,
           }
         : null,
     waypointAngleStyle:
-      args.layout.dynamicTail?.kind === 'line' && args.layout.dynamicTail.routeControlPoint
+      args.interaction.layout.dynamicTail?.kind === 'line' &&
+      args.interaction.layout.dynamicTail.routeControlPoint
         ? {
             position: 'fixed' as const,
-            left: args.layout.dynamicTail.routeControlPoint.x + 12,
-            top: args.layout.dynamicTail.routeControlPoint.y - 28,
-            zIndex: args.layout.effectiveZIndex + 2,
+            left: args.interaction.layout.dynamicTail.routeControlPoint.x + 12,
+            top: args.interaction.layout.dynamicTail.routeControlPoint.y - 28,
+            zIndex: args.interaction.layout.effectiveZIndex + 2,
           }
         : null,
     resizeLeftHandleStyle: {
       position: 'fixed' as const,
-      left: args.layout.calloutPos.x - 6,
-      top: args.layout.calloutPos.y + args.layout.calloutDimensions.height / 2 - 6,
-      zIndex: args.layout.effectiveZIndex + 1,
+      left: args.interaction.layout.calloutPos.x - 6,
+      top:
+        args.interaction.layout.calloutPos.y +
+        args.interaction.layout.calloutDimensions.height / 2 -
+        6,
+      zIndex: args.interaction.layout.effectiveZIndex + 1,
     },
     resizeRightHandleStyle: {
       position: 'fixed' as const,
-      left: args.layout.calloutPos.x + args.layout.calloutDimensions.width - 6,
-      top: args.layout.calloutPos.y + args.layout.calloutDimensions.height / 2 - 6,
-      zIndex: args.layout.effectiveZIndex + 1,
+      left:
+        args.interaction.layout.calloutPos.x + args.interaction.layout.calloutDimensions.width - 6,
+      top:
+        args.interaction.layout.calloutPos.y +
+        args.interaction.layout.calloutDimensions.height / 2 -
+        6,
+      zIndex: args.interaction.layout.effectiveZIndex + 1,
     },
   };
 }
@@ -234,53 +258,63 @@ function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
 function createCalloutHandleCallbacks(args: CalloutBodyPropsArgs) {
   return {
     handleSettingsClick: args.onSettingsClick,
-    handleDragPointerDown: args.drag.handlePointerDown,
-    handleDragKeyDown: args.drag.handleKeyDown,
-    handleHandleBlur: args.drag.handleBlur,
-    handleHandleFocus: args.drag.handleFocus,
-    handleTailPointerDown: args.tailBaseStartDrag.handlePointerDown,
-    handleTailKeyDown: args.tailBaseStartDrag.handleKeyDown,
-    handleTailBaseEndPointerDown: args.tailBaseEndDrag.handlePointerDown,
-    handleTailBaseEndKeyDown: args.tailBaseEndDrag.handleKeyDown,
-    handleTailFramePointerDown: args.tailFrameDrag.handlePointerDown,
-    handleTailFrameKeyDown: args.tailFrameDrag.handleKeyDown,
-    handleWaypointPointerDown: args.waypointDrag.handlePointerDown,
-    handleWaypointKeyDown: args.waypointDrag.handleKeyDown,
-    handleWaypointDoubleClick: args.waypointDrag.handleDoubleClick,
-    handleMouseEnter: args.drag.handleMouseEnter,
-    handleMouseLeave: args.drag.handleMouseLeave,
+    handleDragPointerDown: args.interaction.handles.drag.handlePointerDown,
+    handleDragKeyDown: args.interaction.handles.drag.handleKeyDown,
+    handleHandleBlur: args.interaction.handles.drag.handleBlur,
+    handleHandleFocus: args.interaction.handles.drag.handleFocus,
+    handleTailPointerDown: args.interaction.handles.tailBaseStartDrag.handlePointerDown,
+    handleTailKeyDown: args.interaction.handles.tailBaseStartDrag.handleKeyDown,
+    handleTailBaseEndPointerDown: args.interaction.handles.tailBaseEndDrag.handlePointerDown,
+    handleTailBaseEndKeyDown: args.interaction.handles.tailBaseEndDrag.handleKeyDown,
+    handleTailFramePointerDown: args.interaction.handles.tailFrameDrag.handlePointerDown,
+    handleTailFrameKeyDown: args.interaction.handles.tailFrameDrag.handleKeyDown,
+    handleWaypointPointerDown: args.interaction.handles.waypointDrag.handlePointerDown,
+    handleWaypointKeyDown: args.interaction.handles.waypointDrag.handleKeyDown,
+    handleWaypointDoubleClick: args.interaction.handles.waypointDrag.handleDoubleClick,
+    handleCurveStartPointerDown: args.interaction.handles.curveStartDrag.handlePointerDown,
+    handleCurveStartKeyDown: args.interaction.handles.curveStartDrag.handleKeyDown,
+    handleCurveEndPointerDown: args.interaction.handles.curveEndDrag.handlePointerDown,
+    handleCurveEndKeyDown: args.interaction.handles.curveEndDrag.handleKeyDown,
+    handleMouseEnter: args.interaction.handles.drag.handleMouseEnter,
+    handleMouseLeave: args.interaction.handles.drag.handleMouseLeave,
     handleResizeLeftPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
-      args.widthResize.handlePointerDown('left', event),
+      args.interaction.handles.widthResize.handlePointerDown('left', event),
     handleResizeLeftKeyDown: (event: CalloutHandleKeyboardEvent) =>
-      args.widthResize.handleKeyDown('left', event),
+      args.interaction.handles.widthResize.handleKeyDown('left', event),
     handleResizeRightPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
-      args.widthResize.handlePointerDown('right', event),
+      args.interaction.handles.widthResize.handlePointerDown('right', event),
     handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) =>
-      args.widthResize.handleKeyDown('right', event),
+      args.interaction.handles.widthResize.handleKeyDown('right', event),
   };
 }
 
 function createCalloutHandleState(args: CalloutBodyPropsArgs) {
   return {
-    isDragging: args.drag.isDragging,
+    isDragging: args.interaction.handles.drag.isDragging,
     isHandleVisible:
-      args.drag.isHandleVisible ||
-      args.tailBaseStartDrag.isDragging ||
-      args.tailBaseEndDrag.isDragging ||
-      args.tailFrameDrag.isDragging ||
-      args.waypointDrag.isDragging ||
-      args.widthResize.isResizing,
-    isResizingLeft: args.widthResize.activeSide === 'left',
-    isResizingRight: args.widthResize.activeSide === 'right',
-    isTailDragging: args.tailBaseStartDrag.isDragging,
-    isTailBaseEndDragging: args.tailBaseEndDrag.isDragging,
-    isTailFrameDragging: args.tailFrameDrag.isDragging,
-    isWaypointDragging: args.waypointDrag.isDragging,
+      args.interaction.handles.drag.isHandleVisible ||
+      args.interaction.handles.tailBaseStartDrag.isDragging ||
+      args.interaction.handles.tailBaseEndDrag.isDragging ||
+      args.interaction.handles.tailFrameDrag.isDragging ||
+      args.interaction.handles.curveStartDrag.isDragging ||
+      args.interaction.handles.curveEndDrag.isDragging ||
+      args.interaction.handles.waypointDrag.isDragging ||
+      args.interaction.handles.widthResize.isResizing,
+    isResizingLeft: args.interaction.handles.widthResize.activeSide === 'left',
+    isResizingRight: args.interaction.handles.widthResize.activeSide === 'right',
+    isTailDragging: args.interaction.handles.tailBaseStartDrag.isDragging,
+    isTailBaseEndDragging: args.interaction.handles.tailBaseEndDrag.isDragging,
+    isTailFrameDragging: args.interaction.handles.tailFrameDrag.isDragging,
+    isWaypointDragging: args.interaction.handles.waypointDrag.isDragging,
+    isCurveStartDragging: args.interaction.handles.curveStartDrag.isDragging,
+    isCurveEndDragging: args.interaction.handles.curveEndDrag.isDragging,
     isPolylineWaypoint:
       args.settings.style.connector.kind === 'line' &&
       args.settings.style.connector.routing === 'polyline',
     waypointAngle:
-      args.layout.dynamicTail?.kind === 'line' ? args.layout.dynamicTail.routeControlAngle : null,
+      args.interaction.layout.dynamicTail?.kind === 'line'
+        ? args.interaction.layout.dynamicTail.routeControlAngle
+        : null,
     hasWaypoint: args.settings.placement.connectorWaypoint !== undefined,
   };
 }
@@ -288,12 +322,12 @@ function createCalloutHandleState(args: CalloutBodyPropsArgs) {
 function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
   return {
     applyFormatting: args.editing.applyFormatting,
-    calloutDimensions: args.layout.calloutDimensions,
-    cloudStyle: args.layout.cloudStyle,
+    calloutDimensions: args.interaction.layout.calloutDimensions,
+    cloudStyle: args.interaction.layout.cloudStyle,
     containerRef: args.editing.containerRef,
     contentEditableRef: args.editing.contentEditableRef,
-    editableStyle: args.layout.editableStyle,
-    effectiveZIndex: args.layout.effectiveZIndex,
+    editableStyle: args.interaction.layout.editableStyle,
+    effectiveZIndex: args.interaction.layout.effectiveZIndex,
     floatingToolbarRect: args.editing.floatingToolbarRect,
     frameId: args.frameId,
     handleBlur: args.editing.handleBlur,
@@ -303,8 +337,8 @@ function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
     handlePaste: args.editing.handlePaste,
     voice: args.editing.voice,
     voiceButtonLeftOffset: resolveCalloutVoiceButtonLeftOffset({
-      calloutLeft: args.layout.calloutPos.x,
-      calloutWidth: args.layout.calloutDimensions.width,
+      calloutLeft: args.interaction.layout.calloutPos.x,
+      calloutWidth: args.interaction.layout.calloutDimensions.width,
       viewportWidth: window.innerWidth,
     }),
     isEditing: args.isEditing,
@@ -313,12 +347,12 @@ function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
     portalTheme: args.portalTheme,
     settings: args.settings,
     onTitleChange: args.onTitleChange,
-    dynamicTail: args.layout.dynamicTail,
+    dynamicTail: args.interaction.layout.dynamicTail,
     settingsAnchorRef: args.settingsAnchorRef,
     showSettingsHandle: args.showSettingsHandle,
     ...createCalloutHandleCallbacks(args),
     ...createCalloutHandleState(args),
     ...createCalloutHandleStyles(args),
-    wrapperStyle: args.layout.wrapperStyle,
+    wrapperStyle: args.interaction.layout.wrapperStyle,
   };
 }

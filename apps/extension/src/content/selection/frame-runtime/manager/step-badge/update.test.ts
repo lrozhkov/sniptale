@@ -31,7 +31,7 @@ it(
   expectGlobalStepBadgeSettingsUpdate
 );
 
-it('persists manual boundary placement through the authoritative step-badge owner', () => {
+it('keeps manual boundary placement local to the selected frame', () => {
   let frames = [
     createFrameDataFixture('frame-1', {
       stepBadge: createStepBadgeSettingsFixture({ value: '1' }),
@@ -54,10 +54,29 @@ it('persists manual boundary placement through the authoritative step-badge owne
   });
 
   expect(frames[0]?.stepBadge?.manualPlacement).toEqual({ position: 0.7, side: 'bottom' });
-  expect(sessionStepBadgeTemplateRef.current?.manualPlacement).toEqual({
-    position: 0.7,
-    side: 'bottom',
+  expect(sessionStepBadgeTemplateRef.current).toBeNull();
+});
+
+it('clears a manual boundary placement when a preset replacement requests it', () => {
+  let frames = [
+    createFrameDataFixture('frame-1', {
+      stepBadge: createStepBadgeSettingsFixture({
+        manualPlacement: { position: 0.7, side: 'bottom' },
+      }),
+    }),
+  ];
+  const updateFrameStepBadge = createUpdateFrameStepBadge({
+    globalStepBadgeSettingsRef: { current: { autoMode: true } },
+    recalculateStepBadgesRef: { current: vi.fn() },
+    setFrames: (update) => {
+      frames = typeof update === 'function' ? update(frames) : update;
+    },
   });
+
+  updateFrameStepBadge('frame-1', { manualPlacement: undefined, sourcePresetId: 'system-classic' });
+
+  expect(frames[0]?.stepBadge?.manualPlacement).toBeUndefined();
+  expect(frames[0]?.stepBadge?.sourcePresetId).toBe('system-classic');
 });
 
 it(
@@ -84,13 +103,7 @@ async function expectFrameStepBadgeUpdate() {
   await vi.runAllTimersAsync();
 
   expect(setFrames).toHaveBeenCalledTimes(1);
-  expect(sessionStepBadgeTemplateRef.current).toEqual(
-    expect.objectContaining({
-      enabled: true,
-      type: 'letter',
-      alphabet: 'latin',
-    })
-  );
+  expect(sessionStepBadgeTemplateRef.current).toBeNull();
   expect(recalculateStepBadges).toHaveBeenCalledTimes(1);
 }
 

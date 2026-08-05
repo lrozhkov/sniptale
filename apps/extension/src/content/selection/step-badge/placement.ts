@@ -6,6 +6,7 @@ import type {
   StepBadgeSettings,
   StepBadgeSizeLevel,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { resolveStepBadgeVisualStyle } from '../../../features/highlighter/step-badge-presets/style';
 
 export type StepBadgeFrameRect = { x: number; y: number; width: number; height: number };
 type StepBadgePoint = { x: number; y: number };
@@ -80,6 +81,17 @@ export function getStepBadgeVisualMetrics(
   settings: StepBadgeSettings,
   borderWidth: number
 ): { badgeSize: number; fontSize: number; offset: StepBadgePoint } {
+  if (settings.style) {
+    const badgeSize = resolveStepBadgeVisualStyle(settings, {
+      borderColor: settings.style.backgroundColor,
+      borderWidth,
+    }).diameter;
+    return {
+      badgeSize,
+      fontSize: badgeSize / 1.8,
+      offset: getOffsetFromDirections(settings.offsetDirections, badgeSize),
+    };
+  }
   const sizeLevel = getEffectiveSizeLevel(settings);
   const fontSize = Math.max(12, borderWidth * 2.5) * sizeLevelToMultiplier(sizeLevel);
   const badgeSize = fontSize * 1.8;

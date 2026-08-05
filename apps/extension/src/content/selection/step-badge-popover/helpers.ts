@@ -17,9 +17,9 @@ export type AutoStepBadgeType = Extract<StepBadgeType, 'number' | 'letter'>;
 
 export const ANCHOR_GRID = DEFAULT_POPOVER_ANCHOR_GRID as StepBadgeAnchor[][];
 
-export const SIZE_LEVEL_MIN = 0;
-export const SIZE_LEVEL_MAX = 6;
-export const SIZE_LEVEL_DEFAULT: StepBadgeSizeLevel = 3;
+const SIZE_LEVEL_MIN = 0;
+const SIZE_LEVEL_MAX = 6;
+const SIZE_LEVEL_DEFAULT: StepBadgeSizeLevel = 3;
 export const POPOVER_WIDTH = 280;
 export const POPOVER_HEIGHT = 420;
 

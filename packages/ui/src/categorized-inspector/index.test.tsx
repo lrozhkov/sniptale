@@ -1,0 +1,124 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { CategorizedInspector } from './index';
+
+const sections = [
+  { id: 'outline', label: 'Outline', icon: () => <span>O</span> },
+  { id: 'fill', label: 'Fill', icon: () => <span>F</span> },
+  { id: 'effects', label: 'Effects', icon: () => <span>E</span> },
+] as const;
+
+let container: HTMLDivElement;
+let root: Root;
+
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
+
+it('selects categories and supports roving keyboard navigation', () => {
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="outline"
+        renderSection={(section) => <div data-section={section}>{section}</div>}
+        sections={sections}
+      />
+    );
+  });
+
+  const outline = container.querySelector<HTMLButtonElement>('button[aria-label="Outline"]');
+  const fill = container.querySelector<HTMLButtonElement>('button[aria-label="Fill"]');
+  const effects = container.querySelector<HTMLButtonElement>('button[aria-label="Effects"]');
+  expect(outline?.getAttribute('aria-pressed')).toBe('true');
+
+  act(() => fill?.click());
+  expect(fill?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('[data-section="fill"]')).not.toBeNull();
+
+  act(() => {
+    fill?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' }));
+  });
+  expect(effects?.getAttribute('aria-pressed')).toBe('true');
+  expect(document.activeElement).toBe(effects);
+});
+
+it('wraps arrow navigation and ignores unrelated keys', () => {
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="fill"
+        renderSection={(section) => <div data-section={section} />}
+        sections={sections}
+      />
+    );
+  });
+
+  const button = (label: string) =>
+    container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  const press = (label: string, key: string) => {
+    act(() => {
+      button(label)?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
+    });
+  };
+
+  press('Fill', 'ArrowDown');
+  expect(button('Effects')?.getAttribute('aria-pressed')).toBe('true');
+  press('Effects', 'ArrowRight');
+  expect(button('Outline')?.getAttribute('aria-pressed')).toBe('true');
+  press('Outline', 'ArrowUp');
+  expect(button('Effects')?.getAttribute('aria-pressed')).toBe('true');
+  press('Effects', 'Home');
+  expect(button('Outline')?.getAttribute('aria-pressed')).toBe('true');
+  press('Outline', 'Enter');
+  expect(button('Outline')?.getAttribute('aria-pressed')).toBe('true');
+});
+
+it('falls back when the active category disappears and renders nothing without categories', () => {
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="fill"
+        renderSection={(section) => <div data-section={section} />}
+        sections={sections}
+      />
+    );
+  });
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="fill"
+        renderSection={(section) => <div data-section={section} />}
+        sections={[sections[2]]}
+      />
+    );
+  });
+  expect(container.querySelector('[data-section="effects"]')).not.toBeNull();
+
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="fill"
+        renderSection={(section) => <div data-section={section} />}
+        sections={[]}
+      />
+    );
+  });
+  expect(container.innerHTML).toBe('');
+});

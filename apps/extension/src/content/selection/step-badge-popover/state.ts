@@ -3,10 +3,12 @@ import type {
   StepBadgeAlphabet,
   StepBadgeAnchor,
   StepBadgeOffsetDirection,
+  StepBadgePreset,
   StepBadgeSettings,
   StepBadgeSizeLevel,
   StepBadgeType,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { createStepBadgeSettingsFromTemplate } from '../../../features/highlighter/step-badge-presets/catalog';
 import {
   DEFAULT_STEP_BADGE_SETTINGS,
   filterStepBadgeValue,
@@ -33,6 +35,15 @@ function createStepBadgeHandlers(props: {
   };
 
   return {
+    applyPreset: (preset: StepBadgePreset) => {
+      const next = {
+        ...createStepBadgeSettingsFromTemplate(preset.settings, preset.id),
+        manualPlacement: undefined,
+      };
+      props.setLocalStepBadgeSettings(next);
+      dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
+    },
+    handleSettingsChange: updateSettings,
     handleAnchorChange: (anchor: StepBadgeAnchor) =>
       updateSettings({ anchor, manualPlacement: undefined }),
     handleAlphabetChange: (alphabet: StepBadgeAlphabet) => updateSettings({ alphabet }),

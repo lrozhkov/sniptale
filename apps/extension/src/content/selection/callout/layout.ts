@@ -4,6 +4,7 @@ import { FONT_FAMILY_MAP } from './constants';
 import { getAnchorPosition, getCalloutPosition, getPreferredSideFromAnchor } from './geometry';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 import { getLineConnectorState } from './line-connector';
+import { resolveCalloutAttachmentPosition } from './tail-drag';
 import {
   Z_INDEX_CALLOUT_EDITING,
   Z_INDEX_CALLOUT_VIEWING,
@@ -49,6 +50,24 @@ export function getCalloutLayoutState(args: {
     x: calloutPos.x - automaticCalloutPos.x,
     y: calloutPos.y - automaticCalloutPos.y,
   };
+  const bubbleRect = { ...calloutPos, ...positionDimensions };
+  const blockAttachmentPosition = resolveCalloutAttachmentPosition(
+    bubbleRect,
+    placement.connectorAttachments?.block
+  );
+  const frameAttachmentPosition = resolveCalloutAttachmentPosition(
+    args.frameRect,
+    placement.connectorAttachments?.frame
+  );
+  const connectorPlacement = {
+    ...placement,
+    connectorBasePosition: placement.connectorAttachments?.block
+      ? blockAttachmentPosition
+      : placement.connectorBasePosition,
+    connectorFramePosition: placement.connectorAttachments?.frame
+      ? frameAttachmentPosition
+      : placement.connectorFramePosition,
+  };
   const effectiveZIndex = args.isEditing
     ? Z_INDEX_CALLOUT_EDITING
     : Math.min(args.zIndex, Z_INDEX_CALLOUT_VIEWING);
@@ -59,17 +78,17 @@ export function getCalloutLayoutState(args: {
           borderRadius: style.surface.radius,
           borderWidth: style.surface.borderWidth,
           bubbleOffset,
-          bubbleRect: { ...calloutPos, ...positionDimensions },
+          bubbleRect,
           frameRect: args.frameRect,
-          ...(placement.connectorBasePosition === undefined
+          ...(connectorPlacement.connectorBasePosition === undefined
             ? {}
-            : { tailBasePosition: placement.connectorBasePosition }),
+            : { tailBasePosition: connectorPlacement.connectorBasePosition }),
           ...(placement.connectorBaseWidth === undefined
             ? {}
             : { tailBaseWidth: placement.connectorBaseWidth }),
-          ...(placement.connectorFramePosition === undefined
+          ...(connectorPlacement.connectorFramePosition === undefined
             ? {}
-            : { tailFramePosition: placement.connectorFramePosition }),
+            : { tailFramePosition: connectorPlacement.connectorFramePosition }),
           tailSize: style.connector.wedgeSize,
           ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
           ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
@@ -81,14 +100,17 @@ export function getCalloutLayoutState(args: {
             blockMarker: style.connector.blockMarker,
             blockMarkerSize: style.connector.blockMarkerSize,
             bubbleOffset,
-            bubbleRect: { ...calloutPos, ...positionDimensions },
+            bubbleRect,
             frameBoundaryWidth: args.frameBorderWidth ?? 0,
             frameMarker: style.connector.frameMarker,
             frameMarkerSize: style.connector.frameMarkerSize,
             frameRect: args.frameRect,
             lineWidth: style.connector.width,
-            placement,
+            placement: connectorPlacement,
             routing: style.connector.routing,
+            cornerStyle: style.connector.cornerStyle,
+            curve: style.connector.curve,
+            spacing: style.connector.spacing,
             wedgeSize: style.connector.wedgeSize,
             ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
             ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
@@ -108,7 +130,7 @@ export function getCalloutLayoutState(args: {
     calloutDimensions: positionDimensions,
     wrapperStyle: getCalloutWrapperStyle(args.settings, calloutPos, effectiveZIndex),
     cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing, dynamicTail),
-    editableStyle: getCalloutEditableStyle(args.isEditing),
+    editableStyle: getCalloutEditableStyle(args.settings),
   };
 }
 
@@ -193,7 +215,8 @@ function getCalloutCloudStyle(
     fontWeight: typography.fontWeight,
     textAlign: typography.textAlign,
     textDecoration: typography.textDecoration,
-    lineHeight: 1.4,
+    lineHeight: typography.lineHeight,
+    letterSpacing: typography.letterSpacing,
     cursor: isEditing ? 'text' : 'pointer',
     isolation: 'isolate',
     zIndex: 1,
@@ -202,11 +225,15 @@ function getCalloutCloudStyle(
   };
 }
 
-function getCalloutEditableStyle(_isEditing: boolean): CSSProperties {
+function getCalloutEditableStyle(settings: CalloutSettings): CSSProperties {
+  const typography = settings.style.typography;
   return {
     outline: 'none',
     minHeight: 'auto',
-    wordWrap: 'break-word',
+    unicodeBidi: 'plaintext',
+    hyphens: typography.hyphens,
+    overflowWrap: typography.wordBreak === 'break-word' ? 'anywhere' : 'normal',
+    wordBreak: typography.wordBreak === 'break-word' ? 'break-word' : 'normal',
     whiteSpace: 'pre-wrap',
   };
 }

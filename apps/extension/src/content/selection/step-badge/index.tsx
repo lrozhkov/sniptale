@@ -15,6 +15,8 @@ interface StepBadgeProps {
   settings: StepBadgeSettings;
   borderColor: string;
   borderWidth: number;
+  fillColor?: string;
+  fillOpacity?: number;
   shadow?: number;
   frameRect?: StepBadgeFrameRect;
   isSettingsOpen?: boolean;
@@ -50,6 +52,8 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
         settings: interaction.effectiveSettings,
         borderColor: props.borderColor,
         borderWidth: props.borderWidth,
+        ...(props.fillColor ? { fillColor: props.fillColor } : {}),
+        ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
         zIndex: props.frameRect ? 0 : Z_INDEX_STEP_BADGE,
         clickable: Boolean(props.onClick),
         isDragging: interaction.drag.isDragging,

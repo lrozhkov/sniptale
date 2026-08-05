@@ -1,12 +1,12 @@
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   EffectMode,
   FocusSettings,
 } from '../../../features/highlighter/contracts';
 
 interface FrameSettingsPopoverApplySettings {
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   blurSettings?: BlurSettings;
   focusSettings?: FocusSettings;
 }
@@ -14,7 +14,7 @@ interface FrameSettingsPopoverApplySettings {
 export interface FrameSettingsPopoverProps {
   anchorEl: HTMLElement | null;
   blurSettings?: BlurSettings;
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   compact?: boolean;
   effectMode: EffectMode;
   focusSettings?: FocusSettings;

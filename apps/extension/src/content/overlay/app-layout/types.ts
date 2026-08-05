@@ -97,6 +97,7 @@ export type ContentAppLayoutToolbarProps = {
   pinToTabAvailable: boolean;
   setFutureFrameEffectMode: (mode: EffectMode) => void;
   futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: import('../toolbar/types').ToolbarFutureFrameStepBadgeActions;
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
   mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;

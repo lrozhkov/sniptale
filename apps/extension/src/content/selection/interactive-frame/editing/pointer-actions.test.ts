@@ -176,6 +176,10 @@ describe('transient frame resize', () => {
     callout.placement = {
       ...callout.placement,
       manualPlacement: { centerOffsetX: 130, centerOffsetY: -10 },
+      connectorAttachments: {
+        ...callout.placement.connectorAttachments!,
+        frame: { mode: 'free', perimeterPosition: 50 / 360 },
+      },
       connectorFramePosition: 50 / 360,
       connectorWaypoint: { centerOffsetX: 30, centerOffsetY: -20 },
     };
@@ -201,6 +205,9 @@ describe('transient frame resize', () => {
       centerOffsetY: 50 - resizedCenter.y,
     });
     expect(resized.callout?.placement.connectorFramePosition).toBeCloseTo(50 / 440);
+    expect(resized.callout?.placement.connectorAttachments?.frame.perimeterPosition).toBeCloseTo(
+      50 / 440
+    );
     expect(resized.callout?.style).toEqual(callout.style);
   });
 

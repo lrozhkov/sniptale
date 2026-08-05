@@ -1,9 +1,11 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
   BlurType,
   BorderPreset,
   FocusSettings,
 } from '../../../../features/highlighter/contracts';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   dispatchFocusOpacityChanged,
   dispatchSessionBlurSettingsChanged,
@@ -20,14 +22,14 @@ export function getDefaultFocusSettings(): FocusSettings {
 }
 
 export function createFrameSettingsPresetHandler(args: {
-  onApplyToFrame: (settings: { borderSettings?: BorderPreset }) => void;
-  setSelectedPresetId: (presetId: string) => void;
+  onApplyToFrame: (settings: { borderSettings?: AppliedBorderSettings }) => void;
+  setSelectedPreset: (settings: AppliedBorderSettings) => void;
 }) {
   return (preset: BorderPreset): void => {
-    args.setSelectedPresetId(preset.id);
-    const sessionPreset = { ...preset, padding: { ...preset.padding } };
-    args.onApplyToFrame({ borderSettings: sessionPreset });
-    setFrameSessionBorderPreset(sessionPreset);
+    const applied = projectBorderPresetToAppliedSettings(preset);
+    args.setSelectedPreset(applied);
+    args.onApplyToFrame({ borderSettings: applied });
+    setFrameSessionBorderPreset(applied);
   };
 }
 

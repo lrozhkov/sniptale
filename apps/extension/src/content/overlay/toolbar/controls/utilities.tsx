@@ -49,6 +49,7 @@ export function ToolbarUtilityButtons(props: {
   futureFrameStyle?: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
   futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: import('../types').ToolbarFutureFrameStepBadgeActions;
 }) {
   const { autoBlur, highlighterMode, isLoading, framesCount, onClearHighlights } = props;
   const showClearHighlights = highlighterMode;
@@ -67,6 +68,9 @@ export function ToolbarUtilityButtons(props: {
           {...(props.futureFrameCalloutActions === undefined
             ? {}
             : { futureFrameCalloutActions: props.futureFrameCalloutActions })}
+          {...(props.futureFrameStepBadgeActions === undefined
+            ? {}
+            : { futureFrameStepBadgeActions: props.futureFrameStepBadgeActions })}
           toolbarMenuState={props.toolbarMenuState}
         />
       ) : null}

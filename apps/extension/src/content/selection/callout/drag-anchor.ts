@@ -1,9 +1,13 @@
-import type { CalloutConnectorWaypoint } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutConnectorAttachments,
+  CalloutConnectorWaypoint,
+} from '@sniptale/runtime-contracts/highlighter/callout';
 import type { getCalloutLayoutState } from './layout';
 import { getCalloutEdgePosition, getCalloutPerimeterPosition } from './tail-drag';
 
 type Rect = { x: number; y: number; width: number; height: number };
 type ConnectorGeometry = {
+  connectorAttachments?: CalloutConnectorAttachments;
   connectorBasePosition?: number;
   connectorBaseWidth?: number;
   connectorFramePosition?: number;
@@ -58,15 +62,21 @@ export function getTranslatedConnectorGeometry(
           y: frameRect.y + frameRect.height / 2 + currentWaypoint.centerOffsetY,
         }
       : currentConnector.routeControlPoint;
+    const connectorBasePosition = getCalloutPerimeterPosition(
+      nextBubbleRect,
+      translatePoint(currentConnector.attachment.bubbleEdgePoint, delta)
+    );
+    const connectorFramePosition = getCalloutPerimeterPosition(
+      frameRect,
+      translatePoint(currentConnector.attachment.framePoint, delta)
+    );
     return {
-      connectorBasePosition: getCalloutPerimeterPosition(
-        nextBubbleRect,
-        translatePoint(currentConnector.attachment.bubbleEdgePoint, delta)
-      ),
-      connectorFramePosition: getCalloutPerimeterPosition(
-        frameRect,
-        translatePoint(currentConnector.attachment.framePoint, delta)
-      ),
+      connectorAttachments: {
+        block: { mode: 'free', perimeterPosition: connectorBasePosition },
+        frame: { mode: 'free', perimeterPosition: connectorFramePosition },
+      },
+      connectorBasePosition,
+      connectorFramePosition,
       ...(currentControlPoint
         ? { connectorWaypoint: toWaypoint(frameRect, translatePoint(currentControlPoint, delta)) }
         : {}),
@@ -84,17 +94,23 @@ export function getTranslatedConnectorGeometry(
     nextConnector.side === 'top' || nextConnector.side === 'bottom'
       ? nextBubbleRect.width
       : nextBubbleRect.height;
+  const connectorBasePosition = getCalloutEdgePosition(
+    nextBubbleRect,
+    nextConnector.side,
+    translatePoint(baseCenter, delta)
+  );
+  const connectorFramePosition = getCalloutEdgePosition(
+    frameRect,
+    nextConnector.side,
+    translatePoint(currentConnector.attachment.framePoint, delta)
+  );
   return {
-    connectorBasePosition: getCalloutEdgePosition(
-      nextBubbleRect,
-      nextConnector.side,
-      translatePoint(baseCenter, delta)
-    ),
+    connectorAttachments: {
+      block: { mode: 'free', perimeterPosition: connectorBasePosition },
+      frame: { mode: 'free', perimeterPosition: connectorFramePosition },
+    },
+    connectorBasePosition,
     connectorBaseWidth: baseSpan / Math.max(1, baseEdgeLength),
-    connectorFramePosition: getCalloutEdgePosition(
-      frameRect,
-      nextConnector.side,
-      translatePoint(currentConnector.attachment.framePoint, delta)
-    ),
+    connectorFramePosition,
   };
 }

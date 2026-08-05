@@ -2,12 +2,18 @@ import type { CSSProperties } from 'react';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import { FONT_FAMILY_MAP } from './constants';
 
-const TITLE_TYPOGRAPHY_STYLE = {
-  fontFamily: FONT_FAMILY_MAP['sans'],
-  fontStyle: 'normal',
-  textAlign: 'left',
-  textDecoration: 'none',
-} as const satisfies CSSProperties;
+function getTitleTypographyStyle(style: CalloutVisualStyle): CSSProperties {
+  const title = style.title;
+  return {
+    fontFamily: FONT_FAMILY_MAP[title.fontFamily],
+    fontStyle: title.fontStyle,
+    fontWeight: title.fontWeight,
+    letterSpacing: title.letterSpacing,
+    lineHeight: title.lineHeight,
+    textAlign: title.textAlign,
+    textDecoration: title.textDecoration,
+  };
+}
 
 export function getCalloutTitleStyle(
   style: CalloutVisualStyle,
@@ -19,7 +25,9 @@ export function getCalloutTitleStyle(
   const titleRadius = Math.max(0, style.surface.radius - outlineInset);
 
   return {
-    display: 'block',
+    alignItems: 'center',
+    display: 'flex',
+    gap: 6,
     boxSizing: 'border-box',
     minWidth: 0,
     width: `calc(100% + ${horizontalExtension * 2}px)`,
@@ -34,9 +42,26 @@ export function getCalloutTitleStyle(
     outline: 0,
     background: style.title.backgroundColor,
     color: style.title.textColor,
-    ...TITLE_TYPOGRAPHY_STYLE,
+    ...getTitleTypographyStyle(style),
     fontSize: style.title.fontSize,
-    fontWeight: style.title.fontWeight,
+  };
+}
+
+export function getCalloutTitleInputStyle(): CSSProperties {
+  return {
+    background: 'transparent',
+    border: 0,
+    color: 'inherit',
+    cursor: 'inherit',
+    font: 'inherit',
+    letterSpacing: 'inherit',
+    lineHeight: 'inherit',
+    minWidth: 0,
+    outline: 0,
+    padding: 0,
+    textAlign: 'inherit',
+    textDecoration: 'inherit',
+    width: '100%',
   };
 }
 
@@ -48,9 +73,8 @@ export function getCalloutTitleMeasureStyle(style: CalloutVisualStyle): CSSPrope
     overflow: 'hidden',
     visibility: 'hidden',
     whiteSpace: 'pre',
-    ...TITLE_TYPOGRAPHY_STYLE,
+    ...getTitleTypographyStyle(style),
     fontSize: style.title.fontSize,
-    fontWeight: style.title.fontWeight,
     lineHeight: 0,
     pointerEvents: 'none',
   };

@@ -21,6 +21,10 @@ it('materializes an automatic polyline corner so ordinary movement cannot rerout
   settings.placement.manualPlacement = { centerOffsetX: 0, centerOffsetY: -100 };
   settings.placement.connectorBasePosition = 144 / 336;
   settings.placement.connectorFramePosition = 80 / 400;
+  settings.placement.connectorAttachments = {
+    block: { mode: 'free', perimeterPosition: 144 / 336 },
+    frame: { mode: 'free', perimeterPosition: 80 / 400 },
+  };
   const layout = getCalloutLayoutState({
     dimensions: { width: 160, height: 60 },
     frameRect,

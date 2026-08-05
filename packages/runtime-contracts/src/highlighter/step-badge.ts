@@ -2,6 +2,20 @@ export type StepBadgeType = 'number' | 'letter' | 'manual';
 export type StepBadgeAlphabet = 'cyrillic' | 'latin';
 export type StepBadgeSize = 'standard' | 'large' | 'extra-large';
 export type StepBadgeCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+export type StepBadgeColorSource = 'custom' | 'frame-border' | 'frame-fill';
+export type StepBadgeOutlineColorSource = StepBadgeColorSource | 'surface';
+export type StepBadgeSizeSource = 'frame-border' | 'custom';
+
+export const SYSTEM_STEP_BADGE_PRESET_KEYS = [
+  'system-classic',
+  'system-outline',
+  'system-compact',
+  'system-large',
+  'system-letters',
+] as const;
+
+export type SystemStepBadgePresetKey = (typeof SYSTEM_STEP_BADGE_PRESET_KEYS)[number];
+export type StepBadgePresetOrigin = 'system' | 'user';
 
 export type StepBadgeAnchor =
   | 'top-left'
@@ -45,6 +59,28 @@ export type StepBadgeSizeLevel =
   | 19
   | 20;
 
+export interface StepBadgeVisualStyle {
+  sizeSource: StepBadgeSizeSource;
+  /** Custom diameter and fallback for a linked diameter, in CSS pixels. */
+  diameter: number;
+  backgroundColorSource: StepBadgeColorSource;
+  backgroundColor: string;
+  textColorSource: StepBadgeColorSource;
+  textColor: string;
+  outlineColorSource: StepBadgeOutlineColorSource;
+  outlineColor: string;
+}
+
+export interface StepBadgeTemplateSettings {
+  anchor: StepBadgeAnchor;
+  offsetDirections: StepBadgeOffsetDirection[];
+  type: StepBadgeType;
+  alphabet: StepBadgeAlphabet;
+  value: string;
+  auto: boolean;
+  style: StepBadgeVisualStyle;
+}
+
 export interface StepBadgeSettings {
   enabled: boolean;
   corner?: StepBadgeCorner;
@@ -57,6 +93,34 @@ export interface StepBadgeSettings {
   sizeLevel?: StepBadgeSizeLevel;
   auto?: boolean;
   manualPlacement?: StepBadgeManualPlacement | undefined;
+  style?: StepBadgeVisualStyle;
+  sourcePresetId?: string;
+}
+
+export interface StepBadgePreset {
+  id: string;
+  name: string;
+  enabled?: boolean;
+  order: number;
+  settings: StepBadgeTemplateSettings;
+  origin?: StepBadgePresetOrigin;
+  systemPresetKey?: SystemStepBadgePresetKey;
+  basedOnRevision?: number;
+  customized?: boolean;
+}
+
+export interface StepBadgePresetCatalog {
+  defaultPresetId: string;
+  presets: StepBadgePreset[];
+  systemCatalogRevision: number;
+  catalogCustomized?: boolean;
+}
+
+export function isSystemStepBadgePresetKey(value: unknown): value is SystemStepBadgePresetKey {
+  return (
+    typeof value === 'string' &&
+    (SYSTEM_STEP_BADGE_PRESET_KEYS as readonly string[]).includes(value)
+  );
 }
 
 export interface GlobalStepBadgeSettings {

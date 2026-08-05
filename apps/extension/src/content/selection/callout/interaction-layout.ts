@@ -1,5 +1,9 @@
 import React from 'react';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutAttachment,
+  CalloutCurveSettings,
+  CalloutSettings,
+} from '@sniptale/runtime-contracts/highlighter/callout';
 import { useCalloutDrag } from './drag';
 import type { CalloutDragBehavior } from './drag';
 import type { ConnectorSide } from './dynamic-tail';
@@ -7,6 +11,7 @@ import { getStationaryConnectorWaypoint, getTranslatedConnectorGeometry } from '
 import { getCalloutLayoutState } from './layout';
 import {
   getCalloutPerimeterAnchorPositions,
+  getCalloutPerimeterAnchors,
   getCalloutEdgePosition,
   getCalloutPerimeterPosition,
   useCalloutEdgeDrag,
@@ -14,6 +19,7 @@ import {
 import { useCalloutTailBaseRange } from './tail-base-range';
 import { useCalloutWidthResize } from './width-resize';
 import { useCalloutWaypointDrag } from './waypoint-drag';
+import { useCalloutCurveHandleDrag } from './curve-handle-drag';
 
 type FrameRect = { x: number; y: number; width: number; height: number };
 type SectionRect = { x: number; y: number; width: number; height: number };
@@ -27,8 +33,9 @@ type InteractionArgs = {
     placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
     behavior: CalloutDragBehavior
   ) => void;
-  onTailBaseRangeChange: (position: number, width: number) => void;
-  onTailFramePositionChange: (position: number) => void;
+  onTailBaseRangeChange: (position: number, width: number, attachment?: CalloutAttachment) => void;
+  onTailFramePositionChange: (position: number, attachment?: CalloutAttachment) => void;
+  onCurveChange: (curve: CalloutCurveSettings) => void;
   onWaypointChange: (waypoint: CalloutSettings['placement']['connectorWaypoint']) => void;
   onWidthChange: (
     maxWidth: number,
@@ -170,12 +177,105 @@ function getDraggedCalloutSettings(args: {
   };
 }
 
+function useCalloutCurveDrafts(args: {
+  curve: CalloutCurveSettings;
+  isEditing: boolean;
+  lineState: Extract<
+    NonNullable<ReturnType<typeof getCalloutLayoutState>['dynamicTail']>,
+    { kind: 'line' }
+  > | null;
+  onCurveChange: InteractionArgs['onCurveChange'];
+}) {
+  const handles = args.lineState?.curveHandles ?? null;
+  const routeStart = args.lineState?.routePoints[0] ?? null;
+  const routeEnd = args.lineState?.routePoints.at(-1) ?? null;
+  const routeDistance =
+    routeStart && routeEnd ? Math.hypot(routeEnd.x - routeStart.x, routeEnd.y - routeStart.y) : 0;
+  const maximumDistance = Math.min(96, Math.max(24, routeDistance * 0.5));
+  const commitHandle = (endpoint: 'startHandle' | 'endHandle', offset: { x: number; y: number }) =>
+    args.onCurveChange({ ...args.curve, [endpoint]: offset, mode: 'manual' });
+  const startDrag = useCalloutCurveHandleDrag({
+    defaultPoint: handles?.start ?? null,
+    isEditing: args.isEditing,
+    maximumDistance,
+    onChange: (offset) => commitHandle('startHandle', offset),
+    origin: routeStart,
+    storedOffset: args.curve.startHandle,
+  });
+  const endDrag = useCalloutCurveHandleDrag({
+    defaultPoint: handles?.end ?? null,
+    isEditing: args.isEditing,
+    maximumDistance,
+    onChange: (offset) => commitHandle('endHandle', offset),
+    origin: routeEnd,
+    storedOffset: args.curve.endHandle,
+  });
+  const draft =
+    startDrag.draftOffset || endDrag.draftOffset
+      ? {
+          ...args.curve,
+          ...(startDrag.draftOffset ? { startHandle: startDrag.draftOffset } : {}),
+          ...(endDrag.draftOffset ? { endHandle: endDrag.draftOffset } : {}),
+          mode: 'manual' as const,
+        }
+      : null;
+  return { draft, endDrag, startDrag };
+}
+
+function createConnectorDraftSettings(args: {
+  curveDraft: CalloutCurveSettings | null;
+  lineBaseDrag: ReturnType<typeof useCalloutEdgeDrag>;
+  settings: CalloutSettings;
+  tailBaseRange: ReturnType<typeof useCalloutTailBaseRange>;
+  tailFrameDrag: ReturnType<typeof useCalloutEdgeDrag>;
+  waypointDrag: ReturnType<typeof useCalloutWaypointDrag>;
+}): CalloutSettings {
+  return {
+    ...args.settings,
+    style: args.curveDraft
+      ? {
+          ...args.settings.style,
+          connector: { ...args.settings.style.connector, curve: args.curveDraft },
+        }
+      : args.settings.style,
+    placement: {
+      ...args.settings.placement,
+      ...(args.lineBaseDrag.draftAttachment || args.tailFrameDrag.draftAttachment
+        ? {
+            connectorAttachments: {
+              block: args.lineBaseDrag.draftAttachment ??
+                args.settings.placement.connectorAttachments?.block ?? { mode: 'auto' as const },
+              frame: args.tailFrameDrag.draftAttachment ??
+                args.settings.placement.connectorAttachments?.frame ?? { mode: 'auto' as const },
+            },
+          }
+        : {}),
+      ...(args.tailBaseRange.draftSettings
+        ? {
+            connectorBasePosition: args.tailBaseRange.draftSettings.tailBasePosition,
+            connectorBaseWidth: args.tailBaseRange.draftSettings.tailBaseWidth,
+          }
+        : {}),
+      ...(args.lineBaseDrag.draftPosition === null
+        ? {}
+        : { connectorBasePosition: args.lineBaseDrag.draftPosition }),
+      ...(args.tailFrameDrag.draftPosition === null
+        ? {}
+        : { connectorFramePosition: args.tailFrameDrag.draftPosition }),
+      ...(args.waypointDrag.draftPosition === null
+        ? {}
+        : { connectorWaypoint: args.waypointDrag.draftPosition }),
+    },
+  };
+}
+
 function useCalloutConnectorDrafts(args: {
   baseLayout: ReturnType<typeof getCalloutLayoutState>;
   frameRect: FrameRect;
   isEditing: boolean;
   onTailBaseRangeChange: InteractionArgs['onTailBaseRangeChange'];
   onTailFramePositionChange: InteractionArgs['onTailFramePositionChange'];
+  onCurveChange: InteractionArgs['onCurveChange'];
   onWaypointChange: InteractionArgs['onWaypointChange'];
   settings: CalloutSettings;
   wrapperRef: InteractionArgs['wrapperRef'];
@@ -183,9 +283,13 @@ function useCalloutConnectorDrafts(args: {
   const connectorSide = args.baseLayout.dynamicTail?.side ?? null;
   const bubbleRect = { ...args.baseLayout.calloutPos, ...args.baseLayout.calloutDimensions };
   const titleRect = args.wrapperRef.current
-    ?.querySelector<HTMLElement>('[data-sniptale-callout-title="true"]')
+    ?.querySelector<HTMLElement>('[data-sniptale-callout-title-shell="true"]')
     ?.getBoundingClientRect();
   const bubbleAnchorPositions = getCalloutPerimeterAnchorPositions(
+    bubbleRect,
+    getCalloutSectionAnchorGuides(bubbleRect, titleRect ?? null)
+  );
+  const bubbleAnchors = getCalloutPerimeterAnchors(
     bubbleRect,
     getCalloutSectionAnchorGuides(bubbleRect, titleRect ?? null)
   );
@@ -208,7 +312,8 @@ function useCalloutConnectorDrafts(args: {
       }
     ),
     isEditing: args.isEditing,
-    onPositionChange: (position) => args.onTailBaseRangeChange(position, 0),
+    onPositionChange: (position, attachment) => args.onTailBaseRangeChange(position, 0, attachment),
+    perimeterAnchors: bubbleAnchors,
     perimeterAnchorPositions: bubbleAnchorPositions,
     perimeter: true,
     position: args.settings.placement.connectorBasePosition,
@@ -229,6 +334,7 @@ function useCalloutConnectorDrafts(args: {
           ),
     isEditing: args.isEditing,
     onPositionChange: args.onTailFramePositionChange,
+    perimeterAnchors: getCalloutPerimeterAnchors(args.frameRect),
     perimeter: args.baseLayout.dynamicTail?.kind === 'line',
     position: args.settings.placement.connectorFramePosition,
   });
@@ -245,33 +351,30 @@ function useCalloutConnectorDrafts(args: {
     position: args.settings.placement.connectorWaypoint,
     snapPoints: lineState ? [lineState.routePoints[0]!, lineState.routePoints.at(-1)!] : [],
   });
-  const settings: CalloutSettings = {
-    ...args.settings,
-    placement: {
-      ...args.settings.placement,
-      ...(tailBaseRange.draftSettings
-        ? {
-            connectorBasePosition: tailBaseRange.draftSettings.tailBasePosition,
-            connectorBaseWidth: tailBaseRange.draftSettings.tailBaseWidth,
-          }
-        : {}),
-      ...(lineBaseDrag.draftPosition === null
-        ? {}
-        : { connectorBasePosition: lineBaseDrag.draftPosition }),
-      ...(tailFrameDrag.draftPosition === null
-        ? {}
-        : { connectorFramePosition: tailFrameDrag.draftPosition }),
-      ...(waypointDrag.draftPosition === null
-        ? {}
-        : { connectorWaypoint: waypointDrag.draftPosition }),
-    },
-  };
+  const curveDrafts = useCalloutCurveDrafts({
+    curve: args.settings.style.connector.curve,
+    isEditing: args.isEditing,
+    lineState,
+    onCurveChange: args.onCurveChange,
+  });
+  const settings = createConnectorDraftSettings({
+    curveDraft: curveDrafts.draft,
+    lineBaseDrag,
+    settings: args.settings,
+    tailBaseRange,
+    tailFrameDrag,
+    waypointDrag,
+  });
   return {
     hasDraft:
       tailBaseRange.hasDraft ||
       lineBaseDrag.draftPosition !== null ||
       tailFrameDrag.draftPosition !== null ||
-      waypointDrag.draftPosition !== null,
+      waypointDrag.draftPosition !== null ||
+      curveDrafts.startDrag.draftOffset !== null ||
+      curveDrafts.endDrag.draftOffset !== null,
+    curveEndDrag: curveDrafts.endDrag,
+    curveStartDrag: curveDrafts.startDrag,
     lineBaseDrag,
     settings,
     tailBaseRange,
@@ -301,6 +404,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
     isEditing: args.isEditing,
     onTailBaseRangeChange: args.onTailBaseRangeChange,
     onTailFramePositionChange: args.onTailFramePositionChange,
+    onCurveChange: args.onCurveChange,
     onWaypointChange: args.onWaypointChange,
     settings: placement.settings,
     wrapperRef: args.wrapperRef,
@@ -311,16 +415,20 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
   if (layout.dynamicTail) previousConnectorSideRef.current = layout.dynamicTail.side;
 
   return {
-    drag: placement.drag,
     effectiveSettings: connector.settings,
     layout,
-    tailBaseEndDrag: connector.tailBaseRange.endDrag,
-    tailBaseStartDrag:
-      baseLayout.dynamicTail?.kind === 'line'
-        ? connector.lineBaseDrag
-        : connector.tailBaseRange.startDrag,
-    tailFrameDrag: connector.tailFrameDrag,
-    waypointDrag: connector.waypointDrag,
-    widthResize: placement.widthResize,
+    handles: {
+      curveEndDrag: connector.curveEndDrag,
+      curveStartDrag: connector.curveStartDrag,
+      drag: placement.drag,
+      tailBaseEndDrag: connector.tailBaseRange.endDrag,
+      tailBaseStartDrag:
+        baseLayout.dynamicTail?.kind === 'line'
+          ? connector.lineBaseDrag
+          : connector.tailBaseRange.startDrag,
+      tailFrameDrag: connector.tailFrameDrag,
+      waypointDrag: connector.waypointDrag,
+      widthResize: placement.widthResize,
+    },
   };
 }

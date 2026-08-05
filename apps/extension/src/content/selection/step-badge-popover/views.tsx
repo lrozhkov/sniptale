@@ -2,7 +2,6 @@ import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import {
   ProductGlassInput,
   ProductGlassMiniButton,
-  ProductGlassRange,
   ProductGlassRow,
   ProductGlassSwitch,
   ProductGlassToggleRow,
@@ -11,9 +10,7 @@ import { translate } from '../../../platform/i18n';
 import type {
   StepBadgeAnchor,
   StepBadgeSettings,
-  StepBadgeSizeLevel,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import { SIZE_LEVEL_DEFAULT, SIZE_LEVEL_MAX, SIZE_LEVEL_MIN } from './helpers';
 import { StepBadgeAnchorGrid } from './anchor-grid';
 import { StepBadgeAutoFields } from './auto-fields';
 import { dispatchStepBadgeReorder } from '../../platform/page-context/frame-events';
@@ -59,29 +56,6 @@ function StepBadgeReorderButton(props: {
     >
       {props.label}
     </ProductGlassMiniButton>
-  );
-}
-
-export function StepBadgeSizeSection(props: {
-  onSizeLevelChange: (sizeLevel: StepBadgeSizeLevel) => void;
-  sizeLevel: StepBadgeSizeLevel | undefined;
-}) {
-  return (
-    <ContentPopoverSection
-      title={translate('content.stepBadge.sizeSection')}
-      dataUi="content.step-badge.size-section"
-    >
-      <ProductGlassRange
-        type="range"
-        min={SIZE_LEVEL_MIN}
-        max={SIZE_LEVEL_MAX}
-        step={1}
-        value={props.sizeLevel ?? SIZE_LEVEL_DEFAULT}
-        onChange={(event) =>
-          props.onSizeLevelChange(Number(event.target.value) as StepBadgeSizeLevel)
-        }
-      />
-    </ContentPopoverSection>
   );
 }
 

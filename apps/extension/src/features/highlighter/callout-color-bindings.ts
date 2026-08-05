@@ -1,4 +1,5 @@
 import type {
+  CalloutBadgeColorSource,
   CalloutColorSource,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
@@ -15,6 +16,17 @@ export function getCalloutFrameColors(
     borderColor: frameStyle?.color,
     fillColor: (frameStyle?.fillOpacity ?? 0) > 0 ? frameStyle?.fillColor : undefined,
   };
+}
+
+function resolveBadgeColor(
+  source: CalloutBadgeColorSource,
+  customColor: string,
+  frameColors: CalloutFrameColors,
+  accentColor: string
+) {
+  return source === 'accent'
+    ? accentColor
+    : resolveCalloutBoundColor(source, customColor, frameColors);
 }
 
 export function resolveCalloutBoundColor(
@@ -37,11 +49,37 @@ export function resolveCalloutColorBindings(
     surfaceBackground: 'custom',
     surfaceBorder: 'custom',
   };
+  const accentColor = resolveCalloutBoundColor(
+    colorBindings.accent,
+    style.accentEdge.color,
+    frameColors
+  );
   return {
     ...style,
     accentEdge: {
       ...style.accentEdge,
-      color: resolveCalloutBoundColor(colorBindings.accent, style.accentEdge.color, frameColors),
+      color: accentColor,
+    },
+    badge: {
+      ...style.badge,
+      backgroundColor: resolveBadgeColor(
+        style.badge.backgroundColorSource,
+        style.badge.backgroundColor,
+        frameColors,
+        accentColor
+      ),
+      borderColor: resolveBadgeColor(
+        style.badge.borderColorSource,
+        style.badge.borderColor,
+        frameColors,
+        accentColor
+      ),
+      textColor: resolveBadgeColor(
+        style.badge.textColorSource,
+        style.badge.textColor,
+        frameColors,
+        accentColor
+      ),
     },
     colorBindings,
     connector: {

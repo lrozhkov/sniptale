@@ -1,9 +1,12 @@
 export type EffectMode = 'border' | 'blur' | 'focus';
 
 export type {
+  AppliedBorderSettings,
   BorderPadding,
   BorderPreset,
   BorderPresetOrigin,
+  BorderVisualStyle,
+  BorderVisualStylePatch,
   SystemBorderPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import type { BorderPreset } from '@sniptale/runtime-contracts/highlighter/border-preset';

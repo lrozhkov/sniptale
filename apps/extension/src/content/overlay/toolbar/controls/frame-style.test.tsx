@@ -21,10 +21,28 @@ vi.mock('../../../selection/frame-settings-popover', () => ({
   },
 }));
 
-vi.mock('./future-callout', () => ({
-  FutureCalloutSettingsPopover: (props: Record<string, unknown>) => {
-    popoverMocks.calloutProps = props;
-    return <div data-ui="future-callout-popover" />;
+vi.mock('./future-callout-control', () => ({
+  FutureCalloutControl: (props: {
+    actions: { enable: () => unknown; set: (settings: unknown) => void };
+    menu: ReturnType<typeof useToolbarMenuState>;
+    setStyle: React.Dispatch<React.SetStateAction<ToolbarFutureFrameStyle>>;
+    style: ToolbarFutureFrameStyle;
+  }) => {
+    const settings = props.style.futureCallout;
+    popoverMocks.calloutProps = settings
+      ? { isOpen: props.menu.activeMenuType === 'future-callout', settings }
+      : null;
+    return (
+      <button
+        aria-pressed={settings != null}
+        data-ui="content.toolbar.future-frame-callout"
+        onClick={() => {
+          const next = props.actions.enable();
+          props.setStyle((current) => ({ ...current, futureCallout: next as never }));
+          props.menu.setActiveMenuType('future-callout');
+        }}
+      />
+    );
   },
 }));
 

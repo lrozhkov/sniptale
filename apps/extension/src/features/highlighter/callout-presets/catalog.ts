@@ -12,9 +12,16 @@ type SystemCalloutPreset = CalloutPreset & {
   systemPresetKey: SystemCalloutPresetKey;
 };
 
-export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 5;
+export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 6;
 
-const DEFAULT_PRESET_PLACEMENT = { anchor: 'top-center', side: 'top' } as const;
+const DEFAULT_PRESET_PLACEMENT = {
+  anchor: 'top-center',
+  connectorAttachments: {
+    block: { mode: 'auto' },
+    frame: { mode: 'auto' },
+  },
+  side: 'top',
+} as const;
 
 const baseStyle: CalloutVisualStyle = {
   accentEdge: {
@@ -23,6 +30,22 @@ const baseStyle: CalloutVisualStyle = {
     lineStyle: 'solid',
     side: 'left',
     width: 4,
+  },
+  badge: {
+    backgroundColor: '#f97316',
+    backgroundColorSource: 'accent',
+    borderColor: 'transparent',
+    borderColorSource: 'custom',
+    borderWidth: 0,
+    enabled: false,
+    fontSize: 11,
+    fontWeight: 'bold',
+    placement: 'title-start',
+    shape: 'rounded',
+    size: 20,
+    text: '1',
+    textColor: '#ffffff',
+    textColorSource: 'custom',
   },
   colorBindings: {
     accent: 'custom',
@@ -34,11 +57,19 @@ const baseStyle: CalloutVisualStyle = {
     blockMarker: 'none',
     blockMarkerSize: 10,
     color: '#334155',
+    cornerStyle: { kind: 'sharp', radius: 8 },
+    curve: { curvature: 0.35, mode: 'auto' },
     frameMarker: 'none',
     frameMarkerSize: 10,
     kind: 'none',
     lineStyle: 'solid',
     routing: 'straight',
+    spacing: {
+      blockGap: 0,
+      frameGap: 0,
+      minimumEndSegment: 16,
+      obstacleMargin: 0,
+    },
     wedgeSize: 8,
     width: 2,
   },
@@ -61,37 +92,73 @@ const baseStyle: CalloutVisualStyle = {
     dividerStyle: 'solid',
     dividerWidth: 0,
     enabled: false,
+    direction: 'auto',
+    fontFamily: 'sans',
     fontSize: 13,
+    fontStyle: 'normal',
     fontWeight: 'bold',
+    letterSpacing: 0,
+    lineHeight: 1.2,
+    textAlign: 'left',
+    textDecoration: 'none',
     textColor: '#FFFFFF',
   },
   typography: {
+    direction: 'auto',
     fontFamily: 'sans',
     fontSize: 14,
     fontStyle: 'normal',
     fontWeight: 'normal',
+    hyphens: 'none',
+    letterSpacing: 0,
+    lineHeight: 1.4,
     maxWidth: 220,
     textAlign: 'left',
     textDecoration: 'none',
+    wordBreak: 'normal',
   },
 };
 
 export function cloneCalloutVisualStyle(style: CalloutVisualStyle): CalloutVisualStyle {
   return {
-    accentEdge: { ...style.accentEdge },
-    colorBindings: { ...style.colorBindings },
-    connector: { ...style.connector },
-    customCss: style.customCss,
-    surface: { ...style.surface },
-    title: { ...style.title },
-    typography: { ...style.typography },
+    accentEdge: { ...baseStyle.accentEdge, ...style.accentEdge },
+    badge: { ...baseStyle.badge, ...style.badge },
+    colorBindings: { ...baseStyle.colorBindings, ...style.colorBindings },
+    connector: {
+      ...baseStyle.connector,
+      ...style.connector,
+      cornerStyle: { ...baseStyle.connector.cornerStyle, ...style.connector?.cornerStyle },
+      curve: {
+        ...baseStyle.connector.curve,
+        ...style.connector?.curve,
+        ...(style.connector?.curve?.startHandle
+          ? { startHandle: { ...style.connector.curve.startHandle } }
+          : {}),
+        ...(style.connector?.curve?.endHandle
+          ? { endHandle: { ...style.connector.curve.endHandle } }
+          : {}),
+      },
+      spacing: { ...baseStyle.connector.spacing, ...style.connector?.spacing },
+    },
+    customCss: style.customCss ?? baseStyle.customCss,
+    surface: { ...baseStyle.surface, ...style.surface },
+    title: { ...baseStyle.title, ...style.title },
+    typography: { ...baseStyle.typography, ...style.typography },
   };
 }
 
 export function cloneCalloutPreset(preset: CalloutPreset): CalloutPreset {
+  const connectorAttachments =
+    preset.placement.connectorAttachments ?? DEFAULT_PRESET_PLACEMENT.connectorAttachments;
   return {
     ...preset,
-    placement: { ...preset.placement },
+    placement: {
+      ...preset.placement,
+      connectorAttachments: {
+        block: { ...connectorAttachments.block },
+        frame: { ...connectorAttachments.frame },
+      },
+    },
     style: cloneCalloutVisualStyle(preset.style),
   };
 }

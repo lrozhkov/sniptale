@@ -93,6 +93,10 @@ it('updates the default position and saves it with the live preset preview', asy
   expect(onSave).toHaveBeenCalledOnce();
   expect(onSave.mock.calls[0]?.[0].placement).toEqual({
     anchor: 'bottom-right',
+    connectorAttachments: {
+      block: { mode: 'auto' },
+      frame: { mode: 'auto' },
+    },
     side: 'bottom',
   });
   await act(async () => root.unmount());

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { StepBadgeAnchor, StepBadgeSettings } from '../../../features/highlighter/contracts';
 import { resolveBorderShadowVisual } from '../../../features/highlighter/style';
+import { resolveStepBadgeVisualStyle } from '../../../features/highlighter/step-badge-presets/style';
 import { getStepBadgeVisualMetrics } from './placement';
 
 const ANCHOR_POSITIONS: Record<
@@ -64,6 +65,8 @@ function getManualPosition(settings: StepBadgeSettings) {
 export function getStepBadgeStyle(props: {
   borderColor: string;
   borderWidth: number;
+  fillColor?: string;
+  fillOpacity?: number;
   settings: StepBadgeSettings;
   shadow?: number;
   zIndex: number;
@@ -75,6 +78,12 @@ export function getStepBadgeStyle(props: {
     props.settings,
     props.borderWidth
   );
+  const visualStyle = resolveStepBadgeVisualStyle(props.settings, {
+    borderColor: props.borderColor,
+    borderWidth: props.borderWidth,
+    ...(props.fillColor ? { fillColor: props.fillColor } : {}),
+    ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
+  });
   const manualPosition = getManualPosition(props.settings);
   const position = manualPosition ?? ANCHOR_POSITIONS[anchor];
   const shadowVisual =
@@ -87,8 +96,8 @@ export function getStepBadgeStyle(props: {
     minWidth: `${badgeSize}px`,
     minHeight: `${badgeSize}px`,
     borderRadius: '50%',
-    backgroundColor: props.borderColor,
-    color: 'var(--sniptale-color-text-inverse)',
+    backgroundColor: visualStyle.backgroundColor,
+    color: visualStyle.textColor,
     fontSize: `${fontSize}px`,
     fontWeight: 'bold',
     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -100,7 +109,7 @@ export function getStepBadgeStyle(props: {
     pointerEvents: 'auto',
     cursor: props.clickable ? 'pointer' : 'default',
     boxShadow: shadowVisual?.stepBadgeBoxShadow,
-    border: '2px solid var(--sniptale-color-surface-base)',
+    border: `2px solid ${visualStyle.outlineColor}`,
     userSelect: 'none',
     WebkitUserSelect: 'none',
     transition: props.isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.15s ease-out',

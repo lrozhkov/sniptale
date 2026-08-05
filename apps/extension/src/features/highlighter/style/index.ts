@@ -2,8 +2,10 @@ export type {
   BlurSettings,
   BlurStrokeStyle,
   BlurType,
+  AppliedBorderSettings,
   BorderPadding,
   BorderPreset,
+  BorderVisualStyle,
   EffectMode,
   FocusSettings,
 } from '@sniptale/ui/highlighter-style/types';

@@ -1,6 +1,6 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FocusSettings,
   FrameData,
@@ -13,7 +13,10 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameSessionSnapshot, SerializableFrameData } from './types';
 import { cloneCalloutVisualStyle } from '../../../../features/highlighter/callout-presets/catalog';
-import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import {
+  cloneAppliedBorderSettings,
+  normalizeAppliedBorderSettings,
+} from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 function cloneHistoryCalloutSettings(settings: CalloutSettings): CalloutSettings {
   return {
@@ -39,10 +42,7 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
     ...(frame.blurSettings ? { blurSettings: { ...frame.blurSettings } } : {}),
     ...(frame.borderSettings
       ? {
-          borderSettings: {
-            ...frame.borderSettings,
-            padding: { ...frame.borderSettings.padding },
-          },
+          borderSettings: cloneAppliedBorderSettings(frame.borderSettings),
         }
       : {}),
     ...(frame.callout
@@ -65,6 +65,7 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
           stepBadge: {
             ...frame.stepBadge,
             offsetDirections: [...(frame.stepBadge.offsetDirections ?? [])],
+            ...(frame.stepBadge.style ? { style: { ...frame.stepBadge.style } } : {}),
             ...(frame.stepBadge.manualPlacement
               ? { manualPlacement: { ...frame.stepBadge.manualPlacement } }
               : {}),
@@ -78,7 +79,7 @@ export function captureFrameSessionSnapshot(args: {
   frames: FrameData[];
   globalEffectMode: EffectMode;
   globalStepBadgeSettings: GlobalStepBadgeSettings;
-  sessionBorderPreset: BorderPreset;
+  sessionBorderPreset: AppliedBorderSettings;
   sessionBlurSettings: BlurSettings;
   sessionCalloutStyle: CalloutVisualStyle | null;
   sessionFocusSettings: FocusSettings;
@@ -89,7 +90,7 @@ export function captureFrameSessionSnapshot(args: {
     frames: args.frames.map(cloneFrameSettings),
     globalEffectMode: args.globalEffectMode,
     globalStepBadgeSettings: { ...args.globalStepBadgeSettings },
-    sessionBorderPreset: cloneBorderPreset(args.sessionBorderPreset),
+    sessionBorderPreset: cloneAppliedBorderSettings(args.sessionBorderPreset),
     sessionBlurSettings: { ...args.sessionBlurSettings },
     sessionCalloutStyle: args.sessionCalloutStyle
       ? cloneCalloutVisualStyle(args.sessionCalloutStyle)
@@ -99,6 +100,9 @@ export function captureFrameSessionSnapshot(args: {
       ? {
           ...args.sessionStepBadgeTemplate,
           offsetDirections: [...(args.sessionStepBadgeTemplate.offsetDirections ?? [])],
+          ...(args.sessionStepBadgeTemplate.style
+            ? { style: { ...args.sessionStepBadgeTemplate.style } }
+            : {}),
           ...(args.sessionStepBadgeTemplate.manualPlacement
             ? { manualPlacement: { ...args.sessionStepBadgeTemplate.manualPlacement } }
             : {}),
@@ -113,7 +117,12 @@ export function hydrateFrameSessionSnapshot(snapshot: FrameSessionSnapshot): {
   stepBadgeOrder: Map<string, number>;
 } {
   return {
-    frames: snapshot.frames.map((frame) => cloneFrameSettings(frame)),
+    frames: snapshot.frames.map((frame) => ({
+      ...cloneFrameSettings(frame),
+      ...(frame.borderSettings
+        ? { borderSettings: normalizeAppliedBorderSettings(frame.borderSettings) }
+        : {}),
+    })),
     stepBadgeOrder: new Map(snapshot.stepBadgeOrder),
   };
 }

@@ -170,6 +170,140 @@ it('preserves the explicit angled connector routing mode', () => {
   expect(parsed.value.userPresets?.[0]?.style.connector.routing).toBe('polyline');
 });
 
+it('defaults new connector, typography, badge, and attachment fields for older catalogs', () => {
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  const legacyStyle = {
+    ...preset.style,
+    badge: undefined,
+    connector: {
+      ...preset.style.connector,
+      cornerStyle: undefined,
+      curve: undefined,
+      spacing: undefined,
+    },
+    title: {
+      ...preset.style.title,
+      direction: undefined,
+      fontFamily: undefined,
+      letterSpacing: undefined,
+      lineHeight: undefined,
+    },
+    typography: {
+      ...preset.style.typography,
+      direction: undefined,
+      hyphens: undefined,
+      letterSpacing: undefined,
+      lineHeight: undefined,
+      wordBreak: undefined,
+    },
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-old-next-stage',
+        name: 'Old',
+        placement: { anchor: preset.placement.anchor, side: preset.placement.side },
+        style: legacyStyle,
+      },
+    ],
+  });
+  const migrated = parsed.value.userPresets?.[0];
+
+  expect(migrated).toBeDefined();
+  expect(migrated!.placement!.connectorAttachments).toEqual({
+    block: { mode: 'auto' },
+    frame: { mode: 'auto' },
+  });
+  expect(migrated?.style.connector).toMatchObject({
+    cornerStyle: { kind: 'sharp', radius: 8 },
+    curve: { curvature: 0.35, mode: 'auto' },
+    spacing: { blockGap: 0, frameGap: 0, minimumEndSegment: 16, obstacleMargin: 0 },
+  });
+  expect(migrated?.style.typography).toMatchObject({
+    direction: 'auto',
+    hyphens: 'none',
+    letterSpacing: 0,
+    lineHeight: 1.4,
+    wordBreak: 'normal',
+  });
+  expect(migrated?.style.badge.enabled).toBe(false);
+});
+
+it('round-trips valid curve, attachment, and badge settings', () => {
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        ...preset,
+        id: 'user-next-stage',
+        placement: {
+          ...preset.placement,
+          connectorAttachments: {
+            block: { anchorId: 'title-right', mode: 'anchor', perimeterPosition: 0.2 },
+            frame: { mode: 'free', perimeterPosition: 0.8 },
+          },
+        },
+        style: {
+          ...preset.style,
+          badge: { ...preset.style.badge, enabled: true, text: 'A' },
+          connector: {
+            ...preset.style.connector,
+            curve: {
+              curvature: 0.7,
+              endHandle: { x: 12, y: -8 },
+              mode: 'manual',
+              startHandle: { x: -10, y: 14 },
+            },
+            routing: 'curve',
+          },
+        },
+      },
+    ],
+  });
+
+  expect(parsed).toMatchObject({ hasInvalidRoot: false, invalidFieldCount: 0 });
+  expect(parsed.value.userPresets?.[0]).toMatchObject({
+    placement: {
+      connectorAttachments: {
+        block: { anchorId: 'title-right', mode: 'anchor', perimeterPosition: 0.2 },
+        frame: { mode: 'free', perimeterPosition: 0.8 },
+      },
+    },
+    style: {
+      badge: { enabled: true, text: 'A' },
+      connector: { curve: { mode: 'manual' }, routing: 'curve' },
+    },
+  });
+});
+
+it.each([
+  ['non-object container', 'invalid'],
+  ['unknown attachment mode', { block: { mode: 'unknown' }, frame: { mode: 'auto' } }],
+  [
+    'out-of-range perimeter position',
+    { block: { mode: 'auto' }, frame: { mode: 'free', perimeterPosition: 2 } },
+  ],
+  [
+    'oversized anchor id',
+    { block: { anchorId: 'x'.repeat(65), mode: 'anchor' }, frame: { mode: 'auto' } },
+  ],
+])('rejects a malformed present connector attachment: %s', (_label, connectorAttachments) => {
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      {
+        id: 'user-invalid-attachment',
+        name: 'Invalid attachment',
+        placement: { ...preset.placement, connectorAttachments },
+        style: preset.style,
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets).toEqual([]);
+});
+
 it('parses the explicit system customization marker and its source revision', () => {
   const preset = createSystemCalloutPresetCatalog()[0]!;
   const parsed = parseStoredCalloutPresetCatalog({

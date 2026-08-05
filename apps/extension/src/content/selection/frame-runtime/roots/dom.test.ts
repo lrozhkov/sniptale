@@ -23,11 +23,10 @@ function createFrame(id: string): FrameData {
       customCss: '',
       fillColor: '#ffffff',
       fillOpacity: 0,
-      id: 'border',
+      sourcePresetId: 'border',
       inheritCustomCss: false,
-      name: 'Default Border',
+      sourcePresetName: 'Default Border',
       opacity: 1,
-      order: 0,
       padding: { bottom: 0, left: 0, right: 0, top: 0 },
       radius: 6,
       shadow: 0,
@@ -114,6 +113,35 @@ function expectStepBadgePlacementChangesInvalidateDescriptors() {
   };
   const changedFrame = structuredClone(initialFrame);
   changedFrame.stepBadge!.manualPlacement = { position: 0.75, side: 'bottom' };
+  const frameStates = createFrameStates([['frame-1', 'idle']]);
+
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([initialFrame], frameStates),
+      buildFrameRenderDescriptors([changedFrame], frameStates)
+    )
+  ).toBe(false);
+}
+
+function expectStepBadgeStyleChangesInvalidateDescriptors() {
+  const initialFrame = createFrame('frame-1');
+  initialFrame.stepBadge = {
+    enabled: true,
+    style: {
+      backgroundColor: '#ffffff',
+      backgroundColorSource: 'custom',
+      diameter: 28,
+      outlineColor: '#111111',
+      outlineColorSource: 'custom',
+      sizeSource: 'custom',
+      textColor: '#111111',
+      textColorSource: 'custom',
+    },
+    type: 'number',
+    value: '1',
+  };
+  const changedFrame = structuredClone(initialFrame);
+  changedFrame.stepBadge!.style!.diameter = 40;
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   expect(
@@ -269,6 +297,10 @@ describe('frame-roots-renderer-dom descriptors', () => {
   it(
     'treats manual step-badge placement as render invalidation',
     expectStepBadgePlacementChangesInvalidateDescriptors
+  );
+  it(
+    'treats step-badge visual style changes as render invalidation',
+    expectStepBadgeStyleChangesInvalidateDescriptors
   );
   it(
     'treats tail-base position and width changes as render invalidation',

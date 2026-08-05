@@ -21,6 +21,120 @@ interface InteractiveFrameCalloutOverlayProps {
   onUpdate: (frame: FrameData) => void;
 }
 
+function createCalloutActions(args: {
+  apply: (callout: NonNullable<FrameData['callout']>) => void;
+  callout: NonNullable<FrameData['callout']>;
+  frameId: string;
+  props: InteractiveFrameCalloutOverlayProps;
+  toggleSettings: (frameId: string, popover: 'callout-settings') => void;
+}): Pick<
+  React.ComponentProps<typeof Callout>,
+  | 'onContentChange'
+  | 'onCurveChange'
+  | 'onDelete'
+  | 'onPositionChange'
+  | 'onSettingsClick'
+  | 'onStartEditing'
+  | 'onStopEditing'
+  | 'onTailBaseRangeChange'
+  | 'onTailFramePositionChange'
+  | 'onTitleChange'
+  | 'onWaypointChange'
+  | 'onWidthChange'
+> {
+  const { apply, callout } = args;
+  return {
+    onStartEditing: () => args.props.setIsCalloutEditing(true),
+    onStopEditing: () => args.props.setIsCalloutEditing(false),
+    onContentChange: (bodyHtml) => apply({ ...callout, content: { ...callout.content, bodyHtml } }),
+    onTitleChange: (titleText) => apply({ ...callout, content: { ...callout.content, titleText } }),
+    onDelete: () => {
+      apply({ ...callout, enabled: false });
+      args.props.setIsCalloutEditing(false);
+    },
+    onSettingsClick: () => args.toggleSettings(args.frameId, 'callout-settings'),
+    onPositionChange: (manualPlacement, behavior) =>
+      apply({
+        ...callout,
+        placement: {
+          ...callout.placement,
+          manualPlacement,
+          connectorBasePosition: behavior.connectorBasePosition,
+          connectorBaseWidth: behavior.connectorBaseWidth,
+          connectorFramePosition: behavior.connectorFramePosition,
+          connectorWaypoint: behavior.connectorWaypoint,
+          ...(behavior.translateConnectorGeometry
+            ? {
+                connectorAttachments: {
+                  block:
+                    behavior.connectorBasePosition === undefined
+                      ? (callout.placement.connectorAttachments?.block ?? { mode: 'auto' })
+                      : {
+                          mode: 'free' as const,
+                          perimeterPosition: behavior.connectorBasePosition,
+                        },
+                  frame:
+                    behavior.connectorFramePosition === undefined
+                      ? (callout.placement.connectorAttachments?.frame ?? { mode: 'auto' })
+                      : {
+                          mode: 'free' as const,
+                          perimeterPosition: behavior.connectorFramePosition,
+                        },
+                },
+              }
+            : {}),
+        },
+      }),
+    onTailBaseRangeChange: (connectorBasePosition, connectorBaseWidth, attachment) =>
+      apply({
+        ...callout,
+        placement: {
+          ...callout.placement,
+          connectorAttachments: {
+            block: attachment ?? { mode: 'free', perimeterPosition: connectorBasePosition },
+            frame: callout.placement.connectorAttachments?.frame ?? { mode: 'auto' },
+          },
+          connectorBasePosition,
+          connectorBaseWidth,
+        },
+      }),
+    onTailFramePositionChange: (connectorFramePosition, attachment) =>
+      apply({
+        ...callout,
+        placement: {
+          ...callout.placement,
+          connectorAttachments: {
+            block: callout.placement.connectorAttachments?.block ?? { mode: 'auto' },
+            frame: attachment ?? { mode: 'free', perimeterPosition: connectorFramePosition },
+          },
+          connectorFramePosition,
+        },
+      }),
+    onWaypointChange: (connectorWaypoint) =>
+      apply({
+        ...callout,
+        placement: { ...callout.placement, connectorWaypoint },
+      }),
+    onCurveChange: (curve) =>
+      apply({
+        ...callout,
+        style: {
+          ...callout.style,
+          connector: { ...callout.style.connector, curve },
+        },
+      }),
+    onWidthChange: (maxWidth, manualPlacement) =>
+      apply({
+        ...callout,
+        placement: { ...callout.placement, manualPlacement },
+        style: {
+          ...callout.style,
+          typography: { ...callout.style.typography, maxWidth },
+        },
+      }),
+  };
+}
+
 /** Renders the editable callout overlay and keeps its update/delete behavior local to the callout seam. */
 export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOverlayProps) {
   const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
@@ -63,70 +177,13 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
       isEditing={props.isCalloutEditing}
       isFrameEditing={props.isFrameEditing}
       isSettingsOpen={props.isCalloutPopoverOpen}
-      onStartEditing={() => props.setIsCalloutEditing(true)}
-      onStopEditing={() => props.setIsCalloutEditing(false)}
-      onContentChange={(htmlContent) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          content: { ...callout.content, bodyHtml: htmlContent },
-        });
-      }}
-      onTitleChange={(titleText) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          content: { ...callout.content, titleText },
-        });
-      }}
-      onDelete={() => {
-        applyCalloutFrameUpdate({ ...callout, enabled: false });
-        props.setIsCalloutEditing(false);
-      }}
-      onSettingsClick={() => toggleQuickPopover(props.frame.id, 'callout-settings')}
-      onPositionChange={(manualPlacement, behavior) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          placement: {
-            ...callout.placement,
-            manualPlacement,
-            connectorBasePosition: behavior.connectorBasePosition,
-            connectorBaseWidth: behavior.connectorBaseWidth,
-            connectorFramePosition: behavior.connectorFramePosition,
-            connectorWaypoint: behavior.connectorWaypoint,
-          },
-        });
-      }}
-      onTailBaseRangeChange={(tailBasePosition, tailBaseWidth) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          placement: {
-            ...callout.placement,
-            connectorBasePosition: tailBasePosition,
-            connectorBaseWidth: tailBaseWidth,
-          },
-        });
-      }}
-      onTailFramePositionChange={(tailFramePosition) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          placement: { ...callout.placement, connectorFramePosition: tailFramePosition },
-        });
-      }}
-      onWaypointChange={(connectorWaypoint) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          placement: { ...callout.placement, connectorWaypoint },
-        });
-      }}
-      onWidthChange={(maxWidth, manualPlacement) => {
-        applyCalloutFrameUpdate({
-          ...callout,
-          placement: { ...callout.placement, manualPlacement },
-          style: {
-            ...callout.style,
-            typography: { ...callout.style.typography, maxWidth },
-          },
-        });
-      }}
+      {...createCalloutActions({
+        apply: applyCalloutFrameUpdate,
+        callout,
+        frameId: props.frame.id,
+        props,
+        toggleSettings: toggleQuickPopover,
+      })}
       settingsAnchorRef={props.calloutPopoverAnchorRef}
       showSettingsHandle={!isAnyFrameSelected}
     />

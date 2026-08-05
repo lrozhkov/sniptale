@@ -42,6 +42,7 @@ import {
   DEFAULT_FOCUS_SETTINGS,
 } from '../../../features/highlighter/style/defaults';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { translate } from '../../../platform/i18n';
 import { createBridgedMouseEvent } from '../../platform/trusted-events/synthetic-mouse';
 import { FrameSettingsPopover } from '.';
@@ -402,7 +403,7 @@ describe('FrameSettingsPopover preset selection', () => {
     });
 
     expect(onApplyToFrame).toHaveBeenCalledWith({
-      borderSettings: { ...DEFAULT_BORDER_PRESET },
+      borderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
     });
     expect(onClose).not.toHaveBeenCalled();
     expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
@@ -419,7 +420,7 @@ describe('FrameSettingsPopover preset selection', () => {
 
       renderPopover({
         effectMode,
-        borderSettings: { ...DEFAULT_BORDER_PRESET },
+        borderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
         onApplyToFrame,
         ...(effectMode === 'blur'
           ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: false } }

@@ -1,14 +1,19 @@
 // policyStateIds: [] - exact preset parser sets are immutable value allowlists, not authority state.
 import {
   SYSTEM_CALLOUT_PRESET_KEYS,
+  type CalloutAttachment,
   type CalloutAnchor,
+  type CalloutConnectorAttachments,
   type CalloutPreset,
   type CalloutVisualStyle,
   type SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
+import { parseCalloutVisualStyle } from './visual-style-parser';
 
-export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 3;
+export { parseCalloutVisualStyle } from './visual-style-parser';
+
+export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 4;
 export const MAX_USER_CALLOUT_PRESETS = 16;
 export const MAX_CALLOUT_PRESET_NAME_LENGTH = 64;
 
@@ -50,16 +55,7 @@ interface ParsedStoredCalloutPresetCatalog {
   value: StoredCalloutPresetCatalog;
 }
 
-const connectorKinds = new Set(['none', 'wedge', 'line']);
-const connectorRoutings = new Set(['straight', 'elbow', 'polyline']);
-const connectorMarkers = new Set(['none', 'circle', 'ring-dot', 'square', 'diamond', 'arrow']);
-const lineStyles = new Set(['solid', 'dashed', 'dotted']);
-const fontFamilies = new Set(['sans', 'serif', 'mono', 'cursive']);
-const fontStyles = new Set(['normal', 'italic']);
-const fontWeights = new Set(['normal', 'bold']);
-const textDecorations = new Set(['none', 'underline']);
-const textAlignments = new Set(['left', 'center', 'right', 'justify']);
-const colorSources = new Set(['custom', 'frame-border', 'frame-fill']);
+const attachmentModes = new Set(['auto', 'anchor', 'free']);
 const systemKeys = new Set<string>(SYSTEM_CALLOUT_PRESET_KEYS);
 const calloutAnchors = new Set<CalloutAnchor>([
   'middle-left',
@@ -72,7 +68,6 @@ const calloutAnchors = new Set<CalloutAnchor>([
   'middle-right',
 ]);
 const calloutSides = new Set(['top', 'bottom', 'left', 'right']);
-const accentSides = new Set(['top', 'right', 'bottom', 'left']);
 
 function getExpectedPresetSide(anchor: CalloutAnchor) {
   if (anchor === 'middle-left') return 'left';
@@ -80,52 +75,8 @@ function getExpectedPresetSide(anchor: CalloutAnchor) {
   return anchor.startsWith('bottom') ? 'bottom' : 'top';
 }
 
-function isConnectorMarker(
-  value: unknown
-): value is CalloutVisualStyle['connector']['blockMarker'] {
-  return isString(value) && connectorMarkers.has(value);
-}
-
-function isConnectorKind(value: unknown): value is CalloutVisualStyle['connector']['kind'] {
-  return isString(value) && connectorKinds.has(value);
-}
-
-function isConnectorRouting(value: unknown): value is CalloutVisualStyle['connector']['routing'] {
-  return isString(value) && connectorRoutings.has(value);
-}
-
-function isLineStyle(value: unknown): value is CalloutVisualStyle['connector']['lineStyle'] {
-  return isString(value) && lineStyles.has(value);
-}
-
-function isFontFamily(value: unknown): value is CalloutVisualStyle['typography']['fontFamily'] {
-  return isString(value) && fontFamilies.has(value);
-}
-
-function isFontWeight(value: unknown): value is CalloutVisualStyle['typography']['fontWeight'] {
-  return isString(value) && fontWeights.has(value);
-}
-
-function isFontStyle(value: unknown): value is CalloutVisualStyle['typography']['fontStyle'] {
-  return isString(value) && fontStyles.has(value);
-}
-
-function isTextDecoration(
-  value: unknown
-): value is CalloutVisualStyle['typography']['textDecoration'] {
-  return isString(value) && textDecorations.has(value);
-}
-
-function isTextAlignment(value: unknown): value is CalloutVisualStyle['typography']['textAlign'] {
-  return isString(value) && textAlignments.has(value);
-}
-
 function isSystemPresetKey(value: unknown): value is SystemCalloutPresetKey {
   return isString(value) && systemKeys.has(value);
-}
-
-function isColorSource(value: unknown): value is CalloutVisualStyle['colorBindings']['connector'] {
-  return isString(value) && colorSources.has(value);
 }
 
 export function parseCalloutPresetPlacement(value: unknown): CalloutPreset['placement'] | null {
@@ -139,10 +90,44 @@ export function parseCalloutPresetPlacement(value: unknown): CalloutPreset['plac
   ) {
     return null;
   }
+  const connectorAttachments = parseConnectorAttachments(value['connectorAttachments']);
+  if (connectorAttachments === null) return null;
   return {
     anchor: value['anchor'] as CalloutAnchor,
+    connectorAttachments,
     side: value['side'] as CalloutPreset['placement']['side'],
   };
+}
+
+function parseAttachment(value: unknown): CalloutAttachment | null {
+  if (!isPlainRecord(value) || !isString(value['mode']) || !attachmentModes.has(value['mode'])) {
+    return null;
+  }
+  const perimeterPosition = value['perimeterPosition'];
+  const anchorId = value['anchorId'];
+  if (
+    (perimeterPosition !== undefined && !isNumberInRange(perimeterPosition, 0, 1)) ||
+    (anchorId !== undefined && (!isString(anchorId) || anchorId.length > 64))
+  ) {
+    return null;
+  }
+  return {
+    mode: value['mode'] as NonNullable<
+      CalloutPreset['placement']['connectorAttachments']
+    >['frame']['mode'],
+    ...(isString(anchorId) ? { anchorId } : {}),
+    ...(isNumber(perimeterPosition) ? { perimeterPosition } : {}),
+  };
+}
+
+function parseConnectorAttachments(value: unknown): CalloutConnectorAttachments | null {
+  if (value === undefined) {
+    return { block: { mode: 'auto' as const }, frame: { mode: 'auto' as const } };
+  }
+  if (!isPlainRecord(value)) return null;
+  const block = parseAttachment(value['block']);
+  const frame = parseAttachment(value['frame']);
+  return block && frame ? { block, frame } : null;
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -151,177 +136,6 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isNumberInRange(value: unknown, minimum: number, maximum: number): value is number {
   return isNumber(value) && value >= minimum && value <= maximum;
-}
-
-function isNumberAtLeast(value: unknown, minimum: number): value is number {
-  return isNumber(value) && value >= minimum;
-}
-
-function isCalloutColor(value: unknown): value is string {
-  if (value === 'transparent') return true;
-  if (!isString(value) || (value.length !== 7 && value.length !== 9) || value[0] !== '#') {
-    return false;
-  }
-  const hexDigits = '0123456789abcdefABCDEF';
-  return [...value.slice(1)].every((character) => hexDigits.includes(character));
-}
-
-export function parseCalloutVisualStyle(value: unknown): CalloutVisualStyle | null {
-  if (!isPlainRecord(value)) return null;
-  const accentEdge = value['accentEdge'];
-  const connector = value['connector'];
-  const colorBindings = value['colorBindings'];
-  const customCss = value['customCss'] ?? '';
-  const surface = value['surface'];
-  const title = value['title'];
-  const typography = value['typography'];
-  const blockMarkerSize = isPlainRecord(connector) ? (connector['blockMarkerSize'] ?? 10) : null;
-  const frameMarkerSize = isPlainRecord(connector) ? (connector['frameMarkerSize'] ?? 10) : null;
-  const connectorLineStyle = isPlainRecord(connector) ? (connector['lineStyle'] ?? 'solid') : null;
-  const shadowColor = isPlainRecord(surface) ? (surface['shadowColor'] ?? '#000000') : null;
-  const borderStyle = isPlainRecord(surface) ? (surface['borderStyle'] ?? 'solid') : null;
-  const dividerColor = isPlainRecord(title) ? (title['dividerColor'] ?? 'transparent') : null;
-  const dividerStyle = isPlainRecord(title) ? (title['dividerStyle'] ?? 'solid') : null;
-  const dividerWidth = isPlainRecord(title) ? (title['dividerWidth'] ?? 0) : null;
-  const fontStyle = isPlainRecord(typography) ? (typography['fontStyle'] ?? 'normal') : null;
-  const textDecoration = isPlainRecord(typography)
-    ? (typography['textDecoration'] ?? 'none')
-    : null;
-  const textAlign = isPlainRecord(typography) ? (typography['textAlign'] ?? 'left') : null;
-  const connectorColorSource = isPlainRecord(colorBindings)
-    ? (colorBindings['connector'] ?? 'custom')
-    : 'custom';
-  const surfaceBackgroundColorSource = isPlainRecord(colorBindings)
-    ? (colorBindings['surfaceBackground'] ?? 'custom')
-    : 'custom';
-  const surfaceBorderColorSource = isPlainRecord(colorBindings)
-    ? (colorBindings['surfaceBorder'] ?? 'custom')
-    : 'custom';
-  const accentColorSource = isPlainRecord(colorBindings)
-    ? (colorBindings['accent'] ?? 'custom')
-    : 'custom';
-  const accentColor = isPlainRecord(accentEdge) ? (accentEdge['color'] ?? '#f97316') : '#f97316';
-  const accentEnabled = isPlainRecord(accentEdge) ? (accentEdge['enabled'] ?? false) : false;
-  const accentLineStyle = isPlainRecord(accentEdge)
-    ? (accentEdge['lineStyle'] ?? 'solid')
-    : 'solid';
-  const accentSide = isPlainRecord(accentEdge) ? (accentEdge['side'] ?? 'left') : 'left';
-  const accentWidth = isPlainRecord(accentEdge) ? (accentEdge['width'] ?? 4) : 4;
-  if (
-    !isColorSource(accentColorSource) ||
-    !isString(customCss) ||
-    customCss.length > 4_000 ||
-    !isCalloutColor(accentColor) ||
-    !isBoolean(accentEnabled) ||
-    !isLineStyle(accentLineStyle) ||
-    !isString(accentSide) ||
-    !accentSides.has(accentSide) ||
-    !isNumberInRange(accentWidth, 1, 12) ||
-    !isColorSource(connectorColorSource) ||
-    !isColorSource(surfaceBackgroundColorSource) ||
-    !isColorSource(surfaceBorderColorSource) ||
-    !isPlainRecord(connector) ||
-    !isConnectorMarker(connector['blockMarker']) ||
-    !isNumberInRange(blockMarkerSize, 4, 48) ||
-    !isCalloutColor(connector['color']) ||
-    !isConnectorMarker(connector['frameMarker']) ||
-    !isNumberInRange(frameMarkerSize, 4, 48) ||
-    !isConnectorKind(connector['kind']) ||
-    !isLineStyle(connectorLineStyle) ||
-    !isConnectorRouting(connector['routing']) ||
-    !isNumberInRange(connector['wedgeSize'], 4, 48) ||
-    !isNumberInRange(connector['width'], 1, 12) ||
-    !isPlainRecord(surface) ||
-    !isCalloutColor(surface['backgroundColor']) ||
-    !isCalloutColor(surface['borderColor']) ||
-    !isLineStyle(borderStyle) ||
-    !isNumberInRange(surface['borderWidth'], 0, 12) ||
-    !isNumberInRange(surface['paddingX'], 0, 48) ||
-    !isNumberInRange(surface['paddingY'], 0, 48) ||
-    !isNumberInRange(surface['radius'], 0, 64) ||
-    !isNumberInRange(surface['shadow'], 0, 100) ||
-    !isCalloutColor(shadowColor) ||
-    !isCalloutColor(surface['textColor']) ||
-    !isPlainRecord(title) ||
-    !isCalloutColor(title['backgroundColor']) ||
-    !isCalloutColor(dividerColor) ||
-    !isLineStyle(dividerStyle) ||
-    !isNumberInRange(dividerWidth, 0, 12) ||
-    !isBoolean(title['enabled']) ||
-    !isNumberInRange(title['fontSize'], 8, 144) ||
-    !isFontWeight(title['fontWeight']) ||
-    !isCalloutColor(title['textColor']) ||
-    !isPlainRecord(typography) ||
-    !isFontFamily(typography['fontFamily']) ||
-    !isNumberInRange(typography['fontSize'], 8, 72) ||
-    !isFontStyle(fontStyle) ||
-    !isFontWeight(typography['fontWeight']) ||
-    !isNumberAtLeast(typography['maxWidth'], 80) ||
-    !isTextAlignment(textAlign) ||
-    !isTextDecoration(textDecoration)
-  ) {
-    return null;
-  }
-
-  return {
-    accentEdge: {
-      color: accentColor,
-      enabled: accentEnabled,
-      lineStyle: accentLineStyle,
-      side: accentSide as CalloutVisualStyle['accentEdge']['side'],
-      width: accentWidth,
-    },
-    colorBindings: {
-      accent: accentColorSource,
-      connector: connectorColorSource,
-      surfaceBackground: surfaceBackgroundColorSource,
-      surfaceBorder: surfaceBorderColorSource,
-    },
-    connector: {
-      blockMarker: connector['blockMarker'],
-      blockMarkerSize,
-      color: connector['color'],
-      frameMarker: connector['frameMarker'],
-      frameMarkerSize,
-      kind: connector['kind'],
-      lineStyle: connectorLineStyle,
-      routing: connector['routing'],
-      wedgeSize: connector['wedgeSize'],
-      width: connector['width'],
-    },
-    customCss,
-    surface: {
-      backgroundColor: surface['backgroundColor'],
-      borderColor: surface['borderColor'],
-      borderStyle,
-      borderWidth: surface['borderWidth'],
-      paddingX: surface['paddingX'],
-      paddingY: surface['paddingY'],
-      radius: surface['radius'],
-      shadow: surface['shadow'],
-      shadowColor,
-      textColor: surface['textColor'],
-    },
-    title: {
-      backgroundColor: title['backgroundColor'],
-      dividerColor,
-      dividerStyle,
-      dividerWidth,
-      enabled: title['enabled'],
-      fontSize: title['fontSize'],
-      fontWeight: title['fontWeight'],
-      textColor: title['textColor'],
-    },
-    typography: {
-      fontFamily: typography['fontFamily'],
-      fontSize: typography['fontSize'],
-      fontStyle,
-      fontWeight: typography['fontWeight'],
-      maxWidth: typography['maxWidth'],
-      textAlign,
-      textDecoration,
-    },
-  };
 }
 
 function parsePlacement(value: unknown): StoredCalloutPresetPlacement | null {

@@ -13,14 +13,53 @@ const DEFAULT_STYLE = getCanonicalSystemCalloutPreset('system-callout-bubble').s
 
 const DEFAULT_PLACEMENT: CalloutPlacement = {
   anchor: 'top-center',
+  connectorAttachments: {
+    block: { mode: 'auto' },
+    frame: { mode: 'auto' },
+  },
   side: 'auto',
 };
+
+function cloneConnectorAttachments(placement: Partial<CalloutPlacement>) {
+  const stored = placement.connectorAttachments;
+  return {
+    block: stored?.block
+      ? { ...stored.block }
+      : placement.connectorBasePosition === undefined
+        ? { mode: 'auto' as const }
+        : { mode: 'free' as const, perimeterPosition: placement.connectorBasePosition },
+    frame: stored?.frame
+      ? { ...stored.frame }
+      : placement.connectorFramePosition === undefined
+        ? { mode: 'auto' as const }
+        : { mode: 'free' as const, perimeterPosition: placement.connectorFramePosition },
+  };
+}
 
 export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle {
   return {
     accentEdge: { ...DEFAULT_STYLE.accentEdge, ...style.accentEdge },
+    badge: { ...DEFAULT_STYLE.badge, ...style.badge },
     colorBindings: { ...DEFAULT_STYLE.colorBindings, ...style.colorBindings },
-    connector: { ...DEFAULT_STYLE.connector, ...style.connector },
+    connector: {
+      ...DEFAULT_STYLE.connector,
+      ...style.connector,
+      cornerStyle: {
+        ...DEFAULT_STYLE.connector.cornerStyle,
+        ...style.connector?.cornerStyle,
+      },
+      curve: {
+        ...DEFAULT_STYLE.connector.curve,
+        ...style.connector?.curve,
+        ...(style.connector?.curve?.startHandle
+          ? { startHandle: { ...style.connector.curve.startHandle } }
+          : {}),
+        ...(style.connector?.curve?.endHandle
+          ? { endHandle: { ...style.connector.curve.endHandle } }
+          : {}),
+      },
+      spacing: { ...DEFAULT_STYLE.connector.spacing, ...style.connector?.spacing },
+    },
     customCss: style.customCss ?? DEFAULT_STYLE.customCss,
     surface: { ...DEFAULT_STYLE.surface, ...style.surface },
     title: { ...DEFAULT_STYLE.title, ...style.title },
@@ -34,6 +73,7 @@ export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings
     enabled: settings.enabled,
     placement: {
       ...settings.placement,
+      connectorAttachments: cloneConnectorAttachments(settings.placement),
       ...(settings.placement.manualPlacement
         ? { manualPlacement: { ...settings.placement.manualPlacement } }
         : {}),
@@ -49,12 +89,16 @@ export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings
 export function createDefaultCalloutSettings(
   style?: CalloutVisualStyle,
   sourcePresetId?: string,
-  placement?: Pick<CalloutPlacement, 'anchor' | 'side'>
+  placement?: Pick<CalloutPlacement, 'anchor' | 'side'> &
+    Partial<Pick<CalloutPlacement, 'connectorAttachments'>>
 ): CalloutSettings {
   return {
     content: { bodyHtml: '', titleText: '' },
     enabled: true,
-    placement: { ...(placement ?? DEFAULT_PLACEMENT) },
+    placement: {
+      ...(placement ?? DEFAULT_PLACEMENT),
+      connectorAttachments: cloneConnectorAttachments(placement ?? DEFAULT_PLACEMENT),
+    },
     ...(sourcePresetId ? { sourcePresetId } : {}),
     style: cloneCalloutStyle(style ?? DEFAULT_STYLE),
   };
@@ -70,6 +114,12 @@ export function applyCalloutSettingsPatch(
     placement: {
       ...settings.placement,
       ...patch.placement,
+      connectorAttachments: patch.placement?.connectorAttachments
+        ? {
+            block: { ...patch.placement.connectorAttachments.block },
+            frame: { ...patch.placement.connectorAttachments.frame },
+          }
+        : cloneConnectorAttachments(settings.placement),
       ...(patch.placement?.manualPlacement
         ? { manualPlacement: { ...patch.placement.manualPlacement } }
         : {}),
@@ -86,8 +136,24 @@ export function applyCalloutSettingsPatch(
         : { sourcePresetId: settings.sourcePresetId }),
     style: {
       accentEdge: { ...settings.style.accentEdge, ...patch.style?.accentEdge },
+      badge: { ...settings.style.badge, ...patch.style?.badge },
       colorBindings: { ...settings.style.colorBindings, ...patch.style?.colorBindings },
-      connector: { ...settings.style.connector, ...patch.style?.connector },
+      connector: {
+        ...settings.style.connector,
+        ...patch.style?.connector,
+        cornerStyle: {
+          ...settings.style.connector.cornerStyle,
+          ...patch.style?.connector?.cornerStyle,
+        },
+        curve: {
+          ...settings.style.connector.curve,
+          ...patch.style?.connector?.curve,
+        },
+        spacing: {
+          ...settings.style.connector.spacing,
+          ...patch.style?.connector?.spacing,
+        },
+      },
       customCss: patch.style?.customCss ?? settings.style.customCss,
       surface: { ...settings.style.surface, ...patch.style?.surface },
       title: { ...settings.style.title, ...patch.style?.title },
@@ -103,6 +169,16 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
     enabled: settings.enabled,
     placement: {
       anchor: settings.anchor,
+      connectorAttachments: {
+        block:
+          settings.tailBasePosition === undefined
+            ? { mode: 'auto' }
+            : { mode: 'free', perimeterPosition: settings.tailBasePosition },
+        frame:
+          settings.tailFramePosition === undefined
+            ? { mode: 'auto' }
+            : { mode: 'free', perimeterPosition: settings.tailFramePosition },
+      },
       side: settings.side,
       ...(settings.manualPlacement ? { manualPlacement: { ...settings.manualPlacement } } : {}),
       ...(settings.tailBasePosition === undefined
@@ -117,6 +193,7 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
     },
     style: {
       accentEdge: { ...DEFAULT_STYLE.accentEdge },
+      badge: { ...DEFAULT_STYLE.badge },
       colorBindings: { ...DEFAULT_STYLE.colorBindings },
       customCss: DEFAULT_STYLE.customCss,
       connector: {
@@ -135,13 +212,12 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
       },
       title: { ...DEFAULT_STYLE.title, textColor: settings.textColor },
       typography: {
+        ...DEFAULT_STYLE.typography,
         fontFamily: settings.fontFamily,
         fontSize: settings.fontSize,
         fontStyle: 'normal',
         fontWeight: settings.fontWeight,
         maxWidth: settings.maxWidth,
-        textAlign: 'left',
-        textDecoration: 'none',
       },
     },
   };

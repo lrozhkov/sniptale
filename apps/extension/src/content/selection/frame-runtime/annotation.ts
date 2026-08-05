@@ -45,7 +45,7 @@ function createFrameInput(
   viewport: BrowserAnnotationViewport
 ): BrowserFrameAnnotationInput {
   const linkedElementSelector = readOptionalName(frame.linkedElementSelector);
-  const borderPresetName = readOptionalName(frame.borderSettings?.name);
+  const borderPresetName = readOptionalName(frame.borderSettings?.sourcePresetName);
   const comment = readCalloutText(frame);
 
   return {

@@ -110,9 +110,8 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
     {
       ...storage.DEFAULT_BORDER_PRESET,
       color: '#0ff',
-      id: 'custom',
-      name: 'Custom',
-      order: 1,
+      sourcePresetId: 'custom',
+      sourcePresetName: 'Custom',
       shadow: 100,
     }
   );

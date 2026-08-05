@@ -2,12 +2,13 @@ import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../cont
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FocusSettings,
 } from '../../../features/highlighter/contracts';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 
 export type ToolbarViewportSelection = {
   presetId?: string;
@@ -60,15 +61,21 @@ export interface ToolbarAutoBlurProps {
 
 export interface ToolbarFutureFrameStyle {
   blurSettings: BlurSettings;
-  borderSettings: BorderPreset;
+  borderSettings: AppliedBorderSettings;
   effectMode: EffectMode;
   focusSettings: FocusSettings;
   futureCallout?: CalloutSettings | null;
+  futureStepBadge?: StepBadgeSettings | null;
 }
 
 export interface ToolbarFutureFrameCalloutActions {
   enable: () => CalloutSettings;
   set: (settings: CalloutSettings | null) => void;
+}
+
+export interface ToolbarFutureFrameStepBadgeActions {
+  enable: () => StepBadgeSettings;
+  set: (settings: StepBadgeSettings | null) => void;
 }
 
 export interface ToolbarProps {
@@ -115,6 +122,7 @@ export interface ToolbarProps {
   futureFrameStyle?: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
   futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: ToolbarFutureFrameStepBadgeActions;
   scenario?: {
     byClickDisabled: boolean;
     captureMode: 'manual' | 'by-click';

@@ -1,5 +1,5 @@
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   FocusSettings,
 } from '../../../features/highlighter/contracts';
@@ -16,12 +16,12 @@ import { usePopoverEscapeClose } from '../popover-sync/hooks';
 export function useFrameSettingsPopoverController(args: {
   anchorEl: HTMLElement | null;
   blurSettings?: BlurSettings;
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   focusSettings?: FocusSettings;
   frameId: string;
   isOpen: boolean;
   onApplyToFrame: (settings: {
-    borderSettings?: BorderPreset;
+    borderSettings?: AppliedBorderSettings;
     blurSettings?: BlurSettings;
     focusSettings?: FocusSettings;
   }) => void;

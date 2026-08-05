@@ -4,8 +4,10 @@ export type CalloutAnchor = StepBadgeAnchor;
 export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 export type CalloutFontFamily = 'sans' | 'serif' | 'mono' | 'cursive';
 export type CalloutConnectorKind = 'none' | 'wedge' | 'line';
-export type CalloutConnectorRouting = 'straight' | 'elbow' | 'polyline';
+export type CalloutConnectorRouting = 'straight' | 'elbow' | 'polyline' | 'curve';
 export type CalloutLineStyle = 'solid' | 'dashed' | 'dotted';
+export type CalloutTextDirection = 'auto' | 'ltr' | 'rtl';
+export type CalloutAttachmentMode = 'auto' | 'anchor' | 'free';
 export type CalloutConnectorMarker =
   | 'none'
   | 'circle'
@@ -16,6 +18,7 @@ export type CalloutConnectorMarker =
 export type CalloutPresetOrigin = 'system' | 'user';
 export type CalloutColorSource = 'custom' | 'frame-border' | 'frame-fill';
 export type CalloutAccentSide = 'top' | 'right' | 'bottom' | 'left';
+export type CalloutBadgeColorSource = CalloutColorSource | 'accent';
 
 export const SYSTEM_CALLOUT_PRESET_KEYS = [
   'system-callout-bubble',
@@ -35,6 +38,22 @@ export interface CalloutManualPlacement {
 
 export type CalloutConnectorWaypoint = CalloutManualPlacement;
 
+export interface CalloutPoint {
+  x: number;
+  y: number;
+}
+
+export interface CalloutAttachment {
+  mode: CalloutAttachmentMode;
+  anchorId?: string | undefined;
+  perimeterPosition?: number | undefined;
+}
+
+export interface CalloutConnectorAttachments {
+  frame: CalloutAttachment;
+  block: CalloutAttachment;
+}
+
 export interface CalloutContent {
   bodyHtml: string;
   titleText: string;
@@ -43,6 +62,7 @@ export interface CalloutContent {
 export interface CalloutPlacement {
   anchor: CalloutAnchor;
   side: CalloutSide;
+  connectorAttachments?: CalloutConnectorAttachments | undefined;
   manualPlacement?: CalloutManualPlacement | undefined;
   connectorBasePosition?: number | undefined;
   connectorBaseWidth?: number | undefined;
@@ -69,8 +89,13 @@ export interface CalloutTypographyStyle {
   fontStyle: 'normal' | 'italic';
   fontWeight: 'normal' | 'bold';
   maxWidth: number;
+  lineHeight: number;
+  letterSpacing: number;
+  direction: CalloutTextDirection;
+  hyphens: 'none' | 'auto';
   textAlign: 'left' | 'center' | 'right' | 'justify';
   textDecoration: 'none' | 'underline';
+  wordBreak: 'normal' | 'break-word';
 }
 
 export interface CalloutTitleStyle {
@@ -79,22 +104,68 @@ export interface CalloutTitleStyle {
   dividerStyle: CalloutLineStyle;
   dividerWidth: number;
   enabled: boolean;
+  fontFamily: CalloutFontFamily;
   fontSize: number;
+  fontStyle: 'normal' | 'italic';
   fontWeight: 'normal' | 'bold';
+  letterSpacing: number;
+  lineHeight: number;
+  direction: CalloutTextDirection;
+  textAlign: 'left' | 'center' | 'right' | 'justify';
+  textDecoration: 'none' | 'underline';
   textColor: string;
+}
+
+export interface CalloutConnectorSpacing {
+  frameGap: number;
+  blockGap: number;
+  obstacleMargin: number;
+  minimumEndSegment: number;
+}
+
+export interface CalloutCurveSettings {
+  mode: 'auto' | 'manual';
+  curvature: number;
+  startHandle?: CalloutPoint | undefined;
+  endHandle?: CalloutPoint | undefined;
+}
+
+export interface CalloutConnectorCornerStyle {
+  kind: 'sharp' | 'rounded';
+  radius: number;
 }
 
 export interface CalloutConnectorStyle {
   blockMarker: CalloutConnectorMarker;
   blockMarkerSize: number;
   color: string;
+  cornerStyle: CalloutConnectorCornerStyle;
+  curve: CalloutCurveSettings;
   frameMarker: CalloutConnectorMarker;
   frameMarkerSize: number;
   kind: CalloutConnectorKind;
   lineStyle: CalloutLineStyle;
   routing: CalloutConnectorRouting;
+  spacing: CalloutConnectorSpacing;
   wedgeSize: number;
   width: number;
+}
+
+export interface CalloutBadgeSettings {
+  enabled: boolean;
+  text: string;
+  placement: 'title-start' | 'title-end' | 'body-start';
+  shape: 'circle' | 'rounded' | 'square';
+  size: number;
+  backgroundColor: string;
+  backgroundColorSource: CalloutBadgeColorSource;
+  textColor: string;
+  textColorSource: CalloutBadgeColorSource;
+  borderColor: string;
+  borderColorSource: CalloutBadgeColorSource;
+  borderWidth: number;
+  fontSize: number;
+  fontWeight: 'normal' | 'bold';
 }
 
 export interface CalloutColorBindings {
@@ -114,6 +185,7 @@ export interface CalloutAccentEdgeStyle {
 
 export interface CalloutVisualStyle {
   accentEdge: CalloutAccentEdgeStyle;
+  badge: CalloutBadgeSettings;
   colorBindings: CalloutColorBindings;
   connector: CalloutConnectorStyle;
   customCss: string;
@@ -137,8 +209,13 @@ export type CalloutSettingsPatch = {
   sourcePresetId?: string | undefined;
   style?: {
     accentEdge?: Partial<CalloutAccentEdgeStyle>;
+    badge?: Partial<CalloutBadgeSettings>;
     colorBindings?: Partial<CalloutColorBindings>;
-    connector?: Partial<CalloutConnectorStyle>;
+    connector?: Partial<Omit<CalloutConnectorStyle, 'cornerStyle' | 'curve' | 'spacing'>> & {
+      cornerStyle?: Partial<CalloutConnectorCornerStyle>;
+      curve?: Partial<CalloutCurveSettings>;
+      spacing?: Partial<CalloutConnectorSpacing>;
+    };
     customCss?: string;
     surface?: Partial<CalloutSurfaceStyle>;
     title?: Partial<CalloutTitleStyle>;
@@ -154,7 +231,7 @@ export interface CalloutPreset {
   name: string;
   order: number;
   origin?: CalloutPresetOrigin | undefined;
-  placement: Pick<CalloutPlacement, 'anchor' | 'side'>;
+  placement: Pick<CalloutPlacement, 'anchor' | 'side' | 'connectorAttachments'>;
   style: CalloutVisualStyle;
   systemPresetKey?: SystemCalloutPresetKey | undefined;
 }

@@ -84,6 +84,9 @@ function createToolbarLayoutSection(
     ...(viewModel.frameManager.futureFrameCallout === undefined
       ? {}
       : { futureFrameCalloutActions: viewModel.frameManager.futureFrameCallout }),
+    ...(viewModel.frameManager.futureFrameStepBadge === undefined
+      ? {}
+      : { futureFrameStepBadgeActions: viewModel.frameManager.futureFrameStepBadge }),
     setCaptureAction: viewModel.modeState.setCaptureAction,
     setCurrentViewport: viewModel.modeState.setCurrentViewport,
     setPinToTab: viewModel.modeState.setPinToTab,

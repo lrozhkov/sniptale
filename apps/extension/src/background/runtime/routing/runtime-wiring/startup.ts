@@ -3,6 +3,7 @@ import { cleanupOldRecordings } from '../../../../composition/persistence/record
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
 import { migrateCalloutSystemPresetCatalog } from '../../../../composition/persistence/callout-presets';
+import { migrateStepBadgeSystemPresetCatalog } from '../../../../composition/persistence/step-badge-presets';
 import { cleanupExpiredProjectExportInputs } from '../../../../composition/persistence/project-export-inputs';
 import {
   cleanupCapture,
@@ -61,6 +62,10 @@ export function runStartupMaintenance(
 
   migrateCalloutSystemPresetCatalog().catch((error) => {
     logger.warn('Callout preset catalog migration failed (non-critical)', error);
+  });
+
+  migrateStepBadgeSystemPresetCatalog().catch((error) => {
+    logger.warn('Step badge preset catalog migration failed (non-critical)', error);
   });
 
   resetVideoRecordingRuntimeState();

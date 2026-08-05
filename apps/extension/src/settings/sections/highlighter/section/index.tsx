@@ -3,10 +3,12 @@ import { HighlighterSectionContent } from './content';
 import { DelayedSettingsCenteredLoadingState } from '../../../section-surface/loading-state';
 import { useHighlighterSection } from './useHighlighterSection';
 import { useCalloutPresetCatalogController } from '../callout-presets';
+import { useStepBadgePresetCatalogController } from '../step-badge-presets';
 
 export function HighlighterSection() {
   const controller = useHighlighterSection();
   const calloutPresets = useCalloutPresetCatalogController();
+  const stepBadgePresets = useStepBadgePresetCatalogController();
   const { settings } = controller.status;
 
   if (controller.status.isLoading) {
@@ -30,6 +32,7 @@ export function HighlighterSection() {
       effects={controller.effects}
       presets={controller.presets}
       settings={settings}
+      stepBadgePresets={stepBadgePresets}
     />
   );
 }

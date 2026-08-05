@@ -1,5 +1,6 @@
 import type {
   CalloutAccentSide,
+  CalloutAttachmentMode,
   CalloutConnectorKind,
   CalloutConnectorMarker,
   CalloutConnectorRouting,
@@ -7,6 +8,7 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { CSSProperties } from 'react';
 import {
+  ProductGlassBoldButton,
   ProductGlassIconButton,
   ProductGlassSwitch,
   ProductGlassToggleRow,
@@ -15,6 +17,7 @@ import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
 import { CALLOUT_TEXT_PRESETS } from './inspector-palettes';
 import {
+  AdditionalSettings,
   BoundColorField,
   ChoiceField,
   ColorField,
@@ -86,32 +89,60 @@ export function CalloutConnectorSettings(props: ManualContentProps) {
   );
 }
 
-function LineConnectorSettings(props: ManualContentProps) {
-  const connector = props.settings.style.connector;
-  const markerOptions = MARKERS.map((value) => ({
+function getMarkerOptions() {
+  return MARKERS.map((value) => ({
     value,
     label: translate(
       value === 'ring-dot' ? 'content.callout.marker.ringDot' : `content.callout.marker.${value}`
     ),
   }));
+}
+
+function LineConnectorAdvancedSettings(props: ManualContentProps) {
+  const connector = props.settings.style.connector;
+  const attachments = props.settings.placement.connectorAttachments ?? {
+    block: { mode: 'auto' as const },
+    frame: { mode: 'auto' as const },
+  };
+  const setAttachmentMode = (endpoint: 'block' | 'frame', mode: CalloutAttachmentMode) => {
+    const current = attachments[endpoint];
+    const next =
+      mode === 'auto'
+        ? { mode }
+        : mode === 'anchor'
+          ? {
+              anchorId: current.anchorId ?? 'top-center',
+              mode,
+              ...(current.perimeterPosition === undefined
+                ? {}
+                : { perimeterPosition: current.perimeterPosition }),
+            }
+          : { mode, perimeterPosition: current.perimeterPosition ?? 0.5 };
+    props.onChange({
+      placement: { connectorAttachments: { ...attachments, [endpoint]: next } },
+    });
+  };
   return (
-    <>
-      <PropertyField label={translate('content.callout.routingLabel')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('content.callout.routingLabel')}
-          options={(['straight', 'elbow', 'polyline'] as CalloutConnectorRouting[]).map(
-            (value) => ({ value, label: translate(`content.callout.routing.${value}`) })
-          )}
-          value={connector.routing}
-          onChange={(routing) => props.onChange({ style: { connector: { routing } } })}
-        />
-      </PropertyField>
+    <AdditionalSettings>
+      <ChoiceField
+        label={translate('content.callout.frameAttachmentLabel')}
+        options={['auto', 'anchor', 'free'] as const}
+        value={attachments.frame.mode}
+        getLabel={(mode) => translate(`content.callout.attachmentMode.${mode}`)}
+        onChange={(mode) => setAttachmentMode('frame', mode)}
+      />
+      <ChoiceField
+        label={translate('content.callout.blockAttachmentLabel')}
+        options={['auto', 'anchor', 'free'] as const}
+        value={attachments.block.mode}
+        getLabel={(mode) => translate(`content.callout.attachmentMode.${mode}`)}
+        onChange={(mode) => setAttachmentMode('block', mode)}
+      />
       <PropertyField label={translate('content.callout.blockMarker')}>
         <CompactSelect
           appearance="plain"
           aria-label={translate('content.callout.blockMarker')}
-          options={markerOptions}
+          options={getMarkerOptions()}
           value={connector.blockMarker}
           onChange={(blockMarker) => props.onChange({ style: { connector: { blockMarker } } })}
         />
@@ -131,7 +162,7 @@ function LineConnectorSettings(props: ManualContentProps) {
         <CompactSelect
           appearance="plain"
           aria-label={translate('content.callout.frameMarker')}
-          options={markerOptions}
+          options={getMarkerOptions()}
           value={connector.frameMarker}
           onChange={(frameMarker) => props.onChange({ style: { connector: { frameMarker } } })}
         />
@@ -146,6 +177,109 @@ function LineConnectorSettings(props: ManualContentProps) {
             props.onChange({ style: { connector: { frameMarkerSize } } })
           }
         />
+      ) : null}
+      <NumericProperty
+        label={translate('content.callout.frameGapLabel')}
+        max={128}
+        min={0}
+        value={connector.spacing.frameGap}
+        onChange={(frameGap) => props.onChange({ style: { connector: { spacing: { frameGap } } } })}
+      />
+      <NumericProperty
+        label={translate('content.callout.blockGapLabel')}
+        max={128}
+        min={0}
+        value={connector.spacing.blockGap}
+        onChange={(blockGap) => props.onChange({ style: { connector: { spacing: { blockGap } } } })}
+      />
+      <NumericProperty
+        label={translate('content.callout.obstacleMarginLabel')}
+        max={128}
+        min={0}
+        value={connector.spacing.obstacleMargin}
+        onChange={(obstacleMargin) =>
+          props.onChange({ style: { connector: { spacing: { obstacleMargin } } } })
+        }
+      />
+      <NumericProperty
+        label={translate('content.callout.minimumEndSegmentLabel')}
+        max={128}
+        min={0}
+        value={connector.spacing.minimumEndSegment}
+        onChange={(minimumEndSegment) =>
+          props.onChange({ style: { connector: { spacing: { minimumEndSegment } } } })
+        }
+      />
+      {connector.routing === 'elbow' || connector.routing === 'polyline' ? (
+        <>
+          <ChoiceField
+            label={translate('content.callout.cornerStyleLabel')}
+            options={['sharp', 'rounded'] as const}
+            value={connector.cornerStyle.kind}
+            getLabel={(kind) => translate(`content.callout.cornerStyle.${kind}`)}
+            onChange={(kind) => props.onChange({ style: { connector: { cornerStyle: { kind } } } })}
+          />
+          {connector.cornerStyle.kind === 'rounded' ? (
+            <NumericProperty
+              label={translate('content.callout.cornerRadiusLabel')}
+              max={64}
+              min={0}
+              value={connector.cornerStyle.radius}
+              onChange={(radius) =>
+                props.onChange({ style: { connector: { cornerStyle: { radius } } } })
+              }
+            />
+          ) : null}
+        </>
+      ) : null}
+    </AdditionalSettings>
+  );
+}
+
+function LineConnectorSettings(props: ManualContentProps) {
+  const connector = props.settings.style.connector;
+  return (
+    <SettingsStack>
+      <PropertyField label={translate('content.callout.routingLabel')}>
+        <CompactSelect
+          appearance="plain"
+          aria-label={translate('content.callout.routingLabel')}
+          options={(['straight', 'elbow', 'polyline', 'curve'] as CalloutConnectorRouting[]).map(
+            (value) => ({ value, label: translate(`content.callout.routing.${value}`) })
+          )}
+          value={connector.routing}
+          onChange={(routing) => props.onChange({ style: { connector: { routing } } })}
+        />
+      </PropertyField>
+      {connector.routing === 'curve' ? (
+        <>
+          <NumericProperty
+            label={translate('content.callout.curvatureLabel')}
+            max={1}
+            min={0}
+            step={0.05}
+            unit=""
+            value={connector.curve.curvature}
+            onChange={(curvature) =>
+              props.onChange({ style: { connector: { curve: { curvature } } } })
+            }
+          />
+          {connector.curve.mode === 'manual' ? (
+            <ProductGlassBoldButton
+              onClick={() =>
+                props.onChange({
+                  style: {
+                    connector: {
+                      curve: { endHandle: undefined, mode: 'auto', startHandle: undefined },
+                    },
+                  },
+                })
+              }
+            >
+              {translate('content.callout.resetRoute')}
+            </ProductGlassBoldButton>
+          ) : null}
+        </>
       ) : null}
       <BoundColorField
         customColor={connector.color}
@@ -168,7 +302,8 @@ function LineConnectorSettings(props: ManualContentProps) {
         value={connector.width}
         onChange={(width) => props.onChange({ style: { connector: { width } } })}
       />
-    </>
+      <LineConnectorAdvancedSettings {...props} />
+    </SettingsStack>
   );
 }
 

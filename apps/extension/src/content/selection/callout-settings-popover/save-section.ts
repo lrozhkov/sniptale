@@ -23,6 +23,10 @@ export function createCalloutSaveSection(args: {
 }): CalloutSaveSectionProps {
   const placement: CalloutPreset['placement'] = {
     anchor: args.settings.placement.anchor,
+    connectorAttachments: args.settings.placement.connectorAttachments ?? {
+      block: { mode: 'auto' },
+      frame: { mode: 'auto' },
+    },
     side: getPreferredSideFromAnchor(args.settings.placement.anchor) ?? 'top',
   };
   return {

@@ -36,6 +36,7 @@ export function useFrameManagerSessionEffects(params: {
     sessionDefaultsInitializedRef: refs.sessionSettingsRefs.defaultsInitialized,
     sessionFocusSettingsRef: refs.sessionSettingsRefs.focusSettings,
     sessionCalloutStyleRef: refs.sessionCalloutStyleRef,
+    sessionStepBadgeTemplateRef: refs.sessionStepBadgeTemplateRef,
     syncFocusOpacity,
     updateGlobalStepBadgeSettings,
     updateFrameStepBadge,

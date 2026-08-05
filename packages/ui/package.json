@@ -11,6 +11,7 @@
     "./branding": "./src/branding/index.ts",
     "./canvas-tools/descriptors": "./src/canvas-tools/descriptors.tsx",
     "./canvas-tools": "./src/canvas-tools/index.tsx",
+    "./categorized-inspector": "./src/categorized-inspector/index.tsx",
     "./color-selector/floating-layer": "./src/color-selector/floating-layer.tsx",
     "./color-selector/helpers": "./src/color-selector/helpers.ts",
     "./color-selector/picker-change": "./src/color-selector/picker-change.ts",

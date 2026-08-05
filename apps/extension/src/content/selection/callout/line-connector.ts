@@ -1,7 +1,10 @@
 import type { CSSProperties } from 'react';
 import type {
+  CalloutConnectorCornerStyle,
   CalloutConnectorMarker,
   CalloutConnectorRouting,
+  CalloutConnectorSpacing,
+  CalloutCurveSettings,
   CalloutPlacement,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
@@ -19,12 +22,49 @@ type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 type PerimeterSide = ConnectorSide;
 
-const ENDPOINT_CLEARANCE = 16;
-
 function createPath(points: Point[], left: number, top: number): string {
   return points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x - left} ${point.y - top}`)
     .join(' ');
+}
+
+function getPointAlong(from: Point, to: Point, distance: number): Point {
+  const segmentLength = Math.hypot(to.x - from.x, to.y - from.y);
+  if (segmentLength <= 0) return from;
+  const ratio = Math.min(1, distance / segmentLength);
+  return {
+    x: from.x + (to.x - from.x) * ratio,
+    y: from.y + (to.y - from.y) * ratio,
+  };
+}
+
+function createRoundedPath(
+  points: Point[],
+  left: number,
+  top: number,
+  cornerStyle: CalloutConnectorCornerStyle
+) {
+  if (cornerStyle.kind === 'sharp' || cornerStyle.radius <= 0 || points.length < 3) {
+    return createPath(points, left, top);
+  }
+  const first = points[0]!;
+  let path = `M ${first.x - left} ${first.y - top}`;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1]!;
+    const corner = points[index]!;
+    const next = points[index + 1]!;
+    const radius = Math.min(
+      cornerStyle.radius,
+      Math.hypot(corner.x - previous.x, corner.y - previous.y) / 2,
+      Math.hypot(next.x - corner.x, next.y - corner.y) / 2
+    );
+    const entry = getPointAlong(corner, previous, radius);
+    const exit = getPointAlong(corner, next, radius);
+    path += ` L ${entry.x - left} ${entry.y - top}`;
+    path += ` Q ${corner.x - left} ${corner.y - top} ${exit.x - left} ${exit.y - top}`;
+  }
+  const last = points.at(-1)!;
+  return `${path} L ${last.x - left} ${last.y - top}`;
 }
 
 function getOppositeSide(side: PerimeterSide): PerimeterSide {
@@ -167,6 +207,15 @@ function getRouteScore(points: Point[], obstacles: Rect[]) {
     crossings += obstacles.filter((rect) => segmentCrossesRectInterior(from, to, rect)).length;
   }
   return crossings * 1_000_000 + length;
+}
+
+function inflateRect(rect: Rect, margin: number): Rect {
+  return {
+    x: rect.x - margin,
+    y: rect.y - margin,
+    width: rect.width + margin * 2,
+    height: rect.height + margin * 2,
+  };
 }
 
 function selectBestRoute(routes: Point[][], obstacles: Rect[]) {
@@ -368,6 +417,8 @@ type LineConnectorArgs = {
   blockMarkerSize: number;
   bubbleOffset?: Point;
   bubbleRect: Rect;
+  cornerStyle?: CalloutConnectorCornerStyle;
+  curve?: CalloutCurveSettings;
   frameBoundaryWidth: number;
   frameMarker: CalloutConnectorMarker;
   frameMarkerSize: number;
@@ -377,8 +428,82 @@ type LineConnectorArgs = {
   previousSide?: ConnectorSide;
   preferredSide?: ConnectorSide;
   routing: CalloutConnectorRouting;
+  spacing?: CalloutConnectorSpacing;
   wedgeSize: number;
 };
+
+const DEFAULT_SPACING: CalloutConnectorSpacing = {
+  blockGap: 0,
+  frameGap: 0,
+  minimumEndSegment: 16,
+  obstacleMargin: 0,
+};
+
+const DEFAULT_CURVE: CalloutCurveSettings = { curvature: 0.35, mode: 'auto' };
+const DEFAULT_CORNER_STYLE: CalloutConnectorCornerStyle = { kind: 'sharp', radius: 8 };
+
+function getConnectorSpacing(args: LineConnectorArgs) {
+  return args.spacing ?? DEFAULT_SPACING;
+}
+
+function addPoint(point: Point, offset: Point): Point {
+  return { x: point.x + offset.x, y: point.y + offset.y };
+}
+
+function getCurveRoute(args: {
+  blockPoint: Point;
+  blockSide: PerimeterSide;
+  curve: CalloutCurveSettings;
+  framePoint: Point;
+  frameSide: PerimeterSide;
+  minimumEndSegment: number;
+}) {
+  const distance = Math.hypot(
+    args.framePoint.x - args.blockPoint.x,
+    args.framePoint.y - args.blockPoint.y
+  );
+  const handleLength = Math.max(
+    args.minimumEndSegment,
+    Math.min(distance * 0.72, distance * (0.18 + args.curve.curvature * 0.42))
+  );
+  const blockDirection = getOutwardDirection(args.blockSide);
+  const frameDirection = getOutwardDirection(args.frameSide);
+  const automaticControls = [
+    addPoint(args.blockPoint, {
+      x: blockDirection.x * handleLength,
+      y: blockDirection.y * handleLength,
+    }),
+    addPoint(args.framePoint, {
+      x: frameDirection.x * handleLength,
+      y: frameDirection.y * handleLength,
+    }),
+  ] as const;
+  return {
+    controls: [
+      args.curve.mode === 'manual' && args.curve.startHandle
+        ? addPoint(args.blockPoint, args.curve.startHandle)
+        : automaticControls[0],
+      args.curve.mode === 'manual' && args.curve.endHandle
+        ? addPoint(args.framePoint, args.curve.endHandle)
+        : automaticControls[1],
+    ] as const,
+    points: [args.blockPoint, args.framePoint],
+  };
+}
+
+function createCurvePath(
+  start: Point,
+  controls: readonly [Point, Point],
+  end: Point,
+  left: number,
+  top: number
+) {
+  return (
+    `M ${start.x - left} ${start.y - top} ` +
+    `C ${controls[0].x - left} ${controls[0].y - top} ` +
+    `${controls[1].x - left} ${controls[1].y - top} ${end.x - left} ${end.y - top}`
+  );
+}
 
 function getConnectorAttachment(args: LineConnectorArgs) {
   const attachment = getDynamicTailState({
@@ -390,11 +515,11 @@ function getConnectorAttachment(args: LineConnectorArgs) {
     ...(args.previousSide ? { previousSide: args.previousSide } : {}),
     tailSize: args.wedgeSize,
   });
-  const blockPoint =
+  const blockBoundaryPoint =
     args.placement.connectorBasePosition === undefined
       ? attachment.attachment.bubbleEdgePoint
       : getCalloutPerimeterPoint(args.bubbleRect, args.placement.connectorBasePosition);
-  const framePoint =
+  const frameBoundaryPoint =
     args.placement.connectorFramePosition === undefined
       ? attachment.attachment.framePoint
       : getCalloutPerimeterPoint(args.frameRect, args.placement.connectorFramePosition);
@@ -406,12 +531,23 @@ function getConnectorAttachment(args: LineConnectorArgs) {
     args.placement.connectorFramePosition === undefined
       ? attachment.side
       : getPerimeterSide(args.frameRect, args.placement.connectorFramePosition);
-  return { attachment, blockPoint, blockSide, framePoint, frameSide };
+  const spacing = getConnectorSpacing(args);
+  const blockPoint = offsetOutward(blockBoundaryPoint, blockSide, spacing.blockGap);
+  const framePoint = offsetOutward(frameBoundaryPoint, frameSide, spacing.frameGap);
+  return {
+    attachment,
+    blockBoundaryPoint,
+    blockPoint,
+    blockSide,
+    frameBoundaryPoint,
+    framePoint,
+    frameSide,
+  };
 }
 
 function getEndpointClearance(args: LineConnectorArgs) {
   return Math.max(
-    ENDPOINT_CLEARANCE,
+    getConnectorSpacing(args).minimumEndSegment,
     (args.blockMarker === 'none' ? 0 : args.blockMarkerSize) +
       args.blockBoundaryWidth +
       args.lineWidth,
@@ -430,10 +566,98 @@ function getPlacementWaypoint(args: LineConnectorArgs): Point | undefined {
   };
 }
 
+function getLineConnectorRenderGeometry(args: {
+  connector: LineConnectorArgs;
+  curveState: ReturnType<typeof getCurveRoute> | null;
+  route: Point[];
+  blockPoint: Point;
+  framePoint: Point;
+}) {
+  const { connector, curveState, route } = args;
+  const blockMarkerGeometry = getConnectorEndpointGeometry({
+    adjacentPoint: curveState?.controls[0] ?? route[1]!,
+    boundaryWidth: connector.blockBoundaryWidth,
+    contactPoint: args.blockPoint,
+    endpoint: 'start',
+    lineWidth: connector.lineWidth,
+    marker: connector.blockMarker,
+    markerSize: connector.blockMarkerSize,
+  });
+  const frameMarkerGeometry = getConnectorEndpointGeometry({
+    adjacentPoint: curveState?.controls[1] ?? route.at(-2)!,
+    boundaryWidth: connector.frameBoundaryWidth,
+    contactPoint: args.framePoint,
+    endpoint: 'end',
+    lineWidth: connector.lineWidth,
+    marker: connector.frameMarker,
+    markerSize: connector.frameMarkerSize,
+  });
+  const renderRoute = [
+    blockMarkerGeometry.linePoint,
+    ...route.slice(1, -1),
+    frameMarkerGeometry.linePoint,
+  ];
+  const boundsPoints = [
+    ...renderRoute,
+    ...(curveState?.controls ?? []),
+    blockMarkerGeometry.markerPoint,
+    frameMarkerGeometry.markerPoint,
+  ];
+  const blockMarkerSize = connector.blockMarker === 'none' ? 0 : connector.blockMarkerSize;
+  const frameMarkerSize = connector.frameMarker === 'none' ? 0 : connector.frameMarkerSize;
+  const padding = Math.max(blockMarkerSize, frameMarkerSize, connector.lineWidth) / 2 + 4;
+  const left = Math.min(...boundsPoints.map((point) => point.x)) - padding;
+  const top = Math.min(...boundsPoints.map((point) => point.y)) - padding;
+  const right = Math.max(...boundsPoints.map((point) => point.x)) + padding;
+  const bottom = Math.max(...boundsPoints.map((point) => point.y)) + padding;
+  return {
+    blockMarkerGeometry,
+    bounds: { bottom, left, right, top },
+    frameMarkerGeometry,
+    renderRoute,
+  };
+}
+
+function getLineConnectorSvgStyle(
+  bounds: { bottom: number; left: number; right: number; top: number },
+  bubbleRect: Rect
+): CSSProperties {
+  return {
+    position: 'absolute',
+    left: bounds.left - bubbleRect.x,
+    top: bounds.top - bubbleRect.y,
+    width: Math.max(1, bounds.right - bounds.left),
+    height: Math.max(1, bounds.bottom - bounds.top),
+    overflow: 'visible',
+    pointerEvents: 'none',
+    zIndex: 0,
+  };
+}
+
 export function getLineConnectorState(args: LineConnectorArgs) {
-  const { attachment, blockPoint, blockSide, framePoint, frameSide } = getConnectorAttachment(args);
+  const {
+    attachment,
+    blockBoundaryPoint,
+    blockPoint,
+    blockSide,
+    frameBoundaryPoint,
+    framePoint,
+    frameSide,
+  } = getConnectorAttachment(args);
   const endpointClearance = getEndpointClearance(args);
+  const spacing = getConnectorSpacing(args);
   const waypoint = getPlacementWaypoint(args);
+  const curveState =
+    args.routing === 'curve'
+      ? getCurveRoute({
+          blockPoint,
+          blockSide,
+          curve: args.curve ?? DEFAULT_CURVE,
+          framePoint,
+          frameSide,
+          minimumEndSegment: spacing.minimumEndSegment,
+        })
+      : null;
   const polylineState =
     args.routing === 'polyline'
       ? getPolylineRouteState({
@@ -444,80 +668,51 @@ export function getLineConnectorState(args: LineConnectorArgs) {
         })
       : null;
   const route =
+    curveState?.points ??
     polylineState?.route ??
     getRoute({
       blockPoint,
       blockSide,
       framePoint,
       frameSide,
-      obstacles: [args.bubbleRect, args.frameRect],
+      obstacles: [args.bubbleRect, args.frameRect].map((rect) =>
+        inflateRect(rect, spacing.obstacleMargin)
+      ),
       routing: args.routing,
       endpointClearance,
       ...(waypoint ? { waypoint } : {}),
     });
   const routeControl =
-    polylineState ?? getElbowRouteControl({ blockSide, frameSide, route, routing: args.routing });
+    args.routing === 'curve'
+      ? null
+      : (polylineState ??
+        getElbowRouteControl({ blockSide, frameSide, route, routing: args.routing }));
   const routeControlConstraint: ElbowWaypointConstraint | null =
     args.routing === 'elbow' && isVerticalSide(blockSide) !== isVerticalSide(frameSide)
       ? { blockPoint, blockSide, framePoint, frameSide }
       : null;
-  const blockMarkerGeometry = getConnectorEndpointGeometry({
-    adjacentPoint: route[1]!,
-    boundaryWidth: args.blockBoundaryWidth,
-    contactPoint: blockPoint,
-    endpoint: 'start',
-    lineWidth: args.lineWidth,
-    marker: args.blockMarker,
-    markerSize: args.blockMarkerSize,
+  const presentation = getLineConnectorRenderGeometry({
+    blockPoint,
+    connector: args,
+    curveState,
+    framePoint,
+    route,
   });
-  const frameMarkerGeometry = getConnectorEndpointGeometry({
-    adjacentPoint: route.at(-2)!,
-    boundaryWidth: args.frameBoundaryWidth,
-    contactPoint: framePoint,
-    endpoint: 'end',
-    lineWidth: args.lineWidth,
-    marker: args.frameMarker,
-    markerSize: args.frameMarkerSize,
-  });
-  const renderRoute = [
-    blockMarkerGeometry.linePoint,
-    ...route.slice(1, -1),
-    frameMarkerGeometry.linePoint,
-  ];
-  const boundsPoints = [
-    ...renderRoute,
-    blockMarkerGeometry.markerPoint,
-    frameMarkerGeometry.markerPoint,
-  ];
-  const blockMarkerSize = args.blockMarker === 'none' ? 0 : args.blockMarkerSize;
-  const frameMarkerSize = args.frameMarker === 'none' ? 0 : args.frameMarkerSize;
-  const padding = Math.max(blockMarkerSize, frameMarkerSize, args.lineWidth) / 2 + 4;
-  const left = Math.min(...boundsPoints.map((point) => point.x)) - padding;
-  const top = Math.min(...boundsPoints.map((point) => point.y)) - padding;
-  const right = Math.max(...boundsPoints.map((point) => point.x)) + padding;
-  const bottom = Math.max(...boundsPoints.map((point) => point.y)) + padding;
-  const style: CSSProperties = {
-    position: 'absolute',
-    left: left - args.bubbleRect.x,
-    top: top - args.bubbleRect.y,
-    width: Math.max(1, right - left),
-    height: Math.max(1, bottom - top),
-    overflow: 'visible',
-    pointerEvents: 'none',
-    zIndex: 0,
-  };
+  const { blockMarkerGeometry, bounds, frameMarkerGeometry, renderRoute } = presentation;
+  const style = getLineConnectorSvgStyle(bounds, args.bubbleRect);
+  const { bottom, left, right, top } = bounds;
 
   return {
     attachment: {
       ...attachment.attachment,
-      baseA: blockPoint,
-      baseB: blockPoint,
-      baseEdgeA: blockPoint,
-      baseEdgeB: blockPoint,
-      bubbleEdgePoint: blockPoint,
-      bubblePoint: blockPoint,
-      framePoint,
-      tipPoint: framePoint,
+      baseA: blockBoundaryPoint,
+      baseB: blockBoundaryPoint,
+      baseEdgeA: blockBoundaryPoint,
+      baseEdgeB: blockBoundaryPoint,
+      bubbleEdgePoint: blockBoundaryPoint,
+      bubblePoint: blockBoundaryPoint,
+      framePoint: frameBoundaryPoint,
+      tipPoint: frameBoundaryPoint,
     },
     blockPoint: {
       x: blockMarkerGeometry.markerPoint.x - left,
@@ -530,7 +725,15 @@ export function getLineConnectorState(args: LineConnectorArgs) {
     },
     frameAngle: frameMarkerGeometry.angle,
     kind: 'line' as const,
-    path: createPath(renderRoute, left, top),
+    path: curveState
+      ? createCurvePath(renderRoute[0]!, curveState.controls, renderRoute.at(-1)!, left, top)
+      : createRoundedPath(renderRoute, left, top, args.cornerStyle ?? DEFAULT_CORNER_STYLE),
+    curveHandles: curveState
+      ? {
+          end: curveState.controls[1],
+          start: curveState.controls[0],
+        }
+      : null,
     routeControlAxis: routeControl?.axis ?? null,
     routeControlAngle: polylineState?.angle ?? null,
     routeControlAngleSnap: polylineState?.angleSnap ?? null,

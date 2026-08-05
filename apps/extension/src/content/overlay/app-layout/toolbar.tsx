@@ -195,6 +195,9 @@ function renderToolbarShell(args: {
         {...(args.toolbar.futureFrameCalloutActions === undefined
           ? {}
           : { futureFrameCalloutActions: args.toolbar.futureFrameCalloutActions })}
+        {...(args.toolbar.futureFrameStepBadgeActions === undefined
+          ? {}
+          : { futureFrameStepBadgeActions: args.toolbar.futureFrameStepBadgeActions })}
       />
     </div>
   );

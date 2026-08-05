@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addStepBadgeReorderListener } from '../../platform/page-context/frame-events';
 import { StepBadgePopoverContent } from './body';
+import { DEFAULT_STEP_BADGE_TEMPLATE } from '../../../features/highlighter/step-badge-presets/catalog';
 import { StepBadgeAutoSection, StepBadgeValueSection } from './views';
 
 let container: HTMLDivElement | null = null;
@@ -87,9 +88,20 @@ function registerStepBadgeDisableActionTest(): void {
         onAutoModeChange={vi.fn()}
         onDisable={vi.fn()}
         onOffsetToggle={vi.fn()}
-        onSizeLevelChange={vi.fn()}
+        onApplyPreset={vi.fn()}
+        onConfigurePreset={vi.fn()}
+        onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
+        onResetPreset={vi.fn()}
+        onSettingsChange={vi.fn()}
+        onTogglePreset={vi.fn()}
         onTypeChange={vi.fn()}
+        onUpdatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
         onValueChange={vi.fn()}
+        pendingPresetIds={new Set()}
+        presetError={null}
+        presets={[]}
+        templateSettings={DEFAULT_STEP_BADGE_TEMPLATE}
+        frameVisuals={{ borderColor: '#f97316', borderWidth: 4 }}
       />
     );
 

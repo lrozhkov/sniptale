@@ -1,4 +1,4 @@
-import type { BorderPreset } from '../../../features/highlighter/contracts';
+import type { AppliedBorderSettings } from '../../../features/highlighter/contracts';
 import { getFrameSessionBorderPreset } from '../frame-runtime/session/border-preset';
 
 export type HoverFrameCacheEntry = {
@@ -68,7 +68,7 @@ export function createHoverSession(): HoverSession {
   };
 }
 
-export function getCurrentBorderPreset(): BorderPreset {
+export function getCurrentBorderPreset(): AppliedBorderSettings {
   return getFrameSessionBorderPreset();
 }
 

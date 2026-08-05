@@ -36,4 +36,27 @@ describe('callout color bindings', () => {
 
     expect(resolved.surface.backgroundColor).toBe(style.surface.backgroundColor);
   });
+
+  it('resolves badge colors from the accent and frame sources', () => {
+    const style = getCanonicalSystemCalloutPreset('system-callout-bubble').style;
+    const resolved = resolveCalloutColorBindings(
+      {
+        ...style,
+        accentEdge: { ...style.accentEdge, color: '#ffaa00' },
+        badge: {
+          ...style.badge,
+          backgroundColorSource: 'accent',
+          borderColorSource: 'frame-border',
+          textColorSource: 'frame-fill',
+        },
+      },
+      { borderColor: '#ff0000', fillColor: '#00ff00' }
+    );
+
+    expect(resolved.badge).toMatchObject({
+      backgroundColor: '#ffaa00',
+      borderColor: '#ff0000',
+      textColor: '#00ff00',
+    });
+  });
 });

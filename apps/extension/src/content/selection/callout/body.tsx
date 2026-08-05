@@ -23,7 +23,12 @@ import { CalloutVoiceButton } from './voice-button';
 import type { getDynamicTailState } from './dynamic-tail';
 import type { getLineConnectorState } from './line-connector';
 import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
-import { getCalloutTitleMeasureStyle, getCalloutTitleStyle } from './title-style';
+import {
+  getCalloutTitleInputStyle,
+  getCalloutTitleMeasureStyle,
+  getCalloutTitleStyle,
+} from './title-style';
+import { CalloutBadge, resolveCalloutBadgeText } from './badge';
 import {
   resolveCalloutCustomCss,
   type ResolvedCalloutCustomCss,
@@ -35,6 +40,7 @@ function createCalloutContentProps(
 ) {
   return {
     contentEditable: props.isEditing,
+    dir: props.settings.style.typography.direction,
     onBlur: props.handleBlur,
     onInput: props.handleInput,
     onKeyDown: props.handleKeyDown,
@@ -45,8 +51,35 @@ function createCalloutContentProps(
   };
 }
 
+function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
+  const badge = props.settings.style.badge;
+  const badgeText = resolveCalloutBadgeText({
+    badgeText: badge.text,
+    bodyHtml: props.settings.content.bodyHtml,
+    titleEnabled: props.settings.style.title.enabled,
+    titleText: props.settings.content.titleText,
+  });
+  const showBodyBadge =
+    badge.enabled && (badge.placement === 'body-start' || !props.settings.style.title.enabled);
+  const content = <div {...createCalloutContentProps(props, customStyles)} />;
+  return showBodyBadge ? (
+    <div style={{ alignItems: 'flex-start', display: 'flex', gap: 6 }}>
+      <CalloutBadge badge={badge} text={badgeText} />
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>{content}</div>
+    </div>
+  ) : (
+    content
+  );
+}
+
 function renderCalloutPortalContent(props: CalloutBodyProps) {
   const customStyles = resolveCalloutCustomCss(props.settings.style.customCss).styles;
+  const badgeText = resolveCalloutBadgeText({
+    badgeText: props.settings.style.badge.text,
+    bodyHtml: props.settings.content.bodyHtml,
+    titleEnabled: props.settings.style.title.enabled,
+    titleText: props.settings.content.titleText,
+  });
   return (
     <>
       <div
@@ -77,29 +110,9 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
               >
                 {props.settings.content.titleText}
               </span>
-              <input
-                aria-label={translate('content.callout.titleLabel')}
-                data-sniptale-callout-title="true"
-                readOnly={!props.isEditing}
-                size={1}
-                value={props.settings.content.titleText}
-                onChange={(event) => props.onTitleChange(event.target.value)}
-                onBlur={(event) => {
-                  const callout = event.currentTarget.closest('.sniptale-callout');
-                  if (
-                    !(event.relatedTarget instanceof Node) ||
-                    !callout?.contains(event.relatedTarget)
-                  ) {
-                    props.handleBlur();
-                  }
-                }}
-                onKeyDown={(event) => {
-                  event.stopPropagation();
-                  if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                  }
-                }}
+              <div
+                data-sniptale-callout-title-shell="true"
+                dir={props.settings.style.title.direction}
                 style={{
                   ...getCalloutTitleStyle(
                     props.settings.style,
@@ -108,10 +121,45 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
                   ),
                   ...customStyles.title,
                 }}
-              />
+              >
+                {props.settings.style.badge.enabled &&
+                props.settings.style.badge.placement === 'title-start' ? (
+                  <CalloutBadge badge={props.settings.style.badge} text={badgeText} />
+                ) : null}
+                <input
+                  aria-label={translate('content.callout.titleLabel')}
+                  data-sniptale-callout-title="true"
+                  dir={props.settings.style.title.direction}
+                  readOnly={!props.isEditing}
+                  size={1}
+                  value={props.settings.content.titleText}
+                  onChange={(event) => props.onTitleChange(event.target.value)}
+                  onBlur={(event) => {
+                    const callout = event.currentTarget.closest('.sniptale-callout');
+                    if (
+                      !(event.relatedTarget instanceof Node) ||
+                      !callout?.contains(event.relatedTarget)
+                    ) {
+                      props.handleBlur();
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    event.stopPropagation();
+                    if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  style={getCalloutTitleInputStyle()}
+                />
+                {props.settings.style.badge.enabled &&
+                props.settings.style.badge.placement === 'title-end' ? (
+                  <CalloutBadge badge={props.settings.style.badge} text={badgeText} />
+                ) : null}
+              </div>
             </>
           ) : null}
-          <div {...createCalloutContentProps(props, customStyles)} />
+          {renderBodyContent(props, customStyles)}
         </div>
         {renderCalloutAccentEdge(props.settings.style, props.calloutDimensions, customStyles)}
         <CalloutVoiceButton

@@ -6,8 +6,41 @@ import type {
   CalloutPreset,
   CalloutSettings,
 } from './callout';
-import { CYRILLIC_ALPHABET, LATIN_ALPHABET } from './step-badge';
+import {
+  CYRILLIC_ALPHABET,
+  isSystemStepBadgePresetKey,
+  LATIN_ALPHABET,
+  SYSTEM_STEP_BADGE_PRESET_KEYS,
+} from './step-badge';
 import type { StepBadgeAnchor, StepBadgeManualPlacement, StepBadgeSettings } from './step-badge';
+import {
+  applyManualBorderStylePatch,
+  cloneAppliedBorderSettings,
+  cloneBorderVisualStyle,
+  isSystemBorderPresetKey,
+  normalizeAppliedBorderSettings,
+  projectBorderPresetToAppliedSettings,
+  SYSTEM_BORDER_PRESET_KEYS,
+  type BorderPreset,
+} from './border-preset';
+
+const BORDER_PRESET: BorderPreset = {
+  id: 'border-1',
+  name: 'Border one',
+  order: 0,
+  width: 2,
+  color: '#ff0000',
+  style: 'solid',
+  radius: 4,
+  padding: { top: 1, right: 2, bottom: 3, left: 4 },
+  shadow: 10,
+  opacity: 100,
+  strokeOpacity: 90,
+  fillColor: '#000000',
+  fillOpacity: 20,
+  inheritCustomCss: false,
+  customCss: '',
+};
 
 it('keeps highlighter alphabets and shared anchors canonical', () => {
   expect(CYRILLIC_ALPHABET).toHaveLength(28);
@@ -36,4 +69,56 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
     position: number;
     side: 'top' | 'right' | 'bottom' | 'left';
   }>();
+});
+
+it('recognizes only canonical system step badge preset keys', () => {
+  for (const key of SYSTEM_STEP_BADGE_PRESET_KEYS) {
+    expect(isSystemStepBadgePresetKey(key)).toBe(true);
+  }
+  expect(isSystemStepBadgePresetKey('system-unknown')).toBe(false);
+  expect(isSystemStepBadgePresetKey(null)).toBe(false);
+});
+
+it('recognizes only canonical system border preset keys', () => {
+  for (const key of SYSTEM_BORDER_PRESET_KEYS) expect(isSystemBorderPresetKey(key)).toBe(true);
+  expect(isSystemBorderPresetKey('system-unknown')).toBe(false);
+  expect(isSystemBorderPresetKey(null)).toBe(false);
+});
+
+it('projects catalog presets into independent applied border snapshots', () => {
+  const applied = projectBorderPresetToAppliedSettings(BORDER_PRESET);
+
+  expect(applied).toEqual({
+    ...cloneBorderVisualStyle(BORDER_PRESET),
+    sourcePresetId: BORDER_PRESET.id,
+    sourcePresetName: BORDER_PRESET.name,
+  });
+  expect(applied).not.toHaveProperty('id');
+  expect(applied).not.toHaveProperty('name');
+  expect(applied.padding).not.toBe(BORDER_PRESET.padding);
+});
+
+it('clears preset attribution on manual patches and clones nested padding', () => {
+  const applied = projectBorderPresetToAppliedSettings(BORDER_PRESET);
+  const manual = applyManualBorderStylePatch(applied, {
+    width: 7,
+    padding: { left: 12 },
+  });
+  const clone = cloneAppliedBorderSettings(manual);
+
+  expect(manual).toMatchObject({ width: 7, padding: { top: 1, left: 12 } });
+  expect(manual).not.toHaveProperty('sourcePresetId');
+  expect(manual).not.toHaveProperty('sourcePresetName');
+  expect(clone).toEqual(manual);
+  expect(clone.padding).not.toBe(manual.padding);
+});
+
+it('normalizes legacy catalog snapshots while preserving applied snapshots', () => {
+  const legacy = normalizeAppliedBorderSettings(BORDER_PRESET);
+  const applied = normalizeAppliedBorderSettings(legacy);
+
+  expect(legacy.sourcePresetId).toBe(BORDER_PRESET.id);
+  expect(legacy.sourcePresetName).toBe(BORDER_PRESET.name);
+  expect(applied).toEqual(legacy);
+  expect(applied.padding).not.toBe(legacy.padding);
 });

@@ -215,4 +215,27 @@ describe('useCalloutEdgeDrag', () => {
     dispatchPointer('pointermove', 284, 50);
     expect(drag?.draftPosition).toBeCloseTo(184 / 560);
   });
+
+  it('commits a semantic anchor inside the magnetic zone and free mode outside it', () => {
+    renderHarness('top', true);
+    startDrag();
+    dispatchPointer('pointermove', 293, 50);
+    dispatchPointer('pointerup', 293, 50);
+
+    expect(onPositionChange).toHaveBeenLastCalledWith(200 / 560, {
+      anchorId: 'top-right',
+      mode: 'anchor',
+      perimeterPosition: 200 / 560,
+    });
+
+    onPositionChange.mockClear();
+    startDrag();
+    dispatchPointer('pointermove', 250, 50);
+    dispatchPointer('pointerup', 250, 50);
+
+    expect(onPositionChange).toHaveBeenLastCalledWith(150 / 560, {
+      mode: 'free',
+      perimeterPosition: 150 / 560,
+    });
+  });
 });

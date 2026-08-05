@@ -64,4 +64,48 @@ describe('callout model', () => {
     expect(cloned.placement.connectorWaypoint).not.toBe(normalized.placement.connectorWaypoint);
     expect(cloned.style.surface).not.toBe(normalized.style.surface);
   });
+
+  it('migrates legacy perimeter positions to free attachments without mutating input', () => {
+    const current = normalizeCalloutSettings(legacy);
+    const oldCurrent = cloneCalloutSettings(current);
+    delete oldCurrent.placement.connectorAttachments;
+    oldCurrent.placement.connectorBasePosition = 0.25;
+    oldCurrent.placement.connectorFramePosition = 0.75;
+
+    const normalized = normalizeCalloutSettings(oldCurrent);
+
+    expect(normalized.placement.connectorAttachments).toEqual({
+      block: { mode: 'free', perimeterPosition: 0.25 },
+      frame: { mode: 'free', perimeterPosition: 0.75 },
+    });
+    expect(oldCurrent.placement.connectorAttachments).toBeUndefined();
+  });
+
+  it('defaults absent attachment and visual parameters without changing the waypoint model', () => {
+    const current = normalizeCalloutSettings(legacy);
+    const oldCurrent = cloneCalloutSettings(current);
+    delete oldCurrent.placement.connectorAttachments;
+    oldCurrent.placement.connectorWaypoint = { centerOffsetX: 8, centerOffsetY: -12 };
+    Reflect.deleteProperty(oldCurrent.style, 'badge');
+    Reflect.deleteProperty(oldCurrent.style.connector, 'cornerStyle');
+    Reflect.deleteProperty(oldCurrent.style.connector, 'curve');
+    Reflect.deleteProperty(oldCurrent.style.connector, 'spacing');
+
+    const normalized = normalizeCalloutSettings(oldCurrent);
+
+    expect(normalized.placement.connectorAttachments).toEqual({
+      block: { mode: 'auto' },
+      frame: { mode: 'auto' },
+    });
+    expect(normalized.placement.connectorWaypoint).toEqual({
+      centerOffsetX: 8,
+      centerOffsetY: -12,
+    });
+    expect(normalized.style.connector).toMatchObject({
+      cornerStyle: { kind: 'sharp', radius: 8 },
+      curve: { curvature: 0.35, mode: 'auto' },
+      spacing: { blockGap: 0, frameGap: 0, minimumEndSegment: 16, obstacleMargin: 0 },
+    });
+    expect(normalized.style.badge.enabled).toBe(false);
+  });
 });

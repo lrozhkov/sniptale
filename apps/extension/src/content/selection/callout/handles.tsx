@@ -12,6 +12,12 @@ import type { CalloutHandleKeyboardEvent } from './keyboard';
 
 export type CalloutInteractionHandleProps = {
   dragHandleStyle: CSSProperties;
+  curveStartHandleStyle?: CSSProperties | null;
+  curveEndHandleStyle?: CSSProperties | null;
+  handleCurveStartPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleCurveStartKeyDown?: (event: CalloutHandleKeyboardEvent) => void;
+  handleCurveEndPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  handleCurveEndKeyDown?: (event: CalloutHandleKeyboardEvent) => void;
   handleDragPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleDragKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleHandleBlur: () => void;
@@ -34,6 +40,8 @@ export type CalloutInteractionHandleProps = {
   handleWaypointDoubleClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   hasWaypoint: boolean;
   isDragging: boolean;
+  isCurveStartDragging?: boolean;
+  isCurveEndDragging?: boolean;
   isEditing: boolean;
   isGeometryHandleHidden: boolean;
   isWidthResizeHandleHidden: boolean;
@@ -210,7 +218,12 @@ function renderCalloutTailHandle(
   control: {
     className: string;
     isDragging: boolean;
-    labelKey: 'moveCommentTail' | 'moveCommentTailBaseEnd' | 'moveCommentTailEnd';
+    labelKey:
+      | 'moveCommentCurveStart'
+      | 'moveCommentCurveEnd'
+      | 'moveCommentTail'
+      | 'moveCommentTailBaseEnd'
+      | 'moveCommentTailEnd';
     onKeyDown: (event: CalloutHandleKeyboardEvent) => void;
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
     style: CSSProperties | null;
@@ -373,6 +386,22 @@ export function renderCalloutInteractionHandles(props: CalloutInteractionHandleP
         style: props.tailFrameHandleStyle,
       })}
       {renderCalloutWaypointHandle(props)}
+      {renderCalloutTailHandle(props, {
+        className: 'sniptale-callout-curve-start-handle',
+        isDragging: Boolean(props.isCurveStartDragging),
+        labelKey: 'moveCommentCurveStart',
+        onKeyDown: props.handleCurveStartKeyDown ?? (() => undefined),
+        onPointerDown: props.handleCurveStartPointerDown ?? (() => undefined),
+        style: props.curveStartHandleStyle ?? null,
+      })}
+      {renderCalloutTailHandle(props, {
+        className: 'sniptale-callout-curve-end-handle',
+        isDragging: Boolean(props.isCurveEndDragging),
+        labelKey: 'moveCommentCurveEnd',
+        onKeyDown: props.handleCurveEndKeyDown ?? (() => undefined),
+        onPointerDown: props.handleCurveEndPointerDown ?? (() => undefined),
+        style: props.curveEndHandleStyle ?? null,
+      })}
     </>
   );
 }

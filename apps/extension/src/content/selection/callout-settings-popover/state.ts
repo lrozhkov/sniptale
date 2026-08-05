@@ -92,6 +92,10 @@ export function useCalloutSettingsPopoverState(args: {
             connectorBasePosition: undefined,
             connectorBaseWidth: undefined,
             connectorFramePosition: undefined,
+            connectorAttachments: {
+              block: { mode: 'auto' },
+              frame: { mode: 'auto' },
+            },
             connectorWaypoint: undefined,
           },
         }
@@ -103,6 +107,10 @@ export function useCalloutSettingsPopoverState(args: {
               connectorBasePosition: undefined,
               connectorBaseWidth: undefined,
               connectorFramePosition: undefined,
+              connectorAttachments: {
+                block: { mode: 'auto' },
+                frame: { mode: 'auto' },
+              },
               connectorWaypoint: undefined,
             },
           }

@@ -177,7 +177,13 @@ function preserveCalloutGeometryDuringResize(
     y: resizedFrame.y + resizedFrame.height / 2,
   };
   const connectorWaypoint = startFrame.callout.placement.connectorWaypoint;
-  const connectorFramePosition = startFrame.callout.placement.connectorFramePosition;
+  const frameAttachment = startFrame.callout.placement.connectorAttachments?.frame;
+  const connectorFramePosition =
+    frameAttachment?.mode === 'free'
+      ? frameAttachment.perimeterPosition
+      : frameAttachment
+        ? undefined
+        : startFrame.callout.placement.connectorFramePosition;
   const stationaryFramePosition =
     startFrame.callout.style.connector.kind === 'line' && connectorFramePosition !== undefined
       ? getCalloutPerimeterPosition(
@@ -199,6 +205,19 @@ function preserveCalloutGeometryDuringResize(
         ...(stationaryFramePosition === undefined
           ? {}
           : { connectorFramePosition: stationaryFramePosition }),
+        ...(frameAttachment?.mode === 'free' && stationaryFramePosition !== undefined
+          ? {
+              connectorAttachments: {
+                block: startFrame.callout.placement.connectorAttachments?.block ?? {
+                  mode: 'auto',
+                },
+                frame: {
+                  ...frameAttachment,
+                  perimeterPosition: stationaryFramePosition,
+                },
+              },
+            }
+          : {}),
         ...(connectorWaypoint
           ? {
               connectorWaypoint: {

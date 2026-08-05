@@ -1,4 +1,4 @@
-import type { BorderPreset } from './types';
+import type { BorderVisualStyle } from './types';
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
@@ -30,7 +30,7 @@ export function percentToUnit(value: number): number {
   return clampPercent(value) / 100;
 }
 
-export function normalizeBorderPresetVisualFields(preset: BorderPreset): BorderPreset {
+export function normalizeBorderPresetVisualFields<T extends BorderVisualStyle>(preset: T): T {
   return {
     ...preset,
     shadow: normalizeBorderShadowIntensity(preset.shadow),

@@ -24,13 +24,37 @@ it('creates the six stable system callout presets with independent styles', () =
 
 it('deep-clones every nested visual role', () => {
   const source = createSystemCalloutPresetCatalog()[0]!;
+  source.style.connector.curve = {
+    curvature: 0.5,
+    endHandle: { x: 30, y: -12 },
+    mode: 'manual',
+    startHandle: { x: -20, y: 18 },
+  };
   const clone = cloneCalloutPreset(source);
   clone.placement.anchor = 'bottom-right';
   clone.style.connector.width = 7;
   clone.style.title.enabled = true;
+  clone.style.connector.curve.startHandle!.x = 99;
+  clone.style.connector.curve.endHandle!.y = 99;
   expect(source.style.connector.width).toBe(2);
   expect(source.placement.anchor).toBe('top-center');
   expect(source.style.title.enabled).toBe(false);
+  expect(source.style.connector.curve.startHandle).toEqual({ x: -20, y: 18 });
+  expect(source.style.connector.curve.endHandle).toEqual({ x: 30, y: -12 });
+});
+
+it('normalizes absent optional preset fields without mutating the source', () => {
+  const source = createSystemCalloutPresetCatalog()[0]!;
+  delete source.placement.connectorAttachments;
+  Reflect.deleteProperty(source.style, 'customCss');
+  const clone = cloneCalloutPreset(source);
+
+  expect(clone.placement.connectorAttachments).toEqual({
+    block: { mode: 'auto' },
+    frame: { mode: 'auto' },
+  });
+  expect(clone.style.customCss).toBe('');
+  expect(source.placement.connectorAttachments).toBeUndefined();
 });
 
 it('provides distinct annotation roles and a ring-dot endpoint preset', () => {

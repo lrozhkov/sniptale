@@ -23,7 +23,7 @@ function hasBorderSettingsChange(
   const next = nextProps.frame.borderSettings;
   return (
     prevProps.frame.borderSettings !== nextProps.frame.borderSettings &&
-    (prev?.id !== next?.id ||
+    (prev?.sourcePresetId !== next?.sourcePresetId ||
       prev?.color !== next?.color ||
       prev?.width !== next?.width ||
       prev?.style !== next?.style ||
@@ -69,6 +69,7 @@ function hasStepBadgeChange(prevProps: InteractiveFrameProps, nextProps: Interac
       prev?.manualPlacement?.position !== next?.manualPlacement?.position ||
       prev?.manualPlacement?.side !== next?.manualPlacement?.side ||
       prev?.sizeLevel !== next?.sizeLevel ||
+      JSON.stringify(prev?.style ?? null) !== JSON.stringify(next?.style ?? null) ||
       prevOff.length !== nextOff.length ||
       prevOff.some((direction: string, index: number) => direction !== nextOff[index]) ||
       prev?.type !== next?.type ||

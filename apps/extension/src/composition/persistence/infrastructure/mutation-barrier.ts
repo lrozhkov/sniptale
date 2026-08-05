@@ -101,6 +101,7 @@ export function runWithPersistentDataErasureBarrier<T>(
 export type PersistenceMutationDomain =
   | 'callout-presets'
   | 'highlighter-settings'
+  | 'step-badge-presets'
   | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(

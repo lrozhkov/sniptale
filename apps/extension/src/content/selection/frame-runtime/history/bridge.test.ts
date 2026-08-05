@@ -7,6 +7,7 @@ import type { FrameManagerRefs } from '../contracts';
 import { createFrameDataFixture } from '../test-support';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import { normalizeAppliedBorderSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighter-hover-preview/session';
 import { createFrameHostLayoutService } from '../host-layout/service';
@@ -127,9 +128,13 @@ function expectAppliedSnapshotState(args: {
   expect(args.refs.globalEffectModeRef.current).toBe('blur');
   expect(args.refs.globalStepBadgeSettingsRef.current).toEqual({ autoMode: false });
   expect(args.refs.globalStepBadgeAutoModeRef.current).toBe(false);
-  expect(getFrameSessionBorderPreset()).toEqual(args.snapshot.sessionBorderPreset);
+  expect(getFrameSessionBorderPreset()).toEqual(
+    normalizeAppliedBorderSettings(args.snapshot.sessionBorderPreset)
+  );
   expect(getFrameSessionBorderPreset()).not.toBe(args.snapshot.sessionBorderPreset);
-  expect(getHoverBorderPreset()).toEqual(args.snapshot.sessionBorderPreset);
+  expect(getHoverBorderPreset()).toEqual(
+    normalizeAppliedBorderSettings(args.snapshot.sessionBorderPreset)
+  );
   expect(args.refs.sessionSettingsRefs.blurSettings.current).toEqual(
     args.snapshot.sessionBlurSettings
   );

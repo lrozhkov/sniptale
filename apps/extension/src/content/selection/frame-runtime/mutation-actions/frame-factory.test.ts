@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   FocusSettings,
   HighlighterSettings,
@@ -113,7 +113,7 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
       },
       highlighterSettingsCacheRef: { current: highlighterSettings },
       recalculateStepBadgesRef,
-      calculateFrameCoords: (_element: HTMLElement, borderSettings?: BorderPreset) =>
+      calculateFrameCoords: (_element: HTMLElement, borderSettings?: AppliedBorderSettings) =>
         createFrameDataFixture('frame-1', {
           ...(borderSettings === undefined ? {} : { borderSettings }),
           pagePlacement: { iframePath: [], pageX: 10, pageY: 20 },
@@ -161,8 +161,8 @@ function verifyAddFrameUsesSessionDefaultsAndBadgeAutoMode() {
     blurSettings: createBlurSettings(),
     focusSettings: createFocusSettings(),
     borderSettings: expect.objectContaining({
-      id: 'preset-1',
-      name: 'Orange',
+      sourcePresetId: 'preset-1',
+      sourcePresetName: 'Orange',
     }),
     stepBadge: expect.objectContaining({
       enabled: true,

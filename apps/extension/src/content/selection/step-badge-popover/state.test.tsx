@@ -7,6 +7,7 @@ import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/
 import { addFrameStepBadgeChangedListener } from '../../platform/page-context/frame-events';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useStepBadgePopoverState } from './state';
+import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -158,12 +159,41 @@ function verifyCanonicalPositionClearsManualPlacement() {
   cleanup();
 }
 
+function verifyPresetApplicationClearsManualPlacement() {
+  const listener = vi.fn();
+  const cleanup = addFrameStepBadgeChangedListener(listener);
+  renderHarness({
+    anchor: 'top-left',
+    enabled: true,
+    manualPlacement: { position: 0.6, side: 'bottom' },
+    offsetDirections: [],
+    type: 'number',
+    value: '2',
+  });
+  const preset = createSystemStepBadgePresetCatalog()[0]!;
+
+  act(() => latestState?.applyPreset(preset));
+
+  expect(listener).toHaveBeenCalledWith({
+    frameId: 'frame-1',
+    settings: expect.objectContaining({
+      manualPlacement: undefined,
+      sourcePresetId: preset.id,
+    }),
+  });
+  cleanup();
+}
+
 describe('useStepBadgePopoverState', () => {
   it('dispatches frame step-badge changes and closes when disabled', verifyDisablesBadgeAndCloses);
   it('dispatches manual value changes through the shared event seam', verifyManualValueDispatch);
   it(
     'returns to canonical placement when the anchor changes',
     verifyCanonicalPositionClearsManualPlacement
+  );
+  it(
+    'clears manual placement when a preset is applied',
+    verifyPresetApplicationClearsManualPlacement
   );
   it(
     'opens and commits a grouped history transaction around the popover session',

@@ -33,10 +33,26 @@ let latestSettings: CalloutSettings;
 function applyPatch(settings: CalloutSettings, patch: CalloutSettingsPatch): CalloutSettings {
   return {
     ...settings,
+    placement: {
+      ...settings.placement,
+      ...patch.placement,
+      connectorAttachments:
+        patch.placement?.connectorAttachments ?? settings.placement.connectorAttachments,
+    },
     style: {
       accentEdge: { ...settings.style.accentEdge, ...patch.style?.accentEdge },
+      badge: { ...settings.style.badge, ...patch.style?.badge },
       colorBindings: { ...settings.style.colorBindings, ...patch.style?.colorBindings },
-      connector: { ...settings.style.connector, ...patch.style?.connector },
+      connector: {
+        ...settings.style.connector,
+        ...patch.style?.connector,
+        cornerStyle: {
+          ...settings.style.connector.cornerStyle,
+          ...patch.style?.connector?.cornerStyle,
+        },
+        curve: { ...settings.style.connector.curve, ...patch.style?.connector?.curve },
+        spacing: { ...settings.style.connector.spacing, ...patch.style?.connector?.spacing },
+      },
       customCss: patch.style?.customCss ?? settings.style.customCss,
       surface: { ...settings.style.surface, ...patch.style?.surface },
       title: { ...settings.style.title, ...patch.style?.title },
@@ -73,6 +89,14 @@ async function clickAll(selector: string) {
   for (const element of document.querySelectorAll<HTMLButtonElement>(selector)) {
     await act(async () => element.click());
   }
+}
+
+async function clickText(text: string) {
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (candidate) => candidate.textContent === text
+  );
+  if (!button) throw new Error(`Button not found: ${text}`);
+  await act(async () => button.click());
 }
 
 async function changeAllNumbers() {
@@ -251,6 +275,71 @@ it('stores a semantic frame color source and disables the custom picker', async 
   );
   expect(backgroundPicker?.closest('fieldset')?.disabled).toBe(true);
   expect(latestSettings.style.surface.backgroundColor).not.toBe('#fedcba');
+});
+
+it('edits advanced connector routing, endpoint attachments, and rounded corners', async () => {
+  await openSection('content.callout.manualConnector');
+  await selectOption('content.callout.routingLabel', 'content.callout.routing.curve');
+  await enterNumber('content.callout.curvatureLabel', 0.8);
+  expect(latestSettings.style.connector).toMatchObject({
+    curve: { curvature: 0.8 },
+    routing: 'curve',
+  });
+
+  latestSettings.style.connector.curve.mode = 'manual';
+  latestSettings.style.connector.curve.startHandle = { x: 10, y: 20 };
+  await act(async () => root.render(<Harness />));
+  await clickText('content.callout.resetRoute');
+  expect(latestSettings.style.connector.curve).toMatchObject({ mode: 'auto' });
+
+  await clickText('content.callout.attachmentMode.anchor');
+  expect(latestSettings.placement.connectorAttachments?.frame.mode).toBe('anchor');
+  await clickText('content.callout.attachmentMode.free');
+  expect(latestSettings.placement.connectorAttachments?.frame.mode).toBe('free');
+
+  await selectOption('content.callout.routingLabel', 'content.callout.routing.elbow');
+  await clickText('content.callout.cornerStyle.rounded');
+  await enterNumber('content.callout.cornerRadiusLabel', 18);
+  await enterNumber('content.callout.frameGapLabel', 9);
+  await enterNumber('content.callout.blockGapLabel', 7);
+  expect(latestSettings.style.connector).toMatchObject({
+    cornerStyle: { kind: 'rounded', radius: 18 },
+    spacing: { blockGap: 7, frameGap: 9 },
+  });
+});
+
+it('keeps advanced body, title, and badge typography independently editable', async () => {
+  await selectOption('content.callout.directionLabel', 'content.callout.direction.rtl');
+  await selectOption('content.callout.wordBreakLabel', 'content.callout.wordBreak.break-word');
+  await selectOption('content.callout.hyphensLabel', 'content.callout.hyphens.auto');
+  await enterNumber('content.callout.lineHeightLabel', 1.8);
+  expect(latestSettings.style.typography).toMatchObject({
+    direction: 'rtl',
+    hyphens: 'auto',
+    lineHeight: 1.8,
+    wordBreak: 'break-word',
+  });
+
+  await openSection('content.callout.manualTitle');
+  await selectOption('content.callout.directionLabel', 'content.callout.direction.ltr');
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="content.callout.badgeEnabled"]')
+      ?.click()
+  );
+  expect(latestSettings.style.title.direction).toBe('ltr');
+  expect(latestSettings.style.badge.enabled).toBe(true);
+  await selectOption(
+    'content.callout.badgePlacementLabel',
+    'content.callout.badgePlacement.body-start'
+  );
+  await selectOption('content.callout.badgeShapeLabel', 'content.callout.badgeShape.circle');
+  await selectOption('content.callout.badgeFontWeight', 'content.callout.badgeFontWeight.normal');
+  expect(latestSettings.style.badge).toMatchObject({
+    fontWeight: 'normal',
+    placement: 'body-start',
+    shape: 'circle',
+  });
 });
 
 it('uses plain aligned numeric and select controls in callout settings', () => {

@@ -128,14 +128,111 @@ it('does not let a large title font impose the input default character width on 
   act(() => root.render(<CalloutBody {...props} />));
 
   const title = document.querySelector<HTMLInputElement>('[data-sniptale-callout-title]');
+  const titleShell = document.querySelector<HTMLElement>('[data-sniptale-callout-title-shell]');
   expect(title?.size).toBe(1);
   expect(title?.style.minWidth).toBe('0');
-  expect(title?.style.fontSize).toBe('72px');
-  expect(title?.style.textTransform).toBe('uppercase');
+  expect(titleShell?.style.fontSize).toBe('72px');
+  expect(titleShell?.style.textTransform).toBe('uppercase');
   expect(props.containerRef.current?.style.filter).toBe('drop-shadow(0 2px 3px #000)');
   expect(props.contentEditableRef.current?.style.letterSpacing).toBe('1px');
   const titleMeasure = document.querySelector<HTMLElement>('[data-sniptale-callout-title-measure]');
   expect(titleMeasure?.textContent).toBe('Wide heading');
   expect(titleMeasure?.style.width).toBe('max-content');
   expect(titleMeasure?.style.height).toBe('0px');
+});
+
+it('keeps body and title direction independent, including the auto bidi mode', () => {
+  const preset = createSystemCalloutPresetCatalog()[0]!;
+  const noop = vi.fn();
+  const props = {
+    applyFormatting: noop,
+    calloutDimensions: { height: 120, width: 240 },
+    cloudStyle: {},
+    containerRef: createRef<HTMLDivElement>(),
+    contentEditableRef: createRef<HTMLDivElement>(),
+    dragHandleStyle: {},
+    dynamicTail: null,
+    editableStyle: { unicodeBidi: 'plaintext' as const },
+    effectiveZIndex: 1,
+    floatingToolbarRect: null,
+    frameId: 'frame-direction',
+    handleBlur: noop,
+    handleClick: noop,
+    handleDragKeyDown: noop,
+    handleDragPointerDown: noop,
+    handleHandleBlur: noop,
+    handleHandleFocus: noop,
+    handleInput: noop,
+    handleKeyDown: noop,
+    handleMouseEnter: noop,
+    handleMouseLeave: noop,
+    handlePaste: noop,
+    handleResizeLeftKeyDown: noop,
+    handleResizeLeftPointerDown: noop,
+    handleResizeRightKeyDown: noop,
+    handleResizeRightPointerDown: noop,
+    handleSettingsClick: noop,
+    handleTailBaseEndKeyDown: noop,
+    handleTailBaseEndPointerDown: noop,
+    handleTailFrameKeyDown: noop,
+    handleTailFramePointerDown: noop,
+    handleTailKeyDown: noop,
+    handleTailPointerDown: noop,
+    handleWaypointDoubleClick: noop,
+    handleWaypointKeyDown: noop,
+    handleWaypointPointerDown: noop,
+    hasWaypoint: false,
+    isDragging: false,
+    isEditing: true,
+    isGeometryHandleHidden: false,
+    isHandleVisible: false,
+    isPolylineWaypoint: false,
+    isResizingLeft: false,
+    isResizingRight: false,
+    isTailBaseEndDragging: false,
+    isTailDragging: false,
+    isTailFrameDragging: false,
+    isWaypointDragging: false,
+    isWidthResizeHandleHidden: false,
+    onTitleChange: noop,
+    portalTheme: null,
+    resizeLeftHandleStyle: {},
+    resizeRightHandleStyle: {},
+    settings: {
+      content: { bodyHtml: '<p>مرحبا 123</p>', titleText: 'Title' },
+      enabled: true,
+      placement: preset.placement,
+      style: {
+        ...preset.style,
+        title: { ...preset.style.title, direction: 'auto' as const, enabled: true },
+        typography: { ...preset.style.typography, direction: 'rtl' as const },
+      },
+    },
+    settingsAnchorRef: createRef<HTMLButtonElement>(),
+    settingsHandleStyle: {},
+    showSettingsHandle: false,
+    tailBaseEndHandleStyle: null,
+    tailFrameHandleStyle: null,
+    tailHandleCursor: 'default',
+    tailHandleStyle: null,
+    voice: {
+      actions: { start: noop, stop: noop },
+      state: { active: false, audioLevel: 0, errorCode: null, phase: 'idle' as const },
+    },
+    voiceButtonLeftOffset: 0,
+    waypointAngle: null,
+    waypointAngleStyle: null,
+    waypointHandleStyle: null,
+    wrapperRef: createRef<HTMLDivElement>(),
+    wrapperStyle: {},
+  } satisfies ComponentProps<typeof CalloutBody>;
+
+  act(() => root.render(<CalloutBody {...props} />));
+
+  expect(props.contentEditableRef.current?.getAttribute('dir')).toBe('rtl');
+  expect(props.contentEditableRef.current?.style.unicodeBidi).toBe('plaintext');
+  expect(document.querySelector('[data-sniptale-callout-title-shell]')?.getAttribute('dir')).toBe(
+    'auto'
+  );
+  expect(document.querySelector('[data-sniptale-callout-title]')?.getAttribute('dir')).toBe('auto');
 });

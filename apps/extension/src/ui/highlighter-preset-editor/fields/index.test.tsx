@@ -92,23 +92,51 @@ function getRangeInput(label: string) {
   return input;
 }
 
-async function interactWithFields(state: ReturnType<typeof createBaseState>) {
-  const { colorSelectors, nameInput, numberInputs, resizeHandle, styleButton, textarea } =
-    queryFieldElements();
+function selectCategory(label: string) {
+  const button = container?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  if (!button) throw new Error(`Missing inspector category: ${label}`);
+  act(() => button.click());
+}
 
+async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   await act(async () => {
+    const { colorSelectors, nameInput, styleButton } = queryFieldElements();
     setInputValue(nameInput, 'Updated preset');
     colorSelectors[0]?.click();
-    colorSelectors[1]?.click();
-    setInputValue(textarea, 'border-color: blue;');
+    setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
+    setInputValue(getRangeInput('highlighter.editor.strokeOpacityLabel'), '65');
+    styleButton?.click();
+  });
+
+  selectCategory('highlighter.editor.fillSection');
+  await act(async () => {
+    queryFieldElements().colorSelectors[0]?.click();
+    setInputValue(getRangeInput('highlighter.editor.fillOpacityLabel'), '55');
+  });
+
+  selectCategory('highlighter.editor.geometrySection');
+  await act(async () => {
+    const separatePadding = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+      button.textContent?.includes('highlighter.editor.paddingSeparate')
+    );
+    separatePadding?.click();
+  });
+  await act(async () => {
+    const { numberInputs } = queryFieldElements();
     setInputValue(numberInputs[0] as HTMLInputElement, '11');
     setInputValue(numberInputs[3] as HTMLInputElement, '14');
-    setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
     setInputValue(getRangeInput('highlighter.editor.radiusLabel'), '8');
-    setInputValue(getRangeInput('highlighter.editor.strokeOpacityLabel'), '65');
-    setInputValue(getRangeInput('highlighter.editor.fillOpacityLabel'), '55');
+  });
+
+  selectCategory('highlighter.editor.effectsSection');
+  await act(async () => {
     setInputValue(getRangeInput('highlighter.editor.shadowLabel'), '100');
-    styleButton?.click();
+  });
+
+  selectCategory('highlighter.editor.customCssLabel');
+  await act(async () => {
+    const { resizeHandle, textarea } = queryFieldElements();
+    setInputValue(textarea, 'border-color: blue;');
     resizeHandle?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
 
@@ -116,8 +144,11 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   expect(state.setColor).toHaveBeenCalledWith('#123456');
   expect(state.setFillColor).toHaveBeenCalledWith('#123456');
   expect(state.setCustomCss).toHaveBeenCalledWith('border-color: blue;');
-  expect(state.updatePadding).toHaveBeenCalledWith('top', 11);
-  expect(state.updatePadding).toHaveBeenCalledWith('left', 14);
+  const paddingUpdates = vi
+    .mocked(state.setPadding)
+    .mock.calls.map(([update]) => (typeof update === 'function' ? update(state.padding) : update));
+  expect(paddingUpdates).toContainEqual({ ...state.padding, top: 11 });
+  expect(paddingUpdates).toContainEqual({ ...state.padding, left: 14 });
   expect(state.setStyle).toHaveBeenCalledWith('solid');
   expect(state.setShadow).toHaveBeenCalledWith(100);
   expect(state.handleResizeStart).toHaveBeenCalledOnce();
@@ -149,7 +180,6 @@ describe('BorderPresetEditorFields', () => {
 
     expect(container?.textContent).toContain('highlighter.editor.previewLabel');
     expect(container?.textContent).toContain('highlighter.editor.nameLabel');
-    expect(container?.textContent).toContain('highlighter.editor.customCssLabel');
     expect(container?.textContent).toContain('highlighter.editor.previewSampleText');
     expect(container?.textContent).not.toContain('highlighter.editor.opacityLabel');
     expect(container?.querySelector('input[type="checkbox"]')).toBeNull();
@@ -159,6 +189,7 @@ describe('BorderPresetEditorFields', () => {
 
   it('shows css validation feedback when an error is present', async () => {
     await renderFields(createState({ cssError: 'invalid-css' }));
+    selectCategory('highlighter.editor.customCssLabel');
 
     expect(container?.textContent).toContain('invalid-css');
     expect(container?.querySelector('.border-2')).toBeTruthy();

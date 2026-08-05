@@ -6,6 +6,7 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCalloutStrokeDasharray } from '../../../features/highlighter/callout-stroke';
 import { getCalloutAccentEdgePath } from '../../../features/highlighter/callout-accent-edge';
+import { cloneCalloutVisualStyle } from '../../../features/highlighter/callout-presets/catalog';
 import {
   projectCalloutLineCustomCss,
   resolveCalloutCustomCss,
@@ -110,10 +111,16 @@ function CalloutPreviewConnector(props: {
 
   const path =
     connector.routing === 'elbow'
-      ? 'M 50 25 L 40 25 L 40 35 L 29 35'
+      ? connector.cornerStyle.kind === 'rounded'
+        ? 'M 50 25 L 42 25 Q 40 25 40 27 L 40 33 Q 40 35 38 35 L 29 35'
+        : 'M 50 25 L 40 25 L 40 35 L 29 35'
       : connector.routing === 'polyline'
-        ? 'M 50 25 L 41 25 L 29 35'
-        : 'M 50 25 L 29 35';
+        ? connector.cornerStyle.kind === 'rounded'
+          ? 'M 50 25 L 43 25 Q 41 25 39.5 26.5 L 29 35'
+          : 'M 50 25 L 41 25 L 29 35'
+        : connector.routing === 'curve'
+          ? 'M 50 25 C 43 18 37 42 29 35'
+          : 'M 50 25 L 29 35';
   const connectorCustomStyles = projectCalloutLineCustomCss(props.customStyles.connector);
   return (
     <g data-ui="shared.callout-preview.connector" style={connectorCustomStyles.group}>
@@ -212,6 +219,11 @@ function CalloutPreviewCard(props: {
   const radius = Math.min(Math.max(surface.radius / 3, 1), 9);
   const previewBorderWidth = Math.min(surface.borderWidth, 2);
   const hasWedgeOutline = style.connector.kind === 'wedge' && previewBorderWidth > 0;
+  const badge = style.badge;
+  const badgeInTitle = badge.enabled && style.title.enabled && badge.placement !== 'body-start';
+  const badgeY = badgeInTitle ? 8.5 : style.title.enabled ? 19 : 13;
+  const badgeX = badge.placement === 'title-end' && badgeInTitle ? 86 : 56;
+  const badgeSize = Math.min(7, Math.max(4, badge.size * 0.28));
   return (
     <>
       <defs>
@@ -265,6 +277,20 @@ function CalloutPreviewCard(props: {
             ) : null}
           </g>
         ) : null}
+        {badge.enabled ? (
+          <g data-ui="shared.callout-preview.badge">
+            <rect
+              fill={badge.backgroundColor}
+              height={badgeSize}
+              rx={badge.shape === 'square' ? 0 : badge.shape === 'circle' ? badgeSize / 2 : 2}
+              stroke={badge.borderColor}
+              strokeWidth={Math.min(1.5, badge.borderWidth * 0.35)}
+              width={Math.max(badgeSize, Math.min(14, badge.text.length * 3.2 + 3))}
+              x={badgeX}
+              y={badgeY - badgeSize / 2}
+            />
+          </g>
+        ) : null}
         <path
           d={
             style.title.enabled
@@ -311,7 +337,8 @@ export function CalloutPresetPreview({
   const id = useId().replaceAll(':', '');
   const checkerPatternId = `callout-checker-${id}`;
   const clipPathId = `callout-surface-${id}`;
-  const customStyles = resolveCalloutCustomCss(style.customCss).styles;
+  const normalizedStyle = cloneCalloutVisualStyle(style);
+  const customStyles = resolveCalloutCustomCss(normalizedStyle.customCss).styles;
   const placementPoint = placement ? getPlacementPreviewPoint(placement) : null;
 
   return (
@@ -353,12 +380,12 @@ export function CalloutPresetPreview({
             r="2"
           />
         ) : null}
-        <CalloutPreviewConnector customStyles={customStyles} style={style} />
+        <CalloutPreviewConnector customStyles={customStyles} style={normalizedStyle} />
         <CalloutPreviewCard
           checkerPatternId={checkerPatternId}
           clipPathId={clipPathId}
           customStyles={customStyles}
-          style={style}
+          style={normalizedStyle}
         />
       </svg>
     </span>

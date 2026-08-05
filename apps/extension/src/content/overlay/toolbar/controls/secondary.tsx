@@ -71,6 +71,9 @@ function createUtilityButtonsProps(args: {
           ...(args.toolbarProps.futureFrameCalloutActions === undefined
             ? {}
             : { futureFrameCalloutActions: args.toolbarProps.futureFrameCalloutActions }),
+          ...(args.toolbarProps.futureFrameStepBadgeActions === undefined
+            ? {}
+            : { futureFrameStepBadgeActions: args.toolbarProps.futureFrameStepBadgeActions }),
         }),
   };
 }

@@ -12,7 +12,7 @@ import { PaintBucket, Palette, Square } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { CompactColorSelector } from '../../color-selector';
 import { NumericRow } from '../../compact-inspector-controls';
-import { TextWithOverflowHint } from '../../compact-inspector-controls/overflow-hint';
+import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import {
   resolveCalloutBoundColor,
   type CalloutFrameColors,
@@ -25,27 +25,7 @@ export type ManualContentProps = {
   settings: CalloutSettings;
 };
 
-export function PropertyField(props: {
-  children: ReactNode;
-  compactLabel?: boolean;
-  label: string;
-}) {
-  return (
-    <div
-      data-ui="content.callout-settings.property-field"
-      data-field-label={props.label}
-      className={`grid min-w-0 items-center gap-2 ${
-        props.compactLabel ? 'grid-cols-[4rem_minmax(0,1fr)]' : 'grid-cols-[7.5rem_minmax(0,1fr)]'
-      }`}
-    >
-      <TextWithOverflowHint
-        className="truncate text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
-        text={props.label}
-      />
-      <div className="min-w-0">{props.children}</div>
-    </div>
-  );
-}
+export { PropertyField };
 
 export function ColorField(props: {
   disabled?: boolean;
@@ -137,6 +117,7 @@ export function NumericProperty(props: {
   max?: number;
   scrubMax?: number;
   step?: number;
+  unit?: '' | '%' | 'deg' | 'px';
   value: number;
   onChange: (value: number) => void;
 }) {
@@ -147,7 +128,7 @@ export function NumericProperty(props: {
       min={props.min}
       {...(props.max === undefined ? {} : { max: props.max })}
       step={props.step ?? 1}
-      unit="px"
+      unit={props.unit ?? 'px'}
       value={props.value}
       scrub={{
         min: props.min,
@@ -162,6 +143,23 @@ export function NumericProperty(props: {
 
 export function SettingsStack(props: { children: ReactNode }) {
   return <div className="grid gap-2">{props.children}</div>;
+}
+
+export function AdditionalSettings(props: { children: ReactNode }) {
+  return (
+    <details className="group mt-1 border-t border-[color:var(--sniptale-color-border-soft)] pt-1.5">
+      <summary
+        className={[
+          'cursor-pointer select-none text-[11px] font-semibold',
+          'text-[var(--sniptale-color-text-secondary)]',
+          'hover:text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
+        {translate('content.callout.additionalSettings')}
+      </summary>
+      <div className="mt-2 grid gap-2">{props.children}</div>
+    </details>
+  );
 }
 
 export function ChoiceField<T extends string>(props: {

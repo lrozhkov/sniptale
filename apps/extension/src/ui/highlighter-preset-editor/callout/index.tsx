@@ -31,8 +31,15 @@ function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
 function applyStylePatch(style: CalloutVisualStyle, patch: CalloutSettingsPatch) {
   return {
     accentEdge: { ...style.accentEdge, ...patch.style?.accentEdge },
+    badge: { ...style.badge, ...patch.style?.badge },
     colorBindings: { ...style.colorBindings, ...patch.style?.colorBindings },
-    connector: { ...style.connector, ...patch.style?.connector },
+    connector: {
+      ...style.connector,
+      ...patch.style?.connector,
+      cornerStyle: { ...style.connector.cornerStyle, ...patch.style?.connector?.cornerStyle },
+      curve: { ...style.connector.curve, ...patch.style?.connector?.curve },
+      spacing: { ...style.connector.spacing, ...patch.style?.connector?.spacing },
+    },
     customCss: patch.style?.customCss ?? style.customCss,
     surface: { ...style.surface, ...patch.style?.surface },
     title: { ...style.title, ...patch.style?.title },
@@ -92,7 +99,15 @@ function PresetEditorBody(props: {
             <CalloutSettingsPositionGrid
               anchor={props.placement.anchor}
               layout="square"
-              onChange={(anchor) => props.setPlacement(getPresetPlacement(anchor))}
+              onChange={(anchor) =>
+                props.setPlacement({
+                  ...getPresetPlacement(anchor),
+                  connectorAttachments: props.placement.connectorAttachments ?? {
+                    block: { mode: 'auto' },
+                    frame: { mode: 'auto' },
+                  },
+                })
+              }
             />
           </div>
         }

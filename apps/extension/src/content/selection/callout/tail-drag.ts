@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CalloutAttachment } from '@sniptale/runtime-contracts/highlighter/callout';
 import {
   acceptPointerDragEvent,
   finishPointerDragEvent,
@@ -72,35 +73,73 @@ export function getCalloutPerimeterPosition(rect: Rect, point: { x: number; y: n
 }
 
 export function getCalloutPerimeterAnchorPositions(rect: Rect, horizontalGuides: number[] = []) {
+  return getCalloutPerimeterAnchors(rect, horizontalGuides).map((anchor) => anchor.position);
+}
+
+interface CalloutPerimeterAnchor {
+  id: string;
+  position: number;
+}
+
+export function getCalloutPerimeterAnchors(
+  rect: Rect,
+  horizontalGuides: number[] = []
+): CalloutPerimeterAnchor[] {
   const perimeter = Math.max(1, 2 * (rect.width + rect.height));
-  const canonicalOffsets = [
-    0,
-    rect.width / 2,
-    rect.width,
-    rect.width + rect.height / 2,
-    rect.width + rect.height,
-    rect.width + rect.height + rect.width / 2,
-    2 * rect.width + rect.height,
-    2 * rect.width + rect.height + rect.height / 2,
+  const canonicalOffsets: Array<[string, number]> = [
+    ['top-left', 0],
+    ['top-center', rect.width / 2],
+    ['top-right', rect.width],
+    ['right-center', rect.width + rect.height / 2],
+    ['bottom-right', rect.width + rect.height],
+    ['bottom-center', rect.width + rect.height + rect.width / 2],
+    ['bottom-left', 2 * rect.width + rect.height],
+    ['left-center', 2 * rect.width + rect.height + rect.height / 2],
   ];
-  const guideOffsets = horizontalGuides.flatMap((guideY) => {
+  const guideOffsets: Array<[string, number]> = horizontalGuides.flatMap((guideY, index) => {
     const localY = clamp(guideY - rect.y, 0, rect.height);
-    return [rect.width + localY, 2 * rect.width + 2 * rect.height - localY];
+    return [
+      [`section-${index}-right`, rect.width + localY],
+      [`section-${index}-left`, 2 * rect.width + 2 * rect.height - localY],
+    ];
   });
-  return [...new Set([...canonicalOffsets, ...guideOffsets])].map((offset) => offset / perimeter);
+  const seen = new Set<number>();
+  return [...canonicalOffsets, ...guideOffsets].flatMap(([id, offset]) => {
+    if (seen.has(offset)) return [];
+    seen.add(offset);
+    return [{ id, position: offset / perimeter }];
+  });
+}
+
+export function resolveCalloutAttachmentPosition(
+  rect: Rect,
+  attachment: CalloutAttachment | undefined,
+  horizontalGuides: number[] = []
+) {
+  if (!attachment || attachment.mode === 'auto') return undefined;
+  if (attachment.mode === 'anchor' && attachment.anchorId) {
+    const anchor = getCalloutPerimeterAnchors(rect, horizontalGuides).find(
+      (candidate) => candidate.id === attachment.anchorId
+    );
+    if (anchor) return anchor.position;
+  }
+  return attachment.perimeterPosition;
 }
 
 function getPointDistance(first: Point, second: Point) {
   return Math.hypot(first.x - second.x, first.y - second.y);
 }
 
-function getNearestPerimeterAnchor(rect: Rect, point: Point, anchorPositions: number[]) {
-  return anchorPositions.reduce<{
+function getNearestPerimeterAnchor(rect: Rect, point: Point, anchors: CalloutPerimeterAnchor[]) {
+  return anchors.reduce<{
+    id: string;
     distance: number;
     position: number;
-  } | null>((nearest, position) => {
-    const distance = getPointDistance(point, getCalloutPerimeterPoint(rect, position));
-    return !nearest || distance < nearest.distance ? { distance, position } : nearest;
+  } | null>((nearest, anchor) => {
+    const distance = getPointDistance(point, getCalloutPerimeterPoint(rect, anchor.position));
+    return !nearest || distance < nearest.distance
+      ? { distance, id: anchor.id, position: anchor.position }
+      : nearest;
   }, null);
 }
 
@@ -108,22 +147,37 @@ export function getSnappedCalloutPerimeterPosition(
   rect: Rect,
   point: Point,
   activeSnapPosition: number | null,
-  anchorPositions = getCalloutPerimeterAnchorPositions(rect)
+  anchorPositions: Array<number | CalloutPerimeterAnchor> = getCalloutPerimeterAnchors(rect)
 ) {
+  const anchors = anchorPositions.map((anchor) =>
+    typeof anchor === 'number' ? { id: `position-${anchor}`, position: anchor } : anchor
+  );
   if (activeSnapPosition !== null) {
     const snapPoint = getCalloutPerimeterPoint(rect, activeSnapPosition);
     if (getPointDistance(point, snapPoint) <= PERIMETER_SNAP_RELEASE_DISTANCE) {
-      return { position: activeSnapPosition, snapPosition: activeSnapPosition };
+      const activeAnchor = anchors.find(
+        (anchor) => Math.abs(anchor.position - activeSnapPosition) < Number.EPSILON
+      );
+      return {
+        position: activeSnapPosition,
+        snapAnchorId: activeAnchor?.id ?? null,
+        snapPosition: activeSnapPosition,
+      };
     }
   }
 
-  const nearestAnchor = getNearestPerimeterAnchor(rect, point, anchorPositions);
+  const nearestAnchor = getNearestPerimeterAnchor(rect, point, anchors);
   if (nearestAnchor && nearestAnchor.distance <= PERIMETER_SNAP_ENTER_DISTANCE) {
-    return { position: nearestAnchor.position, snapPosition: nearestAnchor.position };
+    return {
+      position: nearestAnchor.position,
+      snapAnchorId: nearestAnchor.id,
+      snapPosition: nearestAnchor.position,
+    };
   }
 
   return {
     position: getCalloutPerimeterPosition(rect, point),
+    snapAnchorId: null,
     snapPosition: null,
   };
 }
@@ -143,6 +197,47 @@ export function getCalloutEdgePosition(
     : clamp((point.y - edgeRect.y) / Math.max(1, edgeRect.height), 0, 1);
 }
 
+function handleCalloutEdgeKeyDown(
+  args: {
+    connectorSide: ConnectorSide | null;
+    defaultPosition: number;
+    edgeRect: Rect;
+    isEditing: boolean;
+    onPositionChange: (position: number, attachment?: CalloutAttachment) => void;
+    perimeter?: boolean;
+    position: number | undefined;
+  },
+  event: CalloutHandleKeyboardEvent,
+  minPosition: number,
+  maxPosition: number
+) {
+  const side = args.connectorSide;
+  if (args.isEditing || !side) return;
+  const delta = getCalloutKeyboardDelta(event);
+  if (args.perimeter) {
+    if (!delta) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const current = getCalloutPerimeterPoint(args.edgeRect, args.position ?? args.defaultPosition);
+    const position = getCalloutPerimeterPosition(args.edgeRect, {
+      x: current.x + delta.x,
+      y: current.y + delta.y,
+    });
+    args.onPositionChange(position, { mode: 'free', perimeterPosition: position });
+    return;
+  }
+  const horizontal = side === 'top' || side === 'bottom';
+  const axisDelta = horizontal ? delta?.x : delta?.y;
+  if (!axisDelta) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const axisLength = horizontal ? args.edgeRect.width : args.edgeRect.height;
+  const current = args.position ?? args.defaultPosition;
+  args.onPositionChange(
+    clamp(current + axisDelta / Math.max(1, axisLength), minPosition, maxPosition)
+  );
+}
+
 export function useCalloutEdgeDrag(args: {
   connectorSide: ConnectorSide | null;
   defaultPosition: number;
@@ -150,15 +245,18 @@ export function useCalloutEdgeDrag(args: {
   isEditing: boolean;
   maxPosition?: number;
   minPosition?: number;
-  onPositionChange: (position: number) => void;
+  onPositionChange: (position: number, attachment?: CalloutAttachment) => void;
+  perimeterAnchors?: CalloutPerimeterAnchor[];
   perimeterAnchorPositions?: number[];
   perimeter?: boolean;
   position: number | undefined;
 }) {
   const [draftPosition, setDraftPosition] = React.useState<number | null>(null);
+  const [draftAttachment, setDraftAttachment] = React.useState<CalloutAttachment | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const pointerIdRef = React.useRef<number | null>(null);
   const draftRef = React.useRef<number | null>(null);
+  const draftAttachmentRef = React.useRef<CalloutAttachment | null>(null);
   const snapPositionRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -172,6 +270,8 @@ export function useCalloutEdgeDrag(args: {
     if (!isDragging) return false;
     pointerIdRef.current = null;
     draftRef.current = null;
+    draftAttachmentRef.current = null;
+    setDraftAttachment(null);
     snapPositionRef.current = null;
     setDraftPosition(null);
     setIsDragging(false);
@@ -190,10 +290,18 @@ export function useCalloutEdgeDrag(args: {
           args.edgeRect,
           point,
           snapPositionRef.current,
-          args.perimeterAnchorPositions
+          args.perimeterAnchors ?? args.perimeterAnchorPositions
         );
         position = snappedPosition.position;
         snapPositionRef.current = snappedPosition.snapPosition;
+        draftAttachmentRef.current = snappedPosition.snapAnchorId
+          ? {
+              anchorId: snappedPosition.snapAnchorId,
+              mode: 'anchor',
+              perimeterPosition: position,
+            }
+          : { mode: 'free', perimeterPosition: position };
+        setDraftAttachment(draftAttachmentRef.current);
       } else {
         position = getPointerPosition(
           event,
@@ -209,15 +317,22 @@ export function useCalloutEdgeDrag(args: {
     const handleUp = (event: PointerEvent) => {
       if (!finishPointerDragEvent(event, pointerIdRef, () => setIsDragging(false))) return;
       const position = draftRef.current;
+      const attachment = draftAttachmentRef.current;
       draftRef.current = null;
+      draftAttachmentRef.current = null;
+      setDraftAttachment(null);
       snapPositionRef.current = null;
-      if (position !== null) args.onPositionChange(position);
+      if (position !== null) {
+        if (attachment) args.onPositionChange(position, attachment);
+        else args.onPositionChange(position);
+      }
     };
     return registerPointerDragSession({ cancel, move: handleMove, up: handleUp });
   }, [args, cancel, isDragging, maxPosition, minPosition]);
 
   return {
     draftPosition,
+    draftAttachment,
     isDragging,
     handlePointerDown: (event: CalloutTailDragStartEvent) => {
       if (args.isEditing || !args.connectorSide || event.button !== 0) return;
@@ -231,6 +346,8 @@ export function useCalloutEdgeDrag(args: {
       }
       pointerIdRef.current = event.pointerId;
       draftRef.current = null;
+      draftAttachmentRef.current = null;
+      setDraftAttachment(null);
       if (args.perimeter) {
         const currentPosition = args.position ?? args.defaultPosition;
         const currentPoint = getCalloutPerimeterPoint(args.edgeRect, currentPosition);
@@ -238,41 +355,12 @@ export function useCalloutEdgeDrag(args: {
           args.edgeRect,
           currentPoint,
           null,
-          args.perimeterAnchorPositions
+          args.perimeterAnchors ?? args.perimeterAnchorPositions
         ).snapPosition;
       }
       setIsDragging(true);
     },
-    handleKeyDown: (event: CalloutHandleKeyboardEvent) => {
-      const side = args.connectorSide;
-      if (args.isEditing || !side) return;
-      const delta = getCalloutKeyboardDelta(event);
-      if (args.perimeter) {
-        if (!delta) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const current = getCalloutPerimeterPoint(
-          args.edgeRect,
-          args.position ?? args.defaultPosition
-        );
-        args.onPositionChange(
-          getCalloutPerimeterPosition(args.edgeRect, {
-            x: current.x + delta.x,
-            y: current.y + delta.y,
-          })
-        );
-        return;
-      }
-      const horizontal = side === 'top' || side === 'bottom';
-      const axisDelta = horizontal ? delta?.x : delta?.y;
-      if (!axisDelta) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const axisLength = horizontal ? args.edgeRect.width : args.edgeRect.height;
-      const current = args.position ?? args.defaultPosition;
-      args.onPositionChange(
-        clamp(current + axisDelta / Math.max(1, axisLength), minPosition, maxPosition)
-      );
-    },
+    handleKeyDown: (event: CalloutHandleKeyboardEvent) =>
+      handleCalloutEdgeKeyDown(args, event, minPosition, maxPosition),
   };
 }

@@ -1,4 +1,5 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
   BorderPreset,
   EffectMode,
@@ -16,7 +17,7 @@ export interface SerializableFrameData extends Omit<
   FrameData,
   'borderSettings' | 'blurSettings' | 'focusSettings'
 > {
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings | BorderPreset;
   blurSettings?: BlurSettings;
   focusSettings?: FocusSettings;
 }
@@ -25,7 +26,7 @@ export interface FrameSessionSnapshot {
   frames: SerializableFrameData[];
   globalEffectMode: EffectMode;
   globalStepBadgeSettings: GlobalStepBadgeSettings;
-  sessionBorderPreset: BorderPreset;
+  sessionBorderPreset: AppliedBorderSettings | BorderPreset;
   sessionBlurSettings: BlurSettings;
   sessionCalloutStyle: CalloutVisualStyle | null;
   sessionFocusSettings: FocusSettings;

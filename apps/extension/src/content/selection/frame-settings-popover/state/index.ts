@@ -1,8 +1,14 @@
 import type {
-  BlurSettings,
+  AppliedBorderSettings,
   BorderPreset,
+  BorderVisualStylePatch,
+  BlurSettings,
   FocusSettings,
 } from '../../../../features/highlighter/contracts';
+import { applyManualBorderStylePatch } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { useEffect, useState } from 'react';
+import { setFrameSessionBorderPreset } from '../../frame-runtime/session/border-preset';
+import { getBorderPresetCssValidation } from '../../../../ui/highlighter-preset-editor/useBorderPresetEditorState/validation';
 import {
   createFrameBlurHandlers,
   createFrameFocusHandlers,
@@ -13,17 +19,63 @@ import { useFrameStyleCatalog } from './catalog';
 
 type FrameSettingsPopoverStateArgs = {
   blurSettings?: BlurSettings;
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   focusSettings?: FocusSettings;
   frameId: string;
   isOpen: boolean;
   onApplyToFrame: (settings: {
-    borderSettings?: BorderPreset;
+    borderSettings?: AppliedBorderSettings;
     blurSettings?: BlurSettings;
     focusSettings?: FocusSettings;
   }) => void;
   scope?: 'frame' | 'session';
 };
+
+function useManualFrameBorderSettings(args: {
+  applyBorderSettingsFromUser: (settings: AppliedBorderSettings) => void;
+  isOpen: boolean;
+  localBorderSettings: AppliedBorderSettings;
+  onApplyToFrame: (settings: { borderSettings: AppliedBorderSettings }) => void;
+  savePreset: (input: {
+    name?: string;
+    overwrite?: BorderPreset;
+    style: AppliedBorderSettings;
+  }) => Promise<BorderPreset | null>;
+  selectPreset: (preset: BorderPreset) => void;
+}) {
+  const [cssDraft, setCssDraft] = useState(args.localBorderSettings.customCss);
+
+  useEffect(() => {
+    if (args.isOpen) setCssDraft(args.localBorderSettings.customCss);
+  }, [args.isOpen, args.localBorderSettings.customCss]);
+
+  const applyPatch = (patch: BorderVisualStylePatch) => {
+    const settings = applyManualBorderStylePatch(args.localBorderSettings, patch);
+    args.applyBorderSettingsFromUser(settings);
+    args.onApplyToFrame({ borderSettings: settings });
+    setFrameSessionBorderPreset(settings);
+  };
+  const onCssDraftChange = (customCss: string) => {
+    setCssDraft(customCss);
+    const validation = getBorderPresetCssValidation(customCss);
+    if (validation.cssError || validation.hasBlockedProps) return;
+    applyPatch({ customCss, inheritCustomCss: Boolean(customCss.trim()) });
+  };
+  const save = async (input: { name?: string; overwrite?: BorderPreset }) => {
+    const preset = await args.savePreset({ ...input, style: args.localBorderSettings });
+    if (!preset) return false;
+    args.selectPreset(preset);
+    return true;
+  };
+
+  return {
+    applyPatch,
+    cssDraft,
+    cssError: getBorderPresetCssValidation(cssDraft).cssError,
+    onCssDraftChange,
+    save,
+  };
+}
 
 export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs) {
   const session = useFrameSettingsPopoverLifecycle({
@@ -36,7 +88,7 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
   });
   const handleSelectPreset = createFrameSettingsPresetHandler({
     onApplyToFrame: args.onApplyToFrame,
-    setSelectedPresetId: session.frame.selectPreset,
+    setSelectedPreset: session.frame.selectPreset,
   });
   const blurHandlers = createFrameBlurHandlers({
     localBlurSettings: session.frame.localBlurSettings,
@@ -58,10 +110,25 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
     },
     reconcileCatalogSettings: session.catalog.reconcileCatalogSettings,
   });
+  const manual = useManualFrameBorderSettings({
+    applyBorderSettingsFromUser: session.frame.applyBorderSettingsFromUser,
+    isOpen: args.isOpen,
+    localBorderSettings: session.frame.localBorderSettings,
+    onApplyToFrame: args.onApplyToFrame,
+    savePreset: catalog.manual.save,
+    selectPreset: handleSelectPreset,
+  });
 
   return {
     catalog: {
       editor: catalog.editor,
+      manual: {
+        cssDraft: manual.cssDraft,
+        cssError: manual.cssError,
+        isSaving: catalog.manual.isSaving,
+        onCssDraftChange: manual.onCssDraftChange,
+        save: manual.save,
+      },
       pendingPresetIds: catalog.pendingPresetIds,
       visibleBorderPresets: session.catalog.visibleBorderPresets,
     },
@@ -71,6 +138,7 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
       handleBlurTypeChange: blurHandlers.handleBlurTypeChange,
       handleFocusChange: focusHandlers.handleFocusChange,
       handleFocusShowBorderChange: focusHandlers.handleFocusShowBorderChange,
+      handleManualBorderChange: manual.applyPatch,
       handleAddPreset: catalog.handlers.handleAddPreset,
       handleEditPreset: catalog.handlers.handleEditPreset,
       handleSelectPreset,
@@ -79,6 +147,7 @@ export function useFrameSettingsPopoverState(args: FrameSettingsPopoverStateArgs
     settings: {
       global: session.catalog.globalSettings,
       localBlur: session.frame.localBlurSettings,
+      localBorder: session.frame.localBorderSettings,
       localFocus: session.frame.localFocusSettings,
       selectedPresetId: session.frame.selectedPresetId,
     },

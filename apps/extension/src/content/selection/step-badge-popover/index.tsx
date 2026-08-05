@@ -2,10 +2,12 @@ import { useAppLocale } from '../../../platform/i18n';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { StepBadgePopoverAdapter } from './adapter';
 import { StepBadgePopoverEnabledContent } from './enabled-content';
-import { createStepBadgeEnabledContentProps } from './props';
 import { useStepBadgePopoverState } from './state';
 import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
+import { useStepBadgePresetPopoverController } from './preset-controller';
+import { createStepBadgeTemplateFromSettings } from '../../../features/highlighter/step-badge-presets/catalog';
+import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
 
 interface StepBadgePopoverProps {
   anchorEl: HTMLElement | null;
@@ -14,38 +16,12 @@ interface StepBadgePopoverProps {
   isOpen: boolean;
   onClose: () => void;
   stepBadge?: StepBadgeSettings;
-}
-
-function createEnabledContentProps(
-  frameId: string,
-  stepBadgeState: ReturnType<typeof useStepBadgePopoverState>
-) {
-  const {
-    handleAnchorChange,
-    handleAlphabetChange,
-    handleAutoModeChange,
-    handleEnabledChange,
-    handleOffsetToggle,
-    handleSizeLevelChange,
-    handleTypeChange,
-    handleValueChange,
-    isAuto,
-    localStepBadgeSettings,
-  } = stepBadgeState;
-
-  return createStepBadgeEnabledContentProps({
-    frameId,
-    handleAlphabetChange,
-    handleAnchorChange,
-    handleAutoModeChange,
-    handleEnabledChange,
-    handleOffsetToggle,
-    handleSizeLevelChange,
-    handleTypeChange,
-    handleValueChange,
-    isAuto,
-    localStepBadgeSettings,
-  });
+  frameVisuals?: {
+    borderColor: string;
+    borderWidth: number;
+    fillColor?: string;
+    fillOpacity?: number;
+  };
 }
 
 export function StepBadgePopover({
@@ -55,6 +31,7 @@ export function StepBadgePopover({
   stepBadge,
   anchorEl,
   frameRect,
+  frameVisuals,
 }: StepBadgePopoverProps) {
   useAppLocale();
   const stepBadgeState = useStepBadgePopoverState({
@@ -65,6 +42,7 @@ export function StepBadgePopover({
     ...(stepBadge === undefined ? {} : { stepBadge }),
   });
   const { popoverRef } = stepBadgeState;
+  const presets = useStepBadgePresetPopoverController(isOpen);
   const popoverStyle = useFramePopoverPosition({
     anchorEl,
     fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
@@ -73,7 +51,11 @@ export function StepBadgePopover({
     isOpen,
     popoverRef,
   });
-  const enabledContentProps = createEnabledContentProps(frameId, stepBadgeState);
+  const visuals = frameVisuals ?? { borderColor: '#f97316', borderWidth: 4 };
+  const templateSettings = createStepBadgeTemplateFromSettings(
+    stepBadgeState.localStepBadgeSettings,
+    getLinkedStepBadgeDiameter(visuals.borderWidth)
+  );
   return (
     <StepBadgePopoverAdapter
       anchorEl={anchorEl}
@@ -81,7 +63,32 @@ export function StepBadgePopover({
       isOpen={isOpen}
       popoverRef={popoverRef}
     >
-      <StepBadgePopoverEnabledContent {...enabledContentProps} />
+      <StepBadgePopoverEnabledContent
+        frameId={frameId}
+        frameVisuals={visuals}
+        isAuto={stepBadgeState.isAuto}
+        localStepBadgeSettings={stepBadgeState.localStepBadgeSettings}
+        onAlphabetChange={stepBadgeState.handleAlphabetChange}
+        onAnchorChange={(anchor) => {
+          if (anchor) stepBadgeState.handleAnchorChange(anchor);
+        }}
+        onApplyPreset={stepBadgeState.applyPreset}
+        onAutoModeChange={stepBadgeState.handleAutoModeChange}
+        onConfigurePreset={() => undefined}
+        onCreatePreset={presets.create}
+        onDisable={() => stepBadgeState.handleEnabledChange(false)}
+        onOffsetToggle={stepBadgeState.handleOffsetToggle}
+        onResetPreset={(preset) => void presets.reset(preset)}
+        onSettingsChange={stepBadgeState.handleSettingsChange}
+        onTogglePreset={(preset) => void presets.toggle(preset)}
+        onTypeChange={(type) => stepBadgeState.handleTypeChange(type)}
+        onUpdatePreset={presets.update}
+        onValueChange={stepBadgeState.handleValueChange}
+        pendingPresetIds={presets.pending}
+        presetError={presets.error}
+        presets={presets.visiblePresets}
+        templateSettings={templateSettings}
+      />
     </StepBadgePopoverAdapter>
   );
 }

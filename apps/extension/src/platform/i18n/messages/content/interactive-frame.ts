@@ -101,6 +101,14 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Переместить точку маршрута · Shift — шаг 15° · Delete или двойной клик — сбросить',
     en: 'Move route point · Shift snaps by 15° · Delete or double-click resets it',
   },
+  moveCommentCurveStart: {
+    ru: 'Изменить начало кривой',
+    en: 'Adjust curve start',
+  },
+  moveCommentCurveEnd: {
+    ru: 'Изменить конец кривой',
+    en: 'Adjust curve end',
+  },
   deleteButton: {
     ru: 'Удалить (Delete)',
     en: 'Delete (Delete)',

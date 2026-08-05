@@ -51,15 +51,36 @@ function renderContent(effectMode: EffectMode, decorationVisible = true, compact
       handleBlurTypeChange={vi.fn()}
       handleFocusChange={vi.fn()}
       handleFocusShowBorderChange={vi.fn()}
+      handleManualBorderChange={vi.fn()}
       handleAddPreset={vi.fn()}
       handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
       handleTogglePresetEnabled={vi.fn()}
       localBlurSettings={{ amount: 12, blurType: 'distortion', showBorder: decorationVisible }}
+      localBorderSettings={{
+        ...createBorderPreset('preset-1', 'Default'),
+        sourcePresetId: 'preset-1',
+        sourcePresetName: 'Default',
+      }}
       localFocusSettings={{ opacity: 0.65, showBorder: decorationVisible }}
       pendingPresetIds={new Set()}
       selectedPresetId="preset-1"
+      manual={{
+        cssDraft: '',
+        cssError: null,
+        isSaving: false,
+        onCssDraftChange: vi.fn(),
+        save: vi.fn().mockResolvedValue(true),
+      }}
     />
+  );
+}
+
+function expectNoFrameStyleSectionHeading(markup: string) {
+  expect(markup).not.toContain(
+    `sniptale-content-popover-section-label">${translate(
+      'content.overlayControls.frameStyleLabel'
+    )}</label>`
   );
 }
 
@@ -69,7 +90,7 @@ describe('FrameSettingsPopoverContent', () => {
 
     expect(markup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
-    expect(markup).not.toContain(translate('content.overlayControls.frameStyleLabel'));
+    expectNoFrameStyleSectionHeading(markup);
     expect(markup).toContain('shared.ui.content-popover-section');
     expect(markup).toContain('sniptale-content-popover-section');
     expect(markup).toContain('Default');
@@ -100,7 +121,7 @@ describe('FrameSettingsPopoverContent', () => {
             : 'content.interactiveFrame.effectFocus'
         )
       );
-      expect(markup).not.toContain(translate('content.overlayControls.frameStyleLabel'));
+      expectNoFrameStyleSectionHeading(markup);
       expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-frame-style-section');
       expect(markup).toContain('sniptale-glass-switch--on');

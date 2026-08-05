@@ -73,12 +73,23 @@ function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
 
 function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   const stepBadge = props.currentFrame.stepBadge ?? props.frame.stepBadge;
+  const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     anchorEl: props.stepBadgePopoverAnchorRef.current,
+    ...(borderSettings
+      ? {
+          frameVisuals: {
+            borderColor: borderSettings.color,
+            borderWidth: borderSettings.width,
+            fillColor: borderSettings.fillColor,
+            fillOpacity: borderSettings.fillOpacity,
+          },
+        }
+      : {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
   };
 }

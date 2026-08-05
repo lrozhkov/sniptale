@@ -45,6 +45,7 @@ export type FrameRenderDescriptor = {
   stepBadgeManualSide: string | undefined;
   stepBadgeOffsetDirections: string;
   stepBadgeSizeLevel: number | undefined;
+  stepBadgeStyle: string;
   stepBadgeType: string | undefined;
   stepBadgeValue: string | number | undefined;
   width: number;
@@ -113,7 +114,7 @@ function buildFrameBorderDescriptor(frame: FrameData) {
     borderCustomCss: borderSettings?.customCss,
     borderFillColor: borderSettings?.fillColor,
     borderFillOpacity: borderSettings?.fillOpacity,
-    borderId: borderSettings?.id,
+    borderId: borderSettings?.sourcePresetId,
     borderInheritCustomCss: borderSettings?.inheritCustomCss,
     borderOpacity: borderSettings?.opacity,
     borderPaddingBottom: padding?.bottom,
@@ -150,6 +151,7 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
     stepBadgeManualSide: stepBadge?.manualPlacement?.side,
     stepBadgeOffsetDirections: (stepBadge?.offsetDirections ?? []).join(','),
     stepBadgeSizeLevel: stepBadge?.sizeLevel,
+    stepBadgeStyle: JSON.stringify(stepBadge?.style ?? null),
     stepBadgeType: stepBadge?.type,
     stepBadgeValue: stepBadge?.value,
   };

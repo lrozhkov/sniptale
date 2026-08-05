@@ -17,6 +17,85 @@ function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.nativeEvent.stopImmediatePropagation();
 }
 
+type FrameSettingsPopoverController = ReturnType<typeof useFrameSettingsPopoverController>;
+
+function FrameSettingsPopoverSurface(props: {
+  controller: FrameSettingsPopoverController;
+  popoverRef: React.Ref<HTMLDivElement>;
+  popoverStyle: React.CSSProperties;
+  request: FrameSettingsPopoverProps;
+}) {
+  const { catalog, handlers, settings, surface } = props.controller;
+
+  return (
+    <div
+      ref={props.popoverRef}
+      className={[
+        'sniptale-frame-settings-popover',
+        'sniptale-glass-popover',
+        'sniptale-content-popover',
+        'sniptale-content-popover--toolbar-menu',
+        props.request.compact ? 'sniptale-content-popover--compact' : '',
+      ].join(' ')}
+      data-sniptale-activation-bridge="defer"
+      data-theme={surface.portalTheme ?? undefined}
+      data-frame-id={props.request.frameId}
+      onMouseDown={stopPopoverPropagation}
+      onClick={stopPopoverPropagation}
+      style={getThemedPortalStyle(surface.portalTheme, props.popoverStyle)}
+    >
+      <div className="sniptale-content-popover-body">
+        <FrameSettingsPopoverContent
+          compact={props.request.compact ?? false}
+          effectMode={props.request.effectMode}
+          globalSettings={{ ...settings.global, borderPresets: catalog.visibleBorderPresets }}
+          handleBlurChange={handlers.handleBlurChange}
+          handleBlurShowBorderChange={handlers.handleBlurShowBorderChange}
+          handleBlurTypeChange={handlers.handleBlurTypeChange}
+          handleFocusChange={handlers.handleFocusChange}
+          handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
+          handleManualBorderChange={handlers.handleManualBorderChange}
+          handleAddPreset={handlers.handleAddPreset}
+          handleEditPreset={handlers.handleEditPreset}
+          handleSelectPreset={handlers.handleSelectPreset}
+          handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
+          localBlurSettings={settings.localBlur}
+          localBorderSettings={settings.localBorder}
+          localFocusSettings={settings.localFocus}
+          pendingPresetIds={catalog.pendingPresetIds}
+          manual={catalog.manual}
+          {...(settings.selectedPresetId === undefined
+            ? {}
+            : { selectedPresetId: settings.selectedPresetId })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FrameStyleEditorLayer(props: { controller: FrameSettingsPopoverController }) {
+  const { editor } = props.controller.catalog;
+  const { portalTheme } = props.controller.surface;
+
+  return (
+    <div
+      className="sniptale-frame-style-editor-layer"
+      data-sniptale-activation-bridge="defer"
+      data-theme={portalTheme ?? undefined}
+      onMouseDown={stopPopoverPropagation}
+      onClick={stopPopoverPropagation}
+    >
+      <BorderPresetEditor
+        isOpen={editor.isOpen}
+        isSaving={editor.isSaving}
+        onClose={editor.onClose}
+        onSave={editor.onSave}
+        {...(editor.preset === undefined ? {} : { preset: editor.preset })}
+      />
+    </div>
+  );
+}
+
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
   const popoverRef = useFloatingSurfaceWheelContainment(state.surface.popoverRef);
@@ -35,63 +114,13 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
 
   return createPortal(
     <>
-      <div
-        ref={popoverRef}
-        className={[
-          'sniptale-frame-settings-popover',
-          'sniptale-glass-popover',
-          'sniptale-content-popover',
-          'sniptale-content-popover--toolbar-menu',
-          props.compact ? 'sniptale-content-popover--compact' : '',
-        ].join(' ')}
-        data-sniptale-activation-bridge="defer"
-        data-theme={state.surface.portalTheme ?? undefined}
-        data-frame-id={props.frameId}
-        onMouseDown={stopPopoverPropagation}
-        onClick={stopPopoverPropagation}
-        style={getThemedPortalStyle(state.surface.portalTheme, popoverStyle)}
-      >
-        <div className="sniptale-content-popover-body">
-          <FrameSettingsPopoverContent
-            compact={props.compact ?? false}
-            effectMode={props.effectMode}
-            globalSettings={{
-              ...state.settings.global,
-              borderPresets: state.catalog.visibleBorderPresets,
-            }}
-            handleBlurChange={state.handlers.handleBlurChange}
-            handleBlurShowBorderChange={state.handlers.handleBlurShowBorderChange}
-            handleBlurTypeChange={state.handlers.handleBlurTypeChange}
-            handleFocusChange={state.handlers.handleFocusChange}
-            handleFocusShowBorderChange={state.handlers.handleFocusShowBorderChange}
-            handleAddPreset={state.handlers.handleAddPreset}
-            handleEditPreset={state.handlers.handleEditPreset}
-            handleSelectPreset={state.handlers.handleSelectPreset}
-            handleTogglePresetEnabled={state.handlers.handleTogglePresetEnabled}
-            localBlurSettings={state.settings.localBlur}
-            localFocusSettings={state.settings.localFocus}
-            pendingPresetIds={state.catalog.pendingPresetIds}
-            selectedPresetId={state.settings.selectedPresetId}
-          />
-        </div>
-      </div>
-      <div
-        className="sniptale-frame-style-editor-layer"
-        data-sniptale-activation-bridge="defer"
-        data-theme={state.surface.portalTheme ?? undefined}
-        onMouseDown={stopPopoverPropagation}
-        onClick={stopPopoverPropagation}
-      >
-        <BorderPresetEditor
-          isOpen={state.catalog.editor.isOpen}
-          isSaving={state.catalog.editor.isSaving}
-          onClose={state.catalog.editor.onClose}
-          onSave={state.catalog.editor.onSave}
-          {...(state.catalog.editor.preset === undefined
-            ? {}
-            : { preset: state.catalog.editor.preset })}
-        />
-      </div>
+      <FrameSettingsPopoverSurface
+        controller={state}
+        popoverRef={popoverRef}
+        popoverStyle={popoverStyle}
+        request={props}
+      />
+      <FrameStyleEditorLayer controller={state} />
     </>,
     resolveContentPortalTarget(props.anchorEl)
   );

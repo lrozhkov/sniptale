@@ -4,7 +4,7 @@ import {
   normalizeBorderPresetVisualFields,
   percentToUnit,
 } from '@sniptale/ui/highlighter-style/normalize';
-import type { BorderPadding, BorderPreset } from '@sniptale/ui/highlighter-style/types';
+import type { BorderPadding, BorderVisualStyle } from '@sniptale/ui/highlighter-style/types';
 import { projectFrameDecorationCssStyles } from './decoration';
 
 export interface ResolvedBorderPresetVisual {
@@ -13,9 +13,9 @@ export interface ResolvedBorderPresetVisual {
   strokeColor: string;
   strokeOpacity: number;
   strokeWidth: number;
-  strokeStyle: BorderPreset['style'];
+  strokeStyle: BorderVisualStyle['style'];
   radius: number;
-  shadow: BorderPreset['shadow'];
+  shadow: BorderVisualStyle['shadow'];
   fillColor: string;
   fillOpacity: number;
   inheritCustomCss: boolean;
@@ -63,7 +63,7 @@ export function colorToRgba(color: string, opacityPercent: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-function resolveCustomCssStyles(preset: BorderPreset): CSSProperties {
+function resolveCustomCssStyles(preset: BorderVisualStyle): CSSProperties {
   if (!preset.inheritCustomCss) {
     return {};
   }
@@ -76,11 +76,13 @@ function resolveCustomCssStyles(preset: BorderPreset): CSSProperties {
   return projectFrameDecorationCssStyles(validation.styles);
 }
 
-export function resolveBorderPresetVisual(preset: BorderPreset): ResolvedBorderPresetVisual {
+export function resolveBorderPresetVisual(
+  preset: BorderVisualStyle & { id?: string; sourcePresetId?: string }
+): ResolvedBorderPresetVisual {
   const normalizedPreset = normalizeBorderPresetVisualFields(preset);
 
   return {
-    id: normalizedPreset.id,
+    id: normalizedPreset.sourcePresetId ?? normalizedPreset.id ?? 'manual',
     opacity: normalizedPreset.opacity,
     strokeColor: normalizedPreset.color,
     strokeOpacity: normalizedPreset.strokeOpacity,

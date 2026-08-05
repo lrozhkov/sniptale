@@ -1,6 +1,6 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FocusSettings,
   FrameData,
@@ -11,6 +11,7 @@ import { createCompositeSelector } from '../../../platform/frame/selectors';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
 import { getFutureFrameCallout } from '../session/future-callout';
+import { cloneStepBadgeSettings } from '../session/step-badge-defaults';
 
 type BuildFrameForAddArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -20,7 +21,7 @@ type BuildFrameForAddArgs = Pick<
   | 'sessionFocusSettingsRef'
   | 'sessionStepBadgeTemplateRef'
 > & {
-  calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
+  calculateFrameCoords: (element: HTMLElement, borderSettings?: AppliedBorderSettings) => FrameData;
   element: HTMLElement;
 };
 
@@ -83,7 +84,7 @@ function resolveFrameBuildSettings(
 function applyFrameBuildSettings(
   baseFrameData: FrameData,
   params: {
-    borderSettings: BorderPreset;
+    borderSettings: AppliedBorderSettings;
     blurSettings: BlurSettings;
     focusSettings: FocusSettings;
     effectMode: EffectMode;
@@ -113,11 +114,11 @@ function buildStepBadgeSettings(template: StepBadgeSettings | null, isAutoMode: 
   }
 
   if (template.auto === false) {
-    return { ...template };
+    return cloneStepBadgeSettings(template);
   }
 
   return {
-    ...template,
+    ...cloneStepBadgeSettings(template),
     value: isAutoMode ? '' : template.value,
   };
 }

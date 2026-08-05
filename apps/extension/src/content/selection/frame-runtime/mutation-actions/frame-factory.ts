@@ -1,5 +1,5 @@
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   FrameData,
   FreeFrameInput,
 } from '../../../../features/highlighter/contracts';
@@ -20,7 +20,7 @@ type CreateAddFrameHandlerArgs = Pick<
   | 'sessionStepBadgeTemplateRef'
   | 'recalculateStepBadgesRef'
 > & {
-  calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
+  calculateFrameCoords: (element: HTMLElement, borderSettings?: AppliedBorderSettings) => FrameData;
 };
 
 export function createGenerateFrameId() {
@@ -28,7 +28,7 @@ export function createGenerateFrameId() {
 }
 
 export function createCalculateFrameCoords(generateFrameId: () => string) {
-  return (element: HTMLElement, borderSettings?: BorderPreset): FrameData =>
+  return (element: HTMLElement, borderSettings?: AppliedBorderSettings): FrameData =>
     createFrameDataFromElement(generateFrameId(), element, borderSettings);
 }
 

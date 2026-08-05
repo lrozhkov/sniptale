@@ -27,7 +27,17 @@ export function useCalloutPresetEditorDraft(args: {
     sourceIdRef.current = args.source.id;
     setName(getCalloutPresetDisplayName(args.source, args.locale));
     setNameTouched(false);
-    setPlacement({ ...args.source.placement });
+    setPlacement({
+      ...args.source.placement,
+      ...(args.source.placement.connectorAttachments
+        ? {
+            connectorAttachments: {
+              block: { ...args.source.placement.connectorAttachments.block },
+              frame: { ...args.source.placement.connectorAttachments.frame },
+            },
+          }
+        : {}),
+    });
     setStyle(cloneCalloutVisualStyle(args.source.style));
   }, [args.isOpen, args.locale, args.source]);
 

@@ -71,6 +71,43 @@ describe('step badge boundary placement', () => {
     expect(style.transform).toBe('translate(-50%, 50%) translate(7.2px, 0px)');
   });
 
+  it('renders a custom diameter and semantic frame colors without changing placement', () => {
+    const style = getStepBadgeStyle({
+      borderColor: '#123456',
+      borderWidth: 4,
+      clickable: false,
+      fillColor: '#fedcba',
+      fillOpacity: 1,
+      settings: {
+        anchor: 'middle-right',
+        enabled: true,
+        style: {
+          backgroundColor: '#ffffff',
+          backgroundColorSource: 'frame-fill',
+          diameter: 40,
+          outlineColor: '#000000',
+          outlineColorSource: 'frame-border',
+          sizeSource: 'custom',
+          textColor: '#000000',
+          textColorSource: 'frame-border',
+        },
+        type: 'number',
+        value: '4',
+      },
+      zIndex: 10,
+    });
+
+    expect(style).toMatchObject({
+      backgroundColor: '#fedcba',
+      border: '2px solid #123456',
+      color: '#123456',
+      height: '40px',
+      right: 0,
+      top: '50%',
+      width: '40px',
+    });
+  });
+
   it('projects free pointer movement onto one exact frame border', () => {
     const placement = projectStepBadgeToFrameBoundary({
       frameRect,

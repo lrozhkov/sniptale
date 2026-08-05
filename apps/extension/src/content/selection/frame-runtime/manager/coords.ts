@@ -1,4 +1,4 @@
-import type { BorderPreset, FrameData } from '../../../../features/highlighter/contracts';
+import type { AppliedBorderSettings, FrameData } from '../../../../features/highlighter/contracts';
 import { createDocumentPagePlacement, getAbsolutePosition } from '../../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -18,7 +18,7 @@ function getElementViewportPosition(element: HTMLElement): ElementAbsolutePositi
 
 export function calculateFrameViewportCoords(
   element: HTMLElement,
-  borderSettings?: BorderPreset
+  borderSettings?: AppliedBorderSettings
 ): Pick<FrameData, 'x' | 'y' | 'width' | 'height'> {
   const coords = calculateFrameContainerCoords(
     getElementViewportPosition(element),
@@ -36,7 +36,7 @@ export function calculateFrameViewportCoords(
 export function createFrameDataFromElement(
   frameId: string,
   element: HTMLElement,
-  borderSettings?: BorderPreset
+  borderSettings?: AppliedBorderSettings
 ): FrameData {
   const frameCoords = calculateFrameViewportCoords(element, borderSettings);
   const pagePlacement = createDocumentPagePlacement(

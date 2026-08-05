@@ -19,6 +19,7 @@ import {
   createFrameSessionStorageChangedHandler,
 } from './settings';
 import { createCalloutPresetSessionSync } from './callout-defaults';
+import { createStepBadgePresetSessionSync } from './step-badge-defaults';
 import { setFutureFrameCallout } from './future-callout';
 
 export type FrameSessionSyncArgs = {
@@ -29,6 +30,7 @@ export type FrameSessionSyncArgs = {
   sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
+  sessionStepBadgeTemplateRef?: MutableRefObject<StepBadgeSettings | null>;
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
   updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
   updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
@@ -44,6 +46,7 @@ export function setupFrameSessionSyncListeners({
   sessionDefaultsInitializedRef,
   sessionFocusSettingsRef,
   sessionCalloutStyleRef,
+  sessionStepBadgeTemplateRef,
   syncFocusOpacity,
   updateGlobalStepBadgeSettings,
   updateFrameStepBadge,
@@ -76,6 +79,9 @@ export function setupFrameSessionSyncListeners({
   const cleanupWindowListeners = registerWindowListeners(windowListeners);
   const cleanupStorageListener = browserStorage.subscribeToChanges(handleStorageChanged);
   const cleanupCalloutPresetSync = createCalloutPresetSessionSync(sessionCalloutStyleRef);
+  const cleanupStepBadgePresetSync = sessionStepBadgeTemplateRef
+    ? createStepBadgePresetSessionSync(sessionStepBadgeTemplateRef)
+    : () => undefined;
 
   const cleanupFrameSession = combineFrameSessionSyncCleanups({
     cleanupStorageListener,
@@ -85,6 +91,7 @@ export function setupFrameSessionSyncListeners({
     setFutureFrameCallout(null);
     cleanupFrameSession();
     cleanupCalloutPresetSync();
+    cleanupStepBadgePresetSync();
   };
 }
 

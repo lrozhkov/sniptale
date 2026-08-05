@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FrameData,
   FocusSettings,
@@ -20,19 +20,26 @@ interface FrameManagerPublicResultParams {
   frames: FrameData[];
   getFutureFrameStyle: () => {
     blurSettings: BlurSettings;
-    borderSettings: BorderPreset;
+    borderSettings: AppliedBorderSettings;
     effectMode: EffectMode;
     focusSettings: FocusSettings;
     futureCallout?: CalloutSettings | null;
+    futureStepBadge?: StepBadgeSettings | null;
   };
   getGlobalStepBadgeSettings: () => GlobalStepBadgeSettings;
   hasFrameForElement: (element: HTMLElement) => boolean;
   recalculateStepBadges: RecalculateStepBadges;
   removeFrame: FrameMutations['removeFrame'];
   setFutureFrameEffectMode: (mode: EffectMode) => void;
-  futureFrameCallout?: {
-    enable: () => CalloutSettings;
-    set: (settings: CalloutSettings | null) => void;
+  futureFrameAnnotations?: {
+    callout: {
+      enable: () => CalloutSettings;
+      set: (settings: CalloutSettings | null) => void;
+    };
+    stepBadge: {
+      enable: () => StepBadgeSettings;
+      set: (settings: StepBadgeSettings | null) => void;
+    };
   };
   syncAutoBlurFrames: FrameMutations['syncAutoBlurFrames'];
   syncFocusOpacity: FrameMutations['syncFocusOpacity'];
@@ -74,7 +81,7 @@ function arePublicResultParamsEqual(
     prev.recalculateStepBadges === next.recalculateStepBadges &&
     prev.removeFrame === next.removeFrame &&
     prev.setFutureFrameEffectMode === next.setFutureFrameEffectMode &&
-    prev.futureFrameCallout === next.futureFrameCallout &&
+    prev.futureFrameAnnotations === next.futureFrameAnnotations &&
     prev.syncFocusOpacity === next.syncFocusOpacity &&
     prev.syncAutoBlurFrames === next.syncAutoBlurFrames &&
     prev.updateFrame === next.updateFrame &&
@@ -94,9 +101,12 @@ function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
     clearAutoBlurFrames: params.clearAutoBlurFrames,
     removeFrame: params.removeFrame,
     setFutureFrameEffectMode: params.setFutureFrameEffectMode,
-    ...(params.futureFrameCallout === undefined
+    ...(params.futureFrameAnnotations === undefined
       ? {}
-      : { futureFrameCallout: params.futureFrameCallout }),
+      : {
+          futureFrameCallout: params.futureFrameAnnotations.callout,
+          futureFrameStepBadge: params.futureFrameAnnotations.stepBadge,
+        }),
     clearFrames: params.clearFrames,
     syncAutoBlurFrames: params.syncAutoBlurFrames,
     updateFrame: params.updateFrame,

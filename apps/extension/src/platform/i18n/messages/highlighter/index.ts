@@ -9,6 +9,50 @@ import {
 } from '../shared/blur-controls';
 
 export const highlighterMessages = defineMessageSource({
+  stepBadgePresets: {
+    system: {
+      classic: { ru: 'Классический', en: 'Classic' },
+      outline: { ru: 'Контурный', en: 'Outline' },
+      compact: { ru: 'Компактный', en: 'Compact' },
+      large: { ru: 'Крупный', en: 'Large' },
+      letters: { ru: 'Буквенный', en: 'Letters' },
+    },
+    title: { ru: 'Шаблоны нумерации', en: 'Numbering templates' },
+    description: {
+      ru: 'Настраивайте, скрывайте и расставляйте варианты нумерации рамок.',
+      en: 'Customize, hide, and reorder reusable frame numbering styles.',
+    },
+    add: { ru: 'Добавить шаблон', en: 'Add template' },
+    defaultBadge: { ru: 'По умолчанию', en: 'Default' },
+    systemBadge: { ru: 'Системный', en: 'System' },
+    makeDefault: { ru: 'Сделать основным', en: 'Make default' },
+    toggle: { ru: 'Показывать в списке', en: 'Show in list' },
+    lastEnabled: {
+      ru: 'Должен остаться один шаблон',
+      en: 'At least one template must remain enabled',
+    },
+    reset: { ru: 'Восстановить системный вариант', en: 'Restore system template' },
+    delete: { ru: 'Удалить шаблон', en: 'Delete template' },
+    editor: {
+      newTitle: { ru: 'Новый шаблон нумерации', en: 'New numbering template' },
+      editTitle: { ru: 'Изменить шаблон нумерации', en: 'Edit numbering template' },
+      name: { ru: 'Название', en: 'Name' },
+    },
+    messages: {
+      loadError: {
+        ru: 'Не удалось загрузить шаблоны нумерации',
+        en: 'Could not load numbering templates',
+      },
+      saveError: {
+        ru: 'Не удалось сохранить шаблоны нумерации',
+        en: 'Could not save numbering templates',
+      },
+      created: { ru: 'Шаблон создан', en: 'Template created' },
+      updated: { ru: 'Шаблон обновлён', en: 'Template updated' },
+      deleted: { ru: 'Шаблон удалён', en: 'Template deleted' },
+      reset: { ru: 'Системный шаблон восстановлен', en: 'System template restored' },
+    },
+  },
   calloutPresets: {
     system: {
       bubble: { ru: 'Облачко', en: 'Bubble' },
@@ -253,6 +297,18 @@ export const highlighterMessages = defineMessageSource({
     },
   },
   editor: {
+    outlineSection: { ru: 'Контур', en: 'Outline' },
+    fillSection: { ru: 'Заливка', en: 'Fill' },
+    geometrySection: { ru: 'Геометрия', en: 'Geometry' },
+    effectsSection: { ru: 'Эффекты', en: 'Effects' },
+    saveSection: { ru: 'Сохранить', en: 'Save' },
+    manualNavigation: {
+      ru: 'Категории настройки рамки',
+      en: 'Frame style setting categories',
+    },
+    noFill: { ru: 'Без заливки', en: 'No fill' },
+    paddingLinked: { ru: 'Вместе', en: 'Linked' },
+    paddingSeparate: { ru: 'По сторонам', en: 'Per side' },
     editTitle: {
       ru: 'Редактировать пресет',
       en: 'Edit preset',

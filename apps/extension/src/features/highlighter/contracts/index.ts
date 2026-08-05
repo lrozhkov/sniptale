@@ -1,17 +1,21 @@
 // Highlighter Types
 import type {
+  AppliedBorderSettings,
   BlurSettings,
   BorderPreset,
   EffectMode,
   FocusSettings,
 } from '@sniptale/ui/highlighter-style/types';
 export type {
+  AppliedBorderSettings,
   BlurSettings,
   BlurStrokeStyle,
   BlurType,
   BorderPadding,
   BorderPreset,
   BorderPresetOrigin,
+  BorderVisualStyle,
+  BorderVisualStylePatch,
   EffectMode,
   FocusSettings,
   SystemBorderPresetKey,
@@ -67,7 +71,7 @@ export interface FrameData {
   createdBy?: 'auto-blur';
   effectMode?: EffectMode; // Эффект выделения: 'border' (default), 'blur' или 'focus'
   // Снимок настроек на момент создания рамки (чтобы не менялись при смене глобальных настроек)
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   blurSettings?: BlurSettings;
   focusSettings?: FocusSettings;
   // Настройки бейджа шага (нумерация/маркировка)
