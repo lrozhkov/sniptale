@@ -19,11 +19,15 @@ export function useStepBadgePresetPopoverController(isOpen: boolean) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
   const [sessionVisibleIds, setSessionVisibleIds] = useState<ReadonlySet<string>>(new Set());
+  const [editor, setEditor] = useState<{ isOpen: boolean; preset?: StepBadgePreset }>({
+    isOpen: false,
+  });
   const generation = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
     const current = ++generation.current;
+    setEditor({ isOpen: false });
     let visibilityInitialized = false;
     const accept = (next: StepBadgePresetCatalog) => {
       if (current !== generation.current) return;
@@ -75,19 +79,47 @@ export function useStepBadgePresetPopoverController(isOpen: boolean) {
     }
   };
 
+  const saveEditorPreset = async (preset: StepBadgePreset) => {
+    const result = await mutate(preset.id, () =>
+      updateStoredStepBadgePreset({
+        id: preset.id,
+        name: preset.name,
+        settings: preset.settings,
+      })
+    );
+    if (result.outcome === 'applied') setEditor({ isOpen: false });
+  };
+
+  const resetEditorPreset = async (preset: StepBadgePreset) => {
+    const result = await mutate(preset.id, () => resetStoredSystemStepBadgePreset(preset.id));
+    if (result.outcome === 'applied') setEditor({ isOpen: false });
+  };
+
   return {
-    catalog,
-    error,
-    pending,
-    presets: catalog?.presets ?? [],
-    visiblePresets: catalog?.presets.filter((preset) => sessionVisibleIds.has(preset.id)) ?? [],
-    create: (name: string, settings: StepBadgeTemplateSettings) =>
-      mutate('new', () => createUserStepBadgePreset({ name, settings })),
-    update: (preset: StepBadgePreset, settings: StepBadgeTemplateSettings, name = preset.name) =>
-      mutate(preset.id, () => updateStoredStepBadgePreset({ id: preset.id, name, settings })),
-    reset: (preset: StepBadgePreset) =>
-      mutate(preset.id, () => resetStoredSystemStepBadgePreset(preset.id)),
-    toggle: (preset: StepBadgePreset) =>
-      mutate(preset.id, () => setStoredStepBadgePresetEnabled(preset.id, preset.enabled === false)),
+    catalog: {
+      create: (name: string, settings: StepBadgeTemplateSettings) =>
+        mutate('new', () => createUserStepBadgePreset({ name, settings })),
+      error,
+      pending,
+      presets: catalog?.presets ?? [],
+      reset: (preset: StepBadgePreset) =>
+        mutate(preset.id, () => resetStoredSystemStepBadgePreset(preset.id)),
+      toggle: (preset: StepBadgePreset) =>
+        mutate(preset.id, () =>
+          setStoredStepBadgePresetEnabled(preset.id, preset.enabled === false)
+        ),
+      update: (preset: StepBadgePreset, settings: StepBadgeTemplateSettings, name = preset.name) =>
+        mutate(preset.id, () => updateStoredStepBadgePreset({ id: preset.id, name, settings })),
+      value: catalog,
+      visiblePresets: catalog?.presets.filter((preset) => sessionVisibleIds.has(preset.id)) ?? [],
+    },
+    editor: {
+      ...editor,
+      close: () => setEditor({ isOpen: false }),
+      isSaving: editor.preset ? pending.has(editor.preset.id) : false,
+      open: (preset: StepBadgePreset) => setEditor({ isOpen: true, preset }),
+      reset: resetEditorPreset,
+      save: saveEditorPreset,
+    },
   };
 }

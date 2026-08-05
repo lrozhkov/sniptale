@@ -8,6 +8,7 @@ import contentRuntimeEffectsStyles from './effects.css?inline';
 import contentAiPickerStyles from '../../overlay/ai/pick/runtime/styles.css?inline';
 import frameSettingsPopoverStyles from '../../selection/frame-settings-popover/styles.css?inline';
 import calloutSettingsPopoverStyles from '../../selection/callout-settings-popover/styles.css?inline';
+import settingsPopoverStyles from '../../selection/popover-sync/styles.css?inline';
 import contentHostStyles from './host.css?inline';
 
 const CONTENT_ENTRYPOINT_FONT_URL_PATTERNS = [
@@ -293,6 +294,7 @@ export function createContentEntrypointStyles(): string {
         contentAiPickerStyles,
         frameSettingsPopoverStyles,
         calloutSettingsPopoverStyles,
+        settingsPopoverStyles,
       ].join('\n')
     )
   );

@@ -30,6 +30,7 @@ function PositionHarness(props: {
   frameRect?: { x: number; y: number; width: number; height: number };
   isOpen?: boolean;
   layoutHeight?: number;
+  quickControlPlacement?: 'anchor-aligned' | 'callout-aware';
   transformedHeight?: number;
 }) {
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
@@ -53,6 +54,7 @@ function PositionHarness(props: {
     frameRect: props.frameRect ?? { x: 200, y: 20, width: 200, height: 60 },
     isOpen: props.isOpen ?? true,
     popoverRef,
+    ...(props.quickControlPlacement ? { quickControlPlacement: props.quickControlPlacement } : {}),
   });
 
   return (
@@ -383,6 +385,39 @@ describe('frame toolbar popover positioning', () => {
 
     expect(Number((container.firstElementChild as HTMLElement).dataset['left'])).toBe(284);
     expect(Number((container.firstElementChild as HTMLElement).dataset['top'])).toBe(257);
+  });
+});
+
+describe('anchor-aligned quick-control positioning', () => {
+  it('keeps the menu beside its own control instead of a frame callout', () => {
+    const callout = document.createElement('div');
+    callout.className = 'sniptale-callout';
+    callout.dataset['frameId'] = 'frame-1';
+    setRect(callout, new DOMRect(40, 40, 300, 240));
+    document.body.append(callout);
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(400, 320, 26, 26));
+    document.body.append(anchor);
+
+    act(() =>
+      root.render(
+        <PositionHarness
+          anchorEl={anchor}
+          fallbackHeight={240}
+          quickControlPlacement="anchor-aligned"
+        />
+      )
+    );
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(436);
+    expect(Number(popover.dataset['top'])).toBe(320);
+    expect(
+      overlaps(
+        { x: 436, y: 320, width: 160, height: 240 },
+        { x: 400, y: 320, width: 26, height: 26 }
+      )
+    ).toBe(false);
   });
 });
 

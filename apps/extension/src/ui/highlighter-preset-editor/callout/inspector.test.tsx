@@ -19,8 +19,16 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 
 vi.mock('../../color-selector', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../color-selector')>()),
-  CompactColorSelector: (props: { label: string; onChange: (value: string) => void }) => (
-    <button data-color-field={props.label} onClick={() => props.onChange('#123456')}>
+  CompactColorSelector: (props: {
+    disabled?: boolean;
+    label: string;
+    onChange: (value: string) => void;
+  }) => (
+    <button
+      disabled={props.disabled}
+      data-color-field={props.label}
+      onClick={() => props.onChange('#123456')}
+    >
       {props.label}
     </button>
   ),
@@ -161,6 +169,11 @@ afterEach(() => {
 });
 
 it('edits every shared callout inspector section and connector mode', async () => {
+  expect(
+    document.querySelector('[data-color-field="content.callout.textColorLabel"]')
+  ).not.toBeNull();
+  expect(document.querySelector('[data-ui="shared.callout-emphasis"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="shared.callout-alignment"]')).not.toBeNull();
   await selectOption('content.callout.fontFamilyLabel', 'content.callout.font.cursive');
   expect(latestSettings.style.typography.fontFamily).toBe('cursive');
   await clickAll('[data-color-field]');
@@ -193,6 +206,7 @@ it('edits every shared callout inspector section and connector mode', async () =
   await clickAll('button[aria-label="content.callout.titleToggle"]');
   expect(latestSettings.style.title.enabled).toBe(false);
   expect(document.querySelector('button[aria-label="content.callout.manualDivider"]')).toBeNull();
+  expect(document.querySelector('button[aria-label="content.callout.manualBadge"]')).toBeNull();
 
   await openSection('content.callout.manualSize');
   await changeAllNumbers();
@@ -274,10 +288,32 @@ it('stores a semantic frame color source and disables the custom picker', async 
     '[data-color-field="content.callout.backgroundLabel"]'
   );
   expect(backgroundPicker?.closest('fieldset')?.disabled).toBe(true);
+  expect(backgroundPicker?.disabled).toBe(true);
   expect(latestSettings.style.surface.backgroundColor).not.toBe('#fedcba');
 });
 
-it('edits advanced connector routing, endpoint attachments, and rounded corners', async () => {
+it('inherits the shadow color from the resolved comment background and border', async () => {
+  await openSection('content.callout.manualBackground');
+  const customSource = document.querySelector<HTMLButtonElement>(
+    '[data-shadow-color-source="custom"]'
+  );
+  await act(async () => customSource?.click());
+  expect(latestSettings.style.colorBindings.shadow).toBe('surface-background');
+  expect(
+    document
+      .querySelector('[data-color-field="content.callout.shadowColorLabel"]')
+      ?.closest('fieldset')?.disabled
+  ).toBe(true);
+
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('[data-shadow-color-source="surface-background"]')
+      ?.click()
+  );
+  expect(latestSettings.style.colorBindings.shadow).toBe('surface-border');
+});
+
+it('edits advanced connector routing and rounded corners without attachment mode controls', async () => {
   await openSection('content.callout.manualConnector');
   await selectOption('content.callout.routingLabel', 'content.callout.routing.curve');
   await enterNumber('content.callout.curvatureLabel', 0.8);
@@ -292,10 +328,9 @@ it('edits advanced connector routing, endpoint attachments, and rounded corners'
   await clickText('content.callout.resetRoute');
   expect(latestSettings.style.connector.curve).toMatchObject({ mode: 'auto' });
 
-  await clickText('content.callout.attachmentMode.anchor');
-  expect(latestSettings.placement.connectorAttachments?.frame.mode).toBe('anchor');
-  await clickText('content.callout.attachmentMode.free');
-  expect(latestSettings.placement.connectorAttachments?.frame.mode).toBe('free');
+  expect(document.body.textContent).not.toContain('content.callout.frameAttachmentLabel');
+  expect(document.body.textContent).not.toContain('content.callout.blockAttachmentLabel');
+  expect(document.body.textContent).not.toContain('content.callout.attachmentMode.anchor');
 
   await selectOption('content.callout.routingLabel', 'content.callout.routing.elbow');
   await clickText('content.callout.cornerStyle.rounded');
@@ -322,6 +357,8 @@ it('keeps advanced body, title, and badge typography independently editable', as
 
   await openSection('content.callout.manualTitle');
   await selectOption('content.callout.directionLabel', 'content.callout.direction.ltr');
+  expect(document.querySelector('button[aria-label="content.callout.manualBadge"]')).not.toBeNull();
+  await openSection('content.callout.manualBadge');
   await act(async () =>
     document
       .querySelector<HTMLButtonElement>('button[aria-label="content.callout.badgeEnabled"]')
@@ -329,12 +366,24 @@ it('keeps advanced body, title, and badge typography independently editable', as
   );
   expect(latestSettings.style.title.direction).toBe('ltr');
   expect(latestSettings.style.badge.enabled).toBe(true);
+  expect(
+    document.querySelector<HTMLInputElement>(
+      'input[placeholder="content.callout.badgeTextPlaceholder"]'
+    )?.className
+  ).toContain('cursor-text');
   await selectOption(
     'content.callout.badgePlacementLabel',
     'content.callout.badgePlacement.body-start'
   );
   await selectOption('content.callout.badgeShapeLabel', 'content.callout.badgeShape.circle');
-  await selectOption('content.callout.badgeFontWeight', 'content.callout.badgeFontWeight.normal');
+  await selectOption('content.callout.badgeFontWeight', 'content.callout.badgeFontWeightNormal');
+  expect(document.querySelectorAll('[data-badge-color-source]')).toHaveLength(2);
+  expect(
+    document.querySelectorAll('[data-color-field="content.callout.badgeBackgroundColor"]')
+  ).toHaveLength(1);
+  expect(
+    document.querySelectorAll('[data-color-field="content.callout.badgeTextColor"]')
+  ).toHaveLength(1);
   expect(latestSettings.style.badge).toMatchObject({
     fontWeight: 'normal',
     placement: 'body-start',
@@ -436,4 +485,12 @@ it('shows an endpoint size only when that endpoint has a marker', () => {
   expect(withoutMarkers).not.toContain('content.callout.frameMarkerSize');
   expect(withMarkers).toContain('content.callout.blockMarkerSize');
   expect(withMarkers).toContain('content.callout.frameMarkerSize');
+  expect(withMarkers.indexOf('content.callout.blockMarker')).toBeLessThan(
+    withMarkers.indexOf('content.callout.additionalSettings')
+  );
+  expect(withMarkers.indexOf('content.callout.frameMarker')).toBeLessThan(
+    withMarkers.indexOf('content.callout.additionalSettings')
+  );
+  expect(withMarkers).not.toContain('content.callout.frameAttachmentLabel');
+  expect(withMarkers).not.toContain('content.callout.blockAttachmentLabel');
 });

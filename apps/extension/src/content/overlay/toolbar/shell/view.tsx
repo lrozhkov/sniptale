@@ -26,34 +26,39 @@ export function ToolbarShellContent(props: {
 }) {
   const { toolbarProps, viewModel, onHoverCapture, onViewportChange } = props;
   const { derivedState } = viewModel;
+  const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
 
   return (
-    <ContentToolbarShell
-      ref={derivedState.toolbarRef}
-      dragging={derivedState.isDragging}
-      dataUi="content.toolbar.root"
-      data-display-mode={derivedState.displayMode}
-      style={getToolbarVisibilityStyle(derivedState.positionReady, derivedState.position)}
-      onMouseOverCapture={onHoverCapture}
-    >
-      <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-          <circle cx="9" cy="12" r="1" />
-          <circle cx="9" cy="5" r="1" />
-          <circle cx="9" cy="19" r="1" />
-          <circle cx="15" cy="12" r="1" />
-          <circle cx="15" cy="5" r="1" />
-          <circle cx="15" cy="19" r="1" />
-        </svg>
-      </ContentToolbarDragHandle>
+    <>
+      {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
+      <ContentToolbarShell
+        ref={derivedState.toolbarRef}
+        dragging={derivedState.isDragging}
+        dataUi="content.toolbar.root"
+        data-display-mode={derivedState.displayMode}
+        data-menu-open={menuOpen ? 'true' : undefined}
+        style={getToolbarVisibilityStyle(derivedState.positionReady, derivedState.position)}
+        onMouseOverCapture={onHoverCapture}
+      >
+        <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+            <circle cx="9" cy="12" r="1" />
+            <circle cx="9" cy="5" r="1" />
+            <circle cx="9" cy="19" r="1" />
+            <circle cx="15" cy="12" r="1" />
+            <circle cx="15" cy="5" r="1" />
+            <circle cx="15" cy="19" r="1" />
+          </svg>
+        </ContentToolbarDragHandle>
 
-      <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-      <ToolbarSecondaryControls
-        toolbarProps={toolbarProps}
-        viewModel={viewModel}
-        onViewportChange={onViewportChange}
-      />
-    </ContentToolbarShell>
+        <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+        <ToolbarSecondaryControls
+          toolbarProps={toolbarProps}
+          viewModel={viewModel}
+          onViewportChange={onViewportChange}
+        />
+      </ContentToolbarShell>
+    </>
   );
 }

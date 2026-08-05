@@ -57,28 +57,35 @@ export function FutureFrameStyleControls(props: {
 
   return (
     <>
-      {(['border', 'blur', 'focus'] as const).map((mode) => {
-        const active = style.effectMode === mode;
-        const label = getEffectLabel(mode);
-        return (
-          <ContentToolbarButton
-            key={mode}
-            active={active}
-            dataUi={`content.toolbar.future-frame-${mode}`}
-            menuIndicator
-            title={label + (active ? translate('content.interactiveFrame.effectActiveSuffix') : '')}
-            aria-pressed={active}
-            aria-expanded={active && open}
-            onClick={(event) => {
-              event.stopPropagation();
-              setEffectAnchorEl(event.currentTarget);
-              handleEffectClick(mode);
-            }}
-          >
-            <FrameEffectIcon mode={mode} />
-          </ContentToolbarButton>
-        );
-      })}
+      <div
+        className="sniptale-toolbar-subgroup"
+        data-ui="content.toolbar.future-frame-effects-group"
+      >
+        {(['border', 'blur', 'focus'] as const).map((mode) => {
+          const active = style.effectMode === mode;
+          const label = getEffectLabel(mode);
+          return (
+            <ContentToolbarButton
+              key={mode}
+              active={active}
+              dataUi={`content.toolbar.future-frame-${mode}`}
+              menuIndicator
+              title={
+                label + (active ? translate('content.interactiveFrame.effectActiveSuffix') : '')
+              }
+              aria-pressed={active}
+              aria-expanded={active && open}
+              onClick={(event) => {
+                event.stopPropagation();
+                setEffectAnchorEl(event.currentTarget);
+                handleEffectClick(mode);
+              }}
+            >
+              <FrameEffectIcon mode={mode} />
+            </ContentToolbarButton>
+          );
+        })}
+      </div>
 
       <FrameSettingsPopover
         anchorEl={effectAnchorEl}
@@ -95,21 +102,28 @@ export function FutureFrameStyleControls(props: {
         scope="session"
       />
 
-      {props.futureFrameCalloutActions ? (
-        <FutureCalloutControl
-          actions={props.futureFrameCalloutActions}
-          menu={props.toolbarMenuState}
-          setStyle={setStyle}
-          style={style}
-        />
-      ) : null}
-      {props.futureFrameStepBadgeActions ? (
-        <FutureStepBadgeControl
-          actions={props.futureFrameStepBadgeActions}
-          menu={props.toolbarMenuState}
-          setStyle={setStyle}
-          style={style}
-        />
+      {props.futureFrameCalloutActions || props.futureFrameStepBadgeActions ? (
+        <div
+          className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
+          data-ui="content.toolbar.future-frame-annotations-group"
+        >
+          {props.futureFrameCalloutActions ? (
+            <FutureCalloutControl
+              actions={props.futureFrameCalloutActions}
+              menu={props.toolbarMenuState}
+              setStyle={setStyle}
+              style={style}
+            />
+          ) : null}
+          {props.futureFrameStepBadgeActions ? (
+            <FutureStepBadgeControl
+              actions={props.futureFrameStepBadgeActions}
+              menu={props.toolbarMenuState}
+              setStyle={setStyle}
+              style={style}
+            />
+          ) : null}
+        </div>
       ) : null}
     </>
   );

@@ -19,6 +19,8 @@ it('selects all nine anchors and toggles offsets', async () => {
       />
     )
   );
+  expect(host.firstElementChild?.className).toContain('grid-cols-2');
+  expect(host.querySelectorAll('.justify-center')).toHaveLength(2);
   expect(host.querySelectorAll('button[aria-pressed]')).toHaveLength(9);
   await act(async () =>
     (host.querySelectorAll('button[aria-pressed]')[4] as HTMLButtonElement).click()

@@ -77,7 +77,7 @@ describe('useCalloutSettingsPopoverState', () => {
     cleanup();
   });
 
-  it('applies the preset default position and clears session-only placement overrides', () => {
+  it('preserves the existing position when applying a different visual preset', () => {
     settings = createDefaultCalloutSettings();
     settings.placement = {
       ...settings.placement,
@@ -89,24 +89,16 @@ describe('useCalloutSettingsPopoverState', () => {
       ...createSystemCalloutPresetCatalog()[0]!,
       placement: { anchor: 'bottom-right', side: 'bottom' } as const,
     };
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
     renderHarness();
 
     act(() => latestState?.applyPreset(preset));
 
-    expect(latestState?.localSettings.placement).toEqual({
-      anchor: 'bottom-right',
-      connectorAttachments: {
-        block: { mode: 'auto' },
-        frame: { mode: 'auto' },
-      },
-      connectorBasePosition: undefined,
-      connectorBaseWidth: undefined,
-      connectorFramePosition: undefined,
-      connectorWaypoint: undefined,
-      manualPlacement: undefined,
-      side: 'bottom',
-    });
+    expect(latestState?.localSettings.placement).toEqual(settings.placement);
     expect(latestState?.localSettings.sourcePresetId).toBe(preset.id);
+    expect(listener.mock.calls[0]?.[0].settings).not.toHaveProperty('placement');
+    cleanup();
   });
 
   it('opens and commits one history transaction for the popover session', () => {

@@ -99,6 +99,17 @@ it('rejects invalid and missing mutations without writes', async () => {
     outcome: 'rejected',
     reason: 'invalid-input',
   });
+  for (const customCss of [
+    '[badge]\nposition: fixed;',
+    '[badge]\nbackground: src("https://example.com/tracker.png");',
+  ]) {
+    await expect(
+      owner.createUserStepBadgePreset({
+        name: 'Unsafe CSS',
+        settings: { ...settings, style: { ...settings.style, customCss } },
+      })
+    ).resolves.toEqual({ outcome: 'rejected', reason: 'invalid-input' });
+  }
   await expect(owner.setStoredStepBadgePresetEnabled('missing', true)).resolves.toEqual({
     outcome: 'rejected',
     reason: 'not-found',

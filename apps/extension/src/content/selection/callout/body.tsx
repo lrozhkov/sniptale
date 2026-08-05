@@ -72,6 +72,37 @@ function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCallou
   );
 }
 
+function renderTitleMeasure(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
+  const badge = props.settings.style.badge;
+  const badgeText = resolveCalloutBadgeText({
+    badgeText: badge.text,
+    bodyHtml: props.settings.content.bodyHtml,
+    titleEnabled: props.settings.style.title.enabled,
+    titleText: props.settings.content.titleText,
+  });
+  const showTitleBadge =
+    badge.enabled && (badge.placement === 'title-start' || badge.placement === 'title-end');
+
+  return (
+    <span
+      aria-hidden="true"
+      data-sniptale-callout-title-measure="true"
+      style={{
+        ...getCalloutTitleMeasureStyle(props.settings.style),
+        ...customStyles.title,
+      }}
+    >
+      {showTitleBadge && badge.placement === 'title-start' ? (
+        <CalloutBadge badge={badge} isMeasurement text={badgeText} />
+      ) : null}
+      <span>{props.settings.content.titleText}</span>
+      {showTitleBadge && badge.placement === 'title-end' ? (
+        <CalloutBadge badge={badge} isMeasurement text={badgeText} />
+      ) : null}
+    </span>
+  );
+}
+
 function renderCalloutPortalContent(props: CalloutBodyProps) {
   const customStyles = resolveCalloutCustomCss(props.settings.style.customCss).styles;
   const badgeText = resolveCalloutBadgeText({
@@ -100,16 +131,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         >
           {props.settings.style.title.enabled ? (
             <>
-              <span
-                aria-hidden="true"
-                data-sniptale-callout-title-measure="true"
-                style={{
-                  ...getCalloutTitleMeasureStyle(props.settings.style),
-                  ...customStyles.title,
-                }}
-              >
-                {props.settings.content.titleText}
-              </span>
+              {renderTitleMeasure(props, customStyles)}
               <div
                 data-sniptale-callout-title-shell="true"
                 dir={props.settings.style.title.direction}

@@ -10,6 +10,7 @@ import { useStepBadgeInteraction } from './interaction';
 import type { StepBadgeFrameRect } from './placement';
 import { getStepBadgeStyle, StepBadgeValue } from './views';
 import { resolveContentPortalTarget, Z_INDEX_STEP_BADGE } from '../interactive-frame/layout/portal';
+import { resolveStepBadgeCustomCss } from '../../../features/highlighter/step-badge-custom-css';
 
 interface StepBadgeProps {
   settings: StepBadgeSettings;
@@ -27,6 +28,27 @@ interface StepBadgeProps {
   showSettingsHandle?: boolean;
 }
 
+function positionStepBadge(badge: React.ReactNode, frameRect?: StepBadgeFrameRect) {
+  if (!frameRect) return badge;
+  return createPortal(
+    <div
+      className="sniptale-step-badge-layer"
+      style={{
+        position: 'fixed',
+        top: `${frameRect.y}px`,
+        left: `${frameRect.x}px`,
+        width: `${frameRect.width}px`,
+        height: `${frameRect.height}px`,
+        pointerEvents: 'none',
+        zIndex: Z_INDEX_STEP_BADGE,
+      }}
+    >
+      {badge}
+    </div>,
+    resolveContentPortalTarget()
+  );
+}
+
 export const StepBadge: React.FC<StepBadgeProps> = (props) => {
   const interaction = useStepBadgeInteraction({
     borderWidth: props.borderWidth,
@@ -35,7 +57,10 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
     onPositionChange: props.onPositionChange,
     settings: props.settings,
   });
-  if (!props.settings.enabled || !props.settings.value) return null;
+  if (!props.settings.enabled) return null;
+  const customStyles = resolveStepBadgeCustomCss(
+    interaction.effectiveSettings.style?.customCss ?? ''
+  ).styles;
 
   const badge = (
     <div
@@ -48,41 +73,28 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
       }}
       onMouseEnter={interaction.hasControls ? interaction.visibility.handleMouseEnter : undefined}
       onMouseLeave={interaction.hasControls ? interaction.visibility.handleMouseLeave : undefined}
-      style={getStepBadgeStyle({
-        settings: interaction.effectiveSettings,
-        borderColor: props.borderColor,
-        borderWidth: props.borderWidth,
-        ...(props.fillColor ? { fillColor: props.fillColor } : {}),
-        ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
-        zIndex: props.frameRect ? 0 : Z_INDEX_STEP_BADGE,
-        clickable: Boolean(props.onClick),
-        isDragging: interaction.drag.isDragging,
-        ...(props.shadow === undefined ? {} : { shadow: props.shadow }),
-      })}
-      title={`${translate('content.stepBadge.tooltipPrefix')} ${props.settings.value}`}
+      style={{
+        ...getStepBadgeStyle({
+          settings: interaction.effectiveSettings,
+          borderColor: props.borderColor,
+          borderWidth: props.borderWidth,
+          ...(props.fillColor ? { fillColor: props.fillColor } : {}),
+          ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
+          zIndex: props.frameRect ? 0 : Z_INDEX_STEP_BADGE,
+          clickable: Boolean(props.onClick),
+          isDragging: interaction.drag.isDragging,
+          ...(props.shadow === undefined ? {} : { shadow: props.shadow }),
+        }),
+        ...customStyles.badge,
+      }}
+      title={[translate('content.stepBadge.tooltipPrefix'), props.settings.value]
+        .filter(Boolean)
+        .join(' ')}
     >
-      <StepBadgeValue value={props.settings.value} />
+      <StepBadgeValue customStyle={customStyles.text} value={props.settings.value} />
     </div>
   );
-  const positionedBadge = props.frameRect
-    ? createPortal(
-        <div
-          className="sniptale-step-badge-layer"
-          style={{
-            position: 'fixed',
-            top: `${props.frameRect.y}px`,
-            left: `${props.frameRect.x}px`,
-            width: `${props.frameRect.width}px`,
-            height: `${props.frameRect.height}px`,
-            pointerEvents: 'none',
-            zIndex: Z_INDEX_STEP_BADGE,
-          }}
-        >
-          {badge}
-        </div>,
-        resolveContentPortalTarget()
-      )
-    : badge;
+  const positionedBadge = positionStepBadge(badge, props.frameRect);
 
   return (
     <>

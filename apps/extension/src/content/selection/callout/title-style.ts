@@ -67,7 +67,9 @@ export function getCalloutTitleInputStyle(): CSSProperties {
 
 export function getCalloutTitleMeasureStyle(style: CalloutVisualStyle): CSSProperties {
   return {
-    display: 'block',
+    alignItems: 'center',
+    display: 'flex',
+    gap: 6,
     width: 'max-content',
     height: 0,
     overflow: 'hidden',

@@ -4,6 +4,7 @@ import type { EditorState } from './types';
 import { EditorPreview } from './sections/sample';
 import { BorderStyleInspector } from './inspector';
 import type { BorderVisualStylePatch } from '../../../features/highlighter/contracts';
+import { HighlighterManualInspectorSurface } from '../manual-inspector-surface';
 
 function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   if (patch.color !== undefined) state.setColor(patch.color);
@@ -43,7 +44,7 @@ export function BorderPresetEditorFields({ state }: { state: EditorState }) {
       </div>
       <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]">
         <EditorPreview state={state} />
-        <div className="overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]">
+        <HighlighterManualInspectorSurface>
           <BorderStyleInspector
             cssDraft={state.customCss}
             cssError={state.cssError}
@@ -56,7 +57,7 @@ export function BorderPresetEditorFields({ state }: { state: EditorState }) {
             onCssResizeStart={state.handleResizeStart}
             style={state}
           />
-        </div>
+        </HighlighterManualInspectorSurface>
       </div>
     </div>
   );

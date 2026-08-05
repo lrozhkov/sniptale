@@ -11,7 +11,7 @@ import { usePopoverEscapeClose } from '../popover-sync/hooks';
 import { useCalloutSettingsPopoverState } from './state';
 import { useCalloutPresetPopoverController } from './preset-controller';
 import { CalloutPresetEditor } from '../../../ui/highlighter-preset-editor/callout';
-import { useCalloutSettingsPopoverDrag } from './drag';
+import { useFloatingPopoverDrag } from '../popover-sync/drag';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 import { createCalloutSaveSection } from './save-section';
 
@@ -59,7 +59,7 @@ function useCalloutPopoverPresentation(args: {
     isOpen: args.isOpen,
     popoverRef: args.popoverRef,
   });
-  const drag = useCalloutSettingsPopoverDrag({
+  const drag = useFloatingPopoverDrag({
     basePosition: {
       left: typeof popoverStyle.left === 'number' ? popoverStyle.left : 0,
       top: typeof popoverStyle.top === 'number' ? popoverStyle.top : 0,
@@ -134,6 +134,7 @@ export function CalloutSettingsPopover({
       <CalloutSettingsPopoverContent
         {...(frameColors ? { frameColors } : {})}
         handleDelete={handleDelete}
+        headerContext="element"
         headerDrag={presentation.drag}
         handleSettingChange={handleSettingChange}
         localSettings={localSettings}

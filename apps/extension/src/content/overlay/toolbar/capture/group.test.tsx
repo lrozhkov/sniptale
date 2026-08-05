@@ -120,6 +120,9 @@ describe('ToolbarCaptureActionGroup', () => {
   it('omits the history group outside page preparation mode', () => {
     renderGroup(false);
 
+    expect(
+      container?.querySelector('[data-ui="content.toolbar.capture-leading-divider"]')?.className
+    ).toContain('sniptale-capture-leading-divider');
     expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).toBeNull();
     expect(container?.querySelector('[data-ui="test.settings-menu"]')).not.toBeNull();
   });

@@ -16,6 +16,7 @@ import {
   resolveCalloutColorBindings,
   type CalloutFrameColors,
 } from '../../../features/highlighter/callout-color-bindings';
+import { useOpeningPresetOrder } from '../popover-sync/preset-order';
 
 export function CalloutPresetSection(props: {
   activePresetId?: string;
@@ -30,13 +31,11 @@ export function CalloutPresetSection(props: {
 }) {
   const locale = useAppLocale();
   const enabledPresetCount = props.presets.filter((preset) => preset.enabled !== false).length;
+  const orderedPresets = useOpeningPresetOrder(props.presets, props.activePresetId);
   return (
-    <ContentPopoverSection
-      title={translate('content.callout.presetsSection')}
-      dataUi="content.callout-settings.presets-section"
-    >
+    <ContentPopoverSection dataUi="content.callout-settings.presets-section">
       <ProductGlassPresetList className="sniptale-callout-preset-list" scrollable>
-        {props.presets.map((preset) => {
+        {orderedPresets.map((preset) => {
           const pending = props.pendingPresetIds.has(preset.id);
           const disabled = preset.enabled === false;
           const displayName = getCalloutPresetDisplayName(preset, locale);
@@ -109,11 +108,17 @@ export function CalloutPresetSection(props: {
 
 export function CalloutPositionSection(props: {
   anchor: CalloutAnchor;
+  embedded?: boolean;
   onChange: (anchor: CalloutAnchor) => void;
 }) {
-  return (
+  const grid = (
+    <CalloutSettingsPositionGrid layout="square" anchor={props.anchor} onChange={props.onChange} />
+  );
+  return props.embedded ? (
+    grid
+  ) : (
     <ContentPopoverSection title={translate('content.callout.positionSection')}>
-      <CalloutSettingsPositionGrid anchor={props.anchor} onChange={props.onChange} />
+      {grid}
     </ContentPopoverSection>
   );
 }

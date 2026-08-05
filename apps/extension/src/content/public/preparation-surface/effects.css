@@ -66,6 +66,7 @@
   touch-action: none;
 }
 
+.sniptale-callout-drag-handle:hover,
 .sniptale-callout-drag-handle:focus-visible,
 .sniptale-callout-settings-handle:hover,
 .sniptale-callout-settings-handle:focus-visible,

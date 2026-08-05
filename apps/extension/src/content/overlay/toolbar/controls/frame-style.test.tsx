@@ -115,6 +115,9 @@ it('forwards compact menu presentation to future frame settings', () => {
   renderControls(createStyle('blur'), vi.fn(), true);
 
   expect(popoverMocks.props?.['compact']).toBe(true);
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.future-frame-effects-group"]')
+  ).not.toBeNull();
 });
 
 it('switches the future mode and opens its settings on the first click', () => {
@@ -176,6 +179,9 @@ it('enables future comments and opens their settings from the toolbar button', (
   const button = container.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.future-frame-callout"]'
   );
+  expect(
+    container.querySelector('[data-ui="content.toolbar.future-frame-annotations-group"]')
+  ).not.toBeNull();
   act(() => button?.click());
 
   expect(onEnableFutureFrameCallout).toHaveBeenCalledOnce();

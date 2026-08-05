@@ -14,26 +14,30 @@ import type {
 import { StepBadgeAnchorGrid } from './anchor-grid';
 import { StepBadgeAutoFields } from './auto-fields';
 import { dispatchStepBadgeReorder } from '../../platform/page-context/frame-events';
+import { HighlighterPresetPropertyField as PropertyField } from '../../../ui/highlighter-preset-editor/inspector-field';
 
 export function StepBadgePositionSection(props: {
+  embedded?: boolean;
   onAnchorChange: (anchor: StepBadgeAnchor) => void;
   onOffsetToggle: (direction: 'up' | 'down' | 'left' | 'right') => void;
   selectedAnchor: StepBadgeAnchor;
   selectedOffsets: string[];
 }) {
+  const content = (
+    <StepBadgeAnchorGrid
+      onAnchorChange={props.onAnchorChange}
+      onOffsetToggle={props.onOffsetToggle}
+      selectedAnchor={props.selectedAnchor}
+      selectedOffsets={props.selectedOffsets}
+    />
+  );
+  if (props.embedded) return content;
   return (
     <ContentPopoverSection
       title={translate('content.stepBadge.positionSection')}
       dataUi="content.step-badge.position-section"
     >
-      <ProductGlassRow spread>
-        <StepBadgeAnchorGrid
-          onAnchorChange={props.onAnchorChange}
-          onOffsetToggle={props.onOffsetToggle}
-          selectedAnchor={props.selectedAnchor}
-          selectedOffsets={props.selectedOffsets}
-        />
-      </ProductGlassRow>
+      {content}
     </ContentPopoverSection>
   );
 }
@@ -60,14 +64,15 @@ function StepBadgeReorderButton(props: {
 }
 
 export function StepBadgeAutoSection(props: {
+  embedded?: boolean;
   isAuto: boolean;
   settings: StepBadgeSettings;
   onAlphabetChange: (alphabet: 'cyrillic' | 'latin') => void;
   onAutoModeChange: (auto: boolean) => void;
   onTypeChange: (type: 'number' | 'letter') => void;
 }) {
-  return (
-    <ContentPopoverSection dataUi="content.step-badge.auto-section">
+  const content = (
+    <>
       <ProductGlassToggleRow
         title={translate('content.stepBadge.autoTitle')}
         hint={translate('content.stepBadge.autoHint')}
@@ -86,50 +91,68 @@ export function StepBadgeAutoSection(props: {
           onTypeChange={props.onTypeChange}
         />
       ) : null}
+    </>
+  );
+  if (props.embedded) return content;
+  return (
+    <ContentPopoverSection dataUi="content.step-badge.auto-section">
+      {content}
     </ContentPopoverSection>
   );
 }
 
 export function StepBadgeValueSection(props: {
+  embedded?: boolean;
   frameId: string;
   isAuto: boolean;
   onValueChange: (value: string) => void;
   value: string;
 }) {
+  const valueControl = (
+    <ProductGlassRow>
+      {props.isAuto ? (
+        <StepBadgeReorderButton
+          direction="up"
+          frameId={props.frameId}
+          label="-"
+          title={translate('content.stepBadge.moveUp')}
+        />
+      ) : null}
+
+      <ProductGlassInput
+        aria-label={translate('content.stepBadge.valueSection')}
+        type="text"
+        value={props.value}
+        onChange={(event) => props.onValueChange(event.target.value)}
+        disabled={props.isAuto}
+        maxLength={2}
+        placeholder={props.isAuto ? translate('content.stepBadge.autoPlaceholder') : ''}
+        className="sniptale-step-badge-input"
+      />
+
+      {props.isAuto ? (
+        <StepBadgeReorderButton
+          direction="down"
+          frameId={props.frameId}
+          label="+"
+          title={translate('content.stepBadge.moveDown')}
+        />
+      ) : null}
+    </ProductGlassRow>
+  );
+  if (props.embedded) {
+    return (
+      <PropertyField label={translate('content.stepBadge.valueSection')}>
+        {valueControl}
+      </PropertyField>
+    );
+  }
   return (
     <ContentPopoverSection
       title={translate('content.stepBadge.valueSection')}
       dataUi="content.step-badge.value-section"
     >
-      <ProductGlassRow>
-        {props.isAuto ? (
-          <StepBadgeReorderButton
-            direction="up"
-            frameId={props.frameId}
-            label="-"
-            title={translate('content.stepBadge.moveUp')}
-          />
-        ) : null}
-
-        <ProductGlassInput
-          type="text"
-          value={props.value}
-          onChange={(event) => props.onValueChange(event.target.value)}
-          disabled={props.isAuto}
-          maxLength={2}
-          placeholder={props.isAuto ? translate('content.stepBadge.autoPlaceholder') : ''}
-          className="sniptale-step-badge-input"
-        />
-
-        {props.isAuto ? (
-          <StepBadgeReorderButton
-            direction="down"
-            frameId={props.frameId}
-            label="+"
-            title={translate('content.stepBadge.moveDown')}
-          />
-        ) : null}
-      </ProductGlassRow>
+      {valueControl}
     </ContentPopoverSection>
   );
 }

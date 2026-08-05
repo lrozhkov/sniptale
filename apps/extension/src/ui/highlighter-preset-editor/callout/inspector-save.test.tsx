@@ -48,6 +48,7 @@ it('creates a named preset and overwrites the selected preset', async () => {
     'input[aria-label="content.callout.newPresetName"]'
   );
   expect(input?.className).toContain('cursor-text');
+  expect(input?.style.cursor).toBe('text');
   expect(input?.placeholder).toBe('content.callout.newPresetName');
   await act(async () => input?.focus());
   expect(input?.placeholder).toBe('');

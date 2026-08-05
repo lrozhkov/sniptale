@@ -59,7 +59,7 @@ export function ToolbarUtilityButtons(props: {
   }
 
   return (
-    <ContentToolbarGroup utilities>
+    <ContentToolbarGroup className="sniptale-toolbar-highlighter-utilities" utilities>
       {props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
         <FutureFrameStyleControls
           compactMenus={props.compactMenus}

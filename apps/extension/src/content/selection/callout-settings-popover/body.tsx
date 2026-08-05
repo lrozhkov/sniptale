@@ -4,12 +4,7 @@ import type {
   CalloutPreset,
   CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
-import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { useState } from 'react';
-import { X } from 'lucide-react';
-import type { PointerEventHandler } from 'react';
+import { useEffect, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { getPreferredSideFromAnchor } from '../callout/geometry';
 import type { CalloutSettingsPatch } from '../callout/model';
@@ -17,6 +12,12 @@ import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } fro
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-editor/callout/inspector-save';
+import type { FloatingPopoverDrag } from '../popover-sync/drag';
+import {
+  SettingsPopoverHeader,
+  type SettingsPopoverContext,
+} from '../popover-sync/settings-header';
+import { selectOrClosePopoverPreset } from '../popover-sync/preset-selection';
 
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
@@ -26,12 +27,8 @@ export function createCalloutAnchorPlacement(
 
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
-  headerDrag: {
-    isDragging: boolean;
-    onPointerDown: PointerEventHandler<HTMLDivElement>;
-    onPointerMove: PointerEventHandler<HTMLDivElement>;
-    onPointerUp: PointerEventHandler<HTMLDivElement>;
-  };
+  headerContext: SettingsPopoverContext;
+  headerDrag?: FloatingPopoverDrag;
   handleSettingChange: (patch: CalloutSettingsPatch) => void;
   frameColors?: CalloutFrameColors;
   localSettings: CalloutSettings;
@@ -45,56 +42,42 @@ export function CalloutSettingsPopoverContent(props: {
   saveSection: CalloutSaveSectionProps;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState<'preset' | 'manual'>('preset');
+  const [mode, setMode] = useState<'preset' | 'manual'>(() =>
+    props.localSettings.sourcePresetId ? 'preset' : 'manual'
+  );
+  const hasSelectedPreset = Boolean(props.localSettings.sourcePresetId);
+  useEffect(() => {
+    setMode(hasSelectedPreset ? 'preset' : 'manual');
+  }, [hasSelectedPreset]);
   return (
     <>
-      <div
-        className="sniptale-callout-settings-header"
-        data-dragging={props.headerDrag.isDragging ? 'true' : undefined}
-        onPointerDown={props.headerDrag.onPointerDown}
-        onPointerMove={props.headerDrag.onPointerMove}
-        onPointerUp={props.headerDrag.onPointerUp}
-      >
-        <ProductToolbarMenuGroupLabel>
-          {translate('content.callout.settingsTitle')}
-        </ProductToolbarMenuGroupLabel>
-        <button
-          aria-label={translate('content.callout.closeSettings')}
-          className="sniptale-callout-settings-close"
-          onClick={props.onClose}
-          title={translate('content.callout.closeSettings')}
-          type="button"
-        >
-          <X aria-hidden="true" size={14} />
-        </button>
-      </div>
-      <CalloutPositionSection
-        anchor={props.localSettings.placement.anchor}
-        onChange={(anchor) =>
-          props.handleSettingChange({
-            placement: createCalloutAnchorPlacement(anchor),
-          })
-        }
+      <SettingsPopoverHeader
+        action={{
+          label: translate(
+            mode === 'preset' ? 'content.callout.switchToManual' : 'content.callout.switchToPresets'
+          ),
+          onClick: () => setMode(mode === 'preset' ? 'manual' : 'preset'),
+        }}
+        closeLabel={translate('content.callout.closeSettings')}
+        context={props.headerContext}
+        {...(props.headerDrag ? { drag: props.headerDrag } : {})}
+        onClose={props.onClose}
+        title={translate('content.callout.settingsTitle')}
       />
-      <ContentPopoverSection dataUi="content.callout-settings.mode-section">
-        <SegmentedSwitch
-          activeId={mode}
-          ariaLabel={translate('content.callout.settingsTitle')}
-          dataAttribute={{ 'data-callout-settings-mode-switch': 'true' }}
-          onChange={setMode}
-          options={[
-            { id: 'preset', label: translate('content.callout.modePreset') },
-            { id: 'manual', label: translate('content.callout.modeManual') },
-          ]}
-        />
-      </ContentPopoverSection>
       {mode === 'preset' ? (
         <CalloutPresetSection
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           {...(props.localSettings.sourcePresetId
             ? { activePresetId: props.localSettings.sourcePresetId }
             : {})}
-          onApplyPreset={props.onApplyPreset}
+          onApplyPreset={(preset) => {
+            selectOrClosePopoverPreset({
+              isActive: props.localSettings.sourcePresetId === preset.id,
+              onApply: props.onApplyPreset,
+              onClose: props.onClose,
+              preset,
+            });
+          }}
           onCustomizePreset={props.onCustomizePreset}
           {...(props.onResetPreset ? { onResetPreset: props.onResetPreset } : {})}
           onTogglePreset={props.onTogglePreset}
@@ -106,6 +89,17 @@ export function CalloutSettingsPopoverContent(props: {
         <CalloutManualSettings
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
+          positionSection={
+            <CalloutPositionSection
+              embedded
+              anchor={props.localSettings.placement.anchor}
+              onChange={(anchor) =>
+                props.handleSettingChange({
+                  placement: createCalloutAnchorPlacement(anchor),
+                })
+              }
+            />
+          }
           saveSection={props.saveSection}
           onChange={props.handleSettingChange}
         />

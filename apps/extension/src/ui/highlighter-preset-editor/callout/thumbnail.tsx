@@ -327,10 +327,12 @@ function CalloutPreviewCard(props: {
 
 export function CalloutPresetPreview({
   compact = false,
+  editor = false,
   placement,
   style,
 }: {
   compact?: boolean;
+  editor?: boolean;
   placement?: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }) {
@@ -347,7 +349,7 @@ export function CalloutPresetPreview({
         'relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-[8px]',
         'border border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:var(--sniptale-color-surface-canvas)]',
-        compact ? 'h-9 w-16' : 'h-[3.25rem] w-24',
+        editor ? 'h-[4.875rem] w-36' : compact ? 'h-9 w-16' : 'h-[3.25rem] w-24',
       ].join(' ')}
       aria-hidden="true"
       data-callout-placement={placement?.anchor}

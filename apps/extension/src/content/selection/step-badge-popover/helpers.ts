@@ -20,9 +20,6 @@ export const ANCHOR_GRID = DEFAULT_POPOVER_ANCHOR_GRID as StepBadgeAnchor[][];
 const SIZE_LEVEL_MIN = 0;
 const SIZE_LEVEL_MAX = 6;
 const SIZE_LEVEL_DEFAULT: StepBadgeSizeLevel = 3;
-export const POPOVER_WIDTH = 280;
-export const POPOVER_HEIGHT = 420;
-
 export function getAnchorDotPosition(anchor: StepBadgeAnchor): CSSProperties {
   return getSharedAnchorDotPosition(anchor);
 }

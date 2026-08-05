@@ -9,6 +9,7 @@ import { CompactSelect } from '../../compact-inspector-controls';
 export function BorderManualSaveSettings(props: {
   disabled?: boolean;
   isSaving: boolean;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onSave: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   presets: BorderPreset[];
 }) {
@@ -68,6 +69,9 @@ export function BorderManualSaveSettings(props: {
             setSelectedPresetId(presetId);
             setStatus(null);
           }}
+          {...(props.onFloatingInteractionChange
+            ? { onOpenChange: props.onFloatingInteractionChange }
+            : {})}
           options={options}
           placeholder={translate('content.overlayControls.frameStyleSelectPreset')}
           value={selectedPresetId}

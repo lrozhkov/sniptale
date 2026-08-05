@@ -10,6 +10,7 @@ import { getStepBadgePresetDisplayName } from '../../../features/highlighter/ste
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
 import { StepBadgePresetPreview } from '../../../ui/highlighter-preset-editor/step-badge/thumbnail';
+import { useOpeningPresetOrder } from '../popover-sync/preset-order';
 
 export function StepBadgePresetSection(props: {
   activePresetId?: string;
@@ -24,10 +25,11 @@ export function StepBadgePresetSection(props: {
   const locale = useAppLocale();
   const presets = props.presets ?? [];
   const enabledCount = presets.filter((preset) => preset.enabled !== false).length;
+  const orderedPresets = useOpeningPresetOrder(presets, props.activePresetId);
   return (
-    <ContentPopoverSection title={translate('content.stepBadge.presetsSection')}>
+    <ContentPopoverSection>
       <ProductGlassPresetList scrollable>
-        {presets.map((preset) => {
+        {orderedPresets.map((preset) => {
           const disabled = preset.enabled === false;
           const pending = props.pending.has(preset.id);
           return (

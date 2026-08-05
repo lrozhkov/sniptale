@@ -230,6 +230,16 @@ function createConnectorDraftSettings(args: {
   tailFrameDrag: ReturnType<typeof useCalloutEdgeDrag>;
   waypointDrag: ReturnType<typeof useCalloutWaypointDrag>;
 }): CalloutSettings {
+  const draftBasePosition =
+    args.tailBaseRange.draftSettings?.tailBasePosition ??
+    (args.lineBaseDrag.draftPosition === null ? undefined : args.lineBaseDrag.draftPosition);
+  const draftFramePosition =
+    args.tailFrameDrag.draftPosition === null ? undefined : args.tailFrameDrag.draftPosition;
+  const hasDraftAttachment =
+    args.lineBaseDrag.draftAttachment !== null ||
+    args.tailFrameDrag.draftAttachment !== null ||
+    draftBasePosition !== undefined ||
+    draftFramePosition !== undefined;
   return {
     ...args.settings,
     style: args.curveDraft
@@ -240,13 +250,23 @@ function createConnectorDraftSettings(args: {
       : args.settings.style,
     placement: {
       ...args.settings.placement,
-      ...(args.lineBaseDrag.draftAttachment || args.tailFrameDrag.draftAttachment
+      ...(hasDraftAttachment
         ? {
             connectorAttachments: {
-              block: args.lineBaseDrag.draftAttachment ??
-                args.settings.placement.connectorAttachments?.block ?? { mode: 'auto' as const },
-              frame: args.tailFrameDrag.draftAttachment ??
-                args.settings.placement.connectorAttachments?.frame ?? { mode: 'auto' as const },
+              block:
+                args.lineBaseDrag.draftAttachment ??
+                (draftBasePosition === undefined
+                  ? (args.settings.placement.connectorAttachments?.block ?? {
+                      mode: 'auto' as const,
+                    })
+                  : { mode: 'free' as const, perimeterPosition: draftBasePosition }),
+              frame:
+                args.tailFrameDrag.draftAttachment ??
+                (draftFramePosition === undefined
+                  ? (args.settings.placement.connectorAttachments?.frame ?? {
+                      mode: 'auto' as const,
+                    })
+                  : { mode: 'free' as const, perimeterPosition: draftFramePosition }),
             },
           }
         : {}),

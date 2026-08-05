@@ -5,6 +5,7 @@ import {
   CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE,
   CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT,
   CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME,
+  CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME,
   getContentSizeTooltipSurfaceStyle,
   getContentSizeTooltipActionButtonStyle,
@@ -143,7 +144,7 @@ export function createTooltipActions(
 
   const cancelButton = createTooltipButton({
     ariaLabel: copy.cancel,
-    className: 'sniptale-selection-size-cancel-button',
+    className: CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME,
     content: compact ? createActionIcon('cancel') : copy.cancel,
     style: getContentSizeTooltipActionButtonStyle('neutral', variant),
   }) as HTMLButtonElement;
@@ -154,8 +155,7 @@ export function createTooltipActions(
     style: getContentSizeTooltipActionButtonStyle('accent', variant),
   }) as HTMLButtonElement;
 
-  if (compact) actions.append(confirmButton, createTooltipDivider(), cancelButton);
-  else actions.append(cancelButton, confirmButton);
+  actions.append(cancelButton, confirmButton);
   return { actions, cancelButton, confirmButton };
 }
 

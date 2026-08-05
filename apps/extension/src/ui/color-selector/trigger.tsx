@@ -57,6 +57,7 @@ function buildTriggerDisplayValue(value: string, formatMode: ColorSelectorFormat
 }
 
 function PickerTriggerButton(props: {
+  disabled: boolean;
   formatMode: ColorSelectorFormatMode;
   value: string;
   onOpenPicker: () => void;
@@ -74,6 +75,7 @@ function PickerTriggerButton(props: {
   return (
     <button
       type="button"
+      disabled={props.disabled}
       aria-label={translate('shared.ui.colorSelectorChooseColor')}
       onClick={props.onOpenPicker}
       className={PICKER_ACTION_CLASS_NAME}
@@ -94,10 +96,16 @@ function PickerTriggerButton(props: {
   );
 }
 
-function PaletteButton(props: { expanded: boolean; title: string; onClick: () => void }) {
+function PaletteButton(props: {
+  disabled: boolean;
+  expanded: boolean;
+  title: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
+      disabled={props.disabled}
       aria-label={props.title}
       aria-expanded={props.expanded}
       onClick={props.onClick}
@@ -118,6 +126,7 @@ function PaletteButton(props: { expanded: boolean; title: string; onClick: () =>
 
 export function ColorSelectorTrigger(props: {
   active?: boolean;
+  disabled?: boolean;
   expanded: boolean;
   formatMode: ColorSelectorFormatMode;
   label: string;
@@ -130,17 +139,21 @@ export function ColorSelectorTrigger(props: {
     <div
       className={cx(
         ROOT_CLASS_NAME,
-        props.active && COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME
+        props.active && COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME,
+        props.disabled && 'cursor-not-allowed opacity-55'
       )}
+      aria-disabled={props.disabled || undefined}
       data-ui="shared.ui.color-selector.trigger"
       style={resolveCompactInspectorInteractiveControlStyle(undefined)}
     >
       <PickerTriggerButton
+        disabled={props.disabled === true}
         formatMode={props.formatMode}
         value={props.value}
         onOpenPicker={props.onOpenPicker}
       />
       <PaletteButton
+        disabled={props.disabled === true}
         expanded={props.expanded}
         title={props.title}
         onClick={props.onToggleExpanded}

@@ -18,6 +18,36 @@ it('strictly parses valid templates and rejects unsafe colors and duplicate syst
     ],
   });
   expect(unsafe.invalidFieldCount).toBe(1);
+  const oversizedCss = parseStoredStepBadgePresetCatalog({
+    userPresets: [
+      {
+        id: 'user-css',
+        name: 'CSS',
+        settings: { ...settings, style: { ...settings.style, customCss: 'x'.repeat(4_001) } },
+      },
+    ],
+  });
+  expect(oversizedCss.invalidFieldCount).toBe(1);
+  for (const customCss of [
+    '[badge]\nbackground: url(https://example.com/tracker.png);',
+    '[badge]\nbackground: src("https://example.com/tracker.png");',
+    '[badge]\nbackground: image("https://example.com/tracker.png");',
+    '[text]\ncolor: var(--page-color);',
+    '[badge]\nposition: fixed;',
+    '[unknown]\ncolor: red;',
+    '[badge]\ncolor red;',
+  ]) {
+    const unsafeCss = parseStoredStepBadgePresetCatalog({
+      userPresets: [
+        {
+          id: 'user-unsafe-css',
+          name: 'Unsafe CSS',
+          settings: { ...settings, style: { ...settings.style, customCss } },
+        },
+      ],
+    });
+    expect(unsafeCss.invalidFieldCount).toBe(1);
+  }
   const duplicate = parseStoredStepBadgePresetCatalog({
     userPresets: [{ id: 'system-classic', name: 'Duplicate', settings }],
   });

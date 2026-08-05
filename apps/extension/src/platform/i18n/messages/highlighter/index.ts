@@ -301,12 +301,11 @@ export const highlighterMessages = defineMessageSource({
     fillSection: { ru: 'Заливка', en: 'Fill' },
     geometrySection: { ru: 'Геометрия', en: 'Geometry' },
     effectsSection: { ru: 'Эффекты', en: 'Effects' },
-    saveSection: { ru: 'Сохранить', en: 'Save' },
+    saveSection: { ru: 'Сохранение', en: 'Saving' },
     manualNavigation: {
       ru: 'Категории настройки рамки',
       en: 'Frame style setting categories',
     },
-    noFill: { ru: 'Без заливки', en: 'No fill' },
     paddingLinked: { ru: 'Вместе', en: 'Linked' },
     paddingSeparate: { ru: 'По сторонам', en: 'Per side' },
     editTitle: {
@@ -390,7 +389,7 @@ export const highlighterMessages = defineMessageSource({
       en: 'Strong',
     },
     paddingLabel: {
-      ru: 'Отступы от элемента (padding)',
+      ru: 'Отступы от элемента',
       en: 'Element padding',
     },
     paddingTop: {

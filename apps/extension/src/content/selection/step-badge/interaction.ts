@@ -22,7 +22,8 @@ export function useStepBadgeInteraction(args: {
   const badgeRef = React.useRef<HTMLDivElement | null>(null);
   const hasControls = Boolean(args.frameRect && args.onPositionChange);
   const initialPlacement = getStepBadgeInitialPlacement(args.settings);
-  const visualOffset = getStepBadgeVisualMetrics(args.settings, args.borderWidth).offset;
+  const visualMetrics = getStepBadgeVisualMetrics(args.settings, args.borderWidth);
+  const visualOffset = visualMetrics.offset;
   const drag = useStepBadgeBoundaryDrag({
     frameRect: args.frameRect ?? { x: 0, y: 0, width: 1, height: 1 },
     initialPlacement,
@@ -48,6 +49,7 @@ export function useStepBadgeInteraction(args: {
         : null,
       manualPlacement: effectiveSettings.manualPlacement,
       offsetDirections: effectiveSettings.offsetDirections,
+      badgeSize: visualMetrics.badgeSize,
       sizeLevel: effectiveSettings.sizeLevel,
     }),
   });

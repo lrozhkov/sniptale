@@ -104,10 +104,15 @@ function parseColorBindings(value: unknown): CalloutVisualStyle['colorBindings']
   const sources = ['custom', 'frame-border', 'frame-fill'] as const;
   const accent = readEnum(record['accent'], 'custom', sources);
   const connector = readEnum(record['connector'], 'custom', sources);
+  const shadow = readEnum(record['shadow'], 'custom', [
+    'custom',
+    'surface-background',
+    'surface-border',
+  ]);
   const surfaceBackground = readEnum(record['surfaceBackground'], 'custom', sources);
   const surfaceBorder = readEnum(record['surfaceBorder'], 'custom', sources);
-  return accent && connector && surfaceBackground && surfaceBorder
-    ? { accent, connector, surfaceBackground, surfaceBorder }
+  return accent && connector && shadow && surfaceBackground && surfaceBorder
+    ? { accent, connector, shadow, surfaceBackground, surfaceBorder }
     : null;
 }
 

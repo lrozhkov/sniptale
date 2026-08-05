@@ -38,8 +38,8 @@ describe('frame style catalog styles', () => {
     expect(stylesheet).toMatch(/\.sniptale-frame-style-add\s*\{[^}]*justify-content:\s*center;/s);
   });
 
-  it('leaves catalog height to the shared scrollable preset list', () => {
-    expect(stylesheet).toContain('--sniptale-preset-list-max-height:');
+  it('sizes the shared scrollable preset list for five frame presets', () => {
+    expect(stylesheet).toContain('--sniptale-preset-list-max-height: min(242px');
     expect(stylesheet).not.toMatch(/\.sniptale-frame-settings-popover\s*\{[^}]*overflow-y:/s);
   });
 });

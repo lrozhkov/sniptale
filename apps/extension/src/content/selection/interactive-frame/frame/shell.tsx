@@ -88,7 +88,7 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           onResizeStart={props.handleResizeStart}
         />
       </div>
-      {props.currentFrame.stepBadge?.enabled && props.currentFrame.stepBadge.value && (
+      {props.currentFrame.stepBadge?.enabled && (
         <StepBadge
           settings={props.currentFrame.stepBadge}
           borderColor={props.borderColor}

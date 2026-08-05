@@ -45,6 +45,7 @@ export function CalloutSaveSettings(props: CalloutSaveSectionProps) {
             disabled={props.isSaving}
             maxLength={64}
             placeholder={nameFocused ? '' : translate('content.callout.newPresetName')}
+            style={{ cursor: 'text' }}
             value={name}
             onBlur={() => setNameFocused(false)}
             onChange={(event) => {

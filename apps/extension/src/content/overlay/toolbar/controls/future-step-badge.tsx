@@ -27,6 +27,12 @@ import {
   usePopoverEscapeClose,
   usePopoverOutsideClose,
 } from '../../../selection/popover-sync/hooks';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../selection/popover-sync/settings-surface';
+import { StepBadgePresetEditor } from '../../../../ui/highlighter-preset-editor/step-badge';
+import { usePopoverInteractionDismissal } from '../../../selection/popover-sync/interaction-dismissal';
 
 const FUTURE_ID = 'future-frame-step-badge';
 const EMPTY_RECT = { x: 0, y: 0, width: 0, height: 0 };
@@ -48,9 +54,13 @@ export function FutureStepBadgeSettingsPopover(props: {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [local, setLocal] = useState(props.settings);
   const presets = useStepBadgePresetPopoverController(props.isOpen);
+  const dismissal = usePopoverInteractionDismissal({
+    blocked: presets.editor.isOpen,
+    isOpen: props.isOpen,
+  });
   const style = useFramePopoverPosition({
     anchorEl: props.anchorEl,
-    fallbackSize: { width: 384, height: 620 },
+    fallbackSize: { width: SETTINGS_POPOVER_WIDTH, height: SETTINGS_POPOVER_HEIGHT },
     frameId: FUTURE_ID,
     frameRect: EMPTY_RECT,
     isOpen: props.isOpen,
@@ -60,19 +70,28 @@ export function FutureStepBadgeSettingsPopover(props: {
     if (props.isOpen) setLocal(props.settings);
   }, [props.isOpen, props.settings]);
   usePopoverOutsideClose({
-    isOpen: props.isOpen,
+    isOpen: dismissal.isDismissalEnabled,
     onClose: props.onClose,
     popoverRef,
     shouldIgnoreOutsideEvent: (event) => isContentEventWithinElement(event, props.anchorEl),
   });
-  usePopoverDistanceClose({ isOpen: props.isOpen, onClose: props.onClose, popoverRef });
+  usePopoverDistanceClose({
+    isOpen: dismissal.isDismissalEnabled,
+    onClose: props.onClose,
+    popoverRef,
+  });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
-    isOpen: props.isOpen,
+    isOpen: dismissal.isDismissalEnabled,
     onClose: props.onClose,
   });
   const commit = (patch: Partial<StepBadgeSettings>) => {
-    const next = { ...local, ...patch, ...(patch.style ? { style: { ...patch.style } } : {}) };
+    const next = {
+      ...local,
+      ...patch,
+      sourcePresetId: undefined,
+      ...(patch.style ? { style: { ...patch.style } } : {}),
+    };
     setLocal(next);
     props.onChange(next);
   };
@@ -92,46 +111,63 @@ export function FutureStepBadgeSettingsPopover(props: {
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
+        'sniptale-main-toolbar-popover',
       ].join(' ')}
       dataUi="content.toolbar.future-step-badge-popover"
       isOpen={props.isOpen}
       popoverRef={popoverRef}
       portalTarget={resolveContentPortalTarget(props.anchorEl)}
-      style={{ ...style, width: 384 }}
+      style={{ ...style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <StepBadgePopoverContent
         frameId={FUTURE_ID}
         frameVisuals={props.frameVisuals}
+        headerContext="toolbar"
         isAuto={local.auto !== false}
         localStepBadgeSettings={local}
         onAlphabetChange={(alphabet: StepBadgeAlphabet) => commit({ alphabet })}
         onAnchorChange={(anchor: StepBadgeAnchor) => commit({ anchor, manualPlacement: undefined })}
         onApplyPreset={applyPreset}
         onAutoModeChange={(auto) => commit({ auto })}
-        onConfigurePreset={applyPreset}
-        onCreatePreset={presets.create}
+        onConfigurePreset={presets.editor.open}
+        onCreatePreset={presets.catalog.create}
+        onClose={props.onClose}
         onDisable={props.onDisable}
+        onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
         onOffsetToggle={(direction: StepBadgeOffsetDirection) =>
           commit({
             manualPlacement: undefined,
             offsetDirections: toggleStepBadgeOffset(local.offsetDirections ?? [], direction),
           })
         }
-        onResetPreset={(preset) => void presets.reset(preset)}
+        onResetPreset={(preset) => void presets.catalog.reset(preset)}
         onSettingsChange={commit}
-        onTogglePreset={(preset) => void presets.toggle(preset)}
+        onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         onTypeChange={(type: Extract<StepBadgeType, 'number' | 'letter'>) => commit({ type })}
-        onUpdatePreset={presets.update}
+        onUpdatePreset={presets.catalog.update}
         onValueChange={(value) =>
           commit({
             value: filterStepBadgeValue({ auto: local.auto !== false, type: local.type, value }),
           })
         }
-        pendingPresetIds={presets.pending}
-        presetError={presets.error}
-        presets={presets.visiblePresets}
+        pendingPresetIds={presets.catalog.pending}
+        presetError={presets.catalog.error}
+        presets={presets.catalog.visiblePresets}
         templateSettings={template}
       />
+      {presets.editor.preset ? (
+        <StepBadgePresetEditor
+          isOpen={presets.editor.isOpen}
+          isSaving={presets.editor.isSaving}
+          onClose={presets.editor.close}
+          {...(presets.editor.preset.origin === 'system' &&
+          presets.editor.preset.customized === true
+            ? { onReset: () => presets.editor.reset(presets.editor.preset!) }
+            : {})}
+          onSave={presets.editor.save}
+          preset={presets.editor.preset}
+        />
+      ) : null}
     </ContentPopoverAdapter>
   );
 }

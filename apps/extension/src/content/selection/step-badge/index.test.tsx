@@ -26,6 +26,19 @@ it('renders the tooltip label through the shared i18n seam', () => {
   expect(markup).toContain('z-index:2147483647');
 });
 
+it('keeps an enabled badge mounted when its manual value is empty', () => {
+  const markup = renderToStaticMarkup(
+    <StepBadge
+      settings={createStepBadgeSettingsFixture({ auto: false, value: '' })}
+      borderColor="#000"
+      borderWidth={2}
+    />
+  );
+
+  expect(markup).toContain('class="sniptale-step-badge"');
+  expect(markup).toContain('title="Step"');
+});
+
 it('renders hover-only move and settings controls for an enabled badge', () => {
   const host = document.createElement('div');
   document.body.append(host);
@@ -53,6 +66,15 @@ it('renders hover-only move and settings controls for an enabled badge', () => {
   expect(document.querySelector('.sniptale-step-badge-settings-handle')).toBeInstanceOf(
     HTMLButtonElement
   );
+  const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
+  const moveHandle = controls?.querySelector<HTMLElement>('.sniptale-step-badge-move-handle');
+  const settingsHandle = controls?.querySelector<HTMLElement>(
+    '.sniptale-step-badge-settings-handle'
+  );
+  expect(moveHandle?.style.width).toBe('26px');
+  expect(moveHandle?.querySelector('.lucide-move')).not.toBeNull();
+  expect(moveHandle?.querySelector('.lucide-grip-vertical')).toBeNull();
+  expect(settingsHandle?.style.width).toBe('26px');
 
   act(() => root.unmount());
   document.body.replaceChildren();
@@ -158,13 +180,14 @@ it('reanchors move and settings controls after scroll updates the frame geometry
 
   act(() => renderBadge(80));
   const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
-  expect(controls?.style.top).toBe('70px');
+  expect(controls?.style.left).toBe('136px');
+  expect(controls?.style.top).toBe('50px');
 
   act(() => window.dispatchEvent(new Event('scroll')));
   badgeRect = new DOMRect(100, 30, 30, 30);
   act(() => renderBadge(30));
 
-  expect(controls?.style.top).toBe('20px');
+  expect(controls?.style.top).toBe('8px');
   expect(controls?.querySelector('.sniptale-step-badge-move-handle')).toBeInstanceOf(
     HTMLButtonElement
   );

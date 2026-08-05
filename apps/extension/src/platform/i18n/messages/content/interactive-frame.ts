@@ -17,6 +17,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Фокус',
     en: 'Focus',
   },
+  closeEffectSettings: {
+    ru: 'Закрыть настройки эффекта',
+    en: 'Close effect settings',
+  },
   effectActiveSuffix: {
     ru: ' (активен, нажмите для настроек)',
     en: ' (active, click for settings)',

@@ -131,14 +131,6 @@ export function useCalloutSettingsPopoverState(args: {
 
   const applyPreset = (preset: CalloutPreset) => {
     handleSettingChange({
-      placement: {
-        ...preset.placement,
-        connectorBasePosition: undefined,
-        connectorBaseWidth: undefined,
-        connectorFramePosition: undefined,
-        connectorWaypoint: undefined,
-        manualPlacement: undefined,
-      },
       sourcePresetId: preset.id,
       style: cloneCalloutStyle(preset.style),
     });

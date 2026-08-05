@@ -126,6 +126,7 @@ describe('ContentSizeTooltip', () => {
     renderTooltip({ variant: 'frame-edit' });
 
     const surface = getTooltipSurface();
+    const style = container?.querySelector('style');
 
     expect(surface?.dataset['variant']).toBe('frame-edit');
     expect(surface?.style.width).toBe('296px');
@@ -133,6 +134,10 @@ describe('ContentSizeTooltip', () => {
     expect(container?.querySelector('style')?.textContent).toContain(
       '.sniptale-content-size-tooltip-primary-action:hover:not(:disabled)'
     );
+    expect(style?.textContent).toContain(
+      '.sniptale-selection-size-cancel-button:hover:not(:disabled)'
+    );
+    expect(style?.textContent).toContain('var(--sniptale-color-danger)');
     expect(container?.querySelector('style')?.textContent).toContain(
       '.sniptale-size-btn:hover:not(:disabled)'
     );

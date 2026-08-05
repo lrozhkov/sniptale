@@ -63,14 +63,17 @@ const state: DesignReviewViewState = {
   },
 };
 
-it('owns four compact common border groups without nested disclosures', () => {
+it('owns four compact linkable border groups without nested disclosures', () => {
   const root = document.createElement('div');
   root.innerHTML = renderToStaticMarkup(
     <BorderSection actions={actions} disabled={false} state={state} />
   );
 
   expect(root.querySelectorAll('[data-ui="content.design-review.side-field"]')).toHaveLength(4);
-  expect(root.querySelector('[data-ui="content.design-review.side-values"]')).toBeNull();
+  expect(
+    root.querySelectorAll('[data-ui="content.design-review.side-values-compact"]')
+  ).toHaveLength(4);
+  expect(root.querySelectorAll('[data-side-link="all"]')).toHaveLength(4);
   expect(root.textContent).toContain('Толщина');
   expect(root.textContent).toContain('Цвет рамки');
   expect(root.textContent).toContain('Скругление');

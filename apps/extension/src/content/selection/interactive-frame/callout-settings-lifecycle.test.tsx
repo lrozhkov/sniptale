@@ -86,11 +86,17 @@ function openManualCalloutSettings(source: 'quick' | 'selected') {
     expect(quickSettings).toBeInstanceOf(HTMLElement);
     act(() => performPointerClick(quickSettings as HTMLElement));
   }
-  const manualButton = queryAllContentUiElements('button').find(
-    (button) => button.textContent === 'Вручную'
+  const modeButtons = queryAllContentUiElements('button');
+  const manualButton = modeButtons.find(
+    (button) => button.title === translate('content.callout.switchToManual')
   );
-  expect(manualButton).toBeInstanceOf(HTMLButtonElement);
-  act(() => performPointerClick(manualButton as HTMLButtonElement));
+  if (manualButton) {
+    act(() => performPointerClick(manualButton));
+    return;
+  }
+  expect(
+    modeButtons.find((button) => button.title === translate('content.callout.switchToPresets'))
+  ).toBeInstanceOf(HTMLButtonElement);
 }
 
 beforeEach(() => {

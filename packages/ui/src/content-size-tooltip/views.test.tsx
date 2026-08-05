@@ -166,9 +166,10 @@ describe('ContentSizeTooltipContent rendering', () => {
     expect(ratioButton).toBeTruthy();
     expect(cancelButton?.textContent).toBe('');
     expect(confirmButton?.textContent).toBe('');
-    expect(confirmButton?.nextElementSibling?.getAttribute('aria-hidden')).toBe('true');
-    expect(confirmButton?.nextElementSibling?.nextElementSibling).toBe(cancelButton);
-    expect(cancelButton?.parentElement?.lastElementChild).toBe(cancelButton);
+    expect(cancelButton?.nextElementSibling).toBe(confirmButton);
+    expect(cancelButton?.previousElementSibling).toBeNull();
+    expect(confirmButton?.parentElement?.lastElementChild).toBe(confirmButton);
+    expect(cancelButton?.classList).toContain('sniptale-selection-size-cancel-button');
     expect(confirmButton?.style.background).toBe('transparent');
     expect(confirmButton?.style.border).toBe('0px');
     expect(confirmButton?.classList).toContain('sniptale-content-size-tooltip-primary-action');

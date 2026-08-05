@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronUp, Link2, X } from 'lucide-react';
 import type { ContentSizeTooltipProps } from './types';
 import {
   CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE,
+  CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE,
   CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME,
   CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME,
@@ -209,6 +210,7 @@ function TooltipActions(
   const cancelButton = (
     <button
       type="button"
+      className={compact ? CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME : undefined}
       {...(compact ? { 'aria-label': props.copy.cancel, title: props.copy.cancel } : {})}
       onClick={(event) => {
         event.preventDefault();
@@ -246,18 +248,8 @@ function TooltipActions(
 
   return (
     <div style={CONTENT_SIZE_TOOLTIP_ACTIONS_STYLE as CSSProperties}>
-      {compact ? (
-        <>
-          {confirmButton}
-          <TooltipDivider />
-          {cancelButton}
-        </>
-      ) : (
-        <>
-          {cancelButton}
-          {confirmButton}
-        </>
-      )}
+      {cancelButton}
+      {confirmButton}
     </div>
   );
 }

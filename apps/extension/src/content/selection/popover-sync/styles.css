@@ -1,0 +1,79 @@
+.sniptale-settings-popover-header {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: default !important;
+  user-select: none;
+}
+
+.sniptale-settings-popover-header[data-draggable='true'] {
+  cursor: grab !important;
+  touch-action: none;
+}
+
+.sniptale-settings-popover-header[data-dragging='true'] {
+  cursor: grabbing !important;
+}
+
+.sniptale-settings-popover-header .sniptale-toolbar-menu-title {
+  flex: 1;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  cursor: inherit !important;
+}
+
+.sniptale-settings-popover-header-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  cursor: default !important;
+}
+
+.sniptale-settings-popover-mode-action {
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer !important;
+}
+
+.sniptale-settings-popover-mode-action:hover,
+.sniptale-settings-popover-mode-action:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 38%,
+    var(--sniptale-color-border-soft) 62%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  color: var(--sniptale-color-accent);
+  outline: none;
+}
+
+.sniptale-settings-popover-close {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  cursor: pointer !important;
+}
+
+.sniptale-settings-popover-close:hover,
+.sniptale-settings-popover-close:focus-visible {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-input);
+}

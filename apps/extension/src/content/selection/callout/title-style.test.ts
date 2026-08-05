@@ -77,7 +77,9 @@ describe('getCalloutTitleStyle', () => {
 
   it('lets the real title text contribute width without contributing height', () => {
     expect(getCalloutTitleMeasureStyle(style)).toMatchObject({
-      display: 'block',
+      alignItems: 'center',
+      display: 'flex',
+      gap: 6,
       height: 0,
       lineHeight: 0,
       overflow: 'hidden',

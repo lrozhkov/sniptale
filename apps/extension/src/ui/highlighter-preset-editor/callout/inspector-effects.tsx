@@ -1,6 +1,5 @@
 import type {
   CalloutAccentSide,
-  CalloutAttachmentMode,
   CalloutConnectorKind,
   CalloutConnectorMarker,
   CalloutConnectorRouting,
@@ -10,8 +9,6 @@ import type { CSSProperties } from 'react';
 import {
   ProductGlassBoldButton,
   ProductGlassIconButton,
-  ProductGlassSwitch,
-  ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
@@ -100,84 +97,8 @@ function getMarkerOptions() {
 
 function LineConnectorAdvancedSettings(props: ManualContentProps) {
   const connector = props.settings.style.connector;
-  const attachments = props.settings.placement.connectorAttachments ?? {
-    block: { mode: 'auto' as const },
-    frame: { mode: 'auto' as const },
-  };
-  const setAttachmentMode = (endpoint: 'block' | 'frame', mode: CalloutAttachmentMode) => {
-    const current = attachments[endpoint];
-    const next =
-      mode === 'auto'
-        ? { mode }
-        : mode === 'anchor'
-          ? {
-              anchorId: current.anchorId ?? 'top-center',
-              mode,
-              ...(current.perimeterPosition === undefined
-                ? {}
-                : { perimeterPosition: current.perimeterPosition }),
-            }
-          : { mode, perimeterPosition: current.perimeterPosition ?? 0.5 };
-    props.onChange({
-      placement: { connectorAttachments: { ...attachments, [endpoint]: next } },
-    });
-  };
   return (
-    <AdditionalSettings>
-      <ChoiceField
-        label={translate('content.callout.frameAttachmentLabel')}
-        options={['auto', 'anchor', 'free'] as const}
-        value={attachments.frame.mode}
-        getLabel={(mode) => translate(`content.callout.attachmentMode.${mode}`)}
-        onChange={(mode) => setAttachmentMode('frame', mode)}
-      />
-      <ChoiceField
-        label={translate('content.callout.blockAttachmentLabel')}
-        options={['auto', 'anchor', 'free'] as const}
-        value={attachments.block.mode}
-        getLabel={(mode) => translate(`content.callout.attachmentMode.${mode}`)}
-        onChange={(mode) => setAttachmentMode('block', mode)}
-      />
-      <PropertyField label={translate('content.callout.blockMarker')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('content.callout.blockMarker')}
-          options={getMarkerOptions()}
-          value={connector.blockMarker}
-          onChange={(blockMarker) => props.onChange({ style: { connector: { blockMarker } } })}
-        />
-      </PropertyField>
-      {connector.blockMarker !== 'none' ? (
-        <NumericProperty
-          label={translate('content.callout.blockMarkerSize')}
-          min={4}
-          max={48}
-          value={connector.blockMarkerSize}
-          onChange={(blockMarkerSize) =>
-            props.onChange({ style: { connector: { blockMarkerSize } } })
-          }
-        />
-      ) : null}
-      <PropertyField label={translate('content.callout.frameMarker')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('content.callout.frameMarker')}
-          options={getMarkerOptions()}
-          value={connector.frameMarker}
-          onChange={(frameMarker) => props.onChange({ style: { connector: { frameMarker } } })}
-        />
-      </PropertyField>
-      {connector.frameMarker !== 'none' ? (
-        <NumericProperty
-          label={translate('content.callout.frameMarkerSize')}
-          min={4}
-          max={48}
-          value={connector.frameMarkerSize}
-          onChange={(frameMarkerSize) =>
-            props.onChange({ style: { connector: { frameMarkerSize } } })
-          }
-        />
-      ) : null}
+    <AdditionalSettings section="callout-connector">
       <NumericProperty
         label={translate('content.callout.frameGapLabel')}
         max={128}
@@ -302,6 +223,46 @@ function LineConnectorSettings(props: ManualContentProps) {
         value={connector.width}
         onChange={(width) => props.onChange({ style: { connector: { width } } })}
       />
+      <PropertyField label={translate('content.callout.blockMarker')}>
+        <CompactSelect
+          appearance="plain"
+          aria-label={translate('content.callout.blockMarker')}
+          options={getMarkerOptions()}
+          value={connector.blockMarker}
+          onChange={(blockMarker) => props.onChange({ style: { connector: { blockMarker } } })}
+        />
+      </PropertyField>
+      {connector.blockMarker !== 'none' ? (
+        <NumericProperty
+          label={translate('content.callout.blockMarkerSize')}
+          min={4}
+          max={48}
+          value={connector.blockMarkerSize}
+          onChange={(blockMarkerSize) =>
+            props.onChange({ style: { connector: { blockMarkerSize } } })
+          }
+        />
+      ) : null}
+      <PropertyField label={translate('content.callout.frameMarker')}>
+        <CompactSelect
+          appearance="plain"
+          aria-label={translate('content.callout.frameMarker')}
+          options={getMarkerOptions()}
+          value={connector.frameMarker}
+          onChange={(frameMarker) => props.onChange({ style: { connector: { frameMarker } } })}
+        />
+      </PropertyField>
+      {connector.frameMarker !== 'none' ? (
+        <NumericProperty
+          label={translate('content.callout.frameMarkerSize')}
+          min={4}
+          max={48}
+          value={connector.frameMarkerSize}
+          onChange={(frameMarkerSize) =>
+            props.onChange({ style: { connector: { frameMarkerSize } } })
+          }
+        />
+      ) : null}
       <LineConnectorAdvancedSettings {...props} />
     </SettingsStack>
   );
@@ -414,16 +375,6 @@ export function CalloutAccentSettings(props: ManualContentProps) {
   const accent = props.settings.style.accentEdge;
   return (
     <SettingsStack>
-      <ProductGlassToggleRow
-        title={translate('content.callout.accentEnabled')}
-        control={
-          <ProductGlassSwitch
-            aria-label={translate('content.callout.accentEnabled')}
-            on={accent.enabled}
-            onClick={() => props.onChange({ style: { accentEdge: { enabled: !accent.enabled } } })}
-          />
-        }
-      />
       {accent.enabled ? (
         <>
           <AccentSideField

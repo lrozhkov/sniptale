@@ -241,13 +241,31 @@ it('keeps toolbar menus above the Design Review comment popover', () => {
   );
   const openToolbarRootLayer = Number(
     toolbarMenuSurfaceStylesheet.match(
-      /\.sniptale-app:has\(\.sniptale-toolbar \.sniptale-popover-menu\)\s*\{[^}]*z-index:\s*(\d+);/su
+      /\.sniptale-app:has\(\.sniptale-toolbar\[data-menu-open='true'\]\)\s*\{[^}]*z-index:\s*(\d+);/su
     )?.[1]
   );
   const commentPopoverLayer = Number(designReviewPopoverSource.match(/z-\[(\d+)\]/u)?.[1]);
 
   expect(menuLayer).toBeGreaterThan(commentPopoverLayer);
   expect(openToolbarRootLayer).toBeGreaterThan(commentPopoverLayer);
+});
+
+it('keeps open main-toolbar menus above the page without disabling toolbar controls', () => {
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /\.sniptale-toolbar-menu-interaction-guard\s*\{[^}]*position:\s*fixed;[^}]*pointer-events:\s*auto;/su
+  );
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /\.sniptale-toolbar\[data-menu-open='true'\]\s*\{[^}]*pointer-events:\s*auto\s*!important;/su
+  );
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /\.sniptale-toolbar\[data-menu-open='true'\][^{]*\.sniptale-popover-menu\s*\{[^}]*pointer-events:\s*auto\s*!important;/su
+  );
+  expect(toolbarMenuSurfaceStylesheet).toContain('.sniptale-main-toolbar-popover');
+  expect(toolbarMenuSurfaceStylesheet).toContain(':not(.sniptale-modal)');
+  expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-modal-backdrop\s*\)/su);
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /:is\(\.sniptale-modal-backdrop, \.sniptale-modal\)\s*\{[^}]*z-index:\s*2147483647\s*!important;/su
+  );
 });
 
 it('disables the legacy quick-edit outline once the active frame owns the border', () => {
@@ -260,4 +278,19 @@ it('disables the legacy quick-edit outline once the active frame owns the border
   expect(quickEditCursorSource).toContain("[contenteditable='true']:focus");
   expect(quickEditCursorSource).toContain('outline: none !important;');
   expect(quickEditCursorSource).toContain('box-shadow: none !important;');
+});
+
+it('highlights both callout quick actions on hover and keyboard focus', () => {
+  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-drag-handle:hover,');
+  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-drag-handle:focus-visible,');
+  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-settings-handle:hover,');
+  expect(contentRuntimeEffectsStylesheet).toContain(
+    'border-color: var(--sniptale-color-accent) !important;'
+  );
+});
+
+it('uses symmetric standard spacing around the capture divider after highlighter utilities', () => {
+  expect(toolbarShellLayoutStylesheet).toMatch(
+    /\.sniptale-toolbar-highlighter-utilities\s*\+ \.sniptale-capture-leading-divider\s*\{[^}]*margin-inline-start:\s*0;/su
+  );
 });

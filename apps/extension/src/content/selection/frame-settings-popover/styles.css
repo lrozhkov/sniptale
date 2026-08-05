@@ -1,5 +1,5 @@
 .sniptale-frame-settings-popover {
-  --sniptale-preset-list-max-height: min(180px, max(72px, calc(100vh - 360px)));
+  --sniptale-preset-list-max-height: min(242px, max(72px, calc(100vh - 360px)));
 }
 
 .sniptale-frame-settings-popover .sniptale-content-popover-section-label {

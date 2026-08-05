@@ -1,5 +1,9 @@
+.sniptale-callout-settings-popover,
+.sniptale-step-badge-popover {
+  --sniptale-preset-list-max-height: min(296px, max(96px, calc(100vh - 330px)));
+}
+
 .sniptale-callout-settings-popover {
-  --sniptale-preset-list-max-height: min(220px, max(96px, calc(100vh - 330px)));
   cursor: default !important;
 }
 
@@ -22,72 +26,6 @@
 .sniptale-callout-settings-popover input[type='text'],
 .sniptale-callout-settings-popover input[type='number'] {
   cursor: text !important;
-}
-
-.sniptale-callout-settings-header {
-  display: flex;
-  min-height: 28px;
-  align-items: center;
-  justify-content: space-between;
-  cursor: grab !important;
-  user-select: none;
-  touch-action: none;
-}
-
-.sniptale-callout-settings-header[data-dragging='true'] {
-  cursor: grabbing !important;
-}
-
-.sniptale-callout-settings-header .sniptale-toolbar-menu-title {
-  flex: 1;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  cursor: inherit !important;
-}
-
-.sniptale-callout-settings-close {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--sniptale-color-text-secondary);
-  cursor: pointer !important;
-}
-
-.sniptale-callout-settings-close:hover,
-.sniptale-callout-settings-close:focus-visible {
-  color: var(--sniptale-color-text-primary);
-  background: var(--sniptale-color-surface-input);
-}
-
-[data-callout-settings-mode-switch='true'] > span[aria-hidden='true'] {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-panel) 92%,
-    var(--sniptale-color-surface-hover) 8%
-  );
-  box-shadow:
-    inset 0 0 0 1px
-      color-mix(in srgb, var(--sniptale-color-accent) 24%, var(--sniptale-color-border-soft) 76%),
-    0 1px 2px color-mix(in srgb, var(--sniptale-color-shadow-strong) 12%, transparent);
-}
-
-[data-callout-settings-mode-switch='true'] > button:not([aria-pressed='true']):hover {
-  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent);
-}
-
-[data-callout-settings-mode-switch='true'] > button[aria-pressed='true'] {
-  color: var(--sniptale-color-text-primary-strong);
-}
-
-[data-callout-settings-mode-switch='true'] > button,
-[data-callout-settings-mode-switch='true'] > button > span {
-  line-height: 16px;
 }
 
 .sniptale-callout-preset-list {

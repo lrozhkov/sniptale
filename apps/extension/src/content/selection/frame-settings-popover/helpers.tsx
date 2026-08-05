@@ -3,9 +3,6 @@ import { colorToRgba, resolveBorderPresetVisual } from '../../../features/highli
 import { translate } from '../../../platform/i18n';
 import type { BlurType, BorderPreset } from '../../../features/highlighter/contracts';
 
-export const POPOVER_WIDTH = 280;
-export const POPOVER_HEIGHT = 360;
-
 export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties {
   const visual = resolveBorderPresetVisual(preset);
 

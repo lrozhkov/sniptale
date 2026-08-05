@@ -11,7 +11,9 @@ import { CompactSelect } from '../../../ui/compact-inspector-controls';
 import { getStepBadgePresetDisplayName } from '../../../features/highlighter/step-badge-presets/display-name';
 
 export function StepBadgeSaveSection(props: {
+  embedded?: boolean;
   onCreate: (name: string, settings: StepBadgeTemplateSettings) => Promise<{ outcome: string }>;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onUpdate: (
     preset: StepBadgePreset,
     settings: StepBadgeTemplateSettings
@@ -21,20 +23,34 @@ export function StepBadgeSaveSection(props: {
 }) {
   const locale = useAppLocale();
   const [name, setName] = useState('');
+  const [nameFocused, setNameFocused] = useState(false);
   const [selectedId, setSelectedId] = useState(props.presets[0]?.id ?? '');
   useEffect(() => {
     if (!props.presets.some((preset) => preset.id === selectedId))
       setSelectedId(props.presets[0]?.id ?? '');
   }, [props.presets, selectedId]);
-  return (
-    <ContentPopoverSection>
-      <div className="grid gap-2">
+  const content = (
+    <div className="grid gap-3">
+      <div className="grid gap-1.5">
+        <label
+          className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
+          htmlFor="sniptale-step-badge-template-name"
+        >
+          {translate('content.stepBadge.saveAsTemplate')}
+        </label>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
           <ProductInput
+            id="sniptale-step-badge-template-name"
+            aria-label={translate('content.stepBadge.templateName')}
+            className="cursor-text"
             maxLength={64}
-            placeholder={translate('content.stepBadge.templateName')}
+            placeholder={nameFocused ? '' : translate('content.stepBadge.templateName')}
+            style={{ cursor: 'text' }}
+            type="text"
             value={name}
+            onBlur={() => setNameFocused(false)}
             onChange={(event) => setName(event.target.value)}
+            onFocus={() => setNameFocused(true)}
           />
           <ProductActionButton
             compact
@@ -48,6 +64,12 @@ export function StepBadgeSaveSection(props: {
             {translate('content.stepBadge.createTemplate')}
           </ProductActionButton>
         </div>
+      </div>
+      <div className="h-px bg-[var(--sniptale-color-border-soft)]" />
+      <div className="grid gap-1.5">
+        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('content.stepBadge.updateTemplate')}
+        </div>
         <CompactSelect
           appearance="plain"
           aria-label={translate('content.stepBadge.selectTemplate')}
@@ -58,6 +80,9 @@ export function StepBadgeSaveSection(props: {
           placeholder={translate('content.stepBadge.selectTemplate')}
           value={selectedId}
           onChange={setSelectedId}
+          {...(props.onFloatingInteractionChange
+            ? { onOpenChange: props.onFloatingInteractionChange }
+            : {})}
         />
         <ProductActionButton
           compact
@@ -71,6 +96,7 @@ export function StepBadgeSaveSection(props: {
           {translate('content.stepBadge.overwriteTemplate')}
         </ProductActionButton>
       </div>
-    </ContentPopoverSection>
+    </div>
   );
+  return props.embedded ? content : <ContentPopoverSection>{content}</ContentPopoverSection>;
 }

@@ -72,14 +72,33 @@ it('edits positioning, numbering, appearance, and saves a system preset in place
   await act(async () => root.render(<StepBadgePresetEditor controller={controller} />));
   expect(document.body.textContent).toContain('highlighter.stepBadgePresets.editor.editTitle');
   expect(document.body.textContent).toContain('content.stepBadge.autoTitle');
+  expect(
+    document.querySelector('[data-ui="shared.step-badge-preset-editor.inspector"]')
+  ).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="shared.highlighter-manual-inspector-surface"]')
+  ).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')?.textContent
+  ).toBe('content.stepBadge.numberingSection');
+  const positionSection = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="content.stepBadge.positionSection"]'
+  );
+  await act(async () => positionSection?.click());
   expect(document.querySelectorAll('button[aria-pressed]').length).toBeGreaterThanOrEqual(9);
-  const anchors = [...document.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')];
+  const anchors = [
+    ...document.querySelectorAll<HTMLButtonElement>('.grid.w-24 button[aria-pressed]'),
+  ];
   await act(async () => anchors.at(-1)?.click());
   const offset = document.querySelector<HTMLButtonElement>(
     'button[title="content.stepBadge.offsetRight"]'
   );
   await act(async () => offset?.click());
   await act(async () => offset?.click());
+  const sizeSection = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="content.stepBadge.sizeSection"]'
+  );
+  await act(async () => sizeSection?.click());
   const customSize = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'content.stepBadge.sizeCustom'
   );

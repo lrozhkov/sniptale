@@ -24,6 +24,22 @@ describe('angled callout connector route', () => {
     expect(state.axis).toBe('x');
   });
 
+  it('prefers a compact automatic landing over a remote 45 degree corner', () => {
+    const state = getPolylineRouteState({
+      blockPoint: { x: 146, y: 381 },
+      blockSide: 'top',
+      framePoint: { x: 323, y: 212 },
+    });
+
+    expect(state.point).toEqual({ x: 146, y: 357 });
+    expect(state.route).toEqual([
+      { x: 146, y: 381 },
+      { x: 146, y: 357 },
+      { x: 323, y: 212 },
+    ]);
+    expect(Math.abs(state.route[1]!.y - state.route[0]!.y)).toBeLessThanOrEqual(96);
+  });
+
   it('keeps the control on the outward rail and softly attracts it to common angles', () => {
     expect(
       snapPolylineControlPoint({ point: { x: 154, y: 500 }, snap: angleSnap, strict: false })
@@ -42,6 +58,34 @@ describe('angled callout connector route', () => {
     });
     expect(constrainedInward.x).toBeLessThanOrEqual(192);
     expect(constrainedInward.y).toBe(100);
+  });
+
+  it('keeps a remote dragged control point within a usable distance of the route', () => {
+    const snapped = snapPolylineControlPoint({
+      point: { x: 1_400, y: 70 },
+      snap: {
+        fixedPoint: { x: 220, y: 118 },
+        railPoint: { x: 132, y: 70 },
+        side: 'right',
+      },
+      strict: false,
+    });
+
+    expect(snapped.y).toBe(70);
+    expect(snapped.x - 132).toBeLessThanOrEqual(126);
+  });
+
+  it('bounds a stale saved waypoint before rendering an angled route', () => {
+    const state = getPolylineRouteState({
+      blockPoint: { x: 132, y: 70 },
+      blockSide: 'right',
+      framePoint: { x: 220, y: 118 },
+      waypoint: { x: 1_400, y: 70 },
+    });
+
+    expect(state.point?.y).toBe(70);
+    expect((state.point?.x ?? Infinity) - 132).toBeLessThanOrEqual(126);
+    expect(Math.max(...state.route.map((point) => point.x))).toBeLessThanOrEqual(258);
   });
 
   it('uses 15 degree angle steps while Shift snapping is active', () => {

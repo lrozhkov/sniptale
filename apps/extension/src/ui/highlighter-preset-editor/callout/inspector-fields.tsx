@@ -9,7 +9,13 @@ import {
   ProductGlassRow,
 } from '@sniptale/ui/product-glass-controls';
 import { PaintBucket, Palette, Square } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode, SyntheticEvent } from 'react';
+import {
+  loadHighlighterAdditionalSettingsOpen,
+  saveHighlighterAdditionalSettingsOpen,
+  type HighlighterAdditionalSettingsSection,
+} from '../../../composition/persistence/highlighter/additional-settings';
 import { CompactColorSelector } from '../../color-selector';
 import { NumericRow } from '../../compact-inspector-controls';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
@@ -28,6 +34,7 @@ export type ManualContentProps = {
 export { PropertyField };
 
 export function ColorField(props: {
+  control?: ReactNode;
   disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
@@ -36,20 +43,26 @@ export function ColorField(props: {
 }) {
   return (
     <PropertyField label={props.label}>
-      <fieldset
-        className={
-          props.disabled ? 'm-0 min-w-0 border-0 p-0 opacity-55' : 'm-0 min-w-0 border-0 p-0'
-        }
-        disabled={props.disabled}
-      >
-        <CompactColorSelector
-          label={props.label}
-          title={props.label}
-          value={props.value}
-          palette={props.palette}
-          onChange={props.onChange}
-        />
-      </fieldset>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <fieldset
+          className={
+            props.disabled
+              ? 'm-0 min-w-0 flex-1 border-0 p-0 opacity-55'
+              : 'm-0 min-w-0 flex-1 border-0 p-0'
+          }
+          disabled={props.disabled}
+        >
+          <CompactColorSelector
+            disabled={props.disabled === true}
+            label={props.label}
+            title={props.label}
+            value={props.value}
+            palette={props.palette}
+            onChange={props.onChange}
+          />
+        </fieldset>
+        {props.control}
+      </div>
     </PropertyField>
   );
 }
@@ -90,6 +103,7 @@ export function BoundColorField(props: {
           disabled={props.source !== 'custom'}
         >
           <CompactColorSelector
+            disabled={props.source !== 'custom'}
             key={props.source}
             label={props.label}
             title={props.label}
@@ -145,9 +159,45 @@ export function SettingsStack(props: { children: ReactNode }) {
   return <div className="grid gap-2">{props.children}</div>;
 }
 
-export function AdditionalSettings(props: { children: ReactNode }) {
+const knownAdditionalSettingsState = new Map<HighlighterAdditionalSettingsSection, boolean>();
+
+export function AdditionalSettings(props: {
+  children: ReactNode;
+  section: HighlighterAdditionalSettingsSection;
+}) {
+  const [isOpen, setIsOpen] = useState(
+    () => knownAdditionalSettingsState.get(props.section) ?? false
+  );
+  const changedByUser = useRef(false);
+
+  useEffect(() => {
+    if (knownAdditionalSettingsState.has(props.section)) return;
+    let active = true;
+    void loadHighlighterAdditionalSettingsOpen(props.section).then((storedOpen) => {
+      if (!active || changedByUser.current) return;
+      knownAdditionalSettingsState.set(props.section, storedOpen);
+      setIsOpen(storedOpen);
+    });
+    return () => {
+      active = false;
+    };
+  }, [props.section]);
+
+  const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
+    const nextOpen = event.currentTarget.open;
+    if (nextOpen === isOpen) return;
+    changedByUser.current = true;
+    knownAdditionalSettingsState.set(props.section, nextOpen);
+    setIsOpen(nextOpen);
+    void saveHighlighterAdditionalSettingsOpen(props.section, nextOpen);
+  };
+
   return (
-    <details className="group mt-1 border-t border-[color:var(--sniptale-color-border-soft)] pt-1.5">
+    <details
+      className="group mt-1 border-t border-[color:var(--sniptale-color-border-soft)] pt-1.5"
+      onToggle={handleToggle}
+      open={isOpen}
+    >
       <summary
         className={[
           'cursor-pointer select-none text-[11px] font-semibold',

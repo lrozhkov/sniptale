@@ -5,6 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePopoverDistanceClose, usePopoverEscapeClose, usePopoverOutsideClose } from './hooks';
+import {
+  FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
+  FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE,
+} from '@sniptale/ui/floating-interactions/ownership';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -95,6 +99,58 @@ function verifyOutsideClickClose(): void {
   expect(onClose).toHaveBeenCalledOnce();
 }
 
+function verifyOwnedFloatingLayerDoesNotClose(): void {
+  const onClose = vi.fn();
+  const popover = document.createElement('div');
+  const selectOwner = document.createElement('div');
+  const optionLayer = document.createElement('div');
+  selectOwner.setAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE, 'numbering-preset-select');
+  optionLayer.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'numbering-preset-select');
+  popover.appendChild(selectOwner);
+  document.body.append(popover, optionLayer);
+
+  renderPopoverOutsideCloseHook({
+    isOpen: true,
+    onClose,
+    popoverRef: { current: popover },
+  });
+
+  act(() => vi.advanceTimersByTime(150));
+  optionLayer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+
+  expect(onClose).not.toHaveBeenCalled();
+}
+
+function verifyOwnedFloatingLayerDoesNotDistanceClose(): void {
+  const onClose = vi.fn();
+  const popover = document.createElement('div');
+  const selectOwner = document.createElement('div');
+  const optionLayer = document.createElement('div');
+  selectOwner.setAttribute(FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE, 'numbering-preset-select');
+  optionLayer.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'numbering-preset-select');
+  popover.appendChild(selectOwner);
+  document.body.append(popover, optionLayer);
+  mockPopoverRect(popover);
+
+  renderPopoverDistanceCloseHook({
+    isOpen: true,
+    onClose,
+    popoverRef: { current: popover },
+  });
+
+  act(() => vi.advanceTimersByTime(300));
+  optionLayer.dispatchEvent(
+    new MouseEvent('mousemove', {
+      bubbles: true,
+      clientX: 500,
+      clientY: 500,
+      composed: true,
+    })
+  );
+
+  expect(onClose).not.toHaveBeenCalled();
+}
+
 function mockPopoverRect(popover: HTMLDivElement): void {
   vi.spyOn(popover, 'getBoundingClientRect').mockReturnValue({
     bottom: 50,
@@ -141,6 +197,14 @@ describe('popover sync hooks', () => {
   it(
     'closes when an outside click lands after the delayed listener is armed',
     verifyOutsideClickClose
+  );
+  it(
+    'keeps the popover open for a portaled control owned by that popover',
+    verifyOwnedFloatingLayerDoesNotClose
+  );
+  it(
+    'keeps distance dismissal paused over a portaled control owned by that popover',
+    verifyOwnedFloatingLayerDoesNotDistanceClose
   );
   it(
     'closes when the pointer moves far enough away after the delayed listener is armed',

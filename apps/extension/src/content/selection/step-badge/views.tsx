@@ -120,7 +120,13 @@ export function getStepBadgeStyle(props: {
   };
 }
 
-export function StepBadgeValue({ value }: { value: string | number }) {
+export function StepBadgeValue({
+  customStyle,
+  value,
+}: {
+  customStyle?: React.CSSProperties;
+  value: string | number;
+}) {
   return (
     <span
       style={{
@@ -131,6 +137,7 @@ export function StepBadgeValue({ value }: { value: string | number }) {
         height: '100%',
         lineHeight: 1,
         transform: 'translateY(-1px)',
+        ...customStyle,
       }}
     >
       {value}

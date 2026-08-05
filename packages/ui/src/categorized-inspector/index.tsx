@@ -21,12 +21,29 @@ function getNextSectionIndex(key: string, current: number, count: number): numbe
   return null;
 }
 
+function InspectorSectionHeading(props: { control?: ReactNode; label: string }) {
+  return (
+    <div
+      className={[
+        'mb-2 flex min-h-7 items-center justify-between gap-2',
+        'text-[13px] font-semibold leading-5 text-[var(--sniptale-color-text-primary)]',
+      ].join(' ')}
+      data-ui="shared.categorized-inspector.section-heading"
+    >
+      <span>{props.label}</span>
+      {props.control}
+    </div>
+  );
+}
+
 export function CategorizedInspector<SectionId extends string>(props: {
   ariaLabel: string;
   dataUi?: string;
   initialSection: SectionId;
   renderSection: (section: SectionId) => ReactNode;
+  renderSectionHeadingControl?: (section: SectionId) => ReactNode;
   sections: readonly CategorizedInspectorSection<SectionId>[];
+  showSectionHeading?: boolean;
 }) {
   const [activeSection, setActiveSection] = useState<SectionId>(props.initialSection);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -48,6 +65,9 @@ export function CategorizedInspector<SectionId extends string>(props: {
   };
 
   if (!resolvedSection) return null;
+  const resolvedSectionDefinition = props.sections.find(
+    (section) => section.id === resolvedSection
+  );
 
   return (
     <div className="grid min-h-48 grid-cols-[3rem_minmax(0,1fr)]" data-ui={props.dataUi}>
@@ -83,7 +103,15 @@ export function CategorizedInspector<SectionId extends string>(props: {
           );
         })}
       </nav>
-      <div className="min-w-0 p-2.5">{props.renderSection(resolvedSection)}</div>
+      <div className="min-w-0 p-2.5">
+        {props.showSectionHeading && resolvedSectionDefinition ? (
+          <InspectorSectionHeading
+            control={props.renderSectionHeadingControl?.(resolvedSection)}
+            label={resolvedSectionDefinition.label}
+          />
+        ) : null}
+        {props.renderSection(resolvedSection)}
+      </div>
     </div>
   );
 }

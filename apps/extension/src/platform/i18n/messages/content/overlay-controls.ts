@@ -9,8 +9,10 @@ import {
 } from '../shared/blur-controls';
 
 export const contentOverlayControlsMessages = defineMessageSource({
-  frameStyleModePreset: { ru: 'Пресеты', en: 'Presets' },
+  frameStyleModePreset: { ru: 'Шаблоны', en: 'Templates' },
   frameStyleModeManual: { ru: 'Вручную', en: 'Manual' },
+  frameStyleSwitchToManual: { ru: 'Настроить вручную', en: 'Customize manually' },
+  frameStyleSwitchToPresets: { ru: 'Выбрать шаблон', en: 'Choose template' },
   frameStyleManualNavigation: {
     ru: 'Ручная настройка рамки',
     en: 'Manual frame style settings',

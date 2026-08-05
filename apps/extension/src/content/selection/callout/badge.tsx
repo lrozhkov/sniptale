@@ -28,10 +28,18 @@ function getBadgeStyle(badge: CalloutBadgeSettings): CSSProperties {
   };
 }
 
-export function CalloutBadge(props: { badge: CalloutBadgeSettings; text?: string }) {
+export function CalloutBadge(props: {
+  badge: CalloutBadgeSettings;
+  isMeasurement?: boolean;
+  text?: string;
+}) {
   if (!props.badge.enabled) return null;
   return (
-    <span data-ui="content.callout.badge" style={getBadgeStyle(props.badge)}>
+    <span
+      data-sniptale-callout-badge-measure={props.isMeasurement ? 'true' : undefined}
+      data-ui={props.isMeasurement ? undefined : 'content.callout.badge'}
+      style={getBadgeStyle(props.badge)}
+    >
       {props.text ?? props.badge.text}
     </span>
   );

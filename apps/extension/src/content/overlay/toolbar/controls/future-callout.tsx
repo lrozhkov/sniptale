@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PointerEventHandler } from 'react';
 import type {
   CalloutPreset,
   CalloutSettings,
@@ -16,10 +15,17 @@ import {
 } from '../../../selection/callout/model';
 import { CalloutPresetEditor } from '../../../../ui/highlighter-preset-editor/callout';
 import { createCalloutSaveSection } from '../../../selection/callout-settings-popover/save-section';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../selection/popover-sync/settings-surface';
+import {
+  usePopoverDistanceClose,
+  usePopoverEscapeClose,
+} from '../../../selection/popover-sync/hooks';
 
 const FUTURE_CALLOUT_ID = 'future-frame-callout';
 const FUTURE_CALLOUT_RECT = { x: 0, y: 0, width: 0, height: 0 };
-const STATIC_POINTER_HANDLER: PointerEventHandler<HTMLDivElement> = () => undefined;
 
 export function FutureCalloutSettingsPopover(props: {
   anchorEl: HTMLElement | null;
@@ -42,7 +48,7 @@ export function FutureCalloutSettingsPopover(props: {
   });
   const popoverStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
-    fallbackSize: { width: 384, height: 620 },
+    fallbackSize: { width: SETTINGS_POPOVER_WIDTH, height: SETTINGS_POPOVER_HEIGHT },
     frameId: FUTURE_CALLOUT_ID,
     frameRect: FUTURE_CALLOUT_RECT,
     isOpen: props.isOpen,
@@ -52,13 +58,30 @@ export function FutureCalloutSettingsPopover(props: {
   useEffect(() => {
     if (props.isOpen) setLocalSettings(props.settings);
   }, [props.isOpen, props.settings]);
+  usePopoverDistanceClose({
+    isOpen: props.isOpen && !presets.editor.isOpen,
+    onClose: props.onClose,
+    popoverRef,
+  });
+  usePopoverEscapeClose({
+    anchorEl: props.anchorEl,
+    isOpen: props.isOpen && !presets.editor.isOpen,
+    onClose: props.onClose,
+  });
 
   const commit = (next: CalloutSettings) => {
     setLocalSettings(next);
     props.onChange(next);
   };
   const handleSettingChange = (patch: CalloutSettingsPatch) => {
-    commit(applyCalloutSettingsPatch(localSettings, patch));
+    commit(
+      applyCalloutSettingsPatch(
+        localSettings,
+        patch.style && !('sourcePresetId' in patch)
+          ? { ...patch, sourcePresetId: undefined }
+          : patch
+      )
+    );
   };
   const applyPreset = (preset: CalloutPreset) => {
     commit(
@@ -84,22 +107,18 @@ export function FutureCalloutSettingsPopover(props: {
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
+        'sniptale-main-toolbar-popover',
       ].join(' ')}
       dataUi="content.toolbar.future-callout-popover"
       isOpen={props.isOpen}
       popoverRef={popoverRef}
       portalTarget={resolveContentPortalTarget(props.anchorEl)}
-      style={{ ...popoverStyle, width: 384 }}
+      style={{ ...popoverStyle, width: SETTINGS_POPOVER_WIDTH }}
     >
       <CalloutSettingsPopoverContent
         handleDelete={props.onDisable}
         handleSettingChange={handleSettingChange}
-        headerDrag={{
-          isDragging: false,
-          onPointerDown: STATIC_POINTER_HANDLER,
-          onPointerMove: STATIC_POINTER_HANDLER,
-          onPointerUp: STATIC_POINTER_HANDLER,
-        }}
+        headerContext="toolbar"
         localSettings={localSettings}
         onApplyPreset={applyPreset}
         onClose={props.onClose}

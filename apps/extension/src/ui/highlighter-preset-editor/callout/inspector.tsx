@@ -10,9 +10,11 @@ import {
   PanelTop,
   Save,
   Square,
+  Tag,
   Type,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { translate, type TranslationKey } from '../../../platform/i18n';
 import {
   CalloutBorderSettings,
@@ -24,11 +26,16 @@ import type { ManualContentProps } from './inspector-fields';
 import { CalloutCssSettings } from './inspector-css';
 import { CalloutSaveSettings, type CalloutSaveSectionProps } from './inspector-save';
 import { CalloutBackgroundSettings, CalloutSizeSettings } from './inspector-surface';
-import { CalloutTextSettings, CalloutTitleSettings } from './inspector-typography';
+import {
+  CalloutBadgeSettings,
+  CalloutTextSettings,
+  CalloutTitleSettings,
+} from './inspector-typography';
 import {
   CategorizedInspector,
   type CategorizedInspectorSection,
 } from '@sniptale/ui/categorized-inspector';
+import { HighlighterManualInspectorSurface } from '../manual-inspector-surface';
 
 type ManualSection =
   | 'position'
@@ -36,6 +43,7 @@ type ManualSection =
   | 'accent'
   | 'text'
   | 'title'
+  | 'badge'
   | 'divider'
   | 'size'
   | 'background'
@@ -74,6 +82,8 @@ function ManualSettingsContent(
       return <CalloutTextSettings {...props} />;
     case 'title':
       return <CalloutTitleSettings {...props} />;
+    case 'badge':
+      return <CalloutBadgeSettings {...props} />;
     case 'accent':
       return <CalloutAccentSettings {...props} />;
     case 'divider':
@@ -102,6 +112,7 @@ export function CalloutManualSettings(
     MANUAL_SECTIONS[1]!,
     ...(props.settings.style.title.enabled
       ? ([
+          { icon: Tag, id: 'badge', labelKey: 'content.callout.manualBadge' },
           { icon: Minus, id: 'divider', labelKey: 'content.callout.manualDivider' },
         ] satisfies ManualSectionOption[])
       : []),
@@ -122,17 +133,54 @@ export function CalloutManualSettings(
     id,
     label: translate(labelKey),
   }));
+  const renderSectionHeadingControl = (section: ManualSection) => {
+    if (section === 'title') {
+      const enabled = props.settings.style.title.enabled;
+      return (
+        <ProductGlassSwitch
+          aria-label={translate('content.callout.titleToggle')}
+          on={enabled}
+          onClick={() => props.onChange({ style: { title: { enabled: !enabled } } })}
+        />
+      );
+    }
+    if (section === 'badge') {
+      const enabled = props.settings.style.badge.enabled;
+      return (
+        <ProductGlassSwitch
+          aria-label={translate('content.callout.badgeEnabled')}
+          on={enabled}
+          onClick={() => props.onChange({ style: { badge: { enabled: !enabled } } })}
+        />
+      );
+    }
+    if (section === 'accent') {
+      const enabled = props.settings.style.accentEdge.enabled;
+      return (
+        <ProductGlassSwitch
+          aria-label={translate('content.callout.accentEnabled')}
+          on={enabled}
+          onClick={() => props.onChange({ style: { accentEdge: { enabled: !enabled } } })}
+        />
+      );
+    }
+    return null;
+  };
   return (
     <ContentPopoverSection
       dataUi="content.callout-settings.manual-section"
       className="!p-0 overflow-hidden"
     >
-      <CategorizedInspector
-        ariaLabel={translate('content.callout.manualNavigation')}
-        initialSection="text"
-        sections={translatedSections}
-        renderSection={(section) => <ManualSettingsContent {...props} section={section} />}
-      />
+      <HighlighterManualInspectorSurface>
+        <CategorizedInspector
+          ariaLabel={translate('content.callout.manualNavigation')}
+          initialSection="text"
+          renderSectionHeadingControl={renderSectionHeadingControl}
+          showSectionHeading
+          sections={translatedSections}
+          renderSection={(section) => <ManualSettingsContent {...props} section={section} />}
+        />
+      </HighlighterManualInspectorSurface>
     </ContentPopoverSection>
   );
 }

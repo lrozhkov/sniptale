@@ -18,7 +18,6 @@ import {
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { dispatchFrameStepBadgeChanged } from '../../platform/page-context/frame-events';
 import {
-  usePopoverDistanceClose as useStepBadgePopoverDistanceClose,
   usePopoverEscapeClose,
   usePopoverOutsideClose as useStepBadgePopoverOutsideClose,
 } from '../popover-sync/hooks';
@@ -30,15 +29,27 @@ function createStepBadgeHandlers(props: {
   setLocalStepBadgeSettings: React.Dispatch<React.SetStateAction<StepBadgeSettings>>;
 }) {
   const updateSettings = (patch: Partial<StepBadgeSettings>) => {
-    props.setLocalStepBadgeSettings((previous) => ({ ...previous, ...patch }));
-    dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: patch });
+    const manualPatch = { ...patch, sourcePresetId: undefined };
+    props.setLocalStepBadgeSettings((previous) => ({ ...previous, ...manualPatch }));
+    dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: manualPatch });
   };
 
   return {
     applyPreset: (preset: StepBadgePreset) => {
       const next = {
         ...createStepBadgeSettingsFromTemplate(preset.settings, preset.id),
-        manualPlacement: undefined,
+        // Automatic templates intentionally store an empty value: the concrete
+        // number belongs to the frame, not to the reusable visual template.
+        // Keep that runtime value while changing the badge appearance.
+        value:
+          preset.settings.auto !== false && !preset.settings.value
+            ? props.localStepBadgeSettings.value
+            : preset.settings.value,
+        anchor: props.localStepBadgeSettings.anchor ?? preset.settings.anchor,
+        offsetDirections: [...(props.localStepBadgeSettings.offsetDirections ?? [])],
+        ...(props.localStepBadgeSettings.manualPlacement === undefined
+          ? {}
+          : { manualPlacement: { ...props.localStepBadgeSettings.manualPlacement } }),
       };
       props.setLocalStepBadgeSettings(next);
       dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
@@ -70,11 +81,15 @@ function createStepBadgeHandlers(props: {
         value,
       });
 
-      props.setLocalStepBadgeSettings((previous) => ({ ...previous, value: nextValue }));
+      props.setLocalStepBadgeSettings((previous) => ({
+        ...previous,
+        sourcePresetId: undefined,
+        value: nextValue,
+      }));
       if (props.localStepBadgeSettings.auto === false) {
         dispatchFrameStepBadgeChanged({
           frameId: props.frameId,
-          settings: { value: nextValue },
+          settings: { sourcePresetId: undefined, value: nextValue },
         });
       }
     },
@@ -109,6 +124,7 @@ export function useStepBadgePopoverState(props: {
   anchorEl: HTMLElement | null;
   frameId: string;
   isOpen: boolean;
+  isDismissalEnabled?: boolean;
   onClose: () => void;
   stepBadge?: StepBadgeSettings;
 }) {
@@ -132,9 +148,9 @@ export function useStepBadgePopoverState(props: {
     );
   }, [isOpen, stepBadge]);
 
-  useStepBadgePopoverOutsideClose({ isOpen, onClose, popoverRef });
-  useStepBadgePopoverDistanceClose({ isOpen, onClose, popoverRef });
-  usePopoverEscapeClose({ anchorEl: props.anchorEl, isOpen, onClose });
+  const isDismissalOpen = isOpen && props.isDismissalEnabled !== false;
+  useStepBadgePopoverOutsideClose({ isOpen: isDismissalOpen, onClose, popoverRef });
+  usePopoverEscapeClose({ anchorEl: props.anchorEl, isOpen: isDismissalOpen, onClose });
   const handlers = createStepBadgeHandlers({
     frameId,
     localStepBadgeSettings,

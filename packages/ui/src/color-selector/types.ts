@@ -11,6 +11,7 @@ export function getNextColorSelectorFormatMode(
 
 export interface CompactColorSelectorProps {
   className?: string;
+  disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
   onOpenChange?: (open: boolean) => void;

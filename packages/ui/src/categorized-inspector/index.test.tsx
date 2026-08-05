@@ -55,6 +55,33 @@ it('selects categories and supports roving keyboard navigation', () => {
   expect(document.activeElement).toBe(effects);
 });
 
+it('optionally shows the active section label above its controls', () => {
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Border categories"
+        initialSection="outline"
+        renderSection={(section) => <div data-section={section}>{section}</div>}
+        renderSectionHeadingControl={(section) => (
+          <button data-heading-control={section}>On</button>
+        )}
+        sections={sections}
+        showSectionHeading
+      />
+    );
+  });
+
+  const heading = container.querySelector(
+    '[data-ui="shared.categorized-inspector.section-heading"]'
+  );
+  expect(heading?.querySelector('span')?.textContent).toBe('Outline');
+  expect(heading?.className).toContain('text-[13px]');
+  expect(container.querySelector('[data-heading-control="outline"]')).not.toBeNull();
+  act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Fill"]')?.click());
+  expect(heading?.querySelector('span')?.textContent).toBe('Fill');
+  expect(container.querySelector('[data-heading-control="fill"]')).not.toBeNull();
+});
+
 it('wraps arrow navigation and ignores unrelated keys', () => {
   act(() => {
     root.render(

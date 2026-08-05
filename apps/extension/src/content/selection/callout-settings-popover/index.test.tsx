@@ -71,7 +71,7 @@ describe('CalloutSettingsPopover', () => {
     const popover = document.querySelector<HTMLElement>(
       '[data-ui="content.callout-settings.popover"]'
     )!;
-    const header = popover.querySelector<HTMLElement>('.sniptale-callout-settings-header')!;
+    const header = popover.querySelector<HTMLElement>('.sniptale-settings-popover-header')!;
     header.setPointerCapture = vi.fn();
     header.releasePointerCapture = vi.fn();
     const initialLeft = Number.parseFloat(popover.style.left);
@@ -100,7 +100,7 @@ describe('CalloutSettingsPopover', () => {
 
     expect(Number.parseFloat(popover.style.left)).toBe(initialLeft + 50);
     expect(Number.parseFloat(popover.style.top)).toBe(initialTop + 40);
-    const close = popover.querySelector<HTMLButtonElement>('.sniptale-callout-settings-close');
+    const close = popover.querySelector<HTMLButtonElement>('.sniptale-settings-popover-close');
     act(() => close?.click());
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -151,14 +151,11 @@ describe('CalloutSettingsPopover', () => {
       );
     });
 
-    const manualModeButton = [...document.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Вручную'
-    );
-    expect(manualModeButton).toBeDefined();
-
-    act(() => {
-      (manualModeButton as HTMLButtonElement).click();
-    });
+    expect(
+      [...document.querySelectorAll('button')].some(
+        (button) => button.textContent === 'Выбрать шаблон'
+      )
+    ).toBe(true);
 
     const pickerTrigger = document.querySelector<HTMLButtonElement>(
       '[data-ui="shared.ui.color-selector.picker-trigger"]'
@@ -209,10 +206,11 @@ describe('CalloutSettingsPopover', () => {
       );
     });
 
-    const manualModeButton = [...document.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Вручную'
-    );
-    act(() => (manualModeButton as HTMLButtonElement).click());
+    expect(
+      [...document.querySelectorAll('button')].some(
+        (button) => button.textContent === 'Выбрать шаблон'
+      )
+    ).toBe(true);
 
     const fontSelect = document.querySelector<HTMLButtonElement>('[aria-label="Шрифт"]');
     expect(fontSelect).not.toBeNull();

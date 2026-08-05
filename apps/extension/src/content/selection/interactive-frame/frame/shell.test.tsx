@@ -57,6 +57,38 @@ afterEach(() => {
 });
 
 describe('InteractiveFrameFrameShell step badge controls', () => {
+  it('keeps the badge surface and settings anchor mounted for an empty value', () => {
+    const frame = createFrameDataFixture('frame-empty', {
+      stepBadge: createStepBadgeSettingsFixture({ auto: false, value: '' }),
+    });
+
+    act(() => {
+      root.render(
+        <InteractiveFrameFrameShell
+          borderColor="#111"
+          borderWidth={3}
+          containerRef={{ current: null }}
+          currentFrame={frame}
+          frame={frame}
+          frameRef={{ current: null }}
+          frameStyle={{}}
+          fillStyle={{}}
+          strokeStyle={{}}
+          frameZIndex={100}
+          handleMouseDown={vi.fn()}
+          handleResizeStart={vi.fn()}
+          isResizeHovered={false}
+          isStepBadgePopoverOpen
+          state="idle"
+          stepBadgePopoverAnchorRef={{ current: null }}
+          tempFrame={frame}
+        />
+      );
+    });
+
+    expect(host.querySelector('[data-ui="step-badge"]')).not.toBeNull();
+  });
+
   it('commits a boundary move through the step-badge owner and opens quick settings', () => {
     const frame = createFrameDataFixture('frame-1', {
       stepBadge: createStepBadgeSettingsFixture({ value: '3' }),

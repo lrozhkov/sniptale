@@ -69,6 +69,8 @@ export interface StepBadgeVisualStyle {
   textColor: string;
   outlineColorSource: StepBadgeOutlineColorSource;
   outlineColor: string;
+  /** Optional safe decorative CSS for the badge and its text. */
+  customCss?: string;
 }
 
 export interface StepBadgeTemplateSettings {
@@ -94,7 +96,8 @@ export interface StepBadgeSettings {
   auto?: boolean;
   manualPlacement?: StepBadgeManualPlacement | undefined;
   style?: StepBadgeVisualStyle;
-  sourcePresetId?: string;
+  /** Explicit undefined clears the preset link after a manual edit. */
+  sourcePresetId?: string | undefined;
 }
 
 export interface StepBadgePreset {

@@ -26,7 +26,12 @@ function createBorderPreset(id: string, name: string) {
   };
 }
 
-function renderContent(effectMode: EffectMode, decorationVisible = true, compact = false) {
+function renderContent(
+  effectMode: EffectMode,
+  decorationVisible = true,
+  compact = false,
+  customized = false
+) {
   return renderToStaticMarkup(
     <FrameSettingsPopoverContent
       compact={compact}
@@ -56,15 +61,16 @@ function renderContent(effectMode: EffectMode, decorationVisible = true, compact
       handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
       handleTogglePresetEnabled={vi.fn()}
+      headerContext="element"
       localBlurSettings={{ amount: 12, blurType: 'distortion', showBorder: decorationVisible }}
       localBorderSettings={{
         ...createBorderPreset('preset-1', 'Default'),
-        sourcePresetId: 'preset-1',
-        sourcePresetName: 'Default',
+        ...(customized ? {} : { sourcePresetId: 'preset-1', sourcePresetName: 'Default' }),
       }}
       localFocusSettings={{ opacity: 0.65, showBorder: decorationVisible }}
+      onClose={vi.fn()}
       pendingPresetIds={new Set()}
-      selectedPresetId="preset-1"
+      {...(customized ? {} : { selectedPresetId: 'preset-1' })}
       manual={{
         cssDraft: '',
         cssError: null,
@@ -90,6 +96,8 @@ describe('FrameSettingsPopoverContent', () => {
 
     expect(markup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
+    expect(markup).toContain(translate('content.overlayControls.frameStyleSwitchToManual'));
+    expect(markup).toContain('sniptale-settings-popover-close');
     expectNoFrameStyleSectionHeading(markup);
     expect(markup).toContain('shared.ui.content-popover-section');
     expect(markup).toContain('sniptale-content-popover-section');
@@ -106,6 +114,14 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
     expect(markup).toContain(translate('content.overlayControls.addFrameStyle'));
     expect(markup).toContain('sniptale-frame-style-add');
+  });
+
+  it('opens directly in manual mode for customized frame styling', () => {
+    const markup = renderContent('border', true, false, true);
+
+    expect(markup).toContain('data-ui="shared.border-style-inspector"');
+    expect(markup).toContain('data-ui="shared.highlighter-manual-inspector-surface"');
+    expect(markup).not.toContain('sniptale-glass-preset-list--scroll');
   });
 
   it.each(['blur', 'focus'] as const)(
@@ -175,5 +191,21 @@ describe('FrameSettingsPopoverContent', () => {
     expect(focusMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(blurMarkup).not.toContain('sniptale-glass-range-meta');
     expect(focusMarkup).not.toContain('sniptale-glass-range-meta');
+  });
+
+  it('places effect controls before the separated frame-and-fill settings', () => {
+    const blurMarkup = renderContent('blur');
+    const focusMarkup = renderContent('focus');
+    const decorationTitle = translate('content.overlayControls.showBorderTitle');
+
+    expect(
+      blurMarkup.indexOf(translate('content.overlayControls.blurStrengthLabelPrefix'))
+    ).toBeLessThan(blurMarkup.indexOf(translate('content.overlayControls.blurTypeLabel')));
+    expect(blurMarkup.indexOf(translate('content.overlayControls.blurTypeLabel'))).toBeLessThan(
+      blurMarkup.indexOf(decorationTitle)
+    );
+    expect(
+      focusMarkup.indexOf(translate('content.overlayControls.focusDimmingLabelPrefix'))
+    ).toBeLessThan(focusMarkup.indexOf(decorationTitle));
   });
 });

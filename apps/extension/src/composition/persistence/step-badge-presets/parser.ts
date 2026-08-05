@@ -4,6 +4,7 @@ import {
   type StepBadgeTemplateSettings,
   type SystemStepBadgePresetKey,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { validateStepBadgeCustomCss } from '../../../features/highlighter/step-badge-custom-css';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 
 export const STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION = 1;
@@ -110,7 +111,10 @@ export function parseStepBadgeTemplateSettings(value: unknown): StepBadgeTemplat
     !isColor(style['textColor']) ||
     !isString(style['outlineColorSource']) ||
     !outlineSources.has(style['outlineColorSource']) ||
-    !isColor(style['outlineColor'])
+    !isColor(style['outlineColor']) ||
+    (style['customCss'] !== undefined &&
+      (!isString(style['customCss']) ||
+        validateStepBadgeCustomCss(style['customCss']).error !== null))
   )
     return null;
   return {
@@ -135,6 +139,7 @@ export function parseStepBadgeTemplateSettings(value: unknown): StepBadgeTemplat
         'outlineColorSource'
       ] as StepBadgeTemplateSettings['style']['outlineColorSource'],
       outlineColor: style['outlineColor'],
+      customCss: isString(style['customCss']) ? style['customCss'] : '',
     },
   };
 }

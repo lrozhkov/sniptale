@@ -95,6 +95,7 @@ function verifyManualValueDispatch() {
     enabled: true,
     offsetDirections: [],
     sizeLevel: 2,
+    sourcePresetId: 'system-letters',
     type: 'letter',
     value: 'A',
   } as StepBadgeSettings);
@@ -107,6 +108,19 @@ function verifyManualValueDispatch() {
     frameId: 'frame-1',
     settings: { value: 'B' },
   });
+  expect(latestState?.localStepBadgeSettings.sourcePresetId).toBeUndefined();
+  expect(onCloseSpy).not.toHaveBeenCalled();
+
+  act(() => {
+    latestState?.handleValueChange('');
+  });
+
+  expect(listener).toHaveBeenLastCalledWith({
+    frameId: 'frame-1',
+    settings: { value: '' },
+  });
+  expect(latestState?.localStepBadgeSettings.value).toBe('');
+  expect(onCloseSpy).not.toHaveBeenCalled();
 
   cleanup();
 }
@@ -159,28 +173,35 @@ function verifyCanonicalPositionClearsManualPlacement() {
   cleanup();
 }
 
-function verifyPresetApplicationClearsManualPlacement() {
+function verifyPresetApplicationPreservesExistingPlacement() {
   const listener = vi.fn();
   const cleanup = addFrameStepBadgeChangedListener(listener);
   renderHarness({
-    anchor: 'top-left',
+    anchor: 'bottom-center',
     enabled: true,
-    manualPlacement: { position: 0.6, side: 'bottom' },
-    offsetDirections: [],
+    manualPlacement: { position: 0.6, side: 'right' },
+    offsetDirections: ['down'],
     type: 'number',
     value: '2',
   });
-  const preset = createSystemStepBadgePresetCatalog()[0]!;
+  const preset = createSystemStepBadgePresetCatalog().find(
+    (candidate) => candidate.id === 'system-outline'
+  )!;
 
   act(() => latestState?.applyPreset(preset));
 
   expect(listener).toHaveBeenCalledWith({
     frameId: 'frame-1',
     settings: expect.objectContaining({
-      manualPlacement: undefined,
+      anchor: 'bottom-center',
+      manualPlacement: { position: 0.6, side: 'right' },
+      offsetDirections: ['down'],
       sourcePresetId: preset.id,
+      value: '2',
     }),
   });
+  expect(latestState?.localStepBadgeSettings.value).toBe('2');
+  expect(onCloseSpy).not.toHaveBeenCalled();
   cleanup();
 }
 
@@ -192,8 +213,8 @@ describe('useStepBadgePopoverState', () => {
     verifyCanonicalPositionClearsManualPlacement
   );
   it(
-    'clears manual placement when a preset is applied',
-    verifyPresetApplicationClearsManualPlacement
+    'preserves an existing badge placement when a preset is applied',
+    verifyPresetApplicationPreservesExistingPlacement
   );
   it(
     'opens and commits a grouped history transaction around the popover session',

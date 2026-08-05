@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 
-type Position = { left: number; top: number };
-type DragSession = { origin: Position; pointerId: number; startX: number; startY: number };
+type FloatingPopoverPosition = { left: number; top: number };
+type DragSession = {
+  origin: FloatingPopoverPosition;
+  pointerId: number;
+  startX: number;
+  startY: number;
+};
 
 const VIEWPORT_MARGIN = 8;
 
@@ -9,8 +14,11 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
 }
 
-function clampPosition(element: HTMLElement | null, position: Position): Position {
-  const width = element?.offsetWidth ?? 360;
+function clampPosition(
+  element: HTMLElement | null,
+  position: FloatingPopoverPosition
+): FloatingPopoverPosition {
+  const width = element?.offsetWidth ?? 400;
   const height = element?.offsetHeight ?? 600;
   return {
     left: clamp(position.left, VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN),
@@ -18,13 +26,13 @@ function clampPosition(element: HTMLElement | null, position: Position): Positio
   };
 }
 
-export function useCalloutSettingsPopoverDrag(args: {
-  basePosition: Position;
+export function useFloatingPopoverDrag(args: {
+  basePosition: FloatingPopoverPosition;
   isOpen: boolean;
   popoverRef: RefObject<HTMLDivElement | null>;
   resetKey: string;
 }) {
-  const [manualPosition, setManualPosition] = useState<Position | null>(null);
+  const [manualPosition, setManualPosition] = useState<FloatingPopoverPosition | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<DragSession | null>(null);
 
@@ -78,3 +86,5 @@ export function useCalloutSettingsPopoverDrag(args: {
     position: manualPosition ?? args.basePosition,
   };
 }
+
+export type FloatingPopoverDrag = ReturnType<typeof useFloatingPopoverDrag>;

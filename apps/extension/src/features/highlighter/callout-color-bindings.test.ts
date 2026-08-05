@@ -11,6 +11,7 @@ describe('callout color bindings', () => {
         colorBindings: {
           accent: 'frame-border',
           connector: 'frame-border',
+          shadow: 'surface-background',
           surfaceBackground: 'frame-fill',
           surfaceBorder: 'frame-border',
         },
@@ -22,6 +23,7 @@ describe('callout color bindings', () => {
     expect(resolved.accentEdge.color).toBe('#ff0000');
     expect(resolved.surface.borderColor).toBe('#ff0000');
     expect(resolved.surface.backgroundColor).toBe('#00ff00');
+    expect(resolved.surface.shadowColor).toBe('#00ff00');
   });
 
   it('falls back to the stored custom color when a frame source is unavailable', () => {

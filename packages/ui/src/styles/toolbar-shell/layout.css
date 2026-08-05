@@ -61,6 +61,31 @@
   gap: var(--sniptale-toolbar-gap);
 }
 
+.sniptale-toolbar-subgroup {
+  display: flex;
+  align-items: center;
+  gap: var(--sniptale-toolbar-gap);
+}
+
+.sniptale-toolbar:not([data-display-mode='vertical']) .sniptale-toolbar-annotation-group,
+.sniptale-toolbar:not([data-display-mode='vertical']) .sniptale-toolbar-privacy-group-start {
+  margin-inline-start: 2px;
+}
+
+.sniptale-toolbar:not([data-display-mode='vertical'])
+  .sniptale-mode-selector-group
+  .sniptale-mode-wrapper {
+  margin-inline-end: 2px;
+}
+
+.sniptale-toolbar .sniptale-capture-leading-divider {
+  margin-inline-start: 7px;
+}
+
+.sniptale-toolbar .sniptale-toolbar-highlighter-utilities + .sniptale-capture-leading-divider {
+  margin-inline-start: 0;
+}
+
 .sniptale-mode-wrapper,
 .sniptale-settings-wrapper {
   position: relative;

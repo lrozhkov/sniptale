@@ -46,6 +46,7 @@ export function resolveCalloutColorBindings(
   const colorBindings = style.colorBindings ?? {
     accent: 'custom',
     connector: 'custom',
+    shadow: 'custom',
     surfaceBackground: 'custom',
     surfaceBorder: 'custom',
   };
@@ -54,6 +55,22 @@ export function resolveCalloutColorBindings(
     style.accentEdge.color,
     frameColors
   );
+  const surfaceBackgroundColor = resolveCalloutBoundColor(
+    colorBindings.surfaceBackground,
+    style.surface.backgroundColor,
+    frameColors
+  );
+  const surfaceBorderColor = resolveCalloutBoundColor(
+    colorBindings.surfaceBorder,
+    style.surface.borderColor,
+    frameColors
+  );
+  const shadowColor =
+    colorBindings.shadow === 'surface-background'
+      ? surfaceBackgroundColor
+      : colorBindings.shadow === 'surface-border'
+        ? surfaceBorderColor
+        : style.surface.shadowColor;
   return {
     ...style,
     accentEdge: {
@@ -88,16 +105,9 @@ export function resolveCalloutColorBindings(
     },
     surface: {
       ...style.surface,
-      backgroundColor: resolveCalloutBoundColor(
-        colorBindings.surfaceBackground,
-        style.surface.backgroundColor,
-        frameColors
-      ),
-      borderColor: resolveCalloutBoundColor(
-        colorBindings.surfaceBorder,
-        style.surface.borderColor,
-        frameColors
-      ),
+      backgroundColor: surfaceBackgroundColor,
+      borderColor: surfaceBorderColor,
+      shadowColor,
     },
   };
 }

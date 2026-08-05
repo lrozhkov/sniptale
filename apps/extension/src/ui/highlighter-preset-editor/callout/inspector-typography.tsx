@@ -3,16 +3,22 @@ import type {
   CalloutFontFamily,
   CalloutTextDirection,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from 'lucide-react';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
 import {
-  ProductGlassBoldButton,
-  ProductGlassSwitch,
-  ProductGlassToggleRow,
-} from '@sniptale/ui/product-glass-controls';
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  PaintBucket,
+  Palette,
+  PanelTop,
+  Square,
+} from 'lucide-react';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
 import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
+import { resolveCalloutColorBindings } from '../../../features/highlighter/callout-color-bindings';
 import {
   AdditionalSettings,
   ColorField,
@@ -43,46 +49,53 @@ function TypographyButtons(props: {
     ['justify', AlignJustify, 'content.callout.alignJustify'],
   ] as const;
   return (
-    <div className="flex min-w-0 items-center justify-end gap-1">
-      <ProductGlassBoldButton
-        active={props.value.fontWeight === 'bold'}
-        aria-label={translate('content.callout.boldTitle')}
-        onClick={() =>
-          props.onChange({ fontWeight: props.value.fontWeight === 'bold' ? 'normal' : 'bold' })
-        }
-      >
-        <span className="text-[14px] font-bold">B</span>
-      </ProductGlassBoldButton>
-      <ProductGlassBoldButton
-        active={props.value.fontStyle === 'italic'}
-        aria-label={translate('content.callout.italicTitle')}
-        onClick={() =>
-          props.onChange({ fontStyle: props.value.fontStyle === 'italic' ? 'normal' : 'italic' })
-        }
-      >
-        <span className="text-[14px] italic">I</span>
-      </ProductGlassBoldButton>
-      <ProductGlassBoldButton
-        active={props.value.textDecoration === 'underline'}
-        aria-label={translate('content.callout.underlineTitle')}
-        onClick={() =>
-          props.onChange({
-            textDecoration: props.value.textDecoration === 'underline' ? 'none' : 'underline',
-          })
-        }
-      >
-        <span className="text-[14px] underline">U</span>
-      </ProductGlassBoldButton>
-      {alignments.map(([alignment, Icon, labelKey]) => (
+    <div
+      className="grid min-w-0 grid-cols-[auto_1fr] items-center gap-3"
+      data-ui="shared.callout-typography-controls"
+    >
+      <div className="flex items-center justify-start gap-1" data-ui="shared.callout-emphasis">
         <ProductGlassBoldButton
-          key={alignment}
-          active={props.value.textAlign === alignment}
-          aria-label={translate(labelKey)}
-          onClick={() => props.onChange({ textAlign: alignment })}
+          active={props.value.fontWeight === 'bold'}
+          aria-label={translate('content.callout.boldTitle')}
+          onClick={() =>
+            props.onChange({ fontWeight: props.value.fontWeight === 'bold' ? 'normal' : 'bold' })
+          }
         >
-          <Icon size={15} />
+          <span className="text-[14px] font-bold">B</span>
         </ProductGlassBoldButton>
-      ))}
+        <ProductGlassBoldButton
+          active={props.value.fontStyle === 'italic'}
+          aria-label={translate('content.callout.italicTitle')}
+          onClick={() =>
+            props.onChange({ fontStyle: props.value.fontStyle === 'italic' ? 'normal' : 'italic' })
+          }
+        >
+          <span className="text-[14px] italic">I</span>
+        </ProductGlassBoldButton>
+        <ProductGlassBoldButton
+          active={props.value.textDecoration === 'underline'}
+          aria-label={translate('content.callout.underlineTitle')}
+          onClick={() =>
+            props.onChange({
+              textDecoration: props.value.textDecoration === 'underline' ? 'none' : 'underline',
+            })
+          }
+        >
+          <span className="text-[14px] underline">U</span>
+        </ProductGlassBoldButton>
+      </div>
+      <div className="flex items-center justify-end gap-1" data-ui="shared.callout-alignment">
+        {alignments.map(([alignment, Icon, labelKey]) => (
+          <ProductGlassBoldButton
+            key={alignment}
+            active={props.value.textAlign === alignment}
+            aria-label={translate(labelKey)}
+            onClick={() => props.onChange({ textAlign: alignment })}
+          >
+            <Icon size={15} />
+          </ProductGlassBoldButton>
+        ))}
+      </div>
     </div>
   );
 }
@@ -134,7 +147,7 @@ export function CalloutTextSettings(props: ManualContentProps) {
   return (
     <SettingsStack>
       <ColorField
-        label={translate('content.callout.textLabel')}
+        label={translate('content.callout.textColorLabel')}
         onChange={(textColor) => props.onChange({ style: { surface: { textColor } } })}
         palette={CALLOUT_TEXT_PRESETS}
         value={props.settings.style.surface.textColor}
@@ -152,7 +165,7 @@ export function CalloutTextSettings(props: ManualContentProps) {
         value={typography.fontSize}
         onChange={(fontSize) => changeTypography({ fontSize })}
       />
-      <AdditionalSettings>
+      <AdditionalSettings section="callout-text">
         <NumericProperty
           label={translate('content.callout.lineHeightLabel')}
           max={3}
@@ -203,47 +216,71 @@ export function CalloutTextSettings(props: ManualContentProps) {
   );
 }
 
-function BadgeColorSourceField(props: {
+const BADGE_COLOR_SOURCES: CalloutBadgeColorSource[] = [
+  'custom',
+  'frame-border',
+  'frame-fill',
+  'accent',
+];
+
+const BADGE_COLOR_SOURCE_ICONS = {
+  custom: Palette,
+  'frame-border': Square,
+  'frame-fill': PaintBucket,
+  accent: PanelTop,
+} as const;
+
+function BadgeColorField(props: {
+  customColor: string;
   label: string;
-  onChange: (source: CalloutBadgeColorSource) => void;
-  value: CalloutBadgeColorSource;
+  onColorChange: (color: string) => void;
+  onSourceChange: (source: CalloutBadgeColorSource) => void;
+  palette: readonly string[];
+  resolvedColor: string;
+  source: CalloutBadgeColorSource;
+  sourceLabel: string;
 }) {
-  const sources: CalloutBadgeColorSource[] = ['custom', 'frame-border', 'frame-fill', 'accent'];
+  const sourceIndex = BADGE_COLOR_SOURCES.indexOf(props.source);
+  const nextSource =
+    BADGE_COLOR_SOURCES[(sourceIndex + 1) % BADGE_COLOR_SOURCES.length] ?? 'custom';
+  const SourceIcon = BADGE_COLOR_SOURCE_ICONS[props.source];
+  const sourceName = translate(`content.callout.badgeColorSource.${props.source}`);
+  const sourceTitle = `${props.sourceLabel} — ${sourceName}`;
   return (
-    <PropertyField label={props.label}>
-      <CompactSelect
-        appearance="plain"
-        aria-label={props.label}
-        options={sources.map((value) => ({
-          label: translate(`content.callout.badgeColorSource.${value}`),
-          value,
-        }))}
-        value={props.value}
-        onChange={props.onChange}
-      />
-    </PropertyField>
+    <ColorField
+      control={
+        <ProductGlassBoldButton
+          aria-label={sourceTitle}
+          data-badge-color-source={props.source}
+          title={sourceTitle}
+          onClick={() => props.onSourceChange(nextSource)}
+        >
+          <SourceIcon aria-hidden="true" size={14} strokeWidth={2} />
+        </ProductGlassBoldButton>
+      }
+      disabled={props.source !== 'custom'}
+      label={props.label}
+      onChange={props.onColorChange}
+      palette={props.palette}
+      value={props.source === 'custom' ? props.customColor : props.resolvedColor}
+    />
   );
 }
 
-function BadgeSettings(props: ManualContentProps) {
+export function CalloutBadgeSettings(props: ManualContentProps) {
   const badge = props.settings.style.badge;
+  const resolvedBadge = resolveCalloutColorBindings(
+    props.settings.style,
+    props.frameColors ?? {}
+  ).badge;
   const changeBadge = (patch: Partial<typeof badge>) => props.onChange({ style: { badge: patch } });
   return (
     <>
-      <ProductGlassToggleRow
-        title={translate('content.callout.badgeEnabled')}
-        control={
-          <ProductGlassSwitch
-            aria-label={translate('content.callout.badgeEnabled')}
-            on={badge.enabled}
-            onClick={() => changeBadge({ enabled: !badge.enabled })}
-          />
-        }
-      />
       {badge.enabled ? (
         <>
           <PropertyField label={translate('content.callout.badgeTextLabel')}>
             <ProductInput
+              className="cursor-text"
               maxLength={64}
               placeholder={translate('content.callout.badgeTextPlaceholder')}
               value={badge.text}
@@ -281,32 +318,26 @@ function BadgeSettings(props: ManualContentProps) {
             value={badge.size}
             onChange={(size) => changeBadge({ size })}
           />
-          <BadgeColorSourceField
-            label={translate('content.callout.badgeBackgroundSource')}
-            value={badge.backgroundColorSource}
-            onChange={(backgroundColorSource) => changeBadge({ backgroundColorSource })}
+          <BadgeColorField
+            customColor={badge.backgroundColor}
+            label={translate('content.callout.badgeBackgroundColor')}
+            onColorChange={(backgroundColor) => changeBadge({ backgroundColor })}
+            onSourceChange={(backgroundColorSource) => changeBadge({ backgroundColorSource })}
+            palette={CALLOUT_BACKGROUND_PRESETS}
+            resolvedColor={resolvedBadge.backgroundColor}
+            source={badge.backgroundColorSource}
+            sourceLabel={translate('content.callout.badgeBackgroundSource')}
           />
-          {badge.backgroundColorSource === 'custom' ? (
-            <ColorField
-              label={translate('content.callout.badgeBackgroundColor')}
-              value={badge.backgroundColor}
-              palette={CALLOUT_BACKGROUND_PRESETS}
-              onChange={(backgroundColor) => changeBadge({ backgroundColor })}
-            />
-          ) : null}
-          <BadgeColorSourceField
-            label={translate('content.callout.badgeTextSource')}
-            value={badge.textColorSource}
-            onChange={(textColorSource) => changeBadge({ textColorSource })}
+          <BadgeColorField
+            customColor={badge.textColor}
+            label={translate('content.callout.badgeTextColor')}
+            onColorChange={(textColor) => changeBadge({ textColor })}
+            onSourceChange={(textColorSource) => changeBadge({ textColorSource })}
+            palette={CALLOUT_TEXT_PRESETS}
+            resolvedColor={resolvedBadge.textColor}
+            source={badge.textColorSource}
+            sourceLabel={translate('content.callout.badgeTextSource')}
           />
-          {badge.textColorSource === 'custom' ? (
-            <ColorField
-              label={translate('content.callout.badgeTextColor')}
-              value={badge.textColor}
-              palette={CALLOUT_TEXT_PRESETS}
-              onChange={(textColor) => changeBadge({ textColor })}
-            />
-          ) : null}
           <NumericProperty
             label={translate('content.callout.badgeBorderWidth')}
             max={12}
@@ -315,18 +346,15 @@ function BadgeSettings(props: ManualContentProps) {
             onChange={(borderWidth) => changeBadge({ borderWidth })}
           />
           {badge.borderWidth > 0 ? (
-            <BadgeColorSourceField
-              label={translate('content.callout.badgeBorderSource')}
-              value={badge.borderColorSource}
-              onChange={(borderColorSource) => changeBadge({ borderColorSource })}
-            />
-          ) : null}
-          {badge.borderWidth > 0 && badge.borderColorSource === 'custom' ? (
-            <ColorField
+            <BadgeColorField
+              customColor={badge.borderColor}
               label={translate('content.callout.badgeBorderColor')}
-              value={badge.borderColor}
+              onColorChange={(borderColor) => changeBadge({ borderColor })}
+              onSourceChange={(borderColorSource) => changeBadge({ borderColorSource })}
               palette={CALLOUT_TEXT_PRESETS}
-              onChange={(borderColor) => changeBadge({ borderColor })}
+              resolvedColor={resolvedBadge.borderColor}
+              source={badge.borderColorSource}
+              sourceLabel={translate('content.callout.badgeBorderSource')}
             />
           ) : null}
           <NumericProperty
@@ -341,7 +369,11 @@ function BadgeSettings(props: ManualContentProps) {
               appearance="plain"
               aria-label={translate('content.callout.badgeFontWeight')}
               options={(['normal', 'bold'] as const).map((value) => ({
-                label: translate(`content.callout.badgeFontWeight.${value}`),
+                label: translate(
+                  value === 'normal'
+                    ? 'content.callout.badgeFontWeightNormal'
+                    : 'content.callout.badgeFontWeightBold'
+                ),
                 value,
               }))}
               value={badge.fontWeight}
@@ -359,16 +391,6 @@ export function CalloutTitleSettings(props: ManualContentProps) {
   const changeTitle = (patch: Partial<typeof title>) => props.onChange({ style: { title: patch } });
   return (
     <SettingsStack>
-      <ProductGlassToggleRow
-        title={translate('content.callout.titleToggle')}
-        control={
-          <ProductGlassSwitch
-            aria-label={translate('content.callout.titleToggle')}
-            on={title.enabled}
-            onClick={() => changeTitle({ enabled: !title.enabled })}
-          />
-        }
-      />
       {title.enabled ? (
         <>
           <FontFamilyField
@@ -396,7 +418,7 @@ export function CalloutTitleSettings(props: ManualContentProps) {
             palette={CALLOUT_BACKGROUND_PRESETS}
             onChange={(backgroundColor) => changeTitle({ backgroundColor })}
           />
-          <AdditionalSettings>
+          <AdditionalSettings section="callout-title">
             <NumericProperty
               label={translate('content.callout.lineHeightLabel')}
               max={3}
@@ -418,14 +440,9 @@ export function CalloutTitleSettings(props: ManualContentProps) {
               value={title.direction}
               onChange={(direction) => changeTitle({ direction })}
             />
-            <BadgeSettings {...props} />
           </AdditionalSettings>
         </>
-      ) : (
-        <AdditionalSettings>
-          <BadgeSettings {...props} />
-        </AdditionalSettings>
-      )}
+      ) : null}
     </SettingsStack>
   );
 }

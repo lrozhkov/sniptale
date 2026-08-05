@@ -1,6 +1,5 @@
 import { Droplet, Eye, EyeOff, Plus, Settings2, Square, Waves } from 'lucide-react';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
-import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import {
   ProductGlassChip,
   ProductGlassChipIcon,
@@ -26,14 +25,21 @@ import { buildBlurTypeOptions, getBorderPresetPreviewStyle } from './helpers';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BorderStyleInspector } from '../../../ui/highlighter-preset-editor/fields/inspector';
 import { BorderManualSaveSettings } from '../../../ui/highlighter-preset-editor/fields/save-settings';
+import { HighlighterManualInspectorSurface } from '../../../ui/highlighter-preset-editor/manual-inspector-surface';
 import type {
   AppliedBorderSettings,
   BorderVisualStylePatch,
 } from '../../../features/highlighter/contracts';
+import type { FloatingPopoverDrag } from '../popover-sync/drag';
+import {
+  SettingsPopoverHeader,
+  type SettingsPopoverContext,
+} from '../popover-sync/settings-header';
+import { selectOrClosePopoverPreset } from '../popover-sync/preset-selection';
+import { useOpeningPresetOrder } from '../popover-sync/preset-order';
 
 function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
   if (props.iconName === 'droplet') {
@@ -70,6 +76,10 @@ export function FrameSettingsPopoverContent(props: {
   localBlurSettings: BlurSettings;
   localBorderSettings: AppliedBorderSettings;
   localFocusSettings: FocusSettings;
+  headerContext: SettingsPopoverContext;
+  headerDrag?: FloatingPopoverDrag;
+  onClose: () => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
   manual: {
@@ -91,31 +101,35 @@ export function FrameSettingsPopoverContent(props: {
       : props.effectMode === 'focus'
         ? props.handleFocusShowBorderChange
         : undefined;
+  const [mode, setMode] = useState<'preset' | 'manual'>(() =>
+    props.selectedPresetId ? 'preset' : 'manual'
+  );
+  const hasSelectedPreset = Boolean(props.selectedPresetId);
+  useEffect(() => {
+    setMode(hasSelectedPreset ? 'preset' : 'manual');
+  }, [hasSelectedPreset]);
+  const switchMode = () => {
+    if (!decorationEnabled) handleDecorationToggle?.(true);
+    setMode(mode === 'preset' ? 'manual' : 'preset');
+  };
 
   return (
     <>
-      <ProductToolbarMenuGroupLabel>
-        {getFrameEffectTitle(props.effectMode)}
-      </ProductToolbarMenuGroupLabel>
-      <FrameBorderSection
-        borderPresets={props.globalSettings.borderPresets}
-        decorationEnabled={decorationEnabled}
-        effectMode={props.effectMode}
-        handleAddPreset={props.handleAddPreset}
-        handleEditPreset={props.handleEditPreset}
-        handleManualBorderChange={props.handleManualBorderChange}
-        handleSelectPreset={props.handleSelectPreset}
-        handleTogglePresetEnabled={props.handleTogglePresetEnabled}
-        pendingPresetIds={props.pendingPresetIds}
-        localBorderSettings={props.localBorderSettings}
-        manual={props.manual}
-        {...(props.selectedPresetId === undefined
-          ? {}
-          : { selectedPresetId: props.selectedPresetId })}
-        showDecorationHint={!props.compact}
-        {...(handleDecorationToggle === undefined ? {} : { handleDecorationToggle })}
+      <SettingsPopoverHeader
+        action={{
+          label: translate(
+            mode === 'preset'
+              ? 'content.overlayControls.frameStyleSwitchToManual'
+              : 'content.overlayControls.frameStyleSwitchToPresets'
+          ),
+          onClick: switchMode,
+        }}
+        closeLabel={translate('content.interactiveFrame.closeEffectSettings')}
+        context={props.headerContext}
+        {...(props.headerDrag ? { drag: props.headerDrag } : {})}
+        onClose={props.onClose}
+        title={getFrameEffectTitle(props.effectMode)}
       />
-
       {props.effectMode === 'blur' ? (
         <FrameBlurSection
           handleBlurChange={props.handleBlurChange}
@@ -130,6 +144,30 @@ export function FrameSettingsPopoverContent(props: {
           localFocusSettings={props.localFocusSettings}
         />
       ) : null}
+
+      <FrameBorderSection
+        borderPresets={props.globalSettings.borderPresets}
+        decorationEnabled={decorationEnabled}
+        effectMode={props.effectMode}
+        handleAddPreset={props.handleAddPreset}
+        handleEditPreset={props.handleEditPreset}
+        handleManualBorderChange={props.handleManualBorderChange}
+        handleSelectPreset={props.handleSelectPreset}
+        handleTogglePresetEnabled={props.handleTogglePresetEnabled}
+        pendingPresetIds={props.pendingPresetIds}
+        localBorderSettings={props.localBorderSettings}
+        manual={props.manual}
+        mode={mode}
+        onClose={props.onClose}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
+        {...(props.selectedPresetId === undefined
+          ? {}
+          : { selectedPresetId: props.selectedPresetId })}
+        showDecorationHint={!props.compact}
+        {...(handleDecorationToggle === undefined ? {} : { handleDecorationToggle })}
+      />
     </>
   );
 }
@@ -154,19 +192,20 @@ function FrameBorderSection(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  mode: 'preset' | 'manual';
+  onClose: () => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   showDecorationHint: boolean;
 }) {
   const locale = useAppLocale();
   const enabledPresetCount = props.borderPresets.filter(
     (preset) => preset.enabled !== false
   ).length;
-  const [mode, setMode] = useState<'preset' | 'manual'>('preset');
 
   return (
     <ContentPopoverSection className="sniptale-frame-style-section">
       <FrameDecorationToggle {...props} />
-      {props.decorationEnabled ? <FrameStyleModeSwitch mode={mode} onChange={setMode} /> : null}
-      {props.decorationEnabled && mode === 'preset' ? (
+      {props.decorationEnabled && props.mode === 'preset' ? (
         <FramePresetMode
           borderPresets={props.borderPresets}
           enabledPresetCount={enabledPresetCount}
@@ -175,13 +214,14 @@ function FrameBorderSection(props: {
           handleSelectPreset={props.handleSelectPreset}
           handleTogglePresetEnabled={props.handleTogglePresetEnabled}
           locale={locale}
+          onClose={props.onClose}
           pendingPresetIds={props.pendingPresetIds}
           {...(props.selectedPresetId === undefined
             ? {}
             : { selectedPresetId: props.selectedPresetId })}
         />
       ) : null}
-      {props.decorationEnabled && mode === 'manual' ? <FrameManualMode {...props} /> : null}
+      {props.decorationEnabled && props.mode === 'manual' ? <FrameManualMode {...props} /> : null}
     </ContentPopoverSection>
   );
 }
@@ -211,23 +251,6 @@ function FrameDecorationToggle(props: {
   );
 }
 
-function FrameStyleModeSwitch(props: {
-  mode: 'preset' | 'manual';
-  onChange: (mode: 'preset' | 'manual') => void;
-}) {
-  return (
-    <SegmentedSwitch
-      activeId={props.mode}
-      ariaLabel={translate('content.overlayControls.frameStyleLabel')}
-      onChange={props.onChange}
-      options={[
-        { id: 'preset', label: translate('content.overlayControls.frameStyleModePreset') },
-        { id: 'manual', label: translate('content.overlayControls.frameStyleModeManual') },
-      ]}
-    />
-  );
-}
-
 function FramePresetMode(props: {
   borderPresets: BorderPreset[];
   enabledPresetCount: number;
@@ -236,13 +259,15 @@ function FramePresetMode(props: {
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
+  onClose: () => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
 }) {
+  const orderedPresets = useOpeningPresetOrder(props.borderPresets, props.selectedPresetId);
   return (
     <>
       <ProductGlassPresetList scrollable>
-        {props.borderPresets.map((preset) => (
+        {orderedPresets.map((preset) => (
           <FramePresetRow
             enabledPresetCount={props.enabledPresetCount}
             handleEditPreset={props.handleEditPreset}
@@ -250,6 +275,7 @@ function FramePresetMode(props: {
             handleTogglePresetEnabled={props.handleTogglePresetEnabled}
             key={preset.id}
             locale={props.locale}
+            onClose={props.onClose}
             pending={props.pendingPresetIds.has(preset.id)}
             preset={preset}
             selected={props.selectedPresetId === preset.id}
@@ -277,6 +303,7 @@ function FramePresetRow(props: {
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
+  onClose: () => void;
   pending: boolean;
   preset: BorderPreset;
   selected: boolean;
@@ -299,7 +326,12 @@ function FramePresetRow(props: {
         disabled={!isEnabled}
         onClick={(event) => {
           if (createTrustedContentActionIntentSource(event.nativeEvent)) {
-            props.handleSelectPreset(props.preset);
+            selectOrClosePopoverPreset({
+              isActive: props.selected,
+              onApply: props.handleSelectPreset,
+              onClose: props.onClose,
+              preset: props.preset,
+            });
           }
         }}
       >
@@ -355,9 +387,10 @@ function FrameManualMode(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  onFloatingInteractionChange?: (open: boolean) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]">
+    <HighlighterManualInspectorSurface>
       <BorderStyleInspector
         cssDraft={props.manual.cssDraft}
         cssError={props.manual.cssError}
@@ -368,12 +401,15 @@ function FrameManualMode(props: {
             disabled={Boolean(props.manual.cssError)}
             isSaving={props.manual.isSaving}
             onSave={props.manual.save}
+            {...(props.onFloatingInteractionChange
+              ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+              : {})}
             presets={props.borderPresets}
           />
         }
         style={props.localBorderSettings}
       />
-    </div>
+    </HighlighterManualInspectorSurface>
   );
 }
 

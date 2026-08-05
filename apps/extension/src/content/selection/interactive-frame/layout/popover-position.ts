@@ -46,6 +46,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function calculateQuickControlPopoverRect(params: {
+  alignToAnchor: boolean;
   anchorRect: FloatingRect;
   avoidRect?: FloatingRect;
   height: number;
@@ -58,7 +59,13 @@ function calculateQuickControlPopoverRect(params: {
     TOOLBAR_MENU_GAP;
   const leftX = Math.min(params.anchorRect.x, targetRect.x) - TOOLBAR_MENU_GAP - params.width;
   const maxY = Math.max(VIEWPORT_MARGIN, params.viewport.height - params.height - VIEWPORT_MARGIN);
-  const y = clamp(targetRect.y + targetRect.height / 2 - params.height / 2, VIEWPORT_MARGIN, maxY);
+  const y = clamp(
+    params.alignToAnchor
+      ? params.anchorRect.y
+      : targetRect.y + targetRect.height / 2 - params.height / 2,
+    VIEWPORT_MARGIN,
+    maxY
+  );
   const centeredX = clamp(
     targetRect.x + targetRect.width / 2 - params.width / 2,
     VIEWPORT_MARGIN,
@@ -84,6 +91,7 @@ function calculateQuickControlPopoverRect(params: {
 }
 
 function calculateCanonicalPopoverRect(params: {
+  alignQuickControlToAnchor: boolean;
   anchorRect: FloatingRect;
   avoidRect?: FloatingRect;
   preferSidePlacement: boolean;
@@ -99,6 +107,7 @@ function calculateCanonicalPopoverRect(params: {
   const gap = params.preferSidePlacement ? TOOLBAR_MENU_GAP : FRAME_TOOLBAR_POPOVER_GAP;
   if (params.preferSidePlacement) {
     const sideRect = calculateQuickControlPopoverRect({
+      alignToAnchor: params.alignQuickControlToAnchor,
       anchorRect: params.anchorRect,
       ...(params.avoidRect ? { avoidRect: params.avoidRect } : {}),
       height,
@@ -231,6 +240,7 @@ export function useFramePopoverPosition(params: {
   frameRect: FloatingRect;
   isOpen: boolean;
   popoverRef: React.RefObject<HTMLDivElement | null>;
+  quickControlPlacement?: 'anchor-aligned' | 'callout-aware';
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
   const placementSessionRef = React.useRef<{
@@ -311,7 +321,9 @@ export function useFramePopoverPosition(params: {
   const viewport = { width: window.innerWidth, height: window.innerHeight };
   const mainToolbar = getMainToolbar(params.anchorEl);
   const avoidRect = activePlacementSession.preferSidePlacement
-    ? getCalloutAvoidanceRect(params.frameId)
+    ? params.quickControlPlacement === 'anchor-aligned'
+      ? undefined
+      : getCalloutAvoidanceRect(params.frameId)
     : undefined;
   const calculatedRect = mainToolbar
     ? calculateMainToolbarPopoverRect({
@@ -322,6 +334,7 @@ export function useFramePopoverPosition(params: {
         viewport,
       })
     : calculateCanonicalPopoverRect({
+        alignQuickControlToAnchor: params.quickControlPlacement === 'anchor-aligned',
         anchorRect: activePlacementSession.anchorRect,
         ...(avoidRect ? { avoidRect } : {}),
         preferSidePlacement: activePlacementSession.preferSidePlacement,

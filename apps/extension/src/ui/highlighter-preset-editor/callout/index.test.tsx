@@ -41,7 +41,14 @@ it('edits an existing preset in the shared persistent modal', async () => {
   });
 
   expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('Облачко');
-  expect(document.querySelector<HTMLElement>('[role="dialog"]')?.style.width).toBe('400px');
+  expect(document.querySelector<HTMLElement>('[role="dialog"]')?.style.width).toBe('660px');
+  expect(document.querySelector('.sniptale-highlighter-preset-editor-dialog')).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="shared.callout-preset-editor.preview-panel"]')
+  ).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="shared.callout-preset-editor.layout"]')?.className
+  ).toContain('sm:grid-cols-[176px_minmax(0,1fr)]');
   const navigation = [...document.querySelectorAll<HTMLButtonElement>('nav button')];
   expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('Позиция');
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
@@ -99,6 +106,46 @@ it('updates the default position and saves it with the live preset preview', asy
     },
     side: 'bottom',
   });
+  await act(async () => root.unmount());
+});
+
+it('shows localized badge weight options in the shared editor', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const preset = createSystemCalloutPresetCatalog()[4]!;
+
+  await act(async () => {
+    root.render(
+      <CalloutPresetEditor
+        isOpen
+        isSaving={false}
+        preset={preset}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    );
+  });
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[aria-label="Метка"]')?.click()
+  );
+  const badgeToggle = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="Текстовая метка"]'
+  );
+  if (badgeToggle?.getAttribute('aria-pressed') !== 'true') {
+    await act(async () => badgeToggle?.click());
+  }
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[aria-label="Начертание метки"]')?.click()
+  );
+
+  const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(
+    (option) => option.textContent
+  );
+  expect(options).toEqual(expect.arrayContaining(['Обычное', 'Жирное']));
+  expect(options.some((option) => option?.includes('badgeFontWeight'))).toBe(false);
+
   await act(async () => root.unmount());
 });
 

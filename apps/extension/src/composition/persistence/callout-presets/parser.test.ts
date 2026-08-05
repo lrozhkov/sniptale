@@ -63,6 +63,7 @@ it('defaults frame color bindings to custom for older catalogs', () => {
   expect(parsed.value.userPresets?.[0]?.style.colorBindings).toEqual({
     accent: 'custom',
     connector: 'custom',
+    shadow: 'custom',
     surfaceBackground: 'custom',
     surfaceBorder: 'custom',
   });

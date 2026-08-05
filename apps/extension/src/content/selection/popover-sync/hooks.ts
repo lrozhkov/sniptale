@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { isContentEventWithinElement } from '../../platform/dom-host';
+import { isContentEventWithinAnyElement } from '../../platform/dom-host';
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 
 interface PopoverSyncHookProps {
   isOpen: boolean;
@@ -15,6 +16,16 @@ interface PopoverOutsideCloseProps extends PopoverSyncHookProps {
 interface PopoverDistanceCloseProps extends PopoverSyncHookProps {
   autoCloseDistance?: number;
   checkThrottleMs?: number;
+  shouldIgnoreEvent?: (event: MouseEvent) => boolean;
+}
+
+function isPopoverInteraction(event: MouseEvent, popover: HTMLElement | null): boolean {
+  if (!popover) return false;
+  const ownedLayers = getOwnedFloatingInteractionLayers(
+    popover,
+    popover.getRootNode() as ParentNode
+  );
+  return isContentEventWithinAnyElement(event, [popover, ...ownedLayers]);
 }
 
 export function usePopoverEscapeClose(
@@ -58,7 +69,7 @@ export function usePopoverOutsideClose(props: PopoverOutsideCloseProps) {
         return;
       }
 
-      if (!isContentEventWithinElement(event, popoverRef.current)) {
+      if (!isPopoverInteraction(event, popoverRef.current)) {
         onClose();
       }
     };
@@ -82,6 +93,7 @@ export function usePopoverDistanceClose(props: PopoverDistanceCloseProps) {
     listenerDelayMs = 300,
     onClose,
     popoverRef,
+    shouldIgnoreEvent,
   } = props;
 
   useEffect(() => {
@@ -92,6 +104,9 @@ export function usePopoverDistanceClose(props: PopoverDistanceCloseProps) {
     let lastCheckTime = 0;
 
     const handleMouseMove = (event: MouseEvent) => {
+      if (shouldIgnoreEvent?.(event) || isPopoverInteraction(event, popoverRef.current)) {
+        return;
+      }
       const now = Date.now();
       if (now - lastCheckTime < checkThrottleMs) {
         return;
@@ -116,5 +131,13 @@ export function usePopoverDistanceClose(props: PopoverDistanceCloseProps) {
       window.clearTimeout(timer);
       document.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [autoCloseDistance, checkThrottleMs, isOpen, listenerDelayMs, onClose, popoverRef]);
+  }, [
+    autoCloseDistance,
+    checkThrottleMs,
+    isOpen,
+    listenerDelayMs,
+    onClose,
+    popoverRef,
+    shouldIgnoreEvent,
+  ]);
 }

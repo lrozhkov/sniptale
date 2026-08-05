@@ -7,10 +7,11 @@ import {
 import { useFrameSettingsPopoverController } from './controller';
 import type { FrameSettingsPopoverProps } from './types';
 import { FrameSettingsPopoverContent } from './views';
-import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
+import { useFloatingPopoverDrag, type FloatingPopoverDrag } from '../popover-sync/drag';
+import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover-sync/settings-surface';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -21,6 +22,7 @@ type FrameSettingsPopoverController = ReturnType<typeof useFrameSettingsPopoverC
 
 function FrameSettingsPopoverSurface(props: {
   controller: FrameSettingsPopoverController;
+  drag: FloatingPopoverDrag;
   popoverRef: React.Ref<HTMLDivElement>;
   popoverStyle: React.CSSProperties;
   request: FrameSettingsPopoverProps;
@@ -35,6 +37,7 @@ function FrameSettingsPopoverSurface(props: {
         'sniptale-glass-popover',
         'sniptale-content-popover',
         'sniptale-content-popover--toolbar-menu',
+        props.request.scope === 'session' ? 'sniptale-main-toolbar-popover' : '',
         props.request.compact ? 'sniptale-content-popover--compact' : '',
       ].join(' ')}
       data-sniptale-activation-bridge="defer"
@@ -64,6 +67,10 @@ function FrameSettingsPopoverSurface(props: {
           localFocusSettings={settings.localFocus}
           pendingPresetIds={catalog.pendingPresetIds}
           manual={catalog.manual}
+          onFloatingInteractionChange={surface.onFloatingInteractionChange}
+          headerContext={props.request.scope === 'session' ? 'toolbar' : 'element'}
+          {...(props.request.scope === 'session' ? {} : { headerDrag: props.drag })}
+          onClose={props.request.onClose}
           {...(settings.selectedPresetId === undefined
             ? {}
             : { selectedPresetId: settings.selectedPresetId })}
@@ -73,13 +80,19 @@ function FrameSettingsPopoverSurface(props: {
   );
 }
 
-function FrameStyleEditorLayer(props: { controller: FrameSettingsPopoverController }) {
+function FrameStyleEditorLayer(props: {
+  controller: FrameSettingsPopoverController;
+  toolbarOrigin: boolean;
+}) {
   const { editor } = props.controller.catalog;
   const { portalTheme } = props.controller.surface;
 
   return (
     <div
-      className="sniptale-frame-style-editor-layer"
+      className={[
+        'sniptale-frame-style-editor-layer',
+        props.toolbarOrigin ? 'sniptale-main-toolbar-popover' : '',
+      ].join(' ')}
       data-sniptale-activation-bridge="defer"
       data-theme={portalTheme ?? undefined}
       onMouseDown={stopPopoverPropagation}
@@ -99,14 +112,28 @@ function FrameStyleEditorLayer(props: { controller: FrameSettingsPopoverControll
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
   const popoverRef = useFloatingSurfaceWheelContainment(state.surface.popoverRef);
-  const popoverStyle = useFramePopoverPosition({
+  const canonicalStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
-    fallbackSize: { width: POPOVER_WIDTH, height: POPOVER_HEIGHT },
+    fallbackSize: { width: SETTINGS_POPOVER_WIDTH, height: SETTINGS_POPOVER_HEIGHT },
     frameId: props.frameId,
     frameRect: props.frameRect,
     isOpen: props.isOpen,
     popoverRef: state.surface.popoverRef,
   });
+  const drag = useFloatingPopoverDrag({
+    basePosition: {
+      left: typeof canonicalStyle.left === 'number' ? canonicalStyle.left : 0,
+      top: typeof canonicalStyle.top === 'number' ? canonicalStyle.top : 0,
+    },
+    isOpen: props.isOpen,
+    popoverRef: state.surface.popoverRef,
+    resetKey: props.frameId,
+  });
+  const popoverStyle = {
+    ...canonicalStyle,
+    ...(props.scope === 'session' ? {} : drag.position),
+    width: SETTINGS_POPOVER_WIDTH,
+  };
 
   if (!props.isOpen) {
     return null;
@@ -116,11 +143,12 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
     <>
       <FrameSettingsPopoverSurface
         controller={state}
+        drag={drag}
         popoverRef={popoverRef}
         popoverStyle={popoverStyle}
         request={props}
       />
-      <FrameStyleEditorLayer controller={state} />
+      <FrameStyleEditorLayer controller={state} toolbarOrigin={props.scope === 'session'} />
     </>,
     resolveContentPortalTarget(props.anchorEl)
   );

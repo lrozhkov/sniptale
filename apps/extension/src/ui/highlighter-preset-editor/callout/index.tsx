@@ -6,7 +6,6 @@ import type {
   CalloutSettingsPatch,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
   ProductModal,
@@ -20,6 +19,8 @@ import { CalloutSettingsPositionGrid } from './position-grid';
 import { CalloutPresetPreview } from './thumbnail';
 import { useCalloutPresetEditorDraft } from './draft';
 import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
+import { Eye } from 'lucide-react';
+import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
 
 function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
   if (anchor === 'middle-left') return { anchor, side: 'left' };
@@ -79,40 +80,59 @@ function PresetEditorBody(props: {
 }) {
   return (
     <ProductModalBody compact className="space-y-4">
-      <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-4">
-        <CalloutPresetPreview placement={props.placement} style={props.style} />
-        <ProductField label={translate('highlighter.calloutPresets.editor.name')}>
-          <ProductInput
-            value={props.name}
-            maxLength={64}
-            onChange={(event) => props.setName(event.target.value)}
-          />
-        </ProductField>
+      <div>
+        <label className="mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.calloutPresets.editor.name')}
+        </label>
+        <input
+          className={[
+            editorInputClassName,
+            'cursor-text placeholder:text-[var(--sniptale-color-text-dim)]',
+          ].join(' ')}
+          maxLength={64}
+          onChange={(event) => props.setName(event.target.value)}
+          type="text"
+          value={props.name}
+        />
       </div>
-      <CalloutManualSettings
-        settings={createInspectorSettings(props.placement, props.style)}
-        positionSection={
-          <div className="grid gap-2" data-ui="shared.callout-preset-editor.position">
-            <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-              {translate('highlighter.calloutPresets.editor.defaultPosition')}
-            </div>
-            <CalloutSettingsPositionGrid
-              anchor={props.placement.anchor}
-              layout="square"
-              onChange={(anchor) =>
-                props.setPlacement({
-                  ...getPresetPlacement(anchor),
-                  connectorAttachments: props.placement.connectorAttachments ?? {
-                    block: { mode: 'auto' },
-                    frame: { mode: 'auto' },
-                  },
-                })
-              }
-            />
+      <div
+        className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[176px_minmax(0,1fr)]"
+        data-ui="shared.callout-preset-editor.layout"
+      >
+        <div className="flex-shrink-0" data-ui="shared.callout-preset-editor.preview-panel">
+          <div className="mb-2 flex items-center gap-1 text-xs text-[var(--sniptale-color-text-secondary)]">
+            <Eye aria-hidden="true" size={12} />
+            {translate('highlighter.editor.previewLabel')}
           </div>
-        }
-        onChange={(patch) => props.setStyle(applyStylePatch(props.style, patch))}
-      />
+          <div className={`${editorPreviewFrameClassName} flex items-center justify-center`}>
+            <CalloutPresetPreview editor placement={props.placement} style={props.style} />
+          </div>
+        </div>
+        <CalloutManualSettings
+          settings={createInspectorSettings(props.placement, props.style)}
+          positionSection={
+            <div className="grid gap-2" data-ui="shared.callout-preset-editor.position">
+              <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+                {translate('highlighter.calloutPresets.editor.defaultPosition')}
+              </div>
+              <CalloutSettingsPositionGrid
+                anchor={props.placement.anchor}
+                layout="square"
+                onChange={(anchor) =>
+                  props.setPlacement({
+                    ...getPresetPlacement(anchor),
+                    connectorAttachments: props.placement.connectorAttachments ?? {
+                      block: { mode: 'auto' },
+                      frame: { mode: 'auto' },
+                    },
+                  })
+                }
+              />
+            </div>
+          }
+          onChange={(patch) => props.setStyle(applyStylePatch(props.style, patch))}
+        />
+      </div>
     </ProductModalBody>
   );
 }
@@ -165,10 +185,11 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
   return (
     <div ref={modalRootRef} style={{ display: 'contents' }}>
       <ProductModal
+        dialogClassName="sniptale-highlighter-preset-editor-dialog"
         isOpen
-        width="400px"
+        width="660px"
         maxWidth="94vw"
-        maxHeight="88vh"
+        maxHeight="86vh"
         scrollable
         onClose={props.onClose}
       >

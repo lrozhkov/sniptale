@@ -103,6 +103,12 @@ it('does not let a large title font impose the input default character width on 
           '[body]',
           'letter-spacing: 1px;',
         ].join('\n'),
+        badge: {
+          ...preset.style.badge,
+          enabled: true,
+          placement: 'title-start',
+          text: 'MARK',
+        },
         title: { ...preset.style.title, enabled: true, fontSize: 72 },
       },
     },
@@ -136,9 +142,14 @@ it('does not let a large title font impose the input default character width on 
   expect(props.containerRef.current?.style.filter).toBe('drop-shadow(0 2px 3px #000)');
   expect(props.contentEditableRef.current?.style.letterSpacing).toBe('1px');
   const titleMeasure = document.querySelector<HTMLElement>('[data-sniptale-callout-title-measure]');
-  expect(titleMeasure?.textContent).toBe('Wide heading');
+  expect(titleMeasure?.textContent).toBe('MARKWide heading');
   expect(titleMeasure?.style.width).toBe('max-content');
   expect(titleMeasure?.style.height).toBe('0px');
+  expect(titleMeasure?.style.display).toBe('flex');
+  expect(
+    titleMeasure?.querySelector('[data-sniptale-callout-badge-measure="true"]')?.textContent
+  ).toBe('MARK');
+  expect(document.querySelectorAll('[data-ui="content.callout.badge"]')).toHaveLength(1);
 });
 
 it('keeps body and title direction independent, including the auto bidi mode', () => {

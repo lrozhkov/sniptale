@@ -27,7 +27,7 @@ export function getLinkedStepBadgeDiameter(borderWidth: number): number {
 }
 
 export function getEffectiveStepBadgeVisualStyle(
-  settings: StepBadgeSettings
+  settings: Pick<StepBadgeSettings, 'style'>
 ): StepBadgeVisualStyle {
   return settings.style
     ? { ...DEFAULT_STEP_BADGE_VISUAL_STYLE, ...settings.style }
@@ -50,7 +50,7 @@ function resolveColor(
 }
 
 export function resolveStepBadgeVisualStyle(
-  settings: StepBadgeSettings,
+  settings: Pick<StepBadgeSettings, 'style'>,
   frame: StepBadgeFrameVisuals
 ): ResolvedStepBadgeVisualStyle {
   const style = getEffectiveStepBadgeVisualStyle(settings);

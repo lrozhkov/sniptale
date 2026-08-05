@@ -5,6 +5,7 @@ import {
   isContentEventWithinAnyElement,
   queryAllContentUiElements,
 } from '../../platform/dom-host';
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import { addHighlighterModeChangedListener } from '../../platform/page-context/mode-events';
 import { usePopoverDistanceClose, usePopoverOutsideClose } from '../popover-sync/hooks';
 
@@ -24,11 +25,12 @@ function isClickInsideAnyToolbar(event: MouseEvent) {
   );
 }
 
-function isClickInsideAnyPopover(event: MouseEvent) {
-  return isContentEventWithinAnyElement(
-    event,
-    queryAllContentUiElements('.sniptale-frame-settings-popover')
+function isFramePopoverInteraction(event: MouseEvent) {
+  const popovers = queryAllContentUiElements('.sniptale-frame-settings-popover');
+  const ownedLayers = popovers.flatMap((popover) =>
+    getOwnedFloatingInteractionLayers(popover, popover.getRootNode() as ParentNode)
   );
+  return isContentEventWithinAnyElement(event, [...popovers, ...ownedLayers]);
 }
 
 export function useFrameSettingsPopoverOutsideClose(args: {
@@ -39,7 +41,7 @@ export function useFrameSettingsPopoverOutsideClose(args: {
   usePopoverOutsideClose({
     ...args,
     shouldIgnoreOutsideEvent: (event) =>
-      isClickInsideAnyToolbar(event) || isClickInsideAnyPopover(event),
+      isClickInsideAnyToolbar(event) || isFramePopoverInteraction(event),
   });
 }
 
@@ -64,5 +66,5 @@ export function useFrameSettingsPopoverDistanceClose(args: {
   onClose: () => void;
   popoverRef: RefObject<HTMLDivElement | null>;
 }) {
-  usePopoverDistanceClose(args);
+  usePopoverDistanceClose({ ...args, shouldIgnoreEvent: isFramePopoverInteraction });
 }

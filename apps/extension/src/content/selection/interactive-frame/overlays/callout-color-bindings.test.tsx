@@ -43,6 +43,7 @@ it('resolves inherited comment colors from the connected frame before rendering'
   frame.callout!.style.colorBindings = {
     accent: 'frame-border',
     connector: 'frame-border',
+    shadow: 'custom',
     surfaceBackground: 'frame-fill',
     surfaceBorder: 'frame-border',
   };

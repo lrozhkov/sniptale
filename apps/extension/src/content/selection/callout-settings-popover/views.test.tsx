@@ -2,14 +2,14 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { CalloutDeleteButton, CalloutPresetSection } from './views';
+import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } from './views';
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
 import { parseCalloutConnectorMarker } from '../../../ui/highlighter-preset-editor/callout/inspector-effects';
 import { CalloutSettingsPopoverContent, createCalloutAnchorPlacement } from './body';
 import { createDefaultCalloutSettings } from '../callout/model';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
-const settings = createDefaultCalloutSettings();
+const settings = createDefaultCalloutSettings(undefined, 'system-callout-bubble');
 
 describe('callout settings views', () => {
   it('narrows connector markers at the DOM boundary', () => {
@@ -33,11 +33,13 @@ describe('callout settings views', () => {
     const markup = renderToStaticMarkup(
       <CalloutSettingsPopoverContent
         handleDelete={vi.fn()}
+        headerContext="element"
         headerDrag={{
           isDragging: false,
           onPointerDown: vi.fn(),
           onPointerMove: vi.fn(),
           onPointerUp: vi.fn(),
+          position: { left: 0, top: 0 },
         }}
         handleSettingChange={vi.fn()}
         localSettings={settings}
@@ -59,24 +61,44 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('Настройки комментария');
-    expect(markup).toContain('Пресет');
-    expect(markup).toContain('Вручную');
-    expect(markup).toContain('data-callout-settings-mode-switch="true"');
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(2);
+    expect(markup).toContain('Настроить вручную');
+    expect(markup).toContain('sniptale-settings-popover-close');
+    expect(markup).not.toContain('data-callout-settings-mode-switch');
     expect(markup).not.toContain('Сохранить как пресет');
     expect(markup).not.toContain('Название пресета');
-    expect(markup.match(/data-callout-anchor=/g)).toHaveLength(8);
-    expect(markup.indexOf('content.callout-settings.position-row')).toBeLessThan(
-      markup.indexOf('content.callout-settings.mode-section')
+    expect(markup).not.toContain('data-callout-anchor=');
+  });
+
+  it('opens directly in manual mode for a customized callout', () => {
+    const markup = renderToStaticMarkup(
+      <CalloutSettingsPopoverContent
+        handleDelete={vi.fn()}
+        headerContext="element"
+        handleSettingChange={vi.fn()}
+        localSettings={createDefaultCalloutSettings()}
+        onApplyPreset={vi.fn()}
+        onCustomizePreset={vi.fn()}
+        onTogglePreset={vi.fn()}
+        pendingPresetIds={new Set()}
+        presets={createSystemCalloutPresetCatalog()}
+        presetError={null}
+        saveSection={{
+          error: null,
+          isSaving: false,
+          onCreate: vi.fn().mockResolvedValue(true),
+          onOverwrite: vi.fn().mockResolvedValue(true),
+          presets: [],
+        }}
+        onClose={vi.fn()}
+      />
     );
-    expect(markup).toContain('aria-label="По центру слева"');
-    expect(markup.indexOf('data-callout-anchor="middle-left"')).toBeLessThan(
-      markup.indexOf('data-callout-anchor="top-left"')
-    );
-    expect(markup.indexOf('data-callout-anchor="middle-right"')).toBeGreaterThan(
-      markup.indexOf('data-callout-anchor="bottom-right"')
-    );
-    expect(markup).toContain('justify-content:center');
+
+    expect(markup).toContain('aria-label="Параметры комментария"');
+    expect(markup).toContain('Выбрать шаблон');
+    expect(markup).toContain('data-ui="shared.highlighter-manual-inspector-surface"');
+    expect(markup).toContain('data-ui="shared.categorized-inspector.section-heading"');
+    expect(markup).toContain('>Текст</span>');
+    expect(markup).not.toContain('sniptale-callout-preset-list');
   });
 
   it('uses Design Review navigation and visible labels for manual color controls', () => {
@@ -86,10 +108,28 @@ describe('callout settings views', () => {
 
     expect(markup).toContain('aria-label="Параметры комментария"');
     expect(markup.match(/aria-pressed=/g)).toHaveLength(8);
-    expect(markup).toContain('data-field-label="Текст"');
+    expect(markup).toContain('data-field-label="Цвет текста"');
     expect(markup).toContain('shared.ui.color-selector');
     expect(markup).toContain('aria-label="Курсив"');
     expect(markup).toContain('aria-label="Подчёркнутый"');
+  });
+
+  it('renders position as a square category only in manual settings', () => {
+    const markup = renderToStaticMarkup(
+      <CalloutManualSettings
+        onChange={vi.fn()}
+        positionSection={<CalloutPositionSection embedded anchor="top-left" onChange={vi.fn()} />}
+        settings={settings}
+      />
+    );
+    const gridMarkup = renderToStaticMarkup(
+      <CalloutPositionSection embedded anchor="top-left" onChange={vi.fn()} />
+    );
+
+    expect(markup).toContain('aria-label="Позиция"');
+    expect(gridMarkup).toContain('data-position-layout="square"');
+    expect(gridMarkup.match(/data-callout-anchor=/g)).toHaveLength(8);
+    expect(gridMarkup).toContain('grid-template-columns:repeat(3, 28px)');
   });
 
   it('adds saving as the last manual section only when persistence actions are provided', () => {

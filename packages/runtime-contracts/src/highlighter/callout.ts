@@ -17,6 +17,7 @@ export type CalloutConnectorMarker =
   | 'arrow';
 export type CalloutPresetOrigin = 'system' | 'user';
 export type CalloutColorSource = 'custom' | 'frame-border' | 'frame-fill';
+export type CalloutShadowColorSource = 'custom' | 'surface-background' | 'surface-border';
 export type CalloutAccentSide = 'top' | 'right' | 'bottom' | 'left';
 export type CalloutBadgeColorSource = CalloutColorSource | 'accent';
 
@@ -171,6 +172,7 @@ export interface CalloutBadgeSettings {
 export interface CalloutColorBindings {
   accent: CalloutColorSource;
   connector: CalloutColorSource;
+  shadow: CalloutShadowColorSource;
   surfaceBackground: CalloutColorSource;
   surfaceBorder: CalloutColorSource;
 }
