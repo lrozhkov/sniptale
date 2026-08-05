@@ -3,11 +3,13 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 
 import { cx } from './shared';
 import type { CompactSelectOption } from '@sniptale/ui/compact-inspector-controls/select-types';
+import { TextWithOverflowHint } from './overflow-hint';
 
 interface CompactSelectTriggerProps<T extends string> extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   'children'
 > {
+  appearance?: 'surface' | 'plain' | undefined;
   menuId: string;
   open: boolean;
   placeholder?: string | undefined;
@@ -16,6 +18,7 @@ interface CompactSelectTriggerProps<T extends string> extends Omit<
 }
 
 export function CompactSelectTrigger<T extends string>({
+  appearance = 'surface',
   className,
   disabled,
   menuId,
@@ -26,12 +29,10 @@ export function CompactSelectTrigger<T extends string>({
   ...triggerProps
 }: CompactSelectTriggerProps<T>): ReactNode {
   const selectedLabel = selectedOption?.label ?? placeholder ?? '';
-  const triggerTitle = triggerProps.title ?? selectedLabel;
 
   return (
     <button
       {...triggerProps}
-      title={triggerTitle}
       ref={triggerRef}
       type="button"
       aria-controls={menuId}
@@ -41,8 +42,12 @@ export function CompactSelectTrigger<T extends string>({
       className={cx(
         'flex h-9 w-full min-w-0 max-w-full items-center justify-between gap-2',
         'overflow-hidden rounded-[8px] border px-3',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
+        appearance === 'surface' &&
+          [
+            'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
+          ].join(' '),
+        appearance === 'plain' && 'border-transparent bg-transparent',
         'text-left text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]',
         'transition hover:border-[color:var(--sniptale-color-border-strong)]',
         'focus-visible:outline-none focus-visible:border-[color:var(--sniptale-color-border-accent-strong)]',
@@ -72,11 +77,12 @@ function CompactSelectTriggerContent<T extends string>({
         </span>
       ) : null}
       <span className="min-w-0 flex-1">
-        <span className="block truncate">{label}</span>
+        <TextWithOverflowHint className="block truncate" text={label} />
         {selectedOption?.description ? (
-          <span className="block truncate text-[11px] font-medium text-[color:var(--sniptale-color-text-muted)]">
-            {selectedOption.description}
-          </span>
+          <TextWithOverflowHint
+            className="block truncate text-[11px] font-medium text-[color:var(--sniptale-color-text-muted)]"
+            text={selectedOption.description}
+          />
         ) : null}
       </span>
     </span>

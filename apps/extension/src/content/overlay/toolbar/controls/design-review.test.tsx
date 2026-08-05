@@ -67,6 +67,7 @@ it('renders the active panel toggle beside the Design Review export command', ()
   );
   expect(toggle?.getAttribute('aria-pressed')).toBe('true');
   expect(toggle?.getAttribute('title')).toBe('content.designReview.hideFeedbackPanel');
+  expect(container.querySelector('[data-ui="content.toolbar.design-review-divider"]')).toBeNull();
   expect(container.querySelector('[data-ui="test.design-review-export"]')).not.toBeNull();
 
   act(() => toggle?.click());

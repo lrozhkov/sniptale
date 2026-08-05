@@ -8,6 +8,7 @@ import type {
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { scheduleStepBadgeRecalculation } from '../../../frame-dom-driver/timing';
 import type { UpdateGlobalStepBadgeSettings } from '../../contracts';
+import { createSessionStepBadgeSettings } from '../../session/step-badge-defaults';
 
 const DEFAULT_STEP_BADGE_SETTINGS: StepBadgeSettings = {
   enabled: false,
@@ -41,16 +42,11 @@ export function shouldRecalculateBadge(
 
 export function createUpdateFrameStepBadge(params: {
   setFrames: FrameSetter;
-  sessionStepBadgeTemplateRef: MutableRefObject<StepBadgeSettings | null>;
+  sessionStepBadgeTemplateRef?: MutableRefObject<StepBadgeSettings | null>;
   globalStepBadgeSettingsRef: MutableRefObject<GlobalStepBadgeSettings>;
   recalculateStepBadgesRef: MutableRefObject<() => void>;
 }) {
-  const {
-    setFrames,
-    sessionStepBadgeTemplateRef,
-    globalStepBadgeSettingsRef,
-    recalculateStepBadgesRef,
-  } = params;
+  const { setFrames, globalStepBadgeSettingsRef, recalculateStepBadgesRef } = params;
 
   return (frameId: string, settings: Partial<StepBadgeSettings>) => {
     setFrames((prev) =>
@@ -59,9 +55,17 @@ export function createUpdateFrameStepBadge(params: {
           return frame;
         }
 
-        const currentSettings = frame.stepBadge ?? DEFAULT_STEP_BADGE_SETTINGS;
-        const newSettings = { ...currentSettings, ...settings };
-        sessionStepBadgeTemplateRef.current = newSettings;
+        const currentSettings =
+          frame.stepBadge ??
+          (settings.enabled ? createSessionStepBadgeSettings() : DEFAULT_STEP_BADGE_SETTINGS);
+        const newSettings = {
+          ...currentSettings,
+          ...settings,
+          ...(settings.offsetDirections
+            ? { offsetDirections: [...settings.offsetDirections] }
+            : {}),
+          ...(settings.style ? { style: { ...settings.style } } : {}),
+        };
 
         if (
           shouldRecalculateBadge(

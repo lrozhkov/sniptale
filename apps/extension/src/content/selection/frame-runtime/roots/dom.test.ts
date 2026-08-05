@@ -7,6 +7,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areFrameRenderDescriptorsEqual, buildFrameRenderDescriptors } from './descriptors';
 import { renderInteractiveFrames } from './dom';
+import { createDefaultCalloutSettings } from '../../callout/model';
+
+function createCallout() {
+  const callout = createDefaultCalloutSettings();
+  callout.content.bodyHtml = 'Comment';
+  callout.placement = { anchor: 'center', side: 'top' };
+  return callout;
+}
 
 function createFrame(id: string): FrameData {
   return {
@@ -15,11 +23,10 @@ function createFrame(id: string): FrameData {
       customCss: '',
       fillColor: '#ffffff',
       fillOpacity: 0,
-      id: 'border',
+      sourcePresetId: 'border',
       inheritCustomCss: false,
-      name: 'Default Border',
+      sourcePresetName: 'Default Border',
       opacity: 1,
-      order: 0,
       padding: { bottom: 0, left: 0, right: 0, top: 0 },
       radius: 6,
       shadow: 0,
@@ -79,25 +86,12 @@ function expectFrameBorderVisualChangesInvalidateDescriptors() {
 
 function expectPlacementChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
-  initialFrame.callout = {
-    anchor: 'center',
-    bgColor: '#fff',
-    enabled: true,
-    fontFamily: 'sans',
-    fontSize: 14,
-    fontWeight: 'normal',
-    htmlContent: 'Comment',
-    manualPlacement: { centerOffsetX: 40, centerOffsetY: -20 },
-    maxWidth: 200,
-    side: 'top',
-    tailSize: 8,
-    tailBasePosition: 0.25,
-    textColor: '#111',
-    variant: 'bubble',
-  };
+  initialFrame.callout = createCallout();
+  initialFrame.callout.placement.manualPlacement = { centerOffsetX: 40, centerOffsetY: -20 };
+  initialFrame.callout.placement.connectorBasePosition = 0.25;
   initialFrame.pagePlacement = { iframePath: ['iframe#preview'], pageX: 100, pageY: 200 };
   const changedFrame = structuredClone(initialFrame);
-  changedFrame.callout!.manualPlacement!.centerOffsetX = 80;
+  changedFrame.callout!.placement.manualPlacement!.centerOffsetX = 80;
   changedFrame.pagePlacement!.pageY = 240;
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
@@ -129,28 +123,44 @@ function expectStepBadgePlacementChangesInvalidateDescriptors() {
   ).toBe(false);
 }
 
-function expectTailBaseChangesInvalidateDescriptors() {
+function expectStepBadgeStyleChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
-  initialFrame.callout = {
-    anchor: 'center',
-    bgColor: '#fff',
+  initialFrame.stepBadge = {
     enabled: true,
-    fontFamily: 'sans',
-    fontSize: 14,
-    fontWeight: 'normal',
-    htmlContent: 'Comment',
-    maxWidth: 200,
-    side: 'top',
-    tailBasePosition: 0.25,
-    tailBaseWidth: 0.2,
-    tailSize: 8,
-    textColor: '#111',
-    variant: 'bubble',
+    style: {
+      backgroundColor: '#ffffff',
+      backgroundColorSource: 'custom',
+      diameter: 28,
+      outlineColor: '#111111',
+      outlineColorSource: 'custom',
+      sizeSource: 'custom',
+      textColor: '#111111',
+      textColorSource: 'custom',
+    },
+    type: 'number',
+    value: '1',
   };
   const changedFrame = structuredClone(initialFrame);
-  changedFrame.callout!.tailBasePosition = 0.75;
+  changedFrame.stepBadge!.style!.diameter = 40;
+  const frameStates = createFrameStates([['frame-1', 'idle']]);
+
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([initialFrame], frameStates),
+      buildFrameRenderDescriptors([changedFrame], frameStates)
+    )
+  ).toBe(false);
+}
+
+function expectTailBaseChangesInvalidateDescriptors() {
+  const initialFrame = createFrame('frame-1');
+  initialFrame.callout = createCallout();
+  initialFrame.callout.placement.connectorBasePosition = 0.25;
+  initialFrame.callout.placement.connectorBaseWidth = 0.2;
+  const changedFrame = structuredClone(initialFrame);
+  changedFrame.callout!.placement.connectorBasePosition = 0.75;
   const changedWidthFrame = structuredClone(initialFrame);
-  changedWidthFrame.callout!.tailBaseWidth = 0.4;
+  changedWidthFrame.callout!.placement.connectorBaseWidth = 0.4;
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   expect(
@@ -169,23 +179,10 @@ function expectTailBaseChangesInvalidateDescriptors() {
 
 function expectTailFrameChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
-  initialFrame.callout = {
-    anchor: 'center',
-    bgColor: '#fff',
-    enabled: true,
-    fontFamily: 'sans',
-    fontSize: 14,
-    fontWeight: 'normal',
-    htmlContent: 'Comment',
-    maxWidth: 200,
-    side: 'top',
-    tailFramePosition: 0.25,
-    tailSize: 8,
-    textColor: '#111',
-    variant: 'bubble',
-  };
+  initialFrame.callout = createCallout();
+  initialFrame.callout.placement.connectorFramePosition = 0.25;
   const changedFrame = structuredClone(initialFrame);
-  changedFrame.callout!.tailFramePosition = 0.75;
+  changedFrame.callout!.placement.connectorFramePosition = 0.75;
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   expect(
@@ -300,6 +297,10 @@ describe('frame-roots-renderer-dom descriptors', () => {
   it(
     'treats manual step-badge placement as render invalidation',
     expectStepBadgePlacementChangesInvalidateDescriptors
+  );
+  it(
+    'treats step-badge visual style changes as render invalidation',
+    expectStepBadgeStyleChangesInvalidateDescriptors
   );
   it(
     'treats tail-base position and width changes as render invalidation',

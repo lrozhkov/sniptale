@@ -20,6 +20,7 @@ export type { CompactColorSelectorProps } from '@sniptale/ui/color-selector/type
 
 function ColorSelectorHeader(props: {
   active: boolean;
+  disabled: boolean;
   expanded: boolean;
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   label: string;
@@ -31,6 +32,7 @@ function ColorSelectorHeader(props: {
   return (
     <ColorSelectorTrigger
       active={props.active}
+      disabled={props.disabled}
       expanded={props.expanded}
       formatMode={props.formatMode}
       label={props.label}
@@ -146,6 +148,7 @@ function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
 
 function ColorSelectorBody(props: {
   className: string | undefined;
+  disabled: boolean;
   floatingOwnerId: string;
   label: string;
   state: ReturnType<typeof useColorSelectorState>;
@@ -165,6 +168,7 @@ function ColorSelectorBody(props: {
     >
       <ColorSelectorHeader
         active={props.state.expanded || props.state.pickerOpen}
+        disabled={props.disabled}
         expanded={props.state.expanded}
         formatMode={props.state.formatMode}
         label={props.label}
@@ -199,6 +203,7 @@ function ColorSelectorBody(props: {
 
 export function CompactColorSelector({
   className,
+  disabled = false,
   label,
   onChange,
   onOpenChange,
@@ -220,6 +225,16 @@ export function CompactColorSelector({
     value,
   });
   const open = state.expanded || state.pickerOpen;
+  const { expanded, handlePickerCancel, handleToggleExpanded, pickerOpen } = state;
+  useEffect(() => {
+    if (!disabled) return;
+    if (pickerOpen) {
+      handlePickerCancel();
+      return;
+    }
+    if (expanded) handleToggleExpanded();
+  }, [disabled, expanded, handlePickerCancel, handleToggleExpanded, pickerOpen]);
+
   useEffect(() => {
     onOpenChange?.(open);
   }, [onOpenChange, open]);
@@ -227,6 +242,7 @@ export function CompactColorSelector({
   return (
     <ColorSelectorBody
       className={className}
+      disabled={disabled}
       floatingOwnerId={floatingOwnerId}
       label={label}
       state={state}

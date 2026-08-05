@@ -6,6 +6,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addStepBadgeReorderListener } from '../../platform/page-context/frame-events';
 import { StepBadgePopoverContent } from './body';
+import { DEFAULT_STEP_BADGE_TEMPLATE } from '../../../features/highlighter/step-badge-presets/catalog';
+import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
 import { StepBadgeAutoSection, StepBadgeValueSection } from './views';
 
 let container: HTMLDivElement | null = null;
@@ -80,24 +82,99 @@ function registerStepBadgeDisableActionTest(): void {
     const markup = renderToStaticMarkup(
       <StepBadgePopoverContent
         frameId="frame-1"
+        headerContext="element"
         isAuto={false}
         localStepBadgeSettings={{ enabled: true, type: 'number', value: '1' }}
         onAlphabetChange={vi.fn()}
         onAnchorChange={vi.fn()}
         onAutoModeChange={vi.fn()}
         onDisable={vi.fn()}
+        onClose={vi.fn()}
         onOffsetToggle={vi.fn()}
-        onSizeLevelChange={vi.fn()}
+        onApplyPreset={vi.fn()}
+        onConfigurePreset={vi.fn()}
+        onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
+        onResetPreset={vi.fn()}
+        onSettingsChange={vi.fn()}
+        onTogglePreset={vi.fn()}
         onTypeChange={vi.fn()}
+        onUpdatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
         onValueChange={vi.fn()}
+        pendingPresetIds={new Set()}
+        presetError={null}
+        presets={[]}
+        templateSettings={DEFAULT_STEP_BADGE_TEMPLATE}
+        frameVisuals={{ borderColor: '#f97316', borderWidth: 4 }}
       />
     );
 
     expect(markup).toContain('sniptale-toolbar-menu-title');
     expect(markup).toContain('Настройки нумерации');
+    expect(markup).toContain('Выбрать шаблон');
+    expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('sniptale-glass-range-meta');
+    expect(markup).toContain('data-ui="content.step-badge.manual-section"');
+    expect(markup).toContain('data-ui="shared.categorized-inspector.section-heading"');
+    expect(markup).toContain('>Нумерация</span>');
+    expect(markup).not.toContain('sniptale-glass-preset-list');
     expect(markup).toContain('Выключить');
     expect(markup).toContain('sniptale-glass-destructive');
+  });
+}
+
+function registerStepBadgeConfigurePresetTest(): void {
+  it('opens the persistent preset editor without applying the preset or entering manual mode', () => {
+    const preset = createSystemStepBadgePresetCatalog()[0]!;
+    const onApplyPreset = vi.fn();
+    const onConfigurePreset = vi.fn();
+    act(() => {
+      if (!container) {
+        container = document.createElement('div');
+        document.body.appendChild(container);
+        root = createRoot(container);
+      }
+      root?.render(
+        <StepBadgePopoverContent
+          frameId="frame-1"
+          frameVisuals={{ borderColor: '#f97316', borderWidth: 4 }}
+          headerContext="element"
+          isAuto
+          localStepBadgeSettings={{
+            enabled: true,
+            sourcePresetId: preset.id,
+            type: 'number',
+            value: '1',
+          }}
+          onAlphabetChange={vi.fn()}
+          onAnchorChange={vi.fn()}
+          onApplyPreset={onApplyPreset}
+          onAutoModeChange={vi.fn()}
+          onClose={vi.fn()}
+          onConfigurePreset={onConfigurePreset}
+          onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
+          onDisable={vi.fn()}
+          onOffsetToggle={vi.fn()}
+          onResetPreset={vi.fn()}
+          onSettingsChange={vi.fn()}
+          onTogglePreset={vi.fn()}
+          onTypeChange={vi.fn()}
+          onUpdatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
+          onValueChange={vi.fn()}
+          pendingPresetIds={new Set()}
+          presetError={null}
+          presets={[preset]}
+          templateSettings={DEFAULT_STEP_BADGE_TEMPLATE}
+        />
+      );
+    });
+
+    act(() =>
+      container?.querySelector<HTMLButtonElement>('.sniptale-callout-preset-action')?.click()
+    );
+
+    expect(onConfigurePreset).toHaveBeenCalledWith(preset);
+    expect(onApplyPreset).not.toHaveBeenCalled();
+    expect(container?.querySelector('nav')).toBeNull();
   });
 }
 
@@ -105,4 +182,5 @@ describe('StepBadgeValueSection', () => {
   registerStepBadgeReorderTest();
   registerStepBadgeAutoSectionTest();
   registerStepBadgeDisableActionTest();
+  registerStepBadgeConfigurePresetTest();
 });

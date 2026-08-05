@@ -1,5 +1,6 @@
 import React from 'react';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import { getCalloutFrameColors } from '../../../../features/highlighter/callout-color-bindings';
 import { CalloutSettingsPopover } from '../../callout-settings-popover';
 import { FrameSettingsPopover } from '../../frame-settings-popover';
 import { StepBadgePopover } from '../../step-badge-popover';
@@ -15,6 +16,7 @@ export interface InteractiveFramePopoversProps {
   isStepBadgePopoverOpen: boolean;
   isCalloutPopoverOpen: boolean;
   isCalloutEditing: boolean;
+  state: FrameState;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -71,23 +73,36 @@ function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
 
 function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   const stepBadge = props.currentFrame.stepBadge ?? props.frame.stepBadge;
+  const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     anchorEl: props.stepBadgePopoverAnchorRef.current,
+    ...(borderSettings
+      ? {
+          frameVisuals: {
+            borderColor: borderSettings.color,
+            borderWidth: borderSettings.width,
+            fillColor: borderSettings.fillColor,
+            fillOpacity: borderSettings.fillOpacity,
+          },
+        }
+      : {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
   };
 }
 
 function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
   const callout = props.currentFrame.callout ?? props.frame.callout;
+  const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
+    frameColors: getCalloutFrameColors(borderSettings),
     anchorEl: props.calloutPopoverAnchorRef.current,
     ...(callout === undefined ? {} : { settings: callout }),
   };
@@ -101,6 +116,7 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       frameZIndex={props.frameZIndex}
       isCalloutEditing={props.isCalloutEditing}
       isCalloutPopoverOpen={props.isCalloutPopoverOpen}
+      isFrameEditing={props.state === 'editing'}
       calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}
       setIsCalloutEditing={props.setIsCalloutEditing}
       setTempFrame={props.setTempFrame}

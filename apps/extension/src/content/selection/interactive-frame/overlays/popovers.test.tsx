@@ -10,12 +10,14 @@ import {
   createFrameDataFixture,
 } from '../../frame-runtime/react/test-support';
 import { InteractiveFramePopovers } from './popovers';
+import { createDefaultCalloutSettings } from '../../callout/model';
 
 const frameSettingsPopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
 const stepBadgePopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
 const calloutSettingsPopoverMock = vi.hoisted(() =>
   vi.fn((_props: Record<string, unknown>) => null)
 );
+const calloutOverlayMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
 
 vi.mock('../../frame-settings-popover', () => ({
   FrameSettingsPopover: frameSettingsPopoverMock,
@@ -30,7 +32,7 @@ vi.mock('../../callout-settings-popover', () => ({
 }));
 
 vi.mock('./callout', () => ({
-  InteractiveFrameCalloutOverlay: () => null,
+  InteractiveFrameCalloutOverlay: calloutOverlayMock,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -89,6 +91,7 @@ function createPopoversProps(args: {
     isStepBadgePopoverOpen: false,
     isCalloutPopoverOpen: false,
     isCalloutEditing: false,
+    state: 'idle' as const,
     popoverAnchorRef: { current: null },
     stepBadgePopoverAnchorRef: { current: null },
     calloutPopoverAnchorRef: { current: null },
@@ -185,18 +188,8 @@ describe('InteractiveFramePopovers', () => {
           ...frame,
           stepBadge: { enabled: true, type: 'number', value: '1' },
           callout: {
-            anchor: 'top-center',
-            bgColor: '#fff',
-            enabled: true,
-            fontFamily: 'sans',
-            fontSize: 14,
-            fontWeight: 'normal',
-            htmlContent: 'Comment',
-            maxWidth: 200,
-            side: 'auto',
-            tailSize: 8,
-            textColor: '#111',
-            variant: 'bubble',
+            ...createDefaultCalloutSettings(),
+            content: { bodyHtml: 'Comment', titleText: '' },
           },
         }}
       />
@@ -208,6 +201,22 @@ describe('InteractiveFramePopovers', () => {
     );
     expect(calloutSettingsPopoverMock).toHaveBeenCalledWith(
       expect.objectContaining({ isOpen: true }),
+      undefined
+    );
+  });
+
+  it('marks the connected comment as frame-editing while the highlighter frame is edited', () => {
+    const frame = createFrame('frame-1', '#2563eb');
+
+    renderNode(
+      <InteractiveFramePopovers
+        {...createPopoversProps({ currentFrame: frame, frame })}
+        state="editing"
+      />
+    );
+
+    expect(calloutOverlayMock).toHaveBeenCalledWith(
+      expect.objectContaining({ isFrameEditing: true }),
       undefined
     );
   });

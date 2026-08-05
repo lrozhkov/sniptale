@@ -5,7 +5,7 @@ import type {
   CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { CalloutHandleKeyboardEvent } from './keyboard';
-import { clampCalloutMaxWidth } from './width-constraints';
+import { clampCalloutWrapWidth } from './width-constraints';
 
 type Rect = { x: number; y: number; width: number; height: number };
 type ResizeSide = 'left' | 'right';
@@ -38,7 +38,7 @@ type CalloutWidthResizeArgs = {
   dimensions: { width: number; height: number };
   frameRect: Rect;
   isEditing: boolean;
-  manualPlacement: CalloutSettings['manualPlacement'];
+  manualPlacement: CalloutSettings['placement']['manualPlacement'];
   maxWidth: number;
   onWidthChange: (maxWidth: number, placement: CalloutManualPlacement) => void;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
@@ -78,7 +78,7 @@ function getDraft(args: {
   const pointerDelta = args.clientX - args.active.startPointerX;
   const widthDelta = args.active.side === 'left' ? -pointerDelta : pointerDelta;
   return {
-    maxWidth: clampCalloutMaxWidth(args.active.startMaxWidth + widthDelta),
+    maxWidth: clampCalloutWrapWidth(args.active.startMaxWidth + widthDelta),
     placement: getPlacement(args),
   };
 }
@@ -244,7 +244,7 @@ export function useCalloutWidthResize(args: CalloutWidthResizeArgs) {
     event.stopPropagation();
     const direction = event.key === 'ArrowRight' ? 1 : -1;
     const sideDirection = side === 'right' ? direction : -direction;
-    const nextMaxWidth = clampCalloutMaxWidth(
+    const nextMaxWidth = clampCalloutWrapWidth(
       args.maxWidth + sideDirection * (event.shiftKey ? 10 : 5)
     );
     if (nextMaxWidth === args.maxWidth) return;

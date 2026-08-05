@@ -17,6 +17,7 @@ import {
   flushInteractiveFrameResize,
   queueInteractiveFrameResize,
 } from './resize-scheduler';
+import { captureResizeCalloutCenter, clearResizeCalloutCenter } from './resize-callout-geometry';
 
 export interface InteractiveFramePointerStartEvent {
   button: number;
@@ -102,6 +103,7 @@ export function createInteractiveFrameResizeStartHandler(params: {
     params.startXRef.current = event.clientX;
     params.startYRef.current = event.clientY;
     params.startFrameRef.current = { ...params.tempFrameRef.current };
+    captureResizeCalloutCenter(params.startFrameRef, params.frameId);
     cancelPendingInteractiveFrameResize(params);
 
     if (params.state !== 'editing') {
@@ -137,6 +139,7 @@ function clearPointerSession(params: InteractiveFrameListenerConfig) {
   params.isResizingRef.current = false;
   params.resizeDirectionRef.current = null;
   params.pointerIdRef.current = null;
+  clearResizeCalloutCenter(params.startFrameRef);
 }
 
 export function createInteractiveFramePointerAbortHandler(params: InteractiveFrameListenerConfig) {

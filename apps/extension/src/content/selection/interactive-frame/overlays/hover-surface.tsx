@@ -3,6 +3,7 @@ import {
   getThemedPortalStyle,
   resolveContentPortalTarget,
   Z_INDEX_BLOCKING_OVERLAY,
+  Z_INDEX_CALLOUT_EDITING,
 } from '../layout/portal';
 import { dispatchCalloutBlurRequest } from '../../../platform/page-context/frame-events';
 import type { InteractiveFrameHoverOverlayProps } from '../controller/types';
@@ -24,7 +25,7 @@ export function InteractiveFrameHoverOverlaySurface(props: InteractiveFrameHover
         position: 'fixed',
         inset: 0,
         backgroundColor: 'transparent',
-        zIndex: props.isCalloutEditing ? 2147483646 : Z_INDEX_BLOCKING_OVERLAY,
+        zIndex: props.isCalloutEditing ? Z_INDEX_CALLOUT_EDITING - 1 : Z_INDEX_BLOCKING_OVERLAY,
         cursor: 'default',
         pointerEvents: 'auto',
       })}

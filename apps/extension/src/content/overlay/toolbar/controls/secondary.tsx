@@ -68,6 +68,12 @@ function createUtilityButtonsProps(args: {
       : {
           futureFrameStyle: args.toolbarProps.futureFrameStyle,
           onFutureFrameEffectModeChange: args.toolbarProps.onFutureFrameEffectModeChange,
+          ...(args.toolbarProps.futureFrameCalloutActions === undefined
+            ? {}
+            : { futureFrameCalloutActions: args.toolbarProps.futureFrameCalloutActions }),
+          ...(args.toolbarProps.futureFrameStepBadgeActions === undefined
+            ? {}
+            : { futureFrameStepBadgeActions: args.toolbarProps.futureFrameStepBadgeActions }),
         }),
   };
 }

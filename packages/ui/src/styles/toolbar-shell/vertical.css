@@ -25,6 +25,21 @@
   flex-wrap: nowrap;
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-toolbar-subgroup {
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  margin-inline: 0;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-toolbar-privacy-group-start {
+  margin-inline: 0;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-capture-leading-divider {
+  margin: 2px 0;
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn,
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-mode-wrapper,
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-settings-wrapper,

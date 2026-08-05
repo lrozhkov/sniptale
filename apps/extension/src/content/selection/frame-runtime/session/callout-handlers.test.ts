@@ -7,21 +7,11 @@ import {
   createCalloutPopoverSettingsHandler,
   createFrameCalloutChangedHandler,
 } from './callout-handlers';
+import { createDefaultCalloutSettings } from '../../callout/model';
 
-const baseCallout: CalloutSettings = {
-  anchor: 'center',
-  bgColor: '#ffffff',
-  enabled: true,
-  fontFamily: 'sans',
-  fontSize: 14,
-  fontWeight: 'normal',
-  htmlContent: '<p>base</p>',
-  maxWidth: 180,
-  side: 'top',
-  tailSize: 10,
-  textColor: '#111111',
-  variant: 'bubble',
-};
+const baseCallout: CalloutSettings = createDefaultCalloutSettings();
+baseCallout.content.bodyHtml = '<p>base</p>';
+baseCallout.placement = { anchor: 'center', side: 'top' };
 
 function createFrame(overrides: Partial<FrameData> = {}): FrameData {
   return {
@@ -50,11 +40,9 @@ it('creates a callout from the session style when a frame enables it for the fir
   const frames = createFramesHarness([createFrame()]);
   const sessionCalloutStyleRef = {
     current: {
-      anchor: 'bottom-right' as const,
-      bgColor: '#2563eb',
-      fontSize: 18,
-      side: 'right' as const,
-      variant: 'text-only' as const,
+      ...baseCallout.style,
+      surface: { ...baseCallout.style.surface, backgroundColor: '#2563eb' },
+      typography: { ...baseCallout.style.typography, fontSize: 18 },
     },
   };
 
@@ -67,15 +55,14 @@ it('creates a callout from the session style when a frame enables it for the fir
   });
 
   expect(frames.getFrames()[0]?.callout).toMatchObject({
-    anchor: 'bottom-right',
-    bgColor: '#2563eb',
+    content: { bodyHtml: '', titleText: '' },
     enabled: true,
-    fontSize: 18,
-    htmlContent: '',
-    side: 'right',
-    variant: 'text-only',
+    style: {
+      surface: { backgroundColor: '#2563eb' },
+      typography: { fontSize: 18 },
+    },
   });
-  expect(sessionCalloutStyleRef.current).toEqual(frames.getFrames()[0]?.callout);
+  expect(sessionCalloutStyleRef.current).toEqual(frames.getFrames()[0]?.callout?.style);
 });
 
 it('merges popover settings into both the frame callout and the session style ref', () => {
@@ -83,16 +70,15 @@ it('merges popover settings into both the frame callout and the session style re
     createFrame({
       callout: {
         ...baseCallout,
-        bgColor: '#f59e0b',
-        variant: 'text-only',
+        style: {
+          ...baseCallout.style,
+          surface: { ...baseCallout.style.surface, backgroundColor: '#f59e0b' },
+        },
       },
     }),
   ]);
   const sessionCalloutStyleRef = {
-    current: {
-      fontFamily: 'serif' as const,
-      side: 'left' as const,
-    },
+    current: baseCallout.style,
   };
 
   createCalloutPopoverSettingsHandler({
@@ -101,22 +87,18 @@ it('merges popover settings into both the frame callout and the session style re
   })({
     frameId: 'frame-1',
     settings: {
-      bgColor: '#10b981',
-      side: 'bottom',
+      placement: { side: 'bottom' },
+      style: { surface: { backgroundColor: '#10b981' } },
     },
   });
 
   expect(frames.getFrames()[0]?.callout).toMatchObject({
-    ...baseCallout,
-    bgColor: '#10b981',
-    side: 'bottom',
-    variant: 'text-only',
+    placement: { side: 'bottom' },
+    style: { surface: { backgroundColor: '#10b981' } },
   });
   expect(sessionCalloutStyleRef.current).toEqual({
-    ...baseCallout,
-    bgColor: '#10b981',
-    side: 'bottom',
-    variant: 'text-only',
+    ...baseCallout.style,
+    surface: { ...baseCallout.style.surface, backgroundColor: '#10b981' },
   });
 });
 
@@ -126,7 +108,7 @@ it('disables the matching frame callout and leaves unrelated frames untouched', 
     callout: {
       ...baseCallout,
       enabled: true,
-      htmlContent: '<p>keep</p>',
+      content: { bodyHtml: '<p>keep</p>', titleText: '' },
     } as CalloutSettings,
     id: 'frame-2',
   });

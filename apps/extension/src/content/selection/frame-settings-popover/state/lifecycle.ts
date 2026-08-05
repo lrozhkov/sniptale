@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   FocusSettings,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
@@ -14,14 +14,20 @@ import {
 } from '../../../../features/highlighter/style/defaults';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { getDefaultFocusSettings } from './helpers';
+import {
+  cloneAppliedBorderSettings,
+  normalizeAppliedBorderSettings,
+  projectBorderPresetToAppliedSettings,
+} from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const logger = createLogger({ namespace: 'ContentFrameSettingsPopoverLifecycle' });
 
 interface FrameSettingsDraft {
   globalSettings: HighlighterSettings;
+  localBorderSettings: AppliedBorderSettings;
   localBlurSettings: BlurSettings;
   localFocusSettings: FocusSettings;
-  selectedPresetId: string;
+  selectedPresetId: string | undefined;
   visiblePresetIds: string[];
 }
 
@@ -31,7 +37,7 @@ interface FrameSettingsLifecycleState {
   previousOpen: boolean;
   source: {
     blur: BlurSettings | undefined;
-    border: BorderPreset | undefined;
+    border: AppliedBorderSettings | undefined;
     focus: FocusSettings | undefined;
   };
 }
@@ -42,6 +48,7 @@ type SetFrameSettingsDraft = Dispatch<SetStateAction<FrameSettingsDraft>>;
 function createInitialDraft(): FrameSettingsDraft {
   return {
     globalSettings: createDefaultHighlighterSettings(),
+    localBorderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
     localBlurSettings: { ...DEFAULT_BLUR_SETTINGS },
     localFocusSettings: getDefaultFocusSettings(),
     selectedPresetId: DEFAULT_BORDER_PRESET.id,
@@ -57,7 +64,7 @@ function getEnabledPresetIds(settings: HighlighterSettings): string[] {
 
 function createLifecycleState(args: {
   blurSettings?: BlurSettings;
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   focusSettings?: FocusSettings;
 }): FrameSettingsLifecycleState {
   return {
@@ -133,13 +140,19 @@ function syncFrameSettingsPopoverOpenState(
     }
     lifecycle.dirty.blur = false;
     lifecycle.dirty.focus = false;
-    setDraft((current) => ({
-      ...current,
-      selectedPresetId: lifecycle.source.border?.id ?? DEFAULT_BORDER_PRESET.id,
-      localBlurSettings: { ...(lifecycle.source.blur ?? DEFAULT_BLUR_SETTINGS) },
-      localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
-      visiblePresetIds: getEnabledPresetIds(current.globalSettings),
-    }));
+    setDraft((current) => {
+      const localBorderSettings = normalizeAppliedBorderSettings(
+        lifecycle.source.border ?? projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET)
+      );
+      return {
+        ...current,
+        localBorderSettings,
+        selectedPresetId: localBorderSettings.sourcePresetId,
+        localBlurSettings: { ...(lifecycle.source.blur ?? DEFAULT_BLUR_SETTINGS) },
+        localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
+        visiblePresetIds: getEnabledPresetIds(current.globalSettings),
+      };
+    });
   } else if (!isOpen && lifecycle.previousOpen && historyTransaction) {
     pagePreparationHistory.commitTransaction(transactionKey);
   }
@@ -168,7 +181,7 @@ function useFrameSettingsOpenTransaction(
 
 export function useFrameSettingsPopoverLifecycle(args: {
   blurSettings?: BlurSettings;
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings;
   focusSettings?: FocusSettings;
   frameId: string;
   historyTransaction?: boolean;
@@ -209,6 +222,13 @@ export function useFrameSettingsPopoverLifecycle(args: {
       ),
     },
     frame: {
+      applyBorderSettingsFromUser: (settings: AppliedBorderSettings) => {
+        setDraft((current) => ({
+          ...current,
+          localBorderSettings: cloneAppliedBorderSettings(settings),
+          selectedPresetId: settings.sourcePresetId,
+        }));
+      },
       applyBlurSettingsFromUser: (settings: BlurSettings) => {
         lifecycleRef.current.dirty.blur = true;
         setDraft((current) => ({ ...current, localBlurSettings: settings }));
@@ -218,9 +238,14 @@ export function useFrameSettingsPopoverLifecycle(args: {
         setDraft((current) => ({ ...current, localFocusSettings: settings }));
       },
       localBlurSettings: draft.localBlurSettings,
+      localBorderSettings: draft.localBorderSettings,
       localFocusSettings: draft.localFocusSettings,
-      selectPreset: (presetId: string) => {
-        setDraft((current) => ({ ...current, selectedPresetId: presetId }));
+      selectPreset: (settings: AppliedBorderSettings) => {
+        setDraft((current) => ({
+          ...current,
+          localBorderSettings: cloneAppliedBorderSettings(settings),
+          selectedPresetId: settings.sourcePresetId,
+        }));
       },
       selectedPresetId: draft.selectedPresetId,
     },

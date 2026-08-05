@@ -9,7 +9,7 @@ import type {
   FrameState,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type {
   GlobalStepBadgeSettings,
   StepBadgeSettings,
@@ -44,7 +44,7 @@ export interface FrameManagerRefs {
   prevFrameStatesRef: FrameMutableRef<Map<string, FrameState>>;
   prevFramesRef: FrameMutableRef<FrameData[]>;
   rootsRef: FrameMutableRef<Map<string, Root>>;
-  sessionCalloutStyleRef: FrameMutableRef<Partial<CalloutSettings> | null>;
+  sessionCalloutStyleRef: FrameMutableRef<CalloutVisualStyle | null>;
   sessionSettingsRefs: FrameSessionSettingsRefs;
   sessionStepBadgeTemplateRef: FrameMutableRef<StepBadgeSettings | null>;
   stepBadgeOrderRef: FrameMutableRef<Map<string, number>>;

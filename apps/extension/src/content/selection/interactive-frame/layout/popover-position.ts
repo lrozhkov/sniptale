@@ -46,32 +46,54 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function calculateQuickControlPopoverRect(params: {
+  alignToAnchor: boolean;
   anchorRect: FloatingRect;
+  avoidRect?: FloatingRect;
   height: number;
   viewport: { width: number; height: number };
   width: number;
 }): FloatingRect | null {
-  const rightX = params.anchorRect.x + params.anchorRect.width + TOOLBAR_MENU_GAP;
-  const leftX = params.anchorRect.x - TOOLBAR_MENU_GAP - params.width;
-  const x =
-    rightX + params.width <= params.viewport.width - VIEWPORT_MARGIN
-      ? rightX
-      : leftX >= VIEWPORT_MARGIN
-        ? leftX
-        : null;
-  if (x === null) return null;
-
+  const targetRect = params.avoidRect ?? params.anchorRect;
+  const rightX =
+    Math.max(params.anchorRect.x + params.anchorRect.width, targetRect.x + targetRect.width) +
+    TOOLBAR_MENU_GAP;
+  const leftX = Math.min(params.anchorRect.x, targetRect.x) - TOOLBAR_MENU_GAP - params.width;
   const maxY = Math.max(VIEWPORT_MARGIN, params.viewport.height - params.height - VIEWPORT_MARGIN);
   const y = clamp(
-    params.anchorRect.y + params.anchorRect.height / 2 - params.height / 2,
+    params.alignToAnchor
+      ? params.anchorRect.y
+      : targetRect.y + targetRect.height / 2 - params.height / 2,
     VIEWPORT_MARGIN,
     maxY
   );
-  return { x, y, width: params.width, height: params.height };
+  const centeredX = clamp(
+    targetRect.x + targetRect.width / 2 - params.width / 2,
+    VIEWPORT_MARGIN,
+    params.viewport.width - params.width - VIEWPORT_MARGIN
+  );
+  const candidates = [
+    { x: rightX, y, width: params.width, height: params.height },
+    { x: leftX, y, width: params.width, height: params.height },
+    {
+      x: centeredX,
+      y: targetRect.y + targetRect.height + TOOLBAR_MENU_GAP,
+      width: params.width,
+      height: params.height,
+    },
+    {
+      x: centeredX,
+      y: targetRect.y - TOOLBAR_MENU_GAP - params.height,
+      width: params.width,
+      height: params.height,
+    },
+  ];
+  return candidates.find((candidate) => isInsideViewport(candidate, params.viewport)) ?? null;
 }
 
 function calculateCanonicalPopoverRect(params: {
+  alignQuickControlToAnchor: boolean;
   anchorRect: FloatingRect;
+  avoidRect?: FloatingRect;
   preferSidePlacement: boolean;
   surfaceRect: FloatingRect;
   size: { width: number; height: number };
@@ -85,7 +107,9 @@ function calculateCanonicalPopoverRect(params: {
   const gap = params.preferSidePlacement ? TOOLBAR_MENU_GAP : FRAME_TOOLBAR_POPOVER_GAP;
   if (params.preferSidePlacement) {
     const sideRect = calculateQuickControlPopoverRect({
+      alignToAnchor: params.alignQuickControlToAnchor,
       anchorRect: params.anchorRect,
+      ...(params.avoidRect ? { avoidRect: params.avoidRect } : {}),
       height,
       viewport: params.viewport,
       width,
@@ -105,6 +129,21 @@ function calculateCanonicalPopoverRect(params: {
   return { x, y, width, height };
 }
 
+function getCalloutAvoidanceRect(frameId: string): FloatingRect | undefined {
+  const callout = queryAllContentUiElements('.sniptale-callout').find(
+    (element) => element instanceof HTMLElement && element.dataset['frameId'] === frameId
+  );
+  if (!(callout instanceof HTMLElement)) return undefined;
+  const rects = [callout, ...callout.querySelectorAll('.sniptale-callout-dynamic-tail')].map(
+    (element) => toRect(element.getBoundingClientRect())
+  );
+  const left = Math.min(...rects.map((rect) => rect.x));
+  const top = Math.min(...rects.map((rect) => rect.y));
+  const right = Math.max(...rects.map((rect) => rect.x + rect.width));
+  const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 function isInsideViewport(
   rect: FloatingRect,
   viewport: { width: number; height: number }
@@ -114,6 +153,15 @@ function isInsideViewport(
     rect.y >= VIEWPORT_MARGIN &&
     rect.x + rect.width <= viewport.width - VIEWPORT_MARGIN &&
     rect.y + rect.height <= viewport.height - VIEWPORT_MARGIN
+  );
+}
+
+function rectsOverlap(left: FloatingRect, right: FloatingRect): boolean {
+  return !(
+    left.x + left.width <= right.x ||
+    right.x + right.width <= left.x ||
+    left.y + left.height <= right.y ||
+    right.y + right.height <= left.y
   );
 }
 
@@ -192,6 +240,7 @@ export function useFramePopoverPosition(params: {
   frameRect: FloatingRect;
   isOpen: boolean;
   popoverRef: React.RefObject<HTMLDivElement | null>;
+  quickControlPlacement?: 'anchor-aligned' | 'callout-aware';
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
   const placementSessionRef = React.useRef<{
@@ -199,6 +248,7 @@ export function useFramePopoverPosition(params: {
     anchorRect: FloatingRect;
     frameId: string;
     preferSidePlacement: boolean;
+    resolvedRect?: FloatingRect;
     surfaceRect: FloatingRect;
   } | null>(null);
   const placementSession = placementSessionRef.current;
@@ -270,7 +320,12 @@ export function useFramePopoverPosition(params: {
       : params.fallbackSize;
   const viewport = { width: window.innerWidth, height: window.innerHeight };
   const mainToolbar = getMainToolbar(params.anchorEl);
-  const rect = mainToolbar
+  const avoidRect = activePlacementSession.preferSidePlacement
+    ? params.quickControlPlacement === 'anchor-aligned'
+      ? undefined
+      : getCalloutAvoidanceRect(params.frameId)
+    : undefined;
+  const calculatedRect = mainToolbar
     ? calculateMainToolbarPopoverRect({
         anchorRect: toRect(params.anchorEl.getBoundingClientRect()),
         displayMode: mainToolbar.displayMode,
@@ -279,12 +334,24 @@ export function useFramePopoverPosition(params: {
         viewport,
       })
     : calculateCanonicalPopoverRect({
+        alignQuickControlToAnchor: params.quickControlPlacement === 'anchor-aligned',
         anchorRect: activePlacementSession.anchorRect,
+        ...(avoidRect ? { avoidRect } : {}),
         preferSidePlacement: activePlacementSession.preferSidePlacement,
         surfaceRect: activePlacementSession.surfaceRect,
         size,
         viewport,
       });
+  const previousRect = activePlacementSession.resolvedRect;
+  const previousSizedRect = previousRect
+    ? { ...previousRect, width: size.width, height: size.height }
+    : undefined;
+  const keepPreviousPosition =
+    activePlacementSession.preferSidePlacement &&
+    previousSizedRect !== undefined &&
+    (avoidRect === undefined || !rectsOverlap(previousSizedRect, avoidRect));
+  const rect = keepPreviousPosition ? previousSizedRect : calculatedRect;
+  activePlacementSession.resolvedRect = rect;
   return {
     position: 'fixed',
     top: rect.y,

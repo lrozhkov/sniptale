@@ -1,5 +1,9 @@
-import { useCallback } from 'react';
-import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
+import { useCallback, useMemo } from 'react';
+import type {
+  EffectMode,
+  FrameData,
+  StepBadgeSettings,
+} from '../../../../features/highlighter/contracts';
 import type { InteractiveFrameComponent } from '../roots/component';
 import type {
   FrameManagerRefs,
@@ -13,6 +17,14 @@ import { useFrameManagerRuntimeSyncEffects } from './useFrameManagerRuntimeSyncE
 import { useFrameManagerSessionEffects } from './useFrameManagerSessionEffects';
 import { useStepBadgeControllers } from '../manager/step-badge/controllers';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
+import { createSessionCalloutSettings } from '../session/callout-defaults';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import { getFutureFrameCallout, setFutureFrameCallout } from '../session/future-callout';
+import {
+  cloneStepBadgeSettings,
+  createSessionStepBadgeSettings,
+  createStepBadgeTemplateSnapshot,
+} from '../session/step-badge-defaults';
 
 /**
  * Builds the internal frame manager controllers and side effects.
@@ -98,6 +110,7 @@ function useOwnedFrameManagerPublicResult(args: {
     updateFrame: args.mutations.updateFrame,
     updateFrameEffect: args.mutations.updateFrameEffect,
     setFutureFrameEffectMode: args.frameSessionStyle.setFutureFrameEffectMode,
+    futureFrameAnnotations: args.frameSessionStyle.futureFrameAnnotations,
   });
 }
 
@@ -108,8 +121,12 @@ function useFrameSessionStyle(refs: FrameManagerRefs) {
       borderSettings: getFrameSessionBorderPreset(),
       blurSettings: { ...refs.sessionSettingsRefs.blurSettings.current },
       focusSettings: { ...refs.sessionSettingsRefs.focusSettings.current },
+      futureCallout: getFutureFrameCallout(),
+      futureStepBadge: refs.sessionStepBadgeTemplateRef.current?.enabled
+        ? cloneStepBadgeSettings(refs.sessionStepBadgeTemplateRef.current)
+        : null,
     }),
-    [refs.globalEffectModeRef, refs.sessionSettingsRefs]
+    [refs.globalEffectModeRef, refs.sessionSettingsRefs, refs.sessionStepBadgeTemplateRef]
   );
   const setFutureFrameEffectMode = useCallback(
     (mode: EffectMode) => {
@@ -119,7 +136,58 @@ function useFrameSessionStyle(refs: FrameManagerRefs) {
     [refs.globalEffectModeRef, refs.sessionSettingsRefs]
   );
 
-  return { getFutureFrameStyle, setFutureFrameEffectMode };
+  const updateFutureFrameCallout = useCallback(
+    (settings: CalloutSettings | null) => {
+      setFutureFrameCallout(settings);
+      if (settings) refs.sessionCalloutStyleRef.current = structuredClone(settings.style);
+    },
+    [refs.sessionCalloutStyleRef]
+  );
+  const enableFutureFrameCallout = useCallback(() => {
+    const settings = createSessionCalloutSettings(refs.sessionCalloutStyleRef.current);
+    setFutureFrameCallout(settings);
+    return settings;
+  }, [refs.sessionCalloutStyleRef]);
+  const futureFrameCallout = useMemo(
+    () => ({ enable: enableFutureFrameCallout, set: updateFutureFrameCallout }),
+    [enableFutureFrameCallout, updateFutureFrameCallout]
+  );
+  const updateFutureFrameStepBadge = useCallback(
+    (settings: StepBadgeSettings | null) => {
+      if (settings) {
+        refs.sessionStepBadgeTemplateRef.current = createStepBadgeTemplateSnapshot(settings);
+      } else if (refs.sessionStepBadgeTemplateRef.current) {
+        refs.sessionStepBadgeTemplateRef.current = {
+          ...refs.sessionStepBadgeTemplateRef.current,
+          enabled: false,
+        };
+      }
+    },
+    [refs.sessionStepBadgeTemplateRef]
+  );
+  const enableFutureFrameStepBadge = useCallback(() => {
+    const settings = refs.sessionStepBadgeTemplateRef.current
+      ? cloneStepBadgeSettings(refs.sessionStepBadgeTemplateRef.current)
+      : createSessionStepBadgeSettings();
+    settings.enabled = true;
+    refs.sessionStepBadgeTemplateRef.current = createStepBadgeTemplateSnapshot(settings);
+    return cloneStepBadgeSettings(settings);
+  }, [refs.sessionStepBadgeTemplateRef]);
+  const futureFrameStepBadge = useMemo(
+    () => ({ enable: enableFutureFrameStepBadge, set: updateFutureFrameStepBadge }),
+    [enableFutureFrameStepBadge, updateFutureFrameStepBadge]
+  );
+
+  const futureFrameAnnotations = useMemo(
+    () => ({ callout: futureFrameCallout, stepBadge: futureFrameStepBadge }),
+    [futureFrameCallout, futureFrameStepBadge]
+  );
+
+  return {
+    futureFrameAnnotations,
+    getFutureFrameStyle,
+    setFutureFrameEffectMode,
+  };
 }
 
 function useGlobalStepBadgeSettingsGetter(refs: FrameManagerRefs) {

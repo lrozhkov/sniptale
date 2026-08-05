@@ -145,6 +145,10 @@ export const editorCompactTextMessages = defineMessageSource({
     ru: 'Моно',
     en: 'Mono',
   },
+  fontCursive: {
+    ru: 'Рукописный',
+    en: 'Cursive',
+  },
   fontWeight: {
     ru: 'Вес шрифта',
     en: 'Font weight',

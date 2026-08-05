@@ -42,6 +42,7 @@ import {
   DEFAULT_FOCUS_SETTINGS,
 } from '../../../features/highlighter/style/defaults';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { translate } from '../../../platform/i18n';
 import { createBridgedMouseEvent } from '../../platform/trusted-events/synthetic-mouse';
 import { FrameSettingsPopover } from '.';
@@ -288,6 +289,11 @@ describe('FrameSettingsPopover loading state', () => {
     expect(popover?.dataset['frameId']).toBe('frame-1');
     expect(popover?.dataset['theme']).toBe('dark');
     expect(popover?.dataset['sniptaleActivationBridge']).toBe('defer');
+    expect(popover?.style.width).toBe('400px');
+    expect(
+      popover?.querySelector('.sniptale-settings-popover-header')?.getAttribute('data-draggable')
+    ).toBe('true');
+    expect(popover?.querySelector('.sniptale-settings-popover-close')).not.toBeNull();
     expect(
       document.querySelector<HTMLElement>('.sniptale-frame-style-editor-layer')?.dataset[
         'sniptaleActivationBridge'
@@ -305,6 +311,21 @@ describe('FrameSettingsPopover loading state', () => {
     expect(wheelEvent.defaultPrevented).toBe(true);
 
     document.body.removeEventListener('click', hostClick);
+  });
+
+  it('keeps the main-toolbar surface transient and its header static', () => {
+    storageMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise<HighlighterSettings>(() => undefined)
+    );
+
+    renderPopover({ scope: 'session' });
+
+    const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
+    const header = popover?.querySelector('.sniptale-settings-popover-header');
+    expect(popover?.style.width).toBe('400px');
+    expect(popover?.classList.contains('sniptale-main-toolbar-popover')).toBe(true);
+    expect(header?.hasAttribute('data-draggable')).toBe(false);
+    expect(popover?.querySelector('.sniptale-settings-popover-close')).toBeNull();
   });
 
   it('keeps the portal detached while the popover is closed', () => {
@@ -371,7 +392,7 @@ describe('FrameSettingsPopover pending focus edits', () => {
 });
 
 describe('FrameSettingsPopover preset selection', () => {
-  it('applies a trusted selection without closing the catalog', () => {
+  it('closes on a trusted repeat selection without reapplying the active preset', () => {
     const onApplyToFrame = vi.fn();
     const onClose = vi.fn();
     storageMocks.loadHighlighterSettings.mockReturnValue(
@@ -387,25 +408,32 @@ describe('FrameSettingsPopover preset selection', () => {
     expect(onApplyToFrame).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
 
-    act(() => {
-      getPresetButton(getBorderPresetDisplayName(DEFAULT_BORDER_PRESET)).dispatchEvent(
-        createBridgedMouseEvent('click', {
-          button: 0,
-          buttons: 1,
-          clientX: 20,
-          clientY: 30,
-          ctrlKey: false,
-          metaKey: false,
-          shiftKey: false,
-        })
-      );
+    clickTrusted(getPresetButton(getBorderPresetDisplayName(DEFAULT_BORDER_PRESET)));
+
+    expect(onApplyToFrame).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('applies a different trusted preset without closing the catalog', async () => {
+    const onApplyToFrame = vi.fn();
+    const onClose = vi.fn();
+    const persistedSettings = createPersistedSettings();
+    const persistedPreset = persistedSettings.borderPresets[0]!;
+    storageMocks.loadHighlighterSettings.mockResolvedValue(persistedSettings);
+
+    renderPopover({
+      borderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
+      onApplyToFrame,
+      onClose,
     });
+    await flushAsyncEffects();
+
+    clickTrusted(getPresetButton('Persisted preset'));
 
     expect(onApplyToFrame).toHaveBeenCalledWith({
-      borderSettings: { ...DEFAULT_BORDER_PRESET },
+      borderSettings: projectBorderPresetToAppliedSettings(persistedPreset),
     });
     expect(onClose).not.toHaveBeenCalled();
-    expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
   });
 
   it.each(['blur', 'focus'] as const)(
@@ -419,7 +447,7 @@ describe('FrameSettingsPopover preset selection', () => {
 
       renderPopover({
         effectMode,
-        borderSettings: { ...DEFAULT_BORDER_PRESET },
+        borderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
         onApplyToFrame,
         ...(effectMode === 'blur'
           ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: false } }
@@ -462,6 +490,86 @@ describe('FrameSettingsPopover preset selection', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
     vi.useRealTimers();
+  });
+
+  it('keeps the frame menu open when an owned overwrite-preset option is selected', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    const applied = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
+    const {
+      sourcePresetId: _sourcePresetId,
+      sourcePresetName: _sourcePresetName,
+      ...manualBorderSettings
+    } = applied;
+    const firstPreset = createPersistedSettings().borderPresets[0]!;
+    const secondPreset = { ...firstPreset, id: 'second-preset', name: 'Second preset', order: 1 };
+    storageMocks.loadHighlighterSettings.mockResolvedValue(
+      createPersistedSettings({ borderPresets: [firstPreset, secondPreset] })
+    );
+
+    try {
+      renderPopover({ borderSettings: manualBorderSettings, onClose, scope: 'session' });
+      await flushAsyncEffects();
+      act(() => vi.advanceTimersByTime(350));
+
+      act(() =>
+        document
+          .querySelector<HTMLButtonElement>(
+            `button[aria-label="${translate('highlighter.editor.saveSection')}"]`
+          )
+          ?.click()
+      );
+
+      const select = document.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('content.overlayControls.frameStyleOverwrite')}"]`
+      );
+      expect(select).not.toBeNull();
+      act(() => select?.click());
+
+      act(() => {
+        document.body.dispatchEvent(
+          new MouseEvent('mousemove', {
+            bubbles: true,
+            clientX: 1000,
+            clientY: 1000,
+            composed: true,
+          })
+        );
+        document.body.dispatchEvent(
+          new MouseEvent('mousedown', {
+            bubbles: true,
+            clientX: 1000,
+            clientY: 1000,
+            composed: true,
+          })
+        );
+        vi.advanceTimersByTime(250);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+
+      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (candidate) => candidate.textContent === secondPreset.name
+      );
+      expect(option).not.toBeNull();
+      act(() => {
+        option?.dispatchEvent(
+          new MouseEvent('mousemove', {
+            bubbles: true,
+            clientX: 1000,
+            clientY: 1000,
+            composed: true,
+          })
+        );
+        option?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+        option?.click();
+      });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
+      expect(select?.textContent).toContain(secondPreset.name);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

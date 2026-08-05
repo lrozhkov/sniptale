@@ -86,7 +86,13 @@ describe('ToolbarUtilityButtons', () => {
     expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
 
     await renderUtilities(props);
+    expect(
+      container?.querySelector('[data-ui="shared.ui.content-toolbar-group"]')?.className
+    ).toContain('sniptale-toolbar-highlighter-utilities');
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
+    expect(autoBlurButton?.parentElement?.className).toContain(
+      'sniptale-toolbar-privacy-group-start'
+    );
     expect(autoBlurButton?.querySelector('svg')?.getAttribute('class')).toContain(
       'lucide-shield-check'
     );
@@ -132,5 +138,37 @@ describe('ToolbarUtilityButtons', () => {
     expect(
       toggle?.querySelector('.sniptale-toolbar-menu-item-hint')?.getAttribute('class')
     ).toContain('sniptale-toolbar-menu-item-hint--show-compact');
+  });
+
+  it('closes the sensitive-data blur menu when the pointer moves far away', async () => {
+    await renderUtilities(createProps());
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const menu = container?.querySelector<HTMLElement>(
+      '[data-ui="content.toolbar.auto-blur-menu"] .sniptale-popover-menu'
+    );
+    expect(menu).not.toBeNull();
+    vi.spyOn(menu!, 'getBoundingClientRect').mockReturnValue({
+      bottom: 200,
+      height: 100,
+      left: 100,
+      right: 300,
+      top: 100,
+      width: 200,
+      x: 100,
+      y: 100,
+      toJSON: () => ({}),
+    });
+
+    await act(async () => {
+      document.body.dispatchEvent(
+        new MouseEvent('mousemove', { bubbles: true, clientX: 620, clientY: 520 })
+      );
+    });
+
+    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-menu"]')).toBeNull();
   });
 });

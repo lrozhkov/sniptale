@@ -31,6 +31,12 @@ function getElementSelection(element: HTMLElement): Selection | null {
   return element.ownerDocument.defaultView?.getSelection() ?? null;
 }
 
+function hasNonCollapsedSelectionWithinElement(element: HTMLElement): boolean {
+  const selection = getElementSelection(element);
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+  return isRangeWithinElement(selection.getRangeAt(0), element);
+}
+
 function insertPlainTextAtSelection(text: string, editableElement: HTMLDivElement): void {
   const selection = getElementSelection(editableElement);
   const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
@@ -90,7 +96,7 @@ function commitCalloutContent(
   const sanitizedHtml = sanitizeCalloutHtml(editableElement.innerHTML);
   const textContent = editableElement.textContent?.trim() ?? '';
 
-  if (textContent === '') {
+  if (textContent === '' && (args.titleText ?? '').trim() === '') {
     args.onDelete();
   } else {
     args.onContentChange(sanitizedHtml);
@@ -200,13 +206,25 @@ function useCalloutPointerHandlers(
       event.nativeEvent.stopImmediatePropagation();
 
       if (!args.isEditing) {
+        const titleInput =
+          event.target instanceof HTMLInputElement &&
+          event.target.matches('[data-sniptale-callout-title="true"]')
+            ? event.target
+            : null;
         args.onStartEditing();
+        if (titleInput) {
+          window.requestAnimationFrame(() => titleInput.focus({ preventScroll: true }));
+        }
         return;
       }
 
-      if (!isPointerEventWithinEditable(event, args.contentEditableRef.current)) {
+      const editableElement = args.contentEditableRef.current;
+      if (
+        !isPointerEventWithinEditable(event, editableElement) &&
+        !(editableElement && hasNonCollapsedSelectionWithinElement(editableElement))
+      ) {
         event.preventDefault();
-        finishEditing(args.contentEditableRef.current);
+        finishEditing(editableElement);
       }
     },
     [args, finishEditing]
@@ -239,6 +257,12 @@ function isPointerEventWithinEditable(
   event: MouseEvent,
   editableElement: HTMLDivElement | null
 ): boolean {
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[data-sniptale-callout-title="true"]')
+  ) {
+    return true;
+  }
   if (!editableElement) {
     return false;
   }

@@ -67,4 +67,5 @@ export function toggleInteractiveFrameEffectMode(params: {
   params.closePopover();
   params.setEffectMode(params.mode);
   params.onEffectChange?.(params.frameId, params.mode);
+  params.togglePopover(params.frameId, 'frame-settings');
 }

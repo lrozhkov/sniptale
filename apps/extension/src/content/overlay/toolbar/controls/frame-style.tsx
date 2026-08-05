@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Droplet, Focus, Square } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
 import { translate } from '../../../../platform/i18n';
 import { FrameSettingsPopover } from '../../../selection/frame-settings-popover';
-import type { ToolbarFutureFrameStyle } from '../types';
+import type {
+  ToolbarFutureFrameCalloutActions,
+  ToolbarFutureFrameStepBadgeActions,
+  ToolbarFutureFrameStyle,
+} from '../types';
 import type { ToolbarMenuState } from '../state/menu';
+import { FutureCalloutControl } from './future-callout-control';
+import { FutureStepBadgeControl } from './future-step-badge-control';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
@@ -26,10 +32,12 @@ export function FutureFrameStyleControls(props: {
   compactMenus?: boolean;
   futureFrameStyle: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange: (mode: EffectMode) => void;
+  futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: ToolbarFutureFrameStepBadgeActions;
   toolbarMenuState: ToolbarMenuState;
 }) {
   const [style, setStyle] = useState(props.futureFrameStyle);
-  const activeButtonRef = useRef<HTMLButtonElement>(null);
+  const [effectAnchorEl, setEffectAnchorEl] = useState<HTMLButtonElement | null>(null);
   const open = props.toolbarMenuState.activeMenuType === 'frame-style';
 
   useEffect(() => {
@@ -42,38 +50,45 @@ export function FutureFrameStyleControls(props: {
       return;
     }
 
-    props.toolbarMenuState.closeMenu('frame-style');
     setStyle((current) => ({ ...current, effectMode: mode }));
     props.onFutureFrameEffectModeChange(mode);
+    props.toolbarMenuState.setActiveMenuType('frame-style');
   };
 
   return (
     <>
-      {(['border', 'blur', 'focus'] as const).map((mode) => {
-        const active = style.effectMode === mode;
-        const label = getEffectLabel(mode);
-        return (
-          <ContentToolbarButton
-            key={mode}
-            ref={active ? activeButtonRef : undefined}
-            active={active}
-            dataUi={`content.toolbar.future-frame-${mode}`}
-            menuIndicator
-            title={label + (active ? translate('content.interactiveFrame.effectActiveSuffix') : '')}
-            aria-pressed={active}
-            aria-expanded={active && open}
-            onClick={(event) => {
-              event.stopPropagation();
-              handleEffectClick(mode);
-            }}
-          >
-            <FrameEffectIcon mode={mode} />
-          </ContentToolbarButton>
-        );
-      })}
+      <div
+        className="sniptale-toolbar-subgroup"
+        data-ui="content.toolbar.future-frame-effects-group"
+      >
+        {(['border', 'blur', 'focus'] as const).map((mode) => {
+          const active = style.effectMode === mode;
+          const label = getEffectLabel(mode);
+          return (
+            <ContentToolbarButton
+              key={mode}
+              active={active}
+              dataUi={`content.toolbar.future-frame-${mode}`}
+              menuIndicator
+              title={
+                label + (active ? translate('content.interactiveFrame.effectActiveSuffix') : '')
+              }
+              aria-pressed={active}
+              aria-expanded={active && open}
+              onClick={(event) => {
+                event.stopPropagation();
+                setEffectAnchorEl(event.currentTarget);
+                handleEffectClick(mode);
+              }}
+            >
+              <FrameEffectIcon mode={mode} />
+            </ContentToolbarButton>
+          );
+        })}
+      </div>
 
       <FrameSettingsPopover
-        anchorEl={activeButtonRef.current}
+        anchorEl={effectAnchorEl}
         blurSettings={style.blurSettings}
         borderSettings={style.borderSettings}
         compact={props.compactMenus ?? false}
@@ -86,6 +101,30 @@ export function FutureFrameStyleControls(props: {
         onClose={() => props.toolbarMenuState.closeMenu('frame-style')}
         scope="session"
       />
+
+      {props.futureFrameCalloutActions || props.futureFrameStepBadgeActions ? (
+        <div
+          className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
+          data-ui="content.toolbar.future-frame-annotations-group"
+        >
+          {props.futureFrameCalloutActions ? (
+            <FutureCalloutControl
+              actions={props.futureFrameCalloutActions}
+              menu={props.toolbarMenuState}
+              setStyle={setStyle}
+              style={style}
+            />
+          ) : null}
+          {props.futureFrameStepBadgeActions ? (
+            <FutureStepBadgeControl
+              actions={props.futureFrameStepBadgeActions}
+              menu={props.toolbarMenuState}
+              setStyle={setStyle}
+              style={style}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

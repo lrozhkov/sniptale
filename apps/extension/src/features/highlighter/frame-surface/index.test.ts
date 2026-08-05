@@ -11,10 +11,8 @@ function createFrame(overrides: Partial<FrameData> = {}): FrameData {
     height: 80,
     effectMode: 'border',
     borderSettings: {
-      id: 'border',
-      name: 'Border',
-      enabled: true,
-      order: 0,
+      sourcePresetId: 'border',
+      sourcePresetName: 'Border',
       width: 20,
       color: '#f97316',
       style: 'solid',

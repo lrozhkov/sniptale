@@ -1,0 +1,2 @@
+export const SETTINGS_POPOVER_WIDTH = 400;
+export const SETTINGS_POPOVER_HEIGHT = 600;

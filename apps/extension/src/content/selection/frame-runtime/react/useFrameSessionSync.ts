@@ -46,6 +46,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
     sessionDefaultsInitializedRef,
     sessionFocusSettingsRef,
     sessionCalloutStyleRef,
+    sessionStepBadgeTemplateRef,
   } = args;
   const callbackRefs = useFrameSessionSyncCallbackRefs(args);
 
@@ -59,6 +60,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
         sessionDefaultsInitializedRef,
         sessionFocusSettingsRef,
         sessionCalloutStyleRef,
+        ...(sessionStepBadgeTemplateRef ? { sessionStepBadgeTemplateRef } : {}),
         syncFocusOpacity: (sourceFrameId, newOpacity) =>
           callbackRefs.syncFocusOpacityRef.current(sourceFrameId, newOpacity),
         updateGlobalStepBadgeSettings: (settings) =>
@@ -76,6 +78,7 @@ function useFrameSessionSyncEffect(args: UseFrameSessionSyncArgs) {
       sessionBlurSettingsRef,
       sessionDefaultsInitializedRef,
       sessionCalloutStyleRef,
+      sessionStepBadgeTemplateRef,
       sessionFocusSettingsRef,
     ]
   );

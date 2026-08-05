@@ -13,9 +13,8 @@ const baseFrame: FrameData = {
   height: 90,
   effectMode: 'border',
   borderSettings: {
-    id: 'border-1',
-    name: 'Primary',
-    order: 0,
+    sourcePresetId: 'border-1',
+    sourcePresetName: 'Primary',
     color: '#2563eb',
     customCss: '',
     fillColor: '#16a34a',

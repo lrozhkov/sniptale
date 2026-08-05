@@ -26,14 +26,22 @@ function createProps(
     handleTailBaseEndKeyDown: vi.fn(),
     handleTailFramePointerDown: vi.fn(),
     handleTailFrameKeyDown: vi.fn(),
+    handleWaypointPointerDown: vi.fn(),
+    handleWaypointKeyDown: vi.fn(),
+    handleWaypointDoubleClick: vi.fn(),
+    hasWaypoint: false,
     isDragging: false,
     isEditing: false,
+    isGeometryHandleHidden: false,
+    isWidthResizeHandleHidden: false,
     isHandleVisible: true,
     isResizingLeft: false,
     isResizingRight: false,
     isTailDragging: false,
     isTailBaseEndDragging: false,
     isTailFrameDragging: false,
+    isWaypointDragging: false,
+    isPolylineWaypoint: false,
     portalTheme: null,
     settingsAnchorRef: { current: null },
     settingsHandleStyle: { left: 124, top: 100 },
@@ -44,6 +52,9 @@ function createProps(
     tailHandleStyle: { left: 120, top: 140 },
     tailBaseEndHandleStyle: { left: 140, top: 140 },
     tailFrameHandleStyle: { left: 160, top: 180 },
+    waypointHandleStyle: { left: 150, top: 150 },
+    waypointAngle: null,
+    waypointAngleStyle: null,
     ...overrides,
   };
 }
@@ -58,8 +69,39 @@ describe('callout interaction handles', () => {
     expect(markup).toContain('sniptale-callout-tail-base-start-handle');
     expect(markup).toContain('sniptale-callout-tail-base-end-handle');
     expect(markup).toContain('sniptale-callout-tail-frame-handle');
+    expect(markup).toContain('sniptale-callout-waypoint-handle');
+    expect(markup).toContain('lucide-plus');
     expect(markup).toContain('cursor:ew-resize');
     expect(markup).toContain('background:#ffffff');
+    expect(markup).toContain('width:26px;height:26px');
+    expect(markup).toContain('Shift');
+    expect(markup).toContain('Ctrl');
+  });
+
+  it('turns the add-route-point affordance into a plain drag handle after activation', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(createProps({ hasWaypoint: true }))
+    );
+
+    expect(markup).toContain('sniptale-callout-waypoint-handle');
+    expect(markup).not.toContain('lucide-plus');
+  });
+
+  it('renders a diamond control and a compact angle readout while an angled route is dragged', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(
+        createProps({
+          isPolylineWaypoint: true,
+          isWaypointDragging: true,
+          waypointAngle: 45,
+          waypointAngleStyle: { left: 170, top: 120 },
+        })
+      )
+    );
+
+    expect(markup).toContain('transform:rotate(45deg)');
+    expect(markup).toContain('45°');
+    expect(markup).not.toContain('lucide-plus');
   });
 
   it('renders left and right transient width handles on the exact cloud edges', () => {
@@ -91,6 +133,31 @@ describe('callout interaction handles', () => {
 
     expect(markup).toContain('sniptale-callout-drag-handle');
     expect(markup).not.toContain('sniptale-callout-settings-handle');
+  });
+
+  it('hides resize and connector geometry handles while comment settings are open', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(createProps({ isGeometryHandleHidden: true }))
+    );
+
+    expect(markup).toContain('sniptale-callout-drag-handle');
+    expect(markup).toContain('sniptale-callout-settings-handle');
+    expect(markup).not.toContain('sniptale-callout-resize-handle');
+    expect(markup).not.toContain('sniptale-callout-tail-handle');
+  });
+
+  it('hides comment and connector geometry while the connected frame is being edited', () => {
+    const markup = renderToStaticMarkup(
+      renderCalloutInteractionHandles(
+        createProps({ isGeometryHandleHidden: true, isWidthResizeHandleHidden: true })
+      )
+    );
+
+    expect(markup).not.toContain('sniptale-callout-resize-handle');
+    expect(markup).not.toContain('sniptale-callout-tail-base-start-handle');
+    expect(markup).not.toContain('sniptale-callout-tail-frame-handle');
+    expect(markup).not.toContain('sniptale-callout-waypoint-handle');
+    expect(markup).toContain('sniptale-callout-drag-handle');
   });
 
   it('removes invisible handles from pointer hit testing until hover or focus reveals them', () => {

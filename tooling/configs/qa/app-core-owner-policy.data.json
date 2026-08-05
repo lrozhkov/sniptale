@@ -227,6 +227,16 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/callout-presets",
+      "ownerId": "persistence.callout-presets",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/step-badge-presets",
+      "ownerId": "persistence.step-badge-presets",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/command-palette",
       "ownerId": "persistence.command-palette",
       "ownerClass": "persistence"
@@ -372,6 +382,16 @@
       "id": "ai-settings-secrets",
       "path": "apps/extension/src/composition/persistence/ai-settings",
       "stateKind": "authoritative-sensitive"
+    },
+    {
+      "id": "callout-presets",
+      "path": "apps/extension/src/composition/persistence/callout-presets",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "step-badge-presets",
+      "path": "apps/extension/src/composition/persistence/step-badge-presets",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "command-palette",

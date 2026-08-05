@@ -42,10 +42,15 @@ export function useViewportSelectorMenu(props: {
   const [showMenu, setShowMenu] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const onMenuStateChangeRef = useRef(onMenuStateChange);
 
   useEffect(() => {
-    onMenuStateChange?.(showMenu);
-  }, [onMenuStateChange, showMenu]);
+    onMenuStateChangeRef.current = onMenuStateChange;
+  }, [onMenuStateChange]);
+
+  useEffect(() => {
+    onMenuStateChangeRef.current?.(showMenu);
+  }, [showMenu]);
 
   useViewportMenuOutsideClick(showMenu, wrapperRef, setShowMenu);
 

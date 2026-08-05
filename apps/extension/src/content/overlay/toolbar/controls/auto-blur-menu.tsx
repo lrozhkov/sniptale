@@ -196,6 +196,7 @@ function useAutoBlurMenuBindings(props: AutoBlurMenuProps) {
   const open = props.toolbarMenuState.activeMenuType === 'auto-blur';
 
   useToolbarFloatingMenuDismissal({
+    closeOnFarPointer: true,
     menuRef,
     onClose: () => props.toolbarMenuState.closeMenu('auto-blur'),
     open,
@@ -231,7 +232,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
   const bindings = useAutoBlurMenuBindings(props);
 
   return (
-    <div className="relative">
+    <div className="relative sniptale-toolbar-privacy-group-start">
       <ContentToolbarButton
         ref={bindings.triggerRef}
         active={bindings.open || props.autoBlur?.autoApplyEnabled === true}

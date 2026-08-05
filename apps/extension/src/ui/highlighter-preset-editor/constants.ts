@@ -31,6 +31,12 @@ export const editorTextareaClassName = [
   'focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
 ].join(' ');
 
+export const editorNativeResizableTextareaClassName = [
+  editorInputClassName,
+  'min-h-[72px] max-h-[300px] resize-y font-mono placeholder:text-[var(--sniptale-color-text-dim)]',
+  'focus:ring-1 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
+].join(' ');
+
 export const editorResizeHandleClassName = [
   'absolute bottom-0 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-t transition-colors',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-dim)_38%,transparent)]',

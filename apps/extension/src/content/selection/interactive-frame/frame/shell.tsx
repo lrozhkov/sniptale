@@ -88,11 +88,17 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           onResizeStart={props.handleResizeStart}
         />
       </div>
-      {props.currentFrame.stepBadge?.enabled && props.currentFrame.stepBadge.value && (
+      {props.currentFrame.stepBadge?.enabled && (
         <StepBadge
           settings={props.currentFrame.stepBadge}
           borderColor={props.borderColor}
           borderWidth={props.borderWidth}
+          {...(props.currentFrame.borderSettings?.fillColor
+            ? { fillColor: props.currentFrame.borderSettings.fillColor }
+            : {})}
+          {...(props.currentFrame.borderSettings?.fillOpacity === undefined
+            ? {}
+            : { fillOpacity: props.currentFrame.borderSettings.fillOpacity })}
           frameRect={props.currentFrame}
           isSettingsOpen={props.isStepBadgePopoverOpen}
           onPositionChange={(manualPlacement) => {

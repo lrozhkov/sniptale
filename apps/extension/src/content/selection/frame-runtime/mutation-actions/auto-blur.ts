@@ -1,5 +1,5 @@
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   FocusSettings,
   FrameData,
 } from '../../../../features/highlighter/contracts';
@@ -22,6 +22,7 @@ import { createGenerateFrameId } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { calculateFrameContainerCoords, createFrameCalcSettings } from '../coords';
 import { calculateFrameOffsetFromElement } from '../manager/coords';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 type CreateAddAutoBlurFramesHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -37,13 +38,13 @@ type HighlighterSettingsSnapshot =
 
 function resolveDefaultBorderPreset(settings: HighlighterSettingsSnapshot) {
   if (!settings) {
-    return { ...DEFAULT_BORDER_PRESET };
+    return projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
   }
 
   const preset =
     settings.borderPresets.find((item) => item.id === settings.defaultBorderPresetId) ??
     DEFAULT_BORDER_PRESET;
-  return { ...preset };
+  return projectBorderPresetToAppliedSettings(preset);
 }
 
 function cloneFocusSettings(settings: FocusSettings | undefined): FocusSettings {
@@ -58,7 +59,7 @@ function createLinkedElementSelector(element: HTMLElement): string {
 }
 
 function createAutoBlurFrame(args: {
-  borderSettings: BorderPreset;
+  borderSettings: AppliedBorderSettings;
   focusSettings: FocusSettings;
   generateFrameId: () => string;
   target: AutoBlurApplyInput['targets'][number];

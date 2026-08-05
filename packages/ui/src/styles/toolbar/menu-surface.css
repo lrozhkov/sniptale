@@ -2,8 +2,55 @@
  * Toolbar Menu Surface
  * ======================================== */
 
-.sniptale-app:has(.sniptale-toolbar .sniptale-popover-menu) {
+.sniptale-app:has(.sniptale-toolbar[data-menu-open='true']) {
   z-index: 2147483647;
+}
+
+.sniptale-toolbar-menu-interaction-guard {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  z-index: 2147483645;
+  background: transparent;
+}
+
+.sniptale-toolbar[data-menu-open='true'] {
+  z-index: 2147483646;
+  pointer-events: auto !important;
+}
+
+.sniptale-toolbar[data-menu-open='true'] .sniptale-popover-menu {
+  pointer-events: auto !important;
+}
+
+.sniptale-app:has(.sniptale-toolbar[data-menu-open='true'])
+  ~ :is(.sniptale-modal-backdrop, .sniptale-modal),
+.sniptale-main-toolbar-popover :is(.sniptale-modal-backdrop, .sniptale-modal) {
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
+#sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
+  ~ #sniptale-content-overlay-root
+  > :not(.sniptale-main-toolbar-popover):not(.sniptale-modal):not(.sniptale-modal-backdrop):not(
+    :has(.sniptale-modal)
+  ) {
+  z-index: 2147483645 !important;
+  pointer-events: none !important;
+}
+
+#sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
+  ~ #sniptale-content-overlay-root
+  > .sniptale-main-toolbar-popover {
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
+#sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
+  ~ #sniptale-content-overlay-root
+  > :is(.sniptale-modal-backdrop, .sniptale-modal) {
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
 }
 
 .sniptale-popover-menu {

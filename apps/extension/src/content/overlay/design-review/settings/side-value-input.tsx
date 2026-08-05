@@ -50,6 +50,7 @@ export function resolveSideValueKind(property: PageStyleProperty): SideValueKind
 
 export function SideValueInput(props: {
   ariaLabel?: string;
+  compact?: boolean;
   disabled: boolean;
   fallbackValue?: string | undefined;
   kind: SideValueKind;
@@ -74,6 +75,7 @@ export function SideValueInput(props: {
 
 function SideSelectInput(props: {
   ariaLabel?: string;
+  compact?: boolean;
   disabled: boolean;
   onChange: (value: string) => void;
   value: string;
@@ -81,7 +83,7 @@ function SideSelectInput(props: {
   return (
     <CompactSelect
       aria-label={props.ariaLabel}
-      className={PAGE_STYLE_SELECT_CLASS_NAME}
+      className={`${PAGE_STYLE_SELECT_CLASS_NAME} ${props.compact ? '!h-7 !px-1 !text-[10px]' : ''}`}
       disabled={props.disabled}
       options={getBorderStyleOptions(props.value)}
       value={normalizeBorderStyleValue(props.value)}
@@ -92,12 +94,16 @@ function SideSelectInput(props: {
 
 function SideColorInput(props: {
   ariaLabel?: string;
+  compact?: boolean;
+  disabled: boolean;
   fallbackValue?: string | undefined;
   onChange: (value: string) => void;
   value: string;
 }) {
   return (
     <CompactColorSelector
+      {...(props.compact ? { className: '!h-7' } : {})}
+      disabled={props.disabled}
       label={props.ariaLabel ?? ''}
       title={props.ariaLabel ?? ''}
       palette={COLOR_PALETTE}
@@ -110,6 +116,7 @@ function SideColorInput(props: {
 
 function SideTextInput(props: {
   ariaLabel?: string;
+  compact?: boolean;
   disabled: boolean;
   onChange: (value: string) => void;
   value: string;
@@ -117,7 +124,7 @@ function SideTextInput(props: {
   return (
     <CompactInput
       aria-label={props.ariaLabel}
-      className={PAGE_STYLE_CONTROL_CLASS_NAME}
+      className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${props.compact ? '!h-7 !px-1 !text-[11px]' : ''}`}
       disabled={props.disabled}
       value={props.value}
       onChange={(event) => props.onChange(event.currentTarget.value)}
@@ -127,6 +134,7 @@ function SideTextInput(props: {
 
 function SideLengthInput(props: {
   ariaLabel?: string;
+  compact?: boolean;
   disabled: boolean;
   fallbackValue?: string | undefined;
   onChange: (value: string) => void;
@@ -140,12 +148,17 @@ function SideLengthInput(props: {
     (isCssNumericLength(props.value) || (!props.value.trim() && Boolean(fallbackUnit)));
   const unit = parsed.unit || fallbackUnit || 'px';
   const inputValue = showUnit ? parsed.numberText : props.value;
+  const inputClassName = [
+    PAGE_STYLE_CONTROL_CLASS_NAME,
+    showUnit ? '!pr-12' : '!pr-6',
+    props.compact ? '!h-7 !px-1 !pr-5 !text-[11px]' : '',
+  ].join(' ');
 
   return (
     <div className="group/side-number relative min-w-0">
       <CompactInput
         aria-label={props.ariaLabel}
-        className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${showUnit ? '!pr-12' : '!pr-6'}`}
+        className={inputClassName}
         disabled={props.disabled}
         inputMode="decimal"
         value={inputValue}

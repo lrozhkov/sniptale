@@ -1,9 +1,11 @@
-import { Link, Unlink } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ChevronDown, Link2, Unlink2 } from 'lucide-react';
+import { useState } from 'react';
+import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
-import { propertyModified, propertyValue } from '../value-editing/values';
+import { propertyValue } from '../value-editing/values';
+import { AXIS_SIDE_INDEXES, type SideAxis, useSideFieldLinking } from './side-fields-state';
 import { resolveSideValueKind, SideValueInput } from './side-value-input';
 
 type Side = 'bottom' | 'left' | 'right' | 'top';
@@ -16,6 +18,16 @@ const SIDE_LABEL_KEYS = [
   'content.designReview.sideBottom',
   'content.designReview.sideLeft',
 ] as const;
+
+const COMPACT_VALUES_CLASS_NAME = [
+  'grid min-w-0 grid-cols-[repeat(4,minmax(0,1fr))] gap-0.5 rounded-[9px]',
+  'border border-[var(--sniptale-color-border-soft)] p-0.5',
+].join(' ');
+
+const AXIS_GROUP_CLASS_NAME = [
+  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
+  'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
+].join(' ');
 
 export function createSideProperty(prefix: 'margin' | 'padding', side: Side): PageStyleProperty {
   return `${prefix}-${side}` as PageStyleProperty;
@@ -41,139 +53,130 @@ export function createRadiusProperty(side: Side): PageStyleProperty {
   return 'border-bottom-left-radius';
 }
 
-function createSideFieldKey(properties: readonly PageStyleProperty[]): string {
-  return properties.join('|');
-}
-
-function SideToggleButton(props: {
-  children: ReactNode;
+function LinkToggle(props: {
   disabled: boolean;
   linked: boolean;
+  name: 'all' | SideAxis;
   onClick: () => void;
-  title: string;
 }) {
+  const title = translate(
+    props.linked ? 'content.designReview.unlinkedSides' : 'content.designReview.linkedSides'
+  );
   return (
-    <button
-      type="button"
+    <ProductGlassIconButton
+      active={props.linked}
+      aria-label={title}
+      aria-pressed={props.linked}
+      className="h-7 w-7 shrink-0"
+      data-side-link={props.name}
       disabled={props.disabled}
-      title={props.title}
-      aria-label={props.title}
-      className={[
-        props.linked ? '' : 'mt-4',
-        'inline-flex h-8 w-8 items-center justify-center rounded-[7px] border transition',
-        'border-[color:var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-        'hover:border-[color:var(--sniptale-color-accent)] hover:text-[var(--sniptale-color-accent)]',
-      ].join(' ')}
       onClick={props.onClick}
+      title={title}
     >
-      {props.children}
-    </button>
+      {props.linked ? (
+        <Link2 aria-hidden="true" size={14} />
+      ) : (
+        <Unlink2 aria-hidden="true" size={14} />
+      )}
+    </ProductGlassIconButton>
   );
 }
 
-function LinkedSideValue(props: {
-  ariaLabel: string;
-  disabled: boolean;
-  firstDefault?: string | undefined;
-  firstValue: string;
-  onChangeLinked: (value: string) => void;
-  onUnlink: () => void;
-  properties: PageStyleProperty[];
-  title: string;
-}) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_32px] items-center gap-2">
-      <SideValueInput
-        ariaLabel={props.ariaLabel}
-        disabled={props.disabled}
-        fallbackValue={props.firstDefault}
-        kind={resolveSideValueKind(props.properties[0] as PageStyleProperty)}
-        value={props.firstValue}
-        onChange={props.onChangeLinked}
-      />
-      <SideToggleButton
-        disabled={props.disabled}
-        linked={true}
-        title={props.title}
-        onClick={props.onUnlink}
-      >
-        <Link size={14} />
-      </SideToggleButton>
-    </div>
-  );
-}
-
-function UnlinkedSideValues(props: {
-  disabled: boolean;
-  onChange: DesignReviewActions['updateValue'];
-  onLink: () => void;
-  properties: PageStyleProperty[];
-  state: DesignReviewViewState;
-  title: string;
-}) {
-  const valueKind = resolveSideValueKind(props.properties[0] as PageStyleProperty);
-
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_32px] items-start gap-2">
-      <div
-        data-ui="content.design-review.side-values"
-        className="grid min-w-0 grid-cols-[repeat(4,minmax(0,1fr))] gap-2"
-      >
-        {props.properties.map((property, index) => (
-          <SideValueLabel
-            key={property}
-            disabled={props.disabled}
-            kind={valueKind}
-            property={property}
-            index={index}
-            state={props.state}
-            onChange={props.onChange}
-          />
-        ))}
-      </div>
-      <SideToggleButton
-        disabled={props.disabled}
-        linked={false}
-        title={props.title}
-        onClick={props.onLink}
-      >
-        <Unlink size={14} />
-      </SideToggleButton>
-    </div>
-  );
-}
-
-function SideValueLabel(props: {
+function SideValueControl(props: {
+  compact?: boolean;
   disabled: boolean;
   index: number;
-  kind: ReturnType<typeof resolveSideValueKind>;
-  onChange: DesignReviewActions['updateValue'];
+  onChange: (value: string) => void;
   property: PageStyleProperty;
   state: DesignReviewViewState;
 }) {
   const label = translate(SIDE_LABEL_KEYS[props.index] ?? SIDE_LABEL_KEYS[0]);
-
   return (
-    <label className="grid min-w-0 gap-1">
-      <span className="text-center text-[10px] font-semibold text-[var(--sniptale-color-text-dim)]">
-        {label}
-      </span>
+    <div className="min-w-0" data-side-value={SIDE_ORDER[props.index]}>
       <SideValueInput
         ariaLabel={label}
+        compact={props.compact === true}
         disabled={props.disabled}
         fallbackValue={props.state.defaultValues[props.property]}
-        kind={props.kind}
-        showUnit={false}
+        kind={resolveSideValueKind(props.property)}
+        showUnit={!props.compact}
         value={propertyValue(props.state, props.property)}
-        onChange={(value) => props.onChange(props.property, value)}
+        onChange={props.onChange}
       />
-    </label>
+    </div>
   );
 }
 
-function SideFieldLabel(props: { label: string; modifiedCount: number }) {
+function CompactSideValues(props: {
+  disabled: boolean;
+  onSideChange: (index: number, value: string) => void;
+  properties: PageStyleProperty[];
+  state: DesignReviewViewState;
+}) {
   return (
-    <div className="flex items-center gap-2">
+    <div className={COMPACT_VALUES_CLASS_NAME} data-ui="content.design-review.side-values-compact">
+      {props.properties.map((property, index) => (
+        <SideValueControl
+          compact
+          disabled={props.disabled}
+          index={index}
+          key={property}
+          property={property}
+          state={props.state}
+          onChange={(value) => props.onSideChange(index, value)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ExpandedAxisGroup(props: {
+  axis: SideAxis;
+  disabled: boolean;
+  linked: boolean;
+  onLinkToggle: () => void;
+  onSideChange: (index: number, value: string) => void;
+  properties: PageStyleProperty[];
+  state: DesignReviewViewState;
+}) {
+  return (
+    <div className={AXIS_GROUP_CLASS_NAME} data-side-axis={props.axis}>
+      <div className="grid gap-0.5">
+        {AXIS_SIDE_INDEXES[props.axis].map((index) => {
+          const property = props.properties[index] as PageStyleProperty;
+          const label = translate(SIDE_LABEL_KEYS[index] ?? SIDE_LABEL_KEYS[0]);
+          return (
+            <div
+              className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2"
+              key={property}
+            >
+              <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
+                {label}
+              </span>
+              <SideValueControl
+                disabled={props.disabled}
+                index={index}
+                property={property}
+                state={props.state}
+                onChange={(value) => props.onSideChange(index, value)}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <LinkToggle
+        disabled={props.disabled}
+        linked={props.linked}
+        name={props.axis}
+        onClick={props.onLinkToggle}
+      />
+    </div>
+  );
+}
+
+function SideFieldLabel(props: { expanded: boolean; label: string; modifiedCount: number }) {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
       <span
         className={[
           'text-[11px] font-semibold',
@@ -184,23 +187,13 @@ function SideFieldLabel(props: { label: string; modifiedCount: number }) {
       >
         {props.label}
       </span>
+      <ChevronDown
+        aria-hidden="true"
+        className={props.expanded ? 'rotate-180 transition-transform' : 'transition-transform'}
+        size={13}
+      />
     </div>
   );
-}
-
-function updateLinkedSides(props: {
-  onChange: DesignReviewActions['updateValue'];
-  onChangeMany?: DesignReviewActions['updateValues'];
-  properties: PageStyleProperty[];
-  value: string;
-}) {
-  if (props.onChangeMany) {
-    props.onChangeMany(props.properties.map((property) => ({ property, value: props.value })));
-    return;
-  }
-  for (const property of props.properties) {
-    props.onChange(property, props.value);
-  }
 }
 
 export function LinkedSideFields(props: {
@@ -213,81 +206,72 @@ export function LinkedSideFields(props: {
   onChangeMany?: DesignReviewActions['updateValues'];
   onLinkedChange?: ((fieldKey: string, linked: boolean) => void) | undefined;
 }) {
-  const model = createSideFieldModel(props);
-  const toggleTitle = translate(
-    model.linked ? 'content.designReview.unlinkedSides' : 'content.designReview.linkedSides'
-  );
+  const [expanded, setExpanded] = useState(false);
+  const linking = useSideFieldLinking(props);
 
   return (
     <div
-      className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-2"
+      className="grid gap-1.5"
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="pt-2">
-        <SideFieldLabel label={props.label} modifiedCount={model.modifiedCount} />
+      <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
+        <button
+          aria-expanded={expanded}
+          className="min-w-0 cursor-pointer text-left"
+          disabled={props.disabled}
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <SideFieldLabel
+            expanded={expanded}
+            label={props.label}
+            modifiedCount={linking.model.modifiedCount}
+          />
+        </button>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {!expanded ? (
+            <div className="min-w-0 flex-1">
+              <CompactSideValues
+                disabled={props.disabled}
+                properties={props.properties}
+                state={props.state}
+                onSideChange={linking.updateSide}
+              />
+            </div>
+          ) : (
+            <span className="min-w-0 flex-1" aria-hidden="true" />
+          )}
+          <LinkToggle
+            disabled={props.disabled}
+            linked={linking.model.linked}
+            name="all"
+            onClick={linking.toggleAll}
+          />
+        </div>
       </div>
-      <SideFieldInputs model={model} props={props} toggleTitle={toggleTitle} />
+      {expanded ? (
+        <div className="ml-[calc(7rem+0.5rem)] grid gap-1.5">
+          <ExpandedAxisGroup
+            axis="vertical"
+            disabled={props.disabled}
+            linked={linking.model.linked || linking.axisLinked.vertical}
+            properties={props.properties}
+            state={props.state}
+            onLinkToggle={() => linking.toggleAxis('vertical')}
+            onSideChange={linking.updateSide}
+          />
+          <ExpandedAxisGroup
+            axis="horizontal"
+            disabled={props.disabled}
+            linked={linking.model.linked || linking.axisLinked.horizontal}
+            properties={props.properties}
+            state={props.state}
+            onLinkToggle={() => linking.toggleAxis('horizontal')}
+            onSideChange={linking.updateSide}
+          />
+        </div>
+      ) : null}
     </div>
   );
-}
-
-function SideFieldInputs(args: {
-  model: ReturnType<typeof createSideFieldModel>;
-  props: {
-    disabled: boolean;
-    label: string;
-    properties: PageStyleProperty[];
-    state: DesignReviewViewState;
-    onChange: DesignReviewActions['updateValue'];
-    onChangeMany?: DesignReviewActions['updateValues'];
-    onLinkedChange?: ((fieldKey: string, linked: boolean) => void) | undefined;
-  };
-  toggleTitle: string;
-}) {
-  if (args.model.linked) {
-    return (
-      <LinkedSideValue
-        disabled={args.props.disabled}
-        firstDefault={args.model.firstDefault}
-        firstValue={args.model.firstValue}
-        ariaLabel={args.props.label}
-        properties={args.props.properties}
-        title={args.toggleTitle}
-        onChangeLinked={(value) => updateLinkedSides({ ...args.props, value })}
-        onUnlink={() => args.props.onLinkedChange?.(args.model.fieldKey, false)}
-      />
-    );
-  }
-
-  return (
-    <UnlinkedSideValues
-      disabled={args.props.disabled}
-      properties={args.props.properties}
-      state={args.props.state}
-      title={args.toggleTitle}
-      onChange={args.props.onChange}
-      onLink={() => args.props.onLinkedChange?.(args.model.fieldKey, true)}
-    />
-  );
-}
-
-function createSideFieldModel(props: {
-  linked?: boolean | undefined;
-  properties: PageStyleProperty[];
-  state: DesignReviewViewState;
-}) {
-  const fieldKey = createSideFieldKey(props.properties);
-  const explicitLinkState = props.linked ?? props.state.sideFieldLinks?.[fieldKey];
-  const sideValues = props.properties.map(
-    (property) => propertyValue(props.state, property) || props.state.defaultValues[property] || ''
-  );
-  return {
-    fieldKey,
-    firstDefault: props.state.defaultValues[props.properties[0] as PageStyleProperty],
-    firstValue: propertyValue(props.state, props.properties[0] as PageStyleProperty),
-    linked: explicitLinkState ?? new Set(sideValues.map((value) => value.trim())).size <= 1,
-    modifiedCount: props.properties.filter((property) => propertyModified(props.state, property))
-      .length,
-  };
 }

@@ -1,5 +1,5 @@
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   FrameData,
   FreeFrameInput,
 } from '../../../../features/highlighter/contracts';
@@ -7,7 +7,7 @@ import { createFrameDataFromElement } from '../manager/coords';
 import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
 import { applyAddedFrameSideEffects } from './frame-post-add';
 import type { UseFrameMutationActionHelperOptions } from './types';
-import { useFrameUIStore } from '../state/frame-ui.store';
+import { requestFrameCalloutEdit, useFrameUIStore } from '../state/frame-ui.store';
 
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -20,7 +20,7 @@ type CreateAddFrameHandlerArgs = Pick<
   | 'sessionStepBadgeTemplateRef'
   | 'recalculateStepBadgesRef'
 > & {
-  calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
+  calculateFrameCoords: (element: HTMLElement, borderSettings?: AppliedBorderSettings) => FrameData;
 };
 
 export function createGenerateFrameId() {
@@ -28,7 +28,7 @@ export function createGenerateFrameId() {
 }
 
 export function createCalculateFrameCoords(generateFrameId: () => string) {
-  return (element: HTMLElement, borderSettings?: BorderPreset): FrameData =>
+  return (element: HTMLElement, borderSettings?: AppliedBorderSettings): FrameData =>
     createFrameDataFromElement(generateFrameId(), element, borderSettings);
 }
 
@@ -85,6 +85,9 @@ export function createAddFrameHandler({
       ...accepted.rect,
       pagePlacement: accepted.pagePlacement,
     };
+    if (acceptedFrameData.callout?.enabled) {
+      requestFrameCalloutEdit(acceptedFrameData.id);
+    }
     setFrames((prev) => [...prev, acceptedFrameData]);
     applyAddedFrameSideEffects({
       frameData: acceptedFrameData,
@@ -110,6 +113,9 @@ export function createAddFreeFrameHandler(
       generateFrameId: args.generateFrameId,
       input,
     });
+    if (frameData.callout?.enabled) {
+      requestFrameCalloutEdit(frameData.id);
+    }
     args.setFrames((prev) => [...prev, frameData]);
     applyAddedFrameSideEffects({
       frameData,

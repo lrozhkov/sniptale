@@ -329,7 +329,7 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   });
 
   return (
-    <ContentToolbarGroup>
+    <ContentToolbarGroup className="sniptale-mode-selector-group">
       <div className="sniptale-mode-wrapper">
         <ModeSelectorButton
           label={buttonCopy.label}

@@ -13,7 +13,9 @@ const settingsMocks = vi.hoisted(() => ({
 
 vi.mock('../../../../composition/persistence/infrastructure/browser-storage', () => ({
   browserStorage: {
+    canObserveChanges: () => false,
     subscribeToChanges: storageMocks.subscribeToChangesMock,
+    sync: { get: vi.fn(async () => ({})) },
   },
 }));
 
@@ -34,6 +36,7 @@ import {
   dispatchStepBadgeReorder,
 } from '../../../platform/page-context/frame-events';
 import { setupFrameSessionSyncListeners } from './core';
+import { createDefaultCalloutSettings } from '../../callout/model';
 
 const DEFAULT_SETTINGS: HighlighterSettings = {
   borderPresets: [
@@ -63,6 +66,11 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
 };
 
 function createFramesStore() {
+  const callout = createDefaultCalloutSettings();
+  callout.content.bodyHtml = 'old';
+  callout.placement = { anchor: 'top-left', side: 'top' };
+  callout.style.typography.maxWidth = 240;
+  callout.style.connector.wedgeSize = 12;
   let frames: FrameData[] = [
     {
       height: 120,
@@ -70,20 +78,7 @@ function createFramesStore() {
       width: 200,
       x: 10,
       y: 20,
-      callout: {
-        anchor: 'top-left',
-        bgColor: '#111111',
-        enabled: true,
-        fontFamily: 'sans',
-        fontSize: 14,
-        fontWeight: 'normal',
-        htmlContent: 'old',
-        maxWidth: 240,
-        side: 'top',
-        tailSize: 12,
-        textColor: '#ffffff',
-        variant: 'bubble',
-      },
+      callout,
       stepBadge: { enabled: true, value: '1' },
     } as FrameData,
   ];
@@ -105,11 +100,11 @@ function dispatchFrameSessionEvents() {
   dispatchStepBadgeReorder({ direction: 'down', frameId: 'frame-1' });
   dispatchFrameCalloutChanged({
     frameId: 'frame-1',
-    settings: { htmlContent: 'next' },
+    settings: { content: { bodyHtml: 'next' } },
   });
   dispatchCalloutPopoverSettingsChanged({
     frameId: 'frame-1',
-    settings: { variant: 'text-only' },
+    settings: { style: { surface: { backgroundColor: 'transparent' } } },
   });
   dispatchCalloutDelete({ frameId: 'frame-1' });
   dispatchFocusOpacityChanged({ frameId: 'frame-1', opacity: 0.7 });
@@ -157,19 +152,11 @@ it('syncs frame and callout events through the shared frame-event seam', async (
   expect(updateFrameStepBadge).toHaveBeenCalledWith('frame-1', { value: '2' });
   expect(reorderStepBadge).toHaveBeenCalledWith('frame-1', 'down');
   expect(syncFocusOpacity).toHaveBeenCalledWith('frame-1', 0.7);
-  expect(framesStore.getFrames()[0]?.callout).toEqual({
-    anchor: 'top-left',
-    bgColor: '#111111',
+  expect(framesStore.getFrames()[0]?.callout).toMatchObject({
+    content: { bodyHtml: 'next' },
     enabled: false,
-    fontFamily: 'sans',
-    fontSize: 14,
-    fontWeight: 'normal',
-    htmlContent: 'next',
-    maxWidth: 240,
-    side: 'top',
-    tailSize: 12,
-    textColor: '#ffffff',
-    variant: 'text-only',
+    placement: { anchor: 'top-left', side: 'top' },
+    style: { surface: { backgroundColor: 'transparent' } },
   });
 
   cleanup();

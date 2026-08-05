@@ -53,7 +53,7 @@ it('renders frame modes through the compact select field', async () => {
   expect(
     container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
   ).not.toBeNull();
-  expect(container?.querySelector('button')?.getAttribute('title')).toBe('Fit image');
+  expect(container?.querySelector('button')?.getAttribute('title')).toBeNull();
 
   await act(async () => {
     container?.querySelector('button')?.click();
@@ -86,7 +86,7 @@ it('keeps long three-option mode labels in the same select shell', async () => {
   expect(
     container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
   ).not.toBeNull();
-  expect(container?.querySelector('button')?.getAttribute('title')).toBe('Custom');
+  expect(container?.querySelector('button')?.getAttribute('title')).toBeNull();
 });
 
 it('falls back to an empty compact select label for unlabeled legacy callers', async () => {

@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BorderPreset, HighlighterSettings } from '../../../../features/highlighter/contracts';
+import type {
+  AppliedBorderSettings,
+  BorderPreset,
+  HighlighterSettings,
+} from '../../../../features/highlighter/contracts';
+import { cloneBorderVisualStyle } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const persistenceMocks = vi.hoisted(() => ({
   addBorderPresetWithOutcome: vi.fn(),
@@ -54,6 +59,23 @@ const SECOND_PRESET: BorderPreset = {
   id: 'preset-2',
   name: 'Second preset',
   order: 1,
+};
+
+const MANUAL_STYLE: AppliedBorderSettings = {
+  width: 7,
+  color: '#2563eb',
+  style: 'dashed',
+  radius: 9,
+  padding: { top: 1, right: 2, bottom: 3, left: 4 },
+  shadow: 20,
+  opacity: 90,
+  customCss: 'outline-offset: 2px;',
+  fillColor: '#eff6ff',
+  fillOpacity: 30,
+  inheritCustomCss: true,
+  strokeOpacity: 80,
+  sourcePresetId: PRESET.id,
+  sourcePresetName: PRESET.name,
 };
 
 const SETTINGS: HighlighterSettings = {
@@ -223,6 +245,151 @@ describe('frame style catalog visibility', () => {
     });
 
     expect(reconcileCatalogSettings.mock.calls).toEqual([[firstSettings], [secondSettings]]);
+  });
+});
+
+describe('frame style catalog manual saves', () => {
+  it('creates a user preset from visual fields and returns its canonical persisted form', async () => {
+    let submitted: BorderPreset | undefined;
+    persistenceMocks.addBorderPresetWithOutcome.mockImplementation(async (preset) => {
+      submitted = preset;
+      return 'applied';
+    });
+    persistenceMocks.loadHighlighterSettings.mockImplementation(async () => ({
+      ...SETTINGS,
+      borderPresets: [PRESET, submitted as BorderPreset],
+    }));
+    renderHarness();
+
+    let result: BorderPreset | null | undefined;
+    await act(async () => {
+      result = await latest?.manual.save({ name: '  Manual blue  ', style: MANUAL_STYLE });
+    });
+
+    expect(submitted).toMatchObject({
+      id: expect.any(String),
+      name: 'Manual blue',
+      origin: 'user',
+      enabled: true,
+      order: 0,
+      width: MANUAL_STYLE.width,
+      padding: MANUAL_STYLE.padding,
+    });
+    expect(submitted).not.toHaveProperty('sourcePresetId');
+    expect(submitted).not.toHaveProperty('sourcePresetName');
+    expect(result).toEqual(submitted);
+    expect(reconcileCatalogSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ borderPresets: [PRESET, submitted] }),
+      submitted?.id
+    );
+    expect(latest?.manual.isSaving).toBe(false);
+  });
+
+  it('updates only visual fields while preserving system preset identity', async () => {
+    const systemPreset: BorderPreset = {
+      ...PRESET,
+      customized: false,
+      id: 'system-preset',
+      name: 'System preset',
+      origin: 'system',
+      systemPresetKey: 'system-default',
+    };
+    const canonical = {
+      ...systemPreset,
+      ...cloneBorderVisualStyle(MANUAL_STYLE),
+      customized: true,
+    };
+    const canonicalSettings = {
+      ...SETTINGS,
+      borderPresets: [canonical],
+      defaultBorderPresetId: canonical.id,
+    };
+    persistenceMocks.updateBorderPresetWithOutcome.mockResolvedValue('applied');
+    persistenceMocks.loadHighlighterSettings.mockResolvedValue(canonicalSettings);
+    renderHarness();
+
+    let result: BorderPreset | null | undefined;
+    await act(async () => {
+      result = await latest?.manual.save({ overwrite: systemPreset, style: MANUAL_STYLE });
+    });
+
+    const persisted = persistenceMocks.updateBorderPresetWithOutcome.mock.calls[0]?.[0];
+    expect(persisted).toMatchObject({
+      id: systemPreset.id,
+      name: systemPreset.name,
+      origin: 'system',
+      systemPresetKey: systemPreset.systemPresetKey,
+      width: MANUAL_STYLE.width,
+    });
+    expect(persisted).not.toHaveProperty('sourcePresetId');
+    expect(persisted).not.toHaveProperty('sourcePresetName');
+    expect(result).toEqual(canonical);
+    expect(reconcileCatalogSettings).toHaveBeenCalledWith(canonicalSettings, canonical.id);
+  });
+
+  it('ignores duplicate manual submissions while the first mutation is pending', async () => {
+    const deferred = createDeferred<'applied'>();
+    const canonical = { ...PRESET, width: MANUAL_STYLE.width };
+    persistenceMocks.updateBorderPresetWithOutcome.mockReturnValue(deferred.promise);
+    persistenceMocks.loadHighlighterSettings.mockResolvedValue({
+      ...SETTINGS,
+      borderPresets: [canonical],
+    });
+    renderHarness();
+
+    let firstSave: Promise<BorderPreset | null> | undefined;
+    let duplicateResult: BorderPreset | null | undefined;
+    act(() => {
+      firstSave = latest?.manual.save({ overwrite: PRESET, style: MANUAL_STYLE });
+    });
+    await act(async () => {
+      duplicateResult = await latest?.manual.save({ overwrite: PRESET, style: MANUAL_STYLE });
+    });
+    expect(duplicateResult).toBeNull();
+    expect(persistenceMocks.updateBorderPresetWithOutcome).toHaveBeenCalledOnce();
+    expect(latest?.manual.isSaving).toBe(true);
+
+    await act(async () => {
+      deferred.resolve('applied');
+      await firstSave;
+    });
+    expect(latest?.manual.isSaving).toBe(false);
+  });
+
+  it('keeps stale manual completion silent after the popover session closes', async () => {
+    const deferred = createDeferred<'applied'>();
+    persistenceMocks.updateBorderPresetWithOutcome.mockReturnValue(deferred.promise);
+    renderHarness();
+
+    let staleSave: Promise<BorderPreset | null> | undefined;
+    act(() => {
+      staleSave = latest?.manual.save({ overwrite: PRESET, style: MANUAL_STYLE });
+    });
+    renderHarness(false);
+
+    await act(async () => {
+      deferred.resolve('applied');
+      await staleSave;
+    });
+
+    expect(persistenceMocks.loadHighlighterSettings).not.toHaveBeenCalled();
+    expect(reconcileCatalogSettings).not.toHaveBeenCalled();
+    expect(feedbackMocks.error).not.toHaveBeenCalled();
+    expect(latest?.manual.isSaving).toBe(false);
+  });
+
+  it('reports a rejected manual save without publishing catalog state', async () => {
+    persistenceMocks.updateBorderPresetWithOutcome.mockResolvedValue('rejected');
+    renderHarness();
+
+    let result: BorderPreset | null | undefined;
+    await act(async () => {
+      result = await latest?.manual.save({ overwrite: PRESET, style: MANUAL_STYLE });
+    });
+
+    expect(result).toBeNull();
+    expect(reconcileCatalogSettings).not.toHaveBeenCalled();
+    expect(feedbackMocks.error).toHaveBeenCalledOnce();
   });
 });
 

@@ -4,7 +4,7 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarAutoBlurProps } from '../types';
-import type { ToolbarFutureFrameStyle } from '../types';
+import type { ToolbarFutureFrameCalloutActions, ToolbarFutureFrameStyle } from '../types';
 import type { ToolbarMenuState } from '../state/menu';
 import { AutoBlurMenu } from './auto-blur-menu';
 import { FutureFrameStyleControls } from './frame-style';
@@ -48,6 +48,8 @@ export function ToolbarUtilityButtons(props: {
   sidebarVisible: boolean;
   futureFrameStyle?: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange?: (mode: EffectMode) => void;
+  futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: import('../types').ToolbarFutureFrameStepBadgeActions;
 }) {
   const { autoBlur, highlighterMode, isLoading, framesCount, onClearHighlights } = props;
   const showClearHighlights = highlighterMode;
@@ -57,12 +59,18 @@ export function ToolbarUtilityButtons(props: {
   }
 
   return (
-    <ContentToolbarGroup utilities>
+    <ContentToolbarGroup className="sniptale-toolbar-highlighter-utilities" utilities>
       {props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
         <FutureFrameStyleControls
           compactMenus={props.compactMenus}
           futureFrameStyle={props.futureFrameStyle}
           onFutureFrameEffectModeChange={props.onFutureFrameEffectModeChange}
+          {...(props.futureFrameCalloutActions === undefined
+            ? {}
+            : { futureFrameCalloutActions: props.futureFrameCalloutActions })}
+          {...(props.futureFrameStepBadgeActions === undefined
+            ? {}
+            : { futureFrameStepBadgeActions: props.futureFrameStepBadgeActions })}
           toolbarMenuState={props.toolbarMenuState}
         />
       ) : null}

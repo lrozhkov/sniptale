@@ -103,6 +103,7 @@ describe('utils color parsing', () => {
     expect(fontFamilyToCss('serif')).toContain('Georgia');
     expect(fontFamilyToCss('mono')).toContain('ui-monospace');
     expect(fontFamilyToCss('sans')).toContain('system-ui');
+    expect(fontFamilyToCss('cursive')).toContain('cursive');
   });
 });
 

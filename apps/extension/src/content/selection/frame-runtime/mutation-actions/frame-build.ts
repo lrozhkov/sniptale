@@ -1,6 +1,6 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FocusSettings,
   FrameData,
@@ -10,6 +10,8 @@ import type {
 import { createCompositeSelector } from '../../../platform/frame/selectors';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
+import { getFutureFrameCallout } from '../session/future-callout';
+import { cloneStepBadgeSettings } from '../session/step-badge-defaults';
 
 type BuildFrameForAddArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -19,7 +21,7 @@ type BuildFrameForAddArgs = Pick<
   | 'sessionFocusSettingsRef'
   | 'sessionStepBadgeTemplateRef'
 > & {
-  calculateFrameCoords: (element: HTMLElement, borderSettings?: BorderPreset) => FrameData;
+  calculateFrameCoords: (element: HTMLElement, borderSettings?: AppliedBorderSettings) => FrameData;
   element: HTMLElement;
 };
 
@@ -75,18 +77,20 @@ function resolveFrameBuildSettings(
     effectMode: args.globalEffectModeRef.current,
     template: args.sessionStepBadgeTemplateRef.current,
     isAutoMode: args.globalStepBadgeAutoModeRef.current,
+    callout: getFutureFrameCallout(),
   };
 }
 
 function applyFrameBuildSettings(
   baseFrameData: FrameData,
   params: {
-    borderSettings: BorderPreset;
+    borderSettings: AppliedBorderSettings;
     blurSettings: BlurSettings;
     focusSettings: FocusSettings;
     effectMode: EffectMode;
     template: StepBadgeSettings | null;
     isAutoMode: boolean;
+    callout: import('@sniptale/runtime-contracts/highlighter/callout').CalloutSettings | null;
   },
   linked?: { linkedElementSelector: string }
 ) {
@@ -100,6 +104,7 @@ function applyFrameBuildSettings(
     focusSettings: params.focusSettings,
     ...(linked ?? {}),
     ...(stepBadge === undefined ? {} : { stepBadge }),
+    ...(params.callout === null ? {} : { callout: structuredClone(params.callout) }),
   } satisfies FrameData;
 }
 
@@ -109,11 +114,11 @@ function buildStepBadgeSettings(template: StepBadgeSettings | null, isAutoMode: 
   }
 
   if (template.auto === false) {
-    return { ...template };
+    return cloneStepBadgeSettings(template);
   }
 
   return {
-    ...template,
+    ...cloneStepBadgeSettings(template),
     value: isAutoMode ? '' : template.value,
   };
 }

@@ -80,6 +80,7 @@ function renderFieldControlMarkup() {
   return renderToStaticMarkup(
     <>
       <NumericRow {...numericProps} />
+      <NumericRow {...numericProps} appearance="plain" label="Plain opacity" />
       <MiniScrubber {...scrubberProps} />
       <MiniScrubber {...scrubberProps} active />
       <ColorField
@@ -202,6 +203,8 @@ function assertFieldControlMarkup(markup: string) {
   expect(markup).toContain('w-[6.25rem] shrink-0');
   expect(markup).toContain('shared.ui.compact-inspector.numeric-range-scrub');
   expect(markup).toContain('shared.ui.compact-inspector.numeric-range-track');
+  expect(markup).toContain('data-appearance="plain"');
+  expect(markup).toContain('grid-cols-[7.5rem_minmax(0,1fr)]');
   expect(markup).toContain('sniptale-range sniptale-range--edge absolute');
   expect(markup).toContain('width:auto');
   expect(markup).toContain('top:calc(var(--sniptale-range-thumb-size) / -2)');

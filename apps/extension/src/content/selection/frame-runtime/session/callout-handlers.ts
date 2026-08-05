@@ -1,6 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import type { CalloutSettings, FrameData } from '../../../../features/highlighter/contracts';
-import { createDefaultCalloutSettings } from './callout-defaults';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { FrameData } from '../../../../features/highlighter/contracts';
+import { applyCalloutSettingsPatch, createCalloutStyleSnapshot } from '../../callout/model';
+import { createSessionCalloutSettings } from './callout-defaults';
 import type {
   CalloutDeleteDetail,
   FrameCalloutChangedDetail,
@@ -8,7 +10,7 @@ import type {
 
 type FrameCalloutDeps = {
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
-  sessionCalloutStyleRef: MutableRefObject<Partial<CalloutSettings> | null>;
+  sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
 };
 
 export function createFrameCalloutChangedHandler({
@@ -22,17 +24,18 @@ export function createFrameCalloutChangedHandler({
           return frame;
         }
         if (settings.enabled === true && !frame.callout) {
-          const newCallout = createDefaultCalloutSettings(
-            sessionCalloutStyleRef.current ?? undefined
-          );
-          sessionCalloutStyleRef.current = newCallout;
+          const newCallout = createSessionCalloutSettings(sessionCalloutStyleRef.current);
+          sessionCalloutStyleRef.current = createCalloutStyleSnapshot(newCallout);
           return { ...frame, callout: newCallout };
         }
         if (frame.callout && settings.enabled !== false) {
-          return { ...frame, callout: { ...frame.callout, ...settings } };
+          return { ...frame, callout: applyCalloutSettingsPatch(frame.callout, settings) };
         }
         if (settings.enabled === false && frame.callout) {
-          return { ...frame, callout: { ...frame.callout, enabled: false } };
+          return {
+            ...frame,
+            callout: applyCalloutSettingsPatch(frame.callout, { enabled: false }),
+          };
         }
         return frame;
       })
@@ -50,12 +53,9 @@ export function createCalloutPopoverSettingsHandler({
         if (frame.id !== frameId || !frame.callout) {
           return frame;
         }
-        sessionCalloutStyleRef.current = {
-          ...sessionCalloutStyleRef.current,
-          ...frame.callout,
-          ...settings,
-        };
-        return { ...frame, callout: { ...frame.callout, ...settings } };
+        const nextCallout = applyCalloutSettingsPatch(frame.callout, settings);
+        sessionCalloutStyleRef.current = createCalloutStyleSnapshot(nextCallout);
+        return { ...frame, callout: nextCallout };
       })
     );
   };
@@ -68,7 +68,10 @@ export function createCalloutDeleteHandler(setFrames: Dispatch<SetStateAction<Fr
         if (frame.id !== frameId || !frame.callout) {
           return frame;
         }
-        return { ...frame, callout: { ...frame.callout, enabled: false } };
+        return {
+          ...frame,
+          callout: applyCalloutSettingsPatch(frame.callout, { enabled: false }),
+        };
       })
     );
   };

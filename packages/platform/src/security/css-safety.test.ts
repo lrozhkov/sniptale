@@ -18,6 +18,19 @@ describe('containsCssFunction', () => {
 });
 
 describe('containsUnsafeCssSyntax', () => {
+  it.each([
+    'background-image: src("https://attacker.example/pixel");',
+    'background-image: image("https://attacker.example/pixel");',
+    'background-image: s\\72 c("https://attacker.example/pixel");',
+    'background-image: im/**/age("https://attacker.example/pixel");',
+    'background-image: image-set("https://attacker.example/pixel" 1x);',
+    'background-image: -webkit-image-set("https://attacker.example/pixel" 1x);',
+    'background-image: var(--page-image);',
+    'background-image: v\\61r(--page-image);',
+  ])('rejects indirect resource-bearing syntax: %s', (css) => {
+    expect(containsUnsafeCssSyntax(css)).toBe(true);
+  });
+
   it.each(['\n', '\r', '\r\n', '\f'])(
     'resumes scanning after a bad CSS string terminated by %j',
     (lineBreak) => {

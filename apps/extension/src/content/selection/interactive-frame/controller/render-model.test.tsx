@@ -67,6 +67,7 @@ vi.mock('./editing', () => ({
 }));
 
 vi.mock('../../frame-runtime/state/frame-ui.store', () => ({
+  consumeFrameCalloutEditRequest: vi.fn(() => false),
   useFrameUIStore: (selector: (state: typeof renderModelMocks.storeState) => unknown) =>
     selector(renderModelMocks.storeState),
 }));

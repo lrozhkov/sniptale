@@ -8,6 +8,7 @@ import { MIN_FRAME_SIZE } from '../layout/portal';
 const FRAME_SIZE_STEP = 5;
 
 export interface ToolbarClickEvent {
+  currentTarget?: EventTarget & Element;
   nativeEvent: { stopImmediatePropagation(): void };
   preventDefault(): void;
   stopPropagation(): void;
@@ -54,6 +55,9 @@ export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarP
     handleEffectClick:
       (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
         stopToolbarEvent(event);
+        if (event.currentTarget instanceof HTMLButtonElement) {
+          props.popoverAnchorRef.current = event.currentTarget;
+        }
         props.handleEffectButtonClick(mode);
       },
     handleEditClick: (event: ToolbarClickEvent) => {

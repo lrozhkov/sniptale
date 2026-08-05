@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import type {
+  AppliedBorderSettings,
   BlurSettings,
-  BorderPreset,
   EffectMode,
   FrameData,
   FocusSettings,
@@ -9,6 +9,7 @@ import type {
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
 import type { FrameMutations, RecalculateStepBadges } from '../contracts';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 
 interface FrameManagerPublicResultParams {
   addAutoBlurFrames: FrameMutations['addAutoBlurFrames'];
@@ -19,15 +20,27 @@ interface FrameManagerPublicResultParams {
   frames: FrameData[];
   getFutureFrameStyle: () => {
     blurSettings: BlurSettings;
-    borderSettings: BorderPreset;
+    borderSettings: AppliedBorderSettings;
     effectMode: EffectMode;
     focusSettings: FocusSettings;
+    futureCallout?: CalloutSettings | null;
+    futureStepBadge?: StepBadgeSettings | null;
   };
   getGlobalStepBadgeSettings: () => GlobalStepBadgeSettings;
   hasFrameForElement: (element: HTMLElement) => boolean;
   recalculateStepBadges: RecalculateStepBadges;
   removeFrame: FrameMutations['removeFrame'];
   setFutureFrameEffectMode: (mode: EffectMode) => void;
+  futureFrameAnnotations?: {
+    callout: {
+      enable: () => CalloutSettings;
+      set: (settings: CalloutSettings | null) => void;
+    };
+    stepBadge: {
+      enable: () => StepBadgeSettings;
+      set: (settings: StepBadgeSettings | null) => void;
+    };
+  };
   syncAutoBlurFrames: FrameMutations['syncAutoBlurFrames'];
   syncFocusOpacity: FrameMutations['syncFocusOpacity'];
   updateFrame: FrameMutations['updateFrame'];
@@ -68,6 +81,7 @@ function arePublicResultParamsEqual(
     prev.recalculateStepBadges === next.recalculateStepBadges &&
     prev.removeFrame === next.removeFrame &&
     prev.setFutureFrameEffectMode === next.setFutureFrameEffectMode &&
+    prev.futureFrameAnnotations === next.futureFrameAnnotations &&
     prev.syncFocusOpacity === next.syncFocusOpacity &&
     prev.syncAutoBlurFrames === next.syncAutoBlurFrames &&
     prev.updateFrame === next.updateFrame &&
@@ -87,6 +101,12 @@ function buildFrameManagerResult(params: FrameManagerPublicResultParams) {
     clearAutoBlurFrames: params.clearAutoBlurFrames,
     removeFrame: params.removeFrame,
     setFutureFrameEffectMode: params.setFutureFrameEffectMode,
+    ...(params.futureFrameAnnotations === undefined
+      ? {}
+      : {
+          futureFrameCallout: params.futureFrameAnnotations.callout,
+          futureFrameStepBadge: params.futureFrameAnnotations.stepBadge,
+        }),
     clearFrames: params.clearFrames,
     syncAutoBlurFrames: params.syncAutoBlurFrames,
     updateFrame: params.updateFrame,

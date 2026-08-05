@@ -45,27 +45,6 @@ export function sanitizeHtmlFragment(
   return typeof cleanHtml === 'string' ? cleanHtml : '';
 }
 
-export function sanitizeHtmlContainer(
-  html: string,
-  options: HtmlSanitizerOptions = {},
-  purifier: HtmlPurifier = DOMPurify
-): Element | null {
-  if (!html) {
-    return null;
-  }
-
-  const cleanNode = sanitizeWithPurifier(
-    html,
-    {
-      ...buildPurifierConfig(options),
-      RETURN_DOM: true,
-    },
-    purifier
-  );
-
-  return cleanNode instanceof Element ? cleanNode : null;
-}
-
 /**
  * Canonical shared sink for replacing element HTML with a sanitized fragment.
  */

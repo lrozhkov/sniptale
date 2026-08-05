@@ -10,7 +10,7 @@ vi.mock('../controls/secondary', () => ({
   ToolbarSecondaryControls: () => <div data-testid="toolbar-secondary" />,
 }));
 
-function renderToolbarShell(positionReady: boolean) {
+function renderToolbarShell(positionReady: boolean, activeMenuType: string | null = null) {
   return renderToStaticMarkup(
     <ToolbarShellContent
       toolbarProps={{} as never}
@@ -24,6 +24,7 @@ function renderToolbarShell(positionReady: boolean) {
             positionReady,
             handleMouseDown: vi.fn(),
           },
+          toolbarMenuState: { activeMenuType },
         } as never
       }
       onHoverCapture={vi.fn()}
@@ -48,5 +49,12 @@ describe('ToolbarShellContent', () => {
     expect(markup).toContain('left:24px');
     expect(markup).toContain('visibility:visible');
     expect(markup).toContain('pointer-events:auto');
+  });
+
+  it('owns a viewport interaction guard while a main-toolbar menu is open', () => {
+    const markup = renderToolbarShell(true, 'frame-style');
+
+    expect(markup).toContain('sniptale-toolbar-menu-interaction-guard');
+    expect(markup).toContain('data-menu-open="true"');
   });
 });

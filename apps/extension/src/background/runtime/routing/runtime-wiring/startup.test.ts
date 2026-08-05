@@ -1,11 +1,25 @@
 import { expect, it, vi } from 'vitest';
 
 const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
+const migrateStepBadgeSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
   migrateHighlighterSystemPresetCatalog,
+}));
+
+vi.mock('../../../../composition/persistence/callout-presets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/callout-presets')>()),
+  migrateCalloutSystemPresetCatalog,
+}));
+
+vi.mock('../../../../composition/persistence/step-badge-presets', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/step-badge-presets')
+  >()),
+  migrateStepBadgeSystemPresetCatalog,
 }));
 
 vi.mock('../../page-access/service', async (importOriginal) => ({
@@ -46,6 +60,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   recoverVideoCaptureSurfaceOnStartup.mockRejectedValue(new Error('surface recovery failed'));
   reconcileCaptureJobsOnStartup.mockRejectedValue(new Error('capture reconcile failed'));
   initializeAiStorageAccess.mockRejectedValue(new Error('ai init failed'));
+  migrateStepBadgeSystemPresetCatalog.mockRejectedValue(new Error('step badge migration failed'));
 
   runStartupMaintenance(state, logger);
   await flushMicrotasks();
@@ -59,6 +74,8 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   });
   expect(initializeAiStorageAccess).toHaveBeenCalledOnce();
   expect(migrateHighlighterSystemPresetCatalog).toHaveBeenCalledOnce();
+  expect(migrateCalloutSystemPresetCatalog).toHaveBeenCalledOnce();
+  expect(migrateStepBadgeSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
   expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledWith(ensureActivePageAccessRuntime);
   expect(logger.warn).toHaveBeenCalledWith(
@@ -80,6 +97,10 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   );
   expect(logger.warn).toHaveBeenCalledWith(
     'AI storage initialization failed (non-critical)',
+    expect.any(Error)
+  );
+  expect(logger.warn).toHaveBeenCalledWith(
+    'Step badge preset catalog migration failed (non-critical)',
     expect.any(Error)
   );
   expect(logger.warn).toHaveBeenCalledWith(

@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   FocusSettings,
   HighlighterSettings,
@@ -12,9 +12,11 @@ import type {
 import type { StepBadgeSettings } from '../../../../features/highlighter/contracts';
 import { createFrameDataFixture } from '../react/test-support';
 import { createAddFrameHandler, createAddFreeFrameHandler } from './frame-factory';
-import { useFrameUIStore } from '../state/frame-ui.store';
+import { consumeFrameCalloutEditRequest, useFrameUIStore } from '../state/frame-ui.store';
 import { setFrameSessionBorderPreset } from '../session/border-preset';
 import { createFrameHostLayoutService } from '../host-layout/service';
+import { createDefaultCalloutSettings } from '../../callout/model';
+import { setFutureFrameCallout } from '../session/future-callout';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
@@ -111,7 +113,7 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
       },
       highlighterSettingsCacheRef: { current: highlighterSettings },
       recalculateStepBadgesRef,
-      calculateFrameCoords: (_element: HTMLElement, borderSettings?: BorderPreset) =>
+      calculateFrameCoords: (_element: HTMLElement, borderSettings?: AppliedBorderSettings) =>
         createFrameDataFixture('frame-1', {
           ...(borderSettings === undefined ? {} : { borderSettings }),
           pagePlacement: { iframePath: [], pageX: 10, pageY: 20 },
@@ -126,6 +128,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   document.body.replaceChildren();
   useFrameUIStore.getState().reset();
+  setFutureFrameCallout(null);
 });
 
 function createVisibleElement(tagName = 'button') {
@@ -158,8 +161,8 @@ function verifyAddFrameUsesSessionDefaultsAndBadgeAutoMode() {
     blurSettings: createBlurSettings(),
     focusSettings: createFocusSettings(),
     borderSettings: expect.objectContaining({
-      id: 'preset-1',
-      name: 'Orange',
+      sourcePresetId: 'preset-1',
+      sourcePresetName: 'Orange',
     }),
     stepBadge: expect.objectContaining({
       enabled: true,
@@ -236,6 +239,18 @@ describe('frame mutation action frame factory', () => {
       hoveredFrameId: null,
       selectedFrameId: 'free-frame',
     });
+  });
+
+  it('copies the enabled session comment into a new frame and requests immediate editing', () => {
+    const { options } = createOptions();
+    const settings = createDefaultCalloutSettings();
+    setFutureFrameCallout(settings);
+    const frame = createAddFrameHandler(options)(createVisibleElement());
+
+    expect(frame?.callout).toEqual(settings);
+    expect(frame?.callout).not.toBe(settings);
+    expect(consumeFrameCalloutEditRequest('frame-1')).toBe(true);
+    expect(consumeFrameCalloutEditRequest('frame-1')).toBe(false);
   });
 
   it.each([

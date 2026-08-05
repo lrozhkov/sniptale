@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical, Settings2 } from 'lucide-react';
+import { Move, Settings2 } from 'lucide-react';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../../platform/i18n';
 import {
@@ -23,8 +23,8 @@ export function useStepBadgeControlPosition(args: {
       const rect = args.badgeRef.current?.getBoundingClientRect();
       if (!rect) return;
       setPosition({
-        x: Math.max(8, Math.min(window.innerWidth - 52, rect.right - 10)),
-        y: Math.max(8, Math.min(window.innerHeight - 20, rect.top - 10)),
+        x: Math.max(8, Math.min(window.innerWidth - 64, rect.right + 6)),
+        y: Math.max(8, Math.min(window.innerHeight - 34, rect.top - 30)),
       });
     };
     refresh();
@@ -49,17 +49,18 @@ export function StepBadgeControls(props: {
   const portalTheme = useContentPortalTheme();
   if (!props.position) return null;
   const buttonStyle: React.CSSProperties = {
-    width: 20,
-    height: 20,
+    width: 26,
+    height: 26,
     padding: 0,
     borderRadius: '50%',
     border: '1px solid var(--sniptale-color-border-soft)',
     background: 'var(--sniptale-color-surface-panel)',
-    color: 'var(--sniptale-color-text-secondary)',
+    color: 'var(--sniptale-color-text-primary)',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+    transition: 'opacity 120ms ease, color 120ms ease, border-color 120ms ease',
   };
 
   return createPortal(
@@ -91,7 +92,7 @@ export function StepBadgeControls(props: {
         onFocus={props.visibility.handleFocus}
         onBlur={props.visibility.handleBlur}
       >
-        <GripVertical size={13} aria-hidden="true" />
+        <Move size={14} aria-hidden="true" style={{ display: 'block' }} />
       </button>
       {props.showSettingsHandle ? (
         <button
@@ -115,7 +116,7 @@ export function StepBadgeControls(props: {
           onFocus={props.visibility.handleFocus}
           onBlur={props.visibility.handleBlur}
         >
-          <Settings2 size={13} aria-hidden="true" />
+          <Settings2 size={15} aria-hidden="true" />
         </button>
       ) : null}
     </div>,

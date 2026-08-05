@@ -22,6 +22,7 @@ import {
   createFrameFocusHandlers,
   createFrameSettingsPresetHandler,
 } from './helpers';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const PRESET: BorderPreset = {
   color: '#ff00ff',
@@ -45,12 +46,12 @@ it('keeps the selected preset in the current tab without saving the global defau
   setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
   const handler = createFrameSettingsPresetHandler({
     onApplyToFrame: vi.fn(),
-    setSelectedPresetId: vi.fn(),
+    setSelectedPreset: vi.fn(),
   });
 
   handler(PRESET);
 
-  expect(getFrameSessionBorderPreset()).toEqual(PRESET);
+  expect(getFrameSessionBorderPreset()).toEqual(projectBorderPresetToAppliedSettings(PRESET));
   expect(getFrameSessionBorderPreset()).not.toBe(PRESET);
 });
 

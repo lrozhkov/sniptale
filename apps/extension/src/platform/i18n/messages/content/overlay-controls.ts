@@ -9,6 +9,22 @@ import {
 } from '../shared/blur-controls';
 
 export const contentOverlayControlsMessages = defineMessageSource({
+  frameStyleModePreset: { ru: 'Шаблоны', en: 'Templates' },
+  frameStyleModeManual: { ru: 'Вручную', en: 'Manual' },
+  frameStyleSwitchToManual: { ru: 'Настроить вручную', en: 'Customize manually' },
+  frameStyleSwitchToPresets: { ru: 'Выбрать шаблон', en: 'Choose template' },
+  frameStyleManualNavigation: {
+    ru: 'Ручная настройка рамки',
+    en: 'Manual frame style settings',
+  },
+  frameStyleSaveNew: { ru: 'Новый пресет', en: 'New preset' },
+  frameStylePresetName: { ru: 'Название пресета', en: 'Preset name' },
+  frameStyleCreate: { ru: 'Создать', en: 'Create' },
+  frameStyleOverwrite: { ru: 'Перезаписать пресет', en: 'Overwrite preset' },
+  frameStyleSelectPreset: { ru: 'Выберите пресет', en: 'Select a preset' },
+  frameStyleOverwriteAction: { ru: 'Перезаписать', en: 'Overwrite' },
+  frameStyleCreated: { ru: 'Пресет создан', en: 'Preset created' },
+  frameStyleOverwritten: { ru: 'Пресет обновлён', en: 'Preset updated' },
   frameStyleLabel: {
     ru: 'Рамка и заливка',
     en: 'Frame and fill',

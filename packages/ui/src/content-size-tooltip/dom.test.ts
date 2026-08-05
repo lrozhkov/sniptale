@@ -124,6 +124,8 @@ function registerFrameEditVariantTest() {
     expect(tooltip.confirmButton.querySelector('svg')).not.toBeNull();
     expect(tooltip.cancelButton.style.getPropertyValue('width')).toBe('32px');
     expect(tooltip.confirmButton.style.getPropertyValue('width')).toBe('32px');
+    expect(tooltip.cancelButton.nextElementSibling).toBe(tooltip.confirmButton);
+    expect(tooltip.cancelButton.previousElementSibling).toBeNull();
   });
 }
 

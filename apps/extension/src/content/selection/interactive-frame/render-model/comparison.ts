@@ -1,4 +1,5 @@
 import type { InteractiveFrameProps } from './types';
+import { createCalloutRenderKey } from '../../callout/model';
 
 function hasMeaningfulRectChange(
   prevProps: InteractiveFrameProps,
@@ -22,7 +23,7 @@ function hasBorderSettingsChange(
   const next = nextProps.frame.borderSettings;
   return (
     prevProps.frame.borderSettings !== nextProps.frame.borderSettings &&
-    (prev?.id !== next?.id ||
+    (prev?.sourcePresetId !== next?.sourcePresetId ||
       prev?.color !== next?.color ||
       prev?.width !== next?.width ||
       prev?.style !== next?.style ||
@@ -68,6 +69,7 @@ function hasStepBadgeChange(prevProps: InteractiveFrameProps, nextProps: Interac
       prev?.manualPlacement?.position !== next?.manualPlacement?.position ||
       prev?.manualPlacement?.side !== next?.manualPlacement?.side ||
       prev?.sizeLevel !== next?.sizeLevel ||
+      JSON.stringify(prev?.style ?? null) !== JSON.stringify(next?.style ?? null) ||
       prevOff.length !== nextOff.length ||
       prevOff.some((direction: string, index: number) => direction !== nextOff[index]) ||
       prev?.type !== next?.type ||
@@ -80,23 +82,7 @@ function hasCalloutChange(prevProps: InteractiveFrameProps, nextProps: Interacti
   const next = nextProps.frame.callout;
   return (
     prevProps.frame.callout !== nextProps.frame.callout &&
-    (prev?.enabled !== next?.enabled ||
-      prev?.htmlContent !== next?.htmlContent ||
-      prev?.anchor !== next?.anchor ||
-      prev?.side !== next?.side ||
-      prev?.variant !== next?.variant ||
-      prev?.bgColor !== next?.bgColor ||
-      prev?.textColor !== next?.textColor ||
-      prev?.tailSize !== next?.tailSize ||
-      prev?.fontFamily !== next?.fontFamily ||
-      prev?.fontWeight !== next?.fontWeight ||
-      prev?.fontSize !== next?.fontSize ||
-      prev?.maxWidth !== next?.maxWidth ||
-      prev?.manualPlacement?.centerOffsetX !== next?.manualPlacement?.centerOffsetX ||
-      prev?.manualPlacement?.centerOffsetY !== next?.manualPlacement?.centerOffsetY ||
-      prev?.tailBasePosition !== next?.tailBasePosition ||
-      prev?.tailBaseWidth !== next?.tailBaseWidth ||
-      prev?.tailFramePosition !== next?.tailFramePosition)
+    createCalloutRenderKey(prev) !== createCalloutRenderKey(next)
   );
 }
 

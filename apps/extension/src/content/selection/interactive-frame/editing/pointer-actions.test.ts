@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFrameDataFixture } from '../../frame-runtime/test-support';
+import {
+  createCalloutSettingsFixture,
+  createFrameDataFixture,
+} from '../../frame-runtime/test-support';
 
 const highlighter = vi.hoisted(() => ({ pauseHighlighter: vi.fn(), resumeHighlighter: vi.fn() }));
 vi.mock('../../highlighter', () => highlighter);
@@ -138,9 +141,28 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  document.querySelectorAll('.sniptale-callout').forEach((element) => element.remove());
   useFrameUIStore.getState().reset();
   vi.unstubAllGlobals();
 });
+
+function mountCallout(
+  frameId: string,
+  rect: { left: number; top: number; width: number; height: number }
+) {
+  const callout = document.createElement('div');
+  callout.className = 'sniptale-callout';
+  callout.dataset['frameId'] = frameId;
+  callout.getBoundingClientRect = vi.fn(() => ({
+    ...rect,
+    bottom: rect.top + rect.height,
+    right: rect.left + rect.width,
+    x: rect.left,
+    y: rect.top,
+    toJSON: () => ({}),
+  }));
+  document.body.appendChild(callout);
+}
 
 function flushRaf(id = 1) {
   const callback = rafCallbacks.get(id);
@@ -149,6 +171,46 @@ function flushRaf(id = 1) {
 }
 
 describe('transient frame resize', () => {
+  it('keeps the linked callout and its manual connector waypoint fixed while resizing', () => {
+    const callout = createCalloutSettingsFixture();
+    callout.placement = {
+      ...callout.placement,
+      manualPlacement: { centerOffsetX: 130, centerOffsetY: -10 },
+      connectorAttachments: {
+        ...callout.placement.connectorAttachments!,
+        frame: { mode: 'free', perimeterPosition: 50 / 360 },
+      },
+      connectorFramePosition: 50 / 360,
+      connectorWaypoint: { centerOffsetX: 30, centerOffsetY: -20 },
+    };
+    callout.style.connector.kind = 'line';
+    const fixture = createFixture({ callout });
+    mountCallout(fixture.frame.id, { left: 160, top: 20, width: 80, height: 60 });
+    fixture.start(reactPointer(100, 100), 'e');
+
+    createInteractiveFramePointerMoveHandler(fixture.listenerConfig)(domPointer(140, 100));
+    flushRaf();
+
+    const resized = fixture.refs.tempFrameRef.current;
+    const resizedCenter = {
+      x: resized.x + resized.width / 2,
+      y: resized.y + resized.height / 2,
+    };
+    expect(resized.callout?.placement.manualPlacement).toEqual({
+      centerOffsetX: 200 - resizedCenter.x,
+      centerOffsetY: 50 - resizedCenter.y,
+    });
+    expect(resized.callout?.placement.connectorWaypoint).toEqual({
+      centerOffsetX: 100 - resizedCenter.x,
+      centerOffsetY: 50 - resizedCenter.y,
+    });
+    expect(resized.callout?.placement.connectorFramePosition).toBeCloseTo(50 / 440);
+    expect(resized.callout?.placement.connectorAttachments?.frame.perimeterPosition).toBeCloseTo(
+      50 / 440
+    );
+    expect(resized.callout?.style).toEqual(callout.style);
+  });
+
   it.each([
     ['n', { x: 20, y: 40, width: 100, height: 70 }],
     ['ne', { x: 20, y: 40, width: 115, height: 70 }],

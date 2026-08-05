@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   FocusSettings,
   HighlighterSettings,
@@ -78,10 +78,9 @@ function createBuildArgs() {
   setFrameSessionBorderPreset(createHighlighterSettings().borderPresets[0]!);
   const element = document.createElement('button');
   document.body.append(element);
-  const borderSettings: BorderPreset = {
-    id: 'coords-border',
-    name: 'Coords',
-    order: 1,
+  const borderSettings: AppliedBorderSettings = {
+    sourcePresetId: 'coords-border',
+    sourcePresetName: 'Coords',
     width: 2,
     color: '#123456',
     style: 'solid',
@@ -102,7 +101,7 @@ function createBuildArgs() {
   };
 
   return {
-    calculateFrameCoords: (_element: HTMLElement, nextBorder?: BorderPreset) =>
+    calculateFrameCoords: (_element: HTMLElement, nextBorder?: AppliedBorderSettings) =>
       createFrameDataFixture('frame-1', {
         borderSettings: nextBorder ?? borderSettings,
         width: 100,
@@ -125,8 +124,8 @@ function expectBuildFrameUsesSessionDefaultsAndAutoBadgeMode() {
     blurSettings: createBlurSettings(),
     focusSettings: createFocusSettings(),
     borderSettings: expect.objectContaining({
-      id: 'preset-1',
-      name: 'Orange',
+      sourcePresetId: 'preset-1',
+      sourcePresetName: 'Orange',
     }),
     stepBadge: expect.objectContaining({
       enabled: true,
@@ -185,7 +184,7 @@ describe('frame-mutation-actions-frame-build', () => {
       height: 90,
       pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
       effectMode: 'border',
-      borderSettings: { id: 'preset-1' },
+      borderSettings: { sourcePresetId: 'preset-1' },
     });
     expect(frame.linkedElementSelector).toBeUndefined();
     expect(frame.offset).toBeUndefined();

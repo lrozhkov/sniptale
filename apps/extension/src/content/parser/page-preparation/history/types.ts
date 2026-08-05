@@ -1,13 +1,14 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
   BorderPreset,
-  CalloutSettings,
   EffectMode,
   FocusSettings,
   FrameData,
   GlobalStepBadgeSettings,
   StepBadgeSettings,
 } from '../../../../features/highlighter/contracts';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { BrowserAnnotationSessionSnapshot } from '../annotations';
 
 export type PagePreparationDomElement = HTMLElement | SVGElement;
@@ -16,7 +17,7 @@ export interface SerializableFrameData extends Omit<
   FrameData,
   'borderSettings' | 'blurSettings' | 'focusSettings'
 > {
-  borderSettings?: BorderPreset;
+  borderSettings?: AppliedBorderSettings | BorderPreset;
   blurSettings?: BlurSettings;
   focusSettings?: FocusSettings;
 }
@@ -25,9 +26,9 @@ export interface FrameSessionSnapshot {
   frames: SerializableFrameData[];
   globalEffectMode: EffectMode;
   globalStepBadgeSettings: GlobalStepBadgeSettings;
-  sessionBorderPreset: BorderPreset;
+  sessionBorderPreset: AppliedBorderSettings | BorderPreset;
   sessionBlurSettings: BlurSettings;
-  sessionCalloutStyle: Partial<CalloutSettings> | null;
+  sessionCalloutStyle: CalloutVisualStyle | null;
   sessionFocusSettings: FocusSettings;
   sessionStepBadgeTemplate: StepBadgeSettings | null;
   stepBadgeOrder: Array<[string, number]>;

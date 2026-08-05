@@ -11,6 +11,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -187,7 +188,11 @@ describe('frame settings popover state lifecycle', () => {
       blurType: 'pixelate',
       showBorder: false,
     };
-    const borderSettings = { id: 'frame-border' } as BorderPreset;
+    const borderSettings: BorderPreset = {
+      ...DEFAULT_BORDER_PRESET,
+      id: 'frame-border',
+      name: 'Frame border',
+    };
     const focusSettings: FocusSettings = { opacity: 0.7, showBorder: true };
 
     renderHarness(false, 0, { blurSettings, borderSettings, focusSettings });
@@ -309,7 +314,7 @@ describe('frame settings popover state lifecycle', () => {
     await act(async () => latestState?.catalog.editor.onSave(submittedPreset));
 
     expect(onApplyToFrame).toHaveBeenCalledWith({
-      borderSettings: { ...canonicalPreset, padding: { ...canonicalPreset.padding } },
+      borderSettings: projectBorderPresetToAppliedSettings(canonicalPreset),
     });
   });
 

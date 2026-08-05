@@ -17,6 +17,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Фокус',
     en: 'Focus',
   },
+  closeEffectSettings: {
+    ru: 'Закрыть настройки эффекта',
+    en: 'Close effect settings',
+  },
   effectActiveSuffix: {
     ru: ' (активен, нажмите для настроек)',
     en: ' (active, click for settings)',
@@ -62,8 +66,8 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     en: 'Expand frame by 5 px on each side',
   },
   moveComment: {
-    ru: 'Переместить комментарий',
-    en: 'Move comment',
+    ru: 'Переместить комментарий · Shift — движение по оси · Ctrl — перемещать точки коннектора',
+    en: 'Move comment · Shift constrains movement to an axis · Ctrl moves connector points',
   },
   resizeCommentLeft: {
     ru: 'Изменить ширину комментария слева',
@@ -96,6 +100,18 @@ export const contentInteractiveFrameMessages = defineMessageSource({
   moveCommentTailEnd: {
     ru: 'Сместить конец указателя вдоль границы рамки',
     en: 'Move the pointer end along the frame edge',
+  },
+  moveCommentRoutePoint: {
+    ru: 'Переместить точку маршрута · Shift — шаг 15° · Delete или двойной клик — сбросить',
+    en: 'Move route point · Shift snaps by 15° · Delete or double-click resets it',
+  },
+  moveCommentCurveStart: {
+    ru: 'Изменить начало кривой',
+    en: 'Adjust curve start',
+  },
+  moveCommentCurveEnd: {
+    ru: 'Изменить конец кривой',
+    en: 'Adjust curve end',
   },
   deleteButton: {
     ru: 'Удалить (Delete)',

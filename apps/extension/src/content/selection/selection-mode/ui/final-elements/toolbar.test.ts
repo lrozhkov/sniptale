@@ -107,7 +107,7 @@ describe('selection-mode confirmed toolbar', () => {
     expect(tooltip.root.classList).toContain('sniptale-glass-toolbar');
     expect(tooltip.root.classList).toContain('sniptale-toolbar-root');
     expect(tooltip.root.style.width).toBe('max-content');
-    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(3);
+    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(2);
 
     const decrease = tooltip.root.querySelector<HTMLButtonElement>(
       '.sniptale-selection-padding-decrease'
@@ -140,10 +140,9 @@ describe('selection-mode confirmed toolbar', () => {
       'M9 17H7A5 5 0 0 1 7 7h2'
     );
     expect(tooltip.aspectRatioButton.querySelector('svg line')?.getAttribute('x1')).toBe('8');
-    expect(tooltip.actions.lastElementChild).toBe(tooltip.cancelButton);
-    expect(tooltip.cancelButton.previousElementSibling?.classList).toContain(
-      'sniptale-glass-toolbar-divider'
-    );
+    expect(tooltip.actions.firstElementChild).toBe(tooltip.cancelButton);
+    expect(tooltip.actions.lastElementChild?.contains(tooltip.confirmButton)).toBe(true);
+    expect(tooltip.cancelButton.previousElementSibling).toBeNull();
 
     decrease?.click();
     increase?.click();

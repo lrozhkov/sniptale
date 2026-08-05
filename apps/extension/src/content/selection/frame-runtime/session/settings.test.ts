@@ -9,6 +9,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   getFrameSessionBorderPreset,
   resetFrameSessionBorderPreset,
@@ -163,7 +164,9 @@ describe('frame-session-sync-settings', () => {
     await Promise.resolve();
 
     expect(currentTab.globalEffectModeRef.current).toBe('blur');
-    expect(getFrameSessionBorderPreset()).toEqual(currentTabPreset);
+    expect(getFrameSessionBorderPreset()).toEqual(
+      projectBorderPresetToAppliedSettings(currentTabPreset)
+    );
     expect(currentTab.sessionBlurSettingsRef.current).toEqual({
       amount: 13,
       blurType: 'solid',
@@ -181,7 +184,9 @@ describe('frame-session-sync-settings', () => {
     await Promise.resolve();
 
     expect(newTab.globalEffectModeRef.current).toBe('focus');
-    expect(getFrameSessionBorderPreset()).toEqual(latestPreset);
+    expect(getFrameSessionBorderPreset()).toEqual(
+      projectBorderPresetToAppliedSettings(latestPreset)
+    );
     expect(getFrameSessionBorderPreset()).not.toBe(latestPreset);
     expect(newTab.sessionBlurSettingsRef.current).toEqual(latestDefaults.defaultBlurSettings);
     expect(newTab.sessionFocusSettingsRef.current).toEqual(latestDefaults.defaultFocusSettings);
@@ -218,7 +223,9 @@ describe('frame-session-sync-settings', () => {
 
     expect(refs.highlighterSettingsCacheRef.current).toEqual(latestSettings);
     expect(refs.globalEffectModeRef.current).toBe('focus');
-    expect(getFrameSessionBorderPreset()).toEqual(latestPreset);
+    expect(getFrameSessionBorderPreset()).toEqual(
+      projectBorderPresetToAppliedSettings(latestPreset)
+    );
   });
 
   it('initializes the border default after a non-border choice wins during the initial load', async () => {
@@ -249,7 +256,9 @@ describe('frame-session-sync-settings', () => {
     await pending.promise;
     await Promise.resolve();
 
-    expect(getFrameSessionBorderPreset()).toEqual(persistedPreset);
+    expect(getFrameSessionBorderPreset()).toEqual(
+      projectBorderPresetToAppliedSettings(persistedPreset)
+    );
     expect(refs.globalEffectModeRef.current).toBe('focus');
     expect(refs.sessionBlurSettingsRef.current).toEqual({
       amount: 19,
@@ -285,7 +294,9 @@ describe('frame-session-sync-settings', () => {
     await pending.promise;
     await Promise.resolve();
 
-    expect(getFrameSessionBorderPreset()).toEqual(explicitPreset);
+    expect(getFrameSessionBorderPreset()).toEqual(
+      projectBorderPresetToAppliedSettings(explicitPreset)
+    );
   });
 });
 
@@ -324,7 +335,9 @@ function expectLoaderRefUpdates(refs: ReturnType<typeof createSettingsRefs>) {
     defaultEffectMode: undefined,
   });
   expect(refs.globalEffectModeRef.current).toBe('border');
-  expect(getFrameSessionBorderPreset()).toEqual(DEFAULT_BORDER_PRESET);
+  expect(getFrameSessionBorderPreset()).toEqual(
+    projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET)
+  );
   expect(refs.sessionBlurSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultBlurSettings);
   expect(refs.sessionFocusSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultFocusSettings);
 }

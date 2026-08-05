@@ -1,38 +1,82 @@
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { MutableRefObject } from 'react';
+import type {
+  CalloutPresetCatalog,
+  CalloutVisualStyle,
+} from '@sniptale/runtime-contracts/highlighter/callout';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import {
-  DEFAULT_COLOR_TEXT_INVERSE,
-  DEFAULT_COLOR_TEXT_PANEL,
-} from '@sniptale/ui/default-colors/constants';
+  getLoadedCalloutPresetCatalogSnapshot,
+  loadCalloutPresetCatalog,
+  subscribeToCalloutPresetCatalog,
+} from '../../../../composition/persistence/callout-presets';
+import { cloneCalloutStyle, createDefaultCalloutSettings } from '../../callout/model';
 
-const DEFAULT_CALLOUT_SETTINGS: CalloutSettings = {
-  anchor: 'top-center',
-  bgColor: DEFAULT_COLOR_TEXT_PANEL,
-  enabled: false,
-  fontFamily: 'sans',
-  fontSize: 14,
-  fontWeight: 'normal',
-  htmlContent: '',
-  maxWidth: 200,
-  side: 'auto',
-  tailSize: 8,
-  textColor: DEFAULT_COLOR_TEXT_INVERSE,
-  variant: 'bubble',
-};
+const logger = createLogger({ namespace: 'ContentCalloutDefaults' });
 
-export function createDefaultCalloutSettings(template?: Partial<CalloutSettings>): CalloutSettings {
-  return {
-    ...DEFAULT_CALLOUT_SETTINGS,
-    anchor: template?.anchor ?? DEFAULT_CALLOUT_SETTINGS.anchor,
-    bgColor: template?.bgColor ?? DEFAULT_CALLOUT_SETTINGS.bgColor,
-    fontFamily: template?.fontFamily ?? DEFAULT_CALLOUT_SETTINGS.fontFamily,
-    fontSize: template?.fontSize ?? DEFAULT_CALLOUT_SETTINGS.fontSize,
-    fontWeight: template?.fontWeight ?? DEFAULT_CALLOUT_SETTINGS.fontWeight,
-    maxWidth: template?.maxWidth ?? DEFAULT_CALLOUT_SETTINGS.maxWidth,
-    side: template?.side ?? DEFAULT_CALLOUT_SETTINGS.side,
-    tailSize: template?.tailSize ?? DEFAULT_CALLOUT_SETTINGS.tailSize,
-    textColor: template?.textColor ?? DEFAULT_CALLOUT_SETTINGS.textColor,
-    variant: template?.variant ?? DEFAULT_CALLOUT_SETTINGS.variant,
-    enabled: true,
-    htmlContent: '',
+function getDefaultPreset(catalog: CalloutPresetCatalog) {
+  return (
+    catalog.presets.find(
+      (preset) => preset.id === catalog.defaultPresetId && preset.enabled !== false
+    ) ?? catalog.presets.find((preset) => preset.enabled !== false)
+  );
+}
+
+function styleKey(style: CalloutVisualStyle): string {
+  return JSON.stringify(style);
+}
+
+export function createCalloutPresetSessionSync(
+  sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>
+) {
+  let lastDefaultStyleKey: string | null = null;
+  let active = true;
+  let catalogGeneration = 0;
+
+  const applyCatalog = (catalog: CalloutPresetCatalog) => {
+    if (!active) return;
+    const preset = getDefaultPreset(catalog);
+    if (!preset) return;
+    const canReplace =
+      sessionCalloutStyleRef.current === null ||
+      (lastDefaultStyleKey !== null &&
+        styleKey(sessionCalloutStyleRef.current) === lastDefaultStyleKey);
+    if (canReplace) sessionCalloutStyleRef.current = cloneCalloutStyle(preset.style);
+    lastDefaultStyleKey = styleKey(preset.style);
+  };
+
+  const loadGeneration = catalogGeneration + 1;
+  catalogGeneration = loadGeneration;
+  void loadCalloutPresetCatalog()
+    .then((catalog) => {
+      if (loadGeneration === catalogGeneration) applyCatalog(catalog);
+    })
+    .catch((error) => {
+      if (active) logger.error('Failed to load callout preset catalog', error);
+    });
+  const unsubscribe = subscribeToCalloutPresetCatalog((catalog) => {
+    catalogGeneration += 1;
+    applyCatalog(catalog);
+  });
+  return () => {
+    active = false;
+    catalogGeneration += 1;
+    unsubscribe();
   };
 }
+
+export function createSessionCalloutSettings(style: CalloutVisualStyle | null) {
+  const catalog = getLoadedCalloutPresetCatalogSnapshot();
+  const preset = catalog ? getDefaultPreset(catalog) : undefined;
+  const resolvedStyle = style ?? preset?.style;
+  const sourcePresetId =
+    preset && resolvedStyle && styleKey(preset.style) === styleKey(resolvedStyle)
+      ? preset.id
+      : undefined;
+  return createDefaultCalloutSettings(
+    resolvedStyle,
+    sourcePresetId,
+    sourcePresetId ? preset?.placement : undefined
+  );
+}
+
+export { createDefaultCalloutSettings } from '../../callout/model';

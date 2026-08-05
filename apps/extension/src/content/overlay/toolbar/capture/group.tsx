@@ -16,7 +16,10 @@ export function ToolbarCaptureActionGroup(
 
   return (
     <>
-      <ContentToolbarDivider />
+      <ContentToolbarDivider
+        className="sniptale-capture-leading-divider"
+        dataUi="content.toolbar.capture-leading-divider"
+      />
       <ContentToolbarGroup>
         <ToolbarCaptureButtons
           compactMenus={captureProps.compactMenus}

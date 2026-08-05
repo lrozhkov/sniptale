@@ -28,7 +28,7 @@ import {
 const BLUR_SETTINGS: BlurSettings = { amount: 12, blurType: 'gaussian', showBorder: true };
 const FOCUS_SETTINGS: FocusSettings = { opacity: 0.35, showBorder: true };
 const STEP_BADGE_SETTINGS: Partial<StepBadgeSettings> = { enabled: true, value: 'A' };
-const CALLOUT_SETTINGS: Partial<CalloutSettings> = { enabled: true, variant: 'text-only' };
+const CALLOUT_SETTINGS: Partial<CalloutSettings> = { enabled: true };
 
 describe('content frame events for step badges', () => {
   it('dispatches and subscribes to frame-step-badge changes', () => {

@@ -39,8 +39,8 @@ export function useStepBadgeControllers(
     createHistoryWrappedStepBadgeActions({
       globalStepBadgeSettingsRef,
       recalculateStepBadges,
-      recalculateStepBadgesRef,
       sessionStepBadgeTemplateRef,
+      recalculateStepBadgesRef,
       setFrames,
       stepBadgeOrderRef,
       withHistoryCommit,

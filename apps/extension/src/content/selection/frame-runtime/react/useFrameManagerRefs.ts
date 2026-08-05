@@ -11,7 +11,7 @@ import type {
   FrameState,
   HighlighterSettings,
 } from '../../../../features/highlighter/contracts';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type {
   GlobalStepBadgeSettings,
   StepBadgeSettings,
@@ -40,7 +40,7 @@ export function useFrameManagerRefs(): FrameManagerRefs {
   const sessionFocusSettingsRef = useRef<FocusSettings>({ ...DEFAULT_FOCUS_SETTINGS });
   const sessionDefaultsInitializedRef = useRef(false);
   const sessionStepBadgeTemplateRef = useRef<StepBadgeSettings | null>(null);
-  const sessionCalloutStyleRef = useRef<Partial<CalloutSettings> | null>(null);
+  const sessionCalloutStyleRef = useRef<CalloutVisualStyle | null>(null);
   const stepBadgeOrderRef = useRef<Map<string, number>>(new Map());
   const globalStepBadgeSettingsRef = useRef<GlobalStepBadgeSettings>({ autoMode: true });
   const globalStepBadgeAutoModeRef = useRef(globalStepBadgeSettingsRef.current.autoMode);

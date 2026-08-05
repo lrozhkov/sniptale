@@ -23,6 +23,8 @@ export const CONTENT_SIZE_TOOLTIP_STEPPER_CONTROLS_CLASS_NAME =
   'sniptale-content-size-tooltip-stepper-controls';
 export const CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME =
   'sniptale-content-size-tooltip-primary-action';
+export const CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME =
+  'sniptale-selection-size-cancel-button';
 export const CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME =
   'sniptale-content-size-tooltip-ratio-button';
 
@@ -67,6 +69,14 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
     border-color: transparent;
     background: transparent;
     color: var(--sniptale-color-accent-emphasis);
+    box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:hover:not(:disabled) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent);
+    color: var(--sniptale-color-danger);
     box-shadow: none;
   }
 

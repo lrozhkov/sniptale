@@ -1,17 +1,28 @@
 import type {
+  AppliedBorderSettings,
   BlurSettings,
   BorderPreset,
   FocusSettings,
   FrameData,
 } from '../../../features/highlighter/contracts';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
+import type {
+  CalloutSettings,
+  LegacyCalloutSettings,
+} from '@sniptale/runtime-contracts/highlighter/callout';
+import {
+  applyCalloutSettingsPatch,
+  createDefaultCalloutSettings,
+  normalizeCalloutSettings,
+  type CalloutSettingsPatch,
+} from '../callout/model';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { normalizeAppliedBorderSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 type FrameDataFixtureOverrides = Omit<
   Partial<FrameData>,
   'borderSettings' | 'blurSettings' | 'focusSettings' | 'stepBadge' | 'callout' | 'offset'
 > & {
-  borderSettings?: BorderPreset | null;
+  borderSettings?: AppliedBorderSettings | BorderPreset | null;
   blurSettings?: BlurSettings | null;
   focusSettings?: FocusSettings | null;
   stepBadge?: StepBadgeSettings | null;
@@ -25,12 +36,12 @@ export function createBorderSettingsFixture(overrides: Partial<BorderPreset> = {
     customCss: '',
     id: 'border',
     name: 'Default Border',
+    order: 0,
     opacity: 1,
     strokeOpacity: 1,
     fillColor: '#00000000',
     fillOpacity: 0,
     inheritCustomCss: false,
-    order: 0,
     padding: { bottom: 0, left: 0, right: 0, top: 0 },
     radius: 6,
     shadow: 0,
@@ -74,9 +85,15 @@ export function createStepBadgeSettingsFixture(
 }
 
 export function createCalloutSettingsFixture(
-  overrides: Partial<CalloutSettings> = {}
+  overrides: Partial<CalloutSettings> | Partial<LegacyCalloutSettings> = {}
 ): CalloutSettings {
-  return {
+  if ('content' in overrides || 'placement' in overrides || 'style' in overrides) {
+    return applyCalloutSettingsPatch(
+      createDefaultCalloutSettings(),
+      overrides as CalloutSettingsPatch
+    );
+  }
+  return normalizeCalloutSettings({
     anchor: 'center',
     bgColor: '#fff',
     enabled: true,
@@ -90,7 +107,7 @@ export function createCalloutSettingsFixture(
     textColor: '#111',
     variant: 'bubble',
     ...overrides,
-  };
+  } as LegacyCalloutSettings);
 }
 
 export function createFrameDataFixture(
@@ -107,7 +124,7 @@ export function createFrameDataFixture(
     width: 120,
     height: 80,
     effectMode: 'border',
-    borderSettings: borderSettings ?? createBorderSettingsFixture(),
+    borderSettings: normalizeAppliedBorderSettings(borderSettings ?? createBorderSettingsFixture()),
     ...rest,
     ...(blurSettings == null ? {} : { blurSettings }),
     ...(focusSettings == null ? {} : { focusSettings }),

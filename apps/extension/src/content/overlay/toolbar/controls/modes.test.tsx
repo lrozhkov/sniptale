@@ -151,6 +151,10 @@ it('selects a mode option from the menu mousedown action', () => {
 it('orders Working Mode options as Cursor, Annotations, Content Editing, and Design Review', () => {
   renderModeButtons();
 
+  expect(
+    container?.querySelector('[data-ui="shared.ui.content-toolbar-group"]')?.className
+  ).toContain('sniptale-mode-selector-group');
+
   act(() => {
     queryModeSelectorButton()?.click();
   });

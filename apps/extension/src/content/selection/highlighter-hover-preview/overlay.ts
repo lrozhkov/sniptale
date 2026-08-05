@@ -11,7 +11,7 @@ import {
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
-import type { BorderPreset } from '../../../features/highlighter/contracts';
+import type { AppliedBorderSettings } from '../../../features/highlighter/contracts';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getCurrentBorderPreset, type HoverDomSession, type HoverSession } from './session';
 
@@ -135,7 +135,10 @@ export function removeHighlighterOverlayContainer(session: HoverDomSession): voi
   session.hoverOverlay = null;
 }
 
-export function ensureHoverOverlay(session: HoverDomSession, preset: BorderPreset): HTMLElement {
+export function ensureHoverOverlay(
+  session: HoverDomSession,
+  preset: AppliedBorderSettings
+): HTMLElement {
   if (session.hoverOverlay) return session.hoverOverlay;
 
   const visual = resolveBorderPresetVisual(preset);
@@ -175,7 +178,7 @@ function isCaptureUiHidden(): boolean {
 export function showHoverOverlay(
   session: HoverDomSession,
   position: ElementAbsolutePosition,
-  preset: BorderPreset
+  preset: AppliedBorderSettings
 ): void {
   const hoverOverlay = ensureHoverOverlay(session, preset);
   if (isCaptureUiHidden()) {
@@ -202,7 +205,10 @@ export function hideHoverOverlay(session: HoverDomSession): void {
   if (session.hoverOverlay) session.hoverOverlay.style.opacity = '0';
 }
 
-function logHoverOverlayShown(position: ElementAbsolutePosition, preset: BorderPreset): void {
+function logHoverOverlayShown(
+  position: ElementAbsolutePosition,
+  preset: AppliedBorderSettings
+): void {
   logger.debug('Showing hover overlay', {
     elementPos: {
       x: position.x,

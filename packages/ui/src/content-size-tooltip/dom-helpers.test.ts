@@ -137,10 +137,9 @@ describe('content size tooltip dom helpers action controls', () => {
     expect(cancelButton.textContent).toBe('');
     expect(confirmButton.textContent).toBe('');
     expect(confirmButton.classList).toContain('sniptale-content-size-tooltip-primary-action');
-    expect(actions.children).toHaveLength(3);
-    expect(actions.children[0]).toBe(confirmButton);
-    expect(actions.children[1]?.getAttribute('aria-hidden')).toBe('true');
-    expect(actions.children[2]).toBe(cancelButton);
+    expect(actions.children).toHaveLength(2);
+    expect(actions.children[0]).toBe(cancelButton);
+    expect(actions.children[1]).toBe(confirmButton);
   });
 
   it('uses the default confirm label and active ratio button state when enabled', () => {

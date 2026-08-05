@@ -18,7 +18,7 @@ it('does not let deferred default initialization overwrite an explicit tab choic
   setFrameSessionBorderPreset(selectedPreset);
   initializeFrameSessionBorderPreset(persistedDefault);
 
-  expect(getFrameSessionBorderPreset()).toMatchObject({ id: 'explicit' });
+  expect(getFrameSessionBorderPreset()).toMatchObject({ sourcePresetId: 'explicit' });
 });
 
 it('owns one cloned border preset for the current content document', () => {
@@ -33,7 +33,7 @@ it('owns one cloned border preset for the current content document', () => {
   selectedPreset.padding.top = 99;
 
   const storedPreset = getFrameSessionBorderPreset();
-  expect(storedPreset).toMatchObject({ id: 'tab-selection', padding: { top: 4 } });
+  expect(storedPreset).toMatchObject({ sourcePresetId: 'tab-selection', padding: { top: 4 } });
 
   storedPreset.padding.top = 88;
   expect(getFrameSessionBorderPreset().padding.top).toBe(4);

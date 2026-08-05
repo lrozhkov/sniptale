@@ -1,6 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   BlurSettings,
   FocusSettings,
   FrameData,
@@ -40,7 +40,7 @@ function queueStepBadgeRecalculation(
 
 function logAddedFrame(
   frameData: FrameData,
-  borderSettings: BorderPreset,
+  borderSettings: AppliedBorderSettings,
   blurSettings: BlurSettings,
   focusSettings: FocusSettings
 ) {
@@ -50,7 +50,7 @@ function logAddedFrame(
     'effectMode',
     frameData.effectMode,
     'borderPreset',
-    borderSettings.name,
+    borderSettings.sourcePresetName ?? 'manual',
     'blurSettings',
     blurSettings,
     'focusSettings',

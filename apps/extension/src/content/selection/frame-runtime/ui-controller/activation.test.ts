@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 
 const highlighterState = vi.hoisted(() => ({ enabled: true, paused: false }));
+const domHostState = vi.hoisted(() => ({ contentOwnedEvent: false }));
 
 vi.mock('../../highlighter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../highlighter')>();
@@ -19,6 +20,11 @@ vi.mock('../../highlighter', async (importOriginal) => {
     },
   };
 });
+
+vi.mock('../../../platform/dom-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/dom-host')>()),
+  isContentOwnedEvent: () => domHostState.contentOwnedEvent,
+}));
 
 import { createFrameSelectionEventHandlers } from './activation';
 import { pauseHighlighter, resumeHighlighter } from '../../highlighter';
@@ -55,6 +61,7 @@ function createHandlers(
 }
 
 afterEach(() => {
+  domHostState.contentOwnedEvent = false;
   highlighterState.enabled = true;
   resumeHighlighter();
   document.body.replaceChildren();
@@ -158,7 +165,9 @@ describe('frame selection events', () => {
 
     expect(actions.selectFrame).not.toHaveBeenCalled();
   });
+});
 
+describe('frame selection interaction ownership', () => {
   it('keeps a persistent selection on pointerdown in frame interior without consuming drawing', () => {
     const { actions, handlers } = createHandlers('frame-1');
     const event = new MouseEvent('pointerdown', {
@@ -185,6 +194,32 @@ describe('frame selection events', () => {
 
     expect(actions.clearSelection).toHaveBeenCalledOnce();
     expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('does not let retargeted content UI events close an active popover', () => {
+    const { actions, handlers } = createHandlers('frame-1', {
+      frameId: 'frame-1',
+      kind: 'callout-settings',
+    });
+    domHostState.contentOwnedEvent = true;
+    const pointerDown = new MouseEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 20,
+      clientY: 20,
+    });
+    const click = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 190,
+      clientY: 150,
+    });
+
+    handlers.pointerDown(pointerDown as PointerEvent);
+    handlers.click(click);
+
+    expect(actions.clearSelection).not.toHaveBeenCalled();
+    expect(actions.selectFrame).not.toHaveBeenCalled();
   });
 
   it('leaves native trigger activation to the button owner', () => {
@@ -231,6 +266,14 @@ describe('frame selection events', () => {
         return { path: [editorControl, editorLayer], target: editorControl };
       })(),
       (() => {
+        const floatingRoot = document.createElement('div');
+        floatingRoot.setAttribute('data-floating-ui-root', 'true');
+        const floatingControl = document.createElement('button');
+        floatingRoot.append(floatingControl);
+        document.body.append(floatingRoot);
+        return { path: [floatingControl, floatingRoot], target: floatingControl };
+      })(),
+      (() => {
         const floatingLayer = document.createElement('div');
         floatingLayer.setAttribute('data-floating-ui-owned-by', 'frame-style-color');
         document.body.append(floatingLayer);
@@ -245,8 +288,13 @@ describe('frame selection events', () => {
       Object.defineProperty(pointerDown, 'composedPath', { value: () => path });
 
       handlers.pointerDown(pointerDown as PointerEvent);
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(click, 'target', { value: target });
+      Object.defineProperty(click, 'composedPath', { value: () => path });
+      handlers.click(click);
 
       expect(actions.clearSelection).not.toHaveBeenCalled();
+      expect(actions.selectFrame).not.toHaveBeenCalled();
     });
   });
 
@@ -266,7 +314,9 @@ describe('frame selection events', () => {
       expect(escape.defaultPrevented).toBe(false);
     });
   });
+});
 
+describe('frame selection keyboard dismissal', () => {
   it('closes selection on Escape and restores focus to its hover trigger', () => {
     const { actions, handlers } = createHandlers('frame-1');
     const trigger = document.createElement('button');

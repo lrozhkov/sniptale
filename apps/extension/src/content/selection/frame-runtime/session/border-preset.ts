@@ -1,28 +1,37 @@
-import type { BorderPreset } from '../../../../features/highlighter/contracts';
-import { cloneBorderPreset } from '../../../../features/highlighter/presets/catalog';
+import type {
+  AppliedBorderSettings,
+  BorderPreset,
+} from '../../../../features/highlighter/contracts';
+import {
+  cloneAppliedBorderSettings,
+  normalizeAppliedBorderSettings,
+  projectBorderPresetToAppliedSettings,
+} from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
-let currentBorderPreset = cloneBorderPreset(DEFAULT_BORDER_PRESET);
+let currentBorderPreset = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
 let initialized = false;
 
-export function getFrameSessionBorderPreset(): BorderPreset {
-  return cloneBorderPreset(currentBorderPreset);
+export function getFrameSessionBorderPreset(): AppliedBorderSettings {
+  return cloneAppliedBorderSettings(currentBorderPreset);
 }
 
-export function setFrameSessionBorderPreset(preset: BorderPreset): void {
-  currentBorderPreset = cloneBorderPreset(preset);
+export function setFrameSessionBorderPreset(settings: AppliedBorderSettings | BorderPreset): void {
+  currentBorderPreset = normalizeAppliedBorderSettings(settings);
   initialized = true;
 }
 
-export function initializeFrameSessionBorderPreset(preset: BorderPreset): void {
+export function initializeFrameSessionBorderPreset(
+  settings: AppliedBorderSettings | BorderPreset
+): void {
   if (initialized) {
     return;
   }
-  currentBorderPreset = cloneBorderPreset(preset);
+  currentBorderPreset = normalizeAppliedBorderSettings(settings);
   initialized = true;
 }
 
 export function resetFrameSessionBorderPreset(): void {
-  currentBorderPreset = cloneBorderPreset(DEFAULT_BORDER_PRESET);
+  currentBorderPreset = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
   initialized = false;
 }

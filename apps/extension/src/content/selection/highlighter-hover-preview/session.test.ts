@@ -43,7 +43,22 @@ describe('highlighter hover session', () => {
 
     setFrameSessionBorderPreset(restoredPreset);
 
-    expect(getCurrentBorderPreset()).toEqual(restoredPreset);
+    expect(getCurrentBorderPreset()).toEqual({
+      color: restoredPreset.color,
+      customCss: restoredPreset.customCss,
+      fillColor: restoredPreset.fillColor,
+      fillOpacity: restoredPreset.fillOpacity,
+      inheritCustomCss: restoredPreset.inheritCustomCss,
+      opacity: restoredPreset.opacity,
+      padding: restoredPreset.padding,
+      radius: restoredPreset.radius,
+      shadow: restoredPreset.shadow,
+      sourcePresetId: restoredPreset.id,
+      sourcePresetName: restoredPreset.name,
+      strokeOpacity: restoredPreset.strokeOpacity,
+      style: restoredPreset.style,
+      width: restoredPreset.width,
+    });
     expect(getCurrentBorderPreset()).not.toBe(restoredPreset);
   });
 

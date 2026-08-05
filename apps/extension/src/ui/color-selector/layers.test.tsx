@@ -15,21 +15,26 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
+function selector(disabled = false) {
+  return (
+    <CompactColorSelector
+      disabled={disabled}
+      label="Цвет"
+      title="Цвет"
+      value="#f8fafc"
+      palette={['#111111']}
+      recentColors={['#222222']}
+      onChange={() => undefined}
+    />
+  );
+}
+
 function renderSelector() {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root!.render(
-      <CompactColorSelector
-        label="Цвет"
-        title="Цвет"
-        value="#f8fafc"
-        palette={['#111111']}
-        recentColors={['#222222']}
-        onChange={() => undefined}
-      />
-    );
+    root!.render(selector());
   });
 }
 
@@ -117,6 +122,41 @@ it('renders picker and palette content in floating layers under the trigger', ()
   expect(expandedLayer?.dataset['floatingUiRoot']).toBe('true');
   expect(expandedLayer?.style.width).toBe('224px');
   expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+});
+
+it('disables both color actions and closes an open layer when the field becomes linked', () => {
+  renderSelector();
+
+  act(() => {
+    getButton('shared.ui.colorSelectorChooseColor')?.click();
+  });
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]')
+  ).not.toBeNull();
+
+  act(() => {
+    root!.render(selector(true));
+  });
+
+  const actions = container!.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.trigger"] > button'
+  );
+  expect(actions).toHaveLength(2);
+  expect([...actions].every((button) => button.disabled)).toBe(true);
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]')
+  ).toBeNull();
+
+  act(() => {
+    actions[0]?.click();
+    actions[1]?.click();
+  });
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]')
+  ).toBeNull();
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]')
+  ).toBeNull();
 });
 
 it('keeps the picker layer scoped to a local dark theme class', () => {
