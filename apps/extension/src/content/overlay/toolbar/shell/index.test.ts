@@ -53,4 +53,17 @@ describe('resolveToolbarNavigationLockMode', () => {
       })
     ).toBe(false);
   });
+
+  it('uses links-only lock while Annotation owns page picking', () => {
+    expect(
+      resolveToolbarNavigationLockMode({
+        aiPickMode: false,
+        designReviewMode: false,
+        highlighterMode: true,
+        isCursorMode: false,
+        quickEditMode: false,
+        screenshotMode: true,
+      })
+    ).toBe(false);
+  });
 });

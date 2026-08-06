@@ -1,7 +1,7 @@
 import type { Logger } from '@sniptale/platform/observability/logger/types';
-import { isContentModeEnabled } from '../../application/mode-session';
 import type { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import type { removeNavigationLockOverlay, syncNavigationLockOverlay } from './overlay';
+import { isPageElementPickerActive } from './routing';
 
 type BeforeUnloadHandler = (this: Window, ev: BeforeUnloadEvent) => string | void;
 
@@ -69,7 +69,7 @@ export function syncNavigationLockSurfaces(
 ): void {
   toggleNavigationLockClass(deps, state.isNavigationLocked);
   deps.syncNavigationLockOverlay(
-    state.isNavigationLocked && !state.isFullLockMode && !isContentModeEnabled('design-review')
+    state.isNavigationLocked && !state.isFullLockMode && !isPageElementPickerActive()
   );
 }
 
@@ -96,7 +96,7 @@ export function registerNavigationListeners(
   state.cleanupAuxClickHandler = deps.addEventListenerToAllWindowsDynamic(
     'auxclick',
     (event) => {
-      if (isContentModeEnabled('design-review')) {
+      if (isPageElementPickerActive()) {
         handlers.handleInteractionEvent(event);
       }
     },

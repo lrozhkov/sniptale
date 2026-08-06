@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
 const framePlatform = vi.hoisted(() => ({
   createDocumentPagePlacement: vi.fn(() => ({ iframePath: [], pageX: 10, pageY: 20 })),
   getDocumentViewportBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
@@ -24,7 +24,7 @@ const targetPolicy = vi.hoisted(() => ({
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
 
-vi.mock('../../parser/page-preparation/target', () => targetResolver);
+vi.mock('../page-element-target', () => targetResolver);
 vi.mock('./targets', () => targetPolicy);
 vi.mock('../../platform/frame', () => framePlatform);
 vi.mock('../../platform/dom-host', () => domHost);
@@ -124,7 +124,9 @@ function createFixture() {
     session,
     consumeSuppressedClick: handlers.consumeSuppressedClick,
   });
-  targetResolver.resolvePagePreparationTarget.mockImplementation((event: Event) => event.target);
+  targetResolver.resolveSelectablePageHtmlElement.mockImplementation(
+    (event: Event) => event.target
+  );
   return {
     addFrame,
     addFreeFrame,
@@ -216,7 +218,7 @@ describe('free frame drawing gesture', () => {
     handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20));
 
     expect(session.freeDraw.gesture).toBeNull();
-    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+    expect(targetResolver.resolveSelectablePageHtmlElement).not.toHaveBeenCalled();
   });
 
   it('hides every other frame control as soon as drawing takes ownership', () => {

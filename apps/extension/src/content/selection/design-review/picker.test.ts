@@ -330,6 +330,20 @@ it('selects the visible label proxy for an opacity-hidden checkbox menu trigger'
   expect(onSelection.mock.calls[0]?.[0].snapshot.element).toBe(label);
 });
 
+it('programmatically selects the same visible label proxy as pointer navigation', () => {
+  const input = makeVisible(document.createElement('input'));
+  input.id = 'programmatic-language-toggle';
+  input.style.opacity = '0';
+  const label = makeVisible(document.createElement('label'));
+  label.htmlFor = input.id;
+  document.body.append(input, label);
+  const onSelection = vi.fn();
+  const runtime = startPicker({ onSelection });
+
+  expect(runtime.selectElement(input)).toBe(true);
+  expect(onSelection.mock.calls[0]?.[0].snapshot.element).toBe(label);
+});
+
 it('opens the exact live DOM element near its trailing-edge marker', () => {
   const target = makeVisible(document.createElement('button'));
   document.body.append(target);

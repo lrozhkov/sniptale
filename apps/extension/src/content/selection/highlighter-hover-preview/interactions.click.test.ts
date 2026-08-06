@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
   isInsideExistingFrame: vi.fn(() => false),
@@ -10,7 +10,7 @@ const targetPolicy = vi.hoisted(() => ({
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
 
-vi.mock('../../parser/page-preparation/target', () => targetResolver);
+vi.mock('../page-element-target', () => targetResolver);
 vi.mock('./targets', () => targetPolicy);
 
 import { createHoverInteractionHandlers } from './interactions';
@@ -54,7 +54,7 @@ describe('highlighter hover click interaction', () => {
   it('passes through when no target can be resolved', () => {
     const { handlers } = createFixture();
     const event = createClickEvent();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(null);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(null);
 
     handlers.handleClick(event);
 
@@ -64,7 +64,7 @@ describe('highlighter hover click interaction', () => {
   it('passes through extension-owned targets', () => {
     const { handlers } = createFixture();
     const event = createClickEvent();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
       document.createElement('button')
     );
     targetPolicy.isHighlighterExtensionUiElement.mockReturnValueOnce(true);
@@ -77,7 +77,9 @@ describe('highlighter hover click interaction', () => {
   it('leaves an existing frame border click for the frame selection owner', () => {
     const { addFrame, handlers } = createFixture();
     const event = createClickEvent();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
+      document.createElement('div')
+    );
     targetPolicy.isNearExistingFrameBorder.mockReturnValueOnce(true);
 
     handlers.handleClick(event);
@@ -89,7 +91,9 @@ describe('highlighter hover click interaction', () => {
   it('leaves an existing frame interior click for the frame selection owner', () => {
     const { addFrame, handlers } = createFixture();
     const event = createClickEvent(80, 90);
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
+      document.createElement('div')
+    );
     targetPolicy.isInsideExistingFrame.mockReturnValueOnce(true);
 
     handlers.handleClick(event);
@@ -104,7 +108,9 @@ describe('highlighter hover click interaction', () => {
     const iframe = document.createElement('iframe');
     iframe.getBoundingClientRect = vi.fn(() => new DOMRect(100, 200, 300, 180));
     const event = createClickEvent(12, 18);
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
+      document.createElement('div')
+    );
     targetPolicy.isNearExistingFrameBorder.mockReturnValueOnce(true);
 
     handlers.handleClick(event, iframe);
@@ -116,7 +122,9 @@ describe('highlighter hover click interaction', () => {
   it('blocks duplicate frame creation after consuming the click', () => {
     const { addFrame, handlers } = createFixture({ hasFrame: true });
     const event = createClickEvent();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
+      document.createElement('div')
+    );
 
     handlers.handleClick(event);
 
@@ -130,7 +138,9 @@ describe('highlighter hover click interaction', () => {
     const { addFrame, handlers, hideHoverOverlay, session } = createFixture();
     const lastHoverTarget = document.createElement('button');
     session.lastHoverTarget = lastHoverTarget;
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(document.createElement('div'));
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
+      document.createElement('div')
+    );
 
     handlers.handleClick(createClickEvent());
 

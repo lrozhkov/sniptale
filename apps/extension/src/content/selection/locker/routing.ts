@@ -43,8 +43,8 @@ export function isSelectionDelegatedMode(): boolean {
   );
 }
 
-function isDesignReviewPickerActive(): boolean {
-  return isContentModeEnabled('design-review');
+export function isPageElementPickerActive(): boolean {
+  return isContentModeEnabled('design-review') || isContentModeEnabled('highlighter');
 }
 
 export function handleResolvedNavigationTarget(
@@ -87,13 +87,13 @@ export function blockEvent(event: Event): void {
 }
 
 /**
- * Blocks host-page navigation while allowing the Design Review picker listener on
+ * Blocks host-page navigation while allowing the active page-element picker listener on
  * the same capture target to observe the event and select the underlying element.
  */
 export function blockNavigationEvent(event: Event): void {
   event.preventDefault();
   event.stopPropagation();
-  if (!isDesignReviewPickerActive()) {
+  if (!isPageElementPickerActive()) {
     event.stopImmediatePropagation();
   }
 }
@@ -123,7 +123,7 @@ function handleNavigationLink(event: Event, link: HTMLAnchorElement): boolean {
     (fullHref && isGwtInternalTabLink(fullHref)) ||
     (hrefAttr && isGwtInternalTabLink(hrefAttr))
   ) {
-    if (isDesignReviewPickerActive()) {
+    if (isPageElementPickerActive()) {
       blockNavigationEvent(event);
     }
     return true;
@@ -148,7 +148,7 @@ function handleFullLockInteractiveTarget(
     return;
   }
 
-  if (isDesignReviewPickerActive()) {
+  if (isPageElementPickerActive()) {
     return;
   }
 
