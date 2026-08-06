@@ -13,6 +13,7 @@ const facade = vi.hoisted(() => ({
   getOwnerIfCreated: vi.fn(),
   invalidateFrameCache: vi.fn(),
   isEnabled: vi.fn(() => true),
+  isFrameEditing: vi.fn(() => true),
   isPausedState: vi.fn(() => true),
   pause: vi.fn(),
   registerContentMode: vi.fn(),
@@ -41,6 +42,7 @@ beforeEach(() => {
     enableMode: facade.enableMode,
     invalidateFrameCache: facade.invalidateFrameCache,
     isEnabled: facade.isEnabled,
+    isFrameEditing: facade.isFrameEditing,
     isPausedState: facade.isPausedState,
     pause: facade.pause,
     registerFrameCallbacks: facade.registerFrameCallbacks,
@@ -88,6 +90,7 @@ it('routes highlighter commands and queries through the created owner', async ()
   const click = new MouseEvent('click');
 
   expect(runtime.isHighlighterEnabled()).toBe(true);
+  expect(runtime.isFrameEditing()).toBe(true);
   expect(runtime.isHighlighterPausedState()).toBe(true);
   expect(runtime.consumeHighlighterSuppressedClick(click)).toBe(true);
   expect(facade.invalidateFrameCache).toHaveBeenCalledOnce();
@@ -108,6 +111,7 @@ it('does not create an owner for disabled-state queries or cleanup', async () =>
   runtime.disableHighlighterMode();
 
   expect(runtime.isHighlighterEnabled()).toBe(false);
+  expect(runtime.isFrameEditing()).toBe(false);
   expect(runtime.isHighlighterPausedState()).toBe(false);
   expect(runtime.consumeHighlighterSuppressedClick(new MouseEvent('click'))).toBe(false);
   expect(facade.disableMode).not.toHaveBeenCalled();

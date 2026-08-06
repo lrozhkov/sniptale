@@ -1,4 +1,4 @@
-import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
+import { resolveSelectablePageHtmlElement } from '../page-element-target';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { HoverOverlayActions } from './overlay';
 import type { HoverFrameCacheSession, HoverSession, HoverTrackingSession } from './session';
@@ -170,7 +170,7 @@ export function scheduleHoverOverlayUpdate(props: {
   props.session.lastHoverY = props.event.clientY;
   props.session.lastHoverProcessTime = Date.now();
 
-  const target = resolvePagePreparationTarget(props.event, props.iframe);
+  const target = resolveSelectablePageHtmlElement(props.event, props.iframe);
   if (!target) {
     hideHoverPreview(props.session, props.hideHoverOverlay);
     return;
@@ -201,7 +201,7 @@ function createHoverClickHandler(props: HoverInteractionProps) {
       event.stopImmediatePropagation();
       return;
     }
-    const target = resolvePagePreparationTarget(event, iframe);
+    const target = resolveSelectablePageHtmlElement(event, iframe);
     const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     if (
       !target ||

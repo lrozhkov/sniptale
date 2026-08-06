@@ -14,6 +14,12 @@ const service = vi.hoisted(() => ({
   patch: vi.fn(),
   touch: vi.fn(),
 }));
+const localeState = vi.hoisted(() => ({ current: 'en' as 'en' | 'ru' }));
+
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+  useAppLocale: () => localeState.current,
+}));
 
 vi.mock('../service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../service')>()),
@@ -60,6 +66,14 @@ function currentState() {
   return state;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   service.create.mockReset();
@@ -67,6 +81,7 @@ beforeEach(() => {
   service.list.mockReset();
   service.patch.mockReset();
   service.touch.mockReset();
+  localeState.current = 'en';
   service.list.mockResolvedValue([template()]);
 });
 
@@ -113,4 +128,42 @@ it('stores a readable error when loading fails', async () => {
 
   expect(currentState().isLoading).toBe(false);
   expect(currentState().error).toBe('load failed');
+});
+
+it('keeps system templates available while toggling their visibility', async () => {
+  const systemTemplate = template({ id: 'system', isDefault: true });
+  service.list.mockResolvedValueOnce([systemTemplate]);
+  service.remove.mockResolvedValue(undefined);
+
+  await mountProbe();
+
+  await act(async () => currentState().removeTemplate(systemTemplate.id));
+  expect(currentState().templates).toEqual([{ ...systemTemplate, enabled: false }]);
+
+  await act(async () => currentState().removeTemplate(systemTemplate.id));
+  expect(currentState().templates).toEqual([{ ...systemTemplate, enabled: true }]);
+});
+
+it('ignores an older locale load that resolves after the current catalog', async () => {
+  const english = createDeferred<PromptTemplate[]>();
+  const russian = createDeferred<PromptTemplate[]>();
+  service.list.mockReset();
+  service.list
+    .mockImplementationOnce(() => english.promise)
+    .mockImplementationOnce(() => russian.promise);
+  await mountProbe();
+  expect(service.list).toHaveBeenCalledWith('en');
+
+  localeState.current = 'ru';
+  await act(async () => {
+    mountedRoot?.render(<Probe />);
+    await Promise.resolve();
+  });
+  expect(service.list).toHaveBeenLastCalledWith('ru');
+
+  await act(async () => russian.resolve([template({ id: 'ru', name: 'Русский' })]));
+  expect(currentState().templates[0]?.id).toBe('ru');
+
+  await act(async () => english.resolve([template({ id: 'en', name: 'English' })]));
+  expect(currentState().templates[0]?.id).toBe('ru');
 });

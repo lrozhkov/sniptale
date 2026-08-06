@@ -117,6 +117,9 @@ export interface PromptTemplate {
   name: string;
   content: string;
   isDefault?: boolean;
+  enabled?: boolean;
+  customized?: boolean;
+  systemRevision?: number;
   lastUsedAt?: number;
 }
 

@@ -10,11 +10,11 @@ export function resolveToolbarNavigationLockMode(params: {
   aiPickMode: boolean;
   isCursorMode: boolean;
 }): boolean | null {
-  if (params.highlighterMode || params.quickEditMode || params.aiPickMode) {
+  if (params.aiPickMode) {
     return true;
   }
 
-  if (params.designReviewMode) {
+  if (params.designReviewMode || params.highlighterMode || params.quickEditMode) {
     return false;
   }
 

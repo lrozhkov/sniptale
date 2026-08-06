@@ -10,6 +10,9 @@ function verifyTemplateParsing() {
         name: 'Template',
         content: 'Body',
         isDefault: true,
+        enabled: false,
+        customized: true,
+        systemRevision: 2,
         lastUsedAt: 123,
       },
       {
@@ -26,6 +29,9 @@ function verifyTemplateParsing() {
         name: 'Template',
         content: 'Body',
         isDefault: true,
+        enabled: false,
+        customized: true,
+        systemRevision: 2,
         lastUsedAt: 123,
       },
     ],
@@ -60,10 +66,16 @@ function verifyInvalidOptionalTemplateFieldsAreDropped() {
         content: 'Body 2',
         lastUsedAt: 'later',
       },
+      {
+        id: 'template-3',
+        name: 'Template 3',
+        content: 'Body 3',
+        enabled: 'yes',
+      },
     ])
   ).toEqual({
     hasInvalidRoot: false,
-    invalidEntryCount: 2,
+    invalidEntryCount: 3,
     templates: [],
   });
 }

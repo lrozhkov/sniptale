@@ -13,9 +13,9 @@ import type { getFilteredAIProviders } from './helpers';
 export function EmptyState() {
   return (
     <div
-      className="flex items-center gap-2 rounded-[12px] border border-dashed
-        border-[var(--sniptale-color-border-soft)] px-3 py-2 text-xs
-        text-[var(--sniptale-color-text-muted)]"
+      className="sniptale-ai-model-selector-missing flex items-center gap-2 rounded-[12px] border
+        border-[var(--sniptale-color-danger)] px-3 py-2 text-xs
+        text-[var(--sniptale-color-danger)]"
     >
       <Sparkles className="h-3.5 w-3.5" />
       {translate('aiModal.modelNotSelected')}
@@ -32,12 +32,13 @@ export function Trigger(props: {
   return (
     <button
       type="button"
+      data-invalid={!props.selectedLabel || undefined}
       onClick={() => {
         if (!props.disabled) {
           props.onToggle();
         }
       }}
-      className="inline-flex max-w-full items-center gap-2 rounded-[12px] border
+      className="sniptale-ai-model-selector-trigger inline-flex max-w-full items-center gap-2 rounded-[12px] border
         border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] px-3 py-2
         text-xs text-[var(--sniptale-color-text-secondary)] transition
         hover:border-[var(--sniptale-color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"

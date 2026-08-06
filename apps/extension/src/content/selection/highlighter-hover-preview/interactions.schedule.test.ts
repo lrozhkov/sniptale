@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
   isInsideExistingFrame: vi.fn(() => false),
@@ -10,7 +10,7 @@ const targetPolicy = vi.hoisted(() => ({
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
 
-vi.mock('../../parser/page-preparation/target', () => targetResolver);
+vi.mock('../page-element-target', () => targetResolver);
 vi.mock('./targets', () => targetPolicy);
 
 import { scheduleHoverOverlayUpdate } from './interactions';
@@ -59,12 +59,12 @@ describe('highlighter hover scheduling', () => {
 
     scheduleHoverOverlayUpdate(args);
 
-    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+    expect(targetResolver.resolveSelectablePageHtmlElement).not.toHaveBeenCalled();
   });
 
   it('records coordinates and hides when no target resolves', () => {
     const { args, hideHoverOverlay, session } = createArgs();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(null);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(null);
     vi.spyOn(Date, 'now').mockReturnValueOnce(321);
 
     scheduleHoverOverlayUpdate(args);
@@ -81,7 +81,7 @@ describe('highlighter hover scheduling', () => {
   it('hides suppressed and already-framed targets', () => {
     const target = document.createElement('div');
     const first = createArgs();
-    targetResolver.resolvePagePreparationTarget.mockReturnValue(target);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValue(target);
     targetPolicy.isHighlighterExtensionUiElement.mockReturnValueOnce(true);
 
     scheduleHoverOverlayUpdate(first.args);
@@ -104,7 +104,7 @@ describe('highlighter hover scheduling', () => {
     const target = document.createElement('div');
     const { args, hideHoverOverlay, session, showHoverOverlay } = createArgs();
     session.lastHoverTarget = target;
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(target);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
 
     scheduleHoverOverlayUpdate(args);
 
@@ -115,7 +115,7 @@ describe('highlighter hover scheduling', () => {
   it('shows a new eligible target and records it', () => {
     const target = document.createElement('div');
     const { args, session, showHoverOverlay } = createArgs();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(target);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
 
     scheduleHoverOverlayUpdate(args);
 
@@ -127,7 +127,7 @@ describe('highlighter hover scheduling', () => {
   it('stops inside the frame when mode state changes before processing', () => {
     const target = document.createElement('div');
     const { args, hideHoverOverlay, showHoverOverlay } = createArgs();
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(target);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
     args.getState = { isModeEnabled: () => false, isPaused: () => true };
 
     scheduleHoverOverlayUpdate(args);

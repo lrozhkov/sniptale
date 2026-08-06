@@ -39,6 +39,7 @@ export function getTemplatePillClasses(props: {
   isDragging: boolean;
   isLoading: boolean;
   isMenuOpen: boolean;
+  isDisabled?: boolean;
 }) {
   return [
     'sniptale-template-pill',
@@ -46,6 +47,7 @@ export function getTemplatePillClasses(props: {
     props.isDragOver && 'drag-over',
     props.isDragging && 'dragging',
     props.isLoading && 'loading',
+    props.isDisabled && 'disabled',
   ]
     .filter(Boolean)
     .join(' ');

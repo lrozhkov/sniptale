@@ -262,6 +262,12 @@ it('keeps open main-toolbar menus above the page without disabling toolbar contr
   );
 });
 
+it('keeps auto-blur modal interaction exclusive over frame overlay controls', () => {
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /#sniptale-content-app-root:has\(\.sniptale-auto-blur-modal\)[^{]*#sniptale-content-overlay-root[^{]*\{[^}]*z-index:\s*2147483645\s*!important;[^}]*pointer-events:\s*none\s*!important;/su
+  );
+});
+
 it('disables the legacy quick-edit outline once the active frame owns the border', () => {
   expect(sharedStylesheet).not.toContain('.sniptale-editing {');
   expect(sharedStylesheet).not.toContain('.sniptale-editing:focus {');

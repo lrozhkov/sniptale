@@ -12,6 +12,10 @@ vi.mock('../../../selection/auto-blur-runtime', async (importOriginal) => ({
 }));
 
 import { applyAutoBlurWithSettings, type AutoBlurFrameManager } from './operations';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+
+const BORDER_SETTINGS = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -40,6 +44,7 @@ it('allows full-page matches to initialize after the viewport is restored', asyn
   } satisfies AutoBlurFrameManager;
 
   await applyAutoBlurWithSettings({
+    borderSettings: BORDER_SETTINGS,
     blurSettings: { amount: 10, blurType: 'solid', showBorder: false },
     frameManager,
     frames: frameManager.frames,
@@ -60,6 +65,7 @@ it('keeps current-view matches on strict visible initialization', async () => {
   } satisfies AutoBlurFrameManager;
 
   await applyAutoBlurWithSettings({
+    borderSettings: BORDER_SETTINGS,
     blurSettings: { amount: 10, blurType: 'solid', showBorder: false },
     frameManager,
     frames: frameManager.frames,
@@ -67,6 +73,7 @@ it('keeps current-view matches on strict visible initialization', async () => {
   });
 
   expect(frameManager.syncAutoBlurFrames).toHaveBeenCalledWith({
+    borderSettings: BORDER_SETTINGS,
     blurSettings: { amount: 10, blurType: 'solid', showBorder: false },
     targets: expect.any(Array),
   });

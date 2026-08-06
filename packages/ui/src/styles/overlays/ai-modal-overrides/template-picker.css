@@ -2,6 +2,28 @@
  * AI Modal Template Picker
  * ======================================== */
 
+.sniptale-ai-template-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 76%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sniptale-color-surface-input) 32%, transparent);
+}
+
+.sniptale-ai-template-section-title {
+  color: var(--sniptale-color-text-primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sniptale-ai-template-section-description {
+  margin-top: 2px;
+  color: var(--sniptale-color-text-dim);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .sniptale-ai-modal-root .sniptale-template-container {
   gap: 8px;
   align-items: flex-start;
@@ -38,6 +60,11 @@
   border-radius: 10px;
   overflow: visible;
   box-shadow: none;
+}
+
+.sniptale-ai-modal-root .sniptale-template-pill.disabled {
+  opacity: 0.52;
+  filter: saturate(0.55);
 }
 
 .sniptale-ai-modal-root .sniptale-template-pill.menu-open {

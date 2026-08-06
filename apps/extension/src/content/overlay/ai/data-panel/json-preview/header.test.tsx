@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe('JsonPreviewHeader', () => {
-  it('renders the label and delegates the json action contract', async () => {
+  it('renders only the left-aligned actions and delegates the json action contract', async () => {
     const copyFormattedJson = vi.fn();
     const setShowDataPreview = vi.fn();
 
@@ -73,7 +73,8 @@ describe('JsonPreviewHeader', () => {
       />
     );
 
-    expect(container?.textContent).toContain('aiModal.dataForSendingLabel');
+    expect(container?.querySelector('.sniptale-ai-json-header--actions-only')).toBeTruthy();
+    expect(container?.textContent).not.toContain('aiModal.dataForSendingLabel');
     expect(actionsMock).toHaveBeenCalledWith({
       copied: false,
       copyFormattedJson,

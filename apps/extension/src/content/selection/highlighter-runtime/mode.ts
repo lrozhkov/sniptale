@@ -1,5 +1,8 @@
 import { deactivateOtherContentModes, setContentModeEnabled } from '../../application/mode-session';
-import { dispatchHighlighterModeChanged as emitHighlighterModeChanged } from '../../platform/page-context/mode-events';
+import {
+  dispatchFrameEditingChanged,
+  dispatchHighlighterModeChanged as emitHighlighterModeChanged,
+} from '../../platform/page-context/mode-events';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import type { HoverController } from '../highlighter-hover-preview';
 import { mountHighlighterCursorStyle, removeHighlighterCursorStyle } from './runtime-cursor-style';
@@ -47,7 +50,10 @@ export function disableHighlighterRuntime(
 
   state.isModeEnabled = false;
   state.isPaused = false;
-  state.isFrameEditing = false;
+  if (state.isFrameEditing) {
+    state.isFrameEditing = false;
+    dispatchFrameEditingChanged({ active: false });
+  }
   setContentModeEnabled('highlighter', false);
   useFrameUIStore.getState().dismissFrameUi();
   hoverController.tracking.cancelPendingFrame();

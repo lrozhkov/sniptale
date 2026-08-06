@@ -39,7 +39,7 @@ describe('anchor visibility gate', () => {
     expect(measureAnchorVisibility(target).presentation).toBe('suspended');
   });
 
-  it('suspends aria-hidden, empty, and non-finite layout boxes', () => {
+  it('suspends ordinary aria-hidden, empty, and non-finite layout boxes', () => {
     const target = document.createElement('button');
     document.body.appendChild(target);
     target.setAttribute('aria-hidden', 'true');
@@ -54,6 +54,22 @@ describe('anchor visibility gate', () => {
     vi.restoreAllMocks();
     installRect(target, { x: Number.NaN, y: 30, width: 100, height: 40 });
     expect(measureAnchorVisibility(target).reason).toBe('invalid-layout-box');
+  });
+
+  it('keeps a rendered aria-hidden label visible when it proxies a checkbox control', () => {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = 'p-lang-btn-checkbox';
+    const label = document.createElement('label');
+    label.htmlFor = input.id;
+    label.setAttribute('aria-hidden', 'true');
+    document.body.append(input, label);
+    installRect(label, { x: 20, y: 30, width: 100, height: 40 });
+
+    expect(measureAnchorVisibility(label)).toMatchObject({
+      presentation: 'visible',
+      reason: 'visible',
+    });
   });
 
   it('distinguishes carousel clipping from ordinary viewport scroll', () => {

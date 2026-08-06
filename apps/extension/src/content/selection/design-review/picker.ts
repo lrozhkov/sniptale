@@ -1,6 +1,5 @@
 import {
   isContentEventWithinAnyElement,
-  isContentOwnedElement,
   isContentOwnedEvent,
   queryAllContentUiElements,
   queryContentUiElement,
@@ -13,7 +12,10 @@ import {
   getAbsolutePosition,
   getViewportClientPoint,
 } from '../../platform/frame';
-import { resolvePagePreparationElement } from '../../parser/page-preparation/target';
+import {
+  projectSelectablePageElement,
+  resolveSelectablePageProjection,
+} from '../page-element-target';
 import {
   isTrustedKeyboardEvent,
   isTrustedMouseEvent,
@@ -53,69 +55,15 @@ const DESIGN_REVIEW_INTERACTION_ROOT_SELECTOR = [
   '[data-ui="content.annotation-marker"]',
 ].join(',');
 
-function isElementNode(value: unknown): value is Element {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    Reflect.get(value, 'nodeType') === Node.ELEMENT_NODE
-  );
-}
-
-function getAssociatedLabels(element: Element): Element[] {
-  const labels: unknown = Reflect.get(element, 'labels');
-  if (typeof labels !== 'object' || labels === null) return [];
-  const length: unknown = Reflect.get(labels, 'length');
-  if (typeof length !== 'number' || !Number.isInteger(length) || length < 0) return [];
-
-  const result: Element[] = [];
-  for (let index = 0; index < length; index += 1) {
-    const label: unknown = Reflect.get(labels, String(index));
-    if (isElementNode(label)) result.push(label);
-  }
-  return result;
-}
-
 function resolveSelectableSnapshot(element: Element): PageStyleSelectionSnapshot | null {
-  const candidates: Element[] = [element, ...getAssociatedLabels(element)];
-  let ancestor = element.parentElement;
-  while (ancestor) {
-    candidates.push(ancestor);
-    ancestor = ancestor.parentElement;
-  }
-
-  const visited = new Set<Element>();
-  for (const candidate of candidates) {
-    if (visited.has(candidate)) continue;
-    visited.add(candidate);
-    const snapshot = readPageStyleSelectionSnapshot(candidate);
-    if (snapshot) return snapshot;
-  }
-  return null;
-}
-
-function resolveComposedPageElement(event: MouseEvent, iframe?: HTMLIFrameElement): Element | null {
-  const composedTargets = event
-    .composedPath()
-    .filter(
-      (candidate): candidate is Element =>
-        typeof candidate === 'object' &&
-        'nodeType' in candidate &&
-        candidate.nodeType === Node.ELEMENT_NODE
-    );
-  if (composedTargets.some((candidate) => isContentOwnedElement(candidate))) {
-    return null;
-  }
-
-  const resolved = composedTargets[0] ?? resolvePagePreparationElement(event, iframe);
-  return resolved && !isContentOwnedElement(resolved) ? resolved : null;
+  return projectSelectablePageElement(element, readPageStyleSelectionSnapshot);
 }
 
 function resolveSelection(
   event: MouseEvent,
   iframe?: HTMLIFrameElement
 ): DesignReviewSelection | null {
-  const element = resolveComposedPageElement(event, iframe);
-  const snapshot = element ? resolveSelectableSnapshot(element) : null;
+  const snapshot = resolveSelectablePageProjection(event, readPageStyleSelectionSnapshot, iframe);
   if (!snapshot) {
     return null;
   }

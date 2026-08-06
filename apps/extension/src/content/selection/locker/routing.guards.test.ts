@@ -30,6 +30,7 @@ import {
   getLockRoutingTarget,
   handleClosestLink,
   handleResolvedNavigationTarget,
+  isPageElementPickerActive,
   isSelectionDelegatedMode,
   resolveLockTargets,
   shouldAllowQuickEditTarget,
@@ -68,6 +69,7 @@ function shouldBlockInteractiveQuickEditTargetsWhenNeeded(): void {
   const event = createCancelableEvent();
   helpers.getLockEventElements.mockReturnValue([document.createElement('div')]);
   helpers.findClosestInteractiveElementForLock.mockReturnValue(interactiveTarget);
+  helpers.isTextElementForQuickEditLock.mockReturnValue(false);
   modeSession.isContentModeEnabled.mockReturnValue(true);
 
   expect(shouldBlockQuickEditInteractiveTarget(event)).toBe(true);
@@ -175,6 +177,28 @@ describe('locker routing guards', () => {
     const event = createCancelableEvent();
     modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'design-review');
 
+    blockNavigationEvent(event);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
+  });
+  it('keeps Annotation navigation events available to the picker listener', () => {
+    const event = createCancelableEvent();
+    modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'highlighter');
+
+    expect(isPageElementPickerActive()).toBe(true);
+    blockNavigationEvent(event);
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
+  });
+  it('keeps Quick Edit navigation events available to the picker listener', () => {
+    const event = createCancelableEvent();
+    modeSession.isContentModeEnabled.mockImplementation((mode: string) => mode === 'quick-edit');
+
+    expect(isPageElementPickerActive()).toBe(true);
     blockNavigationEvent(event);
 
     expect(event.preventDefault).toHaveBeenCalledOnce();

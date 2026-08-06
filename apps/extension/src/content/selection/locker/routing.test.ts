@@ -206,11 +206,83 @@ function shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker(): void {
   expect(pickerListener).toHaveBeenCalledOnce();
 }
 
+function shouldBlockQuickEditLinksWithoutHidingThemFromThePicker(): void {
+  const link = document.createElement('a');
+  link.href = '/next';
+  link.textContent = 'Next';
+  document.body.appendChild(link);
+  const event = createCancelableClick();
+  const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+  const pickerListener = vi.fn();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+  const lockerListener = (capturedEvent: Event) => {
+    routeLockInteractionEvent(capturedEvent, {
+      isFullLockMode: false,
+      isNavigationLocked: true,
+      isUIHidden: false,
+    });
+  };
+  window.addEventListener('click', lockerListener, { capture: true, once: true });
+  window.addEventListener('click', pickerListener, { capture: true, once: true });
+
+  link.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(stopImmediatePropagation).not.toHaveBeenCalled();
+  expect(pickerListener).toHaveBeenCalledOnce();
+}
+
+function shouldBlockAnnotationLinksWithoutHidingThemFromThePicker(): void {
+  const link = document.createElement('a');
+  link.href = '/next';
+  document.body.appendChild(link);
+  const event = createCancelableClick();
+  const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+  const pickerListener = vi.fn();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'highlighter');
+  const lockerListener = (capturedEvent: Event) => {
+    routeLockInteractionEvent(capturedEvent, {
+      isFullLockMode: false,
+      isNavigationLocked: true,
+      isUIHidden: false,
+    });
+  };
+  window.addEventListener('click', lockerListener, { capture: true });
+  window.addEventListener('click', pickerListener, { capture: true });
+
+  try {
+    link.dispatchEvent(event);
+  } finally {
+    window.removeEventListener('click', lockerListener, { capture: true });
+    window.removeEventListener('click', pickerListener, { capture: true });
+  }
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(stopImmediatePropagation).not.toHaveBeenCalled();
+  expect(pickerListener).toHaveBeenCalledOnce();
+}
+
 function shouldAllowDesignReviewToPickNonLinkControlsDuringAStaleFullLock(): void {
   const button = document.createElement('button');
   document.body.appendChild(button);
   const event = createCancelableClick();
   modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
+
+  button.dispatchEvent(event);
+  routeLockInteractionEvent(event, {
+    isFullLockMode: true,
+    isNavigationLocked: true,
+    isUIHidden: false,
+  });
+
+  expect(event.defaultPrevented).toBe(false);
+}
+
+function shouldAllowAnnotationToPickNonLinkControlsDuringAStaleFullLock(): void {
+  const button = document.createElement('button');
+  document.body.appendChild(button);
+  const event = createCancelableClick();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'highlighter');
 
   button.dispatchEvent(event);
   routeLockInteractionEvent(event, {
@@ -274,8 +346,20 @@ describe('locker routing', () => {
     shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker
   );
   it(
+    'blocks Quick Edit links without hiding them from the picker',
+    shouldBlockQuickEditLinksWithoutHidingThemFromThePicker
+  );
+  it(
+    'blocks Annotation links without hiding them from the picker',
+    shouldBlockAnnotationLinksWithoutHidingThemFromThePicker
+  );
+  it(
     'allows Design Review to pick non-link controls during a stale full lock',
     shouldAllowDesignReviewToPickNonLinkControlsDuringAStaleFullLock
+  );
+  it(
+    'allows Annotation to pick non-link controls during a stale full lock',
+    shouldAllowAnnotationToPickNonLinkControlsDuringAStaleFullLock
   );
   it('blocks Design Review middle-click navigation', shouldBlockDesignReviewMiddleClickNavigation);
 });

@@ -7,6 +7,22 @@ import { AUTO_BLUR_CATEGORIES } from '../../../../features/highlighter/contracts
 import type { AutoBlurController } from '../controller';
 import type { AutoBlurMatch } from '../../../selection/auto-blur-runtime';
 import { AutoBlurModal } from '.';
+import { DEFAULT_HIGHLIGHTER_SETTINGS } from '../../../../composition/persistence/highlighter';
+
+const modalMocks = vi.hoisted(() => ({
+  loadHighlighterSettings: vi.fn(),
+  subscribeToHighlighterSettings: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../../../composition/persistence/highlighter')>();
+  return {
+    ...original,
+    loadHighlighterSettings: modalMocks.loadHighlighterSettings,
+    subscribeToHighlighterSettings: modalMocks.subscribeToHighlighterSettings,
+  };
+});
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -88,6 +104,8 @@ async function expectRowsAndFooterWired() {
   const rowCheckboxes = container?.querySelectorAll('[role="treegrid"] input[type="checkbox"]');
   expect(rowCheckboxes?.[0]).toHaveProperty('checked', true);
   expect(container?.textContent).toContain('john.doe@example.com');
+  expect(container?.textContent).toContain('content.autoBlur.title');
+  expect(container?.textContent).toContain('content.autoBlur.appearanceTitle');
   expect(container?.textContent).toContain('content.autoBlur.alreadyBlurred');
   expect(container?.textContent).not.toContain('content.autoBlur.readyStatus');
 
@@ -131,6 +149,8 @@ async function expectChildDeselection() {
 
 async function expectEscapeClosesModal() {
   const controller = createController();
+  const leakedKeyDown = vi.fn();
+  window.addEventListener('keydown', leakedKeyDown);
   await renderModal(controller);
 
   container
@@ -138,6 +158,8 @@ async function expectEscapeClosesModal() {
     ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
 
   expect(controller.close).toHaveBeenCalledTimes(1);
+  expect(leakedKeyDown).not.toHaveBeenCalled();
+  window.removeEventListener('keydown', leakedKeyDown);
 }
 
 async function expectModalStates() {
@@ -154,6 +176,8 @@ async function expectModalStates() {
 describe('AutoBlurModal', () => {
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    modalMocks.loadHighlighterSettings.mockResolvedValue(DEFAULT_HIGHLIGHTER_SETTINGS);
+    modalMocks.subscribeToHighlighterSettings.mockReturnValue(() => undefined);
   });
 
   afterEach(() => {
@@ -168,6 +192,45 @@ describe('AutoBlurModal', () => {
 
   it('renders selectable rows, marks already blurred targets, and wires footer actions', async () => {
     await expectRowsAndFooterWired();
+  });
+
+  it('applies the same enabled frame-template snapshot that the modal rendered', async () => {
+    let resolveInitialLoad: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
+    modalMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInitialLoad = resolve;
+      })
+    );
+    let publishSettings: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
+    modalMocks.subscribeToHighlighterSettings.mockImplementation((listener) => {
+      publishSettings = listener;
+      return () => undefined;
+    });
+    const currentSettings = {
+      ...DEFAULT_HIGHLIGHTER_SETTINGS,
+      borderPresets: [
+        {
+          ...DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets[0]!,
+          color: '#13579b',
+          id: 'just-loaded-template',
+          name: 'Just loaded',
+        },
+      ],
+      defaultBorderPresetId: 'just-loaded-template',
+    };
+    const controller = createController();
+    await renderModal(controller);
+    await act(async () => {
+      publishSettings?.(currentSettings);
+      resolveInitialLoad?.(DEFAULT_HIGHLIGHTER_SETTINGS);
+      await Promise.resolve();
+    });
+
+    clickButton('content.autoBlur.apply');
+
+    expect(controller.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ color: '#13579b', sourcePresetId: 'just-loaded-template' })
+    );
   });
 
   it('renders category parents for empty categories and exposes tree bulk actions', async () => {

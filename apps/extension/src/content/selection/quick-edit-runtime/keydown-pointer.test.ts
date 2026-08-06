@@ -22,6 +22,10 @@ function createIframeTarget() {
   const innerTarget = iframeDoc.createElement('div');
   innerTarget.textContent = 'Editable text';
   iframeDoc.body.appendChild(innerTarget);
+  Object.defineProperty(innerTarget, 'getClientRects', {
+    configurable: true,
+    value: () => [DOMRect.fromRect({ height: 24, width: 80 })],
+  });
   Object.defineProperty(iframeDoc, 'elementFromPoint', {
     configurable: true,
     value: vi.fn(() => innerTarget),
@@ -63,7 +67,8 @@ it('uses the inner iframe text node for quick edit hover resolution', () => {
     iframe
   );
 
-  expect(showHoverOverlay).toHaveBeenCalledWith(innerTarget);
+  expect(showHoverOverlay).toHaveBeenCalledOnce();
+  expect(showHoverOverlay.mock.calls[0]?.[0]).toBe(innerTarget);
   expect(hideHoverOverlay).not.toHaveBeenCalled();
 });
 

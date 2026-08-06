@@ -10,11 +10,8 @@ import {
 } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
-import {
-  ProductField,
-  ProductKeyboardHint,
-  ProductTextarea,
-} from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { CornerDownLeft } from 'lucide-react';
 import type { useAIModalState } from '../session';
 import { AIModalPromptVoiceButton } from './prompt-voice-button';
 
@@ -23,8 +20,10 @@ export function AIModalPromptField(props: {
   handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   handleResizeStart: (event: MouseEvent) => void;
   isResizing: boolean;
+  onSubmit: () => void;
   prompt: string;
   setPrompt: Dispatch<SetStateAction<string>>;
+  submitDisabled: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   voice: ReturnType<typeof useAIModalState>['voice'];
 }) {
@@ -68,16 +67,25 @@ export function AIModalPromptField(props: {
           }}
           voice={props.voice}
         />
+        <button
+          aria-describedby={hintId}
+          aria-label={translate('aiModal.submitShortcutTitle')}
+          className="sniptale-ai-modal-prompt-submit"
+          disabled={props.disabled || props.submitDisabled}
+          onClick={props.onSubmit}
+          title={translate('aiModal.submitShortcutTitle')}
+          type="button"
+        >
+          <CornerDownLeft aria-hidden="true" size={15} strokeWidth={2} />
+        </button>
         <div
           className={`sniptale-resizer ${props.isResizing ? 'active' : ''}`}
           onMouseDown={props.handleResizeStart}
         />
       </div>
-      <div className="sniptale-ai-modal-kbd-hint" id={hintId}>
-        <ProductKeyboardHint shortcut="Ctrl+Enter">
-          {translate('aiModal.submitShortcutSuffix')}
-        </ProductKeyboardHint>
-      </div>
+      <span className="sr-only" id={hintId}>
+        {translate('aiModal.submitShortcutDescription')}
+      </span>
       {hasVoiceError ? (
         <p className="sniptale-ai-modal-prompt-voice-error" id={voiceErrorId} role="alert">
           {translate('aiModal.voiceInputError')}
@@ -87,21 +95,25 @@ export function AIModalPromptField(props: {
   );
 }
 
-export function renderAIModalPromptField(
-  handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void,
-  isLoading: boolean | undefined,
-  state: ReturnType<typeof useAIModalState>
-) {
+export function renderAIModalPromptField(args: {
+  disabled: boolean;
+  handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onSubmit: () => void;
+  state: ReturnType<typeof useAIModalState>;
+  submitDisabled: boolean;
+}) {
   return (
     <AIModalPromptField
-      disabled={Boolean(isLoading)}
-      handleKeyDown={handleKeyDown}
-      handleResizeStart={state.handleResizeStart}
-      isResizing={state.isResizing}
-      prompt={state.prompt}
-      setPrompt={state.setPrompt}
-      textareaRef={state.textareaRef}
-      voice={state.voice}
+      disabled={args.disabled}
+      handleKeyDown={args.handleKeyDown}
+      handleResizeStart={args.state.handleResizeStart}
+      isResizing={args.state.isResizing}
+      onSubmit={args.onSubmit}
+      prompt={args.state.prompt}
+      setPrompt={args.state.setPrompt}
+      submitDisabled={args.submitDisabled}
+      textareaRef={args.state.textareaRef}
+      voice={args.state.voice}
     />
   );
 }

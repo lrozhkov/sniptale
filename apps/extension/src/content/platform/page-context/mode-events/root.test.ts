@@ -4,9 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addContentModeDisabledListener,
   addExitFrameEditingListener,
+  addFrameEditingChangedListener,
   addHighlighterModeChangedListener,
   dispatchContentModeDisabled,
   dispatchExitFrameEditing,
+  dispatchFrameEditingChanged,
   dispatchHighlighterModeChanged,
 } from '.';
 
@@ -45,6 +47,16 @@ describe('content mode events', () => {
 
     expect(listener).toHaveBeenCalledTimes(1);
 
+    cleanup();
+  });
+
+  it('dispatches frame-editing state through the shared event seam', () => {
+    const listener = vi.fn();
+    const cleanup = addFrameEditingChangedListener(listener);
+
+    dispatchFrameEditingChanged({ active: true });
+
+    expect(listener).toHaveBeenCalledWith({ active: true });
     cleanup();
   });
 

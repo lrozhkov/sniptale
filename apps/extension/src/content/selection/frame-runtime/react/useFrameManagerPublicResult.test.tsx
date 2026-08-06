@@ -100,12 +100,14 @@ describe('frame-manager-public-result-hook', () => {
       updateGlobalStepBadgeSettings: currentArgs.updateGlobalStepBadgeSettings,
     });
     latestPublicResult?.addAutoBlurFrames({
+      borderSettings: DEFAULT_BORDER_PRESET,
       blurSettings: { amount: 8, blurType: 'solid' },
       targets: [],
     });
     latestPublicResult?.addFrame(document.createElement('div'));
     latestPublicResult?.clearAutoBlurFrames({ targets: [] });
     latestPublicResult?.syncAutoBlurFrames({
+      borderSettings: DEFAULT_BORDER_PRESET,
       blurSettings: { amount: 8, blurType: 'solid' },
       targets: [],
     });

@@ -121,4 +121,19 @@ describe('TemplateMenuActionItems', () => {
     expect(onEdit).toHaveBeenCalledWith(template);
     expect(onDelete).toHaveBeenCalledWith(template);
   });
+
+  it('offers reversible hiding instead of deletion for system templates', async () => {
+    const systemTemplate = { ...template, enabled: true, isDefault: true };
+    await renderNode(
+      <TemplateMenuActionItems
+        isLoading={false}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        template={systemTemplate}
+      />
+    );
+
+    expect(container?.textContent).toContain('aiModal.disableSystemTemplate');
+    expect(container?.textContent).not.toContain('common.actions.delete');
+  });
 });

@@ -20,6 +20,9 @@ function isPromptTemplate(value: unknown): value is PromptTemplate {
     isString(value['name']) &&
     isString(value['content']) &&
     (value['isDefault'] === undefined || isBoolean(value['isDefault'])) &&
+    (value['enabled'] === undefined || isBoolean(value['enabled'])) &&
+    (value['customized'] === undefined || isBoolean(value['customized'])) &&
+    (value['systemRevision'] === undefined || isNumber(value['systemRevision'])) &&
     (value['lastUsedAt'] === undefined || isNumber(value['lastUsedAt']))
   );
 }

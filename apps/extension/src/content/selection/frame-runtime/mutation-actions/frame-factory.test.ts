@@ -20,7 +20,8 @@ import { setFutureFrameCallout } from '../session/future-callout';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
-vi.mock('../../highlighter', () => ({
+vi.mock('../../highlighter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../highlighter')>()),
   invalidateFrameCache,
 }));
 
@@ -216,6 +217,23 @@ describe('frame mutation action frame factory', () => {
     expect(frame.effectMode).toBe('border');
     expect(frame.blurSettings).toEqual(createBlurSettings());
     expect(frame.focusSettings).toEqual(createFocusSettings());
+  });
+
+  it('accepts a visible aria-hidden label that proxies an interactive checkbox', () => {
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = 'p-lang-btn-checkbox';
+    const label = createVisibleElement('label') as HTMLLabelElement;
+    label.htmlFor = input.id;
+    label.setAttribute('aria-hidden', 'true');
+    document.body.prepend(input);
+    const { currentFrames, hostLayoutServiceRef, options } = createOptions();
+
+    const frame = createAddFrameHandler(options)(label);
+
+    expect(frame).not.toBeNull();
+    expect(currentFrames()).toHaveLength(1);
+    expect(hostLayoutServiceRef.current.getNode('frame-1')).toBe(label);
   });
 
   it('selects a newly drawn free frame and closes the previous toolbar owner', () => {

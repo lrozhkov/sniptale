@@ -129,6 +129,7 @@ it('renders an empty state when no models are available', async () => {
   );
 
   expect(container?.textContent).toContain(translate('aiModal.modelNotSelected'));
+  expect(container?.querySelector('.sniptale-ai-model-selector-missing')).toBeTruthy();
   expect(container?.querySelector('[data-testid="dropdown-menu"]')).toBeNull();
 });
 

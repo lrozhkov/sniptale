@@ -2,7 +2,11 @@ import type {
   AutoBlurCategory,
   AutoBlurDetection,
 } from '../../../features/highlighter/contracts/auto-blur';
-import type { BlurSettings, FrameData } from '../../../features/highlighter/contracts';
+import type {
+  AppliedBorderSettings,
+  BlurSettings,
+  FrameData,
+} from '../../../features/highlighter/contracts';
 
 export interface AutoBlurTextRect {
   height: number;
@@ -64,6 +68,8 @@ export interface AutoBlurScanInput {
 export interface AutoBlurApplyInput {
   /** Keeps geometry measured during full-page traversal after the viewport is restored. */
   allowDeferredInitialPlacement?: boolean;
+  /** Immutable appearance snapshot resolved by the initiating UI or background action. */
+  borderSettings: AppliedBorderSettings;
   blurSettings: BlurSettings;
   targets: AutoBlurApplyTarget[];
 }

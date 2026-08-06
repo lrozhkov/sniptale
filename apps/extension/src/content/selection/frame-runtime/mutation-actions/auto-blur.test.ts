@@ -40,6 +40,7 @@ vi.mock('../../../platform/frame/selectors', () => ({
 
 vi.mock('../../highlighter', () => ({
   invalidateFrameCache: iframeUtilsMocks.invalidateFrameCache,
+  isFrameEditing: () => false,
 }));
 
 import {
@@ -93,16 +94,6 @@ function createHandlerScenario() {
   });
   const args: HandlerArgs = {
     framesRef,
-    highlighterSettingsCacheRef: {
-      current: {
-        borderPresets: [createBorderSettingsFixture({ id: 'preset-1', color: '#ff0000' })],
-        defaultBlurSettings: createBlurSettingsFixture(),
-        defaultBorderPresetId: 'preset-1',
-        defaultEffectMode: 'border',
-        systemPresetCatalogRevision: 1,
-        defaultFocusSettings: createFocusSettingsFixture(),
-      },
-    },
     hostLayoutServiceRef: { current: createFrameHostLayoutService() },
     sessionFocusSettingsRef: { current: createFocusSettingsFixture({ opacity: 0.7 }) },
     setFrames,
@@ -117,6 +108,7 @@ function createHandlerScenario() {
 
 function createAutoBlurInput(element: HTMLElement) {
   return {
+    borderSettings: createBorderSettingsFixture({ id: 'preset-1', color: '#ff0000' }),
     blurSettings: createBlurSettingsFixture({ amount: 22, blurType: 'solid' }),
     targets: [
       {
@@ -276,12 +268,39 @@ describe('createAddAutoBlurFramesHandler', () => {
     expectAutoBlurFramesAdded();
   });
 
+  it('uses the immutable frame appearance selected by the auto-blur UI', () => {
+    const scenario = createHandlerScenario();
+    const input = createAutoBlurInput(scenario.element);
+    input.borderSettings = createBorderSettingsFixture({
+      id: 'selected-preset',
+      color: '#00aa77',
+    });
+
+    createAddAutoBlurFramesHandler(scenario.args)(input);
+
+    expect(scenario.getFrames()[1]?.borderSettings?.color).toBe('#00aa77');
+  });
+
+  it('does not replace the UI snapshot with a later runtime template snapshot', () => {
+    const scenario = createHandlerScenario();
+    const input = createAutoBlurInput(scenario.element);
+    input.blurSettings.borderPresetId = 'stale-persisted-id';
+    input.borderSettings = createBorderSettingsFixture({
+      id: 'visible-enabled-template',
+      color: '#3366ff',
+    });
+
+    createAddAutoBlurFramesHandler(scenario.args)(input);
+
+    expect(scenario.getFrames()[1]?.borderSettings?.color).toBe('#3366ff');
+  });
+
   it('expands the blur overlay by the configured frame padding', () => {
     const scenario = createHandlerScenario();
-    const preset = scenario.args.highlighterSettingsCacheRef.current!.borderPresets[0]!;
-    preset.padding = { bottom: 3, left: 2, right: 4, top: 1 };
+    const input = createAutoBlurInput(scenario.element);
+    input.borderSettings.padding = { bottom: 3, left: 2, right: 4, top: 1 };
 
-    createAddAutoBlurFramesHandler(scenario.args)(createAutoBlurInput(scenario.element));
+    createAddAutoBlurFramesHandler(scenario.args)(input);
 
     expect(getBlurOverlayBox(scenario.getFrames()[1]!)).toEqual({
       height: 26,
@@ -360,6 +379,7 @@ describe('createAddAutoBlurFramesHandler', () => {
     });
 
     const result = createAddAutoBlurFramesHandler(scenario.args)({
+      borderSettings: createBorderSettingsFixture(),
       blurSettings: createBlurSettingsFixture({ amount: 22, blurType: 'solid' }),
       targets: [
         {

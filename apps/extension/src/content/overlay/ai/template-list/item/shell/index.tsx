@@ -49,7 +49,11 @@ export function TemplatePillShell(props: {
           templateId: props.template.id,
         })
       }
-      onMouseDown={(event) => props.state.handlePointerDown(event, props.template.id)}
+      onMouseDown={(event) => {
+        if (props.template.enabled !== false) {
+          props.state.handlePointerDown(event, props.template.id);
+        }
+      }}
       className={props.pillClasses}
     >
       {props.children}

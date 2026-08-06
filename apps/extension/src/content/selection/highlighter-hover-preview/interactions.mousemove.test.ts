@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolvePagePreparationTarget: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
   isInsideExistingFrame: vi.fn(() => false),
@@ -10,7 +10,7 @@ const targetPolicy = vi.hoisted(() => ({
   isNearExistingFrameBorder: vi.fn(() => false),
 }));
 
-vi.mock('../../parser/page-preparation/target', () => targetResolver);
+vi.mock('../page-element-target', () => targetResolver);
 vi.mock('./targets', () => targetPolicy);
 
 import { createHoverInteractionHandlers } from './interactions';
@@ -46,7 +46,7 @@ describe('highlighter hover mouse lifecycle', () => {
 
     handlers.handleMouseMove(new MouseEvent('mousemove', { clientX: 10, clientY: 12 }));
 
-    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+    expect(targetResolver.resolveSelectablePageHtmlElement).not.toHaveBeenCalled();
   });
 
   it('consumes the first movement after a frozen click without scheduling', () => {
@@ -57,13 +57,13 @@ describe('highlighter hover mouse lifecycle', () => {
 
     expect(session.isHoverPreviewFrozen).toBe(false);
     expect(hideHoverOverlay).toHaveBeenCalledOnce();
-    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+    expect(targetResolver.resolveSelectablePageHtmlElement).not.toHaveBeenCalled();
   });
 
   it('schedules and displays an eligible target', () => {
     const { handlers, session, showHoverOverlay } = createFixture();
     const target = document.createElement('div');
-    targetResolver.resolvePagePreparationTarget.mockReturnValueOnce(target);
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 9;
@@ -88,7 +88,7 @@ describe('highlighter hover mouse lifecycle', () => {
     expect(session.hoverRafId).toBeNull();
     expect(session.lastHoverTarget).toBeNull();
     expect(hideHoverOverlay).toHaveBeenCalledOnce();
-    expect(targetResolver.resolvePagePreparationTarget).not.toHaveBeenCalled();
+    expect(targetResolver.resolveSelectablePageHtmlElement).not.toHaveBeenCalled();
   });
 
   it('cancels pending work and clears the target on mouse leave', () => {

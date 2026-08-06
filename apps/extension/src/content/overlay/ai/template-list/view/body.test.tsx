@@ -97,9 +97,10 @@ describe('TemplateListBody', () => {
 
     await renderNode(<TemplateListBody {...props} />);
 
-    expect(rendered?.container.querySelector('.sniptale-label')?.textContent).toBe(
-      'aiModal.templatesLabel'
-    );
+    expect(
+      rendered?.container.querySelector('.sniptale-ai-template-section-title')?.textContent
+    ).toBe('aiModal.templatesLabel');
+    expect(rendered?.container.textContent).toContain('aiModal.templatesDescription');
     expect(rendered?.container.querySelector('.sniptale-template-container.dragging')).toBeTruthy();
     expect(pillMock).toHaveBeenCalledTimes(2);
     expect(pillMock).toHaveBeenNthCalledWith(1, {

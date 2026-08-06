@@ -1,3 +1,5 @@
+import { isQuickEditTextElement } from '../quick-edit-runtime/elements';
+
 const EXTENSION_CLASS_PREFIX = 'sniptale-';
 const INTERACTIVE_TAGS = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
 const NAVIGATION_DATA_ATTRIBUTES = [
@@ -7,23 +9,6 @@ const NAVIGATION_DATA_ATTRIBUTES = [
   'data-link',
   'data-target-url',
   'data-navigation-url',
-];
-const QUICK_EDIT_TEXT_TAGS = [
-  'p',
-  'span',
-  'div',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'li',
-  'td',
-  'th',
-  'label',
-  'a',
-  'button',
 ];
 
 function hasSniptaleClass(element: HTMLElement): boolean {
@@ -181,20 +166,5 @@ export function isGwtInternalTabLink(href: string | null): boolean {
 }
 
 export function isTextElementForQuickEditLock(element: HTMLElement): boolean {
-  const tagName = element.tagName.toLowerCase();
-  if (!QUICK_EDIT_TEXT_TAGS.includes(tagName) || hasSniptaleClass(element)) {
-    return false;
-  }
-
-  let parent = element.parentElement;
-  while (parent && parent !== document.body) {
-    if (
-      Array.from(parent.classList).some((className) => className.startsWith(EXTENSION_CLASS_PREFIX))
-    ) {
-      return false;
-    }
-    parent = parent.parentElement;
-  }
-
-  return Boolean(element.textContent?.trim());
+  return !isExtensionElement(element) && isQuickEditTextElement(element);
 }

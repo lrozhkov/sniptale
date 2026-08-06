@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PromptTemplate } from '../../../contracts/settings';
 import {
@@ -13,6 +13,7 @@ import {
   savePromptTemplatePatch,
   touchPromptTemplateRecord,
 } from '../service';
+import { useAppLocale } from '../../../platform/i18n';
 
 export interface PromptTemplatesState {
   templates: PromptTemplate[];
@@ -45,22 +46,36 @@ function usePromptTemplateStateValues() {
 }
 
 function usePromptTemplateLoader(state: ReturnType<typeof usePromptTemplateStateValues>) {
+  const locale = useAppLocale();
+  const requestGenerationRef = useRef(0);
   const { setError, setIsLoading, setTemplates } = state;
   const loadTemplates = useCallback(async () => {
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
     setIsLoading(true);
     setError(null);
 
     try {
-      setTemplates(await loadPromptTemplateList());
+      const templates = await loadPromptTemplateList(locale);
+      if (requestGenerationRef.current === requestGeneration) {
+        setTemplates(templates);
+      }
     } catch (error) {
-      setError(getPromptTemplateErrorMessage(error));
+      if (requestGenerationRef.current === requestGeneration) {
+        setError(getPromptTemplateErrorMessage(error));
+      }
     } finally {
-      setIsLoading(false);
+      if (requestGenerationRef.current === requestGeneration) {
+        setIsLoading(false);
+      }
     }
-  }, [setError, setIsLoading, setTemplates]);
+  }, [locale, setError, setIsLoading, setTemplates]);
 
   useEffect(() => {
     void loadTemplates();
+    return () => {
+      requestGenerationRef.current += 1;
+    };
   }, [loadTemplates]);
 
   return loadTemplates;
@@ -107,7 +122,16 @@ function usePromptTemplateCrudActions(state: ReturnType<typeof usePromptTemplate
           setError(null);
           try {
             await deletePromptTemplateRecord(id);
-            setTemplates((previous) => previous.filter((template) => template.id !== id));
+            setTemplates((previous) => {
+              const target = previous.find((template) => template.id === id);
+              return target?.isDefault
+                ? previous.map((template) =>
+                    template.id === id
+                      ? { ...template, enabled: template.enabled === false }
+                      : template
+                  )
+                : previous.filter((template) => template.id !== id);
+            });
           } catch (error) {
             setError(getPromptTemplateErrorMessage(error));
             throw error;

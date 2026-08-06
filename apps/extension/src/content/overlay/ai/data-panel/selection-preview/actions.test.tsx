@@ -69,6 +69,8 @@ describe('DataSelectionPreviewActions', () => {
     const actionHost = container?.querySelector('.sniptale-ai-spoiler-actions');
 
     act(() => {
+      actionHost?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      actionHost?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       actionHost?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       buttons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       buttons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

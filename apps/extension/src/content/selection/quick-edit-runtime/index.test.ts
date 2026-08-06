@@ -48,6 +48,10 @@ function createTextElement(): HTMLElement {
       toJSON: () => ({}),
     }),
   });
+  Object.defineProperty(element, 'getClientRects', {
+    configurable: true,
+    value: () => [element.getBoundingClientRect()],
+  });
 
   return element;
 }

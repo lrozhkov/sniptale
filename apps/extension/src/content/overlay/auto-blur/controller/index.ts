@@ -13,6 +13,7 @@ import {
 } from './effects';
 import type { AutoBlurFrameManager } from './operations';
 import { useAutoBlurSession } from './state';
+import type { AppliedBorderSettings } from '../../../../features/highlighter/contracts';
 
 type UseAutoBlurControllerParams = {
   autoApplyAllowed: boolean;
@@ -23,7 +24,7 @@ type UseAutoBlurControllerParams = {
 type AutoBlurSession = ReturnType<typeof useAutoBlurSession>;
 
 function createControllerResult(args: {
-  apply: () => Promise<void>;
+  apply: (borderSettings: AppliedBorderSettings) => Promise<void>;
   applyOnce: () => Promise<void>;
   autoApplyAllowed: boolean;
   clear: () => void;
