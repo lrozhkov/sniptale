@@ -17,9 +17,17 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Модели не найдены',
     en: 'No models found',
   },
+  modelsNotConfigured: {
+    ru: 'Сначала настройте хотя бы одну AI-модель',
+    en: 'Configure at least one AI model first',
+  },
+  modelRequired: {
+    ru: 'Выберите модель для отправки запроса',
+    en: 'Select a model to submit the request',
+  },
   title: {
-    ru: 'AI Обработка',
-    en: 'AI Processing',
+    ru: 'AI-редактирование контента',
+    en: 'AI content editing',
   },
   closeTitle: {
     ru: 'Закрыть (Escape)',
@@ -45,9 +53,13 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Не удалось запустить голосовой ввод',
     en: 'Voice input could not be started',
   },
-  submitShortcutSuffix: {
-    ru: 'для отправки',
-    en: 'to submit',
+  submitShortcutTitle: {
+    ru: 'Отправить запрос',
+    en: 'Submit request',
+  },
+  submitShortcutDescription: {
+    ru: 'Отправить запрос. Сочетание клавиш: Ctrl + Enter.',
+    en: 'Submit request. Keyboard shortcut: Ctrl + Enter.',
   },
   tokensSuffix: {
     ru: 'токенов',
@@ -141,6 +153,10 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Шаблоны',
     en: 'Templates',
   },
+  templatesDescription: {
+    ru: 'Выберите готовый запрос или создайте свой.',
+    en: 'Choose a ready-made request or create your own.',
+  },
   templatesLoadingSuffix: {
     ru: ' шаблонов...',
     en: ' templates...',
@@ -168,6 +184,30 @@ export const aiModalMessages = defineMessageSource({
   deleteDefaultTemplateTitle: {
     ru: 'Удалить стандартный шаблон?',
     en: 'Delete default template?',
+  },
+  disableSystemTemplate: {
+    ru: 'Скрыть шаблон',
+    en: 'Hide template',
+  },
+  enableSystemTemplate: {
+    ru: 'Вернуть шаблон',
+    en: 'Restore template',
+  },
+  disableSystemTemplateTitle: {
+    ru: 'Скрыть системный шаблон?',
+    en: 'Hide system template?',
+  },
+  enableSystemTemplateTitle: {
+    ru: 'Вернуть системный шаблон?',
+    en: 'Restore system template?',
+  },
+  disableSystemTemplateMessage: {
+    ru: 'Шаблон «{name}» останется в каталоге, но не будет доступен для выбора.',
+    en: '“{name}” will remain in the catalog but will not be available for selection.',
+  },
+  enableSystemTemplateMessage: {
+    ru: 'Шаблон «{name}» снова станет доступен для выбора.',
+    en: '“{name}” will become available for selection again.',
   },
   deleteTemplateTitle: {
     ru: 'Удалить шаблон?',
@@ -261,25 +301,21 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Выделить всё',
     en: 'Select all',
   },
-  dataForSendingLabel: {
-    ru: 'Данные для отправки',
-    en: 'Data to send',
-  },
   hideJsonTitle: {
-    ru: 'Скрыть JSON данных',
-    en: 'Hide data JSON',
+    ru: 'Скрыть данные, которые будут отправлены',
+    en: 'Hide the data that will be sent',
   },
   showJsonTitle: {
-    ru: 'Показать JSON данных для отправки',
-    en: 'Show data JSON to send',
+    ru: 'Показать данные, которые будут отправлены',
+    en: 'Show the data that will be sent',
   },
   hideJsonButton: {
-    ru: 'Скрыть JSON',
-    en: 'Hide JSON',
+    ru: 'Скрыть отправляемые данные',
+    en: 'Hide data to send',
   },
   showJsonButton: {
-    ru: 'Показать JSON',
-    en: 'Show JSON',
+    ru: 'Показать отправляемые данные',
+    en: 'Show data to send',
   },
   copied: {
     ru: 'Скопировано',

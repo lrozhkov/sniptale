@@ -1,4 +1,5 @@
 import type { HighlighterLogger, HoverController } from './controller.types';
+import { dispatchFrameEditingChanged } from '../../platform/page-context/mode-events';
 import {
   addHighlighterFrame,
   clearHighlighterFrames,
@@ -81,10 +82,13 @@ export function createHighlighterStateActions(props: {
 }) {
   return {
     clearFrameEditing: () => {
+      if (!props.state.isFrameEditing) return;
       props.state.isFrameEditing = false;
+      dispatchFrameEditingChanged({ active: false });
       props.logger.log('Frame editing cleared');
     },
     isEnabled: () => props.state.isModeEnabled,
+    isFrameEditing: () => props.state.isFrameEditing,
     isPausedState: () => props.state.isPaused,
     pause: () => {
       props.state.isPaused = true;
@@ -95,7 +99,9 @@ export function createHighlighterStateActions(props: {
       props.logger.log('Highlighter resumed');
     },
     setFrameEditing: () => {
+      if (props.state.isFrameEditing) return;
       props.state.isFrameEditing = true;
+      dispatchFrameEditingChanged({ active: true });
       props.logger.log('Frame editing started');
     },
   };

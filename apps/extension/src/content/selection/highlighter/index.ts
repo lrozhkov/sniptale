@@ -6,6 +6,7 @@ export {
   enableHighlighterMode,
   invalidateFrameCache,
   isHighlighterEnabled,
+  isFrameEditing,
   isHighlighterPausedState,
   pauseHighlighter,
   registerFrameCallbacks,

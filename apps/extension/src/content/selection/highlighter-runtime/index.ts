@@ -44,6 +44,10 @@ export function isHighlighterPausedState(): boolean {
   return highlighterControllerOwner.getOwnerIfCreated()?.isPausedState() ?? false;
 }
 
+export function isFrameEditing(): boolean {
+  return highlighterControllerOwner.getOwnerIfCreated()?.isFrameEditing() ?? false;
+}
+
 export function pauseHighlighter(): void {
   highlighterControllerOwner.getOwner().pause();
 }

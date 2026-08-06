@@ -210,16 +210,6 @@ describe('frame annotation producer history integration', () => {
     });
     const addAutoBlurFrames = createAddAutoBlurFramesHandler({
       framesRef: harness.refs.framesRef,
-      highlighterSettingsCacheRef: {
-        current: {
-          borderPresets: [createBorderSettingsFixture({ id: 'preset' })],
-          defaultBlurSettings: createBlurSettingsFixture(),
-          defaultBorderPresetId: 'preset',
-          defaultEffectMode: 'border',
-          defaultFocusSettings: createFocusSettingsFixture(),
-          systemPresetCatalogRevision: 1,
-        },
-      },
       hostLayoutServiceRef: harness.refs.hostLayoutServiceRef,
       sessionFocusSettingsRef: { current: createFocusSettingsFixture() },
       setFrames: harness.setFrames,
@@ -229,6 +219,7 @@ describe('frame annotation producer history integration', () => {
     let result: ReturnType<typeof addAutoBlurFrames> | undefined;
     act(() => {
       result = mutate({
+        borderSettings: createBorderSettingsFixture({ id: 'preset' }),
         blurSettings: createBlurSettingsFixture(),
         targets: [
           {

@@ -20,6 +20,7 @@ export function TemplatePill({
     isDragging,
     isLoading,
     isMenuOpen,
+    isDisabled: template.enabled === false,
   });
 
   return (

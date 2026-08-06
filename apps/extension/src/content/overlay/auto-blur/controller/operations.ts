@@ -2,7 +2,16 @@ import type {
   AutoBlurCategory,
   AutoBlurSettings,
 } from '../../../../features/highlighter/contracts/auto-blur';
-import type { BlurSettings } from '../../../../features/highlighter/contracts';
+import type {
+  AppliedBorderSettings,
+  BlurSettings,
+} from '../../../../features/highlighter/contracts';
+import {
+  DEFAULT_HIGHLIGHTER_SETTINGS,
+  loadHighlighterSettings,
+} from '../../../../composition/persistence/highlighter';
+import { resolveEnabledBorderPreset } from '../../../../features/highlighter/presets/enabled-catalog';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   DEFAULT_AUTO_BLUR_SETTINGS,
   loadAutoBlurSettings,
@@ -45,6 +54,7 @@ export async function loadSettingsOrDefault(): Promise<AutoBlurSettings> {
 }
 
 export async function applyAutoBlurWithSettings(args: {
+  borderSettings?: AppliedBorderSettings;
   blurSettings: BlurSettings;
   frameManager: AutoBlurFrameManager;
   frames: AutoBlurFrameManager['frames'];
@@ -60,11 +70,27 @@ export async function applyAutoBlurWithSettings(args: {
     (match) => !match.alreadyBlurred && selectedCategories.has(match.category)
   );
 
+  const borderSettings =
+    args.borderSettings ?? (await loadAutoBlurBorderSettings(args.blurSettings.borderPresetId));
+
   return args.frameManager.syncAutoBlurFrames({
     ...(args.scanMode === 'full-page' ? { allowDeferredInitialPlacement: true } : {}),
+    borderSettings,
     blurSettings: args.blurSettings,
     targets: createTargets(selectedMatches),
   });
+}
+
+async function loadAutoBlurBorderSettings(requestedPresetId?: string | null) {
+  let settings = DEFAULT_HIGHLIGHTER_SETTINGS;
+  try {
+    settings = await loadHighlighterSettings();
+  } catch (error) {
+    logger.warn('Failed to load frame templates for auto-blur, falling back to defaults', error);
+  }
+  return projectBorderPresetToAppliedSettings(
+    resolveEnabledBorderPreset(settings, requestedPresetId)
+  );
 }
 
 export async function persistSettings(args: {

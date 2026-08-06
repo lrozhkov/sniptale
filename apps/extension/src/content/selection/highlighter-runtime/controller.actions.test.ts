@@ -100,9 +100,11 @@ it('owns pause and editing state transitions', () => {
   actions.pause();
   actions.setFrameEditing();
   expect(actions.isPausedState()).toBe(true);
+  expect(actions.isFrameEditing()).toBe(true);
 
   actions.resume();
   actions.clearFrameEditing();
+  expect(actions.isFrameEditing()).toBe(false);
   expect(actions.isPausedState()).toBe(false);
   expect(actions.isEnabled()).toBe(false);
 });

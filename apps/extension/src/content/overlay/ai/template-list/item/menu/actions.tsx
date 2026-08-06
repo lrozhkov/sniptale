@@ -2,6 +2,7 @@ import type React from 'react';
 import { translate } from '../../../../../../platform/i18n';
 import { ProductDropdownDivider, ProductDropdownItem } from '@sniptale/ui/product-menus/dropdown';
 import { ContentStrokeIcon } from '../../../../icons/icons';
+import { Eye, EyeOff } from 'lucide-react';
 import { blurPromptIfFocused, createTemplateMenuClickHandler } from '../helpers';
 import type { TemplateMenuItemsProps } from '../types';
 
@@ -51,10 +52,24 @@ export function TemplateMenuActionItems({
         onClick={createTemplateMenuClickHandler(onDelete, template)}
         onMouseDown={stopTemplateMenuEvent}
         disabled={isLoading}
-        danger
+        danger={!template.isDefault}
       >
-        <DeleteTemplateIcon />
-        {translate('common.actions.delete')}
+        {template.isDefault ? (
+          template.enabled === false ? (
+            <Eye size={13} />
+          ) : (
+            <EyeOff size={13} />
+          )
+        ) : (
+          <DeleteTemplateIcon />
+        )}
+        {template.isDefault
+          ? translate(
+              template.enabled === false
+                ? 'aiModal.enableSystemTemplate'
+                : 'aiModal.disableSystemTemplate'
+            )
+          : translate('common.actions.delete')}
       </ProductDropdownItem>
     </>
   );

@@ -1,6 +1,9 @@
 import { useCallback } from 'react';
 import type { AutoBlurCategory } from '../../../../features/highlighter/contracts/auto-blur';
-import type { BlurSettings } from '../../../../features/highlighter/contracts';
+import type {
+  AppliedBorderSettings,
+  BlurSettings,
+} from '../../../../features/highlighter/contracts';
 import { saveAutoBlurSettings } from '../persistence';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -54,6 +57,7 @@ function createSelectedTargets(args: {
 
 async function persistAndApplyTargets(args: {
   autoApplyEnabled: boolean;
+  borderSettings: AppliedBorderSettings;
   blurSettings: BlurSettings;
   close: () => void;
   frameManager: AutoBlurFrameManager;
@@ -62,6 +66,7 @@ async function persistAndApplyTargets(args: {
 }) {
   await persistSettings(args);
   args.frameManager.syncAutoBlurFrames({
+    borderSettings: args.borderSettings,
     blurSettings: args.blurSettings,
     targets: createTargets(args.selectedMatches),
   });
@@ -70,6 +75,7 @@ async function persistAndApplyTargets(args: {
 
 async function applySelectedAutoBlurTargets(args: {
   autoApplyEnabled: boolean;
+  borderSettings: AppliedBorderSettings;
   blurSettings: BlurSettings;
   close: () => void;
   frameManager: AutoBlurFrameManager;
@@ -79,6 +85,7 @@ async function applySelectedAutoBlurTargets(args: {
 }) {
   await persistAndApplyTargets({
     autoApplyEnabled: args.autoApplyEnabled,
+    borderSettings: args.borderSettings,
     blurSettings: args.blurSettings,
     close: args.close,
     frameManager: args.frameManager,
@@ -104,34 +111,38 @@ export function useApplyAction(args: ApplyActionArgs) {
     selectedMatchIds,
   } = args;
 
-  return useCallback(async () => {
-    beginApplying();
+  return useCallback(
+    async (borderSettings: AppliedBorderSettings) => {
+      beginApplying();
 
-    try {
-      await applySelectedAutoBlurTargets({
-        autoApplyEnabled,
-        blurSettings,
-        close,
-        frameManager,
-        matches,
-        selectedCategories,
-        selectedMatchIds,
-      });
-    } catch (error) {
-      logger.error('Failed to apply auto-blur targets', error);
-      failApplying(APPLY_ERROR_MESSAGE_KEY);
-    }
-  }, [
-    autoApplyEnabled,
-    beginApplying,
-    blurSettings,
-    close,
-    failApplying,
-    frameManager,
-    matches,
-    selectedCategories,
-    selectedMatchIds,
-  ]);
+      try {
+        await applySelectedAutoBlurTargets({
+          autoApplyEnabled,
+          borderSettings,
+          blurSettings,
+          close,
+          frameManager,
+          matches,
+          selectedCategories,
+          selectedMatchIds,
+        });
+      } catch (error) {
+        logger.error('Failed to apply auto-blur targets', error);
+        failApplying(APPLY_ERROR_MESSAGE_KEY);
+      }
+    },
+    [
+      autoApplyEnabled,
+      beginApplying,
+      blurSettings,
+      close,
+      failApplying,
+      frameManager,
+      matches,
+      selectedCategories,
+      selectedMatchIds,
+    ]
+  );
 }
 
 export function useApplyOnceAction(args: {

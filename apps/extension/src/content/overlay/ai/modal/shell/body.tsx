@@ -45,7 +45,13 @@ export function AIModalContent({
       <AIModalDialog
         onClose={handleClose}
         onStopVoice={state.voice.actions.stop}
-        promptField={renderAIModalPromptField(handleKeyDown, isLoading, state)}
+        promptField={renderAIModalPromptField({
+          disabled: Boolean(isLoading),
+          handleKeyDown,
+          onSubmit: handleSubmit,
+          state,
+          submitDisabled: footerProps.disabledSubmit,
+        })}
         state={state}
         title={<AIModalHeaderTitle {...(treeData === undefined ? {} : { treeData })} />}
         voiceActive={state.voice.state.active}

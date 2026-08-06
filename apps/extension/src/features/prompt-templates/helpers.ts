@@ -7,6 +7,8 @@ export function getPromptTemplateErrorMessage(error: unknown): string {
 
 export function sortPromptTemplates(templates: PromptTemplate[]): PromptTemplate[] {
   return [...templates].sort((left, right) => {
+    if (left.enabled === false && right.enabled !== false) return 1;
+    if (left.enabled !== false && right.enabled === false) return -1;
     if (left.lastUsedAt && right.lastUsedAt) {
       return right.lastUsedAt - left.lastUsedAt;
     }

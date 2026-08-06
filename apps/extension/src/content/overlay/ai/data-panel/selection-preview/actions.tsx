@@ -16,11 +16,20 @@ export function DataSelectionPreviewActions({
   toggleExpandAll,
   toggleSelectAll,
 }: DataSelectionPreviewActionsProps) {
+  const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
-    <div className="sniptale-ai-spoiler-actions" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="sniptale-ai-spoiler-actions"
+      onClick={stopHeaderToggle}
+      onMouseDown={stopHeaderToggle}
+      onPointerDown={stopHeaderToggle}
+    >
       <button
         className="sniptale-ctrl-btn"
-        onClick={toggleExpandAll}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleExpandAll();
+        }}
         disabled={isLoading}
         title={
           isAnyExpanded
@@ -35,7 +44,10 @@ export function DataSelectionPreviewActions({
       </button>
       <button
         className={`sniptale-ctrl-btn${isAnySelected ? ' active' : ''}`}
-        onClick={toggleSelectAll}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleSelectAll();
+        }}
         disabled={isLoading}
         title={
           isAnySelected

@@ -5,6 +5,8 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { ToolbarLocalSaveControl } from './local-save';
+import { isFrameEditing } from '../../../selection/highlighter';
+import { addFrameEditingChangedListener } from '../../../platform/page-context/mode-events';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -47,6 +49,18 @@ function usePagePreparationHistoryState() {
   }, []);
 
   return historyState;
+}
+
+function useFrameEditingState(): boolean {
+  const [active, setActive] = useState(isFrameEditing);
+
+  useEffect(() => {
+    return addFrameEditingChangedListener(({ active: nextActive }) => {
+      setActive(nextActive);
+    });
+  }, []);
+
+  return active;
 }
 
 function handleHistoryHotkey(args: { canRedo: boolean; canUndo: boolean; event: KeyboardEvent }) {
@@ -123,8 +137,9 @@ function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
 
 export function ToolbarHistoryControls(props: { screenshotMode: boolean }) {
   const historyState = usePagePreparationHistoryState();
-  const canUndo = historyState.canUndo && !historyState.hasOpenTransactions;
-  const canRedo = historyState.canRedo && !historyState.hasOpenTransactions;
+  const frameEditing = useFrameEditingState();
+  const canUndo = historyState.canUndo && !historyState.hasOpenTransactions && !frameEditing;
+  const canRedo = historyState.canRedo && !historyState.hasOpenTransactions && !frameEditing;
 
   usePagePreparationHistoryHotkeys({
     canRedo,

@@ -9,6 +9,10 @@ import {
 } from '../../../../features/highlighter/contracts/auto-blur';
 import type { AutoBlurMatch } from '../../../selection/auto-blur-runtime';
 import type { AutoBlurFrameManager } from './operations';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+
+const BORDER_SETTINGS = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
 
 const controllerMocks = vi.hoisted(() => ({
   defaultSettings: {
@@ -158,13 +162,14 @@ async function expectOpenScanApplyFlow() {
     latestController?.toggleMatch('phone-match');
   });
   await act(async () => {
-    await latestController?.apply();
+    await latestController?.apply(BORDER_SETTINGS);
   });
 
   expect(controllerMocks.saveAutoBlurSettings).toHaveBeenCalledWith(
     controllerMocks.defaultSettings
   );
   expect(syncAutoBlurFrameCalls).toContainEqual({
+    borderSettings: BORDER_SETTINGS,
     blurSettings: controllerMocks.defaultSettings.blurSettings,
     targets: [
       expect.objectContaining({ id: 'email-match' }),
@@ -182,10 +187,11 @@ async function expectChildExclusionFlow() {
     latestController?.toggleMatch('email-match');
   });
   await act(async () => {
-    await latestController?.apply();
+    await latestController?.apply(BORDER_SETTINGS);
   });
 
   expect(syncAutoBlurFrameCalls).toContainEqual({
+    borderSettings: BORDER_SETTINGS,
     blurSettings: controllerMocks.defaultSettings.blurSettings,
     targets: [],
   });
@@ -238,7 +244,7 @@ async function expectPersistenceBeforeClose() {
 
   let applyPromise: Promise<void> | undefined;
   await act(async () => {
-    applyPromise = latestController?.apply();
+    applyPromise = latestController?.apply(BORDER_SETTINGS);
     await Promise.resolve();
   });
 
@@ -357,6 +363,7 @@ describe('useAutoBlurController', () => {
     expect(latestController?.isApplying).toBe(false);
     expect(syncAutoBlurFrameCalls).toContainEqual({
       allowDeferredInitialPlacement: true,
+      borderSettings: expect.any(Object),
       blurSettings: controllerMocks.defaultSettings.blurSettings,
       targets: [expect.objectContaining({ id: 'email-match' })],
     });
@@ -487,7 +494,7 @@ describe('useAutoBlurController', () => {
     await openAndFlushScan();
 
     await act(async () => {
-      await latestController?.apply();
+      await latestController?.apply(BORDER_SETTINGS);
     });
 
     expect(latestController?.isOpen).toBe(true);

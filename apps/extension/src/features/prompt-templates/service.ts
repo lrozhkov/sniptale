@@ -1,4 +1,5 @@
 import type { PromptTemplate } from '../../contracts/settings';
+import type { AppLocale } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   deletePromptTemplate,
@@ -24,9 +25,9 @@ function getDefaultPromptTemplateCreationDeps(): PromptTemplateCreationDeps {
   };
 }
 
-export async function loadPromptTemplateList(): Promise<PromptTemplate[]> {
+export async function loadPromptTemplateList(locale?: AppLocale): Promise<PromptTemplate[]> {
   try {
-    const loadedTemplates = await getPromptTemplates();
+    const loadedTemplates = await getPromptTemplates(locale);
     return sortPromptTemplates(loadedTemplates);
   } catch (error) {
     logger.error('Failed to load prompt templates', error);

@@ -185,3 +185,12 @@ it('keeps the submit tip attached when submit is disabled', async () => {
   expect(submitButton?.disabled).toBe(true);
   expect(submitButton?.getAttribute('aria-describedby')).toBe(submitTip?.id);
 });
+
+it('shows an explicit blocking reason when no model is configured', async () => {
+  await renderFooter({ disabledSubmit: true, models: [], providers: [], selectedModelId: null });
+
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    'Сначала настройте хотя бы одну AI-модель'
+  );
+  expect(getSubmitButton()?.disabled).toBe(true);
+});

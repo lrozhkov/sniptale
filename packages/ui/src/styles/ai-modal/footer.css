@@ -88,6 +88,25 @@
   user-select: none;
 }
 
+.sniptale-ai-modal-model-field {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.sniptale-ai-modal-model-field[data-invalid='true']
+  .sniptale-ai-model-selector-trigger[data-invalid='true'] {
+  border-color: var(--sniptale-color-danger);
+  color: var(--sniptale-color-danger);
+}
+
+.sniptale-ai-modal-model-error {
+  max-width: 230px;
+  color: var(--sniptale-color-danger);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
 .sniptale-ai-model-selector-empty {
   padding: 8px 10px;
   font-size: 12px;

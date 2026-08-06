@@ -13,7 +13,7 @@ export function TemplatePillButton(props: TemplatePillButtonProps) {
     <button
       onMouseDown={() => blurPromptIfFocused()}
       onClick={createTemplateSelectHandler(props)}
-      disabled={props.isLoading}
+      disabled={props.isLoading || props.template.enabled === false}
       title={props.template.content}
       type="button"
       className="sniptale-template-btn"

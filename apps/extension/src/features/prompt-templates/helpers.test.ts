@@ -14,6 +14,7 @@ function createTemplate(overrides: Partial<PromptTemplate> = {}): PromptTemplate
     id: overrides.id ?? 'template-1',
     name: overrides.name ?? 'Template',
     content: overrides.content ?? 'Content',
+    ...(overrides.enabled === undefined ? {} : { enabled: overrides.enabled }),
     ...(overrides.isDefault === undefined
       ? { isDefault: false }
       : { isDefault: overrides.isDefault }),
@@ -34,6 +35,20 @@ function verifySortPromptTemplates() {
     'older',
     'default',
     'plain',
+  ]);
+}
+
+function verifyDisabledTemplatesSortLast() {
+  const sortedTemplates = sortPromptTemplates([
+    createTemplate({ id: 'disabled-first', enabled: false, lastUsedAt: 500 }),
+    createTemplate({ id: 'enabled-last' }),
+    createTemplate({ id: 'disabled-last', enabled: false }),
+  ]);
+
+  expect(sortedTemplates.map((template) => template.id)).toEqual([
+    'enabled-last',
+    'disabled-first',
+    'disabled-last',
   ]);
 }
 
@@ -83,6 +98,7 @@ describe('prompt-templates state helpers', () => {
     'sorts last-used templates ahead of defaults and ordinary templates',
     verifySortPromptTemplates
   );
+  it('sorts disabled system templates after enabled templates', verifyDisabledTemplatesSortLast);
   it(
     'creates and updates prompt-template drafts through pure helpers',
     verifyPromptTemplateDraftHelpers

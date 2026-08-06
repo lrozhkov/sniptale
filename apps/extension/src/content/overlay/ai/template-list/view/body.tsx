@@ -17,8 +17,17 @@ export function TemplateListBody({
   templates,
 }: TemplateListBodyProps) {
   return (
-    <div>
-      <label className="sniptale-label">{translate('aiModal.templatesLabel')}</label>
+    <section className="sniptale-ai-template-section">
+      <div className="sniptale-ai-template-section-header">
+        <div>
+          <div className="sniptale-ai-template-section-title">
+            {translate('aiModal.templatesLabel')}
+          </div>
+          <div className="sniptale-ai-template-section-description">
+            {translate('aiModal.templatesDescription')}
+          </div>
+        </div>
+      </div>
 
       <div className={`sniptale-template-container ${state.draggedId ? 'dragging' : ''}`}>
         {templates.length === 0 ? (
@@ -47,6 +56,6 @@ export function TemplateListBody({
           showAll={state.showAll}
         />
       </div>
-    </div>
+    </section>
   );
 }

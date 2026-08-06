@@ -25,6 +25,7 @@ let root: Root;
 const setPrompt = vi.fn();
 const start = vi.fn();
 const stop = vi.fn();
+const submit = vi.fn();
 const textareaRef: { current: HTMLTextAreaElement | null } = { current: null };
 
 function createState(
@@ -35,8 +36,10 @@ function createState(
     handleKeyDown: vi.fn(),
     handleResizeStart: vi.fn(),
     isResizing: false,
+    onSubmit: submit,
     prompt: 'Keep suffix',
     setPrompt,
+    submitDisabled: false,
     textareaRef,
     voice: {
       actions: { start, stop },
@@ -65,6 +68,7 @@ beforeEach(() => {
   setPrompt.mockClear();
   start.mockClear();
   stop.mockClear();
+  submit.mockClear();
   textareaRef.current = null;
 });
 
@@ -130,5 +134,18 @@ describe('AI Modal prompt voice control', () => {
       container.querySelector<HTMLButtonElement>('[data-ui="content.ai-modal.prompt-voice-input"]')
         ?.disabled
     ).toBe(true);
+  });
+
+  it('renders the compact Enter action and submits from the prompt corner', () => {
+    renderField();
+    const submitButton = container.querySelector<HTMLButtonElement>(
+      '.sniptale-ai-modal-prompt-submit'
+    );
+
+    act(() => submitButton?.click());
+
+    expect(submitButton?.getAttribute('title')).toBe('Отправить запрос');
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain('Ctrl+Enter');
   });
 });

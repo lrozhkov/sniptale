@@ -61,6 +61,14 @@ function containsInPresentationTree(container: Element, candidate: Element) {
   return false;
 }
 
+function isVisibleCheckboxProxyLabel(element: HTMLElement): boolean {
+  if (element.localName !== 'label') return false;
+  const controlId = element.getAttribute('for');
+  if (!controlId) return false;
+  const control = element.ownerDocument.getElementById(controlId);
+  return control?.localName === 'input' && control.getAttribute('type') === 'checkbox';
+}
+
 export function areElementsPresentationRelated(left: Element, right: Element) {
   return containsInPresentationTree(left, right) || containsInPresentationTree(right, left);
 }
@@ -68,7 +76,13 @@ export function areElementsPresentationRelated(left: Element, right: Element) {
 function hasHiddenPresentation(element: HTMLElement): boolean {
   let current: HTMLElement | null = element;
   while (current) {
-    if (current.hidden || current.getAttribute('aria-hidden') === 'true') return true;
+    if (
+      current.hidden ||
+      (current.getAttribute('aria-hidden') === 'true' &&
+        !(current === element && isVisibleCheckboxProxyLabel(current)))
+    ) {
+      return true;
+    }
     const view: Window | null = current.ownerDocument.defaultView;
     const style = view?.getComputedStyle(current);
     if (

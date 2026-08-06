@@ -1,70 +1,25 @@
 import type { PromptTemplate } from '../../../contracts/settings';
+import type { AppLocale } from '../../../platform/i18n';
 import { browserStorage } from '../infrastructure/browser-storage';
-import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredPromptTemplates, parseStoredTemplateOrder } from './guards';
+import {
+  createSystemPromptTemplateCatalog,
+  isSystemPromptTemplateId,
+  PROMPT_TEMPLATE_CATALOG_REVISION,
+  mergePromptTemplateCatalog,
+} from './catalog';
 
 const PROMPT_TEMPLATES_KEY = 'sniptale_prompt_templates';
 const TEMPLATE_ORDER_KEY = 'sniptale_template_order';
 const logger = createLogger({ namespace: 'SharedPromptTemplatesStorage' });
 let promptTemplateMutationQueue = Promise.resolve<void>(undefined);
 
-const DEFAULT_TEMPLATE_IDS = {
-  anonymize: 'default-anonymize',
-  emoji: 'default-emoji',
-  markup: 'default-markup',
-  replaceNames: 'default-replace-names',
-  style: 'default-style',
-  translate: 'default-translate',
-} as const;
-
-// Дефолтные шаблоны для инициализации
-function getDefaultTemplates(): PromptTemplate[] {
-  return [
-    {
-      id: DEFAULT_TEMPLATE_IDS.replaceNames,
-      name: translate('shared.defaults.templateReplaceNamesName'),
-      content: translate('shared.defaults.templateReplaceNamesContent'),
-      isDefault: true,
-    },
-    {
-      id: DEFAULT_TEMPLATE_IDS.translate,
-      name: translate('shared.defaults.templateTranslateName'),
-      content: translate('shared.defaults.templateTranslateContent'),
-      isDefault: true,
-    },
-    {
-      id: DEFAULT_TEMPLATE_IDS.anonymize,
-      name: translate('shared.defaults.templateAnonymizeName'),
-      content: translate('shared.defaults.templateAnonymizeContent'),
-      isDefault: true,
-    },
-    {
-      id: DEFAULT_TEMPLATE_IDS.style,
-      name: translate('shared.defaults.templateStyleName'),
-      content: translate('shared.defaults.templateStyleContent'),
-      isDefault: true,
-    },
-    {
-      id: DEFAULT_TEMPLATE_IDS.emoji,
-      name: translate('shared.defaults.templateEmojiName'),
-      content: translate('shared.defaults.templateEmojiContent'),
-      isDefault: true,
-    },
-    {
-      id: DEFAULT_TEMPLATE_IDS.markup,
-      name: translate('shared.defaults.templateMarkupName'),
-      content: translate('shared.defaults.templateMarkupContent'),
-      isDefault: true,
-    },
-  ];
-}
-
 /**
  * Инициализация хранилища шаблонов дефолтными значениями
  */
 async function initializeDefaultTemplates(): Promise<PromptTemplate[]> {
-  const defaultTemplates = getDefaultTemplates();
+  const defaultTemplates = createSystemPromptTemplateCatalog();
   await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: defaultTemplates });
   logger.debug('Initialized default prompt templates', {
     templateCount: defaultTemplates.length,
@@ -117,21 +72,19 @@ async function loadStoredPromptTemplates(): Promise<PromptTemplate[]> {
   return parsedTemplates.templates;
 }
 
-async function preparePromptTemplatesForMutation(): Promise<PromptTemplate[]> {
+async function materializePromptTemplatesForMutation(): Promise<PromptTemplate[]> {
   const templates = await loadStoredPromptTemplates();
-  if (templates.length > 0) {
-    return templates;
-  }
-
-  return initializeDefaultTemplates();
+  return templates.length > 0
+    ? mergePromptTemplateCatalog(templates)
+    : initializeDefaultTemplates();
 }
 
 /**
  * Получение всех шаблонов промптов
  */
-export async function getPromptTemplates(): Promise<PromptTemplate[]> {
+export async function getPromptTemplates(locale?: AppLocale): Promise<PromptTemplate[]> {
   const templates = await loadStoredPromptTemplates();
-  return templates.length > 0 ? templates : getDefaultTemplates();
+  return mergePromptTemplateCatalog(templates, locale);
 }
 
 /**
@@ -139,14 +92,23 @@ export async function getPromptTemplates(): Promise<PromptTemplate[]> {
  */
 export async function savePromptTemplate(template: PromptTemplate): Promise<void> {
   await queuePromptTemplateMutation(async () => {
-    const templates = await preparePromptTemplatesForMutation();
+    const templates = await materializePromptTemplatesForMutation();
     const index = templates.findIndex((current) => current.id === template.id);
     const nextTemplates = [...templates];
+    const persistedTemplate = isSystemPromptTemplateId(template.id)
+      ? {
+          ...template,
+          customized: true,
+          enabled: template.enabled !== false,
+          isDefault: true,
+          systemRevision: PROMPT_TEMPLATE_CATALOG_REVISION,
+        }
+      : template;
 
     if (index >= 0) {
-      nextTemplates[index] = template;
+      nextTemplates[index] = persistedTemplate;
     } else {
-      nextTemplates.push(template);
+      nextTemplates.push(persistedTemplate);
     }
 
     await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: nextTemplates });
@@ -157,15 +119,20 @@ export async function savePromptTemplate(template: PromptTemplate): Promise<void
 }
 
 /**
- * Удаление шаблона
+ * Удаляет пользовательский шаблон или переключает видимость системного.
  */
 export async function deletePromptTemplate(id: string): Promise<void> {
   await queuePromptTemplateMutation(async () => {
-    const templates = await preparePromptTemplatesForMutation();
-    const filtered = templates.filter((template) => template.id !== id);
+    const templates = await materializePromptTemplatesForMutation();
+    const filtered = isSystemPromptTemplateId(id)
+      ? templates.map((template) =>
+          template.id === id ? { ...template, enabled: template.enabled === false } : template
+        )
+      : templates.filter((template) => template.id !== id);
 
     await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: filtered });
-    logger.debug('Deleted prompt template', {
+    logger.debug('Updated prompt template availability', {
+      isSystemTemplate: isSystemPromptTemplateId(id),
       templateId: id,
     });
   });
@@ -197,7 +164,7 @@ export async function loadTemplateOrder(): Promise<string[]> {
  */
 export async function updateTemplateLastUsed(id: string): Promise<void> {
   await queuePromptTemplateMutation(async () => {
-    const templates = await preparePromptTemplatesForMutation();
+    const templates = await materializePromptTemplatesForMutation();
     const index = templates.findIndex((template) => template.id === id);
 
     if (index < 0) {

@@ -1,104 +1,87 @@
-import { Droplet, Square, Waves } from 'lucide-react';
-import type { BlurSettings, BlurType } from '../../../../features/highlighter/contracts';
-import { translate } from '../../../../platform/i18n';
-import { getControlSegmentedOptionClassName } from '@sniptale/ui/control-language';
-import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
+import type {
+  BlurSettings,
+  BlurType,
+  BorderPreset,
+} from '../../../../features/highlighter/contracts';
+import { getBorderPresetDisplayName } from '../../../../features/highlighter/presets/display-name';
+import { translate, useAppLocale } from '../../../../platform/i18n';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { CompactSelect, NumericRow } from '../../../../ui/compact-inspector-controls';
+import { HighlighterPresetPropertyField as PropertyField } from '../../../../ui/highlighter-preset-editor/inspector-field';
 import { buildBlurTypeOptions } from '../../../selection/frame-settings-popover/helpers';
-
-function BlurTypeIcon(props: { iconName: 'droplet' | 'square' | 'waves' }) {
-  if (props.iconName === 'droplet') return <Droplet className="h-4 w-4" />;
-  if (props.iconName === 'waves') return <Waves className="h-4 w-4" />;
-  return <Square className="h-4 w-4" />;
-}
-
-function AutoBlurTypePicker(props: {
-  blurType: BlurType;
-  updateBlurSettings: (patch: Partial<BlurSettings>) => void;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={translate('content.overlayControls.blurTypeLabel')}
-      className="grid grid-cols-3 gap-2"
-    >
-      {buildBlurTypeOptions().map((option) => (
-        <AutoBlurTypeButton
-          key={option.value}
-          label={option.label}
-          iconName={option.iconName}
-          selected={props.blurType === option.value}
-          onClick={() => props.updateBlurSettings({ blurType: option.value })}
-        />
-      ))}
-    </div>
-  );
-}
-
-function AutoBlurTypeButton(props: {
-  iconName: 'droplet' | 'square' | 'waves';
-  label: string;
-  onClick: () => void;
-  selected: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        'flex w-full flex-col items-center justify-center gap-2 text-center transition-colors',
-        getControlSegmentedOptionClassName({
-          active: props.selected,
-          density: 'default',
-          layout: 'tile',
-        }),
-      ].join(' ')}
-      onClick={props.onClick}
-      aria-pressed={props.selected}
-    >
-      <span className="flex items-center justify-center">
-        <BlurTypeIcon iconName={props.iconName} />
-      </span>
-      <span className="text-sm font-medium leading-5">{props.label}</span>
-    </button>
-  );
-}
 
 export function AutoBlurBlurControls(props: {
   blurSettings: BlurSettings;
+  borderPresets: BorderPreset[];
+  defaultBorderPresetId: string;
   setBlurSettings: (settings: BlurSettings) => void;
 }) {
+  const locale = useAppLocale();
+  const showBorder = props.blurSettings.showBorder ?? false;
+  const selectedPresetId =
+    props.blurSettings.borderPresetId &&
+    props.borderPresets.some((preset) => preset.id === props.blurSettings.borderPresetId)
+      ? props.blurSettings.borderPresetId
+      : props.defaultBorderPresetId;
   const updateBlurSettings = (patch: Partial<BlurSettings>) =>
     props.setBlurSettings({ ...props.blurSettings, ...patch });
 
   return (
-    <section className="grid gap-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="sniptale-label-sm">{translate('content.autoBlur.blurStrength')}</div>
-        <div className="text-sm font-medium text-[var(--sniptale-color-text)]">
-          {props.blurSettings.amount}
+    <section className="sniptale-auto-blur-appearance sniptale-modal-field-surface grid gap-4">
+      <div className="grid gap-1">
+        <div className="text-sm font-semibold text-[var(--sniptale-color-text)]">
+          {translate('content.autoBlur.appearanceTitle')}
+        </div>
+        <div className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
+          {translate('content.autoBlur.appearanceDescription')}
         </div>
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-5">
-        <ProductRange
-          min={1}
+      <div className="grid gap-3">
+        <NumericRow
+          appearance="plain"
+          label={translate('content.autoBlur.blurStrength')}
           max={25}
+          min={1}
+          onCommitValue={(amount) => updateBlurSettings({ amount })}
+          onPreviewValue={(amount) => updateBlurSettings({ amount })}
+          scrub={{ max: 25, min: 1 }}
           value={props.blurSettings.amount}
-          onChange={(event) => updateBlurSettings({ amount: Number(event.target.value) })}
         />
-        <label className="flex min-w-[150px] items-center justify-end gap-2 text-sm">
-          <span>{translate('content.autoBlur.showBorder')}</span>
-          <ProductToggle
-            size="sm"
-            checked={props.blurSettings.showBorder ?? false}
-            onClick={() =>
-              updateBlurSettings({ showBorder: !(props.blurSettings.showBorder ?? false) })
-            }
+        <PropertyField label={translate('content.autoBlur.blurType')}>
+          <CompactSelect<BlurType>
+            appearance="plain"
+            aria-label={translate('content.autoBlur.blurType')}
+            onChange={(blurType) => updateBlurSettings({ blurType })}
+            options={buildBlurTypeOptions().map((option) => ({
+              label: option.label,
+              value: option.value,
+            }))}
+            value={props.blurSettings.blurType}
           />
-        </label>
+        </PropertyField>
+        <PropertyField label={translate('content.autoBlur.showBorder')}>
+          <div className="flex justify-end">
+            <ProductGlassSwitch
+              aria-label={translate('content.autoBlur.showBorder')}
+              on={showBorder}
+              onClick={() => updateBlurSettings({ showBorder: !showBorder })}
+            />
+          </div>
+        </PropertyField>
+        <PropertyField label={translate('content.autoBlur.frameTemplate')}>
+          <CompactSelect
+            appearance="plain"
+            aria-label={translate('content.autoBlur.frameTemplate')}
+            disabled={!showBorder}
+            onChange={(borderPresetId) => updateBlurSettings({ borderPresetId })}
+            options={props.borderPresets.map((preset) => ({
+              label: getBorderPresetDisplayName(preset, locale),
+              value: preset.id,
+            }))}
+            value={selectedPresetId}
+          />
+        </PropertyField>
       </div>
-      <AutoBlurTypePicker
-        blurType={props.blurSettings.blurType as BlurType}
-        updateBlurSettings={updateBlurSettings}
-      />
     </section>
   );
 }

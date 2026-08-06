@@ -5,3 +5,4 @@ export {
   dispatchHighlighterModeChanged,
 } from './highlighter-mode';
 export { addExitFrameEditingListener, dispatchExitFrameEditing } from './exit-frame-editing';
+export { addFrameEditingChangedListener, dispatchFrameEditingChanged } from './frame-editing';

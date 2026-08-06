@@ -1,4 +1,3 @@
-import { translate } from '../../../../../platform/i18n';
 import type { JsonPreviewProps } from '../preview/types';
 import { JsonPreviewActions } from './actions';
 
@@ -21,10 +20,7 @@ export function JsonPreviewHeader({
   showDataPreview,
 }: JsonPreviewHeaderProps) {
   return (
-    <div className="sniptale-ai-json-header">
-      <label className="sniptale-label" style={{ marginBottom: 0 }}>
-        {translate('aiModal.dataForSendingLabel')}
-      </label>
+    <div className="sniptale-ai-json-header sniptale-ai-json-header--actions-only">
       <JsonPreviewActions
         copied={copied}
         copyFormattedJson={copyFormattedJson}

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { ToolbarHistoryControls } from './history';
+import { dispatchFrameEditingChanged } from '../../../platform/page-context/mode-events';
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
@@ -202,6 +203,31 @@ function verifyOpenTransactionBlocksHistoryControls() {
   ).toBe(false);
 }
 
+function verifyFrameEditingBlocksHistoryControls() {
+  historyState = { canRedo: true, canUndo: true, revision: 1 };
+  renderComponent();
+
+  act(() => dispatchFrameEditingChanged({ active: true }));
+
+  const undoButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.history-undo-button"]'
+  );
+  const redoButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.history-redo-button"]'
+  );
+  expect(undoButton?.disabled).toBe(true);
+  expect(redoButton?.disabled).toBe(true);
+
+  document.body.dispatchEvent(
+    new KeyboardEvent('keydown', { bubbles: true, code: 'KeyZ', ctrlKey: true, key: 'z' })
+  );
+  expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+
+  act(() => dispatchFrameEditingChanged({ active: false }));
+  expect(undoButton?.disabled).toBe(false);
+  expect(redoButton?.disabled).toBe(false);
+}
+
 describe('ToolbarHistoryControls', () => {
   it(
     'renders undo and redo controls with disabled state from the history store',
@@ -220,5 +246,9 @@ describe('ToolbarHistoryControls', () => {
   it(
     'keeps undo and redo disabled until a document-mode transaction closes',
     verifyOpenTransactionBlocksHistoryControls
+  );
+  it(
+    'keeps undo and redo disabled while a frame is being edited',
+    verifyFrameEditingBlocksHistoryControls
   );
 });

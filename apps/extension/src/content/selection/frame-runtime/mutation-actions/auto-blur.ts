@@ -5,10 +5,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import { createCompositeSelector } from '../../../platform/frame/selectors';
 import { createDocumentPagePlacement } from '../../../platform/frame';
-import {
-  DEFAULT_BORDER_PRESET,
-  DEFAULT_FOCUS_SETTINGS,
-} from '../../../../composition/persistence/highlighter';
+import { DEFAULT_FOCUS_SETTINGS } from '../../../../composition/persistence/highlighter';
 import { invalidateFrameCache } from '../../highlighter';
 import {
   hasBlurFrameForRect,
@@ -22,30 +19,11 @@ import { createGenerateFrameId } from './frame-factory';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { calculateFrameContainerCoords, createFrameCalcSettings } from '../coords';
 import { calculateFrameOffsetFromElement } from '../manager/coords';
-import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 type CreateAddAutoBlurFramesHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
-  | 'framesRef'
-  | 'hostLayoutServiceRef'
-  | 'highlighterSettingsCacheRef'
-  | 'sessionFocusSettingsRef'
-  | 'setFrames'
+  'framesRef' | 'hostLayoutServiceRef' | 'sessionFocusSettingsRef' | 'setFrames'
 >;
-
-type HighlighterSettingsSnapshot =
-  CreateAddAutoBlurFramesHandlerArgs['highlighterSettingsCacheRef']['current'];
-
-function resolveDefaultBorderPreset(settings: HighlighterSettingsSnapshot) {
-  if (!settings) {
-    return projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
-  }
-
-  const preset =
-    settings.borderPresets.find((item) => item.id === settings.defaultBorderPresetId) ??
-    DEFAULT_BORDER_PRESET;
-  return projectBorderPresetToAppliedSettings(preset);
-}
 
 function cloneFocusSettings(settings: FocusSettings | undefined): FocusSettings {
   return { ...(settings ?? DEFAULT_FOCUS_SETTINGS) };
@@ -149,7 +127,7 @@ export function createAddAutoBlurFramesHandler(args: CreateAddAutoBlurFramesHand
 
   return (input: AutoBlurApplyInput) => {
     const addedFrames: FrameData[] = [];
-    const borderSettings = resolveDefaultBorderPreset(args.highlighterSettingsCacheRef.current);
+    const borderSettings = input.borderSettings;
     const focusSettings = cloneFocusSettings(args.sessionFocusSettingsRef.current);
 
     input.targets.forEach((target) => {

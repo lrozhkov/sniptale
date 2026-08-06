@@ -2,16 +2,16 @@ import { defineMessageSource } from '../source';
 
 export const contentAutoBlurMessages = defineMessageSource({
   title: {
-    ru: 'Auto-Blur',
-    en: 'Auto-Blur',
+    ru: 'Автоматическое размытие данных',
+    en: 'Automatic data blur',
   },
   scanError: {
     ru: 'Не удалось просканировать видимый текст',
     en: 'Failed to scan visible text',
   },
   applyError: {
-    ru: 'Не удалось применить Auto-Blur',
-    en: 'Failed to apply Auto-Blur',
+    ru: 'Не удалось применить автоматическое размытие',
+    en: 'Failed to apply automatic blur',
   },
   loading: {
     ru: 'Поиск сущностей',
@@ -34,7 +34,7 @@ export const contentAutoBlurMessages = defineMessageSource({
     en: 'Status',
   },
   alreadyBlurred: {
-    ru: 'Blur уже установлен',
+    ru: 'Размытие уже применено',
     en: 'Already blurred',
   },
   noMatches: {
@@ -94,12 +94,28 @@ export const contentAutoBlurMessages = defineMessageSource({
     en: 'Collapse category',
   },
   blurStrength: {
-    ru: 'Сила blur',
+    ru: 'Сила размытия',
     en: 'Blur strength',
   },
+  blurType: {
+    ru: 'Тип размытия',
+    en: 'Blur type',
+  },
   showBorder: {
-    ru: 'Показывать рамку',
-    en: 'Show border',
+    ru: 'Рамка и заливка',
+    en: 'Frame and fill',
+  },
+  frameTemplate: {
+    ru: 'Шаблон рамки',
+    en: 'Frame template',
+  },
+  appearanceTitle: {
+    ru: 'Оформление размытия',
+    en: 'Blur appearance',
+  },
+  appearanceDescription: {
+    ru: 'Эти параметры применятся ко всем выбранным элементам.',
+    en: 'These settings will be applied to all selected items.',
   },
   reset: {
     ru: 'Сбросить размытие',

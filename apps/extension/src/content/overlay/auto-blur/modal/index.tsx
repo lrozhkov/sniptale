@@ -10,6 +10,10 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { AutoBlurController } from '../controller';
 import { AutoBlurBlurControls } from './controls';
 import { AutoBlurTable } from './table';
+import { useAutoBlurBorderPresetCatalog } from './use-border-preset-catalog';
+import { resolveEnabledBorderPreset } from '../../../../features/highlighter/presets/enabled-catalog';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import type { HighlighterSettings } from '../../../../features/highlighter/contracts';
 
 function AutoBlurModalState(props: { status: AutoBlurController['status'] }) {
   if (props.status === 'loading') {
@@ -23,7 +27,10 @@ function AutoBlurModalState(props: { status: AutoBlurController['status'] }) {
   return null;
 }
 
-function AutoBlurModalReadyContent(props: { controller: AutoBlurController }) {
+function AutoBlurModalReadyContent(props: {
+  catalog: HighlighterSettings;
+  controller: AutoBlurController;
+}) {
   if (props.controller.status === 'loading' || props.controller.status === 'error') {
     return <AutoBlurModalState status={props.controller.status} />;
   }
@@ -45,6 +52,8 @@ function AutoBlurModalReadyContent(props: { controller: AutoBlurController }) {
       ) : null}
       <AutoBlurBlurControls
         blurSettings={props.controller.blurSettings}
+        borderPresets={props.catalog.borderPresets}
+        defaultBorderPresetId={props.catalog.defaultBorderPresetId}
         setBlurSettings={props.controller.setBlurSettings}
       />
     </div>
@@ -52,6 +61,8 @@ function AutoBlurModalReadyContent(props: { controller: AutoBlurController }) {
 }
 
 export function AutoBlurModal(props: { controller: AutoBlurController }) {
+  const catalog = useAutoBlurBorderPresetCatalog();
+
   if (!props.controller.isOpen) {
     return null;
   }
@@ -63,9 +74,11 @@ export function AutoBlurModal(props: { controller: AutoBlurController }) {
   return (
     <ProductModal
       closeOnBackdrop={false}
+      backdropClassName="sniptale-auto-blur-backdrop"
       dialogClassName="sniptale-auto-blur-modal"
-      maxWidth="760px"
+      maxWidth="780px"
       onKeyDown={(event) => {
+        event.stopPropagation();
         if (event.key === 'Escape' && !disabled) props.controller.close();
       }}
     >
@@ -76,7 +89,7 @@ export function AutoBlurModal(props: { controller: AutoBlurController }) {
         disabled={disabled}
       />
       <ProductModalBody className="grid gap-4 sniptale-modal-scroll">
-        <AutoBlurModalReadyContent controller={props.controller} />
+        <AutoBlurModalReadyContent catalog={catalog} controller={props.controller} />
         {props.controller.errorMessage ? (
           <div className="sniptale-error-text">{translate(props.controller.errorMessage)}</div>
         ) : null}
@@ -90,7 +103,16 @@ export function AutoBlurModal(props: { controller: AutoBlurController }) {
         <ProductActionButton tone="secondary" onClick={props.controller.close} disabled={disabled}>
           {translate('content.autoBlur.cancel')}
         </ProductActionButton>
-        <ProductActionButton onClick={() => void props.controller.apply()} disabled={applyDisabled}>
+        <ProductActionButton
+          onClick={() =>
+            void props.controller.apply(
+              projectBorderPresetToAppliedSettings(
+                resolveEnabledBorderPreset(catalog, props.controller.blurSettings.borderPresetId)
+              )
+            )
+          }
+          disabled={applyDisabled}
+        >
           {translate('content.autoBlur.apply')}
         </ProductActionButton>
       </ProductModalFooter>
