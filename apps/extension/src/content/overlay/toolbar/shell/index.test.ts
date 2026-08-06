@@ -66,4 +66,17 @@ describe('resolveToolbarNavigationLockMode', () => {
       })
     ).toBe(false);
   });
+
+  it('uses links-only lock while Quick Edit owns text-block picking', () => {
+    expect(
+      resolveToolbarNavigationLockMode({
+        aiPickMode: false,
+        designReviewMode: false,
+        highlighterMode: false,
+        isCursorMode: false,
+        quickEditMode: true,
+        screenshotMode: true,
+      })
+    ).toBe(false);
+  });
 });

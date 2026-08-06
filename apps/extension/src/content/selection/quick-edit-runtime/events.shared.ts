@@ -1,6 +1,6 @@
 import { isContentOwnedElement } from '../../platform/dom-host';
-import { resolvePagePreparationTarget } from '../../parser/page-preparation/target';
 import { isQuickEditTextElement } from './elements';
+import { resolveQuickEditTextTarget } from './target';
 
 export interface QuickEditRuntimeEventOptions {
   isEnabled: () => boolean;
@@ -19,7 +19,9 @@ export function resolveQuickEditTarget(
   event: MouseEvent | FocusEvent,
   iframe?: HTMLIFrameElement
 ): HTMLElement | null {
-  return resolvePagePreparationTarget(event, iframe);
+  const editingTarget = resolveActiveQuickEditElement(event.target);
+  if (editingTarget) return editingTarget;
+  return resolveQuickEditTextTarget(event, iframe);
 }
 
 export function isQuickEditOwnedElement(target: HTMLElement): boolean {

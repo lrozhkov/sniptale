@@ -10,6 +10,7 @@ import {
 } from '../../parser/page-preparation/history';
 import { createQuickEditHistoryTracker } from './history';
 import { createQuickEditDocumentModeHistoryTracker } from './document-mode.history';
+import { resolveQuickEditTextTarget } from './target';
 
 function createFrameSnapshot(): FrameSessionSnapshot {
   return {
@@ -80,6 +81,40 @@ it('undoes and redoes DOM text and annotation evidence through one history entry
     after: 'After',
     before: 'Before',
   });
+});
+
+it('keeps the resolved leaf-block identity through commit and undo', () => {
+  const root = document.createElement('main');
+  const paragraph = document.createElement('p');
+  paragraph.id = 'selected-paragraph';
+  const emphasis = document.createElement('strong');
+  emphasis.textContent = 'Before';
+  paragraph.append(emphasis);
+  root.append(paragraph);
+  document.body.append(root);
+  const rect = DOMRect.fromRect({ height: 24, width: 80 });
+  for (const element of [root, paragraph, emphasis]) {
+    Object.defineProperty(element, 'getClientRects', {
+      configurable: true,
+      value: () => ({
+        0: rect,
+        [Symbol.iterator]: () => [rect][Symbol.iterator](),
+        item: (index: number) => (index === 0 ? rect : null),
+        length: 1,
+      }),
+    });
+  }
+  const event = new MouseEvent('click', { bubbles: true, composed: true });
+  emphasis.dispatchEvent(event);
+  const target = resolveQuickEditTextTarget(event);
+
+  expect(target).toBe(paragraph);
+  commitText({ after: 'After', id: 'resolved-target', target: target! });
+  expect(root.textContent).toBe('After');
+
+  pagePreparationHistory.undo();
+  expect(paragraph.textContent).toBe('Before');
+  expect(root.querySelector('#selected-paragraph')).toBe(paragraph);
 });
 
 it('does not create evidence or history for a no-op point edit', () => {

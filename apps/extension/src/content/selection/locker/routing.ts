@@ -22,6 +22,10 @@ export function shouldBlockQuickEditInteractiveTarget(event: Event) {
     return false;
   }
 
+  if (isTextElementForQuickEditLock(interactiveTarget)) {
+    return false;
+  }
+
   blockEvent(event);
   return true;
 }
@@ -44,7 +48,11 @@ export function isSelectionDelegatedMode(): boolean {
 }
 
 export function isPageElementPickerActive(): boolean {
-  return isContentModeEnabled('design-review') || isContentModeEnabled('highlighter');
+  return (
+    isContentModeEnabled('design-review') ||
+    isContentModeEnabled('highlighter') ||
+    isContentModeEnabled('quick-edit')
+  );
 }
 
 export function handleResolvedNavigationTarget(
@@ -112,7 +120,7 @@ function handleQuickEditLink(event: Event, link: HTMLAnchorElement): boolean {
     return true;
   }
 
-  blockEvent(event);
+  blockNavigationEvent(event);
   return true;
 }
 

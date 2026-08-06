@@ -171,6 +171,17 @@ function shouldKeepAnnotationListenersWithoutThePointerBlockingOverlay(): void {
   expect(() => auxClickListener(new Event('auxclick'))).not.toThrow();
 }
 
+function shouldKeepQuickEditListenersWithoutThePointerBlockingOverlay(): void {
+  const harness = createLockerHarness();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+
+  harness.locker.enableNavigationLock(false);
+
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(false);
+  const auxClickListener = getRegisteredEventListener(harness, 'auxclick');
+  expect(() => auxClickListener(new Event('auxclick'))).not.toThrow();
+}
+
 function shouldCleanUpRuntimeListenersWhenDisabled(): void {
   const harness = createLockerHarness();
 
@@ -318,6 +329,10 @@ describe('createNavigationLocker', () => {
   it(
     'keeps Annotation listeners without the pointer-blocking overlay',
     shouldKeepAnnotationListenersWithoutThePointerBlockingOverlay
+  );
+  it(
+    'keeps Quick Edit listeners without the pointer-blocking overlay',
+    shouldKeepQuickEditListenersWithoutThePointerBlockingOverlay
   );
   it(
     'cleans up all runtime listeners and removes the overlay when disabled',

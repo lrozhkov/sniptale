@@ -206,6 +206,32 @@ function shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker(): void {
   expect(pickerListener).toHaveBeenCalledOnce();
 }
 
+function shouldBlockQuickEditLinksWithoutHidingThemFromThePicker(): void {
+  const link = document.createElement('a');
+  link.href = '/next';
+  link.textContent = 'Next';
+  document.body.appendChild(link);
+  const event = createCancelableClick();
+  const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+  const pickerListener = vi.fn();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+  const lockerListener = (capturedEvent: Event) => {
+    routeLockInteractionEvent(capturedEvent, {
+      isFullLockMode: false,
+      isNavigationLocked: true,
+      isUIHidden: false,
+    });
+  };
+  window.addEventListener('click', lockerListener, { capture: true, once: true });
+  window.addEventListener('click', pickerListener, { capture: true, once: true });
+
+  link.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(stopImmediatePropagation).not.toHaveBeenCalled();
+  expect(pickerListener).toHaveBeenCalledOnce();
+}
+
 function shouldBlockAnnotationLinksWithoutHidingThemFromThePicker(): void {
   const link = document.createElement('a');
   link.href = '/next';
@@ -318,6 +344,10 @@ describe('locker routing', () => {
   it(
     'blocks Design Review links without hiding them from the picker',
     shouldBlockDesignReviewLinksWithoutHidingThemFromThePicker
+  );
+  it(
+    'blocks Quick Edit links without hiding them from the picker',
+    shouldBlockQuickEditLinksWithoutHidingThemFromThePicker
   );
   it(
     'blocks Annotation links without hiding them from the picker',
