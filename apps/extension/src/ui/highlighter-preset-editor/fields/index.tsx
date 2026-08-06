@@ -10,6 +10,7 @@ function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   if (patch.color !== undefined) state.setColor(patch.color);
   if (patch.fillColor !== undefined) state.setFillColor(patch.fillColor);
   if (patch.fillOpacity !== undefined) state.setFillOpacity(patch.fillOpacity);
+  if (patch.effects !== undefined) state.setEffects(patch.effects);
   if (patch.opacity !== undefined) state.setOpacity(patch.opacity);
   if (patch.radius !== undefined) state.setRadius(patch.radius);
   if (patch.shadow !== undefined) state.setShadow(patch.shadow);

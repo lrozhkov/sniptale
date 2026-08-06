@@ -131,6 +131,7 @@ export function useCalloutSettingsPopoverState(args: {
 
   const applyPreset = (preset: CalloutPreset) => {
     handleSettingChange({
+      content: { titleText: preset.content.titleText },
       sourcePresetId: preset.id,
       style: cloneCalloutStyle(preset.style),
     });

@@ -44,15 +44,9 @@ export function FutureFrameStyleControls(props: {
     setStyle(props.futureFrameStyle);
   }, [props.futureFrameStyle]);
 
-  const handleEffectClick = (mode: EffectMode) => {
-    if (style.effectMode === mode) {
-      props.toolbarMenuState.toggleMenu('frame-style');
-      return;
-    }
-
+  const handleEffectModeChange = (mode: EffectMode) => {
     setStyle((current) => ({ ...current, effectMode: mode }));
     props.onFutureFrameEffectModeChange(mode);
-    props.toolbarMenuState.setActiveMenuType('frame-style');
   };
 
   return (
@@ -61,30 +55,21 @@ export function FutureFrameStyleControls(props: {
         className="sniptale-toolbar-subgroup"
         data-ui="content.toolbar.future-frame-effects-group"
       >
-        {(['border', 'blur', 'focus'] as const).map((mode) => {
-          const active = style.effectMode === mode;
-          const label = getEffectLabel(mode);
-          return (
-            <ContentToolbarButton
-              key={mode}
-              active={active}
-              dataUi={`content.toolbar.future-frame-${mode}`}
-              menuIndicator
-              title={
-                label + (active ? translate('content.interactiveFrame.effectActiveSuffix') : '')
-              }
-              aria-pressed={active}
-              aria-expanded={active && open}
-              onClick={(event) => {
-                event.stopPropagation();
-                setEffectAnchorEl(event.currentTarget);
-                handleEffectClick(mode);
-              }}
-            >
-              <FrameEffectIcon mode={mode} />
-            </ContentToolbarButton>
-          );
-        })}
+        <ContentToolbarButton
+          active
+          aria-expanded={open}
+          aria-pressed
+          dataUi="content.toolbar.future-frame-style"
+          menuIndicator
+          onClick={(event) => {
+            event.stopPropagation();
+            setEffectAnchorEl(event.currentTarget);
+            props.toolbarMenuState.toggleMenu('frame-style');
+          }}
+          title={getEffectLabel(style.effectMode)}
+        >
+          <FrameEffectIcon mode={style.effectMode} />
+        </ContentToolbarButton>
       </div>
 
       <FrameSettingsPopover
@@ -99,6 +84,7 @@ export function FutureFrameStyleControls(props: {
         isOpen={open}
         onApplyToFrame={(patch) => setStyle((current) => ({ ...current, ...patch }))}
         onClose={() => props.toolbarMenuState.closeMenu('frame-style')}
+        onEffectModeChange={handleEffectModeChange}
         scope="session"
       />
 

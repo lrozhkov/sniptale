@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 import type { BorderPreset } from '../../features/highlighter/contracts';
 import { buildBorderPresetPreviewStyle } from './state/helpers';
 import type { useBorderPresetEditorState } from './useBorderPresetEditorState';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 export type BorderPresetEditorTestState = ReturnType<typeof useBorderPresetEditorState>;
 
@@ -26,6 +27,7 @@ export function createBaseState(): BorderPresetEditorTestState {
     customCss: '',
     fillColor: '#00000000',
     fillOpacity: 0,
+    effects: cloneBorderPresetEffects(undefined),
     inheritCustomCss: false,
     isResizing: false,
     strokeOpacity: 100,
@@ -41,6 +43,7 @@ export function createBaseState(): BorderPresetEditorTestState {
     setCustomCss: vi.fn(),
     setFillColor: vi.fn(),
     setFillOpacity: vi.fn(),
+    setEffects: vi.fn(),
     setInheritCustomCss: vi.fn(),
     setIsResizing: vi.fn(),
     setName: vi.fn(),

@@ -1,7 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { applyCalloutSettingsPatch, createCalloutStyleSnapshot } from '../../callout/model';
+import { applyCalloutSettingsPatch } from '../../callout/model';
 import { createSessionCalloutSettings } from './callout-defaults';
 import type {
   CalloutDeleteDetail,
@@ -25,7 +25,6 @@ export function createFrameCalloutChangedHandler({
         }
         if (settings.enabled === true && !frame.callout) {
           const newCallout = createSessionCalloutSettings(sessionCalloutStyleRef.current);
-          sessionCalloutStyleRef.current = createCalloutStyleSnapshot(newCallout);
           return { ...frame, callout: newCallout };
         }
         if (frame.callout && settings.enabled !== false) {
@@ -45,8 +44,7 @@ export function createFrameCalloutChangedHandler({
 
 export function createCalloutPopoverSettingsHandler({
   setFrames,
-  sessionCalloutStyleRef,
-}: FrameCalloutDeps) {
+}: Pick<FrameCalloutDeps, 'setFrames'>) {
   return ({ frameId, settings }: FrameCalloutChangedDetail) => {
     setFrames((prev) =>
       prev.map((frame) => {
@@ -54,7 +52,6 @@ export function createCalloutPopoverSettingsHandler({
           return frame;
         }
         const nextCallout = applyCalloutSettingsPatch(frame.callout, settings);
-        sessionCalloutStyleRef.current = createCalloutStyleSnapshot(nextCallout);
         return { ...frame, callout: nextCallout };
       })
     );

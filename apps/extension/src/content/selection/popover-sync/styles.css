@@ -1,10 +1,15 @@
 .sniptale-settings-popover-header {
   display: flex;
-  min-height: 28px;
+  min-height: 22px;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: 4px;
   cursor: default !important;
   user-select: none;
+}
+
+.sniptale-content-popover--compact .sniptale-settings-popover-header {
+  min-height: 22px;
 }
 
 .sniptale-settings-popover-header[data-draggable='true'] {
@@ -18,8 +23,6 @@
 
 .sniptale-settings-popover-header .sniptale-toolbar-menu-title {
   flex: 1;
-  font-size: 11px;
-  letter-spacing: 0.05em;
   cursor: inherit !important;
 }
 
@@ -32,8 +35,8 @@
 }
 
 .sniptale-settings-popover-mode-action {
-  min-height: 24px;
-  padding: 3px 7px;
+  min-height: 22px;
+  padding: 2px 7px;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 6px;
   background: transparent;
@@ -44,6 +47,33 @@
   line-height: 16px;
   white-space: nowrap;
   cursor: pointer !important;
+}
+
+.sniptale-settings-popover-destructive-action {
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sniptale-color-text-dim);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer !important;
+}
+
+.sniptale-settings-popover-destructive-action:hover,
+.sniptale-settings-popover-destructive-action:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-danger) 34%,
+    var(--sniptale-color-border-soft) 66%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);
+  color: var(--sniptale-color-danger);
+  outline: none;
 }
 
 .sniptale-settings-popover-mode-action:hover,
@@ -60,8 +90,8 @@
 
 .sniptale-settings-popover-close {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   padding: 0;

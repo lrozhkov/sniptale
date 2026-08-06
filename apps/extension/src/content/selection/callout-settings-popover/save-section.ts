@@ -6,6 +6,7 @@ import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-edi
 import { getPreferredSideFromAnchor } from '../callout/geometry';
 
 type CreateInput = {
+  content: CalloutPreset['content'];
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutSettings['style'];
@@ -32,12 +33,19 @@ export function createCalloutSaveSection(args: {
   return {
     error: args.error,
     isSaving: args.isSaving,
-    onCreate: (name) => args.create({ name, placement, style: args.settings.style }),
+    onCreate: (name) =>
+      args.create({
+        content: { titleText: args.settings.content.titleText },
+        name,
+        placement,
+        style: args.settings.style,
+      }),
     onOverwrite: (presetId) => {
       const preset = args.presets.find((item) => item.id === presetId);
       if (!preset) return Promise.resolve(false);
       return args.overwrite({
         id: preset.id,
+        content: { titleText: args.settings.content.titleText },
         name: preset.name,
         placement,
         style: args.settings.style,

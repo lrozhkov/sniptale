@@ -138,6 +138,7 @@ export function StepBadgePopover({
         onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
         onOffsetToggle={stepBadgeState.handleOffsetToggle}
         onResetPreset={(preset) => void presets.catalog.reset(preset)}
+        onShowPresets={presets.catalog.refresh}
         onSettingsChange={stepBadgeState.handleSettingsChange}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         onTypeChange={(type) => stepBadgeState.handleTypeChange(type)}

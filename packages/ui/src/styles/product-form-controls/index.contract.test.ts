@@ -78,6 +78,11 @@ describe('product-form-controls contract', () => {
     expect(productFormControlsStylesheet).toContain(
       '.sniptale-input:disabled,\n.sniptale-textarea:disabled {\n  cursor: not-allowed;\n}'
     );
+    expect(productFormControlsStylesheet).toContain(
+      '.sniptale-input:focus::placeholder,\n.sniptale-textarea:focus::placeholder {'
+    );
+    expect(productFormControlsStylesheet).toContain('.sniptale-input.sniptale-input-compact {');
+    expect(productFormControlsStylesheet).toContain('min-height: 32px;');
   });
 
   it('keeps product range track and thumb rendering under the shared form owner', () => {

@@ -154,6 +154,7 @@ it('orders Working Mode options as Cursor, Annotations, Content Editing, and Des
   expect(
     container?.querySelector('[data-ui="shared.ui.content-toolbar-group"]')?.className
   ).toContain('sniptale-mode-selector-group');
+  expect(container?.querySelector('[data-ui="content.toolbar.mode-leading-divider"]')).toBeNull();
 
   act(() => {
     queryModeSelectorButton()?.click();
@@ -168,6 +169,14 @@ it('orders Working Mode options as Cursor, Annotations, Content Editing, and Des
     'content.toolbar.mode-option.quick-edit',
     'content.toolbar.mode-option.design-review',
   ]);
+});
+
+it('separates non-cursor mode tools without duplicating the cursor capture divider', () => {
+  renderModeButtons({ pendingMode: 'highlighter' });
+
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.mode-leading-divider"]')
+  ).not.toBeNull();
 });
 
 it('closes the menu without toggling off the already selected mode', () => {

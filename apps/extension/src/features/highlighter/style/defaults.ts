@@ -18,7 +18,7 @@ export const DEFAULT_BLUR_SETTINGS: BlurSettings = {
   borderPresetId: null,
   radius: 0,
   shadow: 0,
-  showBorder: false,
+  showBorder: true,
   strokeColor: '#475569',
   strokeOpacity: 1,
   strokeStyle: 'solid',
@@ -30,7 +30,7 @@ export const DEFAULT_BLUR_SETTINGS: BlurSettings = {
  */
 export const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
   opacity: 0.5,
-  showBorder: false,
+  showBorder: true,
 };
 
 /**

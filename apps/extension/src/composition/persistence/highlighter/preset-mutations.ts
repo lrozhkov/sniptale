@@ -3,12 +3,14 @@ import {
   cloneBorderPreset,
   getCanonicalSystemBorderPreset,
 } from '../../../features/highlighter/presets/catalog';
+import { cloneBorderVisualStyle } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { reorderBorderPresets, resolveDefaultBorderPresetId } from './resolved';
 
 const editableVisualFields = [
   'color',
   'customCss',
+  'effects',
   'fillColor',
   'fillOpacity',
   'inheritCustomCss',
@@ -29,6 +31,15 @@ function editableVisualsEqual(left: BorderPreset, right: BorderPreset): boolean 
         left.padding.right === right.padding.right &&
         left.padding.bottom === right.padding.bottom &&
         left.padding.left === right.padding.left
+      );
+    }
+    if (field === 'effects') {
+      const leftEffects = cloneBorderVisualStyle(left).effects!;
+      const rightEffects = cloneBorderVisualStyle(right).effects!;
+      return (
+        leftEffects.blur.amount === rightEffects.blur.amount &&
+        leftEffects.blur.blurType === rightEffects.blur.blurType &&
+        leftEffects.focus.opacity === rightEffects.focus.opacity
       );
     }
     return left[field] === right[field];

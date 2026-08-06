@@ -12,6 +12,7 @@ import {
   DEFAULT_HIGHLIGHTER_SETTINGS,
 } from '../../../features/highlighter/style/defaults';
 import { normalizeHighlighterCatalogState } from './catalog-migration';
+import { cloneBorderPreset } from '../../../features/highlighter/presets/catalog';
 
 export function warnAboutInvalidStoredSettings(args: {
   hasInvalidRoot: boolean;
@@ -54,13 +55,6 @@ export function resolveDefaultBorderPresetId(
       .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))[0]?.id ??
     DEFAULT_BORDER_PRESET.id
   );
-}
-
-function cloneBorderPreset(preset: BorderPreset): BorderPreset {
-  return {
-    ...preset,
-    padding: { ...preset.padding },
-  };
 }
 
 export function reorderBorderPresets(

@@ -114,6 +114,21 @@ export function useFrameStyleCatalog(args: {
     }
   };
 
+  const refreshPresets = useCallback(async () => {
+    if (!isOpen) return;
+    const session = manualSessionRef.current;
+    try {
+      await runSerializedMutation(async () => {
+        const settings = await loadHighlighterSettings();
+        if (session === manualSessionRef.current) reconcileCatalogSettings(settings);
+      });
+    } catch (error) {
+      if (session === manualSessionRef.current) {
+        logger.error('Failed to refresh frame style templates', error);
+      }
+    }
+  }, [isOpen, reconcileCatalogSettings, runSerializedMutation]);
+
   const setPresetPending = (presetId: string, pending: boolean) => {
     if (pending) activePresetIdsRef.current.add(presetId);
     else activePresetIdsRef.current.delete(presetId);
@@ -163,5 +178,6 @@ export function useFrameStyleCatalog(args: {
       },
     },
     pendingPresetIds,
+    refreshPresets,
   };
 }

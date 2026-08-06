@@ -30,8 +30,8 @@
 
 .sniptale-callout-preset-list {
   gap: 8px;
-  padding: 8px 2px 6px;
-  scroll-padding-block: 8px;
+  padding: 0;
+  scroll-padding-block: 4px;
 }
 
 .sniptale-callout-preset-row {
@@ -52,20 +52,26 @@
   overflow: hidden;
 }
 
-.sniptale-callout-preset-row .sniptale-glass-preset-item--active,
+.sniptale-callout-preset-row .sniptale-glass-preset-item--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
+  );
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  box-shadow: none;
+}
+
 .sniptale-callout-preset-row .sniptale-glass-preset-item--active:hover {
   border-color: color-mix(
     in srgb,
-    var(--sniptale-color-border-strong) 48%,
-    var(--sniptale-color-border-soft) 52%
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
   );
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-hover) 78%,
-    var(--sniptale-color-surface-panel) 22%
-  );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--sniptale-color-accent) 72%, transparent);
+  background: transparent;
+  color: var(--sniptale-color-accent-emphasis);
+  box-shadow: none;
 }
 
 .sniptale-callout-preset-row[data-disabled='true'] {

@@ -13,6 +13,12 @@ describe('glass.toolbar-form-layout contract', () => {
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-button {');
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-button:disabled {');
     expect(glassToolbarFormLayoutStylesheet).toContain('.sniptale-glass-toolbar-divider {');
+    expect(glassToolbarFormLayoutStylesheet).toMatch(
+      /\.sniptale-glass-toolbar-button--active\s*\{[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s
+    );
+    expect(glassToolbarFormLayoutStylesheet).toMatch(
+      /\.sniptale-glass-toolbar-button\.sniptale-glass-toolbar-button--active:hover:not\(:disabled\)\s*\{[^}]*color:\s*var\(--sniptale-color-accent-emphasis\);[^}]*background:\s*transparent;/s
+    );
   });
 
   it('keeps toggle-row layout on the layout owner without swallowing form inputs', () => {

@@ -61,9 +61,11 @@ function ToggleGridOption({
         'hover:border-[color:var(--sniptale-color-border-strong)]',
         option.active &&
           [
-            'border-[color:var(--sniptale-color-border-accent-strong)]',
-            'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
-            'text-[color:var(--sniptale-color-text-primary)]',
+            'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft)_45%)]',
+            'bg-transparent text-[color:var(--sniptale-color-accent)]',
+            'hover:border-[color:color-mix(' +
+              'in_srgb,var(--sniptale-color-accent)_72%,var(--sniptale-color-border-soft)_28%)]',
+            'hover:bg-transparent hover:text-[color:var(--sniptale-color-accent-emphasis)]',
           ].join(' '),
         className
       )}

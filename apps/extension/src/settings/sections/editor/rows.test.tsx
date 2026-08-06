@@ -182,8 +182,9 @@ describe('settings/editor-section rows', () => {
     );
 
     const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-    expect(buttons[0]?.className).toContain('var(--sniptale-color-surface-hover)_82%');
-    expect(buttons[0]?.className).toContain('var(--sniptale-color-accent)_24%');
+    expect(buttons[0]?.className).toContain('bg-transparent');
+    expect(buttons[0]?.className).toContain('text-[var(--sniptale-color-accent)]');
+    expect(buttons[0]?.className).toContain('var(--sniptale-color-accent)_55%');
     await act(async () => {
       buttons[1]?.click();
       buttons.at(-1)?.click();

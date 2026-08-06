@@ -1,4 +1,5 @@
 import type { BorderVisualStyle } from './types';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
@@ -38,5 +39,6 @@ export function normalizeBorderPresetVisualFields<T extends BorderVisualStyle>(p
     fillColor: preset.fillColor ?? '#00000000',
     fillOpacity: preset.fillOpacity ?? 0,
     inheritCustomCss: preset.inheritCustomCss ?? false,
+    effects: cloneBorderPresetEffects(preset.effects),
   };
 }

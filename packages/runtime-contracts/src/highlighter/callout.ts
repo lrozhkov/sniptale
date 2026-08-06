@@ -228,6 +228,7 @@ export type CalloutSettingsPatch = {
 export interface CalloutPreset {
   basedOnRevision?: number | undefined;
   customized?: boolean | undefined;
+  content: Pick<CalloutContent, 'titleText'>;
   enabled?: boolean | undefined;
   id: string;
   name: string;

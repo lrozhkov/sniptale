@@ -24,6 +24,7 @@ import {
 import {
   CALLOUT_PRESET_STORAGE_SCHEMA_VERSION,
   MAX_CALLOUT_PRESET_NAME_LENGTH,
+  parseCalloutPresetContent,
   MAX_USER_CALLOUT_PRESETS,
   parseCalloutPresetPlacement,
   parseCalloutVisualStyle,
@@ -187,12 +188,14 @@ function createUserPresetId(): string {
 }
 
 export function createUserCalloutPreset(input: {
+  content?: CalloutPreset['content'];
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
 }): Promise<CalloutPresetMutationResult> {
   if (
     !isValidName(input.name) ||
+    (input.content !== undefined && !parseCalloutPresetContent(input.content)) ||
     !parseCalloutPresetPlacement(input.placement) ||
     !parseCalloutVisualStyle(input.style)
   ) {
@@ -208,6 +211,7 @@ export function createUserCalloutPreset(input: {
     const id = createUserPresetId();
     const next = addUserPreset(catalog, {
       id,
+      content: input.content ?? { titleText: '' },
       name: input.name.trim(),
       placement: input.placement,
       style: input.style,
@@ -219,6 +223,7 @@ export function createUserCalloutPreset(input: {
 }
 
 export function updateCalloutPreset(input: {
+  content?: CalloutPreset['content'];
   id: string;
   name: string;
   placement: CalloutPreset['placement'];
@@ -226,6 +231,7 @@ export function updateCalloutPreset(input: {
 }): Promise<CalloutPresetMutationResult> {
   if (
     !isValidName(input.name) ||
+    (input.content !== undefined && !parseCalloutPresetContent(input.content)) ||
     !parseCalloutPresetPlacement(input.placement) ||
     !parseCalloutVisualStyle(input.style)
   ) {
@@ -235,7 +241,11 @@ export function updateCalloutPreset(input: {
     if (!catalog.presets.some((preset) => preset.id === input.id)) {
       return { outcome: 'rejected', reason: 'not-found' };
     }
-    const next = updatePreset(catalog, input);
+    const current = catalog.presets.find((preset) => preset.id === input.id)!;
+    const next = updatePreset(catalog, {
+      ...input,
+      content: input.content ?? current.content,
+    });
     return next ? { catalog: next, outcome: 'applied' } : { outcome: 'unchanged' };
   });
 }

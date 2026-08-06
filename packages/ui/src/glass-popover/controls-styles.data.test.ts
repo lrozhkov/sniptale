@@ -8,5 +8,9 @@ describe('glassPopoverControlsStyles', () => {
     expect(glassPopoverControlsStyles).toContain('.sniptale-glass-chip {');
     expect(glassPopoverControlsStyles).toContain('.sniptale-glass-preset-item {');
     expect(glassPopoverControlsStyles).toContain('.sniptale-glass-color-trigger--active');
+    expect(glassPopoverControlsStyles).toMatch(
+      /\.sniptale-glass-icon-button--active,[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/
+    );
+    expect(glassPopoverControlsStyles).toContain('.sniptale-glass-color-trigger--active:hover {');
   });
 });

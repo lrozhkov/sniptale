@@ -9,6 +9,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadHighlighterSettings } from '../../../../composition/persistence/highlighter';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import { initializeFrameSessionBorderPreset } from './border-preset';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const logger = createLogger({ namespace: 'ContentFrameSessionSync' });
 
@@ -39,8 +40,17 @@ export function createFrameSessionSettingsLoader(args: {
         }
 
         args.globalEffectModeRef.current = settings.defaultEffectMode || 'border';
-        args.sessionBlurSettingsRef.current = { ...settings.defaultBlurSettings };
-        args.sessionFocusSettingsRef.current = { ...settings.defaultFocusSettings };
+        const effects = cloneBorderPresetEffects(persistedPreset?.effects);
+        args.sessionBlurSettingsRef.current = {
+          ...settings.defaultBlurSettings,
+          ...effects.blur,
+          showBorder: true,
+        };
+        args.sessionFocusSettingsRef.current = {
+          ...settings.defaultFocusSettings,
+          opacity: effects.focus.opacity,
+          showBorder: true,
+        };
         args.sessionDefaultsInitializedRef.current = true;
       })
       .catch((err) => {

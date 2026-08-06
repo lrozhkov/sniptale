@@ -52,6 +52,7 @@ describe('searchable project picker parts chrome', () => {
 
     expect(markup).not.toContain('Recent');
     expect(markup).toContain('placeholder="Find project"');
+    expect(markup).toContain('cursor-text');
   });
 });
 
@@ -67,9 +68,11 @@ describe('searchable project picker parts states', () => {
     );
 
     expect(createMarkup).toContain('Create');
+    expect(createMarkup).toContain('cursor-pointer');
 
     const renderedContainer = renderProjectListState({
       activeProjectId: 'project-1',
+      dataUiPrefix: 'picker',
       emptyLabel: 'Empty',
       noResultsLabel: 'No results',
       onSelectProject: () => undefined,
@@ -82,7 +85,31 @@ describe('searchable project picker parts states', () => {
     expect(renderedContainer.querySelector('[data-ui="custom-row"]')?.textContent).toBe(
       'Project 1'
     );
+    expect(
+      renderedContainer.querySelector('[data-ui="picker.project-list"]')?.className
+    ).not.toContain('pr-1');
   });
+
+  it.each(['compact', 'default'] as const)(
+    'renders a clickable default project row in %s presentation',
+    (presentation) => {
+      const onSelectProject = vi.fn();
+      const renderedContainer = renderProjectListState({
+        activeProjectId: 'project-1',
+        emptyLabel: 'Empty',
+        noResultsLabel: 'No results',
+        onSelectProject,
+        presentation,
+        projects: [{ id: 'project-1', name: 'Project 1' }],
+        visibleProjects: [{ id: 'project-1', name: 'Project 1' }],
+      });
+      const projectButton = renderedContainer.querySelector<HTMLButtonElement>('button');
+
+      expect(projectButton?.className).toContain('cursor-pointer');
+      act(() => projectButton?.click());
+      expect(onSelectProject).toHaveBeenCalledWith('project-1');
+    }
+  );
 });
 
 describe('searchable project picker parts prefixed helpers', () => {
@@ -113,5 +140,6 @@ describe('searchable project picker parts prefixed helpers', () => {
     expect(renderedContainer.querySelector('[data-ui="picker.project"]')?.textContent).toBe(
       'Project 1'
     );
+    expect(renderedContainer.querySelector('[data-ui="picker.project-list"]')).not.toBeNull();
   });
 });

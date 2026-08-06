@@ -92,12 +92,8 @@ function expectActiveAccentContract(): void {
   );
   expect(toolbarStylesheet).toContain(".sniptale-toggle[data-active='true']:hover:not(:disabled)");
   expect(toolbarStylesheet).toContain('color: var(--sniptale-color-accent-emphasis);');
-  expect(toolbarStylesheet).toContain(
-    'background: color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);'
-  );
-  expect(toolbarStylesheet).toContain(
-    'box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);'
-  );
+  expect(toolbarStylesheet).toContain('background: transparent;');
+  expect(toolbarStylesheet).toContain('box-shadow: none;');
   expect(toolbarStylesheet).toContain('.sniptale-toolbar .sniptale-btn::after {');
   expect(toolbarStylesheet).toContain('content: none !important;');
   expect(toolbarStylesheet).toContain('display: none !important;');
@@ -215,14 +211,12 @@ it('keeps accent-colored active icons without restoring hover tint tooltips', ()
 
 it('keeps the frame tooltip active-hover effect in sync with the floating toolbar', () => {
   const activeHoverBlock = glassToolbarCompositeStylesheet.match(
-    /\.sniptale-glass-toolbar-button--active:hover\s*\{[^}]+\}/
+    /\.sniptale-glass-toolbar-button\.sniptale-glass-toolbar-button--active:hover:not\(:disabled\)\s*\{[^}]+\}/
   )?.[0];
 
   expect(activeHoverBlock).toBeTruthy();
   expect(activeHoverBlock).toContain('color: var(--sniptale-color-accent-emphasis);');
-  expect(activeHoverBlock).toContain(
-    'background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);'
-  );
+  expect(activeHoverBlock).toContain('background: transparent;');
   expect(activeHoverBlock).toContain('box-shadow: none;');
   expect(activeHoverBlock).not.toContain('0 0 14px');
 });
@@ -289,8 +283,14 @@ it('highlights both callout quick actions on hover and keyboard focus', () => {
   );
 });
 
-it('uses symmetric standard spacing around the capture divider after highlighter utilities', () => {
-  expect(toolbarShellLayoutStylesheet).toMatch(
-    /\.sniptale-toolbar-highlighter-utilities\s*\+ \.sniptale-capture-leading-divider\s*\{[^}]*margin-inline-start:\s*0;/su
+it('uses the shared divider spacing without mode-specific horizontal overrides', () => {
+  expect(toolbarShellLayoutStylesheet).toContain(
+    '.sniptale-divider {\n  margin: var(--sniptale-toolbar-divider-margin);'
+  );
+  expect(toolbarShellLayoutStylesheet).not.toContain(
+    '.sniptale-toolbar .sniptale-capture-leading-divider'
+  );
+  expect(toolbarShellLayoutStylesheet).not.toContain(
+    ".sniptale-toolbar:not([data-display-mode='vertical']) .sniptale-toolbar-annotation-group"
   );
 });

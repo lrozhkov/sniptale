@@ -152,6 +152,17 @@ afterEach(() => {
 });
 
 describe('frame style catalog visibility', () => {
+  it('refreshes templates from canonical settings without reopening the popover', async () => {
+    const refreshedSettings = { ...SETTINGS, borderPresets: [PRESET, SECOND_PRESET] };
+    persistenceMocks.loadHighlighterSettings.mockResolvedValue(refreshedSettings);
+    renderHarness();
+
+    await act(async () => latest?.refreshPresets());
+
+    expect(persistenceMocks.loadHighlighterSettings).toHaveBeenCalledOnce();
+    expect(reconcileCatalogSettings).toHaveBeenCalledWith(refreshedSettings);
+  });
+
   it('persists a reversible visibility change and clears its pending state', async () => {
     const hiddenSettings = {
       ...SETTINGS,

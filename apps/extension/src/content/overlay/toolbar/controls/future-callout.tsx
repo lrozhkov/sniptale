@@ -86,6 +86,7 @@ export function FutureCalloutSettingsPopover(props: {
   const applyPreset = (preset: CalloutPreset) => {
     commit(
       applyCalloutSettingsPatch(localSettings, {
+        content: { titleText: preset.content.titleText },
         placement: {
           ...preset.placement,
           connectorBasePosition: undefined,
@@ -124,6 +125,7 @@ export function FutureCalloutSettingsPopover(props: {
         onClose={props.onClose}
         onCustomizePreset={presets.editor.open}
         onResetPreset={(preset) => void presets.editor.reset(preset)}
+        onShowPresets={presets.catalog.refresh}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         pendingPresetIds={presets.catalog.pendingPresetIds}
         presetError={presets.catalog.error}

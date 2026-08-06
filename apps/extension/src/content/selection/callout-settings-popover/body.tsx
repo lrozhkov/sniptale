@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { getPreferredSideFromAnchor } from '../callout/geometry';
 import type { CalloutSettingsPatch } from '../callout/model';
-import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } from './views';
+import { CalloutPositionSection, CalloutPresetSection } from './views';
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-editor/callout/inspector-save';
@@ -35,6 +35,7 @@ export function CalloutSettingsPopoverContent(props: {
   onApplyPreset: (preset: CalloutPreset) => void;
   onCustomizePreset: (preset: CalloutPreset) => void;
   onResetPreset?: ((preset: CalloutPreset) => void) | undefined;
+  onShowPresets: () => void | Promise<void>;
   onTogglePreset: (preset: CalloutPreset) => void;
   pendingPresetIds: ReadonlySet<string>;
   presets: CalloutPreset[];
@@ -49,6 +50,11 @@ export function CalloutSettingsPopoverContent(props: {
   useEffect(() => {
     setMode(hasSelectedPreset ? 'preset' : 'manual');
   }, [hasSelectedPreset]);
+  const switchMode = () => {
+    const nextMode = mode === 'preset' ? 'manual' : 'preset';
+    if (nextMode === 'preset') void props.onShowPresets();
+    setMode(nextMode);
+  };
   return (
     <>
       <SettingsPopoverHeader
@@ -56,10 +62,14 @@ export function CalloutSettingsPopoverContent(props: {
           label: translate(
             mode === 'preset' ? 'content.callout.switchToManual' : 'content.callout.switchToPresets'
           ),
-          onClick: () => setMode(mode === 'preset' ? 'manual' : 'preset'),
+          onClick: switchMode,
         }}
         closeLabel={translate('content.callout.closeSettings')}
         context={props.headerContext}
+        destructiveAction={{
+          label: translate('content.callout.disableButton'),
+          onClick: props.handleDelete,
+        }}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
         title={translate('content.callout.settingsTitle')}
@@ -104,7 +114,6 @@ export function CalloutSettingsPopoverContent(props: {
           onChange={props.handleSettingChange}
         />
       )}
-      <CalloutDeleteButton onDelete={props.handleDelete} />
     </>
   );
 }

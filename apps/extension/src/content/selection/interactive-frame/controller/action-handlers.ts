@@ -155,14 +155,30 @@ function useInteractiveFrameEffectHandler(params: InteractiveFrameActionParams) 
   );
 }
 
+function useInteractiveFrameEffectModeSelect(params: InteractiveFrameActionParams) {
+  const { effectMode, onUpdate, setEffectMode, setTempFrame, tempFrame } = params;
+  return React.useCallback(
+    (mode: EffectMode) => {
+      if (mode === effectMode) return;
+      const nextFrame = { ...tempFrame, effectMode: mode };
+      setEffectMode(mode);
+      setTempFrame(nextFrame);
+      onUpdate(nextFrame);
+    },
+    [effectMode, onUpdate, setEffectMode, setTempFrame, tempFrame]
+  );
+}
+
 /** Builds stable action handlers for interactive-frame editing and effect-mode transitions. */
 export function useInteractiveFrameActionHandlers(params: InteractiveFrameActionParams) {
   const onUpdateRef = useInteractiveFrameUpdateRef(params.onUpdate);
   const editHandlers = useInteractiveFrameEditHandlers(params, onUpdateRef);
   const handleEffectButtonClick = useInteractiveFrameEffectHandler(params);
+  const handleEffectModeSelect = useInteractiveFrameEffectModeSelect(params);
 
   return {
     ...editHandlers,
     handleEffectButtonClick,
+    handleEffectModeSelect,
   };
 }

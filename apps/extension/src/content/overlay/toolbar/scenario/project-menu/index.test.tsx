@@ -168,6 +168,17 @@ it('keeps the menu interactive inside the portal and still selects the clicked s
     '[data-ui="content.toolbar.scenario-project-menu.search-input"]'
   );
   expect(searchInput).not.toBeNull();
+  expect(searchInput?.className).toContain('cursor-text');
+
+  const menu = document.body.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.scenario-project-menu"]'
+  );
+  expect(menu?.classList).toContain('sniptale-main-toolbar-popover');
+  const menuBody = document.body.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.scenario-project-menu.body"]'
+  );
+  expect(menuBody?.className).toContain('px-0.5');
+  expect(menuBody?.classList).not.toContain('p-3');
 
   act(() => {
     searchInput?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
@@ -184,6 +195,7 @@ it('keeps the menu interactive inside the portal and still selects the clicked s
     '[data-ui="content.toolbar.scenario-project-menu.project"]'
   );
   expect(alphaProjectButton).not.toBeNull();
+  expect(alphaProjectButton?.className).toContain('cursor-pointer');
 
   act(() => {
     alphaProjectButton?.click();

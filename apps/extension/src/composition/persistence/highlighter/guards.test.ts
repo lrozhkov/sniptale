@@ -8,6 +8,10 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
   return {
     color: '#ff00aa',
     customCss: '',
+    effects: {
+      blur: { amount: 10, blurType: 'gaussian' },
+      focus: { opacity: 0.5 },
+    },
     fillColor: '#00000000',
     fillOpacity: 0,
     id: 'preset-1',
@@ -36,6 +40,7 @@ function createLegacyBorderPreset() {
   delete preset['strokeOpacity'];
   delete preset['fillOpacity'];
   delete preset['inheritCustomCss'];
+  delete preset['effects'];
   return preset;
 }
 

@@ -1,5 +1,6 @@
 .sniptale-frame-settings-popover {
   --sniptale-preset-list-max-height: min(242px, max(72px, calc(100vh - 360px)));
+  cursor: default;
 }
 
 .sniptale-frame-settings-popover .sniptale-content-popover-section-label {
@@ -12,8 +13,10 @@
   padding-inline: 0;
 }
 
-.sniptale-frame-decoration-toggle-row {
-  align-items: flex-start;
+.sniptale-frame-settings-popover.sniptale-content-popover--toolbar-menu
+  .sniptale-content-popover-section
+  + .sniptale-frame-decoration-section {
+  border-top: 0;
 }
 
 .sniptale-frame-settings-popover .sniptale-glass-preset-item {
@@ -90,40 +93,6 @@
 .sniptale-frame-style-preset-action:disabled {
   cursor: wait;
   opacity: 0.45;
-}
-
-.sniptale-frame-style-add {
-  width: 100%;
-  min-height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--sniptale-color-text-primary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    color 120ms ease,
-    background-color 120ms ease;
-}
-
-.sniptale-frame-style-add:hover,
-.sniptale-frame-style-add:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 38%,
-    var(--sniptale-color-border-soft) 62%
-  );
-  background: color-mix(in srgb, var(--sniptale-color-accent) 7%, transparent);
-  color: var(--sniptale-color-accent);
-  outline: none;
 }
 
 .sniptale-frame-style-editor-layer {

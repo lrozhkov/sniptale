@@ -55,6 +55,12 @@ function verifyRangeActiveFillContract() {
   expect(rangeTrackBlock).toContain('border: 1px solid');
   expect(rangeTrackBlock).toContain('var(--sniptale-range-fill-ratio)');
   expect(rangeTrackBlock).toContain('transparent var(--sniptale-range-fill-ratio)');
+  expect(rangeTrackBlock).toContain(
+    'left center / calc(var(--sniptale-range-thumb-size) / 2) 100% no-repeat'
+  );
+  expect(rangeTrackBlock).toContain(
+    'center / calc(100% - var(--sniptale-range-thumb-size)) 100% no-repeat'
+  );
   expect(mozTrackBlock).toContain('height: var(--sniptale-range-track-height);');
   expect(mozTrackBlock).toContain('border: 1px solid');
   expect(mozProgressBlock).toContain('height: var(--sniptale-range-track-height);');
@@ -95,6 +101,9 @@ describe('content-popover surface contract', () => {
   it('provides a compact density without shrinking readable text', () => {
     expect(readRuleBlock('.sniptale-content-popover--compact {')).toContain('padding: 8px;');
     expect(
+      readRuleBlock('.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu')
+    ).toContain('padding: var(--sniptale-toolbar-menu-edge-inset);');
+    expect(
       readRuleBlock('.sniptale-content-popover--compact .sniptale-content-popover-body')
     ).toContain('gap: 8px;');
     const sectionBlock = readRuleBlock(
@@ -102,6 +111,13 @@ describe('content-popover surface contract', () => {
     );
     expect(sectionBlock).toContain('gap: 6px;');
     expect(sectionBlock).toContain('padding: 8px 10px;');
+    expect(contentPopoverOwnerStylesheet).toContain(
+      '.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu\n  .sniptale-content-popover-section {'
+    );
+    expect(contentPopoverOwnerStylesheet).toContain('padding-inline: 2px;');
+    expect(contentPopoverOwnerStylesheet).toContain(
+      '.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu\n  > .sniptale-content-popover-body {'
+    );
     expect(readRuleBlock('.sniptale-content-popover--compact .sniptale-glass-chip')).toContain(
       'min-height: 28px;'
     );
@@ -117,6 +133,19 @@ describe('content-popover surface contract', () => {
     );
     expect(inlineColorLabelBlock).toContain('width: auto;');
     expect(inlineColorLabelBlock).toContain('white-space: nowrap;');
+  });
+
+  it('keeps toolbar popover content on the canonical menu edge inset', () => {
+    expect(readRuleBlock('.sniptale-content-popover--toolbar-menu,')).toContain(
+      'padding: var(--sniptale-toolbar-menu-edge-inset);'
+    );
+    expect(
+      readRuleBlock('.sniptale-content-popover--toolbar-menu .sniptale-content-popover-section')
+    ).toContain('padding: 10px 2px;');
+    expect(contentPopoverOwnerStylesheet).toContain(
+      '.sniptale-settings-popover-header\n  + .sniptale-content-popover-section {'
+    );
+    expect(contentPopoverOwnerStylesheet).toContain('padding-top: 0;');
   });
 });
 

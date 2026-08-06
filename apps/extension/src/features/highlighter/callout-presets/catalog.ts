@@ -153,6 +153,7 @@ export function cloneCalloutPreset(preset: CalloutPreset): CalloutPreset {
     preset.placement.connectorAttachments ?? DEFAULT_PRESET_PLACEMENT.connectorAttachments;
   return {
     ...preset,
+    content: { ...preset.content },
     placement: {
       ...preset.placement,
       connectorAttachments: {
@@ -172,6 +173,7 @@ function createSystemPreset(
   return {
     basedOnRevision: SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
     customized: false,
+    content: { titleText: '' },
     enabled: true,
     id: systemPresetKey,
     name: systemPresetKey,

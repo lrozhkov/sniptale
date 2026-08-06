@@ -136,16 +136,6 @@ function getPresetRow(name: string) {
   return row;
 }
 
-function getDecorationSwitch() {
-  const toggle = document.querySelector<HTMLButtonElement>('.sniptale-glass-switch');
-
-  if (!toggle) {
-    throw new Error('Expected frame-and-fill decoration switch to be rendered');
-  }
-
-  return toggle;
-}
-
 function clickTrusted(element: HTMLElement) {
   act(() => {
     element.dispatchEvent(
@@ -374,7 +364,7 @@ describe('FrameSettingsPopover pending focus edits', () => {
     setRangeInputValue(getRangeInput(), '30');
 
     expect(onApplyToFrame).toHaveBeenLastCalledWith({
-      focusSettings: { opacity: 0.3, showBorder: false },
+      focusSettings: { opacity: 0.3, showBorder: true },
     });
 
     await act(async () => {
@@ -430,16 +420,18 @@ describe('FrameSettingsPopover preset selection', () => {
 
     clickTrusted(getPresetButton('Persisted preset'));
 
+    expect(onApplyToFrame).toHaveBeenCalledTimes(1);
     expect(onApplyToFrame).toHaveBeenCalledWith({
       borderSettings: projectBorderPresetToAppliedSettings(persistedPreset),
+      blurSettings: DEFAULT_BLUR_SETTINGS,
+      focusSettings: DEFAULT_FOCUS_SETTINGS,
     });
     expect(onClose).not.toHaveBeenCalled();
   });
 
   it.each(['blur', 'focus'] as const)(
-    'preserves the selected preset while %s frame-and-fill decoration is hidden and restored',
+    'keeps the selected template visible for %s despite a legacy hidden-decoration value',
     (effectMode) => {
-      const onApplyToFrame = vi.fn();
       const presetName = getBorderPresetDisplayName(DEFAULT_BORDER_PRESET);
       storageMocks.loadHighlighterSettings.mockReturnValue(
         new Promise<HighlighterSettings>(() => undefined)
@@ -448,29 +440,43 @@ describe('FrameSettingsPopover preset selection', () => {
       renderPopover({
         effectMode,
         borderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
-        onApplyToFrame,
         ...(effectMode === 'blur'
           ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: false } }
           : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: false } }),
       });
 
-      expect(document.querySelector('.sniptale-frame-style-preset-row')).toBeNull();
-      expect(document.body.textContent).not.toContain(presetName);
+      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
+      const decorationSwitch = document.querySelector('.sniptale-glass-switch');
+      expect(decorationSwitch).not.toBeNull();
+      expect(decorationSwitch?.classList).not.toContain('sniptale-glass-switch--on');
+    }
+  );
 
-      act(() => getDecorationSwitch().click());
-
-      expect(onApplyToFrame).toHaveBeenLastCalledWith(
-        effectMode === 'blur'
-          ? { blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: true } }
-          : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: true } }
+  it.each(['border', 'blur', 'focus'] as const)(
+    'closes when the already selected %s effect mode is clicked',
+    (effectMode) => {
+      const onClose = vi.fn();
+      const onEffectModeChange = vi.fn();
+      storageMocks.loadHighlighterSettings.mockReturnValue(
+        new Promise<HighlighterSettings>(() => undefined)
       );
-      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
+      renderPopover({ effectMode, onClose, onEffectModeChange });
 
-      act(() => getDecorationSwitch().click());
-      expect(document.querySelector('.sniptale-frame-style-preset-row')).toBeNull();
+      const label = translate(
+        effectMode === 'border'
+          ? 'content.interactiveFrame.effectBorder'
+          : effectMode === 'blur'
+            ? 'content.interactiveFrame.effectBlur'
+            : 'content.interactiveFrame.effectFocus'
+      );
+      const activeMode = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.title === label
+      );
+      expect(activeMode).not.toBeNull();
+      act(() => activeMode?.click());
 
-      act(() => getDecorationSwitch().click());
-      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
+      expect(onClose).toHaveBeenCalledOnce();
+      expect(onEffectModeChange).not.toHaveBeenCalled();
     }
   );
 
@@ -631,7 +637,7 @@ describe('FrameSettingsPopover preset catalog actions', () => {
     expect(document.body.textContent).toContain(secondPreset.name);
   });
 
-  it('opens the shared style editor from both edit and add actions', async () => {
+  it('opens the shared style editor from the preset edit action', async () => {
     storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
     renderPopover();
     await flushAsyncEffects();
@@ -651,10 +657,6 @@ describe('FrameSettingsPopover preset catalog actions', () => {
     });
     expect(document.querySelector('.sniptale-modal')).toBeNull();
     expect(document.activeElement).toBe(editButton);
-    const addButton = document.querySelector<HTMLElement>('[data-frame-style-action="add"]');
-    clickTrusted(addButton!);
-
-    expect(document.querySelector('.sniptale-modal')).not.toBeNull();
-    expect(document.body.textContent).toContain(translate('highlighter.editor.newTitle'));
+    expect(document.querySelector('[data-frame-style-action="add"]')).toBeNull();
   });
 });

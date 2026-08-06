@@ -79,3 +79,68 @@ it('opens the persistent editor and saves the selected template through the cata
   });
   expect(latest?.editor.isOpen).toBe(false);
 });
+
+it('refreshes the open catalog and reveals a newly saved template', async () => {
+  await act(async () => root?.render(<Harness />));
+  const refreshed = createCatalog();
+  const source = refreshed.presets[0]!;
+  refreshed.presets = [
+    ...refreshed.presets,
+    {
+      ...source,
+      id: 'user-new',
+      name: 'New template',
+      order: refreshed.presets.length,
+      origin: 'user',
+    },
+  ];
+  mocks.load.mockResolvedValueOnce(refreshed);
+
+  await act(async () => latest?.catalog.refresh());
+
+  expect(mocks.load).toHaveBeenCalledTimes(2);
+  expect(latest?.catalog.visiblePresets.some((preset) => preset.id === 'user-new')).toBe(true);
+});
+
+it('ignores an initial load failure after a newer subscription snapshot', async () => {
+  let rejectLoad: ((error: Error) => void) | undefined;
+  mocks.load.mockReturnValueOnce(
+    new Promise((_resolve, reject) => {
+      rejectLoad = reject;
+    })
+  );
+  await act(async () => root?.render(<Harness />));
+  const subscribed = createCatalog();
+  subscribed.catalogCustomized = true;
+
+  act(() => mocks.listener?.(subscribed));
+  await act(async () => rejectLoad?.(new Error('stale load')));
+
+  expect(latest?.catalog.value).toEqual(subscribed);
+  expect(latest?.catalog.error).toBeNull();
+});
+
+it('ignores a refresh failure after a newer subscription snapshot', async () => {
+  await act(async () => root?.render(<Harness />));
+  let rejectRefresh: ((error: Error) => void) | undefined;
+  mocks.load.mockReturnValueOnce(
+    new Promise((_resolve, reject) => {
+      rejectRefresh = reject;
+    })
+  );
+  let refresh: Promise<void> | undefined;
+  act(() => {
+    refresh = latest?.catalog.refresh();
+  });
+  const subscribed = createCatalog();
+  subscribed.catalogCustomized = true;
+
+  act(() => mocks.listener?.(subscribed));
+  await act(async () => {
+    rejectRefresh?.(new Error('stale refresh'));
+    await refresh;
+  });
+
+  expect(latest?.catalog.value).toEqual(subscribed);
+  expect(latest?.catalog.error).toBeNull();
+});

@@ -46,7 +46,7 @@
 .sniptale-content-popover--toolbar-menu,
 .sniptale-content-popover--toolbar-menu.sniptale-glass-popover {
   border-radius: 0;
-  padding: 10px;
+  padding: var(--sniptale-toolbar-menu-edge-inset);
 }
 
 .sniptale-content-popover--toolbar-menu > .sniptale-content-popover-body {
@@ -59,6 +59,12 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.sniptale-content-popover--toolbar-menu
+  .sniptale-settings-popover-header
+  + .sniptale-content-popover-section {
+  padding-top: 0;
 }
 
 .sniptale-content-popover--toolbar-menu
@@ -129,15 +135,29 @@
   padding: 8px;
 }
 
+.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu {
+  padding: var(--sniptale-toolbar-menu-edge-inset);
+}
+
 .sniptale-content-popover--compact .sniptale-content-popover-body,
 .sniptale-content-popover--compact .sniptale-glass-popover-body {
   gap: 8px;
+}
+
+.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu
+  > .sniptale-content-popover-body {
+  gap: 0;
 }
 
 .sniptale-content-popover--compact .sniptale-content-popover-section,
 .sniptale-content-popover--compact .sniptale-glass-section {
   gap: 6px;
   padding: 8px 10px;
+}
+
+.sniptale-content-popover--compact.sniptale-content-popover--toolbar-menu
+  .sniptale-content-popover-section {
+  padding-inline: 2px;
 }
 
 .sniptale-content-popover--compact .sniptale-glass-row,

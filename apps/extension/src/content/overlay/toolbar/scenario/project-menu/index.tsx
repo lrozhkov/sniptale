@@ -30,7 +30,7 @@ function ScenarioProjectMenuBody(props: { onClose: () => void; scenario: Scenari
   }, [props.scenario.pendingProjectSelection]);
 
   return (
-    <div className="grid gap-3 p-3">
+    <div className="grid gap-3 px-0.5" data-ui="content.toolbar.scenario-project-menu.body">
       <ScenarioProjectMenuCurrentProject projectName={props.scenario.projectName} />
       <ScenarioProjectMenuPicker
         isCreating={isCreating}
@@ -56,6 +56,7 @@ function ScenarioProjectMenuPortal(props: {
   return createPortal(
     <div
       ref={props.menuRef}
+      className="sniptale-main-toolbar-popover"
       data-ui="content.toolbar.scenario-project-menu"
       style={{ ...props.menuStyle, pointerEvents: 'auto' }}
       onPointerDown={(event) => {

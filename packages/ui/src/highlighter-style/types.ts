@@ -5,13 +5,16 @@ export type {
   BorderPadding,
   BorderPreset,
   BorderPresetOrigin,
+  BorderPresetBlurType,
+  BorderPresetEffects,
   BorderVisualStyle,
   BorderVisualStylePatch,
   SystemBorderPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import type { BorderPreset } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
-export type BlurType = 'gaussian' | 'distortion' | 'pixelate' | 'solid';
+export type BlurType =
+  import('@sniptale/runtime-contracts/highlighter/border-preset').BorderPresetBlurType;
 export type BlurStrokeStyle = BorderPreset['style'] | 'dash' | 'dot' | 'dash-dot' | 'long-dash';
 
 export interface BlurSettings {

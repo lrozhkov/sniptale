@@ -41,10 +41,12 @@ function expectMatteIconAndSegmentedControls() {
   expect(icon).toContain('border-none');
   expect(icon).toContain('var(--sniptale-color-info)');
   expect(segmented).toContain('min-h-[88px]');
-  expect(segmented).toContain('var(--sniptale-color-surface-hover)_82%');
+  expect(segmented).toContain('bg-transparent');
+  expect(segmented).toContain('text-[var(--sniptale-color-accent)]');
   expect(segmented).toContain(
-    'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]'
+    'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft)_45%)]'
   );
+  expect(segmented).toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
   expect(segmentedIdle).toContain('hover:text-[var(--sniptale-color-text-primary-strong)]');
   expect(segmentedIdle).not.toContain(
     'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_74%,transparent)]'
@@ -74,8 +76,10 @@ function expectDangerPillAndActiveBranches() {
   expect(dangerSecondary).toContain('var(--sniptale-color-danger-soft)_34%');
   expect(pillPrimary).toContain('rounded-full');
   expect(pillPrimary).toContain('border-none');
-  expect(activeIcon).toContain('var(--sniptale-color-surface-hover)_84%');
-  expect(activeIcon).toContain('var(--sniptale-color-accent)_22%');
+  expect(activeIcon).toContain('bg-transparent');
+  expect(activeIcon).toContain('text-[var(--sniptale-color-accent)]');
+  expect(activeIcon).toContain('var(--sniptale-color-accent)_55%');
+  expect(activeIcon).toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
 }
 
 describe('controlLanguage', () => {

@@ -111,4 +111,26 @@ it('migrates legacy user presets to a deterministic default position', () => {
     anchor: 'top-center',
     side: 'top',
   });
+  expect(migrated.presets.find((preset) => preset.id === 'user-legacy')?.content).toEqual({
+    titleText: '',
+  });
+});
+
+it('round-trips the template title without persisting comment body content', () => {
+  const catalog = resolveStoredCalloutPresetCatalog({});
+  const customized = {
+    ...catalog,
+    presets: catalog.presets.map((preset, index) =>
+      index === 0
+        ? { ...preset, customized: true, content: { titleText: 'Template heading' } }
+        : preset
+    ),
+  };
+
+  const stored = serializeCalloutPresetCatalog(customized);
+  expect(stored.systemOverrides?.[0]?.content).toEqual({ titleText: 'Template heading' });
+  expect(resolveStoredCalloutPresetCatalog(stored).presets[0]?.content).toEqual({
+    titleText: 'Template heading',
+  });
+  expect(JSON.stringify(stored)).not.toContain('bodyHtml');
 });

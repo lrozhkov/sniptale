@@ -155,11 +155,6 @@ function FullPagePreferencesMenu(
         title={translate('content.toolbar.fullPageSettingsTitle')}
         variant="capture"
       >
-        <ProductToolbarMenuGroupLabel>
-          {translate('content.toolbar.fullPageFloatingTitle')}
-        </ProductToolbarMenuGroupLabel>
-        <FloatingModeItems {...props} />
-        <ProductToolbarMenuDivider />
         <BooleanPreferenceItem
           disabled={props.saving}
           hint={translate('content.toolbar.fullPageLazyContentHint')}
@@ -178,6 +173,11 @@ function FullPagePreferencesMenu(
           selected={props.preferences.freezeMotion}
           onSelect={() => void props.onUpdate({ freezeMotion: !props.preferences.freezeMotion })}
         />
+        <ProductToolbarMenuDivider />
+        <ProductToolbarMenuGroupLabel>
+          {translate('content.toolbar.fullPageFloatingTitle')}
+        </ProductToolbarMenuGroupLabel>
+        <FloatingModeItems {...props} />
         {props.currentViewport ? (
           <>
             <ProductToolbarMenuDivider />

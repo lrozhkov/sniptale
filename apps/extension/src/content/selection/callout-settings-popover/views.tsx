@@ -1,7 +1,6 @@
 import type { CalloutAnchor, CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import {
-  ProductGlassDestructiveButton,
   ProductGlassPresetItem,
   ProductGlassPresetList,
   ProductGlassPresetMeta,
@@ -120,13 +119,5 @@ export function CalloutPositionSection(props: {
     <ContentPopoverSection title={translate('content.callout.positionSection')}>
       {grid}
     </ContentPopoverSection>
-  );
-}
-
-export function CalloutDeleteButton(props: { onDelete: () => void }) {
-  return (
-    <ProductGlassDestructiveButton onClick={props.onDelete}>
-      {translate('content.callout.disableButton')}
-    </ProductGlassDestructiveButton>
   );
 }

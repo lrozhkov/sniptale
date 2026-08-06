@@ -49,11 +49,12 @@ function applyStylePatch(style: CalloutVisualStyle, patch: CalloutSettingsPatch)
 }
 
 function createInspectorSettings(
+  content: CalloutPreset['content'],
   placement: CalloutPreset['placement'],
   style: CalloutVisualStyle
 ): CalloutSettings {
   return {
-    content: { bodyHtml: '', titleText: '' },
+    content: { bodyHtml: '', titleText: content.titleText },
     enabled: true,
     placement,
     style,
@@ -71,9 +72,11 @@ type CalloutPresetEditorProps = {
 };
 
 function PresetEditorBody(props: {
+  content: CalloutPreset['content'];
   name: string;
   placement: CalloutPreset['placement'];
   setName: (value: string) => void;
+  setContent: (value: CalloutPreset['content']) => void;
   setPlacement: (value: CalloutPreset['placement']) => void;
   setStyle: (value: CalloutVisualStyle) => void;
   style: CalloutVisualStyle;
@@ -109,7 +112,7 @@ function PresetEditorBody(props: {
           </div>
         </div>
         <CalloutManualSettings
-          settings={createInspectorSettings(props.placement, props.style)}
+          settings={createInspectorSettings(props.content, props.placement, props.style)}
           positionSection={
             <div className="grid gap-2" data-ui="shared.callout-preset-editor.position">
               <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
@@ -130,7 +133,12 @@ function PresetEditorBody(props: {
               />
             </div>
           }
-          onChange={(patch) => props.setStyle(applyStylePatch(props.style, patch))}
+          onChange={(patch) => {
+            if (patch.content?.titleText !== undefined) {
+              props.setContent({ titleText: patch.content.titleText });
+            }
+            props.setStyle(applyStylePatch(props.style, patch));
+          }}
         />
       </div>
     </ProductModalBody>
@@ -203,9 +211,11 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           onClose={props.onClose}
         />
         <PresetEditorBody
+          content={preset.content}
           name={draft.name}
           placement={draft.placement}
           setName={draft.setName}
+          setContent={draft.setContent}
           setPlacement={draft.setPlacement}
           setStyle={draft.setStyle}
           style={draft.style}

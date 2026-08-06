@@ -1,16 +1,10 @@
-import { Droplet, Eye, EyeOff, Plus, Settings2, Square, Waves } from 'lucide-react';
+import { Eye, EyeOff, Settings2 } from 'lucide-react';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import {
-  ProductGlassChip,
-  ProductGlassChipIcon,
-  ProductGlassOptionGrid,
   ProductGlassPresetItem,
   ProductGlassPresetList,
   ProductGlassPresetMeta,
   ProductGlassPresetPreview,
-  ProductGlassRange,
-  ProductGlassSwitch,
-  ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type {
@@ -21,7 +15,7 @@ import type {
   FocusSettings,
   HighlighterSettings,
 } from '../../../features/highlighter/contracts';
-import { buildBlurTypeOptions, getBorderPresetPreviewStyle } from './helpers';
+import { getBorderPresetPreviewStyle } from './helpers';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
@@ -40,18 +34,12 @@ import {
 } from '../popover-sync/settings-header';
 import { selectOrClosePopoverPreset } from '../popover-sync/preset-selection';
 import { useOpeningPresetOrder } from '../popover-sync/preset-order';
-
-function BlurTypeIcon(props: { iconName: 'droplet' | 'waves' | 'square' }) {
-  if (props.iconName === 'droplet') {
-    return <Droplet size={15} />;
-  }
-
-  if (props.iconName === 'waves') {
-    return <Waves size={15} />;
-  }
-
-  return <Square size={15} />;
-}
+import {
+  FrameBlurControls,
+  FrameDecorationToggle,
+  FrameEffectModeSelector,
+  FrameFocusControls,
+} from './effect-controls';
 
 function getFrameEffectTitle(effectMode: EffectMode) {
   if (effectMode === 'border') return translate('content.interactiveFrame.effectBorder');
@@ -69,7 +57,6 @@ export function FrameSettingsPopoverContent(props: {
   handleFocusChange: (opacity: number) => void;
   handleFocusShowBorderChange: (showBorder: boolean) => void;
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
-  handleAddPreset: () => void;
   handleEditPreset: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
@@ -79,6 +66,8 @@ export function FrameSettingsPopoverContent(props: {
   headerContext: SettingsPopoverContext;
   headerDrag?: FloatingPopoverDrag;
   onClose: () => void;
+  onEffectModeChange?: (mode: EffectMode) => void;
+  onShowPresets: () => void | Promise<void>;
   onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
@@ -90,17 +79,6 @@ export function FrameSettingsPopoverContent(props: {
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
 }) {
-  const decorationEnabled =
-    props.effectMode === 'border' ||
-    (props.effectMode === 'blur'
-      ? (props.localBlurSettings.showBorder ?? false)
-      : (props.localFocusSettings.showBorder ?? false));
-  const handleDecorationToggle =
-    props.effectMode === 'blur'
-      ? props.handleBlurShowBorderChange
-      : props.effectMode === 'focus'
-        ? props.handleFocusShowBorderChange
-        : undefined;
   const [mode, setMode] = useState<'preset' | 'manual'>(() =>
     props.selectedPresetId ? 'preset' : 'manual'
   );
@@ -109,8 +87,9 @@ export function FrameSettingsPopoverContent(props: {
     setMode(hasSelectedPreset ? 'preset' : 'manual');
   }, [hasSelectedPreset]);
   const switchMode = () => {
-    if (!decorationEnabled) handleDecorationToggle?.(true);
-    setMode(mode === 'preset' ? 'manual' : 'preset');
+    const nextMode = mode === 'preset' ? 'manual' : 'preset';
+    if (nextMode === 'preset') void props.onShowPresets();
+    setMode(nextMode);
   };
 
   return (
@@ -130,26 +109,45 @@ export function FrameSettingsPopoverContent(props: {
         onClose={props.onClose}
         title={getFrameEffectTitle(props.effectMode)}
       />
+      <FrameEffectModeSelector
+        effectMode={props.effectMode}
+        onChange={(effectMode) => {
+          if (effectMode === props.effectMode) {
+            props.onClose();
+            return;
+          }
+          props.onEffectModeChange?.(effectMode);
+        }}
+      />
       {props.effectMode === 'blur' ? (
-        <FrameBlurSection
-          handleBlurChange={props.handleBlurChange}
-          handleBlurTypeChange={props.handleBlurTypeChange}
-          localBlurSettings={props.localBlurSettings}
-        />
+        <>
+          <FrameBlurControls
+            handleBlurChange={props.handleBlurChange}
+            handleBlurTypeChange={props.handleBlurTypeChange}
+            settings={props.localBlurSettings}
+          />
+          <FrameDecorationToggle
+            onChange={props.handleBlurShowBorderChange}
+            showBorder={props.localBlurSettings.showBorder ?? false}
+          />
+        </>
       ) : null}
 
       {props.effectMode === 'focus' ? (
-        <FrameFocusSection
-          handleFocusChange={props.handleFocusChange}
-          localFocusSettings={props.localFocusSettings}
-        />
+        <>
+          <FrameFocusControls
+            handleFocusChange={props.handleFocusChange}
+            settings={props.localFocusSettings}
+          />
+          <FrameDecorationToggle
+            onChange={props.handleFocusShowBorderChange}
+            showBorder={props.localFocusSettings.showBorder ?? false}
+          />
+        </>
       ) : null}
 
       <FrameBorderSection
         borderPresets={props.globalSettings.borderPresets}
-        decorationEnabled={decorationEnabled}
-        effectMode={props.effectMode}
-        handleAddPreset={props.handleAddPreset}
         handleEditPreset={props.handleEditPreset}
         handleManualBorderChange={props.handleManualBorderChange}
         handleSelectPreset={props.handleSelectPreset}
@@ -165,8 +163,6 @@ export function FrameSettingsPopoverContent(props: {
         {...(props.selectedPresetId === undefined
           ? {}
           : { selectedPresetId: props.selectedPresetId })}
-        showDecorationHint={!props.compact}
-        {...(handleDecorationToggle === undefined ? {} : { handleDecorationToggle })}
       />
     </>
   );
@@ -174,10 +170,6 @@ export function FrameSettingsPopoverContent(props: {
 
 function FrameBorderSection(props: {
   borderPresets: BorderPreset[];
-  decorationEnabled: boolean;
-  effectMode: EffectMode;
-  handleAddPreset: () => void;
-  handleDecorationToggle?: (showBorder: boolean) => void;
   handleEditPreset: (preset: BorderPreset) => void;
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
@@ -195,7 +187,6 @@ function FrameBorderSection(props: {
   mode: 'preset' | 'manual';
   onClose: () => void;
   onFloatingInteractionChange?: (open: boolean) => void;
-  showDecorationHint: boolean;
 }) {
   const locale = useAppLocale();
   const enabledPresetCount = props.borderPresets.filter(
@@ -204,12 +195,10 @@ function FrameBorderSection(props: {
 
   return (
     <ContentPopoverSection className="sniptale-frame-style-section">
-      <FrameDecorationToggle {...props} />
-      {props.decorationEnabled && props.mode === 'preset' ? (
+      {props.mode === 'preset' ? (
         <FramePresetMode
           borderPresets={props.borderPresets}
           enabledPresetCount={enabledPresetCount}
-          handleAddPreset={props.handleAddPreset}
           handleEditPreset={props.handleEditPreset}
           handleSelectPreset={props.handleSelectPreset}
           handleTogglePresetEnabled={props.handleTogglePresetEnabled}
@@ -221,40 +210,14 @@ function FrameBorderSection(props: {
             : { selectedPresetId: props.selectedPresetId })}
         />
       ) : null}
-      {props.decorationEnabled && props.mode === 'manual' ? <FrameManualMode {...props} /> : null}
+      {props.mode === 'manual' ? <FrameManualMode {...props} /> : null}
     </ContentPopoverSection>
-  );
-}
-
-function FrameDecorationToggle(props: {
-  decorationEnabled: boolean;
-  effectMode: EffectMode;
-  handleDecorationToggle?: (showBorder: boolean) => void;
-  showDecorationHint: boolean;
-}) {
-  if (props.effectMode === 'border') return null;
-
-  return (
-    <ProductGlassToggleRow
-      className="sniptale-frame-decoration-toggle-row"
-      title={translate('content.overlayControls.showBorderTitle')}
-      hint={
-        props.showDecorationHint ? translate('content.overlayControls.showBorderHint') : undefined
-      }
-      control={
-        <ProductGlassSwitch
-          onClick={() => props.handleDecorationToggle?.(!props.decorationEnabled)}
-          on={props.decorationEnabled}
-        />
-      }
-    />
   );
 }
 
 function FramePresetMode(props: {
   borderPresets: BorderPreset[];
   enabledPresetCount: number;
-  handleAddPreset: () => void;
   handleEditPreset: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
@@ -282,17 +245,6 @@ function FramePresetMode(props: {
           />
         ))}
       </ProductGlassPresetList>
-      <button
-        className="sniptale-frame-style-add"
-        data-frame-style-action="add"
-        onClick={(event) => {
-          if (createTrustedContentActionIntentSource(event.nativeEvent)) props.handleAddPreset();
-        }}
-        type="button"
-      >
-        <Plus size={15} />
-        <span>{translate('content.overlayControls.addFrameStyle')}</span>
-      </button>
     </>
   );
 }
@@ -410,94 +362,5 @@ function FrameManualMode(props: {
         style={props.localBorderSettings}
       />
     </HighlighterManualInspectorSurface>
-  );
-}
-
-function FrameBlurSection(props: {
-  handleBlurChange: (amount: number) => void;
-  handleBlurTypeChange: (blurType: BlurType) => void;
-  localBlurSettings: BlurSettings;
-}) {
-  return (
-    <>
-      <FrameBlurStrengthSection
-        amount={props.localBlurSettings.amount}
-        handleBlurChange={props.handleBlurChange}
-      />
-      <FrameBlurTypeSection
-        blurType={props.localBlurSettings.blurType}
-        handleBlurTypeChange={props.handleBlurTypeChange}
-      />
-    </>
-  );
-}
-
-function FrameBlurStrengthSection(props: {
-  amount: number;
-  handleBlurChange: (amount: number) => void;
-}) {
-  const title = `${translate('content.overlayControls.blurStrengthLabelPrefix')} ${props.amount}`;
-
-  return (
-    <ContentPopoverSection title={title}>
-      <ProductGlassRange
-        type="range"
-        min={1}
-        max={25}
-        value={props.amount}
-        onChange={(event) => props.handleBlurChange(parseInt(event.target.value, 10))}
-      />
-    </ContentPopoverSection>
-  );
-}
-
-function FrameBlurTypeSection(props: {
-  blurType: BlurType;
-  handleBlurTypeChange: (blurType: BlurType) => void;
-}) {
-  return (
-    <ContentPopoverSection title={translate('content.overlayControls.blurTypeLabel')}>
-      <ProductGlassOptionGrid>
-        {buildBlurTypeOptions().map((option) => {
-          const isActive = props.blurType === option.value;
-
-          return (
-            <ProductGlassChip
-              key={option.value}
-              onClick={() => props.handleBlurTypeChange(option.value)}
-              title={option.label}
-              stacked
-              active={isActive}
-            >
-              <ProductGlassChipIcon>
-                <BlurTypeIcon iconName={option.iconName} />
-              </ProductGlassChipIcon>
-              <span>{option.label}</span>
-            </ProductGlassChip>
-          );
-        })}
-      </ProductGlassOptionGrid>
-    </ContentPopoverSection>
-  );
-}
-
-function FrameFocusSection(props: {
-  handleFocusChange: (opacity: number) => void;
-  localFocusSettings: FocusSettings;
-}) {
-  const title = `${translate('content.overlayControls.focusDimmingLabelPrefix')} ${Math.round(
-    props.localFocusSettings.opacity * 100
-  )}%`;
-
-  return (
-    <ContentPopoverSection title={title}>
-      <ProductGlassRange
-        type="range"
-        min={10}
-        max={100}
-        value={props.localFocusSettings.opacity * 100}
-        onChange={(event) => props.handleFocusChange(parseInt(event.target.value, 10) / 100)}
-      />
-    </ContentPopoverSection>
   );
 }

@@ -100,12 +100,14 @@ function createCatalogActions(args: {
         () =>
           exists
             ? updateCalloutPreset({
+                content: preset.content,
                 id: preset.id,
                 name: preset.name,
                 placement: preset.placement,
                 style: preset.style,
               })
             : createUserCalloutPreset({
+                content: preset.content,
                 name: preset.name,
                 placement: preset.placement,
                 style: preset.style,

@@ -26,6 +26,7 @@
   --sniptale-radius-toolbar-glass: 14px;
   --sniptale-size-toolbar: 44px;
   --sniptale-size-toolbar-glass: 46px;
+  --sniptale-toolbar-menu-edge-inset: 10px;
 
   /* Theme-invariant control surface for UI floating above arbitrary page content. */
   --sniptale-color-surface-contrast: #27272a;

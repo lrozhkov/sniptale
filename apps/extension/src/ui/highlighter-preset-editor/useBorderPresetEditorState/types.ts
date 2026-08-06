@@ -1,6 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type { BorderPadding, BorderPreset } from '../../../features/highlighter/contracts';
+import type {
+  BorderPadding,
+  BorderPreset,
+  BorderPresetEffects,
+} from '../../../features/highlighter/contracts';
 
 type BorderPresetStyle = 'solid' | 'dashed' | 'dotted';
 
@@ -17,6 +21,7 @@ export interface BorderPresetDraftSetters {
   setCustomCss: Dispatch<SetStateAction<string>>;
   setFillColor: Dispatch<SetStateAction<string>>;
   setFillOpacity: Dispatch<SetStateAction<number>>;
+  setEffects: Dispatch<SetStateAction<BorderPresetEffects>>;
   setInheritCustomCss: Dispatch<SetStateAction<boolean>>;
   setName: Dispatch<SetStateAction<string>>;
   setOpacity: Dispatch<SetStateAction<number>>;
@@ -35,6 +40,7 @@ export interface BorderPresetDraftState extends BorderPresetDraftSetters {
   customCss: string;
   fillColor: string;
   fillOpacity: number;
+  effects: BorderPresetEffects;
   inheritCustomCss: boolean;
   isResizing: boolean;
   name: string;

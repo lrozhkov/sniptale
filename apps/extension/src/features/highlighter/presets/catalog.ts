@@ -1,4 +1,5 @@
 import type { BorderPreset, SystemBorderPresetKey } from '../contracts';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 type SystemBorderPreset = BorderPreset & {
   basedOnRevision: number;
@@ -8,7 +9,7 @@ type SystemBorderPreset = BorderPreset & {
   systemPresetKey: SystemBorderPresetKey;
 };
 
-export const SYSTEM_BORDER_PRESET_CATALOG_REVISION = 1;
+export const SYSTEM_BORDER_PRESET_CATALOG_REVISION = 2;
 
 function createUniformPadding(value: number) {
   return { top: value, right: value, bottom: value, left: value };
@@ -31,6 +32,7 @@ function createSystemPreset(
     strokeOpacity: 100,
     inheritCustomCss: false,
     customCss: '',
+    effects: cloneBorderPresetEffects(undefined),
     origin: 'system',
     systemPresetKey: key,
     basedOnRevision: SYSTEM_BORDER_PRESET_CATALOG_REVISION,
@@ -123,7 +125,11 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
 ];
 
 export function cloneBorderPreset(preset: BorderPreset): BorderPreset {
-  return { ...preset, padding: { ...preset.padding } };
+  return {
+    ...preset,
+    effects: cloneBorderPresetEffects(preset.effects),
+    padding: { ...preset.padding },
+  };
 }
 
 export function createSystemBorderPresetCatalog(): BorderPreset[] {

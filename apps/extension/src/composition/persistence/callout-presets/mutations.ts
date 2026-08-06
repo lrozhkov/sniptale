@@ -9,6 +9,7 @@ import {
 } from '../../../features/highlighter/callout-presets/catalog';
 
 interface CalloutPresetUpdate {
+  content?: CalloutPreset['content'];
   id: string;
   name: string;
   placement: CalloutPreset['placement'];
@@ -31,7 +32,8 @@ function resolveDefaultId(presets: CalloutPreset[], requestedId: string): string
 
 export function addUserPreset(
   catalog: CalloutPresetCatalog,
-  preset: Pick<CalloutPreset, 'id' | 'name' | 'placement' | 'style'>
+  preset: Pick<CalloutPreset, 'id' | 'name' | 'placement' | 'style'> &
+    Partial<Pick<CalloutPreset, 'content'>>
 ): CalloutPresetCatalog | null {
   if (catalog.presets.some((current) => current.id === preset.id)) return null;
   const order =
@@ -41,6 +43,7 @@ export function addUserPreset(
     presets: [
       ...catalog.presets,
       {
+        content: { ...(preset.content ?? { titleText: '' }) },
         enabled: true,
         id: preset.id,
         name: preset.name,
@@ -62,6 +65,7 @@ export function updatePreset(
   const name = update.name.trim();
   if (
     current.name === name &&
+    JSON.stringify(current.content) === JSON.stringify(update.content ?? current.content) &&
     JSON.stringify(current.placement) === JSON.stringify(update.placement) &&
     JSON.stringify(current.style) === JSON.stringify(update.style)
   ) {
@@ -70,6 +74,7 @@ export function updatePreset(
   const updated: CalloutPreset = {
     ...current,
     customized: current.origin === 'system' ? true : current.customized,
+    content: { ...(update.content ?? current.content) },
     name,
     placement: { ...update.placement },
     style: cloneCalloutVisualStyle(update.style),
@@ -158,6 +163,7 @@ export function resetSystemPreset(
   const canonical = getCanonicalSystemCalloutPreset(current.systemPresetKey);
   if (
     current.customized !== true &&
+    JSON.stringify(current.content) === JSON.stringify(canonical.content) &&
     current.name === canonical.name &&
     JSON.stringify(current.placement) === JSON.stringify(canonical.placement) &&
     JSON.stringify(current.style) === JSON.stringify(canonical.style)

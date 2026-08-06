@@ -10,6 +10,7 @@ import {
   createCalloutSettingsFixture,
   createStepBadgeSettingsFixture,
 } from '../../frame-runtime/test-support';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 vi.mock('../../highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../highlighter')>()),
@@ -31,6 +32,7 @@ function createTriggerProps() {
     closePopover: vi.fn(),
     handleStartEditing: vi.fn(),
     hoverFrame: vi.fn(),
+    popoverAnchorRef: React.createRef<HTMLButtonElement>(),
     scheduleHoverFrameHide: vi.fn(),
     selectFrame: vi.fn(),
     setIsCalloutEditing: vi.fn(),
@@ -43,6 +45,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  useFrameUIStore.getState().reset();
 });
 
 afterEach(() => {
@@ -100,7 +103,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     expect(handlers.selectFrame).toHaveBeenCalledWith('frame-1', { x: 48, y: 0 });
   });
 
-  it('shows add-comment, numbering, and edit actions beside the trigger when they fit', () => {
+  it('shows frame settings first, followed by add-comment, numbering, and edit when they fit', () => {
     const handlers = createTriggerProps();
     const beginTransaction = vi
       .spyOn(pagePreparationHistory, 'beginTransaction')
@@ -120,7 +123,8 @@ describe('InteractiveFrameToolbarTrigger', () => {
     const quickActions = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.sniptale-frame-quick-action')
     );
-    expect(quickActions).toHaveLength(3);
+    expect(quickActions).toHaveLength(4);
+    expect(quickActions[0]?.dataset['quickAction']).toBe('settings');
 
     act(() => document.querySelector<HTMLButtonElement>('[data-quick-action="callout"]')?.click());
     act(() =>
@@ -137,6 +141,35 @@ describe('InteractiveFrameToolbarTrigger', () => {
       settings: { enabled: true },
     });
     cleanupStepBadgeListener();
+  });
+
+  it.each([
+    ['border', 'lucide-square'],
+    ['blur', 'lucide-droplet'],
+    ['focus', 'lucide-focus'],
+  ] as const)('opens quick frame settings with the dynamic %s icon', (effectMode, iconClass) => {
+    const handlers = createTriggerProps();
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{ effectMode, height: 80, id: 'frame-1', width: 180, x: 100, y: 100 }}
+          isVisible
+          {...handlers}
+        />
+      );
+    });
+
+    const settingsButton = document.querySelector<HTMLButtonElement>(
+      '[data-quick-action="settings"]'
+    );
+    expect(settingsButton?.querySelector(`.${iconClass}`)).not.toBeNull();
+    act(() => settingsButton?.click());
+
+    expect(handlers.popoverAnchorRef.current).toBe(settingsButton);
+    expect(useFrameUIStore.getState()).toMatchObject({
+      activePopover: { frameId: 'frame-1', kind: 'frame-settings' },
+      selectedFrameId: null,
+    });
   });
 
   it('renders only the ellipsis when the frame cannot contain the quick actions', () => {
@@ -176,7 +209,10 @@ describe('InteractiveFrameToolbarTrigger', () => {
       );
     });
 
-    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(1);
+    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(2);
+    expect(document.querySelector('[data-quick-action="settings"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
     expect(document.querySelector('[data-quick-action="edit"]')).toBeInstanceOf(HTMLButtonElement);
   });
 });

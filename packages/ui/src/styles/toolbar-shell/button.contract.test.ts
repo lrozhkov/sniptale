@@ -11,5 +11,8 @@ describe('toolbar-shell button contract', () => {
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-btn-danger:hover:not(:disabled)');
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-split-action {');
     expect(toolbarShellButtonStylesheet).not.toContain('.sniptale-split-action-end::before {');
+    expect(toolbarShellButtonStylesheet).toMatch(
+      /\.sniptale-toggle\[data-active='true'\],[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/
+    );
   });
 });

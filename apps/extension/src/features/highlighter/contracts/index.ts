@@ -13,6 +13,8 @@ export type {
   BlurType,
   BorderPadding,
   BorderPreset,
+  BorderPresetBlurType,
+  BorderPresetEffects,
   BorderPresetOrigin,
   BorderVisualStyle,
   BorderVisualStylePatch,

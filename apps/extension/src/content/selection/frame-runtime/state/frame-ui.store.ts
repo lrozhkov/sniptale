@@ -29,10 +29,7 @@ export interface FrameUIState {
   dismissFrame: (frameId: string) => void;
   dismissFrameUi: () => void;
   togglePopover: (frameId: string, kind: FramePopoverKind) => void;
-  toggleQuickPopover: (
-    frameId: string,
-    kind: Extract<FramePopoverKind, 'step-badge' | 'callout-settings'>
-  ) => void;
+  toggleQuickPopover: (frameId: string, kind: FramePopoverKind) => void;
   closePopover: () => void;
   setResizeFrame: (frameId: string | null) => void;
   reset: () => void;
@@ -170,10 +167,7 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
       createOpenPopoverAction(set, get)(frameId, kind);
     },
 
-    toggleQuickPopover: (
-      frameId: string,
-      kind: Extract<FramePopoverKind, 'step-badge' | 'callout-settings'>
-    ) => {
+    toggleQuickPopover: (frameId: string, kind: FramePopoverKind) => {
       const state = get();
       const activePopover = state.activePopover;
       if (state.selectedFrameId !== null) return;

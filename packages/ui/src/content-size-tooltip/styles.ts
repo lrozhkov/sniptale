@@ -73,11 +73,19 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']
-    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:hover:not(:disabled) {
+    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:hover:not(:disabled),
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:focus-visible {
     border-color: transparent;
-    background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent);
-    color: var(--sniptale-color-danger);
+    background: transparent;
     box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:hover:not(:disabled) svg,
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:focus-visible svg {
+    color: var(--sniptale-color-danger);
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']

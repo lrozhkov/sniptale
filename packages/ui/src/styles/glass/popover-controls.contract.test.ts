@@ -17,8 +17,11 @@ describe('glass.popover-controls contract', () => {
 
   it('keeps active accent treatment on the shared controls owner', () => {
     expect(glassPopoverControlsStylesheet).toContain('.sniptale-glass-icon-button--active,');
-    expect(glassPopoverControlsStylesheet).toContain(
-      'background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);'
+    expect(glassPopoverControlsStylesheet).toMatch(
+      /\.sniptale-glass-icon-button--active,[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none;/
+    );
+    expect(glassPopoverControlsStylesheet).toMatch(
+      /\.sniptale-glass-icon-button--active:hover,[\s\S]*?var\(--sniptale-color-accent\) 72%[\s\S]*?color:\s*var\(--sniptale-color-accent-emphasis\);[\s\S]*?background:\s*transparent;/
     );
   });
 
@@ -26,5 +29,7 @@ describe('glass.popover-controls contract', () => {
     expect(glassPopoverControlsStylesheet).toMatch(
       /\.sniptale-glass-preset-list--scroll\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior:\s*contain;/s
     );
+    expect(glassPopoverControlsStylesheet).not.toContain('padding-right: 4px;');
+    expect(glassPopoverControlsStylesheet).not.toContain('scrollbar-gutter: stable;');
   });
 });

@@ -164,7 +164,13 @@ function TooltipStepper(props: {
 }
 
 function TooltipDivider() {
-  return <span aria-hidden="true" style={CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE as CSSProperties} />;
+  return (
+    <span
+      aria-hidden="true"
+      data-ui="content-size-tooltip-divider"
+      style={CONTENT_SIZE_TOOLTIP_DIVIDER_STYLE as CSSProperties}
+    />
+  );
 }
 
 function TooltipAspectRatioButton(props: {
@@ -292,7 +298,7 @@ export function ContentSizeTooltipContent(
         value={props.heightValue}
         variant={props.variant}
       />
-      <TooltipDivider />
+      {props.variant === 'frame-edit' ? null : <TooltipDivider />}
       <TooltipActions
         copy={props.copy}
         onCancel={props.onCancel}

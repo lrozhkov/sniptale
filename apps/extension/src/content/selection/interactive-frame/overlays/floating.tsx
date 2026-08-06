@@ -89,6 +89,7 @@ function getTriggerProps(props: InteractiveFrameFloatingUiProps) {
     closePopover: props.closePopover,
     handleStartEditing: props.handleStartEditing,
     hoverFrame: props.hoverFrame,
+    popoverAnchorRef: props.popoverAnchorRef,
     scheduleHoverFrameHide: props.scheduleHoverFrameHide,
     selectFrame: props.selectFrame,
     setIsCalloutEditing: props.setIsCalloutEditing,

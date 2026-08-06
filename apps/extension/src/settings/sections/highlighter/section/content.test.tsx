@@ -5,13 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HighlighterSectionContentProps } from './types';
 
-const { borderPresetEditorPropsSpy, calloutPropsSpy, effectsPanelPropsSpy, presetsPanelPropsSpy } =
-  vi.hoisted(() => ({
-    borderPresetEditorPropsSpy: vi.fn(),
-    calloutPropsSpy: vi.fn(),
-    effectsPanelPropsSpy: vi.fn(),
-    presetsPanelPropsSpy: vi.fn(),
-  }));
+const { borderPresetEditorPropsSpy, calloutPropsSpy, presetsPanelPropsSpy } = vi.hoisted(() => ({
+  borderPresetEditorPropsSpy: vi.fn(),
+  calloutPropsSpy: vi.fn(),
+  presetsPanelPropsSpy: vi.fn(),
+}));
 
 vi.mock('../callout-presets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../callout-presets')>()),
@@ -23,13 +21,6 @@ vi.mock('../callout-presets', async (importOriginal) => ({
 
 vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
-}));
-
-vi.mock('./effects-panel', () => ({
-  HighlighterEffectsPanel: (props: unknown) => {
-    effectsPanelPropsSpy(props);
-    return <div data-testid="effects-panel">effects</div>;
-  },
 }));
 
 vi.mock('./presets-panel', () => ({
@@ -163,10 +154,7 @@ function verifyRenderedState({ preset, presets, props }: ReturnType<typeof creat
     presets: props.presets,
     settings: props.settings,
   });
-  expect(effectsPanelPropsSpy).toHaveBeenCalledWith({
-    effects: props.effects,
-    settings: props.settings,
-  });
+  expect(container?.querySelector('[data-testid="effects-panel"]')).toBeNull();
   expect(calloutPropsSpy).toHaveBeenCalledWith({ controller: props.calloutPresets });
   expect(borderPresetEditorPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -181,7 +169,6 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   borderPresetEditorPropsSpy.mockReset();
   calloutPropsSpy.mockReset();
-  effectsPanelPropsSpy.mockReset();
   presetsPanelPropsSpy.mockReset();
 });
 

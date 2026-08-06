@@ -97,6 +97,23 @@ it('keeps primary capture and preference-menu activation separate', () => {
   expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).not.toBeNull();
 });
 
+it('shows lazy loading and motion controls before floating-element behavior', () => {
+  const view = render(<Harness />);
+  act(() => {
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')
+      ?.click();
+  });
+
+  const menuText = view.querySelector('.sniptale-full-page-menu')?.textContent ?? '';
+  expect(menuText.indexOf('content.toolbar.fullPageLazyContent')).toBeLessThan(
+    menuText.indexOf('content.toolbar.fullPageFloatingTitle')
+  );
+  expect(menuText.indexOf('content.toolbar.fullPageFreezeMotion')).toBeLessThan(
+    menuText.indexOf('content.toolbar.fullPageFloatingTitle')
+  );
+});
+
 it('updates floating mode and exposes the custom viewport hint', async () => {
   const onUpdate = vi.fn().mockResolvedValue(undefined);
   const view = render(

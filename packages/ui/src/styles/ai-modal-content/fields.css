@@ -134,6 +134,11 @@
   color: var(--sniptale-text-dim);
 }
 
+.sniptale-textarea:focus::placeholder,
+.sniptale-input:focus::placeholder {
+  color: transparent;
+}
+
 .sniptale-input {
   width: 100%;
   padding: 10px 13px;

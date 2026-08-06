@@ -55,11 +55,11 @@ afterEach(() => {
 it('keeps vertical and horizontal padding as independently linkable pairs', async () => {
   const globalLink = container.querySelector<HTMLButtonElement>('[data-padding-link="all"]');
   expect(globalLink?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelectorAll('[data-padding-side] input')).toHaveLength(1);
 
   await act(async () => globalLink?.click());
-  await act(async () =>
-    container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]')?.click()
-  );
+  expect(container.querySelectorAll('[data-padding-side] input')).toHaveLength(2);
+  expect(container.querySelector('[data-ui="shared.border-padding-expanded"]')).not.toBeNull();
 
   expect(
     container
@@ -78,6 +78,7 @@ it('keeps vertical and horizontal padding as independently linkable pairs', asyn
   await act(async () =>
     container.querySelector<HTMLButtonElement>('[data-padding-link="vertical"]')?.click()
   );
+  expect(container.querySelectorAll('[data-padding-side] input')).toHaveLength(3);
   await enterSideValue('top', 9);
   expect(padding).toMatchObject({ top: 9, bottom: 8 });
 

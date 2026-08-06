@@ -188,8 +188,12 @@ describe('frame-session-sync-settings', () => {
       projectBorderPresetToAppliedSettings(latestPreset)
     );
     expect(getFrameSessionBorderPreset()).not.toBe(latestPreset);
-    expect(newTab.sessionBlurSettingsRef.current).toEqual(latestDefaults.defaultBlurSettings);
-    expect(newTab.sessionFocusSettingsRef.current).toEqual(latestDefaults.defaultFocusSettings);
+    expect(newTab.sessionBlurSettingsRef.current).toEqual({
+      amount: 10,
+      blurType: 'gaussian',
+      showBorder: true,
+    });
+    expect(newTab.sessionFocusSettingsRef.current).toEqual({ opacity: 0.5, showBorder: true });
   });
 
   it('discards an older settings load that resolves after the latest request', async () => {
@@ -338,8 +342,12 @@ function expectLoaderRefUpdates(refs: ReturnType<typeof createSettingsRefs>) {
   expect(getFrameSessionBorderPreset()).toEqual(
     projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET)
   );
-  expect(refs.sessionBlurSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultBlurSettings);
-  expect(refs.sessionFocusSettingsRef.current).toEqual(DEFAULT_SETTINGS.defaultFocusSettings);
+  expect(refs.sessionBlurSettingsRef.current).toEqual({
+    amount: 10,
+    blurType: 'gaussian',
+    showBorder: true,
+  });
+  expect(refs.sessionFocusSettingsRef.current).toEqual({ opacity: 0.5, showBorder: true });
 }
 
 function createDeferred<T>() {

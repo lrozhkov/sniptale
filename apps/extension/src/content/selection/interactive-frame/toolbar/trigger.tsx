@@ -21,6 +21,7 @@ import {
   FRAME_TRIGGER_CONTROL_GAP,
   getFrameTriggerPosition,
 } from './trigger-position';
+import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 
 type InteractiveFrameToolbarTriggerProps = {
   frame: FrameData;
@@ -28,6 +29,7 @@ type InteractiveFrameToolbarTriggerProps = {
   closePopover: () => void;
   handleStartEditing: () => void;
   hoverFrame: (frameId: string) => void;
+  popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   scheduleHoverFrameHide: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
@@ -100,9 +102,10 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
   useAppLocale();
   useTriggerPositionRefresh(props.isVisible);
   const portalTheme = useContentPortalTheme();
+  const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
   if (!props.isVisible || !isHighlighterEnabled()) return null;
 
-  const quickActions = createFrameQuickActions(props);
+  const quickActions = createFrameQuickActions({ ...props, toggleQuickPopover });
   const visibleQuickActions = canFitFrameQuickActions(props.frame, quickActions.length + 1)
     ? quickActions
     : [];

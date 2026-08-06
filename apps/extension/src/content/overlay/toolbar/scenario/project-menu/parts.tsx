@@ -63,7 +63,7 @@ export function ScenarioProjectMenuPicker(props: ScenarioProjectMenuPickerProps)
             onClick={onSelect}
             title={project.name}
             data-ui={dataUi}
-            className="flex min-w-0 flex-1 items-center overflow-hidden text-left"
+            className="flex min-w-0 flex-1 cursor-pointer items-center overflow-hidden text-left"
           >
             <span
               className="block min-w-0 max-w-full truncate text-[13px] font-semibold

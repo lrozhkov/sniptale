@@ -60,6 +60,9 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
     togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
     closePopover: props.closePopover,
+    ...(props.handleEffectModeSelect === undefined
+      ? {}
+      : { handleEffectModeSelect: props.handleEffectModeSelect }),
     hoverFrame: props.hoverFrame,
     scheduleHoverFrameHide: props.scheduleHoverFrameHide,
     selectFrame: props.selectFrame,
@@ -90,6 +93,9 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     setIsCalloutEditing: props.setIsCalloutEditing,
     setTempFrame: props.setTempFrame,
     closePopover: props.closePopover,
+    ...(props.handleEffectModeSelect === undefined
+      ? {}
+      : { handleEffectModeSelect: props.handleEffectModeSelect }),
     frameZIndex: props.frameZIndex,
     onUpdate: props.onUpdate,
   };

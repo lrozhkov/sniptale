@@ -59,6 +59,17 @@ describe('frame UI store visibility hierarchy', () => {
     });
   });
 
+  it('opens frame settings as a quick popover without selecting the frame', () => {
+    const store = useFrameUIStore.getState();
+
+    store.toggleQuickPopover('frame-a', 'frame-settings');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      activePopover: { frameId: 'frame-a', kind: 'frame-settings' },
+    });
+  });
+
   it('closes a quick popover when the main toolbar selects a frame', () => {
     const store = useFrameUIStore.getState();
 

@@ -243,4 +243,39 @@ describe('BorderPresetEditorFields', () => {
     expect(textarea?.rows).toBe(5);
     expect(container.querySelector('div[style*="ns-resize"]')).toBeNull();
   });
+
+  it('uses the same supported blur types as the frame menu', async () => {
+    const state = createState();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    await act(async () => {
+      root?.render(
+        <BorderStyleInspector
+          cssDraft=""
+          cssError={null}
+          onChange={vi.fn()}
+          onCssDraftChange={vi.fn()}
+          style={state}
+        />
+      );
+    });
+
+    selectCategory('highlighter.editor.effectsSection');
+    const blurTypeSelect = container.querySelector<HTMLButtonElement>(
+      '[aria-label="highlighter.editor.blurTypeLabel"]'
+    );
+    act(() => blurTypeSelect?.click());
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(
+      (option) => option.textContent
+    );
+
+    expect(options).toEqual([
+      'highlighter.editor.blurTypeGaussian',
+      'highlighter.editor.blurTypeDistortion',
+      'highlighter.editor.blurTypeSolid',
+    ]);
+  });
 });

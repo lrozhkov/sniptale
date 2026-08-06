@@ -58,7 +58,6 @@ function FrameSettingsPopoverSurface(props: {
           handleFocusChange={handlers.handleFocusChange}
           handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
           handleManualBorderChange={handlers.handleManualBorderChange}
-          handleAddPreset={handlers.handleAddPreset}
           handleEditPreset={handlers.handleEditPreset}
           handleSelectPreset={handlers.handleSelectPreset}
           handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
@@ -66,11 +65,13 @@ function FrameSettingsPopoverSurface(props: {
           localBorderSettings={settings.localBorder}
           localFocusSettings={settings.localFocus}
           pendingPresetIds={catalog.pendingPresetIds}
+          onShowPresets={catalog.refreshPresets}
           manual={catalog.manual}
           onFloatingInteractionChange={surface.onFloatingInteractionChange}
           headerContext={props.request.scope === 'session' ? 'toolbar' : 'element'}
           {...(props.request.scope === 'session' ? {} : { headerDrag: props.drag })}
           onClose={props.request.onClose}
+          onEffectModeChange={props.request.onEffectModeChange ?? (() => undefined)}
           {...(settings.selectedPresetId === undefined
             ? {}
             : { selectedPresetId: settings.selectedPresetId })}
@@ -119,6 +120,7 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
     frameRect: props.frameRect,
     isOpen: props.isOpen,
     popoverRef: state.surface.popoverRef,
+    quickControlPlacement: 'frame-aware',
   });
   const drag = useFloatingPopoverDrag({
     basePosition: {

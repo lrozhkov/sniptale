@@ -81,13 +81,19 @@
   border: 1px solid color-mix(in srgb, var(--sniptale-color-border-strong) 72%, transparent);
   background:
     linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%) 0,
-      color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%)
-        var(--sniptale-range-fill-ratio),
-      transparent var(--sniptale-range-fill-ratio),
-      transparent 100%
-    ),
+        color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%),
+        color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%)
+      )
+      left center / calc(var(--sniptale-range-thumb-size) / 2) 100% no-repeat,
+    linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%) 0,
+        color-mix(in srgb, var(--sniptale-color-accent) 78%, white 22%)
+          var(--sniptale-range-fill-ratio),
+        transparent var(--sniptale-range-fill-ratio),
+        transparent 100%
+      )
+      center / calc(100% - var(--sniptale-range-thumb-size)) 100% no-repeat,
     linear-gradient(
       180deg,
       color-mix(in srgb, white 8%, transparent),

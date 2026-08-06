@@ -51,14 +51,27 @@ describe('content entrypoint styles', () => {
     expect(calloutSettingsStyles).toContain('.sniptale-step-badge-popover {');
     expect(calloutSettingsStyles).toContain('--sniptale-preset-list-max-height: min(296px');
     expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-list {\n  gap: 8px;');
-    expect(calloutSettingsStyles).toContain('padding: 8px 2px 6px;');
+    expect(calloutSettingsStyles).toContain('padding: 0;');
+    expect(calloutSettingsStyles).toContain('scroll-padding-block: 4px;');
     expect(calloutSettingsStyles).toContain('flex: 0 0 auto;');
     expect(calloutSettingsStyles).not.toContain('data-callout-settings-mode-switch');
-    expect(calloutSettingsStyles).toContain('box-shadow: inset 2px 0 0');
+    expect(calloutSettingsStyles).toContain(
+      '.sniptale-callout-preset-row .sniptale-glass-preset-item--active {'
+    );
+    expect(calloutSettingsStyles).toContain('background: transparent;');
+    expect(calloutSettingsStyles).toContain('box-shadow: none;');
     expect(calloutSettingsStyles).toContain('cursor: inherit !important;');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-header');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-mode-action');
-    expect(settingsPopoverStyles).toContain('min-height: 28px;');
+    expect(settingsPopoverStyles).toContain('min-height: 22px;');
+    expect(settingsPopoverStyles).toContain(
+      '.sniptale-content-popover--compact .sniptale-settings-popover-header {'
+    );
+    expect(settingsPopoverStyles).toContain('align-items: center;');
+    expect(settingsPopoverStyles).toContain('padding-bottom: 4px;');
+    expect(settingsPopoverStyles).not.toMatch(
+      /\.sniptale-settings-popover-header \.sniptale-toolbar-menu-title\s*\{[^}]*font-size:/s
+    );
     expect(source).toContain('./host.css?inline');
     expect(source).toContain('frame-settings-popover/styles.css?inline');
     expect(source).toContain('callout-settings-popover/styles.css?inline');

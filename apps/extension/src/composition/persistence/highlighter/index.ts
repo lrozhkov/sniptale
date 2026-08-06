@@ -40,7 +40,7 @@ export {
 
 function cacheLoadedHighlighterSettings(settings: HighlighterSettings): HighlighterSettings {
   loadedHighlighterSettingsSnapshot = cloneHighlighterSettings(settings);
-  return loadedHighlighterSettingsSnapshot;
+  return cloneHighlighterSettings(loadedHighlighterSettingsSnapshot);
 }
 
 const { enqueueWrite: enqueueHighlighterWrite, writeSettings: writeHighlighterSettings } =

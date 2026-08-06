@@ -315,6 +315,8 @@ describe('frame settings popover state lifecycle', () => {
 
     expect(onApplyToFrame).toHaveBeenCalledWith({
       borderSettings: projectBorderPresetToAppliedSettings(canonicalPreset),
+      blurSettings: { amount: 10, blurType: 'gaussian', showBorder: true },
+      focusSettings: { opacity: 0.5, showBorder: true },
     });
   });
 

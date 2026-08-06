@@ -108,6 +108,7 @@ function getFrameSettingsPopoverProps() {
   return frameSettingsProps as unknown as {
     borderSettings: FrameData['borderSettings'];
     frameId: string;
+    isOpen: boolean;
     onApplyToFrame: (settings: { borderSettings?: FrameData['borderSettings'] }) => void;
   };
 }
@@ -203,6 +204,15 @@ describe('InteractiveFramePopovers', () => {
       expect.objectContaining({ isOpen: true }),
       undefined
     );
+  });
+
+  it('opens quick frame settings without selecting the frame', () => {
+    const frame = createFrame('frame-1', '#2563eb');
+    const props = createPopoversProps({ currentFrame: frame, frame });
+
+    renderNode(<InteractiveFramePopovers {...props} isSelected={false} isPopoverOpen />);
+
+    expect(getFrameSettingsPopoverProps().isOpen).toBe(true);
   });
 
   it('marks the connected comment as frame-editing while the highlighter frame is edited', () => {

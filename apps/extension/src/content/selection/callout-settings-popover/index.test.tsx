@@ -152,9 +152,7 @@ describe('CalloutSettingsPopover', () => {
     });
 
     expect(
-      [...document.querySelectorAll('button')].some(
-        (button) => button.textContent === 'Выбрать шаблон'
-      )
+      [...document.querySelectorAll('button')].some((button) => button.textContent === 'Шаблоны')
     ).toBe(true);
 
     const pickerTrigger = document.querySelector<HTMLButtonElement>(
@@ -207,9 +205,7 @@ describe('CalloutSettingsPopover', () => {
     });
 
     expect(
-      [...document.querySelectorAll('button')].some(
-        (button) => button.textContent === 'Выбрать шаблон'
-      )
+      [...document.querySelectorAll('button')].some((button) => button.textContent === 'Шаблоны')
     ).toBe(true);
 
     const fontSelect = document.querySelector<HTMLButtonElement>('[aria-label="Шрифт"]');

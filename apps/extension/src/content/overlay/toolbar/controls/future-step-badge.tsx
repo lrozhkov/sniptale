@@ -141,6 +141,7 @@ export function FutureStepBadgeSettingsPopover(props: {
           })
         }
         onResetPreset={(preset) => void presets.catalog.reset(preset)}
+        onShowPresets={presets.catalog.refresh}
         onSettingsChange={commit}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         onTypeChange={(type: Extract<StepBadgeType, 'number' | 'letter'>) => commit({ type })}

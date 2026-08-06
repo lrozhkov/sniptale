@@ -14,6 +14,7 @@ export function useCalloutPresetEditorDraft(args: {
 }) {
   const [name, setName] = useState('');
   const [nameTouched, setNameTouched] = useState(false);
+  const [content, setContent] = useState<CalloutPreset['content']>(args.source.content);
   const [placement, setPlacement] = useState<CalloutPreset['placement']>(args.source.placement);
   const [style, setStyle] = useState<CalloutVisualStyle | null>(null);
   const wasOpenRef = useRef(false);
@@ -27,6 +28,7 @@ export function useCalloutPresetEditorDraft(args: {
     sourceIdRef.current = args.source.id;
     setName(getCalloutPresetDisplayName(args.source, args.locale));
     setNameTouched(false);
+    setContent({ ...args.source.content });
     setPlacement({
       ...args.source.placement,
       ...(args.source.placement.connectorAttachments
@@ -47,6 +49,7 @@ export function useCalloutPresetEditorDraft(args: {
     preset: style
       ? {
           ...args.source,
+          content,
           name: nameTouched ? name : args.source.name,
           placement,
           style,
@@ -56,6 +59,7 @@ export function useCalloutPresetEditorDraft(args: {
       setName(value);
       setNameTouched(true);
     },
+    setContent,
     setPlacement,
     setStyle,
     style,

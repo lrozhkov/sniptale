@@ -9,6 +9,7 @@ import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import type { AppLocale } from '../../../platform/i18n';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 export function applyBorderPresetDraftState(
   nextPreset: BorderPreset,
@@ -26,6 +27,7 @@ export function applyBorderPresetDraftState(
   setters.setStrokeOpacity(nextPreset.strokeOpacity);
   setters.setFillColor(nextPreset.fillColor);
   setters.setFillOpacity(nextPreset.fillOpacity);
+  setters.setEffects(cloneBorderPresetEffects(nextPreset.effects));
   setters.setInheritCustomCss(Boolean(nextPreset.customCss.trim()));
   setters.setCustomCss(nextPreset.customCss);
 }
@@ -42,6 +44,7 @@ export function resetBorderPresetDraftState(setters: BorderPresetDraftSetters) {
   setters.setStrokeOpacity(DEFAULT_BORDER_PRESET.strokeOpacity);
   setters.setFillColor(DEFAULT_BORDER_PRESET.fillColor);
   setters.setFillOpacity(DEFAULT_BORDER_PRESET.fillOpacity);
+  setters.setEffects(cloneBorderPresetEffects(DEFAULT_BORDER_PRESET.effects));
   setters.setInheritCustomCss(DEFAULT_BORDER_PRESET.inheritCustomCss);
   setters.setCustomCss('');
 }

@@ -1,7 +1,6 @@
 import { translate } from '../../../../platform/i18n';
 import { BorderPresetEditor } from '../../../../ui/highlighter-preset-editor';
 import { settingsSectionClassName, SettingsSectionHeader } from '../../../section-surface';
-import { HighlighterEffectsPanel } from './effects-panel';
 import { HighlighterPresetsPanel } from './presets-panel';
 import type { HighlighterSectionContentProps } from './types';
 import { CalloutPresetCatalogSettings } from '../callout-presets';
@@ -22,8 +21,6 @@ export function HighlighterSectionContent(props: HighlighterSectionContentProps)
       {props.stepBadgePresets ? (
         <StepBadgePresetCatalogSettings controller={props.stepBadgePresets} />
       ) : null}
-      <HighlighterEffectsPanel effects={props.effects} settings={props.settings} />
-
       <BorderPresetEditor
         isOpen={presets.isEditorOpen}
         onClose={presets.handleCloseEditor}

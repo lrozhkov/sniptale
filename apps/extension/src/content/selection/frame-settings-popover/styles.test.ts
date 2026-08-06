@@ -18,10 +18,14 @@ describe('frame style catalog styles', () => {
     );
   });
 
-  it('keeps the frame-and-fill switch aligned with its option title', () => {
+  it('keeps the frame-and-fill section joined to the preceding effect controls', () => {
     expect(stylesheet).toMatch(
-      /\.sniptale-frame-decoration-toggle-row\s*\{[^}]*align-items:\s*flex-start;/s
+      /\.sniptale-frame-settings-popover\.sniptale-content-popover--toolbar-menu[\s\S]*?\+\s*\.sniptale-frame-decoration-section\s*\{[^}]*border-top:\s*0;/s
     );
+  });
+
+  it('uses the normal cursor for non-interactive popover space', () => {
+    expect(stylesheet).toMatch(/\.sniptale-frame-settings-popover\s*\{[^}]*cursor:\s*default;/s);
   });
 
   it('reveals unboxed actions on row interaction', () => {
@@ -31,11 +35,6 @@ describe('frame style catalog styles', () => {
     expect(stylesheet).toMatch(
       /\.sniptale-frame-style-preset-action\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s
     );
-  });
-
-  it('keeps the add action as the final full-width catalog control', () => {
-    expect(stylesheet).toContain('.sniptale-frame-style-add {');
-    expect(stylesheet).toMatch(/\.sniptale-frame-style-add\s*\{[^}]*justify-content:\s*center;/s);
   });
 
   it('sizes the shared scrollable preset list for five frame presets', () => {

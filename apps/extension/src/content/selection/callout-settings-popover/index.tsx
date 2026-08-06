@@ -141,6 +141,7 @@ export function CalloutSettingsPopover({
         onApplyPreset={applyPreset}
         onCustomizePreset={presets.editor.open}
         onResetPreset={(preset) => void presets.editor.reset(preset)}
+        onShowPresets={presets.catalog.refresh}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         pendingPresetIds={presets.catalog.pendingPresetIds}
         presets={presets.catalog.visiblePresets}

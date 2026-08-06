@@ -240,7 +240,7 @@ export function useFramePopoverPosition(params: {
   frameRect: FloatingRect;
   isOpen: boolean;
   popoverRef: React.RefObject<HTMLDivElement | null>;
-  quickControlPlacement?: 'anchor-aligned' | 'callout-aware';
+  quickControlPlacement?: 'anchor-aligned' | 'callout-aware' | 'frame-aware';
 }) {
   const [, refresh] = React.useReducer((value) => value + 1, 0);
   const placementSessionRef = React.useRef<{
@@ -323,7 +323,9 @@ export function useFramePopoverPosition(params: {
   const avoidRect = activePlacementSession.preferSidePlacement
     ? params.quickControlPlacement === 'anchor-aligned'
       ? undefined
-      : getCalloutAvoidanceRect(params.frameId)
+      : params.quickControlPlacement === 'frame-aware'
+        ? params.frameRect
+        : getCalloutAvoidanceRect(params.frameId)
     : undefined;
   const calculatedRect = mainToolbar
     ? calculateMainToolbarPopoverRect({

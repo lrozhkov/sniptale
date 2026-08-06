@@ -23,6 +23,7 @@ export interface InteractiveFramePopoversProps {
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   closePopover: () => void;
+  handleEffectModeSelect?: (mode: EffectMode) => void;
   onUpdate: (frame: FrameData) => void;
 }
 
@@ -44,8 +45,11 @@ function applyFrameSettingsPatch(
 
 function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
   return {
-    isOpen: props.isSelected && props.isPopoverOpen,
+    isOpen: props.isPopoverOpen,
     onClose: props.closePopover,
+    ...(props.handleEffectModeSelect === undefined
+      ? {}
+      : { onEffectModeChange: props.handleEffectModeSelect }),
     effectMode: props.effectMode,
     frameId: props.currentFrame.id,
     frameRect: props.currentFrame,

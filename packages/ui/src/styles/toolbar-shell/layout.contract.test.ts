@@ -10,10 +10,6 @@ describe('toolbar-shell layout contract', () => {
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-drag-handle {');
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-group {');
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-toolbar-subgroup {');
-    expect(toolbarShellLayoutStylesheet).toContain('.sniptale-toolbar-annotation-group,');
-    expect(toolbarShellLayoutStylesheet).toContain('.sniptale-toolbar-privacy-group-start {');
-    expect(toolbarShellLayoutStylesheet).toContain('.sniptale-mode-selector-group');
-    expect(toolbarShellLayoutStylesheet).toContain('.sniptale-capture-leading-divider {');
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-spacer {');
   });
 });

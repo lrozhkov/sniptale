@@ -34,6 +34,7 @@ export function useBorderPresetSaveHandler({
       strokeOpacity: draft.strokeOpacity,
       fillColor: draft.fillColor,
       fillOpacity: draft.fillOpacity,
+      effects: draft.effects,
       inheritCustomCss: draft.inheritCustomCss,
       customCss: draft.customCss,
       ...(preset
