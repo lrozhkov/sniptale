@@ -219,8 +219,13 @@ function shouldKeepHoverPreviewHiddenWhileCaptureUiIsHidden(): void {
   const overlay = ensureHoverOverlay(state, storage.DEFAULT_BORDER_PRESET);
   document.body.classList.add('sniptale-capture-ui-hidden');
 
-  showHoverOverlay(state, { height: 10, width: 12, x: 1, y: 2 }, storage.DEFAULT_BORDER_PRESET);
+  const shown = showHoverOverlay(
+    state,
+    { height: 10, width: 12, x: 1, y: 2 },
+    storage.DEFAULT_BORDER_PRESET
+  );
 
+  expect(shown).toBe(false);
   expect(overlay.style.display).not.toBe('block');
   expect(overlay.style.opacity).toBe('0');
 }

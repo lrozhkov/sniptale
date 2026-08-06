@@ -98,17 +98,19 @@ function hideHoverPreview(
   session.lastHoverTarget = null;
 }
 
+function cancelPendingHoverFrame(session: Pick<HoverTrackingSession, 'hoverRafId'>): void {
+  if (session.hoverRafId === null) return;
+  cancelAnimationFrame(session.hoverRafId);
+  session.hoverRafId = null;
+}
+
 function shouldSuppressHoverTarget(
   session: HoverFrameCacheSession,
   target: HTMLElement,
   x: number,
   y: number
 ): boolean {
-  return (
-    isHighlighterExtensionUiElement(target) ||
-    isInsideExistingFrame(session, x, y) ||
-    isNearExistingFrameBorder(session, x, y)
-  );
+  return isHighlighterExtensionUiElement(target) || isNearExistingFrameBorder(session, x, y);
 }
 
 function canShowHoverTarget(props: {
@@ -126,7 +128,7 @@ function processScheduledHoverTarget(props: {
   getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
   hideHoverOverlay: () => void;
   session: HoverInteractionSession;
-  showHoverOverlay: (element: HTMLElement) => void;
+  showHoverOverlay: (element: HTMLElement) => boolean;
   target: HTMLElement;
   x: number;
   y: number;
@@ -152,7 +154,10 @@ function processScheduledHoverTarget(props: {
     }
     return;
   }
-  props.showHoverOverlay(props.target);
+  if (!props.showHoverOverlay(props.target)) {
+    hideHoverPreview(props.session, props.hideHoverOverlay);
+    return;
+  }
   props.session.lastHoverTarget = props.target;
 }
 
@@ -163,7 +168,7 @@ export function scheduleHoverOverlayUpdate(props: {
   hideHoverOverlay: () => void;
   iframe?: HTMLIFrameElement;
   session: HoverInteractionSession;
-  showHoverOverlay: (element: HTMLElement) => void;
+  showHoverOverlay: (element: HTMLElement) => boolean;
 }): void {
   if (props.session.hoverRafId !== null) return;
   props.session.lastHoverX = props.event.clientX;
@@ -203,9 +208,11 @@ function createHoverClickHandler(props: HoverInteractionProps) {
     }
     const target = resolveSelectablePageHtmlElement(event, iframe);
     const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
+    const insideExistingFrame = isInsideExistingFrame(props.session, point.x, point.y);
+    const hasVisibleHoverTarget = props.session.lastHoverTarget !== null;
     if (
       !target ||
-      isInsideExistingFrame(props.session, point.x, point.y) ||
+      (insideExistingFrame && !hasVisibleHoverTarget) ||
       isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {
@@ -236,6 +243,7 @@ function createHoverClickHandler(props: HoverInteractionProps) {
       return;
     }
     if (elementForFrame.nodeType === Node.ELEMENT_NODE && addFrame) {
+      cancelPendingHoverFrame(props.session);
       addFrame(elementForFrame);
       props.session.isHoverPreviewFrozen = true;
       props.overlayActions.hideHoverOverlay();
@@ -249,10 +257,7 @@ function createHoverMouseMoveHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (props.session.freeDraw.gesture) return;
     if (hasBlockingHighlighterPopover()) {
-      if (props.session.hoverRafId !== null) {
-        cancelAnimationFrame(props.session.hoverRafId);
-        props.session.hoverRafId = null;
-      }
+      cancelPendingHoverFrame(props.session);
       hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
       return;
     }
@@ -295,19 +300,11 @@ export function createHoverInteractionHandlers(props: HoverInteractionProps) {
     handleMouseMove,
     handleMouseLeave: () => {
       if (!props.getState.isModeEnabled()) return;
-      if (props.session.hoverRafId !== null) {
-        cancelAnimationFrame(props.session.hoverRafId);
-        props.session.hoverRafId = null;
-      }
+      cancelPendingHoverFrame(props.session);
       hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
       interactionLogger.debug('Hidden hover preview after leaving the viewport');
     },
-    cancelPendingHoverFrame: () => {
-      if (props.session.hoverRafId !== null) {
-        cancelAnimationFrame(props.session.hoverRafId);
-        props.session.hoverRafId = null;
-      }
-    },
+    cancelPendingHoverFrame: () => cancelPendingHoverFrame(props.session),
     clearHoverTracking: () => {
       props.session.lastHoverTarget = null;
       props.session.lastHoverX = -1;

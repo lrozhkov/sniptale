@@ -2,7 +2,11 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeContentUiRoots } from '../../platform/dom-host';
-import { resolveSelectablePageElement, resolveSelectablePageHtmlElement } from '.';
+import {
+  resolveDrawablePageHtmlElement,
+  resolveSelectablePageElement,
+  resolveSelectablePageHtmlElement,
+} from '.';
 
 function makeVisible<T extends Element>(element: T): T {
   const rect = DOMRect.fromRect({ height: 32, width: 96, x: 20, y: 30 });
@@ -16,6 +20,15 @@ function makeVisible<T extends Element>(element: T): T {
     }),
   });
   return element;
+}
+
+function createRectList(rect: DOMRect): DOMRectList {
+  return {
+    0: rect,
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+    item: (index) => (index === 0 ? rect : null),
+    length: 1,
+  };
 }
 
 afterEach(() => {
@@ -121,5 +134,50 @@ describe('shared selectable page element target', () => {
 
     expect(resolvedElement).toBe(path);
     expect(resolvedHtmlElement).toBe(host);
+  });
+
+  it('rejects document roots for Annotation without changing the shared element resolver', () => {
+    makeVisible(document.documentElement);
+    makeVisible(document.body);
+
+    const bodyEvent = new MouseEvent('mousemove', { bubbles: true, composed: true });
+    document.body.dispatchEvent(bodyEvent);
+    expect(resolveSelectablePageElement(bodyEvent)).toBe(document.body);
+    expect(resolveSelectablePageHtmlElement(bodyEvent)).toBeNull();
+    expect(resolveDrawablePageHtmlElement(bodyEvent)).toBe(document.body);
+
+    const htmlEvent = new MouseEvent('mousemove', { bubbles: true, composed: true });
+    document.documentElement.dispatchEvent(htmlEvent);
+    expect(resolveSelectablePageElement(htmlEvent)).toBe(document.documentElement);
+    expect(resolveSelectablePageHtmlElement(htmlEvent)).toBeNull();
+    expect(resolveDrawablePageHtmlElement(htmlEvent)).toBe(document.documentElement);
+  });
+
+  it('requires an Annotation target to intersect its viewport but allows partial visibility', () => {
+    const offscreen = makeVisible(document.createElement('section'));
+    const partiallyVisible = makeVisible(document.createElement('article'));
+    const offscreenRect = DOMRect.fromRect({
+      height: 80,
+      width: 120,
+      x: window.innerWidth + 20,
+      y: 40,
+    });
+    const partialRect = DOMRect.fromRect({
+      height: window.innerHeight * 2,
+      width: 160,
+      x: 20,
+      y: -40,
+    });
+    vi.spyOn(offscreen, 'getClientRects').mockReturnValue(createRectList(offscreenRect));
+    vi.spyOn(partiallyVisible, 'getClientRects').mockReturnValue(createRectList(partialRect));
+    document.body.append(offscreen, partiallyVisible);
+
+    const offscreenEvent = new MouseEvent('mousemove', { bubbles: true, composed: true });
+    offscreen.dispatchEvent(offscreenEvent);
+    expect(resolveSelectablePageHtmlElement(offscreenEvent)).toBeNull();
+
+    const partialEvent = new MouseEvent('mousemove', { bubbles: true, composed: true });
+    partiallyVisible.dispatchEvent(partialEvent);
+    expect(resolveSelectablePageHtmlElement(partialEvent)).toBe(partiallyVisible);
   });
 });

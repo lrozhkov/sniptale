@@ -99,7 +99,7 @@ export type HoverOverlayActions = {
   hideHoverOverlay: () => void;
   removeHoverOverlay: () => void;
   removeOverlayContainer: () => void;
-  showHoverOverlay: (element: HTMLElement) => void;
+  showHoverOverlay: (element: HTMLElement) => boolean;
 };
 
 export function ensureHighlighterOverlayContainer(session: HoverDomSession): HTMLElement {
@@ -179,11 +179,11 @@ export function showHoverOverlay(
   session: HoverDomSession,
   position: ElementAbsolutePosition,
   preset: AppliedBorderSettings
-): void {
+): boolean {
   const hoverOverlay = ensureHoverOverlay(session, preset);
   if (isCaptureUiHidden()) {
     hideHoverOverlay(session);
-    return;
+    return false;
   }
 
   const visual = resolveBorderPresetVisual(preset);
@@ -199,6 +199,7 @@ export function showHoverOverlay(
   applyCanonicalHoverVisual(hoverOverlay, visual);
   applyCanonicalHoverGeometry(hoverOverlay, coords);
   hoverOverlay.style.display = 'block';
+  return true;
 }
 
 export function hideHoverOverlay(session: HoverDomSession): void {
@@ -244,12 +245,12 @@ export function createHoverOverlayActions(session: HoverSession): HoverOverlayAc
       ensureHoverOverlay(session, getCurrentBorderPreset());
       if (!session.hoverOverlay || !session.overlayContainer) {
         logger.warn('Cannot show hover overlay without overlay container state');
-        return;
+        return false;
       }
       const position = getAbsolutePosition(element);
       const preset = getCurrentBorderPreset();
       logHoverOverlayShown(position, preset);
-      showHoverOverlay(session, position, preset);
+      return showHoverOverlay(session, position, preset);
     },
   };
 }

@@ -5,7 +5,7 @@ import {
   getDocumentViewportBounds,
   getTopViewportPoint,
 } from '../../platform/frame';
-import { resolveSelectablePageHtmlElement } from '../page-element-target';
+import { resolveDrawablePageHtmlElement } from '../page-element-target';
 import {
   colorToRgba,
   resolveBorderPresetVisual,
@@ -226,7 +226,7 @@ function canStartDrawing(props: {
   ) {
     return null;
   }
-  const target = resolveSelectablePageHtmlElement(props.event, props.iframe);
+  const target = resolveDrawablePageHtmlElement(props.event, props.iframe);
   return target && !isHighlighterExtensionUiElement(target) ? target : null;
 }
 

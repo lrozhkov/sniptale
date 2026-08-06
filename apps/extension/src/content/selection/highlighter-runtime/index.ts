@@ -36,6 +36,10 @@ export function consumeHighlighterSuppressedClick(event: MouseEvent): boolean {
   return highlighterControllerOwner.getOwnerIfCreated()?.consumeSuppressedClick(event) ?? false;
 }
 
+export function hasHighlighterHoverPreviewTarget(): boolean {
+  return highlighterControllerOwner.getOwnerIfCreated()?.hasHoverPreviewTarget() ?? false;
+}
+
 export function isHighlighterEnabled(): boolean {
   return highlighterControllerOwner.getOwnerIfCreated()?.isEnabled() ?? false;
 }

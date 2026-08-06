@@ -110,6 +110,7 @@ export function createFrameSelectionEventHandlers(params: {
   activePopoverRef: MutableRefObject<ActiveFramePopover | null>;
   selectedFrameIdRef: MutableRefObject<string | null>;
   consumeSuppressedClick: (event: MouseEvent) => boolean;
+  hasHoverPreviewTarget: () => boolean;
   clearSelection: () => void;
   hoverFrame: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
@@ -164,6 +165,7 @@ export function createFrameSelectionEventHandlers(params: {
         stopFrameActivationClick(event);
         return;
       }
+      if (params.hasHoverPreviewTarget()) return;
       const frameId = resolveInteriorHit({
         event,
         frames: params.framesRef.current,

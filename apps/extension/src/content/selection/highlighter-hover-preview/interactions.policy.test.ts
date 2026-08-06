@@ -57,7 +57,7 @@ describe('highlighter hover target/event policy', () => {
   it('shows the inner iframe element resolved from pointer coordinates', () => {
     const { iframe, innerTarget } = createIframeTarget();
     const session = createHoverSession();
-    const showHoverOverlay = vi.fn();
+    const showHoverOverlay = vi.fn((_element: HTMLElement) => true);
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;

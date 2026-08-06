@@ -6,7 +6,10 @@ import { addHighlighterModeChangedListener } from '../../../platform/page-contex
 import { createThrottledMouseMoveHandler, type FrameUiMouseTrackingParams } from './helpers';
 import { createFrameSelectionEventHandlers } from './activation';
 import type { ActiveFramePopover } from '../state/frame-ui.store';
-import { consumeHighlighterSuppressedClick } from '../../highlighter';
+import {
+  consumeHighlighterSuppressedClick,
+  hasHighlighterHoverPreviewTarget,
+} from '../../highlighter';
 
 function cancelPendingAnimationFrame(rafId: MutableRefObject<number | null>) {
   if (rafId.current !== null) {
@@ -119,6 +122,7 @@ export function useFrameUiSelectionEvents(params: {
       activePopoverRef,
       selectedFrameIdRef,
       consumeSuppressedClick: consumeHighlighterSuppressedClick,
+      hasHoverPreviewTarget: hasHighlighterHoverPreviewTarget,
       clearSelection,
       hoverFrame,
       selectFrame,

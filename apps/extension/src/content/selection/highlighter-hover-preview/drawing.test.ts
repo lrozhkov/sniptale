@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({
+  resolveDrawablePageHtmlElement: vi.fn(),
+  resolveSelectablePageHtmlElement: vi.fn(),
+}));
 const framePlatform = vi.hoisted(() => ({
   createDocumentPagePlacement: vi.fn(() => ({ iframePath: [], pageX: 10, pageY: 20 })),
   getDocumentViewportBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
@@ -103,7 +106,7 @@ function createFixture() {
   const addFrame = vi.fn();
   const addFreeFrame = vi.fn();
   const hideHoverOverlay = vi.fn();
-  const showHoverOverlay = vi.fn();
+  const showHoverOverlay = vi.fn(() => true);
   const getCallbacks = () => ({ addFrame, addFreeFrame, hasFrameForElement: null });
   const getState = {
     isFrameEditing: () => false,
@@ -127,6 +130,7 @@ function createFixture() {
   targetResolver.resolveSelectablePageHtmlElement.mockImplementation(
     (event: Event) => event.target
   );
+  targetResolver.resolveDrawablePageHtmlElement.mockImplementation((event: Event) => event.target);
   return {
     addFrame,
     addFreeFrame,
@@ -152,6 +156,20 @@ afterEach(() => {
 });
 
 describe('free frame drawing gesture', () => {
+  it('starts manual drawing from a document root where hover selection is unavailable', () => {
+    const { addFreeFrame, handlers } = createFixture();
+
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, document.body));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 60, 60, document.body));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 60, 60, document.body));
+
+    expect(targetResolver.resolveDrawablePageHtmlElement).toHaveBeenCalled();
+    expect(addFreeFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 20, y: 20, width: 40, height: 40 }),
+      document.body
+    );
+  });
+
   it('renders the selected preset with drawing-layer opacity', () => {
     const { handlers } = createFixture();
     setFrameSessionBorderPreset({
@@ -327,6 +345,7 @@ describe('free frame drawing gesture', () => {
       activePopoverRef: { current: null },
       clearSelection: vi.fn(),
       consumeSuppressedClick: handlers.consumeSuppressedClick,
+      hasHoverPreviewTarget: () => false,
       framesRef: { current: [existingFrame] },
       hoveredFrameIdRef: { current: null },
       hoverFrame: vi.fn(),
