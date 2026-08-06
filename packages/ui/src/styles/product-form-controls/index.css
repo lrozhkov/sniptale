@@ -6,6 +6,19 @@
   cursor: text;
 }
 
+.sniptale-input:focus::placeholder,
+.sniptale-textarea:focus::placeholder {
+  color: transparent;
+}
+
+.sniptale-input.sniptale-input-compact {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .sniptale-input:disabled,
 .sniptale-textarea:disabled {
   cursor: not-allowed;

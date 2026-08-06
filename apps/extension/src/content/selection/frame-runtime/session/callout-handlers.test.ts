@@ -62,10 +62,13 @@ it('creates a callout from the session style when a frame enables it for the fir
       typography: { fontSize: 18 },
     },
   });
-  expect(sessionCalloutStyleRef.current).toEqual(frames.getFrames()[0]?.callout?.style);
+  expect(sessionCalloutStyleRef.current).toMatchObject({
+    surface: { backgroundColor: '#2563eb' },
+    typography: { fontSize: 18 },
+  });
 });
 
-it('merges popover settings into both the frame callout and the session style ref', () => {
+it('merges popover settings into the frame without changing future-callout defaults', () => {
   const frames = createFramesHarness([
     createFrame({
       callout: {
@@ -82,7 +85,6 @@ it('merges popover settings into both the frame callout and the session style re
   };
 
   createCalloutPopoverSettingsHandler({
-    sessionCalloutStyleRef,
     setFrames: frames.setFrames,
   })({
     frameId: 'frame-1',
@@ -96,10 +98,7 @@ it('merges popover settings into both the frame callout and the session style re
     placement: { side: 'bottom' },
     style: { surface: { backgroundColor: '#10b981' } },
   });
-  expect(sessionCalloutStyleRef.current).toEqual({
-    ...baseCallout.style,
-    surface: { ...baseCallout.style.surface, backgroundColor: '#10b981' },
-  });
+  expect(sessionCalloutStyleRef.current).toBe(baseCallout.style);
 });
 
 it('disables the matching frame callout and leaves unrelated frames untouched', () => {

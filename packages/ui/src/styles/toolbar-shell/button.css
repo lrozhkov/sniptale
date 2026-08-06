@@ -97,8 +97,8 @@
     var(--sniptale-color-border-soft) 45%
   );
   color: var(--sniptale-color-accent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-toggle[data-active='true']:hover:not(:disabled),
@@ -109,12 +109,12 @@
 .sniptale-btn-ai.sniptale-ai-active:hover:not(:disabled) {
   border-color: color-mix(
     in srgb,
-    var(--sniptale-color-accent) 55%,
-    var(--sniptale-color-border-soft) 45%
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
   );
   color: var(--sniptale-color-accent-emphasis);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-btn-danger:hover:not(:disabled),

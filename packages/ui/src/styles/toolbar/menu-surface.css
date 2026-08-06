@@ -33,8 +33,8 @@
 #sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
   ~ #sniptale-content-overlay-root
   > :not(.sniptale-main-toolbar-popover):not(.sniptale-modal):not(.sniptale-modal-backdrop):not(
-    :has(.sniptale-modal)
-  ) {
+    .sniptale-blur-overlay
+  ):not(.sniptale-focus-overlay):not(:has(.sniptale-modal)) {
   z-index: 2147483645 !important;
   pointer-events: none !important;
 }
@@ -58,7 +58,7 @@
   top: calc(100% + 10px);
   left: 0;
   min-width: 240px;
-  padding: 10px;
+  padding: var(--sniptale-toolbar-menu-edge-inset);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -68,7 +68,7 @@
 
 .sniptale-toolbar-menu--compact {
   min-width: 220px;
-  padding: 8px;
+  padding: var(--sniptale-toolbar-menu-edge-inset);
   gap: 8px;
 }
 

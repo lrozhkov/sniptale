@@ -127,6 +127,28 @@ it('ignores a stale initial rejection after a subscription snapshot', async () =
   expect(latest?.catalog.error).toBeNull();
 });
 
+it('refreshes the open catalog and reveals a newly saved template', async () => {
+  await act(async () => root?.render(<Harness />));
+  const refreshed = createCatalog('system-callout-bubble');
+  const source = refreshed.presets[0]!;
+  refreshed.presets = [
+    ...refreshed.presets,
+    {
+      ...source,
+      id: 'user-new',
+      name: 'New template',
+      order: refreshed.presets.length,
+      origin: 'user',
+    },
+  ];
+  mocks.load.mockResolvedValueOnce(refreshed);
+
+  await act(async () => latest?.catalog.refresh());
+
+  expect(mocks.load).toHaveBeenCalledTimes(2);
+  expect(latest?.catalog.visiblePresets.some((preset) => preset.id === 'user-new')).toBe(true);
+});
+
 it('does not publish a delayed load after the popover session closes', async () => {
   let resolveLoad: ((catalog: CalloutPresetCatalog) => void) | undefined;
   mocks.load.mockReturnValueOnce(new Promise((resolve) => (resolveLoad = resolve)));
@@ -170,6 +192,7 @@ it('opens the persistent editor and saves the selected preset through the catalo
   await act(async () => preset && latest?.editor.save({ ...preset, name: 'Updated preset' }));
 
   expect(mocks.update).toHaveBeenCalledWith({
+    content: preset?.content,
     id: preset?.id,
     name: 'Updated preset',
     placement: preset?.placement,

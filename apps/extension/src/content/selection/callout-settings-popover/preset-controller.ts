@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CalloutPreset,
   CalloutPresetCatalog,
@@ -36,15 +36,14 @@ export function useCalloutPresetPopoverController(isOpen: boolean) {
     const acceptCatalog = (nextCatalog: CalloutPresetCatalog) => {
       setCatalog(nextCatalog);
       setError(null);
+      const enabledIds = nextCatalog.presets
+        .filter((preset) => preset.enabled !== false)
+        .map((preset) => preset.id);
       if (!sessionVisibilityInitialized) {
         sessionVisibilityInitialized = true;
-        setSessionVisiblePresetIds(
-          new Set(
-            nextCatalog.presets
-              .filter((preset) => preset.enabled !== false)
-              .map((preset) => preset.id)
-          )
-        );
+        setSessionVisiblePresetIds(new Set(enabledIds));
+      } else {
+        setSessionVisiblePresetIds((current) => new Set([...current, ...enabledIds]));
       }
     };
     void loadCalloutPresetCatalog()
@@ -70,6 +69,33 @@ export function useCalloutPresetPopoverController(isOpen: boolean) {
     };
   }, [isOpen]);
 
+  const refresh = useCallback(async () => {
+    if (!isOpen) return;
+    const sessionId = sessionGenerationRef.current;
+    const requestId = catalogRequestRef.current + 1;
+    catalogRequestRef.current = requestId;
+    try {
+      const nextCatalog = await loadCalloutPresetCatalog();
+      if (sessionId !== sessionGenerationRef.current || requestId !== catalogRequestRef.current)
+        return;
+      setCatalog(nextCatalog);
+      setError(null);
+      setSessionVisiblePresetIds(
+        (current) =>
+          new Set([
+            ...current,
+            ...nextCatalog.presets
+              .filter((preset) => preset.enabled !== false)
+              .map((preset) => preset.id),
+          ])
+      );
+    } catch {
+      if (sessionId === sessionGenerationRef.current && requestId === catalogRequestRef.current) {
+        setError(translate('content.callout.presetLoadError'));
+      }
+    }
+  }, [isOpen]);
+
   const mutations = useCalloutPresetPopoverMutations({
     sessionGenerationRef,
     setEditor,
@@ -89,6 +115,7 @@ export function useCalloutPresetPopoverController(isOpen: boolean) {
       overwrite: mutations.overwrite,
       pendingPresetIds,
       presets: catalog?.presets ?? [],
+      refresh,
       toggle: mutations.toggle,
       value: catalog,
       visiblePresets,

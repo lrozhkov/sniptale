@@ -150,6 +150,22 @@ it('does not let a large title font impose the input default character width on 
     titleMeasure?.querySelector('[data-sniptale-callout-badge-measure="true"]')?.textContent
   ).toBe('MARK');
   expect(document.querySelectorAll('[data-ui="content.callout.badge"]')).toHaveLength(1);
+
+  act(() =>
+    root.render(
+      <CalloutBody
+        {...props}
+        settings={{
+          ...props.settings,
+          style: {
+            ...props.settings.style,
+            badge: { ...props.settings.style.badge, placement: 'body-start' },
+          },
+        }}
+      />
+    )
+  );
+  expect(props.contentEditableRef.current?.parentElement?.style.minWidth).toBe('min-content');
 });
 
 it('keeps body and title direction independent, including the auto bidi mode', () => {

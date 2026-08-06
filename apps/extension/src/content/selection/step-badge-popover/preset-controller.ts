@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   StepBadgePreset,
   StepBadgePresetCatalog,
@@ -14,6 +14,10 @@ import {
   updateStoredStepBadgePreset,
 } from '../../../composition/persistence/step-badge-presets';
 
+function getEnabledPresetIds(catalog: StepBadgePresetCatalog) {
+  return catalog.presets.filter((preset) => preset.enabled !== false).map((preset) => preset.id);
+}
+
 export function useStepBadgePresetPopoverController(isOpen: boolean) {
   const [catalog, setCatalog] = useState<StepBadgePresetCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,36 +27,60 @@ export function useStepBadgePresetPopoverController(isOpen: boolean) {
     isOpen: false,
   });
   const generation = useRef(0);
+  const catalogRequest = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
     const current = ++generation.current;
+    const request = ++catalogRequest.current;
     setEditor({ isOpen: false });
     let visibilityInitialized = false;
     const accept = (next: StepBadgePresetCatalog) => {
       if (current !== generation.current) return;
       setCatalog(next);
       setError(null);
+      const enabledIds = getEnabledPresetIds(next);
       if (!visibilityInitialized) {
         visibilityInitialized = true;
-        setSessionVisibleIds(
-          new Set(
-            next.presets.filter((preset) => preset.enabled !== false).map((preset) => preset.id)
-          )
-        );
+        setSessionVisibleIds(new Set(enabledIds));
+      } else {
+        setSessionVisibleIds((current) => new Set([...current, ...enabledIds]));
       }
     };
     void loadStepBadgePresetCatalog()
-      .then(accept)
+      .then((next) => {
+        if (request === catalogRequest.current) accept(next);
+      })
       .catch(() => {
-        if (current === generation.current)
+        if (current === generation.current && request === catalogRequest.current)
           setError(translate('content.stepBadge.presetLoadError'));
       });
-    const unsubscribe = subscribeToStepBadgePresetCatalog(accept);
+    const unsubscribe = subscribeToStepBadgePresetCatalog((next) => {
+      catalogRequest.current += 1;
+      accept(next);
+    });
     return () => {
       if (generation.current === current) generation.current += 1;
+      catalogRequest.current += 1;
       unsubscribe();
     };
+  }, [isOpen]);
+
+  const refresh = useCallback(async () => {
+    if (!isOpen) return;
+    const current = generation.current;
+    const request = ++catalogRequest.current;
+    try {
+      const next = await loadStepBadgePresetCatalog();
+      if (current !== generation.current || request !== catalogRequest.current) return;
+      setCatalog(next);
+      setError(null);
+      setSessionVisibleIds((visible) => new Set([...visible, ...getEnabledPresetIds(next)]));
+    } catch {
+      if (current === generation.current && request === catalogRequest.current) {
+        setError(translate('content.stepBadge.presetLoadError'));
+      }
+    }
   }, [isOpen]);
 
   const mutate = async (id: string, task: () => Promise<{ outcome: string }>) => {
@@ -102,6 +130,7 @@ export function useStepBadgePresetPopoverController(isOpen: boolean) {
       error,
       pending,
       presets: catalog?.presets ?? [],
+      refresh,
       reset: (preset: StepBadgePreset) =>
         mutate(preset.id, () => resetStoredSystemStepBadgePreset(preset.id)),
       toggle: (preset: StepBadgePreset) =>

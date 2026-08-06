@@ -41,6 +41,7 @@ let latestSettings: CalloutSettings;
 function applyPatch(settings: CalloutSettings, patch: CalloutSettingsPatch): CalloutSettings {
   return {
     ...settings,
+    content: { ...settings.content, ...patch.content },
     placement: {
       ...settings.placement,
       ...patch.placement,
@@ -197,16 +198,50 @@ it('edits every shared callout inspector section and connector mode', async () =
   });
 
   await openSection('content.callout.manualTitle');
+  const titleInput = document.querySelector<HTMLInputElement>(
+    'input[placeholder="content.callout.titleTextPlaceholder"]'
+  );
+  expect(titleInput?.type).toBe('text');
+  expect(titleInput?.className).toContain('cursor-text');
+  const titleValueSetter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    'value'
+  )?.set;
+  await act(async () => {
+    if (!titleInput) return;
+    titleValueSetter?.call(titleInput, 'Saved heading');
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    titleInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await clickAll('[data-color-field]');
   await changeAllNumbers();
   expect(latestSettings.style.title).toMatchObject({
     backgroundColor: '#123456',
     textColor: '#123456',
   });
+  expect(latestSettings.content.titleText).toBe('Saved heading');
   await clickAll('button[aria-label="content.callout.titleToggle"]');
   expect(latestSettings.style.title.enabled).toBe(false);
   expect(document.querySelector('button[aria-label="content.callout.manualDivider"]')).toBeNull();
-  expect(document.querySelector('button[aria-label="content.callout.manualBadge"]')).toBeNull();
+  expect(document.querySelector('button[aria-label="content.callout.manualBadge"]')).not.toBeNull();
+
+  await openSection('content.callout.manualBadge');
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="content.callout.badgeEnabled"]')
+      ?.click()
+  );
+  expect(latestSettings.style.badge).toMatchObject({ enabled: true, placement: 'body-start' });
+  expect(
+    document.querySelectorAll(
+      '[role="option"][data-value="title-start"], [role="option"][data-value="title-end"]'
+    )
+  ).toHaveLength(0);
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="content.callout.badgeEnabled"]')
+      ?.click()
+  );
 
   await openSection('content.callout.manualSize');
   await changeAllNumbers();
@@ -371,6 +406,11 @@ it('keeps advanced body, title, and badge typography independently editable', as
       'input[placeholder="content.callout.badgeTextPlaceholder"]'
     )?.className
   ).toContain('cursor-text');
+  expect(
+    document.querySelector<HTMLInputElement>(
+      'input[placeholder="content.callout.badgeTextPlaceholder"]'
+    )?.type
+  ).toBe('text');
   await selectOption(
     'content.callout.badgePlacementLabel',
     'content.callout.badgePlacement.body-start'

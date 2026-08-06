@@ -3,30 +3,10 @@ import {
   ProductGlassToolbarButton,
   ProductGlassToolbarDivider,
 } from '@sniptale/ui/product-glass-toolbar';
-import {
-  Droplet,
-  Focus,
-  ListOrdered,
-  MessageSquare,
-  Minus,
-  Pencil,
-  Plus,
-  Square,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ListOrdered, MessageSquare, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { InteractiveFrameToolbarProps } from './types';
-
-function EffectIcon(props: { mode: 'border' | 'blur' | 'focus' }) {
-  if (props.mode === 'border') {
-    return <Square size={18} />;
-  }
-  if (props.mode === 'blur') {
-    return <Droplet size={18} />;
-  }
-  return <Focus size={18} />;
-}
+import { FrameEffectIcon } from './effect-icon';
 
 export function InteractiveFrameToolbarEffectButtons(props: {
   effectMode: InteractiveFrameToolbarProps['effectMode'];
@@ -38,29 +18,17 @@ export function InteractiveFrameToolbarEffectButtons(props: {
   effectButtons: Array<{ mode: InteractiveFrameToolbarProps['effectMode']; label: string }>;
 }) {
   return (
-    <>
-      {props.effectButtons.map(({ mode, label }) => {
-        const isActive = props.effectMode === mode;
-        return (
-          <ProductGlassToolbarButton
-            key={mode}
-            data-sniptale-activation-bridge="defer"
-            ref={
-              isActive ? (props.popoverAnchorRef as React.RefObject<HTMLButtonElement>) : undefined
-            }
-            onClick={props.handleEffectClick(mode)}
-            onMouseDown={props.handleButtonMouseDown}
-            menuIndicator
-            title={
-              label + (isActive ? translate('content.interactiveFrame.effectActiveSuffix') : '')
-            }
-            active={isActive}
-          >
-            <EffectIcon mode={mode} />
-          </ProductGlassToolbarButton>
-        );
-      })}
-    </>
+    <ProductGlassToolbarButton
+      active
+      data-sniptale-activation-bridge="defer"
+      ref={props.popoverAnchorRef as React.RefObject<HTMLButtonElement>}
+      onClick={props.handleEffectClick(props.effectMode)}
+      onMouseDown={props.handleButtonMouseDown}
+      menuIndicator
+      title={props.effectButtons.find((item) => item.mode === props.effectMode)?.label}
+    >
+      <FrameEffectIcon mode={props.effectMode} size={18} />
+    </ProductGlassToolbarButton>
   );
 }
 

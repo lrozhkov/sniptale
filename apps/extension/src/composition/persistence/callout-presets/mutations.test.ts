@@ -106,6 +106,7 @@ describe('callout preset catalog mutations', () => {
       defaultPresetId: 'user-one',
       presets: [
         {
+          content: { titleText: '' },
           enabled: true,
           id: 'user-one',
           name: 'One',

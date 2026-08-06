@@ -107,7 +107,11 @@ it('keeps the toolbar popover open while selecting a template to overwrite', asy
     );
     await act(async () => vi.advanceTimersByTimeAsync(301));
     await act(async () =>
-      document.querySelector<HTMLButtonElement>('button[aria-label="Выберите шаблон"]')?.click()
+      document
+        .querySelector<HTMLButtonElement>(
+          '[data-ui="shared.highlighter-template-save-settings"] button[aria-haspopup="listbox"]'
+        )
+        ?.click()
     );
     const option = document.querySelector<HTMLButtonElement>('[role="option"]');
     expect(option).not.toBeNull();

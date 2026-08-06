@@ -37,7 +37,10 @@ it('returns detached cached snapshots to callers', async () => {
   const { getLoadedHighlighterSettingsSnapshot, loadHighlighterSettings } =
     await loadHighlighterStorage();
 
-  await loadHighlighterSettings();
+  const loaded = await loadHighlighterSettings();
+  const expectedBlurAmount = loaded.borderPresets[0]!.effects!.blur.amount;
+
+  loaded.borderPresets[0]!.effects!.blur.amount = expectedBlurAmount + 100;
 
   const firstSnapshot = getLoadedHighlighterSettingsSnapshot();
   const secondSnapshot = getLoadedHighlighterSettingsSnapshot();
@@ -45,4 +48,11 @@ it('returns detached cached snapshots to callers', async () => {
   expect(firstSnapshot).toEqual(createDefaultHighlighterSettings());
   expect(secondSnapshot).toEqual(createDefaultHighlighterSettings());
   expect(firstSnapshot).not.toBe(secondSnapshot);
+  expect(firstSnapshot!.borderPresets[0]!.effects!.blur.amount).toBe(expectedBlurAmount);
+  expect(firstSnapshot!.borderPresets[0]!.effects).not.toBe(
+    secondSnapshot!.borderPresets[0]!.effects
+  );
+  expect(firstSnapshot!.borderPresets[0]!.effects!.blur).not.toBe(
+    secondSnapshot!.borderPresets[0]!.effects!.blur
+  );
 });

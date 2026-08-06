@@ -1,8 +1,13 @@
 import type { CSSProperties } from 'react';
 import { getCalloutTailMetrics } from './tail';
 import { CALLOUT_GAP } from './constants';
+import {
+  getRoundedPerimeterPath,
+  getRoundedSidePoint,
+  type ConnectorSide,
+} from './rounded-perimeter';
 
-export type ConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+export type { ConnectorSide } from './rounded-perimeter';
 
 type Rect = { x: number; y: number; width: number; height: number };
 type Point = { x: number; y: number };
@@ -261,10 +266,8 @@ function getBubbleBase(args: {
   const horizontal = args.bubbleSide === 'top' || args.bubbleSide === 'bottom';
   const edgeStart = horizontal ? args.bubbleRect.x : args.bubbleRect.y;
   const edgeLength = horizontal ? args.bubbleRect.width : args.bubbleRect.height;
-  const straightInset = Math.min(Math.max(BUBBLE_EDGE_MARGIN, args.borderRadius), edgeLength / 2);
-  const straightStart = edgeStart + straightInset;
-  const straightEnd = edgeStart + edgeLength - straightInset;
-  const availableSpan = Math.max(0, straightEnd - straightStart);
+  const edgeInset = Math.min(BUBBLE_EDGE_MARGIN, edgeLength / 2);
+  const availableSpan = Math.max(0, edgeLength - 2 * edgeInset);
   const requestedSpan =
     args.width === undefined ? args.desiredSpan : edgeLength * clamp(args.width, 0, 1);
   const baseSpan = clamp(requestedSpan, Math.min(4, availableSpan), availableSpan);
@@ -276,28 +279,47 @@ function getBubbleBase(args: {
       : edgeStart + edgeLength * clamp(args.position, 0, 1);
   const baseCenterAxis = clamp(
     candidateAxis,
-    straightStart + baseSpan / 2,
-    straightEnd - baseSpan / 2
+    edgeStart + edgeInset + baseSpan / 2,
+    edgeStart + edgeLength - edgeInset - baseSpan / 2
   );
-  const edgePoint = horizontal
-    ? { x: baseCenterAxis, y: args.candidate.y }
-    : { x: args.candidate.x, y: baseCenterAxis };
-  const tangent = getSideTangent(args.bubbleSide);
-  const baseEdgeA = offsetPoint(edgePoint, tangent, -baseSpan / 2);
-  const baseEdgeB = offsetPoint(edgePoint, tangent, baseSpan / 2);
-  const interiorNormal = getInteriorNormal(args.bubbleSide);
-  const baseA = offsetPoint(baseEdgeA, interiorNormal, args.baseOverlap);
-  const baseB = offsetPoint(baseEdgeB, interiorNormal, args.baseOverlap);
-  const bubblePoint = offsetPoint(edgePoint, interiorNormal, args.baseOverlap);
+  const baseEdgeAState = getRoundedSidePoint({
+    axis: baseCenterAxis - baseSpan / 2,
+    radius: args.borderRadius,
+    rect: args.bubbleRect,
+    side: args.bubbleSide,
+  });
+  const baseEdgeBState = getRoundedSidePoint({
+    axis: baseCenterAxis + baseSpan / 2,
+    radius: args.borderRadius,
+    rect: args.bubbleRect,
+    side: args.bubbleSide,
+  });
+  const edgePointState = getRoundedSidePoint({
+    axis: baseCenterAxis,
+    radius: args.borderRadius,
+    rect: args.bubbleRect,
+    side: args.bubbleSide,
+  });
+  const baseEdgeA = baseEdgeAState.point;
+  const baseEdgeB = baseEdgeBState.point;
+  const baseA = offsetPoint(baseEdgeA, baseEdgeAState.interiorNormal, args.baseOverlap);
+  const baseB = offsetPoint(baseEdgeB, baseEdgeBState.interiorNormal, args.baseOverlap);
+  const bubblePoint = offsetPoint(
+    edgePointState.point,
+    edgePointState.interiorNormal,
+    args.baseOverlap
+  );
 
   return {
     baseA,
     baseB,
     baseEdgeA,
+    baseEdgeADistance: baseEdgeAState.distance,
     baseEdgeB,
-    bubbleEdgePoint: edgePoint,
+    baseEdgeBDistance: baseEdgeBState.distance,
+    bubbleEdgePoint: edgePointState.point,
     bubblePoint,
-    tangent,
+    tangent: getSideTangent(args.bubbleSide),
   };
 }
 
@@ -414,67 +436,20 @@ function getPathGeometry(args: {
 }
 
 function getBubblePerimeterPath(args: {
-  baseA: Point;
+  baseEdgeADistance: number;
+  baseEdgeBDistance: number;
   bubbleRect: Rect;
   radius: number;
   side: ConnectorSide;
 }): string {
-  const left = args.bubbleRect.x;
-  const top = args.bubbleRect.y;
-  const right = left + args.bubbleRect.width;
-  const bottom = top + args.bubbleRect.height;
-  const radius = Math.min(args.radius, args.bubbleRect.width / 2, args.bubbleRect.height / 2);
-
-  switch (getOppositeSide(args.side)) {
-    case 'top':
-      return [
-        `L ${right - radius} ${top}`,
-        `Q ${right} ${top} ${right} ${top + radius}`,
-        `L ${right} ${bottom - radius}`,
-        `Q ${right} ${bottom} ${right - radius} ${bottom}`,
-        `L ${left + radius} ${bottom}`,
-        `Q ${left} ${bottom} ${left} ${bottom - radius}`,
-        `L ${left} ${top + radius}`,
-        `Q ${left} ${top} ${left + radius} ${top}`,
-        `L ${args.baseA.x} ${args.baseA.y}`,
-      ].join(' ');
-    case 'right':
-      return [
-        `L ${right} ${bottom - radius}`,
-        `Q ${right} ${bottom} ${right - radius} ${bottom}`,
-        `L ${left + radius} ${bottom}`,
-        `Q ${left} ${bottom} ${left} ${bottom - radius}`,
-        `L ${left} ${top + radius}`,
-        `Q ${left} ${top} ${left + radius} ${top}`,
-        `L ${right - radius} ${top}`,
-        `Q ${right} ${top} ${right} ${top + radius}`,
-        `L ${args.baseA.x} ${args.baseA.y}`,
-      ].join(' ');
-    case 'bottom':
-      return [
-        `L ${right - radius} ${bottom}`,
-        `Q ${right} ${bottom} ${right} ${bottom - radius}`,
-        `L ${right} ${top + radius}`,
-        `Q ${right} ${top} ${right - radius} ${top}`,
-        `L ${left + radius} ${top}`,
-        `Q ${left} ${top} ${left} ${top + radius}`,
-        `L ${left} ${bottom - radius}`,
-        `Q ${left} ${bottom} ${left + radius} ${bottom}`,
-        `L ${args.baseA.x} ${args.baseA.y}`,
-      ].join(' ');
-    case 'left':
-      return [
-        `L ${left} ${bottom - radius}`,
-        `Q ${left} ${bottom} ${left + radius} ${bottom}`,
-        `L ${right - radius} ${bottom}`,
-        `Q ${right} ${bottom} ${right} ${bottom - radius}`,
-        `L ${right} ${top + radius}`,
-        `Q ${right} ${top} ${right - radius} ${top}`,
-        `L ${left + radius} ${top}`,
-        `Q ${left} ${top} ${left} ${top + radius}`,
-        `L ${args.baseA.x} ${args.baseA.y}`,
-      ].join(' ');
-  }
+  const bubbleSide = getOppositeSide(args.side);
+  return getRoundedPerimeterPath({
+    direction: bubbleSide === 'top' || bubbleSide === 'right' ? 'clockwise' : 'counterclockwise',
+    fromDistance: args.baseEdgeBDistance,
+    radius: args.radius,
+    rect: args.bubbleRect,
+    toDistance: args.baseEdgeADistance,
+  });
 }
 
 export function getDynamicTailState(args: {
@@ -544,7 +519,8 @@ export function getDynamicTailState(args: {
         ` ${geometry.localTipB.x} ${geometry.localTipB.y}`,
       `L ${geometry.localBaseEdgeB.x} ${geometry.localBaseEdgeB.y}`,
       getBubblePerimeterPath({
-        baseA: geometry.localBaseEdgeA,
+        baseEdgeADistance: points.baseEdgeADistance,
+        baseEdgeBDistance: points.baseEdgeBDistance,
         bubbleRect: geometry.localBubbleRect,
         radius: Math.max(0, args.borderRadius ?? 0),
         side,

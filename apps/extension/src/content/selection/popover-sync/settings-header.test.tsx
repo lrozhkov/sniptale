@@ -16,6 +16,7 @@ describe('SettingsPopoverHeader', () => {
     );
 
     expect(markup).toContain('Settings');
+    expect(markup).toContain('sniptale-toolbar-menu-title');
     expect(markup).not.toContain('data-draggable');
     expect(markup).not.toContain('sniptale-settings-popover-close');
   });
@@ -55,5 +56,22 @@ describe('SettingsPopoverHeader', () => {
     expect(markup).toContain('data-draggable="true"');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).toContain('aria-label="Close"');
+  });
+
+  it('renders a compact destructive action before mode and close actions', () => {
+    const markup = renderToStaticMarkup(
+      <SettingsPopoverHeader
+        action={{ label: 'Customize', onClick: vi.fn() }}
+        closeLabel="Close"
+        context="element"
+        destructiveAction={{ label: 'Disable', onClick: vi.fn() }}
+        onClose={vi.fn()}
+        title="Comment"
+      />
+    );
+
+    expect(markup).toContain('sniptale-settings-popover-destructive-action');
+    expect(markup.indexOf('Disable')).toBeLessThan(markup.indexOf('Customize'));
+    expect(markup.indexOf('Customize')).toBeLessThan(markup.indexOf('aria-label="Close"'));
   });
 });

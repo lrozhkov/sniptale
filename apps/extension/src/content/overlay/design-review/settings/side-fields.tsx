@@ -1,5 +1,4 @@
-import { ChevronDown, Link2, Unlink2 } from 'lucide-react';
-import { useState } from 'react';
+import { Link2, Unlink2 } from 'lucide-react';
 import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
@@ -20,7 +19,7 @@ const SIDE_LABEL_KEYS = [
 ] as const;
 
 const COMPACT_VALUES_CLASS_NAME = [
-  'grid min-w-0 grid-cols-[repeat(4,minmax(0,1fr))] gap-0.5 rounded-[9px]',
+  'w-[4.75rem] min-w-0 rounded-[9px]',
   'border border-[var(--sniptale-color-border-soft)] p-0.5',
 ].join(' ');
 
@@ -115,17 +114,14 @@ function CompactSideValues(props: {
 }) {
   return (
     <div className={COMPACT_VALUES_CLASS_NAME} data-ui="content.design-review.side-values-compact">
-      {props.properties.map((property, index) => (
-        <SideValueControl
-          compact
-          disabled={props.disabled}
-          index={index}
-          key={property}
-          property={property}
-          state={props.state}
-          onChange={(value) => props.onSideChange(index, value)}
-        />
-      ))}
+      <SideValueControl
+        compact
+        disabled={props.disabled}
+        index={0}
+        property={props.properties[0] as PageStyleProperty}
+        state={props.state}
+        onChange={(value) => props.onSideChange(0, value)}
+      />
     </div>
   );
 }
@@ -139,15 +135,21 @@ function ExpandedAxisGroup(props: {
   properties: PageStyleProperty[];
   state: DesignReviewViewState;
 }) {
+  const indexes = AXIS_SIDE_INDEXES[props.axis];
+  const visibleIndexes = props.linked ? [indexes[0]] : indexes;
   return (
-    <div className={AXIS_GROUP_CLASS_NAME} data-side-axis={props.axis}>
+    <div className={`${AXIS_GROUP_CLASS_NAME} w-full`} data-side-axis={props.axis}>
       <div className="grid gap-0.5">
-        {AXIS_SIDE_INDEXES[props.axis].map((index) => {
+        {visibleIndexes.map((index) => {
           const property = props.properties[index] as PageStyleProperty;
-          const label = translate(SIDE_LABEL_KEYS[index] ?? SIDE_LABEL_KEYS[0]);
+          const label = props.linked
+            ? indexes
+                .map((sideIndex) => translate(SIDE_LABEL_KEYS[sideIndex] ?? SIDE_LABEL_KEYS[0]))
+                .join(' / ')
+            : translate(SIDE_LABEL_KEYS[index] ?? SIDE_LABEL_KEYS[0]);
           return (
             <div
-              className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2"
+              className="grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2"
               key={property}
             >
               <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
@@ -174,7 +176,7 @@ function ExpandedAxisGroup(props: {
   );
 }
 
-function SideFieldLabel(props: { expanded: boolean; label: string; modifiedCount: number }) {
+function SideFieldLabel(props: { label: string; modifiedCount: number }) {
   return (
     <div className="flex min-w-0 items-center gap-1">
       <span
@@ -187,11 +189,6 @@ function SideFieldLabel(props: { expanded: boolean; label: string; modifiedCount
       >
         {props.label}
       </span>
-      <ChevronDown
-        aria-hidden="true"
-        className={props.expanded ? 'rotate-180 transition-transform' : 'transition-transform'}
-        size={13}
-      />
     </div>
   );
 }
@@ -206,8 +203,8 @@ export function LinkedSideFields(props: {
   onChangeMany?: DesignReviewActions['updateValues'];
   onLinkedChange?: ((fieldKey: string, linked: boolean) => void) | undefined;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const linking = useSideFieldLinking(props);
+  const expanded = !linking.model.linked;
 
   return (
     <div
@@ -215,33 +212,19 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2">
-        <button
-          aria-expanded={expanded}
-          className="min-w-0 cursor-pointer text-left"
-          disabled={props.disabled}
-          type="button"
-          onClick={() => setExpanded((current) => !current)}
-        >
-          <SideFieldLabel
-            expanded={expanded}
-            label={props.label}
-            modifiedCount={linking.model.modifiedCount}
-          />
-        </button>
-        <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {!expanded ? (
-            <div className="min-w-0 flex-1">
-              <CompactSideValues
-                disabled={props.disabled}
-                properties={props.properties}
-                state={props.state}
-                onSideChange={linking.updateSide}
-              />
-            </div>
-          ) : (
-            <span className="min-w-0 flex-1" aria-hidden="true" />
-          )}
+            <CompactSideValues
+              disabled={props.disabled}
+              properties={props.properties}
+              state={props.state}
+              onSideChange={linking.updateSide}
+            />
+          ) : null}
           <LinkToggle
             disabled={props.disabled}
             linked={linking.model.linked}
@@ -251,7 +234,7 @@ export function LinkedSideFields(props: {
         </div>
       </div>
       {expanded ? (
-        <div className="ml-[calc(7rem+0.5rem)] grid gap-1.5">
+        <div className="grid w-full gap-1.5" data-ui="content.design-review.side-values-expanded">
           <ExpandedAxisGroup
             axis="vertical"
             disabled={props.disabled}

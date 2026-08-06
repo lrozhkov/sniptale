@@ -6,10 +6,11 @@ import { translate } from '../../../platform/i18n';
 import {
   resolveContentPortalTarget,
   useContentPortalTheme,
-  Z_INDEX_FLOATING_UI,
+  Z_INDEX_STEP_BADGE,
 } from '../interactive-frame/layout/portal';
 import type { useTransientControlVisibility } from '../interactive-frame/overlays/transient-control-visibility';
 import type { useStepBadgeBoundaryDrag } from './drag';
+import { getAdjacentControlGroupPosition } from '../popover-sync/adjacent-controls';
 
 export function useStepBadgeControlPosition(args: {
   badgeRef: React.RefObject<HTMLDivElement | null>;
@@ -22,10 +23,13 @@ export function useStepBadgeControlPosition(args: {
     const refresh = () => {
       const rect = args.badgeRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setPosition({
-        x: Math.max(8, Math.min(window.innerWidth - 64, rect.right + 6)),
-        y: Math.max(8, Math.min(window.innerHeight - 34, rect.top - 30)),
-      });
+      setPosition(
+        getAdjacentControlGroupPosition({
+          controlCount: 2,
+          targetRect: rect,
+          viewport: { height: window.innerHeight, width: window.innerWidth },
+        })
+      );
     };
     refresh();
     window.addEventListener('resize', refresh);
@@ -73,7 +77,7 @@ export function StepBadgeControls(props: {
         top: props.position.y,
         display: 'flex',
         gap: 4,
-        zIndex: Z_INDEX_FLOATING_UI,
+        zIndex: Z_INDEX_STEP_BADGE,
         opacity: props.visibility.isVisible ? 1 : 0,
         pointerEvents: props.visibility.isVisible ? 'auto' : 'none',
       })}

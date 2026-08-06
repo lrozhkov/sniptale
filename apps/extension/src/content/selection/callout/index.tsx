@@ -10,11 +10,11 @@ import { CalloutBody } from './body';
 import { resolveCalloutThemeOwner } from './dom';
 import { useCalloutEditing } from './editing';
 import { createCalloutSettingsKey } from './settings-key';
-import { getCalloutTailDragCursor } from './tail-drag';
 import { useCalloutInteractionLayout } from './interaction-layout';
 import type { CalloutHandleKeyboardEvent } from './keyboard';
 import { resolveCalloutVoiceButtonLeftOffset } from './voice-button';
 import type { CalloutDragBehavior } from './drag';
+import { createCalloutHandleStyles } from './handle-styles';
 
 interface CalloutProps {
   frameId: string;
@@ -142,119 +142,6 @@ type CalloutBodyPropsArgs = {
   showSettingsHandle: boolean;
 };
 
-function createCalloutHandleStyles(args: CalloutBodyPropsArgs) {
-  const tailBaseStartPoint =
-    args.interaction.layout.dynamicTail?.kind === 'line'
-      ? args.interaction.layout.dynamicTail.attachment.bubbleEdgePoint
-      : args.interaction.layout.dynamicTail?.attachment.baseEdgeA;
-  const tailBaseEndPoint =
-    args.interaction.layout.dynamicTail?.kind === 'wedge'
-      ? args.interaction.layout.dynamicTail.attachment.baseEdgeB
-      : undefined;
-  const tailFramePoint = args.interaction.layout.dynamicTail?.attachment.tipPoint;
-  return {
-    curveStartHandleStyle:
-      args.interaction.layout.dynamicTail?.kind === 'line' &&
-      args.interaction.layout.dynamicTail.curveHandles
-        ? {
-            position: 'fixed' as const,
-            left: args.interaction.layout.dynamicTail.curveHandles.start.x - 6,
-            top: args.interaction.layout.dynamicTail.curveHandles.start.y - 6,
-            zIndex: args.interaction.layout.effectiveZIndex + 1,
-          }
-        : null,
-    curveEndHandleStyle:
-      args.interaction.layout.dynamicTail?.kind === 'line' &&
-      args.interaction.layout.dynamicTail.curveHandles
-        ? {
-            position: 'fixed' as const,
-            left: args.interaction.layout.dynamicTail.curveHandles.end.x - 6,
-            top: args.interaction.layout.dynamicTail.curveHandles.end.y - 6,
-            zIndex: args.interaction.layout.effectiveZIndex + 1,
-          }
-        : null,
-    dragHandleStyle: {
-      position: 'fixed' as const,
-      left: args.interaction.layout.calloutPos.x + args.editing.dimensions.width + 6,
-      top: args.interaction.layout.calloutPos.y - 30,
-      zIndex: args.interaction.layout.effectiveZIndex + 1,
-    },
-    settingsHandleStyle: {
-      position: 'fixed' as const,
-      left: args.interaction.layout.calloutPos.x + args.editing.dimensions.width + 36,
-      top: args.interaction.layout.calloutPos.y - 30,
-      zIndex: args.interaction.layout.effectiveZIndex + 1,
-    },
-    tailHandleCursor:
-      args.interaction.layout.dynamicTail?.kind === 'line'
-        ? 'grab'
-        : getCalloutTailDragCursor(args.interaction.layout.dynamicTail?.side ?? null),
-    tailHandleStyle: tailBaseStartPoint
-      ? {
-          position: 'fixed' as const,
-          left: tailBaseStartPoint.x - 6,
-          top: tailBaseStartPoint.y - 6,
-          zIndex: args.interaction.layout.effectiveZIndex + 1,
-        }
-      : null,
-    tailBaseEndHandleStyle: tailBaseEndPoint
-      ? {
-          position: 'fixed' as const,
-          left: tailBaseEndPoint.x - 6,
-          top: tailBaseEndPoint.y - 6,
-          zIndex: args.interaction.layout.effectiveZIndex + 1,
-        }
-      : null,
-    tailFrameHandleStyle: tailFramePoint
-      ? {
-          position: 'fixed' as const,
-          left: tailFramePoint.x - 6,
-          top: tailFramePoint.y - 6,
-          zIndex: args.interaction.layout.effectiveZIndex + 1,
-        }
-      : null,
-    waypointHandleStyle:
-      args.interaction.layout.dynamicTail?.kind === 'line' &&
-      args.interaction.layout.dynamicTail.routeControlPoint
-        ? {
-            position: 'fixed' as const,
-            left: args.interaction.layout.dynamicTail.routeControlPoint.x - 6,
-            top: args.interaction.layout.dynamicTail.routeControlPoint.y - 6,
-            zIndex: args.interaction.layout.effectiveZIndex + 1,
-          }
-        : null,
-    waypointAngleStyle:
-      args.interaction.layout.dynamicTail?.kind === 'line' &&
-      args.interaction.layout.dynamicTail.routeControlPoint
-        ? {
-            position: 'fixed' as const,
-            left: args.interaction.layout.dynamicTail.routeControlPoint.x + 12,
-            top: args.interaction.layout.dynamicTail.routeControlPoint.y - 28,
-            zIndex: args.interaction.layout.effectiveZIndex + 2,
-          }
-        : null,
-    resizeLeftHandleStyle: {
-      position: 'fixed' as const,
-      left: args.interaction.layout.calloutPos.x - 6,
-      top:
-        args.interaction.layout.calloutPos.y +
-        args.interaction.layout.calloutDimensions.height / 2 -
-        6,
-      zIndex: args.interaction.layout.effectiveZIndex + 1,
-    },
-    resizeRightHandleStyle: {
-      position: 'fixed' as const,
-      left:
-        args.interaction.layout.calloutPos.x + args.interaction.layout.calloutDimensions.width - 6,
-      top:
-        args.interaction.layout.calloutPos.y +
-        args.interaction.layout.calloutDimensions.height / 2 -
-        6,
-      zIndex: args.interaction.layout.effectiveZIndex + 1,
-    },
-  };
-}
-
 function createCalloutHandleCallbacks(args: CalloutBodyPropsArgs) {
   return {
     handleSettingsClick: args.onSettingsClick,
@@ -352,7 +239,11 @@ function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
     showSettingsHandle: args.showSettingsHandle,
     ...createCalloutHandleCallbacks(args),
     ...createCalloutHandleState(args),
-    ...createCalloutHandleStyles(args),
+    ...createCalloutHandleStyles({
+      layout: args.interaction.layout,
+      showSettingsHandle: args.showSettingsHandle,
+      viewport: { height: window.innerHeight, width: window.innerWidth },
+    }),
     wrapperStyle: args.interaction.layout.wrapperStyle,
   };
 }

@@ -46,6 +46,7 @@ describe('highlighter hover session', () => {
     expect(getCurrentBorderPreset()).toEqual({
       color: restoredPreset.color,
       customCss: restoredPreset.customCss,
+      effects: restoredPreset.effects,
       fillColor: restoredPreset.fillColor,
       fillOpacity: restoredPreset.fillOpacity,
       inheritCustomCss: restoredPreset.inheritCustomCss,

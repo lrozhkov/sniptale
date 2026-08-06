@@ -137,7 +137,16 @@ describe('ContentSizeTooltip', () => {
     expect(style?.textContent).toContain(
       '.sniptale-selection-size-cancel-button:hover:not(:disabled)'
     );
+    expect(style?.textContent).toContain(
+      '.sniptale-selection-size-cancel-button:hover:not(:disabled) svg'
+    );
+    expect(style?.textContent).toContain(
+      '.sniptale-selection-size-cancel-button:focus-visible svg'
+    );
     expect(style?.textContent).toContain('var(--sniptale-color-danger)');
+    expect(style?.textContent).not.toContain(
+      'background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent);'
+    );
     expect(container?.querySelector('style')?.textContent).toContain(
       '.sniptale-size-btn:hover:not(:disabled)'
     );

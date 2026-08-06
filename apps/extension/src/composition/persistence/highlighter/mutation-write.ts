@@ -1,14 +1,12 @@
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { HighlighterSettings } from '../../../features/highlighter/contracts';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import { cloneBorderPreset } from '../../../features/highlighter/presets/catalog';
 
 export function cloneHighlighterSettings(settings: HighlighterSettings): HighlighterSettings {
   return {
     ...settings,
-    borderPresets: settings.borderPresets.map((preset) => ({
-      ...preset,
-      padding: { ...preset.padding },
-    })),
+    borderPresets: settings.borderPresets.map(cloneBorderPreset),
     defaultBlurSettings: { ...settings.defaultBlurSettings },
     defaultFocusSettings: { ...settings.defaultFocusSettings },
   };

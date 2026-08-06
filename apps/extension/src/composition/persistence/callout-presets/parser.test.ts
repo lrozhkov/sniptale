@@ -17,6 +17,24 @@ it('parses compact catalog rows and preserves transparent colors', () => {
   expect(parsed.value.userPresets?.[0]?.style.surface.backgroundColor).toBe('transparent');
 });
 
+it('accepts bounded template title content and rejects oversized titles', () => {
+  const style = createSystemCalloutPresetCatalog()[0]!.style;
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [
+      { content: { titleText: 'Heading' }, id: 'user-valid-title', name: 'Valid', style },
+      {
+        content: { titleText: 'x'.repeat(257) },
+        id: 'user-oversized-title',
+        name: 'Oversized',
+        style,
+      },
+    ],
+  });
+
+  expect(parsed.invalidFieldCount).toBe(1);
+  expect(parsed.value.userPresets?.[0]?.content).toEqual({ titleText: 'Heading' });
+});
+
 it('defaults the shadow color for catalogs saved before shadow colors existed', () => {
   const style = createSystemCalloutPresetCatalog()[0]!.style;
   const legacyStyle = {

@@ -158,11 +158,7 @@ describe('InteractiveFrame size edit interactions', () => {
     );
 
     expect(titles).toEqual([
-      `${translate('content.interactiveFrame.effectBorder')}${translate(
-        'content.interactiveFrame.effectActiveSuffix'
-      )}`,
-      translate('content.interactiveFrame.effectBlur'),
-      translate('content.interactiveFrame.effectFocus'),
+      translate('content.interactiveFrame.effectBorder'),
       translate('content.interactiveFrame.stepBadgeEnable'),
       translate('content.interactiveFrame.calloutAdd'),
       translate('content.interactiveFrame.decreaseFrame'),
@@ -215,18 +211,25 @@ describe('InteractiveFrame size edit interactions', () => {
     }).toEqual(before);
   });
 
-  it('switches an inactive frame effect and opens its settings with one click', () => {
-    const { frame } = renderFrame();
+  it('switches the frame effect from the shared settings menu without closing it', () => {
+    const { frame, onUpdate } = renderFrame();
     act(() => useFrameUIStore.getState().selectFrame(frame.id));
 
     act(() => {
-      findToolbarButton(/Blur|Размытие/).click();
+      findToolbarButton(/Border|Рамка/).click();
     });
 
     expect(useFrameUIStore.getState().activePopover).toEqual({
       frameId: frame.id,
       kind: 'frame-settings',
     });
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeInstanceOf(HTMLElement);
+
+    act(() => {
+      findToolbarButton(/Blur|Размытие/).click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ effectMode: 'blur' }));
     expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeInstanceOf(HTMLElement);
   });
 

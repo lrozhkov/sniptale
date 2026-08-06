@@ -98,9 +98,10 @@ describe('highlighter storage defaults', () => {
     });
     expect(settings.systemPresetCatalogRevision).toBeGreaterThan(0);
     expect(settings.defaultBlurSettings).toMatchObject({
-      showBorder: false,
+      showBorder: true,
       strokeWidth: 0,
     });
+    expect(settings.borderPresets.every((preset) => preset.effects != null)).toBe(true);
     expect(helperPreset).toMatchObject({
       fillOpacity: 0,
       inheritCustomCss: false,

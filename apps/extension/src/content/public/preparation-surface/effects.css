@@ -62,6 +62,15 @@
   touch-action: none;
 }
 
+.sniptale-callout-drag-handle > svg,
+.sniptale-callout-settings-handle > svg,
+.sniptale-step-badge-move-handle > svg,
+.sniptale-step-badge-settings-handle > svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75;
+}
+
 .sniptale-callout-tail-handle {
   touch-action: none;
 }

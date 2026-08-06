@@ -52,7 +52,7 @@ it('edits an existing preset in the shared persistent modal', async () => {
   const navigation = [...document.querySelectorAll<HTMLButtonElement>('nav button')];
   expect(navigation.at(-1)?.getAttribute('aria-label')).toBe('Позиция');
   expect(document.querySelectorAll('[data-callout-anchor]')).toHaveLength(0);
-  expect(document.body.textContent).toContain('Изменить пресет комментария');
+  expect(document.body.textContent).toContain('Изменить шаблон комментария');
 
   await act(async () => root.unmount());
 });
@@ -92,12 +92,24 @@ it('updates the default position and saves it with the live preset preview', asy
     document.querySelector<HTMLButtonElement>('[data-callout-anchor="bottom-right"]')?.click()
   );
   expect(document.querySelector('[data-callout-placement="bottom-right"]')).not.toBeNull();
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[aria-label="Заголовок"]')?.click()
+  );
+  const titleInput = document.querySelector<HTMLInputElement>(
+    'input[placeholder="Введите заголовок"]'
+  );
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  await act(async () => {
+    valueSetter?.call(titleInput, 'Template heading');
+    titleInput?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   const save = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'Сохранить'
   );
   await act(async () => save?.click());
 
   expect(onSave).toHaveBeenCalledOnce();
+  expect(onSave.mock.calls[0]?.[0].content).toEqual({ titleText: 'Template heading' });
   expect(onSave.mock.calls[0]?.[0].placement).toEqual({
     anchor: 'bottom-right',
     connectorAttachments: {

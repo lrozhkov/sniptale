@@ -30,7 +30,7 @@ function PositionHarness(props: {
   frameRect?: { x: number; y: number; width: number; height: number };
   isOpen?: boolean;
   layoutHeight?: number;
-  quickControlPlacement?: 'anchor-aligned' | 'callout-aware';
+  quickControlPlacement?: 'anchor-aligned' | 'callout-aware' | 'frame-aware';
   transformedHeight?: number;
 }) {
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
@@ -418,6 +418,39 @@ describe('anchor-aligned quick-control positioning', () => {
         { x: 400, y: 320, width: 26, height: 26 }
       )
     ).toBe(false);
+  });
+});
+
+describe('frame-aware quick-control positioning', () => {
+  it('keeps quick frame settings inside the viewport and outside the frame', () => {
+    const frameRect = { x: 550, y: 120, width: 200, height: 180 };
+    const anchor = document.createElement('button');
+    setRect(anchor, new DOMRect(756, 120, 26, 26));
+    document.body.append(anchor);
+
+    act(() =>
+      root.render(
+        <PositionHarness
+          anchorEl={anchor}
+          fallbackHeight={240}
+          frameRect={frameRect}
+          quickControlPlacement="frame-aware"
+        />
+      )
+    );
+
+    const popover = container.firstElementChild as HTMLElement;
+    const popoverRect = {
+      x: Number(popover.dataset['left']),
+      y: Number(popover.dataset['top']),
+      width: 160,
+      height: 240,
+    };
+    expect(overlaps(popoverRect, frameRect)).toBe(false);
+    expect(popoverRect.x).toBeGreaterThanOrEqual(8);
+    expect(popoverRect.y).toBeGreaterThanOrEqual(8);
+    expect(popoverRect.x + popoverRect.width).toBeLessThanOrEqual(792);
+    expect(popoverRect.y + popoverRect.height).toBeLessThanOrEqual(592);
   });
 });
 

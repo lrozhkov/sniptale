@@ -110,9 +110,9 @@ export function CalloutManualSettings(
   const sections: ManualSectionOption[] = [
     MANUAL_SECTIONS[0]!,
     MANUAL_SECTIONS[1]!,
+    { icon: Tag, id: 'badge', labelKey: 'content.callout.manualBadge' },
     ...(props.settings.style.title.enabled
       ? ([
-          { icon: Tag, id: 'badge', labelKey: 'content.callout.manualBadge' },
           { icon: Minus, id: 'divider', labelKey: 'content.callout.manualDivider' },
         ] satisfies ManualSectionOption[])
       : []),
@@ -140,7 +140,17 @@ export function CalloutManualSettings(
         <ProductGlassSwitch
           aria-label={translate('content.callout.titleToggle')}
           on={enabled}
-          onClick={() => props.onChange({ style: { title: { enabled: !enabled } } })}
+          onClick={() =>
+            props.onChange({
+              style: {
+                badge:
+                  enabled && props.settings.style.badge.placement !== 'body-start'
+                    ? { placement: 'body-start' }
+                    : {},
+                title: { enabled: !enabled },
+              },
+            })
+          }
         />
       );
     }
@@ -150,7 +160,18 @@ export function CalloutManualSettings(
         <ProductGlassSwitch
           aria-label={translate('content.callout.badgeEnabled')}
           on={enabled}
-          onClick={() => props.onChange({ style: { badge: { enabled: !enabled } } })}
+          onClick={() =>
+            props.onChange({
+              style: {
+                badge: {
+                  enabled: !enabled,
+                  ...(!props.settings.style.title.enabled
+                    ? { placement: 'body-start' as const }
+                    : {}),
+                },
+              },
+            })
+          }
         />
       );
     }

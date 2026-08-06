@@ -74,26 +74,23 @@ function renderSides(
   return { onChange, onChangeMany, onLinkedChange };
 }
 
-it('shows four compact values with one global link and two expandable axis groups', () => {
+it('shows one compact value while all sides are linked', () => {
   const equalValues = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
   const { onLinkedChange } = renderSides(createState(equalValues));
 
   expect(
     container.querySelector('[data-ui="content.design-review.side-values-compact"]')
   ).not.toBeNull();
-  expect(container.querySelectorAll('input')).toHaveLength(4);
+  expect(container.querySelectorAll('input')).toHaveLength(1);
   const unlink = container.querySelector<HTMLButtonElement>('button[data-side-link="all"]');
   expect(unlink?.getAttribute('aria-pressed')).toBe('true');
   act(() => unlink?.click());
   expect(onLinkedChange).toHaveBeenCalledWith(fieldKey, false);
 
-  act(() => container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]')?.click());
-  expect(container.querySelectorAll('[data-side-axis]')).toHaveLength(2);
-  expect(container.querySelector('[data-side-axis="vertical"]')).not.toBeNull();
-  expect(container.querySelector('[data-side-axis="horizontal"]')).not.toBeNull();
+  expect(container.querySelectorAll('[data-side-axis]')).toHaveLength(0);
 });
 
-it('shows four values for unequal sides or an explicit unlinked preference', () => {
+it('automatically expands four values when all sides differ', () => {
   const unequalValues = Object.fromEntries(
     marginProperties.map((property, index) => [property, `${index + 1}px`])
   );
@@ -102,13 +99,22 @@ it('shows four values for unequal sides or an explicit unlinked preference', () 
     container.querySelector('button[data-side-link="all"]')?.getAttribute('aria-pressed')
   ).toBe('false');
   expect(container.querySelectorAll('input')).toHaveLength(4);
-
-  const equalValues = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
-  renderSides({ ...createState(equalValues), sideFieldLinks: { [fieldKey]: false } });
-  expect(container.querySelectorAll('input')).toHaveLength(4);
+  expect(
+    container.querySelector('[data-ui="content.design-review.side-values-expanded"]')
+  ).not.toBeNull();
 });
 
-it('updates all four properties from any compact value while globally linked', () => {
+it('shows one full-width value per equal axis when the global link starts disabled', () => {
+  const equalValues = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
+  renderSides({ ...createState(equalValues), sideFieldLinks: { [fieldKey]: false } });
+
+  expect(container.querySelectorAll('input')).toHaveLength(2);
+  expect(
+    container.querySelector('[data-ui="content.design-review.side-values-expanded"]')?.className
+  ).toContain('w-full');
+});
+
+it('updates all four properties from the single compact value while globally linked', () => {
   const equalValues = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
   const onChangeMany = vi.fn();
   renderSides(createState(equalValues), { onChangeMany });
@@ -125,14 +131,14 @@ it('updates all four properties from any compact value while globally linked', (
   );
 });
 
-it('links and unlinks the vertical pair independently in the expanded view', () => {
+it('shows one value per linked axis and two only after that axis is unlinked', () => {
   const equalValues = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
   const onChangeMany = vi.fn();
   renderSides(
     { ...createState(equalValues), sideFieldLinks: { [fieldKey]: false } },
     { onChangeMany }
   );
-  act(() => container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]')?.click());
+  expect(container.querySelectorAll('input')).toHaveLength(2);
   const verticalLink = container.querySelector<HTMLButtonElement>(
     'button[data-side-link="vertical"]'
   );
@@ -140,6 +146,7 @@ it('links and unlinks the vertical pair independently in the expanded view', () 
 
   act(() => verticalLink?.click());
   expect(verticalLink?.getAttribute('aria-pressed')).toBe('false');
+  expect(container.querySelectorAll('input')).toHaveLength(3);
 
   act(() => verticalLink?.click());
   expect(onChangeMany).toHaveBeenLastCalledWith([
@@ -147,4 +154,5 @@ it('links and unlinks the vertical pair independently in the expanded view', () 
     { property: 'margin-bottom', value: '8px' },
   ]);
   expect(verticalLink?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelectorAll('input')).toHaveLength(2);
 });

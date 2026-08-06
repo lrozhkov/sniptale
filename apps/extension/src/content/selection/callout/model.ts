@@ -90,10 +90,11 @@ export function createDefaultCalloutSettings(
   style?: CalloutVisualStyle,
   sourcePresetId?: string,
   placement?: Pick<CalloutPlacement, 'anchor' | 'side'> &
-    Partial<Pick<CalloutPlacement, 'connectorAttachments'>>
+    Partial<Pick<CalloutPlacement, 'connectorAttachments'>>,
+  content?: Pick<CalloutSettings['content'], 'titleText'>
 ): CalloutSettings {
   return {
-    content: { bodyHtml: '', titleText: '' },
+    content: { bodyHtml: '', titleText: content?.titleText ?? '' },
     enabled: true,
     placement: {
       ...(placement ?? DEFAULT_PLACEMENT),
@@ -231,10 +232,6 @@ export function normalizeCalloutSettings(
     return cloneCalloutSettings(settings);
   }
   return normalizeLegacyCallout(settings);
-}
-
-export function createCalloutStyleSnapshot(settings: CalloutSettings): CalloutVisualStyle {
-  return cloneCalloutStyle(settings.style);
 }
 
 export function createCalloutRenderKey(settings: CalloutSettings | undefined): string {

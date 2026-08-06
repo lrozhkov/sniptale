@@ -55,10 +55,20 @@ export const glassPopoverControlsStyles = `
 .sniptale-glass-mini-button--active,
 .sniptale-glass-bold-button--active,
 .sniptale-glass-color-trigger--active {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, var(--sniptale-color-border-soft) 45%);
   color: var(--sniptale-color-accent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
+  box-shadow: none;
+}
+.sniptale-glass-icon-button--active:hover,
+.sniptale-glass-chip--active:hover,
+.sniptale-glass-mini-button--active:hover,
+.sniptale-glass-bold-button--active:hover,
+.sniptale-glass-color-trigger--active:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 72%, var(--sniptale-color-border-soft) 28%);
+  color: var(--sniptale-color-accent-emphasis);
+  background: transparent;
+  box-shadow: none;
 }
 .sniptale-glass-chip {
   min-height: 32px;
@@ -115,10 +125,16 @@ export const glassPopoverControlsStyles = `
   color: var(--sniptale-color-text-primary);
 }
 .sniptale-glass-preset-item--active {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 30%, var(--sniptale-color-border-soft) 70%);
-  color: var(--sniptale-color-text-primary);
-  background: color-mix(in srgb, var(--sniptale-color-accent-soft) 56%, var(--sniptale-color-surface-panel) 44%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, var(--sniptale-color-border-soft) 45%);
+  color: var(--sniptale-color-accent);
+  background: transparent;
+  box-shadow: none;
+}
+.sniptale-glass-preset-item--active:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 72%, var(--sniptale-color-border-soft) 28%);
+  color: var(--sniptale-color-accent-emphasis);
+  background: transparent;
+  box-shadow: none;
 }
 .sniptale-glass-preset-preview {
   width: 20px;

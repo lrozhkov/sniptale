@@ -44,15 +44,83 @@ const PRESET: BorderPreset = {
 
 it('keeps the selected preset in the current tab without saving the global default', () => {
   setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
+  const setLocalBlurSettings = vi.fn();
+  const setLocalFocusSettings = vi.fn();
+  const onApplyToFrame = vi.fn();
   const handler = createFrameSettingsPresetHandler({
-    onApplyToFrame: vi.fn(),
+    setLocalBlurSettings,
+    setLocalFocusSettings,
+    localBlurSettings: { amount: 3, blurType: 'pixelate', showBorder: false },
+    localFocusSettings: { opacity: 0.2, showBorder: false },
+    onApplyToFrame,
     setSelectedPreset: vi.fn(),
+    syncSessionDefaults: true,
   });
 
   handler(PRESET);
 
   expect(getFrameSessionBorderPreset()).toEqual(projectBorderPresetToAppliedSettings(PRESET));
   expect(getFrameSessionBorderPreset()).not.toBe(PRESET);
+  const expectedBlurSettings = {
+    amount: 10,
+    blurType: 'gaussian',
+    showBorder: true,
+  };
+  const expectedFocusSettings = { opacity: 0.5, showBorder: true };
+  expect(setLocalBlurSettings).toHaveBeenCalledWith(expectedBlurSettings);
+  expect(setLocalFocusSettings).toHaveBeenCalledWith(expectedFocusSettings);
+  expect(onApplyToFrame).toHaveBeenCalledTimes(1);
+  expect(onApplyToFrame).toHaveBeenCalledWith({
+    borderSettings: projectBorderPresetToAppliedSettings(PRESET),
+    blurSettings: expectedBlurSettings,
+    focusSettings: expectedFocusSettings,
+  });
+});
+
+it('keeps existing-frame border and effect changes out of future-frame defaults', () => {
+  setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
+  const blurListener = vi.fn();
+  const focusListener = vi.fn();
+  const cleanupBlur = addSessionBlurSettingsChangedListener(blurListener);
+  const cleanupFocus = addSessionFocusSettingsChangedListener(focusListener);
+  const localBlurSettings: BlurSettings = {
+    amount: 4,
+    blurType: 'gaussian',
+    showBorder: false,
+  };
+  const localFocusSettings: FocusSettings = { opacity: 0.4, showBorder: false };
+
+  createFrameSettingsPresetHandler({
+    localBlurSettings,
+    localFocusSettings,
+    onApplyToFrame: vi.fn(),
+    setLocalBlurSettings: vi.fn(),
+    setLocalFocusSettings: vi.fn(),
+    setSelectedPreset: vi.fn(),
+    syncSessionDefaults: false,
+  })(PRESET);
+  createFrameBlurHandlers({
+    localBlurSettings,
+    onApplyToFrame: vi.fn(),
+    setLocalBlurSettings: vi.fn(),
+    syncSessionDefaults: false,
+  }).handleBlurChange(18);
+  createFrameFocusHandlers({
+    frameId: 'frame-1',
+    localFocusSettings,
+    onApplyToFrame: vi.fn(),
+    setLocalFocusSettings: vi.fn(),
+    syncSessionDefaults: false,
+  }).handleFocusChange(0.75);
+
+  expect(getFrameSessionBorderPreset()).toEqual(
+    projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET)
+  );
+  expect(blurListener).not.toHaveBeenCalled();
+  expect(focusListener).not.toHaveBeenCalled();
+
+  cleanupBlur();
+  cleanupFocus();
 });
 
 it('dispatches session blur settings changes through the shared event seam', () => {
@@ -67,6 +135,7 @@ it('dispatches session blur settings changes through the shared event seam', () 
     localBlurSettings,
     onApplyToFrame: vi.fn(),
     setLocalBlurSettings: vi.fn(),
+    syncSessionDefaults: true,
   });
 
   handlers.handleBlurChange(18);
@@ -89,6 +158,7 @@ it('dispatches session focus and opacity changes through the shared event seam',
     localFocusSettings,
     onApplyToFrame: vi.fn(),
     setLocalFocusSettings: vi.fn(),
+    syncSessionDefaults: true,
   });
 
   handlers.handleFocusChange(0.75);
@@ -112,6 +182,7 @@ it('updates only future focus settings when no existing frame owns the change', 
     localFocusSettings,
     onApplyToFrame: vi.fn(),
     setLocalFocusSettings: vi.fn(),
+    syncSessionDefaults: true,
   });
 
   handlers.handleFocusChange(0.8);

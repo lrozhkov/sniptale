@@ -95,6 +95,7 @@ function registerStepBadgeDisableActionTest(): void {
         onConfigurePreset={vi.fn()}
         onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
         onResetPreset={vi.fn()}
+        onShowPresets={vi.fn()}
         onSettingsChange={vi.fn()}
         onTogglePreset={vi.fn()}
         onTypeChange={vi.fn()}
@@ -109,8 +110,8 @@ function registerStepBadgeDisableActionTest(): void {
     );
 
     expect(markup).toContain('sniptale-toolbar-menu-title');
-    expect(markup).toContain('Настройки нумерации');
-    expect(markup).toContain('Выбрать шаблон');
+    expect(markup).toContain('Нумерация');
+    expect(markup).toContain('Шаблоны');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('sniptale-glass-range-meta');
     expect(markup).toContain('data-ui="content.step-badge.manual-section"');
@@ -118,7 +119,7 @@ function registerStepBadgeDisableActionTest(): void {
     expect(markup).toContain('>Нумерация</span>');
     expect(markup).not.toContain('sniptale-glass-preset-list');
     expect(markup).toContain('Выключить');
-    expect(markup).toContain('sniptale-glass-destructive');
+    expect(markup).toContain('sniptale-settings-popover-destructive-action');
   });
 }
 
@@ -155,6 +156,7 @@ function registerStepBadgeConfigurePresetTest(): void {
           onDisable={vi.fn()}
           onOffsetToggle={vi.fn()}
           onResetPreset={vi.fn()}
+          onShowPresets={vi.fn()}
           onSettingsChange={vi.fn()}
           onTogglePreset={vi.fn()}
           onTypeChange={vi.fn()}

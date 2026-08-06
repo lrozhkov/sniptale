@@ -11,6 +11,7 @@ import {
 } from '../interactive-frame/layout/portal';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
+const MIN_CALLOUT_CONTENT_WIDTH = 40;
 
 export function getCalloutLayoutState(args: {
   dimensions: { width: number; height: number };
@@ -199,7 +200,7 @@ function getCalloutCloudStyle(
   const hasWedgeOutline = connector?.kind === 'wedge' && surface.borderWidth > 0;
   return {
     position: 'relative',
-    minWidth: 40,
+    minWidth: 'min-content',
     width: 'max-content',
     maxWidth: typography.maxWidth,
     backgroundColor: hasWedgeOutline ? 'transparent' : surface.backgroundColor,
@@ -214,7 +215,9 @@ function getCalloutCloudStyle(
     fontStyle: typography.fontStyle,
     fontWeight: typography.fontWeight,
     textAlign: typography.textAlign,
-    textDecoration: typography.textDecoration,
+    // Text decorations propagate through descendants and cannot be cancelled by a child.
+    // Keep the card neutral so body underline never reaches the title or badge.
+    textDecoration: 'none',
     lineHeight: typography.lineHeight,
     letterSpacing: typography.letterSpacing,
     cursor: isEditing ? 'text' : 'pointer',
@@ -230,10 +233,12 @@ function getCalloutEditableStyle(settings: CalloutSettings): CSSProperties {
   return {
     outline: 'none',
     minHeight: 'auto',
+    minWidth: MIN_CALLOUT_CONTENT_WIDTH,
     unicodeBidi: 'plaintext',
     hyphens: typography.hyphens,
     overflowWrap: typography.wordBreak === 'break-word' ? 'anywhere' : 'normal',
     wordBreak: typography.wordBreak === 'break-word' ? 'break-word' : 'normal',
     whiteSpace: 'pre-wrap',
+    textDecoration: typography.textDecoration,
   };
 }

@@ -2,7 +2,7 @@ import type {
   BorderVisualStyle,
   BorderVisualStylePatch,
 } from '../../../features/highlighter/contracts';
-import { Braces, Box, Circle, PaintBucket, Save, Square } from 'lucide-react';
+import { Braces, Box, PaintBucket, Save, Sparkles, Square } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
@@ -16,6 +16,8 @@ import {
   editorResizeHandleClassName,
   editorTextareaClassName,
 } from '../constants';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
 
 const BORDER_PALETTE = [
   '#f97316',
@@ -141,6 +143,12 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
 }
 
 function BorderEffectsSection(props: BorderStyleInspectorProps) {
+  const effects = cloneBorderPresetEffects(props.style.effects);
+  const blurTypeLabels = {
+    gaussian: translate('highlighter.editor.blurTypeGaussian'),
+    distortion: translate('highlighter.editor.blurTypeDistortion'),
+    solid: translate('highlighter.editor.blurTypeSolid'),
+  } satisfies Record<(typeof AVAILABLE_HIGHLIGHTER_BLUR_TYPES)[number], string>;
   return (
     <div className="grid gap-3">
       <EditorCompactRangeField
@@ -151,6 +159,49 @@ function BorderEffectsSection(props: BorderStyleInspectorProps) {
         onChange={(shadow) => props.onChange({ shadow })}
         value={props.style.shadow}
       />
+      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.editor.blurDefaultsTitle')}
+        </div>
+        <EditorCompactRangeField
+          label={translate('highlighter.editor.blurStrengthLabel')}
+          max={25}
+          min={1}
+          onChange={(amount) =>
+            props.onChange({ effects: { ...effects, blur: { ...effects.blur, amount } } })
+          }
+          value={effects.blur.amount}
+        />
+        <PropertyField label={translate('highlighter.editor.blurTypeLabel')}>
+          <CompactSelect
+            appearance="plain"
+            aria-label={translate('highlighter.editor.blurTypeLabel')}
+            onChange={(blurType) =>
+              props.onChange({ effects: { ...effects, blur: { ...effects.blur, blurType } } })
+            }
+            options={AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
+              label: blurTypeLabels[value],
+              value,
+            }))}
+            value={effects.blur.blurType}
+          />
+        </PropertyField>
+      </div>
+      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.editor.focusDefaultsTitle')}
+        </div>
+        <EditorCompactRangeField
+          displaySuffix="%"
+          label={translate('highlighter.editor.focusDimmingLabel')}
+          max={100}
+          min={10}
+          onChange={(opacity) =>
+            props.onChange({ effects: { ...effects, focus: { opacity: opacity / 100 } } })
+          }
+          value={Math.round(effects.focus.opacity * 100)}
+        />
+      </div>
     </div>
   );
 }
@@ -210,7 +261,7 @@ export function BorderStyleInspector(props: BorderStyleInspectorProps) {
     { icon: Square, id: 'outline', label: translate('highlighter.editor.outlineSection') },
     { icon: PaintBucket, id: 'fill', label: translate('highlighter.editor.fillSection') },
     { icon: Box, id: 'geometry', label: translate('highlighter.editor.geometrySection') },
-    { icon: Circle, id: 'effects', label: translate('highlighter.editor.effectsSection') },
+    { icon: Sparkles, id: 'effects', label: translate('highlighter.editor.effectsSection') },
     { icon: Braces, id: 'css', label: translate('highlighter.editor.customCssLabel') },
     ...(props.saveSection
       ? [{ icon: Save, id: 'save', label: translate('highlighter.editor.saveSection') } as const]

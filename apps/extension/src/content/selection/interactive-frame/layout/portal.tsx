@@ -25,7 +25,8 @@ export const Z_INDEX_CALLOUT_VIEWING = 2147483645;
 export const Z_INDEX_CALLOUT_EDITING = 2147483646;
 export const Z_INDEX_RESIZE_HANDLES = 2147483646;
 export const Z_INDEX_FLOATING_UI = 2147483647;
-export const Z_INDEX_STEP_BADGE = 2147483647;
+// Annotation content stays above frame surfaces, but below editors, toolbars, and popovers.
+export const Z_INDEX_STEP_BADGE = 2147483645;
 
 export function getCursorForDirection(direction: ResizeDirection): string {
   switch (direction) {

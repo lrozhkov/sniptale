@@ -44,7 +44,10 @@ describe('getDynamicTailState', () => {
 
     expect(state.outlinePath.match(/ M /g)).toBeNull();
     expect(state.outlinePath.startsWith('M ')).toBe(true);
-    expect(state.outlinePath.match(/ Q /g)).toHaveLength(5);
+    expect(
+      (state.outlinePath.match(/ Q /g)?.length ?? 0) +
+        (state.outlinePath.match(/ A /g)?.length ?? 0)
+    ).toBe(5);
     expect(state.outlinePath.endsWith('Z')).toBe(true);
   });
 
@@ -66,7 +69,10 @@ describe('getDynamicTailState', () => {
     expect(state.side).toBe(side);
     expect(state.outlinePath.startsWith('M ')).toBe(true);
     expect(state.outlinePath.match(/ M /g)).toBeNull();
-    expect(state.outlinePath.match(/ Q /g)).toHaveLength(5);
+    expect(
+      (state.outlinePath.match(/ Q /g)?.length ?? 0) +
+        (state.outlinePath.match(/ A /g)?.length ?? 0)
+    ).toBe(5);
     expect(state.outlinePath.endsWith('Z')).toBe(true);
     expect(state.outlinePath).not.toContain('NaN');
   });

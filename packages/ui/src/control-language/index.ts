@@ -67,11 +67,12 @@ const DANGER_ACTION_TONE_CLASS_NAME = [
 ].join(' ');
 
 const SELECTED_ACTION_TONE_CLASS_NAME = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_82%,transparent)]',
-  'text-[var(--sniptale-color-text-primary-strong)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_86%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_86%,transparent)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]',
+  'bg-transparent text-[var(--sniptale-color-accent)]',
+  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft)_45%)]',
+  'hover:bg-transparent hover:text-[var(--sniptale-color-accent-emphasis)]',
+  'hover:shadow-[inset_0_0_0_1px_color-mix(' +
+    'in_srgb,var(--sniptale-color-accent)_72%,var(--sniptale-color-border-soft)_28%)]',
+  'focus-visible:bg-transparent',
 ].join(' ');
 
 const INFO_ICON_TONE_CLASS_NAME = [
@@ -85,11 +86,12 @@ const DANGER_ICON_TONE_CLASS_NAME = [
 ].join(' ');
 
 const ACTIVE_ICON_TONE_CLASS_NAME = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_84%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_22%,transparent)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_92%,transparent)]',
+  'bg-transparent text-[var(--sniptale-color-accent)]',
+  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft)_45%)]',
+  'hover:bg-transparent',
   'hover:text-[var(--sniptale-color-accent-emphasis)]',
+  'hover:shadow-[inset_0_0_0_1px_color-mix(' +
+    'in_srgb,var(--sniptale-color-accent)_72%,var(--sniptale-color-border-soft)_28%)]',
 ].join(' ');
 
 function getDensityClassName(density: ControlDensity, shape: ControlShape) {

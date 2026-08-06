@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
 import { colorToRgba, resolveBorderPresetVisual } from '../../../features/highlighter/style';
 import { translate } from '../../../platform/i18n';
-import type { BlurType, BorderPreset } from '../../../features/highlighter/contracts';
+import type { BorderPreset } from '../../../features/highlighter/contracts';
+import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
 
 export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties {
   const visual = resolveBorderPresetVisual(preset);
@@ -20,21 +21,26 @@ export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties
 }
 
 export function buildBlurTypeOptions() {
-  return [
-    {
-      value: 'gaussian' as BlurType,
+  const metadata = {
+    gaussian: {
       label: translate('content.overlayControls.blurTypeGaussian'),
       iconName: 'droplet' as const,
     },
-    {
-      value: 'distortion' as BlurType,
+    distortion: {
       label: translate('content.overlayControls.blurTypeDistortion'),
       iconName: 'waves' as const,
     },
-    {
-      value: 'solid' as BlurType,
+    solid: {
       label: translate('content.overlayControls.blurTypeSolid'),
       iconName: 'square' as const,
     },
-  ];
+  } satisfies Record<
+    (typeof AVAILABLE_HIGHLIGHTER_BLUR_TYPES)[number],
+    { iconName: 'droplet' | 'square' | 'waves'; label: string }
+  >;
+
+  return AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
+    value,
+    ...metadata[value],
+  }));
 }

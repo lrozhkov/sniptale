@@ -66,8 +66,23 @@
     var(--sniptale-color-border-soft) 45%
   );
   color: var(--sniptale-color-accent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.sniptale-glass-icon-button--active:hover,
+.sniptale-glass-chip--active:hover,
+.sniptale-glass-mini-button--active:hover,
+.sniptale-glass-bold-button--active:hover,
+.sniptale-glass-color-trigger--active:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-glass-chip {
@@ -110,10 +125,8 @@
 .sniptale-glass-preset-list--scroll {
   min-height: 0;
   max-height: var(--sniptale-preset-list-max-height, 180px);
-  padding-right: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .sniptale-glass-preset-item {
@@ -154,8 +167,19 @@
     var(--sniptale-color-border-soft) 45%
   );
   color: var(--sniptale-color-accent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.sniptale-glass-preset-item--active:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
+  );
+  color: var(--sniptale-color-accent-emphasis);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-glass-preset-preview {

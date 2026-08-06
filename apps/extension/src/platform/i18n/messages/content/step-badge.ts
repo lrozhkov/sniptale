@@ -2,8 +2,8 @@ import { defineMessageSource } from '../source';
 
 export const contentStepBadgeMessages = defineMessageSource({
   settingsTitle: {
-    ru: 'Настройки нумерации',
-    en: 'Numbering settings',
+    ru: 'Нумерация',
+    en: 'Numbering',
   },
   closeSettings: {
     ru: 'Закрыть настройки нумерации',
@@ -11,8 +11,8 @@ export const contentStepBadgeMessages = defineMessageSource({
   },
   modePreset: { ru: 'Шаблоны', en: 'Templates' },
   modeManual: { ru: 'Вручную', en: 'Manual' },
-  switchToManual: { ru: 'Настроить вручную', en: 'Customize manually' },
-  switchToPresets: { ru: 'Выбрать шаблон', en: 'Choose template' },
+  switchToManual: { ru: 'Настроить', en: 'Customize' },
+  switchToPresets: { ru: 'Шаблоны', en: 'Templates' },
   presetsSection: { ru: 'Шаблоны', en: 'Templates' },
   configurePreset: { ru: 'Настроить шаблон', en: 'Configure template' },
   showPreset: { ru: 'Показать шаблон', en: 'Show template' },
@@ -59,6 +59,10 @@ export const contentStepBadgeMessages = defineMessageSource({
   saveAsTemplate: { ru: 'Сохранить как новый шаблон', en: 'Save as new template' },
   updateTemplate: { ru: 'Обновить выбранный шаблон', en: 'Update selected template' },
   templateName: { ru: 'Название шаблона', en: 'Template name' },
+  templateNameExists: {
+    ru: 'Шаблон с таким названием уже существует',
+    en: 'A template with this name already exists',
+  },
   createTemplate: { ru: 'Создать', en: 'Create' },
   selectTemplate: { ru: 'Выберите шаблон', en: 'Select template' },
   overwriteTemplate: { ru: 'Обновить шаблон', en: 'Update template' },

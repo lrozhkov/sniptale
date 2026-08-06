@@ -9,6 +9,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Открыть панель действий рамки',
     en: 'Open frame actions',
   },
+  frameSettings: {
+    ru: 'Настройки рамки',
+    en: 'Frame settings',
+  },
   effectBlur: {
     ru: 'Размытие',
     en: 'Blur',
@@ -114,8 +118,8 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     en: 'Adjust curve end',
   },
   deleteButton: {
-    ru: 'Удалить (Delete)',
-    en: 'Delete (Delete)',
+    ru: 'Удалить',
+    en: 'Delete',
   },
   sizePanelTitle: {
     ru: 'Размер рамки',

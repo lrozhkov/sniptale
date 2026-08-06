@@ -2,7 +2,7 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { CalloutDeleteButton, CalloutPositionSection, CalloutPresetSection } from './views';
+import { CalloutPositionSection, CalloutPresetSection } from './views';
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
 import { parseCalloutConnectorMarker } from '../../../ui/highlighter-preset-editor/callout/inspector-effects';
 import { CalloutSettingsPopoverContent, createCalloutAnchorPlacement } from './body';
@@ -45,6 +45,7 @@ describe('callout settings views', () => {
         localSettings={settings}
         onApplyPreset={vi.fn()}
         onCustomizePreset={vi.fn()}
+        onShowPresets={vi.fn()}
         onTogglePreset={vi.fn()}
         pendingPresetIds={new Set()}
         presets={[]}
@@ -60,8 +61,9 @@ describe('callout settings views', () => {
       />
     );
 
-    expect(markup).toContain('Настройки комментария');
-    expect(markup).toContain('Настроить вручную');
+    expect(markup).toContain('Комментарии');
+    expect(markup).toContain('Настроить');
+    expect(markup).toContain('sniptale-settings-popover-destructive-action');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('data-callout-settings-mode-switch');
     expect(markup).not.toContain('Сохранить как пресет');
@@ -78,6 +80,7 @@ describe('callout settings views', () => {
         localSettings={createDefaultCalloutSettings()}
         onApplyPreset={vi.fn()}
         onCustomizePreset={vi.fn()}
+        onShowPresets={vi.fn()}
         onTogglePreset={vi.fn()}
         pendingPresetIds={new Set()}
         presets={createSystemCalloutPresetCatalog()}
@@ -94,7 +97,7 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('aria-label="Параметры комментария"');
-    expect(markup).toContain('Выбрать шаблон');
+    expect(markup).toContain('Шаблоны');
     expect(markup).toContain('data-ui="shared.highlighter-manual-inspector-surface"');
     expect(markup).toContain('data-ui="shared.categorized-inspector.section-heading"');
     expect(markup).toContain('>Текст</span>');
@@ -107,7 +110,7 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('aria-label="Параметры комментария"');
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(8);
+    expect(markup.match(/aria-pressed=/g)).toHaveLength(9);
     expect(markup).toContain('data-field-label="Цвет текста"');
     expect(markup).toContain('shared.ui.color-selector');
     expect(markup).toContain('aria-label="Курсив"');
@@ -148,7 +151,7 @@ describe('callout settings views', () => {
       />
     );
 
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(9);
+    expect(markup.match(/aria-pressed=/g)).toHaveLength(10);
     expect(markup).toContain('aria-label="Сохранение"');
     expect(markup.lastIndexOf('aria-label="Сохранение"')).toBeGreaterThan(
       markup.lastIndexOf('aria-label="Стили"')
@@ -174,12 +177,5 @@ describe('callout settings views', () => {
     expect(markup).toContain('sniptale-glass-preset-item--active');
     expect(markup).toContain('Настроить стиль');
     expect(markup).toContain('Скрыть из списка');
-  });
-
-  it('keeps the destructive footer action on the shared popover danger button seam', () => {
-    const markup = renderToStaticMarkup(<CalloutDeleteButton onDelete={vi.fn()} />);
-
-    expect(markup).toContain('Выключить');
-    expect(markup).toContain('sniptale-glass-destructive');
   });
 });

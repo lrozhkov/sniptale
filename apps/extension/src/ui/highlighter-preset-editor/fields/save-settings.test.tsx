@@ -17,21 +17,27 @@ vi.mock('../../compact-inspector-controls', async (importOriginal) => ({
     'aria-label': string;
     disabled: boolean;
     onChange: (value: string) => void;
+    onOpenChange?: (open: boolean) => void;
     options: Array<{ label: string; value: string }>;
+    placeholder?: string;
     value: string;
   }) => (
-    <select
-      aria-label={props['aria-label']}
-      disabled={props.disabled}
-      onChange={(event) => props.onChange(event.currentTarget.value)}
-      value={props.value}
-    >
-      {props.options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        aria-label={props['aria-label']}
+        disabled={props.disabled}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
+        onFocus={() => props.onOpenChange?.(true)}
+        value={props.value}
+      >
+        {props.placeholder ? <option value="">{props.placeholder}</option> : null}
+        {props.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </>
   ),
 }));
 
@@ -117,6 +123,9 @@ it('updates the selected preset and preserves controls on rejected saves', async
   const select = container.querySelector<HTMLSelectElement>(
     'select[aria-label="content.overlayControls.frameStyleOverwrite"]'
   );
+  const overwriteButton = getButton('content.overlayControls.frameStyleOverwriteAction');
+  expect(select?.value).toBe('');
+  expect(overwriteButton.disabled).toBe(true);
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(
       select,
@@ -125,8 +134,49 @@ it('updates the selected preset and preserves controls on rejected saves', async
     select?.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-  await act(async () => getButton('content.overlayControls.frameStyleOverwriteAction').click());
+  expect(overwriteButton.disabled).toBe(false);
+  await act(async () => overwriteButton.click());
 
   expect(onSave).toHaveBeenCalledWith({ overwrite: second });
   expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it('forwards floating interaction ownership and disables the shared form', () => {
+  const onFloatingInteractionChange = vi.fn();
+  act(() => {
+    root.render(
+      <BorderManualSaveSettings
+        disabled={false}
+        isSaving={false}
+        onFloatingInteractionChange={onFloatingInteractionChange}
+        onSave={vi.fn().mockResolvedValue(true)}
+        presets={[preset('a')]}
+      />
+    );
+  });
+
+  act(() =>
+    container
+      .querySelector<HTMLSelectElement>(
+        'select[aria-label="content.overlayControls.frameStyleOverwrite"]'
+      )
+      ?.focus()
+  );
+  expect(onFloatingInteractionChange).toHaveBeenCalledWith(true);
+
+  act(() => {
+    root.render(
+      <BorderManualSaveSettings
+        disabled
+        isSaving={false}
+        onSave={vi.fn().mockResolvedValue(true)}
+        presets={[preset('a')]}
+      />
+    );
+  });
+  expect(
+    container.querySelector<HTMLInputElement>(
+      'input[aria-label="content.overlayControls.frameStylePresetName"]'
+    )?.disabled
+  ).toBe(true);
 });

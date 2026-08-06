@@ -113,7 +113,7 @@ function assertTextAndFreehandDefaults(settings: ToolSettings): void {
 
 function assertBlurImageAndLineDefaults(settings: ToolSettings): void {
   expect(settings.blur.strokeWidth).toBe(0);
-  expect(settings.blur.showBorder).toBe(false);
+  expect(settings.blur.showBorder).toBe(true);
   expect(settings.image).toEqual(
     expect.objectContaining({
       opacity: 1,

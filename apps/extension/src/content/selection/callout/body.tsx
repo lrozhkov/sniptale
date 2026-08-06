@@ -65,7 +65,7 @@ function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCallou
   return showBodyBadge ? (
     <div style={{ alignItems: 'flex-start', display: 'flex', gap: 6 }}>
       <CalloutBadge badge={badge} text={badgeText} />
-      <div style={{ flex: '1 1 auto', minWidth: 0 }}>{content}</div>
+      <div style={{ flex: '1 1 auto', minWidth: 'min-content' }}>{content}</div>
     </div>
   ) : (
     content

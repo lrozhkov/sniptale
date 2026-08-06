@@ -63,6 +63,7 @@ export function resolveStoredCalloutPresetCatalog(
       ...canonical,
       basedOnRevision: override.basedOnRevision ?? stored.systemCatalogRevision ?? 0,
       customized: true,
+      content: { ...(override.content ?? canonical.content) },
       enabled: placement?.enabled ?? true,
       name: override.name,
       order: placement?.order ?? nextOrder + index,
@@ -74,6 +75,7 @@ export function resolveStoredCalloutPresetCatalog(
   const users: CalloutPreset[] = (stored.userPresets ?? []).map((user, index) => {
     const placement = placementById.get(user.id);
     return {
+      content: { ...(user.content ?? { titleText: '' }) },
       enabled: placement?.enabled ?? true,
       id: user.id,
       name: user.name,
@@ -119,6 +121,7 @@ export function serializeCalloutPresetCatalog(
       .map((preset) => ({
         basedOnRevision: preset.basedOnRevision ?? catalog.systemCatalogRevision,
         customized: true,
+        content: { ...preset.content },
         name: preset.name,
         placement: { ...preset.placement },
         style: cloneCalloutVisualStyle(preset.style),
@@ -127,6 +130,7 @@ export function serializeCalloutPresetCatalog(
     userPresets: catalog.presets
       .filter((preset) => preset.origin !== 'system')
       .map((preset) => ({
+        content: { ...preset.content },
         id: preset.id,
         name: preset.name,
         placement: { ...preset.placement },

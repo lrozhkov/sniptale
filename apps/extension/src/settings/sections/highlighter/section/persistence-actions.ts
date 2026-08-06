@@ -46,8 +46,8 @@ function createTogglePresetEnabledHandler(state: HighlighterSettingsActionsState
     if (saved) {
       toast.success(
         nextEnabled
-          ? translate('savePresets.messages.presetShown')
-          : translate('savePresets.messages.presetHidden')
+          ? translate('highlighter.section.templateShown')
+          : translate('highlighter.section.templateHidden')
       );
     }
   };

@@ -57,7 +57,6 @@ function renderContent(
       handleFocusChange={vi.fn()}
       handleFocusShowBorderChange={vi.fn()}
       handleManualBorderChange={vi.fn()}
-      handleAddPreset={vi.fn()}
       handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
       handleTogglePresetEnabled={vi.fn()}
@@ -69,6 +68,7 @@ function renderContent(
       }}
       localFocusSettings={{ opacity: 0.65, showBorder: decorationVisible }}
       onClose={vi.fn()}
+      onShowPresets={vi.fn()}
       pendingPresetIds={new Set()}
       {...(customized ? {} : { selectedPresetId: 'preset-1' })}
       manual={{
@@ -104,7 +104,7 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain('Default');
   });
 
-  it('exposes quiet edit and visibility actions plus a trailing add action', () => {
+  it('exposes quiet edit and visibility actions without a duplicate add action', () => {
     const markup = renderContent('border');
 
     expect(markup).toContain('sniptale-frame-style-section');
@@ -112,8 +112,8 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain('sniptale-frame-style-preset-actions');
     expect(markup).toContain(translate('content.overlayControls.configureFrameStyle'));
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
-    expect(markup).toContain(translate('content.overlayControls.addFrameStyle'));
-    expect(markup).toContain('sniptale-frame-style-add');
+    expect(markup).not.toContain(translate('content.overlayControls.addFrameStyle'));
+    expect(markup).not.toContain('sniptale-frame-style-add');
   });
 
   it('opens directly in manual mode for customized frame styling', () => {
@@ -125,7 +125,7 @@ describe('FrameSettingsPopoverContent', () => {
   });
 
   it.each(['blur', 'focus'] as const)(
-    'shares the frame-and-fill preset section with %s when decoration is enabled',
+    'shares the always-visible frame template section with %s',
     (effectMode) => {
       const markup = renderContent(effectMode, true);
 
@@ -138,27 +138,27 @@ describe('FrameSettingsPopoverContent', () => {
         )
       );
       expectNoFrameStyleSectionHeading(markup);
-      expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-frame-style-section');
-      expect(markup).toContain('sniptale-glass-switch--on');
       expect(markup).toContain('Default');
       expect(markup).toContain('Secondary');
-      expect(markup).toContain('sniptale-frame-style-add');
+      expect(markup).not.toContain('sniptale-frame-style-add');
     }
   );
 
-  it('hides the frame-and-fill hint only for compact toolbar menus', () => {
+  it('keeps the mode selector and templates available in compact toolbar menus', () => {
     const expandedMarkup = renderContent('blur', true, false);
     const compactMarkup = renderContent('blur', true, true);
 
-    expect(expandedMarkup).toContain(translate('content.overlayControls.showBorderHint'));
-    expect(compactMarkup).not.toContain(translate('content.overlayControls.showBorderHint'));
-    expect(compactMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
-    expect(compactMarkup).toContain('sniptale-glass-switch');
+    for (const markup of [expandedMarkup, compactMarkup]) {
+      expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
+      expect(markup).toContain(translate('content.interactiveFrame.effectBlur'));
+      expect(markup).toContain(translate('content.interactiveFrame.effectFocus'));
+      expect(markup).toContain('Default');
+    }
   });
 
   it.each(['blur', 'focus'] as const)(
-    'keeps the %s effect controls visible while hidden decoration collapses its presets',
+    'keeps the %s effect controls and templates visible regardless of legacy decoration state',
     (effectMode) => {
       const markup = renderContent(effectMode, false);
 
@@ -166,10 +166,10 @@ describe('FrameSettingsPopoverContent', () => {
       expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-glass-switch');
       expect(markup).not.toContain('sniptale-glass-switch--on');
-      expect(markup).not.toContain('Default');
-      expect(markup).not.toContain('Secondary');
+      expect(markup).toContain('Default');
+      expect(markup).toContain('Secondary');
       expect(markup).not.toContain('sniptale-frame-style-add');
-      expect(markup).toContain('class="sniptale-glass-range"');
+      expect(markup).toContain('shared.ui.compact-inspector.numeric-row');
     }
   );
 
@@ -178,34 +178,38 @@ describe('FrameSettingsPopoverContent', () => {
     const focusMarkup = renderContent('focus');
 
     expect(blurMarkup).toContain('shared.ui.content-popover-section');
-    expect(blurMarkup).toContain('class="sniptale-glass-range"');
-    expect(blurMarkup).toContain('sniptale-glass-switch');
-    expect(blurMarkup).toContain('--sniptale-range-fill-ratio:45.8%');
-    expect(blurMarkup).not.toContain('sniptale-glass-switch" style="--sniptale-range-fill-ratio');
+    expect(blurMarkup).toContain('shared.ui.compact-inspector.numeric-row');
+    expect(blurMarkup).toContain(translate('content.overlayControls.blurTypeLabel'));
+    expect(blurMarkup).toContain(translate('content.overlayControls.blurTypeDistortion'));
+    expect(blurMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
+    expect(blurMarkup).toContain('sniptale-glass-switch--on');
+    expect(blurMarkup).toContain('select');
+    expect(blurMarkup).toContain('--sniptale-range-fill-ratio:45.83333333333333%');
     expect(focusMarkup).toContain('shared.ui.content-popover-section');
-    expect(focusMarkup).toContain('class="sniptale-glass-range"');
+    expect(focusMarkup).toContain('shared.ui.compact-inspector.numeric-row');
     expect(focusMarkup).toContain('type="range"');
-    expect(focusMarkup).toContain('65%');
-    expect(focusMarkup).toContain('--sniptale-range-fill-ratio:61.1%');
+    expect(focusMarkup).toContain('value="65"');
+    expect(focusMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
+    expect(focusMarkup).toContain('sniptale-glass-switch--on');
+    expect(focusMarkup).toContain('--sniptale-range-fill-ratio:61.111111111111114%');
     expect(blurMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(focusMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(blurMarkup).not.toContain('sniptale-glass-range-meta');
     expect(focusMarkup).not.toContain('sniptale-glass-range-meta');
   });
 
-  it('places effect controls before the separated frame-and-fill settings', () => {
+  it('places mode-specific controls before the template list', () => {
     const blurMarkup = renderContent('blur');
     const focusMarkup = renderContent('focus');
-    const decorationTitle = translate('content.overlayControls.showBorderTitle');
 
     expect(
       blurMarkup.indexOf(translate('content.overlayControls.blurStrengthLabelPrefix'))
     ).toBeLessThan(blurMarkup.indexOf(translate('content.overlayControls.blurTypeLabel')));
     expect(blurMarkup.indexOf(translate('content.overlayControls.blurTypeLabel'))).toBeLessThan(
-      blurMarkup.indexOf(decorationTitle)
+      blurMarkup.indexOf('Default')
     );
     expect(
       focusMarkup.indexOf(translate('content.overlayControls.focusDimmingLabelPrefix'))
-    ).toBeLessThan(focusMarkup.indexOf(decorationTitle));
+    ).toBeLessThan(focusMarkup.indexOf('Default'));
   });
 });

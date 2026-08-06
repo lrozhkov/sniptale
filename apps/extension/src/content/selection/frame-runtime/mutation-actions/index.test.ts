@@ -5,7 +5,7 @@ import { createFrameDataFixture } from '../react/test-support';
 import { createUpdateFrameEffectHandler } from '.';
 
 describe('frame mutation action assembly', () => {
-  it('persists target effect settings through the assembled mutation owner', () => {
+  it('changes only the target frame effect and preserves future-frame defaults', () => {
     let currentFrames = [createFrameDataFixture('frame-1'), createFrameDataFixture('frame-2')];
     const setFrames = vi.fn<React.Dispatch<React.SetStateAction<typeof currentFrames>>>(
       (updater) => {
@@ -35,20 +35,18 @@ describe('frame mutation action assembly', () => {
     const sessionDefaultsInitializedRef = { current: false };
     const globalEffectModeRef = { current: 'border' as const };
 
-    const updateFrameEffect = createUpdateFrameEffectHandler({
-      globalEffectModeRef,
-      sessionBlurSettingsRef,
-      sessionDefaultsInitializedRef,
-      sessionFocusSettingsRef,
-      setFrames,
-    });
+    const updateFrameEffect = createUpdateFrameEffectHandler({ setFrames });
     updateFrameEffect('frame-2', 'focus');
 
     const updatedFrame = currentFrames[1];
     expect(updatedFrame?.effectMode).toBe('focus');
-    expect(globalEffectModeRef.current).toBe('focus');
-    expect(sessionDefaultsInitializedRef.current).toBe(true);
-    expect(sessionBlurSettingsRef.current).toEqual(updatedFrame?.blurSettings);
-    expect(sessionFocusSettingsRef.current).toEqual(updatedFrame?.focusSettings);
+    expect(globalEffectModeRef.current).toBe('border');
+    expect(sessionDefaultsInitializedRef.current).toBe(false);
+    expect(sessionBlurSettingsRef.current).toEqual({
+      amount: 8,
+      blurType: 'gaussian',
+      showBorder: true,
+    });
+    expect(sessionFocusSettingsRef.current).toEqual({ opacity: 0.5, showBorder: false });
   });
 });

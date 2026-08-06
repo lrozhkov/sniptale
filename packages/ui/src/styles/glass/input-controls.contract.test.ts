@@ -107,6 +107,12 @@ describe('glass.input-controls range contract', () => {
     expect(webkitTrackBlock).toContain('border: 1px solid');
     expect(webkitTrackBlock).toContain('var(--sniptale-range-fill-ratio)');
     expect(webkitTrackBlock).toContain('transparent var(--sniptale-range-fill-ratio)');
+    expect(webkitTrackBlock).toContain(
+      'left center / calc(var(--sniptale-range-thumb-size) / 2) 100% no-repeat'
+    );
+    expect(webkitTrackBlock).toContain(
+      'center / calc(100% - var(--sniptale-range-thumb-size)) 100% no-repeat'
+    );
     expect(mozTrackBlock).toContain('height: var(--sniptale-range-track-height);');
     expect(mozTrackBlock).toContain('border: 1px solid');
     expect(mozProgressBlock).toContain('height: var(--sniptale-range-track-height);');

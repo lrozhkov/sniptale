@@ -10,6 +10,10 @@ import {
   resolveContentPortalTarget,
   useContentPortalTheme,
   useFixedPortalContainer,
+  Z_INDEX_CALLOUT_EDITING,
+  Z_INDEX_FLOATING_UI,
+  Z_INDEX_FRAME_ACTIVE,
+  Z_INDEX_STEP_BADGE,
 } from './portal';
 
 let root: Root | null = null;
@@ -70,6 +74,12 @@ function PortalThemeProbe() {
 }
 
 describe('interactive-frame portal utils', () => {
+  it('keeps number annotations above frames but below editors and floating UI', () => {
+    expect(Z_INDEX_STEP_BADGE).toBeGreaterThan(Z_INDEX_FRAME_ACTIVE);
+    expect(Z_INDEX_STEP_BADGE).toBeLessThan(Z_INDEX_CALLOUT_EDITING);
+    expect(Z_INDEX_STEP_BADGE).toBeLessThan(Z_INDEX_FLOATING_UI);
+  });
+
   it('fails closed to a detached mount after the registered host retires', () => {
     const { host } = mountContentRoot();
     host.remove();

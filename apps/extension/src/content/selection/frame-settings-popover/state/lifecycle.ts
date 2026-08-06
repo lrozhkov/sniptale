@@ -18,6 +18,7 @@ import {
   cloneAppliedBorderSettings,
   normalizeAppliedBorderSettings,
   projectBorderPresetToAppliedSettings,
+  cloneBorderPresetEffects,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const logger = createLogger({ namespace: 'ContentFrameSettingsPopoverLifecycle' });
@@ -85,17 +86,35 @@ function applyLoadedFrameSettingsDefaults(
   setDraft: SetFrameSettingsDraft
 ): void {
   const { dirty, source } = lifecycleRef.current;
-  setDraft((current) => ({
-    ...current,
-    globalSettings: settings,
-    visiblePresetIds: getEnabledPresetIds(settings),
-    ...(!source.blur && !dirty.blur && settings.defaultBlurSettings
-      ? { localBlurSettings: { ...settings.defaultBlurSettings } }
-      : {}),
-    ...(!source.focus && !dirty.focus && settings.defaultFocusSettings
-      ? { localFocusSettings: { ...settings.defaultFocusSettings } }
-      : {}),
-  }));
+  setDraft((current) => {
+    const preset = settings.borderPresets.find(
+      (item) => item.id === (current.selectedPresetId ?? settings.defaultBorderPresetId)
+    );
+    const effects = cloneBorderPresetEffects(preset?.effects);
+    return {
+      ...current,
+      globalSettings: settings,
+      visiblePresetIds: getEnabledPresetIds(settings),
+      ...(!source.blur && !dirty.blur
+        ? {
+            localBlurSettings: {
+              ...settings.defaultBlurSettings,
+              ...effects.blur,
+              showBorder: true,
+            },
+          }
+        : {}),
+      ...(!source.focus && !dirty.focus
+        ? {
+            localFocusSettings: {
+              ...settings.defaultFocusSettings,
+              opacity: effects.focus.opacity,
+              showBorder: true,
+            },
+          }
+        : {}),
+    };
+  });
 }
 
 function useFrameSettingsDefaultsLoad(

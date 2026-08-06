@@ -59,17 +59,17 @@ export const glassPopoverToolbarFormLayoutStyles = `
 }
 
 .sniptale-glass-toolbar-button--active {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, var(--sniptale-color-border-soft) 45%);
   color: var(--sniptale-color-accent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-glass-toolbar-button--active:hover {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 72%, var(--sniptale-color-border-soft) 28%);
   color: var(--sniptale-color-accent-emphasis);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sniptale-glass-toolbar-button--danger:hover {

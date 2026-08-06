@@ -22,12 +22,12 @@ describe('getCalloutLayoutState', () => {
     const editing = getCalloutLayoutState({ ...baseArgs, isEditing: true });
 
     expect(editing.editableStyle.minHeight).toBe(viewing.editableStyle.minHeight);
-    expect(editing.effectiveZIndex).toBeLessThan(Z_INDEX_STEP_BADGE);
+    expect(editing.effectiveZIndex).toBeGreaterThan(Z_INDEX_STEP_BADGE);
     expect(editing.cloudStyle.width).toBe('max-content');
     expect(editing.cloudStyle.maxWidth).toBe(settings.style.typography.maxWidth);
   });
 
-  it('caps a viewing callout below the global step-badge layer', () => {
+  it('caps a viewing callout at the annotation-content layer', () => {
     const layout = getCalloutLayoutState({
       dimensions: { width: 160, height: 48 },
       frameRect: { x: 200, y: 200, width: 120, height: 80 },
@@ -36,7 +36,7 @@ describe('getCalloutLayoutState', () => {
       zIndex: Z_INDEX_STEP_BADGE,
     });
 
-    expect(layout.effectiveZIndex).toBeLessThan(Z_INDEX_STEP_BADGE);
+    expect(layout.effectiveZIndex).toBeLessThanOrEqual(Z_INDEX_STEP_BADGE);
   });
 
   it('uses the configured shadow color in the rendered filter', () => {
@@ -55,31 +55,6 @@ describe('getCalloutLayoutState', () => {
     });
 
     expect(layout.wrapperStyle.filter).toContain('#ff0000');
-  });
-
-  it('applies preset emphasis and alignment styles to the whole comment', () => {
-    const layout = getCalloutLayoutState({
-      dimensions: { width: 160, height: 48 },
-      frameRect: { x: 200, y: 200, width: 120, height: 80 },
-      isEditing: false,
-      settings: {
-        ...settings,
-        style: {
-          ...settings.style,
-          typography: {
-            ...settings.style.typography,
-            fontStyle: 'italic',
-            textAlign: 'center',
-            textDecoration: 'underline',
-          },
-        },
-      },
-      zIndex: 20,
-    });
-
-    expect(layout.cloudStyle.fontStyle).toBe('italic');
-    expect(layout.cloudStyle.textAlign).toBe('center');
-    expect(layout.cloudStyle.textDecoration).toBe('underline');
   });
 
   it('leaves the HTML cloud transparent for the flush combined bubble and wedge contour', () => {

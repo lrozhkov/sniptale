@@ -6,6 +6,7 @@ import {
   percentToUnit,
 } from './normalize';
 import type { BorderPreset } from './types';
+import { DEFAULT_BORDER_PRESET_EFFECTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const PRESET: BorderPreset = {
   color: '#fff',
@@ -37,6 +38,9 @@ describe('highlighter style normalization', () => {
   it('normalizes fallback values without replacing explicit visual fields', () => {
     expect(normalizeBorderShadowIntensity(undefined, -10)).toBe(0);
     expect(percentToUnit(125)).toBe(1);
-    expect(normalizeBorderPresetVisualFields(PRESET)).toEqual(PRESET);
+    expect(normalizeBorderPresetVisualFields(PRESET)).toEqual({
+      ...PRESET,
+      effects: DEFAULT_BORDER_PRESET_EFFECTS,
+    });
   });
 });

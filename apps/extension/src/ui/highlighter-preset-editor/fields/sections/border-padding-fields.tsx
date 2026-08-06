@@ -1,5 +1,5 @@
 import type { BorderPadding } from '../../../../features/highlighter/contracts';
-import { ChevronDown, Link2, Unlink2 } from 'lucide-react';
+import { Link2, Unlink2 } from 'lucide-react';
 import { useState } from 'react';
 import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import { NumericValueField } from '../../../compact-inspector-controls';
@@ -38,7 +38,7 @@ function PaddingValueField(props: {
   return (
     <div className="min-w-0" data-padding-side={props.side}>
       <NumericValueField
-        className={props.compact ? '!h-7 !w-[2.65rem] !px-1' : '!w-[6.25rem]'}
+        className={props.compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
         label={props.label}
         max={50}
         min={0}
@@ -81,19 +81,26 @@ function ExpandedAxisGroup(props: {
   onSideChange: (side: PaddingSide, value: number) => void;
   padding: BorderPadding;
 }) {
+  const sides = AXIS_SIDES[props.axis];
+  const visibleSides = props.linked ? [sides[0]] : sides;
   return (
     <div
       className={[
         'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
-        'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
+        'w-full border border-[var(--sniptale-color-border-soft)] px-2 py-1',
       ].join(' ')}
       data-padding-axis={props.axis}
     >
       <div className="grid gap-0.5">
-        {AXIS_SIDES[props.axis].map((side) => (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2" key={side}>
+        {visibleSides.map((side) => (
+          <div
+            className="grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2"
+            key={side}
+          >
             <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
-              {props.labels[side]}
+              {props.linked
+                ? sides.map((linkedSide) => props.labels[linkedSide]).join(' / ')
+                : props.labels[side]}
             </span>
             <PaddingValueField
               label={props.labels[side]}
@@ -113,13 +120,13 @@ export function BorderPaddingFields(props: {
   onChange: (padding: BorderPadding) => void;
   padding: BorderPadding;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [allLinked, setAllLinked] = useState(() => areSidesEqual(props.padding, PADDING_SIDES));
   const [axisLinked, setAxisLinked] = useState<Record<PaddingAxis, boolean>>(() => ({
     horizontal: areSidesEqual(props.padding, AXIS_SIDES.horizontal),
     vertical: areSidesEqual(props.padding, AXIS_SIDES.vertical),
   }));
   const labels = getPaddingLabels();
+  const expanded = !allLinked;
 
   const updateSide = (side: PaddingSide, value: number) => {
     if (allLinked) {
@@ -158,45 +165,34 @@ export function BorderPaddingFields(props: {
   return (
     <div className="grid gap-1.5" data-ui="shared.border-padding-fields">
       <div className="flex min-w-0 items-center gap-1.5">
-        <button
-          aria-expanded={expanded}
+        <div
           className={[
-            'flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left',
-            'text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]',
+            'min-w-0 flex-1 text-[11px] font-semibold',
+            'text-[var(--sniptale-color-text-secondary)]',
           ].join(' ')}
-          onClick={() => setExpanded((current) => !current)}
-          type="button"
         >
           <span className="truncate">{translate('highlighter.editor.paddingLabel')}</span>
-          <ChevronDown
-            aria-hidden="true"
-            className={expanded ? 'rotate-180 transition-transform' : 'transition-transform'}
-            size={13}
-          />
-        </button>
+        </div>
         {!expanded ? (
           <div
             className={[
-              'grid grid-cols-4 gap-0.5 rounded-[9px] p-0.5',
+              'w-[4.75rem] rounded-[9px] p-0.5',
               'border border-[var(--sniptale-color-border-soft)]',
             ].join(' ')}
           >
-            {PADDING_SIDES.map((side) => (
-              <PaddingValueField
-                compact
-                key={side}
-                label={labels[side]}
-                onChange={(value) => updateSide(side, value)}
-                side={side}
-                value={props.padding[side]}
-              />
-            ))}
+            <PaddingValueField
+              compact
+              label={labels.top}
+              onChange={(value) => updateSide('top', value)}
+              side="top"
+              value={props.padding.top}
+            />
           </div>
         ) : null}
         <LinkToggle linked={allLinked} name="all" onClick={toggleAll} />
       </div>
       {expanded ? (
-        <div className="grid gap-1.5">
+        <div className="grid w-full gap-1.5" data-ui="shared.border-padding-expanded">
           <ExpandedAxisGroup
             axis="vertical"
             labels={labels}

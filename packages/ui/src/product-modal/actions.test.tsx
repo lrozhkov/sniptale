@@ -28,7 +28,9 @@ describe('ProductActionButton', () => {
     expect(markup).toContain('var(--sniptale-color-danger-soft)_34%');
     expect(markup).toContain('h-10 min-h-10');
     expect(markup).toContain('bg-transparent');
-    expect(markup).toContain('var(--sniptale-color-surface-hover)_82%');
+    expect(markup).toContain('text-[var(--sniptale-color-accent)]');
+    expect(markup).toContain('var(--sniptale-color-accent)_55%');
+    expect(markup).toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
     expect(markup).toContain('custom-action');
   });
 });

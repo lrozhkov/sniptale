@@ -49,6 +49,7 @@ export function useCalloutPresetPopoverMutations(args: {
       args.setIsSaving(true);
       try {
         const result = await updateCalloutPreset({
+          content: preset.content,
           id: preset.id,
           name: preset.name,
           placement: preset.placement,

@@ -39,16 +39,14 @@
 }
 
 .sniptale-toggle[data-active='true'] {
-  border-color: var(--sniptale-color-border-accent-strong);
-  background: color-mix(
+  border-color: color-mix(
     in srgb,
-    var(--sniptale-color-accent-soft) 82%,
-    var(--sniptale-color-surface-panel) 18%
+    var(--sniptale-color-accent) 55%,
+    var(--sniptale-color-border-soft) 45%
   );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow:
-    var(--sniptale-shadow-sm),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  box-shadow: none;
 }
 
 .sniptale-toggle:hover:not(:disabled):not([data-active='true']) {
@@ -58,16 +56,14 @@
 }
 
 .sniptale-toggle[data-active='true']:hover:not(:disabled) {
-  border-color: var(--sniptale-color-border-accent-strong);
-  background: color-mix(
+  border-color: color-mix(
     in srgb,
-    var(--sniptale-color-accent-soft) 88%,
-    var(--sniptale-color-surface-panel) 12%
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
   );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow:
-    0 10px 24px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+  background: transparent;
+  color: var(--sniptale-color-accent-emphasis);
+  box-shadow: none;
 }
 
 .sniptale-toggle:active:not(:disabled) {
@@ -108,15 +104,11 @@
 }
 
 .sniptale-state-lock[data-active='true'] {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-accent-soft) 82%,
-    var(--sniptale-color-surface-panel) 18%
-  );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow:
-    var(--sniptale-shadow-sm),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-accent) 55%, var(--sniptale-color-border-soft) 45%);
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  box-shadow: none;
 }
 
 .sniptale-state-lock[data-active='false'] {
@@ -129,27 +121,20 @@
 }
 
 .sniptale-state-lock[data-active='true']:hover:not(:disabled) {
-  background: color-mix(
+  border-color: color-mix(
     in srgb,
-    var(--sniptale-color-accent-soft) 88%,
-    var(--sniptale-color-surface-panel) 12%
+    var(--sniptale-color-accent) 72%,
+    var(--sniptale-color-border-soft) 28%
   );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow:
-    0 10px 24px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
+  background: transparent;
+  color: var(--sniptale-color-accent-emphasis);
+  box-shadow: none;
 }
 
 .sniptale-state-lock:disabled[data-active='true'] {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-accent-soft) 82%,
-    var(--sniptale-color-surface-panel) 18%
-  );
-  color: var(--sniptale-color-text-primary-strong);
-  box-shadow:
-    var(--sniptale-shadow-sm),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  box-shadow: none;
   cursor: not-allowed;
 }
 

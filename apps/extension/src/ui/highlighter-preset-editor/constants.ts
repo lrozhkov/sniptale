@@ -1,11 +1,12 @@
 export const editorInputClassName =
   'w-full rounded-lg border border-[var(--sniptale-color-border-soft)] ' +
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_86%,var(--sniptale-color-surface-panel)_14%)] ' +
-  'px-3 py-2 ' +
-  'text-sm text-[var(--sniptale-color-text-primary)] ' +
+  'px-2.5 py-1.5 ' +
+  'text-xs leading-[18px] text-[var(--sniptale-color-text-primary)] ' +
   'shadow-[inset_0_1px_0_color-mix(in_srgb,white_8%,transparent)] ' +
   'focus:border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_28%,var(--sniptale-color-border-soft)_72%)] ' +
-  'focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]';
+  'focus:outline-none focus:placeholder:text-transparent focus:ring-2 ' +
+  'focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]';
 
 export const editorPreviewFrameClassName = [
   'relative h-56 w-44 overflow-hidden rounded-lg p-4 transition-colors',

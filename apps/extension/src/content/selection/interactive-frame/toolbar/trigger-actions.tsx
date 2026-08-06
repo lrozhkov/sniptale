@@ -4,12 +4,14 @@ import type { FrameData, FrameState } from '../../../../features/highlighter/con
 import { translate } from '../../../../platform/i18n';
 import { enableFrameStepBadge, startFrameCalloutEditing } from './actions';
 import { FRAME_TRIGGER_CONTROL_SIZE } from './trigger-position';
+import { FrameEffectIcon } from './effect-icon';
+import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 
 type FrameQuickAction = {
-  id: 'callout' | 'step-badge' | 'edit';
+  id: 'settings' | 'callout' | 'step-badge' | 'edit';
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: (button: HTMLButtonElement) => void;
 };
 
 export const frameTriggerControlStyle: React.CSSProperties = {
@@ -31,10 +33,21 @@ export function createFrameQuickActions(props: {
   closePopover: () => void;
   frame: FrameData;
   handleStartEditing: () => void;
+  popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  toggleQuickPopover: FrameUIState['toggleQuickPopover'];
 }): FrameQuickAction[] {
   return [
+    {
+      id: 'settings',
+      icon: <FrameEffectIcon mode={props.frame.effectMode ?? 'border'} size={14} />,
+      label: translate('content.interactiveFrame.frameSettings'),
+      onClick: (button) => {
+        props.popoverAnchorRef.current = button;
+        props.toggleQuickPopover(props.frame.id, 'frame-settings');
+      },
+    },
     ...(props.frame.callout?.enabled
       ? []
       : [
@@ -98,7 +111,7 @@ export function FrameQuickActionButtons(props: {
       onPointerDown={stopQuickActionEvent}
       onClick={(event) => {
         stopQuickActionEvent(event);
-        action.onClick();
+        action.onClick(event.currentTarget);
       }}
       style={frameTriggerControlStyle}
     >

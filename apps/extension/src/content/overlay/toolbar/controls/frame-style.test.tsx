@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
+import type { EffectMode } from '../../../../features/highlighter/contracts';
 import type { ToolbarFutureFrameStyle } from '../types';
 import { useToolbarMenuState } from '../state/menu';
 import { FutureFrameStyleControls } from './frame-style';
@@ -118,27 +119,36 @@ it('forwards compact menu presentation to future frame settings', () => {
   expect(
     container?.querySelector('[data-ui="content.toolbar.future-frame-effects-group"]')
   ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.toolbar.future-frame-style"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="content.toolbar.future-frame-blur"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="content.toolbar.future-frame-focus"]')).toBeNull();
 });
 
-it('switches the future mode and opens its settings on the first click', () => {
+it('opens one dynamic effect menu and projects mode changes from that menu', () => {
   const onFutureFrameEffectModeChange = vi.fn();
   renderControls(createStyle('border'), onFutureFrameEffectModeChange);
 
-  const blurButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.future-frame-blur"]'
+  const effectButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-style"]'
   );
-  act(() => blurButton?.click());
+  act(() => effectButton?.click());
 
-  expect(onFutureFrameEffectModeChange).toHaveBeenCalledWith('blur');
-  expect(blurButton?.getAttribute('aria-pressed')).toBe('true');
   expect(popoverMocks.props).toMatchObject({
-    effectMode: 'blur',
+    effectMode: 'border',
     isOpen: true,
     scope: 'session',
   });
-  expect(popoverMocks.props?.['anchorEl']).toBe(blurButton);
+  expect(popoverMocks.props?.['anchorEl']).toBe(effectButton);
 
-  act(() => blurButton?.click());
+  act(() => {
+    (popoverMocks.props?.['onEffectModeChange'] as ((mode: EffectMode) => void) | undefined)?.(
+      'blur'
+    );
+  });
+  expect(onFutureFrameEffectModeChange).toHaveBeenCalledWith('blur');
+  expect(popoverMocks.props).toMatchObject({ effectMode: 'blur', isOpen: true });
+
+  act(() => effectButton?.click());
   expect(popoverMocks.props?.['isOpen']).toBe(false);
 });
 
@@ -147,10 +157,11 @@ it('projects a mode change made from an existing frame', () => {
   renderControls(createStyle('border'), onFutureFrameEffectModeChange);
   renderControls(createStyle('focus'), onFutureFrameEffectModeChange);
 
-  const focusButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.future-frame-focus"]'
+  const effectButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-style"]'
   );
-  expect(focusButton?.getAttribute('aria-pressed')).toBe('true');
+  expect(effectButton?.getAttribute('aria-pressed')).toBe('true');
+  expect(effectButton?.getAttribute('title')).toBe('content.interactiveFrame.effectFocus');
   expect(onFutureFrameEffectModeChange).not.toHaveBeenCalled();
 });
 

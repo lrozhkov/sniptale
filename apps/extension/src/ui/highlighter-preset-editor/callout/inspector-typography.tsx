@@ -280,9 +280,10 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
         <>
           <PropertyField label={translate('content.callout.badgeTextLabel')}>
             <ProductInput
-              className="cursor-text"
+              className="sniptale-input-compact cursor-text"
               maxLength={64}
               placeholder={translate('content.callout.badgeTextPlaceholder')}
+              type="text"
               value={badge.text}
               onChange={(event) => changeBadge({ text: event.target.value })}
             />
@@ -291,7 +292,10 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
             <CompactSelect
               appearance="plain"
               aria-label={translate('content.callout.badgePlacementLabel')}
-              options={(['title-start', 'title-end', 'body-start'] as const).map((value) => ({
+              options={(props.settings.style.title.enabled
+                ? (['title-start', 'title-end', 'body-start'] as const)
+                : (['body-start'] as const)
+              ).map((value) => ({
                 label: translate(`content.callout.badgePlacement.${value}`),
                 value,
               }))}
@@ -393,6 +397,18 @@ export function CalloutTitleSettings(props: ManualContentProps) {
     <SettingsStack>
       {title.enabled ? (
         <>
+          <PropertyField label={translate('content.callout.titleTextLabel')}>
+            <ProductInput
+              className="sniptale-input-compact cursor-text"
+              maxLength={256}
+              placeholder={translate('content.callout.titleTextPlaceholder')}
+              type="text"
+              value={props.settings.content.titleText}
+              onChange={(event) =>
+                props.onChange({ content: { titleText: event.currentTarget.value } })
+              }
+            />
+          </PropertyField>
           <FontFamilyField
             value={title.fontFamily}
             onChange={(fontFamily) => changeTitle({ fontFamily })}
@@ -407,7 +423,7 @@ export function CalloutTitleSettings(props: ManualContentProps) {
             onChange={(fontSize) => changeTitle({ fontSize })}
           />
           <ColorField
-            label={translate('content.callout.titleTextLabel')}
+            label={translate('content.callout.titleTextColorLabel')}
             value={title.textColor}
             palette={CALLOUT_TEXT_PRESETS}
             onChange={(textColor) => changeTitle({ textColor })}

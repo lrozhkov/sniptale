@@ -58,7 +58,8 @@ export function ProjectSearchField(props: SearchableProjectPickerSearchProps) {
           spellCheck={false}
           aria-autocomplete="none"
           {...inputDataUi}
-          className="min-w-0 flex-1 bg-transparent text-sm text-[var(--sniptale-color-text-primary)] outline-none"
+          className="min-w-0 flex-1 cursor-text bg-transparent text-sm
+            text-[var(--sniptale-color-text-primary)] outline-none"
         />
       </div>
     </label>
@@ -88,8 +89,12 @@ function ProjectPickerList(props: {
   projects: SearchableProjectPickerProject[];
   renderProjectRow?: (args: SearchableProjectPickerRowRenderArgs) => ReactNode;
 }) {
+  const listDataUi = buildSearchableProjectPickerDataUi(props.dataUiPrefix, 'project-list');
   return (
-    <div className="grid max-h-[320px] gap-2 overflow-y-auto overflow-x-hidden pr-1">
+    <div
+      className="grid max-h-[320px] gap-2 overflow-y-auto overflow-x-hidden"
+      {...(listDataUi === undefined ? {} : { 'data-ui': listDataUi })}
+    >
       {props.projects.map((project) => {
         const rowDataUi = buildSearchableProjectPickerDataUi(props.dataUiPrefix, 'project');
 
@@ -134,7 +139,7 @@ export function CreateProjectSection(props: SearchableProjectPickerCreateProject
       type="button"
       onClick={() => void props.onCreateProject()}
       {...(createButtonDataUi === undefined ? {} : { 'data-ui': createButtonDataUi })}
-      className="flex items-center justify-center gap-2 rounded-[14px]
+      className="flex cursor-pointer items-center justify-center gap-2 rounded-[14px]
         border border-[var(--sniptale-color-border-accent-soft)] bg-[var(--sniptale-color-accent-soft)]
         px-3 py-2.5 text-sm font-semibold text-[var(--sniptale-color-accent-emphasis)]"
     >
@@ -199,7 +204,7 @@ function ProjectPickerRow(props: {
         onClick={props.onSelect}
         title={props.project.name}
         {...rowDataUi}
-        className={`flex min-w-0 flex-1 items-center text-left ${
+        className={`flex min-w-0 flex-1 cursor-pointer items-center text-left ${
           props.presentation === 'compact' ? 'gap-2' : 'gap-3'
         }`}
       >

@@ -55,7 +55,6 @@ function createFrameCalloutHandlers(args: {
     handleCalloutPopoverSettingsChanged: args.withHistoryCommit(
       createCalloutPopoverSettingsHandler({
         setFrames: args.setFrames,
-        sessionCalloutStyleRef: args.sessionCalloutStyleRef,
       })
     ),
     handleFrameCalloutChanged: args.withHistoryCommit(

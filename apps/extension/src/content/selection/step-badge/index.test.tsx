@@ -23,7 +23,7 @@ it('renders the tooltip label through the shared i18n seam', () => {
   );
 
   expect(markup).toContain('title="Step 7"');
-  expect(markup).toContain('z-index:2147483647');
+  expect(markup).toContain('z-index:2147483645');
 });
 
 it('keeps an enabled badge mounted when its manual value is empty', () => {
@@ -75,6 +75,7 @@ it('renders hover-only move and settings controls for an enabled badge', () => {
   expect(moveHandle?.querySelector('.lucide-move')).not.toBeNull();
   expect(moveHandle?.querySelector('.lucide-grip-vertical')).toBeNull();
   expect(settingsHandle?.style.width).toBe('26px');
+  expect(controls?.style.zIndex).toBe('2147483645');
 
   act(() => root.unmount());
   document.body.replaceChildren();
@@ -187,7 +188,7 @@ it('reanchors move and settings controls after scroll updates the frame geometry
   badgeRect = new DOMRect(100, 30, 30, 30);
   act(() => renderBadge(30));
 
-  expect(controls?.style.top).toBe('8px');
+  expect(controls?.style.top).toBe('64px');
   expect(controls?.querySelector('.sniptale-step-badge-move-handle')).toBeInstanceOf(
     HTMLButtonElement
   );
@@ -230,7 +231,7 @@ it('mounts a positioned badge in the shared overlay above every frame root', () 
   expect(badgeLayer?.style.top).toBe('80px');
   expect(badgeLayer?.style.width).toBe('200px');
   expect(badgeLayer?.style.height).toBe('120px');
-  expect(badgeLayer?.style.zIndex).toBe('2147483647');
+  expect(badgeLayer?.style.zIndex).toBe('2147483645');
   expect(badge?.style.position).toBe('absolute');
 
   act(() => root.unmount());

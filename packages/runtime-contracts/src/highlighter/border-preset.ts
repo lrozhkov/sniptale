@@ -11,6 +11,22 @@ export const SYSTEM_BORDER_PRESET_KEYS = [
 
 export type SystemBorderPresetKey = (typeof SYSTEM_BORDER_PRESET_KEYS)[number];
 export type BorderPresetOrigin = 'system' | 'user';
+export type BorderPresetBlurType = 'gaussian' | 'distortion' | 'pixelate' | 'solid';
+
+export interface BorderPresetEffects {
+  blur: {
+    amount: number;
+    blurType: BorderPresetBlurType;
+  };
+  focus: {
+    opacity: number;
+  };
+}
+
+export const DEFAULT_BORDER_PRESET_EFFECTS: BorderPresetEffects = {
+  blur: { amount: 10, blurType: 'gaussian' },
+  focus: { opacity: 0.5 },
+};
 
 export interface BorderPadding {
   top: number;
@@ -32,6 +48,7 @@ export interface BorderVisualStyle {
   fillOpacity: number;
   inheritCustomCss: boolean;
   customCss: string;
+  effects?: BorderPresetEffects;
 }
 
 export interface BorderPreset extends BorderVisualStyle {
@@ -69,6 +86,17 @@ export function cloneBorderVisualStyle(style: BorderVisualStyle): BorderVisualSt
     fillOpacity: style.fillOpacity,
     inheritCustomCss: style.inheritCustomCss,
     customCss: style.customCss,
+    effects: cloneBorderPresetEffects(style.effects),
+  };
+}
+
+export function cloneBorderPresetEffects(
+  effects: BorderPresetEffects | undefined
+): BorderPresetEffects {
+  const source = effects ?? DEFAULT_BORDER_PRESET_EFFECTS;
+  return {
+    blur: { ...source.blur },
+    focus: { ...source.focus },
   };
 }
 
@@ -81,7 +109,11 @@ export function projectBorderPresetToAppliedSettings(preset: BorderPreset): Appl
 }
 
 export function cloneAppliedBorderSettings(settings: AppliedBorderSettings): AppliedBorderSettings {
-  return { ...settings, padding: { ...settings.padding } };
+  return {
+    ...settings,
+    padding: { ...settings.padding },
+    effects: cloneBorderPresetEffects(settings.effects),
+  };
 }
 
 export function applyManualBorderStylePatch(

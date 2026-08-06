@@ -13,9 +13,12 @@ import { parseCalloutVisualStyle } from './visual-style-parser';
 
 export { parseCalloutVisualStyle } from './visual-style-parser';
 
-export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 4;
+export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 5;
 export const MAX_USER_CALLOUT_PRESETS = 16;
 export const MAX_CALLOUT_PRESET_NAME_LENGTH = 64;
+const MAX_CALLOUT_PRESET_TITLE_LENGTH = 256;
+
+type StoredCalloutPresetContent = CalloutPreset['content'];
 
 interface StoredCalloutPresetPlacement {
   enabled: boolean;
@@ -26,6 +29,7 @@ interface StoredCalloutPresetPlacement {
 interface StoredSystemCalloutPresetOverride {
   basedOnRevision?: number;
   customized?: boolean;
+  content?: StoredCalloutPresetContent;
   name: string;
   placement?: CalloutPreset['placement'];
   style: CalloutVisualStyle;
@@ -33,6 +37,7 @@ interface StoredSystemCalloutPresetOverride {
 }
 
 interface StoredUserCalloutPreset {
+  content?: StoredCalloutPresetContent;
   id: string;
   name: string;
   placement?: CalloutPreset['placement'];
@@ -159,6 +164,17 @@ function isValidPresetName(value: unknown): value is string {
   );
 }
 
+export function parseCalloutPresetContent(value: unknown): StoredCalloutPresetContent | null {
+  if (
+    !isPlainRecord(value) ||
+    !isString(value['titleText']) ||
+    value['titleText'].length > MAX_CALLOUT_PRESET_TITLE_LENGTH
+  ) {
+    return null;
+  }
+  return { titleText: value['titleText'] };
+}
+
 function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride | null {
   if (
     !isPlainRecord(value) ||
@@ -169,14 +185,18 @@ function parseSystemOverride(value: unknown): StoredSystemCalloutPresetOverride 
     return null;
   }
   const style = parseCalloutVisualStyle(value['style']);
+  const content =
+    value['content'] === undefined ? undefined : parseCalloutPresetContent(value['content']);
   const placement =
     value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
-  if (!style || !isValidPresetName(value['name']) || placement === null) return null;
+  if (!style || !isValidPresetName(value['name']) || placement === null || content === null)
+    return null;
   return {
     ...(isNonNegativeInteger(value['basedOnRevision'])
       ? { basedOnRevision: value['basedOnRevision'] }
       : {}),
     ...(isBoolean(value['customized']) ? { customized: value['customized'] } : {}),
+    ...(content ? { content } : {}),
     name: value['name'].trim(),
     ...(placement ? { placement } : {}),
     style,
@@ -194,10 +214,13 @@ function parseUserPreset(value: unknown): StoredUserCalloutPreset | null {
     return null;
   }
   const style = parseCalloutVisualStyle(value['style']);
+  const content =
+    value['content'] === undefined ? undefined : parseCalloutPresetContent(value['content']);
   const placement =
     value['placement'] === undefined ? undefined : parseCalloutPresetPlacement(value['placement']);
-  if (!style || placement === null) return null;
+  if (!style || placement === null || content === null) return null;
   return {
+    ...(content ? { content } : {}),
     id: value['id'],
     name: value['name'].trim(),
     ...(placement ? { placement } : {}),

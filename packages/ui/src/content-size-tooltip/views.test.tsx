@@ -176,6 +176,7 @@ describe('ContentSizeTooltipContent rendering', () => {
     expect(ratioButton?.style.background).toBe('transparent');
     expect(ratioButton?.style.borderColor).toBe('transparent');
     expect(increaseHeightButton?.style.border).toBe('0px');
+    expect(container?.querySelector('[data-ui="content-size-tooltip-divider"]')).toBeNull();
 
     const ratioIcon = ratioButton?.querySelector('svg');
     expect(ratioIcon?.querySelector('path')?.getAttribute('d')).toBe('M9 17H7A5 5 0 0 1 7 7h2');

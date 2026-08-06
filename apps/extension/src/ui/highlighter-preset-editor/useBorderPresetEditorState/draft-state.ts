@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import type { BorderPresetDraftSetters, BorderPresetDraftState } from './types';
+import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 export function useBorderPresetDraftState() {
   const [name, setName] = useState('');
@@ -14,6 +15,7 @@ export function useBorderPresetDraftState() {
   const [strokeOpacity, setStrokeOpacity] = useState(100);
   const [fillColor, setFillColor] = useState('#00000000');
   const [fillOpacity, setFillOpacity] = useState(0);
+  const [effects, setEffects] = useState(() => cloneBorderPresetEffects(undefined));
   const [inheritCustomCss, setInheritCustomCss] = useState(false);
   const [customCss, setCustomCss] = useState('');
   const [textareaHeight, setTextareaHeight] = useState(72);
@@ -24,6 +26,7 @@ export function useBorderPresetDraftState() {
       setCustomCss,
       setFillColor,
       setFillOpacity,
+      setEffects,
       setInheritCustomCss,
       setIsResizing,
       setName,
@@ -43,6 +46,7 @@ export function useBorderPresetDraftState() {
     customCss,
     fillColor,
     fillOpacity,
+    effects,
     inheritCustomCss,
     isResizing,
     name,

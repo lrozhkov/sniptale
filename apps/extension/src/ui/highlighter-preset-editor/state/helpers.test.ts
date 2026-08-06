@@ -34,6 +34,7 @@ function createSetters() {
     setCustomCss: vi.fn(),
     setFillColor: vi.fn(),
     setFillOpacity: vi.fn(),
+    setEffects: vi.fn(),
     setInheritCustomCss: vi.fn(),
     setIsResizing: vi.fn(),
     setName: vi.fn(),

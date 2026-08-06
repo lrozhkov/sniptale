@@ -83,8 +83,9 @@ it('ignores a stale initial read after a subscription snapshot', async () => {
 
 it('marks a new callout with the matching default preset and applies its default position', () => {
   const preset = mocks.catalog!.presets[0]!;
+  preset.content.titleText = 'Default template title';
   const settings = createSessionCalloutSettings(preset.style);
   expect(settings.sourcePresetId).toBe(preset.id);
-  expect(settings.content).toEqual({ bodyHtml: '', titleText: '' });
+  expect(settings.content).toEqual({ bodyHtml: '', titleText: 'Default template title' });
   expect(settings.placement).toEqual(preset.placement);
 });

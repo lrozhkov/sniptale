@@ -75,7 +75,8 @@ export function createSessionCalloutSettings(style: CalloutVisualStyle | null) {
   return createDefaultCalloutSettings(
     resolvedStyle,
     sourcePresetId,
-    sourcePresetId ? preset?.placement : undefined
+    sourcePresetId ? preset?.placement : undefined,
+    sourcePresetId ? preset?.content : undefined
   );
 }
 

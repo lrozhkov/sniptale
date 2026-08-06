@@ -63,6 +63,7 @@ export const InteractiveFrame: React.FC<InteractiveFrameProps> = React.memo((pro
     handleMouseDown: model.handleMouseDown,
     handleResizeStart: model.handleResizeStart,
     handleEffectButtonClick: model.handleEffectButtonClick,
+    handleEffectModeSelect: model.handleEffectModeSelect,
     handleStartEditing: model.handleStartEditing,
     handleSave: model.handleSave,
     handleCancel: model.handleCancel,

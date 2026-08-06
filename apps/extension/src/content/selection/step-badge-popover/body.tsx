@@ -1,4 +1,3 @@
-import { ProductGlassDestructiveButton } from '@sniptale/ui/product-glass-controls';
 import { useEffect, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import type {
@@ -15,14 +14,6 @@ import {
   type SettingsPopoverContext,
 } from '../popover-sync/settings-header';
 import { selectOrClosePopoverPreset } from '../popover-sync/preset-selection';
-
-function StepBadgeDisableButton(props: { onDisable: () => void }) {
-  return (
-    <ProductGlassDestructiveButton onClick={props.onDisable}>
-      {translate('content.stepBadge.disableButton')}
-    </ProductGlassDestructiveButton>
-  );
-}
 
 export function StepBadgePopoverContent(props: {
   frameId: string;
@@ -51,6 +42,7 @@ export function StepBadgePopoverContent(props: {
     settings: StepBadgeTemplateSettings
   ) => Promise<{ outcome: string }>;
   onResetPreset: (preset: StepBadgePreset) => void;
+  onShowPresets: () => void | Promise<void>;
   onTogglePreset: (preset: StepBadgePreset) => void;
   pendingPresetIds: ReadonlySet<string>;
   presets: StepBadgePreset[];
@@ -70,6 +62,11 @@ export function StepBadgePopoverContent(props: {
   useEffect(() => {
     setMode(hasSelectedPreset ? 'preset' : 'manual');
   }, [hasSelectedPreset]);
+  const switchMode = () => {
+    const nextMode = mode === 'preset' ? 'manual' : 'preset';
+    if (nextMode === 'preset') void props.onShowPresets();
+    setMode(nextMode);
+  };
 
   return (
     <>
@@ -80,10 +77,14 @@ export function StepBadgePopoverContent(props: {
               ? 'content.stepBadge.switchToManual'
               : 'content.stepBadge.switchToPresets'
           ),
-          onClick: () => setMode(mode === 'preset' ? 'manual' : 'preset'),
+          onClick: switchMode,
         }}
         closeLabel={translate('content.stepBadge.closeSettings')}
         context={props.headerContext}
+        destructiveAction={{
+          label: translate('content.stepBadge.disableButton'),
+          onClick: props.onDisable,
+        }}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
         title={translate('content.stepBadge.settingsTitle')}
@@ -111,8 +112,6 @@ export function StepBadgePopoverContent(props: {
       ) : (
         <StepBadgeManualSettings {...props} settings={props.localStepBadgeSettings} />
       )}
-
-      <StepBadgeDisableButton onDisable={props.onDisable} />
     </>
   );
 }

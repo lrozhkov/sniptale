@@ -4,9 +4,46 @@ import {
   normalizeBorderPresetVisualFields,
 } from '@sniptale/ui/highlighter-style/normalize';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
-import { isSystemBorderPresetKey } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import {
+  cloneBorderPresetEffects,
+  isSystemBorderPresetKey,
+  type BorderPresetEffects,
+} from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
+const blurTypes = new Set<BorderPresetEffects['blur']['blurType']>([
+  'gaussian',
+  'distortion',
+  'pixelate',
+  'solid',
+]);
+
+function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
+  if (value === undefined) return cloneBorderPresetEffects(undefined);
+  if (!isPlainRecord(value)) return null;
+  const blur = value['blur'];
+  const focus = value['focus'];
+  if (
+    !isPlainRecord(blur) ||
+    !isNumber(blur['amount']) ||
+    blur['amount'] < 1 ||
+    blur['amount'] > 25 ||
+    !blurTypes.has(blur['blurType'] as BorderPresetEffects['blur']['blurType']) ||
+    !isPlainRecord(focus) ||
+    !isNumber(focus['opacity']) ||
+    focus['opacity'] < 0.1 ||
+    focus['opacity'] > 1
+  ) {
+    return null;
+  }
+  return {
+    blur: {
+      amount: blur['amount'],
+      blurType: blur['blurType'] as BorderPresetEffects['blur']['blurType'],
+    },
+    focus: { opacity: focus['opacity'] },
+  };
+}
 
 function isNonNegativeInteger(value: unknown): value is number {
   return isNumber(value) && Number.isInteger(value) && value >= 0;
@@ -23,6 +60,7 @@ function isBorderPadding(value: unknown): value is BorderPadding {
 }
 
 function parseBorderPreset(value: unknown): BorderPreset | null {
+  const effects = isPlainRecord(value) ? parseBorderPresetEffects(value['effects']) : null;
   if (
     !isPlainRecord(value) ||
     !isString(value['id']) ||
@@ -43,7 +81,8 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     (value['fillOpacity'] !== undefined && !isNumber(value['fillOpacity'])) ||
     (value['inheritCustomCss'] !== undefined && !isBoolean(value['inheritCustomCss'])) ||
     !isBorderPadding(value['padding']) ||
-    !borderStyles.has(value['style'] as BorderPreset['style'])
+    !borderStyles.has(value['style'] as BorderPreset['style']) ||
+    effects === null
   ) {
     return null;
   }
@@ -55,6 +94,7 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
 
   return normalizeBorderPresetVisualFields({
     customCss: value['customCss'],
+    effects,
     color: value['color'],
     fillColor: value['fillColor'] ?? '#00000000',
     fillOpacity: value['fillOpacity'] ?? 0,

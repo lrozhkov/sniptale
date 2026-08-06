@@ -164,7 +164,7 @@ it('falls back to default settings when blur metadata is invalid', () => {
     borderPresetId: null,
     radius: 0,
     shadow: 0,
-    showBorder: false,
+    showBorder: true,
     strokeColor: '#475569',
     strokeOpacity: 1,
     strokeStyle: 'solid',

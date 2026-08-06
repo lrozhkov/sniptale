@@ -87,6 +87,7 @@ describe('useCalloutSettingsPopoverState', () => {
     };
     const preset = {
       ...createSystemCalloutPresetCatalog()[0]!,
+      content: { titleText: 'Template heading' },
       placement: { anchor: 'bottom-right', side: 'bottom' } as const,
     };
     const listener = vi.fn();
@@ -97,6 +98,10 @@ describe('useCalloutSettingsPopoverState', () => {
 
     expect(latestState?.localSettings.placement).toEqual(settings.placement);
     expect(latestState?.localSettings.sourcePresetId).toBe(preset.id);
+    expect(latestState?.localSettings.content).toEqual({
+      bodyHtml: '',
+      titleText: 'Template heading',
+    });
     expect(listener.mock.calls[0]?.[0].settings).not.toHaveProperty('placement');
     cleanup();
   });

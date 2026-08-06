@@ -9,7 +9,11 @@ import {
   TextCursorInput,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
+import {
+  ContentToolbarButton,
+  ContentToolbarDivider,
+  ContentToolbarGroup,
+} from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -299,7 +303,7 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
   const pending = props.pendingMode !== null && props.pendingMode !== undefined;
 
   return (
-    <>
+    <ContentToolbarGroup className="sniptale-page-editing-mode-group">
       {(['block-selection', 'direct-text', 'ai'] as ToolbarPageEditingMode[]).map((mode) => (
         <PageEditingModeButton
           key={mode}
@@ -309,7 +313,7 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
           onSelect={props.onSelectPageEditingMode}
         />
       ))}
-    </>
+    </ContentToolbarGroup>
   );
 }
 
@@ -329,29 +333,37 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   });
 
   return (
-    <ContentToolbarGroup className="sniptale-mode-selector-group">
-      <div className="sniptale-mode-wrapper">
-        <ModeSelectorButton
-          label={buttonCopy.label}
-          disabled={pending}
-          menuIndicator
-          onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
-          open={open}
-          triggerRef={triggerRef}
-        >
-          {getModeIcon(selectedMode)}
-        </ModeSelectorButton>
-
-        {open ? (
-          <ToolbarModeMenu
-            menuRef={menuRef}
-            onClose={() => props.toolbarMenuState.closeMenu('mode')}
-            triggerProps={props}
+    <>
+      <ContentToolbarGroup className="sniptale-mode-selector-group">
+        <div className="sniptale-mode-wrapper">
+          <ModeSelectorButton
+            label={buttonCopy.label}
+            disabled={pending}
+            menuIndicator
+            onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
+            open={open}
             triggerRef={triggerRef}
-          />
-        ) : null}
-      </div>
+          >
+            {getModeIcon(selectedMode)}
+          </ModeSelectorButton>
+
+          {open ? (
+            <ToolbarModeMenu
+              menuRef={menuRef}
+              onClose={() => props.toolbarMenuState.closeMenu('mode')}
+              triggerProps={props}
+              triggerRef={triggerRef}
+            />
+          ) : null}
+        </div>
+      </ContentToolbarGroup>
+      {selectedMode === 'cursor' ? null : (
+        <ContentToolbarDivider
+          className="sniptale-mode-leading-divider"
+          dataUi="content.toolbar.mode-leading-divider"
+        />
+      )}
       <ToolbarQuickEditModeButtons {...props} />
-    </ContentToolbarGroup>
+    </>
   );
 }
