@@ -117,12 +117,12 @@ describe('interactive-frame render model', () => {
     });
     expect(display.strokeStyle).toMatchObject({
       position: 'absolute',
-      inset: 0,
-      width: '100%',
-      height: '100%',
+      inset: -5,
+      width: 'calc(100% + 10px)',
+      height: 'calc(100% + 10px)',
       boxSizing: 'border-box',
       border: testCase.decorationVisible ? '5px dashed rgba(37, 99, 235, 0.4)' : 'none',
-      borderRadius: '8px',
+      borderRadius: '13px',
       background: 'transparent',
     });
     expect(display.frameZIndex).toBe(41);

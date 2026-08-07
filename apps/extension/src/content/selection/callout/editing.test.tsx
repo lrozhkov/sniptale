@@ -9,16 +9,18 @@ import { dispatchCalloutBlurRequest } from '../../platform/page-context/frame-ev
 import { useCalloutEditing } from './editing';
 
 function CalloutEditingLifecycleHarness(props: {
+  htmlContent?: string;
+  onDelete?: () => void;
   onContentChange: (html: string) => void;
   onStopEditing: () => void;
 }) {
   const [isEditing, setIsEditing] = React.useState(true);
   const editing = useCalloutEditing({
     frameId: 'frame-1',
-    htmlContent: '<p>initial</p>',
+    htmlContent: props.htmlContent ?? '<p>initial</p>',
     isEditing,
     onContentChange: props.onContentChange,
-    onDelete: vi.fn(),
+    onDelete: props.onDelete ?? vi.fn(),
     onStartEditing: vi.fn(),
     onStopEditing: () => {
       props.onStopEditing();
@@ -62,6 +64,9 @@ afterEach(() => {
 });
 
 function renderHarness(props: {
+  editableHtml?: string;
+  htmlContent?: string;
+  onDelete?: () => void;
   onContentChange: (html: string) => void;
   onStopEditing: () => void;
 }): { editable: HTMLDivElement; title: HTMLInputElement; wrapper: HTMLDivElement } {
@@ -70,7 +75,14 @@ function renderHarness(props: {
   root = createRoot(container);
 
   act(() => {
-    root?.render(<CalloutEditingLifecycleHarness {...props} />);
+    root?.render(
+      <CalloutEditingLifecycleHarness
+        {...(props.htmlContent === undefined ? {} : { htmlContent: props.htmlContent })}
+        {...(props.onDelete === undefined ? {} : { onDelete: props.onDelete })}
+        onContentChange={props.onContentChange}
+        onStopEditing={props.onStopEditing}
+      />
+    );
   });
 
   const wrapper = container.querySelector<HTMLDivElement>('[data-ui="callout-wrapper"]');
@@ -79,7 +91,7 @@ function renderHarness(props: {
   expect(editable).toBeInstanceOf(HTMLDivElement);
   const title = container.querySelector<HTMLInputElement>('[data-ui="callout-title"]');
   expect(title).toBeInstanceOf(HTMLInputElement);
-  editable!.innerHTML = '<p>updated</p>';
+  editable!.innerHTML = props.editableHtml ?? '<p>updated</p>';
   vi.spyOn(editable!, 'blur').mockImplementation(() => undefined);
 
   return { editable: editable!, title: title!, wrapper: wrapper! };
@@ -175,6 +187,28 @@ describe('useCalloutEditing callout click lifecycle', () => {
     });
 
     expect(history.beginTransactionSpy).toHaveBeenCalledWith('callout-editing:frame-1');
+    expect(onStopEditing).not.toHaveBeenCalled();
+    expect(history.commitTransactionSpy).not.toHaveBeenCalled();
+  });
+
+  it('focuses an empty comment instead of deleting it when its padding is clicked', () => {
+    const history = mockHistoryTransactions();
+    const onDelete = vi.fn();
+    const onStopEditing = vi.fn();
+    const { editable, wrapper } = renderHarness({
+      editableHtml: '',
+      htmlContent: '',
+      onContentChange: vi.fn(),
+      onDelete,
+      onStopEditing,
+    });
+
+    act(() => {
+      wrapper.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(document.activeElement).toBe(editable);
+    expect(onDelete).not.toHaveBeenCalled();
     expect(onStopEditing).not.toHaveBeenCalled();
     expect(history.commitTransactionSpy).not.toHaveBeenCalled();
   });

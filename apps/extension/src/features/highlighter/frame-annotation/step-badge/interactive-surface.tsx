@@ -15,6 +15,7 @@ import { FRAME_ANNOTATION_Z_INDEX } from '../interaction/z-index';
 export function FrameStepBadgeInteractiveSurface(props: {
   borderColor: string;
   borderWidth: number;
+  chromeScale?: number;
   controlsPortalTarget: Element | DocumentFragment;
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   fillColor?: string;
@@ -34,6 +35,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
 }) {
   const interaction = useStepBadgeInteraction({
     borderWidth: props.borderWidth,
+    ...(props.chromeScale === undefined ? {} : { chromeScale: props.chromeScale }),
     ...(props.coordinateSpace ? { coordinateSpace: props.coordinateSpace } : {}),
     frameRect: props.frameRect,
     isSettingsOpen: props.isSettingsOpen,
@@ -52,6 +54,9 @@ export function FrameStepBadgeInteractiveSurface(props: {
       onMouseLeave={interaction.visibility.handleMouseLeave}
       settings={interaction.effectiveSettings}
       zIndex={0}
+      {...(props.chrome === 'export' || props.chromeScale === undefined
+        ? {}
+        : { visualScale: props.chromeScale })}
       {...(props.fillColor ? { fillColor: props.fillColor } : {})}
       {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
       {...(props.shadow === undefined ? {} : { shadow: props.shadow })}

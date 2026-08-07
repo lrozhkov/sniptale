@@ -8,6 +8,8 @@ import {
 } from './dispatch';
 import type { ToolbarClickEvent } from './dispatch';
 import { getFrameAnnotationCommandSchema } from '../../../../features/highlighter/frame-annotation/commands';
+import { appendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
+import { createDefaultFrameCallout } from '../../../../features/highlighter/frame-annotation/defaults';
 
 export function createEffectButtons() {
   return getFrameAnnotationCommandSchema()
@@ -62,9 +64,12 @@ export function startFrameCalloutEditing(
   props.clearSelection?.();
 }
 
-export function createInteractiveFrameToolbarActions(props: InteractiveFrameToolbarProps) {
+export function createInteractiveFrameToolbarActions(
+  props: InteractiveFrameToolbarProps,
+  captureVisibilityToggle?: () => void
+) {
   return {
-    ...createSharedToolbarClickHandlers(props),
+    ...createSharedToolbarClickHandlers(props, captureVisibilityToggle),
     handleStepBadgeClick: (event: ToolbarClickEvent) => {
       event.preventDefault();
       event.stopPropagation();
@@ -80,6 +85,7 @@ export function createInteractiveFrameToolbarActions(props: InteractiveFrameTool
       event.preventDefault();
       event.stopPropagation();
       event.nativeEvent.stopImmediatePropagation();
+      props.setActiveCalloutIndex?.(0);
       const hasCallout = props.frame.callout?.enabled ?? false;
       if (!hasCallout) {
         startFrameCalloutEditing({
@@ -91,7 +97,36 @@ export function createInteractiveFrameToolbarActions(props: InteractiveFrameTool
         });
         return;
       }
-      props.togglePopover(props.frame.id, 'callout-settings');
+      props.togglePopover(props.frame.id, 'callout-settings', 0);
+    },
+    handleAddCalloutClick: (event: ToolbarClickEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent.stopImmediatePropagation();
+      if (!props.frame.callout?.enabled) return;
+      let appended = appendFrameCallout(props.frame, createDefaultFrameCallout());
+      let nextFrame: typeof props.frame;
+      if (props.stageCalloutFrame) {
+        appended = null;
+        nextFrame = props.stageCalloutFrame((current) => {
+          const latest = appendFrameCallout(current, createDefaultFrameCallout());
+          if (!latest) return current;
+          appended = latest;
+          return latest.frame as typeof props.frame;
+        });
+      } else {
+        if (!appended) return;
+        nextFrame = appended.frame as typeof props.frame;
+        props.setTempFrame?.(nextFrame);
+      }
+      if (!appended) return;
+      props.closePopover();
+      pagePreparationHistory.beginTransaction(`callout-editing:${props.frame.id}`);
+      props.onUpdate(nextFrame);
+      props.setActiveCalloutIndex?.(appended.calloutIndex);
+      props.setState('idle');
+      props.setIsCalloutEditing(true);
+      props.clearSelection?.();
     },
   };
 }

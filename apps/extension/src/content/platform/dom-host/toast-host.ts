@@ -4,6 +4,7 @@ import {
 } from '@sniptale/ui/product-feedback/toast-service';
 
 import { appendToContentOverlayRoot, queryContentUiElement } from './ui';
+import { getContentUiScaleSnapshot, subscribeContentUiScale } from './ui-scale';
 
 function isContentToastHostHidden(): boolean {
   const appElement = queryContentUiElement('.sniptale-app');
@@ -17,7 +18,15 @@ function isContentToastHostHidden(): boolean {
 
 const contentToastHostAdapter: ToastHostAdapter = {
   appendHost: appendToContentOverlayRoot,
+  getHostStyle: (index) => {
+    const uiScale = getContentUiScaleSnapshot();
+    return {
+      right: `${20 * uiScale}px`,
+      top: `${(60 + index * 64) * uiScale}px`,
+    };
+  },
   isHidden: isContentToastHostHidden,
+  subscribePositionChanges: subscribeContentUiScale,
 };
 
 export function installContentToastHostAdapter(): () => void {

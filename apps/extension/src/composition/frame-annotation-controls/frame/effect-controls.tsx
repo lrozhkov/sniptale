@@ -113,25 +113,40 @@ export function FrameBlurControls(props: {
 }
 
 export function FrameFocusControls(props: {
+  handleFocusBlurChange: (blurAmount: number) => void;
   handleFocusChange: (opacity: number) => void;
   settings: FocusSettings;
 }) {
-  const label = translate('content.overlayControls.focusDimmingLabelPrefix');
-  const value = Math.round(props.settings.opacity * 100);
-  const handleChange = (nextValue: number) => props.handleFocusChange(nextValue / 100);
+  const dimmingLabel = translate('content.overlayControls.focusDimmingLabelPrefix');
+  const blurLabel = translate('content.overlayControls.focusBlurLabel');
+  const dimmingValue = Math.round(props.settings.opacity * 100);
+  const handleDimmingChange = (nextValue: number) => props.handleFocusChange(nextValue / 100);
   return (
     <ContentPopoverSection>
-      <NumericRow
-        appearance="plain"
-        label={label}
-        max={100}
-        min={10}
-        onCommitValue={handleChange}
-        onPreviewValue={handleChange}
-        scrub={{ max: 100, min: 10 }}
-        unit="%"
-        value={value}
-      />
+      <div className="grid gap-3">
+        <NumericRow
+          appearance="plain"
+          label={dimmingLabel}
+          max={100}
+          min={0}
+          onCommitValue={handleDimmingChange}
+          onPreviewValue={handleDimmingChange}
+          scrub={{ max: 100, min: 0 }}
+          unit="%"
+          value={dimmingValue}
+        />
+        <NumericRow
+          appearance="plain"
+          label={blurLabel}
+          max={25}
+          min={0}
+          onCommitValue={props.handleFocusBlurChange}
+          onPreviewValue={props.handleFocusBlurChange}
+          scrub={{ max: 25, min: 0 }}
+          unit="px"
+          value={props.settings.blurAmount ?? 0}
+        />
+      </div>
     </ContentPopoverSection>
   );
 }

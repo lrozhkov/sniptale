@@ -147,6 +147,11 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   selectCategory('highlighter.editor.effectsSection');
   await act(async () => {
     setInputValue(getRangeInput('highlighter.editor.shadowLabel'), '100');
+    container
+      ?.querySelector<HTMLButtonElement>(
+        'button[aria-label="highlighter.editor.hideFrameDuringCaptureLabel"]'
+      )
+      ?.click();
   });
 
   selectCategory('highlighter.editor.customCssLabel');
@@ -167,6 +172,9 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   expect(paddingUpdates).toContainEqual({ ...state.padding, left: 14 });
   expect(state.setStyle).toHaveBeenCalledWith('dashed');
   expect(state.setShadow).toHaveBeenCalledWith(100);
+  expect(state.setEffects).toHaveBeenCalledWith(
+    expect.objectContaining({ capture: { hideFrame: true } })
+  );
   expect(state.handleResizeStart).toHaveBeenCalledOnce();
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
@@ -277,5 +285,49 @@ describe('BorderPresetEditorFields', () => {
       'highlighter.editor.blurTypeDistortion',
       'highlighter.editor.blurTypeSolid',
     ]);
+  });
+
+  it('writes linked comment and numbering template identifiers through the effects section', async () => {
+    const state = createState();
+    const onChange = vi.fn();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    await act(async () => {
+      root?.render(
+        <BorderStyleInspector
+          cssDraft=""
+          cssError={null}
+          linkedTemplateOptions={{
+            callouts: [{ label: 'Linked comment', value: 'callout-1' }],
+            stepBadges: [{ label: 'Linked number', value: 'badge-1' }],
+          }}
+          onChange={onChange}
+          onCssDraftChange={vi.fn()}
+          style={state}
+        />
+      );
+    });
+
+    selectCategory('highlighter.editor.effectsSection');
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>(
+          '[aria-label="highlighter.editor.linkedCalloutTemplateLabel"]'
+        )
+        ?.click();
+    });
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (candidate) => candidate.textContent === 'Linked comment'
+    );
+    act(() => option?.click());
+
+    expect(onChange).toHaveBeenCalledWith({
+      effects: expect.objectContaining({
+        linkedTemplates: { calloutPresetId: 'callout-1', stepBadgePresetId: null },
+      }),
+    });
   });
 });

@@ -121,3 +121,25 @@ it('disables the matching frame callout and leaves unrelated frames untouched', 
   });
   expect(frames.getFrames()[1]).toEqual(untouchedFrame);
 });
+
+it('updates and deletes an addressed additional callout without mutating the primary one', () => {
+  const extra = {
+    ...structuredClone(baseCallout),
+    content: { bodyHtml: '<p>extra</p>', titleText: '' },
+  };
+  const frames = createFramesHarness([
+    createFrame({ callout: structuredClone(baseCallout), additionalCallouts: [extra] }),
+  ]);
+
+  createCalloutPopoverSettingsHandler({ setFrames: frames.setFrames })({
+    calloutIndex: 1,
+    frameId: 'frame-1',
+    settings: { content: { bodyHtml: '<p>changed</p>' } },
+  });
+
+  expect(frames.getFrames()[0]?.callout?.content.bodyHtml).toBe('<p>base</p>');
+  expect(frames.getFrames()[0]?.additionalCallouts?.[0]?.content.bodyHtml).toBe('<p>changed</p>');
+  createCalloutDeleteHandler(frames.setFrames)({ calloutIndex: 1, frameId: 'frame-1' });
+  expect(frames.getFrames()[0]?.additionalCallouts).toEqual([]);
+  expect(frames.getFrames()[0]?.callout?.enabled).toBe(true);
+});

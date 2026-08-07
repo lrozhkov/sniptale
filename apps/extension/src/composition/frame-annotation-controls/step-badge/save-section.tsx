@@ -9,8 +9,12 @@ import { TemplateSaveSettings } from '../../../ui/highlighter-preset-editor/temp
 
 export function StepBadgeSaveSection(props: {
   embedded?: boolean;
-  onCreate: (name: string, settings: StepBadgeTemplateSettings) => Promise<{ outcome: string }>;
+  onCreate: (
+    name: string,
+    settings: StepBadgeTemplateSettings
+  ) => Promise<{ id?: string; outcome: string }>;
   onFloatingInteractionChange?: (open: boolean) => void;
+  onCreated?: (templateId: string) => void;
   onUpdate: (
     preset: StepBadgePreset,
     settings: StepBadgeTemplateSettings
@@ -26,12 +30,20 @@ export function StepBadgeSaveSection(props: {
       duplicateNameErrorLabel={translate('content.stepBadge.templateNameExists')}
       nameLabel={translate('content.stepBadge.templateName')}
       onCreate={(name) =>
-        props.onCreate(name, props.settings).then((result) => result.outcome === 'applied')
+        props.onCreate(name, props.settings).then((result) => {
+          if (result.outcome !== 'applied') return false;
+          if (result.id) props.onCreated?.(result.id);
+          return true;
+        })
       }
       onOverwrite={(templateId) => {
         const template = props.presets.find((item) => item.id === templateId);
         return template
-          ? props.onUpdate(template, props.settings).then((result) => result.outcome === 'applied')
+          ? props.onUpdate(template, props.settings).then((result) => {
+              if (result.outcome !== 'applied') return false;
+              props.onCreated?.(templateId);
+              return true;
+            })
           : Promise.resolve(false);
       }}
       options={props.presets.map((preset) => ({

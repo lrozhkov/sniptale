@@ -64,6 +64,7 @@ describe('callout interaction handles', () => {
   it('renders the comment grip and boundary-constrained tail point', () => {
     const markup = renderToStaticMarkup(renderCalloutInteractionHandles(createProps()));
 
+    expect(markup).toContain('sniptale-callout-adjacent-controls');
     expect(markup).toContain('sniptale-callout-drag-handle');
     expect(markup).toContain('sniptale-callout-settings-handle');
     expect(markup).toContain('sniptale-callout-tail-handle');

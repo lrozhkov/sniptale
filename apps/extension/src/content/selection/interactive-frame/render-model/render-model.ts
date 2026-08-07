@@ -36,11 +36,13 @@ export function getInteractiveFrameDisplay(params: {
   effectMode: EffectMode;
   state: FrameState;
   zIndex: number;
+  visualScale?: number;
 }) {
   const { frame, currentFrame, effectMode, state, zIndex } = params;
   const scene = resolveFrameAnnotationVisualScene({
     frame: { ...currentFrame, effectMode },
     state,
+    ...(params.visualScale === undefined ? {} : { visualScale: params.visualScale }),
   });
 
   return {

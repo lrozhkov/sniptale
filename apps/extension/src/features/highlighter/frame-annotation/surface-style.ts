@@ -57,18 +57,19 @@ export function getFrameAnnotationStrokeStyle(params: {
   borderRadius: number;
   boxShadow?: string;
 }): CSSProperties {
+  const outwardWidth = Math.max(0, params.borderWidth);
   return {
     position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
+    inset: outwardWidth === 0 ? 0 : -outwardWidth,
+    width: `calc(100% + ${outwardWidth * 2}px)`,
+    height: `calc(100% + ${outwardWidth * 2}px)`,
     boxSizing: 'border-box',
     margin: 0,
     padding: 0,
     border: params.visible
       ? `${params.borderWidth}px ${params.borderStyle} ${params.borderColor}`
       : 'none',
-    borderRadius: `${params.borderRadius}px`,
+    borderRadius: `${params.borderRadius === 0 ? 0 : params.borderRadius + outwardWidth}px`,
     boxShadow: params.visible ? params.boxShadow : undefined,
     background: 'transparent',
     zIndex: 1,

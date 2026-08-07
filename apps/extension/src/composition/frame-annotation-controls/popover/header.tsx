@@ -10,8 +10,10 @@ export function SettingsPopoverHeader(props: {
   closeLabel: string;
   context: SettingsPopoverContext;
   destructiveAction?: { label: string; onClick: () => void };
+  sourceAction?: { description: string; label: string; onClick: () => void };
   drag?: FloatingPopoverDrag;
   onClose: () => void;
+  status?: string;
   title: string;
 }) {
   const draggable = props.context === 'element' && props.drag !== undefined;
@@ -33,6 +35,20 @@ export function SettingsPopoverHeader(props: {
         className="sniptale-settings-popover-header-actions"
         onPointerDown={(event) => event.stopPropagation()}
       >
+        {props.status ? (
+          <span className="sniptale-settings-popover-status">{props.status}</span>
+        ) : null}
+        {props.sourceAction ? (
+          <button
+            aria-label={props.sourceAction.description}
+            className="sniptale-settings-popover-mode-action"
+            onClick={props.sourceAction.onClick}
+            title={props.sourceAction.description}
+            type="button"
+          >
+            {props.sourceAction.label}
+          </button>
+        ) : null}
         {props.destructiveAction ? (
           <button
             className="sniptale-settings-popover-destructive-action"

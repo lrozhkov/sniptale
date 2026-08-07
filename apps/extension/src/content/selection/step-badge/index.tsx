@@ -11,6 +11,7 @@ import {
   resolveContentPortalTarget,
   useContentPortalTheme,
 } from '../interactive-frame/layout/portal';
+import { useContentUiScale } from '../../platform/dom-host';
 
 interface StepBadgeProps {
   settings: StepBadgeSettings;
@@ -31,6 +32,7 @@ interface StepBadgeProps {
 /** Content adapter for the shared badge surface and page-owned portal. */
 export const StepBadge: React.FC<StepBadgeProps> = (props) => {
   const portalTheme = useContentPortalTheme();
+  const chromeScale = useContentUiScale();
   if (!props.frameRect) {
     return (
       <FrameStepBadgeSurface
@@ -50,6 +52,7 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
     <FrameStepBadgeInteractiveSurface
       borderColor={props.borderColor}
       borderWidth={props.borderWidth}
+      chromeScale={chromeScale}
       controlsPortalTarget={portalTarget}
       frameRect={props.frameRect}
       {...(props.onPositionChange ? { onPositionChange: props.onPositionChange } : {})}

@@ -8,6 +8,7 @@ import { InteractiveFrameResizeHandles } from './handles';
 import {
   FrameAnnotationDecoration,
   getFrameAnnotationContainerStyle,
+  isFrameHiddenDuringCapture,
 } from '../../../../features/highlighter/frame-annotation';
 
 interface InteractiveFrameFrameShellProps {
@@ -70,6 +71,7 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       >
         <FrameAnnotationDecoration
           frameId={props.frame.id}
+          hideDuringCapture={isFrameHiddenDuringCapture(props.currentFrame)}
           fillRef={fillRef}
           strokeRef={strokeRef}
           fillStyle={props.fillStyle}
@@ -78,7 +80,11 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
         <InteractiveFrameResizeHandles
           state={props.state}
           isResizeHovered={props.isResizeHovered}
-          tempFrame={props.tempFrame}
+          tempFrame={
+            props.state === 'editing' || props.state === 'resizing'
+              ? props.tempFrame
+              : props.currentFrame
+          }
           borderColor={props.borderColor}
           borderWidth={props.borderWidth}
           onResizeStart={props.handleResizeStart}

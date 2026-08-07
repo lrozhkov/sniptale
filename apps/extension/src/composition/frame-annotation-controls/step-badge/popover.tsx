@@ -23,10 +23,10 @@ import {
   usePopoverOutsideClose,
 } from '../popover/hooks';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { StepBadgePresetEditor } from '../../../ui/highlighter-preset-editor/step-badge';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
+import type { TemplateSourceControl } from '../popover/template-source';
 
 const FUTURE_ID = 'future-frame-step-badge';
 export function FutureStepBadgeSettingsPopover(props: {
@@ -46,6 +46,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   portalTarget?: Element | DocumentFragment;
   headerContext?: SettingsPopoverContext;
   resetKey?: string;
+  templateSourceControl?: TemplateSourceControl;
 }) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [local, setLocal] = useState(props.settings);
@@ -55,6 +56,7 @@ export function FutureStepBadgeSettingsPopover(props: {
     isOpen: props.isOpen,
   });
   const headerContext = props.headerContext ?? 'toolbar';
+  const portalTarget = resolvePopoverPortalTarget(props.portalTarget);
   const presentation = useFrameAnnotationPopoverPresentation({
     anchorEl: props.anchorEl,
     context: headerContext,
@@ -93,6 +95,11 @@ export function FutureStepBadgeSettingsPopover(props: {
     setLocal(next);
     props.onChange(next);
   };
+  const markTemplateCreated = (sourcePresetId: string) => {
+    const next = { ...local, sourcePresetId };
+    setLocal(next);
+    props.onChange(next);
+  };
   const applyPreset = (preset: StepBadgePreset) => {
     const next = createStepBadgeSettingsFromTemplate(preset.settings, preset.id);
     setLocal(next);
@@ -114,7 +121,7 @@ export function FutureStepBadgeSettingsPopover(props: {
       dataUi="content.toolbar.future-step-badge-popover"
       isOpen={props.isOpen}
       popoverRef={popoverRef}
-      portalTarget={resolvePopoverPortalTarget(props.portalTarget)}
+      portalTarget={portalTarget}
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <StepBadgePopoverContent
@@ -127,8 +134,8 @@ export function FutureStepBadgeSettingsPopover(props: {
         onAlphabetChange={(alphabet: StepBadgeAlphabet) => commit({ alphabet })}
         onAnchorChange={(anchor: StepBadgeAnchor) => commit({ anchor, manualPlacement: undefined })}
         onApplyPreset={applyPreset}
+        onForkPreset={() => commit({})}
         onAutoModeChange={(auto) => commit({ auto })}
-        onConfigurePreset={presets.editor.open}
         onCreatePreset={presets.catalog.create}
         onClose={props.onClose}
         onDisable={props.onDisable}
@@ -144,6 +151,7 @@ export function FutureStepBadgeSettingsPopover(props: {
         onShowPresets={presets.catalog.refresh}
         onSettingsChange={commit}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
+        onTemplateCreated={markTemplateCreated}
         onTypeChange={(type: Extract<StepBadgeType, 'number' | 'letter'>) => commit({ type })}
         onUpdatePreset={presets.catalog.update}
         onValueChange={(value) =>
@@ -155,20 +163,10 @@ export function FutureStepBadgeSettingsPopover(props: {
         presetError={presets.catalog.error}
         presets={presets.catalog.visiblePresets}
         templateSettings={template}
+        {...(props.templateSourceControl
+          ? { templateSourceControl: props.templateSourceControl }
+          : {})}
       />
-      {presets.editor.preset ? (
-        <StepBadgePresetEditor
-          isOpen={presets.editor.isOpen}
-          isSaving={presets.editor.isSaving}
-          onClose={presets.editor.close}
-          {...(presets.editor.preset.origin === 'system' &&
-          presets.editor.preset.customized === true
-            ? { onReset: () => presets.editor.reset(presets.editor.preset!) }
-            : {})}
-          onSave={presets.editor.save}
-          preset={presets.editor.preset}
-        />
-      ) : null}
     </ContentPopoverAdapter>
   );
 }

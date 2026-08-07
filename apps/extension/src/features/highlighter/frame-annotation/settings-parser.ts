@@ -32,6 +32,18 @@ function isOptionalString(value: unknown, maxLength: number): boolean {
   return value === undefined || (typeof value === 'string' && value.length <= maxLength);
 }
 
+function isNullableString(value: unknown, maxLength: number): boolean {
+  return value === null || (typeof value === 'string' && value.length <= maxLength);
+}
+
+function isLinkedTemplates(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNullableString(value['calloutPresetId'], 256) &&
+    isNullableString(value['stepBadgePresetId'], 256)
+  );
+}
+
 function isOptionalFinite(value: unknown): boolean {
   return value === undefined || isFiniteNumber(value);
 }
@@ -72,9 +84,16 @@ export function isBorderSettings(value: unknown): boolean {
       (isRecord(effects) &&
         isRecord(effects['blur']) &&
         isRecord(effects['focus']) &&
+        (effects['capture'] === undefined ||
+          (isRecord(effects['capture']) &&
+            (effects['capture']['hideFrame'] === undefined ||
+              typeof effects['capture']['hideFrame'] === 'boolean'))) &&
+        (effects['linkedTemplates'] === undefined ||
+          isLinkedTemplates(effects['linkedTemplates'])) &&
         isFiniteNumber(effects['blur']['amount']) &&
         isOneOf(effects['blur']['blurType'], ['gaussian', 'distortion', 'pixelate', 'solid']) &&
-        isFiniteNumber(effects['focus']['opacity']))) &&
+        isFiniteNumber(effects['focus']['opacity']) &&
+        isOptionalFinite(effects['focus']['blurAmount']))) &&
     isOptionalString(value['sourcePresetId'], 256) &&
     isOptionalString(value['sourcePresetName'], 1_000)
   );
@@ -112,6 +131,10 @@ export function isFocusSettings(value: unknown): boolean {
     isFiniteNumber(value['opacity']) &&
     value['opacity'] >= 0 &&
     value['opacity'] <= 1 &&
+    (value['blurAmount'] === undefined ||
+      (isFiniteNumber(value['blurAmount']) &&
+        value['blurAmount'] >= 0 &&
+        value['blurAmount'] <= 25)) &&
     (value['showBorder'] === undefined || typeof value['showBorder'] === 'boolean')
   );
 }
@@ -382,6 +405,7 @@ export function isCalloutSettings(value: unknown): boolean {
       content['bodyHtml'].length <= 200_000 &&
       typeof content['titleText'] === 'string' &&
       content['titleText'].length <= 10_000 &&
+      isOptionalString(value['instanceId'], 256) &&
       isRecord(placement) &&
       isRecord(style) &&
       isOptionalString(value['sourcePresetId'], 256) &&

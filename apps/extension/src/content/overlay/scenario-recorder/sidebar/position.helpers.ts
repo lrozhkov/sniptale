@@ -1,5 +1,9 @@
 import type { RefObject } from 'react';
 import { queryAllContentUiElements } from '../../../platform/dom-host';
+import {
+  projectClientRectToContentUi,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
 
 export type ScenarioRecorderSidebarPosition = {
   x: number;
@@ -21,12 +25,18 @@ function resolveSidebarRect(position: ScenarioRecorderSidebarPosition, sidebarEl
 
 export function resolveDefaultSidebarPosition(
   sidebarEl: HTMLElement,
-  defaultTop: number
+  defaultTop: number,
+  uiScale = 1
 ): ScenarioRecorderSidebarPosition {
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
   return {
     x: Math.max(
       SIDEBAR_VIEWPORT_PADDING,
-      window.innerWidth - sidebarEl.offsetWidth - DEFAULT_SIDEBAR_RIGHT
+      viewport.width - sidebarEl.offsetWidth - DEFAULT_SIDEBAR_RIGHT
     ),
     y: defaultTop,
   };
@@ -34,15 +44,21 @@ export function resolveDefaultSidebarPosition(
 
 export function clampScenarioRecorderSidebarPosition(
   position: ScenarioRecorderSidebarPosition,
-  sidebarEl: HTMLElement
+  sidebarEl: HTMLElement,
+  uiScale = 1
 ): ScenarioRecorderSidebarPosition {
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
   const maxX = Math.max(
     SIDEBAR_VIEWPORT_PADDING,
-    window.innerWidth - sidebarEl.offsetWidth - SIDEBAR_VIEWPORT_PADDING
+    viewport.width - sidebarEl.offsetWidth - SIDEBAR_VIEWPORT_PADDING
   );
   const maxY = Math.max(
     SIDEBAR_VIEWPORT_PADDING,
-    window.innerHeight - sidebarEl.offsetHeight - SIDEBAR_VIEWPORT_PADDING
+    viewport.height - sidebarEl.offsetHeight - SIDEBAR_VIEWPORT_PADDING
   );
 
   return {
@@ -53,7 +69,7 @@ export function clampScenarioRecorderSidebarPosition(
 
 function rectsIntersect(
   left: { left: number; right: number; top: number; bottom: number },
-  right: DOMRect
+  right: { left: number; right: number; top: number; bottom: number }
 ) {
   return (
     left.left < right.right &&
@@ -63,14 +79,27 @@ function rectsIntersect(
   );
 }
 
-function resolveFloatingBlockerRects(sidebarRef: RefObject<HTMLElement | null>) {
+function resolveFloatingBlockerRects(sidebarRef: RefObject<HTMLElement | null>, uiScale: number) {
   const sidebarEl = sidebarRef.current;
 
   return queryAllContentUiElements<HTMLElement>(
     '[data-ui="content.toolbar.root"], .sniptale-popover-menu'
   )
     .filter((element) => element !== sidebarEl)
-    .map((element) => element.getBoundingClientRect())
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      return projectClientRectToContentUi(
+        { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+        uiScale
+      );
+    })
+    .map((rect) => ({
+      ...rect,
+      left: rect.x,
+      right: rect.x + rect.width,
+      top: rect.y,
+      bottom: rect.y + rect.height,
+    }))
     .filter((rect) => rect.width > 0 && rect.height > 0)
     .sort((left, right) => left.top - right.top);
 }
@@ -78,14 +107,20 @@ function resolveFloatingBlockerRects(sidebarRef: RefObject<HTMLElement | null>) 
 export function resolveScenarioRecorderSidebarPosition(args: {
   requestedPosition: ScenarioRecorderSidebarPosition;
   sidebarRef: RefObject<HTMLElement | null>;
+  uiScale?: number;
 }) {
   const sidebarEl = args.sidebarRef.current;
   if (!sidebarEl) {
     return args.requestedPosition;
   }
 
-  let nextPosition = clampScenarioRecorderSidebarPosition(args.requestedPosition, sidebarEl);
-  const blockerRects = resolveFloatingBlockerRects(args.sidebarRef);
+  const uiScale = args.uiScale ?? 1;
+  let nextPosition = clampScenarioRecorderSidebarPosition(
+    args.requestedPosition,
+    sidebarEl,
+    uiScale
+  );
+  const blockerRects = resolveFloatingBlockerRects(args.sidebarRef, uiScale);
 
   for (const blockerRect of blockerRects) {
     const sidebarRect = resolveSidebarRect(nextPosition, sidebarEl);
@@ -98,7 +133,8 @@ export function resolveScenarioRecorderSidebarPosition(args: {
         ...nextPosition,
         y: blockerRect.bottom + SIDEBAR_BLOCKER_GAP,
       },
-      sidebarEl
+      sidebarEl,
+      uiScale
     );
   }
 

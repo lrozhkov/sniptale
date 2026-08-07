@@ -5,6 +5,7 @@ export function useAnnotationMarkerDrag(args: {
   offset: AnnotationMarkerOffset;
   onChange: (offset: AnnotationMarkerOffset) => void;
   target: Element;
+  uiScale?: number;
 }) {
   const dragRef = useRef<{
     offset: AnnotationMarkerOffset;
@@ -32,10 +33,14 @@ export function useAnnotationMarkerDrag(args: {
       event.preventDefault();
       event.stopPropagation();
       args.onChange(
-        clampMarkerOffset(args.target, {
-          x: drag.offset.x + event.clientX - drag.x,
-          y: drag.offset.y + event.clientY - drag.y,
-        })
+        clampMarkerOffset(
+          args.target,
+          {
+            x: drag.offset.x + event.clientX - drag.x,
+            y: drag.offset.y + event.clientY - drag.y,
+          },
+          args.uiScale
+        )
       );
     },
     onPointerUp: (event: PointerEvent<HTMLButtonElement>) => {

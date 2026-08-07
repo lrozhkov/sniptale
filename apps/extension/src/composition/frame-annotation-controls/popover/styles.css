@@ -34,6 +34,17 @@
   cursor: default !important;
 }
 
+.sniptale-settings-popover-status {
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-warning) 40%, transparent);
+  border-radius: 999px;
+  color: var(--sniptale-color-warning);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
 .sniptale-settings-popover-mode-action {
   min-height: 22px;
   padding: 2px 7px;

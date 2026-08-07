@@ -13,6 +13,24 @@ const HexColorWithOptionalAlphaSchema = z.union([
   z.string().regex(/^#[0-9A-Fa-f]{8}$/),
 ]);
 
+const BorderPresetEffectsSchema = z.object({
+  blur: z.object({
+    amount: z.number().min(1).max(25),
+    blurType: z.enum(['gaussian', 'distortion', 'pixelate', 'solid']),
+  }),
+  focus: z.object({
+    blurAmount: z.number().min(0).max(25),
+    opacity: z.number().min(0).max(1),
+  }),
+  capture: z.object({ hideFrame: z.boolean() }),
+  linkedTemplates: z
+    .object({
+      calloutPresetId: z.string().min(1).nullable(),
+      stepBadgePresetId: z.string().min(1).nullable(),
+    })
+    .optional(),
+});
+
 export const BorderPresetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(50),
@@ -30,6 +48,7 @@ export const BorderPresetSchema = z.object({
   fillOpacity: z.number().int().min(0).max(100),
   inheritCustomCss: z.boolean(),
   customCss: z.string().max(1000),
+  effects: BorderPresetEffectsSchema.optional(),
   origin: z.enum(['system', 'user']).optional(),
   systemPresetKey: z.enum(SYSTEM_BORDER_PRESET_KEYS).optional(),
   basedOnRevision: z.number().int().min(0).optional(),
@@ -55,7 +74,8 @@ export const BlurSettingsSchema = z.object({
 });
 
 export const FocusSettingsSchema = z.object({
-  opacity: z.number().min(0.1).max(1.0),
+  blurAmount: z.number().min(0).max(25).optional(),
+  opacity: z.number().min(0).max(1.0),
   showBorder: z.boolean().optional(),
 });
 

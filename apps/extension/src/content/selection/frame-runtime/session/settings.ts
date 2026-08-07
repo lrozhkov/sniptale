@@ -48,6 +48,7 @@ export function createFrameSessionSettingsLoader(args: {
         };
         args.sessionFocusSettingsRef.current = {
           ...settings.defaultFocusSettings,
+          blurAmount: effects.focus.blurAmount,
           opacity: effects.focus.opacity,
           showBorder: true,
         };

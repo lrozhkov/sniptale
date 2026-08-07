@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
 
+const { useContentUiScaleMock } = vi.hoisted(() => ({
+  useContentUiScaleMock: vi.fn(() => 1),
+}));
+
+vi.mock('../../../platform/dom-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/dom-host')>()),
+  useContentUiScale: useContentUiScaleMock,
+}));
+
 vi.mock('../controls/primary', () => ({
   ToolbarPrimaryControls: () => <div data-testid="toolbar-primary" />,
 }));
@@ -10,7 +19,12 @@ vi.mock('../controls/secondary', () => ({
   ToolbarSecondaryControls: () => <div data-testid="toolbar-secondary" />,
 }));
 
-function renderToolbarShell(positionReady: boolean, activeMenuType: string | null = null) {
+function renderToolbarShell(
+  positionReady: boolean,
+  activeMenuType: string | null = null,
+  uiScale = 1
+) {
+  useContentUiScaleMock.mockReturnValue(uiScale);
   return renderToStaticMarkup(
     <ToolbarShellContent
       toolbarProps={{} as never}
@@ -22,6 +36,7 @@ function renderToolbarShell(positionReady: boolean, activeMenuType: string | nul
             displayMode: 'horizontal',
             position: { x: 24, y: 12 },
             positionReady,
+            uiScale,
             handleMouseDown: vi.fn(),
           },
           toolbarMenuState: { activeMenuType },
@@ -49,6 +64,13 @@ describe('ToolbarShellContent', () => {
     expect(markup).toContain('left:24px');
     expect(markup).toContain('visibility:visible');
     expect(markup).toContain('pointer-events:auto');
+  });
+
+  it('projects logical toolbar coordinates back into the scaled client surface', () => {
+    const markup = renderToolbarShell(true, null, 0.5);
+
+    expect(markup).toContain('top:6px');
+    expect(markup).toContain('left:12px');
   });
 
   it('owns a viewport interaction guard while a main-toolbar menu is open', () => {

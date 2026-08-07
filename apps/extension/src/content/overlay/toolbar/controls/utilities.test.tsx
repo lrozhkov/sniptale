@@ -80,7 +80,7 @@ describe('ToolbarUtilityButtons', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows sensitive-data blur only in highlighter mode and opens the configure menu action', async () => {
+  it('shows sensitive-data blur in highlighter mode and opens the configure menu action', async () => {
     const props = createProps();
     await renderUtilities({ ...props, highlighterMode: false });
     expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
@@ -89,6 +89,9 @@ describe('ToolbarUtilityButtons', () => {
     expect(
       container?.querySelector('[data-ui="shared.ui.content-toolbar-group"]')?.className
     ).toContain('sniptale-toolbar-highlighter-utilities');
+    expect(
+      container?.querySelector('[data-ui="content.toolbar.annotation-divider"]')
+    ).not.toBeNull();
     const autoBlurButton = container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]');
     expect(autoBlurButton?.parentElement?.className).toContain(
       'sniptale-toolbar-privacy-group-start'
@@ -119,6 +122,19 @@ describe('ToolbarUtilityButtons', () => {
 
     expect(props.autoBlur.onOpenSettings).toHaveBeenCalledTimes(1);
     expect(props.onClearHighlights).not.toHaveBeenCalled();
+  });
+
+  it('shows only sensitive-data blur beside Cursor while pin or scenario allows it', async () => {
+    const props = createProps();
+
+    await renderUtilities({ ...props, highlighterMode: false, isCursorMode: true });
+    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).not.toBeNull();
+    expect(container?.querySelector('[data-ui="content.toolbar.clear-frames-button"]')).toBeNull();
+    expect(container?.querySelectorAll('button')).toHaveLength(1);
+
+    props.autoBlur.autoApplyAllowed = false;
+    await renderUtilities({ ...props, highlighterMode: false, isCursorMode: true });
+    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
   });
 
   it('disables auto-enable when the toolbar is not pinned or scenario-owned', async () => {

@@ -1,4 +1,13 @@
 export { applyIsolatedContentRootStyle } from './isolated';
+export { installContentUiScaleCompensation } from './ui-scale';
+export {
+  getContentUiScaleSnapshot,
+  getContentUiPageZoomRevision,
+  setContentUiPageZoom,
+  setContentUiPageZoomAtRevision,
+  subscribeContentUiScale,
+} from './ui-scale';
+export { useContentUiScale } from './use-ui-scale';
 export {
   appendToContentOverlayRoot,
   getContentEventTargetElement,

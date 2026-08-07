@@ -93,7 +93,7 @@ function registerStepBadgeDisableActionTest(): void {
         onClose={vi.fn()}
         onOffsetToggle={vi.fn()}
         onApplyPreset={vi.fn()}
-        onConfigurePreset={vi.fn()}
+        onForkPreset={vi.fn()}
         onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
         onResetPreset={vi.fn()}
         onShowPresets={vi.fn()}
@@ -112,7 +112,8 @@ function registerStepBadgeDisableActionTest(): void {
 
     expect(markup).toContain('sniptale-toolbar-menu-title');
     expect(markup).toContain('Нумерация');
-    expect(markup).toContain('Шаблоны');
+    expect(markup).toContain('Назад к шаблонам');
+    expect(markup).toContain('Не сохранено');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('sniptale-glass-range-meta');
     expect(markup).toContain('data-ui="content.step-badge.manual-section"');
@@ -125,10 +126,10 @@ function registerStepBadgeDisableActionTest(): void {
 }
 
 function registerStepBadgeConfigurePresetTest(): void {
-  it('opens the persistent preset editor without applying the preset or entering manual mode', () => {
+  it('forks the selected preset into the inline temporary editing mode', () => {
     const preset = createSystemStepBadgePresetCatalog()[0]!;
     const onApplyPreset = vi.fn();
-    const onConfigurePreset = vi.fn();
+    const onForkPreset = vi.fn();
     act(() => {
       if (!container) {
         container = document.createElement('div');
@@ -152,7 +153,7 @@ function registerStepBadgeConfigurePresetTest(): void {
           onApplyPreset={onApplyPreset}
           onAutoModeChange={vi.fn()}
           onClose={vi.fn()}
-          onConfigurePreset={onConfigurePreset}
+          onForkPreset={onForkPreset}
           onCreatePreset={vi.fn(async () => ({ outcome: 'applied' }))}
           onDisable={vi.fn()}
           onOffsetToggle={vi.fn()}
@@ -175,9 +176,9 @@ function registerStepBadgeConfigurePresetTest(): void {
       container?.querySelector<HTMLButtonElement>('.sniptale-callout-preset-action')?.click()
     );
 
-    expect(onConfigurePreset).toHaveBeenCalledWith(preset);
+    expect(onForkPreset).toHaveBeenCalledWith(preset);
     expect(onApplyPreset).not.toHaveBeenCalled();
-    expect(container?.querySelector('nav')).toBeNull();
+    expect(container?.querySelector('nav')).not.toBeNull();
   });
 }
 
@@ -191,7 +192,7 @@ function registerStepBadgeSharedViewActionsTest(): void {
         enabled: index === 1 ? false : true,
       }));
     const onApply = vi.fn();
-    const onConfigure = vi.fn();
+    const onFork = vi.fn();
     const onReset = vi.fn();
     const onToggle = vi.fn();
     const onValueChange = vi.fn();
@@ -210,7 +211,7 @@ function registerStepBadgeSharedViewActionsTest(): void {
             activePresetId={presets[0]!.id}
             error="catalog failed"
             onApply={onApply}
-            onConfigure={onConfigure}
+            onFork={onFork}
             onReset={onReset}
             onToggle={onToggle}
             pending={new Set()}
@@ -257,7 +258,8 @@ function registerStepBadgeSharedViewActionsTest(): void {
       valueInput?.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(onApply).toHaveBeenCalledWith(presets[0]);
-    expect(onConfigure).toHaveBeenCalledTimes(2);
+    expect(onFork).toHaveBeenCalledOnce();
+    expect(onFork).toHaveBeenCalledWith(presets[0]);
     expect(onReset).toHaveBeenCalledWith(presets[0]);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onAutoModeChange).toHaveBeenCalledWith(true);

@@ -5,9 +5,11 @@ import { HighlighterPresetsPanel } from './presets-panel';
 import type { HighlighterSectionContentProps } from './types';
 import { CalloutPresetCatalogSettings } from '../callout-presets';
 import { StepBadgePresetCatalogSettings } from '../step-badge-presets';
+import { useLinkedAnnotationTemplateOptions } from '../../../../composition/frame-annotation-controls/frame/linked-template-options';
 
 export function HighlighterSectionContent(props: HighlighterSectionContentProps) {
   const { presets } = props;
+  const linkedTemplateOptions = useLinkedAnnotationTemplateOptions();
 
   return (
     <div className={settingsSectionClassName}>
@@ -25,6 +27,7 @@ export function HighlighterSectionContent(props: HighlighterSectionContentProps)
         isOpen={presets.isEditorOpen}
         onClose={presets.handleCloseEditor}
         onSave={presets.handleSavePreset}
+        linkedTemplateOptions={linkedTemplateOptions}
         {...(presets.editingPreset === undefined ? {} : { preset: presets.editingPreset })}
       />
     </div>

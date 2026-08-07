@@ -29,10 +29,12 @@ let root: Root;
 
 function createTriggerProps() {
   return {
+    captureVisibility: { hiddenDuringCapture: false, toggle: vi.fn() },
     closePopover: vi.fn(),
     handleStartEditing: vi.fn(),
     hoverFrame: vi.fn(),
     popoverAnchorRef: React.createRef<HTMLButtonElement>(),
+    onUpdate: vi.fn(),
     scheduleHoverFrameHide: vi.fn(),
     selectFrame: vi.fn(),
     setIsCalloutEditing: vi.fn(),
@@ -113,7 +115,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     act(() => {
       root.render(
         <InteractiveFrameToolbarTrigger
-          frame={{ effectMode: 'border', height: 80, id: 'frame-1', width: 180, x: 100, y: 100 }}
+          frame={{ effectMode: 'border', height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
           isVisible
           {...handlers}
         />
@@ -123,7 +125,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     const quickActions = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.sniptale-frame-quick-action')
     );
-    expect(quickActions).toHaveLength(4);
+    expect(quickActions).toHaveLength(5);
     expect(quickActions[0]?.dataset['quickAction']).toBe('settings');
 
     act(() => document.querySelector<HTMLButtonElement>('[data-quick-action="callout"]')?.click());
@@ -152,7 +154,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     act(() => {
       root.render(
         <InteractiveFrameToolbarTrigger
-          frame={{ effectMode, height: 80, id: 'frame-1', width: 180, x: 100, y: 100 }}
+          frame={{ effectMode, height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
           isVisible
           {...handlers}
         />
@@ -172,7 +174,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
     });
   });
 
-  it('renders only the ellipsis when the frame cannot contain the quick actions', () => {
+  it('keeps capture visibility beside the ellipsis when the frame cannot contain optional actions', () => {
     act(() => {
       root.render(
         <InteractiveFrameToolbarTrigger
@@ -186,7 +188,10 @@ describe('InteractiveFrameToolbarTrigger', () => {
     expect(document.querySelector('.sniptale-frame-toolbar-trigger')).toBeInstanceOf(
       HTMLButtonElement
     );
-    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(0);
+    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(1);
+    expect(document.querySelector('[data-quick-action="capture-visibility"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
   });
 
   it('does not duplicate add actions for annotations that already exist', () => {
@@ -199,7 +204,7 @@ describe('InteractiveFrameToolbarTrigger', () => {
             height: 80,
             id: 'frame-1',
             stepBadge: createStepBadgeSettingsFixture({ value: '1' }),
-            width: 180,
+            width: 240,
             x: 100,
             y: 100,
           }}
@@ -209,10 +214,37 @@ describe('InteractiveFrameToolbarTrigger', () => {
       );
     });
 
-    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(2);
+    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(3);
     expect(document.querySelector('[data-quick-action="settings"]')).toBeInstanceOf(
       HTMLButtonElement
     );
     expect(document.querySelector('[data-quick-action="edit"]')).toBeInstanceOf(HTMLButtonElement);
+    expect(document.querySelector('[data-quick-action="capture-visibility"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
+  });
+
+  it('toggles capture-only frame visibility without changing live frame geometry', () => {
+    const handlers = createTriggerProps();
+    const frame = {
+      effectMode: 'border' as const,
+      height: 80,
+      id: 'frame-1',
+      width: 48,
+      x: 100,
+      y: 100,
+    };
+    act(() => {
+      root.render(<InteractiveFrameToolbarTrigger frame={frame} isVisible {...handlers} />);
+    });
+
+    const button = document.querySelector<HTMLButtonElement>(
+      '[data-quick-action="capture-visibility"]'
+    );
+    expect(button?.dataset['active']).toBeUndefined();
+    expect(button?.querySelector('.lucide-eye')).not.toBeNull();
+    act(() => button?.click());
+
+    expect(handlers.captureVisibility.toggle).toHaveBeenCalledOnce();
   });
 });

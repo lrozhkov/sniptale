@@ -13,6 +13,16 @@ export const contentStepBadgeMessages = defineMessageSource({
   modeManual: { ru: 'Вручную', en: 'Manual' },
   switchToManual: { ru: 'Настроить', en: 'Customize' },
   switchToPresets: { ru: 'Шаблоны', en: 'Templates' },
+  templateSourceFrame: { ru: 'От рамки', en: 'From frame' },
+  templateSourceForced: { ru: 'Выбранный', en: 'Selected' },
+  templateSourceFrameHint: {
+    ru: 'Использовать шаблон нумерации, связанный с рамкой. Если он не задан, использовать выбранный здесь.',
+    en: 'Use the numbering template linked to the border. If none is linked, use the template selected here.',
+  },
+  templateSourceForcedHint: {
+    ru: 'Всегда использовать выбранный здесь шаблон нумерации, независимо от настроек рамки.',
+    en: 'Always use the numbering template selected here, regardless of the border settings.',
+  },
   presetsSection: { ru: 'Шаблоны', en: 'Templates' },
   configurePreset: { ru: 'Настроить шаблон', en: 'Configure template' },
   showPreset: { ru: 'Показать шаблон', en: 'Show template' },
@@ -144,6 +154,6 @@ export const contentStepBadgeMessages = defineMessageSource({
   },
   disableButton: {
     ru: 'Выключить',
-    en: 'Disable',
+    en: 'Turn off',
   },
 });

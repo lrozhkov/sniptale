@@ -63,17 +63,14 @@ function expectCanonicalFocusGeometry(showBorder: boolean) {
     height: 70,
   });
 
-  expect(getFocusMaskBox(frame)).toEqual({
-    x: 30,
-    y: 40,
-    width: 150,
-    height: 70,
-  });
+  const expected = { x: 30, y: 40, width: 150, height: 70 };
+
+  expect(getFocusMaskBox(frame)).toEqual(expected);
   expectFocusMaskRectAttributes(frame, {
-    x: '30',
-    y: '40',
-    width: '150',
-    height: '70',
+    x: String(expected.x),
+    y: String(expected.y),
+    width: String(expected.width),
+    height: String(expected.height),
   });
 }
 
@@ -100,7 +97,7 @@ describe('frame-manager-effect-geometry', () => {
   });
 
   it.each([false, true])(
-    'keeps focus on the canonical outer frame rect when decoration visibility is %s',
+    'keeps focus aligned with the frame and overlaps a visible stroke when showBorder=%s',
     expectCanonicalFocusGeometry
   );
 });

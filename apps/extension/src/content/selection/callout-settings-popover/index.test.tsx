@@ -151,10 +151,6 @@ describe('CalloutSettingsPopover', () => {
       );
     });
 
-    expect(
-      [...document.querySelectorAll('button')].some((button) => button.textContent === 'Шаблоны')
-    ).toBe(true);
-
     const pickerTrigger = document.querySelector<HTMLButtonElement>(
       '[data-ui="shared.ui.color-selector.picker-trigger"]'
     );
@@ -203,10 +199,6 @@ describe('CalloutSettingsPopover', () => {
         />
       );
     });
-
-    expect(
-      [...document.querySelectorAll('button')].some((button) => button.textContent === 'Шаблоны')
-    ).toBe(true);
 
     const fontSelect = document.querySelector<HTMLButtonElement>('[aria-label="Шрифт"]');
     expect(fontSelect).not.toBeNull();

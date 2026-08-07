@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { writeSanitizedInnerHtml } from '@sniptale/platform/security/sanitizers/html';
 import { CALLOUT_HTML_SANITIZER_OPTIONS, sanitizeCalloutHtml } from './html';
 import {
@@ -18,6 +18,7 @@ function isEventWithinElement(event: Event, element: Element): boolean {
 export function useCalloutMeasureEffect(args: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   coordinateSpace?: FrameAnnotationCoordinateSpace;
+  measurementScale?: number;
   setDimensions: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
   settingsKey: string;
 }) {
@@ -30,10 +31,15 @@ export function useCalloutMeasureEffect(args: {
       const rect = (
         args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace
       ).clientRectToLogical(domRectToFrameAnnotationRect(element.getBoundingClientRect()));
+      const measurementScale = Math.max(args.measurementScale ?? 1, 0.01);
+      const dimensions = {
+        width: rect.width / measurementScale,
+        height: rect.height / measurementScale,
+      };
       setDimensions((current) =>
-        current.width === rect.width && current.height === rect.height
+        current.width === dimensions.width && current.height === dimensions.height
           ? current
-          : { width: rect.width, height: rect.height }
+          : dimensions
       );
     };
     measure();
@@ -41,15 +47,16 @@ export function useCalloutMeasureEffect(args: {
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [args.coordinateSpace, containerRef, setDimensions, settingsKey]);
+  }, [args.coordinateSpace, args.measurementScale, containerRef, setDimensions, settingsKey]);
 }
 
 export function useCalloutSyncContentEffect(args: {
   contentEditableRef: React.RefObject<HTMLDivElement | null>;
   htmlContent: string;
   isEditing: boolean;
+  pendingHtmlContentRef?: React.MutableRefObject<string | null>;
 }) {
-  const { contentEditableRef, htmlContent, isEditing } = args;
+  const { contentEditableRef, htmlContent, isEditing, pendingHtmlContentRef } = args;
 
   useEffect(() => {
     const el = contentEditableRef.current;
@@ -58,10 +65,15 @@ export function useCalloutSyncContentEffect(args: {
     }
 
     const sanitizedHtml = sanitizeCalloutHtml(htmlContent || '');
+    const pendingHtml = pendingHtmlContentRef?.current;
+    if (pendingHtml !== null && pendingHtml !== undefined) {
+      if (sanitizeCalloutHtml(pendingHtml) !== sanitizedHtml) return;
+      if (pendingHtmlContentRef) pendingHtmlContentRef.current = null;
+    }
     if (el.innerHTML !== sanitizedHtml) {
       writeSanitizedInnerHtml(el, htmlContent || '', CALLOUT_HTML_SANITIZER_OPTIONS);
     }
-  }, [contentEditableRef, htmlContent, isEditing]);
+  }, [contentEditableRef, htmlContent, isEditing, pendingHtmlContentRef]);
 }
 
 export function useCalloutEditingFocusEffect(args: {
@@ -72,7 +84,7 @@ export function useCalloutEditingFocusEffect(args: {
   const { contentEditableRef, htmlContent, isEditing } = args;
   const wasEditingRef = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isEditing) {
       wasEditingRef.current = false;
       return;
@@ -94,9 +106,18 @@ export function useCalloutEditingFocusEffect(args: {
     }
 
     el.focus();
+    const focusRetryId = window.requestAnimationFrame(() => {
+      const interactionRoot = el.closest('.sniptale-callout') ?? el;
+      const root = el.getRootNode();
+      const activeElement =
+        root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+      if (!interactionRoot.contains(activeElement)) {
+        el.focus({ preventScroll: true });
+      }
+    });
     const selection = window.getSelection();
     if (!selection || el.childNodes.length === 0) {
-      return;
+      return () => window.cancelAnimationFrame(focusRetryId);
     }
 
     const range = document.createRange();
@@ -104,6 +125,7 @@ export function useCalloutEditingFocusEffect(args: {
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
+    return () => window.cancelAnimationFrame(focusRetryId);
   }, [contentEditableRef, htmlContent, isEditing]);
 }
 

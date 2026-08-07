@@ -404,6 +404,10 @@ function buildProjection(
       (maximum, frame) => Math.max(maximum, frame.focusSettings?.opacity ?? 0.5),
       0
     ),
+    focusBlurAmount: focusFrames.reduce(
+      (maximum, frame) => Math.max(maximum, frame.focusSettings?.blurAmount ?? 0),
+      0
+    ),
     distortionScale: projected.reduce(
       (maximum, entry) =>
         entry.snapshot.effectMode === 'blur'

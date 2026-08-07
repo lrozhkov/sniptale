@@ -33,6 +33,9 @@ function cloneFrameData(frame: FrameData): FrameData {
     ...(frame.focusSettings === undefined ? {} : { focusSettings: frame.focusSettings }),
     ...(frame.stepBadge === undefined ? {} : { stepBadge: frame.stepBadge }),
     ...(frame.callout === undefined ? {} : { callout: frame.callout }),
+    ...(frame.additionalCallouts === undefined
+      ? {}
+      : { additionalCallouts: frame.additionalCallouts }),
     ...(frame.offset === undefined ? {} : { offset: frame.offset }),
     ...(frame.pagePlacement === undefined ? {} : { pagePlacement: frame.pagePlacement }),
   };
@@ -94,6 +97,7 @@ function useInteractiveFrameRuntimeState(params: {
     tempFrame: params.viewState.tempFrame,
     state: params.viewState.state,
     isCalloutEditing: params.viewState.isCalloutEditing,
+    isCalloutDraftPending: params.viewState.pendingCalloutFrameRef.current !== null,
   });
   const normalizedCurrentFrame = cloneFrameData(currentFrame);
   const { sizePanelCoords, toolbarCoords } = useInteractiveFrameFloatingUiLayout({
@@ -172,6 +176,7 @@ function useInteractiveFrameRuntimeSyncs(params: {
     frame: params.frame,
     isCalloutEditing: params.viewState.isCalloutEditing,
     isResizingRef: params.editing.isResizingRef,
+    pendingCalloutFrameRef: params.viewState.pendingCalloutFrameRef,
     setEffectMode: params.viewState.setEffectMode,
     setState: params.viewState.setState,
     setTempFrame: params.viewState.setTempFrame,
@@ -189,6 +194,7 @@ export function useInteractiveFrameEditLifecycle(
     state: runtime.viewState.state,
     isCalloutEditing: runtime.viewState.isCalloutEditing,
     frameWithoutLinkedElement: runtime.frameWithoutLinkedElement,
+    pendingCalloutFrameRef: runtime.viewState.pendingCalloutFrameRef,
     setTempFrame: runtime.viewState.setTempFrame,
     handleCancelRef: runtime.refs.handleCancelRef,
     handleSaveRef: runtime.refs.handleSaveRef,
@@ -198,6 +204,7 @@ export function useInteractiveFrameEditLifecycle(
     abortPointerSession: runtime.editing.abortPointerSession,
     defaultEffectMode,
     frame,
+    pendingCalloutFrameRef: runtime.viewState.pendingCalloutFrameRef,
     setEffectMode: runtime.viewState.setEffectMode,
     setIsCalloutEditing: runtime.viewState.setIsCalloutEditing,
     closePopover: runtime.viewState.closePopover,
@@ -206,6 +213,7 @@ export function useInteractiveFrameEditLifecycle(
   });
   useInteractiveFrameExternalExitEffects({
     abortPointerSession: runtime.editing.abortPointerSession,
+    pendingCalloutFrameRef: runtime.viewState.pendingCalloutFrameRef,
     state: runtime.viewState.state,
     handleCancel,
     setState: runtime.viewState.setState,

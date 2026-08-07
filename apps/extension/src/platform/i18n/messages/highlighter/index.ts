@@ -307,6 +307,14 @@ export const highlighterMessages = defineMessageSource({
       ru: 'Чем выше значение, тем темнее область вне рамки',
       en: 'Higher values make the outside area darker',
     },
+    focusBlurLabel: {
+      ru: 'Размытие области',
+      en: 'Area blur',
+    },
+    focusBlurHint: {
+      ru: 'Гауссово размытие области вне рамки',
+      en: 'Gaussian blur outside the frame',
+    },
   },
   editor: {
     outlineSection: { ru: 'Контур', en: 'Outline' },
@@ -322,6 +330,22 @@ export const highlighterMessages = defineMessageSource({
     blurTypeSolid: blurTypeSolidMessage,
     focusDefaultsTitle: { ru: 'Фокус (по умолчанию)', en: 'Focus defaults' },
     focusDimmingLabel: { ru: 'Затемнение', en: 'Dimming' },
+    focusBlurLabel: { ru: 'Размытие', en: 'Blur' },
+    captureDefaultsTitle: { ru: 'Снимок (по умолчанию)', en: 'Capture defaults' },
+    hideFrameDuringCaptureLabel: {
+      ru: 'Скрывать рамку во время снимка',
+      en: 'Hide frame during capture',
+    },
+    linkedTemplatesTitle: { ru: 'Связанные шаблоны', en: 'Linked templates' },
+    linkedCalloutTemplateLabel: {
+      ru: 'Комментарий',
+      en: 'Comment',
+    },
+    linkedStepBadgeTemplateLabel: {
+      ru: 'Нумерация',
+      en: 'Numbering',
+    },
+    linkedTemplateNone: { ru: 'Не выбран', en: 'Not selected' },
     saveSection: { ru: 'Сохранение', en: 'Saving' },
     manualNavigation: {
       ru: 'Категории настройки рамки',

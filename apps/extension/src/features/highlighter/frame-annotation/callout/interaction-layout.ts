@@ -50,6 +50,7 @@ type InteractionArgs = {
   ) => void;
   settings: CalloutSettings;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
+  visualScale: number;
   zIndex: number;
 };
 
@@ -63,6 +64,7 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
     maxWidth: args.settings.style.typography.maxWidth,
     onWidthChange: args.onWidthChange,
     wrapperRef: args.wrapperRef,
+    visualScale: args.visualScale,
   });
   const widthSettings: CalloutSettings = {
     ...args.settings,
@@ -84,6 +86,7 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
     frameRect: args.frameRect,
     isEditing: args.isEditing,
     settings: widthSettings,
+    visualScale: args.visualScale,
     zIndex: args.zIndex,
   });
   const createDraggedSettings = (
@@ -117,6 +120,7 @@ function useCalloutPlacementDraft(args: InteractionArgs) {
     ...(args.onMoveEnd ? { onMoveEnd: args.onMoveEnd } : {}),
     ...(args.projectMoveRect ? { projectMoveRect: args.projectMoveRect } : {}),
     wrapperRef: args.wrapperRef,
+    visualScale: args.visualScale,
   });
   const settings = drag.draft
     ? createDraggedSettings(drag.draft.placement, drag.draft.translateConnectorGeometry)
@@ -171,6 +175,7 @@ function getDraggedCalloutSettings(args: {
       ? { previousConnectorSide: args.restingLayout.dynamicTail.side }
       : {}),
     settings: provisionalSettings,
+    visualScale: args.args.visualScale,
     zIndex: args.args.zIndex,
   });
   const connectorGeometry = getTranslatedConnectorGeometry(
@@ -197,13 +202,17 @@ function useCalloutCurveDrafts(args: {
     { kind: 'line' }
   > | null;
   onCurveChange: InteractionArgs['onCurveChange'];
+  visualScale: number;
 }) {
   const handles = args.lineState?.curveHandles ?? null;
   const routeStart = args.lineState?.routePoints[0] ?? null;
   const routeEnd = args.lineState?.routePoints.at(-1) ?? null;
   const routeDistance =
     routeStart && routeEnd ? Math.hypot(routeEnd.x - routeStart.x, routeEnd.y - routeStart.y) : 0;
-  const maximumDistance = Math.min(96, Math.max(24, routeDistance * 0.5));
+  const maximumDistance = Math.min(
+    96,
+    Math.max(24, (routeDistance / Math.max(args.visualScale, 0.01)) * 0.5)
+  );
   const commitHandle = (endpoint: 'startHandle' | 'endHandle', offset: { x: number; y: number }) =>
     args.onCurveChange({ ...args.curve, [endpoint]: offset, mode: 'manual' });
   const startDrag = useCalloutCurveHandleDrag({
@@ -214,6 +223,7 @@ function useCalloutCurveDrafts(args: {
     onChange: (offset) => commitHandle('startHandle', offset),
     origin: routeStart,
     storedOffset: args.curve.startHandle,
+    visualScale: args.visualScale,
   });
   const endDrag = useCalloutCurveHandleDrag({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
@@ -223,6 +233,7 @@ function useCalloutCurveDrafts(args: {
     onChange: (offset) => commitHandle('endHandle', offset),
     origin: routeEnd,
     storedOffset: args.curve.endHandle,
+    visualScale: args.visualScale,
   });
   const draft =
     startDrag.draftOffset || endDrag.draftOffset
@@ -313,6 +324,7 @@ function useCalloutConnectorDrafts(args: {
   onCurveChange: InteractionArgs['onCurveChange'];
   onWaypointChange: InteractionArgs['onWaypointChange'];
   settings: CalloutSettings;
+  visualScale: number;
   wrapperRef: InteractionArgs['wrapperRef'];
 }) {
   const connectorSide = args.baseLayout.dynamicTail?.side ?? null;
@@ -338,6 +350,7 @@ function useCalloutConnectorDrafts(args: {
     onChange: args.onWaypointChange,
     position: args.settings.placement.connectorWaypoint,
     snapPoints: lineState ? [lineState.routePoints[0]!, lineState.routePoints.at(-1)!] : [],
+    visualScale: args.visualScale,
   });
   const curveDrafts = useCalloutCurveDrafts({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
@@ -345,6 +358,7 @@ function useCalloutConnectorDrafts(args: {
     isEditing: args.isEditing,
     lineState,
     onCurveChange: args.onCurveChange,
+    visualScale: args.visualScale,
   });
   const settings = createConnectorDraftSettings({
     curveDraft: curveDrafts.draft,
@@ -403,6 +417,7 @@ function useConnectorAttachmentDrags(
     isEditing: args.isEditing,
     onRangeChange: args.onTailBaseRangeChange,
     startPoint: args.baseLayout.dynamicTail?.attachment.baseEdgeA,
+    visualScale: args.visualScale,
   });
   const lineBaseDrag = useCalloutEdgeDrag({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
@@ -421,6 +436,7 @@ function useConnectorAttachmentDrags(
     perimeterAnchorPositions: bubbleAnchorPositions,
     perimeter: true,
     position: args.settings.placement.connectorBasePosition,
+    visualScale: args.visualScale,
   });
   const tailFrameDrag = useCalloutEdgeDrag({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
@@ -442,6 +458,7 @@ function useConnectorAttachmentDrags(
     perimeterAnchors: getCalloutPerimeterAnchors(args.frameRect),
     perimeter: args.baseLayout.dynamicTail?.kind === 'line',
     position: args.settings.placement.connectorFramePosition,
+    visualScale: args.visualScale,
   });
   return { lineBaseDrag, tailBaseRange, tailFrameDrag };
 }
@@ -455,6 +472,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
     frameRect: args.frameRect,
     isEditing: args.isEditing,
     settings: placement.settings,
+    visualScale: args.visualScale,
     zIndex: args.zIndex,
     ...(previousConnectorSideRef.current
       ? { previousConnectorSide: previousConnectorSideRef.current }
@@ -471,6 +489,7 @@ export function useCalloutInteractionLayout(args: InteractionArgs) {
     onCurveChange: args.onCurveChange,
     onWaypointChange: args.onWaypointChange,
     settings: placement.settings,
+    visualScale: args.visualScale,
     wrapperRef: args.wrapperRef,
   });
   const layout = connector.hasDraft

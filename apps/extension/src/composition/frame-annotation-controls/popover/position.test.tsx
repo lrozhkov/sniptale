@@ -11,6 +11,40 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it('positions a compensated toolbar menu using its visual dimensions', () => {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  toolbar.dataset['displayMode'] = 'horizontal';
+  const anchor = document.createElement('button');
+  anchor.style.setProperty('--sniptale-content-ui-scale', '0.5');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 50, top: 80, width: 250, height: 25 })
+  );
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 100, top: 90, width: 20, height: 15 })
+  );
+  let style: CSSProperties | null = null;
+  const popoverRef = { current: null };
+
+  function Harness() {
+    style = useFrameAnnotationSettingsPopoverPosition({
+      anchorEl: anchor,
+      height: 300,
+      isOpen: true,
+      popoverRef,
+      width: 360,
+    });
+    return null;
+  }
+
+  const root = createRoot(document.createElement('div'));
+  act(() => root.render(<Harness />));
+  expect(style).toMatchObject({ left: 100, top: 110, width: 180 });
+  act(() => root.unmount());
+});
+
 it.each([
   ['horizontal', { left: 100, top: 140 }],
   ['vertical', { left: 550, top: 100 }],

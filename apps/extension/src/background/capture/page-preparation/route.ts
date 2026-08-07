@@ -2,6 +2,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { sendViewerPreparationCommand, type WebSnapshotViewerPorts } from './viewer-ports';
 
 async function enablePreparationForRegularPage(
@@ -13,8 +14,10 @@ async function enablePreparationForRegularPage(
   surfaceWarning?: string,
   toolbarVisible?: boolean
 ): Promise<void> {
+  const pageZoom = await browserTabs.getZoom(tabId).catch(() => undefined);
   await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
+    ...(pageZoom === undefined ? {} : { pageZoom }),
     surfaceCapabilityToken,
     surfaceOperationGeneration,
     ...(surfaceLeaseGeneration === undefined ? {} : { surfaceLeaseGeneration }),

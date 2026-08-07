@@ -28,7 +28,8 @@ function createAdjacentControlStyles(
   layout: CalloutLayout,
   showSettingsHandle: boolean,
   viewport: { height: number; width: number },
-  coordinateSpace?: FrameAnnotationCoordinateSpace
+  coordinateSpace?: FrameAnnotationCoordinateSpace,
+  uiScale = 1
 ) {
   const logicalRect = {
     x: layout.calloutPos.x,
@@ -46,6 +47,7 @@ function createAdjacentControlStyles(
   const position = getAdjacentControlGroupPosition({
     controlCount: showSettingsHandle ? 2 : 1,
     targetRect,
+    uiScale,
     viewport,
   });
   const baseStyle = {
@@ -73,7 +75,8 @@ function createResizeHandleStyles(
     width: layout.calloutDimensions.width,
     height: layout.calloutDimensions.height,
   }) ?? { x: layout.calloutPos.x, y: layout.calloutPos.y, ...layout.calloutDimensions };
-  const centerY = projected.y + projected.height / 2 - 6;
+  const halfHandle = 6;
+  const centerY = projected.y + projected.height / 2 - halfHandle;
   const baseStyle = {
     position: 'fixed' as const,
     top: centerY,
@@ -81,17 +84,18 @@ function createResizeHandleStyles(
   };
 
   return {
-    resizeLeftHandleStyle: { ...baseStyle, left: projected.x - 6 },
+    resizeLeftHandleStyle: { ...baseStyle, left: projected.x - halfHandle },
     resizeRightHandleStyle: {
       ...baseStyle,
-      left: projected.x + projected.width - 6,
+      left: projected.x + projected.width - halfHandle,
     },
   };
 }
 
 function createConnectorControlStyles(
   layout: CalloutLayout,
-  coordinateSpace?: FrameAnnotationCoordinateSpace
+  coordinateSpace?: FrameAnnotationCoordinateSpace,
+  uiScale = 1
 ) {
   const { dynamicTail, effectiveZIndex } = layout;
   const zIndex = effectiveZIndex + 1;
@@ -110,36 +114,42 @@ function createConnectorControlStyles(
       curveHandles?.start && coordinateSpace
         ? coordinateSpace.logicalPointToClient(curveHandles.start)
         : curveHandles?.start,
-      zIndex
+      zIndex,
+      undefined
     ),
     curveEndHandleStyle: createFixedPointStyle(
       curveHandles?.end && coordinateSpace
         ? coordinateSpace.logicalPointToClient(curveHandles.end)
         : curveHandles?.end,
-      zIndex
+      zIndex,
+      undefined
     ),
     tailHandleCursor:
       dynamicTail?.kind === 'line' ? 'grab' : getCalloutTailDragCursor(dynamicTail?.side ?? null),
     tailHandleStyle: createFixedPointStyle(
       projectPoint(tailBaseStartPoint, coordinateSpace),
-      zIndex
+      zIndex,
+      undefined
     ),
     tailBaseEndHandleStyle: createFixedPointStyle(
       projectPoint(tailBaseEndPoint, coordinateSpace),
-      zIndex
+      zIndex,
+      undefined
     ),
     tailFrameHandleStyle: createFixedPointStyle(
       projectPoint(dynamicTail?.attachment.tipPoint, coordinateSpace),
-      zIndex
+      zIndex,
+      undefined
     ),
     waypointHandleStyle: createFixedPointStyle(
       projectPoint(routeControlPoint, coordinateSpace),
-      zIndex
+      zIndex,
+      undefined
     ),
     waypointAngleStyle: createFixedPointStyle(
       projectPoint(routeControlPoint, coordinateSpace),
       zIndex + 1,
-      { x: 12, y: -28 }
+      { x: 12 * uiScale, y: -28 * uiScale }
     ),
   };
 }
@@ -155,6 +165,7 @@ export function createCalloutHandleStyles(args: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   layout: CalloutLayout;
   showSettingsHandle: boolean;
+  uiScale?: number;
   viewport: { height: number; width: number };
 }) {
   return {
@@ -162,9 +173,10 @@ export function createCalloutHandleStyles(args: {
       args.layout,
       args.showSettingsHandle,
       args.viewport,
-      args.coordinateSpace
+      args.coordinateSpace,
+      args.uiScale
     ),
-    ...createConnectorControlStyles(args.layout, args.coordinateSpace),
+    ...createConnectorControlStyles(args.layout, args.coordinateSpace, args.uiScale),
     ...createResizeHandleStyles(args.layout, args.coordinateSpace),
   };
 }

@@ -84,6 +84,22 @@ function expectFrameBorderVisualChangesInvalidateDescriptors() {
   expect(areFrameRenderDescriptorsEqual(initialDescriptors, changedDescriptors)).toBe(false);
 }
 
+function expectFocusBlurChangesInvalidateDescriptors() {
+  const initialFrame = createFrame('frame-1');
+  initialFrame.effectMode = 'focus';
+  initialFrame.focusSettings = { blurAmount: 0, opacity: 0.5, showBorder: true };
+  const changedFrame = structuredClone(initialFrame);
+  changedFrame.focusSettings!.blurAmount = 12;
+  const frameStates = createFrameStates([['frame-1', 'idle']]);
+
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([initialFrame], frameStates),
+      buildFrameRenderDescriptors([changedFrame], frameStates)
+    )
+  ).toBe(false);
+}
+
 function expectPlacementChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
   initialFrame.callout = createCallout();
@@ -101,6 +117,29 @@ function expectPlacementChangesInvalidateDescriptors() {
       buildFrameRenderDescriptors([changedFrame], frameStates)
     )
   ).toBe(false);
+}
+
+function expectAdditionalCalloutChangesInvalidateDescriptors() {
+  const initialFrame = createFrame('frame-1');
+  initialFrame.callout = createCallout();
+  const addedFrame = structuredClone(initialFrame);
+  addedFrame.additionalCallouts = [{ ...createCallout(), instanceId: 'extra-1' }];
+  const editedFrame = structuredClone(addedFrame);
+  editedFrame.additionalCallouts![0]!.content.bodyHtml = 'Edited extra';
+  const removedFrame = structuredClone(editedFrame);
+  removedFrame.additionalCallouts = [];
+  const frameStates = createFrameStates([['frame-1', 'idle']]);
+  const descriptor = (frame: FrameData) => buildFrameRenderDescriptors([frame], frameStates);
+
+  expect(areFrameRenderDescriptorsEqual(descriptor(initialFrame), descriptor(addedFrame))).toBe(
+    false
+  );
+  expect(areFrameRenderDescriptorsEqual(descriptor(addedFrame), descriptor(editedFrame))).toBe(
+    false
+  );
+  expect(areFrameRenderDescriptorsEqual(descriptor(editedFrame), descriptor(removedFrame))).toBe(
+    false
+  );
 }
 
 function expectStepBadgePlacementChangesInvalidateDescriptors() {
@@ -291,8 +330,16 @@ describe('frame-roots-renderer-dom descriptors', () => {
     expectFrameBorderVisualChangesInvalidateDescriptors
   );
   it(
+    'treats focus blur changes as render invalidation',
+    expectFocusBlurChangesInvalidateDescriptors
+  );
+  it(
     'treats free-frame and manual-callout placement as render invalidation',
     expectPlacementChangesInvalidateDescriptors
+  );
+  it(
+    'treats additional callout add, edit and removal as render invalidation',
+    expectAdditionalCalloutChangesInvalidateDescriptors
   );
   it(
     'treats manual step-badge placement as render invalidation',

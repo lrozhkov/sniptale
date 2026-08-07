@@ -13,7 +13,7 @@ import { create, type StateCreator } from 'zustand';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 type FramePopoverKind = 'frame-settings' | 'step-badge' | 'callout-settings';
-export type ActiveFramePopover = { frameId: string; kind: FramePopoverKind };
+export type ActiveFramePopover = { frameId: string; kind: FramePopoverKind; calloutIndex?: number };
 
 export interface FrameUIState {
   hoveredFrameId: string | null;
@@ -28,8 +28,8 @@ export interface FrameUIState {
   clearSelection: () => void;
   dismissFrame: (frameId: string) => void;
   dismissFrameUi: () => void;
-  togglePopover: (frameId: string, kind: FramePopoverKind) => void;
-  toggleQuickPopover: (frameId: string, kind: FramePopoverKind) => void;
+  togglePopover: (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => void;
+  toggleQuickPopover: (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => void;
   closePopover: () => void;
   setResizeFrame: (frameId: string | null) => void;
   reset: () => void;
@@ -63,7 +63,7 @@ function cancelHoverHideTimer(frameId?: string) {
 }
 
 function createOpenPopoverAction(set: FrameStoreSet, get: FrameStoreGet) {
-  return (frameId: string, kind: FramePopoverKind) => {
+  return (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => {
     const state = get();
     logger.debug('openPopover called', {
       frameId,
@@ -78,14 +78,17 @@ function createOpenPopoverAction(set: FrameStoreSet, get: FrameStoreGet) {
         hoveredFrameId: null,
         selectedFrameId: frameId,
         toolbarAnchorOffset: null,
-        activePopover: { frameId, kind },
+        activePopover: { frameId, kind, ...(calloutIndex === undefined ? {} : { calloutIndex }) },
         resizeFrameId: null,
       });
       return;
     }
 
     logger.debug('openPopover succeeded', frameId);
-    set({ activePopover: { frameId, kind }, resizeFrameId: null });
+    set({
+      activePopover: { frameId, kind, ...(calloutIndex === undefined ? {} : { calloutIndex }) },
+      resizeFrameId: null,
+    });
   };
 }
 
@@ -158,24 +161,35 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
       });
     },
 
-    togglePopover: (frameId: string, kind: FramePopoverKind) => {
+    togglePopover: (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => {
       const state = get();
-      if (state.activePopover?.frameId === frameId && state.activePopover.kind === kind) {
+      if (
+        state.activePopover?.frameId === frameId &&
+        state.activePopover.kind === kind &&
+        state.activePopover.calloutIndex === calloutIndex
+      ) {
         set({ activePopover: null });
         return;
       }
-      createOpenPopoverAction(set, get)(frameId, kind);
+      createOpenPopoverAction(set, get)(frameId, kind, calloutIndex);
     },
 
-    toggleQuickPopover: (frameId: string, kind: FramePopoverKind) => {
+    toggleQuickPopover: (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => {
       const state = get();
       const activePopover = state.activePopover;
       if (state.selectedFrameId !== null) return;
-      if (activePopover?.frameId === frameId && activePopover.kind === kind) {
+      if (
+        activePopover?.frameId === frameId &&
+        activePopover.kind === kind &&
+        activePopover.calloutIndex === calloutIndex
+      ) {
         set({ activePopover: null });
         return;
       }
-      set({ activePopover: { frameId, kind }, resizeFrameId: null });
+      set({
+        activePopover: { frameId, kind, ...(calloutIndex === undefined ? {} : { calloutIndex }) },
+        resizeFrameId: null,
+      });
     },
 
     closePopover: () => {

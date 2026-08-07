@@ -7,6 +7,7 @@ import { FeedbackPanelHeader } from './header';
 import { useFeedbackPanelLifecycle } from './lifecycle';
 import { FeedbackList } from './list';
 import { useFeedbackPanelPosition } from './position';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 export function DesignReviewFeedbackPanel(props: {
   onClose: () => void;
@@ -20,6 +21,7 @@ export function DesignReviewFeedbackPanel(props: {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FeedbackActionFilter>('all');
   const [filterOpen, setFilterOpen] = useState(false);
+  const uiScale = useContentUiScale();
   useSyncExternalStore(
     browserAnnotationSession.subscribe,
     () => browserAnnotationSession.getState().revision,
@@ -28,7 +30,7 @@ export function DesignReviewFeedbackPanel(props: {
   const records = browserAnnotationSession
     .getState()
     .domRecords.filter(isDesignReviewFeedbackRecord);
-  const drag = useFeedbackPanelPosition(panelRef, props.open);
+  const drag = useFeedbackPanelPosition(panelRef, props.open, uiScale);
   const lifecycle = useFeedbackPanelLifecycle({
     filterOpen,
     filterRootRef,
@@ -44,13 +46,17 @@ export function DesignReviewFeedbackPanel(props: {
     <aside
       ref={panelRef}
       className={[
-        'pointer-events-auto fixed z-[2147483646] flex w-[min(408px,calc(100vw-24px))]',
-        'max-h-[calc(100vh-24px)] flex-col overflow-visible rounded-[14px] border shadow-2xl',
+        'pointer-events-auto fixed z-[2147483646] flex flex-col overflow-visible rounded-[14px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       data-ui="content.design-review.feedback-panel"
-      style={{ left: drag.position.x, top: drag.position.y }}
+      style={{
+        left: drag.position.x * uiScale,
+        top: drag.position.y * uiScale,
+        width: 'min(408px, calc(var(--sniptale-content-ui-viewport-width) - 24px))',
+        maxHeight: 'calc(var(--sniptale-content-ui-viewport-height) - 24px)',
+      }}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >

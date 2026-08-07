@@ -19,6 +19,7 @@ export function useSidebarDragListeners(args: {
   setIsDragging: Dispatch<SetStateAction<boolean>>;
   setRequestedPosition: Dispatch<SetStateAction<ScenarioRecorderSidebarPosition>>;
   sidebarRef: RefObject<HTMLElement | null>;
+  uiScale?: number;
 }) {
   const { dragOffsetRef, isDragging, setIsDragging, setRequestedPosition, sidebarRef } = args;
 
@@ -35,10 +36,11 @@ export function useSidebarDragListeners(args: {
       setRequestedPosition(
         clampScenarioRecorderSidebarPosition(
           {
-            x: event.clientX - dragOffsetRef.current.x,
-            y: event.clientY - dragOffsetRef.current.y,
+            x: event.clientX / (args.uiScale ?? 1) - dragOffsetRef.current.x,
+            y: event.clientY / (args.uiScale ?? 1) - dragOffsetRef.current.y,
           },
-          sidebarRef.current
+          sidebarRef.current,
+          args.uiScale
         )
       );
     };
@@ -53,13 +55,14 @@ export function useSidebarDragListeners(args: {
       window.removeEventListener('mousemove', handleMouseMove, PASSIVE_MOUSE_LISTENER_OPTIONS);
       window.removeEventListener('mouseup', stopDragging, PASSIVE_MOUSE_LISTENER_OPTIONS);
     };
-  }, [dragOffsetRef, isDragging, setIsDragging, setRequestedPosition, sidebarRef]);
+  }, [args.uiScale, dragOffsetRef, isDragging, setIsDragging, setRequestedPosition, sidebarRef]);
 }
 
 export function useSidebarHeaderMouseDown(args: {
   dragOffsetRef: MutableRefObject<ScenarioRecorderSidebarPosition>;
   setIsDragging: Dispatch<SetStateAction<boolean>>;
   sidebarRef: RefObject<HTMLElement | null>;
+  uiScale?: number;
 }) {
   const { dragOffsetRef, setIsDragging, sidebarRef } = args;
 
@@ -70,13 +73,14 @@ export function useSidebarHeaderMouseDown(args: {
       }
 
       const sidebarRect = sidebarRef.current.getBoundingClientRect();
+      const uiScale = args.uiScale ?? 1;
       dragOffsetRef.current = {
-        x: event.clientX - sidebarRect.left,
-        y: event.clientY - sidebarRect.top,
+        x: event.clientX / uiScale - sidebarRect.left / uiScale,
+        y: event.clientY / uiScale - sidebarRect.top / uiScale,
       };
       setIsDragging(true);
       event.preventDefault();
     },
-    [dragOffsetRef, setIsDragging, sidebarRef]
+    [args.uiScale, dragOffsetRef, setIsDragging, sidebarRef]
   );
 }

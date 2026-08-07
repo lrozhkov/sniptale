@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Settings2 } from 'lucide-react';
+import { CopyPlus, Eye, EyeOff } from 'lucide-react';
 
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import {
@@ -19,8 +19,8 @@ import type {
 import { getBorderPresetPreviewStyle } from './helpers';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
-import { useEffect, useState } from 'react';
 import { BorderStyleInspector } from '../../../ui/highlighter-preset-editor/fields/inspector';
+import type { LinkedAnnotationTemplateOptions } from '../../../ui/highlighter-preset-editor/fields/inspector';
 import { BorderManualSaveSettings } from '../../../ui/highlighter-preset-editor/fields/save-settings';
 import { HighlighterManualInspectorSurface } from '../../../ui/highlighter-preset-editor/manual-inspector-surface';
 import type {
@@ -31,6 +31,7 @@ import type { FloatingPopoverDrag } from '../popover/drag';
 import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/header';
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
 import { useOpeningPresetOrder } from '../popover/preset-order';
+import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
 import {
   FrameBlurControls,
   FrameDecorationToggle,
@@ -52,15 +53,17 @@ interface FrameSettingsPopoverContentProps {
   handleBlurChange: (amount: number) => void;
   handleBlurShowBorderChange: (showBorder: boolean) => void;
   handleBlurTypeChange: (blurType: BlurType) => void;
+  handleFocusBlurChange: (blurAmount: number) => void;
   handleFocusChange: (opacity: number) => void;
   handleFocusShowBorderChange: (showBorder: boolean) => void;
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
-  handleEditPreset: (preset: BorderPreset) => void;
+  handleForkPreset?: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   localBlurSettings: BlurSettings;
   localBorderSettings: AppliedBorderSettings;
   localFocusSettings: FocusSettings;
+  linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
   headerContext: SettingsPopoverContext;
   headerDrag?: FloatingPopoverDrag;
   onClose: () => void;
@@ -79,92 +82,104 @@ interface FrameSettingsPopoverContentProps {
 }
 
 export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentProps) {
-  const [mode, setMode] = useState<'preset' | 'manual'>(() =>
-    props.selectedPresetId ? 'preset' : 'manual'
-  );
-  const hasSelectedPreset = Boolean(props.selectedPresetId);
-  useEffect(() => {
-    setMode(hasSelectedPreset ? 'preset' : 'manual');
-  }, [hasSelectedPreset]);
-  const switchMode = () => {
-    const nextMode = mode === 'preset' ? 'manual' : 'preset';
-    if (nextMode === 'preset') void props.onShowPresets();
-    setMode(nextMode);
-  };
+  const workflow = useTemplateForkWorkflow({
+    ...(props.selectedPresetId ? { activeTemplateId: props.selectedPresetId } : {}),
+    onFork: props.handleForkPreset ?? props.handleSelectPreset,
+    onRestore: props.handleSelectPreset,
+    onShowTemplates: props.onShowPresets,
+    templates: props.globalSettings.borderPresets,
+  });
 
   return (
     <>
       <SettingsPopoverHeader
-        action={{
-          label: translate(
-            mode === 'preset'
-              ? 'content.overlayControls.frameStyleSwitchToManual'
-              : 'content.overlayControls.frameStyleSwitchToPresets'
-          ),
-          onClick: switchMode,
-        }}
+        {...(workflow.mode === 'temporary'
+          ? {
+              action: {
+                label: translate('content.templateFork.backToTemplates'),
+                onClick: workflow.requestTemplates,
+              },
+            }
+          : {})}
         closeLabel={translate('content.interactiveFrame.closeEffectSettings')}
         context={props.headerContext}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
+        {...(workflow.mode === 'temporary'
+          ? { status: translate('content.templateFork.temporaryStatus') }
+          : {})}
         title={getFrameEffectTitle(props.effectMode)}
       />
-      <FrameEffectModeSelector
-        effectMode={props.effectMode}
-        onChange={(effectMode) => {
-          if (effectMode === props.effectMode) {
-            props.onClose();
-            return;
-          }
-          props.onEffectModeChange?.(effectMode);
-        }}
-      />
-      {props.effectMode === 'blur' ? (
+      {workflow.confirmingReturn ? (
+        <TemplateForkReturnGuard
+          onContinue={workflow.continueEditing}
+          onDiscard={workflow.discard}
+          onGoToSave={workflow.goToSave}
+        />
+      ) : (
         <>
-          <FrameBlurControls
-            handleBlurChange={props.handleBlurChange}
-            handleBlurTypeChange={props.handleBlurTypeChange}
-            settings={props.localBlurSettings}
+          <FrameEffectModeSelector
+            effectMode={props.effectMode}
+            onChange={(effectMode) => {
+              if (effectMode === props.effectMode) {
+                props.onClose();
+                return;
+              }
+              props.onEffectModeChange?.(effectMode);
+            }}
           />
-          <FrameDecorationToggle
-            onChange={props.handleBlurShowBorderChange}
-            showBorder={props.localBlurSettings.showBorder ?? false}
+          {props.effectMode === 'blur' ? (
+            <>
+              <FrameBlurControls
+                handleBlurChange={props.handleBlurChange}
+                handleBlurTypeChange={props.handleBlurTypeChange}
+                settings={props.localBlurSettings}
+              />
+              <FrameDecorationToggle
+                onChange={props.handleBlurShowBorderChange}
+                showBorder={props.localBlurSettings.showBorder ?? false}
+              />
+            </>
+          ) : null}
+
+          {props.effectMode === 'focus' ? (
+            <>
+              <FrameFocusControls
+                handleFocusBlurChange={props.handleFocusBlurChange}
+                handleFocusChange={props.handleFocusChange}
+                settings={props.localFocusSettings}
+              />
+              <FrameDecorationToggle
+                onChange={props.handleFocusShowBorderChange}
+                showBorder={props.localFocusSettings.showBorder ?? false}
+              />
+            </>
+          ) : null}
+
+          <FrameBorderSection
+            borderPresets={props.globalSettings.borderPresets}
+            {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
+            handleManualBorderChange={props.handleManualBorderChange}
+            handleSelectPreset={props.handleSelectPreset}
+            handleTogglePresetEnabled={props.handleTogglePresetEnabled}
+            pendingPresetIds={props.pendingPresetIds}
+            localBorderSettings={props.localBorderSettings}
+            linkedTemplateOptions={props.linkedTemplateOptions ?? { callouts: [], stepBadges: [] }}
+            manual={props.manual}
+            mode={workflow.mode === 'templates' ? 'preset' : 'manual'}
+            onForkPreset={workflow.fork}
+            onCreated={workflow.completeSave}
+            {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
+            onClose={props.onClose}
+            {...(props.onFloatingInteractionChange
+              ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+              : {})}
+            {...(props.selectedPresetId === undefined
+              ? {}
+              : { selectedPresetId: props.selectedPresetId })}
           />
         </>
-      ) : null}
-
-      {props.effectMode === 'focus' ? (
-        <>
-          <FrameFocusControls
-            handleFocusChange={props.handleFocusChange}
-            settings={props.localFocusSettings}
-          />
-          <FrameDecorationToggle
-            onChange={props.handleFocusShowBorderChange}
-            showBorder={props.localFocusSettings.showBorder ?? false}
-          />
-        </>
-      ) : null}
-
-      <FrameBorderSection
-        borderPresets={props.globalSettings.borderPresets}
-        {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
-        handleEditPreset={props.handleEditPreset}
-        handleManualBorderChange={props.handleManualBorderChange}
-        handleSelectPreset={props.handleSelectPreset}
-        handleTogglePresetEnabled={props.handleTogglePresetEnabled}
-        pendingPresetIds={props.pendingPresetIds}
-        localBorderSettings={props.localBorderSettings}
-        manual={props.manual}
-        mode={mode}
-        onClose={props.onClose}
-        {...(props.onFloatingInteractionChange
-          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
-          : {})}
-        {...(props.selectedPresetId === undefined
-          ? {}
-          : { selectedPresetId: props.selectedPresetId })}
-      />
+      )}
     </>
   );
 }
@@ -172,13 +187,13 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
 function FrameBorderSection(props: {
   acceptAction?: (event: Event) => boolean;
   borderPresets: BorderPreset[];
-  handleEditPreset: (preset: BorderPreset) => void;
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
   localBorderSettings: AppliedBorderSettings;
+  linkedTemplateOptions: LinkedAnnotationTemplateOptions;
   manual: {
     cssDraft: string;
     cssError: string | null;
@@ -186,6 +201,9 @@ function FrameBorderSection(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  onCreated: () => void;
+  onForkPreset: (preset: BorderPreset) => void;
+  saveSectionRequest?: number;
   mode: 'preset' | 'manual';
   onClose: () => void;
   onFloatingInteractionChange?: (open: boolean) => void;
@@ -202,7 +220,7 @@ function FrameBorderSection(props: {
           {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
           borderPresets={props.borderPresets}
           enabledPresetCount={enabledPresetCount}
-          handleEditPreset={props.handleEditPreset}
+          onForkPreset={props.onForkPreset}
           handleSelectPreset={props.handleSelectPreset}
           handleTogglePresetEnabled={props.handleTogglePresetEnabled}
           locale={locale}
@@ -222,7 +240,7 @@ function FramePresetMode(props: {
   acceptAction?: (event: Event) => boolean;
   borderPresets: BorderPreset[];
   enabledPresetCount: number;
-  handleEditPreset: (preset: BorderPreset) => void;
+  onForkPreset: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
@@ -233,12 +251,12 @@ function FramePresetMode(props: {
   const orderedPresets = useOpeningPresetOrder(props.borderPresets, props.selectedPresetId);
   return (
     <>
-      <ProductGlassPresetList scrollable>
+      <ProductGlassPresetList scrollable variant="menu">
         {orderedPresets.map((preset) => (
           <FramePresetRow
             {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
             enabledPresetCount={props.enabledPresetCount}
-            handleEditPreset={props.handleEditPreset}
+            onForkPreset={props.onForkPreset}
             handleSelectPreset={props.handleSelectPreset}
             handleTogglePresetEnabled={props.handleTogglePresetEnabled}
             key={preset.id}
@@ -257,7 +275,7 @@ function FramePresetMode(props: {
 function FramePresetRow(props: {
   acceptAction?: (event: Event) => boolean;
   enabledPresetCount: number;
-  handleEditPreset: (preset: BorderPreset) => void;
+  onForkPreset: (preset: BorderPreset) => void;
   handleSelectPreset: (preset: BorderPreset) => void;
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
@@ -282,6 +300,7 @@ function FramePresetRow(props: {
       <ProductGlassPresetItem
         active={props.selected}
         disabled={!isEnabled}
+        showActiveIndicator
         onClick={(event) => {
           if (acceptFrameSettingsAction(event.nativeEvent, props.acceptAction)) {
             selectOrClosePopoverPreset({
@@ -299,21 +318,23 @@ function FramePresetRow(props: {
         </ProductGlassPresetMeta>
       </ProductGlassPresetItem>
       <span className="sniptale-frame-style-preset-actions">
-        <button
-          aria-label={translate('content.overlayControls.configureFrameStyle')}
-          className="sniptale-frame-style-preset-action"
-          data-frame-style-action="edit"
-          disabled={props.pending}
-          onClick={(event) => {
-            if (acceptFrameSettingsAction(event.nativeEvent, props.acceptAction)) {
-              props.handleEditPreset(props.preset);
-            }
-          }}
-          title={translate('content.overlayControls.configureFrameStyle')}
-          type="button"
-        >
-          <Settings2 size={15} />
-        </button>
+        {props.selected ? (
+          <button
+            aria-label={translate('content.templateFork.fork')}
+            className="sniptale-frame-style-preset-action"
+            data-frame-style-action="fork"
+            disabled={props.pending}
+            onClick={(event) => {
+              if (acceptFrameSettingsAction(event.nativeEvent, props.acceptAction)) {
+                props.onForkPreset(props.preset);
+              }
+            }}
+            title={translate('content.templateFork.fork')}
+            type="button"
+          >
+            <CopyPlus size={15} />
+          </button>
+        ) : null}
         <button
           aria-label={visibilityActionLabel}
           className="sniptale-frame-style-preset-action"
@@ -345,6 +366,7 @@ function FrameManualMode(props: {
   borderPresets: BorderPreset[];
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
   localBorderSettings: AppliedBorderSettings;
+  linkedTemplateOptions: LinkedAnnotationTemplateOptions;
   manual: {
     cssDraft: string;
     cssError: string | null;
@@ -352,6 +374,8 @@ function FrameManualMode(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  onCreated: () => void;
+  saveSectionRequest?: number;
   onFloatingInteractionChange?: (open: boolean) => void;
 }) {
   return (
@@ -361,11 +385,16 @@ function FrameManualMode(props: {
         cssError={props.manual.cssError}
         onChange={props.handleManualBorderChange}
         onCssDraftChange={props.manual.onCssDraftChange}
+        {...(props.saveSectionRequest === undefined
+          ? {}
+          : { saveSectionRequest: props.saveSectionRequest })}
         saveSection={
           <BorderManualSaveSettings
             disabled={Boolean(props.manual.cssError)}
             isSaving={props.manual.isSaving}
             onSave={props.manual.save}
+            onCreated={props.onCreated}
+            onOverwritten={props.onCreated}
             {...(props.onFloatingInteractionChange
               ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
               : {})}
@@ -373,6 +402,7 @@ function FrameManualMode(props: {
           />
         }
         style={props.localBorderSettings}
+        linkedTemplateOptions={props.linkedTemplateOptions}
       />
     </HighlighterManualInspectorSurface>
   );

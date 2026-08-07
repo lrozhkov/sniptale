@@ -7,6 +7,7 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import { useFixedPortalContainer, Z_INDEX_RESIZE_HANDLES } from '../layout/portal';
 import { InteractiveFrameResizeHandleLayer } from './handle-layer';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 interface ResizeHandlesProps {
   state: FrameState;
@@ -25,6 +26,7 @@ export function InteractiveFrameResizeHandles({
   borderWidth,
   onResizeStart,
 }: ResizeHandlesProps): React.ReactElement | null {
+  const visualScale = useContentUiScale();
   const portalContainer = useFixedPortalContainer(
     'sniptale-resize-handles-portal',
     `
@@ -53,6 +55,7 @@ export function InteractiveFrameResizeHandles({
       tempFrame={tempFrame}
       handleSize={handleSize}
       strokeWidth={borderWidth}
+      visualScale={visualScale}
       onResizeStart={onResizeStart}
       {...(borderColor === undefined ? {} : { borderColor })}
     />,

@@ -90,15 +90,15 @@ function openManualCalloutSettings(source: 'quick' | 'selected') {
     act(() => performPointerClick(quickSettings as HTMLElement));
   }
   const modeButtons = queryAllContentUiElements('button');
-  const manualButton = modeButtons.find(
-    (button) => button.title === translate('content.callout.switchToManual')
+  const forkButton = modeButtons.find(
+    (button) => button.title === translate('content.templateFork.fork')
   );
-  if (manualButton) {
-    act(() => performPointerClick(manualButton));
+  if (forkButton) {
+    act(() => performPointerClick(forkButton));
     return;
   }
   expect(
-    modeButtons.find((button) => button.title === translate('content.callout.switchToPresets'))
+    modeButtons.find((button) => button.title === translate('content.templateFork.backToTemplates'))
   ).toBeInstanceOf(HTMLButtonElement);
 }
 
@@ -144,6 +144,7 @@ describe('callout settings lifecycle', () => {
       expect(useFrameUIStore.getState().activePopover).toEqual({
         frameId: 'frame-1',
         kind: 'callout-settings',
+        calloutIndex: 0,
       });
       expect(queryAllContentUiElements('.sniptale-callout-settings-popover')).toHaveLength(1);
 
@@ -159,6 +160,7 @@ describe('callout settings lifecycle', () => {
       expect(useFrameUIStore.getState().activePopover).toEqual({
         frameId: 'frame-1',
         kind: 'callout-settings',
+        calloutIndex: 0,
       });
       expect(queryAllContentUiElements('.sniptale-callout-settings-popover')).toHaveLength(1);
     }

@@ -18,6 +18,7 @@ vi.mock('./interaction-controller', () => ({
       distortionScale: 0,
       effectiveSelectedId: null,
       focusFrames: [],
+      focusBlurAmount: 0,
       focusOpacity: 0,
       projected: [],
       scale: 2,

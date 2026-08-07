@@ -29,6 +29,7 @@ export function useCalloutCurveHandleDrag(args: {
   onChange: (offset: CalloutPoint) => void;
   origin: Point | null;
   storedOffset: CalloutPoint | undefined;
+  visualScale?: number;
 }) {
   const [draftOffset, setDraftOffset] = React.useState<CalloutPoint | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -63,7 +64,10 @@ export function useCalloutCurveHandleDrag(args: {
         args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace
       ).clientPointToLogical({ x: event.clientX, y: event.clientY });
       const offset = clampHandleOffset(
-        { x: point.x - args.origin!.x, y: point.y - args.origin!.y },
+        {
+          x: (point.x - args.origin!.x) / (args.visualScale ?? 1),
+          y: (point.y - args.origin!.y) / (args.visualScale ?? 1),
+        },
         args.maximumDistance
       );
       draftRef.current = offset;
@@ -88,8 +92,8 @@ export function useCalloutCurveHandleDrag(args: {
       event.nativeEvent.stopImmediatePropagation();
       pointerIdRef.current = event.pointerId;
       draftRef.current = args.storedOffset ?? {
-        x: args.defaultPoint.x - args.origin.x,
-        y: args.defaultPoint.y - args.origin.y,
+        x: (args.defaultPoint.x - args.origin.x) / (args.visualScale ?? 1),
+        y: (args.defaultPoint.y - args.origin.y) / (args.visualScale ?? 1),
       };
       setIsDragging(true);
     },
@@ -100,8 +104,8 @@ export function useCalloutCurveHandleDrag(args: {
       event.preventDefault();
       event.stopPropagation();
       const current = args.storedOffset ?? {
-        x: args.defaultPoint.x - args.origin.x,
-        y: args.defaultPoint.y - args.origin.y,
+        x: (args.defaultPoint.x - args.origin.x) / (args.visualScale ?? 1),
+        y: (args.defaultPoint.y - args.origin.y) / (args.visualScale ?? 1),
       };
       const next = clampHandleOffset(
         { x: current.x + delta.x, y: current.y + delta.y },

@@ -12,6 +12,7 @@ import type {
 } from '../../../../contracts/settings';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
+import { resolveContentUiViewport } from '@sniptale/ui/floating-interactions/scale';
 
 const DEFAULT_TOOLBAR_TOP = 5;
 const TOOLBAR_POSITION_PERSIST_DELAY_MS = 150;
@@ -19,19 +20,33 @@ const PASSIVE_MOUSE_LISTENER_OPTIONS: AddEventListenerOptions = { passive: true 
 
 const logger = createLogger({ namespace: 'ContentToolbarDragPosition' });
 
-function resolveDefaultToolbarPosition(toolbarEl: HTMLElement): ContentToolbarPosition {
+function resolveDefaultToolbarPosition(
+  toolbarEl: HTMLElement,
+  uiScale: number
+): ContentToolbarPosition {
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
   return {
-    x: Math.max(0, (window.innerWidth - toolbarEl.offsetWidth) / 2),
+    x: Math.max(0, (viewport.width - toolbarEl.offsetWidth) / 2),
     y: DEFAULT_TOOLBAR_TOP,
   };
 }
 
 function clampToolbarPosition(
   position: ContentToolbarPosition,
-  toolbarEl: HTMLElement
+  toolbarEl: HTMLElement,
+  uiScale: number
 ): ContentToolbarPosition {
-  const maxX = Math.max(0, window.innerWidth - toolbarEl.offsetWidth);
-  const maxY = Math.max(0, window.innerHeight - toolbarEl.offsetHeight);
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
+  const maxX = Math.max(0, viewport.width - toolbarEl.offsetWidth);
+  const maxY = Math.max(0, viewport.height - toolbarEl.offsetHeight);
 
   return {
     x: Math.max(0, Math.min(position.x, maxX)),
@@ -86,6 +101,7 @@ export function useToolbarPositionInitialization(params: {
   savedPosition: ContentToolbarPosition | null;
   setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
   toolbarRef: RefObject<HTMLDivElement | null>;
+  uiScale: number;
 }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const { preferencesReady, savedPosition, setPosition, toolbarRef } = params;
@@ -95,10 +111,11 @@ export function useToolbarPositionInitialization(params: {
       return;
     }
 
-    const initialPosition = savedPosition ?? resolveDefaultToolbarPosition(toolbarRef.current);
-    setPosition(clampToolbarPosition(initialPosition, toolbarRef.current));
+    const initialPosition =
+      savedPosition ?? resolveDefaultToolbarPosition(toolbarRef.current, params.uiScale);
+    setPosition(clampToolbarPosition(initialPosition, toolbarRef.current, params.uiScale));
     setIsInitialized(true);
-  }, [isInitialized, preferencesReady, savedPosition, setPosition, toolbarRef]);
+  }, [isInitialized, params.uiScale, preferencesReady, savedPosition, setPosition, toolbarRef]);
 
   return isInitialized;
 }
@@ -109,6 +126,7 @@ export function useToolbarViewportClamping(params: {
   isInitialized: boolean;
   setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
   toolbarRef: RefObject<HTMLDivElement | null>;
+  uiScale: number;
 }) {
   const { currentViewport, displayMode, isInitialized, setPosition, toolbarRef } = params;
 
@@ -117,8 +135,8 @@ export function useToolbarViewportClamping(params: {
       return;
     }
 
-    setPosition((previous) => clampToolbarPosition(previous, toolbarRef.current!));
-  }, [currentViewport, displayMode, isInitialized, setPosition, toolbarRef]);
+    setPosition((previous) => clampToolbarPosition(previous, toolbarRef.current!, params.uiScale));
+  }, [currentViewport, displayMode, isInitialized, params.uiScale, setPosition, toolbarRef]);
 
   useEffect(() => {
     if (!isInitialized || !toolbarRef.current) {
@@ -130,7 +148,9 @@ export function useToolbarViewportClamping(params: {
         return;
       }
 
-      setPosition((previous) => clampToolbarPosition(previous, toolbarRef.current!));
+      setPosition((previous) =>
+        clampToolbarPosition(previous, toolbarRef.current!, params.uiScale)
+      );
     };
 
     window.addEventListener('resize', syncClampedPosition);
@@ -148,7 +168,7 @@ export function useToolbarViewportClamping(params: {
       window.removeEventListener('resize', syncClampedPosition);
       resizeObserver?.disconnect();
     };
-  }, [displayMode, isInitialized, setPosition, toolbarRef]);
+  }, [displayMode, isInitialized, params.uiScale, setPosition, toolbarRef]);
 }
 
 export function useToolbarPreferencePersistence(params: {
@@ -189,6 +209,7 @@ export function useToolbarDragListeners(params: {
   setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
   stopDragging: () => void;
   toolbarRef: RefObject<HTMLDivElement | null>;
+  uiScale: number;
 }) {
   const { dragOffset, isDragging, setPosition, stopDragging, toolbarRef } = params;
 
@@ -203,11 +224,11 @@ export function useToolbarDragListeners(params: {
       }
 
       const nextPosition = {
-        x: event.clientX - (dragOffset.current?.x ?? 0),
-        y: event.clientY - (dragOffset.current?.y ?? 0),
+        x: event.clientX / params.uiScale - (dragOffset.current?.x ?? 0),
+        y: event.clientY / params.uiScale - (dragOffset.current?.y ?? 0),
       };
 
-      setPosition(clampToolbarPosition(nextPosition, toolbarRef.current));
+      setPosition(clampToolbarPosition(nextPosition, toolbarRef.current, params.uiScale));
     };
 
     window.addEventListener('mousemove', handleMouseMove, PASSIVE_MOUSE_LISTENER_OPTIONS);
@@ -217,5 +238,5 @@ export function useToolbarDragListeners(params: {
       window.removeEventListener('mousemove', handleMouseMove, PASSIVE_MOUSE_LISTENER_OPTIONS);
       window.removeEventListener('mouseup', stopDragging, PASSIVE_MOUSE_LISTENER_OPTIONS);
     };
-  }, [dragOffset, isDragging, setPosition, stopDragging, toolbarRef]);
+  }, [dragOffset, isDragging, params.uiScale, setPosition, stopDragging, toolbarRef]);
 }

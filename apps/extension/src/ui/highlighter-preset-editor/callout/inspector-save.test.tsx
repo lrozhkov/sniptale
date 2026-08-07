@@ -32,14 +32,18 @@ afterEach(() => {
 it('creates a named preset and overwrites the selected preset', async () => {
   const presets = createSystemCalloutPresetCatalog().slice(0, 2);
   const onCreate = vi.fn().mockResolvedValue(true);
+  const onCreated = vi.fn();
   const onOverwrite = vi.fn().mockResolvedValue(true);
+  const onOverwritten = vi.fn();
   await act(async () =>
     root.render(
       <CalloutSaveSettings
         error={null}
         isSaving={false}
         onCreate={onCreate}
+        onCreated={onCreated}
         onOverwrite={onOverwrite}
+        onOverwritten={onOverwritten}
         presets={presets}
       />
     )
@@ -80,7 +84,9 @@ it('creates a named preset and overwrites the selected preset', async () => {
   await act(async () => overwriteButton?.click());
 
   expect(onCreate).toHaveBeenCalledWith('My preset');
+  expect(onCreated).toHaveBeenCalledOnce();
   expect(onOverwrite).toHaveBeenCalledWith(presets[0]?.id);
+  expect(onOverwritten).toHaveBeenCalledWith(presets[0]?.id);
   expect(document.querySelector('[role="status"]')?.textContent).toBe(
     'content.callout.presetOverwritten'
   );

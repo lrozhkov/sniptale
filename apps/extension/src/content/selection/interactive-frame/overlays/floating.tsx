@@ -4,6 +4,7 @@ import { InteractiveFrameBlockingOverlays } from './blocking';
 import { InteractiveFrameSizePanel } from '../size-panel';
 import { InteractiveFrameToolbar } from '../toolbar';
 import { InteractiveFrameToolbarTrigger } from '../toolbar/trigger';
+import { useFrameCaptureVisibilityState } from '../toolbar/capture-visibility-state';
 
 export interface InteractiveFrameFloatingUiProps {
   frame: FrameData;
@@ -18,12 +19,14 @@ export interface InteractiveFrameFloatingUiProps {
   isSelected: boolean;
   toolbarAnchorOffset: { x: number; y: number } | null;
   isCalloutEditing: boolean;
+  activeCalloutIndex?: number;
   maintainAspectRatio: boolean;
   aspectRatio: number | null;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+  stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   setMaintainAspectRatio: React.Dispatch<React.SetStateAction<boolean>>;
   setAspectRatio: React.Dispatch<React.SetStateAction<number | null>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
@@ -32,6 +35,7 @@ export interface InteractiveFrameFloatingUiProps {
     kind: 'frame-settings' | 'step-badge' | 'callout-settings'
   ) => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
+  setActiveCalloutIndex?: React.Dispatch<React.SetStateAction<number>>;
   closePopover: () => void;
   hoverFrame: (frameId: string) => void;
   scheduleHoverFrameHide: (frameId: string) => void;
@@ -47,22 +51,30 @@ export interface InteractiveFrameFloatingUiProps {
 
 /** Renders floating toolbar, size panel, and overlays for the interactive frame. */
 export function InteractiveFrameFloatingUi(props: InteractiveFrameFloatingUiProps) {
+  const captureVisibility = useFrameCaptureVisibilityState({
+    frame: props.frame,
+    onUpdate: props.onUpdate,
+  });
   return (
     <>
-      <InteractiveFrameToolbar {...getToolbarProps(props)} />
-      <InteractiveFrameToolbarTrigger {...getTriggerProps(props)} />
+      <InteractiveFrameToolbar {...getToolbarProps(props, captureVisibility)} />
+      <InteractiveFrameToolbarTrigger {...getTriggerProps(props, captureVisibility)} />
       <InteractiveFrameSizePanel {...getSizePanelProps(props)} />
       <InteractiveFrameBlockingOverlays {...getOverlayProps(props)} />
     </>
   );
 }
 
-function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
+function getToolbarProps(
+  props: InteractiveFrameFloatingUiProps,
+  captureVisibility: ReturnType<typeof useFrameCaptureVisibilityState>
+) {
   return {
     state: props.state,
     toolbarCoords: props.toolbarCoords,
     effectMode: props.effectMode,
     frame: props.frame,
+    captureVisibility,
     isSelected: props.isSelected,
     toolbarAnchorOffset: props.toolbarAnchorOffset,
     isCalloutEditing: props.isCalloutEditing,
@@ -73,6 +85,9 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
     closePopover: props.closePopover,
     togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
+    setTempFrame: props.setTempFrame,
+    ...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {}),
+    ...(props.setActiveCalloutIndex ? { setActiveCalloutIndex: props.setActiveCalloutIndex } : {}),
     setState: props.setState,
     handleEffectButtonClick: props.handleEffectButtonClick,
     handleStartEditing: props.handleStartEditing,
@@ -81,9 +96,13 @@ function getToolbarProps(props: InteractiveFrameFloatingUiProps) {
   };
 }
 
-function getTriggerProps(props: InteractiveFrameFloatingUiProps) {
+function getTriggerProps(
+  props: InteractiveFrameFloatingUiProps,
+  captureVisibility: ReturnType<typeof useFrameCaptureVisibilityState>
+) {
   return {
     frame: props.frame,
+    captureVisibility,
     isVisible:
       props.isHovered && !props.isSelected && (props.state === 'idle' || props.state === 'hover'),
     closePopover: props.closePopover,
@@ -94,6 +113,7 @@ function getTriggerProps(props: InteractiveFrameFloatingUiProps) {
     selectFrame: props.selectFrame,
     setIsCalloutEditing: props.setIsCalloutEditing,
     setState: props.setState,
+    onUpdate: props.onUpdate,
   };
 }
 

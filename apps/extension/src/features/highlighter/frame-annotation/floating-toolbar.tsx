@@ -1,5 +1,6 @@
 import React from 'react';
-import { ListOrdered, MessageSquare, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
 import {
   ProductGlassToolbar,
   ProductGlassToolbarButton,
@@ -74,7 +75,27 @@ export function FrameAnnotationToolbarCalloutButton(props: {
       menuIndicator
       title={props.title ?? commandLabels().get('callout')}
     >
-      <MessageSquare size={17} />
+      <FrameCommentIcon size={17} />
+    </ProductGlassToolbarButton>
+  );
+}
+
+export function FrameAnnotationToolbarAddCalloutButton(props: {
+  disabled?: boolean;
+  title: string;
+  onClick: (event: React.MouseEvent) => void;
+  onMouseDown: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <ProductGlassToolbarButton
+      data-sniptale-activation-bridge="defer"
+      data-ui="content.interactive-frame.add-callout"
+      disabled={props.disabled}
+      onClick={props.onClick}
+      onMouseDown={props.onMouseDown}
+      title={props.title}
+    >
+      <AddFrameCommentIcon size={17} />
     </ProductGlassToolbarButton>
   );
 }
@@ -87,6 +108,9 @@ export function FrameAnnotationToolbarActionButtons(props: {
   onEdit: (event: React.MouseEvent) => void;
   onIncrease: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
+  captureHidden?: boolean;
+  captureVisibilityTitle?: string;
+  onCaptureVisibilityChange?: (event: React.MouseEvent) => void;
   showEdit?: boolean;
 }) {
   const labels = commandLabels();
@@ -129,6 +153,18 @@ export function FrameAnnotationToolbarActionButtons(props: {
         <Trash2 size={18} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarDivider />
+      {props.onCaptureVisibilityChange ? (
+        <ProductGlassToolbarButton
+          active={props.captureHidden === true}
+          aria-pressed={props.captureHidden === true}
+          data-ui="content.interactive-frame.capture-visibility"
+          onClick={props.onCaptureVisibilityChange}
+          onMouseDown={props.onMouseDown}
+          title={props.captureVisibilityTitle}
+        >
+          {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+        </ProductGlassToolbarButton>
+      ) : null}
       <ProductGlassToolbarButton
         onClick={props.onClose}
         onMouseDown={props.onMouseDown}

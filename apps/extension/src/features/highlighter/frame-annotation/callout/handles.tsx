@@ -217,6 +217,40 @@ function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
   );
 }
 
+function removeFixedPlacement(style: CSSProperties): CSSProperties {
+  const { left: _left, top: _top, position: _position, zIndex: _zIndex, ...buttonStyle } = style;
+  return buttonStyle;
+}
+
+function renderCalloutAdjacentControls(props: CalloutInteractionHandleProps) {
+  if (props.isEditing) return null;
+  const { left, top, position, zIndex } = props.dragHandleStyle;
+  const groupedProps: CalloutInteractionHandleProps = {
+    ...props,
+    dragHandleStyle: removeFixedPlacement(props.dragHandleStyle),
+    settingsHandleStyle: removeFixedPlacement(props.settingsHandleStyle),
+  };
+  return (
+    <div
+      className="sniptale-callout-adjacent-controls"
+      data-theme={props.portalTheme ?? undefined}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        position,
+        left,
+        top,
+        zIndex,
+        display: 'flex',
+        gap: 4,
+      })}
+      onMouseEnter={props.handleMouseEnter}
+      onMouseLeave={props.handleMouseLeave}
+    >
+      {renderCalloutMoveHandle(groupedProps)}
+      {renderCalloutSettingsHandle(groupedProps)}
+    </div>
+  );
+}
+
 function renderCalloutTailHandle(
   props: CalloutInteractionHandleProps,
   control: {
@@ -360,8 +394,7 @@ function renderWaypointAngle(props: CalloutInteractionHandleProps) {
 export function renderCalloutInteractionHandles(props: CalloutInteractionHandleProps) {
   return (
     <>
-      {renderCalloutMoveHandle(props)}
-      {renderCalloutSettingsHandle(props)}
+      {renderCalloutAdjacentControls(props)}
       {renderCalloutWidthHandle(props, {
         isResizing: props.isResizingLeft,
         labelKey: 'resizeCommentLeft',

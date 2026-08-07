@@ -18,8 +18,9 @@ function getKeyboardPlacement(args: {
   event: React.KeyboardEvent<HTMLButtonElement>;
   frameRect: StepBadgeFrameRect;
   placement: StepBadgeManualPlacement;
+  visualScale: number;
 }): StepBadgeManualPlacement | null {
-  const step = args.event.shiftKey ? 10 : 1;
+  const step = (args.event.shiftKey ? 10 : 1) * args.visualScale;
   const horizontal = args.placement.side === 'top' || args.placement.side === 'bottom';
   const axisSize = Math.max(1, horizontal ? args.frameRect.width : args.frameRect.height);
   let direction = 0;
@@ -47,6 +48,7 @@ export function useStepBadgeBoundaryDrag(args: {
   initialPlacement: StepBadgeManualPlacement;
   onPositionChange: (placement: StepBadgeManualPlacement) => void;
   visualOffset: { x: number; y: number };
+  visualScale?: number;
 }) {
   const [draftPlacement, setDraftPlacement] = React.useState<StepBadgeManualPlacement | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -84,10 +86,11 @@ export function useStepBadgeBoundaryDrag(args: {
       const placement = projectStepBadgeToFrameBoundary({
         frameRect: args.frameRect,
         point: {
-          x: point.x - args.visualOffset.x,
-          y: point.y - args.visualOffset.y,
+          x: point.x - args.visualOffset.x * (args.visualScale ?? 1),
+          y: point.y - args.visualOffset.y * (args.visualScale ?? 1),
         },
         previousSide: previousSideRef.current,
+        visualScale: args.visualScale ?? 1,
       });
       previousSideRef.current = placement.side;
       draftRef.current = placement;
@@ -131,6 +134,7 @@ export function useStepBadgeBoundaryDrag(args: {
         event,
         frameRect: args.frameRect,
         placement: args.initialPlacement,
+        visualScale: args.visualScale ?? 1,
       });
       if (!placement) return;
       event.preventDefault();

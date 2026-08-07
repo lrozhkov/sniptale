@@ -11,6 +11,7 @@ export function useDesignReviewPointerDrag<TPosition>(args: {
   canStart?(event: PointerEvent<HTMLElement>): boolean;
   move(origin: TPosition, deltaX: number, deltaY: number): void;
   position: TPosition;
+  uiScale?: number;
 }) {
   const dragRef = useRef<PointerDragSession<TPosition> | null>(null);
   const cancelPointerDrag = useCallback(() => {
@@ -34,7 +35,12 @@ export function useDesignReviewPointerDrag<TPosition>(args: {
     (event: PointerEvent<HTMLElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
-      args.move(drag.origin, event.clientX - drag.startX, event.clientY - drag.startY);
+      const uiScale = args.uiScale ?? 1;
+      args.move(
+        drag.origin,
+        (event.clientX - drag.startX) / uiScale,
+        (event.clientY - drag.startY) / uiScale
+      );
     },
     [args]
   );

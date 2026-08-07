@@ -5,6 +5,7 @@ import { EditorPreview } from './sections/sample';
 import { BorderStyleInspector } from './inspector';
 import type { BorderVisualStylePatch } from '../../../features/highlighter/contracts';
 import { HighlighterManualInspectorSurface } from '../manual-inspector-surface';
+import type { LinkedAnnotationTemplateOptions } from './inspector';
 
 function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   if (patch.color !== undefined) state.setColor(patch.color);
@@ -24,7 +25,13 @@ function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   }
 }
 
-export function BorderPresetEditorFields({ state }: { state: EditorState }) {
+export function BorderPresetEditorFields({
+  linkedTemplateOptions,
+  state,
+}: {
+  linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
+  state: EditorState;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -57,6 +64,7 @@ export function BorderPresetEditorFields({ state }: { state: EditorState }) {
             }}
             onCssResizeStart={state.handleResizeStart}
             style={state}
+            {...(linkedTemplateOptions ? { linkedTemplateOptions } : {})}
           />
         </HighlighterManualInspectorSurface>
       </div>

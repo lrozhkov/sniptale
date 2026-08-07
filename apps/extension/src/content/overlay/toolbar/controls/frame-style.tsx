@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   FrameAnnotationCreationControls,
   type FrameAnnotationCreationMenu,
@@ -13,6 +13,12 @@ import type {
 } from '../types';
 import type { ToolbarMenuState, ToolbarPopoverMenu } from '../state/menu';
 import { resolveContentPortalTarget } from '../../../selection/interactive-frame/layout/portal';
+import { setFrameSessionBorderPreset } from '../../../selection/frame-runtime/session/border-preset';
+import {
+  getAnnotationTemplateSources,
+  setAnnotationTemplateSource,
+  subscribeAnnotationTemplateSources,
+} from '../../../selection/frame-runtime/session/annotation-template-source';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
@@ -26,6 +32,11 @@ export function FutureFrameStyleControls(props: {
   toolbarMenuState: ToolbarMenuState;
 }) {
   const [style, setStyle] = useState(props.futureFrameStyle);
+  const templateSources = useSyncExternalStore(
+    subscribeAnnotationTemplateSources,
+    getAnnotationTemplateSources,
+    getAnnotationTemplateSources
+  );
 
   useEffect(() => setStyle(props.futureFrameStyle), [props.futureFrameStyle]);
 
@@ -34,6 +45,10 @@ export function FutureFrameStyleControls(props: {
     <FrameAnnotationCreationControls
       activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
       context="content"
+      calloutTemplateSourceControl={{
+        onChange: (source) => setAnnotationTemplateSource('callout', source),
+        value: templateSources.callout,
+      }}
       {...(props.futureFrameCalloutActions
         ? { enableCallout: props.futureFrameCalloutActions.enable }
         : {})}
@@ -46,6 +61,9 @@ export function FutureFrameStyleControls(props: {
         if (next.effectMode !== previous.effectMode) {
           props.onFutureFrameEffectModeChange(next.effectMode);
         }
+        if (next.borderSettings !== previous.borderSettings) {
+          setFrameSessionBorderPreset(next.borderSettings);
+        }
         if (next.callout !== previous.futureCallout) {
           props.futureFrameCalloutActions?.set(next.callout);
         }
@@ -55,6 +73,10 @@ export function FutureFrameStyleControls(props: {
       }}
       onMenuChange={(menu) => props.toolbarMenuState.setActiveMenuType(toToolbarMenu(menu))}
       portalTarget={resolveContentPortalTarget()}
+      stepBadgeTemplateSourceControl={{
+        onChange: (source) => setAnnotationTemplateSource('stepBadge', source),
+        value: templateSources.stepBadge,
+      }}
       renderFramePopover={(popover) => (
         <FrameSettingsPopover
           anchorEl={popover.anchorEl}

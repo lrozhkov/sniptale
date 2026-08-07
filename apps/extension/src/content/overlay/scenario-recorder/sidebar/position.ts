@@ -5,6 +5,7 @@ import {
   useSidebarPositionInitialization,
   useSidebarResolvedPositionSync,
 } from './position.sync';
+import { useContentUiScale } from '../../../platform/dom-host';
 export {
   clampScenarioRecorderSidebarPosition,
   resolveScenarioRecorderSidebarPosition,
@@ -13,6 +14,7 @@ export {
 
 export function useScenarioRecorderSidebarPosition(visible: boolean) {
   const sidebarState = useSidebarPositionState();
+  const uiScale = useContentUiScale();
 
   useSidebarPositionInitialization({
     initializedRef: sidebarState.initializedRef,
@@ -20,12 +22,14 @@ export function useScenarioRecorderSidebarPosition(visible: boolean) {
     setResolvedPosition: sidebarState.setResolvedPosition,
     sidebarRef: sidebarState.sidebarRef,
     visible,
+    uiScale,
   });
   const { animationFrameRef, scheduleResolvedPositionSync } = useSidebarResolvedPositionSync({
     requestedPosition: sidebarState.requestedPosition,
     setResolvedPosition: sidebarState.setResolvedPosition,
     sidebarRef: sidebarState.sidebarRef,
     visible,
+    uiScale,
   });
   useSidebarFloatingObservers({
     animationFrameRef,
@@ -39,11 +43,13 @@ export function useScenarioRecorderSidebarPosition(visible: boolean) {
     setIsDragging: sidebarState.setIsDragging,
     setRequestedPosition: sidebarState.setRequestedPosition,
     sidebarRef: sidebarState.sidebarRef,
+    uiScale,
   });
   const handleHeaderMouseDown = useSidebarHeaderMouseDown({
     dragOffsetRef: sidebarState.dragOffsetRef,
     setIsDragging: sidebarState.setIsDragging,
     sidebarRef: sidebarState.sidebarRef,
+    uiScale,
   });
 
   return {
@@ -51,5 +57,6 @@ export function useScenarioRecorderSidebarPosition(visible: boolean) {
     isDragging: sidebarState.isDragging,
     position: sidebarState.resolvedPosition,
     sidebarRef: sidebarState.sidebarRef,
+    uiScale,
   };
 }

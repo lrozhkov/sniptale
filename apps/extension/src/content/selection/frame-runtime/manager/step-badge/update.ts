@@ -9,6 +9,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { scheduleStepBadgeRecalculation } from '../../../frame-dom-driver/timing';
 import type { UpdateGlobalStepBadgeSettings } from '../../contracts';
 import { createSessionStepBadgeSettings } from '../../session/step-badge-defaults';
+import {
+  reconcileLinkedAnnotationTemplatesWhenReady,
+  resolveFrameStepBadgeTemplate,
+} from '../../session/linked-annotation-templates';
 
 const DEFAULT_STEP_BADGE_SETTINGS: StepBadgeSettings = {
   enabled: false,
@@ -49,6 +53,7 @@ export function createUpdateFrameStepBadge(params: {
   const { setFrames, globalStepBadgeSettingsRef, recalculateStepBadgesRef } = params;
 
   return (frameId: string, settings: Partial<StepBadgeSettings>) => {
+    const fallback = settings.enabled ? createSessionStepBadgeSettings() : null;
     setFrames((prev) =>
       prev.map((frame) => {
         if (frame.id !== frameId) {
@@ -57,7 +62,9 @@ export function createUpdateFrameStepBadge(params: {
 
         const currentSettings =
           frame.stepBadge ??
-          (settings.enabled ? createSessionStepBadgeSettings() : DEFAULT_STEP_BADGE_SETTINGS);
+          (settings.enabled
+            ? resolveFrameStepBadgeTemplate(fallback!, frame.borderSettings)
+            : DEFAULT_STEP_BADGE_SETTINGS);
         const newSettings = {
           ...currentSettings,
           ...settings,
@@ -80,6 +87,15 @@ export function createUpdateFrameStepBadge(params: {
         return { ...frame, stepBadge: newSettings };
       })
     );
+    if (fallback) {
+      reconcileLinkedAnnotationTemplatesWhenReady({
+        ...(fallback.sourcePresetId
+          ? { expectedStepBadgeSourcePresetId: fallback.sourcePresetId }
+          : {}),
+        frameId,
+        setFrames,
+      });
+    }
   };
 }
 

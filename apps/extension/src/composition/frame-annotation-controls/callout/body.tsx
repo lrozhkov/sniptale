@@ -4,7 +4,6 @@ import type {
   CalloutPreset,
   CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { useEffect, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { getPreferredSideFromAnchor } from '../../../features/highlighter/frame-annotation/callout/geometry';
 import type { CalloutSettingsPatch } from '../../../features/highlighter/frame-annotation/callout/model';
@@ -15,6 +14,8 @@ import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-edi
 import type { FloatingPopoverDrag } from '../popover/drag';
 import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/header';
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
+import { createTemplateSourceAction, type TemplateSourceControl } from '../popover/template-source';
+import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
 
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
@@ -30,7 +31,7 @@ export function CalloutSettingsPopoverContent(props: {
   frameColors?: CalloutFrameColors;
   localSettings: CalloutSettings;
   onApplyPreset: (preset: CalloutPreset) => void;
-  onCustomizePreset: (preset: CalloutPreset) => void;
+  onForkPreset?: (preset: CalloutPreset) => void;
   onResetPreset?: ((preset: CalloutPreset) => void) | undefined;
   onShowPresets: () => void | Promise<void>;
   onTogglePreset: (preset: CalloutPreset) => void;
@@ -39,39 +40,58 @@ export function CalloutSettingsPopoverContent(props: {
   presetError: string | null;
   saveSection: CalloutSaveSectionProps;
   onClose: () => void;
+  templateSourceControl?: TemplateSourceControl;
 }) {
-  const [mode, setMode] = useState<'preset' | 'manual'>(() =>
-    props.localSettings.sourcePresetId ? 'preset' : 'manual'
-  );
-  const hasSelectedPreset = Boolean(props.localSettings.sourcePresetId);
-  useEffect(() => {
-    setMode(hasSelectedPreset ? 'preset' : 'manual');
-  }, [hasSelectedPreset]);
-  const switchMode = () => {
-    const nextMode = mode === 'preset' ? 'manual' : 'preset';
-    if (nextMode === 'preset') void props.onShowPresets();
-    setMode(nextMode);
-  };
+  const workflow = useTemplateForkWorkflow({
+    ...(props.localSettings.sourcePresetId
+      ? { activeTemplateId: props.localSettings.sourcePresetId }
+      : {}),
+    onFork: props.onForkPreset ?? (() => props.handleSettingChange({ sourcePresetId: undefined })),
+    onRestore: props.onApplyPreset,
+    onShowTemplates: props.onShowPresets,
+    templates: props.presets,
+  });
   return (
     <>
       <SettingsPopoverHeader
-        action={{
-          label: translate(
-            mode === 'preset' ? 'content.callout.switchToManual' : 'content.callout.switchToPresets'
-          ),
-          onClick: switchMode,
-        }}
+        {...(workflow.mode === 'temporary'
+          ? {
+              action: {
+                label: translate('content.templateFork.backToTemplates'),
+                onClick: workflow.requestTemplates,
+              },
+            }
+          : {})}
         closeLabel={translate('content.callout.closeSettings')}
         context={props.headerContext}
         destructiveAction={{
           label: translate('content.callout.disableButton'),
           onClick: props.handleDelete,
         }}
+        {...(props.templateSourceControl
+          ? {
+              sourceAction: createTemplateSourceAction(props.templateSourceControl, {
+                forcedDescription: translate('content.callout.templateSourceForcedHint'),
+                forcedLabel: translate('content.callout.templateSourceForced'),
+                frameDescription: translate('content.callout.templateSourceFrameHint'),
+                frameLabel: translate('content.callout.templateSourceFrame'),
+              }),
+            }
+          : {})}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
+        {...(workflow.mode === 'temporary'
+          ? { status: translate('content.templateFork.temporaryStatus') }
+          : {})}
         title={translate('content.callout.settingsTitle')}
       />
-      {mode === 'preset' ? (
+      {workflow.confirmingReturn ? (
+        <TemplateForkReturnGuard
+          onContinue={workflow.continueEditing}
+          onDiscard={workflow.discard}
+          onGoToSave={workflow.goToSave}
+        />
+      ) : workflow.mode === 'templates' ? (
         <CalloutPresetSection
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           {...(props.localSettings.sourcePresetId
@@ -85,7 +105,7 @@ export function CalloutSettingsPopoverContent(props: {
               preset,
             });
           }}
-          onCustomizePreset={props.onCustomizePreset}
+          onForkPreset={workflow.fork}
           {...(props.onResetPreset ? { onResetPreset: props.onResetPreset } : {})}
           onTogglePreset={props.onTogglePreset}
           pendingPresetIds={props.pendingPresetIds}
@@ -96,6 +116,7 @@ export function CalloutSettingsPopoverContent(props: {
         <CalloutManualSettings
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
+          {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
           positionSection={
             <CalloutPositionSection
               embedded
@@ -107,7 +128,11 @@ export function CalloutSettingsPopoverContent(props: {
               }
             />
           }
-          saveSection={props.saveSection}
+          saveSection={{
+            ...props.saveSection,
+            onCreated: workflow.completeSave,
+            onOverwritten: workflow.completeSave,
+          }}
           onChange={props.handleSettingChange}
         />
       )}

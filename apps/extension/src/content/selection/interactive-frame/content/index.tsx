@@ -48,17 +48,24 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
     isSelected: props.isSelected,
     toolbarAnchorOffset: props.toolbarAnchorOffset,
     isCalloutEditing: props.isCalloutEditing,
+    ...(props.activeCalloutIndex === undefined
+      ? {}
+      : { activeCalloutIndex: props.activeCalloutIndex }),
     maintainAspectRatio: props.maintainAspectRatio,
     aspectRatio: props.aspectRatio,
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
     setTempFrame: props.setTempFrame,
+    ...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {}),
     setMaintainAspectRatio: props.setMaintainAspectRatio,
     setAspectRatio: props.setAspectRatio,
     setState: props.setState,
     togglePopover: props.togglePopover,
     setIsCalloutEditing: props.setIsCalloutEditing,
+    ...(props.setActiveCalloutIndex === undefined
+      ? {}
+      : { setActiveCalloutIndex: props.setActiveCalloutIndex }),
     closePopover: props.closePopover,
     ...(props.handleEffectModeSelect === undefined
       ? {}
@@ -85,13 +92,20 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     isStepBadgePopoverOpen: props.isStepBadgePopoverOpen,
     isCalloutPopoverOpen: props.isCalloutPopoverOpen,
     isCalloutEditing: props.isCalloutEditing,
+    ...(props.activeCalloutIndex === undefined
+      ? {}
+      : { activeCalloutIndex: props.activeCalloutIndex }),
     state: props.state,
     effectMode: props.effectMode,
     popoverAnchorRef: props.popoverAnchorRef,
     stepBadgePopoverAnchorRef: props.stepBadgePopoverAnchorRef,
     calloutPopoverAnchorRef: props.calloutPopoverAnchorRef,
     setIsCalloutEditing: props.setIsCalloutEditing,
+    ...(props.setActiveCalloutIndex === undefined
+      ? {}
+      : { setActiveCalloutIndex: props.setActiveCalloutIndex }),
     setTempFrame: props.setTempFrame,
+    ...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {}),
     closePopover: props.closePopover,
     ...(props.handleEffectModeSelect === undefined
       ? {}

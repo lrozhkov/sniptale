@@ -66,28 +66,27 @@ describe('frame-surface resolveFrameSurface', () => {
     }
   );
 
-  it('clamps an inward stroke and radius to a tiny free frame', () => {
+  it('keeps an outward stroke independent from a tiny inner frame', () => {
     expect(resolveFrameSurface(createFrame({ width: 1, height: 3 })).geometry).toEqual({
       x: 10.5,
       y: 20.25,
       width: 1,
       height: 3,
       radius: 0.5,
-      strokeWidth: 0.5,
+      strokeWidth: 20,
     });
   });
 });
 
 describe('frame-surface projectElementFrameSurface', () => {
-  it('measures padding to the inner edge of the inward stroke', () => {
+  it('projects padding before the outward stroke without shrinking the selected area', () => {
     expect(
       projectElementFrameSurface(
         { x: 40, y: 30, width: 160, height: 90 },
         {
-          strokeWidth: 2,
           padding: { top: 4, right: 6, bottom: 7, left: 5 },
         }
       )
-    ).toEqual({ x: 33, y: 24, width: 175, height: 105 });
+    ).toEqual({ x: 35, y: 26, width: 171, height: 101 });
   });
 });

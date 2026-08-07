@@ -16,7 +16,11 @@ export function InteractiveFrameToolbarContent({
   toolbarProps,
 }: InteractiveFrameToolbarContentProps) {
   const effectButtons = createEffectButtons();
-  const toolbarActions = createInteractiveFrameToolbarActions(toolbarProps);
+  const captureVisibility = toolbarProps.captureVisibility;
+  const toolbarActions = createInteractiveFrameToolbarActions(
+    toolbarProps,
+    captureVisibility.toggle
+  );
 
   return (
     <>
@@ -34,6 +38,7 @@ export function InteractiveFrameToolbarContent({
         handleButtonMouseDown={toolbarActions.handleButtonMouseDown}
         handleStepBadgeClick={toolbarActions.handleStepBadgeClick}
         handleCalloutClick={toolbarActions.handleCalloutClick}
+        handleAddCalloutClick={toolbarActions.handleAddCalloutClick}
       />
       <InteractiveFrameToolbarActionButtons
         handleButtonMouseDown={toolbarActions.handleButtonMouseDown}
@@ -42,6 +47,8 @@ export function InteractiveFrameToolbarContent({
         handleCloseClick={toolbarActions.handleCloseClick}
         handleDecreaseClick={toolbarActions.handleDecreaseClick}
         handleIncreaseClick={toolbarActions.handleIncreaseClick}
+        handleCaptureVisibilityClick={toolbarActions.handleCaptureVisibilityClick}
+        hiddenDuringCapture={captureVisibility.hiddenDuringCapture}
         canDecrease={canDecreaseFrameSize(toolbarProps.frame)}
       />
     </>

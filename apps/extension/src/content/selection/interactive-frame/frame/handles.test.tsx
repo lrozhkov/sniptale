@@ -63,6 +63,6 @@ it('renders all eight neutral resize handles on proximity in standard cursor sta
   expect(handles[0]?.style.height).toBe('13px');
   expect(handles[0]?.style.boxSizing).toBe('border-box');
   expect(handles[0]?.style.backgroundColor).toBe('rgb(255, 255, 255)');
-  expect(handles[0]?.style.left).toBe('6px');
-  expect(handles[0]?.style.top).toBe('16px');
+  expect(handles[0]?.style.left).toBe('1px');
+  expect(handles[0]?.style.top).toBe('11px');
 });

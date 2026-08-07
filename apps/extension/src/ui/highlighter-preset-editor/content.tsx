@@ -53,7 +53,8 @@ export function BorderPresetEditorContent({
   onClose,
   preset,
   state,
-}: Pick<BorderPresetEditorProps, 'isSaving' | 'onClose' | 'preset'> & {
+  linkedTemplateOptions,
+}: Pick<BorderPresetEditorProps, 'isSaving' | 'linkedTemplateOptions' | 'onClose' | 'preset'> & {
   state: EditorState;
 }) {
   const modalRootRef = useRef<HTMLDivElement>(null);
@@ -76,7 +77,10 @@ export function BorderPresetEditorContent({
       >
         <ProductModalHeader compact title={title} onClose={onClose} />
         <ProductModalBody compact className="space-y-4">
-          <BorderPresetEditorFields state={state} />
+          <BorderPresetEditorFields
+            {...(linkedTemplateOptions ? { linkedTemplateOptions } : {})}
+            state={state}
+          />
         </ProductModalBody>
         <EditorFooter
           disabled={!state.name.trim() || state.hasBlockedProps || Boolean(state.cssError)}

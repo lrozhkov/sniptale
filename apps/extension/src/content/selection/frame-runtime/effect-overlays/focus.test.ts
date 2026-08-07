@@ -129,4 +129,18 @@ describe('frame-effect-overlays focus geometry', () => {
     expect(refs.focusOverlayRef.current?.style.background).toBe('rgba(0, 0, 0, 0.4)');
     expect(refs.focusSvgRef.current?.querySelector(`rect[data-frame-id="${frame.id}"]`)).toBeNull();
   });
+
+  it('combines focus dimming and gaussian blur once using the strongest active settings', () => {
+    const refs = createOverlayRefs(createFocusRect());
+    const first = createFrame(false);
+    first.focusSettings = createFocusSettingsFixture({ blurAmount: 6, opacity: 0 });
+    const second = createFrame(false);
+    second.id = 'frame-2';
+    second.focusSettings = createFocusSettingsFixture({ blurAmount: 12, opacity: 0.35 });
+
+    updateFocusOverlayMask([first, second], refs);
+
+    expect(refs.focusOverlayRef.current?.style.background).toBe('rgba(0, 0, 0, 0.35)');
+    expect(refs.focusOverlayRef.current?.style.backdropFilter).toBe('blur(12px)');
+  });
 });

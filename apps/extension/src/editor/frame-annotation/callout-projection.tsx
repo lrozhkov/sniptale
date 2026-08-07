@@ -16,8 +16,14 @@ import {
   resolveCalloutVoiceButtonLeftOffset,
 } from '../../composition/frame-annotation-controls/voice/button';
 import { useCalloutVoiceInput } from '../../composition/frame-annotation-controls/voice/input';
+import {
+  getFrameCallout,
+  removeFrameCallout,
+  setFrameCallout,
+} from '../../features/highlighter/frame-annotation/callout/collection';
 
 export function EditorFrameCallout(props: {
+  calloutIndex: number;
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsPortalTarget: HTMLDivElement | null;
   object: FabricObject;
@@ -38,7 +44,7 @@ export function EditorFrameCallout(props: {
     height: number;
   };
 }) {
-  const callout = props.snapshot.callout!;
+  const callout = getFrameCallout(props.snapshot, props.calloutIndex)!;
   const [isEditing, setIsEditing] = React.useState(
     () => callout.content.bodyHtml.trim() === '' && callout.content.titleText.trim() === ''
   );
@@ -62,9 +68,9 @@ export function EditorFrameCallout(props: {
     };
   }, [frameId, onOccupiedBoundsChange, props.isSettingsOpen, props.selected]);
   const apply = (nextCallout: typeof callout) =>
-    props.onSnapshotChange({ ...props.snapshot, callout: nextCallout });
+    props.onSnapshotChange(setFrameCallout(props.snapshot, props.calloutIndex, nextCallout));
   const preview = (nextCallout: typeof callout) =>
-    props.onSnapshotPreview({ ...props.snapshot, callout: nextCallout });
+    props.onSnapshotPreview(setFrameCallout(props.snapshot, props.calloutIndex, nextCallout));
   const stopEditing = () => {
     setIsEditing(false);
     props.onDraftCommit();
@@ -83,7 +89,7 @@ export function EditorFrameCallout(props: {
     isEditing,
     onContentChange: (bodyHtml) =>
       preview({ ...callout, content: { ...callout.content, bodyHtml } }),
-    onDelete: () => apply({ ...callout, enabled: false }),
+    onDelete: () => props.onSnapshotChange(removeFrameCallout(props.snapshot, props.calloutIndex)),
     onStartEditing: () => setIsEditing(true),
     onStopEditing: stopEditing,
     settingsKey: JSON.stringify(callout.style),
@@ -96,7 +102,7 @@ export function EditorFrameCallout(props: {
     callout,
     previewContent: preview,
     onDelete: () => {
-      apply({ ...callout, enabled: false });
+      props.onSnapshotChange(removeFrameCallout(props.snapshot, props.calloutIndex));
       setIsEditing(false);
     },
     onSettingsClick: () => {
@@ -116,6 +122,7 @@ export function EditorFrameCallout(props: {
   return (
     <>
       <FrameCalloutInteractiveSurface
+        chromeScale={1}
         coordinateSpace={props.coordinateSpace}
         {...(props.controlsPortalTarget
           ? { controlsPortalTarget: props.controlsPortalTarget }
@@ -158,11 +165,12 @@ export function EditorFrameCallout(props: {
 
 export function resolveCalloutCenter(
   frameId: string,
-  coordinateSpace: FrameAnnotationCoordinateSpace
+  coordinateSpace: FrameAnnotationCoordinateSpace,
+  calloutIndex = 0
 ): { x: number; y: number } | null {
-  const callout = Array.from(document.querySelectorAll<HTMLElement>('.sniptale-callout')).find(
+  const callout = Array.from(document.querySelectorAll<HTMLElement>('.sniptale-callout')).filter(
     (element) => element.dataset['frameId'] === frameId
-  );
+  )[calloutIndex];
   const rect = callout?.getBoundingClientRect();
   if (!rect) return null;
   const logical = coordinateSpace.clientRectToLogical({

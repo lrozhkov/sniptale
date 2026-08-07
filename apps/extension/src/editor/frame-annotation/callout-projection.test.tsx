@@ -79,6 +79,7 @@ it('starts a newly enabled empty comment in editing mode and suppresses formatti
   act(() =>
     root.render(
       <EditorFrameCallout
+        calloutIndex={0}
         coordinateSpace={identityFrameAnnotationCoordinateSpace}
         controlsPortalTarget={null}
         object={object}

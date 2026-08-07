@@ -89,6 +89,7 @@ export function ScenarioRecorderSidebar(props: {
   position: { x: number; y: number };
   recentSteps: ScenarioRecorderSidebarStep[];
   sidebarRef: RefObject<HTMLElement | null>;
+  uiScale?: number;
 }) {
   const sidebarState = useScenarioRecorderSidebarState();
   const { highlightedStepId, stepsContainerRef } = useHighlightedRecentStep({
@@ -118,6 +119,7 @@ export function ScenarioRecorderSidebar(props: {
         recentSteps={props.recentSteps}
         setDragStepId={sidebarState.setDragStepId}
         sidebarRef={props.sidebarRef}
+        {...(props.uiScale === undefined ? {} : { uiScale: props.uiScale })}
         stepsContainerRef={stepsContainerRef}
       />
       {renderScenarioRecorderSidebarOverlays(sidebarState)}

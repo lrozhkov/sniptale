@@ -18,6 +18,7 @@ import {
   isFocusSettings,
   isStepBadgeSettings,
 } from './settings-parser';
+import { MAX_FRAME_CALLOUTS } from './callout/collection';
 
 const EFFECT_MODES = new Set(['border', 'blur', 'focus']);
 const MAX_NESTING_DEPTH = 24;
@@ -51,10 +52,14 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
     !isBlurSettings(value['blurSettings']) ||
     !isFocusSettings(value['focusSettings']) ||
     !isStepBadgeSettings(value['stepBadge']) ||
-    !isCalloutSettings(value['callout'])
+    !isCalloutSettings(value['callout']) ||
+    !isAdditionalCallouts(value['additionalCallouts'])
   )
     return null;
 
+  const primaryCallout = value['callout'] as CalloutSettings | undefined;
+  const additionalCallouts = value['additionalCallouts'] as CalloutSettings[] | undefined;
+  if (!primaryCallout && additionalCallouts?.length) return null;
   const snapshot: FrameAnnotationSnapshotV1 = {
     id: value['id'],
     version: FRAME_ANNOTATION_SNAPSHOT_VERSION,
@@ -76,9 +81,23 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
     ...(value['stepBadge'] === undefined
       ? {}
       : { stepBadge: value['stepBadge'] as StepBadgeSettings }),
-    ...(value['callout'] === undefined ? {} : { callout: value['callout'] as CalloutSettings }),
+    ...(primaryCallout === undefined ? {} : { callout: primaryCallout }),
+    ...(additionalCallouts === undefined
+      ? {}
+      : {
+          additionalCallouts,
+        }),
   };
   return normalizeFrameAnnotationSnapshot(snapshot);
+}
+
+function isAdditionalCallouts(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.length <= MAX_FRAME_CALLOUTS - 1 &&
+      value.every(isCalloutSettings))
+  );
 }
 
 export function serializeFrameAnnotationSnapshot(snapshot: FrameAnnotationSnapshotV1): string {

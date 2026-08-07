@@ -2,6 +2,7 @@ import type { FrameData } from '../../../../features/highlighter/contracts';
 import { areDescriptorListsEqual } from './descriptor-equality';
 
 export type FocusFrameDescriptor = {
+  blurAmount: number | undefined;
   borderRadius: number | undefined;
   id: string;
   height: number;
@@ -26,6 +27,7 @@ export function buildFocusFrameDescriptors(frames: FrameData[]): FocusFrameDescr
   return frames
     .filter((frame) => frame.effectMode === 'focus')
     .map((frame) => ({
+      blurAmount: frame.focusSettings?.blurAmount,
       borderRadius: frame.borderSettings?.radius,
       id: frame.id,
       height: frame.height,

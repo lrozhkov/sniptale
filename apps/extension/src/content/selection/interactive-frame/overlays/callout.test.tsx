@@ -369,6 +369,7 @@ describe('interactive frame callout overlay', () => {
     });
 
     expect(useFrameUIStore.getState().activePopover).toEqual({
+      calloutIndex: 0,
       frameId: frame.id,
       kind: 'callout-settings',
     });

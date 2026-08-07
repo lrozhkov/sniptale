@@ -13,6 +13,7 @@ import type { FrameAnnotationCoordinateSpace } from '../coordinate-space';
 export function useStepBadgeInteraction(args: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   borderWidth: number;
+  chromeScale?: number;
   frameRect: StepBadgeFrameRect | undefined;
   isSettingsOpen: boolean | undefined;
   onPositionChange: ((placement: StepBadgeManualPlacement) => void) | undefined;
@@ -29,6 +30,7 @@ export function useStepBadgeInteraction(args: {
     initialPlacement,
     onPositionChange: args.onPositionChange ?? (() => undefined),
     visualOffset,
+    ...(args.chromeScale === undefined ? {} : { visualScale: args.chromeScale }),
   });
   const visibility = useTransientControlVisibility(drag.isDragging || Boolean(args.isSettingsOpen));
   const effectiveSettings = drag.draftPlacement
@@ -52,6 +54,7 @@ export function useStepBadgeInteraction(args: {
       badgeSize: visualMetrics.badgeSize,
       sizeLevel: effectiveSettings.sizeLevel,
     }),
+    ...(args.chromeScale === undefined ? {} : { uiScale: args.chromeScale }),
   });
 
   return {

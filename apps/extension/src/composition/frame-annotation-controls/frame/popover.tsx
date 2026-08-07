@@ -7,9 +7,9 @@ import { usePopoverDistanceClose, usePopoverEscapeClose } from '../popover/hooks
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import { getBorderPresetCssValidation } from '../../../ui/highlighter-preset-editor/useBorderPresetEditorState/validation';
-import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
 import { useFrameCreationPopoverState } from './popover-state';
 import type { FrameAnnotationStyleSettings } from '../contracts';
+import { useLinkedAnnotationTemplateOptions } from './linked-template-options';
 
 export type { FrameAnnotationStyleSettings } from '../contracts';
 
@@ -25,6 +25,7 @@ export function FrameAnnotationCreationFramePopover(props: {
 }) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const state = useFrameCreationPopoverState(props);
+  const linkedTemplateOptions = useLinkedAnnotationTemplateOptions();
   const headerContext = props.headerContext ?? 'toolbar';
   const presentation = useFrameAnnotationPopoverPresentation({
     anchorEl: props.anchorEl,
@@ -37,15 +38,18 @@ export function FrameAnnotationCreationFramePopover(props: {
   });
 
   usePopoverDistanceClose({
-    isOpen: props.isOpen && !state.presetEditor.isOpen,
+    isOpen: props.isOpen,
     onClose: props.onClose,
     popoverRef,
   });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
-    isOpen: props.isOpen && !state.presetEditor.isOpen,
+    isOpen: props.isOpen,
     onClose: props.onClose,
   });
+  const handleFocusBlurChange = (blurAmount: number) => {
+    state.border.apply({ focusSettings: { ...props.settings.focusSettings, blurAmount } });
+  };
 
   return (
     <ContentPopoverAdapter
@@ -74,13 +78,11 @@ export function FrameAnnotationCreationFramePopover(props: {
           handleBlurTypeChange={(blurType: BlurType) =>
             state.border.apply({ blurSettings: { ...props.settings.blurSettings, blurType } })
           }
-          handleEditPreset={(preset) => {
-            state.presetEditor.setEditingPreset(preset);
-            state.presetEditor.setOpen(true);
-          }}
+          handleForkPreset={state.border.forkPreset}
           handleFocusChange={(opacity) =>
             state.border.apply({ focusSettings: { ...props.settings.focusSettings, opacity } })
           }
+          handleFocusBlurChange={handleFocusBlurChange}
           handleFocusShowBorderChange={(showBorder) =>
             state.border.apply({ focusSettings: { ...props.settings.focusSettings, showBorder } })
           }
@@ -92,6 +94,7 @@ export function FrameAnnotationCreationFramePopover(props: {
           localBlurSettings={props.settings.blurSettings}
           localBorderSettings={props.settings.borderSettings}
           localFocusSettings={props.settings.focusSettings}
+          linkedTemplateOptions={linkedTemplateOptions}
           manual={{
             cssDraft: state.css.draft,
             cssError: getBorderPresetCssValidation(state.css.draft).cssError,
@@ -117,13 +120,6 @@ export function FrameAnnotationCreationFramePopover(props: {
             : {})}
         />
       </div>
-      <BorderPresetEditor
-        isOpen={state.presetEditor.isOpen}
-        isSaving={state.presetSaving.isSaving}
-        onClose={() => state.presetEditor.setOpen(false)}
-        onSave={state.presetEditor.saveEdited}
-        {...(state.presetEditor.editingPreset ? { preset: state.presetEditor.editingPreset } : {})}
-      />
     </ContentPopoverAdapter>
   );
 }

@@ -7,6 +7,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import {
   getPointerDistanceFromRect,
+  resolveToolbarFloatingMenuStyle,
   TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX,
   useToolbarFloatingMenuDismissal,
 } from './floating.helpers';
@@ -49,6 +50,8 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
 });
 
 it('uses the shared 250px pointer distance policy', () => {
@@ -71,6 +74,35 @@ it('uses the shared 250px pointer distance policy', () => {
   expect(
     getPointerDistanceFromRect(new MouseEvent('mousemove', { clientX: 620, clientY: 520 }), rect)
   ).toBeGreaterThan(TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX);
+});
+
+it('keeps floating menu placement in the same physical viewport under page zoom', () => {
+  vi.stubGlobal('innerWidth', 500);
+  vi.stubGlobal('innerHeight', 400);
+  const owner = document.createElement('div');
+  owner.style.setProperty('--sniptale-content-ui-scale', '0.5');
+  const anchor = document.createElement('button');
+  owner.append(anchor);
+  document.body.append(owner);
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    bottom: 70,
+    height: 20,
+    left: 50,
+    right: 68,
+    top: 50,
+    width: 18,
+    x: 50,
+    y: 50,
+    toJSON: () => ({}),
+  });
+
+  expect(
+    resolveToolbarFloatingMenuStyle({
+      anchorEl: anchor,
+      menuWidth: 300,
+      placement: 'down',
+    })
+  ).toMatchObject({ left: 0, top: 'calc(100% + 10px)' });
 });
 
 it('keeps a floating menu open nearby and uses the non-focus close path far away', () => {

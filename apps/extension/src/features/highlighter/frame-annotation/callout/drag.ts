@@ -52,10 +52,14 @@ function getManualPlacement(args: {
   left: number;
   top: number;
   width: number;
+  visualScale?: number;
 }): CalloutManualPlacement {
+  const visualScale = args.visualScale ?? 1;
   return {
-    centerOffsetX: args.left + args.width / 2 - (args.frameRect.x + args.frameRect.width / 2),
-    centerOffsetY: args.top + args.height / 2 - (args.frameRect.y + args.frameRect.height / 2),
+    centerOffsetX:
+      (args.left + args.width / 2 - (args.frameRect.x + args.frameRect.width / 2)) / visualScale,
+    centerOffsetY:
+      (args.top + args.height / 2 - (args.frameRect.y + args.frameRect.height / 2)) / visualScale,
   };
 }
 
@@ -70,6 +74,7 @@ export function useCalloutDrag(args: {
   onMoveEnd?: () => void;
   projectMoveRect?: (rect: Rect) => Rect;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
+  visualScale?: number;
 }) {
   const [draftPlacement, setDraftPlacement] = React.useState<CalloutManualPlacement | null>(null);
   const [translateConnectorGeometry, setTranslateConnectorGeometry] = React.useState(false);
@@ -200,6 +205,7 @@ function useCalloutDragPointerSession(input: {
         left,
         top,
         width,
+        ...(input.args.visualScale === undefined ? {} : { visualScale: input.args.visualScale }),
       });
       input.translateConnectorGeometryRef.current = event.ctrlKey;
       input.setTranslateConnectorGeometry(event.ctrlKey);
@@ -281,10 +287,22 @@ function moveCalloutWithKeyboard(
   event.stopPropagation();
   const width = args.dimensions.width || rect.width;
   const height = args.dimensions.height || rect.height;
-  const left = clamp(rect.x + delta.x, 8, coordinateSpace.viewport.width - width - 8);
-  const top = clamp(rect.y + delta.y, 8, coordinateSpace.viewport.height - height - 8);
+  const visualScale = args.visualScale ?? 1;
+  const left = clamp(rect.x + delta.x * visualScale, 8, coordinateSpace.viewport.width - width - 8);
+  const top = clamp(
+    rect.y + delta.y * visualScale,
+    8,
+    coordinateSpace.viewport.height - height - 8
+  );
   args.onPositionChange(
-    getManualPlacement({ frameRect: args.frameRect, height, left, top, width }),
+    getManualPlacement({
+      frameRect: args.frameRect,
+      height,
+      left,
+      top,
+      width,
+      ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
+    }),
     { translateConnectorGeometry: false }
   );
 }

@@ -13,18 +13,22 @@ interface ActiveToastEntry {
 
 export interface ToastHostAdapter {
   appendHost: (container: HTMLDivElement) => void;
+  getHostStyle?: (index: number) => Partial<CSSStyleDeclaration>;
   isHidden: () => boolean;
+  subscribePositionChanges?: (listener: () => void) => () => void;
 }
 
 type ToastServiceState = {
   activeToasts: Set<ActiveToastEntry>;
   hostAdapter: ToastHostAdapter | null;
+  positionSubscriptionCleanup: (() => void) | null;
 };
 
 function createToastServiceState(): ToastServiceState {
   return {
     activeToasts: new Set<ActiveToastEntry>(),
     hostAdapter: null,
+    positionSubscriptionCleanup: null,
   };
 }
 
@@ -55,7 +59,11 @@ function getToastHostStyle(index: number): Partial<CSSStyleDeclaration> {
 
 function applyToastPositions(state: ToastServiceState) {
   Array.from(state.activeToasts).forEach((entry, index) => {
-    Object.assign(entry.container.style, getToastHostStyle(index));
+    Object.assign(
+      entry.container.style,
+      getToastHostStyle(index),
+      state.hostAdapter?.getHostStyle?.(index)
+    );
   });
 }
 
@@ -74,7 +82,11 @@ function createToastService() {
       Array.from(state.activeToasts).forEach((entry) => removeToast(state, entry));
     },
     setHostAdapter(adapter: ToastHostAdapter | null): void {
+      state.positionSubscriptionCleanup?.();
       state.hostAdapter = adapter;
+      state.positionSubscriptionCleanup =
+        adapter?.subscribePositionChanges?.(() => applyToastPositions(state)) ?? null;
+      applyToastPositions(state);
     },
     showToast(message: string, type: ToastType = 'info', duration: number = 2000): void {
       if (state.hostAdapter?.isHidden()) {

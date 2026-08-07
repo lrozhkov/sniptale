@@ -10,6 +10,7 @@ import type {
 
 export type RuntimeMessageRequest = {
   type?: string;
+  pageZoom?: number;
   viewport?: {
     presetId: string;
     target: 'viewport' | 'window';

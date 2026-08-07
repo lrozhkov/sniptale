@@ -220,3 +220,27 @@ it('falls back to an unchecked focus-border toggle when showBorder is omitted', 
     showBorder: true,
   });
 });
+
+it('commits gaussian focus blur independently from dimming', async () => {
+  const settings = createSettings({
+    defaultFocusSettings: { blurAmount: 5, opacity: 0.3, showBorder: false },
+  });
+  const props = await renderPanel({ effects: createEffects(), settings });
+  const ranges = container?.querySelectorAll<HTMLInputElement>('input[data-testid="focus-range"]');
+  const blurRange = ranges?.[1];
+
+  expect(ranges).toHaveLength(2);
+  expect(container?.textContent).toContain('highlighter.section.focusBlurLabel');
+
+  await act(async () => {
+    if (!blurRange) return;
+    setInputValue(blurRange, '13');
+    commitRangeValue(blurRange);
+  });
+
+  expect(props.effects.handleUpdateFocusSettings).toHaveBeenCalledWith({
+    blurAmount: 13,
+    opacity: 0.3,
+    showBorder: false,
+  });
+});

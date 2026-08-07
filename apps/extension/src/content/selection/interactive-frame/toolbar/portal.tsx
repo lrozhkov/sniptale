@@ -86,7 +86,7 @@ export function InteractiveFrameToolbarPortal(props: {
         width: 'max-content',
         height: 'max-content',
         pointerEvents: 'auto',
-        maxHeight: 'calc(100vh - 16px)',
+        maxHeight: 'calc(var(--sniptale-content-ui-viewport-height) - 16px)',
         overflowY: 'auto',
         zIndex: Z_INDEX_FLOATING_UI,
       })}
@@ -95,7 +95,10 @@ export function InteractiveFrameToolbarPortal(props: {
     >
       <ProductGlassToolbar
         className="sniptale-action-toolbar"
-        style={{ maxWidth: 'calc(100vw - 16px)', flexWrap: 'wrap' }}
+        style={{
+          maxWidth: 'calc(var(--sniptale-content-ui-viewport-width) - 16px)',
+          flexWrap: 'wrap',
+        }}
         onMouseDown={props.onToolbarMouseDown}
         onClick={props.onToolbarClick}
       >

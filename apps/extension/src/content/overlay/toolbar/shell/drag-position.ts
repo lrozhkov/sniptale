@@ -11,6 +11,7 @@ import {
   useToolbarViewportClamping,
 } from './drag-position.effects';
 import { useToolbarDragController } from './drag-position.controller';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 const DEFAULT_TOOLBAR_TOP = 5;
 
@@ -42,12 +43,14 @@ function useToolbarPreferenceLifecycle(args: {
   setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
   toolbarRef: RefObject<HTMLDivElement | null>;
   dragOffset: RefObject<ContentToolbarPosition>;
+  uiScale: number;
 }) {
   const isInitialized = useToolbarPositionInitialization({
     preferencesReady: args.preferencesReady,
     savedPosition: args.savedPosition,
     setPosition: args.setPosition,
     toolbarRef: args.toolbarRef,
+    uiScale: args.uiScale,
   });
 
   useToolbarViewportClamping({
@@ -56,6 +59,7 @@ function useToolbarPreferenceLifecycle(args: {
     isInitialized,
     setPosition: args.setPosition,
     toolbarRef: args.toolbarRef,
+    uiScale: args.uiScale,
   });
   useToolbarPreferencePersistence({
     compactMenus: args.compactMenus,
@@ -70,6 +74,7 @@ function useToolbarPreferenceLifecycle(args: {
     setPosition: args.setPosition,
     stopDragging: () => args.setIsDragging(false),
     toolbarRef: args.toolbarRef,
+    uiScale: args.uiScale,
   });
 
   return isInitialized;
@@ -82,8 +87,9 @@ export function useToolbarDragPosition(
     x: 0,
     y: DEFAULT_TOOLBAR_TOP,
   });
+  const uiScale = useContentUiScale();
   const { dragOffset, handleMouseDown, isDragging, setIsDragging, toolbarRef } =
-    useToolbarDragController(position);
+    useToolbarDragController(position, uiScale);
   const {
     compactMenus,
     displayMode,
@@ -105,6 +111,7 @@ export function useToolbarDragPosition(
     setIsDragging,
     setPosition,
     toolbarRef,
+    uiScale,
   });
 
   return {

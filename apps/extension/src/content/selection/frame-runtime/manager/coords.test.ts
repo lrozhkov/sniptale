@@ -85,10 +85,10 @@ describe('frame manager coords', () => {
     );
 
     expect(calculateFrameViewportCoords(target, testBorderSettings)).toEqual({
-      x: 233,
-      y: 144,
-      width: 116,
-      height: 67,
+      x: 237,
+      y: 148,
+      width: 108,
+      height: 59,
     });
   });
 

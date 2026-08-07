@@ -236,8 +236,9 @@ function getRoundedTriangleTip(args: {
   baseB: Point;
   framePoint: Point;
   side: ConnectorSide;
+  tipGap: number;
 }) {
-  const tipPoint = offsetPoint(args.framePoint, getOutwardNormal(args.side), CALLOUT_GAP);
+  const tipPoint = offsetPoint(args.framePoint, getOutwardNormal(args.side), args.tipGap);
   const halfRoundingRatio = TIP_ROUNDING_RATIO / 2;
   const vertexScale = 1 / (1 - halfRoundingRatio);
   const tipVertex = {
@@ -335,6 +336,7 @@ function getConnectorPoints(args: {
   tailBaseWidth?: number;
   tailFramePosition?: number;
   tailSize: number;
+  tipGap?: number;
 }) {
   const bubbleSide = getOppositeSide(args.side);
   const bubbleCenter = getCenter(args.bubbleRect);
@@ -382,6 +384,7 @@ function getConnectorPoints(args: {
       baseB: base.baseB,
       framePoint,
       side: args.side,
+      tipGap: args.tipGap ?? CALLOUT_GAP,
     }),
   };
 }
@@ -465,6 +468,7 @@ export function getDynamicTailState(args: {
   tailBaseWidth?: number;
   tailFramePosition?: number;
   tailSize: number;
+  tipGap?: number;
 }): {
   attachment: {
     baseA: Point;

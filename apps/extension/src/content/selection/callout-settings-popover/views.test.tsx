@@ -52,7 +52,7 @@ describe('callout settings views', () => {
         handleSettingChange={vi.fn()}
         localSettings={settings}
         onApplyPreset={vi.fn()}
-        onCustomizePreset={vi.fn()}
+        onForkPreset={vi.fn()}
         onShowPresets={vi.fn()}
         onTogglePreset={vi.fn()}
         pendingPresetIds={new Set()}
@@ -70,7 +70,7 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('Комментарии');
-    expect(markup).toContain('Настроить');
+    expect(markup).not.toContain('Создать копию');
     expect(markup).toContain('sniptale-settings-popover-destructive-action');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('data-callout-settings-mode-switch');
@@ -87,7 +87,7 @@ describe('callout settings views', () => {
         handleSettingChange={vi.fn()}
         localSettings={createDefaultCalloutSettings()}
         onApplyPreset={vi.fn()}
-        onCustomizePreset={vi.fn()}
+        onForkPreset={vi.fn()}
         onShowPresets={vi.fn()}
         onTogglePreset={vi.fn()}
         pendingPresetIds={new Set()}
@@ -105,7 +105,8 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('aria-label="Параметры комментария"');
-    expect(markup).toContain('Шаблоны');
+    expect(markup).toContain('Назад к шаблонам');
+    expect(markup).toContain('Не сохранено');
     expect(markup).toContain('data-ui="shared.highlighter-manual-inspector-surface"');
     expect(markup).toContain('data-ui="shared.categorized-inspector.section-heading"');
     expect(markup).toContain('>Текст</span>');
@@ -172,7 +173,7 @@ describe('callout settings views', () => {
         activePresetId="system-callout-bubble"
         error={null}
         onApplyPreset={vi.fn()}
-        onCustomizePreset={vi.fn()}
+        onForkPreset={vi.fn()}
         onTogglePreset={vi.fn()}
         pendingPresetIds={new Set()}
         presets={createSystemCalloutPresetCatalog()}
@@ -183,13 +184,13 @@ describe('callout settings views', () => {
     expect(markup).toContain('h-9 w-16');
     expect(markup).toContain('sniptale-callout-preset-list');
     expect(markup).toContain('sniptale-glass-preset-item--active');
-    expect(markup).toContain('Настроить стиль');
+    expect(markup).toContain('Создать копию');
     expect(markup).toContain('Скрыть из списка');
   });
 });
 
 describe('callout settings shared interactions', () => {
-  it('dispatches apply, customize, reset, and visibility actions from shared preset rows', () => {
+  it('dispatches apply, fork, reset, and visibility actions from shared preset rows', () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -202,7 +203,7 @@ describe('callout settings shared interactions', () => {
         enabled: index === 1 ? false : true,
       }));
     const onApplyPreset = vi.fn();
-    const onCustomizePreset = vi.fn();
+    const onForkPreset = vi.fn();
     const onResetPreset = vi.fn();
     const onTogglePreset = vi.fn();
 
@@ -212,7 +213,7 @@ describe('callout settings shared interactions', () => {
           activePresetId={presets[0]!.id}
           error="catalog failed"
           onApplyPreset={onApplyPreset}
-          onCustomizePreset={onCustomizePreset}
+          onForkPreset={onForkPreset}
           onResetPreset={onResetPreset}
           onTogglePreset={onTogglePreset}
           pendingPresetIds={new Set()}
@@ -232,7 +233,8 @@ describe('callout settings shared interactions', () => {
     });
 
     expect(onApplyPreset).toHaveBeenCalledWith(presets[0]);
-    expect(onCustomizePreset).toHaveBeenCalledTimes(2);
+    expect(onForkPreset).toHaveBeenCalledOnce();
+    expect(onForkPreset).toHaveBeenCalledWith(presets[0]);
     expect(onResetPreset).toHaveBeenCalledWith(presets[0]);
     expect(onTogglePreset).toHaveBeenCalledTimes(1);
     expect(host.querySelector('[role="alert"]')?.textContent).toBe('catalog failed');
@@ -259,7 +261,7 @@ describe('callout settings shared interactions', () => {
           localSettings={createDefaultCalloutSettings(undefined, presets[0]!.id)}
           onApplyPreset={onApplyPreset}
           onClose={onClose}
-          onCustomizePreset={vi.fn()}
+          onForkPreset={vi.fn()}
           onShowPresets={vi.fn()}
           onTogglePreset={vi.fn()}
           pendingPresetIds={new Set()}
@@ -279,8 +281,8 @@ describe('callout settings shared interactions', () => {
     act(() => {
       rows[0]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
       rows[1]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
-      host.querySelector<HTMLButtonElement>('.sniptale-settings-popover-mode-action')?.click();
     });
+    act(() => host.querySelector<HTMLButtonElement>('button[title="Создать копию"]')?.click());
     act(() => host.querySelector<HTMLButtonElement>('[aria-label="Позиция"]')?.click());
     act(() => {
       [...host.querySelectorAll<HTMLElement>('[data-callout-anchor]')].at(-1)?.click();

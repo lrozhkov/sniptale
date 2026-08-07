@@ -219,11 +219,16 @@ function useCalloutPointerHandlers(
       }
 
       const editableElement = args.contentEditableRef.current;
+      const hasEditableContent = (editableElement?.textContent?.trim() ?? '') !== '';
       if (
         !isPointerEventWithinEditable(event, editableElement) &&
         !(editableElement && hasNonCollapsedSelectionWithinElement(editableElement))
       ) {
         event.preventDefault();
+        if (editableElement && !hasEditableContent && (args.titleText ?? '').trim() === '') {
+          editableElement.focus({ preventScroll: true });
+          return;
+        }
         finishEditing(editableElement);
       }
     },

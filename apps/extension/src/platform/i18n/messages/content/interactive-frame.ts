@@ -13,6 +13,14 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Настройки рамки',
     en: 'Frame settings',
   },
+  hideDuringCapture: {
+    ru: 'Скрывать рамку во время снимка',
+    en: 'Hide frame during capture',
+  },
+  showDuringCapture: {
+    ru: 'Показывать рамку во время снимка',
+    en: 'Show frame during capture',
+  },
   effectBlur: {
     ru: 'Размытие',
     en: 'Blur',
@@ -44,6 +52,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
   calloutAdd: {
     ru: 'Добавить комментарий',
     en: 'Add comment',
+  },
+  calloutAddAnother: {
+    ru: 'Добавить ещё один комментарий',
+    en: 'Add another comment',
   },
   voiceInputStart: {
     ru: 'Начать голосовой ввод. Удерживайте кнопку, чтобы говорить только во время нажатия.',

@@ -32,6 +32,7 @@ const controllerMocks = vi.hoisted(() => ({
   },
   saveAutoBlurSettings: vi.fn(),
   scanAutoBlurTargets: vi.fn(),
+  showToast: vi.fn(),
 }));
 
 vi.mock('../persistence', async (importOriginal) => ({
@@ -49,6 +50,11 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 vi.mock('../../../selection/auto-blur-runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../selection/auto-blur-runtime')>()),
   scanAutoBlurTargets: controllerMocks.scanAutoBlurTargets,
+}));
+
+vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),
+  showToast: controllerMocks.showToast,
 }));
 
 import { type AutoBlurController, useAutoBlurController } from '.';
@@ -208,7 +214,6 @@ async function expectModeCloseFlow() {
 }
 
 async function expectAutoApplyAllowedGate() {
-  vi.useFakeTimers();
   const enabledSettings = {
     ...controllerMocks.defaultSettings,
     autoApplyEnabled: true,
@@ -218,22 +223,38 @@ async function expectAutoApplyAllowedGate() {
   await renderHarness(true, true);
   await act(async () => {
     await Promise.resolve();
+    await Promise.resolve();
   });
+
+  expect(syncAutoBlurFrameCalls).toHaveLength(1);
+  expect(controllerMocks.scanAutoBlurTargets).toHaveBeenCalledWith({
+    frames: [],
+    mode: 'full-page',
+  });
+  expect(controllerMocks.showToast).toHaveBeenCalledTimes(1);
+
+  await renderHarness(true, true);
   await act(async () => {
-    vi.advanceTimersByTime(300);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(syncAutoBlurFrameCalls).toHaveLength(1);
+  expect(controllerMocks.showToast).toHaveBeenCalledTimes(1);
+
+  await renderHarness(true, false);
+  await act(async () => {
     await Promise.resolve();
   });
 
   expect(syncAutoBlurFrameCalls).toHaveLength(1);
 
-  syncAutoBlurFrameCalls = [];
-  await renderHarness(true, false);
+  await renderHarness(true, true);
   await act(async () => {
     await Promise.resolve();
-    vi.advanceTimersByTime(300);
+    await Promise.resolve();
   });
-
-  expect(syncAutoBlurFrameCalls).toHaveLength(0);
+  expect(syncAutoBlurFrameCalls).toHaveLength(2);
+  expect(controllerMocks.showToast).toHaveBeenCalledTimes(2);
 }
 
 async function expectPersistenceBeforeClose() {
@@ -436,6 +457,10 @@ describe('useAutoBlurController', () => {
     });
     expect(latestController?.autoApplyEnabled).toBe(true);
     expect(latestController?.isApplying).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(syncAutoBlurFrameCalls).toHaveLength(1);
   });
 
@@ -507,21 +532,18 @@ describe('useAutoBlurController', () => {
     );
   });
 
-  it('cancels scheduled auto-apply work when the controller unmounts', async () => {
-    vi.useFakeTimers();
-    controllerMocks.loadAutoBlurSettings.mockResolvedValue({
-      ...controllerMocks.defaultSettings,
-      autoApplyEnabled: true,
-    });
+  it('cancels pending one-shot auto-apply work when the controller unmounts', async () => {
+    const settings = createDeferred<AutoBlurSettings>();
+    controllerMocks.loadAutoBlurSettings.mockReturnValue(settings.promise);
     await renderHarness();
-    await act(async () => {
-      await Promise.resolve();
-    });
 
     act(() => root?.unmount());
     root = null;
     await act(async () => {
-      vi.advanceTimersByTime(300);
+      settings.resolve({
+        ...controllerMocks.defaultSettings,
+        autoApplyEnabled: true,
+      });
       await Promise.resolve();
     });
 

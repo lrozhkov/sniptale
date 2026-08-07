@@ -10,8 +10,16 @@ import {
 } from '../../../features/highlighter/frame-annotation/callout/model';
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 
-function dispatchCalloutSettingsChange(frameId: string, settings: CalloutSettingsPatch) {
-  dispatchCalloutPopoverSettingsChanged({ frameId, settings });
+function dispatchCalloutSettingsChange(
+  frameId: string,
+  calloutIndex: number,
+  settings: CalloutSettingsPatch
+) {
+  dispatchCalloutPopoverSettingsChanged({
+    ...(calloutIndex === 0 ? {} : { calloutIndex }),
+    frameId,
+    settings,
+  });
 }
 
 function useCalloutSettingsTransaction(args: {
@@ -51,9 +59,11 @@ function cancelOpenCalloutSettingsTransaction(
 }
 
 export function useCalloutSettingsPopoverState(args: {
+  calloutIndex?: number;
   frameId: string;
   isOpen: boolean;
   settings?: CalloutSettings;
+  onSettingsChange?: (settings: CalloutSettings) => void;
 }) {
   const [localSettings, setLocalSettings] = useState<CalloutSettings>(
     normalizeCalloutSettings(args.settings)
@@ -126,7 +136,8 @@ export function useCalloutSettingsPopoverState(args: {
         : placementPatch;
     const nextSettings = applyCalloutSettingsPatch(localSettings, normalizedPatch);
     setLocalSettings(nextSettings);
-    dispatchCalloutSettingsChange(args.frameId, normalizedPatch);
+    args.onSettingsChange?.(nextSettings);
+    dispatchCalloutSettingsChange(args.frameId, args.calloutIndex ?? 0, normalizedPatch);
   };
 
   const applyPreset = (preset: CalloutPreset) => {
@@ -140,6 +151,8 @@ export function useCalloutSettingsPopoverState(args: {
   return {
     handleSettingChange,
     applyPreset,
+    forkPreset: (_preset: CalloutPreset) => handleSettingChange({ sourcePresetId: undefined }),
+    markTemplateCreated: (sourcePresetId: string) => handleSettingChange({ sourcePresetId }),
     localSettings,
   };
 }

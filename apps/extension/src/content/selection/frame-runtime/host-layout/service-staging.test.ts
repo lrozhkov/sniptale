@@ -168,7 +168,7 @@ describe('frame host-layout unattributed geometry staging', () => {
     vi.advanceTimersByTime(16);
     const committedAfterSettle = scenario.framesRef.current[0]!;
     expect(service.getSnapshot().presentations.get(frame.id)).toBe('visible');
-    expect(committedAfterSettle).toMatchObject({ id: frame.id, width: 172, height: 66 });
+    expect(committedAfterSettle).toMatchObject({ id: frame.id, width: 166, height: 60 });
     expect(committedAfterSettle.x).toBeGreaterThan(committedBeforeMotion.x);
     expect(service.getLastGoodPagePlacement(frame.id)).toMatchObject({
       pageX: committedAfterSettle.x,

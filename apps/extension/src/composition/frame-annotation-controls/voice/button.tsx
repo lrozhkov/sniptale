@@ -30,6 +30,7 @@ export function CalloutVoiceButton(props: {
   dataUi?: string;
   isEditing: boolean;
   leftOffset: number;
+  visualScale?: number;
   voice: ReturnType<typeof useCalloutVoiceInput>;
 }) {
   if (!props.isEditing) return null;
@@ -39,7 +40,11 @@ export function CalloutVoiceButton(props: {
       data-ui={
         props.dataUi ? `${props.dataUi}-control` : 'content.highlighter.callout-voice-control'
       }
-      style={{ left: props.leftOffset }}
+      style={{
+        left: props.leftOffset,
+        scale: props.visualScale ?? 1,
+        transformOrigin: 'center left',
+      }}
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.preventDefault()}
     >

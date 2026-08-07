@@ -62,6 +62,7 @@ export function createBlurSettingsFixture(overrides: Partial<BlurSettings> = {})
 
 export function createFocusSettingsFixture(overrides: Partial<FocusSettings> = {}): FocusSettings {
   return {
+    blurAmount: 0,
     opacity: 0.4,
     showBorder: false,
     ...overrides,

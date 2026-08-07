@@ -8,7 +8,6 @@ import { useFrameSettingsPopoverController } from './controller';
 import type { FrameSettingsPopoverProps } from './types';
 import { FrameSettingsPopoverContent } from '../../../composition/frame-annotation-controls/frame/views';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
-import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import {
   useFloatingPopoverDrag,
@@ -19,6 +18,7 @@ import {
   SETTINGS_POPOVER_WIDTH,
 } from '../../../composition/frame-annotation-controls/popover/surface';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
+import { useLinkedAnnotationTemplateOptions } from '../../../composition/frame-annotation-controls/frame/linked-template-options';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -33,6 +33,7 @@ function FrameSettingsPopoverSurface(props: {
   popoverRef: React.Ref<HTMLDivElement>;
   popoverStyle: React.CSSProperties;
   request: FrameSettingsPopoverProps;
+  linkedTemplateOptions: ReturnType<typeof useLinkedAnnotationTemplateOptions>;
 }) {
   const { catalog, handlers, settings, surface } = props.controller;
 
@@ -63,15 +64,17 @@ function FrameSettingsPopoverSurface(props: {
           handleBlurChange={handlers.handleBlurChange}
           handleBlurShowBorderChange={handlers.handleBlurShowBorderChange}
           handleBlurTypeChange={handlers.handleBlurTypeChange}
+          handleFocusBlurChange={handlers.handleFocusBlurChange}
           handleFocusChange={handlers.handleFocusChange}
           handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
+          handleForkPreset={handlers.handleForkPreset}
           handleManualBorderChange={handlers.handleManualBorderChange}
-          handleEditPreset={handlers.handleEditPreset}
           handleSelectPreset={handlers.handleSelectPreset}
           handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
           localBlurSettings={settings.localBlur}
           localBorderSettings={settings.localBorder}
           localFocusSettings={settings.localFocus}
+          linkedTemplateOptions={props.linkedTemplateOptions}
           pendingPresetIds={catalog.pendingPresetIds}
           onShowPresets={catalog.refreshPresets}
           manual={catalog.manual}
@@ -89,37 +92,9 @@ function FrameSettingsPopoverSurface(props: {
   );
 }
 
-function FrameStyleEditorLayer(props: {
-  controller: FrameSettingsPopoverController;
-  toolbarOrigin: boolean;
-}) {
-  const { editor } = props.controller.catalog;
-  const { portalTheme } = props.controller.surface;
-
-  return (
-    <div
-      className={[
-        'sniptale-frame-style-editor-layer',
-        props.toolbarOrigin ? 'sniptale-main-toolbar-popover' : '',
-      ].join(' ')}
-      data-sniptale-activation-bridge="defer"
-      data-theme={portalTheme ?? undefined}
-      onMouseDown={stopPopoverPropagation}
-      onClick={stopPopoverPropagation}
-    >
-      <BorderPresetEditor
-        isOpen={editor.isOpen}
-        isSaving={editor.isSaving}
-        onClose={editor.onClose}
-        onSave={editor.onSave}
-        {...(editor.preset === undefined ? {} : { preset: editor.preset })}
-      />
-    </div>
-  );
-}
-
 export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const state = useFrameSettingsPopoverController(props);
+  const linkedTemplateOptions = useLinkedAnnotationTemplateOptions();
   const popoverRef = useFloatingSurfaceWheelContainment(state.surface.popoverRef);
   const canonicalStyle = useFramePopoverPosition({
     anchorEl: props.anchorEl,
@@ -157,8 +132,8 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
         popoverRef={popoverRef}
         popoverStyle={popoverStyle}
         request={props}
+        linkedTemplateOptions={linkedTemplateOptions}
       />
-      <FrameStyleEditorLayer controller={state} toolbarOrigin={props.scope === 'session'} />
     </>,
     resolveContentPortalTarget(props.anchorEl)
   );

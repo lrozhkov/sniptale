@@ -18,6 +18,12 @@ import {
 } from '../constants';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+
+export type LinkedAnnotationTemplateOptions = {
+  callouts: Array<{ label: string; value: string }>;
+  stepBadges: Array<{ label: string; value: string }>;
+};
 
 const BORDER_PALETTE = [
   '#f97316',
@@ -41,6 +47,8 @@ type BorderStyleInspectorProps = {
   onCssResizeStart?: (event: MouseEvent<HTMLDivElement>) => void;
   saveSection?: ReactNode;
   style: BorderVisualStyle;
+  linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
+  saveSectionRequest?: number;
 };
 
 function BorderColorField(props: {
@@ -195,12 +203,94 @@ function BorderEffectsSection(props: BorderStyleInspectorProps) {
           displaySuffix="%"
           label={translate('highlighter.editor.focusDimmingLabel')}
           max={100}
-          min={10}
+          min={0}
           onChange={(opacity) =>
-            props.onChange({ effects: { ...effects, focus: { opacity: opacity / 100 } } })
+            props.onChange({
+              effects: { ...effects, focus: { ...effects.focus, opacity: opacity / 100 } },
+            })
           }
           value={Math.round(effects.focus.opacity * 100)}
         />
+        <EditorCompactRangeField
+          displaySuffix="px"
+          label={translate('highlighter.editor.focusBlurLabel')}
+          max={25}
+          min={0}
+          onChange={(blurAmount) =>
+            props.onChange({
+              effects: { ...effects, focus: { ...effects.focus, blurAmount } },
+            })
+          }
+          value={effects.focus.blurAmount}
+        />
+      </div>
+      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.editor.captureDefaultsTitle')}
+        </div>
+        <PropertyField label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}>
+          <ProductGlassSwitch
+            aria-label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+            on={effects.capture.hideFrame}
+            onClick={() =>
+              props.onChange({
+                effects: {
+                  ...effects,
+                  capture: { hideFrame: !effects.capture.hideFrame },
+                },
+              })
+            }
+          />
+        </PropertyField>
+      </div>
+      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.editor.linkedTemplatesTitle')}
+        </div>
+        <PropertyField label={translate('highlighter.editor.linkedCalloutTemplateLabel')}>
+          <CompactSelect
+            appearance="plain"
+            aria-label={translate('highlighter.editor.linkedCalloutTemplateLabel')}
+            onChange={(calloutPresetId) =>
+              props.onChange({
+                effects: {
+                  ...effects,
+                  linkedTemplates: {
+                    calloutPresetId: calloutPresetId || null,
+                    stepBadgePresetId: effects.linkedTemplates?.stepBadgePresetId ?? null,
+                  },
+                },
+              })
+            }
+            options={[
+              { label: translate('highlighter.editor.linkedTemplateNone'), value: '' },
+              ...(props.linkedTemplateOptions?.callouts ?? []),
+            ]}
+            value={effects.linkedTemplates?.calloutPresetId ?? ''}
+          />
+        </PropertyField>
+        <PropertyField label={translate('highlighter.editor.linkedStepBadgeTemplateLabel')}>
+          <CompactSelect
+            appearance="plain"
+            aria-label={translate('highlighter.editor.linkedStepBadgeTemplateLabel')}
+            onChange={(stepBadgePresetId) =>
+              props.onChange({
+                effects: {
+                  ...effects,
+                  linkedTemplates: {
+                    calloutPresetId: effects.linkedTemplates?.calloutPresetId ?? null,
+                    stepBadgePresetId: stepBadgePresetId || null,
+                  },
+                },
+              })
+            }
+            options={[
+              { label: translate('highlighter.editor.linkedTemplateNone'), value: '' },
+              ...(props.linkedTemplateOptions?.stepBadges ?? []),
+            ]}
+            value={effects.linkedTemplates?.stepBadgePresetId ?? ''}
+          />
+        </PropertyField>
       </div>
     </div>
   );
@@ -269,6 +359,9 @@ export function BorderStyleInspector(props: BorderStyleInspectorProps) {
   ] satisfies Array<{ icon: typeof Square; id: BorderInspectorSection; label: string }>;
   return (
     <CategorizedInspector
+      {...(props.saveSectionRequest === undefined
+        ? {}
+        : { activeSectionRequest: { id: 'save' as const, token: props.saveSectionRequest } })}
       ariaLabel={translate('highlighter.editor.manualNavigation')}
       dataUi="shared.border-style-inspector"
       initialSection="outline"

@@ -72,7 +72,10 @@ it('creates and overwrites presets through the canonical catalog owner', async (
 
   const createInput = { name: 'Saved manually', placement: preset.placement, style: preset.style };
   await act(async () => {
-    expect(await latest?.catalog.create(createInput)).toBe(true);
+    expect(await latest?.catalog.create(createInput)).toEqual({
+      id: 'user-new',
+      outcome: 'applied',
+    });
   });
   await act(async () => {
     expect(
@@ -82,7 +85,7 @@ it('creates and overwrites presets through the canonical catalog owner', async (
         placement: preset.placement,
         style: preset.style,
       })
-    ).toBe(true);
+    ).toEqual({ outcome: 'applied' });
   });
 
   expect(mocks.create).toHaveBeenCalledWith(createInput);

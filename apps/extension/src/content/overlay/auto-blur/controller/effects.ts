@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { AutoBlurSettings } from '../../../../features/highlighter/contracts/auto-blur';
 import { DEFAULT_AUTO_BLUR_SETTINGS, getLoadedAutoBlurSettingsSnapshot } from '../persistence';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -8,16 +8,9 @@ import {
   loadSettingsOrDefault,
   type AutoBlurFrameManager,
 } from './operations';
+import { reportAutoBlurApplyResult } from './feedback';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
-const AUTO_APPLY_DEBOUNCE_MS = 300;
-
-type AutoApplyRuntimeState = {
-  cancelled: boolean;
-  running: boolean;
-  timeoutId: number | null;
-};
-
 export function useAutoBlurAutoApplyEffect(args: {
   autoApplyAllowed: boolean;
   autoApplyEnabled: boolean;
@@ -26,76 +19,37 @@ export function useAutoBlurAutoApplyEffect(args: {
   isOpen: boolean;
 }) {
   const { autoApplyAllowed, autoApplyEnabled, frameManager, isApplying, isOpen } = args;
+  const appliedForCurrentAvailabilityRef = useRef(false);
 
   useEffect(() => {
-    if (!autoApplyEnabled || !autoApplyAllowed || isOpen || isApplying) {
+    if (!autoApplyEnabled || !autoApplyAllowed) {
+      appliedForCurrentAvailabilityRef.current = false;
+      return;
+    }
+    if (isOpen || isApplying || appliedForCurrentAvailabilityRef.current) {
       return;
     }
 
-    const runtimeState: AutoApplyRuntimeState = {
-      cancelled: false,
-      running: false,
-      timeoutId: null,
-    };
-    const scheduleApply = () => scheduleAutoApply({ frameManager, runtimeState });
-    const observer = new MutationObserver(scheduleApply);
-
-    scheduleApply();
-    observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+    appliedForCurrentAvailabilityRef.current = true;
+    let cancelled = false;
+    void loadSettingsOrDefault()
+      .then(async (settings) => {
+        if (cancelled) return;
+        const result = await applyAutoBlurWithSettings({
+          blurSettings: settings.blurSettings,
+          frameManager,
+          frames: frameManager.frames,
+          scanMode: 'full-page',
+          selectedCategories: settings.selectedCategories,
+        });
+        if (!cancelled) reportAutoBlurApplyResult(result.addedCount);
+      })
+      .catch((error) => logger.warn('Failed to auto-apply auto-blur targets', error));
 
     return () => {
-      cleanupAutoApply(runtimeState, observer);
+      cancelled = true;
     };
   }, [autoApplyAllowed, autoApplyEnabled, frameManager, isApplying, isOpen]);
-}
-
-async function runAutoApply(args: {
-  frameManager: AutoBlurFrameManager;
-  runtimeState: AutoApplyRuntimeState;
-}) {
-  if (args.runtimeState.running) {
-    return;
-  }
-
-  args.runtimeState.running = true;
-  try {
-    const settings = await loadSettingsOrDefault();
-    if (args.runtimeState.cancelled || !settings.autoApplyEnabled) {
-      return;
-    }
-
-    await applyAutoBlurWithSettings({
-      blurSettings: settings.blurSettings,
-      frameManager: args.frameManager,
-      frames: args.frameManager.frames,
-      selectedCategories: settings.selectedCategories,
-    });
-  } catch (error) {
-    logger.warn('Failed to auto-apply auto-blur targets', error);
-  } finally {
-    args.runtimeState.running = false;
-  }
-}
-
-function scheduleAutoApply(args: {
-  frameManager: AutoBlurFrameManager;
-  runtimeState: AutoApplyRuntimeState;
-}) {
-  if (args.runtimeState.timeoutId !== null) {
-    window.clearTimeout(args.runtimeState.timeoutId);
-  }
-
-  args.runtimeState.timeoutId = window.setTimeout(() => {
-    void runAutoApply(args);
-  }, AUTO_APPLY_DEBOUNCE_MS);
-}
-
-function cleanupAutoApply(runtimeState: AutoApplyRuntimeState, observer: MutationObserver) {
-  runtimeState.cancelled = true;
-  observer.disconnect();
-  if (runtimeState.timeoutId !== null) {
-    window.clearTimeout(runtimeState.timeoutId);
-  }
 }
 
 export function useAutoBlurSettingsBootstrapEffect(args: {

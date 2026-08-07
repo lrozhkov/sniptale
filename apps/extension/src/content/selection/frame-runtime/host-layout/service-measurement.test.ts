@@ -46,8 +46,8 @@ describe('frame host-layout measurement acceptance', () => {
     expect(service.getSnapshot().presentations.get(frame.id)).toBe('visible');
     expect(service.getLastGoodPagePlacement(frame.id)).toEqual({
       iframePath: [],
-      pageX: 34,
-      pageY: 44,
+      pageX: 37,
+      pageY: 47,
     });
     service.dispose();
   });

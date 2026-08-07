@@ -10,8 +10,10 @@ import {
 export function resolveFrameAnnotationVisualScene(params: {
   frame: FrameAnnotationVisualState;
   state: FrameAnnotationInteractionState;
+  visualScale?: number;
 }) {
   const { frame, state } = params;
+  const visualScale = params.visualScale ?? 1;
   const borderVisual = frame.borderSettings
     ? resolveBorderPresetVisual(frame.borderSettings)
     : null;
@@ -35,15 +37,15 @@ export function resolveFrameAnnotationVisualScene(params: {
       decorationVisible: surface.decorationVisible,
       fillVisible: surface.fillVisible,
       fillColor: fillCssColor,
-      borderRadius: surface.geometry.radius,
+      borderRadius: surface.geometry.radius * visualScale,
       ...(borderVisual ? { customCssStyles: borderVisual.customCssStyles } : {}),
     }),
     strokeStyle: getFrameAnnotationStrokeStyle({
       visible: surface.strokeVisible,
-      borderWidth: surface.geometry.strokeWidth,
+      borderWidth: surface.geometry.strokeWidth * visualScale,
       borderStyle: borderVisual?.strokeStyle ?? 'solid',
       borderColor: borderCssColor,
-      borderRadius: surface.geometry.radius,
+      borderRadius: surface.geometry.radius * visualScale,
       ...(shadowVisual?.frameBoxShadow === undefined
         ? {}
         : { boxShadow: shadowVisual.frameBoxShadow }),

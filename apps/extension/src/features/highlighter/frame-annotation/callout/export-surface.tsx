@@ -5,16 +5,23 @@ import { createFrameCalloutActions } from './actions';
 import { useFrameCalloutEditing } from './editing';
 import { FrameCalloutInteractiveSurface } from './interactive-surface';
 import { createCalloutSettingsKey } from './settings-key';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 
 const ignoreExportInteraction = () => undefined;
 
 export function FrameCalloutExportSurface(props: {
   frame: FrameAnnotationSnapshotV1;
+  callout: CalloutSettings;
+  calloutIndex?: number;
   portalTarget: Element | DocumentFragment;
 }) {
-  const callout = props.frame.callout!;
+  const callout = props.callout;
+  const surfaceId =
+    props.calloutIndex === undefined
+      ? props.frame.id
+      : `${props.frame.id}:callout:${props.calloutIndex}`;
   const editing = useFrameCalloutEditing({
-    frameId: props.frame.id,
+    frameId: surfaceId,
     htmlContent: callout.content.bodyHtml,
     isEditing: false,
     onContentChange: ignoreExportInteraction,
@@ -36,9 +43,10 @@ export function FrameCalloutExportSurface(props: {
   return (
     <FrameCalloutInteractiveSurface
       chrome="export"
+      chromeScale={1}
       editing={editing}
       frameBorderWidth={frameSurface.strokeVisible ? frameSurface.geometry.strokeWidth : 0}
-      frameId={props.frame.id}
+      frameId={surfaceId}
       frameRect={props.frame}
       isEditing={false}
       isFrameEditing={false}

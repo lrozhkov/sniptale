@@ -29,7 +29,7 @@
 }
 
 .sniptale-callout-preset-list {
-  gap: 8px;
+  gap: 6px;
   padding: 0;
   scroll-padding-block: 4px;
 }
@@ -50,28 +50,6 @@
   padding: 6px 66px 6px 8px;
   box-sizing: border-box;
   overflow: hidden;
-}
-
-.sniptale-callout-preset-row .sniptale-glass-preset-item--active {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 55%,
-    var(--sniptale-color-border-soft) 45%
-  );
-  background: transparent;
-  color: var(--sniptale-color-accent);
-  box-shadow: none;
-}
-
-.sniptale-callout-preset-row .sniptale-glass-preset-item--active:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 72%,
-    var(--sniptale-color-border-soft) 28%
-  );
-  background: transparent;
-  color: var(--sniptale-color-accent-emphasis);
-  box-shadow: none;
 }
 
 .sniptale-callout-preset-row[data-disabled='true'] {
@@ -104,6 +82,11 @@
 .sniptale-callout-preset-row:focus-within .sniptale-callout-preset-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.sniptale-callout-preset-row:hover .sniptale-glass-preset-check,
+.sniptale-callout-preset-row:focus-within .sniptale-glass-preset-check {
+  opacity: 0;
 }
 
 .sniptale-callout-preset-action {

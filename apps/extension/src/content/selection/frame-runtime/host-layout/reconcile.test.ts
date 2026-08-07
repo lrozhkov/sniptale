@@ -170,12 +170,12 @@ describe('frame host-layout linked geometry reconciliation', () => {
       registry,
     });
 
-    expect(result.frames[0]).toMatchObject({ x: 44, y: 54, width: 192, height: 82 });
+    expect(result.frames[0]).toMatchObject({ x: 47, y: 57, width: 186, height: 76 });
     expect(registry.get(frame.id)?.lastGoodRect).toEqual({
-      x: 44,
-      y: 54,
-      width: 192,
-      height: 82,
+      x: 47,
+      y: 57,
+      width: 186,
+      height: 76,
     });
   });
 

@@ -20,6 +20,7 @@ import {
   type FocusFrameDescriptor,
 } from '../effects/overlay-descriptors';
 import { isFramePresentationRenderable } from '../roots/presentation';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 type UseFrameEffectOverlaysArgs = {
   frames: FrameData[];
@@ -32,6 +33,9 @@ export function useFrameEffectOverlays({
   framesRef,
   hostLayoutSnapshot,
 }: UseFrameEffectOverlaysArgs): void {
+  const visualScale = useContentUiScale();
+  const visualScaleRef = useRef(visualScale);
+  visualScaleRef.current = visualScale;
   const overlayRefs = useFrameEffectOverlayRefs();
   const renderableFramesRef = useRef<FrameData[]>([]);
   renderableFramesRef.current = framesRef.current.filter((frame) =>
@@ -59,9 +63,10 @@ export function useFrameEffectOverlays({
     hostLayoutSnapshot.version,
     overlayRefs,
     ensureBlurFiltersSvg,
-    updateDistortionFilterScale
+    updateDistortionFilterScale,
+    visualScale
   );
-  useImmediateFrameOverlayUpdates(renderableFramesRef, overlayRefs);
+  useImmediateFrameOverlayUpdates(renderableFramesRef, overlayRefs, visualScaleRef);
   useFrameOverlayUnmountCleanup(overlayRefs);
 }
 
@@ -93,38 +98,48 @@ function useFrameEffectSync(
   presentationVersion: number,
   overlayRefs: OverlayRefs,
   ensureBlurFiltersSvg: () => void,
-  updateDistortionFilterScale: (scale: number) => void
+  updateDistortionFilterScale: (scale: number) => void,
+  visualScale: number
 ) {
   const prevFocusDescriptorsRef = useRef<FocusFrameDescriptor[]>([]);
   const prevFocusPresentationVersionRef = useRef(-1);
+  const prevFocusVisualScaleRef = useRef(Number.NaN);
   const prevBlurDescriptorsRef = useRef<BlurFrameDescriptor[]>([]);
+  const prevBlurVisualScaleRef = useRef(Number.NaN);
 
   useEffect(() => {
     const focusDescriptors = buildFocusFrameDescriptors(framesRef.current);
     if (
       areFocusFrameDescriptorsEqual(focusDescriptors, prevFocusDescriptorsRef.current) &&
-      presentationVersion === prevFocusPresentationVersionRef.current
+      presentationVersion === prevFocusPresentationVersionRef.current &&
+      visualScale === prevFocusVisualScaleRef.current
     ) {
       return;
     }
 
     prevFocusDescriptorsRef.current = focusDescriptors;
     prevFocusPresentationVersionRef.current = presentationVersion;
-    updateFocusOverlayMask(framesRef.current, overlayRefs, presentations);
-  }, [frames, framesRef, overlayRefs, presentations, presentationVersion]);
+    prevFocusVisualScaleRef.current = visualScale;
+    updateFocusOverlayMask(framesRef.current, overlayRefs, presentations, visualScale);
+  }, [frames, framesRef, overlayRefs, presentations, presentationVersion, visualScale]);
 
   useEffect(() => {
     const blurDescriptors = buildBlurFrameDescriptors(framesRef.current);
-    if (areBlurFrameDescriptorsEqual(blurDescriptors, prevBlurDescriptorsRef.current)) {
+    if (
+      areBlurFrameDescriptorsEqual(blurDescriptors, prevBlurDescriptorsRef.current) &&
+      visualScale === prevBlurVisualScaleRef.current
+    ) {
       return;
     }
 
     prevBlurDescriptorsRef.current = blurDescriptors;
+    prevBlurVisualScaleRef.current = visualScale;
     updateBlurOverlayNodes(
       framesRef.current,
       overlayRefs,
       ensureBlurFiltersSvg,
-      updateDistortionFilterScale
+      updateDistortionFilterScale,
+      visualScale
     );
   }, [
     ensureBlurFiltersSvg,
@@ -133,20 +148,22 @@ function useFrameEffectSync(
     overlayRefs,
     presentationVersion,
     updateDistortionFilterScale,
+    visualScale,
   ]);
 }
 
 function useImmediateFrameOverlayUpdates(
   framesRef: MutableRefObject<FrameData[]>,
-  overlayRefs: OverlayRefs
+  overlayRefs: OverlayRefs,
+  visualScaleRef: MutableRefObject<number>
 ) {
   useEffect(
-    () => registerImmediateFocusOverlayUpdates(framesRef, overlayRefs),
-    [framesRef, overlayRefs]
+    () => registerImmediateFocusOverlayUpdates(framesRef, overlayRefs, visualScaleRef),
+    [framesRef, overlayRefs, visualScaleRef]
   );
   useEffect(
-    () => registerImmediateBlurOverlayUpdates(framesRef, overlayRefs),
-    [framesRef, overlayRefs]
+    () => registerImmediateBlurOverlayUpdates(framesRef, overlayRefs, visualScaleRef),
+    [framesRef, overlayRefs, visualScaleRef]
   );
 }
 

@@ -25,6 +25,9 @@ function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
   const [focusOpacityDraft, setFocusOpacityDraft] = useRangeDraftValue(
     settings.defaultFocusSettings.opacity * 100
   );
+  const [focusBlurDraft, setFocusBlurDraft] = useRangeDraftValue(
+    settings.defaultFocusSettings.blurAmount ?? 0
+  );
 
   return (
     <div className={highlighterSettingsCardClassName}>
@@ -35,7 +38,7 @@ function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
       <div className="space-y-4">
         <SettingsRangeField
           type="range"
-          min="10"
+          min="0"
           max="100"
           value={focusOpacityDraft}
           onChange={(event) => setFocusOpacityDraft(parseInt(event.target.value))}
@@ -49,6 +52,24 @@ function FocusSettingsPanel({ effects, settings }: HighlighterEffectsProps) {
           displayValue={Math.round(focusOpacityDraft)}
           displaySuffix="%"
           hint={translate('highlighter.section.focusOpacityHint')}
+        />
+
+        <SettingsRangeField
+          type="range"
+          min="0"
+          max="25"
+          value={focusBlurDraft}
+          onChange={(event) => setFocusBlurDraft(parseInt(event.target.value))}
+          onValueCommit={(value) =>
+            effects.handleUpdateFocusSettings({
+              ...settings.defaultFocusSettings,
+              blurAmount: value,
+            })
+          }
+          label={translate('highlighter.section.focusBlurLabel')}
+          displayValue={Math.round(focusBlurDraft)}
+          displaySuffix="px"
+          hint={translate('highlighter.section.focusBlurHint')}
         />
 
         <div className={settingsToggleRowClassName}>

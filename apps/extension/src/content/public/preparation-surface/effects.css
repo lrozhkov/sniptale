@@ -6,6 +6,128 @@
   display: none !important;
 }
 
+/*
+ * This is the interactive-chrome subset of the capture-hidden contract below. Geometry previews
+ * stay in page scale so their rectangles keep matching the DOM; controls remain physically stable.
+ */
+.sniptale-toolbar,
+.sniptale-show-toolbar-button,
+.sniptale-toolbar-portal-wrapper,
+.sniptale-main-toolbar-popover,
+.sniptale-frame-toolbar-bridge,
+.sniptale-frame-settings-popover,
+.sniptale-frame-style-editor-layer,
+[data-floating-ui-capture-transient='true'],
+.sniptale-step-badge-popover,
+.sniptale-callout-settings-popover,
+.sniptale-callout-format-toolbar,
+.sniptale-content-size-tooltip,
+.sniptale-resize-handle,
+.sniptale-callout-adjacent-controls,
+.sniptale-callout-tail-handle,
+.sniptale-step-badge-controls,
+.sniptale-modal,
+.sniptale-scenario-recorder-sidebar,
+[data-ui='content.design-review.popover'],
+[data-ui='content.design-review.feedback-panel'],
+[data-ui='shared.toast.host'],
+.sniptale-annotation-marker-tooltip,
+.sniptale-annotation-marker-chrome {
+  scale: var(--sniptale-content-ui-scale);
+}
+
+[data-floating-ui-capture-transient='true'] {
+  transform-origin: top left;
+}
+
+.sniptale-toolbar,
+.sniptale-toolbar-portal-wrapper,
+.sniptale-main-toolbar-popover,
+.sniptale-frame-toolbar-bridge,
+.sniptale-frame-settings-popover,
+.sniptale-step-badge-popover,
+.sniptale-callout-settings-popover,
+.sniptale-callout-adjacent-controls,
+.sniptale-step-badge-controls {
+  transform-origin: top left;
+}
+
+.sniptale-callout-format-toolbar,
+.sniptale-content-size-tooltip {
+  transform-origin: top left;
+}
+
+.sniptale-resize-handle,
+.sniptale-callout-tail-handle {
+  transform-origin: center;
+}
+
+.sniptale-show-toolbar-button {
+  transform-origin: bottom right;
+}
+
+.sniptale-scenario-recorder-sidebar,
+[data-ui='content.design-review.popover'],
+[data-ui='content.design-review.feedback-panel'] {
+  transform-origin: top left;
+}
+
+.sniptale-annotation-marker-chrome,
+.sniptale-annotation-marker-tooltip {
+  transform-origin: top left;
+}
+
+[data-ui='shared.toast.host'] {
+  transform-origin: top right;
+}
+
+/* Native scrollbar metrics can be rasterized before the inverse page-scale transform. */
+:where(
+  .sniptale-main-toolbar-popover,
+  .sniptale-frame-settings-popover,
+  .sniptale-step-badge-popover,
+  .sniptale-callout-settings-popover,
+  .sniptale-modal,
+  .sniptale-scenario-recorder-sidebar,
+  [data-ui='content.design-review.popover'],
+  [data-ui='content.design-review.feedback-panel']
+) {
+  scrollbar-color: var(--sniptale-color-border-soft) transparent;
+  scrollbar-width: thin;
+}
+
+:where(
+    .sniptale-main-toolbar-popover,
+    .sniptale-frame-settings-popover,
+    .sniptale-step-badge-popover,
+    .sniptale-callout-settings-popover,
+    .sniptale-modal,
+    .sniptale-scenario-recorder-sidebar,
+    [data-ui='content.design-review.popover'],
+    [data-ui='content.design-review.feedback-panel']
+  )
+  ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:where(
+    .sniptale-main-toolbar-popover,
+    .sniptale-frame-settings-popover,
+    .sniptale-step-badge-popover,
+    .sniptale-callout-settings-popover,
+    .sniptale-modal,
+    .sniptale-scenario-recorder-sidebar,
+    [data-ui='content.design-review.popover'],
+    [data-ui='content.design-review.feedback-panel']
+  )
+  ::-webkit-scrollbar-thumb {
+  background: var(--sniptale-color-border-soft);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,
@@ -22,13 +144,18 @@
 :host(.sniptale-capture-ui-hidden) .sniptale-editing-blocking-overlay,
 :host(.sniptale-capture-ui-hidden) .sniptale-resize-handle,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-drag-handle,
+:host(.sniptale-capture-ui-hidden) .sniptale-callout-adjacent-controls,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-tail-handle,
 :host(.sniptale-capture-ui-hidden) .sniptale-callout-settings-handle,
 :host(.sniptale-capture-ui-hidden) .sniptale-step-badge-controls,
 :host(.sniptale-capture-ui-hidden) .sniptale-free-frame-draft-portal,
 :host(.sniptale-capture-ui-hidden) .sniptale-quick-edit-hover,
 :host(.sniptale-capture-ui-hidden) .sniptale-annotation-marker-tooltip,
-:host(.sniptale-capture-ui-hidden) .sniptale-annotation-marker-drag-handle {
+:host(.sniptale-capture-ui-hidden) .sniptale-annotation-marker-drag-handle,
+:host(.sniptale-capture-ui-hidden)
+  .sniptale-interactive-frame-fill[data-hide-during-capture='true'],
+:host(.sniptale-capture-ui-hidden)
+  .sniptale-interactive-frame-stroke[data-hide-during-capture='true'] {
   display: none !important;
 }
 
@@ -39,6 +166,18 @@
   border-color: var(--sniptale-color-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent) !important;
   outline: none;
+}
+
+.sniptale-frame-quick-action[data-active='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent-emphasis) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 30%, transparent) !important;
+}
+
+.sniptale-frame-quick-action[data-active='true']:hover,
+.sniptale-frame-quick-action[data-active='true']:focus-visible {
+  border-color: var(--sniptale-color-accent-emphasis) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 24%, transparent) !important;
 }
 
 /* Highlighter Styles */

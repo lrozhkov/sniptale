@@ -5,6 +5,13 @@ import { CalloutSettingsPopover } from '../../callout-settings-popover';
 import { FrameSettingsPopover } from '../../frame-settings-popover';
 import { StepBadgePopover } from '../../step-badge-popover';
 import { InteractiveFrameCalloutOverlay } from './callout';
+import {
+  getFrameCallout,
+  getFrameCalloutKey,
+  getFrameCallouts,
+  removeFrameCallout,
+  setFrameCallout,
+} from '../../../../features/highlighter/frame-annotation/callout/collection';
 
 export interface InteractiveFramePopoversProps {
   frame: FrameData;
@@ -16,12 +23,15 @@ export interface InteractiveFramePopoversProps {
   isStepBadgePopoverOpen: boolean;
   isCalloutPopoverOpen: boolean;
   isCalloutEditing: boolean;
+  activeCalloutIndex?: number;
   state: FrameState;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
+  setActiveCalloutIndex?: React.Dispatch<React.SetStateAction<number>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+  stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   closePopover: () => void;
   handleEffectModeSelect?: (mode: EffectMode) => void;
   onUpdate: (frame: FrameData) => void;
@@ -99,34 +109,59 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
 }
 
 function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
-  const callout = props.currentFrame.callout ?? props.frame.callout;
+  const activeCalloutIndex = props.activeCalloutIndex ?? 0;
+  const callout =
+    getFrameCallout(props.currentFrame, activeCalloutIndex) ??
+    getFrameCallout(props.frame, activeCalloutIndex);
   const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
+    calloutIndex: activeCalloutIndex,
     onClose: props.closePopover,
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     frameColors: getCalloutFrameColors(borderSettings),
     anchorEl: props.calloutPopoverAnchorRef.current,
+    onSettingsChange: (nextCallout: NonNullable<typeof callout>) => {
+      if (!props.stageCalloutFrame) return;
+      props.stageCalloutFrame(
+        (current) => setFrameCallout(current, activeCalloutIndex, nextCallout) as FrameData
+      );
+    },
+    onDelete: () => {
+      if (!props.stageCalloutFrame) return;
+      props.stageCalloutFrame(
+        (current) => removeFrameCallout(current, activeCalloutIndex) as FrameData
+      );
+      props.setIsCalloutEditing(false);
+    },
     ...(callout === undefined ? {} : { settings: callout }),
   };
 }
 
 function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
-  return (
+  const activeCalloutIndex = props.activeCalloutIndex ?? 0;
+  const calloutCount = Math.max(1, getFrameCallouts(props.currentFrame).length);
+  return Array.from({ length: calloutCount }, (_, calloutIndex) => (
     <InteractiveFrameCalloutOverlay
+      calloutIndex={calloutIndex}
       frame={props.frame}
       currentFrame={props.currentFrame}
-      frameZIndex={props.frameZIndex}
-      isCalloutEditing={props.isCalloutEditing}
-      isCalloutPopoverOpen={props.isCalloutPopoverOpen}
+      frameZIndex={props.frameZIndex + calloutIndex}
+      isCalloutEditing={props.isCalloutEditing && activeCalloutIndex === calloutIndex}
+      isCalloutPopoverOpen={props.isCalloutPopoverOpen && activeCalloutIndex === calloutIndex}
       isFrameEditing={props.state === 'editing'}
+      key={getFrameCalloutKey(props.currentFrame, calloutIndex)}
       calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}
+      {...(props.setActiveCalloutIndex
+        ? { setActiveCalloutIndex: props.setActiveCalloutIndex }
+        : {})}
       setIsCalloutEditing={props.setIsCalloutEditing}
       setTempFrame={props.setTempFrame}
+      {...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {})}
       onUpdate={props.onUpdate}
     />
-  );
+  ));
 }
 
 /** Renders settings, step-badge, and callout popovers for a single frame. */

@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react';
 import { appendToContentOverlayRoot } from '../../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../../platform/dom-host/isolated';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
+import { resolveFocusCutoutGeometry } from '../../../../features/highlighter/frame-surface';
 import {
   createFocusMaskRectNodes,
   getFocusMaskBox,
@@ -14,7 +14,8 @@ import type { AnchorPresentation } from '../host-layout/service';
 export function updateFocusOverlayMask(
   allFrames: FrameData[],
   refs: OverlayRefs,
-  presentations: ReadonlyMap<string, AnchorPresentation> = new Map()
+  presentations: ReadonlyMap<string, AnchorPresentation> = new Map(),
+  visualScale = 1
 ) {
   const focusFrames = allFrames.filter((frame) => frame.effectMode === 'focus');
   if (focusFrames.length === 0) {
@@ -24,13 +25,17 @@ export function updateFocusOverlayMask(
 
   const overlayOpacity = focusFrames.reduce(
     (maxOpacity, frame) => Math.max(maxOpacity, frame.focusSettings?.opacity ?? 0.5),
-    0.1
+    0
   );
-  const overlay = ensureFocusOverlay(overlayOpacity, refs);
+  const overlayBlurAmount = focusFrames.reduce(
+    (maxAmount, frame) => Math.max(maxAmount, frame.focusSettings?.blurAmount ?? 0),
+    0
+  );
+  const overlay = ensureFocusOverlay(overlayOpacity, overlayBlurAmount, refs);
   const cutoutFrames = focusFrames.filter(
     (frame) => (presentations.get(frame.id) ?? 'visible') !== 'offscreen'
   );
-  const svg = createFocusMaskSvg(cutoutFrames, refs.focusMaskIdRef.current);
+  const svg = createFocusMaskSvg(cutoutFrames, refs.focusMaskIdRef.current, visualScale);
 
   refs.focusSvgRef.current?.remove();
   overlay.appendChild(svg);
@@ -42,7 +47,8 @@ export function updateFocusOverlayMask(
 
 export function registerImmediateFocusOverlayUpdates(
   framesRef: MutableRefObject<FrameData[]>,
-  { focusSvgRef }: OverlayRefs
+  { focusSvgRef }: OverlayRefs,
+  visualScaleRef?: MutableRefObject<number>
 ) {
   window.sniptaleUpdateFocusMaskImmediate = (frameId: string, geometry) => {
     const rect = focusSvgRef.current?.querySelector<SVGRectElement>(
@@ -61,10 +67,11 @@ export function registerImmediateFocusOverlayUpdates(
       ...geometry,
     };
     const focusMaskBox = getFocusMaskBox(liveFrame);
-    const surface = resolveFrameSurface(liveFrame);
+    const cutout = resolveFocusCutoutGeometry(liveFrame);
     setFocusMaskRectBox(rect, focusMaskBox);
-    rect.setAttribute('rx', String(surface.geometry.radius));
-    rect.setAttribute('ry', String(surface.geometry.radius));
+    const radius = cutout.radius * (visualScaleRef?.current ?? 1);
+    rect.setAttribute('rx', String(radius));
+    rect.setAttribute('ry', String(radius));
   };
 
   window.sniptaleGetFocusSvgRef = () => focusSvgRef.current;
@@ -84,7 +91,7 @@ function hideFocusOverlay({ focusOverlayRef, focusSvgRef }: OverlayRefs) {
   }
 }
 
-function ensureFocusOverlay(opacity: number, { focusOverlayRef }: OverlayRefs) {
+function ensureFocusOverlay(opacity: number, blurAmount: number, { focusOverlayRef }: OverlayRefs) {
   if (!focusOverlayRef.current?.isConnected) {
     const overlay = document.createElement('div');
     overlay.className = 'sniptale-focus-overlay';
@@ -105,11 +112,17 @@ function ensureFocusOverlay(opacity: number, { focusOverlayRef }: OverlayRefs) {
   }
 
   const clampedOpacity = Math.min(1, Math.max(0, opacity));
+  const clampedBlurAmount = Math.min(25, Math.max(0, blurAmount));
   focusOverlayRef.current.style.background = `rgb(0 0 0 / ${clampedOpacity.toFixed(3)})`;
+  focusOverlayRef.current.style.backdropFilter = `blur(${clampedBlurAmount}px)`;
+  focusOverlayRef.current.style.setProperty(
+    '-webkit-backdrop-filter',
+    `blur(${clampedBlurAmount}px)`
+  );
   return focusOverlayRef.current;
 }
 
-function createFocusMaskSvg(focusFrames: FrameData[], maskId: string) {
+function createFocusMaskSvg(focusFrames: FrameData[], maskId: string, visualScale: number) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
@@ -132,7 +145,7 @@ function createFocusMaskSvg(focusFrames: FrameData[], maskId: string) {
   backgroundRect.setAttribute('fill', 'white');
   mask.appendChild(backgroundRect);
 
-  createFocusMaskRectNodes(focusFrames).forEach((rect) => {
+  createFocusMaskRectNodes(focusFrames, visualScale).forEach((rect) => {
     mask.appendChild(rect);
   });
 

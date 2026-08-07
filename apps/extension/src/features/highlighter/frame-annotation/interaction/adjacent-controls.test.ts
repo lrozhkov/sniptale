@@ -4,6 +4,17 @@ import { getAdjacentControlGroupPosition } from './adjacent-controls';
 const viewport = { height: 600, width: 800 };
 
 describe('adjacent floating controls placement', () => {
+  it('keeps the visual cluster compact when chrome compensates page zoom', () => {
+    expect(
+      getAdjacentControlGroupPosition({
+        controlCount: 2,
+        targetRect: { bottom: 140, left: 100, right: 160, top: 100 },
+        uiScale: 0.5,
+        viewport,
+      })
+    ).toEqual({ x: 163, y: 85 });
+  });
+
   it('uses the canonical right-above position when it fits', () => {
     expect(
       getAdjacentControlGroupPosition({

@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from 'react';
+import type { RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { BrowserDomAnnotationRecord } from '../../parser/page-preparation/annotations';
 import {
@@ -8,7 +8,10 @@ import {
 import { getDesignReviewRecordAction } from '../design-review/records';
 import type { AnnotationMarkerPosition } from './position';
 
-function handleTooltipScroll(event: KeyboardEvent<HTMLElement>, tooltip: HTMLElement | null): void {
+function handleTooltipScroll(
+  event: Pick<KeyboardEvent, 'key' | 'preventDefault'>,
+  tooltip: HTMLElement | null
+): void {
   if (!tooltip) return;
   const page = Math.max(24, tooltip.clientHeight - 16);
   const commands: Partial<Record<string, number>> = {
@@ -35,6 +38,7 @@ export function AnnotationMarkerTooltip(props: {
   position: AnnotationMarkerPosition;
   record: BrowserDomAnnotationRecord;
   scrollRef: RefObject<HTMLSpanElement | null>;
+  transformOrigin: 'top left' | 'top right';
 }) {
   const action = getDesignReviewRecordAction(props.record);
   const option = getDesignReviewActionOption(action);
@@ -67,6 +71,7 @@ export function AnnotationMarkerTooltip(props: {
         left: props.position.tooltipLeft ?? undefined,
         right: props.position.tooltipRight ?? undefined,
         top: props.position.tooltipTop ?? undefined,
+        transformOrigin: props.transformOrigin,
       }}
     >
       <span

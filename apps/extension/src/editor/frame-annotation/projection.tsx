@@ -15,6 +15,11 @@ import type { ResizeDirection } from '../../features/highlighter/contracts';
 import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
 import { MIN_FRAME_SIZE } from './interaction-controller';
 import { EditorFrameCallout, resolveCalloutCenter } from './callout-projection';
+import {
+  getFrameCallout,
+  getFrameCalloutKey,
+  getFrameCallouts,
+} from '../../features/highlighter/frame-annotation/callout/collection';
 import { FrameProjectionSettings, type ProjectionSettingsMenu } from './projection-settings';
 import {
   resolveFrameAnnotationToolbarPlacement,
@@ -57,6 +62,7 @@ export function FrameProjection(props: {
   };
   onOpenSettings: (menu: Exclude<ProjectionSettingsMenu, null>, anchor: HTMLButtonElement) => void;
 }) {
+  const [activeCalloutIndex, setActiveCalloutIndex] = React.useState(0);
   const [calloutBounds, setCalloutBounds] = React.useState<FrameAnnotationToolbarBounds | null>(
     null
   );
@@ -66,8 +72,10 @@ export function FrameProjection(props: {
     []
   );
   React.useEffect(() => {
-    if (!props.snapshot.callout?.enabled) setCalloutBounds(null);
-  }, [props.snapshot.callout?.enabled]);
+    if (!getFrameCallouts(props.snapshot).some((callout) => callout.enabled))
+      setCalloutBounds(null);
+    if (!getFrameCallout(props.snapshot, activeCalloutIndex)) setActiveCalloutIndex(0);
+  }, [activeCalloutIndex, props.snapshot]);
   const editingSelected = props.selected && props.settingsMenu === null;
   const scene = resolveFrameAnnotationVisualScene({
     frame: props.snapshot,
@@ -90,9 +98,11 @@ export function FrameProjection(props: {
       />
       <FrameProjectionOverlays
         {...props}
+        activeCalloutIndex={activeCalloutIndex}
         frameRect={frameRect}
         scene={scene}
         onCalloutBoundsChange={handleCalloutBoundsChange}
+        setActiveCalloutIndex={setActiveCalloutIndex}
       />
       {editingSelected && props.controlsRoot ? (
         <FrameProjectionToolbar
@@ -111,6 +121,7 @@ export function FrameProjection(props: {
       ) : null}
       {props.controlsRoot ? (
         <FrameProjectionSettings
+          activeCalloutIndex={activeCalloutIndex}
           anchor={props.settingsAnchor}
           controlsRoot={props.controlsRoot}
           menu={props.settingsMenu}
@@ -167,9 +178,11 @@ function FrameProjectionVisual(props: {
 
 function FrameProjectionOverlays(
   props: Parameters<typeof FrameProjection>[0] & {
+    activeCalloutIndex: number;
     frameRect: { x: number; y: number; width: number; height: number };
     scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
     onCalloutBoundsChange: (bounds: FrameAnnotationToolbarBounds | null) => void;
+    setActiveCalloutIndex: React.Dispatch<React.SetStateAction<number>>;
   }
 ) {
   return (
@@ -197,7 +210,7 @@ function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
         props.onResizeStart(
           event,
           direction,
-          resolveCalloutCenter(props.snapshot.id, props.coordinateSpace)
+          resolveCalloutCenter(props.snapshot.id, props.coordinateSpace, props.activeCalloutIndex)
         )
       }
     />,
@@ -206,23 +219,34 @@ function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
 }
 
 function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
-  if (!props.snapshot.callout?.enabled || !props.sceneRoot || !props.object) return null;
-  return (
-    <EditorFrameCallout
-      coordinateSpace={props.coordinateSpace}
-      object={props.object}
-      portalTarget={props.sceneRoot}
-      controlsPortalTarget={props.controlsRoot}
-      selected={props.selected}
-      snapshot={props.snapshot}
-      onSnapshotChange={props.onSnapshotChange}
-      onSnapshotPreview={props.onSnapshotPreview}
-      onDraftCommit={props.onDraftCommit}
-      isSettingsOpen={props.settingsMenu === 'callout'}
-      onSettingsOpen={(anchor) => props.onOpenSettings('callout', anchor)}
-      onOccupiedBoundsChange={props.onCalloutBoundsChange}
-      {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
-    />
+  if (!props.sceneRoot || !props.object) return null;
+  const object = props.object;
+  const sceneRoot = props.sceneRoot;
+  return getFrameCallouts(props.snapshot).map((callout, calloutIndex) =>
+    callout.enabled ? (
+      <EditorFrameCallout
+        calloutIndex={calloutIndex}
+        coordinateSpace={props.coordinateSpace}
+        object={object}
+        portalTarget={sceneRoot}
+        controlsPortalTarget={props.controlsRoot}
+        selected={props.selected}
+        snapshot={props.snapshot}
+        onSnapshotChange={props.onSnapshotChange}
+        onSnapshotPreview={props.onSnapshotPreview}
+        onDraftCommit={props.onDraftCommit}
+        isSettingsOpen={
+          props.settingsMenu === 'callout' && props.activeCalloutIndex === calloutIndex
+        }
+        key={getFrameCalloutKey(props.snapshot, calloutIndex)}
+        onSettingsOpen={(anchor) => {
+          props.setActiveCalloutIndex(calloutIndex);
+          props.onOpenSettings('callout', anchor);
+        }}
+        onOccupiedBoundsChange={props.onCalloutBoundsChange}
+        {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
+      />
+    ) : null
   );
 }
 

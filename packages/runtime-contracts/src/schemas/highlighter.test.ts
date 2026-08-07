@@ -31,6 +31,15 @@ function registerBorderPresetSchemaTests() {
         systemPresetKey: 'system-review',
         basedOnRevision: 1,
         customized: true,
+        effects: {
+          blur: { amount: 10, blurType: 'gaussian' },
+          focus: { blurAmount: 2, opacity: 0.5 },
+          capture: { hideFrame: false },
+          linkedTemplates: {
+            calloutPresetId: 'system-callout-card',
+            stepBadgePresetId: 'system-outline',
+          },
+        },
       })
     ).toEqual(
       expect.objectContaining({
@@ -39,6 +48,12 @@ function registerBorderPresetSchemaTests() {
         strokeOpacity: 50,
         origin: 'system',
         systemPresetKey: 'system-review',
+        effects: expect.objectContaining({
+          linkedTemplates: {
+            calloutPresetId: 'system-callout-card',
+            stepBadgePresetId: 'system-outline',
+          },
+        }),
       })
     );
   });

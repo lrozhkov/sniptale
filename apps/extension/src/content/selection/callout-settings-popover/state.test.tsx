@@ -15,9 +15,11 @@ let root: Root | null = null;
 let latestState: ReturnType<typeof useCalloutSettingsPopoverState> | null = null;
 let isOpen = true;
 let settings: CalloutSettings | undefined;
+let calloutIndex = 0;
 
 function Harness() {
   latestState = useCalloutSettingsPopoverState({
+    calloutIndex,
     frameId: 'frame-1',
     isOpen,
     ...(settings ? { settings } : {}),
@@ -44,6 +46,7 @@ beforeEach(() => {
   latestState = null;
   isOpen = true;
   settings = undefined;
+  calloutIndex = 0;
 });
 
 afterEach(() => {
@@ -103,6 +106,26 @@ describe('useCalloutSettingsPopoverState', () => {
       titleText: 'Template heading',
     });
     expect(listener.mock.calls[0]?.[0].settings).not.toHaveProperty('placement');
+    cleanup();
+  });
+
+  it('routes preset changes to the selected additional comment', () => {
+    calloutIndex = 3;
+    settings = createDefaultCalloutSettings();
+    const preset = createSystemCalloutPresetCatalog()[1]!;
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
+    renderHarness();
+
+    act(() => latestState?.applyPreset(preset));
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calloutIndex: 3,
+        frameId: 'frame-1',
+        settings: expect.objectContaining({ sourcePresetId: preset.id }),
+      })
+    );
     cleanup();
   });
 

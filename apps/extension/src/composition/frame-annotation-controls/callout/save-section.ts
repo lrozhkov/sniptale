@@ -15,10 +15,11 @@ type CreateInput = {
 type OverwriteInput = CreateInput & { id: string };
 
 export function createCalloutSaveSection(args: {
-  create: (input: CreateInput) => Promise<boolean>;
+  create: (input: CreateInput) => Promise<boolean | { id?: string; outcome: string } | null>;
   error: string | null;
   isSaving: boolean;
-  overwrite: (input: OverwriteInput) => Promise<boolean>;
+  overwrite: (input: OverwriteInput) => Promise<boolean | { outcome: string } | null>;
+  onCreated?: (templateId: string) => void;
   presets: CalloutPreset[];
   settings: CalloutSettings;
 }): CalloutSaveSectionProps {
@@ -33,23 +34,33 @@ export function createCalloutSaveSection(args: {
   return {
     error: args.error,
     isSaving: args.isSaving,
-    onCreate: (name) =>
-      args.create({
+    onCreate: async (name) => {
+      const result = await args.create({
         content: { titleText: args.settings.content.titleText },
         name,
         placement,
         style: args.settings.style,
-      }),
-    onOverwrite: (presetId) => {
+      });
+      const saved =
+        result === true || (typeof result === 'object' && result?.outcome === 'applied');
+      if (!saved) return false;
+      if (typeof result === 'object' && result?.id) args.onCreated?.(result.id);
+      return true;
+    },
+    onOverwrite: async (presetId) => {
       const preset = args.presets.find((item) => item.id === presetId);
-      if (!preset) return Promise.resolve(false);
-      return args.overwrite({
+      if (!preset) return false;
+      const result = await args.overwrite({
         id: preset.id,
         content: { titleText: args.settings.content.titleText },
         name: preset.name,
         placement,
         style: args.settings.style,
       });
+      const saved =
+        result === true || (typeof result === 'object' && result?.outcome === 'applied');
+      if (saved) args.onCreated?.(preset.id);
+      return saved;
     },
     presets: args.presets,
   };

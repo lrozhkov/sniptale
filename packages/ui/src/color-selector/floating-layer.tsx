@@ -17,6 +17,12 @@ import {
   FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
 } from '../floating-interactions/ownership';
 import { useFloatingSurfaceWheelContainment } from '../floating-interactions/wheel';
+import {
+  projectClientRectToContentUi,
+  projectContentUiPointToClient,
+  readContentUiScaleCompensation,
+  resolveContentUiViewport,
+} from '../floating-interactions/scale';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
 const COLOR_SELECTOR_LAYER_GAP = 8;
@@ -27,28 +33,52 @@ function resolveColorSelectorLayerStyle(anchor: HTMLElement | null): CSSProperti
     return { width: COLOR_SELECTOR_LAYER_WIDTH };
   }
 
-  const rect = anchor.getBoundingClientRect();
-  const viewportWidth = window.innerWidth || rect.right + COLOR_SELECTOR_VIEWPORT_PADDING;
-  const viewportHeight = window.innerHeight || rect.bottom + COLOR_SELECTOR_VIEWPORT_PADDING;
-  const belowRoom = viewportHeight - rect.bottom - COLOR_SELECTOR_VIEWPORT_PADDING;
-  const aboveRoom = rect.top - COLOR_SELECTOR_VIEWPORT_PADDING;
+  const uiScale = readContentUiScaleCompensation(anchor);
+  const clientRect = anchor.getBoundingClientRect();
+  const rect = projectClientRectToContentUi(
+    {
+      x: clientRect.left,
+      y: clientRect.top,
+      width: clientRect.width,
+      height: clientRect.height,
+    },
+    uiScale
+  );
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight || clientRect.bottom + COLOR_SELECTOR_VIEWPORT_PADDING,
+    clientWidth: window.innerWidth || clientRect.right + COLOR_SELECTOR_VIEWPORT_PADDING,
+    scale: uiScale,
+  });
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+  const belowRoom = viewportHeight - bottom - COLOR_SELECTOR_VIEWPORT_PADDING;
+  const aboveRoom = rect.y - COLOR_SELECTOR_VIEWPORT_PADDING;
   const placeAbove = belowRoom < 260 && aboveRoom > belowRoom;
   const maxHeight = Math.max(
     180,
     Math.min(420, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
   );
   const left = Math.min(
-    Math.max(rect.right - COLOR_SELECTOR_LAYER_WIDTH, COLOR_SELECTOR_VIEWPORT_PADDING),
+    Math.max(right - COLOR_SELECTOR_LAYER_WIDTH, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
       viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - COLOR_SELECTOR_LAYER_WIDTH
     )
   );
 
+  const clientPosition = projectContentUiPointToClient(
+    {
+      x: left,
+      y: placeAbove ? rect.y - COLOR_SELECTOR_LAYER_GAP : bottom + COLOR_SELECTOR_LAYER_GAP,
+    },
+    uiScale
+  );
   return {
-    left,
+    left: clientPosition.x,
     maxHeight,
-    top: placeAbove ? rect.top - COLOR_SELECTOR_LAYER_GAP : rect.bottom + COLOR_SELECTOR_LAYER_GAP,
+    top: clientPosition.y,
     transform: placeAbove ? 'translateY(-100%)' : undefined,
     width: COLOR_SELECTOR_LAYER_WIDTH,
   };

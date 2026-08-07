@@ -5,6 +5,7 @@ import type {
   BorderPreset,
   BorderPresetEffects,
 } from '../../../features/highlighter/contracts';
+import type { LinkedAnnotationTemplateOptions } from '../fields/inspector';
 
 type BorderPresetStyle = 'solid' | 'dashed' | 'dotted';
 
@@ -14,6 +15,7 @@ export interface BorderPresetEditorProps {
   onClose: () => void;
   onSave: (preset: BorderPreset) => void;
   preset?: BorderPreset;
+  linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
 }
 
 export interface BorderPresetDraftSetters {

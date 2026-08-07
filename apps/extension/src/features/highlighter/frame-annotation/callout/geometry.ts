@@ -61,10 +61,11 @@ export function getCalloutPosition(args: {
   frameHeight: number;
   side: NonAutoCalloutSide;
   tailSize: number;
+  visualScale?: number;
 }): { x: number; y: number } {
   const { width: cw, height: ch } = args.calloutDimensions;
   const { projection } = getCalloutTailMetrics(args.tailSize);
-  const totalGap = CALLOUT_GAP + projection;
+  const totalGap = (CALLOUT_GAP + projection) * (args.visualScale ?? 1);
   const cornerOffsetX = getCornerOffsetX({
     anchor: args.anchor,
     calloutHeight: ch,

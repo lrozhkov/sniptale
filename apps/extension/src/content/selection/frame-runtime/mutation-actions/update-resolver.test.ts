@@ -111,7 +111,7 @@ function expectResolverRecalculatesOffsetForConnectedCoordChanges() {
   anchorNode.remove();
 }
 
-function expectResolverRecalculatesViewportCoordsForBorderMetricChanges() {
+function expectResolverKeepsInnerGeometryForOutwardBorderWidthChanges() {
   const frame = createFrame();
   const anchorNode = document.createElement('div');
   document.body.appendChild(anchorNode);
@@ -129,16 +129,13 @@ function expectResolverRecalculatesViewportCoordsForBorderMetricChanges() {
     },
   });
 
-  expect(coordsMocks.calculateFrameViewportCoords).toHaveBeenCalledWith(
-    anchorNode,
-    expect.objectContaining({ width: 5 })
-  );
+  expect(coordsMocks.calculateFrameViewportCoords).not.toHaveBeenCalled();
   expect(updated).toMatchObject({
-    x: 40,
-    y: 50,
-    width: 120,
-    height: 90,
-    pagePlacement: { iframePath: [], pageX: 40, pageY: 50 },
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+    borderSettings: { width: 5 },
   });
   expect(updated).not.toHaveProperty('offset');
   anchorNode.remove();
@@ -173,6 +170,43 @@ function expectResolverPreservesManualOffsetForBorderMetricChanges() {
     height: frame.height,
     borderSettings: { width: 5 },
     offset: frame.offset,
+  });
+  anchorNode.remove();
+}
+
+function expectResolverAppliesPaddingToManualFrame() {
+  const frame = {
+    ...createFrame(),
+    offset: { x: 7, y: 9, width: 100, height: 80 },
+  };
+  const anchorNode = document.createElement('div');
+  document.body.appendChild(anchorNode);
+  coordsMocks.calculateFrameOffsetFromElement.mockReturnValue({
+    x: 2,
+    y: 7,
+    width: 108,
+    height: 86,
+  });
+
+  const updated = resolveUpdatedFrame({
+    frame,
+    frameId: frame.id,
+    anchorNode,
+    newFrame: {
+      ...frame,
+      borderSettings: {
+        ...frame.borderSettings!,
+        padding: { top: 2, right: 4, bottom: 3, left: 5 },
+      },
+    },
+  });
+
+  expect(updated).toMatchObject({
+    x: frame.x - 5,
+    y: frame.y - 2,
+    width: frame.width + 9,
+    height: frame.height + 5,
+    offset: { x: 2, y: 7, width: 108, height: 86 },
   });
   anchorNode.remove();
 }
@@ -236,11 +270,15 @@ describe('frame-mutation-actions-update-resolver', () => {
     expectResolverRecalculatesOffsetForConnectedCoordChanges
   );
   it(
-    'treats the linked-element projection as authoritative when border metrics change without an offset',
-    expectResolverRecalculatesViewportCoordsForBorderMetricChanges
+    'keeps inner geometry stable when an outward border width changes',
+    expectResolverKeepsInnerGeometryForOutwardBorderWidthChanges
   );
   it(
     'keeps a manual offset authoritative when border metrics change on a connected element',
     expectResolverPreservesManualOffsetForBorderMetricChanges
+  );
+  it(
+    'expands a manually positioned frame when its padding changes',
+    expectResolverAppliesPaddingToManualFrame
   );
 });

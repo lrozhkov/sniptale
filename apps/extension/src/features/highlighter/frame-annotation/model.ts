@@ -27,6 +27,8 @@ export interface FrameAnnotationVisualState extends FrameAnnotationRect {
   focusSettings?: FocusSettings;
   stepBadge?: StepBadgeSettings;
   callout?: CalloutSettings;
+  /** Additional independently editable callouts. The primary callout remains in `callout`. */
+  additionalCallouts?: CalloutSettings[];
 }
 
 /** Canonical, versioned editor/export boundary. It intentionally has no runtime anchors. */
@@ -51,6 +53,7 @@ export function createFrameAnnotationSnapshot(
 export function normalizeFrameAnnotationSnapshot(
   snapshot: FrameAnnotationSnapshotV1
 ): FrameAnnotationSnapshotV1 {
+  const callouts = normalizeCalloutInstanceIds(snapshot);
   return {
     ...snapshot,
     x: normalizeFinite(snapshot.x),
@@ -58,6 +61,33 @@ export function normalizeFrameAnnotationSnapshot(
     width: normalizeNonNegative(snapshot.width),
     height: normalizeNonNegative(snapshot.height),
     ordering: Math.max(0, Math.trunc(normalizeFinite(snapshot.ordering))),
+    ...callouts,
+  };
+}
+
+function normalizeCalloutInstanceIds(
+  snapshot: FrameAnnotationSnapshotV1
+): Pick<FrameAnnotationSnapshotV1, 'callout' | 'additionalCallouts'> {
+  const used = new Set<string>();
+  const normalize = (callout: CalloutSettings, index: number): CalloutSettings => {
+    const fallback = `${snapshot.id}:callout:${index}`;
+    const preferred = callout.instanceId || fallback;
+    let instanceId = preferred;
+    if (used.has(instanceId)) {
+      instanceId = fallback;
+      let collision = 1;
+      while (used.has(instanceId)) instanceId = `${fallback}:${collision++}`;
+    }
+    used.add(instanceId);
+    return callout.instanceId === instanceId ? callout : { ...callout, instanceId };
+  };
+  const primary = snapshot.callout ? normalize(snapshot.callout, 0) : undefined;
+  const additional = snapshot.additionalCallouts?.map((callout, index) =>
+    normalize(callout, index + 1)
+  );
+  return {
+    ...(primary ? { callout: primary } : {}),
+    ...(additional ? { additionalCallouts: additional } : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
@@ -8,6 +9,11 @@ import {
   resolveCalloutColorBindings,
 } from '../../../../features/highlighter/callout-color-bindings';
 import { createFrameCalloutActions } from '../../../../features/highlighter/frame-annotation/callout/actions';
+import {
+  getFrameCallout,
+  removeFrameCallout,
+  setFrameCallout,
+} from '../../../../features/highlighter/frame-annotation/callout/collection';
 
 interface InteractiveFrameCalloutOverlayProps {
   frame: FrameData;
@@ -17,17 +23,21 @@ interface InteractiveFrameCalloutOverlayProps {
   isCalloutPopoverOpen: boolean;
   isFrameEditing: boolean;
   calloutPopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
+  calloutIndex?: number;
+  setActiveCalloutIndex?: React.Dispatch<React.SetStateAction<number>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+  stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   onUpdate: (frame: FrameData) => void;
 }
 
 function createCalloutActions(args: {
-  apply: (callout: NonNullable<FrameData['callout']>) => void;
-  callout: NonNullable<FrameData['callout']>;
+  apply: (callout: CalloutSettings) => void;
+  callout: CalloutSettings;
   frameId: string;
   props: InteractiveFrameCalloutOverlayProps;
-  toggleSettings: (frameId: string, popover: 'callout-settings') => void;
+  toggleSettings: (frameId: string, popover: 'callout-settings', calloutIndex?: number) => void;
+  settingsAnchor: HTMLButtonElement | null;
 }): Pick<
   React.ComponentProps<typeof Callout>,
   | 'onContentChange'
@@ -47,20 +57,36 @@ function createCalloutActions(args: {
     apply: args.apply,
     callout: args.callout,
     onDelete: () => {
-      args.apply({ ...args.callout, enabled: false });
+      const nextFrame = args.props.stageCalloutFrame
+        ? args.props.stageCalloutFrame(
+            (current) => removeFrameCallout(current, args.props.calloutIndex ?? 0) as FrameData
+          )
+        : (removeFrameCallout(args.props.currentFrame, args.props.calloutIndex ?? 0) as FrameData);
+      if (!args.props.stageCalloutFrame) args.props.setTempFrame(nextFrame);
+      args.props.onUpdate(nextFrame as FrameData);
       args.props.setIsCalloutEditing(false);
     },
-    onSettingsClick: () => args.toggleSettings(args.frameId, 'callout-settings'),
-    onStartEditing: () => args.props.setIsCalloutEditing(true),
+    onSettingsClick: () => {
+      args.props.calloutPopoverAnchorRef.current = args.settingsAnchor;
+      args.props.setActiveCalloutIndex?.(args.props.calloutIndex ?? 0);
+      args.toggleSettings(args.frameId, 'callout-settings', args.props.calloutIndex ?? 0);
+    },
+    onStartEditing: () => {
+      args.props.setActiveCalloutIndex?.(args.props.calloutIndex ?? 0);
+      args.props.setIsCalloutEditing(true);
+    },
     onStopEditing: () => args.props.setIsCalloutEditing(false),
   });
 }
 
 /** Renders the editable callout overlay and keeps its update/delete behavior local to the callout seam. */
 export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOverlayProps) {
+  const calloutIndex = props.calloutIndex ?? 0;
   const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
   const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
-  const callout = props.currentFrame.callout ?? props.frame.callout;
+  const localSettingsAnchorRef = React.useRef<HTMLButtonElement | null>(null);
+  const callout =
+    getFrameCallout(props.currentFrame, calloutIndex) ?? getFrameCallout(props.frame, calloutIndex);
   if (!callout?.enabled) {
     return null;
   }
@@ -78,13 +104,13 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
     style: resolveCalloutColorBindings(callout.style, frameColors),
   };
 
-  const applyCalloutFrameUpdate = (nextCallout: NonNullable<FrameData['callout']>) => {
-    const nextFrameSnapshot = {
-      ...props.currentFrame,
-      callout: nextCallout,
-    };
-
-    props.setTempFrame(nextFrameSnapshot);
+  const applyCalloutFrameUpdate = (nextCallout: CalloutSettings) => {
+    const nextFrameSnapshot = props.stageCalloutFrame
+      ? props.stageCalloutFrame(
+          (current) => setFrameCallout(current, calloutIndex, nextCallout) as FrameData
+        )
+      : (setFrameCallout(props.currentFrame, calloutIndex, nextCallout) as FrameData);
+    if (!props.stageCalloutFrame) props.setTempFrame(nextFrameSnapshot);
     props.onUpdate(nextFrameSnapshot);
   };
 
@@ -103,9 +129,10 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
         callout,
         frameId: props.frame.id,
         props,
+        settingsAnchor: localSettingsAnchorRef.current,
         toggleSettings: toggleQuickPopover,
       })}
-      settingsAnchorRef={props.calloutPopoverAnchorRef}
+      settingsAnchorRef={localSettingsAnchorRef}
       showSettingsHandle={!isAnyFrameSelected}
     />
   );

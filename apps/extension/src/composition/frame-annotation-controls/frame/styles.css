@@ -62,6 +62,11 @@
   pointer-events: auto;
 }
 
+.sniptale-frame-style-preset-row:hover .sniptale-glass-preset-check,
+.sniptale-frame-style-preset-row:focus-within .sniptale-glass-preset-check {
+  opacity: 0;
+}
+
 .sniptale-frame-style-preset-action {
   width: 26px;
   height: 26px;

@@ -29,6 +29,7 @@ export const DEFAULT_BLUR_SETTINGS: BlurSettings = {
  * Дефолтные настройки focus
  */
 export const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
+  blurAmount: 0,
   opacity: 0.5,
   showBorder: true,
 };

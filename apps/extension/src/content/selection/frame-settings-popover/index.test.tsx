@@ -272,7 +272,9 @@ describe('FrameSettingsPopover loading state', () => {
 
     renderPopover();
 
-    const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
+    const popover = document.querySelector<HTMLElement>(
+      '.sniptale-frame-settings-popover[data-frame-id="frame-1"]'
+    );
     expect(popover?.classList).toContain('sniptale-glass-popover');
     expect(popover?.classList).toContain('sniptale-content-popover');
     expect(popover?.classList).toContain('sniptale-content-popover--toolbar-menu');
@@ -284,11 +286,7 @@ describe('FrameSettingsPopover loading state', () => {
       popover?.querySelector('.sniptale-settings-popover-header')?.getAttribute('data-draggable')
     ).toBe('true');
     expect(popover?.querySelector('.sniptale-settings-popover-close')).not.toBeNull();
-    expect(
-      document.querySelector<HTMLElement>('.sniptale-frame-style-editor-layer')?.dataset[
-        'sniptaleActivationBridge'
-      ]
-    ).toBe('defer');
+    expect(document.querySelector('.sniptale-frame-style-editor-layer')).toBeNull();
     expect(popover?.querySelector('.sniptale-content-popover-body')).not.toBeNull();
     popover?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(hostClick).not.toHaveBeenCalled();
@@ -364,7 +362,7 @@ describe('FrameSettingsPopover pending focus edits', () => {
     setRangeInputValue(getRangeInput(), '30');
 
     expect(onApplyToFrame).toHaveBeenLastCalledWith({
-      focusSettings: { opacity: 0.3, showBorder: true },
+      focusSettings: { blurAmount: 0, opacity: 0.3, showBorder: true },
     });
 
     await act(async () => {
@@ -519,6 +517,10 @@ describe('FrameSettingsPopover preset selection', () => {
       act(() => vi.advanceTimersByTime(350));
 
       act(() =>
+        document.querySelector<HTMLButtonElement>('[data-frame-style-action="fork"]')?.click()
+      );
+
+      act(() =>
         document
           .querySelector<HTMLButtonElement>(
             `button[aria-label="${translate('highlighter.editor.saveSection')}"]`
@@ -637,26 +639,22 @@ describe('FrameSettingsPopover preset catalog actions', () => {
     expect(document.body.textContent).toContain(secondPreset.name);
   });
 
-  it('opens the shared style editor from the preset edit action', async () => {
+  it('forks the selected template into the inline manual editor', async () => {
     storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
     renderPopover();
     await flushAsyncEffects();
 
-    const editButton = getPresetRow('Persisted preset').querySelector<HTMLElement>(
-      '[data-frame-style-action="edit"]'
+    clickTrusted(
+      getPresetRow('Persisted preset').querySelector<HTMLElement>('.sniptale-glass-preset-item')!
     );
-    editButton?.focus();
-    clickTrusted(editButton!);
-    const editModal = document.querySelector<HTMLElement>('.sniptale-modal');
-    expect(editModal).not.toBeNull();
-    expect(editModal?.contains(document.activeElement)).toBe(true);
-    expect(document.body.textContent).toContain(translate('highlighter.editor.editTitle'));
-
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    });
+    const forkButton = getPresetRow('Persisted preset').querySelector<HTMLElement>(
+      '[data-frame-style-action="fork"]'
+    );
+    forkButton?.focus();
+    clickTrusted(forkButton!);
+    expect(document.querySelector('[data-ui="shared.border-style-inspector"]')).not.toBeNull();
+    expect(document.body.textContent).toContain(translate('content.templateFork.temporaryStatus'));
     expect(document.querySelector('.sniptale-modal')).toBeNull();
-    expect(document.activeElement).toBe(editButton);
     expect(document.querySelector('[data-frame-style-action="add"]')).toBeNull();
   });
 });

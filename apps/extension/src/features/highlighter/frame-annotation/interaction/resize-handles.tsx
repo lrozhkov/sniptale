@@ -20,6 +20,7 @@ export function FrameAnnotationResizeHandleLayer(props: {
   frameId: string;
   frameRect: FrameAnnotationRect;
   handleSize: number;
+  visualScale?: number;
   strokeWidth?: number;
   position?: 'absolute' | 'fixed';
   onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
@@ -53,7 +54,10 @@ export function FrameAnnotationResizeHandleLayer(props: {
             ...baseStyle,
             ...getFrameAnnotationResizeHandleStyle(
               direction,
-              insetRectToStrokeCenter(props.frameRect, props.strokeWidth ?? 0),
+              expandRectToStrokeCenter(
+                props.frameRect,
+                (props.strokeWidth ?? 0) * (props.visualScale ?? 1)
+              ),
               props.handleSize
             ),
             cursor: getFrameAnnotationResizeCursor(direction),
@@ -64,16 +68,16 @@ export function FrameAnnotationResizeHandleLayer(props: {
   );
 }
 
-function insetRectToStrokeCenter(
+function expandRectToStrokeCenter(
   frame: FrameAnnotationRect,
   strokeWidth: number
 ): FrameAnnotationRect {
-  const inset = Math.max(0, strokeWidth) / 2;
+  const outset = Math.max(0, strokeWidth) / 2;
   return {
-    x: frame.x + inset,
-    y: frame.y + inset,
-    width: Math.max(0, frame.width - inset * 2),
-    height: Math.max(0, frame.height - inset * 2),
+    x: frame.x - outset,
+    y: frame.y - outset,
+    width: frame.width + outset * 2,
+    height: frame.height + outset * 2,
   };
 }
 

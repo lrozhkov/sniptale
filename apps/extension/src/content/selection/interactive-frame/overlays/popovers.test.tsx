@@ -230,4 +230,81 @@ describe('InteractiveFramePopovers', () => {
       undefined
     );
   });
+
+  it('renders every callout while editing and configuring only the active one', () => {
+    const primary = createDefaultCalloutSettings();
+    const extra = {
+      ...createDefaultCalloutSettings(),
+      content: { bodyHtml: '<p>Extra</p>', titleText: '' },
+    };
+    const frame = {
+      ...createFrame('frame-1', '#2563eb'),
+      callout: primary,
+      additionalCallouts: [extra],
+    };
+
+    renderNode(
+      <InteractiveFramePopovers
+        {...createPopoversProps({ currentFrame: frame, frame })}
+        activeCalloutIndex={1}
+        isCalloutEditing
+        isCalloutPopoverOpen
+      />
+    );
+
+    expect(calloutOverlayMock).toHaveBeenCalledTimes(2);
+    expect(calloutOverlayMock.mock.calls[0]?.[0]).toMatchObject({
+      calloutIndex: 0,
+      isCalloutEditing: false,
+    });
+    expect(calloutOverlayMock.mock.calls[1]?.[0]).toMatchObject({
+      calloutIndex: 1,
+      isCalloutEditing: true,
+      isCalloutPopoverOpen: true,
+    });
+    expect(calloutSettingsPopoverMock).toHaveBeenCalledWith(
+      expect.objectContaining({ calloutIndex: 1, settings: extra }),
+      undefined
+    );
+  });
+
+  it('stages additional-callout settings against the latest local frame', () => {
+    const primary = createDefaultCalloutSettings();
+    const extra = {
+      ...createDefaultCalloutSettings(),
+      content: { bodyHtml: '<p>Extra</p>', titleText: '' },
+    };
+    let stagedFrame: FrameData = {
+      ...createFrame('frame-1', '#2563eb'),
+      callout: primary,
+      additionalCallouts: [extra],
+    };
+    const stageCalloutFrame = vi.fn((update: FrameData | ((current: FrameData) => FrameData)) => {
+      stagedFrame = typeof update === 'function' ? update(stagedFrame) : update;
+      return stagedFrame;
+    });
+
+    renderNode(
+      <InteractiveFramePopovers
+        {...createPopoversProps({ currentFrame: stagedFrame, frame: stagedFrame })}
+        activeCalloutIndex={1}
+        isCalloutPopoverOpen
+        stageCalloutFrame={stageCalloutFrame}
+      />
+    );
+
+    const popoverProps = calloutSettingsPopoverMock.mock.calls.at(0)?.at(0) as {
+      onSettingsChange: (settings: typeof extra) => void;
+    };
+    act(() => {
+      popoverProps.onSettingsChange({
+        ...extra,
+        content: { bodyHtml: '<p>Updated extra</p>', titleText: '' },
+      });
+    });
+
+    expect(stageCalloutFrame).toHaveBeenCalledOnce();
+    expect(stagedFrame.callout).toEqual(primary);
+    expect(stagedFrame.additionalCallouts?.[0]?.content.bodyHtml).toBe('<p>Updated extra</p>');
+  });
 });

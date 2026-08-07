@@ -13,6 +13,28 @@ import {
   addPagePreparationHistoryAppliedListener,
   pagePreparationHistory,
 } from '../../../parser/page-preparation/history';
+import { createCalloutRenderKey } from '../../../../features/highlighter/frame-annotation/callout/model';
+
+function createFrameCalloutCollectionKey(frame: FrameData): string {
+  return [frame.callout, ...(frame.additionalCallouts ?? [])]
+    .map((callout) => createCalloutRenderKey(callout))
+    .join('\n');
+}
+
+function preservePendingCallouts(frame: FrameData, pending: FrameData): FrameData {
+  const {
+    callout: _currentCallout,
+    additionalCallouts: _currentAdditionalCallouts,
+    ...frameWithoutCallouts
+  } = frame;
+  return {
+    ...frameWithoutCallouts,
+    ...(pending.callout === undefined ? {} : { callout: pending.callout }),
+    ...(pending.additionalCallouts === undefined
+      ? {}
+      : { additionalCallouts: pending.additionalCallouts }),
+  };
+}
 
 function cancelFrameHistoryTransactions(frameId: string) {
   [
@@ -117,6 +139,7 @@ export function useInteractiveFramePropSync(params: {
   frame: FrameData;
   isCalloutEditing: boolean;
   isResizingRef: React.MutableRefObject<boolean>;
+  pendingCalloutFrameRef?: React.MutableRefObject<FrameData | null>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
@@ -127,6 +150,7 @@ export function useInteractiveFramePropSync(params: {
     frame,
     isCalloutEditing,
     isResizingRef,
+    pendingCalloutFrameRef,
     setEffectMode,
     setState,
     setTempFrame,
@@ -134,7 +158,28 @@ export function useInteractiveFramePropSync(params: {
   } = params;
 
   React.useEffect(() => {
-    if (state === 'editing' || isCalloutEditing) {
+    if (state === 'editing') {
+      return;
+    }
+    const pendingCalloutFrame = pendingCalloutFrameRef?.current;
+    if (pendingCalloutFrame) {
+      if (
+        createFrameCalloutCollectionKey(frame) ===
+        createFrameCalloutCollectionKey(pendingCalloutFrame)
+      ) {
+        if (pendingCalloutFrameRef) pendingCalloutFrameRef.current = null;
+        setTempFrame(frame);
+      } else {
+        setTempFrame(preservePendingCallouts(frame, pendingCalloutFrame));
+      }
+      return;
+    }
+    if (isCalloutEditing) {
+      setTempFrame((current) =>
+        current.callout === undefined && frame.callout !== undefined
+          ? { ...current, callout: frame.callout }
+          : current
+      );
       return;
     }
     if (state === 'resizing' && isResizingRef.current) return;
@@ -147,6 +192,7 @@ export function useInteractiveFramePropSync(params: {
     frame,
     isCalloutEditing,
     isResizingRef,
+    pendingCalloutFrameRef,
     setEffectMode,
     setState,
     setTempFrame,
@@ -158,6 +204,7 @@ export function useInteractiveFrameEditingEffects(params: {
   state: FrameState;
   isCalloutEditing: boolean;
   frameWithoutLinkedElement: FrameData;
+  pendingCalloutFrameRef?: React.MutableRefObject<FrameData | null>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   handleCancelRef: React.MutableRefObject<() => void>;
   handleSaveRef: React.MutableRefObject<() => void>;
@@ -172,11 +219,13 @@ export function useInteractiveFrameExternalExitEffects(params: {
   state: FrameState;
   handleCancel: () => void;
   abortPointerSession: () => boolean;
+  pendingCalloutFrameRef?: React.MutableRefObject<FrameData | null>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
 }) {
-  const { state, handleCancel, abortPointerSession, setState } = params;
+  const { state, handleCancel, abortPointerSession, pendingCalloutFrameRef, setState } = params;
   React.useEffect(() => {
     const handleExitEditing = () => {
+      if (pendingCalloutFrameRef) pendingCalloutFrameRef.current = null;
       const abortedPointerSession = abortPointerSession();
       if (state === 'editing') {
         handleCancel();
@@ -186,11 +235,12 @@ export function useInteractiveFrameExternalExitEffects(params: {
     };
 
     return addExitFrameEditingListener(handleExitEditing);
-  }, [state, handleCancel, abortPointerSession, setState]);
+  }, [state, handleCancel, abortPointerSession, pendingCalloutFrameRef, setState]);
 
   React.useEffect(() => {
     const handleHighlighterDisabled = (enabled: boolean) => {
       if (enabled) return;
+      if (pendingCalloutFrameRef) pendingCalloutFrameRef.current = null;
       const abortedPointerSession = abortPointerSession();
       if (state === 'editing') handleCancel();
       else if (abortedPointerSession) setState('idle');
@@ -199,13 +249,14 @@ export function useInteractiveFrameExternalExitEffects(params: {
     return addHighlighterModeChangedListener(({ enabled }) => {
       handleHighlighterDisabled(enabled);
     });
-  }, [state, handleCancel, abortPointerSession, setState]);
+  }, [state, handleCancel, abortPointerSession, pendingCalloutFrameRef, setState]);
 }
 
 export function useInteractiveFrameHistoryApplyReset(params: {
   abortPointerSession: () => boolean;
   defaultEffectMode: EffectMode;
   frame: FrameData;
+  pendingCalloutFrameRef?: React.MutableRefObject<FrameData | null>;
   closePopover: () => void;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
@@ -217,6 +268,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
     closePopover,
     defaultEffectMode,
     frame,
+    pendingCalloutFrameRef,
     setEffectMode,
     setIsCalloutEditing,
     setState,
@@ -228,6 +280,7 @@ export function useInteractiveFrameHistoryApplyReset(params: {
 
   React.useEffect(() => {
     return addPagePreparationHistoryAppliedListener(() => {
+      if (pendingCalloutFrameRef) pendingCalloutFrameRef.current = null;
       abortPointerSession();
       cancelFrameHistoryTransactions(frameRef.current.id);
       setState('idle');
@@ -250,5 +303,6 @@ export function useInteractiveFrameHistoryApplyReset(params: {
     setTempFrame,
     defaultEffectModeRef,
     frameRef,
+    pendingCalloutFrameRef,
   ]);
 }

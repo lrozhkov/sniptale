@@ -51,13 +51,23 @@ interface FrameSettingsLifecycleState {
 type FrameSettingsLifecycleRef = { current: FrameSettingsLifecycleState };
 type SetFrameSettingsDraft = Dispatch<SetStateAction<FrameSettingsDraft>>;
 
-function createInitialDraft(): FrameSettingsDraft {
+function createInitialDraft(args?: {
+  blurSettings?: BlurSettings;
+  borderSettings?: AppliedBorderSettings;
+  focusSettings?: FocusSettings;
+}): FrameSettingsDraft {
+  const localBorderSettings = normalizeAppliedBorderSettings(
+    args?.borderSettings ?? projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET)
+  );
   return {
     globalSettings: createDefaultHighlighterSettings(),
-    localBorderSettings: projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
-    localBlurSettings: { ...DEFAULT_BLUR_SETTINGS },
-    localFocusSettings: getDefaultFocusSettings(),
-    selectedPresetId: DEFAULT_BORDER_PRESET.id,
+    localBorderSettings,
+    localBlurSettings: { ...(args?.blurSettings ?? DEFAULT_BLUR_SETTINGS) },
+    localFocusSettings: { ...(args?.focusSettings ?? getDefaultFocusSettings()) },
+    selectedPresetId:
+      args?.borderSettings === undefined
+        ? DEFAULT_BORDER_PRESET.id
+        : localBorderSettings.sourcePresetId,
     visiblePresetIds: [DEFAULT_BORDER_PRESET.id],
   };
 }
@@ -107,6 +117,7 @@ function applyLoadedFrameSettingsDefaults(
         ? {
             localFocusSettings: {
               ...settings.defaultFocusSettings,
+              blurAmount: effects.focus.blurAmount,
               opacity: effects.focus.opacity,
               showBorder: true,
             },
@@ -205,7 +216,7 @@ export function useFrameSettingsPopoverLifecycle(args: {
   historyTransaction?: boolean;
   isOpen: boolean;
 }) {
-  const [draft, setDraft] = useState(createInitialDraft);
+  const [draft, setDraft] = useState(() => createInitialDraft(args));
   const lifecycleRef = useRef(createLifecycleState(args));
   lifecycleRef.current.source = {
     blur: args.blurSettings,

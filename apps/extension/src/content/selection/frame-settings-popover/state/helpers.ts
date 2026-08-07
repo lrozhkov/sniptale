@@ -15,6 +15,7 @@ import { setFrameSessionBorderPreset } from '../../frame-runtime/session/border-
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 const DEFAULT_FOCUS_SETTINGS: FocusSettings = {
+  blurAmount: 0,
   opacity: 0.5,
   showBorder: true,
 };
@@ -45,6 +46,7 @@ export function createFrameSettingsPresetHandler(args: {
     };
     const focusSettings = {
       ...args.localFocusSettings,
+      blurAmount: effects.focus.blurAmount,
       opacity: effects.focus.opacity,
       showBorder: true,
     };
@@ -126,6 +128,11 @@ export function createFrameFocusHandlers(args: {
           opacity,
         });
       }
+    },
+    handleFocusBlurChange: (blurAmount: number) => {
+      const nextSettings = { ...args.localFocusSettings, blurAmount };
+      args.setLocalFocusSettings(nextSettings);
+      applyFocusSettings(nextSettings);
     },
     handleFocusShowBorderChange: (showBorder: boolean) => {
       const nextSettings = { ...args.localFocusSettings, showBorder };

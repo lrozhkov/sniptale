@@ -10,7 +10,9 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
     customCss: '',
     effects: {
       blur: { amount: 10, blurType: 'gaussian' },
-      focus: { opacity: 0.5 },
+      focus: { blurAmount: 0, opacity: 0.5 },
+      capture: { hideFrame: false },
+      linkedTemplates: { calloutPresetId: null, stepBadgePresetId: null },
     },
     fillColor: '#00000000',
     fillOpacity: 0,
@@ -157,6 +159,33 @@ describe('highlighter guards border preset visual fields', () => {
         borderPresets: [preset],
       }).value.borderPresets
     ).toEqual([preset]);
+  });
+
+  it('round-trips linked annotation templates and rejects malformed identifiers', () => {
+    const linked = createBorderPreset({
+      effects: {
+        blur: { amount: 10, blurType: 'gaussian' },
+        focus: { blurAmount: 0, opacity: 0.5 },
+        capture: { hideFrame: false },
+        linkedTemplates: {
+          calloutPresetId: 'system-callout-card',
+          stepBadgePresetId: 'system-outline',
+        },
+      },
+    });
+    const malformed = createBorderPreset({
+      id: 'malformed',
+      effects: {
+        blur: { amount: 10, blurType: 'gaussian' },
+        focus: { blurAmount: 0, opacity: 0.5 },
+        capture: { hideFrame: false },
+        linkedTemplates: { calloutPresetId: '', stepBadgePresetId: null },
+      },
+    });
+    const parsed = parseStoredHighlighterSettings({ borderPresets: [linked, malformed] });
+
+    expect(parsed.value.borderPresets).toEqual([linked]);
+    expect(parsed.invalidFieldCount).toBe(1);
   });
 
   it('accepts controlled catalog metadata and rejects unknown system keys', () => {

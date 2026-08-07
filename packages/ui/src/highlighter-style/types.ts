@@ -31,6 +31,7 @@ export interface BlurSettings {
 }
 
 export interface FocusSettings {
+  blurAmount?: number;
   opacity: number;
   showBorder?: boolean;
 }

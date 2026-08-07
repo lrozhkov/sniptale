@@ -12,6 +12,10 @@ import type { UseFrameMutationActionHelperOptions } from './types';
 import { getFrameSessionBorderPreset } from '../session/border-preset';
 import { getFutureFrameCallout } from '../session/future-callout';
 import { cloneStepBadgeSettings } from '../session/step-badge-defaults';
+import {
+  resolveFrameCalloutTemplate,
+  resolveFrameStepBadgeTemplate,
+} from '../session/linked-annotation-templates';
 
 type BuildFrameForAddArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -70,14 +74,17 @@ function resolveFrameBuildSettings(
     | 'sessionStepBadgeTemplateRef'
   >
 ) {
+  const borderSettings = getFrameSessionBorderPreset();
+  const callout = getFutureFrameCallout();
+  const template = args.sessionStepBadgeTemplateRef.current;
   return {
-    borderSettings: getFrameSessionBorderPreset(),
+    borderSettings,
     blurSettings: { ...args.sessionBlurSettingsRef.current },
     focusSettings: { ...args.sessionFocusSettingsRef.current },
     effectMode: args.globalEffectModeRef.current,
-    template: args.sessionStepBadgeTemplateRef.current,
+    template: template ? resolveFrameStepBadgeTemplate(template, borderSettings) : null,
     isAutoMode: args.globalStepBadgeAutoModeRef.current,
-    callout: getFutureFrameCallout(),
+    callout: callout ? resolveFrameCalloutTemplate(callout, borderSettings) : null,
   };
 }
 

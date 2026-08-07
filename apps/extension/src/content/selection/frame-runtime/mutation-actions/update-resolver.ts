@@ -11,6 +11,13 @@ export function resolveUpdatedFrame(args: {
   frameId: string;
   newFrame: FrameData;
 }): FrameData {
+  if (haveFramePaddingChanged(args.frame, args.newFrame)) {
+    return resolveCoordsUpdatedFrame({
+      ...args,
+      newFrame: applyFramePaddingChange(args.frame, args.newFrame),
+    });
+  }
+
   if (haveFrameCoordsChanged(args.frame, args.newFrame)) {
     return resolveCoordsUpdatedFrame(args);
   }
@@ -18,7 +25,7 @@ export function resolveUpdatedFrame(args: {
   if (
     args.anchorNode?.isConnected &&
     args.frame.offset === undefined &&
-    haveFrameBorderMetricsChanged(args.frame, args.newFrame)
+    haveFramePaddingChanged(args.frame, args.newFrame)
   ) {
     return resolveBorderMetricsUpdatedFrame({
       ...args,
@@ -102,16 +109,29 @@ function resolveCoordsUpdatedFrame(args: {
   };
 }
 
-function haveFrameBorderMetricsChanged(frame: FrameData, newFrame: FrameData) {
+function haveFramePaddingChanged(frame: FrameData, newFrame: FrameData) {
   const oldPadding = frame.borderSettings?.padding;
   const newPadding = newFrame.borderSettings?.padding;
   return (
     oldPadding?.top !== newPadding?.top ||
     oldPadding?.left !== newPadding?.left ||
     oldPadding?.right !== newPadding?.right ||
-    oldPadding?.bottom !== newPadding?.bottom ||
-    frame.borderSettings?.width !== newFrame.borderSettings?.width
+    oldPadding?.bottom !== newPadding?.bottom
   );
+}
+
+function applyFramePaddingChange(frame: FrameData, newFrame: FrameData): FrameData {
+  const oldPadding = frame.borderSettings?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const newPadding = newFrame.borderSettings?.padding ?? oldPadding;
+  const leftDelta = newPadding.left - oldPadding.left;
+  const topDelta = newPadding.top - oldPadding.top;
+  return {
+    ...newFrame,
+    x: frame.x - leftDelta,
+    y: frame.y - topDelta,
+    width: Math.max(1, frame.width + leftDelta + newPadding.right - oldPadding.right),
+    height: Math.max(1, frame.height + topDelta + newPadding.bottom - oldPadding.bottom),
+  };
 }
 
 function resolveBorderMetricsUpdatedFrame(args: {

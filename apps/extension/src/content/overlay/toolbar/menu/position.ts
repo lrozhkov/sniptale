@@ -1,3 +1,9 @@
+import {
+  projectClientRectToContentUi,
+  readContentUiScaleCompensation,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
+
 export function getToolbarMenuPosition(
   anchor: HTMLElement | null,
   menuHeight: number,
@@ -7,8 +13,18 @@ export function getToolbarMenuPosition(
     return fallback;
   }
 
-  const rect = anchor.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const spaceAbove = rect.top;
+  const uiScale = readContentUiScaleCompensation(anchor);
+  const clientRect = anchor.getBoundingClientRect();
+  const rect = projectClientRectToContentUi(
+    { x: clientRect.left, y: clientRect.top, width: clientRect.width, height: clientRect.height },
+    uiScale
+  );
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
+  const spaceBelow = viewport.height - rect.y - rect.height;
+  const spaceAbove = rect.y;
   return spaceBelow < menuHeight && spaceAbove > spaceBelow ? 'up' : 'down';
 }

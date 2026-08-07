@@ -23,6 +23,8 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
   if (!isPlainRecord(value)) return null;
   const blur = value['blur'];
   const focus = value['focus'];
+  const capture = value['capture'];
+  const linkedTemplates = value['linkedTemplates'];
   if (
     !isPlainRecord(blur) ||
     !isNumber(blur['amount']) ||
@@ -31,8 +33,14 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
     !blurTypes.has(blur['blurType'] as BorderPresetEffects['blur']['blurType']) ||
     !isPlainRecord(focus) ||
     !isNumber(focus['opacity']) ||
-    focus['opacity'] < 0.1 ||
-    focus['opacity'] > 1
+    focus['opacity'] < 0 ||
+    focus['opacity'] > 1 ||
+    (focus['blurAmount'] !== undefined &&
+      (!isNumber(focus['blurAmount']) || focus['blurAmount'] < 0 || focus['blurAmount'] > 25)) ||
+    (capture !== undefined &&
+      (!isPlainRecord(capture) ||
+        (capture['hideFrame'] !== undefined && !isBoolean(capture['hideFrame'])))) ||
+    !isValidLinkedTemplates(linkedTemplates)
   ) {
     return null;
   }
@@ -41,7 +49,38 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
       amount: blur['amount'],
       blurType: blur['blurType'] as BorderPresetEffects['blur']['blurType'],
     },
-    focus: { opacity: focus['opacity'] },
+    focus: {
+      blurAmount: focus['blurAmount'] === undefined ? 0 : (focus['blurAmount'] as number),
+      opacity: focus['opacity'],
+    },
+    capture: {
+      hideFrame:
+        isPlainRecord(capture) && isBoolean(capture['hideFrame']) ? capture['hideFrame'] : false,
+    },
+    linkedTemplates: parseLinkedTemplates(linkedTemplates),
+  };
+}
+
+function isValidLinkedTemplateId(value: unknown): boolean {
+  return value === undefined || value === null || (isString(value) && value.length > 0);
+}
+
+function isValidLinkedTemplates(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isPlainRecord(value) &&
+      isValidLinkedTemplateId(value['calloutPresetId']) &&
+      isValidLinkedTemplateId(value['stepBadgePresetId']))
+  );
+}
+
+function parseLinkedTemplates(value: unknown): NonNullable<BorderPresetEffects['linkedTemplates']> {
+  if (!isPlainRecord(value)) {
+    return { calloutPresetId: null, stepBadgePresetId: null };
+  }
+  return {
+    calloutPresetId: isString(value['calloutPresetId']) ? value['calloutPresetId'] : null,
+    stepBadgePresetId: isString(value['stepBadgePresetId']) ? value['stepBadgePresetId'] : null,
   };
 }
 

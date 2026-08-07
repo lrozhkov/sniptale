@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { createCalloutSettingsFixture } from '../../frame-runtime/test-support';
 import {
   calculateInteractiveFrameSizePanelPosition,
   calculateInteractiveFrameToolbarPosition,
@@ -174,6 +175,27 @@ afterEach(() => {
 });
 
 describe('useInteractiveFrameRenderModel', () => {
+  it('keeps additional callouts in the normalized runtime frame', async () => {
+    const additionalCallout = createCalloutSettingsFixture({
+      content: { bodyHtml: '', titleText: '' },
+    });
+    const frameWithAdditional = { ...baseFrame, additionalCallouts: [additionalCallout] };
+    const currentFrames: FrameData[] = [];
+
+    function CurrentFrameHarness() {
+      const model = useInteractiveFrameRenderModel({
+        ...getBaseRenderModelProps(),
+        frame: frameWithAdditional,
+      });
+      currentFrames.push(model.currentFrame);
+      return null;
+    }
+
+    await renderHarness(<CurrentFrameHarness />);
+
+    expect(currentFrames.at(-1)?.additionalCallouts).toEqual([additionalCallout]);
+  });
+
   it('never exposes default top-left toolbar coords on selected renders', async () => {
     const snapshots: Array<{
       state: string;

@@ -19,8 +19,10 @@ export function TemplateSaveSettings(props: {
   isSaving?: boolean;
   nameLabel: string;
   onCreate: (name: string) => Promise<boolean>;
+  onCreated?: () => void;
   onFloatingInteractionChange?: (open: boolean) => void;
   onOverwrite: (templateId: string) => Promise<boolean>;
+  onOverwritten?: (templateId: string) => void;
   options: TemplateSaveOption[];
   overwriteActionLabel: string;
   overwriteLabel: string;
@@ -75,6 +77,7 @@ export function TemplateSaveSettings(props: {
                 if (!saved) return;
                 setName('');
                 setStatus(props.createdStatusLabel ?? null);
+                props.onCreated?.();
               })
             }
           >
@@ -107,7 +110,9 @@ export function TemplateSaveSettings(props: {
           disabled={!selectedId || unavailable}
           onClick={() =>
             void props.onOverwrite(selectedId).then((saved) => {
-              if (saved) setStatus(props.overwrittenStatusLabel ?? null);
+              if (!saved) return;
+              setStatus(props.overwrittenStatusLabel ?? null);
+              props.onOverwritten?.(selectedId);
             })
           }
           tone="secondary"

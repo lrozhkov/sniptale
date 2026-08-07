@@ -43,22 +43,33 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export function clampMarkerOffset(
   target: Element,
-  offset: AnnotationMarkerOffset
+  offset: AnnotationMarkerOffset,
+  uiScale = 1
 ): AnnotationMarkerOffset {
-  const rect = getAbsolutePosition(target);
+  const scale = uiScale > 0 ? uiScale : 1;
+  const clientRect = getAbsolutePosition(target);
+  const rect = {
+    x: clientRect.x / scale,
+    y: clientRect.y / scale,
+    width: clientRect.width / scale,
+    height: clientRect.height / scale,
+  };
+  const logicalOffset = { x: offset.x / scale, y: offset.y / scale };
   const defaultX = rect.x + rect.width - 12;
   const defaultY = rect.y - 12;
   return {
-    x: clamp(
-      offset.x,
-      rect.x - MARKER_TARGET_GAP - defaultX,
-      rect.x + rect.width + MARKER_TARGET_GAP - defaultX
-    ),
-    y: clamp(
-      offset.y,
-      rect.y - MARKER_TARGET_GAP - defaultY,
-      rect.y + rect.height + MARKER_TARGET_GAP - MARKER_HEIGHT - defaultY
-    ),
+    x:
+      clamp(
+        logicalOffset.x,
+        rect.x - MARKER_TARGET_GAP - defaultX,
+        rect.x + rect.width + MARKER_TARGET_GAP - defaultX
+      ) * scale,
+    y:
+      clamp(
+        logicalOffset.y,
+        rect.y - MARKER_TARGET_GAP - defaultY,
+        rect.y + rect.height + MARKER_TARGET_GAP - MARKER_HEIGHT - defaultY
+      ) * scale,
   };
 }
 
@@ -159,23 +170,41 @@ function resolveTooltipPosition(
 
 function resolveMarkerPosition(
   target: Element,
-  offset: AnnotationMarkerOffset = { x: 0, y: 0 }
+  offset: AnnotationMarkerOffset = { x: 0, y: 0 },
+  uiScale = 1
 ): AnnotationMarkerPosition | null {
   try {
     if (!target.isConnected || target.getClientRects().length === 0) return null;
-    const rect = getAbsolutePosition(target);
-    if (![rect.height, rect.width, rect.x, rect.y].every(Number.isFinite)) return null;
+    const clientRect = getAbsolutePosition(target);
+    if (![clientRect.height, clientRect.width, clientRect.x, clientRect.y].every(Number.isFinite))
+      return null;
 
-    const boundedOffset = clampMarkerOffset(target, offset);
-    const viewportWidth = Math.max(0, window.innerWidth);
-    const viewportHeight = Math.max(0, window.innerHeight);
+    const scale = uiScale > 0 ? uiScale : 1;
+    const rect = {
+      x: clientRect.x / scale,
+      y: clientRect.y / scale,
+      width: clientRect.width / scale,
+      height: clientRect.height / scale,
+    };
+    const boundedClientOffset = clampMarkerOffset(target, offset, scale);
+    const boundedOffset = {
+      x: boundedClientOffset.x / scale,
+      y: boundedClientOffset.y / scale,
+    };
+    const viewportWidth = Math.max(0, window.innerWidth / scale);
+    const viewportHeight = Math.max(0, window.innerHeight / scale);
     const anchor = resolveMarkerAnchor(rect, boundedOffset, viewportWidth, viewportHeight);
+    const tooltip = resolveTooltipPosition(anchor, viewportWidth, viewportHeight);
 
     return {
-      markerLeft: anchor.markerLeft,
-      markerRight: anchor.markerRight,
-      markerTop: anchor.markerTop,
-      ...resolveTooltipPosition(anchor, viewportWidth, viewportHeight),
+      markerLeft: anchor.markerLeft === null ? null : anchor.markerLeft * scale,
+      markerRight: anchor.markerRight === null ? null : anchor.markerRight * scale,
+      markerTop: anchor.markerTop * scale,
+      ...tooltip,
+      tooltipBottom: tooltip.tooltipBottom === null ? null : tooltip.tooltipBottom * scale,
+      tooltipLeft: tooltip.tooltipLeft === null ? null : tooltip.tooltipLeft * scale,
+      tooltipRight: tooltip.tooltipRight === null ? null : tooltip.tooltipRight * scale,
+      tooltipTop: tooltip.tooltipTop === null ? null : tooltip.tooltipTop * scale,
     };
   } catch {
     return null;
@@ -184,7 +213,8 @@ function resolveMarkerPosition(
 
 export function useMarkerPositions(
   projections: AnnotationMarkerProjection[],
-  offsets: ReadonlyMap<number, AnnotationMarkerOffset>
+  offsets: ReadonlyMap<number, AnnotationMarkerOffset>,
+  uiScale = 1
 ): ReadonlyMap<number, AnnotationMarkerPosition> {
   const [positions, setPositions] = useState<ReadonlyMap<number, AnnotationMarkerPosition>>(
     () => new Map()
@@ -202,7 +232,7 @@ export function useMarkerPositions(
     function samplePositions() {
       const nextPositions = new Map<number, AnnotationMarkerPosition>();
       projections.forEach(({ record, target }) => {
-        const position = resolveMarkerPosition(target, offsets.get(record.annotationId));
+        const position = resolveMarkerPosition(target, offsets.get(record.annotationId), uiScale);
         if (position) nextPositions.set(record.annotationId, position);
       });
       if (!markerPositionsMatch(lastPositions, nextPositions)) {
@@ -219,7 +249,7 @@ export function useMarkerPositions(
       active = false;
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [offsets, projections]);
+  }, [offsets, projections, uiScale]);
 
   return positions;
 }

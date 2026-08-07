@@ -1,14 +1,20 @@
 import React from 'react';
-import { ListOrdered, MessageSquare, Pencil } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Pencil } from 'lucide-react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import { FrameCommentIcon } from '../../../../features/highlighter/frame-annotation/icons';
 import { translate } from '../../../../platform/i18n';
 import { enableFrameStepBadge, startFrameCalloutEditing } from './actions';
 import { FRAME_TRIGGER_CONTROL_SIZE } from './trigger-position';
 import { FrameAnnotationEffectIcon as FrameEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
+import {
+  isFrameHiddenDuringCapture,
+  setFrameHiddenDuringCapture,
+} from '../../../../features/highlighter/frame-annotation/capture-visibility';
 
 type FrameQuickAction = {
-  id: 'settings' | 'callout' | 'step-badge' | 'edit';
+  id: 'settings' | 'callout' | 'step-badge' | 'edit' | 'capture-visibility';
+  active?: boolean;
   icon: React.ReactNode;
   label: string;
   onClick: (button: HTMLButtonElement) => void;
@@ -37,7 +43,11 @@ export function createFrameQuickActions(props: {
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   toggleQuickPopover: FrameUIState['toggleQuickPopover'];
+  onUpdate: (frame: FrameData) => void;
+  captureVisibility?: { hiddenDuringCapture: boolean; toggle: () => void };
 }): FrameQuickAction[] {
+  const hiddenDuringCapture =
+    props.captureVisibility?.hiddenDuringCapture ?? isFrameHiddenDuringCapture(props.frame);
   return [
     {
       id: 'settings',
@@ -53,7 +63,7 @@ export function createFrameQuickActions(props: {
       : [
           {
             id: 'callout' as const,
-            icon: <MessageSquare size={15} aria-hidden="true" />,
+            icon: <FrameCommentIcon size={15} aria-hidden="true" />,
             label: translate('content.interactiveFrame.calloutAdd'),
             onClick: () =>
               startFrameCalloutEditing({
@@ -81,6 +91,27 @@ export function createFrameQuickActions(props: {
       label: translate('content.interactiveFrame.editButton'),
       onClick: props.handleStartEditing,
     },
+    {
+      id: 'capture-visibility',
+      active: hiddenDuringCapture,
+      icon: hiddenDuringCapture ? (
+        <EyeOff size={15} aria-hidden="true" />
+      ) : (
+        <Eye size={15} aria-hidden="true" />
+      ),
+      label: translate(
+        hiddenDuringCapture
+          ? 'content.interactiveFrame.showDuringCapture'
+          : 'content.interactiveFrame.hideDuringCapture'
+      ),
+      onClick: () => {
+        if (props.captureVisibility) {
+          props.captureVisibility.toggle();
+          return;
+        }
+        props.onUpdate(setFrameHiddenDuringCapture(props.frame, !hiddenDuringCapture) as FrameData);
+      },
+    },
   ];
 }
 
@@ -104,6 +135,8 @@ export function FrameQuickActionButtons(props: {
       data-frame-id={props.frameId}
       data-frame-control="trigger"
       data-quick-action={action.id}
+      data-active={action.active ? 'true' : undefined}
+      aria-pressed={action.active ?? undefined}
       title={action.label}
       aria-label={action.label}
       onFocus={props.onFocus}

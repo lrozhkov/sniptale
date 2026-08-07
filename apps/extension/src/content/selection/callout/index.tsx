@@ -15,6 +15,7 @@ import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { useCalloutEditing } from './editing';
 import { CalloutVoiceButton, resolveCalloutVoiceButtonLeftOffset } from './voice-button';
 import type { CalloutDragBehavior } from '../../../features/highlighter/frame-annotation/callout/drag';
+import { useContentUiScale } from '../../platform/dom-host';
 
 interface CalloutProps {
   frameId: string;
@@ -51,11 +52,13 @@ interface CalloutProps {
 export const Callout: React.FC<CalloutProps> = (props) => {
   useAppLocale();
   const portalTheme = useResolvedPortalTheme(resolveCalloutThemeOwner());
+  const chromeScale = useContentUiScale();
   const editing = useCalloutEditing({
     frameId: props.frameId,
     htmlContent: props.settings.content.bodyHtml,
     titleText: props.settings.content.titleText,
     isEditing: props.isEditing,
+    measurementScale: chromeScale,
     onContentChange: props.onContentChange,
     onDelete: props.onDelete,
     onStartEditing: props.onStartEditing,
@@ -65,6 +68,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
 
   return (
     <FrameCalloutInteractiveSurface
+      chromeScale={chromeScale}
       editing={{
         events: {
           applyFormatting: editing.applyFormatting,
@@ -107,6 +111,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
             calloutWidth,
             viewportWidth,
           })}
+          visualScale={chromeScale}
           voice={editing.voice}
         />
       )}

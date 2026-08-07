@@ -7,6 +7,8 @@ export function BorderManualSaveSettings(props: {
   disabled?: boolean;
   isSaving: boolean;
   onFloatingInteractionChange?: (open: boolean) => void;
+  onCreated?: () => void;
+  onOverwritten?: (templateId: string) => void;
   onSave: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   presets: BorderPreset[];
 }) {
@@ -24,9 +26,11 @@ export function BorderManualSaveSettings(props: {
       isSaving={props.isSaving}
       nameLabel={translate('content.overlayControls.frameStylePresetName')}
       onCreate={(name) => props.onSave({ name })}
+      {...(props.onCreated ? { onCreated: props.onCreated } : {})}
       onOverwrite={(presetId) =>
         props.onSave({ overwrite: props.presets.find((preset) => preset.id === presetId)! })
       }
+      {...(props.onOverwritten ? { onOverwritten: props.onOverwritten } : {})}
       options={options}
       overwriteActionLabel={translate('content.overlayControls.frameStyleOverwriteAction')}
       overwriteLabel={translate('content.overlayControls.frameStyleOverwrite')}

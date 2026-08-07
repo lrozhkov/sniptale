@@ -34,7 +34,10 @@ describe('frame-effect-overlays-descriptors', () => {
     const focusDescriptors = buildFocusFrameDescriptors([createFrame('focus-1', 'focus')]);
     const equalFocusDescriptors = buildFocusFrameDescriptors([createFrame('focus-1', 'focus')]);
     const changedFocusDescriptors = buildFocusFrameDescriptors([
-      { ...createFrame('focus-1', 'focus'), focusSettings: { opacity: 0.8, showBorder: false } },
+      {
+        ...createFrame('focus-1', 'focus'),
+        focusSettings: createFocusSettingsFixture({ opacity: 0.8 }),
+      },
     ]);
     const changedFocusRadiusDescriptors = buildFocusFrameDescriptors([
       {
@@ -43,7 +46,10 @@ describe('frame-effect-overlays-descriptors', () => {
       },
     ]);
     const paintOnlyFocusDescriptors = buildFocusFrameDescriptors([
-      { ...createFrame('focus-1', 'focus'), focusSettings: { opacity: 0.4, showBorder: true } },
+      {
+        ...createFrame('focus-1', 'focus'),
+        focusSettings: createFocusSettingsFixture({ showBorder: true }),
+      },
     ]);
     const blurDescriptors = buildBlurFrameDescriptors([createFrame('blur-1', 'blur')]);
     const changedBlurDescriptors = buildBlurFrameDescriptors([
@@ -73,6 +79,7 @@ function expectDescriptorProjection() {
 
   expect(buildFocusFrameDescriptors(frames)).toEqual([
     {
+      blurAmount: 0,
       borderRadius: 6,
       height: 120,
       id: 'focus-1',

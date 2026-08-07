@@ -2,6 +2,11 @@ import { useEffect, type CSSProperties, type RefObject } from 'react';
 import { isContentEventWithinElement } from '../../../platform/dom-host';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ProductToolbarMenuPlacement } from '@sniptale/ui/product-menus/toolbar';
+import {
+  projectClientRectToContentUi,
+  readContentUiScaleCompensation,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
 
 const TOOLBAR_MENU_GAP_PX = 10;
 export const TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX = 250;
@@ -63,7 +68,17 @@ export function resolveToolbarFloatingMenuStyle(params: {
     return null;
   }
 
-  const anchorRect = anchorEl.getBoundingClientRect();
+  const uiScale = readContentUiScaleCompensation(anchorEl);
+  const clientRect = anchorEl.getBoundingClientRect();
+  const anchorRect = projectClientRectToContentUi(
+    { x: clientRect.left, y: clientRect.top, width: clientRect.width, height: clientRect.height },
+    uiScale
+  );
+  const viewport = resolveContentUiViewport({
+    clientHeight: window.innerHeight,
+    clientWidth: window.innerWidth,
+    scale: uiScale,
+  });
 
   if (displayMode === 'vertical') {
     return resolveVerticalToolbarFloatingMenuStyle({
@@ -71,6 +86,7 @@ export function resolveToolbarFloatingMenuStyle(params: {
       menuHeight,
       menuWidth,
       viewportRightInset,
+      viewport,
     });
   }
 
@@ -80,22 +96,24 @@ export function resolveToolbarFloatingMenuStyle(params: {
     placement,
     preferredAlign,
     viewportRightInset,
+    viewport,
   });
 }
 
 function resolveHorizontalToolbarFloatingMenuStyle(args: {
-  anchorRect: DOMRect;
+  anchorRect: { x: number; y: number; width: number; height: number };
   menuWidth: number;
   placement: 'up' | 'down';
   preferredAlign: 'start' | 'end';
   viewportRightInset: number;
+  viewport: { width: number; height: number };
 }): CSSProperties {
-  const minLeft = TOOLBAR_MENU_VIEWPORT_MARGIN_PX - args.anchorRect.left;
+  const minLeft = TOOLBAR_MENU_VIEWPORT_MARGIN_PX - args.anchorRect.x;
   const maxLeft =
-    window.innerWidth -
+    args.viewport.width -
     args.viewportRightInset -
     TOOLBAR_MENU_VIEWPORT_MARGIN_PX -
-    args.anchorRect.left -
+    args.anchorRect.x -
     args.menuWidth;
   const defaultLeft = args.preferredAlign === 'end' ? args.anchorRect.width - args.menuWidth : 0;
   const left = clampValue(defaultLeft, minLeft, maxLeft);
@@ -115,18 +133,23 @@ function resolveHorizontalToolbarFloatingMenuStyle(args: {
 }
 
 function resolveVerticalToolbarFloatingMenuStyle(args: {
-  anchorRect: DOMRect;
+  anchorRect: { x: number; y: number; width: number; height: number };
   menuHeight: number;
   menuWidth: number;
   viewportRightInset: number;
+  viewport: { width: number; height: number };
 }): CSSProperties {
   const spaceRight =
-    window.innerWidth -
+    args.viewport.width -
     args.viewportRightInset -
-    args.anchorRect.right -
+    (args.anchorRect.x + args.anchorRect.width) -
     TOOLBAR_MENU_VIEWPORT_MARGIN_PX;
-  const spaceLeft = args.anchorRect.left - TOOLBAR_MENU_VIEWPORT_MARGIN_PX;
-  const top = resolveVerticalToolbarFloatingMenuTop(args.anchorRect, args.menuHeight);
+  const spaceLeft = args.anchorRect.x - TOOLBAR_MENU_VIEWPORT_MARGIN_PX;
+  const top = resolveVerticalToolbarFloatingMenuTop(
+    args.anchorRect,
+    args.menuHeight,
+    args.viewport.height
+  );
 
   if (spaceRight >= args.menuWidth || spaceRight >= spaceLeft) {
     return {
@@ -142,9 +165,13 @@ function resolveVerticalToolbarFloatingMenuStyle(args: {
   };
 }
 
-function resolveVerticalToolbarFloatingMenuTop(anchorRect: DOMRect, menuHeight: number): number {
-  const minTop = TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.top;
-  const maxTop = window.innerHeight - TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.top - menuHeight;
+function resolveVerticalToolbarFloatingMenuTop(
+  anchorRect: { y: number },
+  menuHeight: number,
+  viewportHeight: number
+): number {
+  const minTop = TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.y;
+  const maxTop = viewportHeight - TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.y - menuHeight;
 
   return clampValue(0, minTop, maxTop);
 }
@@ -230,7 +257,7 @@ export function useToolbarFloatingMenuDismissal(params: {
           if (
             surface &&
             getPointerDistanceFromRect(event, surface.getBoundingClientRect()) >
-              TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX
+              TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX * readContentUiScaleCompensation(surface)
           ) {
             (onFarPointerClose ?? onClose)();
           }

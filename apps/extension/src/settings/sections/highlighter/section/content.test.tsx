@@ -23,6 +23,10 @@ vi.mock('../../../../platform/i18n', () => ({
   translate: (key: string) => key,
 }));
 
+vi.mock('../../../../composition/frame-annotation-controls/frame/linked-template-options', () => ({
+  useLinkedAnnotationTemplateOptions: () => ({ callouts: [], stepBadges: [] }),
+}));
+
 vi.mock('./presets-panel', () => ({
   HighlighterPresetsPanel: (props: unknown) => {
     presetsPanelPropsSpy(props);

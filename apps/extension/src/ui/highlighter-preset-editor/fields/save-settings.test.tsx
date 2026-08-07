@@ -93,9 +93,15 @@ function getButton(label: string) {
 
 it('creates a named preset and reports successful completion', async () => {
   const onSave = vi.fn().mockResolvedValue(true);
+  const onCreated = vi.fn();
   act(() => {
     root.render(
-      <BorderManualSaveSettings isSaving={false} onSave={onSave} presets={[preset('a')]} />
+      <BorderManualSaveSettings
+        isSaving={false}
+        onCreated={onCreated}
+        onSave={onSave}
+        presets={[preset('a')]}
+      />
     );
   });
   const nameInput = container.querySelector<HTMLInputElement>(
@@ -106,6 +112,7 @@ it('creates a named preset and reports successful completion', async () => {
   await act(async () => getButton('content.overlayControls.frameStyleCreate').click());
 
   expect(onSave).toHaveBeenCalledWith({ name: 'New preset' });
+  expect(onCreated).toHaveBeenCalledOnce();
   expect(container.querySelector('[role="status"]')?.textContent).toBe(
     'content.overlayControls.frameStyleCreated'
   );
@@ -139,6 +146,35 @@ it('updates the selected preset and preserves controls on rejected saves', async
 
   expect(onSave).toHaveBeenCalledWith({ overwrite: second });
   expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it('reports a successful overwrite so the caller can return to templates', async () => {
+  const selected = preset('selected');
+  const onOverwritten = vi.fn();
+  act(() => {
+    root.render(
+      <BorderManualSaveSettings
+        isSaving={false}
+        onOverwritten={onOverwritten}
+        onSave={vi.fn().mockResolvedValue(true)}
+        presets={[selected]}
+      />
+    );
+  });
+  const select = container.querySelector<HTMLSelectElement>(
+    'select[aria-label="content.overlayControls.frameStyleOverwrite"]'
+  );
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(
+      select,
+      selected.id
+    );
+    select?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  await act(async () => getButton('content.overlayControls.frameStyleOverwriteAction').click());
+
+  expect(onOverwritten).toHaveBeenCalledWith(selected.id);
 });
 
 it('forwards floating interaction ownership and disables the shared form', () => {

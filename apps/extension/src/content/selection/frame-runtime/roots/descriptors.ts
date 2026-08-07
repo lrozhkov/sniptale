@@ -25,6 +25,7 @@ export type FrameRenderDescriptor = {
   borderWidth: number | undefined;
   calloutKey: string;
   effectMode: FrameData['effectMode'];
+  focusBlurAmount: number | undefined;
   focusOpacity: number | undefined;
   focusShowBorder: boolean | undefined;
   height: number;
@@ -85,6 +86,7 @@ function buildFrameRenderDescriptor(
     blurShowBorder: frame.blurSettings?.showBorder,
     blurType: frame.blurSettings?.blurType,
     effectMode: frame.effectMode,
+    focusBlurAmount: frame.focusSettings?.blurAmount,
     focusOpacity: frame.focusSettings?.opacity,
     focusShowBorder: frame.focusSettings?.showBorder,
     height: frame.height,
@@ -159,6 +161,8 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
 
 function buildFrameCalloutDescriptor(frame: FrameData) {
   return {
-    calloutKey: createCalloutRenderKey(frame.callout),
+    calloutKey: [frame.callout, ...(frame.additionalCallouts ?? [])]
+      .map(createCalloutRenderKey)
+      .join('\n'),
   };
 }

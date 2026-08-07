@@ -31,6 +31,7 @@ const OWNED_FLOATING_SELECTORS = [
   '.sniptale-callout',
   '.sniptale-callout-format-toolbar',
   '.sniptale-callout-drag-handle',
+  '.sniptale-callout-adjacent-controls',
   '.sniptale-callout-tail-handle',
   '.sniptale-callout-settings-handle',
   '.sniptale-step-badge-controls',

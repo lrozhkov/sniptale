@@ -1,7 +1,11 @@
 import React from 'react';
 import { BrushCleaning } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
-import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
+import {
+  ContentToolbarButton,
+  ContentToolbarDivider,
+  ContentToolbarGroup,
+} from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarAutoBlurProps } from '../types';
 import type { ToolbarFutureFrameCalloutActions, ToolbarFutureFrameStyle } from '../types';
@@ -52,36 +56,42 @@ export function ToolbarUtilityButtons(props: {
   futureFrameStepBadgeActions?: import('../types').ToolbarFutureFrameStepBadgeActions;
 }) {
   const { autoBlur, highlighterMode, isLoading, framesCount, onClearHighlights } = props;
+  const showPersistentAutoBlur = props.isCursorMode && autoBlur?.autoApplyAllowed === true;
   const showClearHighlights = highlighterMode;
 
-  if (!highlighterMode) {
+  if (!highlighterMode && !showPersistentAutoBlur) {
     return null;
   }
 
   return (
     <ContentToolbarGroup className="sniptale-toolbar-highlighter-utilities" utilities>
-      {props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
-        <FutureFrameStyleControls
+      {highlighterMode && props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
+        <>
+          <FutureFrameStyleControls
+            compactMenus={props.compactMenus}
+            futureFrameStyle={props.futureFrameStyle}
+            onFutureFrameEffectModeChange={props.onFutureFrameEffectModeChange}
+            {...(props.futureFrameCalloutActions === undefined
+              ? {}
+              : { futureFrameCalloutActions: props.futureFrameCalloutActions })}
+            {...(props.futureFrameStepBadgeActions === undefined
+              ? {}
+              : { futureFrameStepBadgeActions: props.futureFrameStepBadgeActions })}
+            toolbarMenuState={props.toolbarMenuState}
+          />
+          <ContentToolbarDivider dataUi="content.toolbar.annotation-divider" />
+        </>
+      ) : null}
+      {highlighterMode || showPersistentAutoBlur ? (
+        <AutoBlurMenu
+          autoBlur={autoBlur}
           compactMenus={props.compactMenus}
-          futureFrameStyle={props.futureFrameStyle}
-          onFutureFrameEffectModeChange={props.onFutureFrameEffectModeChange}
-          {...(props.futureFrameCalloutActions === undefined
-            ? {}
-            : { futureFrameCalloutActions: props.futureFrameCalloutActions })}
-          {...(props.futureFrameStepBadgeActions === undefined
-            ? {}
-            : { futureFrameStepBadgeActions: props.futureFrameStepBadgeActions })}
+          displayMode={props.displayMode}
+          isLoading={isLoading}
+          sidebarVisible={props.sidebarVisible}
           toolbarMenuState={props.toolbarMenuState}
         />
       ) : null}
-      <AutoBlurMenu
-        autoBlur={autoBlur}
-        compactMenus={props.compactMenus}
-        displayMode={props.displayMode}
-        isLoading={isLoading}
-        sidebarVisible={props.sidebarVisible}
-        toolbarMenuState={props.toolbarMenuState}
-      />
       {showClearHighlights ? (
         <ClearHighlightsButton
           framesCount={framesCount}
