@@ -30,6 +30,7 @@ export interface HighlighterController {
   clearAllHighlights: () => void;
   clearFrameEditing: () => void;
   consumeSuppressedClick: (event: MouseEvent) => boolean;
+  hasHoverPreviewTarget: () => boolean;
   disableMode: () => void;
   dispose: () => void;
   enableMode: () => void;

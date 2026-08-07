@@ -50,13 +50,18 @@ import type {
   RuntimeContentActionRequestByType,
   RuntimeContentActionResponseByType,
 } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
+import type {
+  RuntimeFrameAnnotationRasterRequestByType,
+  RuntimeFrameAnnotationRasterResponseByType,
+} from './frame-annotation-raster.types';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
 type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimeHarRequestByType &
-  RuntimePrivacyErasureRequestByType & {
+  RuntimePrivacyErasureRequestByType &
+  RuntimeFrameAnnotationRasterRequestByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       contentIntent?: ContentPrivilegedActionCapability;
@@ -170,7 +175,8 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
 type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimeHarResponseByType &
-  RuntimePrivacyErasureResponseByType & {
+  RuntimePrivacyErasureResponseByType &
+  RuntimeFrameAnnotationRasterResponseByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.SCREENSHOT_MODE_STATUS]: ScreenshotModeStatusResponse;

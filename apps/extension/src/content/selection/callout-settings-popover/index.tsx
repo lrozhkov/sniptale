@@ -4,16 +4,19 @@ import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { dispatchCalloutDelete } from '../../platform/page-context/frame-events';
 import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
-import { CalloutSettingsPopoverContent } from './body';
-import { POPOVER_HEIGHT, POPOVER_WIDTH } from './helpers';
+import { CalloutSettingsPopoverContent } from '../../../composition/frame-annotation-controls/callout/body';
+import {
+  POPOVER_HEIGHT,
+  POPOVER_WIDTH,
+} from '../../../composition/frame-annotation-controls/callout/helpers';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
-import { usePopoverEscapeClose } from '../popover-sync/hooks';
+import { usePopoverEscapeClose } from '../../../composition/frame-annotation-controls/popover/hooks';
 import { useCalloutSettingsPopoverState } from './state';
-import { useCalloutPresetPopoverController } from './preset-controller';
+import { useCalloutPresetPopoverController } from '../../../composition/frame-annotation-controls/callout/preset-controller';
 import { CalloutPresetEditor } from '../../../ui/highlighter-preset-editor/callout';
-import { useFloatingPopoverDrag } from '../popover-sync/drag';
+import { useFloatingPopoverDrag } from '../../../composition/frame-annotation-controls/popover/drag';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
-import { createCalloutSaveSection } from './save-section';
+import { createCalloutSaveSection } from '../../../composition/frame-annotation-controls/callout/save-section';
 
 function CalloutPersistentPresetEditor(props: {
   editor: ReturnType<typeof useCalloutPresetPopoverController>['editor'];

@@ -4,7 +4,7 @@ import type { FrameData, FrameState } from '../../../../features/highlighter/con
 import { translate } from '../../../../platform/i18n';
 import { enableFrameStepBadge, startFrameCalloutEditing } from './actions';
 import { FRAME_TRIGGER_CONTROL_SIZE } from './trigger-position';
-import { FrameEffectIcon } from './effect-icon';
+import { FrameAnnotationEffectIcon as FrameEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 
 type FrameQuickAction = {

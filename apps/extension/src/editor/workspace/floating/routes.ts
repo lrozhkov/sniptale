@@ -55,12 +55,17 @@ export function isCanvasSelectionToolbarEligible(args: {
   activeTool: EditorTool;
   hasImage: boolean;
   inspector: EditorInspector;
-  selection: Pick<EditorToolbarSelectionState, 'hasSelection'>;
+  selection: Pick<EditorToolbarSelectionState, 'hasSelection'> &
+    Partial<Pick<EditorToolbarSelectionState, 'selectedObjectCount' | 'selectedObjectType'>>;
 }) {
   return (
     args.hasImage &&
     args.inspector === 'tool' &&
     args.selection.hasSelection &&
+    !(
+      args.selection.selectedObjectCount === 1 &&
+      args.selection.selectedObjectType === 'frame-annotation'
+    ) &&
     !SELECTION_TOOLBAR_BLOCKED_TOOLS.has(args.activeTool)
   );
 }
@@ -70,7 +75,8 @@ export function resolveFloatingSurfaceRoute(args: {
   dismissedLeftDrawerTool?: EditorTool | null;
   hasImage: boolean;
   inspector: EditorInspector;
-  selection: Pick<EditorToolbarSelectionState, 'hasSelection'>;
+  selection: Pick<EditorToolbarSelectionState, 'hasSelection'> &
+    Partial<Pick<EditorToolbarSelectionState, 'selectedObjectCount' | 'selectedObjectType'>>;
 }): EditorFloatingSurfaceRoute {
   const leftDrawer =
     args.hasImage &&

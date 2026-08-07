@@ -5,6 +5,7 @@ import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
 import { colorToRgba, resolveBorderPresetVisual } from './visual';
 
 vi.mock('../css-sanitizer/css', () => ({
+  validateCssPolicyString: vi.fn(() => ({ blockedProps: [], properties: [], rawError: false })),
   validateCssString: vi.fn((css: string) => ({
     blockedProps: css.includes('position') ? ['position'] : [],
     hasBlockedProps: css.includes('position'),

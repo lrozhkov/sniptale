@@ -8,6 +8,7 @@ import {
 
 it('classifies annotation, raster, and free-drawing tool roles', () => {
   expect(isStickyAnnotationTool('shape-library')).toBe(true);
+  expect(isStickyAnnotationTool('frame-annotation')).toBe(true);
   expect(isStickyAnnotationTool('select')).toBe(false);
   expect(isStickyAnnotationTool('crop')).toBe(false);
 

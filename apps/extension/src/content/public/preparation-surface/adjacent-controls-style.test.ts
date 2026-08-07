@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
 it('keeps adjacent move and settings icons visually consistent', () => {
-  const source = readFileSync(new URL('./effects.css', import.meta.url), 'utf8');
+  const source = readFileSync(
+    new URL(
+      '../../../features/highlighter/frame-annotation/interaction/styles.css',
+      import.meta.url
+    ),
+    'utf8'
+  );
 
   for (const selector of [
     '.sniptale-callout-drag-handle > svg',

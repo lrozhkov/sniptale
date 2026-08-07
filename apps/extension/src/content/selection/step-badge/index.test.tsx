@@ -10,6 +10,7 @@ vi.mock('../../../platform/i18n', () => ({
 }));
 
 import { StepBadge } from '.';
+import { FrameStepBadgeInteractiveSurface } from '../../../features/highlighter/frame-annotation/step-badge/interactive-surface';
 import { createStepBadgeSettingsFixture } from '../frame-runtime/test-support';
 import { initializeContentUiRoots, resolveContentOverlayRoot } from '../../platform/dom-host';
 
@@ -234,6 +235,67 @@ it('mounts a positioned badge in the shared overlay above every frame root', () 
   expect(badgeLayer?.style.zIndex).toBe('2147483645');
   expect(badge?.style.position).toBe('absolute');
 
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('omits interaction chrome for export and short-circuits a disabled shared badge', () => {
+  const surfaceHost = document.createElement('div');
+  const controlsHost = document.createElement('div');
+  const host = document.createElement('div');
+  document.body.append(host, surfaceHost, controlsHost);
+  const root = createRoot(host);
+  const coordinateSpace = {
+    viewport: { height: 400, width: 600 },
+    clientPointToLogical: (point: { x: number; y: number }) => point,
+    clientRectToLogical: (rect: { x: number; y: number; width: number; height: number }) => rect,
+    logicalPointToClient: (point: { x: number; y: number }) => point,
+    logicalRectToClient: (rect: { x: number; y: number; width: number; height: number }) => rect,
+  };
+
+  act(() => {
+    root.render(
+      <FrameStepBadgeInteractiveSurface
+        borderColor="#123456"
+        borderWidth={3}
+        chrome="export"
+        controlsPortalTarget={controlsHost}
+        coordinateSpace={coordinateSpace}
+        fillColor="#abcdef"
+        fillOpacity={0.5}
+        frameRect={{ height: 40, width: 60, x: 10, y: 20 }}
+        onClick={vi.fn()}
+        onPositionChange={vi.fn()}
+        onSettingsClick={vi.fn()}
+        portalTheme="dark"
+        settings={createStepBadgeSettingsFixture({ value: '9' })}
+        settingsAnchorRef={{ current: null }}
+        shadow={2}
+        showSettingsHandle
+        surfacePortalTarget={surfaceHost}
+      />
+    );
+  });
+
+  expect(surfaceHost.querySelector('.sniptale-step-badge')).toBeInstanceOf(HTMLDivElement);
+  expect(controlsHost.querySelector('.sniptale-step-badge-controls')).toBeNull();
+
+  act(() => {
+    root.render(
+      <FrameStepBadgeInteractiveSurface
+        borderColor="#123456"
+        borderWidth={3}
+        controlsPortalTarget={controlsHost}
+        frameRect={{ height: 40, width: 60, x: 10, y: 20 }}
+        portalTheme={null}
+        settings={createStepBadgeSettingsFixture({ enabled: false })}
+        showSettingsHandle={false}
+        surfacePortalTarget={surfaceHost}
+      />
+    );
+  });
+
+  expect(surfaceHost.querySelector('.sniptale-step-badge')).toBeNull();
   act(() => root.unmount());
   document.body.replaceChildren();
 });

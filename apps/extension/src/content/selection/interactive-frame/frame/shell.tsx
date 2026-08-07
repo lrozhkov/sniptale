@@ -5,7 +5,10 @@ import { registerContentOwnedPassiveChrome } from '../../../platform/dom-host';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { StepBadge } from '../../step-badge';
 import { InteractiveFrameResizeHandles } from './handles';
-import { getInteractiveFrameContainerStyle } from '../layout/style';
+import {
+  FrameAnnotationDecoration,
+  getFrameAnnotationContainerStyle,
+} from '../../../../features/highlighter/frame-annotation';
 
 interface InteractiveFrameFrameShellProps {
   currentFrame: FrameData;
@@ -50,7 +53,7 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       ref={props.containerRef as React.RefObject<HTMLDivElement>}
       className="sniptale-frame-container"
       data-frame-id={props.frame.id}
-      style={getInteractiveFrameContainerStyle(props.currentFrame)}
+      style={getFrameAnnotationContainerStyle(props.currentFrame)}
     >
       <div
         ref={props.frameRef as React.RefObject<HTMLDivElement>}
@@ -65,19 +68,12 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           zIndex: props.frameZIndex,
         }}
       >
-        <div
-          aria-hidden="true"
-          className="sniptale-interactive-frame-fill"
-          data-frame-id={props.frame.id}
-          ref={fillRef}
-          style={props.fillStyle}
-        />
-        <div
-          aria-hidden="true"
-          className="sniptale-interactive-frame-stroke"
-          data-frame-id={props.frame.id}
-          ref={strokeRef}
-          style={props.strokeStyle}
+        <FrameAnnotationDecoration
+          frameId={props.frame.id}
+          fillRef={fillRef}
+          strokeRef={strokeRef}
+          fillStyle={props.fillStyle}
+          strokeStyle={props.strokeStyle}
         />
         <InteractiveFrameResizeHandles
           state={props.state}

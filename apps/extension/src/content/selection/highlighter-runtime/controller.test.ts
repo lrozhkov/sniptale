@@ -42,6 +42,7 @@ it('assembles state, hover, lifecycle, and invalidation owners directly', () => 
   controller.invalidateFrameCache();
   const click = { type: 'click' } as MouseEvent;
   controller.consumeSuppressedClick(click);
+  controller.hasHoverPreviewTarget();
 
   expect(createState).toHaveBeenCalledTimes(1);
   expect(createHoverController).toHaveBeenCalledTimes(1);
@@ -50,6 +51,7 @@ it('assembles state, hover, lifecycle, and invalidation owners directly', () => 
   expect(logAccessibleIframeCount).toHaveBeenCalledTimes(1);
   expect(hoverController.invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(hoverController.consumeSuppressedClick).toHaveBeenCalledWith(click);
+  expect(hoverController.hasHoverTarget).toHaveBeenCalledOnce();
 });
 
 it('gives the hover owner live callback and state accessors', () => {

@@ -186,6 +186,8 @@
     "fonts/manrope-cyrillic-wght-normal.woff2",
     "fonts/manrope-latin-ext-wght-normal.woff2",
     "fonts/manrope-latin-wght-normal.woff2",
+    "fonts/marck-script-cyrillic-400-normal.woff2",
+    "fonts/marck-script-latin-400-normal.woff2",
     "icons/icon-16.png",
     "icons/icon-48.png",
     "icons/icon-128.png"
@@ -203,10 +205,12 @@
     "build": "node ../../node_modules/vite/bin/vite.js build --config vite.config.ts"
   },
   "appDependencies": [
+    "@fontsource/marck-script",
     "@fontsource-variable/manrope",
     "@iconify-icons/tabler",
     "@iconify/react",
     "@webav/mp4box.js",
+    "@zumer/snapdom",
     "dompurify",
     "fabric",
     "idb",

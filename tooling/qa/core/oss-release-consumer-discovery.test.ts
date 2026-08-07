@@ -26,7 +26,11 @@ it('discovers every supported release consumer category and ignores tests', asyn
     'tooling/release/archive.mjs',
     "import { readOssReleasePolicy } from './oss-release-policy.mjs';\n"
   );
-  write(root, 'apps/extension/manifest.json', 'manrope-latin-wght-normal.woff2\n');
+  write(
+    root,
+    'apps/extension/manifest.json',
+    'manrope-latin-wght-normal.woff2\nmarck-script-cyrillic-400-normal.woff2\n'
+  );
   write(root, 'tooling/qa/core/focused.test.ts', "import './verify-oss-release-surface.mjs';\n");
   write(
     root,

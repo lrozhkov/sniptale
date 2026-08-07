@@ -24,6 +24,7 @@
     "semgrep"
   ],
   "ignoreDependencies": [
+    "@fontsource/marck-script",
     "@fontsource-variable/manrope"
   ],
   "ignore": [

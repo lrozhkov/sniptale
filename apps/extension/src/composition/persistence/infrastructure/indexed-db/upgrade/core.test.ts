@@ -24,6 +24,7 @@ const COMPLETE_STORES = [
   'state_manager',
   'native_transfer_sessions',
   'native_transfer_chunks',
+  'frame_annotation_raster_jobs',
 ];
 
 it('creates stores for the expected schema versions', () => {
@@ -56,6 +57,9 @@ it('creates stores for the expected schema versions', () => {
   });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('native_transfer_chunks', {
     keyPath: ['sessionId', 'chunkIndex'],
+  });
+  expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('frame_annotation_raster_jobs', {
+    keyPath: 'jobId',
   });
 });
 

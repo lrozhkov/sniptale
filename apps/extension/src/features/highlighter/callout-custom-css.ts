@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { containsUnsafeCssSyntax } from '@sniptale/platform/security/css-safety';
 import { validateCssString } from './css-sanitizer/css';
+import { validateCssPolicyString } from './css-sanitizer/css';
 
 const CALLOUT_CSS_TARGETS = ['card', 'title', 'body', 'connector', 'accent'] as const;
 
@@ -97,11 +98,38 @@ function fail(
   return { blockedProperties, error, styles: EMPTY_STYLES };
 }
 
-export function resolveCalloutCustomCss(value: string): CalloutCustomCssValidation {
-  if (!value.trim()) return { blockedProperties: [], error: null, styles: EMPTY_STYLES };
+export function validateCalloutCustomCss(
+  value: string
+): Pick<CalloutCustomCssValidation, 'blockedProperties' | 'error'> {
+  if (!value.trim()) return { blockedProperties: [], error: null };
   if (value.length > 4_000 || value.includes('@') || containsUnsafeCssSyntax(value)) {
-    return fail('unsafe');
+    return { blockedProperties: [], error: 'unsafe' };
   }
+  const sections = parseSections(value);
+  if (!sections) return { blockedProperties: [], error: 'syntax' };
+  const blockedProperties: string[] = [];
+  for (const target of CALLOUT_CSS_TARGETS) {
+    const validation = validateCssPolicyString(sections[target].join('\n').trim());
+    if (validation.rawError) return { blockedProperties: [], error: 'syntax' };
+    blockedProperties.push(...validation.blockedProps);
+    const blockedCanonical = validation.blockedProps.map((property) =>
+      property.replace(/-([a-z])/gu, (_match, letter: string) => letter.toUpperCase())
+    );
+    const unknownProperties = validation.properties.filter(
+      (property) =>
+        !ALLOWED_PROPERTIES[target].has(property) && !blockedCanonical.includes(property)
+    );
+    if (unknownProperties.length > 0) return { blockedProperties: [], error: 'syntax' };
+  }
+  return blockedProperties.length > 0
+    ? { blockedProperties: [...new Set(blockedProperties)], error: 'blocked' }
+    : { blockedProperties: [], error: null };
+}
+
+export function resolveCalloutCustomCss(value: string): CalloutCustomCssValidation {
+  const policy = validateCalloutCustomCss(value);
+  if (policy.error) return fail(policy.error, policy.blockedProperties);
+  if (!value.trim()) return { blockedProperties: [], error: null, styles: EMPTY_STYLES };
   const sections = parseSections(value);
   if (!sections) return fail('syntax');
 

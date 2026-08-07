@@ -3,7 +3,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
-import { usePopoverEscapeClose } from '../popover-sync/hooks';
+import { usePopoverEscapeClose } from '../../../composition/frame-annotation-controls/popover/hooks';
 import { createHighlighterRuntimeEscapeKeyHandler } from './runtime-listeners';
 
 function OpenPopoverEscapeOwner(props: { onClose: () => void }) {

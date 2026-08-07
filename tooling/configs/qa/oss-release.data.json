@@ -27,6 +27,11 @@
       "source": "LICENSES/OFL-1.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
+      "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
+      "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt",
       "sha256": "896d3e36cb41d19f279ce9ffb085a9f0d96e58db59c18f042242ff6c7e78d50f",
       "source": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt"
@@ -45,6 +50,11 @@
       "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
       "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt",
+      "sha256": "c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2",
+      "source": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
@@ -203,16 +213,35 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "2b186f9798a85b7b1626de93b48f6861e493901c5b98c359989c7e5dfb02b350",
+      "sha256": "c2789d9ad63094f6d9fcbf925bd74b3930623351cb8c26b60afaa6d7f5cf92db",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "e6819b0eb7a39357d75056ca9b132b41174d8d397b3bb55e7b5a76d5773efb8e",
+      "sha256": "77fac2251618afcae5fc8e7438d24500f648e80dc7da69d9d252fce8f7404475",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
   "bundledAssets": [
+    {
+      "id": "marck-script",
+      "sourcePackage": "@fontsource/marck-script",
+      "version": "5.3.0",
+      "license": "OFL-1.1",
+      "copyright": "Copyright (c) 2011, Denis Masharov <denis.masharov@gmail.com>, Marck Fogel, with Reserved Font Names \"Marck Script\".",
+      "artifacts": [
+        {
+          "path": "apps/extension/public/fonts/marck-script-cyrillic-400-normal.woff2",
+          "sha256": "457f5ae9dd211fb276e605a4ce3ecb35cbe1aee8bb1a54698c81d7834873ed06",
+          "sourcePath": "node_modules/@fontsource/marck-script/files/marck-script-cyrillic-400-normal.woff2"
+        },
+        {
+          "path": "apps/extension/public/fonts/marck-script-latin-400-normal.woff2",
+          "sha256": "b32acf77642711e18c14d57aabeefa02ee25664a7f40929ee5f72396557b6e76",
+          "sourcePath": "node_modules/@fontsource/marck-script/files/marck-script-latin-400-normal.woff2"
+        }
+      ]
+    },
     {
       "id": "manrope",
       "sourcePackage": "@fontsource-variable/manrope",

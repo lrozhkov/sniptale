@@ -7,7 +7,10 @@ import {
 } from '../../platform/dom-host';
 import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import { addHighlighterModeChangedListener } from '../../platform/page-context/mode-events';
-import { usePopoverDistanceClose, usePopoverOutsideClose } from '../popover-sync/hooks';
+import {
+  usePopoverDistanceClose,
+  usePopoverOutsideClose,
+} from '../../../composition/frame-annotation-controls/popover/hooks';
 
 function isClickInsideAnyToolbar(event: MouseEvent) {
   const targetEl = getContentEventTargetElement(event);

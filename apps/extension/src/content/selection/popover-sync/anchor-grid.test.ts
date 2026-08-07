@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_POPOVER_ANCHOR_GRID, getAnchorDotPosition } from './anchor-grid';
+import {
+  DEFAULT_POPOVER_ANCHOR_GRID,
+  getAnchorDotPosition,
+} from '../../../composition/frame-annotation-controls/popover/anchor-grid';
 
 describe('popover anchor grid helpers', () => {
   it('keeps the shared anchor grid in the expected three-by-three order', () => {

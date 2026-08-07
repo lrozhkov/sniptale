@@ -14,6 +14,7 @@ export function createHoverControllerStub() {
   const handlePointerMove = vi.fn();
   const handlePointerUp = vi.fn();
   const hideHoverOverlay = vi.fn();
+  const hasHoverTarget = vi.fn(() => false);
   const invalidateFrameCache = vi.fn();
   const removeHoverOverlay = vi.fn();
   const removeOverlayContainer = vi.fn();
@@ -42,6 +43,7 @@ export function createHoverControllerStub() {
     tracking: {
       cancelPendingFrame: cancelPendingHoverFrame,
       clear: clearHoverTracking,
+      hasTarget: hasHoverTarget,
     },
     cancelDrawing,
     cancelPendingHoverFrame,
@@ -56,6 +58,7 @@ export function createHoverControllerStub() {
     handlePointerMove,
     handlePointerUp,
     hideHoverOverlay,
+    hasHoverTarget,
     invalidateFrameCache,
     removeHoverOverlay,
     removeOverlayContainer,

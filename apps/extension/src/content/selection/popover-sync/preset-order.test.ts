@@ -3,7 +3,10 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import { prioritizeActivePreset, useOpeningPresetOrder } from './preset-order';
+import {
+  prioritizeActivePreset,
+  useOpeningPresetOrder,
+} from '../../../composition/frame-annotation-controls/popover/preset-order';
 
 const presets = [{ id: 'one' }, { id: 'two' }, { id: 'three' }];
 

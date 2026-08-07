@@ -1,6 +1,5 @@
 // Highlighter Types
 import type {
-  AppliedBorderSettings,
   BlurSettings,
   BorderPreset,
   EffectMode,
@@ -41,8 +40,10 @@ export interface HighlighterState {
 
 export * from '@sniptale/runtime-contracts/highlighter/step-badge';
 export * from '@sniptale/runtime-contracts/highlighter/callout';
-import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
-import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type {
+  FrameAnnotationInteractionState,
+  FrameAnnotationVisualState,
+} from '../frame-annotation/model';
 
 // Настройки режима выделения
 export interface HighlighterSettings {
@@ -55,13 +56,7 @@ export interface HighlighterSettings {
   catalogCustomized?: boolean;
 }
 
-export interface FrameData {
-  id: string;
-  /** Canonical outer visual box shared by effects, fill, inward stroke, hit testing, and controls. */
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export interface ContentAnchorMetadata {
   /** Working placement for free frames; last valid recovery placement for linked frames. */
   pagePlacement?: {
     iframePath: string[];
@@ -71,15 +66,6 @@ export interface FrameData {
   /** Linked intent. The live DOM node is runtime-owned and never serialized here. */
   linkedElementSelector?: string;
   createdBy?: 'auto-blur';
-  effectMode?: EffectMode; // Эффект выделения: 'border' (default), 'blur' или 'focus'
-  // Снимок настроек на момент создания рамки (чтобы не менялись при смене глобальных настроек)
-  borderSettings?: AppliedBorderSettings;
-  blurSettings?: BlurSettings;
-  focusSettings?: FocusSettings;
-  // Настройки бейджа шага (нумерация/маркировка)
-  stepBadge?: StepBadgeSettings;
-  // Настройки callout (комментария)
-  callout?: CalloutSettings;
   // Смещение относительно связанного DOM-якоря после ручного редактирования
   // Если задано - рамка следует за элементом с учетом этого смещения
   offset?: {
@@ -90,7 +76,10 @@ export interface FrameData {
   };
 }
 
-export type FrameState = 'idle' | 'hover' | 'editing' | 'resizing';
+/** Page-owned placement composed with the shared visual annotation state. */
+export interface FrameData extends FrameAnnotationVisualState, ContentAnchorMetadata {}
+
+export type FrameState = FrameAnnotationInteractionState;
 
 export type FreeFrameInput = Pick<FrameData, 'x' | 'y' | 'width' | 'height'> & {
   pagePlacement: NonNullable<FrameData['pagePlacement']>;

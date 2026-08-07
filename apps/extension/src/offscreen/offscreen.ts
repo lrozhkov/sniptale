@@ -2,6 +2,8 @@ import { bootstrapOffscreenDocument } from './runtime/bootstrap';
 import { registerOffscreenRuntimeMessageListener } from './runtime';
 import { getCurrentLocale, translate } from '../platform/i18n';
 import { registerOffscreenVoiceInputMessageListener } from './voice-input/runtime';
+import '@sniptale/ui/styles';
+import '../features/highlighter/frame-annotation/callout/font.css';
 
 function applyOffscreenDocumentMetadata(): void {
   if (typeof document === 'undefined') {

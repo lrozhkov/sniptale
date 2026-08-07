@@ -19,7 +19,7 @@ import { createHoverSession } from './session';
 function createFixture(enabled = true) {
   const session = createHoverSession();
   const hideHoverOverlay = vi.fn();
-  const showHoverOverlay = vi.fn();
+  const showHoverOverlay = vi.fn(() => true);
   const handlers = createHoverInteractionHandlers({
     getCallbacks: () => ({ addFrame: vi.fn(), hasFrameForElement: () => false }),
     getState: {

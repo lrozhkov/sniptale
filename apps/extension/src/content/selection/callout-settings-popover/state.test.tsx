@@ -7,7 +7,7 @@ import { addCalloutPopoverSettingsChangedListener } from '../../platform/page-co
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useCalloutSettingsPopoverState } from './state';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
-import { createDefaultCalloutSettings } from '../callout/model';
+import { createDefaultCalloutSettings } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
 let container: HTMLDivElement | null = null;

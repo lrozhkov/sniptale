@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createFrameDataFixture } from '../../../selection/frame-runtime/test-support';
 import { captureFrameSessionSnapshot, hydrateFrameSessionSnapshot } from './frame-session';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
-import { createDefaultCalloutSettings } from '../../../selection/callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 describe('captureFrameSessionSnapshot', () => {
   it('deep-clones manual callout placement and free page placement', () => {

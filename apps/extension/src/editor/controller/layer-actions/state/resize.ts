@@ -6,6 +6,7 @@ import { isTextbox } from '../../core/helpers';
 import { findObjectById } from '../../document/layers';
 import { normalizeScaledAnnotationTarget } from '../../tools/annotation-resize';
 import { isEditableObject } from '../../../document/model';
+import { normalizeFrameAnnotationProxyGeometry } from '../../../frame-annotation/proxy';
 
 export function resizeLayerObject(
   canvas: Canvas | null,
@@ -45,6 +46,7 @@ export function resizeLayerObject(
   if (!normalizeScaledRectangleTarget(object)) {
     normalizeScaledAnnotationTarget(object);
   }
+  normalizeFrameAnnotationProxyGeometry(object);
   object.setCoords();
   ensureObjectReachable(object);
   canvas?.requestRenderAll();

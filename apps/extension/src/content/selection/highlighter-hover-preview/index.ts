@@ -35,6 +35,7 @@ export interface HoverController {
   tracking: {
     cancelPendingFrame: () => void;
     clear: () => void;
+    hasTarget: () => boolean;
   };
 }
 
@@ -44,28 +45,47 @@ export function createHighlighterHoverController(
 ): HoverController {
   const session = createHoverSession();
   const overlayActions = createHoverOverlayActions(session);
+  const clearHoverPreview = () => {
+    overlayActions.hideHoverOverlay();
+    session.lastHoverTarget = null;
+  };
   const drawing = createFreeFrameDrawingHandlers({
     getCallbacks,
     getState,
-    hideHoverOverlay: overlayActions.hideHoverOverlay,
+    hideHoverOverlay: clearHoverPreview,
     session,
   });
   const interactions = createHoverInteractionHandlers({
     getCallbacks,
     getState,
     hoverThrottleMs: 100,
-    overlayActions,
+    overlayActions: {
+      ...overlayActions,
+      hideHoverOverlay: clearHoverPreview,
+    },
     session,
     consumeSuppressedClick: drawing.consumeSuppressedClick,
   });
+  const cancelPendingHoverPreview = () => {
+    interactions.cancelPendingHoverFrame();
+    clearHoverPreview();
+  };
 
   return {
     overlay: {
       createContainer: overlayActions.createOverlayContainer,
-      removeContainer: overlayActions.removeOverlayContainer,
+      removeContainer: () => {
+        interactions.cancelPendingHoverFrame();
+        overlayActions.removeOverlayContainer();
+        session.lastHoverTarget = null;
+      },
       createPreview: overlayActions.createHoverOverlay,
-      removePreview: overlayActions.removeHoverOverlay,
-      hidePreview: overlayActions.hideHoverOverlay,
+      removePreview: () => {
+        interactions.cancelPendingHoverFrame();
+        overlayActions.removeHoverOverlay();
+        session.lastHoverTarget = null;
+      },
+      hidePreview: cancelPendingHoverPreview,
     },
     invalidation: {
       frameCache: () => invalidateHoverFrameCache(session),
@@ -83,6 +103,7 @@ export function createHighlighterHoverController(
     tracking: {
       cancelPendingFrame: interactions.cancelPendingHoverFrame,
       clear: interactions.clearHoverTracking,
+      hasTarget: () => session.lastHoverTarget !== null,
     },
   };
 }

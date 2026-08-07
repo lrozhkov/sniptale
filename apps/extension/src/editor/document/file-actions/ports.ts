@@ -20,4 +20,5 @@ export interface EditorDocumentExportPort {
 
 export interface EditorRenderedImagePort extends EditorDocumentExportPort {
   renderToDataUrl(options: EditorRenderToDataUrlOptions): string;
+  renderForExport?(options: EditorRenderToDataUrlOptions): Promise<string>;
 }

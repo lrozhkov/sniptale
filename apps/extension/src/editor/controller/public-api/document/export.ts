@@ -14,6 +14,8 @@ import type {
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import { loadEditorExportSettings } from '../../../persistence/export-settings';
 import type { Canvas } from 'fabric';
+import { renderEditorWithFrameAnnotations } from './frame-annotation-export';
+import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
 
 import type { SourceState } from '../../../document/model/source-state';
 import type { EditorControllerDocumentSize } from '../../instance/types/shared';
@@ -33,18 +35,22 @@ export interface EditorDocumentExportControllerApi {
  */
 export interface EditorDocumentRenderControllerApi {
   canvas: Canvas | null;
+  canvasDocumentSize: EditorControllerDocumentSize;
 }
 
 /**
  * Controller surface required to copy the rendered editor image.
  */
 export interface EditorDocumentCopyControllerApi {
-  renderToDataUrl: (options: EditorRenderToDataUrlOptions) => string;
+  canvas: Canvas | null;
+  canvasDocumentSize: EditorControllerDocumentSize;
+  renderToDataUrl?: (options: EditorRenderToDataUrlOptions) => string;
 }
 
 export function exportEditorDocumentViaController(
   controller: EditorDocumentExportControllerApi
 ): EditorDocument {
+  flushActiveFrameAnnotationDraft();
   controller.setSource(
     syncSourceStateFromObject(controller.source, getSourceObject(controller.canvas))
   );
@@ -65,18 +71,33 @@ export function renderEditorControllerToDataUrl(
   return renderEditorCanvasToDataUrl(controller.canvas, options);
 }
 
+export async function renderEditorControllerForExport(
+  controller: EditorDocumentRenderControllerApi,
+  options: EditorRenderToDataUrlOptions
+): Promise<string> {
+  return renderEditorWithFrameAnnotations({
+    canvas: controller.canvas,
+    canvasDocumentSize: controller.canvasDocumentSize,
+    renderOptions: options,
+  });
+}
+
 export async function copyRenderedEditorImageViaController(
   controller: EditorDocumentCopyControllerApi,
   options: EditorRenderedImageOptions = {}
 ): Promise<void> {
   const settings = await loadEditorExportSettings();
+  const renderOptions = {
+    format: settings.imageFormat,
+    quality: settings.imageQuality,
+    ...options,
+  } as const;
 
   await copyEditorRenderedImage({
-    dataUrl: controller.renderToDataUrl({
-      format: settings.imageFormat,
-      quality: settings.imageQuality,
-      ...options,
-    }),
+    dataUrl:
+      controller.canvas === null && controller.renderToDataUrl
+        ? controller.renderToDataUrl(renderOptions)
+        : await renderEditorControllerForExport(controller, renderOptions),
     mimeType: resolveEditorImageMimeType(settings.imageFormat),
   });
 }

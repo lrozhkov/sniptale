@@ -28,6 +28,7 @@ type OffscreenIdempotencyMessage = {
   jobId?: unknown;
   recordingId?: unknown;
   requestId?: unknown;
+  reference?: unknown;
   sessionId?: unknown;
   streamInstanceId?: unknown;
   type: OffscreenIdempotencyMessageType;
@@ -45,6 +46,10 @@ const idempotencyPolicyByType = {
   [MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE]: {
     idempotent: false,
     reason: 'privacy erasure and verification are deliberately repeatable under the owner lock',
+  },
+  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
+    idempotent: true,
+    reason: 'frame annotation rasterization is correlated by the staged immutable job reference',
   },
   [VideoMessageType.GET_DESKTOP_MEDIA]: {
     idempotent: true,
@@ -129,6 +134,14 @@ export function getOffscreenCommandIdempotencyPolicy(
 }
 
 function readCorrelationId(message: OffscreenIdempotencyMessage): string {
+  if (
+    typeof message.reference === 'object' &&
+    message.reference !== null &&
+    !Array.isArray(message.reference) &&
+    typeof (message.reference as Record<string, unknown>)['jobId'] === 'string'
+  ) {
+    return (message.reference as Record<string, string>)['jobId']!;
+  }
   if (typeof message.jobId === 'string' && message.jobId.length > 0) {
     return message.jobId;
   }

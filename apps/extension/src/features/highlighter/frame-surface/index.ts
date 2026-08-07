@@ -1,4 +1,5 @@
-import type { BorderPadding, FrameData } from '../contracts';
+import type { BorderPadding } from '../contracts';
+import type { FrameAnnotationVisualState } from '../frame-annotation/model';
 
 const DEFAULT_STROKE_WIDTH = 3;
 const DEFAULT_RADIUS = 0;
@@ -35,7 +36,7 @@ function resolveNonNegative(value: number, fallback = 0): number {
   return Number.isFinite(value) ? Math.max(0, value) : fallback;
 }
 
-function resolveDecorationVisible(frame: FrameData): boolean {
+function resolveDecorationVisible(frame: FrameAnnotationVisualState): boolean {
   switch (frame.effectMode ?? 'border') {
     case 'blur':
       return frame.blurSettings?.showBorder ?? false;
@@ -46,7 +47,7 @@ function resolveDecorationVisible(frame: FrameData): boolean {
   }
 }
 
-export function resolveFrameSurface(frame: FrameData): FrameSurfaceComposition {
+export function resolveFrameSurface(frame: FrameAnnotationVisualState): FrameSurfaceComposition {
   const width = resolveNonNegative(frame.width);
   const height = resolveNonNegative(frame.height);
   const halfShortSide = Math.min(width, height) / 2;

@@ -8,6 +8,7 @@ const iframeListenerMocks = vi.hoisted(() => {
     handler: EventListener;
   }> = [];
   const cleanupFns: ReturnType<typeof vi.fn>[] = [];
+  const scrollHandlers: Array<() => void> = [];
 
   return {
     addEventListenerToAllWindowsDynamicMock: vi.fn((event: string, handler: EventListener) => {
@@ -16,13 +17,15 @@ const iframeListenerMocks = vi.hoisted(() => {
       cleanupFns.push(cleanup);
       return cleanup;
     }),
-    addScrollListenersToAllWindowsMock: vi.fn(() => {
+    addScrollListenersToAllWindowsMock: vi.fn((handler: () => void) => {
+      scrollHandlers.push(handler);
       const cleanup = vi.fn();
       cleanupFns.push(cleanup);
       return cleanup;
     }),
     cleanupFns,
     registrations,
+    scrollHandlers,
   };
 });
 
@@ -38,6 +41,7 @@ import { createHoverControllerStub } from './controller.test-support';
 beforeEach(() => {
   iframeListenerMocks.cleanupFns.length = 0;
   iframeListenerMocks.registrations.length = 0;
+  iframeListenerMocks.scrollHandlers.length = 0;
   iframeListenerMocks.addEventListenerToAllWindowsDynamicMock.mockClear();
   iframeListenerMocks.addScrollListenersToAllWindowsMock.mockClear();
 });
@@ -112,6 +116,22 @@ describe('registerHighlighterRuntimeListeners', () => {
 
     expect(hoverController.cancelDrawing).toHaveBeenCalledWith('mouseleave');
     expect(hoverController.handleMouseLeave).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it('hides the hover preview when scrolling invalidates its visible target', () => {
+    const hoverController = createHoverControllerStub();
+    const cleanup = registerHighlighterRuntimeListeners({
+      disableHighlighterMode: vi.fn(),
+      hasActivePopover: () => false,
+      hoverController,
+      isAnyFrameEditing: () => false,
+    });
+
+    iframeListenerMocks.scrollHandlers[0]?.();
+
+    expect(hoverController.cancelDrawing).toHaveBeenCalledWith('scroll');
+    expect(hoverController.hideHoverOverlay).toHaveBeenCalledOnce();
     cleanup();
   });
 });

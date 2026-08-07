@@ -124,7 +124,7 @@ import {
 function createController() {
   return {
     applyDocument: vi.fn(async () => undefined),
-    canvas: { id: 'canvas' },
+    canvas: { getObjects: vi.fn(() => []), id: 'canvas' },
     canvasDocumentSize: { height: 80, width: 120 },
     history: { id: 'history' },
     originalDocument: { id: 'original' },
@@ -177,10 +177,10 @@ it('bridges document open, load, close, export, render, and copy flows', async (
   expect(mocks.syncSourceStateMock).toHaveBeenCalledWith({ id: 'source' }, 'source-object');
   expect(mocks.buildDocumentMock).toHaveBeenCalledOnce();
   expect(mocks.copyRenderedMock).toHaveBeenCalledWith({
-    dataUrl: 'rendered',
+    dataUrl: 'data-url',
     mimeType: 'image/png',
   });
-  expect(controller.renderToDataUrl).toHaveBeenCalledWith({
+  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 360, width: 640 },
     quality: 0.9,

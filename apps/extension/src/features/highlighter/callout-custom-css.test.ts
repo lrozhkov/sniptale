@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { expect, it } from 'vitest';
-import { resolveCalloutCustomCss } from './callout-custom-css';
+import { projectCalloutLineCustomCss, resolveCalloutCustomCss } from './callout-custom-css';
 import { createSystemCalloutPresetCatalog } from './callout-presets/catalog';
 
 it('projects one field into fixed callout targets', () => {
@@ -41,6 +41,7 @@ it('fails closed for geometry, unknown targets, and fetch-capable CSS', () => {
   const geometry = resolveCalloutCustomCss('[card]\nposition: fixed; box-shadow: 0 0 2px red;');
   expect(geometry).toMatchObject({ error: 'blocked', styles: EMPTY_EXPECTED_STYLES });
   expect(geometry.blockedProperties).toContain('position');
+  expect(resolveCalloutCustomCss('[card]\nmargin-left: 2px;').error).toBe('blocked');
 
   expect(resolveCalloutCustomCss('[page]\ncolor: red;').error).toBe('syntax');
   expect(
@@ -60,6 +61,28 @@ it('fails closed for geometry, unknown targets, and fetch-capable CSS', () => {
   );
   expect(resolveCalloutCustomCss('[card]\nmade-up: 1; color: red;').error).toBe('syntax');
   expect(resolveCalloutCustomCss('[card]\ncolor: red; broken').error).toBe('syntax');
+});
+
+it('projects only supported connector presentation properties', () => {
+  expect(
+    projectCalloutLineCustomCss({
+      filter: 'blur(1px)',
+      opacity: 0.5,
+      stroke: '#f00',
+      strokeDasharray: '2 1',
+      strokeLinecap: 'round',
+      strokeLinejoin: 'bevel',
+    })
+  ).toEqual({
+    group: { filter: 'blur(1px)', opacity: 0.5 },
+    line: {
+      stroke: '#f00',
+      strokeDasharray: '2 1',
+      strokeLinecap: 'round',
+      strokeLinejoin: 'bevel',
+    },
+  });
+  expect(projectCalloutLineCustomCss({})).toEqual({ group: {}, line: {} });
 });
 
 const EMPTY_EXPECTED_STYLES = {

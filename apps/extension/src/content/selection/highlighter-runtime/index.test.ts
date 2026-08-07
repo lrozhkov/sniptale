@@ -11,6 +11,7 @@ const facade = vi.hoisted(() => ({
   enableMode: vi.fn(),
   getOwner: vi.fn(),
   getOwnerIfCreated: vi.fn(),
+  hasHoverPreviewTarget: vi.fn(() => true),
   invalidateFrameCache: vi.fn(),
   isEnabled: vi.fn(() => true),
   isFrameEditing: vi.fn(() => true),
@@ -41,6 +42,7 @@ beforeEach(() => {
     disableMode: facade.disableMode,
     enableMode: facade.enableMode,
     invalidateFrameCache: facade.invalidateFrameCache,
+    hasHoverPreviewTarget: facade.hasHoverPreviewTarget,
     isEnabled: facade.isEnabled,
     isFrameEditing: facade.isFrameEditing,
     isPausedState: facade.isPausedState,
@@ -93,6 +95,7 @@ it('routes highlighter commands and queries through the created owner', async ()
   expect(runtime.isFrameEditing()).toBe(true);
   expect(runtime.isHighlighterPausedState()).toBe(true);
   expect(runtime.consumeHighlighterSuppressedClick(click)).toBe(true);
+  expect(runtime.hasHighlighterHoverPreviewTarget()).toBe(true);
   expect(facade.invalidateFrameCache).toHaveBeenCalledOnce();
   expect(facade.enableMode).toHaveBeenCalledOnce();
   expect(facade.disableMode).toHaveBeenCalledOnce();
@@ -102,6 +105,7 @@ it('routes highlighter commands and queries through the created owner', async ()
   expect(facade.setFrameEditing).toHaveBeenCalledOnce();
   expect(facade.clearFrameEditing).toHaveBeenCalledOnce();
   expect(facade.consumeSuppressedClick).toHaveBeenCalledWith(click);
+  expect(facade.hasHoverPreviewTarget).toHaveBeenCalledOnce();
 });
 
 it('does not create an owner for disabled-state queries or cleanup', async () => {
@@ -114,6 +118,7 @@ it('does not create an owner for disabled-state queries or cleanup', async () =>
   expect(runtime.isFrameEditing()).toBe(false);
   expect(runtime.isHighlighterPausedState()).toBe(false);
   expect(runtime.consumeHighlighterSuppressedClick(new MouseEvent('click'))).toBe(false);
+  expect(runtime.hasHighlighterHoverPreviewTarget()).toBe(false);
   expect(facade.disableMode).not.toHaveBeenCalled();
   expect(facade.getOwner).not.toHaveBeenCalled();
 });

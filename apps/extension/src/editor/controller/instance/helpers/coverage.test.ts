@@ -141,6 +141,8 @@ import {
   focusObjectInViewportForController,
   scheduleViewportStateSyncForController,
   sendFrameObjectsToBackForController,
+  snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
   syncViewportStateForController,
 } from './viewport';
 
@@ -294,5 +296,92 @@ describe('editor controller instance helper wrappers', () => {
     expect(controller.viewportSyncFrame).toBe(11);
     expect(controller.syncViewportState).toHaveBeenCalledTimes(2);
     expect(controller.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
+  });
+
+  it('projects external DOM geometry through magnet and grid fallbacks', () => {
+    mocks.applyGridSnapMock.mockClear();
+    const controller = createController();
+    const rect = { x: 13, y: 26, width: 80, height: 40 };
+    controller.magnetManager = {
+      hasActiveGuides: vi.fn(() => true),
+      snapRect: vi.fn(() => ({ ...rect, x: 12 })),
+    };
+    storeState.workspace.magnetEnabled = true;
+
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject({ x: 12 });
+    expect(mocks.applyGridSnapMock).not.toHaveBeenCalled();
+
+    controller.magnetManager.hasActiveGuides.mockReturnValue(false);
+    mocks.applyGridSnapMock.mockImplementationOnce((object) => object.set({ left: 24, top: 48 }));
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject({
+      x: 24,
+      y: 48,
+      width: 80,
+      height: 40,
+    });
+
+    controller.magnetManager = null;
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject(rect);
+  });
+
+  it('snaps each active resize edge through magnet and grid settings', () => {
+    const controller = createController();
+    const rect = { x: 13, y: 26, width: 80, height: 41 };
+    controller.magnetManager = {
+      hasActiveGuides: vi.fn(() => true),
+      snapResizeRect: vi.fn(() => ({ ...rect, x: 12 })),
+    };
+    storeState.workspace.magnetEnabled = true;
+
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'w',
+        minimumSize: 8,
+        rect,
+      })
+    ).toMatchObject({ x: 12 });
+
+    controller.magnetManager.hasActiveGuides.mockReturnValue(false);
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'nw',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual({ x: 24, y: 24, width: 68, height: 43 });
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'se',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual({ x: 12, y: 26, width: 84, height: 46 });
+
+    storeState.workspace.gridSnapEnabled = false;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'e',
+        minimumSize: 8,
+        rect,
+      })
+    ).toMatchObject({ x: 12 });
+
+    controller.magnetManager = null;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 's',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual(rect);
+    storeState.workspace.gridSnapEnabled = true;
+    storeState.workspace.gridSize = 24;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'nw',
+        minimumSize: 8,
+        rect: { x: 13, y: 13, width: 8, height: 8 },
+      })
+    ).toEqual({ x: 13, y: 13, width: 8, height: 8 });
   });
 });

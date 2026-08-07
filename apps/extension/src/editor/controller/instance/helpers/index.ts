@@ -6,6 +6,8 @@ export {
   focusObjectInViewportForController,
   scheduleViewportStateSyncForController,
   sendFrameObjectsToBackForController,
+  snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
   syncViewportStateForController,
 } from './viewport';
 export {

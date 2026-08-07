@@ -11,7 +11,7 @@ import { normalizeAppliedBorderSettings } from '@sniptale/runtime-contracts/high
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 import { getCurrentBorderPreset as getHoverBorderPreset } from '../../highlighter-hover-preview/session';
 import { createFrameHostLayoutService } from '../host-layout/service';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const CALLOUT_STYLE = createDefaultCalloutSettings().style;
 

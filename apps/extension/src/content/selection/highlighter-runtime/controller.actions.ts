@@ -117,9 +117,12 @@ export function createHighlighterInvalidateActions(
   };
 }
 
-export function createHighlighterInputActions(hoverController: Pick<HoverController, 'input'>) {
+export function createHighlighterInputActions(
+  hoverController: Pick<HoverController, 'input' | 'tracking'>
+) {
   return {
     consumeSuppressedClick: (event: MouseEvent) =>
       hoverController.input.consumeSuppressedClick(event),
+    hasHoverPreviewTarget: () => hoverController.tracking.hasTarget(),
   };
 }

@@ -6,12 +6,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dispatchCalloutBlurRequest } from '../../platform/page-context/frame-events';
 import {
-  useCalloutBlurRequestEffect,
   useCalloutEditingFocusEffect,
   useCalloutEscapeCaptureEffect,
-} from './editing.effects';
+} from '../../../features/highlighter/frame-annotation/callout/editing-effects';
+import { useCalloutBlurRequestEffect } from './editing-blur-request-effect';
 import { useCalloutEditing } from './editing';
-import { useCalloutEditingHandlers } from './editing.handlers';
+import { useCalloutEditingHandlers } from '../../../features/highlighter/frame-annotation/callout/editing-handlers';
 
 function FocusEffectHarness(props: {
   htmlContent: string;

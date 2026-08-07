@@ -31,6 +31,8 @@ import {
   classifyBackgroundOwnedSender,
   classifySettingsPageSenderUrl,
   isPageAccessSenderUrl,
+  isImageEditorSenderUrl,
+  isWebSnapshotViewerSenderUrl,
 } from './sender-classification';
 import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
 
@@ -88,6 +90,15 @@ function authorizePageAccessRoute(
   }
 
   return AUTHORIZED;
+}
+
+function authorizeFrameAnnotationRasterRoute(
+  request: BackgroundOwnedAuthorizationRequest
+): IpcAuthorizationResult {
+  return isImageEditorSenderUrl(request.sender.url) ||
+    isWebSnapshotViewerSenderUrl(request.sender.url)
+    ? AUTHORIZED
+    : reject('Unauthorized frame annotation raster sender');
 }
 
 function authorizeLocalDataErasureRoute(
@@ -244,6 +255,8 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':
       return authorizeContentRuntimeWakeupRoute;
+    case 'frame-annotation-raster':
+      return authorizeFrameAnnotationRasterRoute;
     case 'llm-content-processing':
       return authorizeContentLlmRoute;
     case 'llm-scenario-editor-processing':

@@ -33,7 +33,7 @@ const SELF_PATHS = new Set([
   'tooling/release/oss-release-policy.mjs',
 ]);
 const FONT_LITERAL_PATTERN =
-  /(?:manrope-(?:cyrillic|latin-ext|latin)-wght-normal\.woff2|@fontsource-variable\/manrope\/files\/manrope-)/u;
+  /(?:manrope-(?:cyrillic|latin-ext|latin)-wght-normal\.woff2|@fontsource-variable\/manrope\/files\/manrope-|marck-script-(?:cyrillic|latin)-400-normal\.woff2|@fontsource\/marck-script\/files\/marck-script-)/u;
 const VALIDATOR_PATTERN = /(?:verify-oss-release-surface(?:\.mjs)?|OSS release surface)/u;
 const ARCHIVE_PATTERN =
   /(?:from ['"].*oss-release-policy\.mjs['"]|package-dist\.mjs|release:package-only|verify-release-archive\.mjs)/u;

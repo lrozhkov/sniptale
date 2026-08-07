@@ -36,7 +36,7 @@ import {
   dispatchStepBadgeReorder,
 } from '../../../platform/page-context/frame-events';
 import { setupFrameSessionSyncListeners } from './core';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const DEFAULT_SETTINGS: HighlighterSettings = {
   borderPresets: [

@@ -4,9 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 
-vi.mock('../platform/trusted-events', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../platform/trusted-events')>()),
+vi.mock('../../composition/voice-input/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/voice-input/trusted-events')>()),
   isTrustedMouseEvent: vi.fn(() => true),
+  isTrustedPointerEvent: vi.fn(() => true),
 }));
 
 import { ContentVoiceInputButton } from './button';
@@ -127,4 +128,30 @@ it('keeps the pointer stable while an internal stop is settling', () => {
   expect(button?.disabled).toBe(true);
   expect(button?.className).toContain('disabled:cursor-pointer');
   expect(button?.className).toContain('disabled:opacity-100');
+});
+
+it('renders error and disabled states and stops an active pointer session', () => {
+  const active = renderButton(true);
+  act(() =>
+    active.button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+  );
+  expect(active.onStop).toHaveBeenCalledOnce();
+
+  act(() => {
+    root?.render(
+      <ContentVoiceInputButton
+        appearance="contrast"
+        dataUi="voice-error-test"
+        disabled
+        labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
+        onStart={vi.fn()}
+        onStop={vi.fn()}
+        state={{ active: false, audioLevel: 0, errorCode: 'runtime', phase: 'error' }}
+      />
+    );
+  });
+  const error = container?.querySelector('button');
+  expect(error?.title).toBe('Error');
+  expect(error?.className).toContain('color-danger');
+  expect(error?.className).toContain('disabled:opacity-45');
 });

@@ -57,7 +57,7 @@ type ResizeToolController = Pick<
 
 export function renderEditorInspectorContentBody(
   props: EditorInspectorContentBodyProps,
-  controller: ResizeToolController
+  controller: ImageEditorController
 ) {
   if (props.inspector === 'tool' && props.highlightedTool === 'crop') {
     return renderEditorInspectorResizeToolSection(props, controller);

@@ -28,7 +28,7 @@ vi.mock('../../../composition/persistence/callout-presets', async (importOrigina
   },
 }));
 
-import { useCalloutPresetPopoverController } from './preset-controller';
+import { useCalloutPresetPopoverController } from '../../../composition/frame-annotation-controls/callout/preset-controller';
 
 function createCatalog(defaultPresetId: string): CalloutPresetCatalog {
   return {

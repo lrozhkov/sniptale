@@ -15,7 +15,7 @@ import { createAddFrameHandler, createAddFreeFrameHandler } from './frame-factor
 import { consumeFrameCalloutEditRequest, useFrameUIStore } from '../state/frame-ui.store';
 import { setFrameSessionBorderPreset } from '../session/border-preset';
 import { createFrameHostLayoutService } from '../host-layout/service';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 import { setFutureFrameCallout } from '../session/future-callout';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());

@@ -185,5 +185,7 @@ declare module 'fabric' {
     sniptaleEffects?: EditorRasterEffect[];
     sniptaleRichShape?: EditorRichShapeDocumentObject;
     sniptaleRichShapeCatalogId?: string;
+    sniptaleFrameAnnotationRevision?: number;
+    sniptaleFrameAnnotationJson?: string;
   }
 }

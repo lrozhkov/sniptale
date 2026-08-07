@@ -57,6 +57,25 @@ describe('voice input consumer policy', () => {
     });
   });
 
+  it('binds only the exact editor document for frame-callout voice input', () => {
+    expect(
+      authorizeVoiceInputPortSender({
+        documentId: 'editor-document',
+        url: 'chrome-extension://extension-id/apps/extension/src/editor/index.html?embed=scenario',
+      })
+    ).toEqual({
+      consumerId: 'editor-callout',
+      documentId: 'editor-document',
+      maxDurationMs: null,
+    });
+    expect(
+      authorizeVoiceInputPortSender({
+        documentId: 'editor-lookalike',
+        url: 'chrome-extension://extension-id/apps/extension/src/editor/index.html.evil',
+      })
+    ).toBeNull();
+  });
+
   it('rejects a missing documentId and a lookalike extension path', () => {
     expect(
       authorizeVoiceInputPortSender({

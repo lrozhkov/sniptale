@@ -11,6 +11,7 @@ export function useCanvasWrapperState() {
 
   const store = useEditorStore(
     useShallow((state) => ({
+      activeTool: state.activeTool,
       layers: state.layers,
       selection: state.selection,
       setImageData: state.setImageData,

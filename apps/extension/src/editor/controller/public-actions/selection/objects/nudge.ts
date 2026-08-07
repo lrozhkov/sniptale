@@ -4,6 +4,7 @@ import { syncSourceStateFromObject } from '../../../document/source';
 
 import type { SourceState } from '../../../../document/model/source-state';
 import { getMutableEditorSelection } from './active-selection';
+import { normalizeFrameAnnotationProxyGeometry } from '../../../../frame-annotation/proxy';
 
 export function nudgeEditorSelection(options: {
   canvas: Canvas | null;
@@ -29,6 +30,7 @@ export function nudgeEditorSelection(options: {
     });
     ensureObjectReachable(object);
     object.setCoords();
+    normalizeFrameAnnotationProxyGeometry(object);
     nextSource = syncSourceStateFromObject(nextSource, object);
   });
 

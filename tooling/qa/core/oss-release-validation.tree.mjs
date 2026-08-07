@@ -32,7 +32,7 @@ export function validatePackages(root, policy, inventory) {
   return errors;
 }
 
-function validateBundledFontConsumers(root, artifacts) {
+function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
   const errors = [];
   const fileNames = artifacts.map((entry) => path.basename(entry.path)).sort();
   const manifest = JSON.parse(
@@ -48,13 +48,13 @@ function validateBundledFontConsumers(root, artifacts) {
     readFileSync(path.resolve(root, 'apps/extension/build/layout.data.json'), 'utf8')
   );
   const layoutText = JSON.stringify(layout);
-  const vite = readFileSync(path.resolve(root, 'apps/extension/vite.config.ts'), 'utf8');
-  const styles = readFileSync(path.resolve(root, 'packages/ui/src/styles/fonts.css'), 'utf8');
+  const styleConsumers = releaseConsumers
+    .filter((entry) => entry.category === 'bundled-font' && entry.path.endsWith('.css'))
+    .map((entry) => readFileSync(path.resolve(root, entry.path), 'utf8'));
   for (const fileName of fileNames) {
     if (
       !layoutText.includes(`fonts/${fileName}`) ||
-      !vite.includes(fileName) ||
-      !styles.includes(fileName)
+      !styleConsumers.some((styles) => styles.includes(fileName))
     ) {
       errors.push(`bundled font consumer drift: ${fileName}`);
     }
@@ -62,10 +62,10 @@ function validateBundledFontConsumers(root, artifacts) {
   return errors;
 }
 
-function validateManropeSourceParity(root, manrope) {
+function validateBundledAssetSourceParity(root, asset) {
   const errors = [];
-  for (const artifact of manrope?.artifacts ?? []) {
-    const expectedSourcePath = `node_modules/@fontsource-variable/manrope/files/${path.basename(artifact.path)}`;
+  for (const artifact of asset?.artifacts ?? []) {
+    const expectedSourcePath = `node_modules/${asset.sourcePackage}/files/${path.basename(artifact.path)}`;
     if (artifact.sourcePath !== expectedSourcePath) {
       errors.push(`bundled font installed source mapping drift: ${artifact.path}`);
       continue;
@@ -78,6 +78,11 @@ function validateManropeSourceParity(root, manrope) {
       errors.push(`bundled font installed source is missing: ${artifact.sourcePath}`);
     }
   }
+  return errors;
+}
+
+function validateManropeLicenseSource(root) {
+  const errors = [];
   try {
     const installed = readFileSync(
       path.resolve(root, 'node_modules/@fontsource-variable/manrope/LICENSE')
@@ -122,7 +127,8 @@ export function validateBundledAssets(root, policy, inventory) {
   }
   return [
     ...errors,
-    ...validateManropeSourceParity(root, manrope),
-    ...validateBundledFontConsumers(root, declared),
+    ...policy.bundledAssets.flatMap((asset) => validateBundledAssetSourceParity(root, asset)),
+    ...validateManropeLicenseSource(root),
+    ...validateBundledFontConsumers(root, declared, inventory.currentTree.releaseConsumers),
   ];
 }

@@ -6,6 +6,7 @@ export {
 export {
   copyRenderedEditorImageViaController,
   exportEditorDocumentViaController,
+  renderEditorControllerForExport,
   renderEditorControllerToDataUrl,
 } from './export';
 export {

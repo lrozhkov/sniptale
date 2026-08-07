@@ -9,6 +9,7 @@ export function isStickyAnnotationTool(tool: EditorTool): boolean {
     case 'fill':
     case 'pencil':
     case 'highlighter':
+    case 'frame-annotation':
     case 'shapes-and-lines':
     case 'rough-shape':
     case 'shape-library':

@@ -36,17 +36,20 @@ import {
 } from '../../../composition/persistence/infrastructure/mutation-barrier';
 
 function createSerialLockManager(): PersistenceLockManager {
-  let queue: Promise<void> = Promise.resolve();
+  const queues = new Map<string, Promise<void>>();
   return {
     request<T>(
-      _name: string,
+      name: string,
       _options: { mode: 'exclusive' | 'shared' },
       operation: () => T | Promise<T>
     ): Promise<T> {
-      const execution = queue.then(operation);
-      queue = execution.then(
-        () => undefined,
-        () => undefined
+      const execution = (queues.get(name) ?? Promise.resolve()).then(operation);
+      queues.set(
+        name,
+        execution.then(
+          () => undefined,
+          () => undefined
+        )
       );
       return execution;
     },

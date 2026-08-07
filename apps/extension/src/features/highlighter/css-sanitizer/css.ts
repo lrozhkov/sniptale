@@ -138,6 +138,27 @@ function parseCssDeclarations(value: string): CssDeclaration[] | null {
   return parsed;
 }
 
+export function validateCssPolicyString(cssString: string): {
+  blockedProps: string[];
+  properties: string[];
+  rawError: boolean;
+} {
+  if (!cssString) return { blockedProps: [], properties: [], rawError: false };
+  if (containsUnsafeCssSyntax(cssString)) {
+    return { blockedProps: [], properties: [], rawError: true };
+  }
+  const declarations = parseCssDeclarations(cssString);
+  if (!declarations) return { blockedProps: [], properties: [], rawError: true };
+  const properties = declarations.map(({ name }) => toCamelStyleProperty(name));
+  return {
+    blockedProps: declarations
+      .filter(({ name }) => BLOCKED_CSS_PROPS.includes(toCamelStyleProperty(name)))
+      .map(({ name }) => name),
+    properties,
+    rawError: false,
+  };
+}
+
 function recognizeCssDeclaration(declaration: CssDeclaration): string | null {
   const probe = document.createElement('div').style;
   probe.setProperty(declaration.name, declaration.value);

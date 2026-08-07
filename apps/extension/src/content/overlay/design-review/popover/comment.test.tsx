@@ -13,7 +13,7 @@ const trustedEventMocks = vi.hoisted(() => ({
   isTrustedPointerEvent: vi.fn(() => true),
 }));
 
-vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
+vi.mock('../../../../composition/voice-input/trusted-events', async (importOriginal) => ({
   ...(await importOriginal()),
   isTrustedMouseEvent: trustedEventMocks.isTrustedMouseEvent,
   isTrustedPointerEvent: trustedEventMocks.isTrustedPointerEvent,

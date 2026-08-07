@@ -70,7 +70,7 @@ function normalizeFrameCssProperty(property: string): string {
   return `${unprefixed[0]?.toLowerCase()}${unprefixed.slice(1)}`;
 }
 
-function isReservedFrameCssProperty(property: string): boolean {
+export function isReservedFrameCssProperty(property: string): boolean {
   const canonicalProperty = normalizeFrameCssProperty(property);
   return (
     RESERVED_FRAME_CSS_PROPERTIES.includes(canonicalProperty) ||

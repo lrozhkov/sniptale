@@ -28,6 +28,7 @@ export const backgroundOwnedMessageTypes = [
   MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
   MessageType.CONTENT_RUNTIME_WAKEUP,
   MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
+  MessageType.FRAME_ANNOTATION_RASTERIZE,
 ] as const;
 
 const backgroundOwnedMessageTypeSet = new Set<string>(backgroundOwnedMessageTypes);

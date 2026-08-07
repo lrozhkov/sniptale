@@ -1,7 +1,7 @@
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areDescriptorListsEqual } from '../effects/descriptor-equality';
 import type { AnchorPresentation } from '../host-layout/service';
-import { createCalloutRenderKey } from '../../callout/model';
+import { createCalloutRenderKey } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 export type FrameRenderDescriptor = {
   blurAmount: number | undefined;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { selectOrClosePopoverPreset } from './preset-selection';
+import { selectOrClosePopoverPreset } from '../../../composition/frame-annotation-controls/popover/preset-selection';
 
 describe('selectOrClosePopoverPreset', () => {
   it('closes without reapplying an active preset', () => {

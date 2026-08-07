@@ -31,6 +31,16 @@ function getBlurInteractionPatch(object: FabricObject, locked: boolean) {
   };
 }
 
+function getFrameAnnotationInteractionPatch(object: FabricObject) {
+  if (object.sniptaleType !== 'frame-annotation') return {};
+  return {
+    evented: false,
+    hasBorders: false,
+    hasControls: false,
+    selectable: false,
+  };
+}
+
 export function applyBaseInteractionPatch(
   object: FabricObject,
   options: {
@@ -58,5 +68,6 @@ export function applyBaseInteractionPatch(
       : !options.arrowObject,
     ...getStepInteractionPatch(object),
     ...getBlurInteractionPatch(object, options.locked),
+    ...getFrameAnnotationInteractionPatch(object),
   });
 }

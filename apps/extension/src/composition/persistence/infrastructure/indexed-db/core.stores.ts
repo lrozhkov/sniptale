@@ -1,6 +1,6 @@
 // Keep the IndexedDB name stable so existing user media/projects remain readable across rebrands.
 export const DB_NAME = 'sniptale-video-db';
-export const DB_VERSION = 22;
+export const DB_VERSION = 23;
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
@@ -20,6 +20,7 @@ export const EDITOR_SESSIONS_STORE = 'editor_sessions';
 export const WEB_SNAPSHOTS_STORE = 'web_snapshots';
 export const VIDEO_EFFECT_BUNDLES_STORE = 'video_effect_bundles';
 export const PROJECT_EXPORT_INPUTS_STORE = 'project_export_inputs';
+export const FRAME_ANNOTATION_RASTER_JOBS_STORE = 'frame_annotation_raster_jobs';
 export const EDITOR_CUSTOM_SHAPES_STORE = 'editor_custom_shapes';
 export const STATE_MANAGER_STORE = 'state_manager';
 export const NATIVE_TRANSFER_SESSIONS_STORE = 'native_transfer_sessions';
@@ -44,6 +45,7 @@ export const EXPECTED_STORES = [
   WEB_SNAPSHOTS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   PROJECT_EXPORT_INPUTS_STORE,
+  FRAME_ANNOTATION_RASTER_JOBS_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
   STATE_MANAGER_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
@@ -67,6 +69,7 @@ export const EXPECTED_INDEXES = {
   [WEB_SNAPSHOTS_STORE]: ['createdAt'],
   [VIDEO_EFFECT_BUNDLES_STORE]: ['enabled', 'updatedAt'],
   [PROJECT_EXPORT_INPUTS_STORE]: ['createdAt'],
+  [FRAME_ANNOTATION_RASTER_JOBS_STORE]: ['createdAt'],
   [EDITOR_CUSTOM_SHAPES_STORE]: ['enabled', 'updatedAt'],
   [STATE_MANAGER_STORE]: ['domain', 'updatedAtEpochMs'],
   [NATIVE_TRANSFER_SESSIONS_STORE]: ['createdAt', 'updatedAt'],

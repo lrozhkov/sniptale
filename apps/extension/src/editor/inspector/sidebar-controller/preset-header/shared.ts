@@ -218,6 +218,7 @@ export function resolveActiveToolPresetOwner(tool: EditorTool): ActiveToolPreset
     case 'shapes-and-lines':
     case 'rough-shape':
     case 'callout':
+    case 'frame-annotation':
     case 'selection':
     case 'brush':
     case 'eraser':

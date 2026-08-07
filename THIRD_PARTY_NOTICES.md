@@ -31,6 +31,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30`
 - Repository/source: https://github.com/fontsource/font-files.git
 
+### `@fontsource/marck-script` 5.3.0
+
+- Installed path: `node_modules/@fontsource/marck-script`
+- Declared license expression: `OFL-1.1`
+- Selected license: `OFL-1.1`
+- License source class: `installed-file`
+- License source: `node_modules/@fontsource/marck-script/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt`](LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt)
+- License text SHA-256: `bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c`
+- Repository/source: https://github.com/fontsource/font-files.git
+
 ### `@iconify-icons/tabler` 1.2.95
 
 - Installed path: `node_modules/@iconify-icons/tabler`
@@ -81,6 +93,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt`](LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt)
 - License text SHA-256: `ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047`
 - Repository/source: https://github.com/gpac/mp4box.js.git
+
+### `@zumer/snapdom` 2.23.2
+
+- Installed path: `node_modules/@zumer/snapdom`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@zumer/snapdom/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@zumer__snapdom-2.23.2.txt`](LICENSES/dependencies/@zumer__snapdom-2.23.2.txt)
+- License text SHA-256: `c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2`
+- Repository/source: https://github.com/zumerlab/snapdom.git
 
 ### `core-util-is` 1.0.3
 

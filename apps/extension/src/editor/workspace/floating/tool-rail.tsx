@@ -49,6 +49,7 @@ const EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL = {
   eraser: 'eraser',
   fill: 'fill',
   highlighter: 'highlighter',
+  'frame-annotation': 'rectangle',
   image: 'image',
   line: 'line',
   pencil: 'pencil',

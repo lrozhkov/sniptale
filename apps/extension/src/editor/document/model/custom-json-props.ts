@@ -4,6 +4,8 @@ export const CUSTOM_JSON_PROPS = [
   'sniptaleLabel',
   'sniptaleLocked',
   'sniptaleRole',
+  'sniptaleFrameAnnotationRevision',
+  'sniptaleFrameAnnotationJson',
   'sniptaleBackgroundMode',
   'sniptaleBackgroundFit',
   'sniptaleBackgroundImageData',

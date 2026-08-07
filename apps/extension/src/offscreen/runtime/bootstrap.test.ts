@@ -11,6 +11,7 @@ const offscreenMocks = vi.hoisted(() => ({
   subscribeToDbTermination: vi.fn(),
   reconcileProjectExportJobs: vi.fn(),
   cleanupOrphanedRecordingStaging: vi.fn(),
+  deleteAllFrameAnnotationRasterJobs: vi.fn(),
   reconcileRecordingCompletionOutbox: vi.fn(),
 }));
 
@@ -47,6 +48,12 @@ vi.mock('../../composition/persistence/recordings/staging', async (importOrigina
   ...(await importOriginal<typeof import('../../composition/persistence/recordings/staging')>()),
   cleanupOrphanedRecordingStaging: offscreenMocks.cleanupOrphanedRecordingStaging,
 }));
+vi.mock('../../composition/persistence/frame-annotation-raster-jobs', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/frame-annotation-raster-jobs')
+  >()),
+  deleteAllFrameAnnotationRasterJobs: offscreenMocks.deleteAllFrameAnnotationRasterJobs,
+}));
 vi.mock('../recording/post-record-publication', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recording/post-record-publication')>()),
   reconcileRecordingCompletionOutbox: offscreenMocks.reconcileRecordingCompletionOutbox,
@@ -61,10 +68,12 @@ function resetOffscreenMocks() {
   offscreenMocks.subscribeToDbTermination.mockReset();
   offscreenMocks.reconcileProjectExportJobs.mockReset();
   offscreenMocks.cleanupOrphanedRecordingStaging.mockReset();
+  offscreenMocks.deleteAllFrameAnnotationRasterJobs.mockReset();
   offscreenMocks.reconcileRecordingCompletionOutbox.mockReset();
   offscreenMocks.initDB.mockResolvedValue(undefined);
   offscreenMocks.reconcileProjectExportJobs.mockResolvedValue(undefined);
   offscreenMocks.cleanupOrphanedRecordingStaging.mockResolvedValue(0);
+  offscreenMocks.deleteAllFrameAnnotationRasterJobs.mockResolvedValue(undefined);
   offscreenMocks.reconcileRecordingCompletionOutbox.mockResolvedValue(false);
 }
 
@@ -81,11 +90,16 @@ async function verifyTerminationReinitFlow() {
 
   const { bootstrapOffscreenDocument } = await import('./bootstrap');
   bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
+  await vi.waitFor(() => {
+    expect(offscreenMocks.subscribeToDbTermination).toHaveBeenCalledTimes(1);
+    expect(offscreenMocks.deleteAllFrameAnnotationRasterJobs).toHaveBeenCalledOnce();
+    expect(offscreenMocks.cleanupOrphanedRecordingStaging).toHaveBeenCalledOnce();
+  });
 
   expect(offscreenMocks.initDB).toHaveBeenCalledTimes(1);
   expect(offscreenMocks.subscribeToDbTermination).toHaveBeenCalledTimes(1);
   expect(offscreenMocks.cleanupOrphanedRecordingStaging).toHaveBeenCalledOnce();
+  expect(offscreenMocks.deleteAllFrameAnnotationRasterJobs).toHaveBeenCalledOnce();
 
   const handleTermination = offscreenMocks.subscribeToDbTermination.mock.calls[0]?.[0] as
     | (() => void)
@@ -177,15 +191,16 @@ async function verifyOrphanCleanupFailureBlocksReady() {
 
   const { bootstrapOffscreenDocument } = await import('./bootstrap');
   bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
+  await vi.waitFor(() =>
+    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'OFFSCREEN_ERROR',
+      error: 'staging cleanup unavailable',
+      offscreenStartupId: 'startup-1',
+      phase: 'runtime',
+    })
+  );
 
   expect(offscreenMocks.reconcileProjectExportJobs).not.toHaveBeenCalled();
-  expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_ERROR',
-    error: 'staging cleanup unavailable',
-    offscreenStartupId: 'startup-1',
-    phase: 'runtime',
-  });
 }
 
 async function verifyCompletionReplayFailureBlocksReady() {

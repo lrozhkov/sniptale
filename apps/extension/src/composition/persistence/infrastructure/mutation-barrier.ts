@@ -1,5 +1,6 @@
 // policyStateId: persistent-data-erasure-lease
 const PERSISTENCE_LOCK_NAME = 'sniptale:persistence:privacy-erasure';
+const PERSISTENCE_TRANSITION_LOCK_NAME = `${PERSISTENCE_LOCK_NAME}:transition`;
 
 type PersistenceLockMode = 'exclusive' | 'shared';
 
@@ -92,10 +93,29 @@ export function runWithPersistenceMutationPermit<T>(
   });
 }
 
+/**
+ * Keeps a cross-context persistence workflow admitted while its individual writes use the
+ * canonical mutation permit. Privacy erasure reserves this gate before the write barrier, so a
+ * continuation cannot survive an MV3 worker restart and publish data after verified erasure.
+ */
+export function runWithPersistenceMutationTransition<T>(
+  operation: () => T | Promise<T>
+): Promise<T> {
+  return getPersistenceLockManager().request(
+    PERSISTENCE_TRANSITION_LOCK_NAME,
+    { mode: 'shared' },
+    operation
+  );
+}
+
 export function runWithPersistentDataErasureBarrier<T>(
   operation: () => T | Promise<T>
 ): Promise<T> {
-  return runWithPersistenceLock('exclusive', operation);
+  return getPersistenceLockManager().request(
+    PERSISTENCE_TRANSITION_LOCK_NAME,
+    { mode: 'exclusive' },
+    () => runWithPersistenceLock('exclusive', operation)
+  );
 }
 
 export type PersistenceMutationDomain =

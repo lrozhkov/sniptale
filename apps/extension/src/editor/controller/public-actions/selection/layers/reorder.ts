@@ -1,5 +1,6 @@
 import type { Canvas } from 'fabric';
 import { reorderLayerObjects } from '../../../layer-actions';
+import { synchronizeFrameAnnotationOrdering } from '../../../../frame-annotation/proxy';
 
 export function reorderEditorLayer(options: {
   canvas: Canvas | null;
@@ -16,6 +17,7 @@ export function reorderEditorLayer(options: {
   }
 
   sendFrameObjectsToBack();
+  synchronizeFrameAnnotationOrdering(canvas?.getObjects?.() ?? []);
   canvas?.requestRenderAll();
   commitHistory();
   syncRuntimeState();

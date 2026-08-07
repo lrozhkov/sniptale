@@ -9,6 +9,7 @@ interface FloatingSurfaceWheelEvent extends ComposedEventLike {
   deltaX: number;
   deltaY: number;
   preventDefault: () => void;
+  stopPropagation: () => void;
 }
 
 type ScrollAxis = 'x' | 'y';
@@ -162,6 +163,7 @@ export function containFloatingSurfaceWheel(event: FloatingSurfaceWheelEvent): v
   }
   event.__sniptaleFloatingWheelContained = true;
   event.preventDefault();
+  event.stopPropagation();
 
   const boundary = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   const target = getWheelEventTargetElement(event);

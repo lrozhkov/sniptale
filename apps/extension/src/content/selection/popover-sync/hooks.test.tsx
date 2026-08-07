@@ -4,7 +4,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePopoverDistanceClose, usePopoverEscapeClose, usePopoverOutsideClose } from './hooks';
+import {
+  usePopoverDistanceClose,
+  usePopoverEscapeClose,
+  usePopoverOutsideClose,
+} from '../../../composition/frame-annotation-controls/popover/hooks';
 import {
   FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE,
   FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE,

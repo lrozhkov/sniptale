@@ -67,6 +67,7 @@ function resolveToolSettingsOwner(tool: EditorTool): SelectionSettingsOwner | nu
     case 'step':
       return 'step';
     case 'callout':
+    case 'frame-annotation':
     case 'shapes-and-lines':
     case 'rough-shape':
     case 'brush':
@@ -114,6 +115,7 @@ function resolveSelectionSettingsOwner(
       return 'image';
     case 'transparent-base':
     case 'browser-frame':
+    case 'frame-annotation':
       return null;
   }
 }

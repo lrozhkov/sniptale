@@ -94,16 +94,16 @@ export function renderEditorCanvasToDataUrl(
   const activeObject = canvas.getActiveObject();
   canvas.discardActiveObject();
   canvas.renderAll();
-
-  const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
-  const mimeType = resolveBrowserClipboardImageMimeType(options.format);
-  const dataUrl = renderedCanvas.toDataURL(mimeType, normalizeQuality(options.quality));
-
-  if (activeObject) {
-    canvas.setActiveObject(activeObject);
+  try {
+    const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
+    const mimeType = resolveBrowserClipboardImageMimeType(options.format);
+    return renderedCanvas.toDataURL(mimeType, normalizeQuality(options.quality));
+  } finally {
+    if (activeObject) {
+      canvas.setActiveObject(activeObject);
+    }
+    canvas.renderAll();
   }
-  canvas.renderAll();
-  return dataUrl;
 }
 
 async function createClipboardBlob(dataUrl: string): Promise<Blob> {

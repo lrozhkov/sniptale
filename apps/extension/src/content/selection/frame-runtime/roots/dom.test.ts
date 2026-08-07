@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { areFrameRenderDescriptorsEqual, buildFrameRenderDescriptors } from './descriptors';
 import { renderInteractiveFrames } from './dom';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 function createCallout() {
   const callout = createDefaultCalloutSettings();

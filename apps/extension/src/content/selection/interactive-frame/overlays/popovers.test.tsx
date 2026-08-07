@@ -10,7 +10,7 @@ import {
   createFrameDataFixture,
 } from '../../frame-runtime/react/test-support';
 import { InteractiveFramePopovers } from './popovers';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const frameSettingsPopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));
 const stepBadgePopoverMock = vi.hoisted(() => vi.fn((_props: Record<string, unknown>) => null));

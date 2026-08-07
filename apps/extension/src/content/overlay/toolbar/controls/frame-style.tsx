@@ -1,32 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Droplet, Focus, Square } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import {
+  FrameAnnotationCreationControls,
+  type FrameAnnotationCreationMenu,
+  type FrameAnnotationCreationSettings,
+} from '../../../../composition/frame-annotation-controls/creation-controls';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
-import { translate } from '../../../../platform/i18n';
 import { FrameSettingsPopover } from '../../../selection/frame-settings-popover';
 import type {
   ToolbarFutureFrameCalloutActions,
   ToolbarFutureFrameStepBadgeActions,
   ToolbarFutureFrameStyle,
 } from '../types';
-import type { ToolbarMenuState } from '../state/menu';
-import { FutureCalloutControl } from './future-callout-control';
-import { FutureStepBadgeControl } from './future-step-badge-control';
+import type { ToolbarMenuState, ToolbarPopoverMenu } from '../state/menu';
+import { resolveContentPortalTarget } from '../../../selection/interactive-frame/layout/portal';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
-
-function FrameEffectIcon(props: { mode: EffectMode }) {
-  if (props.mode === 'border') return <Square size={18} />;
-  if (props.mode === 'blur') return <Droplet size={18} />;
-  return <Focus size={18} />;
-}
-
-function getEffectLabel(mode: EffectMode): string {
-  if (mode === 'border') return translate('content.interactiveFrame.effectBorder');
-  if (mode === 'blur') return translate('content.interactiveFrame.effectBlur');
-  return translate('content.interactiveFrame.effectFocus');
-}
 
 export function FutureFrameStyleControls(props: {
   compactMenus?: boolean;
@@ -37,80 +26,91 @@ export function FutureFrameStyleControls(props: {
   toolbarMenuState: ToolbarMenuState;
 }) {
   const [style, setStyle] = useState(props.futureFrameStyle);
-  const [effectAnchorEl, setEffectAnchorEl] = useState<HTMLButtonElement | null>(null);
-  const open = props.toolbarMenuState.activeMenuType === 'frame-style';
 
-  useEffect(() => {
-    setStyle(props.futureFrameStyle);
-  }, [props.futureFrameStyle]);
+  useEffect(() => setStyle(props.futureFrameStyle), [props.futureFrameStyle]);
 
-  const handleEffectModeChange = (mode: EffectMode) => {
-    setStyle((current) => ({ ...current, effectMode: mode }));
-    props.onFutureFrameEffectModeChange(mode);
-  };
-
+  const creationSettings = toCreationSettings(style);
   return (
-    <>
-      <div
-        className="sniptale-toolbar-subgroup"
-        data-ui="content.toolbar.future-frame-effects-group"
-      >
-        <ContentToolbarButton
-          active
-          aria-expanded={open}
-          aria-pressed
-          dataUi="content.toolbar.future-frame-style"
-          menuIndicator
-          onClick={(event) => {
-            event.stopPropagation();
-            setEffectAnchorEl(event.currentTarget);
-            props.toolbarMenuState.toggleMenu('frame-style');
-          }}
-          title={getEffectLabel(style.effectMode)}
-        >
-          <FrameEffectIcon mode={style.effectMode} />
-        </ContentToolbarButton>
-      </div>
-
-      <FrameSettingsPopover
-        anchorEl={effectAnchorEl}
-        blurSettings={style.blurSettings}
-        borderSettings={style.borderSettings}
-        compact={props.compactMenus ?? false}
-        effectMode={style.effectMode}
-        focusSettings={style.focusSettings}
-        frameId={FUTURE_FRAME_ID}
-        frameRect={EMPTY_FRAME_RECT}
-        isOpen={open}
-        onApplyToFrame={(patch) => setStyle((current) => ({ ...current, ...patch }))}
-        onClose={() => props.toolbarMenuState.closeMenu('frame-style')}
-        onEffectModeChange={handleEffectModeChange}
-        scope="session"
-      />
-
-      {props.futureFrameCalloutActions || props.futureFrameStepBadgeActions ? (
-        <div
-          className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
-          data-ui="content.toolbar.future-frame-annotations-group"
-        >
-          {props.futureFrameCalloutActions ? (
-            <FutureCalloutControl
-              actions={props.futureFrameCalloutActions}
-              menu={props.toolbarMenuState}
-              setStyle={setStyle}
-              style={style}
-            />
-          ) : null}
-          {props.futureFrameStepBadgeActions ? (
-            <FutureStepBadgeControl
-              actions={props.futureFrameStepBadgeActions}
-              menu={props.toolbarMenuState}
-              setStyle={setStyle}
-              style={style}
-            />
-          ) : null}
-        </div>
-      ) : null}
-    </>
+    <FrameAnnotationCreationControls
+      activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
+      context="content"
+      {...(props.futureFrameCalloutActions
+        ? { enableCallout: props.futureFrameCalloutActions.enable }
+        : {})}
+      {...(props.futureFrameStepBadgeActions
+        ? { enableStepBadge: props.futureFrameStepBadgeActions.enable }
+        : {})}
+      onChange={(next) => {
+        const previous = style;
+        setStyle(fromCreationSettings(next));
+        if (next.effectMode !== previous.effectMode) {
+          props.onFutureFrameEffectModeChange(next.effectMode);
+        }
+        if (next.callout !== previous.futureCallout) {
+          props.futureFrameCalloutActions?.set(next.callout);
+        }
+        if (next.stepBadge !== previous.futureStepBadge) {
+          props.futureFrameStepBadgeActions?.set(next.stepBadge);
+        }
+      }}
+      onMenuChange={(menu) => props.toolbarMenuState.setActiveMenuType(toToolbarMenu(menu))}
+      portalTarget={resolveContentPortalTarget()}
+      renderFramePopover={(popover) => (
+        <FrameSettingsPopover
+          anchorEl={popover.anchorEl}
+          blurSettings={popover.settings.blurSettings}
+          borderSettings={popover.settings.borderSettings}
+          compact={props.compactMenus ?? false}
+          effectMode={popover.settings.effectMode}
+          focusSettings={popover.settings.focusSettings}
+          frameId={FUTURE_FRAME_ID}
+          frameRect={EMPTY_FRAME_RECT}
+          isOpen={popover.isOpen}
+          onApplyToFrame={(patch) => popover.onChange({ ...popover.settings, ...patch })}
+          onClose={popover.onClose}
+          onEffectModeChange={(effectMode) => popover.onChange({ ...popover.settings, effectMode })}
+          scope="session"
+        />
+      )}
+      settings={creationSettings}
+      showCallout={props.futureFrameCalloutActions !== undefined}
+      showStepBadge={props.futureFrameStepBadgeActions !== undefined}
+    />
   );
+}
+
+function toCreationSettings(style: ToolbarFutureFrameStyle): FrameAnnotationCreationSettings {
+  return {
+    blurSettings: style.blurSettings,
+    borderSettings: style.borderSettings,
+    effectMode: style.effectMode,
+    focusSettings: style.focusSettings,
+    callout: style.futureCallout ?? null,
+    stepBadge: style.futureStepBadge ?? null,
+  };
+}
+
+function fromCreationSettings(settings: FrameAnnotationCreationSettings): ToolbarFutureFrameStyle {
+  return {
+    blurSettings: settings.blurSettings,
+    borderSettings: settings.borderSettings,
+    effectMode: settings.effectMode,
+    focusSettings: settings.focusSettings,
+    futureCallout: settings.callout,
+    futureStepBadge: settings.stepBadge,
+  };
+}
+
+function toCreationMenu(menu: ToolbarPopoverMenu | null): FrameAnnotationCreationMenu | null {
+  if (menu === 'frame-style') return 'frame';
+  if (menu === 'future-callout') return 'callout';
+  if (menu === 'future-step-badge') return 'step-badge';
+  return null;
+}
+
+function toToolbarMenu(menu: FrameAnnotationCreationMenu | null): ToolbarPopoverMenu | null {
+  if (menu === 'frame') return 'frame-style';
+  if (menu === 'callout') return 'future-callout';
+  if (menu === 'step-badge') return 'future-step-badge';
+  return null;
 }

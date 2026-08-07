@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getStepBadgeBoundaryCenter, projectStepBadgeToFrameBoundary } from './placement';
-import { getStepBadgeStyle } from './views';
+import {
+  getStepBadgeBoundaryCenter,
+  projectStepBadgeToFrameBoundary,
+} from '../../../features/highlighter/frame-annotation/step-badge/placement';
+import { getStepBadgeStyle } from '../../../features/highlighter/frame-annotation/step-badge-surface';
 
 const frameRect = { x: 100, y: 80, width: 200, height: 120 };
 

@@ -14,38 +14,19 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import type { EffectMode, ResizeDirection } from '../../../../features/highlighter/contracts';
+import type { EffectMode } from '../../../../features/highlighter/contracts';
 import type { FrameSurfaceRect } from '../../../../features/highlighter/frame-surface';
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../../features/highlighter/frame-annotation/interaction/z-index';
 
 export const MIN_FRAME_SIZE = 1;
-export const Z_INDEX_FRAME_IDLE_MAX = 2147483642;
-export const Z_INDEX_BLOCKING_OVERLAY = 2147483643;
-export const Z_INDEX_FRAME_ACTIVE = 2147483644;
-export const Z_INDEX_CALLOUT_VIEWING = 2147483645;
-export const Z_INDEX_CALLOUT_EDITING = 2147483646;
-export const Z_INDEX_RESIZE_HANDLES = 2147483646;
-export const Z_INDEX_FLOATING_UI = 2147483647;
+export const Z_INDEX_FRAME_IDLE_MAX = FRAME_ANNOTATION_Z_INDEX.frameIdleMax;
+export const Z_INDEX_BLOCKING_OVERLAY = FRAME_ANNOTATION_Z_INDEX.blockingOverlay;
+export const Z_INDEX_FRAME_ACTIVE = FRAME_ANNOTATION_Z_INDEX.frameActive;
+export const Z_INDEX_CALLOUT_EDITING = FRAME_ANNOTATION_Z_INDEX.calloutEditing;
+export const Z_INDEX_RESIZE_HANDLES = FRAME_ANNOTATION_Z_INDEX.resizeHandles;
+export const Z_INDEX_FLOATING_UI = FRAME_ANNOTATION_Z_INDEX.floatingUi;
 // Annotation content stays above frame surfaces, but below editors, toolbars, and popovers.
-export const Z_INDEX_STEP_BADGE = 2147483645;
-
-export function getCursorForDirection(direction: ResizeDirection): string {
-  switch (direction) {
-    case 'nw':
-    case 'se':
-      return 'nwse-resize';
-    case 'ne':
-    case 'sw':
-      return 'nesw-resize';
-    case 'n':
-    case 's':
-      return 'ns-resize';
-    case 'e':
-    case 'w':
-      return 'ew-resize';
-    default:
-      return 'move';
-  }
-}
+export const Z_INDEX_STEP_BADGE = FRAME_ANNOTATION_Z_INDEX.stepBadge;
 
 export function updateEffectOverlay(
   effectMode: EffectMode,

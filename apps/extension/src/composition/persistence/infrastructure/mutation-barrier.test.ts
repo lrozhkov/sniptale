@@ -5,6 +5,7 @@ import {
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithPersistenceMutationPermit,
+  runWithPersistenceMutationTransition,
   runWithPersistenceDomainMutationLock,
   runWithPersistentDataErasureBarrier,
   type PersistenceLockManager,
@@ -120,6 +121,26 @@ it('keeps a live mutation admitted until completion and queues erasure plus late
   expect(erasureOperation.mock.invocationCallOrder[0]).toBeLessThan(
     lateOperation.mock.invocationCallOrder[0]!
   );
+});
+
+it('keeps a cross-context transition ahead of erasure across worker-local state loss', async () => {
+  let releaseTransition!: () => void;
+  const transitionGate = new Promise<void>((resolve) => {
+    releaseTransition = resolve;
+  });
+  const admittedContinuation = vi.fn(async () => transitionGate);
+  const erasureOperation = vi.fn(async () => undefined);
+
+  const transition = runWithPersistenceMutationTransition(admittedContinuation);
+  await vi.waitFor(() => expect(admittedContinuation).toHaveBeenCalledOnce());
+  const erasure = runWithPersistentDataErasureBarrier(erasureOperation);
+  await Promise.resolve();
+  expect(erasureOperation).not.toHaveBeenCalled();
+
+  releaseTransition();
+  await transition;
+  await erasure;
+  expect(erasureOperation).toHaveBeenCalledOnce();
 });
 
 it('issues an unforgeable permit only for the lifetime of its admitted operation', async () => {

@@ -126,4 +126,7 @@ it('keeps click suppression under the hover input owner', () => {
 
   expect(actions.consumeSuppressedClick(click)).toBe(true);
   expect(hoverController.consumeSuppressedClick).toHaveBeenCalledWith(click);
+  hoverController.hasHoverTarget.mockReturnValueOnce(true);
+  expect(actions.hasHoverPreviewTarget()).toBe(true);
+  expect(hoverController.hasHoverTarget).toHaveBeenCalledOnce();
 });

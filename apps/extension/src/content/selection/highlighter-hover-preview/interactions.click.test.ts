@@ -17,6 +17,7 @@ import { createHoverInteractionHandlers } from './interactions';
 import { createHoverSession } from './session';
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -44,7 +45,7 @@ function createFixture(overrides: { hasFrame?: boolean } = {}) {
       isPaused: () => false,
     },
     hoverThrottleMs: 100,
-    overlayActions: { hideHoverOverlay, showHoverOverlay: vi.fn() },
+    overlayActions: { hideHoverOverlay, showHoverOverlay: vi.fn(() => true) },
     session,
   });
   return { addFrame, handlers, hideHoverOverlay, session };
@@ -101,6 +102,53 @@ describe('highlighter hover click interaction', () => {
     expect(targetPolicy.isInsideExistingFrame).toHaveBeenCalledWith(expect.anything(), 80, 90);
     expect(addFrame).not.toHaveBeenCalled();
     expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('creates a nested frame when an interior hover preview is visible', () => {
+    const { addFrame, handlers, session } = createFixture();
+    const event = createClickEvent(80, 90);
+    const nestedTarget = document.createElement('button');
+    session.lastHoverTarget = nestedTarget;
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(nestedTarget);
+    targetPolicy.isInsideExistingFrame.mockReturnValueOnce(true);
+
+    handlers.handleClick(event);
+
+    expect(addFrame).toHaveBeenCalledWith(nestedTarget);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopImmediatePropagation).toHaveBeenCalledOnce();
+  });
+
+  it('cancels a queued hover target before a successful click freezes the preview', () => {
+    const { addFrame, handlers, session } = createFixture();
+    const visibleTarget = document.createElement('button');
+    const queuedTarget = document.createElement('section');
+    const pendingFrames = new Map<number, FrameRequestCallback>();
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        pendingFrames.set(42, callback);
+        return 42;
+      })
+    );
+    vi.stubGlobal(
+      'cancelAnimationFrame',
+      vi.fn((id: number) => pendingFrames.delete(id))
+    );
+    session.lastHoverTarget = visibleTarget;
+    targetResolver.resolveSelectablePageHtmlElement
+      .mockReturnValueOnce(queuedTarget)
+      .mockReturnValueOnce(visibleTarget);
+
+    handlers.handleMouseMove(new MouseEvent('mousemove', { clientX: 20, clientY: 20 }));
+    expect(session.hoverRafId).toBe(42);
+    handlers.handleClick(createClickEvent(20, 20));
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    expect(pendingFrames).toHaveLength(0);
+    expect(session.hoverRafId).toBeNull();
+    expect(session.lastHoverTarget).toBeNull();
+    expect(addFrame).toHaveBeenCalledWith(visibleTarget);
   });
 
   it('uses top-viewport coordinates when arbitrating an iframe border click', () => {

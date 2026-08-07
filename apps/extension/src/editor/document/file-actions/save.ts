@@ -83,11 +83,14 @@ export async function saveEditorRenderedImage(
     loadSettings(),
     loadEditorExportSettings(),
   ]);
-  const dataUrl = controller.renderToDataUrl({
+  const renderOptions = {
     format: exportSettings.imageFormat,
     quality: exportSettings.imageQuality,
     ...(options.outputSize ? { outputSize: options.outputSize } : {}),
-  });
+  } as const;
+  const dataUrl = controller.renderForExport
+    ? await controller.renderForExport(renderOptions)
+    : controller.renderToDataUrl(renderOptions);
   const embedMode = readEditorEmbedMode(window.location.search);
   const actionType = options.actionType ?? 'download_default';
   const assetId = readEditorAssetId(window.location.search);

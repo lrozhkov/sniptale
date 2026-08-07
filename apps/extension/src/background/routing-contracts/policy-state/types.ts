@@ -10,6 +10,7 @@ export type PolicyStateId =
   | 'content-action-runtime-tokens'
   | 'content-action-trusted-event-proofs'
   | 'diagnostics-erasure-exclusion'
+  | 'frame-annotation-raster-jobs'
   | 'gallery-image-update-capabilities'
   | 'llm-session-tokens'
   | 'native-ingestion-erasure-exclusion'

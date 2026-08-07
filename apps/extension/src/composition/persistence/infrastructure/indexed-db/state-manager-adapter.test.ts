@@ -55,13 +55,16 @@ afterEach(() => {
 });
 
 async function verifyMutationInitializationPermit() {
-  let lockQueue = Promise.resolve();
+  const lockQueues = new Map<string, Promise<void>>();
   installPersistenceLockManagerForTests({
-    request(_name, _options, operation) {
-      const execution = lockQueue.then(operation);
-      lockQueue = execution.then(
-        () => undefined,
-        () => undefined
+    request(name, _options, operation) {
+      const execution = (lockQueues.get(name) ?? Promise.resolve()).then(operation);
+      lockQueues.set(
+        name,
+        execution.then(
+          () => undefined,
+          () => undefined
+        )
       );
       return execution;
     },

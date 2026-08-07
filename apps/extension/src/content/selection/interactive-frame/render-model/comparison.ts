@@ -1,5 +1,5 @@
 import type { InteractiveFrameProps } from './types';
-import { createCalloutRenderKey } from '../../callout/model';
+import { createCalloutRenderKey } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 function hasMeaningfulRectChange(
   prevProps: InteractiveFrameProps,

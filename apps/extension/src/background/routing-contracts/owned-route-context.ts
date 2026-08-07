@@ -8,6 +8,7 @@ export type BackgroundOwnedRouteHandlerId =
   | 'ai-settings-mutation'
   | 'content-action-capability-issuance'
   | 'content-runtime-wakeup'
+  | 'frame-annotation-raster'
   | 'llm-content-processing'
   | 'llm-scenario-editor-processing'
   | 'llm-session'

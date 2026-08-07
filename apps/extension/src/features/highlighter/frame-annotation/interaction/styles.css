@@ -1,0 +1,41 @@
+.sniptale-resize-handle {
+  touch-action: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.sniptale-resize-handle:hover {
+  border-color: var(--sniptale-color-accent) !important;
+  background: #ffffff !important;
+}
+
+.sniptale-callout-drag-handle,
+.sniptale-callout-tail-handle,
+.sniptale-step-badge-move-handle {
+  touch-action: none;
+}
+
+.sniptale-callout-drag-handle > svg,
+.sniptale-callout-settings-handle > svg,
+.sniptale-step-badge-move-handle > svg,
+.sniptale-step-badge-settings-handle > svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75;
+}
+
+.sniptale-callout-drag-handle:hover,
+.sniptale-callout-drag-handle:focus-visible,
+.sniptale-callout-settings-handle:hover,
+.sniptale-callout-settings-handle:focus-visible,
+.sniptale-step-badge-move-handle:hover,
+.sniptale-step-badge-move-handle:focus-visible,
+.sniptale-step-badge-settings-handle:hover,
+.sniptale-step-badge-settings-handle:focus-visible,
+.sniptale-callout-tail-handle:hover,
+.sniptale-callout-tail-handle:focus-visible {
+  border-color: var(--sniptale-color-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 20%, transparent) !important;
+}

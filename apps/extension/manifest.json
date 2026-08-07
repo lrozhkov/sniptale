@@ -29,7 +29,9 @@
       "resources": [
         "fonts/manrope-cyrillic-wght-normal.woff2",
         "fonts/manrope-latin-ext-wght-normal.woff2",
-        "fonts/manrope-latin-wght-normal.woff2"
+        "fonts/manrope-latin-wght-normal.woff2",
+        "fonts/marck-script-cyrillic-400-normal.woff2",
+        "fonts/marck-script-latin-400-normal.woff2"
       ],
       "matches": ["http://*/*", "https://*/*"],
       "use_dynamic_url": true

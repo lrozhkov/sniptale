@@ -184,11 +184,11 @@
   "contentScripts": [],
   "webAccessibleResources": [
     {
-      "name": "web_accessible_resources:{\"resources\":[\"fonts/manrope-cyrillic-wght-normal.woff2\",\"fonts/manrope-latin-ext-wght-normal.woff2\",\"fonts/manrope-latin-wght-normal.woff2\"],\"matches\":[\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "name": "web_accessible_resources:{\"resources\":[\"fonts/manrope-cyrillic-wght-normal.woff2\",\"fonts/manrope-latin-ext-wght-normal.woff2\",\"fonts/manrope-latin-wght-normal.woff2\",\"fonts/marck-script-cyrillic-400-normal.woff2\",\"fonts/marck-script-latin-400-normal.woff2\"],\"matches\":[\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
       "owner": "apps/extension/src/content/public/preparation-surface/styles.ts",
-      "feature": "Content runtime font rendering on HTTP and HTTPS pages",
+      "feature": "Content runtime UI and frame-annotation font rendering on HTTP and HTTPS pages",
       "runtimeRoute": "content runtime shadow-DOM CSS loaded through chrome.runtime.getURL font URLs",
-      "capabilityPolicy": "Expose only the exact Manrope font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
+      "capabilityPolicy": "Expose only the exact Manrope and Marck Script font files required by extension-owned content UI; injected JavaScript bundles remain non-web-accessible.",
       "failureBehavior": "Missing font assets fall back to system fonts without expanding web-accessible JavaScript exposure.",
       "justification": "Allows the injected content runtime to render the extension UI consistently after host-page injection.",
       "reviewNote": "Keep resources concrete, dynamic-url scoped, and avoid wildcard WAR entries for injected runtime bundles.",

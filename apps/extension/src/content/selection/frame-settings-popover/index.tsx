@@ -6,12 +6,19 @@ import {
 } from '../interactive-frame/layout/portal';
 import { useFrameSettingsPopoverController } from './controller';
 import type { FrameSettingsPopoverProps } from './types';
-import { FrameSettingsPopoverContent } from './views';
+import { FrameSettingsPopoverContent } from '../../../composition/frame-annotation-controls/frame/views';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import { BorderPresetEditor } from '../../../ui/highlighter-preset-editor';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
-import { useFloatingPopoverDrag, type FloatingPopoverDrag } from '../popover-sync/drag';
-import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover-sync/settings-surface';
+import {
+  useFloatingPopoverDrag,
+  type FloatingPopoverDrag,
+} from '../../../composition/frame-annotation-controls/popover/drag';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../composition/frame-annotation-controls/popover/surface';
+import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 
 function stopPopoverPropagation(event: React.MouseEvent<HTMLDivElement>) {
   event.stopPropagation();
@@ -49,6 +56,7 @@ function FrameSettingsPopoverSurface(props: {
     >
       <div className="sniptale-content-popover-body">
         <FrameSettingsPopoverContent
+          acceptAction={(event) => Boolean(createTrustedContentActionIntentSource(event))}
           compact={props.request.compact ?? false}
           effectMode={props.request.effectMode}
           globalSettings={{ ...settings.global, borderPresets: catalog.visibleBorderPresets }}

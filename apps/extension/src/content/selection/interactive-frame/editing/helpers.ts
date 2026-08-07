@@ -5,7 +5,10 @@ import type {
   ResizeDirection,
 } from '../../../../features/highlighter/contracts';
 import { MIN_FRAME_SIZE, updateEffectOverlay } from '../layout/portal';
-import { getCalloutPerimeterPoint, getCalloutPerimeterPosition } from '../../callout/tail-drag';
+import {
+  preserveFrameAnnotationCalloutDuringResize,
+  resizeFrameAnnotationRect,
+} from '../../../../features/highlighter/frame-annotation/interaction/resize-geometry';
 import { getResizeCalloutCenter } from './resize-callout-geometry';
 
 export function syncInteractiveFrameContainer(
@@ -67,29 +70,13 @@ function getResizedFrame(
   deltaY: number,
   startFrame: FrameData
 ) {
-  let newX = startFrame.x;
-  let newY = startFrame.y;
-  let newWidth = startFrame.width;
-  let newHeight = startFrame.height;
-
-  if (direction.includes('e')) {
-    newWidth = Math.max(MIN_FRAME_SIZE, startFrame.width + deltaX);
-  }
-  if (direction.includes('w')) {
-    const validDelta = Math.min(deltaX, startFrame.width - MIN_FRAME_SIZE);
-    newX = startFrame.x + validDelta;
-    newWidth = startFrame.width - validDelta;
-  }
-  if (direction.includes('s')) {
-    newHeight = Math.max(MIN_FRAME_SIZE, startFrame.height + deltaY);
-  }
-  if (direction.includes('n')) {
-    const validDelta = Math.min(deltaY, startFrame.height - MIN_FRAME_SIZE);
-    newY = startFrame.y + validDelta;
-    newHeight = startFrame.height - validDelta;
-  }
-
-  return { x: newX, y: newY, width: newWidth, height: newHeight };
+  return resizeFrameAnnotationRect({
+    deltaX,
+    deltaY,
+    direction,
+    minimumSize: MIN_FRAME_SIZE,
+    start: startFrame,
+  });
 }
 
 function applyResizeUpdate(params: {
@@ -112,7 +99,7 @@ function applyResizeUpdate(params: {
     params.startFrame
   );
   syncInteractiveFrameContainer(params.containerRef.current, resizedFrame);
-  const nextFrame = preserveCalloutGeometryDuringResize(
+  const nextFrame = preserveFrameAnnotationCalloutDuringResize(
     params.startFrame,
     resizedFrame,
     params.calloutCenter
@@ -158,75 +145,4 @@ export function applyInteractiveFramePointerUpdate(
     return;
   }
   applyDragUpdate(update);
-}
-
-function preserveCalloutGeometryDuringResize(
-  startFrame: FrameData,
-  resizedFrame: Pick<FrameData, 'x' | 'y' | 'width' | 'height'>,
-  calloutCenter: { x: number; y: number } | null
-): FrameData {
-  const nextFrame = { ...startFrame, ...resizedFrame };
-  if (!startFrame.callout?.enabled || !calloutCenter) return nextFrame;
-
-  const startCenter = {
-    x: startFrame.x + startFrame.width / 2,
-    y: startFrame.y + startFrame.height / 2,
-  };
-  const resizedCenter = {
-    x: resizedFrame.x + resizedFrame.width / 2,
-    y: resizedFrame.y + resizedFrame.height / 2,
-  };
-  const connectorWaypoint = startFrame.callout.placement.connectorWaypoint;
-  const frameAttachment = startFrame.callout.placement.connectorAttachments?.frame;
-  const connectorFramePosition =
-    frameAttachment?.mode === 'free'
-      ? frameAttachment.perimeterPosition
-      : frameAttachment
-        ? undefined
-        : startFrame.callout.placement.connectorFramePosition;
-  const stationaryFramePosition =
-    startFrame.callout.style.connector.kind === 'line' && connectorFramePosition !== undefined
-      ? getCalloutPerimeterPosition(
-          resizedFrame,
-          getCalloutPerimeterPoint(startFrame, connectorFramePosition)
-        )
-      : connectorFramePosition;
-
-  return {
-    ...nextFrame,
-    callout: {
-      ...startFrame.callout,
-      placement: {
-        ...startFrame.callout.placement,
-        manualPlacement: {
-          centerOffsetX: calloutCenter.x - resizedCenter.x,
-          centerOffsetY: calloutCenter.y - resizedCenter.y,
-        },
-        ...(stationaryFramePosition === undefined
-          ? {}
-          : { connectorFramePosition: stationaryFramePosition }),
-        ...(frameAttachment?.mode === 'free' && stationaryFramePosition !== undefined
-          ? {
-              connectorAttachments: {
-                block: startFrame.callout.placement.connectorAttachments?.block ?? {
-                  mode: 'auto',
-                },
-                frame: {
-                  ...frameAttachment,
-                  perimeterPosition: stationaryFramePosition,
-                },
-              },
-            }
-          : {}),
-        ...(connectorWaypoint
-          ? {
-              connectorWaypoint: {
-                centerOffsetX: startCenter.x + connectorWaypoint.centerOffsetX - resizedCenter.x,
-                centerOffsetY: startCenter.y + connectorWaypoint.centerOffsetY - resizedCenter.y,
-              },
-            }
-          : {}),
-      },
-    },
-  };
 }

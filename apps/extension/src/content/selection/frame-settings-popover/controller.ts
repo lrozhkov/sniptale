@@ -11,8 +11,8 @@ import {
   useFrameSettingsPopoverOutsideClose,
 } from './sync';
 import { useFrameSettingsPopoverState } from './state';
-import { usePopoverEscapeClose } from '../popover-sync/hooks';
-import { usePopoverInteractionDismissal } from '../popover-sync/interaction-dismissal';
+import { usePopoverEscapeClose } from '../../../composition/frame-annotation-controls/popover/hooks';
+import { usePopoverInteractionDismissal } from '../../../composition/frame-annotation-controls/popover/interaction-dismissal';
 
 export function useFrameSettingsPopoverController(args: {
   anchorEl: HTMLElement | null;

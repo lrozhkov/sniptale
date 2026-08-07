@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const sessionModule = vi.hoisted(() => {
-  const session = { owner: 'hover-session' };
+  const session = { lastHoverTarget: null as HTMLElement | null, owner: 'hover-session' };
   return {
     createHoverSession: vi.fn(() => session),
     invalidateHoverFrameCache: vi.fn(),
@@ -59,6 +59,7 @@ import { createHighlighterHoverController, logAccessibleIframeCount } from '.';
 
 afterEach(() => {
   vi.clearAllMocks();
+  sessionModule.session.lastHoverTarget = null;
 });
 
 function createStateGetters() {
@@ -89,14 +90,17 @@ describe('highlighter hover preview controller', () => {
       getCallbacks,
       getState,
       hoverThrottleMs: 100,
-      overlayActions: overlayModule.actions,
+      overlayActions: {
+        ...overlayModule.actions,
+        hideHoverOverlay: expect.any(Function),
+      },
       session: sessionModule.session,
       consumeSuppressedClick: drawingModule.handlers.consumeSuppressedClick,
     });
     expect(drawingModule.createFreeFrameDrawingHandlers).toHaveBeenCalledWith({
       getCallbacks,
       getState,
-      hideHoverOverlay: overlayModule.actions.hideHoverOverlay,
+      hideHoverOverlay: expect.any(Function),
       session: sessionModule.session,
     });
   });
@@ -123,19 +127,39 @@ describe('highlighter hover preview controller', () => {
     controller.input.cancelDrawing();
     controller.input.consumeSuppressedClick(event);
 
+    expect(controller.tracking.hasTarget()).toBe(false);
+    sessionModule.session.lastHoverTarget = document.createElement('button');
+    expect(controller.tracking.hasTarget()).toBe(true);
+    controller.overlay.hidePreview();
+    expect(controller.tracking.hasTarget()).toBe(false);
+
     expect(overlayModule.actions.createOverlayContainer).toHaveBeenCalledOnce();
     expect(overlayModule.actions.removeOverlayContainer).toHaveBeenCalledOnce();
     expect(overlayModule.actions.createHoverOverlay).toHaveBeenCalledOnce();
     expect(overlayModule.actions.removeHoverOverlay).toHaveBeenCalledOnce();
-    expect(overlayModule.actions.hideHoverOverlay).toHaveBeenCalledOnce();
+    expect(overlayModule.actions.hideHoverOverlay).toHaveBeenCalledTimes(2);
     expect(sessionModule.invalidateHoverFrameCache).toHaveBeenCalledWith(sessionModule.session);
     expect(interactionModule.handlers.handleMouseMove).toHaveBeenCalledWith(event, iframe);
     expect(interactionModule.handlers.handleMouseLeave).toHaveBeenCalledOnce();
     expect(interactionModule.handlers.handleClick).toHaveBeenCalledWith(event, iframe);
-    expect(interactionModule.handlers.cancelPendingHoverFrame).toHaveBeenCalledOnce();
+    expect(interactionModule.handlers.cancelPendingHoverFrame).toHaveBeenCalledTimes(5);
     expect(interactionModule.handlers.clearHoverTracking).toHaveBeenCalledOnce();
     expect(drawingModule.handlers.cancelDrawing).toHaveBeenCalledOnce();
     expect(drawingModule.handlers.consumeSuppressedClick).toHaveBeenCalledWith(event);
+  });
+
+  it('invalidates pending hover work before a hidden preview can retain click authority', () => {
+    const controller = createHighlighterHoverController(
+      () => ({ addFrame: null, addFreeFrame: null, hasFrameForElement: null }),
+      createStateGetters()
+    );
+    sessionModule.session.lastHoverTarget = document.createElement('button');
+
+    controller.overlay.hidePreview();
+
+    expect(interactionModule.handlers.cancelPendingHoverFrame).toHaveBeenCalledOnce();
+    expect(overlayModule.actions.hideHoverOverlay).toHaveBeenCalledOnce();
+    expect(controller.tracking.hasTarget()).toBe(false);
   });
 
   it('logs the accessible iframe count', () => {

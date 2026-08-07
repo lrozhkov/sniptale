@@ -13,6 +13,7 @@ import {
 } from '../instance/actions/lifecycle/tool-mode';
 import { ImageEditorControllerLayerActions } from './controller-layer-actions';
 import type { OpenImageOptions } from './types';
+import { renderEditorControllerForExport } from '../public-api';
 
 export abstract class ImageEditorControllerLifecycleActions extends ImageEditorControllerLayerActions {
   protected abstract getDocumentCommandService(): EditorDocumentCommandService;
@@ -48,6 +49,10 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
 
   renderToDataUrl(options: EditorRenderToDataUrlOptions) {
     return this.getDocumentCommandService().renderToDataUrl(this.getControllerInstance(), options);
+  }
+
+  async renderForExport(options: EditorRenderToDataUrlOptions) {
+    return renderEditorControllerForExport(this.getControllerInstance(), options);
   }
 
   async copyRenderedImage(options?: EditorRenderedImageOptions) {

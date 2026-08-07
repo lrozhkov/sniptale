@@ -1,8 +1,13 @@
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { cloneCanvasBitmap, projectViewerFrames } from './canvas';
-import { drawViewerDecorations } from './decoration';
-import { drawViewerBlurLayers, drawViewerFocusLayer } from './effects';
+import { createFrameAnnotationSnapshot } from '../../../../features/highlighter/frame-annotation';
+import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotation-raster-client';
+import { blobToDataUrl, dataUrlToBlob } from '../../../../platform/media-utils/data-url';
 import type { ViewerCaptureMode } from '../types';
+import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../../platform/i18n';
+
+const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
 
 function loadDataUrlImage(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -19,38 +24,42 @@ export async function composeViewerCaptureOverlays(args: {
   iframe: HTMLIFrameElement;
   mode: ViewerCaptureMode;
 }): Promise<string> {
-  if (args.frames.length === 0) {
-    return args.baseDataUrl;
-  }
-
+  if (args.frames.length === 0) return args.baseDataUrl;
   const image = await loadDataUrlImage(args.baseDataUrl);
   const imageWidth = image.naturalWidth || image.width;
   const imageHeight = image.naturalHeight || image.height;
-  if (imageWidth <= 0 || imageHeight <= 0) {
-    return args.baseDataUrl;
-  }
-
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Web snapshot viewer overlay canvas is unavailable.');
-  }
+  if (imageWidth <= 0 || imageHeight <= 0) return args.baseDataUrl;
 
   const scale = window.devicePixelRatio || 1;
   const width = imageWidth / scale;
   const height = imageHeight / scale;
-  canvas.width = imageWidth;
-  canvas.height = imageHeight;
-  context.drawImage(image, 0, 0, imageWidth, imageHeight);
-  context.scale(scale, scale);
-  const projections = projectViewerFrames(args);
-  drawViewerFocusLayer({ context, projections, scale, width, height });
-  const backdrop = cloneCanvasBitmap(canvas);
-  if (!backdrop) {
-    throw new Error('Web snapshot viewer effect backdrop is unavailable.');
+  const iframeRect = args.iframe.getBoundingClientRect();
+  const scrollX = args.mode === 'full' ? (args.iframe.contentWindow?.scrollX ?? 0) : 0;
+  const scrollY = args.mode === 'full' ? (args.iframe.contentWindow?.scrollY ?? 0) : 0;
+  const snapshots = args.frames.map((frame, ordering) =>
+    createFrameAnnotationSnapshot(
+      {
+        ...frame,
+        x: frame.x - iframeRect.left + scrollX,
+        y: frame.y - iframeRect.top + scrollY,
+      },
+      ordering
+    )
+  );
+  const output = await rasterizeFrameAnnotations({
+    transport: frameAnnotationRasterTransport,
+    input: {
+      baseImage: await dataUrlToBlob(args.baseDataUrl),
+      width,
+      height,
+      requestedWidth: imageWidth,
+      requestedHeight: imageHeight,
+      snapshots,
+    },
+  });
+  const result = await blobToDataUrl(output.blob);
+  if (output.metadata.downscaled) {
+    showToast(translate('highlighter.exportOptimizedSize'), 'warning');
   }
-  drawViewerBlurLayers({ context, backdrop, projections, scale, width, height });
-  drawViewerDecorations(context, projections);
-
-  return canvas.toDataURL('image/png');
+  return result;
 }

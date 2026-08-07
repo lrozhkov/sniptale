@@ -90,7 +90,86 @@ function isPageStorageErasureOperation(value: unknown): value is 'erase' | 'veri
   return value === 'erase' || value === 'verify';
 }
 
+function isFrameAnnotationRasterReference(value: unknown): value is {
+  inputSha256: string;
+  jobId: string;
+  revision: number;
+} {
+  return (
+    isRecord(value) &&
+    isString(value['jobId']) &&
+    isString(value['inputSha256']) &&
+    isNumber(value['revision']) &&
+    Number.isSafeInteger(value['revision']) &&
+    value['revision'] >= 0
+  );
+}
+
+function isFrameAnnotationRasterLeaseId(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= 128;
+}
+
+const isFrameAnnotationRasterResponseEnvelope = createRuntimeResponseGuard<
+  RuntimeMessageResponse<{ result: string }>
+>({ optional: { result: isString } });
+
+function isFrameAnnotationRasterResponse(
+  value: unknown
+): value is RuntimeMessageResponse<{ result: string }> {
+  return (
+    isFrameAnnotationRasterResponseEnvelope(value) &&
+    isRecord(value) &&
+    (value['success'] !== true || isString(value['result']))
+  );
+}
+
 export const runtimeActionCoreMessageContracts = {
+  [MessageType.FRAME_ANNOTATION_RASTERIZE]: {
+    parseRequest: createGuardParser(
+      'runtime FRAME_ANNOTATION_RASTERIZE message',
+      (
+        value
+      ): value is
+        | {
+            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+            operation: 'prepare';
+            leaseId: string;
+          }
+        | {
+            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+            operation: 'cancel';
+            leaseId: string;
+          }
+        | {
+            type: typeof MessageType.FRAME_ANNOTATION_RASTERIZE;
+            operation: 'rasterize';
+            reference: { inputSha256: string; jobId: string; revision: number };
+          } =>
+        isRecord(value) &&
+        value['type'] === MessageType.FRAME_ANNOTATION_RASTERIZE &&
+        ((value['operation'] === 'prepare' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
+          (value['operation'] === 'cancel' && isFrameAnnotationRasterLeaseId(value['leaseId'])) ||
+          (value['operation'] === 'rasterize' &&
+            isFrameAnnotationRasterReference(value['reference'])))
+    ),
+    parseResponse: createGuardParser(
+      'runtime FRAME_ANNOTATION_RASTERIZE response',
+      isFrameAnnotationRasterResponse
+    ),
+  },
+  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE message',
+      createMessageGuard({
+        type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+        required: { capabilityToken: isString, reference: isFrameAnnotationRasterReference },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE response',
+      isFrameAnnotationRasterResponse
+    ),
+  },
   [MessageType.REQUEST_LLM_SESSION]: {
     parseRequest: createZodParser<RequestLlmSessionMessage>(
       'runtime REQUEST_LLM_SESSION message',

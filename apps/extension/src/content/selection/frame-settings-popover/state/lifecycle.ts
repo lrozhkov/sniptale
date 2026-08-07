@@ -15,6 +15,11 @@ import {
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { getDefaultFocusSettings } from './helpers';
 import {
+  createSessionVisibleBorderPresetIds,
+  mergeSessionVisibleBorderPresetIds,
+  selectSessionVisibleBorderPresets,
+} from '../../../../features/highlighter/presets/session-visible';
+import {
   cloneAppliedBorderSettings,
   normalizeAppliedBorderSettings,
   projectBorderPresetToAppliedSettings,
@@ -57,12 +62,6 @@ function createInitialDraft(): FrameSettingsDraft {
   };
 }
 
-function getEnabledPresetIds(settings: HighlighterSettings): string[] {
-  return settings.borderPresets
-    .filter((preset) => preset.enabled !== false)
-    .map((preset) => preset.id);
-}
-
 function createLifecycleState(args: {
   blurSettings?: BlurSettings;
   borderSettings?: AppliedBorderSettings;
@@ -94,7 +93,7 @@ function applyLoadedFrameSettingsDefaults(
     return {
       ...current,
       globalSettings: settings,
-      visiblePresetIds: getEnabledPresetIds(settings),
+      visiblePresetIds: createSessionVisibleBorderPresetIds(settings),
       ...(!source.blur && !dirty.blur
         ? {
             localBlurSettings: {
@@ -169,7 +168,7 @@ function syncFrameSettingsPopoverOpenState(
         selectedPresetId: localBorderSettings.sourcePresetId,
         localBlurSettings: { ...(lifecycle.source.blur ?? DEFAULT_BLUR_SETTINGS) },
         localFocusSettings: { ...(lifecycle.source.focus ?? getDefaultFocusSettings()) },
-        visiblePresetIds: getEnabledPresetIds(current.globalSettings),
+        visiblePresetIds: createSessionVisibleBorderPresetIds(current.globalSettings),
       };
     });
   } else if (!isOpen && lifecycle.previousOpen && historyTransaction) {
@@ -229,15 +228,17 @@ export function useFrameSettingsPopoverLifecycle(args: {
       reconcileCatalogSettings: (settings: HighlighterSettings, revealPresetId?: string) => {
         lifecycleRef.current.catalogRevision += 1;
         setDraft((current) => {
-          const visiblePresetIds =
-            revealPresetId && !current.visiblePresetIds.includes(revealPresetId)
-              ? [...current.visiblePresetIds, revealPresetId]
-              : current.visiblePresetIds;
+          const visiblePresetIds = mergeSessionVisibleBorderPresetIds(
+            current.visiblePresetIds,
+            settings,
+            revealPresetId
+          );
           return { ...current, globalSettings: settings, visiblePresetIds };
         });
       },
-      visibleBorderPresets: draft.globalSettings.borderPresets.filter((preset) =>
-        draft.visiblePresetIds.includes(preset.id)
+      visibleBorderPresets: selectSessionVisibleBorderPresets(
+        draft.globalSettings,
+        draft.visiblePresetIds
       ),
     },
     frame: {

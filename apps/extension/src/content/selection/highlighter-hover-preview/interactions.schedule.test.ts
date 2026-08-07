@@ -18,7 +18,7 @@ import { createHoverSession } from './session';
 
 function createArgs() {
   const hideHoverOverlay = vi.fn();
-  const showHoverOverlay = vi.fn();
+  const showHoverOverlay = vi.fn(() => true);
   const session = createHoverSession();
   const args: Parameters<typeof scheduleHoverOverlayUpdate>[0] = {
     event: new MouseEvent('mousemove', { clientX: 120, clientY: 80 }),
@@ -122,6 +122,31 @@ describe('highlighter hover scheduling', () => {
     expect(showHoverOverlay).toHaveBeenCalledWith(target);
     expect(session.lastHoverTarget).toBe(target);
     expect(session.hoverRafId).toBe(77);
+  });
+
+  it('does not retain a target when the preview owner refuses to show it', () => {
+    const target = document.createElement('div');
+    const { args, hideHoverOverlay, session, showHoverOverlay } = createArgs();
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
+    showHoverOverlay.mockReturnValueOnce(false);
+
+    scheduleHoverOverlayUpdate(args);
+
+    expect(showHoverOverlay).toHaveBeenCalledWith(target);
+    expect(hideHoverOverlay).toHaveBeenCalledOnce();
+    expect(session.lastHoverTarget).toBeNull();
+  });
+
+  it('shows an eligible nested target inside an existing annotation frame', () => {
+    const target = document.createElement('button');
+    const { args, session, showHoverOverlay } = createArgs();
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
+    targetPolicy.isInsideExistingFrame.mockReturnValueOnce(true);
+
+    scheduleHoverOverlayUpdate(args);
+
+    expect(showHoverOverlay).toHaveBeenCalledWith(target);
+    expect(session.lastHoverTarget).toBe(target);
   });
 
   it('stops inside the frame when mode state changes before processing', () => {

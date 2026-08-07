@@ -40,7 +40,8 @@ function createHandlers(
     kind: 'frame-settings' | 'step-badge' | 'callout-settings';
   } | null = null,
   consumeSuppressedClick = vi.fn(() => false),
-  frames: FrameData[] = [frame()]
+  frames: FrameData[] = [frame()],
+  hasHoverPreviewTarget = vi.fn(() => false)
 ) {
   const actions = {
     clearSelection: vi.fn(),
@@ -55,6 +56,7 @@ function createHandlers(
       activePopoverRef: { current: activePopover },
       selectedFrameIdRef: { current: selectedFrameId },
       consumeSuppressedClick,
+      hasHoverPreviewTarget,
       ...actions,
     }),
   };
@@ -83,6 +85,29 @@ describe('frame selection events', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it('keeps a frame border authoritative over a stale interior hover preview', () => {
+    const hasHoverPreviewTarget = vi.fn(() => true);
+    const { actions, handlers } = createHandlers(
+      null,
+      null,
+      vi.fn(() => false),
+      [frame()],
+      hasHoverPreviewTarget
+    );
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: 101,
+      clientY: 150,
+    });
+
+    handlers.click(event);
+
+    expect(hasHoverPreviewTarget).not.toHaveBeenCalled();
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it('selects and consumes a simple primary click in the frame interior', () => {
     const { actions, handlers } = createHandlers();
     const event = new MouseEvent('click', {
@@ -96,6 +121,31 @@ describe('frame selection events', () => {
 
     expect(actions.selectFrame).toHaveBeenCalledWith('frame-1', { x: 90, y: 50 });
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('leaves an interior click for the visible hover-preview owner', () => {
+    const consumeSuppressedClick = vi.fn(() => false);
+    const hasHoverPreviewTarget = vi.fn(() => true);
+    const { actions, handlers } = createHandlers(
+      null,
+      null,
+      consumeSuppressedClick,
+      [frame()],
+      hasHoverPreviewTarget
+    );
+    const event = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+      clientX: 190,
+      clientY: 150,
+    });
+
+    handlers.click(event);
+
+    expect(hasHoverPreviewTarget).toHaveBeenCalledOnce();
+    expect(consumeSuppressedClick).toHaveBeenCalledWith(event);
+    expect(actions.selectFrame).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it.each([

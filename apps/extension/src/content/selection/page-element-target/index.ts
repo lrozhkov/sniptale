@@ -191,13 +191,42 @@ export function resolveSelectablePageElement(
   return resolveSelectablePageProjection(event, (element) => element, iframe);
 }
 
+function isAnnotationHtmlTarget(element: SelectablePageElement): element is HTMLElement {
+  if (element.namespaceURI !== HTML_NAMESPACE) return false;
+  const document = element.ownerDocument;
+  if (element === document.documentElement || element === document.body) return false;
+  const view = document.defaultView;
+  if (!view) return false;
+
+  return Array.from(element.getClientRects()).some((rect) => {
+    const intersectionWidth = Math.min(rect.right, view.innerWidth) - Math.max(rect.left, 0);
+    const intersectionHeight = Math.min(rect.bottom, view.innerHeight) - Math.max(rect.top, 0);
+    return intersectionWidth > 0 && intersectionHeight > 0;
+  });
+}
+
+function isHtmlTarget(element: SelectablePageElement): element is HTMLElement {
+  return element.namespaceURI === HTML_NAMESPACE;
+}
+
+export function resolveDrawablePageHtmlElement(
+  event: Event,
+  iframe?: HTMLIFrameElement
+): HTMLElement | null {
+  return resolveSelectablePageProjection(
+    event,
+    (element) => (isHtmlTarget(element) ? element : null),
+    iframe
+  );
+}
+
 export function resolveSelectablePageHtmlElement(
   event: Event,
   iframe?: HTMLIFrameElement
 ): HTMLElement | null {
   return resolveSelectablePageProjection(
     event,
-    (element) => (element.namespaceURI === HTML_NAMESPACE ? (element as HTMLElement) : null),
+    (element) => (isAnnotationHtmlTarget(element) ? element : null),
     iframe
   );
 }
