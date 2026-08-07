@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   installFont: vi.fn(async () => undefined),
   toCanvas: vi.fn(),
 }));
+vi.mock('@sniptale/platform/browser/runtime', () => ({
+  runtimeInfo: { getURL: (path: string) => `chrome-extension://test/${path}` },
+}));
 vi.mock('@zumer/snapdom', () => ({ snapdom: { toCanvas: mocks.toCanvas } }));
 vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/media-utils/data-url')>()),
@@ -94,7 +97,21 @@ it('rasterizes through SnapDOM with the bounded offscreen options and cleans its
   ).resolves.toMatchObject({ metadata: { downscaled: false, outputWidth: 100, outputHeight: 50 } });
   expect(mocks.toCanvas).toHaveBeenCalledWith(
     expect.any(HTMLElement),
-    expect.objectContaining({ compress: false, dpr: 1, embedFonts: false })
+    expect.objectContaining({
+      compress: false,
+      dpr: 1,
+      embedFonts: true,
+      localFonts: expect.arrayContaining([
+        expect.objectContaining({
+          family: 'Sniptale Handwritten',
+          src: 'chrome-extension://test/fonts/marck-script-cyrillic-400-normal.woff2',
+        }),
+        expect.objectContaining({
+          family: 'Sniptale Handwritten',
+          src: 'chrome-extension://test/fonts/marck-script-latin-400-normal.woff2',
+        }),
+      ]),
+    })
   );
   expect(document.body.childElementCount).toBe(before);
 });

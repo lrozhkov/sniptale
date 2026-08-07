@@ -1,6 +1,6 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 
-const FONT_FAMILY = 'Sniptale Handwritten';
+const FRAME_CALLOUT_HANDWRITTEN_FONT_FAMILY = 'Sniptale Handwritten';
 const FONT_ASSETS = [
   {
     path: 'fonts/marck-script-cyrillic-400-normal.woff2',
@@ -33,7 +33,7 @@ const installationByDocument = new WeakMap<object, Promise<void>>();
 
 const defaultDependencies: FontInstallerDependencies = {
   createFace: (source, unicodeRange) =>
-    new FontFace(FONT_FAMILY, source, {
+    new FontFace(FRAME_CALLOUT_HANDWRITTEN_FONT_FAMILY, source, {
       display: 'block',
       style: 'normal',
       weight: '400',
@@ -46,6 +46,20 @@ const defaultDependencies: FontInstallerDependencies = {
   },
   resolveAssetUrl: (path) => runtimeInfo.getURL(path),
 };
+
+export function getFrameCalloutHandwrittenFontSources(): Array<{
+  family: string;
+  src: string;
+  style: 'normal';
+  weight: '400';
+}> {
+  return FONT_ASSETS.map((asset) => ({
+    family: FRAME_CALLOUT_HANDWRITTEN_FONT_FAMILY,
+    src: runtimeInfo.getURL(asset.path),
+    style: 'normal',
+    weight: '400',
+  }));
+}
 
 /** Installs the bundled face into the actual document that owns the rendered surface. */
 export function installFrameCalloutHandwrittenFont(

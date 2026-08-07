@@ -148,8 +148,8 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
       settings: { ...badge, manualPlacement: { position: 0.5, side: 'right' } },
       zIndex: 2,
       clickable: true,
-    }).right
-  ).toBe(0);
+    })
+  ).toMatchObject({ boxSizing: 'border-box', right: 0 });
   for (const side of ['top', 'bottom', 'left'] as const) {
     expect(
       getStepBadgeStyle({
@@ -224,6 +224,7 @@ it('renders ordered border, blur, focus, badge, and callout export surfaces', as
   expect(html).toContain('sniptale-callout');
   expect(html).toContain('<b>Body</b>');
   expect(html).toContain('sniptale-step-badge');
+  expect(html).toContain('--sniptale-color-surface-base: #ffffff');
 });
 
 it('covers callout badge fallbacks and disabled/measurement variants', () => {

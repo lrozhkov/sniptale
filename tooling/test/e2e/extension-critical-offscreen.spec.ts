@@ -11,6 +11,10 @@ import {
   createFrameAnnotationSnapshot,
   parseFrameAnnotationSnapshot,
 } from '../../../apps/extension/src/features/highlighter/frame-annotation';
+import {
+  createDefaultFrameCallout,
+  createDefaultFrameStepBadge,
+} from '../../../apps/extension/src/features/highlighter/frame-annotation/defaults';
 import { test } from './support/extension-fixture';
 import {
   applyHarnessBootstrap,
@@ -219,14 +223,24 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
     waitUntil: 'domcontentloaded',
   });
   await page.locator('[data-ui="editor.page.root"]').waitFor();
+  const callout = createDefaultFrameCallout();
+  callout.content.bodyHtml = 'Тест';
+  callout.style.surface.textColor = '#ef4444';
+  callout.style.typography.fontFamily = 'cursive';
+  callout.style.typography.fontSize = 36;
+  callout.style.typography.fontWeight = 'bold';
+  callout.style.typography.maxWidth = 220;
+  const stepBadge = { ...createDefaultFrameStepBadge(), auto: false, value: '1' };
   const createdSnapshot = createFrameAnnotationSnapshot(
     {
       id: 'frame-raster-e2e',
-      x: 20,
-      y: 20,
+      x: 80,
+      y: 110,
       width: 120,
       height: 50,
       effectMode: 'border',
+      callout,
+      stepBadge,
       borderSettings: {
         color: '#ff0000',
         customCss: '',
@@ -266,8 +280,8 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
       if (!prepare?.success) throw new Error('Frame raster prepare failed');
 
       const canvas = document.createElement('canvas');
-      canvas.width = 200;
-      canvas.height = 100;
+      canvas.width = 260;
+      canvas.height = 180;
       const context = canvas.getContext('2d');
       if (!context) throw new Error('2D canvas is unavailable');
       context.fillStyle = '#f3f4f6';
@@ -280,7 +294,7 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
       });
       const snapshots = [frameSnapshot];
       const metadata = new TextEncoder().encode(
-        JSON.stringify({ width: 200, height: 100, snapshots })
+        JSON.stringify({ width: 260, height: 180, snapshots })
       );
       const imageBytes = new Uint8Array(await baseImage.arrayBuffer());
       const digestInput = new Uint8Array(metadata.length + imageBytes.length);
@@ -301,7 +315,7 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
         transaction.objectStore(jobStore).put({
           ...reference,
           createdAt: Date.now(),
-          input: { baseImage, height: 100, snapshots, width: 200 },
+          input: { baseImage, height: 180, snapshots, width: 260 },
         });
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
@@ -338,11 +352,59 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
         const pixels = outputContext.getImageData(0, 0, bitmap.width, bitmap.height).data;
         let opaque = 0;
         let red = 0;
+        let whiteBadgeOutline = 0;
+        let calloutDark = 0;
+        let calloutRed = 0;
+        let calloutDarkLeft = bitmap.width;
+        let calloutDarkRight = -1;
+        let calloutRedLeft = bitmap.width;
+        let calloutRedRight = -1;
         for (let index = 0; index < pixels.length; index += 4) {
+          const pixelIndex = index / 4;
+          const x = pixelIndex % bitmap.width;
+          const y = Math.floor(pixelIndex / bitmap.width);
           if (pixels[index + 3] > 0) opaque += 1;
           if (pixels[index] > 200 && pixels[index + 1] < 80 && pixels[index + 2] < 80) red += 1;
+          const badgeDistance = Math.hypot(x - 80, y - 110);
+          if (
+            badgeDistance >= 12 &&
+            badgeDistance <= 16 &&
+            pixels[index] > 250 &&
+            pixels[index + 1] > 250 &&
+            pixels[index + 2] > 250
+          ) {
+            whiteBadgeOutline += 1;
+          }
+          if (y < 95 && pixels[index] < 75 && pixels[index + 1] < 85 && pixels[index + 2] < 95) {
+            calloutDark += 1;
+            calloutDarkLeft = Math.min(calloutDarkLeft, x);
+            calloutDarkRight = Math.max(calloutDarkRight, x);
+          }
+          if (y < 95 && pixels[index] > 180 && pixels[index + 1] < 110 && pixels[index + 2] < 110) {
+            calloutRed += 1;
+            calloutRedLeft = Math.min(calloutRedLeft, x);
+            calloutRedRight = Math.max(calloutRedRight, x);
+          }
         }
-        return { elapsedMs: performance.now() - startedAt, opaque, red, size: output.size };
+        const preview = document.createElement('img');
+        preview.dataset['ui'] = 'frame-raster-e2e-output';
+        preview.src = URL.createObjectURL(output);
+        preview.style.cssText = 'display:block;width:520px;height:360px;image-rendering:auto';
+        document.body.replaceChildren(preview);
+        await preview.decode();
+        return {
+          calloutDark,
+          calloutDarkLeft,
+          calloutDarkRight,
+          calloutRed,
+          calloutRedLeft,
+          calloutRedRight,
+          elapsedMs: performance.now() - startedAt,
+          opaque,
+          red,
+          size: output.size,
+          whiteBadgeOutline,
+        };
       } finally {
         await send({ type: 'FRAME_ANNOTATION_RASTERIZE', operation: 'cancel', leaseId });
         database.close();
@@ -358,6 +420,11 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
 
   expect(result.elapsedMs).toBeLessThan(15_000);
   expect(result.size).toBeGreaterThan(500);
-  expect(result.opaque).toBe(20_000);
+  expect(result.opaque).toBe(46_800);
   expect(result.red).toBeGreaterThan(100);
+  expect(result.calloutDark).toBeGreaterThan(1_000);
+  expect(result.calloutRed).toBeGreaterThan(50);
+  expect(result.calloutRedLeft).toBeGreaterThan(result.calloutDarkLeft + 4);
+  expect(result.calloutRedRight).toBeLessThan(result.calloutDarkRight - 4);
+  expect(result.whiteBadgeOutline).toBeGreaterThan(20);
 });

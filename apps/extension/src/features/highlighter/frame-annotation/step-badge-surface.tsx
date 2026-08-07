@@ -79,6 +79,7 @@ export function getStepBadgeStyle(props: {
     height: `${badgeSize}px`,
     minWidth: `${badgeSize}px`,
     minHeight: `${badgeSize}px`,
+    boxSizing: 'border-box',
     borderRadius: '50%',
     backgroundColor: visual.backgroundColor,
     color: visual.textColor,

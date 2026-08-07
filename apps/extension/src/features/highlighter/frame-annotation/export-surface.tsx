@@ -33,7 +33,17 @@ export function FrameAnnotationExportSurface(props: {
   return (
     <div
       ref={setPortalTarget}
-      style={{ position: 'relative', width: props.width, height: props.height, overflow: 'hidden' }}
+      style={
+        {
+          position: 'relative',
+          width: props.width,
+          height: props.height,
+          overflow: 'hidden',
+          '--sniptale-color-text-inverse': '#ffffff',
+          '--sniptale-color-surface-base': '#ffffff',
+          '--sniptale-color-accent': '#f97316',
+        } as React.CSSProperties
+      }
     >
       {distortionScale > 0 ? <FrameAnnotationDistortionFilter scale={distortionScale} /> : null}
       <img
