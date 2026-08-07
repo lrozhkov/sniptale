@@ -182,7 +182,7 @@ function ManageSizePresetsButton() {
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
-      onClick={() => void openSettingsPage({ section: 'presets' })}
+      onClick={() => void openSettingsPage({ route: { section: 'screen-sizes' } })}
     >
       {translate('popup.video.manageSizePresets')}
     </button>

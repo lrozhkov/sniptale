@@ -9,11 +9,10 @@ const HIGH_RISK_FOCUSED_PROOF_PATTERNS = [
   /^apps\/extension\/src\/composition\/persistence\//u,
   /^apps\/extension\/src\/features\/ai\/privacy\//u,
   /^apps\/extension\/src\/platform\/(?:security|sanitizers)\//u,
-  /^apps\/extension\/src\/settings\/(?:runtime\/privacy-erasure-client|sections\/privacy)\//u,
+  /^apps\/extension\/src\/settings\/runtime\/(?:ai-settings|privacy-erasure-client)\//u,
+  /^apps\/extension\/src\/settings\/sections\/system\/access-data\/privacy\//u,
   /^packages\/(?:runtime-contracts|platform)\/src\//u,
   /^apps\/extension\/src\/background\/llm\//u,
-  /^src\/settings\/sections\/ai-providers\//u,
-  /^apps\/extension\/src\/settings\/sections\/ai-providers\//u,
 ];
 
 const HIGH_RISK_FOCUSED_PROOF_EXCLUSIONS = new Set([

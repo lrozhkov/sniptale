@@ -38,32 +38,32 @@ function markerComponent(label: string) {
   return () => <div>{label}</div>;
 }
 
-vi.mock('../../sections/appearance', () => ({
+vi.mock('../../sections/general/interface-browser', () => ({
   AppearanceSection: markerComponent('appearance-section'),
 }));
-vi.mock('../../sections/ai-providers', () => {
+vi.mock('../../sections/ai/connections', () => {
   return { AIProvidersSection: markerComponent('ai-section') };
 });
-vi.mock('../../sections/viewport-presets', () => {
+vi.mock('../../sections/capture/screen-sizes', () => {
   return { PresetsSection: markerComponent('presets-section') };
 });
-vi.mock('../../sections/save-presets', () => {
+vi.mock('../../sections/capture/saving', () => {
   return { SavePresetsSection: markerComponent('saves-section') };
 });
-vi.mock('../../sections/templates', () => {
-  return { TemplatesSection: markerComponent('templates-section') };
+vi.mock('../../sections/ai/prompts', () => {
+  return { AIPromptsSection: markerComponent('templates-section') };
 });
-vi.mock('../../sections/permissions', () => {
-  return { PermissionsSection: markerComponent('permissions-section') };
+vi.mock('../../sections/system/access-data', () => {
+  return { AccessDataSection: markerComponent('permissions-section') };
 });
-vi.mock('../../sections/image', () => {
-  return { ImageSettingsSection: markerComponent('image-section') };
+vi.mock('../../sections/capture/media-quality', () => {
+  return { MediaQualitySection: markerComponent('image-section') };
 });
-vi.mock('../../sections/quick-actions', () => {
+vi.mock('../../sections/capture/quick-actions', () => {
   return { QuickActionsSection: markerComponent('quickactions-section') };
 });
-vi.mock('../../sections/highlighter/section', () => {
-  return { HighlighterSection: markerComponent('highlighter-section') };
+vi.mock('../../sections/styles/annotations', () => {
+  return { AnnotationsSection: markerComponent('highlighter-section') };
 });
 
 vi.mock('../navigation/sidebar', () => ({
@@ -72,15 +72,15 @@ vi.mock('../navigation/sidebar', () => ({
     return (
       <div data-ui="settings.sidebar">
         {[
-          'appearance',
-          'ai',
-          'presets',
-          'saves',
-          'highlighter',
-          'image',
-          'templates',
-          'quickactions',
-          'permissions',
+          'interface-browser',
+          'ai-connections',
+          'screen-sizes',
+          'saving',
+          'annotations',
+          'media-quality',
+          'ai-prompts',
+          'quick-actions',
+          'access-data',
         ].map((tab) => (
           <button key={tab} type="button" onClick={() => props.onTabChange(tab)}>
             {tab}
@@ -100,7 +100,7 @@ vi.mock('../command-palette', () => ({
     settingsPageMocks.settingsCommandPaletteMock(props);
     return props.isOpen ? (
       <div data-testid="settings-command-palette">
-        <button type="button" onClick={() => props.onTabChange('quickactions')}>
+        <button type="button" onClick={() => props.onTabChange('quick-actions')}>
           palette-quickactions
         </button>
         <button type="button" onClick={props.onClose}>
@@ -228,15 +228,15 @@ describe('SettingsPage navigation', () => {
 
   it('renders each settings tab surface through the owner sidebar and command palette', async () => {
     const settingsTabs: Array<[string, string]> = [
-      ['ai', 'ai-section'],
-      ['presets', 'presets-section'],
-      ['saves', 'saves-section'],
-      ['highlighter', 'highlighter-section'],
-      ['image', 'image-section'],
-      ['templates', 'templates-section'],
-      ['quickactions', 'quickactions-section'],
-      ['permissions', 'permissions-section'],
-      ['appearance', 'appearance-section'],
+      ['ai-connections', 'ai-section'],
+      ['screen-sizes', 'presets-section'],
+      ['saving', 'saves-section'],
+      ['annotations', 'highlighter-section'],
+      ['media-quality', 'image-section'],
+      ['ai-prompts', 'templates-section'],
+      ['quick-actions', 'quickactions-section'],
+      ['access-data', 'permissions-section'],
+      ['interface-browser', 'appearance-section'],
     ];
 
     await renderPage();

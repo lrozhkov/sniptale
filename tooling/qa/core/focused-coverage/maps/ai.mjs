@@ -86,21 +86,20 @@ export const AI_OWNER_MAPPINGS = [
   },
   {
     owner: 'settings-ai-runtime-mutation-client',
-    productionFile:
-      'apps/extension/src/settings/sections/ai-providers/runtime/settings-mutations.ts',
+    productionFile: 'apps/extension/src/settings/runtime/ai-settings/mutations.ts',
     reason:
       'Settings AI mutation client and secret-status transport are covered by runtime client fixtures.',
     testFiles: [
-      'apps/extension/src/settings/sections/ai-providers/runtime/secret-protection-status.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.test.ts',
     ],
   },
   {
     owner: 'settings-ai-runtime-secret-status-client',
     productionFile:
-      'apps/extension/src/settings/sections/ai-providers/runtime/secret-protection-status.ts',
+      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.ts',
     reason: 'Settings AI secret protection status client is covered by runtime client fixtures.',
     testFiles: [
-      'apps/extension/src/settings/sections/ai-providers/runtime/secret-protection-status.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.test.ts',
     ],
   },
   {

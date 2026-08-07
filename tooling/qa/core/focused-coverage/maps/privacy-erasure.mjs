@@ -2,7 +2,7 @@ import { PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS } from './privacy-erasure-runtim
 import { PRIVACY_ERASURE_VIDEO_PREVIEW_OWNER_MAPPINGS } from './privacy-erasure-video-preview.mjs';
 
 const SETTINGS_ROOT = 'apps/extension/src/settings';
-const SETTINGS_PRIVACY_TEST = `${SETTINGS_ROOT}/sections/privacy/index.test.tsx`;
+const SETTINGS_PRIVACY_TEST = `${SETTINGS_ROOT}/sections/system/access-data/privacy/index.test.tsx`;
 const SETTINGS_SECTION_TEST = `${SETTINGS_ROOT}/shell/page/sections.test.tsx`;
 const MESSAGE_TYPES_CONTRACT_TEST =
   'packages/runtime-contracts/src/messaging/message-types/index.test.ts';
@@ -245,7 +245,7 @@ export const PRIVACY_ERASURE_OWNER_MAPPINGS = [
   {
     allowCrossOwner: true,
     owner: 'local-data-erasure-settings-ui-owner',
-    productionPrefix: `${SETTINGS_ROOT}/sections/privacy`,
+    productionPrefix: `${SETTINGS_ROOT}/sections/system/access-data/privacy`,
     reason: 'Settings privacy navigation, section wiring, and destructive flow are covered.',
     testFiles: [SETTINGS_PRIVACY_TEST, SETTINGS_SECTION_TEST],
   },

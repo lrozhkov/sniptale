@@ -62,10 +62,10 @@ export const SHARED_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[]
         'Settings > Loading sections',
         [
           'apps/extension/src/settings/section-surface/loading-state.tsx',
-          'apps/extension/src/settings/sections/highlighter/section/index.tsx',
-          'apps/extension/src/settings/sections/ai-providers/index.tsx',
-          'apps/extension/src/settings/sections/quick-actions/list.tsx',
-          'apps/extension/src/settings/sections/templates/content.tsx',
+          'apps/extension/src/settings/sections/styles/annotations/borders/index.tsx',
+          'apps/extension/src/settings/sections/ai/connections/index.tsx',
+          'apps/extension/src/settings/sections/capture/quick-actions/list.tsx',
+          'apps/extension/src/settings/sections/ai/prompts/templates/content.tsx',
         ]
       ),
       usage(

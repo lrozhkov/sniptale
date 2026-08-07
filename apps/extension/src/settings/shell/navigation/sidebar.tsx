@@ -1,6 +1,7 @@
 import { translate } from '../../../platform/i18n';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import { SETTINGS_NAV_ITEMS, type SettingsTab } from '.';
+import { SETTINGS_NAV_GROUPS, type SettingsNavItem } from './registry';
+import type { SettingsTab } from '.';
 import { settingsPageSidebarClassName } from '../../section-surface';
 
 interface SettingsSidebarProps {
@@ -41,7 +42,7 @@ function getSettingsSidebarFooterLabel() {
 
 function SettingsSidebarItem(props: {
   activeTab: SettingsTab;
-  item: (typeof SETTINGS_NAV_ITEMS)[number];
+  item: SettingsNavItem;
   onTabChange: (tab: SettingsTab) => void;
 }) {
   const isActive = props.activeTab === props.item.id;
@@ -49,10 +50,12 @@ function SettingsSidebarItem(props: {
   return (
     <button
       key={props.item.id}
+      type="button"
+      aria-current={isActive ? 'page' : undefined}
       onClick={() => props.onTabChange(props.item.id)}
       className={`
-        flex w-full cursor-pointer items-center gap-3 rounded-[16px] border border-transparent
-        px-4 py-3 transition-colors
+        flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-[10px] border border-transparent
+        px-3 py-1.5 transition-colors
         text-left relative
         ${
           isActive
@@ -69,7 +72,7 @@ function SettingsSidebarItem(props: {
             : 'text-[var(--sniptale-color-text-secondary)]'
         }
       >
-        <Icon size={18} />
+        <Icon size={16} />
       </span>
       <span className="text-sm font-medium tracking-[-0.01em]">{translate(props.item.label)}</span>
     </button>
@@ -84,7 +87,7 @@ export function SettingsSidebar({ activeTab, onTabChange }: SettingsSidebarProps
     >
       <div
         data-ui="settings.sidebar.header"
-        className="border-b border-[var(--sniptale-color-border-soft)] px-5 py-5"
+        className="border-b border-[var(--sniptale-color-border-soft)] px-4 py-3"
       >
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sniptale-color-text-dim)]">
           {translate('settings.navigation.sidebarEyebrow')}
@@ -94,23 +97,38 @@ export function SettingsSidebar({ activeTab, onTabChange }: SettingsSidebarProps
       <div
         data-ui="settings.sidebar.nav-list"
         className={[
-          'min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3',
-          '[scrollbar-gutter:stable]',
+          'min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto p-2.5',
+          'lg:overflow-y-hidden',
         ].join(' ')}
       >
-        {SETTINGS_NAV_ITEMS.map((item) => (
-          <SettingsSidebarItem
-            key={item.id}
-            activeTab={activeTab}
-            item={item}
-            onTabChange={onTabChange}
-          />
+        {SETTINGS_NAV_GROUPS.map((group) => (
+          <section key={group.id} aria-labelledby={`settings-nav-group-${group.id}`}>
+            <h2
+              id={`settings-nav-group-${group.id}`}
+              className={[
+                'mb-0.5 px-3 text-[10px] font-semibold uppercase leading-4 tracking-[0.1em]',
+                'text-[var(--sniptale-color-text-dim)]',
+              ].join(' ')}
+            >
+              {translate(group.label)}
+            </h2>
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <SettingsSidebarItem
+                  key={item.id}
+                  activeTab={activeTab}
+                  item={item}
+                  onTabChange={onTabChange}
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
 
       <div
         data-ui="settings.sidebar.footer"
-        className="border-t border-[var(--sniptale-color-border-soft)] px-5 py-4"
+        className="border-t border-[var(--sniptale-color-border-soft)] px-4 py-2.5"
       >
         <p className="text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
           {getSettingsSidebarFooterLabel()}

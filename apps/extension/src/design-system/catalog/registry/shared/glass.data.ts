@@ -222,7 +222,7 @@ export const SHARED_DESIGN_SYSTEM_GLASS_REGISTRY: DesignSystemRegistryEntry[] = 
         'settings.appearance.theme-select',
         'Настройки > Внешний вид > Выбор темы',
         'Settings > Appearance > Theme select',
-        ['apps/extension/src/settings/sections/appearance/index.tsx']
+        ['apps/extension/src/settings/sections/general/interface-browser/index.tsx']
       ),
       usage(
         'popup.video-setup.quality-select',

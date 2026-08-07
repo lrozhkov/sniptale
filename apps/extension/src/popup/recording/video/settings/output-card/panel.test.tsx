@@ -101,7 +101,9 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
   });
 
   act(() => manageButton?.click());
-  expect(openSettingsPageMock).toHaveBeenCalledWith({ section: 'video' });
+  expect(openSettingsPageMock).toHaveBeenCalledWith({
+    route: { section: 'media-quality', view: 'video' },
+  });
 });
 
 it('disables a known over-budget frame-rate choice instead of silently accepting it', () => {

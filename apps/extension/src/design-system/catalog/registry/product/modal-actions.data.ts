@@ -95,13 +95,13 @@ export const PRODUCT_DESIGN_SYSTEM_MODAL_ACTIONS_REGISTRY: DesignSystemRegistryE
         'settings.providers.form-actions',
         'Настройки > AI providers > Form actions',
         'Settings > AI providers > Form actions',
-        ['apps/extension/src/settings/sections/ai-providers/surface/modals.tsx']
+        ['apps/extension/src/settings/sections/ai/connections/surface/modals.tsx']
       ),
       usage(
         'settings.viewport.actions',
         'Настройки > Viewport preset editor > Actions',
         'Settings > Viewport preset editor > Actions',
-        ['apps/extension/src/settings/sections/viewport-presets/editor/index.tsx']
+        ['apps/extension/src/settings/sections/capture/screen-sizes/editor/index.tsx']
       ),
     ],
     status: 'active',

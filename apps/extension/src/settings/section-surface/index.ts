@@ -1,4 +1,5 @@
 export { SettingsSectionHeader } from './section-header';
+export { SettingsSubpageTabs } from './subpage-tabs';
 export { SettingsRangeField } from './range-field';
 export {
   settingsAddButtonClassName,

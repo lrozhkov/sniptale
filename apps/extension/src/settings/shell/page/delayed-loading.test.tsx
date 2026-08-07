@@ -54,67 +54,59 @@ function markerComponent(label: string) {
   };
 }
 
-vi.mock('../../sections/appearance', () => ({
+vi.mock('../../sections/general/interface-browser', () => ({
   AppearanceSection: markerComponent('appearance-section'),
 }));
-vi.mock('../../sections/ai-providers', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('ai');
+vi.mock('../../sections/ai/connections', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('ai-connections');
   return { AIProvidersSection: markerComponent('ai-section') };
 });
-vi.mock('../../sections/viewport-presets', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('presets');
+vi.mock('../../sections/capture/screen-sizes', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('screen-sizes');
   return { PresetsSection: markerComponent('presets-section') };
 });
-vi.mock('../../sections/save-presets', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('saves');
+vi.mock('../../sections/capture/saving', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('saving');
   return { SavePresetsSection: markerComponent('saves-section') };
 });
-vi.mock('../../sections/highlighter/section', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('highlighter');
-  return { HighlighterSection: markerComponent('highlighter-section') };
+vi.mock('../../sections/styles/annotations', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('annotations');
+  return { AnnotationsSection: markerComponent('highlighter-section') };
 });
-vi.mock('../../sections/editor', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('editor');
-  return { EditorSection: markerComponent('editor-section') };
+vi.mock('../../sections/styles/editor-resources', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('editor-resources');
+  return { EditorResourcesSection: markerComponent('editor-section') };
 });
-vi.mock('../../sections/image', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('image');
-  return { ImageSettingsSection: markerComponent('image-section') };
+vi.mock('../../sections/capture/media-quality', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('media-quality');
+  return { MediaQualitySection: markerComponent('image-section') };
 });
-vi.mock('../../sections/templates', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('templates');
-  return { TemplatesSection: markerComponent('templates-section') };
+vi.mock('../../sections/ai/prompts', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('ai-prompts');
+  return { AIPromptsSection: markerComponent('templates-section') };
 });
-vi.mock('../../sections/quick-actions', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('quickactions');
+vi.mock('../../sections/capture/quick-actions', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('quick-actions');
   return { QuickActionsSection: markerComponent('quickactions-section') };
 });
-vi.mock('../../sections/video-quality-profiles', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('video');
-  return { VideoQualityProfilesSection: markerComponent('video-section') };
-});
-vi.mock('../../sections/voice-input', () => {
+vi.mock('../../sections/system/voice-input', () => {
   settingsPageDelayMocks.loadedSectionModules.push('voice-input');
   return { VoiceInputSettingsSection: markerComponent('voice-input-section') };
 });
-vi.mock('../../sections/native-app', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('native');
+vi.mock('../../sections/system/native-app', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('native-app');
   return { NativeAppSection: markerComponent('native-section') };
 });
-vi.mock('../../sections/permissions', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('permissions');
-  return { PermissionsSection: markerComponent('permissions-section') };
-});
-vi.mock('../../sections/privacy', () => {
-  settingsPageDelayMocks.loadedSectionModules.push('privacy');
-  return { PrivacySection: markerComponent('privacy-section') };
+vi.mock('../../sections/system/access-data', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('access-data');
+  return { AccessDataSection: markerComponent('permissions-section') };
 });
 
 vi.mock('../navigation/sidebar', () => ({
   SettingsSidebar: (props: { onTabChange: (tab: string) => void }) => {
     settingsPageDelayMocks.settingsSidebarMock(props);
     return (
-      <button type="button" onClick={() => props.onTabChange('ai')}>
+      <button type="button" onClick={() => props.onTabChange('ai-connections')}>
         ai
       </button>
     );
@@ -199,19 +191,17 @@ describe('SettingsPage delayed loading', () => {
 
     expect(new Set(settingsPageDelayMocks.loadedSectionModules)).toEqual(
       new Set([
-        'ai',
-        'presets',
-        'saves',
-        'highlighter',
-        'editor',
-        'image',
-        'templates',
-        'quickactions',
-        'video',
+        'ai-connections',
+        'screen-sizes',
+        'saving',
+        'annotations',
+        'editor-resources',
+        'media-quality',
+        'ai-prompts',
+        'quick-actions',
         'voice-input',
-        'native',
-        'permissions',
-        'privacy',
+        'native-app',
+        'access-data',
       ])
     );
   });

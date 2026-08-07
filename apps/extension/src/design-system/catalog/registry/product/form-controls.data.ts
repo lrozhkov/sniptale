@@ -126,7 +126,7 @@ export const PRODUCT_DESIGN_SYSTEM_FORM_CONTROLS_REGISTRY: DesignSystemRegistryE
         'settings.providers.forms',
         'Настройки > AI providers > Формы',
         'Settings > AI providers > Forms',
-        ['apps/extension/src/settings/sections/ai-providers/surface/modals.tsx']
+        ['apps/extension/src/settings/sections/ai/connections/surface/modals.tsx']
       ),
       usage(
         'content.save-dialog.checkbox-row',
@@ -144,7 +144,7 @@ export const PRODUCT_DESIGN_SYSTEM_FORM_CONTROLS_REGISTRY: DesignSystemRegistryE
         'settings.viewport.fields',
         'Настройки > Viewport preset editor > Fields',
         'Settings > Viewport preset editor > Fields',
-        ['apps/extension/src/settings/sections/viewport-presets/editor/index.tsx']
+        ['apps/extension/src/settings/sections/capture/screen-sizes/editor/index.tsx']
       ),
       usage(
         'settings.page.controls',

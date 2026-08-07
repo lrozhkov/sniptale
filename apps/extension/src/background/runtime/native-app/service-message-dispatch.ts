@@ -1,4 +1,4 @@
-import { openSettingsPage } from '../../../platform/navigation/extension-pages';
+import { openLegacySettingsPage } from '../../../platform/navigation/extension-pages';
 import type {
   NativeAppInboundMessage,
   NativeAppOutboundMessage,
@@ -208,7 +208,7 @@ function handleOpenSettings(
   if (!ctx.consumeInvocation(message)) {
     return;
   }
-  void openSettingsPage({ section: message.section });
+  void openLegacySettingsPage(message.section);
 }
 
 function handleOperationFailed(

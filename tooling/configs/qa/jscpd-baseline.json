@@ -95,10 +95,10 @@
       "sampleFingerprint": "bacf2fc5aa7b239dff4352f7bbd5108029d33ef28afe59b8c4bda5fb4adf92ae"
     },
     {
-      "family": "apps/extension/src/settings/sections/video-quality-profiles",
+      "family": "apps/extension/src/settings/sections/capture/media-quality/video",
       "count": 2,
       "lines": 81,
-      "debtId": "noise.jscpd.settings-sections-video-quality-profiles.553ddf0b71ce",
+      "debtId": "noise.jscpd.settings-sections-capture-media-quality-video.553ddf0b71ce",
       "sampleFingerprint": "553ddf0b71ce3cacf2a3878249647115e4499823a64cc7847f9e89faebde3722"
     },
     {
@@ -172,10 +172,10 @@
       "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
     },
     {
-      "family": "apps/extension/src/settings/sections/viewport-presets",
+      "family": "apps/extension/src/settings/sections/capture/screen-sizes",
       "count": 1,
       "lines": 10,
-      "debtId": "noise.jscpd.settings-sections-viewport-presets.b80dffc340ce",
+      "debtId": "noise.jscpd.settings-sections-capture-screen-sizes.b80dffc340ce",
       "sampleFingerprint": "b80dffc340ce9bfbe5cc72d774acbe1cb707366b1171c391c51d6bfd608e245d"
     },
     {
