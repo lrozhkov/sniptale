@@ -47,20 +47,6 @@ const defaultDependencies: FontInstallerDependencies = {
   resolveAssetUrl: (path) => runtimeInfo.getURL(path),
 };
 
-export function getFrameCalloutHandwrittenFontSources(): Array<{
-  family: string;
-  src: string;
-  style: 'normal';
-  weight: '400';
-}> {
-  return FONT_ASSETS.map((asset) => ({
-    family: FRAME_CALLOUT_HANDWRITTEN_FONT_FAMILY,
-    src: runtimeInfo.getURL(asset.path),
-    style: 'normal',
-    weight: '400',
-  }));
-}
-
 /** Installs the bundled face into the actual document that owns the rendered surface. */
 export function installFrameCalloutHandwrittenFont(
   owner: FrameCalloutFontOwner,

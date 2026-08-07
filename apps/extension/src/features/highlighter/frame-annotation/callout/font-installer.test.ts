@@ -8,7 +8,6 @@ vi.mock('@sniptale/platform/browser/runtime', () => ({
 import {
   type FrameCalloutFontFace,
   type FrameCalloutFontOwner,
-  getFrameCalloutHandwrittenFontSources,
   installFrameCalloutHandwrittenFont,
 } from './font-installer';
 
@@ -19,23 +18,6 @@ function createOwner(add = vi.fn()): FrameCalloutFontOwner {
 function createFace(load: () => Promise<FrameCalloutFontFace>): FrameCalloutFontFace {
   return { load };
 }
-
-it('exposes both bundled subsets as explicit local raster font sources', () => {
-  expect(getFrameCalloutHandwrittenFontSources()).toEqual([
-    {
-      family: 'Sniptale Handwritten',
-      src: 'chrome-extension://test/fonts/marck-script-cyrillic-400-normal.woff2',
-      style: 'normal',
-      weight: '400',
-    },
-    {
-      family: 'Sniptale Handwritten',
-      src: 'chrome-extension://test/fonts/marck-script-latin-400-normal.woff2',
-      style: 'normal',
-      weight: '400',
-    },
-  ]);
-});
 
 it('installs both bundled subsets once per owner document', async () => {
   const add = vi.fn();

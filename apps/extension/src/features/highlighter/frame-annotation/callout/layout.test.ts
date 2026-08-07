@@ -23,6 +23,7 @@ describe('getCalloutLayoutState', () => {
 
     expect(editing.editableStyle.minHeight).toBe(viewing.editableStyle.minHeight);
     expect(editing.effectiveZIndex).toBeGreaterThan(FRAME_ANNOTATION_Z_INDEX.stepBadge);
+    expect(editing.cloudStyle.boxSizing).toBe('border-box');
     expect(editing.cloudStyle.width).toBe('max-content');
     expect(editing.cloudStyle.maxWidth).toBe(settings.style.typography.maxWidth);
   });

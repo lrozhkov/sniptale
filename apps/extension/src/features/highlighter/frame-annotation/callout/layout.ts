@@ -223,6 +223,8 @@ function getCalloutCloudStyle(
   const hasWedgeOutline = connector?.kind === 'wedge' && surface.borderWidth > 0;
   return {
     position: 'relative',
+    // The surface cannot depend on runtime-global resets: maxWidth owns the complete bubble.
+    boxSizing: 'border-box',
     minWidth: 'min-content',
     width: 'max-content',
     maxWidth: typography.maxWidth,

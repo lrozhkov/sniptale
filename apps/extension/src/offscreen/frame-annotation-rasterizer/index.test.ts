@@ -101,16 +101,7 @@ it('rasterizes through SnapDOM with the bounded offscreen options and cleans its
       compress: false,
       dpr: 1,
       embedFonts: true,
-      localFonts: expect.arrayContaining([
-        expect.objectContaining({
-          family: 'Sniptale Handwritten',
-          src: 'chrome-extension://test/fonts/marck-script-cyrillic-400-normal.woff2',
-        }),
-        expect.objectContaining({
-          family: 'Sniptale Handwritten',
-          src: 'chrome-extension://test/fonts/marck-script-latin-400-normal.woff2',
-        }),
-      ]),
+      reconcile: true,
     })
   );
   expect(document.body.childElementCount).toBe(before);

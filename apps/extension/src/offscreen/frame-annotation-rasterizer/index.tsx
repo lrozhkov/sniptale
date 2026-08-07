@@ -13,10 +13,7 @@ import {
   loadFrameCalloutHandwrittenFont,
   requiresFrameCalloutHandwrittenFont,
 } from '../../features/highlighter/frame-annotation/callout/font-readiness';
-import {
-  getFrameCalloutHandwrittenFontSources,
-  installFrameCalloutHandwrittenFont,
-} from '../../features/highlighter/frame-annotation/callout/font-installer';
+import { installFrameCalloutHandwrittenFont } from '../../features/highlighter/frame-annotation/callout/font-installer';
 
 const MAX_PIXEL_AREA = 16_000_000;
 const MAX_SIDE = 16_384;
@@ -113,10 +110,10 @@ async function rasterizeAtScale(
         dpr: 1,
         scale: 1,
         embedFonts: true,
-        localFonts: getFrameCalloutHandwrittenFontSources(),
         cache: 'disabled',
         compress: false,
         outerShadows: true,
+        reconcile: true,
       }),
       deadline
     );

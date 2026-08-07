@@ -224,12 +224,13 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
   });
   await page.locator('[data-ui="editor.page.root"]').waitFor();
   const callout = createDefaultFrameCallout();
-  callout.content.bodyHtml = 'Тест';
+  callout.content.bodyHtml = 'Тест тест тест тест';
   callout.style.surface.textColor = '#ef4444';
+  callout.style.surface.shadow = 0;
   callout.style.typography.fontFamily = 'cursive';
-  callout.style.typography.fontSize = 36;
+  callout.style.typography.fontSize = 28;
   callout.style.typography.fontWeight = 'bold';
-  callout.style.typography.maxWidth = 220;
+  callout.style.typography.maxWidth = 160;
   const stepBadge = { ...createDefaultFrameStepBadge(), auto: false, value: '1' };
   const createdSnapshot = createFrameAnnotationSnapshot(
     {
@@ -423,6 +424,8 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
   expect(result.opaque).toBe(46_800);
   expect(result.red).toBeGreaterThan(100);
   expect(result.calloutDark).toBeGreaterThan(1_000);
+  expect(result.calloutDarkRight - result.calloutDarkLeft + 1).toBeLessThanOrEqual(160);
+  expect(result.calloutDarkRight - result.calloutDarkLeft + 1).toBeGreaterThanOrEqual(150);
   expect(result.calloutRed).toBeGreaterThan(50);
   expect(result.calloutRedLeft).toBeGreaterThan(result.calloutDarkLeft + 4);
   expect(result.calloutRedRight).toBeLessThan(result.calloutDarkRight - 4);
