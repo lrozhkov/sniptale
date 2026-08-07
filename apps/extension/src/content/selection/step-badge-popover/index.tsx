@@ -1,16 +1,20 @@
 import { useAppLocale } from '../../../platform/i18n';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { StepBadgePopoverAdapter } from './adapter';
-import { StepBadgePopoverEnabledContent } from './enabled-content';
+import { StepBadgePopoverEnabledContent } from '../../../composition/frame-annotation-controls/step-badge/enabled-content';
 import { useStepBadgePopoverState } from './state';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
-import { useStepBadgePresetPopoverController } from './preset-controller';
+import { useStepBadgePresetPopoverController } from '../../../composition/frame-annotation-controls/step-badge/preset-controller';
 import { createStepBadgeTemplateFromSettings } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
-import { useFloatingPopoverDrag } from '../popover-sync/drag';
-import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover-sync/settings-surface';
+import { useFloatingPopoverDrag } from '../../../composition/frame-annotation-controls/popover/drag';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../composition/frame-annotation-controls/popover/surface';
 import { StepBadgePresetEditor } from '../../../ui/highlighter-preset-editor/step-badge';
-import { usePopoverInteractionDismissal } from '../popover-sync/interaction-dismissal';
+import { usePopoverInteractionDismissal } from '../../../composition/frame-annotation-controls/popover/interaction-dismissal';
+import { dispatchStepBadgeReorder } from '../../platform/page-context/frame-events';
 
 interface StepBadgePopoverProps {
   anchorEl: HTMLElement | null;
@@ -138,6 +142,9 @@ export function StepBadgePopover({
         onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
         onOffsetToggle={stepBadgeState.handleOffsetToggle}
         onResetPreset={(preset) => void presets.catalog.reset(preset)}
+        onReorder={(direction, ownedFrameId) =>
+          dispatchStepBadgeReorder({ direction, frameId: ownedFrameId })
+        }
         onShowPresets={presets.catalog.refresh}
         onSettingsChange={stepBadgeState.handleSettingsChange}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}

@@ -25,6 +25,14 @@ export const editorToolLabelMessages = defineMessageSource({
     ru: 'Подсветка',
     en: 'Highlighter',
   },
+  frameAnnotation: {
+    ru: 'Рамка-аннотация',
+    en: 'Frame annotation',
+  },
+  resizeFrameAnnotation: {
+    ru: 'Изменить размер рамки-аннотации',
+    en: 'Resize frame annotation',
+  },
   rectangle: {
     ru: 'Прямоугольник',
     en: 'Rectangle',

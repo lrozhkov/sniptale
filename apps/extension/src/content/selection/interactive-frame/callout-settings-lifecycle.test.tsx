@@ -5,7 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../features/highlighter/contracts';
 import { addCalloutPopoverSettingsChangedListener } from '../../platform/page-context/frame-events';
-import { createDefaultCalloutSettings, applyCalloutSettingsPatch } from '../callout/model';
+import {
+  createDefaultCalloutSettings,
+  applyCalloutSettingsPatch,
+} from '../../../features/highlighter/frame-annotation/callout/model';
 import { useFrameUIController } from '../frame-runtime/ui-controller';
 import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { initializeContentUiRoots, queryAllContentUiElements } from '../../platform/dom-host';

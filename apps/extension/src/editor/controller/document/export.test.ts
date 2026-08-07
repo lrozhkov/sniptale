@@ -7,6 +7,7 @@ import {
   copyEditorRenderedImage,
   renderEditorCanvasToDataUrl,
 } from './export';
+import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 
 const writeMock = vi.fn();
 
@@ -235,5 +236,21 @@ describe('renderEditorCanvasToDataUrl', () => {
 
     expect(getContextSpy).toHaveBeenCalledWith('2d');
     expect(drawImage).toHaveBeenCalledWith(canvas.renderedCanvas, 0, 0, 640, 360);
+  });
+
+  it('restores the active object when rendering fails', () => {
+    const canvas = createExportCanvas();
+    canvas.toCanvasElement.mockImplementation(() => {
+      throw new Error('allocation failed');
+    });
+
+    expect(() =>
+      renderEditorCanvasToDataUrl(createFabricCanvasFixture(canvas), {
+        format: 'png',
+        quality: 100,
+      })
+    ).toThrow('allocation failed');
+    expect(canvas.setActiveObject).toHaveBeenCalledWith(canvas.activeObject);
+    expect(canvas.renderAll).toHaveBeenCalledTimes(2);
   });
 });

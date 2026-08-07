@@ -1,12 +1,17 @@
-import type { Canvas, FabricObject } from 'fabric';
+import { Rect, type Canvas, type FabricObject } from 'fabric';
 import type { EditorTool, EditorWorkspaceSettings } from '../../../features/editor/document/types';
 import { AligningGuidelines, type EditorMagnetTransformEvent } from './aligning-guidelines';
 import { DEFAULT_EDITOR_MAGNET_OPTIONS } from './options';
 import { collectMagnetTargets, isMagnetTarget } from './targets';
 
 export interface EditorMagnetManager {
+  clearGuides(): void;
   dispose(): void;
   hasActiveGuides(): boolean;
+  snapRect(input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }): { x: number; y: number; width: number; height: number };
 }
 
 interface EditorMagnetManagerOptions {
@@ -74,6 +79,32 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
     return this.verticalLines.size > 0 || this.horizontalLines.size > 0 || this.onlyDrawPoint;
   }
 
+  snapRect(input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }) {
+    const target = new Rect({
+      left: input.rect.x,
+      top: input.rect.y,
+      width: input.rect.width,
+      height: input.rect.height,
+      originX: 'left',
+      originY: 'top',
+      strokeWidth: 0,
+    });
+    if (input.excludeId !== undefined) target.sniptaleId = input.excludeId;
+    target.sniptaleType = 'rectangle';
+    target.canvas = this.canvas;
+    this.moving({ target } as unknown as EditorMagnetTransformEvent);
+    this.canvas.requestRenderAll();
+    return {
+      x: Number(target.left ?? input.rect.x),
+      y: Number(target.top ?? input.rect.y),
+      width: input.rect.width,
+      height: input.rect.height,
+    };
+  }
+
   private shouldHandleEvent(target: FabricObject): boolean {
     return (
       this.managerOptions.getWorkspace().magnetEnabled &&
@@ -82,7 +113,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
     );
   }
 
-  private clearGuides() {
+  clearGuides(): void {
     this.verticalLines.clear();
     this.horizontalLines.clear();
     this.cacheMap.clear();

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
-import { getCalloutTailMetrics } from './tail';
-import { getDynamicTailState } from './dynamic-tail';
-import { getCalloutLayoutState } from './layout';
-import { createDefaultCalloutSettings } from './model';
+import { getCalloutTailMetrics } from '../../../features/highlighter/frame-annotation/callout/tail';
+import { getDynamicTailState } from '../../../features/highlighter/frame-annotation/callout/dynamic-tail';
+import { getCalloutLayoutState } from '../../../features/highlighter/frame-annotation/callout/layout';
+import { createDefaultCalloutSettings } from '../../../features/highlighter/frame-annotation/callout/model';
 
 const frameRect = { x: 100, y: 100, width: 160, height: 120 };
 const anchorPoint = { x: 180, y: 100 };

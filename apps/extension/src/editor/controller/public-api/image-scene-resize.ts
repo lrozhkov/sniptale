@@ -7,6 +7,7 @@ import { reportEditorActionFailure } from '../../runtime/async-actions';
 import { emptyCanvasJson } from '../core/helpers';
 import { MIN_CANVAS_SIZE } from '../../document/model';
 import type { EditorControllerPublicApiAdapter } from './types';
+import { renderEditorControllerForExport } from './document/export';
 
 function normalizeSceneSize(width: number, height: number) {
   return {
@@ -68,7 +69,7 @@ async function flattenEditorControllerImageScene(
 
   const nextSize = normalizeSceneSize(width, height);
   controller.clearCropSelection();
-  const dataUrl = controller.renderToDataUrl({
+  const dataUrl = await renderEditorControllerForExport(controller, {
     format: 'png',
     outputSize: nextSize,
     quality: 1,

@@ -11,6 +11,13 @@ import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { ToolPropertiesButton } from './tool-properties-button';
+import { FrameAnnotationCreationControls } from '../../../composition/frame-annotation-controls/creation-controls';
+import {
+  initializeFrameAnnotationCreationDefaults,
+  setFrameAnnotationCreationDefaults,
+  useFrameAnnotationCreationDefaults,
+} from '../../frame-annotation/creation-defaults';
+import { loadHighlighterSettings } from '../../../composition/persistence/highlighter';
 
 const TOOL_PROPERTIES_CLASS_NAME = floatingChromeClassNames(
   [
@@ -39,6 +46,7 @@ const TOOLS_WITH_PROPERTIES = new Set<EditorTool>([
   'line',
   'text',
   'step',
+  'frame-annotation',
 ]);
 
 const TOOL_RAIL_BUTTON_SIZE_PX = 36;
@@ -252,14 +260,26 @@ export function EditorFloatingToolPropertiesRail({
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const frameAnnotationDefaults = useFrameAnnotationCreationDefaults();
+  useEffect(() => {
+    if (activeTool === 'frame-annotation') {
+      void initializeFrameAnnotationCreationDefaults(loadHighlighterSettings);
+    }
+  }, [activeTool]);
   const groups = useToolPropertyGroups(documentController.compactCommandGroups);
-  const enabled = isToolPropertiesEnabled({
+  const standardPropertiesEnabled = isToolPropertiesEnabled({
     activeTool,
     groups,
     hasImage,
     inspector: documentController.inspector,
     selection,
   });
+  const frameAnnotationPropertiesEnabled =
+    hasImage &&
+    documentController.inspector === 'tool' &&
+    !selection.hasSelection &&
+    activeTool === 'frame-annotation';
+  const enabled = standardPropertiesEnabled || frameAnnotationPropertiesEnabled;
   const hidden = useToolPropertiesVisibility(enabled);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
   const className = leftDrawerOpen
@@ -283,13 +303,21 @@ export function EditorFloatingToolPropertiesRail({
         className={className}
         style={resolveToolPropertiesStyle(activeTool)}
       >
-        <ToolPropertiesButtons
-          activeGroupId={activeGroupId}
-          groups={groups}
-          onToggle={(groupId) =>
-            setActiveGroupId((current) => (current === groupId ? null : groupId))
-          }
-        />
+        {frameAnnotationPropertiesEnabled ? (
+          <FrameAnnotationCreationControls
+            dataUi="editor.frame-annotation.creation-controls"
+            onChange={setFrameAnnotationCreationDefaults}
+            settings={frameAnnotationDefaults}
+          />
+        ) : (
+          <ToolPropertiesButtons
+            activeGroupId={activeGroupId}
+            groups={groups}
+            onToggle={(groupId) =>
+              setActiveGroupId((current) => (current === groupId ? null : groupId))
+            }
+          />
+        )}
       </FloatingChromeToolbar>
     </div>
   );

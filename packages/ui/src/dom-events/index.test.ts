@@ -116,6 +116,20 @@ describe('floating surface wheel containment', () => {
     expect(scrollable.scrollTop).toBe(200);
   });
 
+  it('does not leak wheel input to an ancestor interaction owner', () => {
+    const host = document.createElement('div');
+    const surface = document.createElement('div');
+    host.appendChild(surface);
+    document.body.appendChild(host);
+    const hostWheel = vi.fn();
+    host.addEventListener('wheel', hostWheel);
+    surface.addEventListener('wheel', containFloatingSurfaceWheel);
+
+    surface.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 }));
+
+    expect(hostWheel).not.toHaveBeenCalled();
+  });
+
   it('does not scroll an outer floating surface after a nested menu owns the wheel event', () => {
     const outerSurface = document.createElement('div');
     const innerMenu = document.createElement('div');
@@ -160,12 +174,14 @@ describe('floating surface wheel containment', () => {
     const textTarget = document.createTextNode('Menu');
     surface.append(textTarget);
     const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
     const event = {
       currentTarget: surface,
       deltaMode: WheelEvent.DOM_DELTA_PIXEL,
       deltaX: 0,
       deltaY: 80,
       preventDefault,
+      stopPropagation,
       target: textTarget,
       composedPath: () => [],
     };
@@ -179,5 +195,6 @@ describe('floating surface wheel containment', () => {
     });
 
     expect(preventDefault).toHaveBeenCalledTimes(2);
+    expect(stopPropagation).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,5 +1,6 @@
 import type { Canvas } from 'fabric';
 import { moveLayerSelection, moveLayerSelectionToEdge } from '../layer-actions/reorder/selection';
+import { synchronizeFrameAnnotationOrdering } from '../../frame-annotation/proxy';
 
 export function moveEditorSelection(options: {
   canvas: Canvas | null;
@@ -14,6 +15,7 @@ export function moveEditorSelection(options: {
   }
 
   sendFrameObjectsToBack();
+  synchronizeFrameAnnotationOrdering(canvas?.getObjects() ?? []);
   canvas?.requestRenderAll();
   commitHistory();
   syncRuntimeState();
@@ -32,6 +34,7 @@ export function moveEditorSelectionToEdge(options: {
   }
 
   sendFrameObjectsToBack();
+  synchronizeFrameAnnotationOrdering(canvas?.getObjects() ?? []);
   canvas?.requestRenderAll();
   commitHistory();
   syncRuntimeState();

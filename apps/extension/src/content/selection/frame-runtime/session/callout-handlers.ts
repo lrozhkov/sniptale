@@ -1,7 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { applyCalloutSettingsPatch } from '../../callout/model';
+import { applyCalloutSettingsPatch } from '../../../../features/highlighter/frame-annotation/callout/model';
 import { createSessionCalloutSettings } from './callout-defaults';
 import type {
   CalloutDeleteDetail,

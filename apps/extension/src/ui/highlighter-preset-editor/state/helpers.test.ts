@@ -9,6 +9,7 @@ import {
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 
 vi.mock('../../../features/highlighter/css-sanitizer/css', () => ({
+  validateCssPolicyString: vi.fn(() => ({ blockedProps: [], properties: [], rawError: false })),
   validateCssString: vi.fn((css: string) => ({
     blockedProps: [],
     hasBlockedProps: false,

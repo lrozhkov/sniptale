@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCalloutBadgeText } from './badge';
+import { resolveFrameCalloutBadgeText as resolveCalloutBadgeText } from '../../../features/highlighter/frame-annotation/callout-badge';
 
 describe('resolveCalloutBadgeText', () => {
   it('uses explicit text before the title and body fallbacks', () => {

@@ -1,4 +1,3 @@
-import { translate } from '../../../../platform/i18n';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import type { InteractiveFrameToolbarProps } from './types';
@@ -8,13 +7,12 @@ import {
   dispatchStepBadgeEnable,
 } from './dispatch';
 import type { ToolbarClickEvent } from './dispatch';
+import { getFrameAnnotationCommandSchema } from '../../../../features/highlighter/frame-annotation/commands';
 
 export function createEffectButtons() {
-  return [
-    { mode: 'border' as EffectMode, label: translate('content.interactiveFrame.effectBorder') },
-    { mode: 'blur' as EffectMode, label: translate('content.interactiveFrame.effectBlur') },
-    { mode: 'focus' as EffectMode, label: translate('content.interactiveFrame.effectFocus') },
-  ];
+  return getFrameAnnotationCommandSchema()
+    .filter((item) => item.id.startsWith('effect-'))
+    .map((item) => ({ mode: item.id.slice('effect-'.length) as EffectMode, label: item.label }));
 }
 
 export function createToolbarSurfaceHandlers(props: InteractiveFrameToolbarProps) {

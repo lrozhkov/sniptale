@@ -16,6 +16,7 @@ export function syncSelectionToolSettingsFromObject(
   switch (type) {
     case 'transparent-base':
     case 'browser-frame':
+    case 'frame-annotation':
       break;
     case 'source-image':
     case 'background':

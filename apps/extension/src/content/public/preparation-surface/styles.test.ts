@@ -22,13 +22,13 @@ import {
 const STYLES_SOURCE_PATH = fileURLToPath(new URL('./styles.ts', import.meta.url));
 const HOST_STYLES_PATH = fileURLToPath(new URL('./host.css', import.meta.url));
 const FRAME_SETTINGS_STYLES_PATH = fileURLToPath(
-  new URL('../../selection/frame-settings-popover/styles.css', import.meta.url)
+  new URL('../../../composition/frame-annotation-controls/frame/styles.css', import.meta.url)
 );
 const CALLOUT_SETTINGS_STYLES_PATH = fileURLToPath(
-  new URL('../../selection/callout-settings-popover/styles.css', import.meta.url)
+  new URL('../../../composition/frame-annotation-controls/callout/styles.css', import.meta.url)
 );
 const SETTINGS_POPOVER_STYLES_PATH = fileURLToPath(
-  new URL('../../selection/popover-sync/styles.css', import.meta.url)
+  new URL('../../../composition/frame-annotation-controls/popover/styles.css', import.meta.url)
 );
 
 afterEach(() => {
@@ -73,9 +73,10 @@ describe('content entrypoint styles', () => {
       /\.sniptale-settings-popover-header \.sniptale-toolbar-menu-title\s*\{[^}]*font-size:/s
     );
     expect(source).toContain('./host.css?inline');
-    expect(source).toContain('frame-settings-popover/styles.css?inline');
-    expect(source).toContain('callout-settings-popover/styles.css?inline');
-    expect(source).toContain('popover-sync/styles.css?inline');
+    expect(source).toContain('frame-annotation-controls/frame/styles.css?inline');
+    expect(source).toContain('frame-annotation-controls/callout/styles.css?inline');
+    expect(source).toContain('frame-annotation-controls/popover/styles.css?inline');
+    expect(source).toContain('frame-annotation/interaction/styles.css?inline');
     expect(source).toContain('@sniptale/ui/styles?inline');
     expect(source).not.toContain('@sniptale/ui/styles/tailwind?inline');
     expect(source).not.toContain('../../../shared/design-tokens.css?inline');
@@ -113,6 +114,10 @@ describe('content entrypoint styles', () => {
           "manrope-latin-ext-wght-normal.woff2') format('woff2-variations');",
         ].join(''),
         'src: url(./manrope-cyrillic-wght-normal.woff2) format("woff2-variations");',
+        [
+          "src: url('@fontsource/marck-script/files/",
+          "marck-script-cyrillic-400-normal.woff2') format('woff2');",
+        ].join(''),
       ].join('\n')
     );
 
@@ -128,10 +133,16 @@ describe('content entrypoint styles', () => {
     expect(styles).toContain(
       'url("chrome-extension://sniptale/fonts/manrope-cyrillic-wght-normal.woff2")'
     );
+    expect(styles).toContain(
+      'url("chrome-extension://sniptale/fonts/marck-script-cyrillic-400-normal.woff2")'
+    );
     expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith(
       'node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2'
     );
     expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith('fonts/manrope-cyrillic-wght-normal.woff2');
     expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith('fonts/manrope-latin-ext-wght-normal.woff2');
+    expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith(
+      'fonts/marck-script-cyrillic-400-normal.woff2'
+    );
   });
 });

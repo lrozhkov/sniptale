@@ -95,6 +95,7 @@ function buildHighlightedToolCompactCommands(
     case 'rough-shape':
     case 'shape-library':
     case 'callout':
+    case 'frame-annotation':
       return [];
     case 'pencil':
     case 'highlighter':

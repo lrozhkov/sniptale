@@ -7,7 +7,13 @@ import {
 } from './context-menu/types';
 import type { useCanvasImageIntake } from './use-intake';
 import type { useCanvasWrapperState } from './use-state';
+import type { EditorControllerPublicApiAdapter } from '../../controller/public-api/types';
+import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
 import { CanvasEmptyState, CanvasViewport } from './views';
+
+type CanvasSurfaceController = CanvasContextMenuController &
+  EditorFrameAnnotationPlaneController &
+  Pick<EditorControllerPublicApiAdapter, 'activeTool'>;
 
 const canvasWrapperClassName =
   'relative h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--sniptale-color-surface-canvas)]';
@@ -16,7 +22,7 @@ function CanvasContextZone(props: {
   backgroundColor: string;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   contextMenuState: CanvasContextMenuState | null;
-  controller: CanvasContextMenuController;
+  controller: CanvasSurfaceController;
   gridStyle: React.CSSProperties | null;
   handleCanvasContextMenu: React.MouseEventHandler<HTMLDivElement>;
   hasImage: boolean;
@@ -34,13 +40,16 @@ function CanvasContextZone(props: {
       onContextMenu={props.handleCanvasContextMenu}
     >
       <CanvasViewport
+        activeTool={props.controller.activeTool}
         hasImage={props.hasImage}
         backgroundColor={props.backgroundColor}
+        controller={props.controller}
         viewportRef={props.viewportRef}
         stageRef={props.stageRef}
         surfaceRef={props.surfaceRef}
         canvasRef={props.canvasRef}
         gridStyle={props.gridStyle}
+        layers={props.layers}
       />
       {!props.hasImage ? <CanvasEmptyState {...props.imageIntake} /> : null}
       {props.contextMenuState ? (
@@ -83,7 +92,7 @@ interface CanvasWrapperSurfaceProps {
   backgroundColor: string;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   contextMenuState: CanvasContextMenuState | null;
-  controller: CanvasContextMenuController;
+  controller: CanvasSurfaceController;
   gridOverlayClassName: string;
   gridStyle: React.CSSProperties | null;
   handleCanvasContextMenu: React.MouseEventHandler<HTMLDivElement>;

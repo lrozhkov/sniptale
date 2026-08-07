@@ -5,10 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addStepBadgeReorderListener } from '../../platform/page-context/frame-events';
-import { StepBadgePopoverContent } from './body';
+import { StepBadgePopoverContent } from '../../../composition/frame-annotation-controls/step-badge/body';
 import { DEFAULT_STEP_BADGE_TEMPLATE } from '../../../features/highlighter/step-badge-presets/catalog';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
-import { StepBadgeAutoSection, StepBadgeValueSection } from './views';
+import { StepBadgeAutoSection, StepBadgePositionSection, StepBadgeValueSection } from './views';
+import { StepBadgePresetSection } from '../../../composition/frame-annotation-controls/step-badge/preset-list';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -180,9 +181,95 @@ function registerStepBadgeConfigurePresetTest(): void {
   });
 }
 
+function registerStepBadgeSharedViewActionsTest(): void {
+  it('dispatches shared preset, position, value, and mode actions', () => {
+    const presets = createSystemStepBadgePresetCatalog()
+      .slice(0, 2)
+      .map((preset, index) => ({
+        ...preset,
+        customized: index === 0,
+        enabled: index === 1 ? false : true,
+      }));
+    const onApply = vi.fn();
+    const onConfigure = vi.fn();
+    const onReset = vi.fn();
+    const onToggle = vi.fn();
+    const onValueChange = vi.fn();
+    const onAutoModeChange = vi.fn();
+    const onAnchorChange = vi.fn();
+    const onOffsetToggle = vi.fn();
+    if (!container) {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+    }
+    act(() =>
+      root?.render(
+        <>
+          <StepBadgePresetSection
+            activePresetId={presets[0]!.id}
+            error="catalog failed"
+            onApply={onApply}
+            onConfigure={onConfigure}
+            onReset={onReset}
+            onToggle={onToggle}
+            pending={new Set()}
+            presets={presets}
+          />
+          <StepBadgePositionSection
+            onAnchorChange={onAnchorChange}
+            onOffsetToggle={onOffsetToggle}
+            selectedAnchor="top-left"
+            selectedOffsets={[]}
+          />
+          <StepBadgeAutoSection
+            embedded
+            isAuto={false}
+            onAlphabetChange={vi.fn()}
+            onAutoModeChange={onAutoModeChange}
+            onTypeChange={vi.fn()}
+            settings={{ enabled: true, type: 'number', value: '1' }}
+          />
+          <StepBadgeValueSection
+            embedded
+            frameId="frame-1"
+            isAuto={false}
+            onValueChange={onValueChange}
+            value="1"
+          />
+        </>
+      )
+    );
+    const rows = [...container.querySelectorAll<HTMLElement>('.sniptale-callout-preset-row')];
+    const valueInput = container.querySelector<HTMLInputElement>('.sniptale-step-badge-input');
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    act(() => {
+      rows[0]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
+      rows.forEach((row) =>
+        row
+          .querySelectorAll<HTMLButtonElement>('.sniptale-callout-preset-action')
+          .forEach((button) => button.click())
+      );
+      container?.querySelector<HTMLButtonElement>('[data-step-badge-anchor="top-center"]')?.click();
+      container?.querySelector<HTMLButtonElement>('[data-offset-direction="up"]')?.click();
+      container?.querySelector<HTMLButtonElement>('.sniptale-glass-switch')?.click();
+      valueSetter?.call(valueInput, '22');
+      valueInput?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onApply).toHaveBeenCalledWith(presets[0]);
+    expect(onConfigure).toHaveBeenCalledTimes(2);
+    expect(onReset).toHaveBeenCalledWith(presets[0]);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onAutoModeChange).toHaveBeenCalledWith(true);
+    expect(onValueChange).toHaveBeenCalledWith('22');
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('catalog failed');
+  });
+}
+
 describe('StepBadgeValueSection', () => {
   registerStepBadgeReorderTest();
   registerStepBadgeAutoSectionTest();
   registerStepBadgeDisableActionTest();
   registerStepBadgeConfigurePresetTest();
+  registerStepBadgeSharedViewActionsTest();
 });

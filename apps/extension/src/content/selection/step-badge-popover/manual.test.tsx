@@ -7,7 +7,7 @@ import {
   createStepBadgeSettingsFromTemplate,
   DEFAULT_STEP_BADGE_TEMPLATE,
 } from '../../../features/highlighter/step-badge-presets/catalog';
-import { StepBadgeManualSettings } from './manual';
+import { StepBadgeManualSettings } from '../../../composition/frame-annotation-controls/step-badge/manual';
 
 it('organizes manual numbering settings by category and cycles color sources beside the picker', async () => {
   const host = document.createElement('div');

@@ -7,7 +7,7 @@ import {
   createCalloutPopoverSettingsHandler,
   createFrameCalloutChangedHandler,
 } from './callout-handlers';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const baseCallout: CalloutSettings = createDefaultCalloutSettings();
 baseCallout.content.bodyHtml = '<p>base</p>';

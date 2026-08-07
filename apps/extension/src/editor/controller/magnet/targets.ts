@@ -57,6 +57,8 @@ export function collectMagnetTargets(
       return;
     }
 
+    if (target.sniptaleId && candidate.sniptaleId === target.sniptaleId) return;
+
     if (isEditableMagnetSibling(candidate) && !selectedChildren.has(candidate)) {
       targets.add(candidate);
     }

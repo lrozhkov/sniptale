@@ -3,7 +3,7 @@
 import { expect, it } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 import { resolveInteractiveCurrentFrame } from './current-frame';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const baseCallout = createDefaultCalloutSettings();
 

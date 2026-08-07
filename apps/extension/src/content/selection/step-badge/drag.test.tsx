@@ -4,7 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StepBadgeManualPlacement } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import { useStepBadgeBoundaryDrag } from './drag';
+import type { FrameAnnotationCoordinateSpace } from '../../../features/highlighter/frame-annotation/coordinate-space';
+import { useStepBadgeBoundaryDrag } from '../../../features/highlighter/frame-annotation/step-badge/drag';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -27,10 +28,12 @@ function createPointerEvent(
 const initialPlacement: StepBadgeManualPlacement = { position: 0.25, side: 'top' };
 
 function Harness(props: {
+  coordinateSpace?: FrameAnnotationCoordinateSpace;
   initialPlacement: StepBadgeManualPlacement;
   visualOffset?: { x: number; y: number };
 }) {
   const drag = useStepBadgeBoundaryDrag({
+    ...(props.coordinateSpace ? { coordinateSpace: props.coordinateSpace } : {}),
     frameRect: { height: 120, width: 200, x: 100, y: 80 },
     initialPlacement: props.initialPlacement,
     onPositionChange,
@@ -150,5 +153,82 @@ describe('useStepBadgeBoundaryDrag', () => {
 
     expect(onPositionChange).toHaveBeenCalledOnce();
     expect(onPositionChange).toHaveBeenCalledWith({ position: 0.6, side: 'top' });
+  });
+
+  it('moves horizontal and vertical placements from the keyboard and ignores other keys', () => {
+    const handle = host.querySelector('button') as HTMLButtonElement;
+
+    act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })));
+    expect(onPositionChange).not.toHaveBeenCalled();
+
+    act(() =>
+      handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({ position: 0.255, side: 'top' });
+
+    act(() => root.render(<Harness initialPlacement={{ position: 0.5, side: 'left' }} />));
+    act(() =>
+      handle.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown', shiftKey: true })
+      )
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      position: 0.5833333333333334,
+      side: 'left',
+    });
+    act(() =>
+      handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }))
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      position: 0.49166666666666664,
+      side: 'left',
+    });
+  });
+
+  it('ignores non-primary pointer starts and projects client coordinates through the adapter', () => {
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn(() => {
+      throw new Error('portal removed');
+    });
+    const secondary = createPointerEvent('pointerdown', {
+      clientX: 140,
+      clientY: 80,
+      pointerId: 10,
+    });
+    Object.defineProperty(secondary, 'button', { value: 1 });
+    act(() => handle.dispatchEvent(secondary));
+    expect(handle.dataset['draft']).toBe('');
+
+    act(() =>
+      root.render(
+        <Harness
+          coordinateSpace={{
+            viewport: { height: 400, width: 600 },
+            clientPointToLogical: ({ x, y }) => ({ x: x + 100, y: y + 40 }),
+            clientRectToLogical: (rect) => rect,
+            logicalPointToClient: ({ x, y }) => ({ x: x - 100, y: y - 40 }),
+            logicalRectToClient: (rect) => rect,
+          }}
+          initialPlacement={initialPlacement}
+        />
+      )
+    );
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 20, clientY: 40, pointerId: 11 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 100, clientY: 40, pointerId: 11 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointerup', { clientX: 100, clientY: 40, pointerId: 11 })
+      )
+    );
+
+    expect(onPositionChange).toHaveBeenLastCalledWith({ position: 0.5, side: 'top' });
   });
 });

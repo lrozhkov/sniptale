@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from 'vitest';
 import type { FrameData } from '../../../../../features/highlighter/contracts';
-import { applyAutoStepBadgeValues } from './auto-values';
+import {
+  applyAutoStepBadgeValues,
+  sortStepBadgeOwnersByStoredOrder,
+} from '../../../../../features/highlighter/frame-annotation/step-badge/auto-values';
 import { createFrameDataFixture, createStepBadgeSettingsFixture } from '../../test-support';
 
 function createFrame(
@@ -43,5 +46,43 @@ describe('frame-manager-step-badge-auto-values', () => {
     const frames = [createFrame('manual', 0, { auto: false, value: 'M' }), createFrame('none', 1)];
 
     expect(applyAutoStepBadgeValues(frames, new Map())).toBe(frames);
+  });
+
+  it('orders stored owners ahead of unstored owners and keeps the fallback deterministic', () => {
+    const frames = [
+      createFrame('fallback-b', 1),
+      createFrame('stored', 2),
+      createFrame('fallback-a', 0),
+    ];
+
+    expect(
+      sortStepBadgeOwnersByStoredOrder(frames, new Map([['stored', 4]]), (left, right) =>
+        left.id.localeCompare(right.id)
+      ).map((frame) => frame.id)
+    ).toEqual(['stored', 'fallback-a', 'fallback-b']);
+    expect(
+      sortStepBadgeOwnersByStoredOrder(
+        frames,
+        new Map([
+          ['fallback-b', 2],
+          ['stored', 1],
+          ['fallback-a', 3],
+        ]),
+        () => 0
+      ).map((frame) => frame.id)
+    ).toEqual(['stored', 'fallback-b', 'fallback-a']);
+  });
+
+  it('generates separate Cyrillic and Latin letter sequences while ignoring disabled badges', () => {
+    const frames = [
+      createFrame('cyrillic-a', 0, { type: 'letter', alphabet: 'cyrillic' }),
+      createFrame('cyrillic-b', 1, { type: 'letter', alphabet: 'cyrillic' }),
+      createFrame('latin-a', 2, { type: 'letter', alphabet: 'latin' }),
+      createFrame('disabled', 3, { enabled: false, type: 'number', value: 'kept' }),
+    ];
+
+    const result = applyAutoStepBadgeValues(frames);
+
+    expect(result.map((frame) => frame.stepBadge?.value)).toEqual(['А', 'Б', 'A', 'kept']);
   });
 });

@@ -1,0 +1,361 @@
+import React from 'react';
+import { createPortal } from 'react-dom';
+import type { FabricObject } from 'fabric';
+import {
+  FrameAnnotationDecoration,
+  resolveFrameAnnotationVisualScene,
+  type FrameAnnotationSnapshotV1,
+} from '../../features/highlighter/frame-annotation';
+import { FrameAnnotationBlurSurface } from '../../features/highlighter/frame-annotation/effect-surface';
+import { FrameAnnotationFloatingToolbar } from '../../features/highlighter/frame-annotation/floating-toolbar';
+import type { FrameAnnotationCommandId } from '../../features/highlighter/frame-annotation/commands';
+import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
+import { FrameAnnotationResizeHandleLayer } from '../../features/highlighter/frame-annotation/interaction/resize-handles';
+import type { ResizeDirection } from '../../features/highlighter/contracts';
+import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
+import { MIN_FRAME_SIZE } from './interaction-controller';
+import { EditorFrameCallout, resolveCalloutCenter } from './callout-projection';
+import { FrameProjectionSettings, type ProjectionSettingsMenu } from './projection-settings';
+import {
+  resolveFrameAnnotationToolbarPlacement,
+  type FrameAnnotationToolbarBounds,
+} from './toolbar-placement';
+import { EditorFrameAnnotationLayerControls } from './toolbar-layer-controls';
+
+export function FrameProjection(props: {
+  coordinateSpace: FrameAnnotationCoordinateSpace;
+  controlsRoot: HTMLDivElement | null;
+  interactive: boolean;
+  object: FabricObject | null;
+  sceneRoot: HTMLDivElement | null;
+  selected: boolean;
+  scale: number;
+  snapshot: FrameAnnotationSnapshotV1;
+  settingsAnchor: HTMLButtonElement | null;
+  settingsMenu: ProjectionSettingsMenu;
+  onMoveStart: (event: React.PointerEvent) => void;
+  onResizeStart: (
+    event: React.PointerEvent,
+    direction: ResizeDirection,
+    calloutCenter: { x: number; y: number } | null
+  ) => void;
+  onCommand: (command: FrameAnnotationCommandId) => void;
+  onSnapshotChange: (snapshot: FrameAnnotationSnapshotV1) => void;
+  onSnapshotPreview: (snapshot: FrameAnnotationSnapshotV1) => void;
+  onStepBadgeReorder: (direction: 'up' | 'down') => void;
+  onDraftCommit: () => void;
+  onMoveEnd?: () => void;
+  onCloseSettings: () => void;
+  onBringForward?: () => void;
+  onSendBackward?: () => void;
+  onToggleLock?: () => void;
+  projectMoveRect?: (rect: { x: number; y: number; width: number; height: number }) => {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  onOpenSettings: (menu: Exclude<ProjectionSettingsMenu, null>, anchor: HTMLButtonElement) => void;
+}) {
+  const [calloutBounds, setCalloutBounds] = React.useState<FrameAnnotationToolbarBounds | null>(
+    null
+  );
+  const handleCalloutBoundsChange = React.useCallback(
+    (next: FrameAnnotationToolbarBounds | null) =>
+      setCalloutBounds((current) => (sameBounds(current, next) ? current : next)),
+    []
+  );
+  React.useEffect(() => {
+    if (!props.snapshot.callout?.enabled) setCalloutBounds(null);
+  }, [props.snapshot.callout?.enabled]);
+  const editingSelected = props.selected && props.settingsMenu === null;
+  const scene = resolveFrameAnnotationVisualScene({
+    frame: props.snapshot,
+    state: editingSelected ? 'editing' : 'idle',
+  });
+  const frameRect = {
+    x: props.snapshot.x,
+    y: props.snapshot.y,
+    width: props.snapshot.width,
+    height: props.snapshot.height,
+  };
+  return (
+    <>
+      <FrameProjectionVisual
+        frameRect={frameRect}
+        interactive={props.interactive}
+        scene={scene}
+        snapshot={props.snapshot}
+        onMoveStart={props.onMoveStart}
+      />
+      <FrameProjectionOverlays
+        {...props}
+        frameRect={frameRect}
+        scene={scene}
+        onCalloutBoundsChange={handleCalloutBoundsChange}
+      />
+      {editingSelected && props.controlsRoot ? (
+        <FrameProjectionToolbar
+          coordinateSpace={props.coordinateSpace}
+          calloutBounds={calloutBounds}
+          controlsRoot={props.controlsRoot}
+          open={props.onOpenSettings}
+          scene={scene}
+          snapshot={props.snapshot}
+          onCommand={props.onCommand}
+          object={props.object}
+          onBringForward={props.onBringForward ?? (() => {})}
+          onSendBackward={props.onSendBackward ?? (() => {})}
+          onToggleLock={props.onToggleLock ?? (() => {})}
+        />
+      ) : null}
+      {props.controlsRoot ? (
+        <FrameProjectionSettings
+          anchor={props.settingsAnchor}
+          controlsRoot={props.controlsRoot}
+          menu={props.settingsMenu}
+          scene={scene}
+          snapshot={props.snapshot}
+          close={props.onCloseSettings}
+          onChange={props.onSnapshotChange}
+          onPreview={props.onSnapshotPreview}
+          onReorder={props.onStepBadgeReorder}
+          onDraftCommit={props.onDraftCommit}
+          {...(props.onMoveEnd ? { onMoveEnd: props.onMoveEnd } : {})}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function FrameProjectionVisual(props: {
+  frameRect: { x: number; y: number; width: number; height: number };
+  interactive: boolean;
+  scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
+  snapshot: FrameAnnotationSnapshotV1;
+  onMoveStart: (event: React.PointerEvent) => void;
+}) {
+  const pointerEvents = props.interactive ? 'auto' : 'none';
+  return (
+    <div
+      data-frame-id={props.snapshot.id}
+      onPointerDown={props.onMoveStart}
+      style={{
+        position: 'absolute',
+        left: props.frameRect.x,
+        top: props.frameRect.y,
+        width: props.frameRect.width,
+        height: props.frameRect.height,
+        pointerEvents,
+      }}
+    >
+      <div
+        style={{ ...props.scene.frameStyle, position: 'relative', left: 0, top: 0, pointerEvents }}
+      >
+        {props.snapshot.effectMode === 'blur' ? (
+          <FrameAnnotationBlurSurface frame={props.snapshot} />
+        ) : null}
+        <FrameAnnotationDecoration
+          frameId={props.snapshot.id}
+          fillStyle={props.scene.fillStyle}
+          strokeStyle={props.scene.strokeStyle}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FrameProjectionOverlays(
+  props: Parameters<typeof FrameProjection>[0] & {
+    frameRect: { x: number; y: number; width: number; height: number };
+    scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
+    onCalloutBoundsChange: (bounds: FrameAnnotationToolbarBounds | null) => void;
+  }
+) {
+  return (
+    <>
+      <FrameResizeOverlay {...props} />
+      <FrameCalloutOverlay {...props} />
+      <FrameStepBadgeOverlay {...props} />
+    </>
+  );
+}
+
+type FrameProjectionOverlayProps = Parameters<typeof FrameProjectionOverlays>[0];
+
+function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
+  if (!props.selected || props.settingsMenu !== null || !props.controlsRoot) return null;
+  return createPortal(
+    <FrameAnnotationResizeHandleLayer
+      borderColor={props.scene.borderColor}
+      frameId={props.snapshot.id}
+      frameRect={props.coordinateSpace.logicalRectToClient(props.frameRect)}
+      handleSize={Math.min(16, Math.max(10, 8 + props.scene.borderWidth))}
+      strokeWidth={props.scene.surface.strokeVisible ? props.scene.borderWidth * props.scale : 0}
+      position="fixed"
+      onResizeStart={(event, direction) =>
+        props.onResizeStart(
+          event,
+          direction,
+          resolveCalloutCenter(props.snapshot.id, props.coordinateSpace)
+        )
+      }
+    />,
+    props.controlsRoot
+  );
+}
+
+function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
+  if (!props.snapshot.callout?.enabled || !props.sceneRoot || !props.object) return null;
+  return (
+    <EditorFrameCallout
+      coordinateSpace={props.coordinateSpace}
+      object={props.object}
+      portalTarget={props.sceneRoot}
+      controlsPortalTarget={props.controlsRoot}
+      selected={props.selected}
+      snapshot={props.snapshot}
+      onSnapshotChange={props.onSnapshotChange}
+      onSnapshotPreview={props.onSnapshotPreview}
+      onDraftCommit={props.onDraftCommit}
+      isSettingsOpen={props.settingsMenu === 'callout'}
+      onSettingsOpen={(anchor) => props.onOpenSettings('callout', anchor)}
+      onOccupiedBoundsChange={props.onCalloutBoundsChange}
+      {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
+    />
+  );
+}
+
+function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
+  const anchorRef = React.useRef<HTMLButtonElement | null>(null);
+  const settings = props.snapshot.stepBadge;
+  if (!settings?.enabled || !props.sceneRoot || !props.controlsRoot) return null;
+  return (
+    <FrameStepBadgeInteractiveSurface
+      borderColor={props.scene.borderColor}
+      borderWidth={props.scene.borderWidth}
+      controlsPortalTarget={props.controlsRoot}
+      coordinateSpace={props.coordinateSpace}
+      frameRect={props.frameRect}
+      onPositionChange={(manualPlacement) =>
+        props.onSnapshotChange({ ...props.snapshot, stepBadge: { ...settings, manualPlacement } })
+      }
+      portalTheme={null}
+      isSettingsOpen={props.settingsMenu === 'step'}
+      onSettingsClick={() => {
+        if (anchorRef.current) props.onOpenSettings('step', anchorRef.current);
+      }}
+      settings={settings}
+      settingsAnchorRef={anchorRef}
+      showSettingsHandle={!props.selected || props.settingsMenu === 'step'}
+      surfacePortalTarget={props.sceneRoot}
+      {...(props.snapshot.borderSettings?.fillColor
+        ? { fillColor: props.snapshot.borderSettings.fillColor }
+        : {})}
+      {...(props.snapshot.borderSettings?.fillOpacity === undefined
+        ? {}
+        : { fillOpacity: props.snapshot.borderSettings.fillOpacity })}
+      {...(props.snapshot.borderSettings?.shadow === undefined
+        ? {}
+        : { shadow: props.snapshot.borderSettings.shadow })}
+    />
+  );
+}
+
+function sameBounds(
+  first: FrameAnnotationToolbarBounds | null,
+  second: FrameAnnotationToolbarBounds | null
+): boolean {
+  return (
+    first === second ||
+    (first !== null &&
+      second !== null &&
+      first.bottom === second.bottom &&
+      first.left === second.left &&
+      first.right === second.right &&
+      first.top === second.top)
+  );
+}
+
+function FrameProjectionToolbar(props: {
+  calloutBounds: FrameAnnotationToolbarBounds | null;
+  coordinateSpace: FrameAnnotationCoordinateSpace;
+  controlsRoot: HTMLDivElement;
+  open: (menu: Exclude<ProjectionSettingsMenu, null>, anchor: HTMLButtonElement) => void;
+  scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
+  snapshot: FrameAnnotationSnapshotV1;
+  onCommand: (command: FrameAnnotationCommandId) => void;
+  object: FabricObject | null;
+  onBringForward: () => void;
+  onSendBackward: () => void;
+  onToggleLock: () => void;
+}) {
+  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
+  const [, refreshPlacement] = React.useReducer((value) => value + 1, 0);
+  React.useLayoutEffect(() => {
+    refreshPlacement();
+    if (typeof ResizeObserver === 'undefined' || !toolbarRef.current) return;
+    const observer = new ResizeObserver(() => refreshPlacement());
+    observer.observe(toolbarRef.current);
+    return () => observer.disconnect();
+  }, [props.snapshot.id]);
+  const frameBounds = props.coordinateSpace.logicalRectToClient({
+    x: props.snapshot.x,
+    y: props.snapshot.y,
+    width: props.snapshot.width,
+    height: props.snapshot.height,
+  });
+  const toolbarRect = toolbarRef.current?.getBoundingClientRect();
+  const position = resolveFrameAnnotationToolbarPlacement({
+    calloutBounds: props.calloutBounds,
+    frameBounds: {
+      bottom: frameBounds.y + frameBounds.height,
+      left: frameBounds.x,
+      right: frameBounds.x + frameBounds.width,
+      top: frameBounds.y,
+    },
+    ...(toolbarRect
+      ? { toolbarSize: { height: toolbarRect.height, width: toolbarRect.width } }
+      : {}),
+    viewport: { height: window.innerHeight, width: window.innerWidth },
+  });
+  return createPortal(
+    <div
+      ref={toolbarRef}
+      style={{
+        position: 'fixed',
+        left: position.left,
+        top: position.top,
+        width: 'max-content',
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+    >
+      <FrameAnnotationFloatingToolbar
+        calloutEnabled={props.snapshot.callout?.enabled}
+        canDecrease={
+          props.snapshot.width >= MIN_FRAME_SIZE + 10 &&
+          props.snapshot.height >= MIN_FRAME_SIZE + 10
+        }
+        effectMode={props.snapshot.effectMode ?? 'border'}
+        onCalloutSettingsClick={(anchor) => props.open('callout', anchor)}
+        onEffectSettingsClick={(anchor) => props.open('effect', anchor)}
+        onStepSettingsClick={(anchor) => props.open('step', anchor)}
+        stepBadgeEnabled={props.snapshot.stepBadge?.enabled}
+        showEdit={false}
+        trailingSlot={
+          props.object ? (
+            <EditorFrameAnnotationLayerControls
+              locked={props.object.sniptaleLocked === true}
+              onBringForward={props.onBringForward}
+              onSendBackward={props.onSendBackward}
+              onToggleLock={props.onToggleLock}
+            />
+          ) : null
+        }
+        onCommand={props.onCommand}
+      />
+    </div>,
+    props.controlsRoot
+  );
+}

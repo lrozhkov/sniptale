@@ -2,12 +2,12 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import { dispatchCalloutPopoverSettingsChanged } from '../../platform/page-context/frame-events';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
-import { normalizeCalloutSettings } from './helpers';
+import { normalizeCalloutSettings } from '../../../composition/frame-annotation-controls/callout/helpers';
 import {
   applyCalloutSettingsPatch,
   cloneCalloutStyle,
   type CalloutSettingsPatch,
-} from '../callout/model';
+} from '../../../features/highlighter/frame-annotation/callout/model';
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 
 function dispatchCalloutSettingsChange(frameId: string, settings: CalloutSettingsPatch) {

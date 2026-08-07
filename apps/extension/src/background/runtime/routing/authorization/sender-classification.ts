@@ -38,6 +38,14 @@ export function isScenarioEditorSenderUrl(senderUrl: string | undefined): boolea
   return matchesExtensionPagePath(senderUrl, 'apps/extension/src/scenario-editor/index.html');
 }
 
+export function isImageEditorSenderUrl(senderUrl: string | undefined): boolean {
+  return matchesExtensionPagePath(senderUrl, 'apps/extension/src/editor/index.html');
+}
+
+export function isWebSnapshotViewerSenderUrl(senderUrl: string | undefined): boolean {
+  return matchesExtensionPagePath(senderUrl, 'apps/extension/src/web-snapshot-viewer/index.html');
+}
+
 export function isPageAccessSenderUrl(senderUrl: string | undefined): boolean {
   if (!senderUrl) {
     return false;

@@ -122,6 +122,11 @@ export interface EditorControllerInstanceSceneActions {
 export interface EditorControllerInstanceObjectCapabilities {
   getPublicApiAdapter(): EditorControllerPublicApiAdapter;
   applyGridSnap(object: FabricObject): void;
+  snapFrameAnnotationRect(input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }): { x: number; y: number; width: number; height: number };
+  clearFrameAnnotationSnap(): void;
   buildViewportState(): EditorViewportState;
   syncViewportState(): void;
   scheduleViewportStateSync(): void;

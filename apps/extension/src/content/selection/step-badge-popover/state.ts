@@ -14,13 +14,13 @@ import {
   filterStepBadgeValue,
   normalizeStepBadgeFromProp,
   toggleStepBadgeOffset,
-} from './helpers';
+} from '../../../composition/frame-annotation-controls/step-badge/helpers';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { dispatchFrameStepBadgeChanged } from '../../platform/page-context/frame-events';
 import {
   usePopoverEscapeClose,
   usePopoverOutsideClose as useStepBadgePopoverOutsideClose,
-} from '../popover-sync/hooks';
+} from '../../../composition/frame-annotation-controls/popover/hooks';
 
 function createStepBadgeHandlers(props: {
   frameId: string;

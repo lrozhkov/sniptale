@@ -4,17 +4,22 @@
     {
       "category": "archive-integration",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "611c4d0856746b9aa15c2212939e1fcb78e9c0d7ca4439fed2be87980f23a0c4"
+      "sha256": "52260019cdddb595f181442afec8978b64feb7a4aca2251890515a4d5f68c11e"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/build/layout.data.json",
-      "sha256": "611c4d0856746b9aa15c2212939e1fcb78e9c0d7ca4439fed2be87980f23a0c4"
+      "sha256": "52260019cdddb595f181442afec8978b64feb7a4aca2251890515a4d5f68c11e"
     },
     {
       "category": "bundled-font",
       "path": "apps/extension/manifest.json",
-      "sha256": "d9ef0f311e55a08761c987f76d2930687d3522389624d26b4508d54dba4e3829"
+      "sha256": "ad9bf0d256e776b2b8a4bf7b5f9185ab4e173bbb21b4d7e5d35cef0e9fef8e8c"
+    },
+    {
+      "category": "bundled-font",
+      "path": "apps/extension/src/features/highlighter/frame-annotation/callout/font.css",
+      "sha256": "a7618bc0a0d38315fda985db2ea2736c49d9c226f80459df572c423c434497f1"
     },
     {
       "category": "bundled-font",
@@ -24,12 +29,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "3d36424a4e6effebb0a606a90f107e0b4cee259d25e383e589d6ac75388e0b8e"
+      "sha256": "48ac28ef3ae89e983b74c04ef9c16ac296846794dac772d918d162836a58cbc2"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "3d36424a4e6effebb0a606a90f107e0b4cee259d25e383e589d6ac75388e0b8e"
+      "sha256": "48ac28ef3ae89e983b74c04ef9c16ac296846794dac772d918d162836a58cbc2"
     },
     {
       "category": "bundled-font",
@@ -39,7 +44,7 @@
     {
       "category": "bundled-font",
       "path": "tooling/configs/qa/manifest-permissions.data.json",
-      "sha256": "43130834734704dc40c29e7863a2149b4ac7eebfa7e2f82c6094ad0457beaeb4"
+      "sha256": "2f684443e8e872405f3bb4a13deef2a04405f677782bfa4389ca41d193ebf1b6"
     },
     {
       "category": "archive-integration",
@@ -59,7 +64,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/qa/core/oss-release-validation.tree.mjs",
-      "sha256": "497c436f75b1bf646603ccc1957d832f6164fbcf667fa6fc78e0123483c15de6"
+      "sha256": "24a48ede90b885469749d889c7435d62570908d1da346cd6d64a68fa14290c48"
     },
     {
       "category": "archive-integration",

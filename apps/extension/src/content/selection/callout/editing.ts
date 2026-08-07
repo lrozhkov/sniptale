@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import {
-  useCalloutBlurRequestEffect,
   useCalloutEditingFocusEffect,
   useCalloutEscapeCaptureEffect,
   useCalloutMeasureEffect,
   useCalloutSelectionChangeEffect,
   useCalloutSyncContentEffect,
-} from './editing.effects';
-import { useCalloutEditingHandlers } from './editing.handlers';
+} from '../../../features/highlighter/frame-annotation/callout/editing-effects';
+import { useCalloutEditingHandlers } from '../../../features/highlighter/frame-annotation/callout/editing-handlers';
+import { useCalloutBlurRequestEffect } from './editing-blur-request-effect';
 import { useCalloutVoiceInput } from './voice-input';
 
 type UseCalloutEditingArgs = {

@@ -2,11 +2,16 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   reportEditorActionFailure: vi.fn(),
+  renderForExport: vi.fn(async () => 'data:image/png;base64,flat'),
 }));
 
 vi.mock('../../runtime/async-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/async-actions')>()),
   reportEditorActionFailure: mocks.reportEditorActionFailure,
+}));
+vi.mock('./document/export', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./document/export')>()),
+  renderEditorControllerForExport: mocks.renderForExport,
 }));
 
 import { resizeEditorControllerImageScene } from './image-scene-resize';
@@ -17,7 +22,7 @@ function createController(overrides: Record<string, unknown> = {}) {
     canvas: { id: 'canvas' },
     clearCropSelection: vi.fn(),
     commitHistory: vi.fn(),
-    renderToDataUrl: vi.fn(() => 'data:image/png;base64,flat'),
+    renderToDataUrl: vi.fn(() => 'data:image/png;base64,legacy-flat'),
     source: { id: 'source', name: 'capture.png' },
     syncRuntimeState: vi.fn(),
     ...overrides,
@@ -40,11 +45,12 @@ it('flattens image scene resize through a fresh document apply', async () => {
   await flushResize();
 
   expect(controller.clearCropSelection).toHaveBeenCalledOnce();
-  expect(controller.renderToDataUrl).toHaveBeenCalledWith({
+  expect(mocks.renderForExport).toHaveBeenCalledWith(controller, {
     format: 'png',
     outputSize: { height: 80, width: 120 },
     quality: 1,
   });
+  expect(controller.renderToDataUrl).not.toHaveBeenCalled();
   expect(controller.applyDocument).toHaveBeenCalledWith(
     expect.objectContaining({
       canvasHeight: 80,

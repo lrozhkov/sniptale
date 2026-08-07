@@ -147,6 +147,7 @@ function renderDrawingToolBranch(
     case 'crop':
     case 'pencil':
     case 'highlighter':
+    case 'frame-annotation':
       return null;
   }
 }
@@ -189,6 +190,7 @@ function renderRemainingToolBranch(
     case 'step':
     case 'pencil':
     case 'highlighter':
+    case 'frame-annotation':
       return renderDefaultToolInspector();
   }
 }
@@ -220,6 +222,7 @@ function renderRasterToolBranch(highlightedTool: EditorTool): React.ReactNode | 
     case 'crop':
     case 'pencil':
     case 'highlighter':
+    case 'frame-annotation':
       return null;
   }
 }
@@ -255,6 +258,7 @@ function renderShapeToolBranch(
     case 'step':
     case 'image':
     case 'crop':
+    case 'frame-annotation':
       return null;
   }
 }

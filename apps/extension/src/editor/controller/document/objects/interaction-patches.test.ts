@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { Rect } from 'fabric';
 
 const mocks = vi.hoisted(() => ({
   isBlurObject: vi.fn(),
@@ -48,4 +49,22 @@ it('applies base editor interaction controls with step and blur patches', () => 
   expect(blur.set).toHaveBeenCalledWith(
     expect.objectContaining({ hasControls: false, lockScalingX: true, lockScalingY: true })
   );
+});
+
+it('keeps frame annotation proxy interaction owned by its DOM projection', () => {
+  const frame = new Rect({ width: 100, height: 80 });
+  frame.sniptaleType = 'frame-annotation';
+
+  applyBaseInteractionPatch(frame, {
+    arrowInteraction: null,
+    arrowObject: false,
+    locked: false,
+  });
+
+  expect(frame).toMatchObject({
+    evented: false,
+    hasBorders: false,
+    hasControls: false,
+    selectable: false,
+  });
 });

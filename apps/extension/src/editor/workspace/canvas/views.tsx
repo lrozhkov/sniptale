@@ -9,6 +9,9 @@ import {
   EDITOR_CANVAS_VIEWPORT_DATA_UI,
 } from './context-menu/types';
 import { EditorRasterOverlay } from './raster-overlay';
+import { EditorFrameAnnotationPlane } from '../../frame-annotation/plane';
+import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
+import type { EditorLayerItem, EditorTool } from '../../../features/editor/document/types';
 
 const emptyStateButtonClassName = [
   'mt-5',
@@ -60,14 +63,17 @@ interface CanvasEmptyStateProps {
 }
 
 export function CanvasViewport(props: {
+  activeTool?: EditorTool;
   hasImage: boolean;
   backgroundColor: string;
+  controller?: EditorFrameAnnotationPlaneController;
   dataUi?: string;
   surfaceRef?: React.Ref<HTMLDivElement>;
   viewportRef: React.Ref<HTMLDivElement>;
   stageRef: React.Ref<HTMLDivElement>;
   canvasRef: React.Ref<HTMLCanvasElement>;
   gridStyle: React.CSSProperties | null;
+  layers?: EditorLayerItem[];
 }) {
   const surfaceStyle = props.hasImage
     ? ({
@@ -95,7 +101,14 @@ export function CanvasViewport(props: {
 function CanvasStage(
   props: Pick<
     Parameters<typeof CanvasViewport>[0],
-    'canvasRef' | 'gridStyle' | 'hasImage' | 'stageRef' | 'surfaceRef'
+    | 'activeTool'
+    | 'canvasRef'
+    | 'controller'
+    | 'gridStyle'
+    | 'hasImage'
+    | 'layers'
+    | 'stageRef'
+    | 'surfaceRef'
   > & {
     surfaceStyle: React.CSSProperties | undefined;
   }
@@ -117,6 +130,14 @@ function CanvasStage(
             canvasRef={props.canvasRef as React.RefObject<HTMLCanvasElement | null>}
             hasImage={props.hasImage}
           />
+          {props.hasImage && props.controller ? (
+            <EditorFrameAnnotationPlane
+              activeTool={props.activeTool ?? 'select'}
+              canvasRef={props.canvasRef as React.RefObject<HTMLCanvasElement | null>}
+              controller={props.controller}
+              layers={props.layers ?? []}
+            />
+          ) : null}
           {props.hasImage && props.gridStyle ? (
             <div className="pointer-events-none absolute inset-0 z-20" style={props.gridStyle} />
           ) : null}

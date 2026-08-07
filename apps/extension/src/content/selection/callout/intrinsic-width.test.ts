@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
-import { createDefaultCalloutSettings } from './model';
-import { getCalloutLayoutState } from './layout';
+import { createDefaultCalloutSettings } from '../../../features/highlighter/frame-annotation/callout/model';
+import { getCalloutLayoutState } from '../../../features/highlighter/frame-annotation/callout/layout';
 
 describe('callout intrinsic text width', () => {
   it('keeps the card at least as wide as an unbreakable word at large font sizes', () => {

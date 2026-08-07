@@ -1,12 +1,13 @@
 import React from 'react';
-import {
-  ProductGlassToolbarButton,
-  ProductGlassToolbarDivider,
-} from '@sniptale/ui/product-glass-toolbar';
-import { ListOrdered, MessageSquare, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ProductGlassToolbarDivider } from '@sniptale/ui/product-glass-toolbar';
 import { translate } from '../../../../platform/i18n';
 import type { InteractiveFrameToolbarProps } from './types';
-import { FrameEffectIcon } from './effect-icon';
+import {
+  FrameAnnotationToolbarActionButtons,
+  FrameAnnotationToolbarCalloutButton,
+  FrameAnnotationToolbarEffectButton,
+  FrameAnnotationToolbarStepButton,
+} from '../../../../features/highlighter/frame-annotation/floating-toolbar';
 
 export function InteractiveFrameToolbarEffectButtons(props: {
   effectMode: InteractiveFrameToolbarProps['effectMode'];
@@ -18,67 +19,13 @@ export function InteractiveFrameToolbarEffectButtons(props: {
   effectButtons: Array<{ mode: InteractiveFrameToolbarProps['effectMode']; label: string }>;
 }) {
   return (
-    <ProductGlassToolbarButton
-      active
-      data-sniptale-activation-bridge="defer"
-      ref={props.popoverAnchorRef as React.RefObject<HTMLButtonElement>}
+    <FrameAnnotationToolbarEffectButton
+      anchorRef={props.popoverAnchorRef}
+      effectMode={props.effectMode}
+      label={props.effectButtons.find((item) => item.mode === props.effectMode)?.label}
       onClick={props.handleEffectClick(props.effectMode)}
       onMouseDown={props.handleButtonMouseDown}
-      menuIndicator
-      title={props.effectButtons.find((item) => item.mode === props.effectMode)?.label}
-    >
-      <FrameEffectIcon mode={props.effectMode} size={18} />
-    </ProductGlassToolbarButton>
-  );
-}
-
-function InteractiveFrameToolbarStepButton(props: {
-  frame: InteractiveFrameToolbarProps['frame'];
-  stepBadgePopoverAnchorRef: InteractiveFrameToolbarProps['stepBadgePopoverAnchorRef'];
-  handleButtonMouseDown: (event: React.MouseEvent) => void;
-  handleStepBadgeClick: (event: React.MouseEvent) => void;
-}) {
-  return (
-    <ProductGlassToolbarButton
-      data-sniptale-activation-bridge="defer"
-      ref={props.stepBadgePopoverAnchorRef as React.RefObject<HTMLButtonElement>}
-      onClick={props.handleStepBadgeClick}
-      onMouseDown={props.handleButtonMouseDown}
-      menuIndicator
-      title={
-        props.frame.stepBadge?.enabled
-          ? translate('content.interactiveFrame.stepBadgeEnabled')
-          : translate('content.interactiveFrame.stepBadgeEnable')
-      }
-      {...(props.frame.stepBadge?.enabled ? { active: true } : {})}
-    >
-      <ListOrdered size={17} />
-    </ProductGlassToolbarButton>
-  );
-}
-
-function InteractiveFrameToolbarCalloutButton(props: {
-  frame: InteractiveFrameToolbarProps['frame'];
-  calloutPopoverAnchorRef: InteractiveFrameToolbarProps['calloutPopoverAnchorRef'];
-  handleButtonMouseDown: (event: React.MouseEvent) => void;
-  handleCalloutClick: (event: React.MouseEvent) => void;
-}) {
-  return (
-    <ProductGlassToolbarButton
-      data-sniptale-activation-bridge="defer"
-      ref={props.calloutPopoverAnchorRef as React.RefObject<HTMLButtonElement>}
-      onClick={props.handleCalloutClick}
-      onMouseDown={props.handleButtonMouseDown}
-      menuIndicator
-      title={
-        props.frame.callout?.enabled
-          ? translate('content.interactiveFrame.calloutEdit')
-          : translate('content.interactiveFrame.calloutAdd')
-      }
-      {...(props.frame.callout?.enabled ? { active: true } : {})}
-    >
-      <MessageSquare size={17} />
-    </ProductGlassToolbarButton>
+    />
   );
 }
 
@@ -92,51 +39,15 @@ export function InteractiveFrameToolbarActionButtons(props: {
   canDecrease: boolean;
 }) {
   return (
-    <>
-      <ProductGlassToolbarDivider />
-      <ProductGlassToolbarButton
-        onClick={props.handleDecreaseClick}
-        onMouseDown={props.handleButtonMouseDown}
-        disabled={!props.canDecrease}
-        title={translate('content.interactiveFrame.decreaseFrame')}
-        aria-label={translate('content.interactiveFrame.decreaseFrame')}
-      >
-        <Minus size={18} />
-      </ProductGlassToolbarButton>
-      <ProductGlassToolbarButton
-        onClick={props.handleIncreaseClick}
-        onMouseDown={props.handleButtonMouseDown}
-        title={translate('content.interactiveFrame.increaseFrame')}
-        aria-label={translate('content.interactiveFrame.increaseFrame')}
-      >
-        <Plus size={18} />
-      </ProductGlassToolbarButton>
-      <ProductGlassToolbarButton
-        onClick={props.handleEditClick}
-        onMouseDown={props.handleButtonMouseDown}
-        title={translate('content.interactiveFrame.editButton')}
-      >
-        <Pencil size={18} />
-      </ProductGlassToolbarButton>
-      <ProductGlassToolbarDivider />
-      <ProductGlassToolbarButton
-        onClick={props.handleDeleteClick}
-        onMouseDown={props.handleButtonMouseDown}
-        danger
-        title={translate('content.interactiveFrame.deleteButton')}
-      >
-        <Trash2 size={18} />
-      </ProductGlassToolbarButton>
-      <ProductGlassToolbarDivider />
-      <ProductGlassToolbarButton
-        onClick={props.handleCloseClick}
-        onMouseDown={props.handleButtonMouseDown}
-        title={translate('common.actions.close')}
-        aria-label={translate('common.actions.close')}
-      >
-        <X size={18} />
-      </ProductGlassToolbarButton>
-    </>
+    <FrameAnnotationToolbarActionButtons
+      canDecrease={props.canDecrease}
+      onClose={props.handleCloseClick}
+      onDecrease={props.handleDecreaseClick}
+      onDelete={props.handleDeleteClick}
+      onEdit={props.handleEditClick}
+      onIncrease={props.handleIncreaseClick}
+      onMouseDown={props.handleButtonMouseDown}
+    />
   );
 }
 
@@ -148,20 +59,32 @@ export function InteractiveFrameToolbarMiddleSection(props: {
   handleStepBadgeClick: (event: React.MouseEvent) => void;
   handleCalloutClick: (event: React.MouseEvent) => void;
 }) {
+  const stepEnabled = props.frame.stepBadge?.enabled === true;
+  const calloutEnabled = props.frame.callout?.enabled === true;
   return (
     <>
       <ProductGlassToolbarDivider />
-      <InteractiveFrameToolbarStepButton
-        frame={props.frame}
-        stepBadgePopoverAnchorRef={props.stepBadgePopoverAnchorRef}
-        handleButtonMouseDown={props.handleButtonMouseDown}
-        handleStepBadgeClick={props.handleStepBadgeClick}
+      <FrameAnnotationToolbarStepButton
+        active={stepEnabled}
+        anchorRef={props.stepBadgePopoverAnchorRef}
+        onClick={props.handleStepBadgeClick}
+        onMouseDown={props.handleButtonMouseDown}
+        title={translate(
+          stepEnabled
+            ? 'content.interactiveFrame.stepBadgeEnabled'
+            : 'content.interactiveFrame.stepBadgeEnable'
+        )}
       />
-      <InteractiveFrameToolbarCalloutButton
-        frame={props.frame}
-        calloutPopoverAnchorRef={props.calloutPopoverAnchorRef}
-        handleButtonMouseDown={props.handleButtonMouseDown}
-        handleCalloutClick={props.handleCalloutClick}
+      <FrameAnnotationToolbarCalloutButton
+        active={calloutEnabled}
+        anchorRef={props.calloutPopoverAnchorRef}
+        onClick={props.handleCalloutClick}
+        onMouseDown={props.handleButtonMouseDown}
+        title={translate(
+          calloutEnabled
+            ? 'content.interactiveFrame.calloutEdit'
+            : 'content.interactiveFrame.calloutAdd'
+        )}
       />
     </>
   );

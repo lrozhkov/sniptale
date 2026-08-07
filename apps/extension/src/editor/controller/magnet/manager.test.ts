@@ -130,6 +130,20 @@ function createManagerHarness(options: {
 
 describe('editor magnet manager', () => {
   it('snaps moving objects to sibling edges and workspace axes', verifyMoveSnapping);
+  it('snaps external DOM geometry while excluding its authoritative proxy', () => {
+    const proxy = createRect({ left: 43, top: 38, width: 20, height: 20 });
+    proxy.sniptaleId = 'frame-1';
+    const sibling = createRect({ left: 60, top: 40, width: 20, height: 20 });
+    const { manager } = createManagerHarness({ objects: [proxy, sibling] });
+
+    expect(
+      manager.snapRect({
+        excludeId: 'frame-1',
+        rect: { x: 43, y: 38, width: 20, height: 20 },
+      })
+    ).toMatchObject({ x: 40, y: 40, width: 20, height: 20 });
+    expect(manager.hasActiveGuides()).toBe(true);
+  });
   it(
     'snaps scaling handles and draws guides without clearing crop overlays after render',
     verifyScalingAndRenderPath

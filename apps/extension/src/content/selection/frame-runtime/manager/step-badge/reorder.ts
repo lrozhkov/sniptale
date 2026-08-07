@@ -2,12 +2,12 @@ import type { FrameData } from '../../../../../features/highlighter/contracts';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ReorderStepBadge } from '../../contracts';
 import { scheduleStepBadgeRecalculation } from './update';
-import { sortFramesByStoredStepBadgeOrder } from './order';
+import { sortStepBadgeOwnersByStoredOrder } from '../../../../../features/highlighter/frame-annotation/step-badge/auto-values';
 
 type FrameSetter = Dispatch<SetStateAction<FrameData[]>>;
 
 export function sortFramesForStepBadgeReorder(frames: FrameData[], orderMap: Map<string, number>) {
-  return sortFramesByStoredStepBadgeOrder(
+  return sortStepBadgeOwnersByStoredOrder(
     frames.filter((frame) => frame.stepBadge?.enabled && frame.stepBadge.auto !== false),
     orderMap,
     (a, b) => a.y - b.y || a.x - b.x

@@ -42,6 +42,14 @@ const contentRuntimeEffectsStylesheet = readFileSync(
   new URL('../../public/preparation-surface/effects.css', import.meta.url),
   'utf8'
 );
+const frameAnnotationInteractionStylesheet = readFileSync(
+  new URL('../../../features/highlighter/frame-annotation/interaction/styles.css', import.meta.url),
+  'utf8'
+);
+const frameAnnotationToolbarSource = readFileSync(
+  new URL('../../../features/highlighter/frame-annotation/floating-toolbar.tsx', import.meta.url),
+  'utf8'
+);
 const quickEditCursorSource = readFileSync(
   new URL('../../selection/quick-edit-runtime/cursor.ts', import.meta.url),
   'utf8'
@@ -140,8 +148,9 @@ function expectToolbarSizeContract(): void {
   expect(toolbarShellButtonStylesheet).toContain(
     'box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);'
   );
-  expect(interactiveFrameToolbarSectionsSource).toContain('<Pencil size={18} />');
-  expect(interactiveFrameToolbarSectionsSource).toContain('<Trash2 size={18} />');
+  expect(interactiveFrameToolbarSectionsSource).toContain('FrameAnnotationToolbarActionButtons');
+  expect(frameAnnotationToolbarSource).toContain('<Pencil size={18} />');
+  expect(frameAnnotationToolbarSource).toContain('<Trash2 size={18} />');
 }
 
 function expectVerticalToolbarContract(): void {
@@ -281,10 +290,14 @@ it('disables the legacy quick-edit outline once the active frame owns the border
 });
 
 it('highlights both callout quick actions on hover and keyboard focus', () => {
-  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-drag-handle:hover,');
-  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-drag-handle:focus-visible,');
-  expect(contentRuntimeEffectsStylesheet).toContain('.sniptale-callout-settings-handle:hover,');
-  expect(contentRuntimeEffectsStylesheet).toContain(
+  expect(frameAnnotationInteractionStylesheet).toContain('.sniptale-callout-drag-handle:hover,');
+  expect(frameAnnotationInteractionStylesheet).toContain(
+    '.sniptale-callout-drag-handle:focus-visible,'
+  );
+  expect(frameAnnotationInteractionStylesheet).toContain(
+    '.sniptale-callout-settings-handle:hover,'
+  );
+  expect(frameAnnotationInteractionStylesheet).toContain(
     'border-color: var(--sniptale-color-accent) !important;'
   );
 });

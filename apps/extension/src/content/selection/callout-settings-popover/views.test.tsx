@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
 
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { CalloutPositionSection, CalloutPresetSection } from './views';
+import {
+  CalloutPositionSection,
+  CalloutPresetSection,
+} from '../../../composition/frame-annotation-controls/callout/views';
 import { CalloutManualSettings } from '../../../ui/highlighter-preset-editor/callout/inspector';
 import { parseCalloutConnectorMarker } from '../../../ui/highlighter-preset-editor/callout/inspector-effects';
-import { CalloutSettingsPopoverContent, createCalloutAnchorPlacement } from './body';
-import { createDefaultCalloutSettings } from '../callout/model';
+import {
+  CalloutSettingsPopoverContent,
+  createCalloutAnchorPlacement,
+} from '../../../composition/frame-annotation-controls/callout/body';
+import { createDefaultCalloutSettings } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 
 const settings = createDefaultCalloutSettings(undefined, 'system-callout-bubble');
@@ -177,5 +185,111 @@ describe('callout settings views', () => {
     expect(markup).toContain('sniptale-glass-preset-item--active');
     expect(markup).toContain('Настроить стиль');
     expect(markup).toContain('Скрыть из списка');
+  });
+});
+
+describe('callout settings shared interactions', () => {
+  it('dispatches apply, customize, reset, and visibility actions from shared preset rows', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const presets = createSystemCalloutPresetCatalog()
+      .slice(0, 2)
+      .map((preset, index) => ({
+        ...preset,
+        customized: index === 0,
+        enabled: index === 1 ? false : true,
+      }));
+    const onApplyPreset = vi.fn();
+    const onCustomizePreset = vi.fn();
+    const onResetPreset = vi.fn();
+    const onTogglePreset = vi.fn();
+
+    act(() =>
+      root.render(
+        <CalloutPresetSection
+          activePresetId={presets[0]!.id}
+          error="catalog failed"
+          onApplyPreset={onApplyPreset}
+          onCustomizePreset={onCustomizePreset}
+          onResetPreset={onResetPreset}
+          onTogglePreset={onTogglePreset}
+          pendingPresetIds={new Set()}
+          presets={presets}
+        />
+      )
+    );
+    const rows = [...host.querySelectorAll<HTMLElement>('.sniptale-callout-preset-row')];
+    act(() => {
+      rows[0]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
+      rows[0]
+        ?.querySelectorAll<HTMLButtonElement>('.sniptale-callout-preset-action')
+        .forEach((button) => button.click());
+      rows[1]
+        ?.querySelectorAll<HTMLButtonElement>('.sniptale-callout-preset-action')
+        .forEach((button) => button.click());
+    });
+
+    expect(onApplyPreset).toHaveBeenCalledWith(presets[0]);
+    expect(onCustomizePreset).toHaveBeenCalledTimes(2);
+    expect(onResetPreset).toHaveBeenCalledWith(presets[0]);
+    expect(onTogglePreset).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('catalog failed');
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it('switches between shared preset and manual modes and commits position changes', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const presets = createSystemCalloutPresetCatalog().slice(0, 2);
+    const onApplyPreset = vi.fn();
+    const onClose = vi.fn();
+    const handleSettingChange = vi.fn();
+    act(() =>
+      root.render(
+        <CalloutSettingsPopoverContent
+          handleDelete={vi.fn()}
+          handleSettingChange={handleSettingChange}
+          headerContext="element"
+          localSettings={createDefaultCalloutSettings(undefined, presets[0]!.id)}
+          onApplyPreset={onApplyPreset}
+          onClose={onClose}
+          onCustomizePreset={vi.fn()}
+          onShowPresets={vi.fn()}
+          onTogglePreset={vi.fn()}
+          pendingPresetIds={new Set()}
+          presetError={null}
+          presets={presets}
+          saveSection={{
+            error: null,
+            isSaving: false,
+            onCreate: vi.fn().mockResolvedValue(true),
+            onOverwrite: vi.fn().mockResolvedValue(true),
+            presets,
+          }}
+        />
+      )
+    );
+    const rows = [...host.querySelectorAll<HTMLElement>('.sniptale-callout-preset-row')];
+    act(() => {
+      rows[0]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
+      rows[1]?.querySelector<HTMLButtonElement>('.sniptale-glass-preset-item')?.click();
+      host.querySelector<HTMLButtonElement>('.sniptale-settings-popover-mode-action')?.click();
+    });
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Позиция"]')?.click());
+    act(() => {
+      [...host.querySelectorAll<HTMLElement>('[data-callout-anchor]')].at(-1)?.click();
+    });
+    expect(onClose).toHaveBeenCalled();
+    expect(onApplyPreset).toHaveBeenCalled();
+    expect(handleSettingChange).toHaveBeenCalledWith({ placement: expect.any(Object) });
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
   });
 });

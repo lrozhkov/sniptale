@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { translate } from '../../../platform/i18n';
-import { buildBlurTypeOptions } from './helpers';
+import { buildBlurTypeOptions } from '../../../composition/frame-annotation-controls/frame/helpers';
 
 describe('frame blur type options', () => {
   it('uses the canonical Gauss, Wave, and Marker catalog', () => {

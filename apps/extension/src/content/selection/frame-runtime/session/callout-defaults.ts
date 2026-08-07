@@ -9,7 +9,10 @@ import {
   loadCalloutPresetCatalog,
   subscribeToCalloutPresetCatalog,
 } from '../../../../composition/persistence/callout-presets';
-import { cloneCalloutStyle, createDefaultCalloutSettings } from '../../callout/model';
+import {
+  cloneCalloutStyle,
+  createDefaultCalloutSettings,
+} from '../../../../features/highlighter/frame-annotation/callout/model';
 
 const logger = createLogger({ namespace: 'ContentCalloutDefaults' });
 
@@ -80,4 +83,4 @@ export function createSessionCalloutSettings(style: CalloutVisualStyle | null) {
   );
 }
 
-export { createDefaultCalloutSettings } from '../../callout/model';
+export { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';

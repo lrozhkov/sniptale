@@ -48,6 +48,8 @@ export interface ProductTemplateMenuShellProps extends HTMLAttributes<HTMLDivEle
 export function ProductDropdownMenu({
   children,
   className = '',
+  onWheel,
+  onWheelCapture,
   style,
   ...props
 }: ProductDropdownMenuProps) {
@@ -57,6 +59,10 @@ export function ProductDropdownMenu({
       ref={menuRef}
       {...props}
       className={['sniptale-dropdown-menu', className].filter(Boolean).join(' ')}
+      onWheelCapture={(event) => {
+        onWheelCapture?.(event);
+        if (!event.isPropagationStopped()) onWheel?.(event);
+      }}
       style={style}
     >
       {children}

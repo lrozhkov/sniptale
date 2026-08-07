@@ -52,6 +52,7 @@ export function InteractiveFrameResizeHandles({
       frameId={tempFrame.id}
       tempFrame={tempFrame}
       handleSize={handleSize}
+      strokeWidth={borderWidth}
       onResizeStart={onResizeStart}
       {...(borderColor === undefined ? {} : { borderColor })}
     />,

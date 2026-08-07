@@ -100,4 +100,17 @@ it('keeps the selection toolbar on canvas only for editable selection states', (
     leftDrawer: 'shape-library',
     rightUtility: null,
   });
+
+  expect(
+    isCanvasSelectionToolbarEligible({
+      activeTool: 'select',
+      hasImage: true,
+      inspector: 'tool',
+      selection: {
+        hasSelection: true,
+        selectedObjectCount: 1,
+        selectedObjectType: 'frame-annotation',
+      },
+    })
+  ).toBe(false);
 });

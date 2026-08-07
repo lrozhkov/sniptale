@@ -6,10 +6,13 @@ import type { SourceState } from '../../../document/model/source-state';
 import { ensureEditorSourceLayer } from '../source';
 import { prepareCanvasForDocumentLoad, renderCanvasAfterDocumentLoad } from './canvas';
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
+import { restoreFrameAnnotationProxyFromMetadata } from '../../../frame-annotation/proxy';
+import { assertValidFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
 ): Promise<SourceState | null> {
+  assertValidFrameAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson);
   await options.canvas.loadFromJSON(options.prepared.normalizedDocument.canvasJson);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,
@@ -22,7 +25,15 @@ export async function loadPreparedDocumentOnCanvas(
   }
   prepareCanvasForDocumentLoad(canvasPrepareOptions);
   options.upgradeLegacyArrowObjects();
-  options.canvas.getObjects().forEach((object) => options.prepareObject(object));
+  options.canvas.getObjects().forEach((object) => {
+    options.prepareObject(object);
+    if (
+      object.sniptaleType === 'frame-annotation' &&
+      !restoreFrameAnnotationProxyFromMetadata(object)
+    ) {
+      throw new Error('Invalid frame annotation proxy');
+    }
+  });
   restoreRichShapeObjects(options.canvas, options.prepared.normalizedDocument.richShapes ?? [], {
     prepareObject: options.prepareObject,
   });

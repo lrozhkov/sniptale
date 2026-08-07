@@ -23,6 +23,7 @@ import { backgroundOwnedRouteInventory } from './owned-route-inventory';
 import type { BackgroundOwnedRouteHandlerId } from '../../../routing-contracts/owned-route-context';
 import type { ActionResult, BackgroundOwnedAction } from './types';
 import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
+import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -70,6 +71,8 @@ function getBackgroundOwnedRouteHandler(
       return routeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':
       return routeContentRuntimeWakeupAction;
+    case 'frame-annotation-raster':
+      return routeFrameAnnotationRasterAction;
     case 'llm-content-processing':
       return routeLlmAction;
     case 'llm-scenario-editor-processing':
@@ -89,6 +92,10 @@ function getBackgroundOwnedRouteHandler(
     case 'voice-input-offscreen-event':
       return routeVoiceInputOffscreenEventAction;
   }
+}
+
+function routeFrameAnnotationRasterAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(routeFrameAnnotationRasterMessage(action.message, action.context.sendResponse));
 }
 
 function routeVoiceInputOffscreenEventAction(action: BackgroundOwnedAction): ActionResult | null {

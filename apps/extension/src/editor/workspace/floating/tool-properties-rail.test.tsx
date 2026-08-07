@@ -231,6 +231,19 @@ it('does not show the crop compact popover while canvas and image size controls 
   expect(container?.textContent).not.toContain('crop-status');
 });
 
+it('shows the connected three-button creation group for frame annotations', () => {
+  renderRail({ activeTool: 'frame-annotation', compactCommandGroups: [] });
+
+  expect(
+    container?.querySelector('[data-ui="editor.frame-annotation.creation-controls"]')
+  ).not.toBeNull();
+  expect(container?.querySelector('[data-ui="frame-annotation.creation.frame"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="frame-annotation.creation.callout"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[data-ui="frame-annotation.creation.step-badge"]')
+  ).not.toBeNull();
+});
+
 it.each(['selection', 'brush', 'eraser', 'fill'] as const)(
   'keeps %s tool properties visible while a layer remains selected',
   (activeTool) => {

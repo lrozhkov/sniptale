@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { applyAutoStepBadgeValues } from './auto-values';
+import { applyAutoStepBadgeValues } from '../../../../../features/highlighter/frame-annotation/step-badge/auto-values';
 import { createHistoryWrappedStepBadgeActions } from './actions-runtime';
 import type {
   FrameManagerRefs,

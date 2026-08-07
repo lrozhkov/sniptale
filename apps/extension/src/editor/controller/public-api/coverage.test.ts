@@ -142,7 +142,7 @@ function createController() {
     applyDocument: vi.fn(async (document) => {
       controller.lastApplied = document;
     }),
-    canvas: { id: 'canvas' },
+    canvas: { getObjects: vi.fn(() => []), id: 'canvas' },
     canvasDocumentSize: { height: 80, width: 120 },
     clearCropSelection: vi.fn(),
     commitHistory: vi.fn(),
@@ -244,10 +244,10 @@ it('bridges document export, render, and history flows', async () => {
     'source-object'
   );
   expect(mocks.copyRenderedMock).toHaveBeenCalledWith({
-    dataUrl: 'rendered',
+    dataUrl: 'data-url',
     mimeType: 'image/png',
   });
-  expect(controller.renderToDataUrl).toHaveBeenCalledWith({
+  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 360, width: 640 },
     quality: 0.9,
@@ -278,7 +278,7 @@ it('forwards scene actions through the scene public api wrappers', async () => {
 
   expect(mocks.resizeCanvasMock).toHaveBeenCalled();
   expect(controller.clearCropSelection).toHaveBeenCalledOnce();
-  expect(controller.renderToDataUrl).toHaveBeenCalledWith({
+  expect(mocks.renderToDataUrlMock).toHaveBeenCalledWith(controller.canvas, {
     format: 'png',
     outputSize: { height: 80, width: 120 },
     quality: 1,
@@ -288,7 +288,7 @@ it('forwards scene actions through the scene public api wrappers', async () => {
       canvasHeight: 80,
       canvasWidth: 120,
       sourceHeight: 80,
-      sourceImageData: 'rendered',
+      sourceImageData: 'data-url',
       sourceName: 'capture.png',
       sourceWidth: 120,
     }),

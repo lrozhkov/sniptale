@@ -120,6 +120,8 @@ export function getEditorObjectTypeLabel(type: EditorObjectType): string {
       return translate('editor.runtime.pencil');
     case 'highlighter':
       return translate('editor.runtime.highlighter');
+    case 'frame-annotation':
+      return translate('editor.tools.frameAnnotation');
     case 'rectangle':
       return translate('editor.runtime.rectangle');
     case 'ellipse':

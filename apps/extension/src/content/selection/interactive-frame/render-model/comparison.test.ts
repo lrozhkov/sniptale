@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { InteractiveFrameProps } from './types';
 import { areInteractiveFramePropsEqual } from './comparison';
-import { createDefaultCalloutSettings } from '../../callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 function createProps(): InteractiveFrameProps {
   return {

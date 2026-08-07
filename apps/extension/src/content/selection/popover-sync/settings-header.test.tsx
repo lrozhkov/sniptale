@@ -2,7 +2,7 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsPopoverHeader } from './settings-header';
+import { SettingsPopoverHeader } from '../../../composition/frame-annotation-controls/popover/header';
 
 describe('SettingsPopoverHeader', () => {
   it('renders a transient toolbar header without drag or close controls', () => {

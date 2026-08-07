@@ -1,4 +1,4 @@
-import type { FabricObject } from 'fabric';
+import { Rect, type FabricObject } from 'fabric';
 import type { EditorViewportState } from '../../../../features/editor/document/types';
 import { useEditorStore } from '../../../state/useEditorStore';
 import { applyEditorGridSnap } from '../../viewport/grid';
@@ -22,6 +22,36 @@ export function applyGridSnapForController(
   }
 
   applyEditorGridSnap(object, workspace);
+}
+
+export function snapExternalEditorRectForController(
+  controller: EditorControllerInstance,
+  input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }
+): { x: number; y: number; width: number; height: number } {
+  const workspace = useEditorStore.getState().workspace;
+  const snapped = controller.magnetManager?.snapRect(input) ?? input.rect;
+  if (workspace.magnetEnabled && controller.magnetManager?.hasActiveGuides()) return snapped;
+  const proxy = new Rect({
+    left: snapped.x,
+    top: snapped.y,
+    width: snapped.width,
+    height: snapped.height,
+    originX: 'left',
+    originY: 'top',
+    strokeWidth: 0,
+  });
+  if (input.excludeId !== undefined) proxy.sniptaleId = input.excludeId;
+  proxy.sniptaleType = 'rectangle';
+  applyEditorGridSnap(proxy, workspace);
+  return {
+    x: Number(proxy.left ?? snapped.x),
+    y: Number(proxy.top ?? snapped.y),
+    width: snapped.width,
+    height: snapped.height,
+  };
 }
 
 export function buildViewportStateForController(

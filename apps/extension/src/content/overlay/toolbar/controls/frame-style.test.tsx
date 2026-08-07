@@ -5,14 +5,20 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
-import type { ToolbarFutureFrameStyle } from '../types';
+import type {
+  ToolbarFutureFrameCalloutActions,
+  ToolbarFutureFrameStepBadgeActions,
+  ToolbarFutureFrameStyle,
+} from '../types';
 import { useToolbarMenuState } from '../state/menu';
 import { FutureFrameStyleControls } from './frame-style';
-import { createDefaultCalloutSettings } from '../../../selection/callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
+import { createDefaultFrameStepBadge } from '../../../../features/highlighter/frame-annotation/defaults';
 
 const popoverMocks = vi.hoisted(() => ({
   props: null as Record<string, unknown> | null,
   calloutProps: null as Record<string, unknown> | null,
+  stepBadgeProps: null as Record<string, unknown> | null,
 }));
 
 vi.mock('../../../selection/frame-settings-popover', () => ({
@@ -22,28 +28,17 @@ vi.mock('../../../selection/frame-settings-popover', () => ({
   },
 }));
 
-vi.mock('./future-callout-control', () => ({
-  FutureCalloutControl: (props: {
-    actions: { enable: () => unknown; set: (settings: unknown) => void };
-    menu: ReturnType<typeof useToolbarMenuState>;
-    setStyle: React.Dispatch<React.SetStateAction<ToolbarFutureFrameStyle>>;
-    style: ToolbarFutureFrameStyle;
-  }) => {
-    const settings = props.style.futureCallout;
-    popoverMocks.calloutProps = settings
-      ? { isOpen: props.menu.activeMenuType === 'future-callout', settings }
-      : null;
-    return (
-      <button
-        aria-pressed={settings != null}
-        data-ui="content.toolbar.future-frame-callout"
-        onClick={() => {
-          const next = props.actions.enable();
-          props.setStyle((current) => ({ ...current, futureCallout: next as never }));
-          props.menu.setActiveMenuType('future-callout');
-        }}
-      />
-    );
+vi.mock('../../../../composition/frame-annotation-controls/callout/popover', () => ({
+  FutureCalloutSettingsPopover: (props: Record<string, unknown>) => {
+    popoverMocks.calloutProps = props;
+    return <div data-ui="future-frame-callout-popover" />;
+  },
+}));
+
+vi.mock('../../../../composition/frame-annotation-controls/step-badge/popover', () => ({
+  FutureStepBadgeSettingsPopover: (props: Record<string, unknown>) => {
+    popoverMocks.stepBadgeProps = props;
+    return <div data-ui="future-frame-step-badge-popover" />;
   },
 }));
 
@@ -68,10 +63,8 @@ function Harness(props: {
   compactMenus?: boolean;
   futureFrameStyle: ToolbarFutureFrameStyle;
   onFutureFrameEffectModeChange: (mode: ToolbarFutureFrameStyle['effectMode']) => void;
-  futureFrameCalloutActions?: {
-    enable: () => ReturnType<typeof createDefaultCalloutSettings>;
-    set: (settings: ReturnType<typeof createDefaultCalloutSettings> | null) => void;
-  };
+  futureFrameCalloutActions?: ToolbarFutureFrameCalloutActions;
+  futureFrameStepBadgeActions?: ToolbarFutureFrameStepBadgeActions;
 }) {
   const toolbarMenuState = useToolbarMenuState();
   return <FutureFrameStyleControls {...props} toolbarMenuState={toolbarMenuState} />;
@@ -102,6 +95,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   popoverMocks.props = null;
   popoverMocks.calloutProps = null;
+  popoverMocks.stepBadgeProps = null;
 });
 
 afterEach(() => {
@@ -122,6 +116,11 @@ it('forwards compact menu presentation to future frame settings', () => {
   expect(container?.querySelector('[data-ui="content.toolbar.future-frame-style"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="content.toolbar.future-frame-blur"]')).toBeNull();
   expect(container?.querySelector('[data-ui="content.toolbar.future-frame-focus"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.future-frame-effects-group"]')
+      ?.parentElement
+  ).toBe(container);
+  expect(container?.querySelector('.sniptale-frame-annotation-creation-controls')).toBeNull();
 });
 
 it('opens one dynamic effect menu and projects mode changes from that menu', () => {
@@ -196,6 +195,45 @@ it('enables future comments and opens their settings from the toolbar button', (
   act(() => button?.click());
 
   expect(onEnableFutureFrameCallout).toHaveBeenCalledOnce();
+  expect(onFutureFrameCalloutChange).toHaveBeenCalledWith(settings);
   expect(button?.getAttribute('aria-pressed')).toBe('true');
-  expect(popoverMocks.calloutProps).toMatchObject({ isOpen: true, settings });
+  expect(popoverMocks.calloutProps).toMatchObject({
+    isOpen: true,
+    settings,
+    portalTarget: expect.anything(),
+  });
+});
+
+it('enables future numbering and opens the shared settings menu', () => {
+  const settings = createDefaultFrameStepBadge();
+  const enable = vi.fn(() => settings);
+  const set = vi.fn();
+  if (!container) {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
+  act(() => {
+    root?.render(
+      <Harness
+        futureFrameStyle={createStyle('border')}
+        futureFrameStepBadgeActions={{ enable, set }}
+        onFutureFrameEffectModeChange={vi.fn()}
+      />
+    );
+  });
+
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-step-badge"]'
+  );
+  act(() => button?.click());
+
+  expect(enable).toHaveBeenCalledOnce();
+  expect(set).toHaveBeenCalledWith(settings);
+  expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(popoverMocks.stepBadgeProps).toMatchObject({
+    isOpen: true,
+    settings,
+    portalTarget: expect.anything(),
+  });
 });

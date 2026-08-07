@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectMode } from '../../../features/highlighter/contracts';
 import { translate } from '../../../platform/i18n';
-import { FrameSettingsPopoverContent } from './views';
+import { FrameSettingsPopoverContent } from '../../../composition/frame-annotation-controls/frame/views';
 
 function createBorderPreset(id: string, name: string) {
   return {

@@ -5,32 +5,38 @@ import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
-import { createDefaultCalloutSettings } from '../../../selection/callout/model';
+import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 import { createSystemCalloutPresetCatalog } from '../../../../features/highlighter/callout-presets/catalog';
 
 const mocks = vi.hoisted(() => ({ refresh: vi.fn(), presets: [] as CalloutPreset[] }));
 
-vi.mock('@sniptale/ui/content-popover-adapter', () => ({
+vi.mock('@sniptale/ui/content-popover-adapter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/content-popover-adapter')>()),
   ContentPopoverAdapter: (props: { children: ReactNode; isOpen: boolean }) =>
     props.isOpen ? <div>{props.children}</div> : null,
 }));
-vi.mock('../../../selection/callout-settings-popover/body', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../selection/callout-settings-popover/body')>()),
-  CalloutSettingsPopoverContent: (props: {
-    onApplyPreset: (preset: CalloutPreset) => void;
-    onShowPresets: () => void;
-  }) => (
-    <>
-      <button data-testid="show-templates" onClick={props.onShowPresets} type="button" />
-      <button
-        data-testid="apply-template"
-        onClick={() => props.onApplyPreset(mocks.presets[0]!)}
-        type="button"
-      />
-    </>
-  ),
-}));
-vi.mock('../../../selection/callout-settings-popover/preset-controller', () => ({
+vi.mock(
+  '../../../../composition/frame-annotation-controls/callout/body',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/frame-annotation-controls/callout/body')
+    >()),
+    CalloutSettingsPopoverContent: (props: {
+      onApplyPreset: (preset: CalloutPreset) => void;
+      onShowPresets: () => void;
+    }) => (
+      <>
+        <button data-testid="show-templates" onClick={props.onShowPresets} type="button" />
+        <button
+          data-testid="apply-template"
+          onClick={() => props.onApplyPreset(mocks.presets[0]!)}
+          type="button"
+        />
+      </>
+    ),
+  })
+);
+vi.mock('../../../../composition/frame-annotation-controls/callout/preset-controller', () => ({
   useCalloutPresetPopoverController: () => ({
     catalog: {
       create: vi.fn(),
@@ -54,11 +60,11 @@ vi.mock('../../../selection/callout-settings-popover/preset-controller', () => (
     },
   }),
 }));
-vi.mock('../../../selection/interactive-frame/layout/popover-position', () => ({
-  useFramePopoverPosition: () => ({}),
+vi.mock('../../../../composition/frame-annotation-controls/popover/position', () => ({
+  useFrameAnnotationSettingsPopoverPosition: () => ({}),
 }));
 
-import { FutureCalloutSettingsPopover } from './future-callout';
+import { FutureCalloutSettingsPopover } from '../../../../composition/frame-annotation-controls/callout/popover';
 
 afterEach(() => {
   mocks.refresh.mockReset();

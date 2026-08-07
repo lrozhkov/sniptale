@@ -8,6 +8,7 @@ import {
   focusObjectInViewportForController,
   scheduleViewportStateSyncForController,
   scheduleZoomToFitForController,
+  snapExternalEditorRectForController,
   syncRuntimeStateForController,
   syncViewportStateForController,
 } from '../instance/helpers';
@@ -16,6 +17,18 @@ import { ImageEditorControllerState } from './controller-state';
 export abstract class ImageEditorControllerViewportHelperActions extends ImageEditorControllerState {
   applyGridSnap(object: FabricObject): void {
     applyGridSnapForController(this.instance, object);
+  }
+
+  snapFrameAnnotationRect(input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }) {
+    return snapExternalEditorRectForController(this.instance, input);
+  }
+
+  clearFrameAnnotationSnap(): void {
+    this.instance.magnetManager?.clearGuides();
+    this.instance.canvas?.requestRenderAll();
   }
 
   buildViewportState() {

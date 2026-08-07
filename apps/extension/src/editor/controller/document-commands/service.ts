@@ -132,7 +132,6 @@ function buildEditorDocumentCommandService<TAdapter>(args: {
     renderToDataUrl(controller, options) {
       return args.operations.renderToDataUrl(controller.getPublicApiAdapter(), options);
     },
-
     async copyRenderedImage(controller, options) {
       await args.operations.copyRenderedImage(controller.getPublicApiAdapter(), options);
     },

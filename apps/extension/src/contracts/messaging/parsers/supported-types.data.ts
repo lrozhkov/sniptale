@@ -32,6 +32,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.NATIVE_APP_MUTATION,
   MessageType.PAGE_ACCESS,
   MessageType.ERASE_LOCAL_EXTENSION_DATA,
+  MessageType.FRAME_ANNOTATION_RASTERIZE,
   MessageType.EXECUTE_SAVE,
   MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK,
   MessageType.EXPORT_POPUP_SAVE_ARCHIVE,
@@ -136,6 +137,7 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
 
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
+  MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
   MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
   MessageType.OFFSCREEN_VOICE_INPUT_START,
   MessageType.OFFSCREEN_VOICE_INPUT_STOP,

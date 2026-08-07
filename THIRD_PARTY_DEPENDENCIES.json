@@ -14,6 +14,19 @@
       "version": "5.2.8"
     },
     {
+      "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
+      "licenseExpression": "OFL-1.1",
+      "licenseSource": "node_modules/@fontsource/marck-script/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@fontsource/marck-script",
+      "packagePath": "node_modules/@fontsource/marck-script",
+      "selectedLicense": "OFL-1.1",
+      "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
+      "sourceUrl": "https://github.com/fontsource/font-files.git",
+      "version": "5.3.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@iconify-icons__tabler-1.2.95.txt",
       "licenseExpression": "MIT",
       "licenseProvenance": {
@@ -71,6 +84,19 @@
       "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
       "sourceUrl": "https://github.com/gpac/mp4box.js.git",
       "version": "0.5.7"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@zumer__snapdom-2.23.2.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@zumer/snapdom/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@zumer/snapdom",
+      "packagePath": "node_modules/@zumer/snapdom",
+      "selectedLicense": "MIT",
+      "sha256": "c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2",
+      "sourceUrl": "https://github.com/zumerlab/snapdom.git",
+      "version": "2.23.2"
     },
     {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",

@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
-import { StepBadgeSaveSection } from './save-section';
+import { StepBadgeSaveSection } from '../../../composition/frame-annotation-controls/step-badge/save-section';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -69,4 +69,39 @@ it('uses the shared compact template form and preserves numbering settings on sa
   await act(async () => createButton?.click());
 
   expect(onCreate).toHaveBeenCalledWith('Numbering template', settings);
+
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.compact-select"] button')
+      ?.click();
+    await Promise.resolve();
+  });
+  expect(document.querySelectorAll('[role="option"]')).toHaveLength(presets.length);
+  await act(async () => {
+    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]?.click();
+  });
+  const activeOverwriteButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'content.stepBadge.overwriteTemplate'
+  );
+  expect(activeOverwriteButton?.disabled).toBe(false);
+  await act(async () => activeOverwriteButton?.click());
+  expect(onUpdate).toHaveBeenCalledWith(presets[1], settings);
+});
+
+it('renders the wrapped section and reports rejected create and missing overwrite outcomes', async () => {
+  const presets = createSystemStepBadgePresetCatalog().slice(0, 1);
+  const onCreate = vi.fn().mockResolvedValue({ outcome: 'rejected' });
+  const onUpdate = vi.fn().mockResolvedValue({ outcome: 'rejected' });
+  await act(async () =>
+    root.render(
+      <StepBadgeSaveSection
+        onCreate={onCreate}
+        onFloatingInteractionChange={vi.fn()}
+        onUpdate={onUpdate}
+        presets={presets}
+        settings={presets[0]!.settings}
+      />
+    )
+  );
+  expect(document.querySelector('.sniptale-content-popover-section')).not.toBeNull();
 });

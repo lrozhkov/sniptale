@@ -40,6 +40,13 @@ import {
 } from './message-types';
 import { handlePageStoragePrivacyErasure } from './privacy-erasure';
 import { handleProjectExportRuntimeMessage } from './routing.project-export';
+import {
+  completeFrameAnnotationRasterJob,
+  cleanupFrameAnnotationRasterJobs,
+  acquireFrameAnnotationRasterInput,
+  deleteFrameAnnotationRasterJob,
+} from '../../composition/persistence/frame-annotation-raster-jobs';
+import { FrameAnnotationRasterizer } from '../frame-annotation-rasterizer';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
@@ -92,6 +99,7 @@ export function resolveOffscreenErrorPhase(
   switch (type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
@@ -120,6 +128,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       return 'immediate-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
@@ -160,6 +169,18 @@ export async function handleOffscreenRuntimeMessage(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
+    case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: {
+      try {
+        await cleanupFrameAnnotationRasterJobs();
+        const input = await acquireFrameAnnotationRasterInput(message.reference);
+        const result = await new FrameAnnotationRasterizer().rasterize(input);
+        await completeFrameAnnotationRasterJob(message.reference, result.blob, result.metadata);
+        return 'applied';
+      } catch (error) {
+        await deleteFrameAnnotationRasterJob(message.reference.jobId).catch(() => undefined);
+        throw error;
+      }
+    }
     case VideoMessageType.GET_DESKTOP_MEDIA:
       await requestDesktopMedia(
         message.captureMode,

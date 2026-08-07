@@ -14,7 +14,7 @@ import {
   createDefaultCalloutSettings,
   normalizeCalloutSettings,
   type CalloutSettingsPatch,
-} from '../callout/model';
+} from '../../../features/highlighter/frame-annotation/callout/model';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { normalizeAppliedBorderSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 

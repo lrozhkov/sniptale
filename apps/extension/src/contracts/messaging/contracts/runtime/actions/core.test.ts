@@ -18,6 +18,75 @@ const offscreenPageStorageContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE];
 const unattendedFullPageContract =
   runtimeActionCoreMessageContracts[MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED];
+const frameAnnotationRasterContract =
+  runtimeActionCoreMessageContracts[MessageType.FRAME_ANNOTATION_RASTERIZE];
+const offscreenFrameAnnotationRasterContract =
+  runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE];
+
+it('parses bounded frame-annotation raster references and authoritative results', () => {
+  const reference = { inputSha256: 'a'.repeat(64), jobId: 'job-1', revision: 1 };
+  expect(
+    frameAnnotationRasterContract.parseRequest({
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'rasterize',
+      reference,
+    })
+  ).toMatchObject({ reference });
+  expect(
+    frameAnnotationRasterContract.parseResponse({ success: true, result: 'completed' })
+  ).toMatchObject({ result: 'completed' });
+  expect(
+    frameAnnotationRasterContract.parseResponse({ success: false, error: 'raster failed' })
+  ).toEqual({ success: false, error: 'raster failed' });
+  expect(() => frameAnnotationRasterContract.parseResponse({ success: true })).toThrow();
+  expect(
+    offscreenFrameAnnotationRasterContract.parseRequest({
+      type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+      capabilityToken: 'capability',
+      reference,
+    })
+  ).toMatchObject({ reference });
+  for (const invalidReference of [
+    null,
+    { ...reference, jobId: 4 },
+    { ...reference, inputSha256: 3 },
+    { ...reference, revision: -1 },
+    { ...reference, revision: 1.5 },
+  ]) {
+    expect(() =>
+      frameAnnotationRasterContract.parseRequest({
+        type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+        operation: 'rasterize',
+        reference: invalidReference,
+      })
+    ).toThrow();
+  }
+  expect(() =>
+    frameAnnotationRasterContract.parseRequest({
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      reference,
+    })
+  ).toThrow();
+});
+
+it('requires a bounded correlation identity for frame-annotation raster preparation', () => {
+  expect(
+    frameAnnotationRasterContract.parseRequest({
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: 'lease-1',
+    })
+  ).toMatchObject({ leaseId: 'lease-1' });
+  for (const leaseId of [undefined, '', 'x'.repeat(129)]) {
+    expect(() =>
+      frameAnnotationRasterContract.parseRequest({
+        type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+        operation: 'prepare',
+        leaseId,
+      })
+    ).toThrow();
+  }
+});
 
 it('parses page-access requests', () => {
   expect(

@@ -21,6 +21,7 @@ import { applyEditorCustomShapesStoreUpgrade } from './core.editor-custom-shapes
 import { applyVideoEffectBundlesStoreUpgrade } from './core.video-effect-bundles.ts';
 import { applyNativeTransferStoresUpgrade } from './core.native-transfer.ts';
 import { applyProjectExportInputsStoreUpgrade } from './core.project-export-inputs.ts';
+import { applyFrameAnnotationRasterJobsStoreUpgrade } from './core.frame-annotation-raster-jobs.ts';
 import type { UpgradeDatabase } from './types';
 
 export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
@@ -39,6 +40,7 @@ export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
   applyStateManagerStoreUpgrade(db, oldVersion);
   applyNativeTransferStoresUpgrade(db, oldVersion);
   applyProjectExportInputsStoreUpgrade(db, oldVersion);
+  applyFrameAnnotationRasterJobsStoreUpgrade(db, oldVersion);
   removeLegacyAnnotationPacksStore(db, oldVersion);
   removeRetiredPageStyleAssetsStore(db, oldVersion);
 }

@@ -1,136 +1,81 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { createCanvasContextStub } from './canvas-context.test.helpers';
 
-const overlayMocks = vi.hoisted(() => {
-  const order: string[] = [];
-  return {
-    order,
-    cloneCanvasBitmap: vi.fn(() => {
-      order.push('backdrop');
-      return document.createElement('canvas');
-    }),
-    drawViewerBlurLayers: vi.fn(() => order.push('effect')),
-    drawViewerDecorations: vi.fn(() => order.push('decoration')),
-    drawViewerFocusLayer: vi.fn(() => order.push('focus')),
-    projectViewerFrames: vi.fn(() => []),
-  };
-});
-
-vi.mock('./canvas', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./canvas')>()),
-  cloneCanvasBitmap: overlayMocks.cloneCanvasBitmap,
-  projectViewerFrames: overlayMocks.projectViewerFrames,
+const mocks = vi.hoisted(() => ({
+  blobToDataUrl: vi.fn(async () => 'data:image/png;base64,composited'),
+  dataUrlToBlob: vi.fn(async () => new Blob(['base'], { type: 'image/png' })),
+  rasterize: vi.fn(async () => ({
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: false, outputHeight: 100, outputScale: 2, outputWidth: 200 },
+  })),
+  showToast: vi.fn(),
 }));
 
-vi.mock('./decoration', () => ({
-  drawViewerDecorations: overlayMocks.drawViewerDecorations,
+vi.mock('../../../../composition/frame-annotation-raster-client', () => ({
+  rasterizeFrameAnnotations: mocks.rasterize,
 }));
-
-vi.mock('./effects', () => ({
-  drawViewerBlurLayers: overlayMocks.drawViewerBlurLayers,
-  drawViewerFocusLayer: overlayMocks.drawViewerFocusLayer,
+vi.mock('../../../../platform/media-utils/data-url', () => ({
+  blobToDataUrl: mocks.blobToDataUrl,
+  dataUrlToBlob: mocks.dataUrlToBlob,
 }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.showToast }));
 
 import { composeViewerCaptureOverlays } from './composer';
-
-const canvasContext = createCanvasContextStub({
-  drawImage: vi.fn(),
-  scale: vi.fn(),
-});
 
 class DataUrlImage {
   naturalHeight = 100;
   naturalWidth = 200;
   onerror: (() => void) | null = null;
   onload: (() => void) | null = null;
-
   set src(_value: string) {
     this.onload?.();
   }
 }
 
-function createIframe(): HTMLIFrameElement {
+function createIframe() {
   const iframe = document.createElement('iframe');
-  iframe.getBoundingClientRect = () =>
-    ({
-      bottom: 220,
-      height: 200,
-      left: 10,
-      right: 310,
-      top: 20,
-      width: 300,
-      x: 10,
-      y: 20,
-      toJSON: () => ({}),
-    }) as DOMRect;
+  iframe.getBoundingClientRect = () => ({ left: 10, top: 20 }) as DOMRect;
+  Object.defineProperty(iframe, 'contentWindow', {
+    configurable: true,
+    value: { scrollX: 7, scrollY: 11 },
+  });
   return iframe;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  overlayMocks.order.length = 0;
   vi.stubGlobal('Image', DataUrlImage);
   vi.stubGlobal('devicePixelRatio', 2);
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvasContext);
-  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
-    'data:image/png;base64,with-overlays'
-  );
 });
 
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
-
-it('composes focus, effect, and decoration layers in canonical order at capture DPR', async () => {
-  const frame: FrameData = {
-    height: 40,
-    id: 'frame-1',
-    width: 60,
-    x: 30,
-    y: 50,
-  };
-  const iframe = createIframe();
-
+it('projects viewer coordinates into the shared DOM raster client at capture DPR', async () => {
+  const frame: FrameData = { id: 'frame-1', x: 45, y: 70, width: 40, height: 24 };
   await expect(
     composeViewerCaptureOverlays({
       baseDataUrl: 'data:image/png;base64,base',
       frames: [frame],
-      iframe,
-      mode: 'visible',
+      iframe: createIframe(),
+      mode: 'full',
     })
-  ).resolves.toBe('data:image/png;base64,with-overlays');
-
-  expect(canvasContext.drawImage).toHaveBeenCalledWith(expect.any(DataUrlImage), 0, 0, 200, 100);
-  expect(canvasContext.scale).toHaveBeenCalledWith(2, 2);
-  expect(overlayMocks.projectViewerFrames).toHaveBeenCalledWith({
-    baseDataUrl: 'data:image/png;base64,base',
-    frames: [frame],
-    iframe,
-    mode: 'visible',
-  });
-  expect(overlayMocks.drawViewerFocusLayer).toHaveBeenCalledWith({
-    context: canvasContext,
-    projections: [],
-    scale: 2,
-    width: 100,
-    height: 50,
-  });
-  expect(overlayMocks.drawViewerBlurLayers).toHaveBeenCalledWith({
-    context: canvasContext,
-    backdrop: expect.any(HTMLCanvasElement),
-    projections: [],
-    scale: 2,
-    width: 100,
-    height: 50,
-  });
-  expect(overlayMocks.order).toEqual(['focus', 'backdrop', 'effect', 'decoration']);
+  ).resolves.toBe('data:image/png;base64,composited');
+  expect(mocks.rasterize).toHaveBeenCalledWith(
+    expect.objectContaining({
+      input: expect.objectContaining({
+        height: 50,
+        requestedHeight: 100,
+        requestedWidth: 200,
+        snapshots: [
+          expect.objectContaining({ id: 'frame-1', ordering: 0, version: 1, x: 42, y: 61 }),
+        ],
+        width: 100,
+      }),
+    })
+  );
 });
 
-it('returns the base bitmap without allocating overlay canvas state when there are no frames', async () => {
+it('returns the base image without staging when there are no frames', async () => {
   await expect(
     composeViewerCaptureOverlays({
       baseDataUrl: 'data:image/png;base64,base',
@@ -139,7 +84,37 @@ it('returns the base bitmap without allocating overlay canvas state when there a
       mode: 'visible',
     })
   ).resolves.toBe('data:image/png;base64,base');
+  expect(mocks.rasterize).not.toHaveBeenCalled();
+});
 
-  expect(overlayMocks.projectViewerFrames).not.toHaveBeenCalled();
-  expect(canvasContext.drawImage).not.toHaveBeenCalled();
+it('warns when the overlay raster is saved at an optimized size', async () => {
+  mocks.rasterize.mockResolvedValueOnce({
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: true, outputHeight: 50, outputScale: 1, outputWidth: 100 },
+  });
+  await composeViewerCaptureOverlays({
+    baseDataUrl: 'data:image/png;base64,base',
+    frames: [{ id: 'frame-1', x: 0, y: 0, width: 10, height: 10 }],
+    iframe: createIframe(),
+    mode: 'visible',
+  });
+  expect(mocks.showToast).toHaveBeenCalledWith(expect.any(String), 'warning');
+});
+
+it('does not warn about optimized size when final data conversion fails', async () => {
+  mocks.rasterize.mockResolvedValueOnce({
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: true, outputHeight: 50, outputScale: 1, outputWidth: 100 },
+  });
+  mocks.blobToDataUrl.mockRejectedValueOnce(new Error('conversion failed'));
+
+  await expect(
+    composeViewerCaptureOverlays({
+      baseDataUrl: 'data:image/png;base64,base',
+      frames: [{ id: 'frame-1', x: 0, y: 0, width: 10, height: 10 }],
+      iframe: createIframe(),
+      mode: 'visible',
+    })
+  ).rejects.toThrow('conversion failed');
+  expect(mocks.showToast).not.toHaveBeenCalled();
 });

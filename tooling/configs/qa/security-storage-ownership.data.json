@@ -34,6 +34,12 @@
   ],
   "sensitiveRetentionOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts",
+      "owner": "frame-annotation-raster-jobs",
+      "justification": "The frame annotation raster owner temporarily stages bounded page-derived PNG input, sanitized annotation snapshots, and derived PNG output for one local offscreen export.",
+      "reviewNote": "Payloads are local-only, capped at 64 MiB per input/output and three jobs, expire after one hour, are excluded from backup/sync/export/diagnostics, and are removed on consume, cancellation, lease expiry, startup cleanup, and verified local-data erasure. The complete client transition holds the cross-context persistence transition gate across MV3 worker restarts."
+    },
+    {
       "file": "apps/extension/src/composition/persistence/video-preview-cache/mutations.ts",
       "owner": "video-preview-cache",
       "justification": "The video preview cache owner persists bounded local-only derived MP4 segments in its dedicated IndexedDB database.",

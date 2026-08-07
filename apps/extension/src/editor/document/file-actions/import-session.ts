@@ -2,6 +2,7 @@ import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
+import { assertValidFrameAnnotationsInCanvasJson } from '../../frame-annotation/import-boundary';
 
 const MAX_SESSION_FILE_BYTES = 40 * 1024 * 1024;
 const MAX_SESSION_TEXT_LENGTH = 50 * 1024 * 1024;
@@ -186,6 +187,12 @@ function assertSafeCanvasJson(canvasJson: string): void {
 
   const objects = parsedCanvas['objects'];
   if (Array.isArray(objects) && objects.length > MAX_FABRIC_OBJECTS) {
+    throwInvalidSession();
+  }
+
+  try {
+    assertValidFrameAnnotationsInCanvasJson(canvasJson);
+  } catch {
     throwInvalidSession();
   }
 

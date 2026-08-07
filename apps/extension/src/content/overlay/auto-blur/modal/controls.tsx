@@ -8,7 +8,7 @@ import { translate, useAppLocale } from '../../../../platform/i18n';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect, NumericRow } from '../../../../ui/compact-inspector-controls';
 import { HighlighterPresetPropertyField as PropertyField } from '../../../../ui/highlighter-preset-editor/inspector-field';
-import { buildBlurTypeOptions } from '../../../selection/frame-settings-popover/helpers';
+import { buildBlurTypeOptions } from '../../../../composition/frame-annotation-controls/frame/helpers';
 
 export function AutoBlurBlurControls(props: {
   blurSettings: BlurSettings;

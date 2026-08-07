@@ -34,6 +34,7 @@ function applyBasicSelectionSettings(
   switch (selectedType) {
     case 'transparent-base':
     case 'browser-frame':
+    case 'frame-annotation':
       return true;
     case 'source-image':
     case 'image':

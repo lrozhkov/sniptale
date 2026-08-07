@@ -6,15 +6,15 @@ import type {
   CalloutCurveSettings,
   CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { CalloutBody } from './body';
+import {
+  FrameCalloutInteractiveSurface,
+  createCalloutSettingsKey,
+} from '../../../features/highlighter/frame-annotation/callout/interactive-surface';
 import { resolveCalloutThemeOwner } from './dom';
+import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 import { useCalloutEditing } from './editing';
-import { createCalloutSettingsKey } from './settings-key';
-import { useCalloutInteractionLayout } from './interaction-layout';
-import type { CalloutHandleKeyboardEvent } from './keyboard';
-import { resolveCalloutVoiceButtonLeftOffset } from './voice-button';
-import type { CalloutDragBehavior } from './drag';
-import { createCalloutHandleStyles } from './handle-styles';
+import { CalloutVoiceButton, resolveCalloutVoiceButtonLeftOffset } from './voice-button';
+import type { CalloutDragBehavior } from '../../../features/highlighter/frame-annotation/callout/drag';
 
 interface CalloutProps {
   frameId: string;
@@ -47,203 +47,73 @@ interface CalloutProps {
   showSettingsHandle: boolean;
 }
 
-/**
- * Компонент Callout - облачко с текстом рядом с рамкой
- * Поддерживает inline-редактирование и Rich Text (bold, italic, underline)
- */
-export const Callout: React.FC<CalloutProps> = ({
-  frameId,
-  frameBorderWidth,
-  settings,
-  frameRect,
-  zIndex,
-  isEditing,
-  isFrameEditing,
-  isSettingsOpen,
-  onStartEditing,
-  onStopEditing,
-  onContentChange,
-  onTitleChange,
-  onDelete,
-  onSettingsClick,
-  onPositionChange,
-  onTailBaseRangeChange,
-  onTailFramePositionChange,
-  onCurveChange,
-  onWaypointChange,
-  onWidthChange,
-  settingsAnchorRef,
-  showSettingsHandle,
-}) => {
+/** Content adapter: page history, voice and the page-owned portal stay outside shared mechanics. */
+export const Callout: React.FC<CalloutProps> = (props) => {
   useAppLocale();
   const portalTheme = useResolvedPortalTheme(resolveCalloutThemeOwner());
   const editing = useCalloutEditing({
-    frameId,
-    htmlContent: settings.content.bodyHtml,
-    titleText: settings.content.titleText,
-    isEditing,
-    onContentChange,
-    onDelete,
-    onStartEditing,
-    onStopEditing,
-    settingsKey: createCalloutSettingsKey(settings),
-  });
-  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
-  const interaction = useCalloutInteractionLayout({
-    dimensions: editing.dimensions,
-    frameBorderWidth,
-    frameRect,
-    isEditing,
-    isSettingsOpen,
-    onPositionChange,
-    onTailBaseRangeChange,
-    onTailFramePositionChange,
-    onCurveChange,
-    onWaypointChange,
-    onWidthChange,
-    settings,
-    wrapperRef,
-    zIndex,
+    frameId: props.frameId,
+    htmlContent: props.settings.content.bodyHtml,
+    titleText: props.settings.content.titleText,
+    isEditing: props.isEditing,
+    onContentChange: props.onContentChange,
+    onDelete: props.onDelete,
+    onStartEditing: props.onStartEditing,
+    onStopEditing: props.onStopEditing,
+    settingsKey: createCalloutSettingsKey(props.settings),
   });
 
   return (
-    <CalloutBody
-      {...createCalloutBodyProps({
-        editing,
-        frameId,
-        interaction,
-        isEditing,
-        isFrameEditing,
-        isSettingsOpen,
-        onSettingsClick,
-        onTitleChange,
-        portalTheme,
-        settings: interaction.effectiveSettings,
-        settingsAnchorRef,
-        showSettingsHandle,
-      })}
-      wrapperRef={wrapperRef}
+    <FrameCalloutInteractiveSurface
+      editing={{
+        events: {
+          applyFormatting: editing.applyFormatting,
+          blur: editing.handleBlur,
+          click: editing.handleClick,
+          input: editing.handleInput,
+          keyDown: editing.handleKeyDown,
+          paste: editing.handlePaste,
+        },
+        layout: {
+          dimensions: editing.dimensions,
+          floatingToolbarRect: editing.floatingToolbarRect,
+        },
+        refs: {
+          container: editing.containerRef,
+          contentEditable: editing.contentEditableRef,
+        },
+      }}
+      frameBorderWidth={props.frameBorderWidth}
+      frameId={props.frameId}
+      frameRect={props.frameRect}
+      isEditing={props.isEditing}
+      isFrameEditing={props.isFrameEditing}
+      isSettingsOpen={props.isSettingsOpen}
+      onCurveChange={props.onCurveChange}
+      onPositionChange={props.onPositionChange}
+      onSettingsClick={props.onSettingsClick}
+      onTailBaseRangeChange={props.onTailBaseRangeChange}
+      onTailFramePositionChange={props.onTailFramePositionChange}
+      onTitleChange={props.onTitleChange}
+      onWaypointChange={props.onWaypointChange}
+      onWidthChange={props.onWidthChange}
+      portalTarget={resolveContentPortalTarget(resolveCalloutThemeOwner())}
+      portalTheme={portalTheme}
+      renderVoiceSlot={({ calloutLeft, calloutWidth, viewportWidth }) => (
+        <CalloutVoiceButton
+          isEditing={props.isEditing}
+          leftOffset={resolveCalloutVoiceButtonLeftOffset({
+            calloutLeft,
+            calloutWidth,
+            viewportWidth,
+          })}
+          voice={editing.voice}
+        />
+      )}
+      settings={props.settings}
+      settingsAnchorRef={props.settingsAnchorRef}
+      showSettingsHandle={props.showSettingsHandle}
+      zIndex={props.zIndex}
     />
   );
 };
-
-type CalloutBodyPropsArgs = {
-  editing: ReturnType<typeof useCalloutEditing>;
-  frameId: string;
-  isEditing: boolean;
-  isFrameEditing: boolean;
-  isSettingsOpen: boolean;
-  interaction: ReturnType<typeof useCalloutInteractionLayout>;
-  portalTheme: ReturnType<typeof useResolvedPortalTheme>;
-  settings: CalloutSettings;
-  onSettingsClick: () => void;
-  onTitleChange: (titleText: string) => void;
-  settingsAnchorRef: React.RefObject<HTMLButtonElement | null>;
-  showSettingsHandle: boolean;
-};
-
-function createCalloutHandleCallbacks(args: CalloutBodyPropsArgs) {
-  return {
-    handleSettingsClick: args.onSettingsClick,
-    handleDragPointerDown: args.interaction.handles.drag.handlePointerDown,
-    handleDragKeyDown: args.interaction.handles.drag.handleKeyDown,
-    handleHandleBlur: args.interaction.handles.drag.handleBlur,
-    handleHandleFocus: args.interaction.handles.drag.handleFocus,
-    handleTailPointerDown: args.interaction.handles.tailBaseStartDrag.handlePointerDown,
-    handleTailKeyDown: args.interaction.handles.tailBaseStartDrag.handleKeyDown,
-    handleTailBaseEndPointerDown: args.interaction.handles.tailBaseEndDrag.handlePointerDown,
-    handleTailBaseEndKeyDown: args.interaction.handles.tailBaseEndDrag.handleKeyDown,
-    handleTailFramePointerDown: args.interaction.handles.tailFrameDrag.handlePointerDown,
-    handleTailFrameKeyDown: args.interaction.handles.tailFrameDrag.handleKeyDown,
-    handleWaypointPointerDown: args.interaction.handles.waypointDrag.handlePointerDown,
-    handleWaypointKeyDown: args.interaction.handles.waypointDrag.handleKeyDown,
-    handleWaypointDoubleClick: args.interaction.handles.waypointDrag.handleDoubleClick,
-    handleCurveStartPointerDown: args.interaction.handles.curveStartDrag.handlePointerDown,
-    handleCurveStartKeyDown: args.interaction.handles.curveStartDrag.handleKeyDown,
-    handleCurveEndPointerDown: args.interaction.handles.curveEndDrag.handlePointerDown,
-    handleCurveEndKeyDown: args.interaction.handles.curveEndDrag.handleKeyDown,
-    handleMouseEnter: args.interaction.handles.drag.handleMouseEnter,
-    handleMouseLeave: args.interaction.handles.drag.handleMouseLeave,
-    handleResizeLeftPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
-      args.interaction.handles.widthResize.handlePointerDown('left', event),
-    handleResizeLeftKeyDown: (event: CalloutHandleKeyboardEvent) =>
-      args.interaction.handles.widthResize.handleKeyDown('left', event),
-    handleResizeRightPointerDown: (event: React.PointerEvent<HTMLButtonElement>) =>
-      args.interaction.handles.widthResize.handlePointerDown('right', event),
-    handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) =>
-      args.interaction.handles.widthResize.handleKeyDown('right', event),
-  };
-}
-
-function createCalloutHandleState(args: CalloutBodyPropsArgs) {
-  return {
-    isDragging: args.interaction.handles.drag.isDragging,
-    isHandleVisible:
-      args.interaction.handles.drag.isHandleVisible ||
-      args.interaction.handles.tailBaseStartDrag.isDragging ||
-      args.interaction.handles.tailBaseEndDrag.isDragging ||
-      args.interaction.handles.tailFrameDrag.isDragging ||
-      args.interaction.handles.curveStartDrag.isDragging ||
-      args.interaction.handles.curveEndDrag.isDragging ||
-      args.interaction.handles.waypointDrag.isDragging ||
-      args.interaction.handles.widthResize.isResizing,
-    isResizingLeft: args.interaction.handles.widthResize.activeSide === 'left',
-    isResizingRight: args.interaction.handles.widthResize.activeSide === 'right',
-    isTailDragging: args.interaction.handles.tailBaseStartDrag.isDragging,
-    isTailBaseEndDragging: args.interaction.handles.tailBaseEndDrag.isDragging,
-    isTailFrameDragging: args.interaction.handles.tailFrameDrag.isDragging,
-    isWaypointDragging: args.interaction.handles.waypointDrag.isDragging,
-    isCurveStartDragging: args.interaction.handles.curveStartDrag.isDragging,
-    isCurveEndDragging: args.interaction.handles.curveEndDrag.isDragging,
-    isPolylineWaypoint:
-      args.settings.style.connector.kind === 'line' &&
-      args.settings.style.connector.routing === 'polyline',
-    waypointAngle:
-      args.interaction.layout.dynamicTail?.kind === 'line'
-        ? args.interaction.layout.dynamicTail.routeControlAngle
-        : null,
-    hasWaypoint: args.settings.placement.connectorWaypoint !== undefined,
-  };
-}
-
-function createCalloutBodyProps(args: CalloutBodyPropsArgs) {
-  return {
-    applyFormatting: args.editing.applyFormatting,
-    calloutDimensions: args.interaction.layout.calloutDimensions,
-    cloudStyle: args.interaction.layout.cloudStyle,
-    containerRef: args.editing.containerRef,
-    contentEditableRef: args.editing.contentEditableRef,
-    editableStyle: args.interaction.layout.editableStyle,
-    effectiveZIndex: args.interaction.layout.effectiveZIndex,
-    floatingToolbarRect: args.editing.floatingToolbarRect,
-    frameId: args.frameId,
-    handleBlur: args.editing.handleBlur,
-    handleClick: args.editing.handleClick,
-    handleInput: args.editing.handleInput,
-    handleKeyDown: args.editing.handleKeyDown,
-    handlePaste: args.editing.handlePaste,
-    voice: args.editing.voice,
-    voiceButtonLeftOffset: resolveCalloutVoiceButtonLeftOffset({
-      calloutLeft: args.interaction.layout.calloutPos.x,
-      calloutWidth: args.interaction.layout.calloutDimensions.width,
-      viewportWidth: window.innerWidth,
-    }),
-    isEditing: args.isEditing,
-    isGeometryHandleHidden: args.isSettingsOpen || args.isFrameEditing,
-    isWidthResizeHandleHidden: args.isFrameEditing,
-    portalTheme: args.portalTheme,
-    settings: args.settings,
-    onTitleChange: args.onTitleChange,
-    dynamicTail: args.interaction.layout.dynamicTail,
-    settingsAnchorRef: args.settingsAnchorRef,
-    showSettingsHandle: args.showSettingsHandle,
-    ...createCalloutHandleCallbacks(args),
-    ...createCalloutHandleState(args),
-    ...createCalloutHandleStyles({
-      layout: args.interaction.layout,
-      showSettingsHandle: args.showSettingsHandle,
-      viewport: { height: window.innerHeight, width: window.innerWidth },
-    }),
-    wrapperStyle: args.interaction.layout.wrapperStyle,
-  };
-}

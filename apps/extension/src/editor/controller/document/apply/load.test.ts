@@ -29,6 +29,13 @@ vi.mock('./canvas', async (importOriginal) => ({
 }));
 
 import { loadPreparedDocumentOnCanvas, restoreRichShapeObjects } from './load';
+import {
+  createFabricCanvasFixture,
+  createTypedTestFixture,
+} from '../../../testing/fabric-canvas.test-support';
+import type { LoadPreparedDocumentOptions } from './types';
+import { createFrameAnnotationProxy } from '../../../frame-annotation/proxy';
+import { CUSTOM_JSON_PROPS } from '../../../document/model/custom-json-props';
 
 function createPreparedDocument() {
   return {
@@ -65,6 +72,7 @@ describe('document apply load owner', () => {
         rebuildFrameDecorations: vi.fn(async () => undefined),
         syncBackgroundLayer,
         upgradeLegacyArrowObjects: vi.fn(),
+        viewportDevicePixelRatioBaseline: 2,
         zoomLevel: 1,
       })
     ).resolves.toEqual({ id: 'source' });
@@ -88,5 +96,60 @@ describe('document apply load owner', () => {
     });
 
     expect(canvas.add).not.toHaveBeenCalled();
+  });
+
+  it('loads without optional viewport and background callbacks', async () => {
+    const canvas = {
+      add: vi.fn(),
+      getObjects: vi.fn(() => []),
+      loadFromJSON: vi.fn(async () => undefined),
+    };
+    const prepared = createPreparedDocument();
+    prepared.normalizedDocument.richShapes = [];
+    await expect(
+      loadPreparedDocumentOnCanvas({
+        canvas: createFabricCanvasFixture(canvas),
+        prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
+        prepareObject: vi.fn(),
+        rebuildFrameDecorations: vi.fn(async () => undefined),
+        upgradeLegacyArrowObjects: vi.fn(),
+        zoomLevel: 1,
+      })
+    ).resolves.toEqual({ id: 'source' });
+  });
+
+  it('fails the load when Fabric does not restore a validated frame proxy as a Rect', async () => {
+    const proxy = createFrameAnnotationProxy({
+      frame: { id: 'frame-1', x: 1, y: 2, width: 100, height: 80, effectMode: 'border' },
+      label: 'Frame 1',
+      ordering: 0,
+    });
+    const frameObject = {
+      sniptaleId: 'frame-1',
+      sniptaleRole: 'annotation',
+      sniptaleType: 'frame-annotation',
+      sniptaleFrameAnnotationRevision: 1,
+      sniptaleFrameAnnotationJson: proxy.sniptaleFrameAnnotationJson,
+    };
+    const canvas = {
+      add: vi.fn(),
+      getObjects: vi.fn(() => [frameObject]),
+      loadFromJSON: vi.fn(async () => undefined),
+    };
+    const prepared = createPreparedDocument();
+    prepared.normalizedDocument.richShapes = [];
+    prepared.normalizedDocument.canvasJson = JSON.stringify({
+      objects: [proxy.toObject([...CUSTOM_JSON_PROPS])],
+    });
+    await expect(
+      loadPreparedDocumentOnCanvas({
+        canvas: createFabricCanvasFixture(canvas),
+        prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
+        prepareObject: vi.fn(),
+        rebuildFrameDecorations: vi.fn(async () => undefined),
+        upgradeLegacyArrowObjects: vi.fn(),
+        zoomLevel: 1,
+      })
+    ).rejects.toThrow('Invalid frame annotation proxy');
   });
 });

@@ -9,6 +9,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { reconcileProjectExportJobs } from '../project-export';
 import { cleanupOrphanedRecordingStaging } from '../../composition/persistence/recordings/staging';
 import { reconcileRecordingCompletionOutbox } from '../recording/post-record-publication';
+import { deleteAllFrameAnnotationRasterJobs } from '../../composition/persistence/frame-annotation-raster-jobs';
 
 const logger = createLogger({ namespace: 'OffscreenDocument' });
 const OFFSCREEN_STARTUP_ID_PARAM = 'offscreenStartupId';
@@ -49,6 +50,7 @@ async function initializeOffscreenDb(offscreenStartupId: string): Promise<void> 
 }
 
 async function reconcileOffscreenRuntimeState(): Promise<void> {
+  await deleteAllFrameAnnotationRasterJobs();
   await cleanupOrphanedRecordingStaging();
   await reconcileProjectExportJobs();
   await reconcileRecordingCompletionOutbox({ sendRuntimeMessage });

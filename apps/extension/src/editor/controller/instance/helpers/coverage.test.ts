@@ -141,6 +141,7 @@ import {
   focusObjectInViewportForController,
   scheduleViewportStateSyncForController,
   sendFrameObjectsToBackForController,
+  snapExternalEditorRectForController,
   syncViewportStateForController,
 } from './viewport';
 
@@ -294,5 +295,31 @@ describe('editor controller instance helper wrappers', () => {
     expect(controller.viewportSyncFrame).toBe(11);
     expect(controller.syncViewportState).toHaveBeenCalledTimes(2);
     expect(controller.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
+  });
+
+  it('projects external DOM geometry through magnet and grid fallbacks', () => {
+    mocks.applyGridSnapMock.mockClear();
+    const controller = createController();
+    const rect = { x: 13, y: 26, width: 80, height: 40 };
+    controller.magnetManager = {
+      hasActiveGuides: vi.fn(() => true),
+      snapRect: vi.fn(() => ({ ...rect, x: 12 })),
+    };
+    storeState.workspace.magnetEnabled = true;
+
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject({ x: 12 });
+    expect(mocks.applyGridSnapMock).not.toHaveBeenCalled();
+
+    controller.magnetManager.hasActiveGuides.mockReturnValue(false);
+    mocks.applyGridSnapMock.mockImplementationOnce((object) => object.set({ left: 24, top: 48 }));
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject({
+      x: 24,
+      y: 48,
+      width: 80,
+      height: 40,
+    });
+
+    controller.magnetManager = null;
+    expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject(rect);
   });
 });

@@ -11,18 +11,21 @@ import {
 } from '../mutation-barrier';
 import { runWithIndexedDbMutation } from './mutation';
 
-let lockQueue = Promise.resolve();
+let lockQueues = new Map<string, Promise<void>>();
 
 beforeEach(() => {
   vi.clearAllMocks();
   initDBMock.mockResolvedValue({ id: 'db' });
-  lockQueue = Promise.resolve();
+  lockQueues = new Map();
   installPersistenceLockManagerForTests({
-    request(_name, _options, operation) {
-      const execution = lockQueue.then(operation);
-      lockQueue = execution.then(
-        () => undefined,
-        () => undefined
+    request(name, _options, operation) {
+      const execution = (lockQueues.get(name) ?? Promise.resolve()).then(operation);
+      lockQueues.set(
+        name,
+        execution.then(
+          () => undefined,
+          () => undefined
+        )
       );
       return execution;
     },

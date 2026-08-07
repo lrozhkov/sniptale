@@ -2,6 +2,21 @@
   "schemaVersion": 1,
   "finalOwnerRules": [
     {
+      "sourcePrefix": "apps/extension/src/composition/frame-annotation-controls",
+      "ownerId": "app-core.frame-annotation-controls",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/frame-annotation-raster-client",
+      "ownerId": "app-core.frame-annotation-raster-client",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/voice-input",
+      "ownerId": "app-core.voice-input",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/contracts/ai",
       "ownerId": "app-core.ai-wire-policy",
       "ownerClass": "app-core"
@@ -272,6 +287,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
+      "ownerId": "persistence.frame-annotation-raster-jobs",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/infrastructure",
       "ownerId": "persistence.infrastructure",
       "ownerClass": "persistence"
@@ -363,6 +383,11 @@
     }
   ],
   "authorityOwners": [
+    {
+      "id": "frame-annotation-raster-jobs",
+      "path": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs",
+      "stateKind": "authoritative-staging"
+    },
     {
       "id": "indexed-db-core",
       "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db",

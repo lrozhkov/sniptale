@@ -9,6 +9,10 @@ import {
 } from '../shared/blur-controls';
 
 export const highlighterMessages = defineMessageSource({
+  exportOptimizedSize: {
+    ru: 'Изображение сохранено в оптимизированном размере',
+    en: 'The image was saved at an optimized size',
+  },
   stepBadgePresets: {
     system: {
       classic: { ru: 'Классический', en: 'Classic' },

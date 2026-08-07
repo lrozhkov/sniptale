@@ -7,6 +7,7 @@ import {
   getCalloutFrameColors,
   resolveCalloutColorBindings,
 } from '../../../../features/highlighter/callout-color-bindings';
+import { createFrameCalloutActions } from '../../../../features/highlighter/frame-annotation/callout/actions';
 
 interface InteractiveFrameCalloutOverlayProps {
   frame: FrameData;
@@ -42,97 +43,17 @@ function createCalloutActions(args: {
   | 'onWaypointChange'
   | 'onWidthChange'
 > {
-  const { apply, callout } = args;
-  return {
-    onStartEditing: () => args.props.setIsCalloutEditing(true),
-    onStopEditing: () => args.props.setIsCalloutEditing(false),
-    onContentChange: (bodyHtml) => apply({ ...callout, content: { ...callout.content, bodyHtml } }),
-    onTitleChange: (titleText) => apply({ ...callout, content: { ...callout.content, titleText } }),
+  return createFrameCalloutActions({
+    apply: args.apply,
+    callout: args.callout,
     onDelete: () => {
-      apply({ ...callout, enabled: false });
+      args.apply({ ...args.callout, enabled: false });
       args.props.setIsCalloutEditing(false);
     },
     onSettingsClick: () => args.toggleSettings(args.frameId, 'callout-settings'),
-    onPositionChange: (manualPlacement, behavior) =>
-      apply({
-        ...callout,
-        placement: {
-          ...callout.placement,
-          manualPlacement,
-          connectorBasePosition: behavior.connectorBasePosition,
-          connectorBaseWidth: behavior.connectorBaseWidth,
-          connectorFramePosition: behavior.connectorFramePosition,
-          connectorWaypoint: behavior.connectorWaypoint,
-          ...(behavior.translateConnectorGeometry
-            ? {
-                connectorAttachments: {
-                  block:
-                    behavior.connectorBasePosition === undefined
-                      ? (callout.placement.connectorAttachments?.block ?? { mode: 'auto' })
-                      : {
-                          mode: 'free' as const,
-                          perimeterPosition: behavior.connectorBasePosition,
-                        },
-                  frame:
-                    behavior.connectorFramePosition === undefined
-                      ? (callout.placement.connectorAttachments?.frame ?? { mode: 'auto' })
-                      : {
-                          mode: 'free' as const,
-                          perimeterPosition: behavior.connectorFramePosition,
-                        },
-                },
-              }
-            : {}),
-        },
-      }),
-    onTailBaseRangeChange: (connectorBasePosition, connectorBaseWidth, attachment) =>
-      apply({
-        ...callout,
-        placement: {
-          ...callout.placement,
-          connectorAttachments: {
-            block: attachment ?? { mode: 'free', perimeterPosition: connectorBasePosition },
-            frame: callout.placement.connectorAttachments?.frame ?? { mode: 'auto' },
-          },
-          connectorBasePosition,
-          connectorBaseWidth,
-        },
-      }),
-    onTailFramePositionChange: (connectorFramePosition, attachment) =>
-      apply({
-        ...callout,
-        placement: {
-          ...callout.placement,
-          connectorAttachments: {
-            block: callout.placement.connectorAttachments?.block ?? { mode: 'auto' },
-            frame: attachment ?? { mode: 'free', perimeterPosition: connectorFramePosition },
-          },
-          connectorFramePosition,
-        },
-      }),
-    onWaypointChange: (connectorWaypoint) =>
-      apply({
-        ...callout,
-        placement: { ...callout.placement, connectorWaypoint },
-      }),
-    onCurveChange: (curve) =>
-      apply({
-        ...callout,
-        style: {
-          ...callout.style,
-          connector: { ...callout.style.connector, curve },
-        },
-      }),
-    onWidthChange: (maxWidth, manualPlacement) =>
-      apply({
-        ...callout,
-        placement: { ...callout.placement, manualPlacement },
-        style: {
-          ...callout.style,
-          typography: { ...callout.style.typography, maxWidth },
-        },
-      }),
-  };
+    onStartEditing: () => args.props.setIsCalloutEditing(true),
+    onStopEditing: () => args.props.setIsCalloutEditing(false),
+  });
 }
 
 /** Renders the editable callout overlay and keeps its update/delete behavior local to the callout seam. */

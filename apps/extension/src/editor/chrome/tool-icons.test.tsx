@@ -22,6 +22,7 @@ function registerToolOrderTest() {
       'select',
       'pencil',
       'highlighter',
+      'frame-annotation',
       'blur',
       'text',
       'callout',
