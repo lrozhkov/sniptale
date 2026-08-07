@@ -104,7 +104,39 @@ it('rasterizes through SnapDOM with the bounded offscreen options and cleans its
       reconcile: true,
     })
   );
+  const host = mocks.toCanvas.mock.calls[0]?.[0] as HTMLElement;
+  expect(host.classList.contains('sniptale-extension-surface')).toBe(true);
+  expect(host.style.width).toBe('100px');
+  expect(host.style.height).toBe('50px');
+  expect(host.querySelector('[style*="transform: scale"]')).toBeNull();
   expect(document.body.childElementCount).toBe(before);
+});
+
+it('keeps the DOM in logical coordinates when the requested output is scaled', async () => {
+  mocks.toCanvas.mockImplementation(async (host: HTMLElement) => {
+    expect(host.style.width).toBe('100px');
+    expect(host.style.height).toBe('50px');
+    expect(host.getBoundingClientRect().width).toBe(0);
+    return canvasWithBlob(new Blob(['output'], { type: 'image/png' }));
+  });
+
+  await expect(
+    new FrameAnnotationRasterizer().rasterize({
+      baseImage: new Blob(['base'], { type: 'image/png' }),
+      width: 100,
+      height: 50,
+      requestedWidth: 200,
+      requestedHeight: 100,
+      snapshots: [],
+    })
+  ).resolves.toMatchObject({
+    metadata: { downscaled: false, outputWidth: 200, outputHeight: 100, outputScale: 2 },
+  });
+
+  expect(mocks.toCanvas).toHaveBeenCalledWith(
+    expect.any(HTMLElement),
+    expect.objectContaining({ width: 200, height: 100, scale: 1 })
+  );
 });
 
 it('retries once after allocation failure and once for an oversized first result', async () => {

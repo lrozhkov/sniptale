@@ -71,8 +71,9 @@ async function rasterizeAtScale(
   const width = Math.max(1, Math.floor(input.width * scale));
   const height = Math.max(1, Math.floor(input.height * scale));
   const host = document.createElement('div');
+  host.className = 'sniptale-extension-surface';
   host.style.cssText =
-    `position:fixed;left:0;top:0;width:${width}px;height:${height}px;` +
+    `position:fixed;left:0;top:0;width:${input.width}px;height:${input.height}px;` +
     'overflow:hidden;flex:none';
   document.body.appendChild(host);
   let root: Root | null = null;
@@ -80,29 +81,23 @@ async function rasterizeAtScale(
     const imageUrl = await withRasterDeadline(blobToDataUrl(input.baseImage), deadline);
     const mountedRoot = createRoot(host);
     root = mountedRoot;
+    const renderSurface = (layoutRevision: number) => (
+      <FrameAnnotationExportSurface
+        baseImageUrl={imageUrl}
+        height={input.height}
+        key={layoutRevision}
+        snapshots={input.snapshots}
+        width={input.width}
+      />
+    );
     flushSync(() => {
-      mountedRoot.render(
-        <div style={{ width, height, transformOrigin: 'top left' }}>
-          <div
-            style={{
-              width: input.width,
-              height: input.height,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            <FrameAnnotationExportSurface
-              baseImageUrl={imageUrl}
-              height={input.height}
-              snapshots={input.snapshots}
-              width={input.width}
-            />
-          </div>
-        </div>
-      );
+      mountedRoot.render(renderSurface(0));
     });
     await waitForRasterSurface(host, deadline);
     await loadRequiredFrameAnnotationFonts(input, host.ownerDocument, deadline);
+    flushSync(() => mountedRoot.render(renderSurface(1)));
+    await waitForRasterSurface(host, deadline);
+    await waitForRasterSurface(host, deadline);
     const canvas = await withRasterDeadline(
       snapdom.toCanvas(host, {
         width,

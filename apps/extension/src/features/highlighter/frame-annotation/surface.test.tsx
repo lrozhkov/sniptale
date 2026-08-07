@@ -140,7 +140,9 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   expect(
     getStepBadgeVisualMetrics({ ...badge, offsetDirections: ['right', 'down'] }, 2).offset.x
   ).toBeGreaterThan(0);
-  expect(renderToStaticMarkup(<StepBadgeValue value={12} />)).toContain('12');
+  const badgeValueMarkup = renderToStaticMarkup(<StepBadgeValue value={12} />);
+  expect(badgeValueMarkup).toContain('12');
+  expect(badgeValueMarkup).toContain('font-family:system-ui, -apple-system, sans-serif');
   expect(
     getStepBadgeStyle({
       borderColor: '#000',
