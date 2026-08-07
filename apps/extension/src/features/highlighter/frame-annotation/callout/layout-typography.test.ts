@@ -22,6 +22,22 @@ describe('callout layout typography', () => {
     expect(layout.cloudStyle.fontStyle).toBe('italic');
     expect(layout.cloudStyle.textAlign).toBe('center');
     expect(layout.cloudStyle.textDecoration).toBe('none');
+    expect(layout.editableStyle.fontFamily).toContain('system-ui');
     expect(layout.editableStyle.textDecoration).toBe('underline');
+  });
+
+  it('applies the selected body font directly instead of relying on container inheritance', () => {
+    const settings = createDefaultCalloutSettings();
+    settings.style.typography.fontFamily = 'cursive';
+
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings,
+      zIndex: 20,
+    });
+
+    expect(layout.editableStyle.fontFamily).toContain('Sniptale Handwritten');
   });
 });

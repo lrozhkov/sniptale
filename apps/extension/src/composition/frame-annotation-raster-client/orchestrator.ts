@@ -69,7 +69,7 @@ async function runAdmittedRasterTransition(
     if (options.isCurrent && !options.isCurrent()) {
       throw new Error('Frame annotation raster result is stale');
     }
-    return consumeFrameAnnotationRasterOutput(reference);
+    return await consumeFrameAnnotationRasterOutput(reference);
   } finally {
     const cleanup = reference
       ? withTimeout(

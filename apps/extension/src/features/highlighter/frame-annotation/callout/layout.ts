@@ -257,6 +257,7 @@ function getCalloutEditableStyle(settings: CalloutSettings): CSSProperties {
     outline: 'none',
     minHeight: 'auto',
     minWidth: MIN_CALLOUT_CONTENT_WIDTH,
+    fontFamily: resolveFrameCalloutFontFamily(typography.fontFamily),
     unicodeBidi: 'plaintext',
     hyphens: typography.hyphens,
     overflowWrap: typography.wordBreak === 'break-word' ? 'anywhere' : 'normal',

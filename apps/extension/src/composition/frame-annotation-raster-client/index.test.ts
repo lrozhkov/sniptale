@@ -45,6 +45,38 @@ it('consumes a validated result and always deletes the staged payload', async ()
   expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
 });
 
+it('does not start cleanup until atomic output consumption has finished', async () => {
+  let resolveConsume!: (value: {
+    blob: Blob;
+    metadata: {
+      downscaled: boolean;
+      outputHeight: number;
+      outputScale: number;
+      outputWidth: number;
+    };
+  }) => void;
+  mocks.consume.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveConsume = resolve;
+      })
+  );
+
+  const result = rasterizeFrameAnnotations({
+    input,
+    transport: { sendRuntimeMessage: mocks.send },
+  });
+  await vi.waitFor(() => expect(mocks.consume).toHaveBeenCalledWith(reference));
+  expect(mocks.deleteJob).not.toHaveBeenCalled();
+
+  resolveConsume({
+    blob: new Blob(['output']),
+    metadata: { downscaled: false, outputHeight: 10, outputScale: 1, outputWidth: 20 },
+  });
+  await expect(result).resolves.toMatchObject({ metadata: { outputWidth: 20 } });
+  expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
+});
+
 it('rejects a stale result before consume and still deletes the staged payload', async () => {
   await expect(
     rasterizeFrameAnnotations({
