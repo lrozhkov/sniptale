@@ -13,6 +13,7 @@ let nextRasterRevision = 1;
 const PREPARE_TIMEOUT_MS = 15_000;
 const RASTER_RESPONSE_TIMEOUT_MS = 65_000;
 const CANCEL_TIMEOUT_MS = 3_000;
+const CLEANUP_TIMEOUT_MS = 3_000;
 
 export type FrameAnnotationRasterTransitionOptions = {
   signal?: AbortSignal;
@@ -70,8 +71,14 @@ async function runAdmittedRasterTransition(
     }
     return consumeFrameAnnotationRasterOutput(reference);
   } finally {
-    if (reference) await deleteFrameAnnotationRasterJob(reference.jobId).catch(() => undefined);
-    await withTimeout(
+    const cleanup = reference
+      ? withTimeout(
+          deleteFrameAnnotationRasterJob(reference.jobId),
+          CLEANUP_TIMEOUT_MS,
+          'Frame annotation raster cleanup timed out'
+        )
+      : Promise.resolve();
+    const cancellation = withTimeout(
       options.transport.sendRuntimeMessage({
         type: MessageType.FRAME_ANNOTATION_RASTERIZE,
         operation: 'cancel',
@@ -79,7 +86,8 @@ async function runAdmittedRasterTransition(
       }),
       CANCEL_TIMEOUT_MS,
       'Frame annotation raster cancellation timed out'
-    ).catch(() => undefined);
+    );
+    await Promise.allSettled([cleanup, cancellation]);
   }
 }
 

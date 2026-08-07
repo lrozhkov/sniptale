@@ -107,6 +107,27 @@ it('does not leave a failed export pending when cancellation messaging stalls', 
   expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
 });
 
+it('does not hide the export failure when staged payload deletion stalls', async () => {
+  vi.useFakeTimers();
+  mocks.deleteJob.mockImplementationOnce(() => new Promise(() => undefined));
+  mocks.send.mockImplementation(async (message: { leaseId?: string; operation?: string }) =>
+    message.operation === 'prepare'
+      ? { success: true, result: message.leaseId }
+      : message.operation === 'rasterize'
+        ? { success: false, error: 'raster failed' }
+        : { success: true, result: 'cancelled' }
+  );
+
+  const result = rasterizeFrameAnnotations({
+    input,
+    transport: { sendRuntimeMessage: mocks.send },
+  });
+  const expectation = expect(result).rejects.toThrow('raster failed');
+  await vi.advanceTimersByTimeAsync(3_000);
+
+  await expectation;
+});
+
 it('cancels the correlated preparation identity after a client timeout', async () => {
   vi.useFakeTimers();
   mocks.send.mockImplementation((message: { leaseId?: string; operation?: string }) => {

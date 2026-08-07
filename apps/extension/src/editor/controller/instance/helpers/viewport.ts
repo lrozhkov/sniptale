@@ -54,6 +54,42 @@ export function snapExternalEditorRectForController(
   };
 }
 
+export function snapExternalEditorResizeRectForController(
+  controller: EditorControllerInstance,
+  input: {
+    direction: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+    excludeId?: string;
+    minimumSize: number;
+    rect: { x: number; y: number; width: number; height: number };
+  }
+): { x: number; y: number; width: number; height: number } {
+  const workspace = useEditorStore.getState().workspace;
+  const snapped = controller.magnetManager?.snapResizeRect?.(input) ?? input.rect;
+  if (workspace.magnetEnabled && controller.magnetManager?.hasActiveGuides()) return snapped;
+  if (!workspace.gridEnabled || !workspace.gridSnapEnabled) return snapped;
+  const size = Math.max(1, workspace.gridSize);
+  const right = snapped.x + snapped.width;
+  const bottom = snapped.y + snapped.height;
+  const nextLeft = input.direction.includes('w')
+    ? Math.min(Math.round(snapped.x / size) * size, right - input.minimumSize)
+    : snapped.x;
+  const nextTop = input.direction.includes('n')
+    ? Math.min(Math.round(snapped.y / size) * size, bottom - input.minimumSize)
+    : snapped.y;
+  const nextRight = input.direction.includes('e')
+    ? Math.max(Math.round(right / size) * size, snapped.x + input.minimumSize)
+    : right;
+  const nextBottom = input.direction.includes('s')
+    ? Math.max(Math.round(bottom / size) * size, snapped.y + input.minimumSize)
+    : bottom;
+  return {
+    x: nextLeft,
+    y: nextTop,
+    width: nextRight - nextLeft,
+    height: nextBottom - nextTop,
+  };
+}
+
 export function buildViewportStateForController(
   controller: EditorControllerInstance
 ): EditorViewportState {

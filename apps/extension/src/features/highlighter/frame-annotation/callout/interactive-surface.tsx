@@ -20,6 +20,7 @@ import {
   loadFrameCalloutHandwrittenFont,
   requiresFrameCalloutHandwrittenFont,
 } from './font-readiness';
+import { installFrameCalloutHandwrittenFont } from './font-installer';
 
 type FrameCalloutEditingModel = {
   events: {
@@ -85,12 +86,23 @@ export type FrameCalloutInteractiveSurfaceProps = {
 
 export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSurfaceProps) {
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const [, markFontReady] = React.useReducer((revision) => revision + 1, 0);
   React.useEffect(() => {
     if (!requiresFrameCalloutHandwrittenFont(props.settings)) return;
-    void loadFrameCalloutHandwrittenFont(
-      document,
-      getFrameCalloutFontProbeText(props.settings)
-    ).catch(() => undefined);
+    const owner = wrapperRef.current?.ownerDocument;
+    if (!owner) return;
+    let current = true;
+    void installFrameCalloutHandwrittenFont(owner)
+      .then(() =>
+        loadFrameCalloutHandwrittenFont(owner, getFrameCalloutFontProbeText(props.settings))
+      )
+      .then((loaded) => {
+        if (current && loaded) markFontReady();
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
   }, [props.settings]);
   const coordinateSpace = props.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
   const interaction = useCalloutInteractionLayout({

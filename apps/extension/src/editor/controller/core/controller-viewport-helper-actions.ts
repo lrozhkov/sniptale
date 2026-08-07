@@ -9,6 +9,7 @@ import {
   scheduleViewportStateSyncForController,
   scheduleZoomToFitForController,
   snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
   syncRuntimeStateForController,
   syncViewportStateForController,
 } from '../instance/helpers';
@@ -24,6 +25,15 @@ export abstract class ImageEditorControllerViewportHelperActions extends ImageEd
     rect: { x: number; y: number; width: number; height: number };
   }) {
     return snapExternalEditorRectForController(this.instance, input);
+  }
+
+  snapFrameAnnotationResizeRect(input: {
+    direction: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+    excludeId?: string;
+    minimumSize: number;
+    rect: { x: number; y: number; width: number; height: number };
+  }) {
+    return snapExternalEditorResizeRectForController(this.instance, input);
   }
 
   clearFrameAnnotationSnap(): void {

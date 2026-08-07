@@ -34,6 +34,11 @@ it('continues resizing when the pointer moves outside the annotation plane', () 
     canvasDocumentSize: { width: 400, height: 300 },
     commitHistory: vi.fn(),
     prepareObject: vi.fn(),
+    snapFrameAnnotationResizeRect: vi.fn(({ rect }) => ({
+      ...rect,
+      width: 250,
+      height: 170,
+    })),
     syncRuntimeState: vi.fn(),
   };
 
@@ -71,7 +76,13 @@ it('continues resizing when the pointer moves outside the annotation plane', () 
     window.dispatchEvent(pointerEvent('pointerup', 250, 180));
   });
 
-  expect(readFrameAnnotationSnapshot(object)).toMatchObject({ width: 240, height: 160 });
+  expect(controller.snapFrameAnnotationResizeRect).toHaveBeenCalledWith({
+    direction: 'se',
+    excludeId: 'frame-1',
+    minimumSize: 8,
+    rect: { x: 10, y: 20, width: 240, height: 160 },
+  });
+  expect(readFrameAnnotationSnapshot(object)).toMatchObject({ width: 250, height: 170 });
   expect(controller.commitHistory).toHaveBeenCalledOnce();
 });
 

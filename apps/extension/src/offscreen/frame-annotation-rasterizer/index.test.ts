@@ -2,8 +2,25 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ toBlob: vi.fn() }));
-vi.mock('@zumer/snapdom', () => ({ snapdom: { toBlob: mocks.toBlob } }));
+const mocks = vi.hoisted(() => ({
+  blobToDataUrl: vi.fn(async () => 'data:image/png;base64,YmFzZQ=='),
+  installFont: vi.fn(async () => undefined),
+  toCanvas: vi.fn(),
+}));
+vi.mock('@zumer/snapdom', () => ({ snapdom: { toCanvas: mocks.toCanvas } }));
+vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/media-utils/data-url')>()),
+  blobToDataUrl: mocks.blobToDataUrl,
+}));
+vi.mock(
+  '../../features/highlighter/frame-annotation/callout/font-installer',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../features/highlighter/frame-annotation/callout/font-installer')
+    >()),
+    installFrameCalloutHandwrittenFont: mocks.installFont,
+  })
+);
 import {
   resolveAllocationRetryScale,
   resolveFrameAnnotationInitialScale,
@@ -15,14 +32,24 @@ import { createDefaultFrameCallout } from '../../features/highlighter/frame-anno
 import { createFrameAnnotationSnapshot } from '../../features/highlighter/frame-annotation';
 
 beforeEach(() => {
-  mocks.toBlob.mockReset();
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    callback(0);
-    return 1;
+  mocks.blobToDataUrl.mockReset();
+  mocks.blobToDataUrl.mockResolvedValue('data:image/png;base64,YmFzZQ==');
+  mocks.toCanvas.mockReset();
+  mocks.installFont.mockClear();
+  vi.stubGlobal('requestAnimationFrame', () => {
+    throw new Error('requestAnimationFrame is suspended in chrome.offscreen');
   });
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:base');
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+    configurable: true,
+    value: vi.fn(async () => undefined),
+  });
 });
+
+function canvasWithBlob(blob: Blob) {
+  return {
+    toBlob: (callback: BlobCallback) => callback(blob),
+  } as HTMLCanvasElement;
+}
 
 it('caps output to 16 MP and 16,384 pixels per side while preserving aspect ratio', () => {
   expect(resolveOutputScale(4_000, 4_000)).toBe(1);
@@ -55,7 +82,7 @@ it('uses one half-area allocation retry and targets 60 MiB for oversized PNG out
 });
 
 it('rasterizes through SnapDOM with the bounded offscreen options and cleans its host', async () => {
-  mocks.toBlob.mockResolvedValue(new Blob(['output'], { type: 'image/png' }));
+  mocks.toCanvas.mockResolvedValue(canvasWithBlob(new Blob(['output'], { type: 'image/png' })));
   const before = document.body.childElementCount;
   await expect(
     new FrameAnnotationRasterizer().rasterize({
@@ -65,20 +92,19 @@ it('rasterizes through SnapDOM with the bounded offscreen options and cleans its
       snapshots: [],
     })
   ).resolves.toMatchObject({ metadata: { downscaled: false, outputWidth: 100, outputHeight: 50 } });
-  expect(mocks.toBlob).toHaveBeenCalledWith(
+  expect(mocks.toCanvas).toHaveBeenCalledWith(
     expect.any(HTMLElement),
-    expect.objectContaining({ dpr: 1, type: 'png', useProxy: '' })
+    expect.objectContaining({ compress: false, dpr: 1, embedFonts: false })
   );
   expect(document.body.childElementCount).toBe(before);
-  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:base');
 });
 
 it('retries once after allocation failure and once for an oversized first result', async () => {
   const sizedBlob = new Blob([], { type: 'image/png' });
   Object.defineProperty(sizedBlob, 'size', { value: 65 * 1024 * 1024 });
-  mocks.toBlob
+  mocks.toCanvas
     .mockRejectedValueOnce(new Error('allocation'))
-    .mockResolvedValueOnce(new Blob(['retry'], { type: 'image/png' }));
+    .mockResolvedValueOnce(canvasWithBlob(new Blob(['retry'], { type: 'image/png' })));
   await expect(
     new FrameAnnotationRasterizer().rasterize({
       baseImage: new Blob([], { type: 'image/png' }),
@@ -87,10 +113,10 @@ it('retries once after allocation failure and once for an oversized first result
       snapshots: [],
     })
   ).resolves.toMatchObject({ metadata: { downscaled: true } });
-  mocks.toBlob
+  mocks.toCanvas
     .mockReset()
-    .mockResolvedValueOnce(sizedBlob)
-    .mockResolvedValueOnce(new Blob(['smaller'], { type: 'image/png' }));
+    .mockResolvedValueOnce(canvasWithBlob(sizedBlob))
+    .mockResolvedValueOnce(canvasWithBlob(new Blob(['smaller'], { type: 'image/png' })));
   await expect(
     new FrameAnnotationRasterizer().rasterize({
       baseImage: new Blob([], { type: 'image/png' }),
@@ -99,13 +125,13 @@ it('retries once after allocation failure and once for an oversized first result
       snapshots: [],
     })
   ).resolves.toMatchObject({ metadata: { downscaled: true } });
-  expect(mocks.toBlob).toHaveBeenCalledTimes(2);
+  expect(mocks.toCanvas).toHaveBeenCalledTimes(2);
 });
 
 it('bounds a stalled SnapDOM attempt without retrying or leaking its host', async () => {
   vi.useFakeTimers();
   try {
-    mocks.toBlob.mockImplementation(() => new Promise(() => undefined));
+    mocks.toCanvas.mockImplementation(() => new Promise(() => undefined));
     const before = document.body.childElementCount;
     const raster = new FrameAnnotationRasterizer().rasterize({
       baseImage: new Blob([], { type: 'image/png' }),
@@ -114,17 +140,33 @@ it('bounds a stalled SnapDOM attempt without retrying or leaking its host', asyn
       snapshots: [],
     });
 
-    await vi.waitFor(() => expect(mocks.toBlob).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mocks.toCanvas).toHaveBeenCalledOnce());
     const timeoutExpectation = expect(raster).rejects.toThrow('timed out');
     await vi.advanceTimersByTimeAsync(50_000);
 
     await timeoutExpectation;
-    expect(mocks.toBlob).toHaveBeenCalledOnce();
+    expect(mocks.toCanvas).toHaveBeenCalledOnce();
     expect(document.body.childElementCount).toBe(before);
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:base');
   } finally {
     vi.useRealTimers();
   }
+});
+
+it('removes its host when bounded base-image conversion fails', async () => {
+  mocks.blobToDataUrl.mockRejectedValueOnce(new Error('base conversion failed'));
+  const before = document.body.childElementCount;
+
+  await expect(
+    new FrameAnnotationRasterizer().rasterize({
+      baseImage: new Blob([], { type: 'image/png' }),
+      width: 100,
+      height: 50,
+      snapshots: [],
+    })
+  ).rejects.toThrow('base conversion failed');
+
+  expect(document.body.childElementCount).toBe(before);
+  expect(mocks.toCanvas).not.toHaveBeenCalled();
 });
 
 it('loads the exact handwritten face after render without awaiting global font readiness', async () => {
@@ -135,7 +177,7 @@ it('loads the exact handwritten face after render without awaiting global font r
     configurable: true,
     value: { check, load, ready: neverReady },
   });
-  mocks.toBlob.mockResolvedValue(new Blob(['output'], { type: 'image/png' }));
+  mocks.toCanvas.mockResolvedValue(canvasWithBlob(new Blob(['output'], { type: 'image/png' })));
   const callout = createDefaultFrameCallout();
   callout.style.typography.fontFamily = 'cursive';
 
@@ -158,7 +200,7 @@ it('loads the exact handwritten face after render without awaiting global font r
     expect.stringContaining('Бб')
   );
   expect(check).toHaveBeenCalled();
-  expect(mocks.toBlob).toHaveBeenCalledOnce();
+  expect(mocks.toCanvas).toHaveBeenCalledOnce();
 });
 
 it('rejects non-PNG input before decoding it in the offscreen document', async () => {
@@ -170,11 +212,11 @@ it('rejects non-PNG input before decoding it in the offscreen document', async (
       snapshots: [],
     })
   ).rejects.toThrow('input must be a PNG Blob');
-  expect(mocks.toBlob).not.toHaveBeenCalled();
+  expect(mocks.toCanvas).not.toHaveBeenCalled();
 });
 
 it('rejects a non-PNG SnapDOM blob instead of passing it to clipboard and download flows', async () => {
-  mocks.toBlob.mockResolvedValue(new Blob(['svg'], { type: 'image/svg+xml' }));
+  mocks.toCanvas.mockResolvedValue(canvasWithBlob(new Blob(['svg'], { type: 'image/svg+xml' })));
 
   await expect(
     new FrameAnnotationRasterizer().rasterize({
@@ -184,5 +226,5 @@ it('rejects a non-PNG SnapDOM blob instead of passing it to clipboard and downlo
       snapshots: [],
     })
   ).rejects.toThrow('PNG Blob');
-  expect(mocks.toBlob).toHaveBeenCalledOnce();
+  expect(mocks.toCanvas).toHaveBeenCalledOnce();
 });

@@ -7,6 +7,7 @@ export {
   scheduleViewportStateSyncForController,
   sendFrameObjectsToBackForController,
   snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
   syncViewportStateForController,
 } from './viewport';
 export {

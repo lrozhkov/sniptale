@@ -144,6 +144,57 @@ describe('editor magnet manager', () => {
     ).toMatchObject({ x: 40, y: 40, width: 20, height: 20 });
     expect(manager.hasActiveGuides()).toBe(true);
   });
+  it('snaps only the active edge of external DOM resize geometry', () => {
+    const proxy = createRect({ left: 10, top: 10, width: 47, height: 20 });
+    proxy.sniptaleId = 'frame-1';
+    const sibling = createRect({ left: 60, top: 10, width: 20, height: 20 });
+    const { manager } = createManagerHarness({ objects: [proxy, sibling] });
+
+    expect(
+      manager.snapResizeRect({
+        direction: 'e',
+        excludeId: 'frame-1',
+        minimumSize: 8,
+        rect: { x: 10, y: 10, width: 47, height: 20 },
+      })
+    ).toMatchObject({ x: 10, y: 10, width: 50, height: 20 });
+    expect(manager.hasActiveGuides()).toBe(true);
+  });
+  it.each([
+    {
+      direction: 'e' as const,
+      sibling: { left: 14, top: 10, width: 20, height: 8 },
+    },
+    {
+      direction: 'w' as const,
+      sibling: { left: -100, top: 10, width: 114, height: 8 },
+    },
+    {
+      direction: 's' as const,
+      sibling: { left: 10, top: 14, width: 8, height: 20 },
+    },
+    {
+      direction: 'n' as const,
+      sibling: { left: 10, top: -100, width: 8, height: 114 },
+    },
+  ])(
+    'keeps the minimum size when magnet snaps the $direction edge inward',
+    ({ direction, sibling }) => {
+      const proxy = createRect({ left: 10, top: 10, width: 8, height: 8 });
+      proxy.sniptaleId = 'frame-minimum';
+      const { manager } = createManagerHarness({ objects: [proxy, createRect(sibling)] });
+
+      expect(
+        manager.snapResizeRect({
+          direction,
+          excludeId: 'frame-minimum',
+          minimumSize: 8,
+          rect: { x: 10, y: 10, width: 8, height: 8 },
+        })
+      ).toEqual({ x: 10, y: 10, width: 8, height: 8 });
+      expect(manager.hasActiveGuides()).toBe(true);
+    }
+  );
   it(
     'snaps scaling handles and draws guides without clearing crop overlays after render',
     verifyScalingAndRenderPath

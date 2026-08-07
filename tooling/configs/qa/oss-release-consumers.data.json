@@ -18,6 +18,11 @@
     },
     {
       "category": "bundled-font",
+      "path": "apps/extension/src/features/highlighter/frame-annotation/callout/font-installer.ts",
+      "sha256": "f077144b443982c3b490112b8b202f52faf33d8d85c88a3cdde39f7099c5938b"
+    },
+    {
+      "category": "bundled-font",
       "path": "apps/extension/src/features/highlighter/frame-annotation/callout/font.css",
       "sha256": "a7618bc0a0d38315fda985db2ea2736c49d9c226f80459df572c423c434497f1"
     },

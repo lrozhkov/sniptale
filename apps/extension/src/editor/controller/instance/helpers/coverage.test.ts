@@ -142,6 +142,7 @@ import {
   scheduleViewportStateSyncForController,
   sendFrameObjectsToBackForController,
   snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
   syncViewportStateForController,
 } from './viewport';
 
@@ -321,5 +322,66 @@ describe('editor controller instance helper wrappers', () => {
 
     controller.magnetManager = null;
     expect(snapExternalEditorRectForController(controller, { rect })).toMatchObject(rect);
+  });
+
+  it('snaps each active resize edge through magnet and grid settings', () => {
+    const controller = createController();
+    const rect = { x: 13, y: 26, width: 80, height: 41 };
+    controller.magnetManager = {
+      hasActiveGuides: vi.fn(() => true),
+      snapResizeRect: vi.fn(() => ({ ...rect, x: 12 })),
+    };
+    storeState.workspace.magnetEnabled = true;
+
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'w',
+        minimumSize: 8,
+        rect,
+      })
+    ).toMatchObject({ x: 12 });
+
+    controller.magnetManager.hasActiveGuides.mockReturnValue(false);
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'nw',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual({ x: 24, y: 24, width: 68, height: 43 });
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'se',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual({ x: 12, y: 26, width: 84, height: 46 });
+
+    storeState.workspace.gridSnapEnabled = false;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'e',
+        minimumSize: 8,
+        rect,
+      })
+    ).toMatchObject({ x: 12 });
+
+    controller.magnetManager = null;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 's',
+        minimumSize: 8,
+        rect,
+      })
+    ).toEqual(rect);
+    storeState.workspace.gridSnapEnabled = true;
+    storeState.workspace.gridSize = 24;
+    expect(
+      snapExternalEditorResizeRectForController(controller, {
+        direction: 'nw',
+        minimumSize: 8,
+        rect: { x: 13, y: 13, width: 8, height: 8 },
+      })
+    ).toEqual({ x: 13, y: 13, width: 8, height: 8 });
   });
 });

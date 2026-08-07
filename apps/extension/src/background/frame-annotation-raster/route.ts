@@ -13,12 +13,16 @@ import { acquireMediaMutationPermit } from '../mutation-exclusion/media-activity
 
 const LEASE_TIMEOUT_MS = 2 * 60 * 1_000;
 const PREPARE_TIMEOUT_MS = 10_000;
-let activeLease: {
+const RASTER_TIMEOUT_MS = 55_000;
+type RasterLease = {
+  cancelled: boolean;
   id: string;
   phase: 'prepared' | 'running';
+  released: boolean;
   releaseMutationPermit: () => void;
   timeout: ReturnType<typeof setTimeout>;
-} | null = null;
+};
+let activeLease: RasterLease | null = null;
 let pendingPreparation: {
   cancelled: boolean;
   id: string;
@@ -72,16 +76,15 @@ async function runFrameAnnotationRaster(
   if (activeLease.phase !== 'prepared') {
     throw new Error('Frame annotation raster lease is already running');
   }
-  activeLease.phase = 'running';
+  const lease = activeLease;
+  lease.phase = 'running';
   try {
-    await ensureOffscreenDocument('Render frame annotations for image export');
-    await waitForOffscreenReady();
-    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-      attachOffscreenCommandCapability({
-        type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
-        reference,
-      })
+    const response = await withTimeout(
+      runOffscreenFrameAnnotationRaster(reference, lease),
+      RASTER_TIMEOUT_MS,
+      'Frame annotation rasterization timed out'
     );
+    if (lease.cancelled) throw new Error('Frame annotation rasterization was cancelled');
     if (!response || typeof response !== 'object' || response['success'] !== true) {
       throw new Error(
         response && typeof response === 'object' && typeof response['error'] === 'string'
@@ -89,8 +92,33 @@ async function runFrameAnnotationRaster(
           : 'Frame annotation rasterization failed'
       );
     }
+  } catch (error) {
+    lease.cancelled = true;
+    throw error;
   } finally {
-    releaseFrameAnnotationRasterLease(reference.jobId);
+    finishFrameAnnotationRasterLease(lease);
+  }
+}
+
+async function runOffscreenFrameAnnotationRaster(
+  reference: FrameAnnotationRasterReferencePayload,
+  lease: RasterLease
+) {
+  await ensureOffscreenDocument('Render frame annotations for image export');
+  assertRunningFrameAnnotationRasterLease(lease);
+  await waitForOffscreenReady();
+  assertRunningFrameAnnotationRasterLease(lease);
+  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+      reference,
+    })
+  );
+}
+
+function assertRunningFrameAnnotationRasterLease(lease: RasterLease): void {
+  if (activeLease !== lease || lease.phase !== 'running' || lease.cancelled || lease.released) {
+    throw new Error('Frame annotation rasterization was cancelled');
   }
 }
 
@@ -103,12 +131,23 @@ async function acquireFrameAnnotationRasterLease(id: string): Promise<string> {
   pendingPreparation = { cancelled: false, id, releaseMutationPermit };
   let transferredToLease = false;
   try {
-    await withTimeout(initializeFrameAnnotationRasterLease(id), PREPARE_TIMEOUT_MS);
+    await withTimeout(
+      initializeFrameAnnotationRasterLease(id),
+      PREPARE_TIMEOUT_MS,
+      'Frame annotation raster preparation timed out'
+    );
     assertPreparationIsCurrent(id);
     const timeout = setTimeout(() => {
       void expireFrameAnnotationRasterLease(id);
     }, LEASE_TIMEOUT_MS);
-    activeLease = { id, phase: 'prepared', releaseMutationPermit, timeout };
+    activeLease = {
+      cancelled: false,
+      id,
+      phase: 'prepared',
+      released: false,
+      releaseMutationPermit,
+      timeout,
+    };
     transferredToLease = true;
     return id;
   } finally {
@@ -133,28 +172,38 @@ function assertPreparationIsCurrent(id: string): void {
 async function cancelFrameAnnotationRasterLease(id: string): Promise<void> {
   const preparation = pendingPreparation?.id === id ? pendingPreparation : null;
   if (preparation) preparation.cancelled = true;
+  const lease = detachFrameAnnotationRasterLease(id);
+  if (lease) lease.cancelled = true;
   try {
     await deleteFrameAnnotationRasterJob(id);
   } finally {
     preparation?.releaseMutationPermit();
-    if (activeLease?.id === id && activeLease.phase === 'prepared') {
-      releaseFrameAnnotationRasterLease(id);
-    }
+    if (lease?.phase === 'prepared') finishFrameAnnotationRasterLease(lease);
   }
 }
 
 async function expireFrameAnnotationRasterLease(id: string): Promise<void> {
+  const lease = detachFrameAnnotationRasterLease(id);
+  if (lease) lease.cancelled = true;
   try {
     await deleteFrameAnnotationRasterJob(id);
   } finally {
-    releaseFrameAnnotationRasterLease(id);
+    if (lease?.phase === 'prepared') finishFrameAnnotationRasterLease(lease);
   }
 }
 
-function releaseFrameAnnotationRasterLease(id: string): void {
-  if (!activeLease || activeLease.id !== id) return;
+function detachFrameAnnotationRasterLease(id: string): RasterLease | null {
+  if (!activeLease || activeLease.id !== id) return null;
   const lease = activeLease;
   activeLease = null;
+  clearTimeout(lease.timeout);
+  return lease;
+}
+
+function finishFrameAnnotationRasterLease(lease: RasterLease): void {
+  if (lease.released) return;
+  lease.released = true;
+  if (activeLease === lease) activeLease = null;
   clearTimeout(lease.timeout);
   lease.releaseMutationPermit();
 }
@@ -163,13 +212,10 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timeoutResult = new Promise<never>((_resolve, reject) => {
-    timeout = setTimeout(
-      () => reject(new Error('Frame annotation raster preparation timed out')),
-      timeoutMs
-    );
+    timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([work, timeoutResult]).finally(() => clearTimeout(timeout));
 }

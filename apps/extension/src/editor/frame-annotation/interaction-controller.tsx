@@ -441,39 +441,59 @@ function updateDrag(
   if (!point) return;
   const dx = point.x - drag.origin.x;
   const dy = point.y - drag.origin.y;
-  const next =
-    drag.mode === 'move'
-      ? { ...drag.start, x: drag.start.x + dx, y: drag.start.y + dy }
-      : drag.mode === 'resize' && drag.resizeDirection
-        ? preserveFrameAnnotationCalloutDuringResize(
-            drag.start,
-            resizeFrameAnnotationRect({
-              deltaX: dx,
-              deltaY: dy,
-              direction: drag.resizeDirection,
-              minimumSize: MIN_FRAME_SIZE,
-              start: drag.start,
-            }),
-            drag.calloutCenter ?? null
-          )
-        : {
-            ...drag.start,
-            x: Math.min(drag.origin.x, point.x),
-            y: Math.min(drag.origin.y, point.y),
-            width: Math.abs(dx),
-            height: Math.abs(dy),
-          };
+  const next = resolveDraggedFrame({ drag, dx, dy, point, controller: props.controller });
   const snapped =
-    drag.mode === 'resize'
-      ? next
-      : {
+    drag.mode === 'move'
+      ? {
           ...next,
           ...(props.controller.snapFrameAnnotationRect?.({
             excludeId: drag.start.id,
             rect: next,
           }) ?? {}),
-        };
+        }
+      : next;
   updateDraft(snapped);
+}
+
+function resolveDraggedFrame(input: {
+  controller: EditorFrameAnnotationPlaneController;
+  drag: DragState;
+  dx: number;
+  dy: number;
+  point: { x: number; y: number };
+}): FrameAnnotationSnapshotV1 {
+  const { drag } = input;
+  if (drag.mode === 'move') {
+    return { ...drag.start, x: drag.start.x + input.dx, y: drag.start.y + input.dy };
+  }
+  if (drag.mode === 'resize' && drag.resizeDirection) {
+    const resized = resizeFrameAnnotationRect({
+      deltaX: input.dx,
+      deltaY: input.dy,
+      direction: drag.resizeDirection,
+      minimumSize: MIN_FRAME_SIZE,
+      start: drag.start,
+    });
+    const snapped =
+      input.controller.snapFrameAnnotationResizeRect?.({
+        direction: drag.resizeDirection,
+        excludeId: drag.start.id,
+        minimumSize: MIN_FRAME_SIZE,
+        rect: resized,
+      }) ?? resized;
+    return preserveFrameAnnotationCalloutDuringResize(
+      drag.start,
+      snapped,
+      drag.calloutCenter ?? null
+    );
+  }
+  return {
+    ...drag.start,
+    x: Math.min(drag.origin.x, input.point.x),
+    y: Math.min(drag.origin.y, input.point.y),
+    width: Math.abs(input.dx),
+    height: Math.abs(input.dy),
+  };
 }
 
 function startExistingDrag(

@@ -265,6 +265,93 @@ it('bounds a preparation even when offscreen initialization never settles', asyn
   await cancelLease(nextLeaseId);
 });
 
+it('bounds a running offscreen command and admits the next export without a stale lease', async () => {
+  const leaseId = await prepareLease();
+  vi.useFakeTimers();
+  mocks.send.mockImplementationOnce(() => new Promise(() => undefined));
+  const rasterResponse = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    {
+      operation: 'rasterize',
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      reference: { inputSha256: 'f'.repeat(64), jobId: leaseId, revision: 6 },
+    },
+    rasterResponse
+  );
+
+  await vi.advanceTimersByTimeAsync(55_000);
+  expect(rasterResponse).toHaveBeenCalledWith({
+    error: 'Frame annotation rasterization timed out',
+    success: false,
+  });
+  vi.useRealTimers();
+
+  const nextLeaseId = await prepareLease();
+  await cancelLease(nextLeaseId);
+});
+
+it('bounds stalled running offscreen setup inside the raster deadline', async () => {
+  const leaseId = await prepareLease();
+  let resolveSetup!: (value: undefined) => void;
+  vi.useFakeTimers();
+  try {
+    mocks.ensure.mockImplementationOnce(
+      () =>
+        new Promise<undefined>((resolve) => {
+          resolveSetup = resolve;
+        })
+    );
+    const rasterResponse = vi.fn();
+    routeFrameAnnotationRasterMessage(
+      {
+        operation: 'rasterize',
+        type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+        reference: { inputSha256: 'a'.repeat(64), jobId: leaseId, revision: 8 },
+      },
+      rasterResponse
+    );
+
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(rasterResponse).toHaveBeenCalledWith({
+      error: 'Frame annotation rasterization timed out',
+      success: false,
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+
+  const nextLeaseId = await prepareLease();
+  await cancelLease(nextLeaseId);
+  resolveSetup(undefined);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('detaches a cancelled running lease so a retry is not rejected as already in progress', async () => {
+  const leaseId = await prepareLease();
+  let resolveRaster!: (value: { success: boolean; result: string }) => void;
+  mocks.send.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveRaster = resolve;
+      })
+  );
+  routeFrameAnnotationRasterMessage(
+    {
+      operation: 'rasterize',
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      reference: { inputSha256: '1'.repeat(64), jobId: leaseId, revision: 7 },
+    },
+    vi.fn()
+  );
+  await vi.waitFor(() => expect(mocks.send).toHaveBeenCalledOnce());
+  await cancelLease(leaseId);
+
+  const nextLeaseId = await prepareLease();
+  await cancelLease(nextLeaseId);
+  resolveRaster({ success: true, result: 'applied' });
+});
+
 it('makes privacy erasure wait for admitted staging and rejects a new prepare', async () => {
   const leaseId = await prepareLease();
   const erasure = reserveMediaErasureExclusion();
@@ -339,8 +426,12 @@ it('holds erasure exclusion after cancellation until an active raster operation 
     expect(erasureDrained).toBe(false);
     resolveRenderEnsure(undefined);
     await vi.waitFor(() =>
-      expect(rasterResponse).toHaveBeenCalledWith({ success: true, result: 'completed' })
+      expect(rasterResponse).toHaveBeenCalledWith({
+        success: false,
+        error: 'Frame annotation rasterization was cancelled',
+      })
     );
+    expect(mocks.send).not.toHaveBeenCalled();
     await erasureDrain;
   } finally {
     erasure.release();

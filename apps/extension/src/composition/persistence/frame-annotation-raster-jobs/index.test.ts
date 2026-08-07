@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createFrameAnnotationSnapshot } from '../../../features/highlighter/frame-annotation';
 
 const mocks = vi.hoisted(() => {
   const records = new Map<string, unknown>();
@@ -59,6 +60,23 @@ it('stages, validates, completes, and atomically consumes a raster job', async (
     metadata: { outputWidth: 100 },
   });
   expect(mocks.records.has('job-1')).toBe(false);
+});
+
+it('digests snapshots by canonical value instead of caller property order', async () => {
+  const snapshot = createFrameAnnotationSnapshot(
+    { id: 'frame-order', x: 1, y: 2, width: 30, height: 20 },
+    0
+  );
+  const orderedInput = { ...input, snapshots: [snapshot] };
+  const reference = await stageFrameAnnotationRasterJob({
+    input: orderedInput,
+    jobId: 'job-order',
+    revision: 1,
+  });
+
+  await expect(acquireFrameAnnotationRasterInput(reference)).resolves.toMatchObject({
+    snapshots: [{ id: 'frame-order' }],
+  });
 });
 
 it('rejects a reference whose digest no longer matches the staged payload', async () => {

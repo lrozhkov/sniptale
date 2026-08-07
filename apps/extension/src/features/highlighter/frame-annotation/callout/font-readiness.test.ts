@@ -23,3 +23,20 @@ it('loads and verifies the exact shared handwritten face with Latin and Cyrillic
   expect(load).toHaveBeenCalledWith(FRAME_CALLOUT_HANDWRITTEN_FONT_LOAD, text);
   expect(check).toHaveBeenCalledWith(FRAME_CALLOUT_HANDWRITTEN_FONT_LOAD, text);
 });
+
+it('requires the handwritten face for an independently styled title', () => {
+  const callout = createDefaultFrameCallout();
+  callout.style.typography.fontFamily = 'sans';
+  callout.style.title.enabled = true;
+  callout.style.title.fontFamily = 'cursive';
+
+  expect(requiresFrameCalloutHandwrittenFont(callout)).toBe(true);
+});
+
+it('requires the handwritten face when sanctioned custom CSS selects it', () => {
+  const callout = createDefaultFrameCallout();
+  callout.style.typography.fontFamily = 'sans';
+  callout.style.customCss = '[body]\nfont-family: "Sniptale Handwritten"';
+
+  expect(requiresFrameCalloutHandwrittenFont(callout)).toBe(true);
+});

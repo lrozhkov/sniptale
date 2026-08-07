@@ -321,7 +321,11 @@ function encodeInputMetadata(input: FrameAnnotationRasterInput): Uint8Array {
       height: input.height,
       requestedWidth: input.requestedWidth,
       requestedHeight: input.requestedHeight,
-      snapshots: input.snapshots,
+      snapshots: input.snapshots.map((snapshot) => {
+        const parsed = parseFrameAnnotationSnapshot(snapshot);
+        if (!parsed) throw new Error('Invalid frame annotation raster input');
+        return parsed;
+      }),
     })
   );
 }

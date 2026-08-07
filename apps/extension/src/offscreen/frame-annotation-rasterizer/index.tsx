@@ -1,4 +1,5 @@
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import { snapdom } from '@zumer/snapdom';
 import { FrameAnnotationExportSurface } from '../../features/highlighter/frame-annotation/export-surface';
 import type {
@@ -6,11 +7,13 @@ import type {
   FrameAnnotationRasterOutputMetadata,
 } from '../../composition/persistence/frame-annotation-raster-jobs';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { blobToDataUrl } from '../../platform/media-utils/data-url';
 import {
   getFrameCalloutFontProbeText,
   loadFrameCalloutHandwrittenFont,
   requiresFrameCalloutHandwrittenFont,
 } from '../../features/highlighter/frame-annotation/callout/font-readiness';
+import { installFrameCalloutHandwrittenFont } from '../../features/highlighter/frame-annotation/callout/font-installer';
 
 const MAX_PIXEL_AREA = 16_000_000;
 const MAX_SIDE = 16_384;
@@ -68,46 +71,52 @@ async function rasterizeAtScale(
   const width = Math.max(1, Math.floor(input.width * scale));
   const height = Math.max(1, Math.floor(input.height * scale));
   const host = document.createElement('div');
-  host.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;height:${height}px;overflow:hidden`;
+  host.style.cssText =
+    `position:fixed;left:0;top:0;width:${width}px;height:${height}px;` +
+    'overflow:hidden;flex:none';
   document.body.appendChild(host);
-  const imageUrl = URL.createObjectURL(input.baseImage);
-  const root = createRoot(host);
+  let root: Root | null = null;
   try {
-    root.render(
-      <div style={{ width, height, transformOrigin: 'top left' }}>
-        <div
-          style={{
-            width: input.width,
-            height: input.height,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
-          }}
-        >
-          <FrameAnnotationExportSurface
-            baseImageUrl={imageUrl}
-            height={input.height}
-            snapshots={input.snapshots}
-            width={input.width}
-          />
+    const imageUrl = await withRasterDeadline(blobToDataUrl(input.baseImage), deadline);
+    const mountedRoot = createRoot(host);
+    root = mountedRoot;
+    flushSync(() => {
+      mountedRoot.render(
+        <div style={{ width, height, transformOrigin: 'top left' }}>
+          <div
+            style={{
+              width: input.width,
+              height: input.height,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <FrameAnnotationExportSurface
+              baseImageUrl={imageUrl}
+              height={input.height}
+              snapshots={input.snapshots}
+              width={input.width}
+            />
+          </div>
         </div>
-      </div>
-    );
-    await waitForPaint(host, deadline);
-    await loadRequiredFrameAnnotationFonts(input, deadline);
-    const blob = await withRasterDeadline(
-      snapdom.toBlob(host, {
+      );
+    });
+    await waitForRasterSurface(host, deadline);
+    await loadRequiredFrameAnnotationFonts(input, host.ownerDocument, deadline);
+    const canvas = await withRasterDeadline(
+      snapdom.toCanvas(host, {
         width,
         height,
         dpr: 1,
         scale: 1,
-        type: 'png',
-        embedFonts: true,
-        useProxy: '',
-        cache: 'soft',
-        reconcile: true,
+        embedFonts: false,
+        cache: 'disabled',
+        compress: false,
+        outerShadows: true,
       }),
       deadline
     );
+    const blob = await encodePng(canvas, deadline);
     if (!(blob instanceof Blob) || blob.type !== 'image/png') {
       throw new Error('SnapDOM did not return a PNG Blob');
     }
@@ -119,10 +128,21 @@ async function rasterizeAtScale(
       metadata: { downscaled, outputWidth: width, outputHeight: height, outputScale: scale },
     };
   } finally {
-    root.unmount();
-    URL.revokeObjectURL(imageUrl);
+    root?.unmount();
     host.remove();
   }
+}
+
+function encodePng(canvas: HTMLCanvasElement, deadline: number): Promise<Blob> {
+  return withRasterDeadline(
+    new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Frame annotation raster PNG encoding failed'));
+      }, 'image/png');
+    }),
+    deadline
+  );
 }
 
 function isRecoverableAllocationFailure(error: unknown): boolean {
@@ -181,19 +201,17 @@ function resolveMaximumOutputScale(width: number, height: number): number {
   );
 }
 
-async function waitForPaint(host: HTMLElement, deadline: number): Promise<void> {
-  await withRasterDeadline(
-    new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-    ),
-    deadline
-  );
+async function waitForRasterSurface(host: HTMLElement, deadline: number): Promise<void> {
+  await withRasterDeadline(new Promise<void>((resolve) => setTimeout(resolve, 0)), deadline);
   const image = host.querySelector('img');
-  if (image && !image.complete) await withRasterDeadline(image.decode(), deadline);
+  if (image && (!image.complete || image.naturalWidth === 0)) {
+    await withRasterDeadline(image.decode(), deadline);
+  }
 }
 
 async function loadRequiredFrameAnnotationFonts(
   input: Pick<FrameAnnotationRasterInput, 'snapshots'>,
+  owner: Document,
   deadline: number
 ): Promise<void> {
   const callouts = input.snapshots
@@ -201,9 +219,7 @@ async function loadRequiredFrameAnnotationFonts(
     .filter(requiresFrameCalloutHandwrittenFont);
   if (callouts.length === 0) return;
   const text = callouts.map(getFrameCalloutFontProbeText).join(' ');
-  const loaded = await withRasterDeadline(
-    loadFrameCalloutHandwrittenFont(document, text),
-    deadline
-  );
+  await withRasterDeadline(installFrameCalloutHandwrittenFont(owner), deadline);
+  const loaded = await withRasterDeadline(loadFrameCalloutHandwrittenFont(owner, text), deadline);
   if (!loaded) throw new Error('Frame annotation handwritten font failed to load');
 }
