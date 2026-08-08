@@ -5,24 +5,33 @@ import { DelayedSettingsCenteredLoadingState } from '../../section-surface/loadi
 import { SettingsSidebar } from '../navigation/sidebar';
 import { SettingsCommandPalette } from '../command-palette';
 import { settingsPageContentClassName, settingsPageLayoutClassName } from '../../section-surface';
-import { type SettingsTab } from '../navigation';
+import {
+  type SettingsRoute,
+  updateSettingsRouteView,
+} from '../../../platform/navigation/extension-pages/settings-route/codec';
 import { useSettingsStore } from '../../runtime/store/useSettingsStore';
-import { AISecretUnlockPage } from '../../sections/ai-unlock';
+import { AISecretUnlockPage } from '../../sections/ai/unlock';
 import {
   preloadDeferredSettingsSections,
-  renderSettingsTabContent,
+  renderSettingsRouteContent,
   shouldDeferSettingsTab,
 } from './sections';
+import { useSettingsRoute } from '../route/history';
 
 function SettingsPageSurface(props: {
-  activeTab: SettingsTab;
-  onTabChange: (tab: SettingsTab) => void;
+  onRouteChange: (route: SettingsRoute) => void;
+  route: SettingsRoute;
 }) {
-  const content = renderSettingsTabContent(props.activeTab);
+  const content = renderSettingsRouteContent(props.route, (view) =>
+    props.onRouteChange(updateSettingsRouteView(props.route, view))
+  );
 
   return (
     <div data-ui="settings.page.layout" className={settingsPageLayoutClassName}>
-      <SettingsSidebar activeTab={props.activeTab} onTabChange={props.onTabChange} />
+      <SettingsSidebar
+        activeTab={props.route.section}
+        onTabChange={(section) => props.onRouteChange({ section })}
+      />
       <main
         data-ui="settings.page.content"
         className={[settingsPageContentClassName, 'min-h-0 overflow-hidden'].join(' ')}
@@ -35,7 +44,7 @@ function SettingsPageSurface(props: {
               '[scrollbar-gutter:stable] p-6 lg:p-8',
             ].join(' ')}
           >
-            {shouldDeferSettingsTab(props.activeTab) ? (
+            {shouldDeferSettingsTab(props.route.section) ? (
               <Suspense fallback={<DelayedSettingsCenteredLoadingState />}>{content}</Suspense>
             ) : (
               content
@@ -93,7 +102,7 @@ function SettingsPageStyles() {
 
 function SettingsPageMain() {
   const { loadSettings } = useSettingsStore();
-  const [activeTab, setActiveTab] = useState<SettingsTab>(() => getInitialSettingsTab());
+  const { navigate, route } = useSettingsRoute();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   usePageLocaleMetadata('settings.navigation.documentTitle');
 
@@ -127,12 +136,12 @@ function SettingsPageMain() {
       }
     >
       <SettingsPageBackdrop />
-      <SettingsPageSurface activeTab={activeTab} onTabChange={setActiveTab} />
+      <SettingsPageSurface route={route} onRouteChange={navigate} />
       <SettingsCommandPalette
         isOpen={commandPaletteOpen}
-        activeTab={activeTab}
+        activeTab={route.section}
         onClose={() => setCommandPaletteOpen(false)}
-        onTabChange={setActiveTab}
+        onTabChange={(section) => navigate({ section })}
       />
       <SettingsPageStyles />
     </div>
@@ -142,30 +151,4 @@ function SettingsPageMain() {
 export function SettingsPage() {
   const isAIUnlockPage = new URL(globalThis.location.href).searchParams.get('aiUnlock') === '1';
   return isAIUnlockPage ? <AISecretUnlockPage /> : <SettingsPageMain />;
-}
-
-function getInitialSettingsTab(): SettingsTab {
-  const section = new URL(globalThis.location.href).searchParams.get('section');
-  if (
-    section === 'native-app' ||
-    section === 'native-hotkeys' ||
-    section === 'native-screenshots' ||
-    section === 'native-video' ||
-    section === 'native-telemetry'
-  ) {
-    return 'nativeApp';
-  }
-  if (section === 'permissions') {
-    return 'permissions';
-  }
-  if (section === 'video') {
-    return 'video';
-  }
-  if (section === 'voice-input') {
-    return 'voiceInput';
-  }
-  if (section === 'presets') {
-    return 'presets';
-  }
-  return 'appearance';
 }

@@ -36,7 +36,32 @@ function InspectorSectionHeading(props: { control?: ReactNode; label: string }) 
   );
 }
 
+function useRequestedInspectorSection<SectionId extends string>(
+  initialSection: SectionId,
+  request: { id: SectionId; token: number } | undefined,
+  sections: readonly CategorizedInspectorSection<SectionId>[]
+) {
+  const [activeSection, setActiveSection] = useState<SectionId>(initialSection);
+  const activeExists = sections.some((section) => section.id === activeSection);
+  const requestedId = request?.id;
+  const requestedToken = request?.token;
+
+  useEffect(() => {
+    if (requestedId !== undefined && requestedToken !== undefined) setActiveSection(requestedId);
+  }, [requestedId, requestedToken]);
+
+  useEffect(() => {
+    if (!activeExists && sections[0]) setActiveSection(sections[0].id);
+  }, [activeExists, sections]);
+
+  return {
+    activeSection: activeExists ? activeSection : sections[0]?.id,
+    setActiveSection,
+  };
+}
+
 export function CategorizedInspector<SectionId extends string>(props: {
+  activeSectionRequest?: { id: SectionId; token: number };
   ariaLabel: string;
   dataUi?: string;
   initialSection: SectionId;
@@ -45,14 +70,12 @@ export function CategorizedInspector<SectionId extends string>(props: {
   sections: readonly CategorizedInspectorSection<SectionId>[];
   showSectionHeading?: boolean;
 }) {
-  const [activeSection, setActiveSection] = useState<SectionId>(props.initialSection);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const activeExists = props.sections.some((section) => section.id === activeSection);
-  const resolvedSection = activeExists ? activeSection : props.sections[0]?.id;
-
-  useEffect(() => {
-    if (!activeExists && props.sections[0]) setActiveSection(props.sections[0].id);
-  }, [activeExists, props.sections]);
+  const { activeSection: resolvedSection, setActiveSection } = useRequestedInspectorSection(
+    props.initialSection,
+    props.activeSectionRequest,
+    props.sections
+  );
 
   const handleNavigation = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const nextIndex = getNextSectionIndex(event.key, index, props.sections.length);

@@ -20,3 +20,8 @@ export {
   getFrameAnnotationStrokeStyle,
 } from './surface-style';
 export { resolveFrameAnnotationVisualScene } from './render-scene';
+export {
+  isFrameHiddenDuringCapture,
+  setBorderHiddenDuringCapture,
+  setFrameHiddenDuringCapture,
+} from './capture-visibility';

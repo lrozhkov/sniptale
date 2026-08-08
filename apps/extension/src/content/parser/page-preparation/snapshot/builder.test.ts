@@ -92,6 +92,9 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
   const calloutHandle = document.createElement('button');
   calloutHandle.className = 'sniptale-callout-drag-handle';
   calloutHandle.textContent = 'Runtime callout handle';
+  const calloutAdjacentControls = document.createElement('div');
+  calloutAdjacentControls.className = 'sniptale-callout-adjacent-controls';
+  calloutAdjacentControls.textContent = 'Runtime adjacent callout controls';
   const calloutSettingsHandle = document.createElement('button');
   calloutSettingsHandle.className = 'sniptale-callout-settings-handle';
   calloutSettingsHandle.textContent = 'Runtime callout settings';
@@ -111,6 +114,7 @@ function appendFrameOverlayFixture(overlayRoot: HTMLElement): void {
     trigger,
     triggerBridge,
     calloutHandle,
+    calloutAdjacentControls,
     calloutSettingsHandle,
     stepBadgeControls,
     freeDraft

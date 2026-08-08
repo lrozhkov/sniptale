@@ -12,6 +12,7 @@ export const SYSTEM_BORDER_PRESET_KEYS = [
 export type SystemBorderPresetKey = (typeof SYSTEM_BORDER_PRESET_KEYS)[number];
 export type BorderPresetOrigin = 'system' | 'user';
 export type BorderPresetBlurType = 'gaussian' | 'distortion' | 'pixelate' | 'solid';
+export type AnnotationTemplateSource = 'frame-default' | 'forced';
 
 export interface BorderPresetEffects {
   blur: {
@@ -19,13 +20,23 @@ export interface BorderPresetEffects {
     blurType: BorderPresetBlurType;
   };
   focus: {
+    blurAmount: number;
     opacity: number;
+  };
+  capture: {
+    hideFrame: boolean;
+  };
+  linkedTemplates?: {
+    calloutPresetId: string | null;
+    stepBadgePresetId: string | null;
   };
 }
 
 export const DEFAULT_BORDER_PRESET_EFFECTS: BorderPresetEffects = {
   blur: { amount: 10, blurType: 'gaussian' },
-  focus: { opacity: 0.5 },
+  focus: { blurAmount: 0, opacity: 0.5 },
+  capture: { hideFrame: false },
+  linkedTemplates: { calloutPresetId: null, stepBadgePresetId: null },
 };
 
 export interface BorderPadding {
@@ -42,10 +53,7 @@ export interface BorderVisualStyle {
   radius: number;
   padding: BorderPadding;
   shadow: number;
-  opacity: number;
-  strokeOpacity: number;
   fillColor: string;
-  fillOpacity: number;
   inheritCustomCss: boolean;
   customCss: string;
   effects?: BorderPresetEffects;
@@ -80,10 +88,7 @@ export function cloneBorderVisualStyle(style: BorderVisualStyle): BorderVisualSt
     radius: style.radius,
     padding: { ...style.padding },
     shadow: style.shadow,
-    opacity: style.opacity,
-    strokeOpacity: style.strokeOpacity,
     fillColor: style.fillColor,
-    fillOpacity: style.fillOpacity,
     inheritCustomCss: style.inheritCustomCss,
     customCss: style.customCss,
     effects: cloneBorderPresetEffects(style.effects),
@@ -96,7 +101,12 @@ export function cloneBorderPresetEffects(
   const source = effects ?? DEFAULT_BORDER_PRESET_EFFECTS;
   return {
     blur: { ...source.blur },
-    focus: { ...source.focus },
+    focus: { blurAmount: source.focus.blurAmount ?? 0, opacity: source.focus.opacity },
+    capture: { hideFrame: source.capture?.hideFrame ?? false },
+    linkedTemplates: {
+      calloutPresetId: source.linkedTemplates?.calloutPresetId ?? null,
+      stepBadgePresetId: source.linkedTemplates?.stepBadgePresetId ?? null,
+    },
   };
 }
 

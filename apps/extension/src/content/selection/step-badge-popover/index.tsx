@@ -12,7 +12,6 @@ import {
   SETTINGS_POPOVER_HEIGHT,
   SETTINGS_POPOVER_WIDTH,
 } from '../../../composition/frame-annotation-controls/popover/surface';
-import { StepBadgePresetEditor } from '../../../ui/highlighter-preset-editor/step-badge';
 import { usePopoverInteractionDismissal } from '../../../composition/frame-annotation-controls/popover/interaction-dismissal';
 import { dispatchStepBadgeReorder } from '../../platform/page-context/frame-events';
 
@@ -27,27 +26,7 @@ interface StepBadgePopoverProps {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
-}
-
-function StepBadgePersistentPresetEditor(props: {
-  editor: ReturnType<typeof useStepBadgePresetPopoverController>['editor'];
-}) {
-  const { editor } = props;
-  if (!editor.preset) return null;
-  return (
-    <StepBadgePresetEditor
-      isOpen={editor.isOpen}
-      isSaving={editor.isSaving}
-      onClose={editor.close}
-      {...(editor.preset.origin === 'system' && editor.preset.customized === true
-        ? { onReset: () => editor.reset(editor.preset!) }
-        : {})}
-      onSave={editor.save}
-      preset={editor.preset}
-    />
-  );
 }
 
 function useStepBadgePopoverPresentation(args: {
@@ -82,15 +61,64 @@ function useStepBadgePopoverPresentation(args: {
   };
 }
 
-export function StepBadgePopover({
-  isOpen,
-  onClose,
-  frameId,
-  stepBadge,
-  anchorEl,
-  frameRect,
-  frameVisuals,
-}: StepBadgePopoverProps) {
+function StepBadgePopoverSurface(props: {
+  dismissal: ReturnType<typeof usePopoverInteractionDismissal>;
+  presentation: ReturnType<typeof useStepBadgePopoverPresentation>;
+  presets: ReturnType<typeof useStepBadgePresetPopoverController>;
+  request: StepBadgePopoverProps;
+  state: ReturnType<typeof useStepBadgePopoverState>;
+  templateSettings: ReturnType<typeof createStepBadgeTemplateFromSettings>;
+  visuals: NonNullable<StepBadgePopoverProps['frameVisuals']>;
+}) {
+  const { anchorEl, frameId, isOpen, onClose } = props.request;
+  return (
+    <StepBadgePopoverAdapter
+      anchorEl={anchorEl}
+      getPopoverStyle={() => props.presentation.popoverStyle}
+      isOpen={isOpen}
+      popoverRef={props.state.popoverRef}
+    >
+      <StepBadgePopoverEnabledContent
+        frameId={frameId}
+        frameVisuals={props.visuals}
+        headerContext="element"
+        headerDrag={props.presentation.drag}
+        isAuto={props.state.isAuto}
+        localStepBadgeSettings={props.state.localStepBadgeSettings}
+        onAlphabetChange={props.state.handleAlphabetChange}
+        onAnchorChange={(anchor) => {
+          if (anchor) props.state.handleAnchorChange(anchor);
+        }}
+        onApplyPreset={props.state.applyPreset}
+        onForkPreset={props.state.forkPreset}
+        onAutoModeChange={props.state.handleAutoModeChange}
+        onCreatePreset={props.presets.catalog.create}
+        onClose={onClose}
+        onDisable={() => props.state.handleEnabledChange(false)}
+        onFloatingInteractionChange={props.dismissal.onFloatingInteractionChange}
+        onOffsetToggle={props.state.handleOffsetToggle}
+        onResetPreset={(preset) => void props.presets.catalog.reset(preset)}
+        onReorder={(direction, ownedFrameId) =>
+          dispatchStepBadgeReorder({ direction, frameId: ownedFrameId })
+        }
+        onShowPresets={props.presets.catalog.refresh}
+        onSettingsChange={props.state.handleSettingsChange}
+        onTogglePreset={(preset) => void props.presets.catalog.toggle(preset)}
+        onTemplateCreated={props.state.markTemplateCreated}
+        onTypeChange={(type) => props.state.handleTypeChange(type)}
+        onUpdatePreset={props.presets.catalog.update}
+        onValueChange={props.state.handleValueChange}
+        pendingPresetIds={props.presets.catalog.pending}
+        presetError={props.presets.catalog.error}
+        presets={props.presets.catalog.visiblePresets}
+        templateSettings={props.templateSettings}
+      />
+    </StepBadgePopoverAdapter>
+  );
+}
+
+export function StepBadgePopover(props: StepBadgePopoverProps) {
+  const { anchorEl, frameId, frameRect, frameVisuals, isOpen, onClose, stepBadge } = props;
   useAppLocale();
   const presets = useStepBadgePresetPopoverController(isOpen);
   const dismissal = usePopoverInteractionDismissal({ blocked: presets.editor.isOpen, isOpen });
@@ -116,47 +144,14 @@ export function StepBadgePopover({
     getLinkedStepBadgeDiameter(visuals.borderWidth)
   );
   return (
-    <StepBadgePopoverAdapter
-      anchorEl={anchorEl}
-      getPopoverStyle={() => presentation.popoverStyle}
-      isOpen={isOpen}
-      popoverRef={popoverRef}
-    >
-      <StepBadgePopoverEnabledContent
-        frameId={frameId}
-        frameVisuals={visuals}
-        headerContext="element"
-        headerDrag={presentation.drag}
-        isAuto={stepBadgeState.isAuto}
-        localStepBadgeSettings={stepBadgeState.localStepBadgeSettings}
-        onAlphabetChange={stepBadgeState.handleAlphabetChange}
-        onAnchorChange={(anchor) => {
-          if (anchor) stepBadgeState.handleAnchorChange(anchor);
-        }}
-        onApplyPreset={stepBadgeState.applyPreset}
-        onAutoModeChange={stepBadgeState.handleAutoModeChange}
-        onConfigurePreset={presets.editor.open}
-        onCreatePreset={presets.catalog.create}
-        onClose={onClose}
-        onDisable={() => stepBadgeState.handleEnabledChange(false)}
-        onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
-        onOffsetToggle={stepBadgeState.handleOffsetToggle}
-        onResetPreset={(preset) => void presets.catalog.reset(preset)}
-        onReorder={(direction, ownedFrameId) =>
-          dispatchStepBadgeReorder({ direction, frameId: ownedFrameId })
-        }
-        onShowPresets={presets.catalog.refresh}
-        onSettingsChange={stepBadgeState.handleSettingsChange}
-        onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
-        onTypeChange={(type) => stepBadgeState.handleTypeChange(type)}
-        onUpdatePreset={presets.catalog.update}
-        onValueChange={stepBadgeState.handleValueChange}
-        pendingPresetIds={presets.catalog.pending}
-        presetError={presets.catalog.error}
-        presets={presets.catalog.visiblePresets}
-        templateSettings={templateSettings}
-      />
-      <StepBadgePersistentPresetEditor editor={presets.editor} />
-    </StepBadgePopoverAdapter>
+    <StepBadgePopoverSurface
+      dismissal={dismissal}
+      presentation={presentation}
+      presets={presets}
+      request={props}
+      state={stepBadgeState}
+      templateSettings={templateSettings}
+      visuals={visuals}
+    />
   );
 }

@@ -12,11 +12,12 @@ it('renders the microphone substrate only while the callout is being edited', ()
     renderToStaticMarkup(<CalloutVoiceButton isEditing={false} leftOffset={48} voice={voice} />)
   ).toBe('');
   const markup = renderToStaticMarkup(
-    <CalloutVoiceButton isEditing leftOffset={48} voice={voice} />
+    <CalloutVoiceButton isEditing leftOffset={48} visualScale={0.5} voice={voice} />
   );
   expect(markup).toContain('content.highlighter.callout-voice-input');
   expect(markup).toContain('surface-contrast');
   expect(markup).toContain('text-inverse');
+  expect(markup).toContain('scale:0.5');
 });
 
 it('moves the microphone to the left when the callout is clamped at the right viewport edge', () => {

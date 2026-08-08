@@ -21,11 +21,15 @@ type CalloutConnectorState =
   | ReturnType<typeof getDynamicTailState>
   | ReturnType<typeof getLineConnectorState>;
 
-function getCalloutToolbarWrapperStyle(rect: DOMRect, zIndex: number): React.CSSProperties {
+function getCalloutToolbarWrapperStyle(
+  rect: DOMRect,
+  zIndex: number,
+  visualScale: number
+): React.CSSProperties {
   return {
     position: 'fixed',
-    top: rect.top - 46,
-    left: rect.left + rect.width / 2 - 62,
+    top: rect.top - 46 * visualScale,
+    left: rect.left + rect.width / 2 - 62 * visualScale,
     zIndex,
   };
 }
@@ -37,6 +41,7 @@ export function renderCalloutFloatingToolbar(props: {
   isEditing: boolean;
   portalTheme: AppTheme | null;
   portalTarget: Element | DocumentFragment;
+  visualScale?: number;
 }) {
   if (!props.floatingToolbarRect || !props.isEditing) {
     return null;
@@ -47,7 +52,11 @@ export function renderCalloutFloatingToolbar(props: {
       data-theme={props.portalTheme ?? undefined}
       style={mergeThemeScopedStyle(
         props.portalTheme,
-        getCalloutToolbarWrapperStyle(props.floatingToolbarRect, props.effectiveZIndex)
+        getCalloutToolbarWrapperStyle(
+          props.floatingToolbarRect,
+          props.effectiveZIndex,
+          props.visualScale ?? 1
+        )
       )}
     >
       <ProductGlassToolbar
@@ -84,7 +93,8 @@ export function renderCalloutFloatingToolbar(props: {
 export function renderDynamicCalloutTail(
   tail: CalloutConnectorState | null,
   style: CalloutVisualStyle,
-  customStyles?: ResolvedCalloutCustomCss
+  customStyles?: ResolvedCalloutCustomCss,
+  visualScale = 1
 ) {
   if (!tail) return null;
   if (tail.kind === 'line') {
@@ -103,7 +113,7 @@ export function renderDynamicCalloutTail(
           fill="none"
           pointerEvents="stroke"
           stroke="transparent"
-          strokeWidth={18}
+          strokeWidth={18 * visualScale}
         />
         <g style={connectorCustomStyles.group}>
           <path
@@ -118,7 +128,7 @@ export function renderDynamicCalloutTail(
             )}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={style.connector.width}
+            strokeWidth={style.connector.width * visualScale}
             style={connectorCustomStyles.line}
           />
           {renderConnectorMarker(
@@ -126,14 +136,14 @@ export function renderDynamicCalloutTail(
             tail.blockPoint,
             style.connector.color,
             tail.blockAngle,
-            style.connector.blockMarkerSize
+            style.connector.blockMarkerSize * visualScale
           )}
           {renderConnectorMarker(
             style.connector.frameMarker,
             tail.framePoint,
             style.connector.color,
             tail.frameAngle,
-            style.connector.frameMarkerSize
+            style.connector.frameMarkerSize * visualScale
           )}
         </g>
       </svg>
@@ -153,7 +163,7 @@ export function renderDynamicCalloutTail(
         fill="none"
         pointerEvents="stroke"
         stroke="transparent"
-        strokeWidth={18}
+        strokeWidth={18 * visualScale}
       />
       {style.surface.borderWidth > 0 ? (
         <path
@@ -168,7 +178,7 @@ export function renderDynamicCalloutTail(
           )}
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth={style.surface.borderWidth}
+          strokeWidth={style.surface.borderWidth * visualScale}
           style={customStyles?.connector}
         />
       ) : (
@@ -186,10 +196,16 @@ export function renderDynamicCalloutTail(
 export function renderCalloutAccentEdge(
   style: CalloutVisualStyle,
   dimensions: { width: number; height: number },
-  customStyles?: ResolvedCalloutCustomCss
+  customStyles?: ResolvedCalloutCustomCss,
+  visualScale = 1
 ) {
   return (
-    <CalloutAccentEdgeView customStyles={customStyles} dimensions={dimensions} style={style} />
+    <CalloutAccentEdgeView
+      customStyles={customStyles}
+      dimensions={dimensions}
+      style={style}
+      visualScale={visualScale}
+    />
   );
 }
 
@@ -197,6 +213,7 @@ function CalloutAccentEdgeView(props: {
   customStyles: ResolvedCalloutCustomCss | undefined;
   dimensions: { width: number; height: number };
   style: CalloutVisualStyle;
+  visualScale: number;
 }) {
   const clipId = `sniptale-callout-accent-${React.useId().replaceAll(':', '')}`;
   const { dimensions, style } = props;
@@ -217,7 +234,11 @@ function CalloutAccentEdgeView(props: {
     >
       <defs>
         <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
-          <rect height={dimensions.height} rx={style.surface.radius} width={dimensions.width} />
+          <rect
+            height={dimensions.height}
+            rx={style.surface.radius * props.visualScale}
+            width={dimensions.width}
+          />
         </clipPath>
       </defs>
       <path
@@ -228,7 +249,7 @@ function CalloutAccentEdgeView(props: {
         strokeDasharray={getCalloutStrokeDasharray(accent.lineStyle, accent.width)}
         strokeLinecap={accent.lineStyle === 'dotted' ? 'round' : 'butt'}
         strokeLinejoin="round"
-        strokeWidth={accent.width * 2}
+        strokeWidth={accent.width * 2 * props.visualScale}
         style={props.customStyles?.accent}
       />
     </svg>

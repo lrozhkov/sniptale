@@ -4,6 +4,7 @@ import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/r
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   browserTabsGet: vi.fn(),
+  browserTabsGetZoom: vi.fn(),
   getApplied: vi.fn(),
   getAvailability: vi.fn(),
   loadSettings: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
-  browserTabs: { get: mocks.browserTabsGet },
+  browserTabs: { get: mocks.browserTabsGet, getZoom: mocks.browserTabsGetZoom },
 }));
 
 vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
@@ -87,6 +88,7 @@ beforeEach(() => {
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `uuid-${++uuid}`) });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: mocks.sendTabMessage });
   mocks.browserTabsGet.mockResolvedValue({ id: 5, windowId: 3, url: 'https://example.com' });
+  mocks.browserTabsGetZoom.mockResolvedValue(1);
   mocks.loadSettings.mockResolvedValue({
     defaultViewportPresetId: preset.id,
     viewportPresets: [preset],
@@ -152,6 +154,7 @@ describe('screenshot mode default surface setup', () => {
     expect(mocks.sendTabMessage).toHaveBeenCalledWith(5, {
       toolbarVisible: false,
       type: 'ENABLE_SCREENSHOT_MODE',
+      pageZoom: 1,
       surfaceCapabilityToken: expect.any(String),
       surfaceLeaseGeneration: 1,
       surfaceOperationGeneration: 1,
@@ -206,6 +209,7 @@ describe('screenshot mode default surface setup', () => {
     expect(mocks.getAvailability).not.toHaveBeenCalled();
     expect(mocks.sendTabMessage).toHaveBeenCalledWith(5, {
       type: 'ENABLE_SCREENSHOT_MODE',
+      pageZoom: 1,
       surfaceCapabilityToken: expect.any(String),
       surfaceOperationGeneration: 0,
       viewport: null,

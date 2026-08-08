@@ -62,7 +62,7 @@ afterEach(() => {
 
 describe('SettingsSidebar', () => {
   it('renders the sidebar chrome, translated labels, and active marker state', () => {
-    renderSidebar('appearance');
+    renderSidebar('interface-browser');
 
     expect(container?.querySelector('[data-ui="settings.sidebar.header"]')?.textContent).toBe(
       'Настройки'
@@ -73,14 +73,14 @@ describe('SettingsSidebar', () => {
     );
     expect(container?.querySelectorAll('button')).toHaveLength(SETTINGS_NAV_ITEMS.length);
     expect(container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className).toContain(
-      'overflow-y-auto'
+      'lg:overflow-y-hidden'
     );
     expect(container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className).toContain(
-      '[scrollbar-gutter:stable]'
+      'overflow-y-auto'
     );
 
     const activeButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-      button.textContent?.includes('settings.navigation.appearance')
+      button.textContent?.includes('settings.navigation.interfaceBrowser')
     );
 
     expect(activeButton?.className).toContain(
@@ -90,9 +90,9 @@ describe('SettingsSidebar', () => {
   });
 
   it('routes item clicks through the provided tab change handler', () => {
-    const onTabChange = renderSidebar('appearance');
+    const onTabChange = renderSidebar('interface-browser');
     const templatesButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-      button.textContent?.includes('settings.navigation.templates')
+      button.textContent?.includes('settings.navigation.aiPrompts')
     );
 
     expect(templatesButton).toBeTruthy();
@@ -101,6 +101,6 @@ describe('SettingsSidebar', () => {
       templatesButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(onTabChange).toHaveBeenCalledWith('templates');
+    expect(onTabChange).toHaveBeenCalledWith('ai-prompts');
   });
 });

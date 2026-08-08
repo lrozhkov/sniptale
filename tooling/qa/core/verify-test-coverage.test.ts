@@ -78,7 +78,9 @@ it('skips excluded and out-of-scope files', () => {
     )
   ).toBeNull();
   expect(
-    resolveCoverageThreshold('apps/extension/src/settings/sections/quick-actions/test-helpers.tsx')
+    resolveCoverageThreshold(
+      'apps/extension/src/settings/sections/capture/quick-actions/test-helpers.tsx'
+    )
   ).toBeNull();
 });
 

@@ -16,6 +16,9 @@ export function BorderPresetEditor(props: BorderPresetEditorProps) {
       isSaving={props.isSaving ?? false}
       onClose={props.onClose}
       state={state}
+      {...(props.linkedTemplateOptions
+        ? { linkedTemplateOptions: props.linkedTemplateOptions }
+        : {})}
       {...(props.preset === undefined ? {} : { preset: props.preset })}
     />
   );

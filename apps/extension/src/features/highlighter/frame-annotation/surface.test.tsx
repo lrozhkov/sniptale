@@ -113,6 +113,7 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
       />
       <FrameAnnotationDistortionFilter scale={4} />
       <FrameAnnotationFocusSurface
+        blurAmount={9}
         frames={[{ ...borderless, effectMode: 'focus' }]}
         height={200}
         opacity={-1}
@@ -125,6 +126,7 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   );
   expect(effects).toContain('sniptale-distortion-filter');
   expect(effects).toContain('blur(7px)');
+  expect(effects).toContain('blur(9px)');
   const badge = createDefaultFrameStepBadge();
   const { style, ...plainBadge } = structuredClone(badge);
   expect(style).toBeDefined();
@@ -150,8 +152,13 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
       settings: { ...badge, manualPlacement: { position: 0.5, side: 'right' } },
       zIndex: 2,
       clickable: true,
+      visualScale: 0.5,
     })
-  ).toMatchObject({ boxSizing: 'border-box', right: 0 });
+  ).toMatchObject({
+    boxSizing: 'border-box',
+    left: '100%',
+    transform: expect.stringContaining('scale(0.5)'),
+  });
   for (const side of ['top', 'bottom', 'left'] as const) {
     expect(
       getStepBadgeStyle({
@@ -227,6 +234,34 @@ it('renders ordered border, blur, focus, badge, and callout export surfaces', as
   expect(html).toContain('<b>Body</b>');
   expect(html).toContain('sniptale-step-badge');
   expect(html).toContain('--sniptale-color-surface-base: #ffffff');
+});
+
+it('omits only capture-hidden frame decoration while retaining its number and comment', async () => {
+  const hiddenBorder = {
+    ...border,
+    effects: {
+      ...border.effects!,
+      capture: { hideFrame: true },
+    },
+  };
+  const html = await renderExportSurface({
+    baseImageUrl: 'blob:base',
+    height: 300,
+    snapshots: [
+      {
+        ...frame(),
+        borderSettings: hiddenBorder,
+        callout: createDefaultFrameCallout(),
+        stepBadge: createDefaultFrameStepBadge(),
+      },
+    ],
+    width: 500,
+  });
+
+  expect(html).not.toContain('sniptale-interactive-frame-fill');
+  expect(html).not.toContain('sniptale-interactive-frame-stroke');
+  expect(html).toContain('sniptale-step-badge');
+  expect(html).toContain('sniptale-callout');
 });
 
 it('covers callout badge fallbacks and disabled/measurement variants', () => {

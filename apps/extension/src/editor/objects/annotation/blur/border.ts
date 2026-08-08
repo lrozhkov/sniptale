@@ -1,7 +1,6 @@
 import type { FabricObject } from 'fabric';
 import type { BlurSettings } from '../../../../features/highlighter/contracts';
 import { DEFAULT_BLUR_SETTINGS } from '../../../../features/highlighter/style/defaults';
-import { hexToRgba } from '../../../document/model';
 import type { BlurRuntimeObject } from './types';
 import { createObjectFactoryStrokeDashArray } from '../../stroke-dash';
 
@@ -46,13 +45,6 @@ function resolveShadow(value: unknown): NonNullable<BlurSettings['shadow']> {
   return Math.max(0, Math.round(resolveFiniteNumber(value, DEFAULT_BLUR_SETTINGS.shadow ?? 0)));
 }
 
-function resolveStrokeOpacity(value: unknown): number {
-  return Math.min(
-    1,
-    Math.max(0, resolveFiniteNumber(value, DEFAULT_BLUR_SETTINGS.strokeOpacity ?? 1))
-  );
-}
-
 export function applyBlurBorderStyle(object: BlurRuntimeObject, settings: BlurSettings): void {
   const radius = resolveRadius(settings.radius);
 
@@ -82,12 +74,11 @@ export function getBlurFrameStyle(settings: BlurSettings): {
   const strokeWidth = resolveStrokeWidth(settings.strokeWidth);
   const visible = (settings.showBorder ?? true) && strokeWidth > 0;
   const strokeStyle = resolveStrokeStyle(settings.strokeStyle);
-  const strokeOpacity = resolveStrokeOpacity(settings.strokeOpacity);
 
   return {
     radius: resolveRadius(settings.radius),
     shadow: resolveShadow(settings.shadow),
-    stroke: hexToRgba(strokeColor, strokeOpacity),
+    stroke: strokeColor,
     strokeColor,
     strokeDashArray: createObjectFactoryStrokeDashArray(strokeStyle, strokeWidth, {
       dashDotGapMultiplier: 1.9,
@@ -105,7 +96,7 @@ export function applyBlurBorderMetadata(object: BlurRuntimeObject, settings: Blu
   delete object.sniptaleShapeStrokeStyle;
   object.sniptaleShapeRadius = resolveRadius(settings.radius);
   object.sniptaleShapeShadow = resolveShadow(settings.shadow);
-  object.sniptaleShapeStrokeOpacity = resolveStrokeOpacity(settings.strokeOpacity);
+  delete object.sniptaleShapeStrokeOpacity;
   object.sniptaleShapeFillOpacity = 0;
   object.sniptaleShapeCustomCss = '';
   object.sniptaleShapeInheritCustomCss = false;
@@ -117,7 +108,6 @@ export function getBlurBorderSettings(object: FabricObject) {
     radius: resolveRadius(object.sniptaleShapeRadius),
     shadow: resolveShadow(object.sniptaleShapeShadow),
     strokeColor: resolveStrokeColor(object.sniptaleBlurStrokeColor),
-    strokeOpacity: resolveStrokeOpacity(object.sniptaleShapeStrokeOpacity),
     strokeStyle: resolveStrokeStyle(
       object.sniptaleBlurStrokeStyle ?? object.sniptaleShapeStrokeStyle
     ),

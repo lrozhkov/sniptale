@@ -6,7 +6,7 @@ import {
   ProductGlassPresetList,
   ProductGlassPresetMeta,
 } from '@sniptale/ui/product-glass-controls';
-import { Eye, EyeOff, RotateCcw, Settings2 } from 'lucide-react';
+import { CopyPlus, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { getStepBadgePresetDisplayName } from '../../../features/highlighter/step-badge-presets/display-name';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { PresetNameWithOverflowHint } from '../../../ui/compact-inspector-controls/overflow-hint';
@@ -17,7 +17,7 @@ export function StepBadgePresetSection(props: {
   activePresetId?: string;
   error: string | null;
   onApply: (preset: StepBadgePreset) => void;
-  onConfigure: (preset: StepBadgePreset) => void;
+  onFork: (preset: StepBadgePreset) => void;
   onReset: (preset: StepBadgePreset) => void;
   onToggle: (preset: StepBadgePreset) => void;
   pending: ReadonlySet<string>;
@@ -29,7 +29,7 @@ export function StepBadgePresetSection(props: {
   const orderedPresets = useOpeningPresetOrder(presets, props.activePresetId);
   return (
     <ContentPopoverSection>
-      <ProductGlassPresetList scrollable>
+      <ProductGlassPresetList scrollable variant="menu">
         {orderedPresets.map((preset) => {
           const disabled = preset.enabled === false;
           const pending = props.pending.has(preset.id);
@@ -43,6 +43,7 @@ export function StepBadgePresetSection(props: {
                 active={props.activePresetId === preset.id}
                 disabled={disabled}
                 onClick={() => props.onApply(preset)}
+                showActiveIndicator
               >
                 <StepBadgePresetPreview compact settings={preset.settings} />
                 <ProductGlassPresetMeta>
@@ -52,15 +53,18 @@ export function StepBadgePresetSection(props: {
                 </ProductGlassPresetMeta>
               </ProductGlassPresetItem>
               <span className="sniptale-callout-preset-actions">
-                <button
-                  className="sniptale-callout-preset-action"
-                  disabled={pending}
-                  onClick={() => props.onConfigure(preset)}
-                  title={translate('content.stepBadge.configurePreset')}
-                  type="button"
-                >
-                  <Settings2 size={15} />
-                </button>
+                {props.activePresetId === preset.id ? (
+                  <button
+                    aria-label={translate('content.templateFork.fork')}
+                    className="sniptale-callout-preset-action"
+                    disabled={pending}
+                    onClick={() => props.onFork(preset)}
+                    title={translate('content.templateFork.fork')}
+                    type="button"
+                  >
+                    <CopyPlus size={15} />
+                  </button>
+                ) : null}
                 {preset.origin === 'system' && preset.customized === true ? (
                   <button
                     className="sniptale-callout-preset-action"

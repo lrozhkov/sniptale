@@ -197,7 +197,9 @@ it('opens the size-preset settings section from the selector management action',
   ).toBe(true);
 
   act(() => manageButton?.click());
-  expect(runtimeMocks.openSettingsPage).toHaveBeenCalledWith({ section: 'presets' });
+  expect(runtimeMocks.openSettingsPage).toHaveBeenCalledWith({
+    route: { section: 'screen-sizes' },
+  });
 });
 
 it('selects native size when the native curtain option is clicked', async () => {

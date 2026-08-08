@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
 import { getAbsolutePosition } from '../../../platform/frame';
+import { resolveContentUiViewport } from '@sniptale/ui/floating-interactions/scale';
 
 const POPOVER_WIDTH = 480;
 export const DESIGN_REVIEW_POPOVER_VIEWPORT_GAP = 12;
@@ -64,17 +65,18 @@ export function resolveDesignReviewPopoverPosition(
 }
 
 export function readDesignReviewPopoverTargetRect(
-  element: Element | null
+  element: Element | null,
+  uiScale = 1
 ): PopoverTargetRect | null {
   if (!element) return null;
   try {
     const position = getAbsolutePosition(element);
     return position.width > 0 || position.height > 0
       ? {
-          bottom: position.y + position.height,
-          left: position.x,
-          right: position.x + position.width,
-          top: position.y,
+          bottom: (position.y + position.height) / uiScale,
+          left: position.x / uiScale,
+          right: (position.x + position.width) / uiScale,
+          top: position.y / uiScale,
         }
       : null;
   } catch {
@@ -86,6 +88,7 @@ export function useDesignReviewPopoverMetrics(args: {
   active: boolean;
   elementRef: RefObject<HTMLElement | null>;
   measurementKey: string;
+  uiScale?: number;
 }): PopoverMetrics | null {
   const [metrics, setMetrics] = useState<PopoverMetrics | null>(null);
 
@@ -98,10 +101,16 @@ export function useDesignReviewPopoverMetrics(args: {
 
     const measure = () => {
       const rect = element.getBoundingClientRect();
+      const uiScale = args.uiScale ?? 1;
+      const viewport = resolveContentUiViewport({
+        clientHeight: window.innerHeight,
+        clientWidth: window.innerWidth,
+        scale: uiScale,
+      });
       const next = {
-        height: rect.height,
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
+        height: rect.height / uiScale,
+        viewportHeight: viewport.height,
+        viewportWidth: viewport.width,
       };
       setMetrics((current) =>
         current?.height === next.height &&
@@ -122,7 +131,7 @@ export function useDesignReviewPopoverMetrics(args: {
       window.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('resize', measure);
     };
-  }, [args.active, args.elementRef, args.measurementKey]);
+  }, [args.active, args.elementRef, args.measurementKey, args.uiScale]);
 
   return metrics;
 }

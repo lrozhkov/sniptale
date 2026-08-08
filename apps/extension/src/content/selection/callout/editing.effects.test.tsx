@@ -39,12 +39,14 @@ function FocusEffectHarness(props: {
 function BlurRequestHarness(props: {
   finishEditing: (editableElement?: HTMLDivElement | null) => void;
   frameId: string;
+  isEditing?: boolean;
 }) {
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
   useCalloutBlurRequestEffect({
     contentEditableRef,
     finishEditing: props.finishEditing,
     frameId: props.frameId,
+    isEditing: props.isEditing ?? true,
   });
 
   return <div ref={contentEditableRef} contentEditable suppressContentEditableWarning />;
@@ -79,11 +81,12 @@ function EscapeCaptureHarness(props: {
   );
 }
 
-function RestoredContentMeasureHarness(props: { htmlContent: string }) {
+function RestoredContentMeasureHarness(props: { htmlContent: string; measurementScale?: number }) {
   const editing = useCalloutEditing({
     frameId: 'restored-frame',
     htmlContent: props.htmlContent,
     isEditing: false,
+    ...(props.measurementScale === undefined ? {} : { measurementScale: props.measurementScale }),
     onContentChange: vi.fn(),
     onDelete: vi.fn(),
     onStartEditing: vi.fn(),
@@ -378,6 +381,22 @@ describe('useCalloutBlurRequestEffect', () => {
     expect(finishEditing).toHaveBeenCalledWith(editable);
     expect(blurSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores matching blur requests for inactive comments on the same frame', () => {
+    const finishEditing = vi.fn();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <BlurRequestHarness finishEditing={finishEditing} frameId="frame-1" isEditing={false} />
+      );
+    });
+    act(() => dispatchCalloutBlurRequest({ frameId: 'frame-1' }));
+
+    expect(finishEditing).not.toHaveBeenCalled();
+  });
 });
 
 describe('restored callout measurement', () => {
@@ -399,6 +418,32 @@ describe('restored callout measurement', () => {
     expect(container.querySelector('[data-ui="restored-callout"]')?.textContent).toContain(
       'restored comment'
     );
+    expect(container.querySelector('[data-ui="measured-width"]')?.textContent).toBe('180');
+    rectSpy.mockRestore();
+  });
+
+  it('remeasures the rendered cloud when page zoom compensation changes', () => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let renderedWidth = 180;
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(() => new DOMRect(0, 0, renderedWidth, 48));
+
+    act(() => {
+      root?.render(
+        <RestoredContentMeasureHarness htmlContent="scaled comment" measurementScale={1} />
+      );
+    });
+    expect(container.querySelector('[data-ui="measured-width"]')?.textContent).toBe('180');
+
+    renderedWidth = 90;
+    act(() => {
+      root?.render(
+        <RestoredContentMeasureHarness htmlContent="scaled comment" measurementScale={0.5} />
+      );
+    });
     expect(container.querySelector('[data-ui="measured-width"]')?.textContent).toBe('180');
     rectSpy.mockRestore();
   });

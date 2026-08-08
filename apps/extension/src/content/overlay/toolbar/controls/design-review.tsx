@@ -1,5 +1,5 @@
-import { MessageCircle } from 'lucide-react';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
+import { FeedbackCollectionIcon } from '../../design-review/icons';
 import { translate } from '../../../../platform/i18n';
 import { AnnotationExportMenu } from '../design-review/export-menu';
 import type { ToolbarMenuState } from '../state/menu';
@@ -27,7 +27,7 @@ export function ToolbarDesignReviewControls(props: {
             : 'content.designReview.showFeedbackPanel'
         )}
       >
-        <MessageCircle size={20} strokeWidth={2} />
+        <FeedbackCollectionIcon size={20} strokeWidth={2} />
       </ContentToolbarButton>
       <AnnotationExportMenu
         compactMenus={props.compactMenus}

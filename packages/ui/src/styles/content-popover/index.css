@@ -70,6 +70,38 @@
   box-shadow: none;
 }
 
+.sniptale-content-popover .sniptale-glass-preset-list--menu .sniptale-glass-preset-item {
+  border-color: transparent;
+  background: transparent;
+}
+
+.sniptale-content-popover .sniptale-glass-preset-list--menu .sniptale-glass-preset-item:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 78%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 82%, transparent);
+}
+
+.sniptale-content-popover .sniptale-glass-preset-list--menu .sniptale-glass-preset-item--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 20%,
+    var(--sniptale-color-border-soft) 80%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 88%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-content-popover
+  .sniptale-glass-preset-list--menu
+  .sniptale-glass-preset-item--active:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 28%,
+    var(--sniptale-color-border-soft) 72%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 94%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
 .sniptale-content-popover .sniptale-glass-switch {
   width: 38px;
   min-width: 38px;

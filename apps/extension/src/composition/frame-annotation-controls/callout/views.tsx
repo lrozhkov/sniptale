@@ -6,7 +6,7 @@ import {
   ProductGlassPresetList,
   ProductGlassPresetMeta,
 } from '@sniptale/ui/product-glass-controls';
-import { Eye, EyeOff, RotateCcw, Settings2 } from 'lucide-react';
+import { CopyPlus, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { getCalloutPresetDisplayName } from '../../../features/highlighter/callout-presets/display-name';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { CalloutPresetPreview } from '../../../ui/highlighter-preset-editor/callout/thumbnail';
@@ -21,7 +21,7 @@ import { useOpeningPresetOrder } from '../popover/preset-order';
 export function CalloutPresetSection(props: {
   activePresetId?: string;
   onApplyPreset: (preset: CalloutPreset) => void;
-  onCustomizePreset: (preset: CalloutPreset) => void;
+  onForkPreset: (preset: CalloutPreset) => void;
   onResetPreset?: ((preset: CalloutPreset) => void) | undefined;
   onTogglePreset: (preset: CalloutPreset) => void;
   pendingPresetIds: ReadonlySet<string>;
@@ -34,7 +34,7 @@ export function CalloutPresetSection(props: {
   const orderedPresets = useOpeningPresetOrder(props.presets, props.activePresetId);
   return (
     <ContentPopoverSection dataUi="content.callout-settings.presets-section">
-      <ProductGlassPresetList className="sniptale-callout-preset-list" scrollable>
+      <ProductGlassPresetList className="sniptale-callout-preset-list" scrollable variant="menu">
         {orderedPresets.map((preset) => {
           const pending = props.pendingPresetIds.has(preset.id);
           const disabled = preset.enabled === false;
@@ -49,6 +49,7 @@ export function CalloutPresetSection(props: {
                 active={props.activePresetId === preset.id}
                 disabled={disabled}
                 onClick={() => props.onApplyPreset(preset)}
+                showActiveIndicator
               >
                 <CalloutPresetPreview
                   compact
@@ -60,16 +61,18 @@ export function CalloutPresetSection(props: {
                 </ProductGlassPresetMeta>
               </ProductGlassPresetItem>
               <span className="sniptale-callout-preset-actions">
-                <button
-                  aria-label={translate('content.callout.configurePreset')}
-                  className="sniptale-callout-preset-action"
-                  disabled={pending}
-                  onClick={() => props.onCustomizePreset(preset)}
-                  title={translate('content.callout.configurePreset')}
-                  type="button"
-                >
-                  <Settings2 size={15} />
-                </button>
+                {props.activePresetId === preset.id ? (
+                  <button
+                    aria-label={translate('content.templateFork.fork')}
+                    className="sniptale-callout-preset-action"
+                    disabled={pending}
+                    onClick={() => props.onForkPreset(preset)}
+                    title={translate('content.templateFork.fork')}
+                    type="button"
+                  >
+                    <CopyPlus size={15} />
+                  </button>
+                ) : null}
                 {preset.origin === 'system' && preset.customized === true && props.onResetPreset ? (
                   <button
                     aria-label={translate('highlighter.calloutPresets.reset')}

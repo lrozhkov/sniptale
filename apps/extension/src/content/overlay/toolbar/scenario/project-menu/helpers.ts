@@ -7,6 +7,11 @@ import {
   useContentPortalTheme,
   Z_INDEX_FLOATING_UI,
 } from '../../../../selection/interactive-frame/layout/portal';
+import { useContentUiScale } from '../../../../platform/dom-host';
+import {
+  projectClientRectToContentUi,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
 
 const SCENARIO_PROJECT_MENU_WIDTH = 352;
 const MENU_VIEWPORT_PADDING = 16;
@@ -15,6 +20,12 @@ const MENU_VERTICAL_GAP = 12;
 const MENU_MAX_HEIGHT_PADDING = 24;
 const SIDEBAR_RESERVED_WIDTH = 348;
 const MENU_HEIGHT_ESTIMATE = 420;
+type ScenarioProjectMenuAnchorRect = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
 
 export function useScenarioProjectMenuDismissal(params: {
   isOpen: boolean;
@@ -61,9 +72,12 @@ export function useScenarioProjectMenuDismissal(params: {
   }, [isOpen, menuRef, onClose, triggerRef]);
 }
 
-function resolveScenarioProjectMenuTop(anchorRect: DOMRect): number {
+function resolveScenarioProjectMenuTop(
+  anchorRect: ScenarioProjectMenuAnchorRect,
+  viewportHeight: number
+): number {
   const preferredTop = anchorRect.bottom + MENU_VERTICAL_GAP;
-  const maxTop = window.innerHeight - MENU_HEIGHT_ESTIMATE - MENU_VIEWPORT_PADDING;
+  const maxTop = viewportHeight - MENU_HEIGHT_ESTIMATE - MENU_VIEWPORT_PADDING;
 
   if (preferredTop <= maxTop) {
     return preferredTop;
@@ -72,12 +86,16 @@ function resolveScenarioProjectMenuTop(anchorRect: DOMRect): number {
   return Math.max(MENU_VIEWPORT_PADDING, anchorRect.top - MENU_HEIGHT_ESTIMATE - MENU_VERTICAL_GAP);
 }
 
-function resolveScenarioProjectMenuLeft(anchorRect: DOMRect, sidebarVisible: boolean): number {
+function resolveScenarioProjectMenuLeft(
+  anchorRect: ScenarioProjectMenuAnchorRect,
+  sidebarVisible: boolean,
+  viewportWidth: number
+): number {
   const reservedRight = sidebarVisible ? SIDEBAR_RESERVED_WIDTH : 0;
   const minLeft = MENU_VIEWPORT_PADDING;
   const maxLeft = Math.max(
     minLeft,
-    window.innerWidth - reservedRight - SCENARIO_PROJECT_MENU_WIDTH - MENU_VIEWPORT_PADDING
+    viewportWidth - reservedRight - SCENARIO_PROJECT_MENU_WIDTH - MENU_VIEWPORT_PADDING
   );
   const preferredLeft = anchorRect.right - SCENARIO_PROJECT_MENU_WIDTH;
 
@@ -92,27 +110,31 @@ function clampValue(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function resolveVerticalScenarioProjectMenuTop(anchorRect: DOMRect): number {
+function resolveVerticalScenarioProjectMenuTop(
+  anchorRect: ScenarioProjectMenuAnchorRect,
+  viewportHeight: number
+): number {
   return clampValue(
     anchorRect.top,
     MENU_VIEWPORT_PADDING,
-    window.innerHeight - MENU_HEIGHT_ESTIMATE - MENU_VIEWPORT_PADDING
+    viewportHeight - MENU_HEIGHT_ESTIMATE - MENU_VIEWPORT_PADDING
   );
 }
 
 function resolveVerticalScenarioProjectMenuLeft(
-  anchorRect: DOMRect,
-  sidebarVisible: boolean
+  anchorRect: ScenarioProjectMenuAnchorRect,
+  sidebarVisible: boolean,
+  viewportWidth: number
 ): number {
   const reservedRight = sidebarVisible ? SIDEBAR_RESERVED_WIDTH : 0;
   const minLeft = MENU_VIEWPORT_PADDING;
   const maxLeft = Math.max(
     minLeft,
-    window.innerWidth - reservedRight - SCENARIO_PROJECT_MENU_WIDTH - MENU_VIEWPORT_PADDING
+    viewportWidth - reservedRight - SCENARIO_PROJECT_MENU_WIDTH - MENU_VIEWPORT_PADDING
   );
   const preferredRightLeft = anchorRect.right + MENU_SIDE_GAP;
   const preferredLeftLeft = anchorRect.left - SCENARIO_PROJECT_MENU_WIDTH - MENU_SIDE_GAP;
-  const spaceRight = window.innerWidth - reservedRight - anchorRect.right - MENU_VIEWPORT_PADDING;
+  const spaceRight = viewportWidth - reservedRight - anchorRect.right - MENU_VIEWPORT_PADDING;
   const spaceLeft = anchorRect.left - MENU_VIEWPORT_PADDING;
 
   if (spaceRight >= SCENARIO_PROJECT_MENU_WIDTH || spaceRight >= spaceLeft) {
@@ -123,20 +145,30 @@ function resolveVerticalScenarioProjectMenuLeft(
 }
 
 function resolveScenarioProjectMenuPosition(params: {
-  anchorRect: DOMRect;
+  anchorRect: ScenarioProjectMenuAnchorRect;
   displayMode: ContentToolbarDisplayMode;
   sidebarVisible: boolean;
+  viewportHeight: number;
+  viewportWidth: number;
 }) {
   if (params.displayMode === 'vertical') {
     return {
-      left: resolveVerticalScenarioProjectMenuLeft(params.anchorRect, params.sidebarVisible),
-      top: resolveVerticalScenarioProjectMenuTop(params.anchorRect),
+      left: resolveVerticalScenarioProjectMenuLeft(
+        params.anchorRect,
+        params.sidebarVisible,
+        params.viewportWidth
+      ),
+      top: resolveVerticalScenarioProjectMenuTop(params.anchorRect, params.viewportHeight),
     };
   }
 
   return {
-    left: resolveScenarioProjectMenuLeft(params.anchorRect, params.sidebarVisible),
-    top: resolveScenarioProjectMenuTop(params.anchorRect),
+    left: resolveScenarioProjectMenuLeft(
+      params.anchorRect,
+      params.sidebarVisible,
+      params.viewportWidth
+    ),
+    top: resolveScenarioProjectMenuTop(params.anchorRect, params.viewportHeight),
   };
 }
 
@@ -148,6 +180,7 @@ export function useScenarioProjectMenuStyle(params: {
 }) {
   const { anchorEl, displayMode, isOpen, sidebarVisible } = params;
   const theme = useContentPortalTheme(anchorEl);
+  const uiScale = useContentUiScale();
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
 
   useLayoutEffect(() => {
@@ -157,16 +190,39 @@ export function useScenarioProjectMenuStyle(params: {
     }
 
     const updateMenuStyle = () => {
-      const anchorRect = anchorEl.getBoundingClientRect();
+      const clientRect = anchorEl.getBoundingClientRect();
+      const projectedRect = projectClientRectToContentUi(
+        {
+          x: clientRect.left,
+          y: clientRect.top,
+          width: clientRect.width,
+          height: clientRect.height,
+        },
+        uiScale
+      );
+      const anchorRect = {
+        ...projectedRect,
+        bottom: projectedRect.y + projectedRect.height,
+        left: projectedRect.x,
+        right: projectedRect.x + projectedRect.width,
+        top: projectedRect.y,
+      };
+      const viewport = resolveContentUiViewport({
+        clientHeight: window.innerHeight,
+        clientWidth: window.innerWidth,
+        scale: uiScale,
+      });
       const position = resolveScenarioProjectMenuPosition({
         anchorRect,
         displayMode,
         sidebarVisible,
+        viewportHeight: viewport.height,
+        viewportWidth: viewport.width,
       });
       const nextStyle = getThemedPortalStyle(theme, {
         position: 'fixed',
-        top: position.top,
-        left: position.left,
+        top: position.top * uiScale,
+        left: position.left * uiScale,
         width: SCENARIO_PROJECT_MENU_WIDTH,
         maxHeight: `calc(100vh - ${MENU_MAX_HEIGHT_PADDING * 2}px)`,
         overflowY: 'auto',
@@ -186,7 +242,7 @@ export function useScenarioProjectMenuStyle(params: {
       window.removeEventListener('resize', updateMenuStyle);
       document.removeEventListener('scroll', updateMenuStyle, true);
     };
-  }, [anchorEl, displayMode, isOpen, sidebarVisible, theme]);
+  }, [anchorEl, displayMode, isOpen, sidebarVisible, theme, uiScale]);
 
   return menuStyle;
 }

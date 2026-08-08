@@ -10,9 +10,15 @@ import {
   DEFAULT_BORDER_PRESET,
 } from '../../features/highlighter/style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import {
+  getFrameCallout,
+  removeFrameCallout,
+  setFrameCallout,
+} from '../../features/highlighter/frame-annotation/callout/collection';
 
 export type ProjectionSettingsMenu = 'callout' | 'effect' | 'step' | null;
 export function FrameProjectionSettings(props: {
+  activeCalloutIndex: number;
   anchor: HTMLButtonElement | null;
   controlsRoot: HTMLDivElement;
   menu: ProjectionSettingsMenu;
@@ -24,29 +30,29 @@ export function FrameProjectionSettings(props: {
   onReorder: (direction: 'up' | 'down') => void;
   onDraftCommit: () => void;
 }) {
+  const activeCallout = getFrameCallout(props.snapshot, props.activeCalloutIndex);
   const closeDraft = () => {
     props.onDraftCommit();
     props.close();
   };
   return (
     <>
-      {props.snapshot.callout?.enabled ? (
+      {activeCallout?.enabled ? (
         <FutureCalloutSettingsPopover
           anchorEl={props.anchor}
           headerContext="element"
           isOpen={props.menu === 'callout'}
-          onChange={(callout) => props.onPreview({ ...props.snapshot, callout })}
+          onChange={(callout) =>
+            props.onPreview(setFrameCallout(props.snapshot, props.activeCalloutIndex, callout))
+          }
           onClose={closeDraft}
           onDisable={() => {
-            props.onChange({
-              ...props.snapshot,
-              callout: { ...props.snapshot.callout!, enabled: false },
-            });
+            props.onChange(removeFrameCallout(props.snapshot, props.activeCalloutIndex));
             props.close();
           }}
           portalTarget={props.controlsRoot}
-          resetKey={props.snapshot.id}
-          settings={props.snapshot.callout}
+          resetKey={`${props.snapshot.id}:${activeCallout.instanceId ?? props.activeCalloutIndex}`}
+          settings={activeCallout}
         />
       ) : null}
       <FrameAnnotationCreationFramePopover
@@ -76,9 +82,6 @@ export function FrameProjectionSettings(props: {
             ...(props.snapshot.borderSettings?.fillColor
               ? { fillColor: props.snapshot.borderSettings.fillColor }
               : {}),
-            ...(props.snapshot.borderSettings?.fillOpacity === undefined
-              ? {}
-              : { fillOpacity: props.snapshot.borderSettings.fillOpacity }),
           }}
           headerContext="element"
           isOpen={props.menu === 'step'}

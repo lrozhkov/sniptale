@@ -110,6 +110,25 @@ describe('ContentPopoverAdapter', () => {
     verifyPortalTargetRender();
   });
 
+  it('renders detached modal content as a sibling rather than inside the scaled popover', () => {
+    act(() => {
+      root?.render(
+        <ContentPopoverAdapter
+          isOpen
+          anchorEl={anchorEl}
+          portalTarget={portalTarget}
+          detachedChildren={<div data-testid="detached-editor">Editor</div>}
+        >
+          <div>Popover</div>
+        </ContentPopoverAdapter>
+      );
+    });
+
+    const editor = portalTarget?.querySelector('[data-testid="detached-editor"]');
+    expect(editor).not.toBeNull();
+    expect(editor?.closest('.sniptale-content-popover')).toBeNull();
+  });
+
   it('falls back to the resolved portal target and merges explicit style with the theme', () => {
     verifyFallbackPortalRender();
   });

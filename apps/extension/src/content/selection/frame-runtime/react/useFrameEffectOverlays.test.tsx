@@ -179,13 +179,15 @@ async function expectSuspensionKeepsEffectsActive() {
   expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(
     frames,
     expect.any(Object),
-    expect.any(Map)
+    expect.any(Map),
+    1
   );
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
     frames,
     expect.any(Object),
     expect.any(Function),
-    expect.any(Function)
+    expect.any(Function),
+    1
   );
 
   await renderHarness(
@@ -199,13 +201,15 @@ async function expectSuspensionKeepsEffectsActive() {
   expect(domMocks.updateFocusOverlayMask).toHaveBeenLastCalledWith(
     frames,
     expect.any(Object),
-    expect.any(Map)
+    expect.any(Map),
+    1
   );
   expect(domMocks.updateBlurOverlayNodes).toHaveBeenLastCalledWith(
     frames,
     expect.any(Object),
     expect.any(Function),
-    expect.any(Function)
+    expect.any(Function),
+    1
   );
 }
 

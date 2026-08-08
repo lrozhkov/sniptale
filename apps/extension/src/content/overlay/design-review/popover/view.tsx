@@ -14,6 +14,7 @@ import {
   resolveDesignReviewPopoverPosition,
   useDesignReviewPopoverMetrics,
 } from './position';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void }) {
   return (
@@ -51,28 +52,29 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
   );
 }
 
-export function DesignReviewPopover(props: {
-  actions: DesignReviewActions;
-  open: boolean;
-  state: DesignReviewViewState;
-}) {
+function useDesignReviewPopoverViewModel(props: { open: boolean; state: DesignReviewViewState }) {
   const [deleteRequested, setDeleteRequested] = useState(false);
   const popoverRef = useRef<HTMLElement | null>(null);
   const containedPopoverRef = useFloatingSurfaceWheelContainment(popoverRef);
   const previousSelectionRef = useRef<Element | null>(null);
   const selectionElement = props.state.selection?.element ?? null;
+  const uiScale = useContentUiScale();
   const active = Boolean(props.open && props.state.anchor && props.state.selection);
   const metrics = useDesignReviewPopoverMetrics({
     active,
     elementRef: popoverRef,
     measurementKey: `${props.state.selection?.domPath ?? ''}:${props.state.settingsOpen}:${deleteRequested}`,
+    uiScale,
   });
+  const anchor = props.state.anchor
+    ? { x: props.state.anchor.x / uiScale, y: props.state.anchor.y / uiScale }
+    : null;
   const basePosition = resolveDesignReviewPopoverPosition(
-    props.state.anchor ?? {
+    anchor ?? {
       x: DESIGN_REVIEW_POPOVER_VIEWPORT_GAP,
       y: DESIGN_REVIEW_POPOVER_VIEWPORT_GAP,
     },
-    readDesignReviewPopoverTargetRect(selectionElement),
+    readDesignReviewPopoverTargetRect(selectionElement, uiScale),
     props.state.settingsOpen,
     metrics
   );
@@ -82,6 +84,7 @@ export function DesignReviewPopover(props: {
     geometryKey: metrics?.height ?? 0,
     popoverRef,
     resetKey: selectionElement,
+    uiScale,
   });
 
   useEffect(() => {
@@ -95,21 +98,43 @@ export function DesignReviewPopover(props: {
     }
   }, [props.open, selectionElement]);
 
+  return {
+    basePosition,
+    containedPopoverRef,
+    deleteRequested,
+    drag,
+    setDeleteRequested,
+    uiScale,
+  };
+}
+
+export function DesignReviewPopover(props: {
+  actions: DesignReviewActions;
+  open: boolean;
+  state: DesignReviewViewState;
+}) {
+  const view = useDesignReviewPopoverViewModel(props);
+
   if (!props.open || !props.state.anchor || !props.state.selection) {
     return null;
   }
 
   return (
     <aside
-      ref={containedPopoverRef}
+      ref={view.containedPopoverRef}
       data-ui="content.design-review.popover"
       className={[
-        'pointer-events-auto fixed z-[2147483646] max-h-[calc(100vh-24px)] cursor-default overflow-visible',
+        'pointer-events-auto fixed z-[2147483646] cursor-default overflow-visible',
         'rounded-[12px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
-      style={{ left: drag.position.left, top: drag.position.top, width: basePosition.width }}
+      style={{
+        left: view.drag.position.left * view.uiScale,
+        top: view.drag.position.top * view.uiScale,
+        width: view.basePosition.width,
+        maxHeight: 'calc(var(--sniptale-content-ui-viewport-height) - 24px)',
+      }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
@@ -131,17 +156,17 @@ export function DesignReviewPopover(props: {
       <div
         className="grid grid-rows-[auto_minmax(0,1fr)] overflow-visible"
         data-ui="content.design-review.popover-layout"
-        style={{ maxHeight: basePosition.maxHeight }}
+        style={{ maxHeight: view.basePosition.maxHeight }}
       >
         <div className="relative z-20 p-3 pb-2 pt-4" data-ui="content.design-review.comment-layer">
           <div
             className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
             data-ui="content.design-review.popover-drag-handle"
             title={translate('content.designReview.movePopover')}
-            onPointerDown={drag.onPointerDown}
-            onPointerMove={drag.onPointerMove}
-            onPointerUp={drag.onPointerUp}
-            onPointerCancel={drag.onPointerUp}
+            onPointerDown={view.drag.onPointerDown}
+            onPointerMove={view.drag.onPointerMove}
+            onPointerUp={view.drag.onPointerUp}
+            onPointerCancel={view.drag.onPointerUp}
           />
           <PageStyleCommentField
             actions={{
@@ -164,23 +189,26 @@ export function DesignReviewPopover(props: {
           <DesignReviewElementBar
             onCopyElement={() => void props.actions.copyElement()}
             onCopyPath={() => void props.actions.copyPath()}
-            onDeleteRequest={() => setDeleteRequested(true)}
+            onDeleteRequest={() => view.setDeleteRequested(true)}
             onSettingsOpenChange={props.actions.setSettingsOpen}
             selection={props.state.selection}
             settingsOpen={props.state.settingsOpen}
           />
-          {deleteRequested ? (
+          {view.deleteRequested ? (
             <DeleteConfirmation
-              onCancel={() => setDeleteRequested(false)}
+              onCancel={() => view.setDeleteRequested(false)}
               onConfirm={props.actions.delete}
             />
           ) : null}
           {props.state.settingsOpen ? (
             <div
               className={[
-                'max-h-[min(52vh,32rem)] overflow-y-auto border-t',
+                'overflow-y-auto border-t',
                 'border-[color:var(--sniptale-color-border-soft)]',
               ].join(' ')}
+              style={{
+                maxHeight: 'min(calc(var(--sniptale-content-ui-viewport-height) * 0.52), 32rem)',
+              }}
             >
               <DesignReviewSettings actions={props.actions} disabled={false} state={props.state} />
             </div>

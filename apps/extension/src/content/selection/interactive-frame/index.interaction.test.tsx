@@ -10,6 +10,19 @@ import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { InteractiveFrame } from '.';
 import { queryAllContentUiElements, queryContentUiElement } from '../../platform/dom-host';
 import { translate } from '../../../platform/i18n';
+import { createCalloutSettingsFixture } from '../frame-runtime/test-support';
+import {
+  addCalloutDeleteListener,
+  addCalloutPopoverSettingsChangedListener,
+  addFrameCalloutChangedListener,
+} from '../../platform/page-context/frame-events';
+import { createDefaultFrameCallout } from '../../../features/highlighter/frame-annotation/defaults';
+import { applyCalloutSettingsPatch } from '../../../features/highlighter/frame-annotation/callout/model';
+import {
+  getFrameCallout,
+  removeFrameCallout,
+  setFrameCallout,
+} from '../../../features/highlighter/frame-annotation/callout/collection';
 
 const highlighterMocks = vi.hoisted(() => ({
   clearFrameEditing: vi.fn(),
@@ -28,6 +41,7 @@ vi.mock('../highlighter', async (importOriginal) => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let deferredFrameUpdates: FrameData[] = [];
 
 function createFrame(): FrameData {
   return {
@@ -61,6 +75,117 @@ function renderFrame(props?: Partial<React.ComponentProps<typeof InteractiveFram
   });
 
   return { frame, onDelete, onUpdate };
+}
+
+function ControlledCalloutFrame() {
+  const [frame, setFrame] = React.useState(createFrame);
+
+  React.useEffect(
+    () =>
+      addFrameCalloutChangedListener(({ frameId, settings }) => {
+        if (frameId !== frame.id) return;
+        setFrame((current) => ({
+          ...current,
+          callout: applyCalloutSettingsPatch(
+            current.callout ?? createDefaultFrameCallout(),
+            settings
+          ),
+        }));
+      }),
+    [frame.id]
+  );
+
+  return <InteractiveFrame frame={frame} zIndex={10} onDelete={vi.fn()} onUpdate={setFrame} />;
+}
+
+function renderControlledCalloutFrame() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(<ControlledCalloutFrame />));
+}
+
+function ControlledCalloutCollectionFrame() {
+  const [frame, setFrame] = React.useState<FrameData>(() => ({
+    ...createFrame(),
+    callout: createDefaultFrameCallout(),
+  }));
+
+  React.useEffect(() => {
+    const removeSettingsListener = addCalloutPopoverSettingsChangedListener(
+      ({ calloutIndex = 0, frameId, settings }) => {
+        if (frameId !== frame.id) return;
+        setFrame((current) => {
+          const callout = getFrameCallout(current, calloutIndex);
+          return callout
+            ? (setFrameCallout(
+                current,
+                calloutIndex,
+                applyCalloutSettingsPatch(callout, settings)
+              ) as FrameData)
+            : current;
+        });
+      }
+    );
+    const removeDeleteListener = addCalloutDeleteListener(({ calloutIndex = 0, frameId }) => {
+      if (frameId !== frame.id) return;
+      setFrame((current) => removeFrameCallout(current, calloutIndex) as FrameData);
+    });
+    return () => {
+      removeSettingsListener();
+      removeDeleteListener();
+    };
+  }, [frame.id]);
+
+  return <InteractiveFrame frame={frame} zIndex={10} onDelete={vi.fn()} onUpdate={setFrame} />;
+}
+
+function renderControlledCalloutCollectionFrame() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(<ControlledCalloutCollectionFrame />));
+}
+
+function DeferredCalloutCollectionFrame() {
+  const [frame, setFrame] = React.useState<FrameData>(() => ({
+    ...createFrame(),
+    callout: createDefaultFrameCallout(),
+  }));
+  const acceptedAdditionalCountRef = React.useRef(0);
+  const deferUpdate = React.useCallback((nextFrame: FrameData) => {
+    deferredFrameUpdates.push(nextFrame);
+    const nextAdditionalCount = nextFrame.additionalCallouts?.length ?? 0;
+    if (nextAdditionalCount > acceptedAdditionalCountRef.current) {
+      acceptedAdditionalCountRef.current = nextAdditionalCount;
+      setFrame(nextFrame);
+      return;
+    }
+    window.setTimeout(() => setFrame(nextFrame), 25);
+  }, []);
+
+  return <InteractiveFrame frame={frame} zIndex={10} onDelete={vi.fn()} onUpdate={deferUpdate} />;
+}
+
+function renderDeferredCalloutCollectionFrame() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(<DeferredCalloutCollectionFrame />));
+}
+
+function enterActiveCalloutText(value: string) {
+  const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
+  expect(editable).toBeInstanceOf(HTMLElement);
+  expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+  act(() => {
+    if (!editable) return;
+    editable.textContent = value;
+    editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+    editable.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' })
+    );
+  });
 }
 
 function findToolbarButton(titlePattern: RegExp): HTMLButtonElement {
@@ -106,6 +231,7 @@ function openFrameSizeEditor() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   useFrameUIStore.getState().reset();
+  deferredFrameUpdates = [];
 });
 
 afterEach(() => {
@@ -116,6 +242,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   useFrameUIStore.getState().reset();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
@@ -148,8 +275,118 @@ describe('InteractiveFrame size edit interactions', () => {
       expect.objectContaining({ x: 115, y: 75, width: 330, height: 190 })
     );
   });
+});
 
-  it('orders toolbar commands in separated frame, annotation, edit, delete, and close groups', () => {
+describe('InteractiveFrame callout collection interactions', () => {
+  it('renders and immediately edits an additional callout from the selected toolbar', () => {
+    const frame = { ...createFrame(), callout: createCalloutSettingsFixture() };
+    const { onUpdate } = renderFrame({ frame });
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+
+    act(() => {
+      findToolbarButton(/Add another comment|Добавить ещё один комментарий/).click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ additionalCallouts: [expect.objectContaining({ enabled: true })] })
+    );
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(2);
+    const editable = queryAllContentUiElements('[contenteditable="true"]');
+    expect(editable).toHaveLength(1);
+    expect((editable[0]?.getRootNode() as ShadowRoot).activeElement).toBe(editable[0]);
+  });
+
+  it('focuses a primary comment enabled from the quick action and removes it when left empty', () => {
+    renderControlledCalloutFrame();
+    act(() => useFrameUIStore.getState().hoverFrame('frame-1'));
+
+    act(() => {
+      findToolbarButton(/Add comment|Добавить комментарий/).click();
+    });
+
+    const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
+    expect(editable).toBeInstanceOf(HTMLElement);
+    expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+
+    act(() => editable?.blur());
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(0);
+  });
+
+  it('adds four independent comments and disables only the selected additional comment', () => {
+    renderControlledCalloutCollectionFrame();
+
+    for (let index = 1; index <= 4; index += 1) {
+      act(() => useFrameUIStore.getState().selectFrame('frame-1'));
+      act(() => {
+        findToolbarButton(/Add another comment|Добавить ещё один комментарий/).click();
+      });
+      enterActiveCalloutText(`Comment ${index}`);
+    }
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(5);
+    expect(
+      queryAllContentUiElements('.sniptale-callout').map((callout) => callout.textContent)
+    ).toEqual(expect.arrayContaining(['Comment 1', 'Comment 2', 'Comment 3', 'Comment 4']));
+
+    const settingsHandles = queryAllContentUiElements<HTMLElement>(
+      '.sniptale-callout-settings-handle'
+    );
+    act(() => settingsHandles.at(-1)?.click());
+    act(() => {
+      findToolbarButton(new RegExp(translate('content.callout.disableButton'))).click();
+    });
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(4);
+    expect(
+      queryAllContentUiElements('.sniptale-callout').some((callout) =>
+        callout.textContent?.includes('Comment 4')
+      )
+    ).toBe(false);
+  });
+
+  it('keeps staged text and permits the next comment before the frame owner acknowledges updates', () => {
+    vi.useFakeTimers();
+    renderDeferredCalloutCollectionFrame();
+
+    act(() => useFrameUIStore.getState().selectFrame('frame-1'));
+    act(() => {
+      findToolbarButton(/Add another comment|Добавить ещё один комментарий/).click();
+    });
+    enterActiveCalloutText('Second comment');
+
+    expect(deferredFrameUpdates.at(-1)?.additionalCallouts?.[0]?.content.bodyHtml).toContain(
+      'Second comment'
+    );
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(2);
+    expect(
+      queryAllContentUiElements('.sniptale-callout').map((callout) => callout.textContent ?? '')
+    ).toEqual(expect.arrayContaining([expect.stringContaining('Second comment')]));
+
+    act(() => useFrameUIStore.getState().selectFrame('frame-1'));
+    act(() => {
+      findToolbarButton(/Add another comment|Добавить ещё один комментарий/).click();
+    });
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(3);
+    expect(queryAllContentUiElements('[contenteditable="true"]')).toHaveLength(1);
+    enterActiveCalloutText('Third comment');
+
+    act(() => useFrameUIStore.getState().selectFrame('frame-1'));
+    act(() => {
+      findToolbarButton(/Add another comment|Добавить ещё один комментарий/).click();
+    });
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(4);
+    expect(queryAllContentUiElements('[contenteditable="true"]')).toHaveLength(1);
+
+    act(() => vi.runAllTimers());
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(4);
+    vi.useRealTimers();
+  });
+});
+
+describe('InteractiveFrame toolbar and size interactions', () => {
+  it('separates numbering from the remaining toolbar command groups', () => {
     const { frame } = renderFrame();
     act(() => useFrameUIStore.getState().selectFrame(frame.id));
     const toolbar = queryContentUiElement<HTMLElement>('.sniptale-action-toolbar');
@@ -165,9 +402,10 @@ describe('InteractiveFrame size edit interactions', () => {
       translate('content.interactiveFrame.increaseFrame'),
       translate('content.interactiveFrame.editButton'),
       translate('content.interactiveFrame.deleteButton'),
+      translate('content.interactiveFrame.hideDuringCapture'),
       translate('common.actions.close'),
     ]);
-    expect(toolbar?.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(4);
+    expect(toolbar?.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(5);
     expect(
       [
         ...(toolbar?.querySelectorAll<HTMLButtonElement>('[data-menu-indicator="true"]') ?? []),

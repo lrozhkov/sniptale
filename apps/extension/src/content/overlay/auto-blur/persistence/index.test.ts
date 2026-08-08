@@ -47,7 +47,6 @@ function createSettings(): AutoBlurSettings {
       shadow: 0,
       showBorder: true,
       strokeColor: '#475569',
-      strokeOpacity: 1,
       strokeStyle: 'solid',
       strokeWidth: 2,
     },
@@ -167,6 +166,32 @@ async function verifiesSnapshotClone() {
   expect(module.getLoadedAutoBlurSettingsSnapshot()).toEqual(createSettings());
 }
 
+async function verifiesLegacyStrokeOpacityFoldAndCanonicalSave() {
+  const module = await loadStorage();
+  syncGetMock.mockResolvedValue({
+    [module.AUTO_BLUR_SETTINGS_KEY]: {
+      ...createSettings(),
+      blurSettings: {
+        ...createSettings().blurSettings,
+        strokeColor: '#11223380',
+        strokeOpacity: 0.5,
+      },
+    },
+  });
+
+  const loaded = await module.loadAutoBlurSettings();
+  expect(loaded.blurSettings.strokeColor).toBe('#11223340');
+  expect(loaded.blurSettings).not.toHaveProperty('strokeOpacity');
+  expect(module.getLoadedAutoBlurSettingsSnapshot()?.blurSettings).not.toHaveProperty(
+    'strokeOpacity'
+  );
+
+  await module.saveAutoBlurSettings(loaded);
+  const persisted = syncSetMock.mock.lastCall?.[0]?.[module.AUTO_BLUR_SETTINGS_KEY];
+  expect(persisted.blurSettings.strokeColor).toBe('#11223340');
+  expect(persisted.blurSettings).not.toHaveProperty('strokeOpacity');
+}
+
 describe('auto-blur storage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -186,4 +211,8 @@ describe('auto-blur storage', () => {
     verifiesPixelateBlurTypeLoad
   );
   it('returns cloned cached snapshots after load', verifiesSnapshotClone);
+  it(
+    'folds legacy stroke opacity before caching and canonical saves',
+    verifiesLegacyStrokeOpacityFoldAndCanonicalSave
+  );
 });

@@ -6,6 +6,7 @@ import { contentDesignReviewMessages } from './design-review';
 import { contentRuntimeMessages } from './runtime';
 import { contentSaveDialogMessages } from './save-dialog';
 import { contentStepBadgeMessages } from './step-badge';
+import { contentTemplateForkMessages } from './template-fork';
 import { contentToolbarMessages } from './toolbar/index';
 import { defineMessageSource } from '../source';
 
@@ -16,6 +17,7 @@ export const contentMessages = defineMessageSource({
   saveDialog: contentSaveDialogMessages,
   callout: contentCalloutMessages,
   stepBadge: contentStepBadgeMessages,
+  templateFork: contentTemplateForkMessages,
   interactiveFrame: contentInteractiveFrameMessages,
   overlayControls: contentOverlayControlsMessages,
   designReview: contentDesignReviewMessages,

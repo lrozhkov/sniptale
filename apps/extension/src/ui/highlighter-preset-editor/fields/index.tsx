@@ -5,16 +5,14 @@ import { EditorPreview } from './sections/sample';
 import { BorderStyleInspector } from './inspector';
 import type { BorderVisualStylePatch } from '../../../features/highlighter/contracts';
 import { HighlighterManualInspectorSurface } from '../manual-inspector-surface';
+import type { LinkedAnnotationTemplateOptions } from './inspector';
 
 function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   if (patch.color !== undefined) state.setColor(patch.color);
   if (patch.fillColor !== undefined) state.setFillColor(patch.fillColor);
-  if (patch.fillOpacity !== undefined) state.setFillOpacity(patch.fillOpacity);
   if (patch.effects !== undefined) state.setEffects(patch.effects);
-  if (patch.opacity !== undefined) state.setOpacity(patch.opacity);
   if (patch.radius !== undefined) state.setRadius(patch.radius);
   if (patch.shadow !== undefined) state.setShadow(patch.shadow);
-  if (patch.strokeOpacity !== undefined) state.setStrokeOpacity(patch.strokeOpacity);
   if (patch.style !== undefined) state.setStyle(patch.style);
   if (patch.width !== undefined) state.setWidth(patch.width);
   if (patch.inheritCustomCss !== undefined) state.setInheritCustomCss(patch.inheritCustomCss);
@@ -24,7 +22,13 @@ function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   }
 }
 
-export function BorderPresetEditorFields({ state }: { state: EditorState }) {
+export function BorderPresetEditorFields({
+  linkedTemplateOptions,
+  state,
+}: {
+  linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
+  state: EditorState;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -57,6 +61,7 @@ export function BorderPresetEditorFields({ state }: { state: EditorState }) {
             }}
             onCssResizeStart={state.handleResizeStart}
             style={state}
+            {...(linkedTemplateOptions ? { linkedTemplateOptions } : {})}
           />
         </HighlighterManualInspectorSurface>
       </div>

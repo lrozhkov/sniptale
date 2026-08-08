@@ -9,7 +9,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { translate } from '../../../platform/i18n';
-import { registerContentOwnedPassiveChrome } from '../../platform/dom-host';
+import { registerContentOwnedPassiveChrome, useContentUiScale } from '../../platform/dom-host';
 import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 import {
   getDesignReviewActionOption,
@@ -50,6 +50,7 @@ function AnnotationMarker(
     onOffsetChange: (offset: AnnotationMarkerOffset) => void;
     onOpenRecord?: (annotationId: number) => boolean;
     position: AnnotationMarkerPosition | undefined;
+    uiScale: number;
   }
 ) {
   const tooltipScrollRef = useRef<HTMLSpanElement>(null);
@@ -59,6 +60,7 @@ function AnnotationMarker(
     offset: props.offset,
     onChange: props.onOffsetChange,
     target: props.target,
+    uiScale: props.uiScale,
   });
   if (!props.position || props.record.markerNumber === undefined) return null;
 
@@ -85,75 +87,84 @@ function AnnotationMarker(
         top: props.position.markerTop,
       }}
     >
-      <button
-        type="button"
-        aria-describedby={showTooltip ? tooltipId : undefined}
-        aria-label={markerLabel}
-        className={[
-          'inline-flex min-w-8 items-center justify-center gap-0.5',
-          'box-border h-8 max-w-[calc(100vw-8px)] overflow-hidden rounded-full border-solid',
-          'border-[color:var(--sniptale-color-surface-canvas)]',
-          'bg-[var(--sniptale-color-surface-canvas)] px-1.5 text-[10px] font-bold',
-          'text-[var(--sniptale-color-text-primary)] shadow-lg outline-none',
-          'focus-visible:border-[color:var(--sniptale-color-accent)]',
-          props.showChrome ? 'pointer-events-auto' : 'pointer-events-none',
-          props.interactive ? 'cursor-pointer' : 'cursor-help',
-        ].join(' ')}
-        data-ui="content.annotation-marker-button"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (!props.interactive) return;
-          if (props.active) {
-            props.onCloseRecord?.();
-          } else {
-            props.onOpenRecord?.(props.record.annotationId);
-          }
-        }}
-        onKeyDown={(event) => handleTooltipScroll(event, tooltipScrollRef.current)}
-        ref={markerButtonRef}
-        style={{ borderWidth: 3 }}
-        tabIndex={props.showChrome ? 0 : -1}
+      <div
+        className="sniptale-annotation-marker-chrome relative inline-flex"
+        style={{ transformOrigin: props.position.markerRight === null ? 'top left' : 'top right' }}
       >
-        <Icon
-          aria-hidden="true"
-          className={`pointer-events-none ${getDesignReviewActionTone(action)}`}
-          size={13}
-          strokeWidth={2.25}
-        />
-        <span className="pointer-events-none truncate">{props.record.markerNumber}</span>
-      </button>
-      {props.showChrome && props.interactive ? (
         <button
           type="button"
-          aria-label={translate('content.designReview.moveMarker')}
+          aria-describedby={showTooltip ? tooltipId : undefined}
+          aria-label={markerLabel}
           className={[
-            'sniptale-annotation-marker-drag-handle pointer-events-auto absolute',
-            '-right-1 -top-3 hidden h-5 w-5 touch-none',
-            'items-center justify-center rounded-full border shadow-md',
-            'border-[color:var(--sniptale-color-border-soft)]',
-            'bg-[var(--sniptale-color-surface-panel)] group-hover:inline-flex',
-            'group-focus-within:inline-flex cursor-grab active:cursor-grabbing',
+            'inline-flex min-w-8 items-center justify-center gap-0.5',
+            'box-border h-8 overflow-hidden rounded-full border-solid',
+            'border-[color:var(--sniptale-color-surface-canvas)]',
+            'bg-[var(--sniptale-color-surface-canvas)] px-1.5 text-[10px] font-bold',
+            'text-[var(--sniptale-color-text-primary)] shadow-lg outline-none',
+            'focus-visible:border-[color:var(--sniptale-color-accent)]',
+            props.showChrome ? 'pointer-events-auto' : 'pointer-events-none',
+            props.interactive ? 'cursor-pointer' : 'cursor-help',
           ].join(' ')}
-          data-ui="content.annotation-marker-drag-handle"
+          data-ui="content.annotation-marker-button"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!props.interactive) return;
+            if (props.active) {
+              props.onCloseRecord?.();
+            } else {
+              props.onOpenRecord?.(props.record.annotationId);
+            }
           }}
-          onPointerCancel={drag.onPointerUp}
-          onPointerDown={drag.onPointerDown}
-          onPointerMove={drag.onPointerMove}
-          onPointerUp={drag.onPointerUp}
+          onKeyDown={(event) => handleTooltipScroll(event, tooltipScrollRef.current)}
+          ref={markerButtonRef}
+          style={{
+            borderWidth: 3,
+            maxWidth: 'calc(var(--sniptale-content-ui-viewport-width) - 8px)',
+          }}
+          tabIndex={props.showChrome ? 0 : -1}
         >
-          <Grip size={11} />
+          <Icon
+            aria-hidden="true"
+            className={`pointer-events-none ${getDesignReviewActionTone(action)}`}
+            size={13}
+            strokeWidth={2.25}
+          />
+          <span className="pointer-events-none truncate">{props.record.markerNumber}</span>
         </button>
-      ) : null}
+        {props.showChrome && props.interactive ? (
+          <button
+            type="button"
+            aria-label={translate('content.designReview.moveMarker')}
+            className={[
+              'sniptale-annotation-marker-drag-handle pointer-events-auto absolute',
+              '-right-1 -top-3 hidden h-5 w-5 touch-none',
+              'items-center justify-center rounded-full border shadow-md',
+              'border-[color:var(--sniptale-color-border-soft)]',
+              'bg-[var(--sniptale-color-surface-panel)] group-hover:inline-flex',
+              'group-focus-within:inline-flex cursor-grab active:cursor-grabbing',
+            ].join(' ')}
+            data-ui="content.annotation-marker-drag-handle"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onPointerCancel={drag.onPointerUp}
+            onPointerDown={drag.onPointerDown}
+            onPointerMove={drag.onPointerMove}
+            onPointerUp={drag.onPointerUp}
+          >
+            <Grip size={11} />
+          </button>
+        ) : null}
+      </div>
       {showTooltip ? (
         <AnnotationMarkerTooltip
           id={tooltipId}
           position={props.position}
           record={props.record}
           scrollRef={tooltipScrollRef}
+          transformOrigin={props.position.tooltipRight === null ? 'top left' : 'top right'}
         />
       ) : null}
     </div>
@@ -175,6 +186,7 @@ export function BrowserAnnotationMarkers(props: {
   onOpenRecord?: (annotationId: number) => boolean;
   showChrome?: boolean;
 }) {
+  const uiScale = useContentUiScale();
   const markerLayerRef = usePassiveContentChromeRef<HTMLDivElement>();
   const [offsets, setOffsets] = useState<ReadonlyMap<number, AnnotationMarkerOffset>>(
     () => new Map()
@@ -185,7 +197,7 @@ export function BrowserAnnotationMarkers(props: {
     () => 0
   );
   const projections = useMemo(() => createMarkerProjections(revision), [revision]);
-  const positions = useMarkerPositions(projections, offsets);
+  const positions = useMarkerPositions(projections, offsets, uiScale);
 
   useEffect(() => {
     const liveIds = new Set(projections.map(({ record }) => record.annotationId));
@@ -214,6 +226,7 @@ export function BrowserAnnotationMarkers(props: {
             setOffsets((current) => new Map(current).set(projection.record.annotationId, offset))
           }
           position={positions.get(projection.record.annotationId)}
+          uiScale={uiScale}
           {...(props.onOpenRecord ? { onOpenRecord: props.onOpenRecord } : {})}
         />
       ))}

@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { InteractiveFrameProps } from './types';
 import { areInteractiveFramePropsEqual } from './comparison';
 import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
+import {
+  cloneBorderPresetEffects,
+  projectBorderPresetToAppliedSettings,
+} from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 
 function createProps(): InteractiveFrameProps {
   return {
@@ -49,6 +54,59 @@ describe('areInteractiveFramePropsEqual', () => {
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
 
+  it('treats capture-only frame visibility as a render-critical change', () => {
+    const prevProps = createProps();
+    const borderSettings = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
+    prevProps.frame.borderSettings = borderSettings;
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        borderSettings: {
+          ...borderSettings,
+          effects: {
+            ...cloneBorderPresetEffects(borderSettings.effects),
+            capture: { hideFrame: true },
+          },
+        },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
+
+  it('treats linked annotation templates and focus blur as render-critical changes', () => {
+    const prevProps = createProps();
+    const borderSettings = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
+    prevProps.frame.borderSettings = borderSettings;
+    const linkedTemplateProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        borderSettings: {
+          ...borderSettings,
+          effects: {
+            ...cloneBorderPresetEffects(borderSettings.effects),
+            linkedTemplates: {
+              calloutPresetId: 'callout-template',
+              stepBadgePresetId: 'badge-template',
+            },
+          },
+        },
+      },
+    };
+    const focusBlurProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        focusSettings: { ...prevProps.frame.focusSettings!, blurAmount: 8 },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, linkedTemplateProps)).toBe(false);
+    expect(areInteractiveFramePropsEqual(prevProps, focusBlurProps)).toBe(false);
+  });
+
   it('treats a tail-base-only change as render-critical', () => {
     const prevProps = createProps();
     prevProps.frame.callout = createDefaultCalloutSettings();
@@ -77,6 +135,19 @@ describe('areInteractiveFramePropsEqual', () => {
 
     expect(areInteractiveFramePropsEqual(prevProps, nextPositionProps)).toBe(false);
     expect(areInteractiveFramePropsEqual(prevProps, nextWidthProps)).toBe(false);
+  });
+
+  it('treats additional callout collection changes as render-critical', () => {
+    const prevProps = createProps();
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        additionalCallouts: [createDefaultCalloutSettings()],
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
 
   it('treats a tail-frame-only change as render-critical', () => {

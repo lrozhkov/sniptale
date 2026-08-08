@@ -17,6 +17,7 @@ function createToolbarProps(
 ): InteractiveFrameToolbarProps {
   return {
     calloutPopoverAnchorRef: { current: null },
+    captureVisibility: { hiddenDuringCapture: false, toggle: vi.fn() },
     clearSelection: vi.fn(),
     closePopover: vi.fn(),
     effectMode: 'border',
@@ -29,6 +30,7 @@ function createToolbarProps(
     onUpdate: vi.fn(),
     popoverAnchorRef: { current: null },
     setIsCalloutEditing: vi.fn(),
+    setActiveCalloutIndex: vi.fn(),
     setState: vi.fn(),
     state: 'hover',
     stepBadgePopoverAnchorRef: { current: null },
@@ -88,6 +90,51 @@ describe('interactive frame toolbar callout actions', () => {
     actions.handleCalloutClick(createToolbarEvent());
 
     expect(props.togglePopover).toHaveBeenNthCalledWith(1, 'frame-1', 'step-badge');
-    expect(props.togglePopover).toHaveBeenNthCalledWith(2, 'frame-1', 'callout-settings');
+    expect(props.togglePopover).toHaveBeenNthCalledWith(2, 'frame-1', 'callout-settings', 0);
+  });
+
+  it('adds an independent empty callout and starts editing that callout', () => {
+    const props = createToolbarProps(
+      createFrameDataFixture('frame-1', { callout: createCalloutSettingsFixture() })
+    );
+    vi.spyOn(pagePreparationHistory, 'beginTransaction').mockImplementation(() => true);
+
+    createInteractiveFrameToolbarActions(props).handleAddCalloutClick(createToolbarEvent());
+
+    expect(props.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        additionalCallouts: [
+          expect.objectContaining({
+            enabled: true,
+            content: { bodyHtml: '', titleText: '' },
+          }),
+        ],
+      })
+    );
+    expect(props.setActiveCalloutIndex).toHaveBeenCalledWith(1);
+    expect(props.setIsCalloutEditing).toHaveBeenCalledWith(true);
+  });
+
+  it('does not add an additional callout before the primary callout is enabled', () => {
+    const props = createToolbarProps();
+
+    createInteractiveFrameToolbarActions(props).handleAddCalloutClick(createToolbarEvent());
+
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    expect(props.setIsCalloutEditing).not.toHaveBeenCalled();
+  });
+
+  it('toggles capture-only visibility from the selected frame toolbar', () => {
+    const props = createToolbarProps();
+
+    createInteractiveFrameToolbarActions(props).handleCaptureVisibilityClick(createToolbarEvent());
+
+    expect(props.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        borderSettings: expect.objectContaining({
+          effects: expect.objectContaining({ capture: { hideFrame: true } }),
+        }),
+      })
+    );
   });
 });

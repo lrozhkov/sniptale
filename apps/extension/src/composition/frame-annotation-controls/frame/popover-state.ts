@@ -54,6 +54,7 @@ export function useFrameCreationPopoverState(props: {
   const applyBorderPatch = (patch: BorderVisualStylePatch) =>
     applyBorderStylePatch(props.settings, patch, apply);
   const selectPreset = (preset: BorderPreset) => selectBorderPreset(props.settings, preset, apply);
+  const forkPreset = (preset: BorderPreset) => forkBorderPreset(props.settings, preset, apply);
   const savePreset = (input: { name?: string; overwrite?: BorderPreset }) =>
     saveBorderPreset(
       input,
@@ -84,6 +85,7 @@ export function useFrameCreationPopoverState(props: {
     border: {
       apply,
       applyPatch: applyBorderPatch,
+      forkPreset,
       selectPreset,
     },
     catalog: {
@@ -123,6 +125,7 @@ function applyBorderStylePatch(
           blurSettings: { ...settings.blurSettings, ...effects.blur, showBorder: true },
           focusSettings: {
             ...settings.focusSettings,
+            blurAmount: effects.focus.blurAmount,
             opacity: effects.focus.opacity,
             showBorder: true,
           },
@@ -140,7 +143,30 @@ function selectBorderPreset(
   apply({
     borderSettings: projectBorderPresetToAppliedSettings(preset),
     blurSettings: { ...settings.blurSettings, ...effects.blur, showBorder: true },
-    focusSettings: { ...settings.focusSettings, opacity: effects.focus.opacity, showBorder: true },
+    focusSettings: {
+      ...settings.focusSettings,
+      blurAmount: effects.focus.blurAmount,
+      opacity: effects.focus.opacity,
+      showBorder: true,
+    },
+  });
+}
+
+function forkBorderPreset(
+  settings: FrameAnnotationStyleSettings,
+  preset: BorderPreset,
+  apply: (patch: Partial<FrameAnnotationStyleSettings>) => void
+) {
+  const effects = cloneBorderPresetEffects(preset.effects);
+  apply({
+    borderSettings: applyManualBorderStylePatch(projectBorderPresetToAppliedSettings(preset), {}),
+    blurSettings: { ...settings.blurSettings, ...effects.blur, showBorder: true },
+    focusSettings: {
+      ...settings.focusSettings,
+      blurAmount: effects.focus.blurAmount,
+      opacity: effects.focus.opacity,
+      showBorder: true,
+    },
   });
 }
 
@@ -155,8 +181,20 @@ async function saveBorderPreset(
   setSaving(true);
   try {
     const id = input.overwrite?.id ?? crypto.randomUUID();
+    const effects = cloneBorderPresetEffects(settings.borderSettings.effects);
     const preset: BorderPreset = {
       ...settings.borderSettings,
+      effects: {
+        ...effects,
+        blur: {
+          amount: settings.blurSettings.amount,
+          blurType: settings.blurSettings.blurType,
+        },
+        focus: {
+          blurAmount: settings.focusSettings.blurAmount ?? 0,
+          opacity: settings.focusSettings.opacity,
+        },
+      },
       id,
       name: input.name?.trim() || input.overwrite?.name || '',
       enabled: true,

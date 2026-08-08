@@ -80,6 +80,18 @@ it('clamps dragged sidebar coordinates into the viewport', () => {
   });
 });
 
+it('keeps the physical sidebar drag viewport stable under page zoom compensation', () => {
+  vi.stubGlobal('innerWidth', 720);
+  vi.stubGlobal('innerHeight', 450);
+
+  expect(
+    clampScenarioRecorderSidebarPosition({ x: -40, y: 9999 }, sidebarEl as HTMLDivElement, 0.5)
+  ).toEqual({
+    x: 12,
+    y: 468,
+  });
+});
+
 it('keeps the recorder sidebar under the toolbar and floating menus when they overlap', () => {
   createFloatingBlocker('toolbar', {
     top: 80,

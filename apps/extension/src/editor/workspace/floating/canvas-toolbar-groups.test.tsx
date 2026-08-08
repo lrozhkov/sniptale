@@ -181,7 +181,6 @@ it('uses the specialized blur grouping and keeps only More as the layer-only add
       command('blur-stroke-width'),
       command('blur-stroke-style'),
       command('blur-stroke-color'),
-      command('blur-stroke-opacity'),
     ],
     selection: { selectedObjectType: 'blur' },
   });

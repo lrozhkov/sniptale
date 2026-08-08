@@ -129,7 +129,12 @@
   overscroll-behavior: contain;
 }
 
+.sniptale-glass-preset-list--menu {
+  gap: 6px;
+}
+
 .sniptale-glass-preset-item {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
@@ -149,6 +154,47 @@
     border-color 0.15s ease,
     color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+.sniptale-glass-preset-list--menu .sniptale-glass-preset-item {
+  border-color: transparent;
+  background: transparent;
+}
+
+.sniptale-glass-preset-list--menu .sniptale-glass-preset-item:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 78%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 82%, transparent);
+}
+
+.sniptale-glass-preset-list--menu .sniptale-glass-preset-item--active {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 20%,
+    var(--sniptale-color-border-soft) 80%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 88%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-glass-preset-list--menu .sniptale-glass-preset-item--active:hover {
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 28%,
+    var(--sniptale-color-border-soft) 72%
+  );
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 94%, transparent);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.sniptale-glass-preset-check {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--sniptale-color-accent-emphasis);
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .sniptale-glass-preset-item:hover {

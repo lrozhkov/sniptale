@@ -79,6 +79,10 @@ export const contentOverlayControlsMessages = defineMessageSource({
     ru: 'Затемнение',
     en: 'Dimming',
   },
+  focusBlurLabel: {
+    ru: 'Размытие',
+    en: 'Blur',
+  },
   selectionSizeTitle: {
     ru: 'Размер выделения',
     en: 'Selection size',

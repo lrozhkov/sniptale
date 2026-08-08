@@ -52,6 +52,7 @@ it('renders the wedge frame endpoint live before committing the pointer drag', (
       onWaypointChange: vi.fn(),
       onWidthChange: vi.fn(),
       settings,
+      visualScale: 1,
       wrapperRef: { current: null },
       zIndex: 20,
     });
@@ -126,6 +127,7 @@ it('projects whole-callout dragging through the effective shared connector setti
       onWaypointChange: vi.fn(),
       onWidthChange: vi.fn(),
       settings,
+      visualScale: 1,
       wrapperRef,
       zIndex: 20,
     });

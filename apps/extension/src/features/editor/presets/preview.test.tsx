@@ -213,10 +213,7 @@ describe('editor preset preview renderer', () => {
         radius: 0,
         padding: { top: 0, right: 0, bottom: 0, left: 0 },
         shadow: 0,
-        opacity: 100,
-        strokeOpacity: 100,
         fillColor: '#888888',
-        fillOpacity: 20,
         inheritCustomCss: false,
         customCss: '',
       })
@@ -256,6 +253,6 @@ describe('editor preset preview renderer', () => {
     expect(step).toContain('>7<');
     expect(scene).toContain('linear-gradient(90deg, #101010 0%, #808080 50%, #f0f0f0 100%)');
     expect(sceneColor).toContain('background:#0f0f0f');
-    expect(border).toContain('#777777ff');
+    expect(border).toContain('#777777');
   });
 });

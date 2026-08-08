@@ -6,61 +6,29 @@ import {
 } from '@sniptale/ui/highlighter-style/normalize';
 import type { BorderPadding, BorderVisualStyle } from '@sniptale/ui/highlighter-style/types';
 import { projectFrameDecorationCssStyles } from './decoration';
+import { parseColor } from '@sniptale/foundation/color';
 
 export interface ResolvedBorderPresetVisual {
   id: string;
-  opacity: number;
   strokeColor: string;
-  strokeOpacity: number;
   strokeWidth: number;
   strokeStyle: BorderVisualStyle['style'];
   radius: number;
   shadow: BorderVisualStyle['shadow'];
   fillColor: string;
-  fillOpacity: number;
   inheritCustomCss: boolean;
   customCss: string;
   customCssStyles: CSSProperties;
   padding: BorderPadding;
 }
 
-function expandShortHex(hex: string): string {
-  return hex
-    .split('')
-    .map((char) => char + char)
-    .join('');
-}
-
-function normalizeHexColor(color: string): string | null {
-  const trimmed = color.trim();
-  if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
-    return expandShortHex(trimmed.slice(1));
-  }
-
-  if (/^#[0-9a-f]{4}$/i.test(trimmed)) {
-    return expandShortHex(trimmed.slice(1, 4));
-  }
-
-  if (/^#[0-9a-f]{6}$/i.test(trimmed) || /^#[0-9a-f]{8}$/i.test(trimmed)) {
-    return trimmed.slice(1, 7);
-  }
-
-  return null;
-}
-
 export function colorToRgba(color: string, opacityPercent: number): string {
-  const opacity = percentToUnit(opacityPercent);
-  const safeHex = normalizeHexColor(color);
-
-  if (!safeHex) {
-    return color;
-  }
-
-  const red = parseInt(safeHex.slice(0, 2), 16);
-  const green = parseInt(safeHex.slice(2, 4), 16);
-  const blue = parseInt(safeHex.slice(4, 6), 16);
-
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+  if (color.trim().toLowerCase() === 'transparent') return color;
+  const parsed = parseColor(color);
+  const alpha = parsed ? parsed.alpha * percentToUnit(opacityPercent) : null;
+  return parsed
+    ? `rgba(${parsed.red}, ${parsed.green}, ${parsed.blue}, ${Number(alpha!.toFixed(4))})`
+    : color;
 }
 
 function resolveCustomCssStyles(preset: BorderVisualStyle): CSSProperties {
@@ -83,15 +51,12 @@ export function resolveBorderPresetVisual(
 
   return {
     id: normalizedPreset.sourcePresetId ?? normalizedPreset.id ?? 'manual',
-    opacity: normalizedPreset.opacity,
     strokeColor: normalizedPreset.color,
-    strokeOpacity: normalizedPreset.strokeOpacity,
     strokeWidth: normalizedPreset.width,
     strokeStyle: normalizedPreset.style,
     radius: normalizedPreset.radius,
     shadow: normalizedPreset.shadow,
     fillColor: normalizedPreset.fillColor,
-    fillOpacity: normalizedPreset.fillOpacity,
     inheritCustomCss: normalizedPreset.inheritCustomCss,
     customCss: normalizedPreset.customCss,
     customCssStyles: resolveCustomCssStyles(normalizedPreset),

@@ -1,5 +1,6 @@
 import React from 'react';
 import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
+import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 
 const MARGIN = 8;
 const GAP = 10;
@@ -36,7 +37,11 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
     return { position: 'fixed', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' };
   }
   const anchor = args.anchorEl.getBoundingClientRect();
-  const width = Math.min(args.width, window.innerWidth - MARGIN * 2);
+  const uiScale = readContentUiScaleCompensation(args.anchorEl);
+  const margin = MARGIN * uiScale;
+  const gap = GAP * uiScale;
+  const width = Math.min(args.width * uiScale, window.innerWidth - margin * 2);
+  const height = args.height * uiScale;
   const mainToolbar = args.anchorEl.closest<HTMLElement>(
     '.sniptale-toolbar, .sniptale-glass-toolbar'
   );
@@ -44,17 +49,19 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
     return resolveMainToolbarPosition({
       anchor,
       displayMode: mainToolbar.dataset['displayMode'] === 'vertical' ? 'vertical' : 'horizontal',
-      height: args.height,
+      height,
+      gap,
+      margin,
       toolbar: mainToolbar.getBoundingClientRect(),
       width,
     });
   }
-  const left = clamp(anchor.left, MARGIN, window.innerWidth - width - MARGIN);
-  const below = anchor.bottom + GAP;
+  const left = clamp(anchor.left, margin, window.innerWidth - width - margin);
+  const below = anchor.bottom + gap;
   const top =
-    below + args.height <= window.innerHeight - MARGIN
+    below + height <= window.innerHeight - margin
       ? below
-      : Math.max(MARGIN, anchor.top - GAP - args.height);
+      : Math.max(margin, anchor.top - gap - height);
   return { position: 'fixed', left, top, width, ...interactiveSurfaceStyle };
 }
 
@@ -62,26 +69,36 @@ function resolveMainToolbarPosition(input: {
   anchor: DOMRect;
   displayMode: 'horizontal' | 'vertical';
   height: number;
+  gap: number;
+  margin: number;
   toolbar: DOMRect;
   width: number;
 }): React.CSSProperties {
-  const horizontalLeft = clamp(input.anchor.left, MARGIN, window.innerWidth - input.width - MARGIN);
-  const verticalTop = clamp(input.anchor.top, MARGIN, window.innerHeight - input.height - MARGIN);
+  const horizontalLeft = clamp(
+    input.anchor.left,
+    input.margin,
+    window.innerWidth - input.width - input.margin
+  );
+  const verticalTop = clamp(
+    input.anchor.top,
+    input.margin,
+    window.innerHeight - input.height - input.margin
+  );
   const candidates = {
     down: {
       left: horizontalLeft,
-      top: Math.max(input.toolbar.bottom, input.anchor.bottom + GAP),
+      top: Math.max(input.toolbar.bottom, input.anchor.bottom + input.gap),
     },
     up: {
       left: horizontalLeft,
-      top: Math.min(input.toolbar.top, input.anchor.top - GAP) - input.height,
+      top: Math.min(input.toolbar.top, input.anchor.top - input.gap) - input.height,
     },
     right: {
-      left: Math.max(input.toolbar.right, input.anchor.right + GAP),
+      left: Math.max(input.toolbar.right, input.anchor.right + input.gap),
       top: verticalTop,
     },
     left: {
-      left: Math.min(input.toolbar.left, input.anchor.left - GAP) - input.width,
+      left: Math.min(input.toolbar.left, input.anchor.left - input.gap) - input.width,
       top: verticalTop,
     },
   };
@@ -92,10 +109,10 @@ function resolveMainToolbarPosition(input: {
   const position =
     ordered.find(
       (candidate) =>
-        candidate.left >= MARGIN &&
-        candidate.top >= MARGIN &&
-        candidate.left + input.width <= window.innerWidth - MARGIN &&
-        candidate.top + input.height <= window.innerHeight - MARGIN
+        candidate.left >= input.margin &&
+        candidate.top >= input.margin &&
+        candidate.left + input.width <= window.innerWidth - input.margin &&
+        candidate.top + input.height <= window.innerHeight - input.margin
     ) ?? ordered[0]!;
   return { position: 'fixed', ...position, width: input.width, ...interactiveSurfaceStyle };
 }

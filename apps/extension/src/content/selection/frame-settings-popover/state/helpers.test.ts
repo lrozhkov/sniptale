@@ -28,7 +28,6 @@ const PRESET: BorderPreset = {
   color: '#ff00ff',
   id: 'preset-1',
   name: 'Preset',
-  opacity: 100,
   order: 1,
   padding: { bottom: 8, left: 8, right: 8, top: 8 },
   radius: 4,
@@ -37,9 +36,7 @@ const PRESET: BorderPreset = {
   width: 2,
   customCss: '',
   fillColor: '#00000000',
-  fillOpacity: 0,
   inheritCustomCss: false,
-  strokeOpacity: 100,
 };
 
 it('keeps the selected preset in the current tab without saving the global default', () => {
@@ -66,7 +63,7 @@ it('keeps the selected preset in the current tab without saving the global defau
     blurType: 'gaussian',
     showBorder: true,
   };
-  const expectedFocusSettings = { opacity: 0.5, showBorder: true };
+  const expectedFocusSettings = { blurAmount: 0, opacity: 0.5, showBorder: true };
   expect(setLocalBlurSettings).toHaveBeenCalledWith(expectedBlurSettings);
   expect(setLocalFocusSettings).toHaveBeenCalledWith(expectedFocusSettings);
   expect(onApplyToFrame).toHaveBeenCalledTimes(1);
@@ -190,6 +187,32 @@ it('updates only future focus settings when no existing frame owns the change', 
   expect(focusListener).toHaveBeenCalledWith({
     settings: { ...localFocusSettings, opacity: 0.8 },
   });
+  expect(opacityListener).not.toHaveBeenCalled();
+
+  cleanupFocus();
+  cleanupOpacity();
+});
+
+it('applies focus blur through the shared focus-settings seam without an opacity event', () => {
+  const focusListener = vi.fn();
+  const opacityListener = vi.fn();
+  const cleanupFocus = addSessionFocusSettingsChangedListener(focusListener);
+  const cleanupOpacity = addFocusOpacityChangedListener(opacityListener);
+  const localFocusSettings: FocusSettings = { blurAmount: 0, opacity: 0.4, showBorder: false };
+  const onApplyToFrame = vi.fn();
+  const handlers = createFrameFocusHandlers({
+    frameId: 'frame-1',
+    localFocusSettings,
+    onApplyToFrame,
+    setLocalFocusSettings: vi.fn(),
+    syncSessionDefaults: true,
+  });
+
+  handlers.handleFocusBlurChange(11);
+
+  const expected = { ...localFocusSettings, blurAmount: 11 };
+  expect(onApplyToFrame).toHaveBeenCalledWith({ focusSettings: expected });
+  expect(focusListener).toHaveBeenCalledWith({ settings: expected });
   expect(opacityListener).not.toHaveBeenCalled();
 
   cleanupFocus();

@@ -64,6 +64,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeFrameAnnotationRasterRequestByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
+      pageZoom?: number;
       contentIntent?: ContentPrivilegedActionCapability;
       tabId?: number;
       viewport?: AppliedViewportPresetPayload | null;

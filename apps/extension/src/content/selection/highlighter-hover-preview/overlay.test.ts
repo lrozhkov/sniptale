@@ -27,15 +27,12 @@ const framePosition = vi.hoisted(() => ({
 const logger = vi.hoisted(() => ({ debug: vi.fn(), warn: vi.fn() }));
 const storage = vi.hoisted(() => ({
   DEFAULT_BORDER_PRESET: {
-    color: '#ff0',
+    color: '#ffff00a6',
     customCss: '',
     fillColor: '#00000000',
-    fillOpacity: 0,
     inheritCustomCss: false,
-    strokeOpacity: 100,
     id: 'default',
     name: 'Default',
-    opacity: 80,
     order: 0,
     padding: {
       bottom: 4,
@@ -118,12 +115,13 @@ function shouldCreateAndUpdateTheHoverOverlay(): void {
   expect(overlay.style.opacity).toBe('0.72');
   expect(overlay.style.borderStyle).toBe('solid');
   expect(overlay.style.borderWidth).toBe('2px');
-  expect(overlay.style.borderRadius).toBe('6px');
+  expect(overlay.style.borderRadius).toBe('8px');
+  expect(overlay.style.boxSizing).toBe('content-box');
   expect(overlay.style.boxShadow).not.toBe('none');
   hideHoverOverlay(state);
 
-  expect(overlay.style.top).toBe('16px');
-  expect(overlay.style.left).toBe('12px');
+  expect(overlay.style.top).toBe('14px');
+  expect(overlay.style.left).toBe('10px');
   expect(overlay.style.width).toBe('40px');
   expect(overlay.style.height).toBe('30px');
   expect(overlay.style.borderColor).toBe('rgb(0, 255, 255)');
@@ -139,9 +137,7 @@ function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
     { height: 10, width: 12, x: 1, y: 2 },
     {
       ...storage.DEFAULT_BORDER_PRESET,
-      fillColor: '#60A5FA',
-      fillOpacity: 8,
-      strokeOpacity: 65,
+      fillColor: '#60A5FA14',
     }
   );
 
@@ -178,11 +174,11 @@ function shouldKeepCanonicalGeometryAndStrokeWhilePreservingCustomDecoration(): 
     inheritCustomCss: true,
   });
   const overlay = state.hoverOverlay;
-  expect(overlay?.style.boxSizing).toBe('border-box');
+  expect(overlay?.style.boxSizing).toBe('content-box');
   expect(overlay?.style.borderWidth).toBe('2px');
   expect(overlay?.style.borderStyle).toBe('solid');
-  expect(overlay?.style.borderColor).toBe('rgb(255, 255, 0)');
-  expect(overlay?.style.borderRadius).toBe('6px');
+  expect(overlay?.style.borderColor).toBe('rgba(255, 255, 0, 0.65)');
+  expect(overlay?.style.borderRadius).toBe('8px');
   expect(overlay?.style.backgroundColor).toBe('red');
   expect(overlay?.style.backgroundImage).toBe('linear-gradient(red, blue)');
   expect(overlay?.style.boxShadow).toBe('0 0 4px red');
@@ -190,8 +186,8 @@ function shouldKeepCanonicalGeometryAndStrokeWhilePreservingCustomDecoration(): 
   expect(overlay?.style.outlineOffset).toBe('7px');
   expect(overlay?.style.clipPath).toBe('none');
   expect(overlay?.style.transition).toContain('opacity 0.2s');
-  expect(overlay?.style.top).toBe('16px');
-  expect(overlay?.style.left).toBe('12px');
+  expect(overlay?.style.top).toBe('14px');
+  expect(overlay?.style.left).toBe('10px');
   expect(overlay?.style.width).toBe('40px');
   expect(overlay?.style.height).toBe('30px');
   expect(overlay?.style.clip).toBe('');

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { normalizeSyncProcessResult } from '../runtime/sync-process-result.mjs';
+import { collectTaskTopologySourceByTarget } from './task-topology-lineage.mjs';
 
 const GIT_BATCH_MAX_BUFFER = 64 * 1024 * 1024;
 const HEAD_CODE_GLOBS = ['*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs'];
@@ -78,6 +79,10 @@ export function readHeadFileText(relativePath, options = {}) {
 }
 
 export function createHeadFileTextResolver(relativePaths, options = {}) {
-  const sources = readHeadFileTexts(relativePaths, options);
-  return (relativePath) => sources.get(relativePath) ?? null;
+  const lineage = collectTaskTopologySourceByTarget({ root: options.root ?? process.cwd() });
+  const sourcePaths = relativePaths.map(
+    (relativePath) => lineage.get(relativePath) ?? relativePath
+  );
+  const sources = readHeadFileTexts(sourcePaths, options);
+  return (relativePath) => sources.get(lineage.get(relativePath) ?? relativePath) ?? null;
 }

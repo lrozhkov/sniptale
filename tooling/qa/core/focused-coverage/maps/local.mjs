@@ -132,8 +132,7 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'content-design-review-layout-settings',
-    productionFile:
-      'apps/extension/src/content/overlay/design-review/settings/sections/frame.tsx',
+    productionFile: 'apps/extension/src/content/overlay/design-review/settings/sections/frame.tsx',
     exclusive: true,
     reason:
       'The compact settings navigation suite selects the localized size-and-spacing owner and proves its width and height controls.',
@@ -194,7 +193,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-design-review-frame',
     productionFile: 'apps/extension/src/content/selection/design-review/frame.ts',
     exclusive: true,
-    reason: 'The frame suite proves exact absolute geometry and the frozen two-pixel black outline.',
+    reason:
+      'The frame suite proves exact absolute geometry and the frozen two-pixel black outline.',
     testFiles: ['apps/extension/src/content/selection/design-review/frame.test.ts'],
   },
   {
@@ -415,15 +415,18 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'settings-editor-section',
-    productionFile: 'apps/extension/src/settings/sections/editor/rows.tsx',
-    reason: 'Settings editor preset rows are covered by the focused rows component suite.',
-    testFiles: ['apps/extension/src/settings/sections/editor/rows.test.tsx'],
+    productionFile: 'apps/extension/src/settings/sections/styles/editor-resources/tools/model.ts',
+    reason: 'Settings tool preset ordering is covered by the owner-local model suite.',
+    testFiles: ['apps/extension/src/settings/sections/styles/editor-resources/tools/model.test.ts'],
   },
   {
     owner: 'settings-editor-section',
-    productionFile: 'apps/extension/src/settings/sections/editor/types.ts',
-    reason: 'Settings editor preset row type contracts are covered by rows rendering tests.',
-    testFiles: ['apps/extension/src/settings/sections/editor/rows.test.tsx'],
+    productionFile:
+      'apps/extension/src/settings/sections/styles/editor-resources/palettes/model.ts',
+    reason: 'Settings palette ordering is covered by the owner-local model suite.',
+    testFiles: [
+      'apps/extension/src/settings/sections/styles/editor-resources/palettes/model.test.ts',
+    ],
   },
   {
     owner: 'offscreen-project-export-service-root',
@@ -439,61 +442,65 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'settings-highlighter-persistence',
-    productionFile: 'apps/extension/src/settings/sections/highlighter/section/persistence.ts',
+    productionFile:
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence.ts',
     reason:
       'Highlighter persistence queue ownership is covered by queue and session regression suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/drag-actions.queue.test.ts',
-      'apps/extension/src/settings/sections/highlighter/section/persistence-actions.behavior.test.ts',
-      'apps/extension/src/settings/sections/highlighter/section/persistence-session.test.ts',
-      'apps/extension/src/settings/sections/highlighter/section/persistence.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.queue.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence-actions.behavior.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence-session.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence.test.ts',
     ],
   },
   {
     owner: 'settings-highlighter-persistence-actions',
     productionFile:
-      'apps/extension/src/settings/sections/highlighter/section/persistence-actions.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence-actions.ts',
     reason: 'Highlighter settings persistence actions are covered by behavior regressions.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/persistence-actions.behavior.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/persistence-actions.behavior.test.ts',
     ],
   },
   {
     owner: 'settings-highlighter-crud-actions',
-    productionFile: 'apps/extension/src/settings/sections/highlighter/section/crud-actions.ts',
+    productionFile:
+      'apps/extension/src/settings/sections/styles/annotations/borders/crud-actions.ts',
     reason: 'Highlighter preset CRUD actions are covered by focused action suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/actions.integration.test.ts',
-      'apps/extension/src/settings/sections/highlighter/section/actions.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/actions.integration.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/actions.test.ts',
     ],
   },
   {
-    owner: 'settings-highlighter-drag-actions',
-    productionFile: 'apps/extension/src/settings/sections/highlighter/section/drag-actions.ts',
-    reason: 'Highlighter drag persistence ordering is covered by drag queue and integration tests.',
+    owner: 'settings-highlighter-ordering-actions',
+    productionFile:
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.ts',
+    reason:
+      'Highlighter insertion-intent persistence ordering is covered by queue and integration tests.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/actions.integration.test.ts',
-      'apps/extension/src/settings/sections/highlighter/section/drag-actions.queue.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/actions.integration.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.queue.test.ts',
     ],
   },
   {
     owner: 'settings-highlighter-storage-state',
-    productionFile: 'apps/extension/src/settings/sections/highlighter/section/state.ts',
+    productionFile: 'apps/extension/src/settings/sections/styles/annotations/borders/state.ts',
     reason: 'Highlighter storage sync lifecycle is covered by state storage and race suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/state.loading-race.test.tsx',
-      'apps/extension/src/settings/sections/highlighter/section/state.storage-sync.test.tsx',
-      'apps/extension/src/settings/sections/highlighter/section/state.test.tsx',
+      'apps/extension/src/settings/sections/styles/annotations/borders/state.loading-race.test.tsx',
+      'apps/extension/src/settings/sections/styles/annotations/borders/state.storage-sync.test.tsx',
+      'apps/extension/src/settings/sections/styles/annotations/borders/state.test.tsx',
     ],
   },
   {
     owner: 'settings-highlighter-section-composition',
     productionFile:
-      'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/useHighlighterSection.ts',
     reason:
       'Highlighter section composition keeps disposable UI state separate from its persistence session.',
     testFiles: [
-      'apps/extension/src/settings/sections/highlighter/section/useHighlighterSection.test.tsx',
+      'apps/extension/src/settings/sections/styles/annotations/borders/useHighlighterSection.test.tsx',
     ],
   },
   {

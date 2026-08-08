@@ -21,7 +21,9 @@ vi.mock('../../persistence/highlighter', async (importOriginal) => ({
 import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { useFrameCreationPopoverState } from './popover-state';
+import { FrameAnnotationCreationFramePopover } from './popover';
 import type { FrameAnnotationStyleSettings } from '../contracts';
+import { translate } from '../../../platform/i18n';
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -69,7 +71,11 @@ it('owns frame preset selection, manual effects, visibility, create and edit mut
     latest?.border.apply({ effectMode: 'focus' });
     latest?.border.applyPatch({
       color: '#123456',
-      effects: { blur: { amount: 7, blurType: 'pixelate' }, focus: { opacity: 0.25 } },
+      effects: {
+        blur: { amount: 7, blurType: 'pixelate' },
+        focus: { blurAmount: 4, opacity: 0.25 },
+        capture: { hideFrame: true },
+      },
     });
     if (preset) latest?.border.selectPreset(preset);
     latest?.css.setDraft('border-radius: 4px');
@@ -90,6 +96,86 @@ it('owns frame preset selection, manual effects, visibility, create and edit mut
   expect(mocks.add).toHaveBeenCalled();
   expect(mocks.update).toHaveBeenCalledTimes(2);
   expect(latest?.presetEditor.isOpen).toBe(false);
+});
+
+it('persists the current blur and focus effects when creating or overwriting a template', async () => {
+  const defaults = createDefaultHighlighterSettings();
+  const overwrite = defaults.borderPresets[0]!;
+  settings = {
+    ...settings,
+    blurSettings: { ...settings.blurSettings, amount: 23, blurType: 'distortion' },
+    focusSettings: { ...settings.focusSettings, blurAmount: 8, opacity: 0.31 },
+    borderSettings: {
+      ...settings.borderSettings,
+      effects: {
+        ...settings.borderSettings.effects!,
+        blur: { amount: 2, blurType: 'gaussian' },
+        focus: { blurAmount: 1, opacity: 0.9 },
+      },
+    },
+  };
+  await act(async () => root?.render(<Harness />));
+
+  await act(async () => {
+    await latest?.presetSaving.save({ name: 'Effects copy' });
+    await latest?.presetSaving.save({ overwrite });
+  });
+
+  const expectedEffects = expect.objectContaining({
+    blur: { amount: 23, blurType: 'distortion' },
+    focus: { blurAmount: 8, opacity: 0.31 },
+  });
+  expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({ effects: expectedEffects }));
+  expect(mocks.update).toHaveBeenCalledWith(
+    expect.objectContaining({ id: overwrite.id, effects: expectedEffects })
+  );
+});
+
+it('wires the focus blur control into creation settings', async () => {
+  const anchor = document.createElement('button');
+  document.body.append(anchor);
+  settings = { ...settings, effectMode: 'focus' };
+
+  await act(async () =>
+    root?.render(
+      <FrameAnnotationCreationFramePopover
+        anchorEl={anchor}
+        isOpen
+        onChange={onChange}
+        onClose={vi.fn()}
+        settings={settings}
+      />
+    )
+  );
+  const blurLabel = translate('content.overlayControls.focusBlurLabel');
+  const increase = document.querySelector<HTMLButtonElement>(
+    `button[aria-label="${blurLabel} increase"]`
+  );
+
+  expect(increase).not.toBeNull();
+  act(() => increase?.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      focusSettings: expect.objectContaining({ blurAmount: 1 }),
+    })
+  );
+
+  const dimmingLabel = translate('content.overlayControls.focusDimmingLabelPrefix');
+  const dimmingIncrease = document.querySelector<HTMLButtonElement>(
+    `button[aria-label="${dimmingLabel} increase"]`
+  );
+  const decorationToggle = document.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('content.overlayControls.showBorderTitle')}"]`
+  );
+  act(() => {
+    dimmingIncrease?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    decorationToggle?.click();
+  });
+
+  expect(dimmingIncrease).not.toBeNull();
+  expect(decorationToggle).not.toBeNull();
+
+  anchor.remove();
 });
 
 it('keeps rejected frame preset mutations atomic and clears pending state', async () => {

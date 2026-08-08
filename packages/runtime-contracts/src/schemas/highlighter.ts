@@ -13,23 +13,39 @@ const HexColorWithOptionalAlphaSchema = z.union([
   z.string().regex(/^#[0-9A-Fa-f]{8}$/),
 ]);
 
+const BorderPresetEffectsSchema = z.object({
+  blur: z.object({
+    amount: z.number().min(1).max(25),
+    blurType: z.enum(['gaussian', 'distortion', 'pixelate', 'solid']),
+  }),
+  focus: z.object({
+    blurAmount: z.number().min(0).max(25),
+    opacity: z.number().min(0).max(1),
+  }),
+  capture: z.object({ hideFrame: z.boolean() }),
+  linkedTemplates: z
+    .object({
+      calloutPresetId: z.string().min(1).nullable(),
+      stepBadgePresetId: z.string().min(1).nullable(),
+    })
+    .optional(),
+});
+
 export const BorderPresetSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(50),
   enabled: z.boolean().optional(),
   order: z.number().int().min(0),
   width: z.number().int().min(1).max(20),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  color: HexColorWithOptionalAlphaSchema,
   style: z.enum(['solid', 'dashed', 'dotted']),
   radius: z.number().int().min(0).max(50),
   padding: BorderPaddingSchema,
   shadow: z.number().int().min(0).max(100),
-  opacity: z.number().int().min(0).max(100),
-  strokeOpacity: z.number().int().min(0).max(100),
   fillColor: HexColorWithOptionalAlphaSchema,
-  fillOpacity: z.number().int().min(0).max(100),
   inheritCustomCss: z.boolean(),
   customCss: z.string().max(1000),
+  effects: BorderPresetEffectsSchema.optional(),
   origin: z.enum(['system', 'user']).optional(),
   systemPresetKey: z.enum(SYSTEM_BORDER_PRESET_KEYS).optional(),
   basedOnRevision: z.number().int().min(0).optional(),
@@ -43,11 +59,7 @@ export const BlurSettingsSchema = z.object({
   radius: z.number().int().min(0).max(50).optional(),
   shadow: z.number().int().min(0).max(100).optional(),
   showBorder: z.boolean().optional(),
-  strokeColor: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .optional(),
-  strokeOpacity: z.number().min(0).max(1).optional(),
+  strokeColor: HexColorWithOptionalAlphaSchema.optional(),
   strokeStyle: z
     .enum(['solid', 'dashed', 'dotted', 'dash', 'dot', 'dash-dot', 'long-dash'])
     .optional(),
@@ -55,7 +67,8 @@ export const BlurSettingsSchema = z.object({
 });
 
 export const FocusSettingsSchema = z.object({
-  opacity: z.number().min(0.1).max(1.0),
+  blurAmount: z.number().min(0).max(25).optional(),
+  opacity: z.number().min(0).max(1.0),
   showBorder: z.boolean().optional(),
 });
 

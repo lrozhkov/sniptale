@@ -39,7 +39,7 @@
 
 .sniptale-content-popover--scroll,
 .sniptale-content-popover.sniptale-glass-popover-scroll {
-  max-height: 80vh;
+  max-height: calc(var(--sniptale-content-ui-viewport-height, 100vh) * 0.8);
   overflow-y: auto;
 }
 

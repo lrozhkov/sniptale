@@ -75,6 +75,7 @@ it('lists only Design Review feedback and opens the live element from the row or
     root.render(<DesignReviewFeedbackPanel onClose={onClose} onOpenRecord={onOpenRecord} open />);
   });
 
+  expect(container.querySelector('.lucide-messages-square')).not.toBeNull();
   const items = container.querySelectorAll('[data-ui="content.design-review.feedback-item"]');
   expect(items).toHaveLength(1);
   expect(items[0]?.textContent).toContain('content.designReview.actionFix');

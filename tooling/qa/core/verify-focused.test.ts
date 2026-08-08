@@ -170,12 +170,12 @@ it('collects focused storage-write-pattern files for targeted persistence seams'
   expect(
     module.collectFocusedStorageWritePatternFiles([
       'apps/extension/src/composition/persistence/storage/example.ts',
-      'apps/extension/src/settings/sections/save-presets/actions/index.ts',
+      'apps/extension/src/settings/sections/capture/saving/actions/index.ts',
       'apps/extension/src/popup/index.tsx',
     ])
   ).toEqual([
     'apps/extension/src/composition/persistence/storage/example.ts',
-    'apps/extension/src/settings/sections/save-presets/actions/index.ts',
+    'apps/extension/src/settings/sections/capture/saving/actions/index.ts',
   ]);
 });
 

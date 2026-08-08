@@ -101,6 +101,84 @@ describe('getCalloutLayoutState', () => {
     expect(layout.dynamicTail?.side).toBe('right');
   });
 
+  it.each([
+    { visualScale: 0.2, expectedX: 278 },
+    { visualScale: 4, expectedX: 620 },
+  ])(
+    'keeps a manual offset in physical pixels at visual scale $visualScale',
+    ({ expectedX, visualScale }) => {
+      const layout = getCalloutLayoutState({
+        dimensions: { width: 100 * visualScale, height: 40 * visualScale },
+        frameRect: { x: 200, y: 200, width: 120, height: 80 },
+        isEditing: false,
+        settings: {
+          ...settings,
+          placement: {
+            ...settings.placement,
+            manualPlacement: { centerOffsetX: 140, centerOffsetY: 0 },
+          },
+        },
+        visualScale,
+        zIndex: 20,
+      });
+
+      expect(layout.calloutPos.x).toBeCloseTo(expectedX);
+      expect(
+        (layout.calloutPos.x + layout.calloutDimensions.width / 2 - 260) / visualScale
+      ).toBeCloseTo(140);
+    }
+  );
+
+  it('scales automatic spacing and wedge geometry in the page coordinate space', () => {
+    const baseline = getCalloutLayoutState({
+      dimensions: { width: 100, height: 40 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings,
+      zIndex: 20,
+    });
+    const zoomed = getCalloutLayoutState({
+      dimensions: { width: 20, height: 8 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings,
+      visualScale: 0.2,
+      zIndex: 20,
+    });
+
+    expect((200 - (zoomed.calloutPos.y + 8)) / 0.2).toBeCloseTo(200 - (baseline.calloutPos.y + 40));
+    expect(baseline.dynamicTail?.kind).toBe('wedge');
+    expect(zoomed.dynamicTail?.kind).toBe('wedge');
+    if (baseline.dynamicTail?.kind === 'wedge' && zoomed.dynamicTail?.kind === 'wedge') {
+      expect(Math.abs(baseline.dynamicTail.attachment.tipPoint.y - 200)).toBeCloseTo(8);
+      expect(Math.abs(zoomed.dynamicTail.attachment.tipPoint.y - 200) / 0.2).toBeCloseTo(8);
+    }
+  });
+});
+
+describe('getCalloutLayoutState connector geometry', () => {
+  it.each(['wedge', 'line'] as const)(
+    'lands a %s connector on the center line of an outward frame stroke',
+    (kind) => {
+      const layout = getCalloutLayoutState({
+        dimensions: { width: 160, height: 48 },
+        frameBorderWidth: 4,
+        frameRect: { x: 200, y: 200, width: 120, height: 80 },
+        isEditing: false,
+        settings: {
+          ...settings,
+          style: {
+            ...settings.style,
+            connector: { ...settings.style.connector, kind, routing: 'straight' },
+          },
+        },
+        zIndex: 20,
+      });
+
+      expect(layout.dynamicTail?.attachment.framePoint.y).toBe(198);
+    }
+  );
+
   it('uses identical tail geometry before and after a zero-distance manual placement', () => {
     const dimensions = { width: 160, height: 48 };
     const frameRect = { x: 200, y: 200, width: 120, height: 80 };

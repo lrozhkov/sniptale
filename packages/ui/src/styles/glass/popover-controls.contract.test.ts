@@ -32,4 +32,12 @@ describe('glass.popover-controls contract', () => {
     expect(glassPopoverControlsStylesheet).not.toContain('padding-right: 4px;');
     expect(glassPopoverControlsStylesheet).not.toContain('scrollbar-gutter: stable;');
   });
+
+  it('provides the canonical menu selection treatment for preset catalogs', () => {
+    expect(glassPopoverControlsStylesheet).toContain('.sniptale-glass-preset-list--menu {');
+    expect(glassPopoverControlsStylesheet).toMatch(
+      /\.sniptale-glass-preset-list--menu \.sniptale-glass-preset-item\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;/s
+    );
+    expect(glassPopoverControlsStylesheet).toContain('.sniptale-glass-preset-check {');
+  });
 });

@@ -13,6 +13,7 @@ export function useStepBadgeControlPosition(args: {
   badgeRef: React.RefObject<HTMLDivElement | null>;
   isEnabled: boolean;
   placementKey: string;
+  uiScale?: number;
 }) {
   const [position, setPosition] = React.useState<{ x: number; y: number } | null>(null);
   React.useLayoutEffect(() => {
@@ -24,6 +25,7 @@ export function useStepBadgeControlPosition(args: {
         getAdjacentControlGroupPosition({
           controlCount: 2,
           targetRect: rect,
+          ...(args.uiScale === undefined ? {} : { uiScale: args.uiScale }),
           viewport: { height: window.innerHeight, width: window.innerWidth },
         })
       );
@@ -35,7 +37,7 @@ export function useStepBadgeControlPosition(args: {
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, [args.badgeRef, args.isEnabled, args.placementKey]);
+  }, [args.badgeRef, args.isEnabled, args.placementKey, args.uiScale]);
   return position;
 }
 

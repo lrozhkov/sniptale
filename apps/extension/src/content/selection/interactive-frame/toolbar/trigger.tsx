@@ -19,12 +19,20 @@ import {
   canFitFrameQuickActions,
   FRAME_TRIGGER_BRIDGE_PADDING,
   FRAME_TRIGGER_CONTROL_GAP,
-  getFrameTriggerPosition,
 } from './trigger-position';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
+import { resolveContentShadowRoot } from '../../../platform/dom-host';
+import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
+import type { FrameCaptureVisibilityState } from './capture-visibility-state';
+import {
+  resolveStableFrameTriggerPosition,
+  suspendFrameTriggerPlacement,
+  type FrameTriggerPlacementSession,
+} from './trigger-placement-session';
 
 type InteractiveFrameToolbarTriggerProps = {
   frame: FrameData;
+  captureVisibility: FrameCaptureVisibilityState;
   isVisible: boolean;
   closePopover: () => void;
   handleStartEditing: () => void;
@@ -34,6 +42,7 @@ type InteractiveFrameToolbarTriggerProps = {
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
+  onUpdate: (frame: FrameData) => void;
 };
 
 function useTriggerPositionRefresh(isVisible: boolean) {
@@ -101,15 +110,31 @@ function FrameToolbarTriggerButton(props: {
 export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTriggerProps) {
   useAppLocale();
   useTriggerPositionRefresh(props.isVisible);
+  const placementSessionRef = React.useRef<FrameTriggerPlacementSession | null>(null);
   const portalTheme = useContentPortalTheme();
+  const uiScale = readContentUiScaleCompensation(resolveContentShadowRoot()?.host ?? null);
   const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
-  if (!props.isVisible || !isHighlighterEnabled()) return null;
+  if (!props.isVisible || !isHighlighterEnabled()) {
+    placementSessionRef.current = suspendFrameTriggerPlacement(placementSessionRef.current);
+    return null;
+  }
 
-  const quickActions = createFrameQuickActions({ ...props, toggleQuickPopover });
-  const visibleQuickActions = canFitFrameQuickActions(props.frame, quickActions.length + 1)
+  const quickActions = createFrameQuickActions({
+    ...props,
+    captureVisibility: props.captureVisibility,
+    toggleQuickPopover,
+  });
+  const visibleQuickActions = canFitFrameQuickActions(props.frame, quickActions.length + 1, uiScale)
     ? quickActions
-    : [];
-  const position = getFrameTriggerPosition(props.frame, visibleQuickActions.length + 1);
+    : quickActions.filter((action) => action.id === 'capture-visibility');
+  const placement = resolveStableFrameTriggerPosition({
+    controlCount: visibleQuickActions.length + 1,
+    frame: props.frame,
+    session: placementSessionRef.current,
+    uiScale,
+  });
+  const position = placement.position;
+  placementSessionRef.current = placement.session;
   const onFocus = () => props.hoverFrame(props.frame.id);
   const onBlur = () => props.scheduleHoverFrameHide(props.frame.id);
 
@@ -122,8 +147,8 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
       data-theme={portalTheme ?? undefined}
       style={getThemedPortalStyle(portalTheme, {
         position: 'fixed',
-        left: position.x - FRAME_TRIGGER_BRIDGE_PADDING,
-        top: position.y - FRAME_TRIGGER_BRIDGE_PADDING,
+        left: position.x - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
+        top: position.y - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
         padding: FRAME_TRIGGER_BRIDGE_PADDING,
         display: 'flex',
         flexDirection: position.direction,

@@ -1,6 +1,7 @@
-import { Droplet, Focus, ListOrdered, MessageSquareText, Square } from 'lucide-react';
+import { Droplet, Focus, ListOrdered, Square } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { RefObject } from 'react';
+import { FrameCommentIcon } from '../../features/highlighter/frame-annotation/icons';
 import type { EffectMode } from '../../features/highlighter/contracts';
 import { translate } from '../../platform/i18n';
 import type { FrameAnnotationCreationMenu, FrameAnnotationCreationSettings } from './contracts';
@@ -85,7 +86,7 @@ export function AnnotationCreationButtons(props: {
           }}
           title={translate('content.callout.settingsTitle')}
         >
-          <MessageSquareText size={18} />
+          <FrameCommentIcon size={18} />
         </ContentToolbarButton>
       ) : null}
       {props.showStepBadge ? (

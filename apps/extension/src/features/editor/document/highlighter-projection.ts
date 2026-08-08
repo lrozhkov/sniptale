@@ -1,7 +1,7 @@
 import type { EditorShapeSettings } from './types';
-import { percentToUnit } from '@sniptale/ui/highlighter-style/normalize';
 import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
 import { resolveBorderPresetVisual } from '../../highlighter/style/public';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 
 interface HighlighterPresetSettings {
   borderPresets: BorderPreset[];
@@ -38,18 +38,18 @@ export function projectBorderPresetToEditorShapeSettings(
   return {
     borderPresetId: visual.id,
     customCss: '',
-    fillColor: visual.fillColor,
-    fillOpacity: percentToUnit(visual.fillOpacity),
+    fillColor: setColorAlpha(visual.fillColor, 1) ?? visual.fillColor,
+    fillOpacity: getColorAlpha(visual.fillColor) ?? 1,
     inheritCustomCss: false,
-    opacity: percentToUnit(visual.strokeOpacity),
+    opacity: 1,
     radius: visual.radius,
     shadow: visual.shadow,
     shadowAngle: 90,
     shadowBlur: 12,
-    shadowColor: visual.strokeColor,
+    shadowColor: setColorAlpha(visual.strokeColor, 1) ?? visual.strokeColor,
     shadowDistance: 4,
-    strokeColor: visual.strokeColor,
-    strokeOpacity: percentToUnit(visual.strokeOpacity),
+    strokeColor: setColorAlpha(visual.strokeColor, 1) ?? visual.strokeColor,
+    strokeOpacity: getColorAlpha(visual.strokeColor) ?? 1,
     strokeStyle: visual.strokeStyle,
     strokeWidth: visual.strokeWidth,
   };

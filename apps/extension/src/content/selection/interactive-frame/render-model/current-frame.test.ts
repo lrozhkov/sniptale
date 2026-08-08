@@ -118,3 +118,28 @@ it('prefers the external frame when only non-content callout settings differ', (
     })
   ).toBe(baseFrame);
 });
+
+it('renders the complete pending callout draft until external props acknowledge it', () => {
+  const additionalCallout = createDefaultCalloutSettings();
+  const tempFrame = {
+    ...baseFrame,
+    additionalCallouts: [additionalCallout],
+    callout: {
+      ...baseFrame.callout!,
+      style: {
+        ...baseFrame.callout!.style,
+        surface: { ...baseFrame.callout!.style.surface, backgroundColor: '#111827' },
+      },
+    },
+  };
+
+  expect(
+    resolveInteractiveCurrentFrame({
+      frame: baseFrame,
+      tempFrame,
+      state: 'hover',
+      isCalloutEditing: false,
+      isCalloutDraftPending: true,
+    })
+  ).toBe(tempFrame);
+});

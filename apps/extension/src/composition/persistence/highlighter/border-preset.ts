@@ -9,6 +9,7 @@ import {
   isSystemBorderPresetKey,
   type BorderPresetEffects,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
 const blurTypes = new Set<BorderPresetEffects['blur']['blurType']>([
@@ -23,6 +24,8 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
   if (!isPlainRecord(value)) return null;
   const blur = value['blur'];
   const focus = value['focus'];
+  const capture = value['capture'];
+  const linkedTemplates = value['linkedTemplates'];
   if (
     !isPlainRecord(blur) ||
     !isNumber(blur['amount']) ||
@@ -31,8 +34,14 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
     !blurTypes.has(blur['blurType'] as BorderPresetEffects['blur']['blurType']) ||
     !isPlainRecord(focus) ||
     !isNumber(focus['opacity']) ||
-    focus['opacity'] < 0.1 ||
-    focus['opacity'] > 1
+    focus['opacity'] < 0 ||
+    focus['opacity'] > 1 ||
+    (focus['blurAmount'] !== undefined &&
+      (!isNumber(focus['blurAmount']) || focus['blurAmount'] < 0 || focus['blurAmount'] > 25)) ||
+    (capture !== undefined &&
+      (!isPlainRecord(capture) ||
+        (capture['hideFrame'] !== undefined && !isBoolean(capture['hideFrame'])))) ||
+    !isValidLinkedTemplates(linkedTemplates)
   ) {
     return null;
   }
@@ -41,7 +50,38 @@ function parseBorderPresetEffects(value: unknown): BorderPresetEffects | null {
       amount: blur['amount'],
       blurType: blur['blurType'] as BorderPresetEffects['blur']['blurType'],
     },
-    focus: { opacity: focus['opacity'] },
+    focus: {
+      blurAmount: focus['blurAmount'] === undefined ? 0 : (focus['blurAmount'] as number),
+      opacity: focus['opacity'],
+    },
+    capture: {
+      hideFrame:
+        isPlainRecord(capture) && isBoolean(capture['hideFrame']) ? capture['hideFrame'] : false,
+    },
+    linkedTemplates: parseLinkedTemplates(linkedTemplates),
+  };
+}
+
+function isValidLinkedTemplateId(value: unknown): boolean {
+  return value === undefined || value === null || (isString(value) && value.length > 0);
+}
+
+function isValidLinkedTemplates(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isPlainRecord(value) &&
+      isValidLinkedTemplateId(value['calloutPresetId']) &&
+      isValidLinkedTemplateId(value['stepBadgePresetId']))
+  );
+}
+
+function parseLinkedTemplates(value: unknown): NonNullable<BorderPresetEffects['linkedTemplates']> {
+  if (!isPlainRecord(value)) {
+    return { calloutPresetId: null, stepBadgePresetId: null };
+  }
+  return {
+    calloutPresetId: isString(value['calloutPresetId']) ? value['calloutPresetId'] : null,
+    stepBadgePresetId: isString(value['stepBadgePresetId']) ? value['stepBadgePresetId'] : null,
   };
 }
 
@@ -75,7 +115,7 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     !isString(value['color']) ||
     !isString(value['customCss']) ||
     !isNumber(value['radius']) ||
-    !isNumber(value['opacity']) ||
+    (value['opacity'] !== undefined && !isNumber(value['opacity'])) ||
     (value['strokeOpacity'] !== undefined && !isNumber(value['strokeOpacity'])) ||
     (value['fillColor'] !== undefined && !isString(value['fillColor'])) ||
     (value['fillOpacity'] !== undefined && !isNumber(value['fillOpacity'])) ||
@@ -92,21 +132,34 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     return null;
   }
 
+  const color = normalizeColor(value['color']);
+  const fillColor = normalizeColor(isString(value['fillColor']) ? value['fillColor'] : '#00000000');
+  if (!color || !fillColor) return null;
+  const strokeOpacity = isNumber(value['strokeOpacity'])
+    ? value['strokeOpacity'] / 100
+    : isNumber(value['opacity'])
+      ? value['opacity'] <= 1
+        ? value['opacity']
+        : value['opacity'] / 100
+      : 1;
+  const canonicalColor = multiplyColorAlpha(color, strokeOpacity);
+  const canonicalFillColor = isNumber(value['fillOpacity'])
+    ? multiplyColorAlpha(fillColor, value['fillOpacity'] / 100)
+    : fillColor;
+  if (!canonicalColor || !canonicalFillColor) return null;
+
   return normalizeBorderPresetVisualFields({
     customCss: value['customCss'],
     effects,
-    color: value['color'],
-    fillColor: value['fillColor'] ?? '#00000000',
-    fillOpacity: value['fillOpacity'] ?? 0,
+    color: canonicalColor,
+    fillColor: canonicalFillColor,
     id: value['id'],
     inheritCustomCss: value['inheritCustomCss'] ?? false,
     name: value['name'],
-    opacity: value['opacity'],
     order: value['order'],
     padding: value['padding'],
     radius: value['radius'],
     shadow,
-    strokeOpacity: value['strokeOpacity'] ?? value['opacity'],
     style: value['style'] as BorderPreset['style'],
     width: value['width'],
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),

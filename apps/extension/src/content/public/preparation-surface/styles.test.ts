@@ -21,6 +21,7 @@ import {
 
 const STYLES_SOURCE_PATH = fileURLToPath(new URL('./styles.ts', import.meta.url));
 const HOST_STYLES_PATH = fileURLToPath(new URL('./host.css', import.meta.url));
+const EFFECTS_STYLES_PATH = fileURLToPath(new URL('./effects.css', import.meta.url));
 const FRAME_SETTINGS_STYLES_PATH = fileURLToPath(
   new URL('../../../composition/frame-annotation-controls/frame/styles.css', import.meta.url)
 );
@@ -40,26 +41,34 @@ describe('content entrypoint styles', () => {
     const styles = createContentEntrypointStyles();
     const source = readFileSync(STYLES_SOURCE_PATH, 'utf8');
     const hostStyles = readFileSync(HOST_STYLES_PATH, 'utf8');
+    const effectsStyles = readFileSync(EFFECTS_STYLES_PATH, 'utf8');
     const frameSettingsStyles = readFileSync(FRAME_SETTINGS_STYLES_PATH, 'utf8');
     const calloutSettingsStyles = readFileSync(CALLOUT_SETTINGS_STYLES_PATH, 'utf8');
     const settingsPopoverStyles = readFileSync(SETTINGS_POPOVER_STYLES_PATH, 'utf8');
 
     expect(styles).toBeTypeOf('string');
     expect(hostStyles).toContain(':host {');
+    expect(hostStyles).toContain('--sniptale-content-ui-scale: 1;');
+    expect(effectsStyles).toContain('scale: var(--sniptale-content-ui-scale);');
+    expect(effectsStyles).toContain('.sniptale-resize-handle');
+    expect(effectsStyles).toContain('.sniptale-toolbar-portal-wrapper');
+    expect(effectsStyles).toContain('scrollbar-width: thin;');
+    expect(effectsStyles).toContain('::-webkit-scrollbar');
     expect(frameSettingsStyles).toContain('.sniptale-frame-style-preset-row');
     expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-row');
     expect(calloutSettingsStyles).toContain('.sniptale-step-badge-popover {');
     expect(calloutSettingsStyles).toContain('--sniptale-preset-list-max-height: min(296px');
-    expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-list {\n  gap: 8px;');
+    expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-list {\n  gap: 6px;');
     expect(calloutSettingsStyles).toContain('padding: 0;');
     expect(calloutSettingsStyles).toContain('scroll-padding-block: 4px;');
     expect(calloutSettingsStyles).toContain('flex: 0 0 auto;');
     expect(calloutSettingsStyles).not.toContain('data-callout-settings-mode-switch');
     expect(calloutSettingsStyles).toContain(
+      '.sniptale-callout-preset-row:hover .sniptale-glass-preset-check,'
+    );
+    expect(calloutSettingsStyles).not.toContain(
       '.sniptale-callout-preset-row .sniptale-glass-preset-item--active {'
     );
-    expect(calloutSettingsStyles).toContain('background: transparent;');
-    expect(calloutSettingsStyles).toContain('box-shadow: none;');
     expect(calloutSettingsStyles).toContain('cursor: inherit !important;');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-header');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-mode-action');

@@ -13,32 +13,34 @@ function clamp(value: number, minimum: number, maximum: number) {
 export function getAdjacentControlGroupPosition(args: {
   controlCount: number;
   targetRect: Rect;
+  uiScale?: number;
   viewport: Viewport;
 }) {
+  const uiScale = args.uiScale ?? 1;
   const count = Math.max(1, args.controlCount);
-  const width = count * ADJACENT_CONTROL_BUTTON_SIZE + (count - 1) * ADJACENT_CONTROL_GAP;
-  const maximumLeft = Math.max(VIEWPORT_MARGIN, args.viewport.width - VIEWPORT_MARGIN - width);
-  const right = args.targetRect.right + TARGET_GAP;
-  const left = args.targetRect.left - TARGET_GAP - width;
+  const controlSize = ADJACENT_CONTROL_BUTTON_SIZE * uiScale;
+  const viewportMargin = VIEWPORT_MARGIN * uiScale;
+  const targetGap = TARGET_GAP * uiScale;
+  const width = count * controlSize + (count - 1) * ADJACENT_CONTROL_GAP * uiScale;
+  const maximumLeft = Math.max(viewportMargin, args.viewport.width - viewportMargin - width);
+  const right = args.targetRect.right + targetGap;
+  const left = args.targetRect.left - targetGap - width;
   const x =
-    right + width <= args.viewport.width - VIEWPORT_MARGIN
+    right + width <= args.viewport.width - viewportMargin
       ? right
-      : left >= VIEWPORT_MARGIN
+      : left >= viewportMargin
         ? left
-        : clamp(right, VIEWPORT_MARGIN, maximumLeft);
+        : clamp(right, viewportMargin, maximumLeft);
 
-  const above = args.targetRect.top - ADJACENT_CONTROL_BUTTON_SIZE - ADJACENT_CONTROL_GAP;
-  const below = args.targetRect.bottom + ADJACENT_CONTROL_GAP;
-  const maximumTop = Math.max(
-    VIEWPORT_MARGIN,
-    args.viewport.height - VIEWPORT_MARGIN - ADJACENT_CONTROL_BUTTON_SIZE
-  );
+  const above = args.targetRect.top - controlSize - ADJACENT_CONTROL_GAP * uiScale;
+  const below = args.targetRect.bottom + ADJACENT_CONTROL_GAP * uiScale;
+  const maximumTop = Math.max(viewportMargin, args.viewport.height - viewportMargin - controlSize);
   const y =
-    above >= VIEWPORT_MARGIN
+    above >= viewportMargin
       ? above
-      : below + ADJACENT_CONTROL_BUTTON_SIZE <= args.viewport.height - VIEWPORT_MARGIN
+      : below + controlSize <= args.viewport.height - viewportMargin
         ? below
-        : clamp(above, VIEWPORT_MARGIN, maximumTop);
+        : clamp(above, viewportMargin, maximumTop);
 
   return { x, y };
 }

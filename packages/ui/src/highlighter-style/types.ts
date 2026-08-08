@@ -25,12 +25,12 @@ export interface BlurSettings {
   shadow?: BorderPreset['shadow'];
   showBorder?: boolean;
   strokeColor?: string;
-  strokeOpacity?: number;
   strokeStyle?: BlurStrokeStyle;
   strokeWidth?: number;
 }
 
 export interface FocusSettings {
+  blurAmount?: number;
   opacity: number;
   showBorder?: boolean;
 }

@@ -20,8 +20,7 @@ it('resolves semantic colors and uses fallback for transparent frame fill', () =
     resolveStepBadgeVisualStyle(settings, {
       borderColor: '#123456',
       borderWidth: 4,
-      fillColor: '#fedcba',
-      fillOpacity: 0,
+      fillColor: '#fedcba00',
     })
   ).toMatchObject({ backgroundColor: '#abcdef', outlineColor: '#123456', textColor: '#123456' });
   expect(
@@ -29,7 +28,6 @@ it('resolves semantic colors and uses fallback for transparent frame fill', () =
       borderColor: '#123456',
       borderWidth: 4,
       fillColor: '#fedcba',
-      fillOpacity: 0.5,
     }).backgroundColor
   ).toBe('#fedcba');
 });

@@ -8,6 +8,7 @@ import { collectChangedTargets } from '../runtime/changed-targets.helpers.mjs';
 import { runScopedRuleCli } from './scoped-rule-cli.mjs';
 import { isProductSourcePath, normalizeRepoSrcPath } from './src-production-targets.mjs';
 import { readHeadFileTexts } from './git-head-sources.mjs';
+import { collectTaskTopologySourceByTarget } from './task-topology-lineage.mjs';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const DOMAIN_TYPE_PATTERN =
@@ -105,7 +106,9 @@ export function collectDomainFixtureRealismViolations(files, context = {}) {
 }
 
 function countPreviousViolations(relativePath) {
-  const renameSource = collectRenameSourceByTarget().get(relativePath);
+  const renameSource =
+    collectRenameSourceByTarget().get(relativePath) ??
+    collectTaskTopologySourceByTarget().get(relativePath);
   const paths = renameSource ? [renameSource, relativePath] : [relativePath];
   const sources = readHeadFileTexts(paths);
   const source = (renameSource ? sources.get(renameSource) : null) ?? sources.get(relativePath);

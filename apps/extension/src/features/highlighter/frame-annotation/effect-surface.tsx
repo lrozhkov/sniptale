@@ -1,6 +1,7 @@
 import React from 'react';
 import type { FrameAnnotationSnapshotV1 } from './model';
 import { getFrameAnnotationBlurBackdropStyle } from './effect-style';
+import { resolveFocusCutoutGeometry } from '../frame-surface';
 
 export function FrameAnnotationBlurSurface({ frame }: { frame: FrameAnnotationSnapshotV1 }) {
   const effect = getFrameAnnotationBlurBackdropStyle(frame);
@@ -49,41 +50,58 @@ export function FrameAnnotationDistortionFilter(props: { scale: number }) {
 }
 
 export function FrameAnnotationFocusSurface(props: {
+  blurAmount: number;
   frames: FrameAnnotationSnapshotV1[];
   height: number;
   opacity: number;
   width: number;
 }) {
   const maskId = React.useId().replaceAll(':', '');
+  const blurAmount = Math.min(25, Math.max(0, props.blurAmount));
+  const opacity = Math.min(1, Math.max(0, props.opacity));
   return (
-    <svg
-      aria-hidden="true"
-      height={props.height}
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-      width={props.width}
-    >
-      <defs>
-        <mask id={maskId}>
-          <rect fill="white" height="100%" width="100%" />
-          {props.frames.map((frame) => (
-            <rect
-              fill="black"
-              height={frame.height}
-              key={frame.id}
-              rx={frame.borderSettings?.radius ?? 0}
-              width={frame.width}
-              x={frame.x}
-              y={frame.y}
-            />
-          ))}
-        </mask>
-      </defs>
-      <rect
-        fill={`rgb(0 0 0 / ${Math.min(1, Math.max(0, props.opacity))})`}
-        height="100%"
-        mask={`url(#${maskId})`}
-        width="100%"
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      <svg height="0" style={{ position: 'absolute' }} width="0">
+        <defs>
+          <mask
+            height={props.height}
+            id={maskId}
+            maskUnits="userSpaceOnUse"
+            width={props.width}
+            x="0"
+            y="0"
+          >
+            <rect fill="white" height={props.height} width={props.width} />
+            {props.frames.map((frame) => {
+              const cutout = resolveFocusCutoutGeometry(frame);
+              return (
+                <rect
+                  fill="black"
+                  height={cutout.height}
+                  key={frame.id}
+                  rx={cutout.radius}
+                  width={cutout.width}
+                  x={cutout.x}
+                  y={cutout.y}
+                />
+              );
+            })}
+          </mask>
+        </defs>
+      </svg>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: props.width,
+          height: props.height,
+          backgroundColor: `rgb(0 0 0 / ${opacity})`,
+          backdropFilter: `blur(${blurAmount}px)`,
+          WebkitBackdropFilter: `blur(${blurAmount}px)`,
+          mask: `url(#${maskId})`,
+          WebkitMask: `url(#${maskId})`,
+        }}
       />
-    </svg>
+    </div>
   );
 }

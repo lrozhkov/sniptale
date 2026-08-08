@@ -33,7 +33,6 @@ export function calculateFrameContainerCoords(
   settings: FrameCalcSettings
 ): FrameContainerCoords {
   return projectElementFrameSurface(elementPos, {
-    strokeWidth: settings.borderWidth,
     padding: settings.padding,
   });
 }

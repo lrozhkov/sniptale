@@ -8,6 +8,7 @@ export function InteractiveFrameResizeHandleLayer(props: {
   tempFrame: FrameData;
   handleSize: number;
   strokeWidth: number;
+  visualScale?: number;
   borderColor?: string;
   onResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }) {
@@ -18,6 +19,7 @@ export function InteractiveFrameResizeHandleLayer(props: {
       frameRect={props.tempFrame}
       handleSize={props.handleSize}
       strokeWidth={props.strokeWidth}
+      {...(props.visualScale === undefined ? {} : { visualScale: props.visualScale })}
       onResizeStart={props.onResizeStart}
       {...(props.borderColor === undefined ? {} : { borderColor: props.borderColor })}
     />

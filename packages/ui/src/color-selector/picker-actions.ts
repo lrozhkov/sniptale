@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { COLOR_SELECTOR_TRANSPARENT } from './helpers';
+import { getColorAlpha, normalizeColor, replaceColorChannels } from '@sniptale/foundation/color';
 
 type PickerRollback = ReturnType<typeof usePickerRollback>;
+
+function resolvePaletteSelection(currentColor: string, paletteColor: string): string {
+  const normalizedPaletteColor = normalizeColor(paletteColor) ?? paletteColor;
+  const paletteAlpha = getColorAlpha(normalizedPaletteColor);
+  if (
+    (paletteAlpha !== null && paletteAlpha < 1) ||
+    currentColor.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT
+  ) {
+    return normalizedPaletteColor;
+  }
+
+  return replaceColorChannels(currentColor, normalizedPaletteColor) ?? normalizedPaletteColor;
+}
 
 function usePreviewResetRef(onPreviewReset: ((value: string) => void) | undefined) {
   const previewResetRef = useRef(onPreviewReset);
@@ -92,7 +106,15 @@ function useCommitSelectionHandlers(args: {
       setDraftColor(COLOR_SELECTOR_TRANSPARENT);
       onPreviewChange?.(COLOR_SELECTOR_TRANSPARENT);
     }, [onPreviewChange, setDraftColor]),
-    handleSwatchSelect: useCallback(
+    handlePaletteSelect: useCallback(
+      (nextColor: string) => {
+        const resolvedColor = resolvePaletteSelection(draftColor, nextColor);
+        setDraftColor(resolvedColor);
+        onChange(resolvedColor);
+      },
+      [draftColor, onChange, setDraftColor]
+    ),
+    handleRecentSelect: useCallback(
       (nextColor: string) => {
         setDraftColor(nextColor);
         onChange(nextColor);

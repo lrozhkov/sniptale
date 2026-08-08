@@ -6,6 +6,8 @@ import {
   serializeFrameAnnotationSnapshot,
 } from '.';
 import { createDefaultFrameCallout, createDefaultFrameStepBadge } from './defaults';
+import { createDefaultHighlighterSettings } from '../style/defaults';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 describe('frame annotation snapshot boundary', () => {
   it('round-trips the versioned visual state without page or editor runtime metadata', () => {
@@ -27,6 +29,60 @@ describe('frame annotation snapshot boundary', () => {
     ).toEqual(snapshot);
     expect(snapshot).not.toHaveProperty('pagePlacement');
     expect(snapshot).not.toHaveProperty('linkedElementSelector');
+  });
+
+  it('round-trips up to four additional callouts and rejects oversized collections', () => {
+    const callout = createDefaultFrameCallout();
+    const snapshot = createFrameAnnotationSnapshot(
+      {
+        id: 'frame-with-callouts',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 80,
+        callout,
+        additionalCallouts: Array.from({ length: 4 }, () => structuredClone(callout)),
+      },
+      0
+    );
+    expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+    expect(
+      parseFrameAnnotationSnapshot({
+        ...snapshot,
+        additionalCallouts: [...snapshot.additionalCallouts!, structuredClone(callout)],
+      })
+    ).toBeNull();
+    expect(parseFrameAnnotationSnapshot({ ...snapshot, callout: undefined })).toBeNull();
+  });
+
+  it('normalizes duplicate callout instance ids to stable collision-free identities', () => {
+    const callout = { ...createDefaultFrameCallout(), instanceId: 'duplicate' };
+    const snapshot = createFrameAnnotationSnapshot(
+      {
+        id: 'frame-duplicates',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 80,
+        callout,
+        additionalCallouts: [{ ...callout }, { ...callout }],
+      },
+      0
+    );
+    const parsed = parseFrameAnnotationSnapshot({
+      ...snapshot,
+      callout,
+      additionalCallouts: [{ ...callout }, { ...callout }],
+    });
+    const ids = [parsed?.callout, ...(parsed?.additionalCallouts ?? [])].map(
+      (item) => item?.instanceId
+    );
+
+    expect(ids).toEqual(['duplicate', 'frame-duplicates:callout:1', 'frame-duplicates:callout:2']);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(
+      parseSerializedFrameAnnotationSnapshot(serializeFrameAnnotationSnapshot(parsed!))
+    ).toEqual(parsed);
   });
 
   it('rejects unknown versions, invalid geometry, cycles, and unbounded metadata', () => {
@@ -102,6 +158,37 @@ describe('frame annotation snapshot boundary', () => {
         },
       })
     ).toBeNull();
+  });
+
+  it('validates linked frame template ids at the snapshot boundary', () => {
+    const defaults = createDefaultHighlighterSettings();
+    const borderSettings = projectBorderPresetToAppliedSettings(defaults.borderPresets[0]!);
+    const valid = createFrameAnnotationSnapshot(
+      { id: 'linked-frame', x: 0, y: 0, width: 100, height: 80, borderSettings },
+      0
+    );
+    expect(parseFrameAnnotationSnapshot(valid)).toEqual({
+      ...valid,
+      borderSettings: { ...valid.borderSettings!, color: '#f97316' },
+    });
+
+    for (const linkedTemplates of [
+      'callout',
+      { calloutPresetId: 17, stepBadgePresetId: null },
+      { calloutPresetId: null, stepBadgePresetId: {} },
+      { calloutPresetId: 'x'.repeat(257), stepBadgePresetId: null },
+      { calloutPresetId: null },
+    ]) {
+      expect(
+        parseFrameAnnotationSnapshot({
+          ...valid,
+          borderSettings: {
+            ...valid.borderSettings,
+            effects: { ...valid.borderSettings!.effects, linkedTemplates },
+          },
+        })
+      ).toBeNull();
+    }
   });
 
   it('accepts the complete canonical badge and callout visual settings', () => {

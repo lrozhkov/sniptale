@@ -1,113 +1,70 @@
-import { lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react';
-import { AppearanceSection } from '../../sections/appearance';
-import { isSettingsTabVisible, normalizeSettingsTab, type SettingsTab } from '../navigation';
+import { lazy, type LazyExoticComponent, type ReactNode } from 'react';
+import type {
+  SettingsRoute,
+  SettingsSectionId,
+} from '../../../platform/navigation/extension-pages/settings-route/codec';
+import { AppearanceSection } from '../../sections/general/interface-browser';
+import {
+  DEFERRED_SETTINGS_SECTION_LOADERS,
+  type SettingsSectionModule,
+} from '../navigation/registry';
 
-type SettingsSectionComponent = ComponentType;
-type DeferredSettingsTab = Exclude<SettingsTab, 'appearance'>;
-type SettingsSectionLoader = () => Promise<Record<string, SettingsSectionComponent>>;
+type DeferredSettingsSection = Exclude<SettingsSectionId, 'interface-browser'>;
+type DeferredSectionComponent = React.ComponentType<{
+  onViewChange?: (view: string) => void;
+  view?: string;
+}>;
 
 function createLazySettingsSection(
-  loadModule: SettingsSectionLoader,
+  loadModule: () => Promise<SettingsSectionModule>,
   exportName: string
-): LazyExoticComponent<SettingsSectionComponent> {
+): LazyExoticComponent<DeferredSectionComponent> {
   return lazy(async () => {
     const module = await loadModule();
     const component = module[exportName];
-    if (!component) {
-      throw new Error(`Missing settings section export: ${exportName}`);
-    }
-
+    if (!component) throw new Error(`Missing settings section export: ${exportName}`);
     return { default: component };
   });
 }
 
-const deferredSettingsSectionLoaders: Record<DeferredSettingsTab, SettingsSectionLoader> = {
-  ai: () => import('../../sections/ai-providers'),
-  presets: () => import('../../sections/viewport-presets'),
-  saves: () => import('../../sections/save-presets'),
-  highlighter: () => import('../../sections/highlighter/section'),
-  editor: () => import('../../sections/editor'),
-  image: () => import('../../sections/image'),
-  video: () => import('../../sections/video-quality-profiles'),
-  voiceInput: () => import('../../sections/voice-input'),
-  templates: () => import('../../sections/templates'),
-  quickactions: () => import('../../sections/quick-actions'),
-  nativeApp: () => import('../../sections/native-app'),
-  permissions: () => import('../../sections/permissions'),
-  privacy: () => import('../../sections/privacy'),
-};
-
-const deferredSettingsSections: Record<
-  DeferredSettingsTab,
-  LazyExoticComponent<SettingsSectionComponent>
-> = {
-  ai: createLazySettingsSection(deferredSettingsSectionLoaders.ai, 'AIProvidersSection'),
-  presets: createLazySettingsSection(deferredSettingsSectionLoaders.presets, 'PresetsSection'),
-  saves: createLazySettingsSection(deferredSettingsSectionLoaders.saves, 'SavePresetsSection'),
-  highlighter: createLazySettingsSection(
-    deferredSettingsSectionLoaders.highlighter,
-    'HighlighterSection'
-  ),
-  editor: createLazySettingsSection(deferredSettingsSectionLoaders.editor, 'EditorSection'),
-  image: createLazySettingsSection(deferredSettingsSectionLoaders.image, 'ImageSettingsSection'),
-  video: createLazySettingsSection(
-    deferredSettingsSectionLoaders.video,
-    'VideoQualityProfilesSection'
-  ),
-  voiceInput: createLazySettingsSection(
-    deferredSettingsSectionLoaders.voiceInput,
-    'VoiceInputSettingsSection'
-  ),
-  templates: createLazySettingsSection(
-    deferredSettingsSectionLoaders.templates,
-    'TemplatesSection'
-  ),
-  quickactions: createLazySettingsSection(
-    deferredSettingsSectionLoaders.quickactions,
-    'QuickActionsSection'
-  ),
-  nativeApp: createLazySettingsSection(
-    deferredSettingsSectionLoaders.nativeApp,
-    'NativeAppSection'
-  ),
-  permissions: createLazySettingsSection(
-    deferredSettingsSectionLoaders.permissions,
-    'PermissionsSection'
-  ),
-  privacy: createLazySettingsSection(deferredSettingsSectionLoaders.privacy, 'PrivacySection'),
-};
+const deferredSettingsSections = Object.fromEntries(
+  Object.entries(DEFERRED_SETTINGS_SECTION_LOADERS).map(([section, descriptor]) => [
+    section,
+    createLazySettingsSection(descriptor.load, descriptor.exportName),
+  ])
+) as Record<DeferredSettingsSection, LazyExoticComponent<DeferredSectionComponent>>;
 
 let deferredSettingsSectionsPreloadPromise: Promise<void> | null = null;
 
 export function preloadDeferredSettingsSections(): Promise<void> {
-  if (deferredSettingsSectionsPreloadPromise) {
-    return deferredSettingsSectionsPreloadPromise;
-  }
-
+  if (deferredSettingsSectionsPreloadPromise) return deferredSettingsSectionsPreloadPromise;
   deferredSettingsSectionsPreloadPromise = Promise.all(
-    Object.entries(deferredSettingsSectionLoaders)
-      .filter(([tab]) => isSettingsTabVisible(tab as SettingsTab))
-      .map(([, loadModule]) => loadModule())
+    Object.values(DEFERRED_SETTINGS_SECTION_LOADERS).map((descriptor) => descriptor.load())
   )
     .then(() => undefined)
     .catch((error) => {
       deferredSettingsSectionsPreloadPromise = null;
       throw error;
     });
-
   return deferredSettingsSectionsPreloadPromise;
 }
 
-export function shouldDeferSettingsTab(tab: SettingsTab): tab is DeferredSettingsTab {
-  return tab !== 'appearance' && isSettingsTabVisible(tab);
+export function shouldDeferSettingsTab(
+  section: SettingsSectionId
+): section is DeferredSettingsSection {
+  return section !== 'interface-browser';
 }
 
-export function renderSettingsTabContent(activeTab: SettingsTab): ReactNode {
-  const visibleTab = normalizeSettingsTab(activeTab);
-  if (visibleTab === 'appearance') {
-    return <AppearanceSection />;
-  }
-
-  const Section = deferredSettingsSections[visibleTab];
-  return <Section />;
+export function renderSettingsRouteContent(
+  route: SettingsRoute,
+  onViewChange: (view: string) => void
+): ReactNode {
+  if (route.section === 'interface-browser') return <AppearanceSection />;
+  const Section = deferredSettingsSections[route.section];
+  return (
+    <Section
+      onViewChange={onViewChange}
+      {...(route.view === undefined ? {} : { view: route.view })}
+    />
+  );
 }

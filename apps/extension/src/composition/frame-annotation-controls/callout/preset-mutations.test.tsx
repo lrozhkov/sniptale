@@ -68,7 +68,7 @@ it('drops a completed save from a stale popover session', async () => {
   const pending = latest!.create(preset);
   sessionGenerationRef!.current += 1;
   resolveCreate?.({ outcome: 'applied' });
-  await expect(pending).resolves.toBe(false);
+  await expect(pending).resolves.toBeNull();
 });
 
 afterEach(() => {
@@ -99,8 +99,8 @@ it('surfaces rejected and thrown toggle, save, reset, create and overwrite mutat
   await act(async () => {
     await latest?.save(preset);
     await latest?.save(preset);
-    expect(await latest?.overwrite(userPreset)).toBe(false);
-    expect(await latest?.overwrite(userPreset)).toBe(false);
+    expect(await latest?.overwrite(userPreset)).toBeNull();
+    expect(await latest?.overwrite(userPreset)).toBeNull();
   });
 
   mocks.reset.mockResolvedValueOnce({ outcome: 'rejected' }).mockRejectedValueOnce(new Error());
@@ -112,8 +112,8 @@ it('surfaces rejected and thrown toggle, save, reset, create and overwrite mutat
 
   mocks.create.mockResolvedValueOnce({ outcome: 'rejected' }).mockRejectedValueOnce(new Error());
   await act(async () => {
-    expect(await latest?.create(userPreset)).toBe(false);
-    expect(await latest?.create(userPreset)).toBe(false);
+    expect(await latest?.create(userPreset)).toBeNull();
+    expect(await latest?.create(userPreset)).toBeNull();
   });
   expect(state.isSaving).toBe(false);
 });

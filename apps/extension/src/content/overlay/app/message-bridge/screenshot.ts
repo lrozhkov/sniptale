@@ -1,4 +1,5 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { setContentUiPageZoom } from '../../../platform/dom-host';
 import { createBackgroundAutoStartContentActionIntentSource } from '../../../application/privileged-action-intent';
 import { isLockEnabled } from '../../../selection/locker';
 import type {
@@ -139,6 +140,8 @@ function handleEnableScreenshotMode(
   if (request.type !== MessageType.ENABLE_SCREENSHOT_MODE) {
     return false;
   }
+
+  if (typeof request.pageZoom === 'number') setContentUiPageZoom(request.pageZoom);
 
   setScreenshotSurfaceBinding({
     token: request.surfaceCapabilityToken ?? null,

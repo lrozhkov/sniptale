@@ -199,6 +199,8 @@ export interface CalloutVisualStyle {
 export interface CalloutSettings {
   content: CalloutContent;
   enabled: boolean;
+  /** Stable identity for independently editable callouts attached to the same frame. */
+  instanceId?: string | undefined;
   placement: CalloutPlacement;
   sourcePresetId?: string | undefined;
   style: CalloutVisualStyle;
@@ -207,6 +209,7 @@ export interface CalloutSettings {
 export type CalloutSettingsPatch = {
   content?: Partial<CalloutContent>;
   enabled?: boolean;
+  instanceId?: string | undefined;
   placement?: Partial<CalloutPlacement>;
   sourcePresetId?: string | undefined;
   style?: {

@@ -1,79 +1,29 @@
 // @vitest-environment jsdom
-
 import { isValidElement, Suspense } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../sections/appearance', () => ({
+vi.mock('../../sections/general/interface-browser', () => ({
   AppearanceSection: () => 'appearance',
 }));
-
-vi.mock('../../sections/editor', () => ({
-  EditorSection: () => 'editor',
+vi.mock('../../sections/styles/editor-resources', () => ({
+  EditorResourcesSection: () => 'editor',
+}));
+vi.mock('../../sections/system/access-data', () => ({
+  AccessDataSection: ({ view }: { view?: string }) => `access:${view}`,
 }));
 
-vi.mock('../../sections/ai-providers', () => ({
-  AIProvidersSection: () => 'ai',
-}));
-
-vi.mock('../../sections/viewport-presets', () => ({
-  PresetsSection: () => 'presets',
-}));
-
-vi.mock('../../sections/save-presets', () => ({
-  SavePresetsSection: () => 'saves',
-}));
-
-vi.mock('../../sections/highlighter/section', () => ({
-  HighlighterSection: () => 'highlighter',
-}));
-
-vi.mock('../../sections/image', () => ({
-  ImageSettingsSection: () => 'image',
-}));
-
-vi.mock('../../sections/video-quality-profiles', () => ({
-  VideoQualityProfilesSection: () => 'video',
-}));
-
-vi.mock('../../sections/templates', () => ({
-  TemplatesSection: () => 'templates',
-}));
-
-vi.mock('../../sections/quick-actions', () => ({
-  QuickActionsSection: () => 'quickactions',
-}));
-
-vi.mock('../../sections/permissions', () => ({
-  PermissionsSection: () => 'permissions',
-}));
-
-vi.mock('../../sections/privacy', () => ({
-  PrivacySection: () => 'privacy',
-}));
-
-import {
-  preloadDeferredSettingsSections,
-  renderSettingsTabContent,
-  shouldDeferSettingsTab,
-} from './sections';
+import { renderSettingsRouteContent, shouldDeferSettingsTab } from './sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-
 async function render(node: React.ReactNode) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  await act(async () => {
-    root?.render(node);
-  });
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root?.render(node));
 }
-
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
@@ -82,38 +32,19 @@ afterEach(() => {
 });
 
 describe('settings page section registry', () => {
-  it('marks the editor tab as deferred and exposes a lazy render branch', () => {
-    expect(shouldDeferSettingsTab('editor')).toBe(true);
-    expect(shouldDeferSettingsTab('appearance')).toBe(false);
-    const appearanceSection = renderSettingsTabContent('appearance');
-    const editorSection = renderSettingsTabContent('editor');
-
-    expect(isValidElement(appearanceSection)).toBe(true);
-    expect(appearanceSection).toHaveProperty('type');
-    expect(isValidElement(editorSection)).toBe(true);
+  it('keeps only the initial interface surface eager', () => {
+    expect(shouldDeferSettingsTab('editor-resources')).toBe(true);
+    expect(shouldDeferSettingsTab('interface-browser')).toBe(false);
+    expect(
+      isValidElement(renderSettingsRouteContent({ section: 'interface-browser' }, vi.fn()))
+    ).toBe(true);
   });
-
-  it('preloads deferred settings tabs and resolves the editor lazy section', async () => {
-    await preloadDeferredSettingsSections();
-
-    await render(<Suspense fallback="loading">{renderSettingsTabContent('editor')}</Suspense>);
-
-    expect(container?.textContent).toBe('editor');
-  });
-
-  it('preloads and resolves the privacy lazy section', async () => {
-    await preloadDeferredSettingsSections();
-
-    await render(<Suspense fallback="loading">{renderSettingsTabContent('privacy')}</Suspense>);
-
-    expect(container?.textContent).toBe('privacy');
-  });
-
-  it('preloads and resolves the video quality profiles section', async () => {
-    await preloadDeferredSettingsSections();
-
-    await render(<Suspense fallback="loading">{renderSettingsTabContent('video')}</Suspense>);
-
-    expect(container?.textContent).toBe('video');
+  it('preloads and resolves route views through composition owners', async () => {
+    await render(
+      <Suspense fallback="loading">
+        {renderSettingsRouteContent({ section: 'access-data', view: 'privacy' }, vi.fn())}
+      </Suspense>
+    );
+    expect(container?.textContent).toBe('access:privacy');
   });
 });

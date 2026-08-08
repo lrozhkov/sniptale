@@ -5,13 +5,18 @@ import { ToolbarSecondaryControls } from '../controls/secondary';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { useToolbarEventDeliveryDiagnostics } from './event-diagnostics';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
-function getToolbarVisibilityStyle(positionReady: boolean, position: { x: number; y: number }) {
+function getToolbarVisibilityStyle(
+  positionReady: boolean,
+  position: { x: number; y: number },
+  uiScale: number
+) {
   return {
-    top: `${position.y}px`,
-    left: `${position.x}px`,
+    top: `${position.y * uiScale}px`,
+    left: `${position.x * uiScale}px`,
     visibility: positionReady ? 'visible' : 'hidden',
     pointerEvents: positionReady ? 'auto' : 'none',
     animation: positionReady ? undefined : 'none',
@@ -26,6 +31,7 @@ export function ToolbarShellContent(props: {
 }) {
   const { toolbarProps, viewModel, onHoverCapture, onViewportChange } = props;
   const { derivedState } = viewModel;
+  const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
 
@@ -38,7 +44,11 @@ export function ToolbarShellContent(props: {
         dataUi="content.toolbar.root"
         data-display-mode={derivedState.displayMode}
         data-menu-open={menuOpen ? 'true' : undefined}
-        style={getToolbarVisibilityStyle(derivedState.positionReady, derivedState.position)}
+        style={getToolbarVisibilityStyle(
+          derivedState.positionReady,
+          derivedState.position,
+          uiScale
+        )}
         onMouseOverCapture={onHoverCapture}
       >
         <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>

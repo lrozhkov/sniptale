@@ -40,6 +40,7 @@ type FrameCalloutEditingModel = {
 
 export type FrameCalloutInteractiveSurfaceProps = {
   chrome?: 'export' | 'interactive';
+  chromeScale: number;
   controlsPortalTarget?: Element | DocumentFragment;
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   editing: FrameCalloutEditingModel;
@@ -105,9 +106,13 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
     };
   }, [props.settings]);
   const coordinateSpace = props.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
+  const visualScale = props.chrome === 'export' ? 1 : props.chromeScale;
   const interaction = useCalloutInteractionLayout({
     coordinateSpace,
-    dimensions: props.editing.layout.dimensions,
+    dimensions: {
+      width: props.editing.layout.dimensions.width * visualScale,
+      height: props.editing.layout.dimensions.height * visualScale,
+    },
     frameBorderWidth: props.frameBorderWidth,
     frameRect: props.frameRect,
     isEditing: props.isEditing,
@@ -121,6 +126,7 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
     onWidthChange: props.onWidthChange,
     ...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {}),
     settings: props.settings,
+    visualScale,
     wrapperRef,
     zIndex: props.zIndex,
   });
@@ -210,7 +216,12 @@ function createCalloutBodyProps(args: BodyArgs) {
   return {
     applyFormatting: editing.events.applyFormatting,
     calloutDimensions: layout.calloutDimensions,
-    cloudStyle: layout.cloudStyle,
+    cloudStyle: {
+      ...layout.cloudStyle,
+      ...(args.props.chrome === 'export'
+        ? {}
+        : { scale: args.props.chromeScale, transformOrigin: 'top left' }),
+    },
     containerRef: editing.refs.container,
     contentEditableRef: editing.refs.contentEditable,
     editableStyle: layout.editableStyle,
@@ -235,12 +246,14 @@ function createCalloutBodyProps(args: BodyArgs) {
     dynamicTail: layout.dynamicTail,
     settingsAnchorRef: args.props.settingsAnchorRef,
     showSettingsHandle: args.props.showSettingsHandle,
+    visualScale: args.props.chrome === 'export' ? 1 : args.props.chromeScale,
     ...createCalloutHandleCallbacks(args),
     ...createCalloutHandleState(args),
     ...createCalloutHandleStyles({
       coordinateSpace: args.coordinateSpace,
       layout,
       showSettingsHandle: args.props.showSettingsHandle,
+      uiScale: args.props.chromeScale,
       viewport: args.coordinateSpace.viewport,
     }),
     wrapperStyle: layout.wrapperStyle,

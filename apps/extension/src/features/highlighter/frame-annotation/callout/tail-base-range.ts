@@ -13,6 +13,7 @@ export function useCalloutTailBaseRange(args: {
   isEditing: boolean;
   onRangeChange: (position: number, width: number) => void;
   startPoint: Point | undefined;
+  visualScale?: number;
 }) {
   const startPosition = getCalloutEdgePosition(
     args.bubbleRect,
@@ -22,7 +23,7 @@ export function useCalloutTailBaseRange(args: {
   const endPosition = getCalloutEdgePosition(args.bubbleRect, args.connectorSide, args.endPoint);
   const horizontal = args.connectorSide === 'top' || args.connectorSide === 'bottom';
   const edgeLength = horizontal ? args.bubbleRect.width : args.bubbleRect.height;
-  const minWidth = Math.min(1, 4 / Math.max(1, edgeLength));
+  const minWidth = Math.min(1, (4 * (args.visualScale ?? 1)) / Math.max(1, edgeLength));
   const startDrag = useCalloutEdgeDrag({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
     edgeRect: args.bubbleRect,
@@ -34,6 +35,7 @@ export function useCalloutTailBaseRange(args: {
       args.onRangeChange((position + endPosition) / 2, Math.max(minWidth, endPosition - position));
     },
     position: undefined,
+    ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
   });
   const endDrag = useCalloutEdgeDrag({
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
@@ -49,6 +51,7 @@ export function useCalloutTailBaseRange(args: {
       );
     },
     position: undefined,
+    ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
   });
   const draftStart = startDrag.draftPosition ?? startPosition;
   const draftEnd = endDrag.draftPosition ?? endPosition;

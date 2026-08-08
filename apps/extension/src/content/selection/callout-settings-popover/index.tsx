@@ -13,31 +13,12 @@ import { useFramePopoverPosition } from '../interactive-frame/layout/popover-pos
 import { usePopoverEscapeClose } from '../../../composition/frame-annotation-controls/popover/hooks';
 import { useCalloutSettingsPopoverState } from './state';
 import { useCalloutPresetPopoverController } from '../../../composition/frame-annotation-controls/callout/preset-controller';
-import { CalloutPresetEditor } from '../../../ui/highlighter-preset-editor/callout';
 import { useFloatingPopoverDrag } from '../../../composition/frame-annotation-controls/popover/drag';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 import { createCalloutSaveSection } from '../../../composition/frame-annotation-controls/callout/save-section';
 
-function CalloutPersistentPresetEditor(props: {
-  editor: ReturnType<typeof useCalloutPresetPopoverController>['editor'];
-}) {
-  const { editor } = props;
-  if (!editor.preset) return null;
-  return (
-    <CalloutPresetEditor
-      isOpen={editor.isOpen}
-      isSaving={editor.isSaving}
-      preset={editor.preset}
-      onClose={editor.close}
-      {...(editor.preset.origin === 'system' && editor.preset.customized === true
-        ? { onReset: () => editor.reset(editor.preset!) }
-        : {})}
-      onSave={editor.save}
-    />
-  );
-}
-
 interface CalloutSettingsPopoverProps {
+  calloutIndex?: number;
   isOpen: boolean;
   onClose: () => void;
   frameId: string;
@@ -45,6 +26,67 @@ interface CalloutSettingsPopoverProps {
   frameRect: { x: number; y: number; width: number; height: number };
   settings?: CalloutSettings;
   anchorEl: HTMLElement | null;
+  onDelete?: () => void;
+  onSettingsChange?: (settings: CalloutSettings) => void;
+}
+
+function CalloutSettingsPopoverSurface(props: {
+  handleDelete: () => void;
+  popoverRef: RefObject<HTMLDivElement | null>;
+  portalTarget: HTMLElement | ShadowRoot | DocumentFragment;
+  presentation: ReturnType<typeof useCalloutPopoverPresentation>;
+  presets: ReturnType<typeof useCalloutPresetPopoverController>;
+  request: CalloutSettingsPopoverProps;
+  state: ReturnType<typeof useCalloutSettingsPopoverState>;
+}) {
+  const { frameColors, isOpen, onClose } = props.request;
+  const saveSection = createCalloutSaveSection({
+    create: props.presets.catalog.create,
+    error: props.presets.catalog.error,
+    isSaving: props.presets.catalog.isSaving,
+    overwrite: props.presets.catalog.overwrite,
+    presets: props.presets.catalog.presets,
+    settings: props.state.localSettings,
+    onCreated: props.state.markTemplateCreated,
+  });
+  return (
+    <ContentPopoverAdapter
+      isOpen={isOpen}
+      anchorEl={props.request.anchorEl}
+      portalTarget={props.portalTarget}
+      popoverRef={props.popoverRef}
+      className={[
+        'sniptale-callout-settings-popover sniptale-glass-popover',
+        'sniptale-glass-popover--wide sniptale-content-popover--compact',
+        'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
+      ].join(' ')}
+      style={{ ...props.presentation.style, width: POPOVER_WIDTH }}
+      dataUi="content.callout-settings.popover"
+    >
+      <CalloutSettingsPopoverContent
+        {...(frameColors ? { frameColors } : {})}
+        handleDelete={props.handleDelete}
+        headerContext="element"
+        headerDrag={props.presentation.drag}
+        handleSettingChange={props.state.handleSettingChange}
+        localSettings={props.state.localSettings}
+        onApplyPreset={props.state.applyPreset}
+        onForkPreset={props.state.forkPreset}
+        onResetPreset={(preset) => {
+          void props.presets.editor.reset(preset).then((restored) => {
+            if (restored) props.state.applyPreset(restored);
+          });
+        }}
+        onShowPresets={props.presets.catalog.refresh}
+        onTogglePreset={(preset) => void props.presets.catalog.toggle(preset)}
+        pendingPresetIds={props.presets.catalog.pendingPresetIds}
+        presets={props.presets.catalog.visiblePresets}
+        presetError={props.presets.catalog.error}
+        saveSection={saveSection}
+        onClose={onClose}
+      />
+    </ContentPopoverAdapter>
+  );
 }
 
 function useCalloutPopoverPresentation(args: {
@@ -77,15 +119,8 @@ function useCalloutPopoverPresentation(args: {
   };
 }
 
-export function CalloutSettingsPopover({
-  isOpen,
-  onClose,
-  frameId,
-  frameColors,
-  frameRect,
-  settings,
-  anchorEl,
-}: CalloutSettingsPopoverProps) {
+export function CalloutSettingsPopover(props: CalloutSettingsPopoverProps) {
+  const { anchorEl, frameId, frameRect, isOpen, onClose, settings } = props;
   useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const presentation = useCalloutPopoverPresentation({
@@ -95,64 +130,36 @@ export function CalloutSettingsPopover({
     isOpen,
     popoverRef,
   });
-  const { applyPreset, handleSettingChange, localSettings } = useCalloutSettingsPopoverState({
+  const state = useCalloutSettingsPopoverState({
+    calloutIndex: props.calloutIndex ?? 0,
     frameId,
     isOpen,
     ...(settings === undefined ? {} : { settings }),
+    ...(props.onSettingsChange ? { onSettingsChange: props.onSettingsChange } : {}),
   });
   const presets = useCalloutPresetPopoverController(isOpen);
-  const saveSection = createCalloutSaveSection({
-    create: presets.catalog.create,
-    error: presets.catalog.error,
-    isSaving: presets.catalog.isSaving,
-    overwrite: presets.catalog.overwrite,
-    presets: presets.catalog.presets,
-    settings: localSettings,
-  });
+  const portalTarget = resolveContentPortalTarget(anchorEl);
 
   usePopoverEscapeClose({ anchorEl, isOpen: isOpen && !presets.editor.isOpen, onClose });
 
   const handleDelete = () => {
-    dispatchCalloutDelete({ frameId });
+    props.onDelete?.();
+    dispatchCalloutDelete({
+      ...((props.calloutIndex ?? 0) === 0 ? {} : { calloutIndex: props.calloutIndex }),
+      frameId,
+    });
     onClose();
   };
 
   return (
-    <ContentPopoverAdapter
-      isOpen={isOpen}
-      anchorEl={anchorEl}
-      portalTarget={resolveContentPortalTarget(anchorEl)}
+    <CalloutSettingsPopoverSurface
+      handleDelete={handleDelete}
       popoverRef={popoverRef}
-      className={[
-        'sniptale-callout-settings-popover sniptale-glass-popover',
-        'sniptale-glass-popover--wide sniptale-content-popover--compact',
-        'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
-      ].join(' ')}
-      style={{
-        ...presentation.style,
-        width: POPOVER_WIDTH,
-      }}
-      dataUi="content.callout-settings.popover"
-    >
-      <CalloutSettingsPopoverContent
-        {...(frameColors ? { frameColors } : {})}
-        handleDelete={handleDelete}
-        headerContext="element"
-        headerDrag={presentation.drag}
-        handleSettingChange={handleSettingChange}
-        localSettings={localSettings}
-        onApplyPreset={applyPreset}
-        onCustomizePreset={presets.editor.open}
-        onResetPreset={(preset) => void presets.editor.reset(preset)}
-        onShowPresets={presets.catalog.refresh}
-        onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
-        pendingPresetIds={presets.catalog.pendingPresetIds}
-        presets={presets.catalog.visiblePresets}
-        presetError={presets.catalog.error}
-        saveSection={saveSection}
-        onClose={onClose}
-      />
-      <CalloutPersistentPresetEditor editor={presets.editor} />
-    </ContentPopoverAdapter>
+      portalTarget={portalTarget}
+      presentation={presentation}
+      presets={presets}
+      request={props}
+      state={state}
+    />
   );
 }

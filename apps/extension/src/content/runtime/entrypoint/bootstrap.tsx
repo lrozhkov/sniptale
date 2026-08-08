@@ -1,5 +1,12 @@
 import { createRoot } from 'react-dom/client';
-import { initializeContentUiRoots } from '../../platform/dom-host';
+import {
+  initializeContentUiRoots,
+  getContentUiPageZoomRevision,
+  installContentUiScaleCompensation,
+  setContentUiPageZoomAtRevision,
+} from '../../platform/dom-host';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { createContentEntrypointStyles } from '../../public/preparation-surface/styles';
 import {
   createShadowHost,
@@ -77,18 +84,32 @@ export function initializeTopLevelContentEntry(): void {
   const { appContainer } = initializeContentUiRoots(shadow);
   installContentUiActivationBridge(shadow);
   document.body.appendChild(host);
+  const disposeContentUiScaleCompensation = installContentUiScaleCompensation(host);
 
   const root = createRoot(appContainer);
   root.render(<App />);
   const disposeContentRuntime = initializeTopLevelContentRuntime(readWindowViewportInfo);
+  const pageZoomRevision = getContentUiPageZoomRevision();
+  void getContentRuntimeServices()
+    .messaging.sendRuntimeMessage({ type: MessageType.SCREENSHOT_MODE_STATUS })
+    .then((response) => {
+      if (response.success && typeof response.pageZoom === 'number') {
+        setContentUiPageZoomAtRevision(response.pageZoom, pageZoomRevision);
+      }
+    })
+    .catch(() => undefined);
   const disposeToastHostAdapter = installContentToastHostAdapter();
   registerContentRuntimeCleanup(() => {
     try {
       disposeContentRuntime();
     } finally {
-      disposeToastHostAdapter();
-      root.unmount();
-      host.remove();
+      try {
+        disposeContentUiScaleCompensation();
+        disposeToastHostAdapter();
+        root.unmount();
+      } finally {
+        host.remove();
+      }
     }
   });
 

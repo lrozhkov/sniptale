@@ -89,15 +89,12 @@ function expectSavedHighlighterPreset(updateSelectionShapeSettings: ReturnType<t
 
   expect(mocks.addBorderPresetMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      color: '#112233',
+      color: '#11223366',
       customCss: '',
-      fillColor: '#00ff00',
-      fillOpacity: 25,
+      fillColor: '#00ff0040',
       id: 'preset-new',
       inheritCustomCss: false,
-      opacity: 40,
       padding: DEFAULT_BORDER_PRESET.padding,
-      strokeOpacity: 40,
     })
   );
   expect(appendBorderPresetMock).toHaveBeenCalledWith(

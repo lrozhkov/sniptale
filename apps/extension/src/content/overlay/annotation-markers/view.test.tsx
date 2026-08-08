@@ -386,7 +386,7 @@ it('anchors a variable-width focused marker inside the right viewport edge', asy
   expect(marker?.textContent).toBe('12345');
   expect(group?.style.left).toBe('');
   expect(group?.style.right).toBe('12px');
-  expect(marker?.className).toContain('max-w-[calc(100vw-8px)]');
+  expect(marker?.style.maxWidth).toBe('calc(var(--sniptale-content-ui-viewport-width) - 8px)');
   expect(marker?.style.borderWidth).toBe('3px');
   act(() => marker?.focus());
   expect(group?.style.right).toBe('12px');

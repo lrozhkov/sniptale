@@ -7,12 +7,17 @@ vi.mock('../../platform/dom-host', async (importOriginal) => ({
   appendToContentOverlayRoot: (element: HTMLElement) => document.body.append(element),
 }));
 
-import { showQuickEditHoverOverlay } from './overlay.hover';
+import {
+  ensureQuickEditHoverOverlay,
+  hideQuickEditHoverOverlay,
+  removeQuickEditHoverOverlay,
+  showQuickEditHoverOverlay,
+} from './overlay.hover';
 import { createQuickEditOverlayState } from './overlay.state';
 
 afterEach(() => document.body.replaceChildren());
 
-it('projects the hover stroke inward without changing its previous outer visual box', () => {
+it('projects the hover stroke outside the padded content box', () => {
   const target = document.createElement('div');
   Object.defineProperty(target, 'getBoundingClientRect', {
     configurable: true,
@@ -22,11 +27,23 @@ it('projects the hover stroke inward without changing its previous outer visual 
 
   showQuickEditHoverOverlay(state, target);
 
-  expect(state.hoverOverlay?.style).toMatchObject({
-    boxSizing: 'border-box',
-    left: '6px',
-    top: '2px',
-    width: '76px',
-    height: '76px',
-  });
+  expect(state.hoverOverlay?.style.boxSizing).toBe('content-box');
+  expect(state.hoverOverlay?.style.left).toBe('6px');
+  expect(state.hoverOverlay?.style.top).toBe('2px');
+  expect(state.hoverOverlay?.style.width).toBe('70px');
+  expect(state.hoverOverlay?.style.height).toBe('70px');
+
+  const originalOverlay = state.hoverOverlay;
+  expect(ensureQuickEditHoverOverlay(state)).toBe(originalOverlay);
+  hideQuickEditHoverOverlay(state);
+  expect(state.hoverOverlay?.style.display).toBe('none');
+  removeQuickEditHoverOverlay(state);
+  expect(state.hoverOverlay).toBeNull();
+});
+
+it('allows hide and removal before the hover overlay is created', () => {
+  const state = createQuickEditOverlayState();
+  hideQuickEditHoverOverlay(state);
+  removeQuickEditHoverOverlay(state);
+  expect(state.hoverOverlay).toBeNull();
 });

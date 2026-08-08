@@ -85,7 +85,20 @@ function registerArrowBlurTextStepParserTests() {
         variant: undefined,
       })
     ).toMatchObject(arrowSettings);
-    expect(parseBlurSettings(blurSettings)).toEqual(blurSettings);
+    const { strokeOpacity: _legacyStrokeOpacity, ...canonicalBlurSettings } = blurSettings;
+    expect(parseBlurSettings(blurSettings)).toEqual({
+      ...canonicalBlurSettings,
+      strokeColor: '#11223399',
+    });
+    expect(
+      parseBlurSettings({ ...blurSettings, strokeColor: '#445566', strokeOpacity: undefined })
+    ).toMatchObject({ strokeColor: '#445566' });
+    expect(
+      parseBlurSettings({ ...blurSettings, strokeColor: 'var(--legacy)', strokeOpacity: undefined })
+    ).toMatchObject({ strokeColor: 'var(--legacy)' });
+    expect(
+      parseBlurSettings({ ...blurSettings, strokeColor: undefined, strokeOpacity: undefined })
+    ).not.toHaveProperty('strokeColor');
     expect(parseTextSettings(textSettings)).toEqual(textSettings);
     expect(parseStepSettings(stepSettings)).toEqual(stepSettings);
     expect(parseStepSettings({ ...stepSettings, type: 'manual', value: 'OK' })).toEqual({

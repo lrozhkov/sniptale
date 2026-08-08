@@ -28,7 +28,40 @@ function useInteractiveFrameLocalState(params: {
   const [isCalloutEditing, setIsCalloutEditing] = React.useState(() =>
     consumeFrameCalloutEditRequest(params.frame.id)
   );
+  const [activeCalloutIndex, setActiveCalloutIndex] = React.useState(0);
   const [tempFrame, setTempFrame] = React.useState<FrameData>(params.frame);
+  const authoritativeFrameRef = React.useRef(params.frame);
+  authoritativeFrameRef.current = params.frame;
+  const tempFrameRef = React.useRef(tempFrame);
+  tempFrameRef.current = tempFrame;
+  const pendingCalloutFrameRef = React.useRef<FrameData | null>(null);
+  const pendingCalloutTimeoutRef = React.useRef<number | null>(null);
+  React.useEffect(
+    () => () => {
+      if (pendingCalloutTimeoutRef.current !== null)
+        window.clearTimeout(pendingCalloutTimeoutRef.current);
+    },
+    []
+  );
+  const stageCalloutFrame = React.useCallback(
+    (update: FrameData | ((frame: FrameData) => FrameData)) => {
+      const nextFrame = typeof update === 'function' ? update(tempFrameRef.current) : update;
+      tempFrameRef.current = nextFrame;
+      pendingCalloutFrameRef.current = nextFrame;
+      setTempFrame(nextFrame);
+      if (pendingCalloutTimeoutRef.current !== null)
+        window.clearTimeout(pendingCalloutTimeoutRef.current);
+      pendingCalloutTimeoutRef.current = window.setTimeout(() => {
+        pendingCalloutTimeoutRef.current = null;
+        if (pendingCalloutFrameRef.current !== nextFrame) return;
+        pendingCalloutFrameRef.current = null;
+        tempFrameRef.current = authoritativeFrameRef.current;
+        setTempFrame(authoritativeFrameRef.current);
+      }, 2_000);
+      return nextFrame;
+    },
+    []
+  );
   const [effectMode, setEffectMode] = React.useState<EffectMode>(
     params.frame.effectMode || params.defaultEffectMode
   );
@@ -37,15 +70,19 @@ function useInteractiveFrameLocalState(params: {
 
   return {
     aspectRatio,
+    activeCalloutIndex,
     effectMode,
     isCalloutEditing,
     maintainAspectRatio,
+    pendingCalloutFrameRef,
     setAspectRatio,
+    setActiveCalloutIndex,
     setEffectMode,
     setIsCalloutEditing,
     setMaintainAspectRatio,
     setState,
     setTempFrame,
+    stageCalloutFrame,
     state,
     tempFrame,
   };
@@ -80,35 +117,43 @@ function useInteractiveFrameStoreState() {
 }
 
 function createInteractiveFrameLocalState(params: {
+  activeCalloutIndex: number;
   aspectRatio: number | null;
   effectMode: EffectMode;
   isCalloutEditing: boolean;
   maintainAspectRatio: boolean;
+  pendingCalloutFrameRef: React.MutableRefObject<FrameData | null>;
   state: FrameState;
   tempFrame: FrameData;
 }) {
   return {
+    activeCalloutIndex: params.activeCalloutIndex,
     state: params.state,
     isCalloutEditing: params.isCalloutEditing,
     tempFrame: params.tempFrame,
     effectMode: params.effectMode,
     maintainAspectRatio: params.maintainAspectRatio,
     aspectRatio: params.aspectRatio,
+    pendingCalloutFrameRef: params.pendingCalloutFrameRef,
   };
 }
 
 function createInteractiveFrameLocalSetters(params: {
+  setActiveCalloutIndex: React.Dispatch<React.SetStateAction<number>>;
   setAspectRatio: React.Dispatch<React.SetStateAction<number | null>>;
   setEffectMode: React.Dispatch<React.SetStateAction<EffectMode>>;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setMaintainAspectRatio: React.Dispatch<React.SetStateAction<boolean>>;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+  stageCalloutFrame: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
 }) {
   return {
+    setActiveCalloutIndex: params.setActiveCalloutIndex,
     setState: params.setState,
     setIsCalloutEditing: params.setIsCalloutEditing,
     setTempFrame: params.setTempFrame,
+    stageCalloutFrame: params.stageCalloutFrame,
     setEffectMode: params.setEffectMode,
     setMaintainAspectRatio: params.setMaintainAspectRatio,
     setAspectRatio: params.setAspectRatio,

@@ -93,8 +93,20 @@ function parseDefaultFocusSettings(value: unknown): ParsedField {
   const nextValue: Partial<FocusSettings> = {};
   let invalidFieldCount = 0;
 
-  if (value['opacity'] === undefined || isNumber(value['opacity'])) {
+  if (
+    value['opacity'] === undefined ||
+    (isNumber(value['opacity']) && value['opacity'] >= 0 && value['opacity'] <= 1)
+  ) {
     if (value['opacity'] !== undefined) nextValue.opacity = value['opacity'];
+  } else {
+    invalidFieldCount++;
+  }
+
+  if (
+    value['blurAmount'] === undefined ||
+    (isNumber(value['blurAmount']) && value['blurAmount'] >= 0 && value['blurAmount'] <= 25)
+  ) {
+    if (value['blurAmount'] !== undefined) nextValue.blurAmount = value['blurAmount'];
   } else {
     invalidFieldCount++;
   }

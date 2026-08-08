@@ -37,8 +37,14 @@ export function resolveInteractiveCurrentFrame(args: {
   tempFrame: FrameData;
   state: FrameState;
   isCalloutEditing: boolean;
+  isCalloutDraftPending?: boolean;
 }) {
-  if (args.state === 'editing' || args.state === 'resizing' || args.isCalloutEditing) {
+  if (
+    args.state === 'editing' ||
+    args.state === 'resizing' ||
+    args.isCalloutEditing ||
+    args.isCalloutDraftPending
+  ) {
     return args.tempFrame;
   }
 

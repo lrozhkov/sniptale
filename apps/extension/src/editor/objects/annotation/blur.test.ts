@@ -88,7 +88,6 @@ it('creates blur objects with persisted settings and source metadata', () => {
     shadow: 0,
     showBorder: true,
     strokeColor: '#475569',
-    strokeOpacity: 1,
     strokeStyle: 'solid',
     strokeWidth: 2,
   });
@@ -166,7 +165,6 @@ it('falls back to default settings when blur metadata is invalid', () => {
     shadow: 0,
     showBorder: true,
     strokeColor: '#475569',
-    strokeOpacity: 1,
     strokeStyle: 'solid',
     strokeWidth: 0,
   });

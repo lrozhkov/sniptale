@@ -261,8 +261,7 @@ it('omits interaction chrome for export and short-circuits a disabled shared bad
         chrome="export"
         controlsPortalTarget={controlsHost}
         coordinateSpace={coordinateSpace}
-        fillColor="#abcdef"
-        fillOpacity={0.5}
+        fillColor="#abcdef80"
         frameRect={{ height: 40, width: 60, x: 10, y: 20 }}
         onClick={vi.fn()}
         onPositionChange={vi.fn()}

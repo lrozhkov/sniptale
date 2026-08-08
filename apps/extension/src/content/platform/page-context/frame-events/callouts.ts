@@ -6,11 +6,14 @@ import {
 } from '../event-bus';
 
 export type FrameCalloutChangedDetail = {
+  /** Logical callout index: 0 is the primary callout, 1–4 are additional callouts. */
+  calloutIndex?: number;
   frameId: string;
   settings: CalloutSettingsPatch;
 };
 
 export type CalloutDeleteDetail = {
+  calloutIndex?: number;
   frameId: string;
 };
 

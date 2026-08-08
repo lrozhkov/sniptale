@@ -87,12 +87,9 @@ describe('BorderPresetEditor opened state', () => {
       radius: 4,
       padding: { top: 1, right: 1, bottom: 1, left: 1 },
       shadow: 0,
-      opacity: 100,
       customCss: '',
       fillColor: '#00000000',
-      fillOpacity: 0,
       inheritCustomCss: false,
-      strokeOpacity: 100,
     };
     const derivedState = { derived: 'state' };
 

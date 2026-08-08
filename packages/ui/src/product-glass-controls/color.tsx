@@ -1,5 +1,5 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
-import { ProductGlassColorOption, ProductGlassColorTrigger } from './primitives';
+import type { ReactNode } from 'react';
+import { ProductGlassColorOption } from './primitives';
 
 function joinClassNames(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
@@ -17,9 +17,8 @@ export interface ProductGlassColorFieldProps {
   value: string;
   colors: string[];
   disabled?: boolean;
-  onValueChange?: (value: string) => void;
   onPresetSelect?: (color: string) => void;
-  inputProps?: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'disabled'>;
+  pickerTrigger: ReactNode;
 }
 
 export function ProductGlassColorPalette({
@@ -58,9 +57,8 @@ export function ProductGlassColorField({
   value,
   colors,
   disabled = false,
-  onValueChange,
   onPresetSelect,
-  inputProps,
+  pickerTrigger,
 }: ProductGlassColorFieldProps) {
   return (
     <div className="sniptale-glass-color-control">
@@ -69,24 +67,7 @@ export function ProductGlassColorField({
           {label}
         </span>
         <div className="sniptale-glass-color-line-main">
-          <ProductGlassColorTrigger
-            active={!disabled}
-            disabled={disabled}
-            className="sniptale-glass-hidden-color"
-          >
-            <span className="sniptale-glass-color-swatch" style={{ backgroundColor: value }} />
-            <input
-              {...inputProps}
-              className={joinClassNames('sniptale-glass-color-native', inputProps?.className)}
-              type="color"
-              value={value}
-              disabled={disabled}
-              onChange={(event) => {
-                inputProps?.onChange?.(event);
-                onValueChange?.(event.target.value);
-              }}
-            />
-          </ProductGlassColorTrigger>
+          <div className="sniptale-glass-hidden-color">{pickerTrigger}</div>
           <ProductGlassColorPalette
             colors={colors}
             value={value}

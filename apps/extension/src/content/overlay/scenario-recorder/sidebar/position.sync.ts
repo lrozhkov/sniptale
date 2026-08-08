@@ -21,6 +21,7 @@ export function useSidebarPositionInitialization(args: {
   setResolvedPosition: Dispatch<SetStateAction<ScenarioRecorderSidebarPosition>>;
   sidebarRef: RefObject<HTMLElement | null>;
   visible: boolean;
+  uiScale?: number;
 }) {
   const { initializedRef, setRequestedPosition, setResolvedPosition, sidebarRef, visible } = args;
 
@@ -29,11 +30,22 @@ export function useSidebarPositionInitialization(args: {
       return;
     }
 
-    const nextPosition = resolveDefaultSidebarPosition(sidebarRef.current, DEFAULT_SIDEBAR_TOP);
+    const nextPosition = resolveDefaultSidebarPosition(
+      sidebarRef.current,
+      DEFAULT_SIDEBAR_TOP,
+      args.uiScale
+    );
     initializedRef.current = true;
     setRequestedPosition(nextPosition);
     setResolvedPosition(nextPosition);
-  }, [initializedRef, setRequestedPosition, setResolvedPosition, sidebarRef, visible]);
+  }, [
+    args.uiScale,
+    initializedRef,
+    setRequestedPosition,
+    setResolvedPosition,
+    sidebarRef,
+    visible,
+  ]);
 }
 
 export function useSidebarResolvedPositionSync(args: {
@@ -41,6 +53,7 @@ export function useSidebarResolvedPositionSync(args: {
   setResolvedPosition: Dispatch<SetStateAction<ScenarioRecorderSidebarPosition>>;
   sidebarRef: RefObject<HTMLElement | null>;
   visible: boolean;
+  uiScale?: number;
 }) {
   const { requestedPosition, setResolvedPosition, sidebarRef, visible } = args;
   const animationFrameRef = useRef<number | null>(null);
@@ -53,11 +66,12 @@ export function useSidebarResolvedPositionSync(args: {
     const nextPosition = resolveScenarioRecorderSidebarPosition({
       requestedPosition,
       sidebarRef,
+      ...(args.uiScale === undefined ? {} : { uiScale: args.uiScale }),
     });
     setResolvedPosition((current) =>
       arePositionsEqual(current, nextPosition) ? current : nextPosition
     );
-  }, [requestedPosition, setResolvedPosition, sidebarRef]);
+  }, [args.uiScale, requestedPosition, setResolvedPosition, sidebarRef]);
 
   const scheduleResolvedPositionSync = useCallback(() => {
     if (animationFrameRef.current !== null) {

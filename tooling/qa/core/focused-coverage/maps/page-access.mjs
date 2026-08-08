@@ -1,7 +1,9 @@
 import { POPUP_PAGE_ACCESS_OWNER_MAPPINGS } from './popup-page-access.mjs';
 
 const SETTINGS_PERMISSION_REQUESTS_ROOT =
-  'apps/extension/src/settings/sections/permissions/useSettingsPermissions/requests';
+  'apps/extension/src/settings/sections/system/access-data/permissions/useSettingsPermissions/requests';
+const SETTINGS_PERMISSION_LIB_ROOT =
+  'apps/extension/src/settings/sections/system/access-data/permissions/permissions-lib';
 
 export const PAGE_ACCESS_OWNER_MAPPINGS = [
   {
@@ -79,33 +81,28 @@ export const PAGE_ACCESS_OWNER_MAPPINGS = [
   ...POPUP_PAGE_ACCESS_OWNER_MAPPINGS,
   {
     owner: 'settings-page-access-permission-disclosures',
-    productionFile:
-      'apps/extension/src/settings/sections/permissions/permissions-lib/required-disclosures.ts',
+    productionFile: `${SETTINGS_PERMISSION_LIB_ROOT}/required-disclosures.ts`,
     exclusive: true,
     reason: 'Permission disclosure rows are covered by their focused disclosure suite.',
-    testFiles: [
-      'apps/extension/src/settings/sections/permissions/permissions-lib/required-disclosures.test.ts',
-    ],
+    testFiles: [`${SETTINGS_PERMISSION_LIB_ROOT}/required-disclosures.test.ts`],
   },
   {
     owner: 'settings-page-access-permission-types',
-    productionFile: 'apps/extension/src/settings/sections/permissions/permissions-lib/types.ts',
+    productionFile: `${SETTINGS_PERMISSION_LIB_ROOT}/types.ts`,
     exclusive: true,
     reason: 'Permission library type changes are covered through content/request/runtime suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/permissions/permissions-lib/content.test.ts',
-      'apps/extension/src/settings/sections/permissions/permissions-lib/request.test.ts',
-      'apps/extension/src/settings/sections/permissions/permissions-lib/runtime.test.ts',
+      `${SETTINGS_PERMISSION_LIB_ROOT}/content.test.ts`,
+      `${SETTINGS_PERMISSION_LIB_ROOT}/request.test.ts`,
+      `${SETTINGS_PERMISSION_LIB_ROOT}/runtime.test.ts`,
     ],
   },
   {
     owner: 'settings-page-access-permission-index',
-    productionFile: 'apps/extension/src/settings/sections/permissions/permissions-lib/index.ts',
+    productionFile: `${SETTINGS_PERMISSION_LIB_ROOT}/index.ts`,
     exclusive: true,
     reason: 'Permission library facade exports are covered by content/subscription integration.',
-    testFiles: [
-      'apps/extension/src/settings/sections/permissions/permissions-lib/content-and-subscriptions.test.ts',
-    ],
+    testFiles: [`${SETTINGS_PERMISSION_LIB_ROOT}/content-and-subscriptions.test.ts`],
   },
   {
     owner: 'settings-page-access-request-dispatch',

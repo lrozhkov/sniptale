@@ -5,9 +5,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  useInteractiveFrameIdleReset,
   useInteractiveFrameEditingKeyboardEffect,
   useInteractiveFrameEditingOverlayEffect,
 } from './edit-mode-effects';
+import type { FrameData } from '../../../../features/highlighter/contracts';
 
 const setFrameEditing = vi.fn();
 const clearFrameEditing = vi.fn();
@@ -75,6 +77,23 @@ function OverlayEffectHarness(props: {
 }) {
   useInteractiveFrameEditingOverlayEffect(props.state, props.isCalloutEditing);
   return <div>overlay</div>;
+}
+
+const idleFrame: FrameData = { id: 'frame-1', x: 10, y: 20, width: 100, height: 80 };
+
+function IdleResetHarness(props: {
+  pendingCalloutFrame: FrameData | null;
+  setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
+}) {
+  const pendingCalloutFrameRef = React.useRef<FrameData | null>(props.pendingCalloutFrame);
+  useInteractiveFrameIdleReset({
+    frameWithoutLinkedElement: idleFrame,
+    isCalloutEditing: false,
+    pendingCalloutFrameRef,
+    setTempFrame: props.setTempFrame,
+    state: 'idle',
+  });
+  return null;
 }
 
 describe('interactive frame editing keyboard effect', () => {
@@ -160,5 +179,26 @@ describe('interactive frame editing overlay effect', () => {
     expect(overlayContainer.classList.contains('sniptale-hidden-during-edit')).toBe(false);
 
     overlayContainer.remove();
+  });
+});
+
+describe('interactive frame idle reset', () => {
+  it('does not discard a staged callout while the frame owner is still acknowledging it', () => {
+    const setTempFrame = vi.fn();
+    const pendingCalloutFrame = { ...idleFrame, additionalCallouts: [] };
+
+    renderHarness(
+      <IdleResetHarness pendingCalloutFrame={pendingCalloutFrame} setTempFrame={setTempFrame} />
+    );
+
+    expect(setTempFrame).not.toHaveBeenCalled();
+  });
+
+  it('restores the external frame after the pending callout is acknowledged', () => {
+    const setTempFrame = vi.fn();
+
+    renderHarness(<IdleResetHarness pendingCalloutFrame={null} setTempFrame={setTempFrame} />);
+
+    expect(setTempFrame).toHaveBeenCalledWith(idleFrame);
   });
 });

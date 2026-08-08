@@ -11,20 +11,18 @@ export type FrameRenderDescriptor = {
   borderColor: string | undefined;
   borderCustomCss: string | undefined;
   borderFillColor: string | undefined;
-  borderFillOpacity: number | undefined;
   borderInheritCustomCss: boolean | undefined;
-  borderOpacity: number | undefined;
   borderPaddingBottom: number | undefined;
   borderPaddingLeft: number | undefined;
   borderPaddingRight: number | undefined;
   borderPaddingTop: number | undefined;
   borderRadius: number | undefined;
   borderShadow: number | undefined;
-  borderStrokeOpacity: number | undefined;
   borderStyle: string | undefined;
   borderWidth: number | undefined;
   calloutKey: string;
   effectMode: FrameData['effectMode'];
+  focusBlurAmount: number | undefined;
   focusOpacity: number | undefined;
   focusShowBorder: boolean | undefined;
   height: number;
@@ -85,6 +83,7 @@ function buildFrameRenderDescriptor(
     blurShowBorder: frame.blurSettings?.showBorder,
     blurType: frame.blurSettings?.blurType,
     effectMode: frame.effectMode,
+    focusBlurAmount: frame.focusSettings?.blurAmount,
     focusOpacity: frame.focusSettings?.opacity,
     focusShowBorder: frame.focusSettings?.showBorder,
     height: frame.height,
@@ -113,17 +112,14 @@ function buildFrameBorderDescriptor(frame: FrameData) {
     borderColor: borderSettings?.color,
     borderCustomCss: borderSettings?.customCss,
     borderFillColor: borderSettings?.fillColor,
-    borderFillOpacity: borderSettings?.fillOpacity,
     borderId: borderSettings?.sourcePresetId,
     borderInheritCustomCss: borderSettings?.inheritCustomCss,
-    borderOpacity: borderSettings?.opacity,
     borderPaddingBottom: padding?.bottom,
     borderPaddingLeft: padding?.left,
     borderPaddingRight: padding?.right,
     borderPaddingTop: padding?.top,
     borderRadius: borderSettings?.radius,
     borderShadow: borderSettings?.shadow,
-    borderStrokeOpacity: borderSettings?.strokeOpacity,
     borderStyle: borderSettings?.style,
     borderWidth: borderSettings?.width,
   };
@@ -159,6 +155,8 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
 
 function buildFrameCalloutDescriptor(frame: FrameData) {
   return {
-    calloutKey: createCalloutRenderKey(frame.callout),
+    calloutKey: [frame.callout, ...(frame.additionalCallouts ?? [])]
+      .map(createCalloutRenderKey)
+      .join('\n'),
   };
 }

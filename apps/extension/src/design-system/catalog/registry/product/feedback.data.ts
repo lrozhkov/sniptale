@@ -60,11 +60,11 @@ export const PRODUCT_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[
         'Настройки > AI providers > Confirm dialog',
         'Settings > AI providers > Confirm dialog',
         [
-          'apps/extension/src/settings/sections/ai-providers/surface/content.tsx',
-          'apps/extension/src/settings/sections/save-presets/surface/overlays.tsx',
-          'apps/extension/src/settings/sections/viewport-presets/section-content/content.tsx',
-          'apps/extension/src/settings/sections/templates/content.tsx',
-          'apps/extension/src/settings/sections/quick-actions/index.tsx',
+          'apps/extension/src/settings/sections/ai/connections/surface/content.tsx',
+          'apps/extension/src/settings/sections/capture/saving/surface/overlays.tsx',
+          'apps/extension/src/settings/sections/capture/screen-sizes/section-content/content.tsx',
+          'apps/extension/src/settings/sections/ai/prompts/templates/content.tsx',
+          'apps/extension/src/settings/sections/capture/quick-actions/index.tsx',
         ]
       ),
     ],

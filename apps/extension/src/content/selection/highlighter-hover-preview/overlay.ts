@@ -7,7 +7,6 @@ import { getAbsolutePosition } from '../../platform/frame';
 import { appendToContentOverlayRoot, queryAllContentUiElements } from '../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import {
-  colorToRgba,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -41,31 +40,25 @@ function applyHoverVisualDefaults(
   element: HTMLElement,
   visual: ReturnType<typeof resolveBorderPresetVisual>
 ): void {
-  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
-  element.style.borderRadius = `${visual.radius}px`;
-  element.style.boxSizing = 'border-box';
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
+  element.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
+  element.style.boxSizing = 'content-box';
   element.style.margin = '0';
   element.style.padding = '0';
   element.style.outline = 'none';
   element.style.clipPath = 'none';
   element.style.boxShadow =
     resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
-  element.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);
+  element.style.backgroundColor = visual.fillColor;
 }
 
 function applyCanonicalHoverVisual(
   element: HTMLElement,
   visual: ReturnType<typeof resolveBorderPresetVisual>
 ): void {
-  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
-  element.style.borderRadius = `${visual.radius}px`;
-  element.style.boxSizing = 'border-box';
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
+  element.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
+  element.style.boxSizing = 'content-box';
   element.style.margin = '0';
   element.style.padding = '0';
   element.style.clipPath = 'none';
@@ -73,12 +66,13 @@ function applyCanonicalHoverVisual(
 
 function applyCanonicalHoverGeometry(
   element: HTMLElement,
-  geometry?: ReturnType<typeof calculateFrameContainerCoords>
+  geometry?: ReturnType<typeof calculateFrameContainerCoords>,
+  outwardWidth = 0
 ): void {
   element.style.position = 'absolute';
   element.style.inset = 'auto';
-  element.style.top = geometry ? `${geometry.y}px` : 'auto';
-  element.style.left = geometry ? `${geometry.x}px` : 'auto';
+  element.style.top = geometry ? `${geometry.y - outwardWidth}px` : 'auto';
+  element.style.left = geometry ? `${geometry.x - outwardWidth}px` : 'auto';
   element.style.width = geometry ? `${geometry.width}px` : '0px';
   element.style.height = geometry ? `${geometry.height}px` : '0px';
 }
@@ -146,7 +140,7 @@ export function ensureHoverOverlay(
   hoverOverlay.className = 'sniptale-highlight-hover';
   hoverOverlay.style.cssText = `
     position: absolute;
-    box-sizing: border-box;
+    box-sizing: content-box;
     margin: 0;
     padding: 0;
     pointer-events: none;
@@ -197,7 +191,7 @@ export function showHoverOverlay(
   applyHoverVisualDefaults(hoverOverlay, visual);
   applyHoverCustomCssStyles(hoverOverlay, visual.customCssStyles);
   applyCanonicalHoverVisual(hoverOverlay, visual);
-  applyCanonicalHoverGeometry(hoverOverlay, coords);
+  applyCanonicalHoverGeometry(hoverOverlay, coords, visual.strokeWidth);
   hoverOverlay.style.display = 'block';
   return true;
 }

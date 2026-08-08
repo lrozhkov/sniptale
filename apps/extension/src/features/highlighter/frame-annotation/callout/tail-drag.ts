@@ -76,6 +76,31 @@ export function getCalloutPerimeterPosition(rect: Rect, point: { x: number; y: n
   return closest.offset / Math.max(1, 2 * (rect.width + rect.height));
 }
 
+export function projectCalloutPerimeterPosition(
+  source: Rect,
+  target: Rect,
+  position: number
+): number {
+  const sourcePerimeter = Math.max(1, 2 * (source.width + source.height));
+  const distance = clamp(position, 0, 1) * sourcePerimeter;
+  let targetDistance: number;
+  if (distance <= source.width) {
+    targetDistance = (distance / Math.max(1, source.width)) * target.width;
+  } else if (distance <= source.width + source.height) {
+    const sideOffset = distance - source.width;
+    targetDistance = target.width + (sideOffset / Math.max(1, source.height)) * target.height;
+  } else if (distance <= source.width * 2 + source.height) {
+    const sideOffset = distance - source.width - source.height;
+    targetDistance =
+      target.width + target.height + (sideOffset / Math.max(1, source.width)) * target.width;
+  } else {
+    const sideOffset = distance - source.width * 2 - source.height;
+    targetDistance =
+      target.width * 2 + target.height + (sideOffset / Math.max(1, source.height)) * target.height;
+  }
+  return targetDistance / Math.max(1, 2 * (target.width + target.height));
+}
+
 export function getCalloutPerimeterAnchorPositions(rect: Rect, horizontalGuides: number[] = []) {
   return getCalloutPerimeterAnchors(rect, horizontalGuides).map((anchor) => anchor.position);
 }
@@ -151,14 +176,15 @@ export function getSnappedCalloutPerimeterPosition(
   rect: Rect,
   point: Point,
   activeSnapPosition: number | null,
-  anchorPositions: Array<number | CalloutPerimeterAnchor> = getCalloutPerimeterAnchors(rect)
+  anchorPositions: Array<number | CalloutPerimeterAnchor> = getCalloutPerimeterAnchors(rect),
+  visualScale = 1
 ) {
   const anchors = anchorPositions.map((anchor) =>
     typeof anchor === 'number' ? { id: `position-${anchor}`, position: anchor } : anchor
   );
   if (activeSnapPosition !== null) {
     const snapPoint = getCalloutPerimeterPoint(rect, activeSnapPosition);
-    if (getPointDistance(point, snapPoint) <= PERIMETER_SNAP_RELEASE_DISTANCE) {
+    if (getPointDistance(point, snapPoint) <= PERIMETER_SNAP_RELEASE_DISTANCE * visualScale) {
       const activeAnchor = anchors.find(
         (anchor) => Math.abs(anchor.position - activeSnapPosition) < Number.EPSILON
       );
@@ -171,7 +197,7 @@ export function getSnappedCalloutPerimeterPosition(
   }
 
   const nearestAnchor = getNearestPerimeterAnchor(rect, point, anchors);
-  if (nearestAnchor && nearestAnchor.distance <= PERIMETER_SNAP_ENTER_DISTANCE) {
+  if (nearestAnchor && nearestAnchor.distance <= PERIMETER_SNAP_ENTER_DISTANCE * visualScale) {
     return {
       position: nearestAnchor.position,
       snapAnchorId: nearestAnchor.id,
@@ -210,6 +236,7 @@ function handleCalloutEdgeKeyDown(
     onPositionChange: (position: number, attachment?: CalloutAttachment) => void;
     perimeter?: boolean;
     position: number | undefined;
+    visualScale?: number;
   },
   event: CalloutHandleKeyboardEvent,
   minPosition: number,
@@ -217,6 +244,7 @@ function handleCalloutEdgeKeyDown(
 ) {
   const side = args.connectorSide;
   if (args.isEditing || !side) return;
+  const visualScale = args.visualScale ?? 1;
   const delta = getCalloutKeyboardDelta(event);
   if (args.perimeter) {
     if (!delta) return;
@@ -224,8 +252,8 @@ function handleCalloutEdgeKeyDown(
     event.stopPropagation();
     const current = getCalloutPerimeterPoint(args.edgeRect, args.position ?? args.defaultPosition);
     const position = getCalloutPerimeterPosition(args.edgeRect, {
-      x: current.x + delta.x,
-      y: current.y + delta.y,
+      x: current.x + delta.x * visualScale,
+      y: current.y + delta.y * visualScale,
     });
     args.onPositionChange(position, { mode: 'free', perimeterPosition: position });
     return;
@@ -238,7 +266,7 @@ function handleCalloutEdgeKeyDown(
   const axisLength = horizontal ? args.edgeRect.width : args.edgeRect.height;
   const current = args.position ?? args.defaultPosition;
   args.onPositionChange(
-    clamp(current + axisDelta / Math.max(1, axisLength), minPosition, maxPosition)
+    clamp(current + (axisDelta * visualScale) / Math.max(1, axisLength), minPosition, maxPosition)
   );
 }
 
@@ -255,6 +283,7 @@ export function useCalloutEdgeDrag(args: {
   perimeterAnchorPositions?: number[];
   perimeter?: boolean;
   position: number | undefined;
+  visualScale?: number;
 }) {
   const [draftPosition, setDraftPosition] = React.useState<number | null>(null);
   const [draftAttachment, setDraftAttachment] = React.useState<CalloutAttachment | null>(null);
@@ -297,7 +326,8 @@ export function useCalloutEdgeDrag(args: {
           args.edgeRect,
           point,
           snapPositionRef.current,
-          args.perimeterAnchors ?? args.perimeterAnchorPositions
+          args.perimeterAnchors ?? args.perimeterAnchorPositions,
+          args.visualScale ?? 1
         );
         position = snappedPosition.position;
         snapPositionRef.current = snappedPosition.snapPosition;
@@ -362,7 +392,8 @@ export function useCalloutEdgeDrag(args: {
           args.edgeRect,
           currentPoint,
           null,
-          args.perimeterAnchors ?? args.perimeterAnchorPositions
+          args.perimeterAnchors ?? args.perimeterAnchorPositions,
+          args.visualScale ?? 1
         ).snapPosition;
       }
       setIsDragging(true);

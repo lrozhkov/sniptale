@@ -48,7 +48,7 @@ describe('frame host-layout state authority', () => {
     vi.advanceTimersByTime(64);
 
     expect(publishedSnapshots).toHaveLength(1);
-    expect(publishedSnapshots[0]?.[0]).toMatchObject({ x: 214, y: 74 });
+    expect(publishedSnapshots[0]?.[0]).toMatchObject({ x: 217, y: 77 });
     expect(framesRef.current).toBe(publishedSnapshots[0]);
     service.dispose();
   });

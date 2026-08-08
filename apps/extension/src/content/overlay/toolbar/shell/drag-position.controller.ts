@@ -8,7 +8,10 @@ import {
 } from 'react';
 import type { ContentToolbarPosition } from '../../../../contracts/settings';
 
-export function useToolbarDragController(position: ContentToolbarPosition): {
+export function useToolbarDragController(
+  position: ContentToolbarPosition,
+  uiScale = 1
+): {
   dragOffset: RefObject<ContentToolbarPosition>;
   handleMouseDown: (event: {
     clientX: number;
@@ -26,12 +29,12 @@ export function useToolbarDragController(position: ContentToolbarPosition): {
     (event: { clientX: number; clientY: number; preventDefault: () => void }) => {
       setIsDragging(true);
       dragOffset.current = {
-        x: event.clientX - position.x,
-        y: event.clientY - position.y,
+        x: event.clientX / uiScale - position.x,
+        y: event.clientY / uiScale - position.y,
       };
       event.preventDefault();
     },
-    [position.x, position.y]
+    [position.x, position.y, uiScale]
   );
 
   return {

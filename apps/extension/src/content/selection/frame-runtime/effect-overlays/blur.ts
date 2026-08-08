@@ -10,7 +10,8 @@ export function updateBlurOverlayNodes(
   allFrames: FrameData[],
   refs: OverlayRefs,
   ensureBlurFiltersSvg: () => void,
-  updateDistortionFilterScale: (scale: number) => void
+  updateDistortionFilterScale: (scale: number) => void,
+  visualScale = 1
 ) {
   const blurFrames = allFrames.filter((frame) => frame.effectMode === 'blur');
   const blurFrameIds = new Set(blurFrames.map((frame) => frame.id));
@@ -28,13 +29,14 @@ export function updateBlurOverlayNodes(
 
   blurFrames.forEach((frame) => {
     const overlay = getOrCreateBlurOverlay(frame.id, refs);
-    applyBlurOverlayFrame(overlay, frame, updateDistortionFilterScale);
+    applyBlurOverlayFrame(overlay, frame, updateDistortionFilterScale, visualScale);
   });
 }
 
 export function registerImmediateBlurOverlayUpdates(
   framesRef: MutableRefObject<FrameData[]>,
-  { blurOverlaysRef }: OverlayRefs
+  { blurOverlaysRef }: OverlayRefs,
+  visualScaleRef?: MutableRefObject<number>
 ) {
   window.sniptaleUpdateBlurOverlayImmediate = (frameId: string, geometry) => {
     const overlay = blurOverlaysRef.current.get(frameId);
@@ -54,7 +56,7 @@ export function registerImmediateBlurOverlayUpdates(
     overlay.style.top = `${overlayBox.y}px`;
     overlay.style.width = `${overlayBox.width}px`;
     overlay.style.height = `${overlayBox.height}px`;
-    overlay.style.borderRadius = `${surface.geometry.radius}px`;
+    overlay.style.borderRadius = `${surface.geometry.radius * (visualScaleRef?.current ?? 1)}px`;
   };
 
   return () => {
@@ -98,7 +100,8 @@ function getOrCreateBlurOverlay(frameId: string, { blurOverlaysRef }: OverlayRef
 function applyBlurOverlayFrame(
   overlay: HTMLDivElement,
   frame: FrameData,
-  updateDistortionFilterScale: (scale: number) => void
+  updateDistortionFilterScale: (scale: number) => void,
+  visualScale: number
 ) {
   const overlayBox = getBlurOverlayBox(frame);
   const backdropStyle = getBlurBackdropStyle(frame);
@@ -116,6 +119,6 @@ function applyBlurOverlayFrame(
   overlay.style.backdropFilter = backdropStyle.backdropFilter;
   (overlay.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter =
     backdropStyle.backdropFilter;
-  overlay.style.borderRadius = `${resolveFrameSurface(frame).geometry.radius}px`;
+  overlay.style.borderRadius = `${resolveFrameSurface(frame).geometry.radius * visualScale}px`;
   overlay.style.border = 'none';
 }

@@ -32,6 +32,18 @@ function isOptionalString(value: unknown, maxLength: number): boolean {
   return value === undefined || (typeof value === 'string' && value.length <= maxLength);
 }
 
+function isNullableString(value: unknown, maxLength: number): boolean {
+  return value === null || (typeof value === 'string' && value.length <= maxLength);
+}
+
+function isLinkedTemplates(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isNullableString(value['calloutPresetId'], 256) &&
+    isNullableString(value['stepBadgePresetId'], 256)
+  );
+}
+
 function isOptionalFinite(value: unknown): boolean {
   return value === undefined || isFiniteNumber(value);
 }
@@ -54,14 +66,13 @@ function hasSafeColorFields(value: Record<string, unknown>, fields: readonly str
   return fields.every((field) => isSafeCssColor(value[field]));
 }
 
-export function isBorderSettings(value: unknown): boolean {
+function isBorderSettings(value: unknown): boolean {
   if (!isOptionalRecord(value) || value === undefined) return value === undefined;
   const padding = value['padding'];
   const effects = value['effects'];
   return (
-    ['width', 'radius', 'opacity', 'strokeOpacity', 'fillOpacity', 'shadow'].every((key) =>
-      isFiniteNumber(value[key])
-    ) &&
+    ['width', 'radius', 'shadow'].every((key) => isFiniteNumber(value[key])) &&
+    ['opacity', 'strokeOpacity', 'fillOpacity'].every((key) => isOptionalFinite(value[key])) &&
     hasSafeColorFields(value, ['color', 'fillColor']) &&
     isOneOf(value['style'], ['solid', 'dashed', 'dotted']) &&
     isRecord(padding) &&
@@ -72,15 +83,62 @@ export function isBorderSettings(value: unknown): boolean {
       (isRecord(effects) &&
         isRecord(effects['blur']) &&
         isRecord(effects['focus']) &&
+        (effects['capture'] === undefined ||
+          (isRecord(effects['capture']) &&
+            (effects['capture']['hideFrame'] === undefined ||
+              typeof effects['capture']['hideFrame'] === 'boolean'))) &&
+        (effects['linkedTemplates'] === undefined ||
+          isLinkedTemplates(effects['linkedTemplates'])) &&
         isFiniteNumber(effects['blur']['amount']) &&
         isOneOf(effects['blur']['blurType'], ['gaussian', 'distortion', 'pixelate', 'solid']) &&
-        isFiniteNumber(effects['focus']['opacity']))) &&
+        isFiniteNumber(effects['focus']['opacity']) &&
+        isOptionalFinite(effects['focus']['blurAmount']))) &&
     isOptionalString(value['sourcePresetId'], 256) &&
     isOptionalString(value['sourcePresetName'], 1_000)
   );
 }
 
-export function isBlurSettings(value: unknown): boolean {
+export function parseBorderSettings(value: unknown): AppliedBorderSettings | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isBorderSettings(value) || !isRecord(value)) return null;
+  const color = normalizeColor(value['color'] as string);
+  const fillColor = normalizeColor(value['fillColor'] as string);
+  if (!color || !fillColor) return null;
+  const strokeMultiplier = isFiniteNumber(value['strokeOpacity'])
+    ? value['strokeOpacity'] / 100
+    : isFiniteNumber(value['opacity'])
+      ? value['opacity'] <= 1
+        ? value['opacity']
+        : value['opacity'] / 100
+      : 1;
+  const canonicalColor = multiplyColorAlpha(color, strokeMultiplier);
+  const canonicalFillColor = isFiniteNumber(value['fillOpacity'])
+    ? multiplyColorAlpha(fillColor, value['fillOpacity'] / 100)
+    : fillColor;
+  if (!canonicalColor || !canonicalFillColor) return null;
+  return {
+    width: value['width'] as number,
+    color: canonicalColor,
+    style: value['style'] as AppliedBorderSettings['style'],
+    radius: value['radius'] as number,
+    padding: { ...(value['padding'] as AppliedBorderSettings['padding']) },
+    shadow: value['shadow'] as number,
+    fillColor: canonicalFillColor,
+    inheritCustomCss: value['inheritCustomCss'] as boolean,
+    customCss: value['customCss'] as string,
+    ...(isRecord(value['effects'])
+      ? { effects: value['effects'] as unknown as NonNullable<AppliedBorderSettings['effects']> }
+      : {}),
+    ...(typeof value['sourcePresetId'] === 'string'
+      ? { sourcePresetId: value['sourcePresetId'] }
+      : {}),
+    ...(typeof value['sourcePresetName'] === 'string'
+      ? { sourcePresetName: value['sourcePresetName'] }
+      : {}),
+  };
+}
+
+function isBlurSettings(value: unknown): boolean {
   if (!isOptionalRecord(value) || value === undefined) return value === undefined;
   return (
     isFiniteNumber(value['amount']) &&
@@ -106,12 +164,51 @@ export function isBlurSettings(value: unknown): boolean {
   );
 }
 
+export function parseBlurSettings(value: unknown): BlurSettings | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isBlurSettings(value) || !isRecord(value)) return null;
+  const strokeColor = isSafeCssColor(value['strokeColor'])
+    ? normalizeColor(value['strokeColor'])
+    : null;
+  const canonicalStrokeColor =
+    strokeColor && isFiniteNumber(value['strokeOpacity'])
+      ? multiplyColorAlpha(strokeColor, value['strokeOpacity'])
+      : strokeColor;
+  return {
+    amount: value['amount'] as number,
+    blurType: value['blurType'] as BlurSettings['blurType'],
+    ...(value['borderPresetId'] === undefined
+      ? {}
+      : { borderPresetId: value['borderPresetId'] as string | null }),
+    ...(isFiniteNumber(value['radius']) ? { radius: value['radius'] } : {}),
+    ...(isFiniteNumber(value['shadow']) ? { shadow: value['shadow'] } : {}),
+    ...(typeof value['showBorder'] === 'boolean' ? { showBorder: value['showBorder'] } : {}),
+    ...(canonicalStrokeColor ? { strokeColor: canonicalStrokeColor } : {}),
+    ...(isOneOf(value['strokeStyle'], [
+      'solid',
+      'dashed',
+      'dotted',
+      'dash',
+      'dot',
+      'dash-dot',
+      'long-dash',
+    ])
+      ? { strokeStyle: value['strokeStyle'] as NonNullable<BlurSettings['strokeStyle']> }
+      : {}),
+    ...(isFiniteNumber(value['strokeWidth']) ? { strokeWidth: value['strokeWidth'] } : {}),
+  };
+}
+
 export function isFocusSettings(value: unknown): boolean {
   if (!isOptionalRecord(value) || value === undefined) return value === undefined;
   return (
     isFiniteNumber(value['opacity']) &&
     value['opacity'] >= 0 &&
     value['opacity'] <= 1 &&
+    (value['blurAmount'] === undefined ||
+      (isFiniteNumber(value['blurAmount']) &&
+        value['blurAmount'] >= 0 &&
+        value['blurAmount'] <= 25)) &&
     (value['showBorder'] === undefined || typeof value['showBorder'] === 'boolean')
   );
 }
@@ -382,6 +479,7 @@ export function isCalloutSettings(value: unknown): boolean {
       content['bodyHtml'].length <= 200_000 &&
       typeof content['titleText'] === 'string' &&
       content['titleText'].length <= 10_000 &&
+      isOptionalString(value['instanceId'], 256) &&
       isRecord(placement) &&
       isRecord(style) &&
       isOptionalString(value['sourcePresetId'], 256) &&
@@ -413,3 +511,5 @@ import { validateCalloutCustomCss } from '../callout-custom-css';
 import { validateCssPolicyString } from '../css-sanitizer/css';
 import { validateStepBadgeCustomCss } from '../step-badge-custom-css';
 import { isReservedFrameCssProperty } from '../style/decoration';
+import type { AppliedBorderSettings, BlurSettings } from '@sniptale/ui/highlighter-style/types';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';

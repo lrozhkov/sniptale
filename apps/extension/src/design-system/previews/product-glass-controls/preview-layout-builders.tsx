@@ -15,6 +15,7 @@ import {
   ProductGlassSectionLabel,
   ProductGlassThreeColumnGrid,
 } from '@sniptale/ui/product-glass-controls/controls';
+import { CompactColorSelector } from '../../../ui/color-selector';
 
 type ProductPreviewCopy = ReturnType<typeof getProductPreviewCopy>;
 
@@ -102,13 +103,29 @@ function buildColorRowPreview(copy: ProductPreviewCopy) {
           label={copy.active}
           value="#0080ff"
           colors={['#0080ff', '#22c55e', '#ef4444']}
-          inputProps={{ readOnly: true, 'aria-label': copy.active }}
+          pickerTrigger={
+            <CompactColorSelector
+              label={copy.active}
+              title={copy.active}
+              value="#0080ff"
+              pickerOnly
+              onChange={() => undefined}
+            />
+          }
         />
         <ProductGlassColorField
           label={copy.defaultLabel}
           value="#111827"
           colors={['#111827', '#f59e0b', '#a855f7']}
-          inputProps={{ readOnly: true, 'aria-label': copy.defaultLabel }}
+          pickerTrigger={
+            <CompactColorSelector
+              label={copy.defaultLabel}
+              title={copy.defaultLabel}
+              value="#111827"
+              pickerOnly
+              onChange={() => undefined}
+            />
+          }
         />
       </ProductGlassColorRow>
     </DesignSystemFloatingPreviewFrame>

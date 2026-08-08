@@ -1,5 +1,4 @@
 import {
-  getControlIconButtonClassName,
   getControlSecondaryButtonClassName,
   getFormActionRowClassName,
   getFormPanelSurfaceClassName,
@@ -49,30 +48,11 @@ export const settingsEmptyStateClassName = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_42%,var(--sniptale-color-surface-panel)_58%)]',
 ].join(' ');
 
-export const settingsListRowClassName = [
-  getFormPanelSurfaceClassName({ compact: true }),
-  'group relative flex items-center gap-3 p-3 transition-colors',
-  'hover:border-[var(--sniptale-color-border-strong)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
-].join(' ');
-
 export const settingsToggleRowClassName = getFormActionRowClassName({ emphasis: 'primary' });
 
 export const settingsAddButtonClassName = [
   'flex w-full',
   getControlSecondaryButtonClassName({ density: 'default' }),
-].join(' ');
-
-export const settingsInfoIconButtonClassName = [
-  getControlIconButtonClassName({ density: 'compact', tone: 'info' }),
-  'disabled:cursor-not-allowed disabled:opacity-30',
-  'h-10 w-10',
-].join(' ');
-
-export const settingsDangerIconButtonClassName = [
-  getControlIconButtonClassName({ density: 'compact', tone: 'danger' }),
-  'disabled:cursor-not-allowed disabled:opacity-30',
-  'h-10 w-10',
 ].join(' ');
 
 export const settingsNeutralBadgeClassName = [

@@ -24,12 +24,12 @@ vi.mock('../navigation', async (importOriginal) => ({
   SettingsTab: undefined,
   SETTINGS_NAV_ITEMS: [
     {
-      id: 'appearance',
+      id: 'interface-browser',
       icon: () => <svg data-testid="appearance-icon" />,
       label: 'settings.appearance',
     },
     {
-      id: 'templates',
+      id: 'ai-prompts',
       icon: () => <svg data-testid="templates-icon" />,
       label: 'settings.templates',
     },
@@ -76,7 +76,7 @@ describe('SettingsCommandPalette', () => {
     render(
       <SettingsCommandPalette
         isOpen
-        activeTab="appearance"
+        activeTab="interface-browser"
         onClose={onClose}
         onTabChange={onTabChange}
       />
@@ -87,20 +87,20 @@ describe('SettingsCommandPalette', () => {
     expect(paletteProps.actions).toHaveLength(2);
     expect(paletteProps.actions[0]).toEqual(
       expect.objectContaining({
-        id: 'settings-appearance',
+        id: 'settings-interface-browser',
         subtitle: 't:shared.ui.commandPaletteCurrentContextHint',
         title: 't:settings.appearance',
       })
     );
     expect(paletteProps.actions[1]).toEqual(
       expect.objectContaining({
-        id: 'settings-templates',
+        id: 'settings-ai-prompts',
         subtitle: 't:shared.ui.commandPaletteNavigationHint',
         title: 't:settings.templates',
       })
     );
 
     paletteProps.actions[1].onSelect();
-    expect(onTabChange).toHaveBeenCalledWith('templates');
+    expect(onTabChange).toHaveBeenCalledWith('ai-prompts');
   });
 });

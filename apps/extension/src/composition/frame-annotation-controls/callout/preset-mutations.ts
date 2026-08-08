@@ -3,6 +3,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
 import { translate } from '../../../platform/i18n';
 import {
+  loadCalloutPresetCatalog,
   resetSystemCalloutPreset,
   setCalloutPresetEnabled,
   updateCalloutPreset,
@@ -75,22 +76,27 @@ export function useCalloutPresetPopoverMutations(args: {
 
   const reset = useCallback(
     async (preset: CalloutPreset) => {
-      if (preset.origin !== 'system' || preset.customized !== true) return;
+      if (preset.origin !== 'system' || preset.customized !== true) return null;
       const sessionId = args.sessionGenerationRef.current;
       args.setPendingPresetIds((current) => new Set(current).add(preset.id));
       args.setIsSaving(true);
       try {
         const result = await resetSystemCalloutPreset(preset.id);
-        if (sessionId !== args.sessionGenerationRef.current) return;
+        if (sessionId !== args.sessionGenerationRef.current) return null;
         if (result.outcome === 'rejected') {
           args.setError(translate('content.callout.presetUpdateError'));
-          return;
+          return null;
         }
+        const catalog = await loadCalloutPresetCatalog();
+        if (sessionId !== args.sessionGenerationRef.current) return null;
+        const restored = catalog.presets.find((candidate) => candidate.id === preset.id) ?? null;
         args.setEditor({ isOpen: false });
+        return restored;
       } catch {
         if (sessionId === args.sessionGenerationRef.current) {
           args.setError(translate('content.callout.presetUpdateError'));
         }
+        return null;
       } finally {
         if (sessionId === args.sessionGenerationRef.current) args.setIsSaving(false);
         args.setPendingPresetIds((current) => {

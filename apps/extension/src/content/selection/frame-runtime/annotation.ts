@@ -4,6 +4,7 @@ import type {
   BrowserFrameAnnotationInput,
 } from '../../parser/page-preparation/annotations';
 import { areBrowserFrameAnnotationsEqual } from '../../parser/page-preparation/annotations';
+import { getFrameCallouts } from '../../../features/highlighter/frame-annotation/callout/collection';
 
 function readCalloutNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -21,17 +22,19 @@ function readCalloutNode(node: Node): string {
 }
 
 function readCalloutText(frame: FrameData): string | undefined {
-  if (frame.callout?.enabled !== true) {
-    return undefined;
-  }
-
-  const parsed = new DOMParser().parseFromString(frame.callout.content.bodyHtml, 'text/html');
-  const body = Array.from(parsed.body.childNodes, readCalloutNode)
-    .join('')
-    .replace(/\n$/, '')
-    .trim();
-  const title = frame.callout.style.title.enabled ? frame.callout.content.titleText.trim() : '';
-  const text = [title, body].filter(Boolean).join('\n');
+  const text = getFrameCallouts(frame)
+    .filter((callout) => callout.enabled)
+    .map((callout) => {
+      const parsed = new DOMParser().parseFromString(callout.content.bodyHtml, 'text/html');
+      const body = Array.from(parsed.body.childNodes, readCalloutNode)
+        .join('')
+        .replace(/\n$/, '')
+        .trim();
+      const title = callout.style.title.enabled ? callout.content.titleText.trim() : '';
+      return [title, body].filter(Boolean).join('\n');
+    })
+    .filter(Boolean)
+    .join('\n\n');
   return text === '' ? undefined : text;
 }
 

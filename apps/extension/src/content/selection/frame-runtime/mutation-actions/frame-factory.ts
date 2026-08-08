@@ -8,6 +8,7 @@ import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
 import { applyAddedFrameSideEffects } from './frame-post-add';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { requestFrameCalloutEdit, useFrameUIStore } from '../state/frame-ui.store';
+import { reconcileLinkedAnnotationTemplatesWhenReady } from '../session/linked-annotation-templates';
 
 type CreateAddFrameHandlerArgs = Pick<
   UseFrameMutationActionHelperOptions,
@@ -89,6 +90,16 @@ export function createAddFrameHandler({
       requestFrameCalloutEdit(acceptedFrameData.id);
     }
     setFrames((prev) => [...prev, acceptedFrameData]);
+    reconcileLinkedAnnotationTemplatesWhenReady({
+      ...(acceptedFrameData.callout?.sourcePresetId
+        ? { expectedCalloutSourcePresetId: acceptedFrameData.callout.sourcePresetId }
+        : {}),
+      ...(acceptedFrameData.stepBadge?.sourcePresetId
+        ? { expectedStepBadgeSourcePresetId: acceptedFrameData.stepBadge.sourcePresetId }
+        : {}),
+      frameId: acceptedFrameData.id,
+      setFrames,
+    });
     applyAddedFrameSideEffects({
       frameData: acceptedFrameData,
       isAutoMode: globalStepBadgeAutoModeRef.current,
@@ -117,6 +128,16 @@ export function createAddFreeFrameHandler(
       requestFrameCalloutEdit(frameData.id);
     }
     args.setFrames((prev) => [...prev, frameData]);
+    reconcileLinkedAnnotationTemplatesWhenReady({
+      ...(frameData.callout?.sourcePresetId
+        ? { expectedCalloutSourcePresetId: frameData.callout.sourcePresetId }
+        : {}),
+      ...(frameData.stepBadge?.sourcePresetId
+        ? { expectedStepBadgeSourcePresetId: frameData.stepBadge.sourcePresetId }
+        : {}),
+      frameId: frameData.id,
+      setFrames: args.setFrames,
+    });
     applyAddedFrameSideEffects({
       frameData,
       isAutoMode: args.globalStepBadgeAutoModeRef.current,

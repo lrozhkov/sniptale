@@ -20,10 +20,7 @@ function registerBorderPresetSchemaTests() {
         radius: 8,
         padding: { top: 1, right: 2, bottom: 3, left: 4 },
         shadow: 30,
-        opacity: 70,
-        strokeOpacity: 50,
         fillColor: '#44556688',
-        fillOpacity: 25,
         inheritCustomCss: true,
         customCss: 'outline: 1px solid red;',
         enabled: false,
@@ -31,14 +28,27 @@ function registerBorderPresetSchemaTests() {
         systemPresetKey: 'system-review',
         basedOnRevision: 1,
         customized: true,
+        effects: {
+          blur: { amount: 10, blurType: 'gaussian' },
+          focus: { blurAmount: 2, opacity: 0.5 },
+          capture: { hideFrame: false },
+          linkedTemplates: {
+            calloutPresetId: 'system-callout-card',
+            stepBadgePresetId: 'system-outline',
+          },
+        },
       })
     ).toEqual(
       expect.objectContaining({
         fillColor: '#44556688',
-        fillOpacity: 25,
-        strokeOpacity: 50,
         origin: 'system',
         systemPresetKey: 'system-review',
+        effects: expect.objectContaining({
+          linkedTemplates: {
+            calloutPresetId: 'system-callout-card',
+            stepBadgePresetId: 'system-outline',
+          },
+        }),
       })
     );
   });
@@ -55,10 +65,7 @@ function registerBorderPresetSchemaTests() {
         radius: 8,
         padding: { top: 1, right: 2, bottom: 3, left: 4 },
         shadow: 0,
-        opacity: 100,
-        strokeOpacity: 100,
         fillColor: '#00000000',
-        fillOpacity: 0,
         inheritCustomCss: false,
         customCss: '',
         origin: 'system',
@@ -78,8 +85,7 @@ function registerBlurSchemaTests() {
         radius: 8,
         shadow: 30,
         showBorder: true,
-        strokeColor: '#112233',
-        strokeOpacity: 0.6,
+        strokeColor: '#11223399',
         strokeStyle: 'dash-dot',
         strokeWidth: 0,
       })
@@ -90,8 +96,7 @@ function registerBlurSchemaTests() {
       radius: 8,
       shadow: 30,
       showBorder: true,
-      strokeColor: '#112233',
-      strokeOpacity: 0.6,
+      strokeColor: '#11223399',
       strokeStyle: 'dash-dot',
       strokeWidth: 0,
     });

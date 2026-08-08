@@ -123,6 +123,28 @@ it('preserves explicit hue when grayscale updates arrive through resolved colors
   );
 });
 
+it('preserves alpha across channel edits and clamps manual alpha changes', () => {
+  renderHarness(() => ({ color: usePickerColorState('#33669980') }));
+  const getColor = () => hookState['color'] as ReturnType<typeof usePickerColorState>;
+
+  act(() => {
+    expect(getColor().handleChannelColorChange('invalid')).toBeNull();
+    expect(getColor().handleAlphaChange('invalid')).toBeNull();
+    getColor().handleChannelColorChange('#ff0000');
+  });
+  expect(getColor().resolvedColor).toBe('#ff000080');
+
+  act(() => {
+    getColor().handleAlphaChange('120');
+  });
+  expect(getColor().resolvedColor).toBe('#ff0000');
+
+  act(() => {
+    getColor().handleAlphaChange('-10');
+  });
+  expect(getColor().resolvedColor).toBe('#ff000000');
+});
+
 it('exposes eyedropper pressed state, resolves picked colors, and clears on unmount', async () => {
   let resolvePick: ((result: { sRGBHex: string }) => void) | null = null;
   const onColorChange = vi.fn();

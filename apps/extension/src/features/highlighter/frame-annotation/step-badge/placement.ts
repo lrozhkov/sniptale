@@ -85,6 +85,7 @@ export function projectStepBadgeToFrameBoundary(args: {
   frameRect: StepBadgeFrameRect;
   point: StepBadgePoint;
   previousSide?: StepBadgeBoundarySide;
+  visualScale?: number;
 }): StepBadgeManualPlacement {
   const sides: StepBadgeBoundarySide[] = ['top', 'right', 'bottom', 'left'];
   const distances = sides.map((side) => ({
@@ -97,8 +98,9 @@ export function projectStepBadgeToFrameBoundary(args: {
   const previousDistance = args.previousSide
     ? getSideDistance(args.frameRect, args.point, args.previousSide)
     : Number.POSITIVE_INFINITY;
+  const sideSwitchDeadZone = SIDE_SWITCH_DEAD_ZONE_PX * (args.visualScale ?? 1);
   const side =
-    args.previousSide && previousDistance <= nearestDistance + SIDE_SWITCH_DEAD_ZONE_PX
+    args.previousSide && previousDistance <= nearestDistance + sideSwitchDeadZone
       ? args.previousSide
       : nearest;
 

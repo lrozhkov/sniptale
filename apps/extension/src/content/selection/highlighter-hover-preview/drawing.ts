@@ -7,7 +7,6 @@ import {
 } from '../../platform/frame';
 import { resolveDrawablePageHtmlElement } from '../page-element-target';
 import {
-  colorToRgba,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -79,24 +78,18 @@ function ensurePreview(session: HoverSession): HTMLElement {
   const visual = resolveBorderPresetVisual(preset);
   preview.style.cssText = `
     position: fixed;
-    box-sizing: border-box;
+    box-sizing: content-box;
     pointer-events: none;
-    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-      visual.strokeColor,
-      visual.strokeOpacity
-    )};
-    border-radius: ${visual.radius}px;
-    background: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
+    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
+    border-radius: ${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px;
+    background: ${visual.fillColor};
     opacity: 0.88;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;
   Object.assign(preview.style, visual.customCssStyles);
-  preview.style.boxSizing = 'border-box';
-  preview.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
-  preview.style.borderRadius = `${visual.radius}px`;
+  preview.style.boxSizing = 'content-box';
+  preview.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
+  preview.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
   preview.style.margin = '0';
   preview.style.padding = '0';
   preview.style.clipPath = 'none';
@@ -201,8 +194,9 @@ function clamp(value: number, min: number, max: number) {
 
 function renderPreview(session: HoverSession, rect: DrawRect) {
   const preview = ensurePreview(session);
-  preview.style.left = `${rect.x}px`;
-  preview.style.top = `${rect.y}px`;
+  const visual = resolveBorderPresetVisual(getCurrentBorderPreset());
+  preview.style.left = `${rect.x - visual.strokeWidth}px`;
+  preview.style.top = `${rect.y - visual.strokeWidth}px`;
   preview.style.width = `${rect.width}px`;
   preview.style.height = `${rect.height}px`;
 }

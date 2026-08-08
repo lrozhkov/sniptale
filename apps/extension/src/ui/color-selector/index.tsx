@@ -24,6 +24,7 @@ function ColorSelectorHeader(props: {
   expanded: boolean;
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   label: string;
+  pickerOnly: boolean;
   title: string;
   value: string;
   onOpenPicker: () => void;
@@ -36,6 +37,7 @@ function ColorSelectorHeader(props: {
       expanded={props.expanded}
       formatMode={props.formatMode}
       label={props.label}
+      showPaletteButton={!props.pickerOnly}
       title={props.title}
       value={props.value}
       onToggleExpanded={props.onToggleExpanded}
@@ -45,6 +47,8 @@ function ColorSelectorHeader(props: {
 }
 
 type ColorSelectorPanelsProps = {
+  allowAlpha: boolean;
+  allowTransparent: boolean;
   cycleFormatMode: () => void;
   draftColor: string;
   expanded: boolean;
@@ -60,7 +64,8 @@ type ColorSelectorPanelsProps = {
   onCancel: () => void;
   onColorChange: (color: string) => void;
   onSelectTransparent: () => void;
-  onSelect: (color: string) => void;
+  onPaletteSelect: (color: string) => void;
+  onRecentSelect: (color: string) => void;
   rootNode: HTMLDivElement | null;
   state: ReturnType<typeof useColorSelectorState>;
 };
@@ -88,7 +93,8 @@ function ColorSelectorExpandedLayer(
         recentColors={props.normalizedRecentColors}
         title={props.title}
         value={props.value}
-        onSelect={props.onSelect}
+        onPaletteSelect={props.onPaletteSelect}
+        onRecentSelect={props.onRecentSelect}
       />
     </ColorSelectorFloatingLayer>
   );
@@ -113,6 +119,8 @@ function ColorSelectorPickerLayer(
       ui="shared.ui.color-selector.picker-layer"
     >
       <ColorSelectorPickerPopover
+        allowAlpha={props.allowAlpha}
+        allowTransparent={props.allowTransparent}
         color={props.draftColor}
         formatMode={props.formatMode}
         onApply={props.onApply}
@@ -147,10 +155,13 @@ function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
 }
 
 function ColorSelectorBody(props: {
+  allowAlpha: boolean;
+  allowTransparent: boolean;
   className: string | undefined;
   disabled: boolean;
   floatingOwnerId: string;
   label: string;
+  pickerOnly: boolean;
   state: ReturnType<typeof useColorSelectorState>;
   title: string;
 }) {
@@ -172,12 +183,15 @@ function ColorSelectorBody(props: {
         expanded={props.state.expanded}
         formatMode={props.state.formatMode}
         label={props.label}
+        pickerOnly={props.pickerOnly}
         title={props.title}
         value={props.state.draftColor}
         onToggleExpanded={props.state.handleToggleExpanded}
         onOpenPicker={props.state.handleOpenPicker}
       />
       <ColorSelectorPanels
+        allowAlpha={props.allowAlpha}
+        allowTransparent={props.allowTransparent}
         cycleFormatMode={props.state.cycleFormatMode}
         draftColor={props.state.draftColor}
         expanded={props.state.expanded}
@@ -193,7 +207,8 @@ function ColorSelectorBody(props: {
         onCancel={props.state.handlePickerCancel}
         onColorChange={props.state.handleDraftColorChange}
         onSelectTransparent={props.state.handleSelectTransparent}
-        onSelect={props.state.handleSwatchSelect}
+        onPaletteSelect={props.state.handlePaletteSelect}
+        onRecentSelect={props.state.handleRecentSelect}
         rootNode={props.state.rootRef.current}
         state={props.state}
       />
@@ -202,6 +217,8 @@ function ColorSelectorBody(props: {
 }
 
 export function CompactColorSelector({
+  allowAlpha = true,
+  allowTransparent = true,
   className,
   disabled = false,
   label,
@@ -210,6 +227,7 @@ export function CompactColorSelector({
   onPreviewChange,
   onPreviewReset,
   palette = [],
+  pickerOnly = false,
   recentColors = [],
   title,
   value,
@@ -241,10 +259,13 @@ export function CompactColorSelector({
 
   return (
     <ColorSelectorBody
+      allowAlpha={allowAlpha}
+      allowTransparent={allowTransparent}
       className={className}
       disabled={disabled}
       floatingOwnerId={floatingOwnerId}
       label={label}
+      pickerOnly={pickerOnly}
       state={state}
       title={title}
     />

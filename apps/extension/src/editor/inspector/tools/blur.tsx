@@ -138,30 +138,6 @@ function renderBlurRadiusSection(props: BlurControlsProps, settings: BlurSetting
   );
 }
 
-function renderBlurStrokeOpacitySection(props: BlurControlsProps, settings: BlurSettings) {
-  const borderSettings = resolveBlurBorderSettings(settings);
-  const label = translate('editor.compact.opacity');
-
-  return (
-    <NumericRow
-      label={label}
-      min={0}
-      max={100}
-      step={5}
-      unit="%"
-      value={Math.round(borderSettings.strokeOpacity * 100)}
-      scrub={{ min: 0, max: 100, step: 5 }}
-      onPreviewValue={(strokeOpacity) =>
-        props.previewBlurPatch({ strokeOpacity: strokeOpacity / 100 })
-      }
-      onCommitValue={(strokeOpacity) => {
-        props.previewBlurPatch({ strokeOpacity: strokeOpacity / 100 });
-        props.commitPendingSelectionSettings();
-      }}
-    />
-  );
-}
-
 export function renderBlurControlsSection(props: BlurControlsProps) {
   const settings = props.inspectorToolSettings.blur;
   const controls = [
@@ -177,7 +153,6 @@ export function renderBlurControlsSection(props: BlurControlsProps) {
         {renderBlurStrokeWidthSection(props, settings)}
         {renderBlurStrokeStyleSection(props, settings)}
         {renderBlurStrokeColorSection(props, settings)}
-        {renderBlurStrokeOpacitySection(props, settings)}
       </div>
     </CollapsibleSection>,
   ];

@@ -1,0 +1,114 @@
+// @vitest-environment jsdom
+
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createFrameDataFixture } from '../../frame-runtime/test-support';
+
+vi.mock('../toolbar', () => ({
+  InteractiveFrameToolbar: (props: { captureVisibility: { hiddenDuringCapture: boolean } }) => (
+    <output
+      data-ui="test.selected-frame-toolbar-visibility"
+      data-hidden={String(props.captureVisibility.hiddenDuringCapture)}
+    />
+  ),
+}));
+
+vi.mock('../toolbar/trigger', () => ({
+  InteractiveFrameToolbarTrigger: (props: {
+    captureVisibility: { hiddenDuringCapture: boolean; toggle: () => void };
+  }) => (
+    <button
+      type="button"
+      data-ui="test.frame-trigger-visibility"
+      data-hidden={String(props.captureVisibility.hiddenDuringCapture)}
+      onClick={props.captureVisibility.toggle}
+    />
+  ),
+}));
+
+vi.mock('../size-panel', () => ({ InteractiveFrameSizePanel: () => null }));
+vi.mock('./blocking', () => ({ InteractiveFrameBlockingOverlays: () => null }));
+
+import { InteractiveFrameFloatingUi } from './floating';
+
+function createProps(): React.ComponentProps<typeof InteractiveFrameFloatingUi> {
+  const frame = createFrameDataFixture('frame-1');
+  return {
+    aspectRatio: null,
+    calloutPopoverAnchorRef: { current: null },
+    clearSelection: vi.fn(),
+    closePopover: vi.fn(),
+    effectMode: 'border',
+    frame,
+    frameId: frame.id,
+    handleCancel: vi.fn(),
+    handleDelete: vi.fn(),
+    handleEffectButtonClick: vi.fn(),
+    handleSave: vi.fn(),
+    handleStartEditing: vi.fn(),
+    hoverFrame: vi.fn(),
+    isCalloutEditing: false,
+    isFrameActive: true,
+    isHovered: true,
+    isSelected: false,
+    maintainAspectRatio: false,
+    onUpdate: vi.fn(),
+    popoverAnchorRef: { current: null },
+    scheduleHoverFrameHide: vi.fn(),
+    selectFrame: vi.fn(),
+    setAspectRatio: vi.fn(),
+    setIsCalloutEditing: vi.fn(),
+    setMaintainAspectRatio: vi.fn(),
+    setState: vi.fn(),
+    setTempFrame: vi.fn(),
+    sizePanelCoords: { x: 0, y: 0 },
+    state: 'hover',
+    stepBadgePopoverAnchorRef: { current: null },
+    tempFrame: frame,
+    togglePopover: vi.fn(),
+    toolbarAnchorOffset: null,
+    toolbarCoords: { x: 0, y: 0 },
+  };
+}
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe('InteractiveFrameFloatingUi', () => {
+  it('shares capture visibility between the frame action and selected toolbar immediately', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<InteractiveFrameFloatingUi {...props} />));
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[data-ui="test.frame-trigger-visibility"]'
+    );
+    const selectedToolbar = () =>
+      container.querySelector<HTMLOutputElement>(
+        '[data-ui="test.selected-frame-toolbar-visibility"]'
+      );
+
+    expect(trigger?.dataset['hidden']).toBe('false');
+    expect(selectedToolbar()?.dataset['hidden']).toBe('false');
+    act(() => trigger?.click());
+
+    expect(trigger?.dataset['hidden']).toBe('true');
+    expect(selectedToolbar()?.dataset['hidden']).toBe('true');
+    expect(props.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        borderSettings: expect.objectContaining({
+          effects: expect.objectContaining({ capture: { hideFrame: true } }),
+        }),
+      })
+    );
+
+    act(() => root.unmount());
+  });
+});

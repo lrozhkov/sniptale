@@ -25,7 +25,6 @@ type StepBadgeManualSettingsProps = {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
   isAuto: boolean;
   onAlphabetChange: (alphabet: 'cyrillic' | 'latin') => void;
@@ -34,7 +33,8 @@ type StepBadgeManualSettingsProps = {
   onCreatePreset: (
     name: string,
     settings: StepBadgeTemplateSettings
-  ) => Promise<{ outcome: string }>;
+  ) => Promise<{ id?: string; outcome: string }>;
+  onTemplateCreated?: (templateId: string) => void;
   onOffsetToggle: (direction: 'up' | 'down' | 'left' | 'right') => void;
   onFloatingInteractionChange?: (open: boolean) => void;
   onSettingsChange: (patch: Partial<StepBadgeSettings>) => void;
@@ -46,6 +46,7 @@ type StepBadgeManualSettingsProps = {
   onValueChange: (value: string) => void;
   presets: StepBadgePreset[];
   settings: StepBadgeSettings;
+  saveSectionRequest?: number;
   templateSettings: StepBadgeTemplateSettings;
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 };
@@ -117,6 +118,7 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
       <StepBadgeSaveSection
         embedded
         onCreate={props.onCreatePreset}
+        {...(props.onTemplateCreated ? { onCreated: props.onTemplateCreated } : {})}
         {...(props.onFloatingInteractionChange
           ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
           : {})}
@@ -134,6 +136,9 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
     >
       <HighlighterManualInspectorSurface>
         <CategorizedInspector
+          {...(props.saveSectionRequest === undefined
+            ? {}
+            : { activeSectionRequest: { id: 'save' as const, token: props.saveSectionRequest } })}
           ariaLabel={translate('content.stepBadge.manualNavigation')}
           initialSection="numbering"
           renderSection={renderSection}

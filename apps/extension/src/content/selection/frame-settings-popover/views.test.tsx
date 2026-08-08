@@ -54,10 +54,10 @@ function renderContent(
       handleBlurChange={vi.fn()}
       handleBlurShowBorderChange={vi.fn()}
       handleBlurTypeChange={vi.fn()}
+      handleFocusBlurChange={vi.fn()}
       handleFocusChange={vi.fn()}
       handleFocusShowBorderChange={vi.fn()}
       handleManualBorderChange={vi.fn()}
-      handleEditPreset={vi.fn()}
       handleSelectPreset={vi.fn()}
       handleTogglePresetEnabled={vi.fn()}
       headerContext="element"
@@ -96,7 +96,7 @@ describe('FrameSettingsPopoverContent', () => {
 
     expect(markup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
-    expect(markup).toContain(translate('content.overlayControls.frameStyleSwitchToManual'));
+    expect(markup).not.toContain(translate('content.overlayControls.frameStyleSwitchToManual'));
     expect(markup).toContain('sniptale-settings-popover-close');
     expectNoFrameStyleSectionHeading(markup);
     expect(markup).toContain('shared.ui.content-popover-section');
@@ -104,13 +104,13 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain('Default');
   });
 
-  it('exposes quiet edit and visibility actions without a duplicate add action', () => {
+  it('exposes a fork only for the selected template and retains visibility actions', () => {
     const markup = renderContent('border');
 
     expect(markup).toContain('sniptale-frame-style-section');
     expect(markup).toContain('sniptale-glass-preset-list--scroll');
     expect(markup).toContain('sniptale-frame-style-preset-actions');
-    expect(markup).toContain(translate('content.overlayControls.configureFrameStyle'));
+    expect(markup).toContain(translate('content.templateFork.fork'));
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
     expect(markup).not.toContain(translate('content.overlayControls.addFrameStyle'));
     expect(markup).not.toContain('sniptale-frame-style-add');
@@ -190,8 +190,9 @@ describe('FrameSettingsPopoverContent', () => {
     expect(focusMarkup).toContain('type="range"');
     expect(focusMarkup).toContain('value="65"');
     expect(focusMarkup).toContain(translate('content.overlayControls.showBorderTitle'));
+    expect(focusMarkup).toContain(translate('content.overlayControls.focusBlurLabel'));
     expect(focusMarkup).toContain('sniptale-glass-switch--on');
-    expect(focusMarkup).toContain('--sniptale-range-fill-ratio:61.111111111111114%');
+    expect(focusMarkup).toContain('--sniptale-range-fill-ratio:65%');
     expect(blurMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(focusMarkup.match(/sniptale-toolbar-menu-title/g)).toHaveLength(1);
     expect(blurMarkup).not.toContain('sniptale-glass-range-meta');

@@ -11,13 +11,13 @@ import {
   resolveContentPortalTarget,
   useContentPortalTheme,
 } from '../interactive-frame/layout/portal';
+import { useContentUiScale } from '../../platform/dom-host';
 
 interface StepBadgeProps {
   settings: StepBadgeSettings;
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   shadow?: number;
   frameRect?: StepBadgeFrameRect;
   isSettingsOpen?: boolean;
@@ -31,6 +31,7 @@ interface StepBadgeProps {
 /** Content adapter for the shared badge surface and page-owned portal. */
 export const StepBadge: React.FC<StepBadgeProps> = (props) => {
   const portalTheme = useContentPortalTheme();
+  const chromeScale = useContentUiScale();
   if (!props.frameRect) {
     return (
       <FrameStepBadgeSurface
@@ -39,7 +40,6 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
         settings={props.settings}
         zIndex={FRAME_ANNOTATION_Z_INDEX.stepBadge}
         {...(props.fillColor ? { fillColor: props.fillColor } : {})}
-        {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
         {...(props.shadow === undefined ? {} : { shadow: props.shadow })}
         {...(props.onClick ? { onClick: props.onClick } : {})}
       />
@@ -50,6 +50,7 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
     <FrameStepBadgeInteractiveSurface
       borderColor={props.borderColor}
       borderWidth={props.borderWidth}
+      chromeScale={chromeScale}
       controlsPortalTarget={portalTarget}
       frameRect={props.frameRect}
       {...(props.onPositionChange ? { onPositionChange: props.onPositionChange } : {})}
@@ -58,7 +59,6 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
       showSettingsHandle={Boolean(props.showSettingsHandle)}
       surfacePortalTarget={portalTarget}
       {...(props.fillColor ? { fillColor: props.fillColor } : {})}
-      {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
       {...(props.shadow === undefined ? {} : { shadow: props.shadow })}
       {...(props.isSettingsOpen === undefined ? {} : { isSettingsOpen: props.isSettingsOpen })}
       {...(props.onClick ? { onClick: props.onClick } : {})}

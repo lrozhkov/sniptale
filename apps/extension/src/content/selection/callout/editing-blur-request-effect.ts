@@ -5,15 +5,16 @@ export function useCalloutBlurRequestEffect(args: {
   contentEditableRef: React.RefObject<HTMLDivElement | null>;
   finishEditing: (editableElement?: HTMLDivElement | null) => void;
   frameId: string;
+  isEditing: boolean;
 }) {
-  const { contentEditableRef, finishEditing, frameId } = args;
+  const { contentEditableRef, finishEditing, frameId, isEditing } = args;
 
   useEffect(() => {
     return addCalloutBlurRequestListener(({ frameId: requestedFrameId }) => {
-      if (requestedFrameId === frameId && contentEditableRef.current) {
+      if (isEditing && requestedFrameId === frameId && contentEditableRef.current) {
         finishEditing(contentEditableRef.current);
         contentEditableRef.current.blur();
       }
     });
-  }, [contentEditableRef, finishEditing, frameId]);
+  }, [contentEditableRef, finishEditing, frameId, isEditing]);
 }

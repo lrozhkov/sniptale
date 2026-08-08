@@ -33,9 +33,11 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.bottom).toBe(0);
+    expect(style.top).toBe('100%');
     expect(style.left).toBe('75%');
-    expect(style.transform).toBe('translate(-50%, 50%) translate(0px, 0px)');
+    expect(style.transform).toBe(
+      'translate(-14.580000000000004px, -14.580000000000004px) scale(1)'
+    );
 
     const thickStyle = getStepBadgeStyle({
       borderColor: '#111',
@@ -49,8 +51,8 @@ describe('step badge boundary placement', () => {
       },
       zIndex: 10,
     });
-    expect({ bottom: thickStyle.bottom, left: thickStyle.left }).toEqual({
-      bottom: 0,
+    expect({ top: thickStyle.top, left: thickStyle.left }).toEqual({
+      top: '100%',
       left: '75%',
     });
   });
@@ -71,7 +73,28 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.transform).toBe('translate(-50%, 50%) translate(7.2px, 0px)');
+    expect(style.transform).toBe('translate(-3.6000000000000005px, -10.8px) scale(1)');
+  });
+
+  it('compensates the visual offset together with the badge at page zoom', () => {
+    const style = getStepBadgeStyle({
+      borderColor: '#111',
+      borderWidth: 4,
+      clickable: false,
+      settings: {
+        enabled: true,
+        manualPlacement: { position: 0.75, side: 'bottom' },
+        offsetDirections: ['right'],
+        size: 'standard',
+        type: 'number',
+        value: '4',
+      },
+      visualScale: 0.5,
+      zIndex: 10,
+    });
+
+    expect(style.transform).toBe('translate(-1.8000000000000003px, -5.4px) scale(0.5)');
+    expect(style.scale).toBeUndefined();
   });
 
   it('renders a custom diameter and semantic frame colors without changing placement', () => {
@@ -80,7 +103,6 @@ describe('step badge boundary placement', () => {
       borderWidth: 4,
       clickable: false,
       fillColor: '#fedcba',
-      fillOpacity: 1,
       settings: {
         anchor: 'middle-right',
         enabled: true,
@@ -105,7 +127,7 @@ describe('step badge boundary placement', () => {
       border: '2px solid #123456',
       color: '#123456',
       height: '40px',
-      right: 0,
+      left: '100%',
       top: '50%',
       width: '40px',
     });

@@ -126,7 +126,6 @@ function createFrame(): FrameData {
       color: '#ff671d',
       id: 'preset-1',
       name: 'Preset',
-      opacity: 100,
       radius: 0,
       width: 3,
     }),
@@ -369,6 +368,7 @@ describe('interactive frame callout overlay', () => {
     });
 
     expect(useFrameUIStore.getState().activePopover).toEqual({
+      calloutIndex: 0,
       frameId: frame.id,
       kind: 'callout-settings',
     });

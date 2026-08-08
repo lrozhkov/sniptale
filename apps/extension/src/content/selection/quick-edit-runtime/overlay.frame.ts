@@ -10,8 +10,8 @@ export function applyQuickEditFrameRect(frameElement: HTMLElement, element: Elem
     QUICK_EDIT_FRAME_SETTINGS
   );
 
-  frameElement.style.top = `${frameCoords.y}px`;
-  frameElement.style.left = `${frameCoords.x}px`;
+  frameElement.style.top = `${frameCoords.y - QUICK_EDIT_FRAME_SETTINGS.borderWidth}px`;
+  frameElement.style.left = `${frameCoords.x - QUICK_EDIT_FRAME_SETTINGS.borderWidth}px`;
   frameElement.style.width = `${frameCoords.width}px`;
   frameElement.style.height = `${frameCoords.height}px`;
 }

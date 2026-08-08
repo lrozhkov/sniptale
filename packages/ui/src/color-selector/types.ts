@@ -10,6 +10,8 @@ export function getNextColorSelectorFormatMode(
 }
 
 export interface CompactColorSelectorProps {
+  allowAlpha?: boolean;
+  allowTransparent?: boolean;
   className?: string;
   disabled?: boolean;
   label: string;
@@ -18,6 +20,7 @@ export interface CompactColorSelectorProps {
   onPreviewChange?: (value: string) => void;
   onPreviewReset?: (value: string) => void;
   palette?: readonly string[];
+  pickerOnly?: boolean;
   recentColors?: readonly string[];
   title: string;
   value: string;

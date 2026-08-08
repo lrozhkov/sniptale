@@ -36,14 +36,14 @@ export function buildScreenshotModeStatusResponse(
     };
   };
 
-  browserTabs
-    .get(tabId)
-    .then((tab) => {
+  Promise.all([browserTabs.get(tabId), browserTabs.getZoom(tabId).catch(() => undefined)])
+    .then(([tab, pageZoom]) => {
       const capability = getScreenshotModeCapability(tab);
       sendResponse({
         success: true,
         ...documentScope,
         ...sessionScope(),
+        ...(pageZoom === undefined ? {} : { pageZoom }),
         tabId,
         viewport: viewportState.get(tabId) || null,
         supported: capability.supported,

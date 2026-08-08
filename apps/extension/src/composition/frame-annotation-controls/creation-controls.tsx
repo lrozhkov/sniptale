@@ -12,6 +12,7 @@ import type {
   FrameAnnotationCreationMenu,
   FrameAnnotationCreationSettings,
 } from './contracts';
+import type { TemplateSourceControl } from './popover/template-source';
 
 export type {
   FrameAnnotationCreationFramePopoverRenderArgs,
@@ -32,6 +33,8 @@ export function FrameAnnotationCreationControls(props: {
   settings: FrameAnnotationCreationSettings;
   showCallout?: boolean;
   showStepBadge?: boolean;
+  calloutTemplateSourceControl?: TemplateSourceControl;
+  stepBadgeTemplateSourceControl?: TemplateSourceControl;
 }) {
   const [internalActiveMenu, setInternalActiveMenu] = useState<FrameAnnotationCreationMenu | null>(
     null
@@ -101,6 +104,12 @@ export function FrameAnnotationCreationControls(props: {
         update={update}
         {...(props.portalTarget ? { portalTarget: props.portalTarget } : {})}
         {...(props.renderFramePopover ? { renderFramePopover: props.renderFramePopover } : {})}
+        {...(props.calloutTemplateSourceControl
+          ? { calloutTemplateSourceControl: props.calloutTemplateSourceControl }
+          : {})}
+        {...(props.stepBadgeTemplateSourceControl
+          ? { stepBadgeTemplateSourceControl: props.stepBadgeTemplateSourceControl }
+          : {})}
       />
     </>
   );

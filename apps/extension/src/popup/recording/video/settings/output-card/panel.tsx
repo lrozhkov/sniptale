@@ -131,7 +131,9 @@ export function OutputSettingsPanel(props: {
           'hover:bg-[var(--sniptale-color-surface-hover)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
-        onClick={() => void openSettingsPage({ section: 'video' })}
+        onClick={() =>
+          void openSettingsPage({ route: { section: 'media-quality', view: 'video' } })
+        }
       >
         {translate('popup.video.manageQualityProfiles')}
       </button>

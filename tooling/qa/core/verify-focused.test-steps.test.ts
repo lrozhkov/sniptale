@@ -109,9 +109,14 @@ it('does not treat runtime-state authority inventory path updates as high-risk p
   ).toBe(true);
   expect(
     module.isHighRiskFocusedProofFile(
-      'apps/extension/src/settings/sections/ai-providers/controller/save.ts'
+      'apps/extension/src/settings/runtime/ai-settings/mutations.ts'
     )
   ).toBe(true);
+  expect(
+    module.isHighRiskFocusedProofFile(
+      'apps/extension/src/settings/sections/ai/connections/controller/save.ts'
+    )
+  ).toBe(false);
 });
 
 it('fails fast for new coverage-eligible production files without local test ownership', async () => {

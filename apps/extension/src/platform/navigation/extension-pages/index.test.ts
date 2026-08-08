@@ -77,11 +77,11 @@ describe('extension page settings helpers', () => {
     browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9 }]);
     const { openSettingsPage } = await import('./index');
 
-    await openSettingsPage({ section: 'native-hotkeys' });
+    await openSettingsPage({ route: { section: 'native-app', view: 'commands' } });
 
     expect(browserTabsUpdateMock).toHaveBeenCalledWith(7, {
       active: true,
-      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-hotkeys',
+      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-app&view=commands',
     });
     expect(browserWindowsUpdateMock).toHaveBeenCalledWith(9, { focused: true });
     expect(browserTabsCreateMock).not.toHaveBeenCalled();

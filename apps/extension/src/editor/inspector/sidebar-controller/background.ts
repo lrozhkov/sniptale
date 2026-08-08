@@ -11,6 +11,7 @@ import { createEditorFrameGradientPatch } from '../../../features/editor/documen
 import { readFileAsDataUrl } from '../../document/file-actions/file-reader';
 import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
 import type { getFrameGradientPresets } from '../sidebar-shared';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 
 interface SidebarBackgroundUtilityArgs {
   borderPresets: BorderPreset[];
@@ -48,7 +49,10 @@ export function buildSidebarBackgroundActions(args: SidebarBackgroundUtilityArgs
 
       const patch = {
         shape: buildPresetPatch(preset),
-        step: { color: preset.color },
+        step: {
+          color: setColorAlpha(preset.color, 1) ?? preset.color,
+          opacity: getColorAlpha(preset.color) ?? 1,
+        },
       };
       if (args.targets.preset) {
         args.targets.preset(patch);

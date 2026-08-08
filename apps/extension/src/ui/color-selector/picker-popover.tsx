@@ -22,6 +22,8 @@ const PANEL_CLASS_NAME = [
 ].join(' ');
 
 type ColorSelectorPickerPopoverProps = {
+  allowAlpha?: boolean;
+  allowTransparent?: boolean;
   color: string;
   formatMode: ColorSelectorFormatMode;
   onApply: () => void;
@@ -41,9 +43,19 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
       resolvedColor: color.handleColorChange(nextColor),
     });
   const manualColorInput = useManualColorInput(color.resolvedColor, handlePickerColorChange);
-  const rgbInputs = useRgbInputs(color.resolvedColor, handlePickerColorChange);
-  const hslInputs = useHslInputs(color.resolvedColor, handlePickerColorChange);
-  const eyedropper = useEyedropper(handlePickerColorChange, props.onEyedropperStateChange);
+  const handleChannelColorChange = (nextColor: string) =>
+    applyResolvedPickerColorChange({
+      onColorChange: props.onColorChange,
+      resolvedColor: color.handleChannelColorChange(nextColor),
+    });
+  const handleAlphaChange = (nextAlpha: string) =>
+    applyResolvedPickerColorChange({
+      onColorChange: props.onColorChange,
+      resolvedColor: color.handleAlphaChange(nextAlpha),
+    });
+  const rgbInputs = useRgbInputs(color.resolvedColor, handleChannelColorChange);
+  const hslInputs = useHslInputs(color.resolvedColor, handleChannelColorChange);
+  const eyedropper = useEyedropper(handleChannelColorChange, props.onEyedropperStateChange);
 
   return (
     <div className={PANEL_CLASS_NAME} data-ui="shared.ui.color-selector.picker">
@@ -60,11 +72,14 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
           value={color.value}
         />
         <PickerControls
+          allowAlpha={props.allowAlpha !== false}
+          allowTransparent={props.allowTransparent !== false}
           color={color}
           eyedropper={eyedropper}
           formatMode={props.formatMode}
           hslInputs={hslInputs}
           manualColorInput={manualColorInput}
+          onAlphaChange={handleAlphaChange}
           onCycleFormatMode={props.onCycleFormatMode}
           onHueChange={(nextHue) =>
             applyResolvedPickerColorChange({

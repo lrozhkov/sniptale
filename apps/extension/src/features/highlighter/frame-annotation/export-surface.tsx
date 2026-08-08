@@ -1,5 +1,6 @@
 import React from 'react';
 import { FrameAnnotationDecoration } from './decoration';
+import { isFrameHiddenDuringCapture } from './capture-visibility';
 import type { FrameAnnotationSnapshotV1 } from './model';
 import { resolveFrameAnnotationVisualScene } from './render-scene';
 import {
@@ -10,6 +11,7 @@ import {
 import { getFrameAnnotationBlurBackdropStyle } from './effect-style';
 import { FrameCalloutExportSurface } from './callout/export-surface';
 import { FrameStepBadgeInteractiveSurface } from './step-badge/interactive-surface';
+import { getFrameCalloutKey, getFrameCallouts } from './callout/collection';
 
 export function FrameAnnotationExportSurface(props: {
   baseImageUrl: string;
@@ -21,6 +23,10 @@ export function FrameAnnotationExportSurface(props: {
   const focusFrames = props.snapshots.filter((frame) => frame.effectMode === 'focus');
   const focusOpacity = focusFrames.reduce(
     (maximum, frame) => Math.max(maximum, frame.focusSettings?.opacity ?? 0.5),
+    0
+  );
+  const focusBlurAmount = focusFrames.reduce(
+    (maximum, frame) => Math.max(maximum, frame.focusSettings?.blurAmount ?? 0),
     0
   );
   const distortionScale = props.snapshots.reduce(
@@ -69,6 +75,7 @@ export function FrameAnnotationExportSurface(props: {
       )}
       {focusFrames.length > 0 ? (
         <FrameAnnotationFocusSurface
+          blurAmount={focusBlurAmount}
           frames={focusFrames}
           height={props.height}
           opacity={focusOpacity}
@@ -99,11 +106,13 @@ function FrameAnnotationExportEntry(props: {
         }}
       >
         <div style={scene.frameStyle}>
-          <FrameAnnotationDecoration
-            frameId={props.frame.id}
-            fillStyle={scene.fillStyle}
-            strokeStyle={scene.strokeStyle}
-          />
+          {isFrameHiddenDuringCapture(props.frame) ? null : (
+            <FrameAnnotationDecoration
+              frameId={props.frame.id}
+              fillStyle={scene.fillStyle}
+              strokeStyle={scene.strokeStyle}
+            />
+          )}
         </div>
       </div>
       {props.portalTarget && props.frame.stepBadge?.enabled ? (
@@ -121,17 +130,24 @@ function FrameAnnotationExportEntry(props: {
           {...(props.frame.borderSettings?.fillColor
             ? { fillColor: props.frame.borderSettings.fillColor }
             : {})}
-          {...(props.frame.borderSettings?.fillOpacity === undefined
-            ? {}
-            : { fillOpacity: props.frame.borderSettings.fillOpacity })}
           {...(props.frame.borderSettings?.shadow === undefined
             ? {}
             : { shadow: props.frame.borderSettings.shadow })}
         />
       ) : null}
-      {props.portalTarget && props.frame.callout?.enabled ? (
-        <FrameCalloutExportSurface frame={props.frame} portalTarget={props.portalTarget} />
-      ) : null}
+      {props.portalTarget
+        ? getFrameCallouts(props.frame).map((callout, calloutIndex) =>
+            callout.enabled ? (
+              <FrameCalloutExportSurface
+                callout={callout}
+                calloutIndex={calloutIndex}
+                frame={props.frame}
+                key={getFrameCalloutKey(props.frame, calloutIndex)}
+                portalTarget={props.portalTarget!}
+              />
+            ) : null
+          )
+        : null}
     </>
   );
 }

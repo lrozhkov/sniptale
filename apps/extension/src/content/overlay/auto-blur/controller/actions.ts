@@ -16,24 +16,11 @@ import {
   persistSettings,
   type AutoBlurFrameManager,
 } from './operations';
+import { reportAutoBlurApplyResult } from './feedback';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 const APPLY_ERROR_MESSAGE_KEY = 'content.autoBlur.applyError' satisfies TranslationKey;
-const APPLY_ONCE_SUCCESS_MESSAGE_KEY = 'content.autoBlur.applyOnceSuccess' satisfies TranslationKey;
-const APPLY_ONCE_EMPTY_MESSAGE_KEY = 'content.autoBlur.applyOnceEmpty' satisfies TranslationKey;
 const APPLY_ONCE_ERROR_MESSAGE_KEY = 'content.autoBlur.applyOnceError' satisfies TranslationKey;
-
-function reportApplyOnceResult(addedCount: number) {
-  if (addedCount === 0) {
-    showToast(translate(APPLY_ONCE_EMPTY_MESSAGE_KEY), 'info');
-    return;
-  }
-
-  showToast(
-    translate(APPLY_ONCE_SUCCESS_MESSAGE_KEY).replace('{count}', String(addedCount)),
-    'success'
-  );
-}
 
 interface ApplyActionArgs {
   blurSettings: BlurSettings;
@@ -165,7 +152,7 @@ export function useApplyOnceAction(args: {
         scanMode: 'full-page',
         selectedCategories: settings.selectedCategories,
       });
-      reportApplyOnceResult(result.addedCount);
+      reportAutoBlurApplyResult(result.addedCount);
     } catch (error) {
       logger.error('Failed to apply auto-blur once', error);
       failApplying(APPLY_ERROR_MESSAGE_KEY);
@@ -198,17 +185,10 @@ export function useToggleAutoApplyAction(args: {
   beginApplying: () => void;
   failApplying: (message: TranslationKey) => void;
   finishApplying: () => void;
-  frameManager: AutoBlurFrameManager;
   setAutoApplyEnabled: (enabled: boolean) => void;
 }) {
-  const {
-    autoApplyAllowed,
-    beginApplying,
-    failApplying,
-    finishApplying,
-    frameManager,
-    setAutoApplyEnabled,
-  } = args;
+  const { autoApplyAllowed, beginApplying, failApplying, finishApplying, setAutoApplyEnabled } =
+    args;
 
   return useCallback(async () => {
     beginApplying();
@@ -223,27 +203,11 @@ export function useToggleAutoApplyAction(args: {
       const nextSettings = { ...settings, autoApplyEnabled: nextEnabled };
       await saveAutoBlurSettings(nextSettings);
       setAutoApplyEnabled(nextEnabled);
-
-      if (nextEnabled) {
-        await applyAutoBlurWithSettings({
-          blurSettings: settings.blurSettings,
-          frameManager,
-          frames: frameManager.frames,
-          selectedCategories: settings.selectedCategories,
-        });
-      }
     } catch (error) {
       logger.error('Failed to toggle auto-blur mode', error);
       failApplying(APPLY_ERROR_MESSAGE_KEY);
     } finally {
       finishApplying();
     }
-  }, [
-    autoApplyAllowed,
-    beginApplying,
-    failApplying,
-    finishApplying,
-    frameManager,
-    setAutoApplyEnabled,
-  ]);
+  }, [autoApplyAllowed, beginApplying, failApplying, finishApplying, setAutoApplyEnabled]);
 }

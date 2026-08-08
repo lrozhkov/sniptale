@@ -27,7 +27,6 @@ type FrameVisuals = {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
 };
 
 const SOURCE_ICONS = {

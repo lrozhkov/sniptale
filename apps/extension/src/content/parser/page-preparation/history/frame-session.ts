@@ -50,6 +50,9 @@ function cloneFrameSettings(frame: FrameData): SerializableFrameData {
           callout: cloneHistoryCalloutSettings(frame.callout),
         }
       : {}),
+    ...(frame.additionalCallouts
+      ? { additionalCallouts: frame.additionalCallouts.map(cloneHistoryCalloutSettings) }
+      : {}),
     ...(frame.focusSettings ? { focusSettings: { ...frame.focusSettings } } : {}),
     ...(frame.offset ? { offset: { ...frame.offset } } : {}),
     ...(frame.pagePlacement

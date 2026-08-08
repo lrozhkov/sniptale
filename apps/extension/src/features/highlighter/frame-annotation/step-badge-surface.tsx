@@ -12,53 +12,45 @@ import { translate } from '../../../platform/i18n';
 const ANCHOR_POSITIONS: Record<StepBadgeAnchor, Record<string, number | string>> = {
   'top-left': { top: 0, left: 0 },
   'top-center': { top: 0, left: '50%' },
-  'top-right': { top: 0, right: 0 },
+  'top-right': { top: 0, left: '100%' },
   'middle-left': { top: '50%', left: 0 },
   center: { top: '50%', left: '50%' },
-  'middle-right': { top: '50%', right: 0 },
-  'bottom-left': { bottom: 0, left: 0 },
-  'bottom-center': { bottom: 0, left: '50%' },
-  'bottom-right': { bottom: 0, right: 0 },
+  'middle-right': { top: '50%', left: '100%' },
+  'bottom-left': { top: '100%', left: 0 },
+  'bottom-center': { top: '100%', left: '50%' },
+  'bottom-right': { top: '100%', left: '100%' },
 };
 
 function resolvePosition(settings: StepBadgeSettings) {
   const manual = settings.manualPlacement;
   if (manual) {
     const value = `${Math.max(0, Math.min(1, manual.position)) * 100}%`;
-    if (manual.side === 'top') return { top: 0, left: value, translate: 'translate(-50%, -50%)' };
-    if (manual.side === 'right') return { top: value, right: 0, translate: 'translate(50%, -50%)' };
+    if (manual.side === 'top') return { top: 0, left: value, translateX: -0.5, translateY: -0.5 };
+    if (manual.side === 'right')
+      return { top: value, left: '100%', translateX: -0.5, translateY: -0.5 };
     if (manual.side === 'bottom')
-      return { bottom: 0, left: value, translate: 'translate(-50%, 50%)' };
-    return { top: value, left: 0, translate: 'translate(-50%, -50%)' };
+      return { top: '100%', left: value, translateX: -0.5, translateY: -0.5 };
+    return { top: value, left: 0, translateX: -0.5, translateY: -0.5 };
   }
   const anchor = settings.anchor ?? settings.corner ?? 'top-left';
   const resolved = anchor in ANCHOR_POSITIONS ? (anchor as StepBadgeAnchor) : 'top-left';
-  const x = resolved.endsWith('right') ? '50%' : '-50%';
-  const y = resolved.startsWith('bottom') ? '50%' : '-50%';
   return {
     ...ANCHOR_POSITIONS[resolved],
-    translate: `translate(${resolveHorizontalTranslation(resolved, x)}, ${resolveVerticalTranslation(resolved, y)})`,
+    translateX: -0.5,
+    translateY: -0.5,
   };
-}
-
-function resolveHorizontalTranslation(anchor: StepBadgeAnchor, fallback: string): string {
-  return anchor === 'center' || anchor.endsWith('center') ? '-50%' : fallback;
-}
-
-function resolveVerticalTranslation(anchor: StepBadgeAnchor, fallback: string): string {
-  return anchor === 'center' || anchor.startsWith('middle') ? '-50%' : fallback;
 }
 
 export function getStepBadgeStyle(props: {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   settings: StepBadgeSettings;
   shadow?: number;
   zIndex: number;
   clickable: boolean;
   isDragging?: boolean;
+  visualScale?: number;
 }): React.CSSProperties {
   const { badgeSize, fontSize, offset } = getStepBadgeVisualMetrics(
     props.settings,
@@ -68,9 +60,9 @@ export function getStepBadgeStyle(props: {
     borderColor: props.borderColor,
     borderWidth: props.borderWidth,
     ...(props.fillColor ? { fillColor: props.fillColor } : {}),
-    ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
   });
   const position = resolvePosition(props.settings);
+  const visualScale = props.visualScale ?? 1;
   const shadow =
     props.shadow === undefined ? null : resolveBorderShadowVisual(props.shadow, props.borderColor);
   return {
@@ -89,7 +81,10 @@ export function getStepBadgeStyle(props: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transform: `${position.translate} translate(${offset.x}px, ${offset.y}px)`,
+    transform: `translate(${(position.translateX * badgeSize + offset.x) * visualScale}px, ${
+      (position.translateY * badgeSize + offset.y) * visualScale
+    }px) scale(${visualScale})`,
+    transformOrigin: 'top left',
     zIndex: props.zIndex,
     pointerEvents: 'auto',
     cursor: props.clickable ? 'pointer' : 'default',
@@ -99,9 +94,7 @@ export function getStepBadgeStyle(props: {
     WebkitUserSelect: 'none',
     transition: props.isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.15s ease-out',
     top: position.top,
-    bottom: position.bottom,
     left: position.left,
-    right: position.right,
   };
 }
 
@@ -134,9 +127,9 @@ export function FrameStepBadgeSurface(props: {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   elementRef?: React.Ref<HTMLDivElement>;
   isDragging?: boolean;
+  visualScale?: number;
   onClick?: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -163,10 +156,10 @@ export function FrameStepBadgeSurface(props: {
           borderColor: props.borderColor,
           borderWidth: props.borderWidth,
           ...(props.fillColor ? { fillColor: props.fillColor } : {}),
-          ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
           zIndex: props.zIndex,
           clickable: Boolean(props.onClick),
           ...(props.isDragging === undefined ? {} : { isDragging: props.isDragging }),
+          ...(props.visualScale === undefined ? {} : { visualScale: props.visualScale }),
           ...(props.shadow === undefined ? {} : { shadow: props.shadow }),
         }),
         ...customStyles.badge,

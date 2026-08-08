@@ -4,6 +4,8 @@ import {
   PickerRgbFields,
   PickerToolbar,
 } from './picker-sections';
+import { PickerInputField } from './picker-controls';
+import { translate } from '../../platform/i18n';
 import type {
   useEyedropper,
   useFormatMode,
@@ -61,11 +63,14 @@ function PickerFields(props: {
 }
 
 export function PickerControls(props: {
+  allowAlpha?: boolean;
+  allowTransparent?: boolean;
   color: ReturnType<typeof usePickerColorState>;
   eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ReturnType<typeof useFormatMode>['formatMode'];
   hslInputs: ReturnType<typeof useHslInputs>;
   manualColorInput: ReturnType<typeof useManualColorInput>;
+  onAlphaChange: (nextAlpha: string) => void;
   onCycleFormatMode: () => void;
   onHueChange: (nextHue: string) => void;
   onSelectTransparent: () => void;
@@ -74,6 +79,7 @@ export function PickerControls(props: {
   return (
     <div className="space-y-3">
       <PickerToolbar
+        allowTransparent={props.allowTransparent !== false}
         eyedropperAvailable={props.eyedropper.eyedropperAvailable}
         eyedropperPressed={props.eyedropper.eyedropperPressed}
         handleEyedropperPick={props.eyedropper.handleEyedropperPick}
@@ -82,6 +88,34 @@ export function PickerControls(props: {
         onSelectTransparent={props.onSelectTransparent}
         resolvedColor={props.color.resolvedColor}
       />
+      {props.allowAlpha !== false ? (
+        <div className="grid grid-cols-[1fr_72px] items-center gap-2">
+          <input
+            aria-label={translate('shared.ui.colorSelectorAlpha')}
+            type="range"
+            min={0}
+            max={100}
+            value={props.color.alphaPercent}
+            onChange={(event) => props.onAlphaChange(event.target.value)}
+            className="sniptale-color-selector-alpha-range h-9 w-full"
+            style={{
+              backgroundColor: '#fff',
+              backgroundImage: [
+                `linear-gradient(to right, transparent, ${props.color.resolvedColor.slice(0, 7)})`,
+                'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
+              ].join(', '),
+              backgroundSize: '100% 100%, 12px 12px',
+            }}
+          />
+          <PickerInputField
+            ariaLabel={translate('shared.ui.colorSelectorAlpha')}
+            min={0}
+            max={100}
+            value={props.color.alphaPercent}
+            onChange={props.onAlphaChange}
+          />
+        </div>
+      ) : null}
       <PickerFields
         formatMode={props.formatMode}
         hslInputs={props.hslInputs}

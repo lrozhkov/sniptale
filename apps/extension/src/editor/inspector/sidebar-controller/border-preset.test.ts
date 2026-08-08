@@ -39,19 +39,16 @@ describe('createBorderPresetFromShapeSettings', () => {
 
     expect(preset).toEqual(
       expect.objectContaining({
-        color: '#445566',
+        color: '#445566b3',
         customCss: '',
         enabled: true,
-        fillColor: '#112233',
-        fillOpacity: 25,
+        fillColor: '#11223340',
         inheritCustomCss: false,
         name: 'editor.tools.rectangle 1',
-        opacity: 70,
         order: 5,
         padding: { top: 6, right: 8, bottom: 10, left: 12 },
         radius: 8,
         shadow: 30,
-        strokeOpacity: 70,
         style: 'dashed',
         width: 6,
       })
@@ -86,11 +83,11 @@ describe('createBorderPresetFromShapeSettings', () => {
 
     expect(preset).toEqual(
       expect.objectContaining({
-        fillOpacity: 62,
+        color: '#1234569e',
+        fillColor: '#abcdef9e',
         name: 'editor.tools.rectangle 2',
         padding: DEFAULT_BORDER_PRESET.padding,
         radius: 0,
-        strokeOpacity: 62,
         width: 1,
       })
     );

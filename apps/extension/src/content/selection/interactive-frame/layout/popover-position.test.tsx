@@ -85,6 +85,24 @@ afterEach(() => {
 });
 
 describe('main toolbar frame popover positioning', () => {
+  it('uses compensated visual size and spacing at page zoom', () => {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['displayMode'] = 'horizontal';
+    setRect(toolbar, new DOMRect(100, 100, 210, 24));
+    document.body.append(toolbar);
+    const anchor = document.createElement('button');
+    anchor.style.setProperty('--sniptale-content-ui-scale', '0.5');
+    setRect(anchor, new DOMRect(220, 104, 16, 16));
+    toolbar.append(anchor);
+
+    act(() => root.render(<PositionHarness anchorEl={anchor} />));
+
+    const popover = container.firstElementChild as HTMLElement;
+    expect(Number(popover.dataset['left'])).toBe(220);
+    expect(Number(popover.dataset['top'])).toBe(125);
+  });
+
   it('opens below the complete horizontal main toolbar without overlapping it', () => {
     const toolbar = document.createElement('div');
     toolbar.className = 'sniptale-toolbar';

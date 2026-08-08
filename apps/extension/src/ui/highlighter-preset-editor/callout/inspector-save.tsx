@@ -7,7 +7,9 @@ export type CalloutSaveSectionProps = {
   error: string | null;
   isSaving: boolean;
   onCreate: (name: string) => Promise<boolean>;
+  onCreated?: () => void;
   onOverwrite: (presetId: string) => Promise<boolean>;
+  onOverwritten?: (templateId: string) => void;
   presets: CalloutPreset[];
 };
 
@@ -27,7 +29,9 @@ export function CalloutSaveSettings(props: CalloutSaveSectionProps) {
       isSaving={props.isSaving}
       nameLabel={translate('content.callout.newPresetName')}
       onCreate={props.onCreate}
+      {...(props.onCreated ? { onCreated: props.onCreated } : {})}
       onOverwrite={props.onOverwrite}
+      {...(props.onOverwritten ? { onOverwritten: props.onOverwritten } : {})}
       options={options}
       overwriteActionLabel={translate('content.callout.overwritePresetAction')}
       overwriteLabel={translate('content.callout.overwritePreset')}

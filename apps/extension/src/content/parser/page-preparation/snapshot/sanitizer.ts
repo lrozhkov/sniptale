@@ -30,6 +30,7 @@ const SNIPTALE_RUNTIME_SELECTORS = [
   '.sniptale-content-size-tooltip',
   '.sniptale-resize-handle',
   '.sniptale-callout-drag-handle',
+  '.sniptale-callout-adjacent-controls',
   '.sniptale-callout-tail-handle',
   '.sniptale-callout-settings-handle',
   '.sniptale-step-badge-controls',

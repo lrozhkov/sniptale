@@ -64,6 +64,7 @@ function PickerTriggerButton(props: {
 }) {
   const isTransparent = props.value.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT;
   const previewColor = resolvePickerColor(props.value);
+  const swatchColor = isTransparent ? 'transparent' : previewColor;
   const displayValue = buildTriggerDisplayValue(props.value, props.formatMode);
   const valueClassName = isTransparent
     ? 'truncate text-[12px] font-semibold italic text-[var(--sniptale-color-text-primary)]'
@@ -89,7 +90,14 @@ function PickerTriggerButton(props: {
           'bg-[color:var(--sniptale-color-surface-panel)]',
           'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-surface-panel)_52%,transparent)]',
         ].join(' ')}
-        style={{ backgroundColor: isTransparent ? 'transparent' : previewColor }}
+        style={{
+          backgroundColor: '#fff',
+          backgroundImage: [
+            `linear-gradient(${swatchColor}, ${swatchColor})`,
+            'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
+          ].join(', '),
+          backgroundSize: '100% 100%, 8px 8px',
+        }}
       />
       <span className={valueClassName}>{displayValue}</span>
     </button>
@@ -130,6 +138,7 @@ export function ColorSelectorTrigger(props: {
   expanded: boolean;
   formatMode: ColorSelectorFormatMode;
   label: string;
+  showPaletteButton?: boolean;
   title: string;
   value: string;
   onOpenPicker: () => void;
@@ -152,12 +161,14 @@ export function ColorSelectorTrigger(props: {
         value={props.value}
         onOpenPicker={props.onOpenPicker}
       />
-      <PaletteButton
-        disabled={props.disabled === true}
-        expanded={props.expanded}
-        title={props.title}
-        onClick={props.onToggleExpanded}
-      />
+      {props.showPaletteButton === false ? null : (
+        <PaletteButton
+          disabled={props.disabled === true}
+          expanded={props.expanded}
+          title={props.title}
+          onClick={props.onToggleExpanded}
+        />
+      )}
     </div>
   );
 }

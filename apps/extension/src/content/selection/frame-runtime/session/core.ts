@@ -21,6 +21,11 @@ import {
 import { createCalloutPresetSessionSync } from './callout-defaults';
 import { createStepBadgePresetSessionSync } from './step-badge-defaults';
 import { setFutureFrameCallout } from './future-callout';
+import { resetAnnotationTemplateSources } from './annotation-template-source';
+import { ensureLinkedAnnotationTemplateCatalogsReady } from './linked-annotation-templates';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'FrameSessionSync' });
 
 export type FrameSessionSyncArgs = {
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
@@ -54,6 +59,7 @@ export function setupFrameSessionSyncListeners({
   withHistoryCommit,
 }: FrameSessionSyncArgs) {
   setFutureFrameCallout(null);
+  resetAnnotationTemplateSources();
   const loadSettings = createFrameSessionSettingsLoader({
     globalEffectModeRef,
     highlighterSettingsCacheRef,
@@ -76,6 +82,9 @@ export function setupFrameSessionSyncListeners({
   });
 
   loadSettings();
+  void ensureLinkedAnnotationTemplateCatalogsReady().catch((error) =>
+    logger.error('Failed to preload annotation template catalogs', error)
+  );
   const cleanupWindowListeners = registerWindowListeners(windowListeners);
   const cleanupStorageListener = browserStorage.subscribeToChanges(handleStorageChanged);
   const cleanupCalloutPresetSync = createCalloutPresetSessionSync(sessionCalloutStyleRef);
@@ -89,6 +98,7 @@ export function setupFrameSessionSyncListeners({
   });
   return () => {
     setFutureFrameCallout(null);
+    resetAnnotationTemplateSources();
     cleanupFrameSession();
     cleanupCalloutPresetSync();
     cleanupStepBadgePresetSync();

@@ -9,7 +9,7 @@ vi.mock('../../../platform/i18n', async () => ({
 
 import { createDefaultEditorPresetStorageState } from './defaults';
 import { parseStoredEditorPresetState, resolveStoredEditorPresetState } from './guards';
-import { parseSceneBackgroundSettings } from './setting-parsers';
+import { parseBlurSettings, parseSceneBackgroundSettings } from './setting-parsers';
 import { DEFAULT_SCENE_BACKGROUND_PRESET_SETTINGS } from './scene-defaults';
 
 function createDefaultsState() {
@@ -100,6 +100,24 @@ function registerAdditionalFamilyParsingTest() {
     expect(parsed.value.text?.defaultPresetId).toBe('text-default');
     expect(parsed.value.step?.defaultPresetId).toBe('step-default');
     expect(parsed.value.sceneBackground?.defaultPresetId).toBe('scene-default');
+  });
+}
+
+function registerLegacyBlurAlphaParsingTest() {
+  it('folds optional legacy blur stroke opacity into canonical color alpha', () => {
+    expect(
+      parseBlurSettings({
+        amount: 8,
+        blurType: 'gaussian',
+        showBorder: true,
+        strokeColor: '#11223380',
+        strokeOpacity: 0.5,
+      })
+    ).toMatchObject({ strokeColor: '#11223340' });
+    expect(
+      parseBlurSettings({ amount: 8, blurType: 'solid', strokeColor: '#445566' })
+    ).toMatchObject({ strokeColor: '#445566' });
+    expect(parseBlurSettings({ amount: 8, blurType: 'solid', strokeOpacity: 'opaque' })).toBeNull();
   });
 }
 
@@ -290,6 +308,7 @@ describe('editor preset guards', () => {
   registerRootValidationTest();
   registerParsedRootCollectionTest();
   registerAdditionalFamilyParsingTest();
+  registerLegacyBlurAlphaParsingTest();
   registerSceneSourceImageParsingTest();
   registerInvalidFieldCountTest();
   registerDefaultResolutionTest();

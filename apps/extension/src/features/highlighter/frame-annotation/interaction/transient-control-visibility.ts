@@ -16,7 +16,10 @@ export function useTransientControlVisibility(isPinned: boolean) {
   }, []);
 
   const scheduleHide = React.useCallback(() => {
-    if (isPinned) return;
+    if (isPinned) {
+      setIsHovered(false);
+      return;
+    }
     if (hoverLeaveTimeoutRef.current !== null) {
       window.clearTimeout(hoverLeaveTimeoutRef.current);
     }

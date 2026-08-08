@@ -25,6 +25,7 @@ import {
   ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls/controls';
 import { buildGridLayoutPreviews, buildRowLayoutPreviews } from './preview-layout-builders';
+import { CompactColorSelector } from '../../../ui/color-selector';
 
 type ProductPreviewCopy = ReturnType<typeof getProductPreviewCopy>;
 
@@ -142,7 +143,15 @@ function buildColorAndActionPreviews(copy: ProductPreviewCopy) {
           label={copy.active}
           value="#0080ff"
           colors={['#0080ff', '#22c55e', '#ef4444']}
-          inputProps={{ readOnly: true, 'aria-label': copy.active }}
+          pickerTrigger={
+            <CompactColorSelector
+              label={copy.active}
+              title={copy.active}
+              value="#0080ff"
+              pickerOnly
+              onChange={() => undefined}
+            />
+          }
         />
       </DesignSystemFloatingPreviewFrame>
     ),

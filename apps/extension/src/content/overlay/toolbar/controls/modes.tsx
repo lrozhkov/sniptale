@@ -1,13 +1,14 @@
 import React, { useRef } from 'react';
 import {
+  Bot,
   Check,
-  FilePenLine,
   Highlighter,
-  MessageSquareText,
   MousePointer2,
   MousePointerClick,
+  TextCursor,
   TextCursorInput,
 } from 'lucide-react';
+import { DesignReviewModeIcon } from '../../design-review/icons';
 import { translate } from '../../../../platform/i18n';
 import {
   ContentToolbarButton,
@@ -30,10 +31,6 @@ import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
-const AI_ICON_CLASS_NAME = [
-  MODE_ICON_CLASS_NAME,
-  'inline-flex items-center justify-center text-[10px] font-bold tracking-[-0.04em]',
-].join(' ');
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
 type ToolbarInteractionMode = 'cursor' | 'design-review' | 'highlighter' | 'quick-edit';
@@ -43,14 +40,6 @@ const TOOLBAR_INTERACTION_MODES: readonly ToolbarInteractionMode[] = [
   'quick-edit',
   'design-review',
 ];
-
-function ToolbarAiIcon() {
-  return (
-    <span aria-hidden="true" className={AI_ICON_CLASS_NAME}>
-      AI
-    </span>
-  );
-}
 
 function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode {
   if (props.pendingMode) {
@@ -77,7 +66,7 @@ function getModeIcon(mode: ToolbarInteractionMode) {
     case 'quick-edit':
       return <TextCursorInput size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'design-review':
-      return <MessageSquareText size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <DesignReviewModeIcon size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
       return <Highlighter size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
@@ -254,9 +243,9 @@ function getPageEditingModeCopy(mode: ToolbarPageEditingMode) {
 function getPageEditingModeIcon(mode: ToolbarPageEditingMode) {
   switch (mode) {
     case 'direct-text':
-      return <FilePenLine size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <TextCursor size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'ai':
-      return <ToolbarAiIcon />;
+      return <Bot size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'block-selection':
     default:
       return <MousePointerClick size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;

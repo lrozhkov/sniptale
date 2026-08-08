@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import {
   useCalloutEditingFocusEffect,
@@ -16,6 +16,7 @@ type UseCalloutEditingArgs = {
   htmlContent: string;
   titleText?: string;
   isEditing: boolean;
+  measurementScale?: number;
   onContentChange: (htmlContent: string) => void;
   onDelete: () => void;
   onStartEditing: () => void;
@@ -75,6 +76,7 @@ function useCalloutEditingEffects(args: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   contentEditableRef: React.RefObject<HTMLDivElement | null>;
   handlers: ReturnType<typeof useCalloutEditingHandlers>;
+  pendingHtmlContentRef: React.MutableRefObject<string | null>;
   voice: ReturnType<typeof useCalloutVoiceInput>;
   setDimensions: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
   setFloatingToolbarRect: React.Dispatch<React.SetStateAction<DOMRect | null>>;
@@ -84,9 +86,13 @@ function useCalloutEditingEffects(args: {
     contentEditableRef,
     htmlContent: calloutArgs.htmlContent,
     isEditing: calloutArgs.isEditing,
+    pendingHtmlContentRef: args.pendingHtmlContentRef,
   });
   useCalloutMeasureEffect({
     containerRef,
+    ...(calloutArgs.measurementScale === undefined
+      ? {}
+      : { measurementScale: calloutArgs.measurementScale }),
     setDimensions: args.setDimensions,
     settingsKey: calloutArgs.settingsKey,
   });
@@ -110,19 +116,29 @@ function useCalloutEditingEffects(args: {
     contentEditableRef,
     finishEditing: handlers.finishEditing,
     frameId: calloutArgs.frameId,
+    isEditing: calloutArgs.isEditing,
   });
 }
 
 export function useCalloutEditing(args: UseCalloutEditingArgs) {
+  const { onContentChange } = args;
   const contentEditableRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [floatingToolbarRect, setFloatingToolbarRect] = useState<DOMRect | null>(null);
+  const pendingHtmlContentRef = useRef<string | null>(null);
+  const handleContentChange = useCallback(
+    (htmlContent: string) => {
+      pendingHtmlContentRef.current = htmlContent;
+      onContentChange(htmlContent);
+    },
+    [onContentChange]
+  );
   useCalloutEditingHistoryTransaction(args.frameId, args.isEditing);
   const voice = useCalloutVoiceInput({
     contentEditableRef,
     isEditing: args.isEditing,
-    onContentChange: args.onContentChange,
+    onContentChange: handleContentChange,
   });
 
   const handlers = useCalloutEditingHandlers({
@@ -130,7 +146,7 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     frameId: args.frameId,
     isEditing: args.isEditing,
     onManualInput: voice.actions.stop,
-    onContentChange: args.onContentChange,
+    onContentChange: handleContentChange,
     onDelete: args.onDelete,
     ...(args.titleText === undefined ? {} : { titleText: args.titleText }),
     onStartEditing: args.onStartEditing,
@@ -142,6 +158,7 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     containerRef,
     contentEditableRef,
     handlers,
+    pendingHtmlContentRef,
     voice,
     setDimensions,
     setFloatingToolbarRect,

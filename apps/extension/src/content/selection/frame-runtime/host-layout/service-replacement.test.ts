@@ -62,7 +62,7 @@ describe('frame host-layout replacement stability', () => {
 
     vi.advanceTimersByTime(16);
     expect(service.getSnapshot().presentations.get(frame.id)).toBe('visible');
-    expect(scenario.framesRef.current[0]).toMatchObject({ id: frame.id, width: 172, height: 66 });
+    expect(scenario.framesRef.current[0]).toMatchObject({ id: frame.id, width: 166, height: 60 });
     expect(scenario.framesRef.current[0]!.x).toBeGreaterThan(committedBeforeDetach.x);
     expect(service.getNode(frame.id)).toBe(replacement);
     service.dispose();

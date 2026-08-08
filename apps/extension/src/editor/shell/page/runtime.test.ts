@@ -42,11 +42,15 @@ vi.mock('../../document/page-session', () => ({
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
 
-vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/highlighter')>()),
-  DEFAULT_BORDER_PRESET: { id: 'default-border' },
-  loadHighlighterSettings: loadHighlighterSettingsMock,
-}));
+vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../../composition/persistence/highlighter')>();
+  return {
+    ...original,
+    DEFAULT_BORDER_PRESET: { ...original.DEFAULT_BORDER_PRESET, id: 'default-border' },
+    loadHighlighterSettings: loadHighlighterSettingsMock,
+  };
+});
 
 vi.mock('../../../composition/persistence/editor-presets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/editor-presets')>()),
@@ -202,7 +206,9 @@ async function verifiesDefaultPresetLoading() {
   loadEditorPageDefaults(hydrateDefaults, hydrateWorkspaceDefaults);
   await flushRuntimeDefaultsWork();
 
-  expect(hydrateDefaults).toHaveBeenCalledWith({ borderPreset: { id: 'default-border' } });
+  expect(hydrateDefaults).toHaveBeenCalledWith({
+    borderPreset: expect.objectContaining({ id: 'default-border' }),
+  });
   expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({ backgroundColor: '#f2f4f7' });
 }
 

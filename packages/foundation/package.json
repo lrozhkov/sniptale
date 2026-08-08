@@ -7,6 +7,7 @@
   "type": "module",
   "exports": {
     "./best-effort": "./src/best-effort/index.ts",
+    "./color": "./src/color/index.ts",
     "./default-owner": "./src/default-owner/index.ts",
     "./gradient-stops": "./src/gradient-stops/index.ts",
     "./history/clone": "./src/history/clone.ts",

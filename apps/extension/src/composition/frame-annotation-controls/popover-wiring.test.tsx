@@ -23,6 +23,8 @@ const calls = vi.hoisted(() => ({
   calloutReset: vi.fn(),
   calloutSave: vi.fn(),
   calloutToggle: vi.fn(),
+  editorPresetEnabled: true,
+  editorResetEnabled: true,
   frameApply: vi.fn(),
   frameApplyPatch: vi.fn(),
   frameCloseEditor: vi.fn(),
@@ -68,7 +70,7 @@ vi.mock('./callout/body', async (importOriginal) => ({
         patch
       </button>
       <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
-      <button onClick={() => props['onCustomizePreset'](props['presets'][0])}>customize</button>
+      <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
       <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
       <button onClick={() => props['onShowPresets']()}>refresh</button>
       <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
@@ -94,7 +96,12 @@ vi.mock('./callout/preset-controller', () => ({
       isOpen: true,
       isSaving: false,
       open: calls.calloutOpen,
-      preset: calls.calloutPreset,
+      preset: calls.editorPresetEnabled
+        ? {
+            ...calls.calloutPreset,
+            ...(calls.editorResetEnabled ? {} : { customized: false, origin: 'user' as const }),
+          }
+        : null,
       reset: calls.calloutReset,
       save: calls.calloutSave,
     },
@@ -113,7 +120,7 @@ vi.mock('./step-badge/body', () => ({
       <button onClick={() => props['onAnchorChange']('bottom-right')}>anchor</button>
       <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
       <button onClick={() => props['onAutoModeChange'](false)}>auto</button>
-      <button onClick={() => props['onConfigurePreset'](props['presets'][0])}>configure</button>
+      <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
       <button onClick={() => props['onOffsetToggle']('up')}>offset</button>
       <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
       <button onClick={() => props['onSettingsChange']({ sizeLevel: 5 })}>settings</button>
@@ -142,7 +149,12 @@ vi.mock('./step-badge/preset-controller', () => ({
       isOpen: true,
       isSaving: false,
       open: calls.stepOpen,
-      preset: calls.stepPreset,
+      preset: calls.editorPresetEnabled
+        ? {
+            ...calls.stepPreset,
+            ...(calls.editorResetEnabled ? {} : { customized: false, origin: 'user' as const }),
+          }
+        : null,
       reset: calls.stepReset,
       save: calls.stepSave,
     },
@@ -161,8 +173,9 @@ vi.mock('./frame/views', async (importOriginal) => ({
       <button onClick={() => props['handleBlurChange'](10)}>blur</button>
       <button onClick={() => props['handleBlurShowBorderChange'](false)}>blur-border</button>
       <button onClick={() => props['handleBlurTypeChange']('pixelate')}>blur-type</button>
-      <button onClick={() => props['handleEditPreset'](calls.framePreset)}>edit</button>
+      <button onClick={() => props['handleForkPreset'](calls.framePreset)}>fork</button>
       <button onClick={() => props['handleFocusChange'](0.4)}>focus</button>
+      <button onClick={() => props['handleFocusBlurChange'](8)}>focus-blur</button>
       <button onClick={() => props['handleFocusShowBorderChange'](false)}>focus-border</button>
       <button onClick={() => props['handleManualBorderChange']({ width: 5 })}>manual</button>
       <button onClick={() => props['handleSelectPreset'](calls.framePreset)}>select</button>
@@ -178,6 +191,7 @@ vi.mock('./frame/popover-state', () => ({
     border: {
       apply: calls.frameApply,
       applyPatch: calls.frameApplyPatch,
+      forkPreset: calls.frameSelect,
       selectPreset: calls.frameSelect,
     },
     catalog: {
@@ -216,13 +230,52 @@ import { FutureStepBadgeSettingsPopover } from './step-badge/popover';
 let root: Root;
 let host: HTMLDivElement;
 let anchor: HTMLButtonElement;
+let portal: HTMLDivElement;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
+  portal = document.createElement('div');
   anchor = document.createElement('button');
-  document.body.append(host, anchor);
+  document.body.append(host, anchor, portal);
   root = createRoot(host);
+  calls.editorPresetEnabled = true;
+  calls.editorResetEnabled = true;
+});
+
+it('does not open persistent preset editors from the inline settings surfaces', async () => {
+  const renderPopovers = () => (
+    <>
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        portalTarget={portal}
+        settings={createDefaultFrameCallout()}
+      />
+      <FutureStepBadgeSettingsPopover
+        anchorEl={anchor}
+        frameVisuals={{ borderColor: '#f97316', borderWidth: 4 }}
+        isOpen
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        portalTarget={portal}
+        settings={createDefaultFrameStepBadge()}
+      />
+    </>
+  );
+
+  calls.editorPresetEnabled = false;
+  await act(async () => root.render(renderPopovers()));
+  expect(portal.querySelectorAll('.sniptale-modal')).toHaveLength(0);
+
+  calls.editorPresetEnabled = true;
+  calls.editorResetEnabled = false;
+  await act(async () => root.render(renderPopovers()));
+  expect(portal.querySelectorAll('.sniptale-modal')).toHaveLength(0);
 });
 
 afterEach(() => {
@@ -232,10 +285,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('wires every callout and numbering mutation through the shared popover owners', () => {
+it('wires every callout and numbering mutation through the shared popover owners', async () => {
   const onCalloutChange = vi.fn();
   const onStepChange = vi.fn();
-  act(() =>
+  await act(async () =>
     root.render(
       <>
         <FutureCalloutSettingsPopover
@@ -244,6 +297,7 @@ it('wires every callout and numbering mutation through the shared popover owners
           onChange={onCalloutChange}
           onClose={vi.fn()}
           onDisable={vi.fn()}
+          portalTarget={portal}
           settings={createDefaultFrameCallout()}
         />
         <FutureStepBadgeSettingsPopover
@@ -253,21 +307,25 @@ it('wires every callout and numbering mutation through the shared popover owners
           onChange={onStepChange}
           onClose={vi.fn()}
           onDisable={vi.fn()}
+          portalTarget={portal}
           settings={{ ...createDefaultFrameStepBadge(), auto: false }}
         />
       </>
     )
   );
-  act(() =>
-    document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.click())
-  );
+  const editors = portal.querySelectorAll<HTMLElement>('.sniptale-modal');
+  expect(editors).toHaveLength(0);
+  await act(async () => {
+    portal
+      .querySelectorAll<HTMLButtonElement>('.sniptale-callout-settings-popover button')
+      .forEach((button) => button.click());
+    await Promise.resolve();
+  });
   expect(onCalloutChange).toHaveBeenCalled();
-  expect(calls.calloutOpen).toHaveBeenCalled();
   expect(calls.calloutReset).toHaveBeenCalled();
   expect(calls.calloutRefresh).toHaveBeenCalled();
   expect(calls.calloutToggle).toHaveBeenCalled();
   expect(onStepChange).toHaveBeenCalled();
-  expect(calls.stepOpen).toHaveBeenCalled();
   expect(calls.stepRefresh).toHaveBeenCalled();
   expect(calls.stepToggle).toHaveBeenCalled();
 });
@@ -298,8 +356,6 @@ it('wires every frame effect and preset command through the shared frame popover
   expect(calls.frameSelect).toHaveBeenCalled();
   expect(calls.frameToggle).toHaveBeenCalled();
   expect(calls.frameRefresh).toHaveBeenCalled();
-  expect(calls.frameEdit).toHaveBeenCalledWith(calls.framePreset);
-  expect(calls.frameCloseEditor).toHaveBeenCalledWith(true);
 });
 
 it('projects creation settings into the three shared popovers and supports an injected frame host', () => {

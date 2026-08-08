@@ -15,16 +15,13 @@ const baseFrame: FrameData = {
   borderSettings: {
     sourcePresetId: 'border-1',
     sourcePresetName: 'Primary',
-    color: '#2563eb',
+    color: '#2563eb66',
     customCss: '',
-    fillColor: '#16a34a',
-    fillOpacity: 25,
-    opacity: 75,
+    fillColor: '#16a34a40',
     inheritCustomCss: true,
     padding: { top: 0, left: 0, right: 0, bottom: 0 },
     radius: 8,
     shadow: 30,
-    strokeOpacity: 40,
     style: 'dashed',
     width: 5,
   },
@@ -54,7 +51,7 @@ function createCompositionFrame(testCase: CompositionCase): FrameData {
     effectMode: testCase.effectMode,
     borderSettings: {
       ...baseFrame.borderSettings!,
-      fillOpacity: testCase.fillVisible ? 25 : 0,
+      fillColor: testCase.fillVisible ? '#16a34a40' : '#16a34a00',
     },
     ...(testCase.effectMode === 'blur'
       ? {
@@ -113,16 +110,16 @@ describe('interactive-frame render model', () => {
       boxSizing: 'border-box',
       border: 'none',
       borderRadius: '8px',
-      backgroundColor: testCase.fillVisible ? 'rgba(22, 163, 74, 0.25)' : 'transparent',
+      backgroundColor: testCase.fillVisible ? '#16a34a40' : 'transparent',
     });
     expect(display.strokeStyle).toMatchObject({
       position: 'absolute',
-      inset: 0,
-      width: '100%',
-      height: '100%',
+      inset: -5,
+      width: 'calc(100% + 10px)',
+      height: 'calc(100% + 10px)',
       boxSizing: 'border-box',
-      border: testCase.decorationVisible ? '5px dashed rgba(37, 99, 235, 0.4)' : 'none',
-      borderRadius: '8px',
+      border: testCase.decorationVisible ? '5px dashed #2563eb66' : 'none',
+      borderRadius: '13px',
       background: 'transparent',
     });
     expect(display.frameZIndex).toBe(41);
@@ -163,8 +160,8 @@ describe('interactive-frame render model', () => {
       expect(getLayerGeometry(hidden.strokeStyle)).toEqual(getLayerGeometry(visible.strokeStyle));
       expect(hidden.fillStyle.backgroundColor).toBe('transparent');
       expect(hidden.strokeStyle.border).toBe('none');
-      expect(visible.fillStyle.backgroundColor).toBe('rgba(22, 163, 74, 0.25)');
-      expect(visible.strokeStyle.border).toBe('5px dashed rgba(37, 99, 235, 0.4)');
+      expect(visible.fillStyle.backgroundColor).toBe('#16a34a40');
+      expect(visible.strokeStyle.border).toBe('5px dashed #2563eb66');
       expect(hidden.frameZIndex).toBe(2147483644);
       expect(visible.frameZIndex).toBe(2147483644);
     }
@@ -217,6 +214,6 @@ describe('interactive-frame render model', () => {
       backgroundImage: 'linear-gradient(red, blue)',
       boxShadow: 'inset 0 0 0 1px rgb(1, 2, 3)',
     });
-    expect(display.strokeStyle.border).toBe('5px dashed rgba(37, 99, 235, 0.4)');
+    expect(display.strokeStyle.border).toBe('5px dashed #2563eb66');
   });
 });

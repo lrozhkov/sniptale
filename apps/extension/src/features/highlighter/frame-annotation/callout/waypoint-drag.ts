@@ -33,17 +33,17 @@ function snapCoordinate(value: number, candidates: number[]) {
   return nearest ?? value;
 }
 
-function snapWaypoint(point: Point, snapPoints: Point[]) {
+function snapWaypoint(point: Point, snapPoints: Point[], visualScale: number) {
   return {
     x: snapCoordinate(
-      point.x,
-      snapPoints.map((candidate) => candidate.x)
+      point.x / visualScale,
+      snapPoints.map((candidate) => candidate.x / visualScale)
     ),
     y: snapCoordinate(
-      point.y,
-      snapPoints.map((candidate) => candidate.y)
+      point.y / visualScale,
+      snapPoints.map((candidate) => candidate.y / visualScale)
     ),
-  };
+  } satisfies Point;
 }
 
 function resolveWaypointPoint(args: {
@@ -52,6 +52,7 @@ function resolveWaypointPoint(args: {
   point: Point;
   snapPoints: Point[];
   strictAngleSnap: boolean;
+  visualScale: number;
 }) {
   if (args.angleSnap) {
     return snapPolylineControlPoint({
@@ -60,23 +61,31 @@ function resolveWaypointPoint(args: {
       strict: args.strictAngleSnap,
     });
   }
-  const snapped = snapWaypoint(args.point, args.snapPoints);
+  const logicalSnapped = snapWaypoint(args.point, args.snapPoints, args.visualScale);
+  const snapped = {
+    x: logicalSnapped.x * args.visualScale,
+    y: logicalSnapped.y * args.visualScale,
+  };
   return args.elbowConstraint
     ? constrainPerpendicularWaypoint({ ...args.elbowConstraint, waypoint: snapped })
     : snapped;
 }
 
-function toWaypoint(frameRect: Rect, point: Point): CalloutConnectorWaypoint {
+function toWaypoint(frameRect: Rect, point: Point, visualScale: number): CalloutConnectorWaypoint {
   return {
-    centerOffsetX: point.x - (frameRect.x + frameRect.width / 2),
-    centerOffsetY: point.y - (frameRect.y + frameRect.height / 2),
+    centerOffsetX: (point.x - (frameRect.x + frameRect.width / 2)) / visualScale,
+    centerOffsetY: (point.y - (frameRect.y + frameRect.height / 2)) / visualScale,
   };
 }
 
-function fromWaypoint(frameRect: Rect, waypoint: CalloutConnectorWaypoint): Point {
+function fromWaypoint(
+  frameRect: Rect,
+  waypoint: CalloutConnectorWaypoint,
+  visualScale: number
+): Point {
   return {
-    x: frameRect.x + frameRect.width / 2 + waypoint.centerOffsetX,
-    y: frameRect.y + frameRect.height / 2 + waypoint.centerOffsetY,
+    x: frameRect.x + frameRect.width / 2 + waypoint.centerOffsetX * visualScale,
+    y: frameRect.y + frameRect.height / 2 + waypoint.centerOffsetY * visualScale,
   };
 }
 
@@ -121,6 +130,7 @@ export function useCalloutWaypointDrag(args: {
   onChange: (waypoint: CalloutConnectorWaypoint | undefined) => void;
   position: CalloutConnectorWaypoint | undefined;
   snapPoints: Point[];
+  visualScale?: number;
 }) {
   const [draftPosition, setDraftPosition] = React.useState<CalloutConnectorWaypoint | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -214,7 +224,9 @@ function useWaypointPointerSession(input: {
           point: pointerPoint,
           snapPoints: input.args.snapPoints,
           strictAngleSnap: event.shiftKey,
-        })
+          visualScale: input.args.visualScale ?? 1,
+        }),
+        input.args.visualScale ?? 1
       );
       input.draftRef.current = waypoint;
       input.setDraftPosition(waypoint);
@@ -260,7 +272,7 @@ function beginWaypointDrag(input: {
     // The transient portal may be detached while capture is requested.
   }
   const initialPoint = args.defaultPoint;
-  const initial = toWaypoint(args.frameRect, initialPoint);
+  const initial = toWaypoint(args.frameRect, initialPoint, args.visualScale ?? 1);
   const point = (
     args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace
   ).clientPointToLogical({ x: event.clientX, y: event.clientY });
@@ -291,10 +303,13 @@ function moveWaypointWithKeyboard(
   if (!delta) return;
   event.preventDefault();
   event.stopPropagation();
-  const current = args.position ? fromWaypoint(args.frameRect, args.position) : args.defaultPoint;
+  const visualScale = args.visualScale ?? 1;
+  const current = args.position
+    ? fromWaypoint(args.frameRect, args.position, visualScale)
+    : args.defaultPoint;
   const nextPoint = {
-    x: args.axis === 'y' ? current.x : current.x + delta.x,
-    y: args.axis === 'x' ? current.y : current.y + delta.y,
+    x: args.axis === 'y' ? current.x : current.x + delta.x * visualScale,
+    y: args.axis === 'x' ? current.y : current.y + delta.y * visualScale,
   };
   args.onChange(
     toWaypoint(
@@ -305,7 +320,9 @@ function moveWaypointWithKeyboard(
         point: nextPoint,
         snapPoints: args.snapPoints,
         strictAngleSnap: event.shiftKey,
-      })
+        visualScale,
+      }),
+      visualScale
     )
   );
 }

@@ -1,5 +1,6 @@
 import type { BorderPadding } from '../contracts';
 import type { FrameAnnotationVisualState } from '../frame-annotation/model';
+import { hasVisibleColor } from '@sniptale/foundation/color';
 
 const DEFAULT_STROKE_WIDTH = 3;
 const DEFAULT_RADIUS = 0;
@@ -16,6 +17,10 @@ export interface FrameSurfaceGeometry extends FrameSurfaceRect {
   strokeWidth: number;
 }
 
+export interface FocusCutoutGeometry extends FrameSurfaceRect {
+  radius: number;
+}
+
 export interface FrameSurfaceComposition {
   geometry: FrameSurfaceGeometry;
   decorationVisible: boolean;
@@ -24,7 +29,6 @@ export interface FrameSurfaceComposition {
 }
 
 export interface FrameSurfaceProjectionSettings {
-  strokeWidth: number;
   padding: BorderPadding;
 }
 
@@ -59,7 +63,7 @@ export function resolveFrameSurface(frame: FrameAnnotationVisualState): FrameSur
     frame.borderSettings?.radius ?? DEFAULT_RADIUS,
     DEFAULT_RADIUS
   );
-  const strokeWidth = clamp(requestedStrokeWidth, 0, halfShortSide);
+  const strokeWidth = requestedStrokeWidth;
   const decorationVisible = resolveDecorationVisible(frame);
 
   return {
@@ -73,8 +77,20 @@ export function resolveFrameSurface(frame: FrameAnnotationVisualState): FrameSur
     },
     decorationVisible,
     strokeVisible:
-      decorationVisible && strokeWidth > 0 && (frame.borderSettings?.strokeOpacity ?? 100) > 0,
-    fillVisible: decorationVisible && (frame.borderSettings?.fillOpacity ?? 0) > 0,
+      decorationVisible && strokeWidth > 0 && hasVisibleColor(frame.borderSettings?.color),
+    fillVisible: decorationVisible && hasVisibleColor(frame.borderSettings?.fillColor),
+  };
+}
+
+export function resolveFocusCutoutGeometry(frame: FrameAnnotationVisualState): FocusCutoutGeometry {
+  const surface = resolveFrameSurface(frame);
+
+  return {
+    x: surface.geometry.x,
+    y: surface.geometry.y,
+    width: surface.geometry.width,
+    height: surface.geometry.height,
+    radius: surface.geometry.radius,
   };
 }
 
@@ -82,12 +98,10 @@ export function projectElementFrameSurface(
   elementRect: FrameSurfaceRect,
   settings: FrameSurfaceProjectionSettings
 ): FrameSurfaceRect {
-  const strokeWidth = resolveNonNegative(settings.strokeWidth);
-
   return {
-    x: elementRect.x - settings.padding.left - strokeWidth,
-    y: elementRect.y - settings.padding.top - strokeWidth,
-    width: elementRect.width + settings.padding.left + settings.padding.right + strokeWidth * 2,
-    height: elementRect.height + settings.padding.top + settings.padding.bottom + strokeWidth * 2,
+    x: elementRect.x - settings.padding.left,
+    y: elementRect.y - settings.padding.top,
+    width: elementRect.width + settings.padding.left + settings.padding.right,
+    height: elementRect.height + settings.padding.top + settings.padding.bottom,
   };
 }

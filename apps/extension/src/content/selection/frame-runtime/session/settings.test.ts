@@ -193,7 +193,11 @@ describe('frame-session-sync-settings', () => {
       blurType: 'gaussian',
       showBorder: true,
     });
-    expect(newTab.sessionFocusSettingsRef.current).toEqual({ opacity: 0.5, showBorder: true });
+    expect(newTab.sessionFocusSettingsRef.current).toEqual({
+      blurAmount: 0,
+      opacity: 0.5,
+      showBorder: true,
+    });
   });
 
   it('discards an older settings load that resolves after the latest request', async () => {
@@ -347,7 +351,11 @@ function expectLoaderRefUpdates(refs: ReturnType<typeof createSettingsRefs>) {
     blurType: 'gaussian',
     showBorder: true,
   });
-  expect(refs.sessionFocusSettingsRef.current).toEqual({ opacity: 0.5, showBorder: true });
+  expect(refs.sessionFocusSettingsRef.current).toEqual({
+    blurAmount: 0,
+    opacity: 0.5,
+    showBorder: true,
+  });
 }
 
 function createDeferred<T>() {

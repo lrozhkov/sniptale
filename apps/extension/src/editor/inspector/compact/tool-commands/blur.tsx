@@ -147,23 +147,6 @@ function buildBlurStrokeStyleCommand(
   };
 }
 
-function buildBlurStrokeOpacityCommand(params: ToolCommandParams, settings: BlurSettings) {
-  const borderSettings = resolveBlurBorderSettings(settings);
-  return buildRangeCompactCommand({
-    id: 'blur-stroke-opacity',
-    icon: 'opacity',
-    label: translate('editor.compact.opacity'),
-    token: 'OP',
-    value: borderSettings.strokeOpacity,
-    valueText: `${Math.round(borderSettings.strokeOpacity * 100)}%`,
-    min: 0,
-    max: 1,
-    step: 0.05,
-    onChange: (rawValue) => params.previewBlurPatch({ strokeOpacity: Number(rawValue) }),
-    onValueCommit: params.commitPendingSelectionSettings,
-  });
-}
-
 export function buildBlurCompactCommands(params: ToolCommandParams): CompactCommand[] {
   const settings = params.inspectorToolSettings.blur;
   return [
@@ -173,6 +156,5 @@ export function buildBlurCompactCommands(params: ToolCommandParams): CompactComm
     buildBlurStrokeWidthCommand(params, settings),
     buildBlurStrokeStyleCommand(params, settings),
     buildBlurStrokeColorCommand(params, settings),
-    buildBlurStrokeOpacityCommand(params, settings),
   ];
 }

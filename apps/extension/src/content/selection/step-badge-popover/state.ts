@@ -54,6 +54,11 @@ function createStepBadgeHandlers(props: {
       props.setLocalStepBadgeSettings(next);
       dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
     },
+    forkPreset: (_preset: StepBadgePreset) => updateSettings({}),
+    markTemplateCreated: (sourcePresetId: string) => {
+      props.setLocalStepBadgeSettings((previous) => ({ ...previous, sourcePresetId }));
+      dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: { sourcePresetId } });
+    },
     handleSettingsChange: updateSettings,
     handleAnchorChange: (anchor: StepBadgeAnchor) =>
       updateSettings({ anchor, manualPlacement: undefined }),

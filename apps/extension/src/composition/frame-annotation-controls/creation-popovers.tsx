@@ -8,6 +8,7 @@ import type {
   FrameAnnotationCreationSettings,
   FrameAnnotationStyleSettings,
 } from './contracts';
+import type { TemplateSourceControl } from './popover/template-source';
 
 export function FrameCreationPopovers(props: {
   activeMenu: FrameAnnotationCreationMenu | null;
@@ -21,6 +22,8 @@ export function FrameCreationPopovers(props: {
   showStepBadge: boolean;
   stepBadgeRef: RefObject<HTMLButtonElement | null>;
   update: (patch: Partial<FrameAnnotationCreationSettings>) => void;
+  calloutTemplateSourceControl?: TemplateSourceControl;
+  stepBadgeTemplateSourceControl?: TemplateSourceControl;
 }) {
   const frameSettings = selectFrameStyle(props.settings);
   const frameArgs = {
@@ -51,6 +54,9 @@ export function FrameCreationPopovers(props: {
             props.close();
           }}
           settings={props.settings.callout}
+          {...(props.calloutTemplateSourceControl
+            ? { templateSourceControl: props.calloutTemplateSourceControl }
+            : {})}
           {...(props.portalTarget ? { portalTarget: props.portalTarget } : {})}
         />
       ) : null}
@@ -61,7 +67,6 @@ export function FrameCreationPopovers(props: {
             borderColor: props.settings.borderSettings.color,
             borderWidth: props.settings.borderSettings.width,
             fillColor: props.settings.borderSettings.fillColor,
-            fillOpacity: props.settings.borderSettings.fillOpacity,
           }}
           isOpen={props.activeMenu === 'step-badge'}
           onChange={(stepBadge) => props.update({ stepBadge })}
@@ -71,6 +76,9 @@ export function FrameCreationPopovers(props: {
             props.close();
           }}
           settings={props.settings.stepBadge}
+          {...(props.stepBadgeTemplateSourceControl
+            ? { templateSourceControl: props.stepBadgeTemplateSourceControl }
+            : {})}
           {...(props.portalTarget ? { portalTarget: props.portalTarget } : {})}
         />
       ) : null}

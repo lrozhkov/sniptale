@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 import {
-  colorToRgba,
   resolveBorderShadowVisual,
   type ResolvedBorderPresetVisual,
 } from '../../../../features/highlighter/style';
@@ -28,14 +27,11 @@ function getSelectionFrameCss(visual: ResolvedBorderPresetVisual): string {
   const frameShadow = resolveBorderShadowVisual(visual.shadow, visual.strokeColor).frameBoxShadow;
 
   return `
-    background-color: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
+    background-color: ${visual.fillColor};
     outline: none;
     ${frameShadow ? `box-shadow: ${frameShadow};` : ''}
     ${customCss}
-    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-      visual.strokeColor,
-      visual.strokeOpacity
-    )};
+    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
     border-radius: ${visual.radius}px;
     clip-path: none;
   `;

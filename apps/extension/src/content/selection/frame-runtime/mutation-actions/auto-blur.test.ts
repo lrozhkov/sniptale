@@ -130,14 +130,14 @@ function expectAddedFrame(frame: FrameData | undefined, _element: HTMLElement) {
     blurSettings: { amount: 22, blurType: 'solid', showBorder: true },
     createdBy: 'auto-blur',
     effectMode: 'blur',
-    height: 22,
+    height: 18,
     linkedElementSelector: '#target',
-    offset: { height: -8, width: -16, x: 93, y: 108 },
-    width: 74,
-    x: 98,
-    y: 118,
+    offset: { height: -12, width: -20, x: 95, y: 110 },
+    width: 70,
+    x: 100,
+    y: 120,
   });
-  expect(getBlurOverlayBox(frame!)).toEqual({ height: 22, width: 74, x: 98, y: 118 });
+  expect(getBlurOverlayBox(frame!)).toEqual({ height: 18, width: 70, x: 100, y: 120 });
 }
 
 function expectAutoBlurFramesAdded() {
@@ -303,10 +303,10 @@ describe('createAddAutoBlurFramesHandler', () => {
     createAddAutoBlurFramesHandler(scenario.args)(input);
 
     expect(getBlurOverlayBox(scenario.getFrames()[1]!)).toEqual({
-      height: 26,
-      width: 80,
-      x: 96,
-      y: 117,
+      height: 22,
+      width: 76,
+      x: 98,
+      y: 119,
     });
   });
 

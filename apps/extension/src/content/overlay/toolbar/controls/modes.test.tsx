@@ -243,6 +243,18 @@ it('keeps AI Editor out of Working Mode and groups it under Content Editing', ()
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.ai"]')).toBeNull();
 });
 
+it('uses direct-edit and AI glyphs that describe their distinct actions', () => {
+  renderModeButtons({ quickEditMode: true });
+
+  const directTextIcon = document.querySelector(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"] svg'
+  );
+  const aiIcon = document.querySelector('[data-ui="content.toolbar.page-editing-mode.ai"] svg');
+
+  expect(directTextIcon?.getAttribute('class')).toContain('lucide-text-cursor');
+  expect(aiIcon?.getAttribute('class')).toContain('lucide-bot');
+});
+
 it('routes all three mutually exclusive Content Editing choices through one selector action', () => {
   const onSelectPageEditingMode = vi.fn();
   renderModeButtons({ onSelectPageEditingMode, quickEditMode: true });

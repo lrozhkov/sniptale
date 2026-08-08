@@ -95,6 +95,19 @@ describe('frame UI store visibility hierarchy', () => {
     });
   });
 
+  it('switches between individual callout settings without closing the popover family', () => {
+    const store = useFrameUIStore.getState();
+
+    store.toggleQuickPopover('frame-a', 'callout-settings', 1);
+    store.toggleQuickPopover('frame-a', 'callout-settings', 2);
+
+    expect(useFrameUIStore.getState().activePopover).toEqual({
+      frameId: 'frame-a',
+      kind: 'callout-settings',
+      calloutIndex: 2,
+    });
+  });
+
   it('delays hover dismissal and cancels it when the pointer reaches the trigger', () => {
     vi.useFakeTimers();
     const store = useFrameUIStore.getState();

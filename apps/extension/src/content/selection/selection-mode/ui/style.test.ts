@@ -14,16 +14,13 @@ function createSelectionVisual(
   return {
     customCss: '',
     customCssStyles: { outlineOffset: '2px' },
-    fillColor: '#22c55e',
-    fillOpacity: 25,
+    fillColor: '#22c55e40',
     id: 'preset-1',
     inheritCustomCss: true,
-    opacity: 100,
     padding: { bottom: 4, left: 4, right: 4, top: 4 },
     radius: 8,
     shadow: 30,
-    strokeColor: '#2563eb',
-    strokeOpacity: 75,
+    strokeColor: '#2563ebbf',
     strokeStyle: 'dashed',
     strokeWidth: 3,
     ...overrides,
@@ -34,18 +31,18 @@ describe('selection-mode ui style helpers', () => {
   it('renders drag-frame css without a viewport-sized spread shadow', () => {
     const cssText = getSelectionDragFrameStyle(createSelectionVisual());
 
-    expect(cssText).toContain('border: 3px dashed rgba(37, 99, 235, 0.75)');
-    expect(cssText).toContain('background-color: rgba(34, 197, 94, 0.25)');
+    expect(cssText).toContain('border: 3px dashed #2563ebbf');
+    expect(cssText).toContain('background-color: #22c55e40');
     expect(cssText).not.toContain('9999px');
     expect(cssText).toContain('outline-offset: 2px;');
   });
 
   it('renders hover and final-frame css across soft, hard, and no-shadow variants', () => {
     expect(getSelectionHoverFrameStyle(createSelectionVisual())).toContain(
-      'color-mix(in srgb, #2563eb 32%, transparent)'
+      'color-mix(in srgb, #2563ebbf 32%, transparent)'
     );
     expect(getSelectionFinalFrameStyle(createSelectionVisual({ shadow: 100 }), 500)).toContain(
-      'color-mix(in srgb, #2563eb 52%, transparent)'
+      'color-mix(in srgb, #2563ebbf 52%, transparent)'
     );
     expect(getSelectionFinalFrameStyle(createSelectionVisual({ shadow: 0 }), 500)).not.toContain(
       'box-shadow'

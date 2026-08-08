@@ -1,5 +1,8 @@
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { resolveFrameSurface } from '../../../../features/highlighter/frame-surface';
+import {
+  resolveFocusCutoutGeometry,
+  resolveFrameSurface,
+} from '../../../../features/highlighter/frame-surface';
 import { getFrameAnnotationBlurBackdropStyle } from '../../../../features/highlighter/frame-annotation/effect-style';
 
 type FrameBox = Pick<FrameData, 'x' | 'y' | 'width' | 'height'>;
@@ -7,7 +10,11 @@ type FrameEffectBox = FrameBox &
   Pick<FrameData, 'borderSettings' | 'blurSettings' | 'focusSettings'>;
 
 export function getFocusMaskBox(frame: FrameEffectBox): FrameBox {
-  const { x, y, width, height } = resolveFrameSurface({ id: '', ...frame }).geometry;
+  const { x, y, width, height } = resolveFocusCutoutGeometry({
+    id: '',
+    ...frame,
+    effectMode: 'focus',
+  });
   return { x, y, width, height };
 }
 
@@ -18,10 +25,10 @@ export function setFocusMaskRectBox(rect: SVGRectElement, box: FrameBox): void {
   rect.setAttribute('height', String(box.height));
 }
 
-export function createFocusMaskRectNodes(frames: FrameData[]): SVGRectElement[] {
+export function createFocusMaskRectNodes(frames: FrameData[], visualScale = 1): SVGRectElement[] {
   return frames.map((frame) => {
     const focusMaskBox = getFocusMaskBox(frame);
-    const radius = resolveFrameSurface(frame).geometry.radius;
+    const radius = resolveFocusCutoutGeometry(frame).radius * visualScale;
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 
     rect.dataset['frameId'] = frame.id;

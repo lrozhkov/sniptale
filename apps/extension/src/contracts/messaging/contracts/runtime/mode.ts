@@ -86,6 +86,7 @@ export const runtimeModeMessageContracts = {
       createMessageGuard({
         type: MessageType.ENABLE_SCREENSHOT_MODE,
         optional: {
+          pageZoom: isNumber,
           tabId: isNumber,
           viewport: isNullable(isAppliedViewportPreset),
           quickActionOverlay: isQuickActionOverlay,
@@ -138,6 +139,7 @@ export const runtimeModeMessageContracts = {
         optional: {
           documentId: isString,
           enabled: isBoolean,
+          pageZoom: isNumber,
           supported: isBoolean,
           surfaceCapabilityToken: isString,
           surfaceLeaseGeneration: isNumber,

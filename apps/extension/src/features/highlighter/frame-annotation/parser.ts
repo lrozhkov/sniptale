@@ -1,23 +1,20 @@
 // policyStateIds: [] - effect modes and parser limits are immutable validation policy, not authority state.
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
-import type {
-  AppliedBorderSettings,
-  BlurSettings,
-  FocusSettings,
-} from '@sniptale/ui/highlighter-style/types';
+import type { FocusSettings } from '@sniptale/ui/highlighter-style/types';
 import {
   FRAME_ANNOTATION_SNAPSHOT_VERSION,
   normalizeFrameAnnotationSnapshot,
   type FrameAnnotationSnapshotV1,
 } from './model';
 import {
-  isBorderSettings,
-  isBlurSettings,
+  parseBorderSettings,
+  parseBlurSettings,
   isCalloutSettings,
   isFocusSettings,
   isStepBadgeSettings,
 } from './settings-parser';
+import { MAX_FRAME_CALLOUTS } from './callout/collection';
 
 const EFFECT_MODES = new Set(['border', 'blur', 'focus']);
 const MAX_NESTING_DEPTH = 24;
@@ -46,15 +43,21 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
   const effectMode = value['effectMode'];
   if (effectMode !== undefined && !EFFECT_MODES.has(effectMode as string)) return null;
   if (!isBoundedJsonRecord(value, 0, new Set())) return null;
+  const borderSettings = parseBorderSettings(value['borderSettings']);
+  const blurSettings = parseBlurSettings(value['blurSettings']);
   if (
-    !isBorderSettings(value['borderSettings']) ||
-    !isBlurSettings(value['blurSettings']) ||
+    borderSettings === null ||
+    blurSettings === null ||
     !isFocusSettings(value['focusSettings']) ||
     !isStepBadgeSettings(value['stepBadge']) ||
-    !isCalloutSettings(value['callout'])
+    !isCalloutSettings(value['callout']) ||
+    !isAdditionalCallouts(value['additionalCallouts'])
   )
     return null;
 
+  const primaryCallout = value['callout'] as CalloutSettings | undefined;
+  const additionalCallouts = value['additionalCallouts'] as CalloutSettings[] | undefined;
+  if (!primaryCallout && additionalCallouts?.length) return null;
   const snapshot: FrameAnnotationSnapshotV1 = {
     id: value['id'],
     version: FRAME_ANNOTATION_SNAPSHOT_VERSION,
@@ -64,21 +67,31 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
     width: value['width'],
     height: value['height'],
     ...(effectMode === undefined ? {} : { effectMode: effectMode as 'border' | 'blur' | 'focus' }),
-    ...(value['borderSettings'] === undefined
-      ? {}
-      : { borderSettings: value['borderSettings'] as AppliedBorderSettings }),
-    ...(value['blurSettings'] === undefined
-      ? {}
-      : { blurSettings: value['blurSettings'] as BlurSettings }),
+    ...(borderSettings === undefined ? {} : { borderSettings }),
+    ...(blurSettings === undefined ? {} : { blurSettings }),
     ...(value['focusSettings'] === undefined
       ? {}
       : { focusSettings: value['focusSettings'] as FocusSettings }),
     ...(value['stepBadge'] === undefined
       ? {}
       : { stepBadge: value['stepBadge'] as StepBadgeSettings }),
-    ...(value['callout'] === undefined ? {} : { callout: value['callout'] as CalloutSettings }),
+    ...(primaryCallout === undefined ? {} : { callout: primaryCallout }),
+    ...(additionalCallouts === undefined
+      ? {}
+      : {
+          additionalCallouts,
+        }),
   };
   return normalizeFrameAnnotationSnapshot(snapshot);
+}
+
+function isAdditionalCallouts(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.length <= MAX_FRAME_CALLOUTS - 1 &&
+      value.every(isCalloutSettings))
+  );
 }
 
 export function serializeFrameAnnotationSnapshot(snapshot: FrameAnnotationSnapshotV1): string {

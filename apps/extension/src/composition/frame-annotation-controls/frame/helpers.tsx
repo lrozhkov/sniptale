@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-import { colorToRgba, resolveBorderPresetVisual } from '../../../features/highlighter/style';
+import { resolveBorderPresetVisual } from '../../../features/highlighter/style';
 import { translate } from '../../../platform/i18n';
 import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
@@ -13,9 +13,9 @@ export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties
     height: '16px',
     borderWidth: `${Math.min(visual.strokeWidth, 3)}px`,
     borderStyle: visual.strokeStyle,
-    borderColor: colorToRgba(visual.strokeColor, visual.strokeOpacity),
+    borderColor: visual.strokeColor,
     borderRadius: `${Math.min(visual.radius, 4)}px`,
-    backgroundColor: colorToRgba(visual.fillColor, visual.fillOpacity),
+    backgroundColor: visual.fillColor,
     opacity: 1,
     boxSizing: 'border-box',
   };

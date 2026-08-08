@@ -28,10 +28,12 @@ function hasBorderSettingsChange(
       prev?.width !== next?.width ||
       prev?.style !== next?.style ||
       prev?.radius !== next?.radius ||
-      prev?.opacity !== next?.opacity ||
-      prev?.strokeOpacity !== next?.strokeOpacity ||
       prev?.fillColor !== next?.fillColor ||
-      prev?.fillOpacity !== next?.fillOpacity ||
+      prev?.effects?.capture?.hideFrame !== next?.effects?.capture?.hideFrame ||
+      prev?.effects?.linkedTemplates?.calloutPresetId !==
+        next?.effects?.linkedTemplates?.calloutPresetId ||
+      prev?.effects?.linkedTemplates?.stepBadgePresetId !==
+        next?.effects?.linkedTemplates?.stepBadgePresetId ||
       prev?.inheritCustomCss !== next?.inheritCustomCss ||
       prev?.customCss !== next?.customCss ||
       prev?.shadow !== next?.shadow)
@@ -51,6 +53,7 @@ function hasBlurFocusChange(prevProps: InteractiveFrameProps, nextProps: Interac
         prevBlur?.showBorder !== nextBlur?.showBorder)) ||
     (prevProps.frame.focusSettings !== nextProps.frame.focusSettings &&
       (prevFocus?.opacity !== nextFocus?.opacity ||
+        prevFocus?.blurAmount !== nextFocus?.blurAmount ||
         prevFocus?.showBorder !== nextFocus?.showBorder))
   );
 }
@@ -80,9 +83,16 @@ function hasStepBadgeChange(prevProps: InteractiveFrameProps, nextProps: Interac
 function hasCalloutChange(prevProps: InteractiveFrameProps, nextProps: InteractiveFrameProps) {
   const prev = prevProps.frame.callout;
   const next = nextProps.frame.callout;
+  const prevAdditional = prevProps.frame.additionalCallouts ?? [];
+  const nextAdditional = nextProps.frame.additionalCallouts ?? [];
   return (
-    prevProps.frame.callout !== nextProps.frame.callout &&
-    createCalloutRenderKey(prev) !== createCalloutRenderKey(next)
+    (prevProps.frame.callout !== nextProps.frame.callout &&
+      createCalloutRenderKey(prev) !== createCalloutRenderKey(next)) ||
+    prevAdditional.length !== nextAdditional.length ||
+    prevAdditional.some(
+      (callout, index) =>
+        createCalloutRenderKey(callout) !== createCalloutRenderKey(nextAdditional[index])
+    )
   );
 }
 

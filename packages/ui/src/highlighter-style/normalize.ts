@@ -35,9 +35,7 @@ export function normalizeBorderPresetVisualFields<T extends BorderVisualStyle>(p
   return {
     ...preset,
     shadow: normalizeBorderShadowIntensity(preset.shadow),
-    strokeOpacity: preset.strokeOpacity ?? preset.opacity,
     fillColor: preset.fillColor ?? '#00000000',
-    fillOpacity: preset.fillOpacity ?? 0,
     inheritCustomCss: preset.inheritCustomCss ?? false,
     effects: cloneBorderPresetEffects(preset.effects),
   };

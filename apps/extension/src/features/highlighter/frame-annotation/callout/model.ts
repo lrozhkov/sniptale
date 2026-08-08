@@ -71,6 +71,7 @@ export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings
   return {
     content: { ...settings.content },
     enabled: settings.enabled,
+    ...(settings.instanceId === undefined ? {} : { instanceId: settings.instanceId }),
     placement: {
       ...settings.placement,
       connectorAttachments: cloneConnectorAttachments(settings.placement),
@@ -112,6 +113,9 @@ export function applyCalloutSettingsPatch(
   return {
     content: { ...settings.content, ...patch.content },
     enabled: patch.enabled ?? settings.enabled,
+    ...((patch.instanceId ?? settings.instanceId)
+      ? { instanceId: patch.instanceId ?? settings.instanceId }
+      : {}),
     placement: {
       ...settings.placement,
       ...patch.placement,

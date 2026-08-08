@@ -14,6 +14,14 @@ import { useToolbarMenuState } from '../state/menu';
 import { FutureFrameStyleControls } from './frame-style';
 import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 import { createDefaultFrameStepBadge } from '../../../../features/highlighter/frame-annotation/defaults';
+import {
+  getFrameSessionBorderPreset,
+  resetFrameSessionBorderPreset,
+} from '../../../selection/frame-runtime/session/border-preset';
+import {
+  getAnnotationTemplateSources,
+  resetAnnotationTemplateSources,
+} from '../../../selection/frame-runtime/session/annotation-template-source';
 
 const popoverMocks = vi.hoisted(() => ({
   props: null as Record<string, unknown> | null,
@@ -96,6 +104,8 @@ beforeEach(() => {
   popoverMocks.props = null;
   popoverMocks.calloutProps = null;
   popoverMocks.stepBadgeProps = null;
+  resetFrameSessionBorderPreset();
+  resetAnnotationTemplateSources();
 });
 
 afterEach(() => {
@@ -104,6 +114,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+  resetAnnotationTemplateSources();
 });
 
 it('forwards compact menu presentation to future frame settings', () => {
@@ -236,4 +247,53 @@ it('enables future numbering and opens the shared settings menu', () => {
     settings,
     portalTarget: expect.anything(),
   });
+});
+
+it('exposes independent frame-default and forced template controls to both toolbar menus', () => {
+  const callout = createDefaultCalloutSettings();
+  const stepBadge = createDefaultFrameStepBadge();
+  if (!container) {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
+  act(() => {
+    root?.render(
+      <Harness
+        futureFrameCalloutActions={{ enable: () => callout, set: vi.fn() }}
+        futureFrameStepBadgeActions={{ enable: () => stepBadge, set: vi.fn() }}
+        futureFrameStyle={{
+          ...createStyle('border'),
+          futureCallout: callout,
+          futureStepBadge: stepBadge,
+        }}
+        onFutureFrameEffectModeChange={vi.fn()}
+      />
+    );
+  });
+
+  expect(popoverMocks.calloutProps?.['templateSourceControl']).toMatchObject({
+    value: 'frame-default',
+  });
+  expect(popoverMocks.stepBadgeProps?.['templateSourceControl']).toMatchObject({
+    value: 'frame-default',
+  });
+
+  act(() => {
+    const calloutControl = popoverMocks.calloutProps?.['templateSourceControl'] as {
+      onChange: (source: 'forced') => void;
+    };
+    calloutControl.onChange('forced');
+  });
+  expect(getAnnotationTemplateSources().callout).toBe('forced');
+  expect(popoverMocks.calloutProps?.['templateSourceControl']).toMatchObject({ value: 'forced' });
+  expect(getAnnotationTemplateSources().stepBadge).toBe('frame-default');
+});
+
+it('keeps capture visibility out of the future-frame toolbar', () => {
+  renderControls(createStyle('border'), vi.fn());
+  expect(
+    container?.querySelector('[data-ui="content.toolbar.future-frame-capture-visibility"]')
+  ).toBeNull();
+  expect(getFrameSessionBorderPreset().effects?.capture).toEqual({ hideFrame: false });
 });

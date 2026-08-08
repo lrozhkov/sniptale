@@ -20,6 +20,7 @@ function createToolbarProps(
 ): InteractiveFrameToolbarProps {
   return {
     calloutPopoverAnchorRef: { current: null },
+    captureVisibility: { hiddenDuringCapture: false, toggle: vi.fn() },
     clearSelection: vi.fn(),
     effectMode: 'border',
     frame,

@@ -87,13 +87,13 @@ export const PRODUCT_DESIGN_SYSTEM_MODAL_SHELL_REGISTRY: DesignSystemRegistryEnt
         'settings.ai-provider.modal',
         'Настройки > AI providers > Form modal',
         'Settings > AI providers > Form modal',
-        ['apps/extension/src/settings/sections/ai-providers/surface/modals.tsx']
+        ['apps/extension/src/settings/sections/ai/connections/surface/modals.tsx']
       ),
       usage(
         'settings.viewport.modal',
         'Настройки > Viewport preset editor',
         'Settings > Viewport preset editor',
-        ['apps/extension/src/settings/sections/viewport-presets/editor/index.tsx']
+        ['apps/extension/src/settings/sections/capture/screen-sizes/editor/index.tsx']
       ),
       usage(
         'content.template-editor.modal',
@@ -102,7 +102,7 @@ export const PRODUCT_DESIGN_SYSTEM_MODAL_SHELL_REGISTRY: DesignSystemRegistryEnt
         [
           '../../../../features/prompt-templates/editor/index.tsx',
           'apps/extension/src/content/overlay/ai/modal/shell/dialog.tsx',
-          'apps/extension/src/settings/sections/templates/content.tsx',
+          'apps/extension/src/settings/sections/ai/prompts/templates/content.tsx',
         ]
       ),
     ],

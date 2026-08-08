@@ -9,6 +9,7 @@ import {
   useInteractiveFrameEditLifecycle,
   useInteractiveFrameRuntime,
 } from './render-model.runtime';
+import { useContentUiScale } from '../../../platform/dom-host';
 
 /** Builds the full render model for the interactive frame while keeping the entry component thin. */
 export function useInteractiveFrameRenderModel({
@@ -21,6 +22,7 @@ export function useInteractiveFrameRenderModel({
   onEffectChange,
   defaultEffectMode = 'border',
 }: InteractiveFrameProps) {
+  const visualScale = useContentUiScale();
   const runtime = useInteractiveFrameRuntime({ frame, defaultEffectMode, onStateChange, onUpdate });
   const actions = useInteractiveFrameRenderActions({
     frame,
@@ -37,6 +39,7 @@ export function useInteractiveFrameRenderModel({
     effectMode: runtime.viewState.effectMode,
     state: runtime.viewState.state,
     zIndex,
+    visualScale,
   });
 
   React.useEffect(() => {

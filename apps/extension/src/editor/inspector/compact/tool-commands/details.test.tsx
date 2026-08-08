@@ -231,7 +231,6 @@ it('builds blur compact commands with area and frame controls', () => {
     'blur-stroke-width',
     'blur-stroke-style',
     'blur-stroke-color',
-    'blur-stroke-opacity',
   ]);
   commitNumeric(((commands[1]?.content as any).props.children as any).props, 15);
   ((commands[0]?.content as any).props.children as any).props.onChange('solid');

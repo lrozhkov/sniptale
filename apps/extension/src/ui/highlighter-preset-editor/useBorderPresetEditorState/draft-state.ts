@@ -11,10 +11,7 @@ export function useBorderPresetDraftState() {
   const [radius, setRadius] = useState(0);
   const [padding, setPadding] = useState({ top: 3, left: 3, right: 3, bottom: 3 });
   const [shadow, setShadow] = useState(0);
-  const [opacity, setOpacity] = useState(100);
-  const [strokeOpacity, setStrokeOpacity] = useState(100);
   const [fillColor, setFillColor] = useState('#00000000');
-  const [fillOpacity, setFillOpacity] = useState(0);
   const [effects, setEffects] = useState(() => cloneBorderPresetEffects(undefined));
   const [inheritCustomCss, setInheritCustomCss] = useState(false);
   const [customCss, setCustomCss] = useState('');
@@ -25,16 +22,13 @@ export function useBorderPresetDraftState() {
       setColor,
       setCustomCss,
       setFillColor,
-      setFillOpacity,
       setEffects,
       setInheritCustomCss,
       setIsResizing,
       setName,
-      setOpacity,
       setPadding,
       setRadius,
       setShadow,
-      setStrokeOpacity,
       setStyle,
       setTextareaHeight,
       setWidth,
@@ -45,16 +39,13 @@ export function useBorderPresetDraftState() {
     color,
     customCss,
     fillColor,
-    fillOpacity,
     effects,
     inheritCustomCss,
     isResizing,
     name,
-    opacity,
     padding,
     radius,
     shadow,
-    strokeOpacity,
     style,
     textareaHeight,
     width,

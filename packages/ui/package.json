@@ -37,6 +37,7 @@
     "./editor-chrome": "./src/editor-chrome/index.tsx",
     "./floating-chrome": "./src/floating-chrome/index.tsx",
     "./floating-interactions/placement": "./src/floating-interactions/placement.ts",
+    "./floating-interactions/scale": "./src/floating-interactions/scale.ts",
     "./floating-interactions/ownership": "./src/floating-interactions/ownership.ts",
     "./floating-interactions/wheel": "./src/floating-interactions/wheel.ts",
     "./glass-popover/base-styles.data": "./src/glass-popover/base-styles.data.ts",

@@ -7,6 +7,7 @@ const persistence = vi.hoisted(() => ({
   addBorder: vi.fn(),
   loadHighlighter: vi.fn(),
   setBorderEnabled: vi.fn(),
+  createStep: vi.fn(),
   subscribeCallout: vi.fn(() => () => undefined),
   subscribeStep: vi.fn(() => () => undefined),
   updateBorder: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('../persistence/step-badge-presets', async (importOriginal) => ({
     presets: [],
     systemCatalogRevision: 1,
   }),
+  createUserStepBadgePreset: persistence.createStep,
   subscribeToStepBadgePresetCatalog: persistence.subscribeStep,
 }));
 vi.mock('../persistence/highlighter', async (importOriginal) => ({
@@ -76,6 +78,7 @@ beforeEach(() => {
   persistence.addBorder.mockResolvedValue('applied');
   persistence.updateBorder.mockResolvedValue('applied');
   persistence.setBorderEnabled.mockResolvedValue(undefined);
+  persistence.createStep.mockResolvedValue({ id: 'created-step', outcome: 'applied' });
 });
 
 afterEach(() => {
@@ -94,6 +97,7 @@ it('renders both shared element popovers as interactive draggable surfaces', asy
   const callout = createDefaultFrameCallout();
   const stepBadge = createDefaultFrameStepBadge();
   const frameSettings = createDefaultHighlighterSettings();
+  const stepTemplateSourceChange = vi.fn();
 
   await act(async () =>
     root?.render(
@@ -120,6 +124,7 @@ it('renders both shared element popovers as interactive draggable surfaces', asy
           portalTarget={portal!}
           resetKey="frame-1"
           settings={stepBadge}
+          templateSourceControl={{ onChange: stepTemplateSourceChange, value: 'forced' }}
         />
         <FrameAnnotationCreationFramePopover
           anchorEl={anchor}
@@ -152,12 +157,33 @@ it('renders both shared element popovers as interactive draggable surfaces', asy
         'true'
     )
   ).toBe(true);
+  const stepPopover = portal?.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.future-step-badge-popover"]'
+  );
+  act(() =>
+    stepPopover?.querySelector<HTMLButtonElement>(`button[aria-label="Сохранение"]`)?.click()
+  );
+  const stepName = stepPopover?.querySelector<HTMLInputElement>(
+    'input[aria-label="Название шаблона"]'
+  );
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  await act(async () => {
+    setter?.call(stepName, 'Shared step');
+    stepName?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const createStep = [...(stepPopover?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.textContent === 'Создать'
+  );
+  await act(async () => createStep?.click());
+  expect(persistence.createStep).toHaveBeenCalled();
+
   await act(async () => {
     for (const button of portal?.querySelectorAll<HTMLButtonElement>('button') ?? []) {
       button.click();
       await Promise.resolve();
     }
   });
+  expect(stepTemplateSourceChange).toHaveBeenCalledWith('frame-default');
 });
 
 it('covers shared badge position, enabled-state, value normalization, and save controls', () => {
@@ -264,13 +290,15 @@ it('projects callout save actions through the canonical shared settings snapshot
     order: 0,
     origin: 'user' as const,
   };
-  const create = vi.fn(async () => true);
+  const create = vi.fn(async () => ({ id: 'created-callout', outcome: 'applied' }));
   const overwrite = vi.fn(async () => true);
+  const onCreated = vi.fn();
   const section = createCalloutSaveSection({
     create,
     error: null,
     isSaving: false,
     overwrite,
+    onCreated,
     presets: [preset],
     settings: callout,
   });
@@ -279,6 +307,8 @@ it('projects callout save actions through the canonical shared settings snapshot
   await expect(section.onOverwrite('missing')).resolves.toBe(false);
   await expect(section.onOverwrite('preset-1')).resolves.toBe(true);
   expect(create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Saved' }));
+  expect(onCreated).toHaveBeenCalledWith('created-callout');
+  expect(onCreated).toHaveBeenCalledWith('preset-1');
   expect(overwrite).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'preset-1', name: 'Preset' })
   );
@@ -302,6 +332,7 @@ it('runs the shared draggable header actions without leaking pointer events', ()
   const action = vi.fn();
   const close = vi.fn();
   const destructive = vi.fn();
+  const source = vi.fn();
   act(() =>
     root?.render(
       <SettingsPopoverHeader
@@ -309,6 +340,11 @@ it('runs the shared draggable header actions without leaking pointer events', ()
         closeLabel="Close"
         context="element"
         destructiveAction={{ label: 'Disable', onClick: destructive }}
+        sourceAction={{
+          description: 'Use the template linked to the frame',
+          label: 'From frame',
+          onClick: source,
+        }}
         drag={{
           isDragging: true,
           onPointerDown: vi.fn(),
@@ -326,6 +362,8 @@ it('runs the shared draggable header actions without leaking pointer events', ()
   );
   expect(action).toHaveBeenCalledOnce();
   expect(destructive).toHaveBeenCalledOnce();
+  expect(source).toHaveBeenCalledOnce();
+  expect(host?.querySelector('[title="Use the template linked to the frame"]')).not.toBeNull();
   expect(close).toHaveBeenCalledOnce();
 });
 

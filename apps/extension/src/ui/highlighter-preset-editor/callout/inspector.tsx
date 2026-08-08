@@ -70,6 +70,7 @@ function ManualSettingsContent(
   props: ManualContentProps & {
     positionSection?: ReactNode;
     saveSection?: CalloutSaveSectionProps;
+    saveSectionRequest?: number;
     section: ManualSection;
   }
 ) {
@@ -105,6 +106,7 @@ export function CalloutManualSettings(
   props: ManualContentProps & {
     positionSection?: ReactNode;
     saveSection?: CalloutSaveSectionProps;
+    saveSectionRequest?: number;
   }
 ) {
   const sections: ManualSectionOption[] = [
@@ -194,6 +196,9 @@ export function CalloutManualSettings(
     >
       <HighlighterManualInspectorSurface>
         <CategorizedInspector
+          {...(props.saveSectionRequest === undefined
+            ? {}
+            : { activeSectionRequest: { id: 'save' as const, token: props.saveSectionRequest } })}
           ariaLabel={translate('content.callout.manualNavigation')}
           initialSection="text"
           renderSectionHeadingControl={renderSectionHeadingControl}

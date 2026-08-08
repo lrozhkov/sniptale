@@ -9,7 +9,7 @@ type SystemBorderPreset = BorderPreset & {
   systemPresetKey: SystemBorderPresetKey;
 };
 
-export const SYSTEM_BORDER_PRESET_CATALOG_REVISION = 2;
+export const SYSTEM_BORDER_PRESET_CATALOG_REVISION = 3;
 
 function createUniformPadding(value: number) {
   return { top: value, right: value, bottom: value, left: value };
@@ -20,7 +20,7 @@ function createSystemPreset(
   order: number,
   visual: Pick<
     BorderPreset,
-    'color' | 'fillColor' | 'fillOpacity' | 'padding' | 'radius' | 'shadow' | 'style' | 'width'
+    'color' | 'fillColor' | 'padding' | 'radius' | 'shadow' | 'style' | 'width'
   >
 ): SystemBorderPreset {
   return {
@@ -28,8 +28,6 @@ function createSystemPreset(
     name: key,
     enabled: true,
     order,
-    opacity: 100,
-    strokeOpacity: 100,
     inheritCustomCss: false,
     customCss: '',
     effects: cloneBorderPresetEffects(undefined),
@@ -49,7 +47,6 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     radius: 0,
     padding: createUniformPadding(3),
     fillColor: '#00000000',
-    fillOpacity: 0,
     shadow: 0,
   }),
   createSystemPreset('system-soft-highlight', 1, {
@@ -58,8 +55,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 10,
     padding: createUniformPadding(6),
-    fillColor: '#60A5FA',
-    fillOpacity: 8,
+    fillColor: '#60A5FA14',
     shadow: 30,
   }),
   createSystemPreset('system-marker', 2, {
@@ -68,8 +64,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 4,
     padding: createUniformPadding(3),
-    fillColor: '#FACC15',
-    fillOpacity: 18,
+    fillColor: '#FACC152E',
     shadow: 0,
   }),
   createSystemPreset('system-success', 3, {
@@ -78,8 +73,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 8,
     padding: createUniformPadding(5),
-    fillColor: '#22C55E',
-    fillOpacity: 8,
+    fillColor: '#22C55E14',
     shadow: 0,
   }),
   createSystemPreset('system-attention', 4, {
@@ -88,8 +82,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 6,
     padding: createUniformPadding(5),
-    fillColor: '#EF4444',
-    fillOpacity: 7,
+    fillColor: '#EF444412',
     shadow: 30,
   }),
   createSystemPreset('system-review', 5, {
@@ -99,7 +92,6 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     radius: 8,
     padding: createUniformPadding(5),
     fillColor: '#00000000',
-    fillOpacity: 0,
     shadow: 0,
   }),
   createSystemPreset('system-light-ui', 6, {
@@ -109,7 +101,6 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     radius: 4,
     padding: createUniformPadding(4),
     fillColor: '#00000000',
-    fillOpacity: 0,
     shadow: 0,
   }),
   createSystemPreset('system-dark-ui', 7, {
@@ -119,7 +110,6 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     radius: 4,
     padding: createUniformPadding(4),
     fillColor: '#00000000',
-    fillOpacity: 0,
     shadow: 30,
   }),
 ];

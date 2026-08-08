@@ -13,14 +13,12 @@ import {
 
 function createBorderPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
-    color: '#2563eb',
+    color: '#2563ebb3',
     customCss: '',
-    fillColor: '#16a34a',
-    fillOpacity: 35,
+    fillColor: '#16a34a59',
     id: 'preset-1',
     inheritCustomCss: true,
     name: 'Default',
-    opacity: 42,
     order: 0,
     padding: {
       bottom: 4,
@@ -30,7 +28,6 @@ function createBorderPreset(overrides: Partial<BorderPreset> = {}): BorderPreset
     },
     radius: 12,
     shadow: 30,
-    strokeOpacity: 70,
     style: 'dashed',
     width: 6,
     ...overrides,
@@ -53,9 +50,9 @@ function assertShapeAndStepDefaults(settings: ToolSettings): void {
     borderPresetId: 'preset-1',
     customCss: '',
     fillColor: '#16a34a',
-    fillOpacity: 0.35,
+    fillOpacity: 89 / 255,
     inheritCustomCss: false,
-    opacity: 0.7,
+    opacity: 1,
     radius: 12,
     shadow: 30,
     shadowAngle: 90,
@@ -63,7 +60,7 @@ function assertShapeAndStepDefaults(settings: ToolSettings): void {
     shadowColor: '#2563eb',
     shadowDistance: 4,
     strokeColor: '#2563eb',
-    strokeOpacity: 0.7,
+    strokeOpacity: 179 / 255,
     strokeStyle: 'dashed',
     strokeWidth: 6,
   });
@@ -120,7 +117,7 @@ function assertBlurImageAndLineDefaults(settings: ToolSettings): void {
       radius: 12,
       shadow: 30,
       strokeColor: '#2563eb',
-      strokeOpacity: 0.7,
+      strokeOpacity: 179 / 255,
       strokeStyle: 'dashed',
       strokeWidth: 0,
     })

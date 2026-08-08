@@ -2,9 +2,10 @@ import type { CSSProperties } from 'react';
 import type { CalloutSettings, CalloutSide } from '@sniptale/runtime-contracts/highlighter/callout';
 import { resolveFrameCalloutFontFamily } from './font-family';
 import { getAnchorPosition, getCalloutPosition, getPreferredSideFromAnchor } from './geometry';
+import { CALLOUT_GAP } from './constants';
 import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 import { getLineConnectorState } from './line-connector';
-import { resolveCalloutAttachmentPosition } from './tail-drag';
+import { projectCalloutPerimeterPosition, resolveCalloutAttachmentPosition } from './tail-drag';
 import { FRAME_ANNOTATION_Z_INDEX } from '../interaction/z-index';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
@@ -18,8 +19,10 @@ export function getCalloutLayoutState(args: {
   settings: CalloutSettings;
   zIndex: number;
   previousConnectorSide?: ConnectorSide;
+  visualScale?: number;
 }) {
   const { placement, style } = args.settings;
+  const visualScale = args.visualScale ?? 1;
   const anchorPos = getAnchorPosition(placement.anchor, args.frameRect);
   const effectiveDimensions = getEffectiveCalloutDimensions(args);
   const preferredSide = getPreferredSideFromAnchor(placement.anchor);
@@ -34,23 +37,38 @@ export function getCalloutLayoutState(args: {
     frameHeight: args.frameRect.height,
     side: resolvedSide,
     tailSize: style.connector.kind === 'wedge' ? style.connector.wedgeSize : 0,
+    visualScale,
   });
   const calloutPos = placement.manualPlacement
-    ? getManualCalloutPosition(args.frameRect, positionDimensions, placement.manualPlacement)
+    ? getManualCalloutPosition(
+        args.frameRect,
+        positionDimensions,
+        placement.manualPlacement,
+        visualScale
+      )
     : automaticCalloutPos;
   const bubbleOffset = {
     x: calloutPos.x - automaticCalloutPos.x,
     y: calloutPos.y - automaticCalloutPos.y,
   };
   const bubbleRect = { ...calloutPos, ...positionDimensions };
+  const frameStrokeWidth = (args.frameBorderWidth ?? 0) * visualScale;
+  const connectorFrameRect = outsetRegionRect(args.frameRect, frameStrokeWidth / 2);
   const blockAttachmentPosition = resolveCalloutAttachmentPosition(
     bubbleRect,
     placement.connectorAttachments?.block
   );
-  const frameAttachmentPosition = resolveCalloutAttachmentPosition(
-    args.frameRect,
-    placement.connectorAttachments?.frame
-  );
+  const frameAttachment = placement.connectorAttachments?.frame;
+  const frameAttachmentPosition =
+    frameAttachment?.mode === 'anchor'
+      ? resolveCalloutAttachmentPosition(connectorFrameRect, frameAttachment)
+      : frameAttachment?.mode === 'free' && frameAttachment.perimeterPosition !== undefined
+        ? projectCalloutPerimeterPosition(
+            args.frameRect,
+            connectorFrameRect,
+            frameAttachment.perimeterPosition
+          )
+        : undefined;
   const connectorPlacement = {
     ...placement,
     connectorBasePosition: placement.connectorAttachments?.block
@@ -69,6 +87,7 @@ export function getCalloutLayoutState(args: {
     bubbleOffset,
     bubbleRect,
     connectorPlacement,
+    connectorFrameRect,
     resolvedSide,
   });
   const dynamicTail =
@@ -91,12 +110,14 @@ export function getCalloutLayoutState(args: {
 function getEffectiveCalloutDimensions(args: {
   dimensions: { width: number; height: number };
   settings: CalloutSettings;
+  visualScale?: number;
 }) {
+  const visualScale = args.visualScale ?? 1;
   return args.dimensions.width > 0 && args.dimensions.height > 0
     ? args.dimensions
     : {
-        width: Math.min(args.settings.style.typography.maxWidth, 200),
-        height: Math.max(24, args.settings.style.typography.fontSize * 2.5),
+        width: Math.min(args.settings.style.typography.maxWidth, 200) * visualScale,
+        height: Math.max(24, args.settings.style.typography.fontSize * 2.5) * visualScale,
       };
 }
 
@@ -106,28 +127,53 @@ function getCalloutConnectorState(input: {
   bubbleOffset: { x: number; y: number };
   bubbleRect: RegionRect;
   connectorPlacement: CalloutSettings['placement'];
+  connectorFrameRect: RegionRect;
   resolvedSide: Exclude<CalloutSide, 'auto'>;
 }) {
-  const { args, anchorPos, bubbleOffset, bubbleRect, connectorPlacement, resolvedSide } = input;
+  const {
+    args,
+    anchorPos,
+    bubbleOffset,
+    bubbleRect,
+    connectorPlacement,
+    connectorFrameRect,
+    resolvedSide,
+  } = input;
   const { placement, style } = args.settings;
+  const visualScale = args.visualScale ?? 1;
+  const visualPlacement = {
+    ...connectorPlacement,
+    ...(connectorPlacement.connectorBaseWidth === undefined
+      ? {}
+      : { connectorBaseWidth: connectorPlacement.connectorBaseWidth * visualScale }),
+    ...(connectorPlacement.connectorWaypoint === undefined
+      ? {}
+      : {
+          connectorWaypoint: {
+            centerOffsetX: connectorPlacement.connectorWaypoint.centerOffsetX * visualScale,
+            centerOffsetY: connectorPlacement.connectorWaypoint.centerOffsetY * visualScale,
+          },
+        }),
+  };
   if (style.connector.kind === 'wedge') {
     return getDynamicTailState({
       anchorPoint: anchorPos,
-      borderRadius: style.surface.radius,
-      borderWidth: style.surface.borderWidth,
+      borderRadius: style.surface.radius * visualScale,
+      borderWidth: style.surface.borderWidth * visualScale,
       bubbleOffset,
       bubbleRect,
-      frameRect: args.frameRect,
+      frameRect: connectorFrameRect,
       ...(connectorPlacement.connectorBasePosition === undefined
         ? {}
         : { tailBasePosition: connectorPlacement.connectorBasePosition }),
-      ...(placement.connectorBaseWidth === undefined
+      ...(visualPlacement.connectorBaseWidth === undefined
         ? {}
-        : { tailBaseWidth: placement.connectorBaseWidth }),
+        : { tailBaseWidth: visualPlacement.connectorBaseWidth }),
       ...(connectorPlacement.connectorFramePosition === undefined
         ? {}
         : { tailFramePosition: connectorPlacement.connectorFramePosition }),
-      tailSize: style.connector.wedgeSize,
+      tailSize: style.connector.wedgeSize * visualScale,
+      tipGap: CALLOUT_GAP * visualScale,
       ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
       ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
     });
@@ -135,27 +181,62 @@ function getCalloutConnectorState(input: {
   if (style.connector.kind === 'line') {
     return getLineConnectorState({
       anchorPoint: anchorPos,
-      blockBoundaryWidth: style.surface.borderWidth,
+      blockBoundaryWidth: style.surface.borderWidth * visualScale,
       blockMarker: style.connector.blockMarker,
-      blockMarkerSize: style.connector.blockMarkerSize,
+      blockMarkerSize: style.connector.blockMarkerSize * visualScale,
       bubbleOffset,
       bubbleRect,
-      frameBoundaryWidth: args.frameBorderWidth ?? 0,
+      frameBoundaryWidth: 0,
       frameMarker: style.connector.frameMarker,
-      frameMarkerSize: style.connector.frameMarkerSize,
-      frameRect: args.frameRect,
-      lineWidth: style.connector.width,
-      placement: connectorPlacement,
+      frameMarkerSize: style.connector.frameMarkerSize * visualScale,
+      frameRect: connectorFrameRect,
+      lineWidth: style.connector.width * visualScale,
+      placement: visualPlacement,
       routing: style.connector.routing,
-      cornerStyle: style.connector.cornerStyle,
-      curve: style.connector.curve,
-      spacing: style.connector.spacing,
-      wedgeSize: style.connector.wedgeSize,
+      cornerStyle: {
+        ...style.connector.cornerStyle,
+        radius: style.connector.cornerStyle.radius * visualScale,
+      },
+      curve: {
+        ...style.connector.curve,
+        ...(style.connector.curve.startHandle === undefined
+          ? {}
+          : {
+              startHandle: {
+                x: style.connector.curve.startHandle.x * visualScale,
+                y: style.connector.curve.startHandle.y * visualScale,
+              },
+            }),
+        ...(style.connector.curve.endHandle === undefined
+          ? {}
+          : {
+              endHandle: {
+                x: style.connector.curve.endHandle.x * visualScale,
+                y: style.connector.curve.endHandle.y * visualScale,
+              },
+            }),
+      },
+      spacing: {
+        blockGap: style.connector.spacing.blockGap * visualScale,
+        frameGap: style.connector.spacing.frameGap * visualScale,
+        minimumEndSegment: style.connector.spacing.minimumEndSegment * visualScale,
+        obstacleMargin: style.connector.spacing.obstacleMargin * visualScale,
+      },
+      wedgeSize: style.connector.wedgeSize * visualScale,
       ...(placement.manualPlacement ? {} : { preferredSide: resolvedSide }),
       ...(args.previousConnectorSide ? { previousSide: args.previousConnectorSide } : {}),
     });
   }
   return null;
+}
+
+function outsetRegionRect(rect: RegionRect, outset: number): RegionRect {
+  return {
+    x: rect.x - outset,
+    y: rect.y - outset,
+    width: rect.width + outset * 2,
+    height: rect.height + outset * 2,
+  };
 }
 
 function doesWedgeExitBubble(
@@ -178,12 +259,19 @@ function doesWedgeExitBubble(
 function getManualCalloutPosition(
   frameRect: RegionRect,
   dimensions: { width: number; height: number },
-  placement: NonNullable<CalloutSettings['placement']['manualPlacement']>
+  placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
+  visualScale: number
 ) {
   const desiredX =
-    frameRect.x + frameRect.width / 2 + placement.centerOffsetX - dimensions.width / 2;
+    frameRect.x +
+    frameRect.width / 2 +
+    placement.centerOffsetX * visualScale -
+    dimensions.width / 2;
   const desiredY =
-    frameRect.y + frameRect.height / 2 + placement.centerOffsetY - dimensions.height / 2;
+    frameRect.y +
+    frameRect.height / 2 +
+    placement.centerOffsetY * visualScale -
+    dimensions.height / 2;
   return {
     x: desiredX,
     y: desiredY,

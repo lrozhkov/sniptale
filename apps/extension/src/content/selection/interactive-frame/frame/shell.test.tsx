@@ -30,7 +30,14 @@ vi.mock('../../step-badge', () => ({
   ),
 }));
 
-vi.mock('./handles', () => ({ InteractiveFrameResizeHandles: () => null }));
+const resizeHandleOwner = vi.hoisted(() => ({ props: null as unknown }));
+
+vi.mock('./handles', () => ({
+  InteractiveFrameResizeHandles: (props: unknown) => {
+    resizeHandleOwner.props = props;
+    return null;
+  },
+}));
 
 import { InteractiveFrameFrameShell } from './shell';
 import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
@@ -54,9 +61,48 @@ afterEach(() => {
   act(() => root.unmount());
   document.body.replaceChildren();
   vi.clearAllMocks();
+  resizeHandleOwner.props = null;
 });
 
 describe('InteractiveFrameFrameShell step badge controls', () => {
+  it('anchors idle resize handles to current frame geometry instead of a stale draft', () => {
+    const currentFrame = createFrameDataFixture('frame-current', {
+      x: 140,
+      y: 90,
+      width: 320,
+      height: 180,
+    });
+    const staleDraft = { ...currentFrame, x: 20, y: 15, width: 120, height: 80 };
+
+    act(() => {
+      root.render(
+        <InteractiveFrameFrameShell
+          borderColor="#111"
+          borderWidth={3}
+          containerRef={{ current: null }}
+          currentFrame={currentFrame}
+          frame={currentFrame}
+          frameRef={{ current: null }}
+          frameStyle={{}}
+          fillStyle={{}}
+          strokeStyle={{}}
+          frameZIndex={100}
+          handleMouseDown={vi.fn()}
+          handleResizeStart={vi.fn()}
+          isResizeHovered
+          isStepBadgePopoverOpen={false}
+          state="idle"
+          stepBadgePopoverAnchorRef={{ current: null }}
+          tempFrame={staleDraft}
+        />
+      );
+    });
+
+    expect((resizeHandleOwner.props as { tempFrame: typeof currentFrame }).tempFrame).toBe(
+      currentFrame
+    );
+  });
+
   it('keeps the badge surface and settings anchor mounted for an empty value', () => {
     const frame = createFrameDataFixture('frame-empty', {
       stepBadge: createStepBadgeSettingsFixture({ auto: false, value: '' }),
@@ -91,6 +137,14 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
 
   it('commits a boundary move through the step-badge owner and opens quick settings', () => {
     const frame = createFrameDataFixture('frame-1', {
+      borderSettings: {
+        ...createFrameDataFixture('defaults').borderSettings!,
+        effects: {
+          blur: { amount: 10, blurType: 'gaussian' },
+          focus: { blurAmount: 0, opacity: 0.5 },
+          capture: { hideFrame: true },
+        },
+      },
       stepBadge: createStepBadgeSettingsFixture({ value: '3' }),
     });
     const stepBadgeListener = vi.fn();
@@ -135,6 +189,8 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(fill?.style.borderRadius).toBe('8px');
     expect(stroke?.style.border).toBe('3px solid rgb(17, 17, 17)');
     expect(stroke?.style.borderRadius).toBe('8px');
+    expect(fill?.dataset['hideDuringCapture']).toBe('true');
+    expect(stroke?.dataset['hideDuringCapture']).toBe('true');
     for (const [name, value] of Object.entries(PASSIVE_CONTENT_CHROME)) {
       expect(container?.getAttribute(name)).toBe(value);
       expect(surface?.getAttribute(name)).toBe(value);

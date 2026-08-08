@@ -42,6 +42,7 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
       onSidebarHeaderMouseDown={sidebarPosition.handleHeaderMouseDown}
       projectName={args.scenario.state.scenarioProjectName}
       position={sidebarPosition.position}
+      uiScale={sidebarPosition.uiScale}
       recentSteps={args.scenario.state.recentSteps}
       sidebarRef={sidebarPosition.sidebarRef}
       dragging={sidebarPosition.isDragging}

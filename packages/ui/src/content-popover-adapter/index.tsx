@@ -14,6 +14,7 @@ export interface ContentPopoverAdapterProps {
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
+  detachedChildren?: ReactNode;
   dataUi?: string;
 }
 
@@ -51,6 +52,7 @@ export function ContentPopoverAdapter({
   className,
   style,
   children,
+  detachedChildren,
   dataUi,
 }: ContentPopoverAdapterProps) {
   const surfaceRef = useFloatingSurfaceWheelContainment(popoverRef);
@@ -60,19 +62,25 @@ export function ContentPopoverAdapter({
     return null;
   }
 
-  return createPortal(
-    <div
-      ref={surfaceRef}
-      className={joinClassNames('sniptale-content-popover', className)}
-      data-ui={dataUi ?? 'shared.ui.content-popover'}
-      data-theme={portalTheme ?? undefined}
-      style={resolvePopoverStyle(portalTheme, style)}
-      onMouseDown={stopPopoverEventPropagation}
-      onClick={stopPopoverEventPropagation}
-    >
-      <div className="sniptale-content-popover-body">{children}</div>
-    </div>,
-    portalTarget ?? resolveThemeSafePortalTarget(anchorEl)
+  const resolvedPortalTarget = portalTarget ?? resolveThemeSafePortalTarget(anchorEl);
+  return (
+    <>
+      {createPortal(
+        <div
+          ref={surfaceRef}
+          className={joinClassNames('sniptale-content-popover', className)}
+          data-ui={dataUi ?? 'shared.ui.content-popover'}
+          data-theme={portalTheme ?? undefined}
+          style={resolvePopoverStyle(portalTheme, style)}
+          onMouseDown={stopPopoverEventPropagation}
+          onClick={stopPopoverEventPropagation}
+        >
+          <div className="sniptale-content-popover-body">{children}</div>
+        </div>,
+        resolvedPortalTarget
+      )}
+      {detachedChildren ? createPortal(detachedChildren, resolvedPortalTarget) : null}
+    </>
   );
 }
 

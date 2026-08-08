@@ -6,13 +6,15 @@ import {
   resetScreenshotSurfaceSessionsForTests,
 } from '../../capture-surface/screenshot-session';
 
-const { browserTabsGetMock } = vi.hoisted(() => ({
+const { browserTabsGetMock, browserTabsGetZoomMock } = vi.hoisted(() => ({
   browserTabsGetMock: vi.fn(),
+  browserTabsGetZoomMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: {
     get: browserTabsGetMock,
+    getZoom: browserTabsGetZoomMock,
   },
 }));
 
@@ -37,6 +39,7 @@ async function verifyBuildScreenshotModeStatusResponse() {
   const sendResponse = vi.fn();
 
   browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
+  browserTabsGetZoomMock.mockResolvedValue(1);
   const surfaceSession = beginScreenshotSurfaceSession(5);
   bindScreenshotSurfaceSession({ documentId: 'content-document-5', tabId: 5 });
 
@@ -50,24 +53,25 @@ async function verifyBuildScreenshotModeStatusResponse() {
     )
   ).toBe(true);
 
-  await Promise.resolve();
-
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: true,
-    documentId: 'content-document-5',
-    enabled: true,
-    tabId: 5,
-    viewport: {
-      presetId: 'test:viewport',
-      target: 'viewport',
-      width: 1440,
-      height: 900,
-    },
-    supported: true,
-    surfaceCapabilityToken: surfaceSession.capabilityToken,
-    surfaceOperationGeneration: 0,
-    unsupportedReason: null,
-  });
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
+      documentId: 'content-document-5',
+      enabled: true,
+      pageZoom: 1,
+      tabId: 5,
+      viewport: {
+        presetId: 'test:viewport',
+        target: 'viewport',
+        width: 1440,
+        height: 900,
+      },
+      supported: true,
+      surfaceCapabilityToken: surfaceSession.capabilityToken,
+      surfaceOperationGeneration: 0,
+      unsupportedReason: null,
+    })
+  );
 }
 
 async function verifyUnboundStatusDoesNotClaimCapability() {
@@ -76,6 +80,7 @@ async function verifyUnboundStatusDoesNotClaimCapability() {
   const sendResponse = vi.fn();
 
   browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
+  browserTabsGetZoomMock.mockResolvedValue(1);
   beginScreenshotSurfaceSession(5);
 
   expect(
@@ -87,17 +92,18 @@ async function verifyUnboundStatusDoesNotClaimCapability() {
       'content-document-5'
     )
   ).toBe(true);
-  await Promise.resolve();
-
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: true,
-    documentId: 'content-document-5',
-    enabled: true,
-    tabId: 5,
-    viewport: null,
-    supported: true,
-    unsupportedReason: null,
-  });
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
+      documentId: 'content-document-5',
+      enabled: true,
+      pageZoom: 1,
+      tabId: 5,
+      viewport: null,
+      supported: true,
+      unsupportedReason: null,
+    })
+  );
   expect(getScreenshotSurfaceSession(5)).toMatchObject({ documentId: null });
 }
 
@@ -112,6 +118,7 @@ async function verifyBuildScreenshotModeStatusReadsLatestState() {
   const tabLookup = createDeferred<chrome.tabs.Tab>();
 
   browserTabsGetMock.mockReturnValueOnce(tabLookup.promise);
+  browserTabsGetZoomMock.mockResolvedValue(1);
 
   expect(
     buildScreenshotModeStatusResponse(
@@ -126,17 +133,18 @@ async function verifyBuildScreenshotModeStatusReadsLatestState() {
   screenshotModeState.delete(5);
   viewportState.delete(5);
   tabLookup.resolve({ id: 5, url: 'https://example.com' } as chrome.tabs.Tab);
-  await Promise.resolve();
-
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: true,
-    documentId: 'content-document-5',
-    enabled: false,
-    tabId: 5,
-    viewport: null,
-    supported: true,
-    unsupportedReason: null,
-  });
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
+      documentId: 'content-document-5',
+      enabled: false,
+      pageZoom: 1,
+      tabId: 5,
+      viewport: null,
+      supported: true,
+      unsupportedReason: null,
+    })
+  );
 }
 
 async function verifyBuildScreenshotModeStatusFallback() {
@@ -165,6 +173,7 @@ async function verifyBuildScreenshotModeStatusFallback() {
 describe('tab-mode-router-screenshot status responses', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserTabsGetZoomMock.mockResolvedValue(1);
     resetScreenshotSurfaceSessionsForTests();
   });
 

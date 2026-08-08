@@ -135,12 +135,48 @@ function verifyStackingAndHideAllFlow() {
   });
 }
 
+function verifyHostPositionAdapterFlow() {
+  it('reprojects active toast hosts when the content UI scale changes', () => {
+    let scale = 0.5;
+    let notifyPositionChange: (() => void) | undefined;
+    const unsubscribe = vi.fn();
+    configureToastHostAdapter({
+      appendHost: (container) => document.body.appendChild(container),
+      getHostStyle: (index) => ({
+        right: `${20 * scale}px`,
+        top: `${(60 + index * 64) * scale}px`,
+      }),
+      isHidden: () => false,
+      subscribePositionChanges: (listener) => {
+        notifyPositionChange = listener;
+        return unsubscribe;
+      },
+    });
+
+    act(() => {
+      showToast('Scaled', 'info', 5000);
+    });
+    const host = document.querySelector<HTMLElement>('[data-ui="shared.toast.host"]');
+    expect(host?.style.right).toBe('10px');
+    expect(host?.style.top).toBe('30px');
+
+    scale = 2;
+    act(() => notifyPositionChange?.());
+    expect(host?.style.right).toBe('40px');
+    expect(host?.style.top).toBe('120px');
+
+    configureToastHostAdapter(null);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+}
+
 function runToastServiceSuite() {
   verifyErrorToastFlow();
   verifySuccessToastFlow();
   verifyInfoAndWarningVariants();
   verifyHiddenUiAndInvalidToneGuards();
   verifyStackingAndHideAllFlow();
+  verifyHostPositionAdapterFlow();
 }
 
 describe('toast-service', runToastServiceSuite);

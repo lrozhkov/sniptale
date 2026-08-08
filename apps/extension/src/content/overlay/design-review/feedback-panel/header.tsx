@@ -1,5 +1,6 @@
-import { MessageCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { PointerEventHandler } from 'react';
+import { FeedbackCollectionIcon } from '../icons';
 import { translate } from '../../../../platform/i18n';
 
 export function FeedbackPanelHeader(props: {
@@ -18,7 +19,7 @@ export function FeedbackPanelHeader(props: {
       onPointerUp={props.onPointerUp}
       onPointerCancel={props.onPointerUp}
     >
-      <MessageCircle size={19} />
+      <FeedbackCollectionIcon size={19} />
       <strong className="text-sm">{translate('content.designReview.panelTitle')}</strong>
       <span className="text-xs text-[var(--sniptale-color-text-dim)]">{props.count}</span>
       <button

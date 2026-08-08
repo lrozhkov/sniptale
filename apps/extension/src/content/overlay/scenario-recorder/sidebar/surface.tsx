@@ -60,7 +60,8 @@ function ScenarioRecorderSidebarFooter(props: { onOpenEditor: () => void }) {
 
 function getScenarioRecorderSidebarSurfaceClassName(dragging: boolean) {
   return [
-    'pointer-events-auto fixed z-40 grid min-w-0 w-[336px] gap-3 overflow-hidden rounded-[22px] border p-3',
+    'sniptale-scenario-recorder-sidebar pointer-events-auto fixed z-40 grid min-w-0',
+    'w-[336px] gap-3 overflow-hidden rounded-[22px] border p-3',
     'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_88%,transparent)]',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_98%,transparent)]',
     'shadow-[0_18px_38px_color-mix(in_srgb,var(--sniptale-color-overlay)_14%,transparent)]',
@@ -70,11 +71,14 @@ function getScenarioRecorderSidebarSurfaceClassName(dragging: boolean) {
   ].join(' ');
 }
 
-function getScenarioRecorderSidebarSurfaceStyle(position: { x: number; y: number }) {
+function getScenarioRecorderSidebarSurfaceStyle(
+  position: { x: number; y: number },
+  uiScale: number
+) {
   return {
     zIndex: 2147483646,
-    top: `${position.y}px`,
-    left: `${position.x}px`,
+    top: `${position.y * uiScale}px`,
+    left: `${position.x * uiScale}px`,
   };
 }
 
@@ -123,13 +127,14 @@ export function ScenarioRecorderSidebarSurface(props: {
   recentSteps: ScenarioRecorderSidebarStep[];
   setDragStepId: (stepId: string | null) => void;
   sidebarRef: RefObject<HTMLElement | null>;
+  uiScale?: number;
   stepsContainerRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
     <aside
       ref={props.sidebarRef}
       data-ui="content.scenario.sidebar"
-      style={getScenarioRecorderSidebarSurfaceStyle(props.position)}
+      style={getScenarioRecorderSidebarSurfaceStyle(props.position, props.uiScale ?? 1)}
       className={getScenarioRecorderSidebarSurfaceClassName(props.dragging)}
     >
       <ScenarioRecorderSidebarHeader

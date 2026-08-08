@@ -53,10 +53,7 @@ const DYNAMIC_PRESET: BorderPreset = {
   radius: 8,
   padding: { top: 2, right: 2, bottom: 2, left: 2 },
   shadow: 0,
-  opacity: 100,
-  strokeOpacity: 100,
-  fillColor: '#00d4ff',
-  fillOpacity: 0,
+  fillColor: '#00d4ff00',
   inheritCustomCss: false,
   customCss: '',
 };

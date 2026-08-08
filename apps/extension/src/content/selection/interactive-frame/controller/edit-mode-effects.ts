@@ -32,16 +32,26 @@ function isEditableKeyboardTarget(event: KeyboardEvent): boolean {
 
 export function useInteractiveFrameIdleReset(params: {
   state: FrameState;
+  isCalloutEditing: boolean;
   frameWithoutLinkedElement: FrameData;
+  pendingCalloutFrameRef?: React.MutableRefObject<FrameData | null>;
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
 }) {
-  const { state, frameWithoutLinkedElement, setTempFrame } = params;
+  const {
+    state,
+    isCalloutEditing,
+    frameWithoutLinkedElement,
+    pendingCalloutFrameRef,
+    setTempFrame,
+  } = params;
 
   React.useEffect(() => {
-    if (state === 'idle') {
+    const hasPendingCallout =
+      pendingCalloutFrameRef !== undefined && pendingCalloutFrameRef.current !== null;
+    if (state === 'idle' && !isCalloutEditing && !hasPendingCallout) {
       setTempFrame(frameWithoutLinkedElement);
     }
-  }, [state, setTempFrame, frameWithoutLinkedElement]);
+  }, [state, isCalloutEditing, setTempFrame, frameWithoutLinkedElement, pendingCalloutFrameRef]);
 }
 
 export function useInteractiveFrameEditingOverlayEffect(

@@ -23,17 +23,17 @@ async function runPresetSave<T>(args: {
   args.state.setError(null);
   try {
     const result = await args.command(args.input);
-    if (sessionId !== args.state.sessionGenerationRef.current) return false;
+    if (sessionId !== args.state.sessionGenerationRef.current) return null;
     if (result.outcome === 'rejected') {
       args.state.setError(args.errorMessage);
-      return false;
+      return null;
     }
-    return true;
+    return result;
   } catch {
     if (sessionId === args.state.sessionGenerationRef.current) {
       args.state.setError(args.errorMessage);
     }
-    return false;
+    return null;
   } finally {
     if (sessionId === args.state.sessionGenerationRef.current) args.state.setIsSaving(false);
   }

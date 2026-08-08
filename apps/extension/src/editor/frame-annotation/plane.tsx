@@ -71,6 +71,7 @@ export function EditorFrameAnnotationPlane(props: {
         ) : null}
         {interaction.projection.focusFrames.length > 0 ? (
           <FrameAnnotationFocusSurface
+            blurAmount={interaction.projection.focusBlurAmount}
             frames={interaction.projection.focusFrames}
             height={documentSize.height}
             opacity={interaction.projection.focusOpacity}

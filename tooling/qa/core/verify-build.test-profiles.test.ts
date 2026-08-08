@@ -441,7 +441,7 @@ it('keeps shared feature privacy entrypoints on the related profile', () => {
 });
 
 it('keeps destructive settings privacy owners on the related profile', () => {
-  const sourceFile = 'apps/extension/src/settings/sections/privacy/index.tsx';
+  const sourceFile = 'apps/extension/src/settings/sections/system/access-data/privacy/index.tsx';
   const scope = resolveBuildTestScope({
     targetFiles: [sourceFile],
     codeFiles: [sourceFile],
@@ -449,13 +449,13 @@ it('keeps destructive settings privacy owners on the related profile', () => {
     focusedScopeResolver: () => ({
       detail: 'local owner tests=2; coverageTargets=1',
       testFiles: [
-        'apps/extension/src/settings/sections/privacy/index.test.tsx',
+        'apps/extension/src/settings/sections/system/access-data/privacy/index.test.tsx',
         'apps/extension/src/settings/shell/page/sections.test.tsx',
       ],
       verdict: 'run-local-coverage',
     }),
     ownerTestResolver: () => [
-      'apps/extension/src/settings/sections/privacy/index.test.tsx',
+      'apps/extension/src/settings/sections/system/access-data/privacy/index.test.tsx',
       'apps/extension/src/settings/shell/page/sections.test.tsx',
     ],
   });

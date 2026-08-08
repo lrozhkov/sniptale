@@ -4,13 +4,22 @@ import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from './editor';
 import { buildScenarioEditorUrl } from './scenario-editor';
+import {
+  buildSettingsRouteUrl,
+  resolveSettingsRoute,
+  type LegacySettingsSection,
+  type SettingsRoute,
+} from './settings-route/codec';
 
-function buildSettingsPageUrl(section?: string): string {
+export function buildSettingsPageUrl(route?: SettingsRoute): string {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/settings/index.html'));
-  if (section) {
-    url.searchParams.set('section', section);
-  }
-  return url.toString();
+  return route ? buildSettingsRouteUrl(url, route).toString() : url.toString();
+}
+
+function buildLegacySettingsPageUrl(section: LegacySettingsSection): string {
+  const url = new URL(buildSettingsPageUrl());
+  url.searchParams.set('section', section);
+  return resolveSettingsRoute(url).normalizedUrl.toString();
 }
 
 export function isOwnedSettingsPage(senderUrl: string | undefined): boolean {
@@ -104,8 +113,7 @@ function buildScenarioAudiencePageUrl(projectId: string, presentationSessionId: 
   });
 }
 
-export async function openSettingsPage(options: { section?: string } = {}): Promise<void> {
-  const url = buildSettingsPageUrl(options.section);
+async function openSettingsUrl(url: string): Promise<void> {
   const [existing] = await browserTabs.query({ url: `${buildSettingsPageUrl()}*` });
   if (typeof existing?.id === 'number') {
     await browserTabs.update(existing.id, { active: true, url });
@@ -115,6 +123,14 @@ export async function openSettingsPage(options: { section?: string } = {}): Prom
     return;
   }
   await browserTabs.create({ url });
+}
+
+export async function openSettingsPage(options: { route?: SettingsRoute } = {}): Promise<void> {
+  await openSettingsUrl(buildSettingsPageUrl(options.route));
+}
+
+export async function openLegacySettingsPage(section: LegacySettingsSection): Promise<void> {
+  await openSettingsUrl(buildLegacySettingsPageUrl(section));
 }
 
 export async function openVideoEditorPage(

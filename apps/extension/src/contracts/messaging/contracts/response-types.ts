@@ -38,6 +38,7 @@ export type ModeStatusResponse = RuntimeMessageResponse<{
 export type ScreenshotModeStatusResponse = RuntimeMessageResponse<{
   documentId?: string;
   enabled?: boolean;
+  pageZoom?: number;
   supported?: boolean;
   surfaceLeaseGeneration?: number;
   surfaceOperationGeneration?: number;

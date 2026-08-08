@@ -6,6 +6,11 @@ import { enablePreparationByCapability, disablePreparationByCapability } from '.
 import { createAckingViewerPortRegistration } from './viewer-ports.test-support';
 
 const sendTabMessageMock = vi.hoisted(() => vi.fn());
+const getZoomMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { getZoom: getZoomMock },
+}));
 
 vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/runtime-messaging')>()),
@@ -15,10 +20,13 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
 beforeEach(() => {
   sendTabMessageMock.mockReset();
   sendTabMessageMock.mockResolvedValue({ success: true });
+  getZoomMock.mockReset();
+  getZoomMock.mockResolvedValue(1);
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
 });
 
 it('routes regular page preparation through the content-script message', async () => {
+  getZoomMock.mockResolvedValue(2);
   await enablePreparationByCapability({
     capability: TabRuntimeCapability.Regular,
     ports: new Map(),
@@ -36,6 +44,7 @@ it('routes regular page preparation through the content-script message', async (
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
+    pageZoom: 2,
     surfaceCapabilityToken: 'surface-token',
     surfaceLeaseGeneration: 2,
     surfaceOperationGeneration: 3,
@@ -85,6 +94,7 @@ it('forwards pinned-toolbar visibility through regular page preparation', async 
   });
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    pageZoom: 1,
     surfaceCapabilityToken: 'surface-token',
     surfaceOperationGeneration: 0,
     toolbarVisible: false,

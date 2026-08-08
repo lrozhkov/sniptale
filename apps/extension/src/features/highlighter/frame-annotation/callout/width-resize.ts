@@ -48,6 +48,7 @@ type CalloutWidthResizeArgs = {
   maxWidth: number;
   onWidthChange: (maxWidth: number, placement: CalloutManualPlacement) => void;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
+  visualScale?: number;
 };
 
 function areManualPlacementsEqual(
@@ -62,7 +63,9 @@ function getPlacement(args: {
   active: ActiveResize;
   dimensions: { width: number; height: number };
   frameRect: Rect;
+  visualScale?: number;
 }): CalloutManualPlacement {
+  const visualScale = args.visualScale ?? 1;
   const frameCenterX = args.frameRect.x + args.frameRect.width / 2;
   const frameCenterY = args.frameRect.y + args.frameRect.height / 2;
   const centerX =
@@ -70,8 +73,8 @@ function getPlacement(args: {
       ? args.active.fixedEdgeX - args.dimensions.width / 2
       : args.active.fixedEdgeX + args.dimensions.width / 2;
   return {
-    centerOffsetX: centerX - frameCenterX,
-    centerOffsetY: args.active.fixedCenterY - frameCenterY,
+    centerOffsetX: (centerX - frameCenterX) / visualScale,
+    centerOffsetY: (args.active.fixedCenterY - frameCenterY) / visualScale,
   };
 }
 
@@ -80,8 +83,9 @@ function getDraft(args: {
   clientX: number;
   dimensions: { width: number; height: number };
   frameRect: Rect;
+  visualScale?: number;
 }): ResizeDraft {
-  const pointerDelta = args.clientX - args.active.startPointerX;
+  const pointerDelta = (args.clientX - args.active.startPointerX) / (args.visualScale ?? 1);
   const widthDelta = args.active.side === 'left' ? -pointerDelta : pointerDelta;
   return {
     maxWidth: clampCalloutWrapWidth(args.active.startMaxWidth + widthDelta),
@@ -125,12 +129,13 @@ function useCalloutWidthResizeState(args: CalloutWidthResizeArgs) {
         active,
         dimensions,
         frameRect,
+        ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
       }),
     };
     if (areManualPlacementsEqual(nextDraft.placement, currentDraft.placement)) return;
     draftRef.current = nextDraft;
     setDraft(nextDraft);
-  }, [dimensions, frameRect]);
+  }, [args.visualScale, dimensions, frameRect]);
 
   return {
     activeRef,
@@ -167,6 +172,7 @@ function useCalloutWidthResizeLifecycle(args: {
         ).clientPointToLogical({ x: event.clientX, y: event.clientY }).x,
         dimensions,
         frameRect,
+        ...(callout.visualScale === undefined ? {} : { visualScale: callout.visualScale }),
       });
       draftRef.current = nextDraft;
       setDraft(nextDraft);
@@ -204,6 +210,7 @@ function useCalloutWidthResizeLifecycle(args: {
     onWidthChange,
     setActiveSide,
     setDraft,
+    callout.visualScale,
   ]);
 }
 
@@ -272,7 +279,12 @@ export function useCalloutWidthResize(args: CalloutWidthResizeArgs) {
     };
     args.onWidthChange(
       nextMaxWidth,
-      getPlacement({ active, dimensions: args.dimensions, frameRect: args.frameRect })
+      getPlacement({
+        active,
+        dimensions: args.dimensions,
+        frameRect: args.frameRect,
+        ...(args.visualScale === undefined ? {} : { visualScale: args.visualScale }),
+      })
     );
   };
 

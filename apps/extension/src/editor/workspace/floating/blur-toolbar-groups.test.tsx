@@ -23,8 +23,7 @@ it('builds blur groups in the requested effect and frame order', () => {
     command('blur-radius', '8px'),
     command('blur-stroke-width', '5px'),
     command('blur-stroke-style', 'Dash'),
-    command('blur-stroke-color', '#112233'),
-    command('blur-stroke-opacity', '60%'),
+    command('blur-stroke-color', '#11223399'),
   ]);
 
   expect(isBlurToolbarCommandSet([command('blur-type')])).toBe(true);
@@ -41,7 +40,7 @@ it('builds blur groups in the requested effect and frame order', () => {
   ).toContain('blur-radius');
   expect(
     renderToStaticMarkup(<>{groups?.find((group) => group.id === 'border')?.content}</>)
-  ).toContain('blur-stroke-opacity');
+  ).not.toContain('blur-stroke-opacity');
   expect(
     renderToStaticMarkup(<>{groups?.find((group) => group.id === 'effect')?.trigger}</>)
   ).toContain('span');
@@ -57,8 +56,7 @@ it('keeps only border dots visible when blur frame is disabled', () => {
     command('blur-radius', '8px'),
     command('blur-stroke-width', '0px'),
     command('blur-stroke-style', 'Solid'),
-    command('blur-stroke-color', '#112233'),
-    command('blur-stroke-opacity', '0%'),
+    command('blur-stroke-color', '#11223300'),
   ]);
 
   const triggerMarkup = renderToStaticMarkup(

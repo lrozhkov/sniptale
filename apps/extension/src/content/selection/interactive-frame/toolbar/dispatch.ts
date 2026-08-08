@@ -4,6 +4,7 @@ import {
   dispatchFrameStepBadgeChanged,
 } from '../../../platform/page-context/frame-events';
 import { MIN_FRAME_SIZE } from '../layout/portal';
+import { setFrameHiddenDuringCapture } from '../../../../features/highlighter/frame-annotation/capture-visibility';
 
 const FRAME_SIZE_STEP = 5;
 
@@ -50,7 +51,10 @@ export function dispatchCalloutEnable(frameId: string) {
   dispatchFrameCalloutChanged({ frameId, settings: { enabled: true } });
 }
 
-export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarProps) {
+export function createSharedToolbarClickHandlers(
+  props: InteractiveFrameToolbarProps,
+  captureVisibilityToggle?: () => void
+) {
   return {
     handleEffectClick:
       (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
@@ -82,6 +86,19 @@ export function createSharedToolbarClickHandlers(props: InteractiveFrameToolbarP
     handleIncreaseClick: (event: ToolbarClickEvent) => {
       stopToolbarEvent(event);
       props.onUpdate(resizeFrameByStep(props.frame, 'increase'));
+    },
+    handleCaptureVisibilityClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      if (captureVisibilityToggle) {
+        captureVisibilityToggle();
+        return;
+      }
+      props.onUpdate(
+        setFrameHiddenDuringCapture(
+          props.frame,
+          !(props.frame.borderSettings?.effects?.capture?.hideFrame ?? false)
+        ) as InteractiveFrameToolbarProps['frame']
+      );
     },
     handleButtonMouseDown: (event: ToolbarClickEvent) => {
       event.preventDefault();

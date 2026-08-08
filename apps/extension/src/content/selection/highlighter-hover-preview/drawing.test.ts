@@ -183,10 +183,7 @@ describe('free frame drawing gesture', () => {
       radius: 8,
       padding: { top: 5, right: 5, bottom: 5, left: 5 },
       shadow: 30,
-      opacity: 100,
-      strokeOpacity: 70,
-      fillColor: '#EF4444',
-      fillOpacity: 7,
+      fillColor: '#EF444412',
       inheritCustomCss: false,
       customCss: '',
     });
@@ -198,7 +195,8 @@ describe('free frame drawing gesture', () => {
     expect(preview?.style.opacity).toBe('0.88');
     expect(preview?.style.borderStyle).toBe('dashed');
     expect(preview?.style.borderWidth).toBe('4px');
-    expect(preview?.style.borderRadius).toBe('8px');
+    expect(preview?.style.borderRadius).toBe('12px');
+    expect(preview?.style.boxSizing).toBe('content-box');
     expect(preview?.style.background).toBe('rgba(239, 68, 68, 0.07)');
     expect(preview?.style.boxShadow).not.toBe('none');
   });
@@ -226,7 +224,7 @@ describe('free frame drawing gesture', () => {
     expect(preview?.style.boxShadow).toBe('0 0 4px red');
     expect(preview?.style.borderWidth).toBe('4px');
     expect(preview?.style.borderStyle).toBe(DEFAULT_BORDER_PRESET.style);
-    expect(preview?.style.borderRadius).toBe('8px');
+    expect(preview?.style.borderRadius).toBe('12px');
   });
 
   it('does not start a page gesture through an open settings popover', () => {

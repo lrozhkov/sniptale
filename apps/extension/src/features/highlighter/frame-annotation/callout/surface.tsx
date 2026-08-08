@@ -122,7 +122,12 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         onMouseEnter={props.handleMouseEnter}
         onMouseLeave={props.handleMouseLeave}
       >
-        {renderDynamicCalloutTail(props.dynamicTail, props.settings.style, customStyles)}
+        {renderDynamicCalloutTail(
+          props.dynamicTail,
+          props.settings.style,
+          customStyles,
+          props.visualScale ?? 1
+        )}
         <div
           ref={props.containerRef as Ref<HTMLDivElement>}
           style={{ ...props.cloudStyle, ...customStyles.card }}
@@ -181,7 +186,12 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
           ) : null}
           {renderBodyContent(props, customStyles)}
         </div>
-        {renderCalloutAccentEdge(props.settings.style, props.calloutDimensions, customStyles)}
+        {renderCalloutAccentEdge(
+          props.settings.style,
+          props.calloutDimensions,
+          customStyles,
+          props.visualScale ?? 1
+        )}
         {props.voiceSlot}
       </div>
       {props.showInteractionChrome !== false
@@ -195,6 +205,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
             isEditing: props.isEditing,
             portalTheme: props.portalTheme,
             portalTarget: controlsPortalTarget,
+            ...(props.visualScale === undefined ? {} : { visualScale: props.visualScale }),
           })
         : null}
     </>
@@ -228,6 +239,7 @@ type CalloutBodyProps = CalloutInteractionHandleProps & {
     | ReturnType<typeof getLineConnectorState>
     | null;
   showInteractionChrome?: boolean;
+  visualScale?: number;
 };
 
 export function CalloutBody(props: CalloutBodyProps) {

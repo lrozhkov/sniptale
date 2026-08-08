@@ -11,11 +11,11 @@ import {
 } from './service.test-support';
 import { dispatchNativeRuntimeMessage } from './service-message-dispatch';
 
-const mocks = vi.hoisted(() => ({ openSettingsPage: vi.fn() }));
+const mocks = vi.hoisted(() => ({ openLegacySettingsPage: vi.fn() }));
 
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages')>()),
-  openSettingsPage: mocks.openSettingsPage,
+  openLegacySettingsPage: mocks.openLegacySettingsPage,
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -28,7 +28,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.openSettingsPage.mockResolvedValue(undefined);
+  mocks.openLegacySettingsPage.mockResolvedValue(undefined);
   Object.assign(globalThis, { chrome: { runtime: { id: 'extension-id' } } });
 });
 
@@ -65,7 +65,7 @@ it('dispatches settings, pong, open-settings, and early statuses', () => {
   dispatchNativeRuntimeMessage(ctx, createOpenSettingsRequest());
   dispatchNativeRuntimeMessage(ctx, createRecordingProgress());
 
-  expect(mocks.openSettingsPage).toHaveBeenCalledWith({ section: 'native-app' });
+  expect(mocks.openLegacySettingsPage).toHaveBeenCalledWith('native-app');
 });
 
 it('rejects stale lease-owned control messages before side effects', () => {
@@ -81,7 +81,7 @@ it('rejects stale lease-owned control messages before side effects', () => {
   expect(ctx.warn).toHaveBeenCalledWith('Stale settings');
   expect(ctx.warn).toHaveBeenCalledWith('Stale open-settings');
   expect(ctx.warn).toHaveBeenCalledWith('Stale tray action');
-  expect(mocks.openSettingsPage).not.toHaveBeenCalled();
+  expect(mocks.openLegacySettingsPage).not.toHaveBeenCalled();
 });
 
 it('dispatches media messages through ingestion and posts async responses', async () => {
@@ -99,8 +99,28 @@ it('dispatches media messages through ingestion and posts async responses', asyn
   );
 });
 
+it('covers invocation, heartbeat, command, tray, and recording control guards', async () => {
+  const ctx = createContext({ consumeInvocation: false, handshakeAccepted: false });
+  dispatchNativeRuntimeMessage(ctx, createPong());
+  dispatchNativeRuntimeMessage(ctx, createOpenSettingsRequest());
+  dispatchNativeRuntimeMessage(ctx, createCommandAccepted('lease-1'));
+  expect(ctx.warn).toHaveBeenCalledWith('Early pong');
+  expect(ctx.warn).toHaveBeenCalledWith('Early status');
+  expect(mocks.openLegacySettingsPage).not.toHaveBeenCalled();
+
+  const active = createContext();
+  dispatchNativeRuntimeMessage(active, createTrayActionRequest('lease-1'));
+  dispatchNativeRuntimeMessage(active, createCommandAccepted('stale'));
+  await Promise.resolve();
+  expect(active.warn).toHaveBeenCalledWith('Stale command accepted');
+});
+
 function createContext(
-  patch: { consumeInvocation?: boolean; pendingReason?: 'user-requested-takeover' } = {}
+  patch: {
+    consumeInvocation?: boolean;
+    handshakeAccepted?: boolean;
+    pendingReason?: 'user-requested-takeover';
+  } = {}
 ) {
   let status = createStatus();
   const ctx = {
@@ -109,7 +129,7 @@ function createContext(
     clearPendingReason: vi.fn(),
     consumeInvocation: vi.fn(() => patch.consumeInvocation ?? true),
     getConnectionId: () => 'conn-1',
-    getHandshakeAccepted: () => true,
+    getHandshakeAccepted: () => patch.handshakeAccepted ?? true,
     getPendingReason: () => patch.pendingReason ?? null,
     getStatus: () => status,
     ingestion: createIngestion(),
@@ -258,6 +278,17 @@ function createRecordingProgress() {
     recordingId: 'recording-1',
     status: 'recording',
     type: 'app.recording.progress',
+  } as const;
+}
+
+function createCommandAccepted(controllerLeaseId: string) {
+  return {
+    acceptedAtEpochMs: 1,
+    commandId: 'command-1',
+    controllerLeaseId,
+    operation: 'screenshot',
+    protocolVersion: 1,
+    type: 'app.command.accepted',
   } as const;
 }
 

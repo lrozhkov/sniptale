@@ -24,7 +24,7 @@ export function ensureQuickEditBlockingOverlay(state: QuickEditOverlayState): vo
   activeFrameOverlay.style.cssText = `
     position: fixed;
     border: ${EDITABLE_BORDER};
-    box-sizing: border-box;
+    box-sizing: content-box;
     margin: 0;
     padding: 0;
     border-radius: 0;

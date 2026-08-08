@@ -4,6 +4,7 @@ import { resolveContentPortalTarget } from '../interactive-frame/layout/portal';
 export function StepBadgePopoverAdapter(props: {
   anchorEl: HTMLElement | null;
   children: React.ReactNode;
+  detachedChildren?: React.ReactNode;
   getPopoverStyle: () => React.CSSProperties;
   isOpen: boolean;
   popoverRef: React.RefObject<HTMLDivElement | null>;
@@ -20,6 +21,9 @@ export function StepBadgePopoverAdapter(props: {
       ].join(' ')}
       style={props.getPopoverStyle()}
       dataUi="content.step-badge.popover"
+      {...(props.detachedChildren === undefined
+        ? {}
+        : { detachedChildren: props.detachedChildren })}
     >
       {props.children}
     </ContentPopoverAdapter>

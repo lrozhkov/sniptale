@@ -136,7 +136,6 @@ function useAutoBlurControllerActions(args: {
     beginApplying: transitions.beginApplying,
     failApplying: transitions.failApplying,
     finishApplying: transitions.finishApplying,
-    frameManager: params.frameManager,
     setAutoApplyEnabled: transitions.setAutoApplyEnabled,
   });
 

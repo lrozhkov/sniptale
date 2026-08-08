@@ -34,7 +34,7 @@ it('flags whole-object overwrite writes that spread existing state', () => {
   const root = createTempRoot();
   const file = writeFile(
     root,
-    'apps/extension/src/settings/sections/save-presets/actions/index.ts',
+    'apps/extension/src/settings/sections/capture/saving/actions/index.ts',
     'browserStorage.local.set({ ...settings, showSidebar: true });\n'
   );
 
@@ -42,7 +42,7 @@ it('flags whole-object overwrite writes that spread existing state', () => {
     expect.objectContaining({
       rule: 'storage-write-patterns',
       file: expect.stringContaining(
-        'apps/extension/src/settings/sections/save-presets/actions/index.ts'
+        'apps/extension/src/settings/sections/capture/saving/actions/index.ts'
       ),
     }),
   ]);
