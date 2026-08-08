@@ -56,6 +56,26 @@ export const runtimePolicyStateDescriptors = [
     storageClass: 'state-manager',
   },
   {
+    authorityFamily: 'gradient-preset-persistence',
+    failClosedOnRestart: false,
+    id: 'gradient-preset-mutation-queue',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/composition/persistence/gradient-presets/index.ts',
+    proofModules: [
+      'apps/extension/src/composition/persistence/gradient-presets/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Durable sync storage remains authoritative across runtime restart;',
+      'the new runtime recreates an empty local ordering queue and re-reads validated storage',
+      'under the cross-context mutation barrier before every write.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'capture-surface',
     failClosedOnRestart: false,
     id: 'capture-surface-leases',

@@ -12,6 +12,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/gradient-preset-resources",
+      "ownerId": "app-core.gradient-preset-resources",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/voice-input",
       "ownerId": "app-core.voice-input",
       "ownerClass": "app-core"
@@ -139,6 +144,11 @@
     {
       "sourcePrefix": "apps/extension/src/ui/color-selector",
       "ownerId": "app-core.editor-controls.color",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/paint-selector",
+      "ownerId": "app-core.editor-controls.paint",
       "ownerClass": "app-core"
     },
     {
@@ -284,6 +294,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/highlighter",
       "ownerId": "persistence.highlighter",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/gradient-presets",
+      "ownerId": "persistence.gradient-presets",
       "ownerClass": "persistence"
     },
     {
@@ -451,6 +466,11 @@
     {
       "id": "highlighter",
       "path": "apps/extension/src/composition/persistence/highlighter",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "gradient-presets",
+      "path": "apps/extension/src/composition/persistence/gradient-presets",
       "stateKind": "authoritative-durable"
     },
     {
@@ -648,6 +668,7 @@
     "apps/extension/src/ui/glass-select",
     "apps/extension/src/ui/gradient-preset-grid",
     "apps/extension/src/ui/highlighter-preset-editor",
+    "apps/extension/src/ui/paint-selector",
     "apps/extension/src/ui/keyboard",
     "apps/extension/src/ui/page-bootstrap",
     "apps/extension/src/ui/popup-shell",

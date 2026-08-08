@@ -13,6 +13,7 @@ import {
   removeFrameCallout,
   setFrameCallout,
 } from '../../../../features/highlighter/frame-annotation/callout/collection';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export interface InteractiveFramePopoversProps {
   frame: FrameData;
@@ -122,7 +123,7 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
           frameVisuals: {
             borderColor: borderSettings.color,
             borderWidth: borderSettings.width,
-            fillColor: borderSettings.fillColor,
+            fillColor: getRepresentativeColor(borderSettings.fillPaint),
           },
         }
       : {}),

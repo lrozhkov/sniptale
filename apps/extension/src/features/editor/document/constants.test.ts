@@ -15,7 +15,7 @@ function createBorderPreset(overrides: Partial<BorderPreset> = {}): BorderPreset
   return {
     color: '#2563ebb3',
     customCss: '',
-    fillColor: '#16a34a59',
+    fillPaint: { kind: 'solid' as const, color: '#16a34a59' },
     id: 'preset-1',
     inheritCustomCss: true,
     name: 'Default',

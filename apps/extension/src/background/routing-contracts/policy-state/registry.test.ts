@@ -25,6 +25,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'frame-annotation-raster-jobs',
   'full-page-capture-leases',
   'gallery-image-update-capabilities',
+  'gradient-preset-mutation-queue',
   'llm-session-tokens',
   'native-ingestion-erasure-exclusion',
   'offscreen-command-capability-generations',

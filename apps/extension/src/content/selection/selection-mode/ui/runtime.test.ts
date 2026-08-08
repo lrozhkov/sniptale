@@ -86,6 +86,7 @@ function createSelectionVisual(
     customCss: '',
     customCssStyles: {},
     fillColor: '#22c55e',
+    fillCss: '#22c55e',
     id: 'preset-1',
     inheritCustomCss: false,
     padding: { bottom: 4, left: 4, right: 4, top: 4 },

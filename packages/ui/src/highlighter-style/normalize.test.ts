@@ -11,7 +11,7 @@ import { DEFAULT_BORDER_PRESET_EFFECTS } from '@sniptale/runtime-contracts/highl
 const PRESET: BorderPreset = {
   color: '#fff',
   customCss: '',
-  fillColor: '#123456',
+  fillPaint: { kind: 'solid', color: '#123456' },
   id: 'preset-1',
   inheritCustomCss: true,
   name: 'Preset',
@@ -37,6 +37,7 @@ describe('highlighter style normalization', () => {
     expect(percentToUnit(125)).toBe(1);
     expect(normalizeBorderPresetVisualFields(PRESET)).toEqual({
       ...PRESET,
+      fillPaint: { kind: 'solid', color: '#123456ff' },
       effects: DEFAULT_BORDER_PRESET_EFFECTS,
     });
   });

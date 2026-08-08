@@ -2039,6 +2039,18 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/gradient-preset-resources",
+      "disposition": "rollout",
+      "reason": "The gradient preset resource adapter has focused lifecycle and failure proof in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/gradient-preset-resources/use-gradient-preset-catalog.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/gradient-preset-resources/use-gradient-preset-catalog.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/ai-settings",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -2295,6 +2307,28 @@
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/gradient-presets",
+      "disposition": "rollout",
+      "reason": "The revisioned gradient preset authority has owner-local parser, mutation, concurrency, and failure proof in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/gradient-presets/contracts.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/defaults.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/index.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/mutations.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/parser.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/storage.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/gradient-presets/contracts.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/defaults.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/index.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/mutations.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/parser.ts",
+        "apps/extension/src/composition/persistence/gradient-presets/storage.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -11443,6 +11477,7 @@
       "disposition": "unmapped",
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
       "productionFiles": [
+        "apps/extension/src/ui/color-selector/editor-panel.tsx",
         "apps/extension/src/ui/color-selector/expanded.tsx",
         "apps/extension/src/ui/color-selector/index.tsx",
         "apps/extension/src/ui/color-selector/picker-channel-fields.tsx",
@@ -11549,6 +11584,7 @@
         "apps/extension/src/ui/highlighter-preset-editor/callout/position-grid.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/callout/thumbnail.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/content.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/fill-paint-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/helpers.ts",
         "apps/extension/src/ui/highlighter-preset-editor/fields/index.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/inspector.tsx",
@@ -11597,6 +11633,7 @@
         "apps/extension/src/ui/highlighter-preset-editor/callout/position-grid.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/callout/thumbnail.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/content.tsx",
+        "apps/extension/src/ui/highlighter-preset-editor/fields/fill-paint-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/helpers.ts",
         "apps/extension/src/ui/highlighter-preset-editor/fields/index.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/inspector.tsx",
@@ -11651,6 +11688,22 @@
         "apps/extension/src/ui/page-bootstrap/index.ts",
         "apps/extension/src/ui/page-bootstrap/page-bootstrap-error-boundary.tsx",
         "apps/extension/src/ui/page-bootstrap/page-bootstrap.tsx"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/ui/paint-selector",
+      "disposition": "unmapped",
+      "reason": "The rendered Paint selector has focused interaction proof but remains outside the hard coverage threshold until its visual-state harness is generalized.",
+      "productionFiles": [
+        "apps/extension/src/ui/paint-selector/gradient-editor.tsx",
+        "apps/extension/src/ui/paint-selector/gradient-rail.tsx",
+        "apps/extension/src/ui/paint-selector/index.tsx",
+        "apps/extension/src/ui/paint-selector/lifecycle.ts",
+        "apps/extension/src/ui/paint-selector/mode-state.ts",
+        "apps/extension/src/ui/paint-selector/popup.tsx",
+        "apps/extension/src/ui/paint-selector/preset-controls.tsx"
       ],
       "rolloutFiles": [],
       "unownedFocusedFiles": []
@@ -12547,6 +12600,12 @@
         "packages/foundation/src/gradient-stops/index.ts",
         "packages/foundation/src/history/clone.ts",
         "packages/foundation/src/history/snapshot-history.ts",
+        "packages/foundation/src/paint/contracts.ts",
+        "packages/foundation/src/paint/css.ts",
+        "packages/foundation/src/paint/index.ts",
+        "packages/foundation/src/paint/interpolate.ts",
+        "packages/foundation/src/paint/normalize.ts",
+        "packages/foundation/src/paint/operations.ts",
         "packages/foundation/src/utils/delay.ts",
         "packages/foundation/src/utils/export-timestamp.ts",
         "packages/foundation/src/utils/filename.ts",
@@ -12561,6 +12620,12 @@
         "packages/foundation/src/gradient-stops/index.ts",
         "packages/foundation/src/history/clone.ts",
         "packages/foundation/src/history/snapshot-history.ts",
+        "packages/foundation/src/paint/contracts.ts",
+        "packages/foundation/src/paint/css.ts",
+        "packages/foundation/src/paint/index.ts",
+        "packages/foundation/src/paint/interpolate.ts",
+        "packages/foundation/src/paint/normalize.ts",
+        "packages/foundation/src/paint/operations.ts",
         "packages/foundation/src/utils/delay.ts",
         "packages/foundation/src/utils/export-timestamp.ts",
         "packages/foundation/src/utils/filename.ts",
@@ -13070,6 +13135,9 @@
         "packages/ui/src/inspector-shell/index.tsx",
         "packages/ui/src/inspector-shell/tokens.ts",
         "packages/ui/src/loading-delay/index.tsx",
+        "packages/ui/src/paint-selector/operations.ts",
+        "packages/ui/src/paint-selector/state.ts",
+        "packages/ui/src/paint-selector/types.ts",
         "packages/ui/src/product-feedback/confirm-dialog/index.tsx",
         "packages/ui/src/product-feedback/toast-service/index.ts",
         "packages/ui/src/product-feedback/toast/index.tsx",
@@ -13178,6 +13246,9 @@
         "packages/ui/src/inspector-shell/index.tsx",
         "packages/ui/src/inspector-shell/tokens.ts",
         "packages/ui/src/loading-delay/index.tsx",
+        "packages/ui/src/paint-selector/operations.ts",
+        "packages/ui/src/paint-selector/state.ts",
+        "packages/ui/src/paint-selector/types.ts",
         "packages/ui/src/product-feedback/confirm-dialog/index.tsx",
         "packages/ui/src/product-feedback/toast-service/index.ts",
         "packages/ui/src/product-feedback/toast/index.tsx",
@@ -13231,7 +13302,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "5f0bf631754c31cfc899a3e13ab1c1c4f062b0099afe410c42484618c5ee5e31"
+        "contentHash": "aaf8a4bccc350099348c8994521de1af09b75efe40b9885118362f8d3a27e9df"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -17526,7 +17597,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/dependency-legal/license-selection.mjs",
-        "contentHash": "208de2ea1c0830730a41876cb032c560ac6fd1bf1d54f89d267480161a5feb02"
+        "contentHash": "4c5fbde1becf2ce4e503a2b1200ac605896513c4ef6d3b7ac0c4f5ee9e6b9f7c"
       },
       "consumers": [
         "tooling/release/dependency-legal/index.mjs",

@@ -404,6 +404,9 @@ function FrameManualMode(props: {
         cssError={props.manual.cssError}
         onChange={props.handleManualBorderChange}
         onCssDraftChange={props.manual.onCssDraftChange}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
         {...(props.saveSectionRequest === undefined
           ? {}
           : { saveSectionRequest: props.saveSectionRequest })}

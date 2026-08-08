@@ -62,9 +62,9 @@
       "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/dompurify-3.4.12.txt",
+      "archivePath": "LICENSES/dependencies/dompurify-3.4.13.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "source": "LICENSES/dependencies/dompurify-3.4.12.txt"
+      "source": "LICENSES/dependencies/dompurify-3.4.13.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
@@ -213,12 +213,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "c2789d9ad63094f6d9fcbf925bd74b3930623351cb8c26b60afaa6d7f5cf92db",
+      "sha256": "c54b332e3c025afa693e602443750d406db979daf86f27d3073581b3cf333734",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "77fac2251618afcae5fc8e7438d24500f648e80dc7da69d9d252fce8f7404475",
+      "sha256": "708cbfe7ef4ea43f934a6bea2be7a26c01dd2f5ae1c9fd37d4f058b3804b8414",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -311,7 +311,7 @@
     "reviewedSelections": [
       {
         "packageName": "dompurify",
-        "version": "3.4.12",
+        "version": "3.4.13",
         "selectedLicense": "Apache-2.0"
       },
       {

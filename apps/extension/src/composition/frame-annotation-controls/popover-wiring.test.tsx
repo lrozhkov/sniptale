@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 const calls = vi.hoisted(() => ({
   calloutPreset: {
@@ -34,6 +35,7 @@ const calls = vi.hoisted(() => ({
   frameSelect: vi.fn(),
   frameToggle: vi.fn(),
   stepCreate: vi.fn(),
+  stepFrameVisuals: vi.fn(),
   stepOpen: vi.fn(),
   stepRefresh: vi.fn(),
   stepReset: vi.fn(),
@@ -114,23 +116,26 @@ vi.mock('../../../ui/highlighter-preset-editor/callout', () => ({
 }));
 
 vi.mock('./step-badge/body', () => ({
-  StepBadgePopoverContent: (props: Record<string, any>) => (
-    <div>
-      <button onClick={() => props['onAlphabetChange']('cyrillic')}>alphabet</button>
-      <button onClick={() => props['onAnchorChange']('bottom-right')}>anchor</button>
-      <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
-      <button onClick={() => props['onAutoModeChange'](false)}>auto</button>
-      <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
-      <button onClick={() => props['onOffsetToggle']('up')}>offset</button>
-      <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
-      <button onClick={() => props['onSettingsChange']({ sizeLevel: 5 })}>settings</button>
-      <button onClick={() => props['onShowPresets']()}>refresh</button>
-      <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
-      <button onClick={() => props['onTypeChange']('letter')}>type</button>
-      <button onClick={() => props['onValueChange']('A12')}>value</button>
-      <button onClick={() => props['onDisable']()}>disable</button>
-    </div>
-  ),
+  StepBadgePopoverContent: (props: Record<string, any>) => {
+    calls.stepFrameVisuals(props['frameVisuals']);
+    return (
+      <div>
+        <button onClick={() => props['onAlphabetChange']('cyrillic')}>alphabet</button>
+        <button onClick={() => props['onAnchorChange']('bottom-right')}>anchor</button>
+        <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
+        <button onClick={() => props['onAutoModeChange'](false)}>auto</button>
+        <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
+        <button onClick={() => props['onOffsetToggle']('up')}>offset</button>
+        <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
+        <button onClick={() => props['onSettingsChange']({ sizeLevel: 5 })}>settings</button>
+        <button onClick={() => props['onShowPresets']()}>refresh</button>
+        <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
+        <button onClick={() => props['onTypeChange']('letter')}>type</button>
+        <button onClick={() => props['onValueChange']('A12')}>value</button>
+        <button onClick={() => props['onDisable']()}>disable</button>
+      </div>
+    );
+  },
 }));
 vi.mock('./step-badge/preset-controller', () => ({
   useStepBadgePresetPopoverController: () => ({
@@ -419,6 +424,11 @@ it('projects creation settings into the three shared popovers and supports an in
     document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.click())
   );
   expect(update).toHaveBeenCalledWith({ stepBadge: null });
+  expect(calls.stepFrameVisuals).toHaveBeenLastCalledWith({
+    borderColor: settings.borderSettings.color,
+    borderWidth: settings.borderSettings.width,
+    fillColor: getRepresentativeColor(settings.borderSettings.fillPaint),
+  });
 
   act(() =>
     root.render(

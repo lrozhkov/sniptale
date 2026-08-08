@@ -27,7 +27,7 @@ function getSelectionFrameCss(visual: ResolvedBorderPresetVisual): string {
   const frameShadow = resolveBorderShadowVisual(visual.shadow, visual.strokeColor).frameBoxShadow;
 
   return `
-    background-color: ${visual.fillColor};
+    background: ${visual.fillCss};
     outline: none;
     ${frameShadow ? `box-shadow: ${frameShadow};` : ''}
     ${customCss}

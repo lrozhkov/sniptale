@@ -1,4 +1,6 @@
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import type { Paint } from '@sniptale/foundation/paint';
+import { arePaintsEqual } from '@sniptale/foundation/paint';
 import { areDescriptorListsEqual } from '../effects/descriptor-equality';
 import type { AnchorPresentation } from '../host-layout/service';
 import { createCalloutRenderKey } from '../../../../features/highlighter/frame-annotation/callout/model';
@@ -10,7 +12,7 @@ export type FrameRenderDescriptor = {
   borderId: string | undefined;
   borderColor: string | undefined;
   borderCustomCss: string | undefined;
-  borderFillColor: string | undefined;
+  borderFillPaint: Paint | undefined;
   borderInheritCustomCss: boolean | undefined;
   borderPaddingBottom: number | undefined;
   borderPaddingLeft: number | undefined;
@@ -65,7 +67,18 @@ export function areFrameRenderDescriptorsEqual(
   next: FrameRenderDescriptor[],
   current: FrameRenderDescriptor[]
 ): boolean {
-  return areDescriptorListsEqual(next, current);
+  return (
+    areDescriptorListsEqual(
+      next.map(({ borderFillPaint: _paint, ...descriptor }) => descriptor),
+      current.map(({ borderFillPaint: _paint, ...descriptor }) => descriptor)
+    ) &&
+    next.every((descriptor, index) => {
+      const currentPaint = current[index]?.borderFillPaint;
+      return descriptor.borderFillPaint && currentPaint
+        ? arePaintsEqual(descriptor.borderFillPaint, currentPaint)
+        : descriptor.borderFillPaint === currentPaint;
+    })
+  );
 }
 
 function buildFrameRenderDescriptor(
@@ -111,7 +124,7 @@ function buildFrameBorderDescriptor(frame: FrameData) {
   return {
     borderColor: borderSettings?.color,
     borderCustomCss: borderSettings?.customCss,
-    borderFillColor: borderSettings?.fillColor,
+    borderFillPaint: borderSettings?.fillPaint,
     borderId: borderSettings?.sourcePresetId,
     borderInheritCustomCss: borderSettings?.inheritCustomCss,
     borderPaddingBottom: padding?.bottom,

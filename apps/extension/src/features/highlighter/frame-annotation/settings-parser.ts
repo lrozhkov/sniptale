@@ -73,7 +73,9 @@ function isBorderSettings(value: unknown): boolean {
   return (
     ['width', 'radius', 'shadow'].every((key) => isFiniteNumber(value[key])) &&
     ['opacity', 'strokeOpacity', 'fillOpacity'].every((key) => isOptionalFinite(value[key])) &&
-    hasSafeColorFields(value, ['color', 'fillColor']) &&
+    hasSafeColorFields(value, ['color']) &&
+    (value['fillPaint'] === undefined || parsePaint(value['fillPaint']) !== null) &&
+    (value['fillColor'] === undefined || isSafeCssColor(value['fillColor'])) &&
     isOneOf(value['style'], ['solid', 'dashed', 'dotted']) &&
     isRecord(padding) &&
     ['top', 'right', 'bottom', 'left'].every((key) => isFiniteNumber(padding[key])) &&
@@ -102,7 +104,9 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
   if (value === undefined) return undefined;
   if (!isBorderSettings(value) || !isRecord(value)) return null;
   const color = normalizeColor(value['color'] as string);
-  const fillColor = normalizeColor(value['fillColor'] as string);
+  const fillColor = normalizeColor(
+    typeof value['fillColor'] === 'string' ? value['fillColor'] : '#00000000'
+  );
   if (!color || !fillColor) return null;
   const strokeMultiplier = isFiniteNumber(value['strokeOpacity'])
     ? value['strokeOpacity'] / 100
@@ -116,6 +120,8 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
     ? multiplyColorAlpha(fillColor, value['fillOpacity'] / 100)
     : fillColor;
   if (!canonicalColor || !canonicalFillColor) return null;
+  const parsedFillPaint = parsePaint(value['fillPaint']);
+  if (value['fillPaint'] !== undefined && !parsedFillPaint) return null;
   return {
     width: value['width'] as number,
     color: canonicalColor,
@@ -123,7 +129,7 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
     radius: value['radius'] as number,
     padding: { ...(value['padding'] as AppliedBorderSettings['padding']) },
     shadow: value['shadow'] as number,
-    fillColor: canonicalFillColor,
+    fillPaint: parsedFillPaint ?? createSolidPaint(canonicalFillColor),
     inheritCustomCss: value['inheritCustomCss'] as boolean,
     customCss: value['customCss'] as string,
     ...(isRecord(value['effects'])
@@ -517,3 +523,4 @@ import { validateStepBadgeCustomCss } from '../step-badge-custom-css';
 import { isReservedFrameCssProperty } from '../style/decoration';
 import type { AppliedBorderSettings, BlurSettings } from '@sniptale/ui/highlighter-style/types';
 import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
+import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';

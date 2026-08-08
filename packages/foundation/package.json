@@ -10,6 +10,7 @@
     "./color": "./src/color/index.ts",
     "./default-owner": "./src/default-owner/index.ts",
     "./gradient-stops": "./src/gradient-stops/index.ts",
+    "./paint": "./src/paint/index.ts",
     "./history/clone": "./src/history/clone.ts",
     "./history/snapshot-history": "./src/history/snapshot-history.ts",
     "./utils/delay": "./src/utils/delay.ts",

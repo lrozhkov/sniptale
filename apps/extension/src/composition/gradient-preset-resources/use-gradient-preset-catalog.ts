@@ -1,0 +1,105 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import type { Gradient } from '@sniptale/foundation/paint';
+import { translate, useAppLocale, type AppLocale } from '../../platform/i18n';
+import {
+  addGradientPreset,
+  deleteGradientPreset,
+  loadGradientPresetCatalog,
+  subscribeToGradientPresetCatalog,
+  toggleGradientPresetFavoriteForSurface,
+  updateGradientPreset,
+  type GradientPresetCatalog,
+  type GradientPresetMutationOutcome,
+  type GradientPresetSurface,
+} from '../persistence/gradient-presets';
+
+const createPresetId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `gradient-${crypto.randomUUID()}`
+    : `gradient-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function getSystemPresetName(id: string, locale: AppLocale): string {
+  if (id === 'system-sunset')
+    return translate('highlighter.paintPicker.systemPresets.sunset', locale);
+  if (id === 'system-ocean')
+    return translate('highlighter.paintPicker.systemPresets.ocean', locale);
+  if (id === 'system-aurora')
+    return translate('highlighter.paintPicker.systemPresets.aurora', locale);
+  if (id === 'system-radial-glow')
+    return translate('highlighter.paintPicker.systemPresets.radialGlow', locale);
+  if (id === 'system-conic-spectrum')
+    return translate('highlighter.paintPicker.systemPresets.spectrum', locale);
+  return id;
+}
+
+export function useGradientPresetCatalog(surface: GradientPresetSurface) {
+  const locale = useAppLocale();
+  const [catalog, setCatalog] = useState<GradientPresetCatalog | null>(null);
+  const activeRef = useRef(true);
+  const publicationGenerationRef = useRef(0);
+  useEffect(() => {
+    activeRef.current = true;
+    const generation = ++publicationGenerationRef.current;
+    void loadGradientPresetCatalog()
+      .then((next) => {
+        if (activeRef.current && generation === publicationGenerationRef.current) setCatalog(next);
+      })
+      .catch(() => {
+        if (activeRef.current) showToast(translate('highlighter.paintPicker.loadError'), 'error');
+      });
+    const unsubscribe = subscribeToGradientPresetCatalog((next) => {
+      publicationGenerationRef.current += 1;
+      if (activeRef.current) setCatalog(next);
+    });
+    return () => {
+      activeRef.current = false;
+      unsubscribe();
+    };
+  }, []);
+  const run = useCallback(
+    async (operation: () => Promise<GradientPresetMutationOutcome>): Promise<boolean> => {
+      try {
+        const outcome = await operation();
+        if (outcome === 'rejected') {
+          showToast(translate('highlighter.paintPicker.saveError'), 'error');
+          return false;
+        }
+        const generation = ++publicationGenerationRef.current;
+        const next = await loadGradientPresetCatalog();
+        if (activeRef.current && generation === publicationGenerationRef.current) setCatalog(next);
+        return true;
+      } catch {
+        showToast(translate('highlighter.paintPicker.saveError'), 'error');
+        return false;
+      }
+    },
+    []
+  );
+  return useMemo(
+    () => ({
+      presets: (catalog?.presets ?? []).map((preset) => ({
+        ...preset,
+        name: preset.origin === 'system' ? getSystemPresetName(preset.id, locale) : preset.name,
+        favorite: catalog?.favoriteIdsBySurface[surface]?.includes(preset.id) ?? false,
+      })),
+      actions: {
+        onSave: (name: string, gradient: Gradient) =>
+          run(() =>
+            addGradientPreset({
+              id: createPresetId(),
+              name,
+              order: catalog?.presets.length ?? 0,
+              origin: 'user',
+              gradient,
+            })
+          ),
+        onUpdate: (id: string, gradient: Gradient) => run(() => updateGradientPreset(id, gradient)),
+        onDelete: (id: string) => run(() => deleteGradientPreset(id)),
+        onToggleFavorite: (id: string) =>
+          run(() => toggleGradientPresetFavoriteForSurface(surface, id)),
+      },
+    }),
+    [catalog, locale, run, surface]
+  );
+}

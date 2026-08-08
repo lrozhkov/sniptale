@@ -78,6 +78,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.sync).toContain('sniptale_settings');
   expect(plan.sync).toContain('sniptale_auto_blur_settings');
   expect(plan.sync).toContain('sniptale_callout_presets');
+  expect(plan.sync).toContain('sniptale_gradient_presets');
 });
 
 it('includes extension-page trace localStorage in the page-local erasure inventory', () => {

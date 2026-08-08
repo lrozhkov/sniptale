@@ -8,7 +8,7 @@ const projectionMock = vi.hoisted(() =>
   vi.fn((preset) => ({
     borderPresetId: preset.id,
     customCss: '',
-    fillColor: 'transparent',
+    fillPaint: { kind: 'solid' as const, color: 'transparent' },
     fillOpacity: 0,
     inheritCustomCss: false,
     opacity: preset.strokeOpacity,
@@ -59,7 +59,7 @@ function createBorderPreset(id: string, color: string, enabled = true, system = 
     shadow: 0,
     opacity: 100,
     strokeOpacity: 100,
-    fillColor: '#ffffff',
+    fillPaint: { kind: 'solid' as const, color: '#ffffff' },
     fillOpacity: 0,
     inheritCustomCss: false,
     customCss: '',
@@ -87,7 +87,7 @@ function Harness(props: {
     currentSettings: {
       borderPresetId: null,
       customCss: '',
-      fillColor: 'transparent',
+      fillPaint: { kind: 'solid' as const, color: 'transparent' },
       fillOpacity: 0,
       inheritCustomCss: false,
       opacity: 100,

@@ -66,7 +66,7 @@ function createPreset() {
     shadow: 30,
     opacity: 80,
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     fillOpacity: 0,
     inheritCustomCss: false,
     strokeOpacity: 100,

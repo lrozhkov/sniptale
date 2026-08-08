@@ -25,12 +25,12 @@ export function getFrameAnnotationInteractiveStyle(params: {
 export function getFrameAnnotationFillStyle(params: {
   decorationVisible: boolean;
   fillVisible: boolean;
-  fillColor: string;
+  fillCss: string;
   borderRadius: number;
   customCssStyles?: CSSProperties;
 }): CSSProperties {
   return {
-    backgroundColor: params.fillVisible ? params.fillColor : 'transparent',
+    background: params.fillVisible ? params.fillCss : 'transparent',
     ...(params.decorationVisible ? params.customCssStyles : undefined),
     position: 'absolute',
     inset: 0,

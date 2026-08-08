@@ -17,7 +17,7 @@ const baseFrame: FrameData = {
     sourcePresetName: 'Primary',
     color: '#2563eb66',
     customCss: '',
-    fillColor: '#16a34a40',
+    fillPaint: { kind: 'solid' as const, color: '#16a34a40' },
     inheritCustomCss: true,
     padding: { top: 0, left: 0, right: 0, bottom: 0 },
     radius: 8,
@@ -51,7 +51,10 @@ function createCompositionFrame(testCase: CompositionCase): FrameData {
     effectMode: testCase.effectMode,
     borderSettings: {
       ...baseFrame.borderSettings!,
-      fillColor: testCase.fillVisible ? '#16a34a40' : '#16a34a00',
+      fillPaint: {
+        kind: 'solid' as const,
+        color: testCase.fillVisible ? '#16a34a40' : '#16a34a00',
+      },
     },
     ...(testCase.effectMode === 'blur'
       ? {
@@ -110,7 +113,7 @@ describe('interactive-frame render model', () => {
       boxSizing: 'border-box',
       border: 'none',
       borderRadius: '8px',
-      backgroundColor: testCase.fillVisible ? '#16a34a40' : 'transparent',
+      background: testCase.fillVisible ? '#16a34a40' : 'transparent',
     });
     expect(display.strokeStyle).toMatchObject({
       position: 'absolute',
@@ -158,9 +161,9 @@ describe('interactive-frame render model', () => {
       expect(hidden.frameStyle).toEqual(visible.frameStyle);
       expect(getLayerGeometry(hidden.fillStyle)).toEqual(getLayerGeometry(visible.fillStyle));
       expect(getLayerGeometry(hidden.strokeStyle)).toEqual(getLayerGeometry(visible.strokeStyle));
-      expect(hidden.fillStyle.backgroundColor).toBe('transparent');
+      expect(hidden.fillStyle.background).toBe('transparent');
       expect(hidden.strokeStyle.border).toBe('none');
-      expect(visible.fillStyle.backgroundColor).toBe('#16a34a40');
+      expect(visible.fillStyle.background).toBe('#16a34a40');
       expect(visible.strokeStyle.border).toBe('5px dashed #2563eb66');
       expect(hidden.frameZIndex).toBe(2147483644);
       expect(visible.frameZIndex).toBe(2147483644);

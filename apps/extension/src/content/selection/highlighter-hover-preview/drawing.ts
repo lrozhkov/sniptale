@@ -82,7 +82,7 @@ function ensurePreview(session: HoverSession): HTMLElement {
     pointer-events: none;
     border: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
     border-radius: ${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px;
-    background: ${visual.fillColor};
+    background: ${visual.fillCss};
     opacity: 0.88;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;

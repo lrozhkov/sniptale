@@ -7,6 +7,7 @@ import type {
 } from '../document/presets';
 import { createEditorFrameGradientCss } from '../document/frame-gradient';
 import type { BorderPreset } from '../../highlighter/contracts';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 
 function getAlphaColor(hexColor: string, opacity: number): string {
   const normalizedOpacity = Math.max(0, Math.min(1, opacity));
@@ -199,7 +200,7 @@ export function renderBorderPresetPreview(preset: BorderPreset) {
     <span
       className="block h-4 w-8 rounded-[5px] border"
       style={{
-        backgroundColor: preset.fillColor,
+        background: serializePaintToCss(preset.fillPaint),
         borderColor: preset.color,
         borderWidth: Math.max(1, Math.min(3, Math.round(preset.width / 2))),
       }}

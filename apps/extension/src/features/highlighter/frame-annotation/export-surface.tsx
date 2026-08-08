@@ -12,6 +12,7 @@ import { getFrameAnnotationBlurBackdropStyle } from './effect-style';
 import { FrameCalloutExportSurface } from './callout/export-surface';
 import { FrameStepBadgeInteractiveSurface } from './step-badge/interactive-surface';
 import { getFrameCalloutKey, getFrameCallouts } from './callout/collection';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export function FrameAnnotationExportSurface(props: {
   baseImageUrl: string;
@@ -127,8 +128,8 @@ function FrameAnnotationExportEntry(props: {
           settings={props.frame.stepBadge}
           showSettingsHandle={false}
           surfacePortalTarget={props.portalTarget}
-          {...(props.frame.borderSettings?.fillColor
-            ? { fillColor: props.frame.borderSettings.fillColor }
+          {...(props.frame.borderSettings?.fillPaint
+            ? { fillColor: getRepresentativeColor(props.frame.borderSettings.fillPaint) }
             : {})}
           {...(props.frame.borderSettings?.shadow === undefined
             ? {}

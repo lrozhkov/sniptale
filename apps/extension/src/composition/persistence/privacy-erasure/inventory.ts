@@ -55,6 +55,7 @@ const syncPreferenceKeys = [
   'sniptale_highlighter_settings',
   'sniptale_callout_presets',
   'sniptale_step_badge_presets',
+  'sniptale_gradient_presets',
   'sniptale_auto_blur_settings',
 ] as const;
 

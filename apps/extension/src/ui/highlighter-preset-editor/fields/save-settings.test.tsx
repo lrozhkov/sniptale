@@ -53,7 +53,7 @@ const preset = (id: string): BorderPreset => ({
   radius: 4,
   padding: { top: 1, right: 1, bottom: 1, left: 1 },
   shadow: 0,
-  fillColor: '#000000',
+  fillPaint: { kind: 'solid' as const, color: '#000000' },
   inheritCustomCss: false,
   customCss: '',
 });

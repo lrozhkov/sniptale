@@ -213,7 +213,7 @@ describe('editor preset preview renderer', () => {
         radius: 0,
         padding: { top: 0, right: 0, bottom: 0, left: 0 },
         shadow: 0,
-        fillColor: '#888888',
+        fillPaint: { kind: 'solid' as const, color: '#888888' },
         inheritCustomCss: false,
         customCss: '',
       })

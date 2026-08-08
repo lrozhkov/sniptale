@@ -12,7 +12,7 @@ function registerCalloutDefaultProjectionTests() {
     const settings = DEFAULT_EDITOR_TOOL_SETTINGS({
       ...DEFAULT_BORDER_PRESET,
       color: '#2563eb',
-      fillColor: '#16a34a',
+      fillPaint: { kind: 'solid' as const, color: '#16a34a' },
       radius: 12,
       width: 6,
     }).callout;

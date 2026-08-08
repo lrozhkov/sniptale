@@ -14,7 +14,7 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
       capture: { hideFrame: false },
       linkedTemplates: { calloutPresetId: null, stepBadgePresetId: null },
     },
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid', color: '#00000000' },
     id: 'preset-1',
     inheritCustomCss: false,
     name: 'Preset',
@@ -35,7 +35,7 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
 
 function createLegacyBorderPreset() {
   const preset: Record<string, unknown> = createBorderPreset();
-  delete preset['fillColor'];
+  delete preset['fillPaint'];
   delete preset['inheritCustomCss'];
   delete preset['effects'];
   preset['opacity'] = 0.8;
@@ -133,27 +133,31 @@ describe('highlighter guards border preset visual fields', () => {
       {
         ...createBorderPreset(),
         color: '#ff00aacc',
-        fillColor: '#00000000',
+        fillPaint: { kind: 'solid', color: '#00000000' },
         inheritCustomCss: false,
       },
     ]);
   });
 
   it('keeps expanded border preset visual fields from storage', () => {
-    const preset = createBorderPreset({
+    const preset = {
+      ...createLegacyBorderPreset(),
       customCss: 'outline: 2px solid #abcdef;',
       fillColor: '#123456',
       fillOpacity: 35,
       inheritCustomCss: true,
       strokeOpacity: 65,
-    });
+    };
 
     const parsed = parseStoredHighlighterSettings({
       borderPresets: [preset],
     }).value.borderPresets;
 
     expect(parsed).toEqual([
-      expect.objectContaining({ color: '#ff00aaa6', fillColor: '#12345659' }),
+      expect.objectContaining({
+        color: '#ff00aaa6',
+        fillPaint: { kind: 'solid', color: '#12345659' },
+      }),
     ]);
     expect(parsed?.[0]).not.toHaveProperty('fillOpacity');
     expect(parsed?.[0]).not.toHaveProperty('strokeOpacity');

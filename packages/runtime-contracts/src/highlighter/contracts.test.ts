@@ -34,7 +34,19 @@ const BORDER_PRESET: BorderPreset = {
   radius: 4,
   padding: { top: 1, right: 2, bottom: 3, left: 4 },
   shadow: 10,
-  fillColor: '#000000',
+  fillPaint: {
+    kind: 'gradient',
+    gradient: {
+      type: 'linear',
+      angle: 90,
+      interpolation: 'srgb',
+      repeat: { enabled: false, span: 1 },
+      stops: [
+        { id: 'left', color: '#000000ff', position: 0, midpoint: 0.5 },
+        { id: 'right', color: '#ffffffff', position: 1, midpoint: 0.5 },
+      ],
+    },
+  },
   inheritCustomCss: false,
   customCss: '',
 };
@@ -93,6 +105,7 @@ it('projects catalog presets into independent applied border snapshots', () => {
   expect(applied).not.toHaveProperty('id');
   expect(applied).not.toHaveProperty('name');
   expect(applied.padding).not.toBe(BORDER_PRESET.padding);
+  expect(applied.fillPaint).not.toBe(BORDER_PRESET.fillPaint);
 });
 
 it('clears preset attribution on manual patches and clones nested padding', () => {
@@ -108,6 +121,12 @@ it('clears preset attribution on manual patches and clones nested padding', () =
   expect(manual).not.toHaveProperty('sourcePresetName');
   expect(clone).toEqual(manual);
   expect(clone.padding).not.toBe(manual.padding);
+  expect(manual.fillPaint).not.toBe(applied.fillPaint);
+  expect(clone.fillPaint).not.toBe(manual.fillPaint);
+  if (manual.fillPaint.kind === 'gradient' && applied.fillPaint.kind === 'gradient') {
+    manual.fillPaint.gradient.stops[0]!.color = '#ff0000ff';
+    expect(applied.fillPaint.gradient.stops[0]!.color).toBe('#000000ff');
+  }
 });
 
 it('normalizes legacy catalog snapshots while preserving applied snapshots', () => {

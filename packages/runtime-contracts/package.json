@@ -67,6 +67,7 @@
     "./web-snapshot": "./src/web-snapshot/index.ts"
   },
   "dependencies": {
+    "@sniptale/foundation": "0.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -46,6 +46,16 @@ function leaf(...keys: string[]): ExactShape {
 }
 const pointShape = leaf('x', 'y');
 const attachmentShape = leaf('anchorId', 'mode', 'perimeterPosition');
+const paintShape: ExactShape = {
+  ...leaf('kind', 'color'),
+  gradient: {
+    ...leaf('type', 'angle', 'startAngle', 'interpolation'),
+    center: pointShape,
+    radius: pointShape,
+    repeat: leaf('enabled', 'span'),
+    stops: true,
+  },
+};
 
 const frameShape: ExactShape = {
   blurSettings: leaf(
@@ -75,6 +85,7 @@ const frameShape: ExactShape = {
       'style',
       'width'
     ),
+    fillPaint: paintShape,
     effects: {
       blur: leaf('amount', 'blurType'),
       capture: leaf('hideFrame'),

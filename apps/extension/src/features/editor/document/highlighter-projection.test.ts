@@ -8,6 +8,7 @@ import {
 import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
 import { createSystemBorderPresetCatalog } from '../../highlighter/presets/catalog';
 import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
@@ -20,7 +21,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     radius: 12,
     padding: { top: 2, right: 4, bottom: 6, left: 8 },
     shadow: BORDER_SHADOW_SOFT_INTENSITY,
-    fillColor: '#16a34a59',
+    fillPaint: { kind: 'solid', color: '#16a34a59' },
     inheritCustomCss: true,
     customCss: 'outline: 1px solid red;',
     ...overrides,
@@ -56,8 +57,8 @@ describe('highlighter preset projection', () => {
       expect(projection).toMatchObject({
         borderPresetId: preset.id,
         customCss: '',
-        fillColor: setColorAlpha(preset.fillColor, 1),
-        fillOpacity: getColorAlpha(preset.fillColor),
+        fillColor: setColorAlpha(getRepresentativeColor(preset.fillPaint), 1),
+        fillOpacity: getColorAlpha(getRepresentativeColor(preset.fillPaint)),
         inheritCustomCss: false,
         radius: preset.radius,
         shadow: preset.shadow,
@@ -69,14 +70,17 @@ describe('highlighter preset projection', () => {
     }
   });
 
-  it('keeps invalid legacy color text stable behind the editor projection fallback', () => {
+  it('projects canonical paint alpha while keeping legacy stroke fallback stable', () => {
     const projection = projectBorderPresetToEditorShapeSettings(
-      createPreset({ color: 'var(--legacy-stroke)', fillColor: 'var(--legacy-fill)' })
+      createPreset({
+        color: 'var(--legacy-stroke)',
+        fillPaint: { kind: 'solid', color: '#16a34a59' },
+      })
     );
 
     expect(projection).toMatchObject({
-      fillColor: 'var(--legacy-fill)',
-      fillOpacity: 1,
+      fillColor: '#16a34a',
+      fillOpacity: 89 / 255,
       shadowColor: 'var(--legacy-stroke)',
       strokeColor: 'var(--legacy-stroke)',
       strokeOpacity: 1,

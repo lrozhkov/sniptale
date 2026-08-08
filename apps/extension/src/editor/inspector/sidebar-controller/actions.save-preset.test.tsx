@@ -91,7 +91,7 @@ function expectSavedHighlighterPreset(updateSelectionShapeSettings: ReturnType<t
     expect.objectContaining({
       color: '#11223366',
       customCss: '',
-      fillColor: '#00ff0040',
+      fillPaint: { kind: 'solid', color: '#00ff0040' },
       id: 'preset-new',
       inheritCustomCss: false,
       padding: DEFAULT_BORDER_PRESET.padding,

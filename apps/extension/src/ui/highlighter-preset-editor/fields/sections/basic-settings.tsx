@@ -3,6 +3,7 @@ import { CompactColorSelector } from '../../../color-selector';
 import type { EditorState } from '../types';
 import { EditorCompactRangeField } from './compact-range-field';
 import { EditorStyleButtons } from './style-buttons';
+import { HighlighterFillPaintField } from '../fill-paint-field';
 
 const PRESET_COLOR_PALETTE = [
   '#f97316',
@@ -47,11 +48,16 @@ function EditorColorFields({ state }: { state: EditorState }) {
         value={state.color}
         onChange={state.setColor}
       />
-      <EditorColorField
-        label={translate('highlighter.editor.fillColorLabel')}
-        value={state.fillColor}
-        onChange={state.setFillColor}
-      />
+      <div className="min-w-0 space-y-1.5">
+        <label className="block text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('highlighter.editor.fillColorLabel')}
+        </label>
+        <HighlighterFillPaintField
+          label={translate('highlighter.editor.fillColorLabel')}
+          value={state.fillPaint}
+          onChange={state.setFillPaint}
+        />
+      </div>
     </div>
   );
 }

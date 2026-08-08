@@ -10,7 +10,7 @@ export type BorderPresetEditorTestState = ReturnType<typeof useBorderPresetEdito
 const PREVIEW_STYLE = buildBorderPresetPreviewStyle({
   color: '#ffaa00',
   customCss: '',
-  fillColor: '#00000000',
+  fillPaint: { kind: 'solid' as const, color: '#00000000' },
   inheritCustomCss: false,
   radius: 8,
   shadow: 0,
@@ -23,7 +23,7 @@ export function createBaseState(): BorderPresetEditorTestState {
     color: '#ffaa00',
     cssError: null,
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     effects: cloneBorderPresetEffects(undefined),
     inheritCustomCss: false,
     isResizing: false,
@@ -36,7 +36,7 @@ export function createBaseState(): BorderPresetEditorTestState {
     radius: 8,
     setColor: vi.fn(),
     setCustomCss: vi.fn(),
-    setFillColor: vi.fn(),
+    setFillPaint: vi.fn(),
     setEffects: vi.fn(),
     setInheritCustomCss: vi.fn(),
     setIsResizing: vi.fn(),
@@ -67,7 +67,7 @@ export function createPreset(): BorderPreset {
     padding: { top: 1, right: 1, bottom: 1, left: 1 },
     shadow: 30,
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     inheritCustomCss: false,
   };
 }

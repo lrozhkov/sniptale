@@ -30,7 +30,7 @@ export function useBorderPresetSaveHandler({
       radius: draft.radius,
       padding: draft.padding,
       shadow: draft.shadow,
-      fillColor: draft.fillColor,
+      fillPaint: draft.fillPaint,
       effects: draft.effects,
       inheritCustomCss: draft.inheritCustomCss,
       customCss: draft.customCss,

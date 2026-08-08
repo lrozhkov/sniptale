@@ -88,7 +88,7 @@ describe('BorderPresetEditor opened state', () => {
       padding: { top: 1, right: 1, bottom: 1, left: 1 },
       shadow: 0,
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
     };
     const derivedState = { derived: 'state' };

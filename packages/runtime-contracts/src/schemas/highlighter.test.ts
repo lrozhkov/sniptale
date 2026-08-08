@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createGradientPaint } from '@sniptale/foundation/paint';
 
 import { BlurSettingsSchema, BorderPresetSchema } from './highlighter';
 
@@ -8,6 +9,14 @@ describe('highlighter schemas', () => {
 });
 
 function registerBorderPresetSchemaTests() {
+  const gradient = createGradientPaint(
+    '#44556688',
+    (() => {
+      let id = 0;
+      return () => `schema-stop-${++id}`;
+    })()
+  );
+
   it('accepts the expanded border preset visual contract', () => {
     expect(
       BorderPresetSchema.parse({
@@ -20,7 +29,7 @@ function registerBorderPresetSchemaTests() {
         radius: 8,
         padding: { top: 1, right: 2, bottom: 3, left: 4 },
         shadow: 30,
-        fillColor: '#44556688',
+        fillPaint: gradient,
         inheritCustomCss: true,
         customCss: 'outline: 1px solid red;',
         enabled: false,
@@ -40,7 +49,7 @@ function registerBorderPresetSchemaTests() {
       })
     ).toEqual(
       expect.objectContaining({
-        fillColor: '#44556688',
+        fillPaint: gradient,
         origin: 'system',
         systemPresetKey: 'system-review',
         effects: expect.objectContaining({
@@ -51,6 +60,27 @@ function registerBorderPresetSchemaTests() {
         }),
       })
     );
+  });
+
+  it('migrates legacy fill fields but emits only canonical Paint', () => {
+    const parsed = BorderPresetSchema.parse({
+      id: 'legacy',
+      name: 'Legacy',
+      order: 0,
+      width: 4,
+      color: '#112233',
+      style: 'solid',
+      radius: 8,
+      padding: { top: 1, right: 2, bottom: 3, left: 4 },
+      shadow: 0,
+      fillColor: '#44556680',
+      fillOpacity: 50,
+      inheritCustomCss: false,
+      customCss: '',
+    });
+    expect(parsed.fillPaint).toEqual({ kind: 'solid', color: '#44556640' });
+    expect(parsed).not.toHaveProperty('fillColor');
+    expect(parsed).not.toHaveProperty('fillOpacity');
   });
 
   it('rejects arbitrary storage-owned system translation keys', () => {
@@ -65,7 +95,7 @@ function registerBorderPresetSchemaTests() {
         radius: 8,
         padding: { top: 1, right: 2, bottom: 3, left: 4 },
         shadow: 0,
-        fillColor: '#00000000',
+        fillPaint: { kind: 'solid', color: '#00000000' },
         inheritCustomCss: false,
         customCss: '',
         origin: 'system',

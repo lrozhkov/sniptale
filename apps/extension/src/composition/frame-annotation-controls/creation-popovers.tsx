@@ -9,6 +9,7 @@ import type {
   FrameAnnotationStyleSettings,
 } from './contracts';
 import type { TemplateSourceControl } from './popover/template-source';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export function FrameCreationPopovers(props: {
   activeMenu: FrameAnnotationCreationMenu | null;
@@ -66,7 +67,7 @@ export function FrameCreationPopovers(props: {
           frameVisuals={{
             borderColor: props.settings.borderSettings.color,
             borderWidth: props.settings.borderSettings.width,
-            fillColor: props.settings.borderSettings.fillColor,
+            fillColor: getRepresentativeColor(props.settings.borderSettings.fillPaint),
           }}
           isOpen={props.activeMenu === 'step-badge'}
           onChange={(stepBadge) => props.update({ stepBadge })}

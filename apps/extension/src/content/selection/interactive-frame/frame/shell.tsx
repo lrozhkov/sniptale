@@ -10,6 +10,7 @@ import {
   getFrameAnnotationContainerStyle,
   isFrameHiddenDuringCapture,
 } from '../../../../features/highlighter/frame-annotation';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 interface InteractiveFrameFrameShellProps {
   currentFrame: FrameData;
@@ -94,8 +95,8 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           settings={props.currentFrame.stepBadge}
           borderColor={props.borderColor}
           borderWidth={props.borderWidth}
-          {...(props.currentFrame.borderSettings?.fillColor
-            ? { fillColor: props.currentFrame.borderSettings.fillColor }
+          {...(props.currentFrame.borderSettings?.fillPaint
+            ? { fillColor: getRepresentativeColor(props.currentFrame.borderSettings.fillPaint) }
             : {})}
           frameRect={props.currentFrame}
           isSettingsOpen={props.isStepBadgePopoverOpen}

@@ -118,7 +118,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710`
 - Repository/source: https://github.com/isaacs/core-util-is
 
-### `dompurify` 3.4.12
+### `dompurify` 3.4.13
 
 - Installed path: `node_modules/dompurify`
 - Declared license expression: `(MPL-2.0 OR Apache-2.0)`
@@ -126,7 +126,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/dompurify/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.12.txt`](LICENSES/dependencies/dompurify-3.4.12.txt)
+- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.13.txt`](LICENSES/dependencies/dompurify-3.4.13.txt)
 - License text SHA-256: `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`
 - Repository/source: https://github.com/cure53/DOMPurify.git
 

@@ -21,7 +21,7 @@ function createFrame(id: string): FrameData {
     borderSettings: {
       color: '#000000',
       customCss: '',
-      fillColor: '#ffffff',
+      fillPaint: { kind: 'solid' as const, color: '#ffffff' },
       sourcePresetId: 'border',
       inheritCustomCss: false,
       sourcePresetName: 'Default Border',
@@ -72,7 +72,10 @@ function expectFrameStateChangesInvalidateDescriptors() {
 function expectFrameBorderVisualChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
   const changedFrame = createFrame('frame-1');
-  changedFrame.borderSettings = { ...changedFrame.borderSettings!, fillColor: '#12345673' };
+  changedFrame.borderSettings = {
+    ...changedFrame.borderSettings!,
+    fillPaint: { kind: 'solid' as const, color: '#12345673' },
+  };
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   const initialDescriptors = buildFrameRenderDescriptors([initialFrame], frameStates);

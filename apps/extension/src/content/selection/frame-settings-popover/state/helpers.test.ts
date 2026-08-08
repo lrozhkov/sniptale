@@ -35,7 +35,7 @@ const PRESET: BorderPreset = {
   style: 'solid',
   width: 2,
   customCss: '',
-  fillColor: '#00000000',
+  fillPaint: { kind: 'solid' as const, color: '#00000000' },
   inheritCustomCss: false,
 };
 

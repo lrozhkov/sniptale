@@ -11,7 +11,7 @@ const editableVisualFields = [
   'color',
   'customCss',
   'effects',
-  'fillColor',
+  'fillPaint',
   'inheritCustomCss',
   'padding',
   'radius',
@@ -39,7 +39,9 @@ function editableVisualsEqual(left: BorderPreset, right: BorderPreset): boolean 
         leftEffects.focus.opacity === rightEffects.focus.opacity
       );
     }
-    return left[field] === right[field];
+    return field === 'fillPaint'
+      ? JSON.stringify(left.fillPaint) === JSON.stringify(right.fillPaint)
+      : left[field] === right[field];
   });
 }
 

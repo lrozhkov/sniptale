@@ -9,6 +9,7 @@ import { getBorderPresetDisplayName } from '../../../features/highlighter/preset
 import type { AppLocale } from '../../../platform/i18n';
 import type { BorderPresetDraftSetters } from '../useBorderPresetEditorState/types';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { clonePaint, serializePaintToCss, type Paint } from '@sniptale/foundation/paint';
 
 export function applyBorderPresetDraftState(
   nextPreset: BorderPreset,
@@ -22,7 +23,7 @@ export function applyBorderPresetDraftState(
   setters.setRadius(nextPreset.radius);
   setters.setPadding({ ...nextPreset.padding });
   setters.setShadow(nextPreset.shadow);
-  setters.setFillColor(nextPreset.fillColor);
+  setters.setFillPaint(clonePaint(nextPreset.fillPaint));
   setters.setEffects(cloneBorderPresetEffects(nextPreset.effects));
   setters.setInheritCustomCss(Boolean(nextPreset.customCss.trim()));
   setters.setCustomCss(nextPreset.customCss);
@@ -36,7 +37,7 @@ export function resetBorderPresetDraftState(setters: BorderPresetDraftSetters) {
   setters.setRadius(DEFAULT_BORDER_PRESET.radius);
   setters.setPadding({ ...DEFAULT_BORDER_PRESET.padding });
   setters.setShadow(DEFAULT_BORDER_PRESET.shadow);
-  setters.setFillColor(DEFAULT_BORDER_PRESET.fillColor);
+  setters.setFillPaint(clonePaint(DEFAULT_BORDER_PRESET.fillPaint));
   setters.setEffects(cloneBorderPresetEffects(DEFAULT_BORDER_PRESET.effects));
   setters.setInheritCustomCss(DEFAULT_BORDER_PRESET.inheritCustomCss);
   setters.setCustomCss('');
@@ -45,7 +46,7 @@ export function resetBorderPresetDraftState(setters: BorderPresetDraftSetters) {
 export function buildBorderPresetPreviewStyle({
   color,
   customCss,
-  fillColor,
+  fillPaint,
   inheritCustomCss,
   radius,
   shadow,
@@ -54,7 +55,7 @@ export function buildBorderPresetPreviewStyle({
 }: {
   color: string;
   customCss: string;
-  fillColor: string;
+  fillPaint: Paint;
   inheritCustomCss: boolean;
   radius: number;
   shadow: number;
@@ -67,7 +68,7 @@ export function buildBorderPresetPreviewStyle({
   const shadowVisual = resolveBorderShadowVisual(shadow, color);
 
   return {
-    backgroundColor: fillColor,
+    background: serializePaintToCss(fillPaint),
     boxShadow: shadowVisual.settingsPreviewBoxShadow,
     opacity: 1,
     ...customCssStyles,

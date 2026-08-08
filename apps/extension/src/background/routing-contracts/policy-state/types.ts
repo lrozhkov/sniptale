@@ -12,6 +12,7 @@ export type PolicyStateId =
   | 'content-action-trusted-event-proofs'
   | 'diagnostics-erasure-exclusion'
   | 'frame-annotation-raster-jobs'
+  | 'gradient-preset-mutation-queue'
   | 'gallery-image-update-capabilities'
   | 'llm-session-tokens'
   | 'native-ingestion-erasure-exclusion'

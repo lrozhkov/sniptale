@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
     {
       color: '#ff00ff',
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
       id: 'preset-1',
       name: 'Preset',

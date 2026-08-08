@@ -112,7 +112,7 @@
       "version": "1.0.3"
     },
     {
-      "archivePath": "LICENSES/dependencies/dompurify-3.4.12.txt",
+      "archivePath": "LICENSES/dependencies/dompurify-3.4.13.txt",
       "licenseExpression": "(MPL-2.0 OR Apache-2.0)",
       "licenseSource": "node_modules/dompurify/LICENSE",
       "licenseSourceKind": "installed-file",
@@ -122,7 +122,7 @@
       "selectedLicense": "Apache-2.0",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "sourceUrl": "https://github.com/cure53/DOMPurify.git",
-      "version": "3.4.12"
+      "version": "3.4.13"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",

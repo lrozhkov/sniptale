@@ -34,7 +34,7 @@ function hasBorderSettingsChange(
       prevPadding?.right !== nextPadding?.right ||
       prevPadding?.bottom !== nextPadding?.bottom ||
       prevPadding?.left !== nextPadding?.left ||
-      prev?.fillColor !== next?.fillColor ||
+      (prev && next ? !arePaintsEqual(prev.fillPaint, next.fillPaint) : prev !== next) ||
       prev?.effects?.capture?.hideFrame !== next?.effects?.capture?.hideFrame ||
       prev?.effects?.linkedTemplates?.calloutPresetId !==
         next?.effects?.linkedTemplates?.calloutPresetId ||
@@ -123,3 +123,4 @@ export function areInteractiveFramePropsEqual(
     prevProps.onEffectChange !== nextProps.onEffectChange
   );
 }
+import { arePaintsEqual } from '@sniptale/foundation/paint';

@@ -1,5 +1,6 @@
 import type { BorderPreset, SystemBorderPresetKey } from '../contracts';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { clonePaint, createSolidPaint } from '@sniptale/foundation/paint';
 
 type SystemBorderPreset = BorderPreset & {
   basedOnRevision: number;
@@ -20,7 +21,7 @@ function createSystemPreset(
   order: number,
   visual: Pick<
     BorderPreset,
-    'color' | 'fillColor' | 'padding' | 'radius' | 'shadow' | 'style' | 'width'
+    'color' | 'fillPaint' | 'padding' | 'radius' | 'shadow' | 'style' | 'width'
   >
 ): SystemBorderPreset {
   return {
@@ -46,7 +47,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 0,
     padding: createUniformPadding(3),
-    fillColor: '#00000000',
+    fillPaint: createSolidPaint('#00000000'),
     shadow: 0,
   }),
   createSystemPreset('system-soft-highlight', 1, {
@@ -55,7 +56,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 10,
     padding: createUniformPadding(6),
-    fillColor: '#60A5FA14',
+    fillPaint: createSolidPaint('#60A5FA14'),
     shadow: 30,
   }),
   createSystemPreset('system-marker', 2, {
@@ -64,7 +65,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 4,
     padding: createUniformPadding(3),
-    fillColor: '#FACC152E',
+    fillPaint: createSolidPaint('#FACC152E'),
     shadow: 0,
   }),
   createSystemPreset('system-success', 3, {
@@ -73,7 +74,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 8,
     padding: createUniformPadding(5),
-    fillColor: '#22C55E14',
+    fillPaint: createSolidPaint('#22C55E14'),
     shadow: 0,
   }),
   createSystemPreset('system-attention', 4, {
@@ -82,7 +83,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 6,
     padding: createUniformPadding(5),
-    fillColor: '#EF444412',
+    fillPaint: createSolidPaint('#EF444412'),
     shadow: 30,
   }),
   createSystemPreset('system-review', 5, {
@@ -91,7 +92,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'dashed',
     radius: 8,
     padding: createUniformPadding(5),
-    fillColor: '#00000000',
+    fillPaint: createSolidPaint('#00000000'),
     shadow: 0,
   }),
   createSystemPreset('system-light-ui', 6, {
@@ -100,7 +101,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 4,
     padding: createUniformPadding(4),
-    fillColor: '#00000000',
+    fillPaint: createSolidPaint('#00000000'),
     shadow: 0,
   }),
   createSystemPreset('system-dark-ui', 7, {
@@ -109,7 +110,7 @@ const canonicalCatalog: readonly SystemBorderPreset[] = [
     style: 'solid',
     radius: 4,
     padding: createUniformPadding(4),
-    fillColor: '#00000000',
+    fillPaint: createSolidPaint('#00000000'),
     shadow: 30,
   }),
 ];
@@ -119,6 +120,7 @@ export function cloneBorderPreset(preset: BorderPreset): BorderPreset {
     ...preset,
     effects: cloneBorderPresetEffects(preset.effects),
     padding: { ...preset.padding },
+    fillPaint: clonePaint(preset.fillPaint),
   };
 }
 

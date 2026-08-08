@@ -4,6 +4,7 @@ import type { EditorToolSettings } from '../../../features/editor/document/tool-
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 import { MAX_EDITOR_RASTER_IMAGE_FILE_BYTES } from '../../document/file-actions/raster-intake';
 import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 const { readFileAsDataUrlMock } = vi.hoisted(() => ({
   readFileAsDataUrlMock: vi.fn(),
@@ -76,8 +77,8 @@ function registerPresetTargetFallbackTests() {
     expect(targets.shape).toHaveBeenCalledWith({
       borderPresetId: DEFAULT_BORDER_PRESET.id,
       customCss: '',
-      fillColor: setColorAlpha(DEFAULT_BORDER_PRESET.fillColor, 1),
-      fillOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.fillColor),
+      fillColor: setColorAlpha(getRepresentativeColor(DEFAULT_BORDER_PRESET.fillPaint), 1),
+      fillOpacity: getColorAlpha(getRepresentativeColor(DEFAULT_BORDER_PRESET.fillPaint)),
       inheritCustomCss: false,
       opacity: 1,
       radius: DEFAULT_BORDER_PRESET.radius,
@@ -111,7 +112,7 @@ function registerPortablePresetProjectionTest() {
     const preset = {
       ...DEFAULT_BORDER_PRESET,
       color: '#f97316b3',
-      fillColor: '#22c55e59',
+      fillPaint: { kind: 'solid' as const, color: '#22c55e59' },
       id: 'preset-shared',
       radius: 12,
       style: 'dashed' as const,
@@ -165,8 +166,8 @@ function registerCombinedPresetTargetTests() {
       shape: {
         borderPresetId: DEFAULT_BORDER_PRESET.id,
         customCss: '',
-        fillColor: setColorAlpha(DEFAULT_BORDER_PRESET.fillColor, 1),
-        fillOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.fillColor),
+        fillColor: setColorAlpha(getRepresentativeColor(DEFAULT_BORDER_PRESET.fillPaint), 1),
+        fillOpacity: getColorAlpha(getRepresentativeColor(DEFAULT_BORDER_PRESET.fillPaint)),
         inheritCustomCss: false,
         opacity: 1,
         radius: DEFAULT_BORDER_PRESET.radius,

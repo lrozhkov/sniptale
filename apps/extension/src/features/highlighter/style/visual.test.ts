@@ -41,7 +41,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     radius: 8,
     padding: { top: 1, right: 2, bottom: 3, left: 4 },
     shadow: BORDER_SHADOW_SOFT_INTENSITY,
-    fillColor: '#445566',
+    fillPaint: { kind: 'solid' as const, color: '#445566' },
     inheritCustomCss: true,
     customCss: 'outline: 1px solid red;',
     ...overrides,
@@ -49,21 +49,25 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
 }
 
 describe('highlighter visual preset resolver', () => {
-  it('normalizes legacy fields and resolves independent stroke and fill visuals', () => {
-    const visual = resolveBorderPresetVisual(
-      createPreset({
-        fillColor: undefined as never,
-        inheritCustomCss: undefined as never,
-      })
-    );
+  it('resolves independent canonical stroke and fill visuals', () => {
+    const visual = resolveBorderPresetVisual(createPreset());
 
     expect(visual).toMatchObject({
       strokeColor: '#112233',
-      fillColor: '#00000000',
-      inheritCustomCss: false,
-      customCssStyles: {},
+      fillColor: '#445566ff',
+      fillCss: '#445566ff',
+      inheritCustomCss: true,
+      customCssStyles: { outline: '1px solid red' },
     });
     expect(colorToRgba('#112233', 50)).toBe('rgba(17, 34, 51, 0.5)');
+  });
+
+  it('rejects malformed Paint from a typed canonical producer', () => {
+    expect(() =>
+      resolveBorderPresetVisual(
+        createPreset({ fillPaint: { kind: 'solid' as const, color: undefined as never } })
+      )
+    ).toThrow('invalid canonical Paint');
   });
 
   it('keeps non-hex colors and normalizes short and alpha hex colors', () => {

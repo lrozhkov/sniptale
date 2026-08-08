@@ -205,6 +205,19 @@ it('serializes domain read-modify-write owners through an exclusive named lock',
   expect(second).toHaveBeenCalledOnce();
 });
 
+it('serializes gradient preset mutations through their cross-context domain', async () => {
+  const calls: string[] = [];
+  const first = runWithPersistenceDomainMutationLock('gradient-presets', async () => {
+    calls.push('first');
+    await Promise.resolve();
+  });
+  const second = runWithPersistenceDomainMutationLock('gradient-presets', async () => {
+    calls.push('second');
+  });
+  await Promise.all([first, second]);
+  expect(calls).toEqual(['first', 'second']);
+});
+
 it('keeps a domain read-modify-write admitted until privacy erasure can begin', async () => {
   let releaseMutation!: () => void;
   const mutationGate = new Promise<void>((resolve) => {

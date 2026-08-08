@@ -7,6 +7,7 @@ import {
 import type { BorderPadding, BorderVisualStyle } from '@sniptale/ui/highlighter-style/types';
 import { projectFrameDecorationCssStyles } from './decoration';
 import { parseColor } from '@sniptale/foundation/color';
+import { getRepresentativeColor, serializePaintToCss } from '@sniptale/foundation/paint';
 
 export interface ResolvedBorderPresetVisual {
   id: string;
@@ -15,7 +16,10 @@ export interface ResolvedBorderPresetVisual {
   strokeStyle: BorderVisualStyle['style'];
   radius: number;
   shadow: BorderVisualStyle['shadow'];
+  /** Deterministic scalar bridge for consumers that cannot render Paint. */
   fillColor: string;
+  /** Full Paint rendering for frame surfaces. */
+  fillCss: string;
   inheritCustomCss: boolean;
   customCss: string;
   customCssStyles: CSSProperties;
@@ -56,7 +60,8 @@ export function resolveBorderPresetVisual(
     strokeStyle: normalizedPreset.style,
     radius: normalizedPreset.radius,
     shadow: normalizedPreset.shadow,
-    fillColor: normalizedPreset.fillColor,
+    fillCss: serializePaintToCss(normalizedPreset.fillPaint),
+    fillColor: getRepresentativeColor(normalizedPreset.fillPaint),
     inheritCustomCss: normalizedPreset.inheritCustomCss,
     customCss: normalizedPreset.customCss,
     customCssStyles: resolveCustomCssStyles(normalizedPreset),

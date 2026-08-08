@@ -7,7 +7,7 @@ function createFrame(id: string): FrameData {
     borderSettings: {
       color: '#000000',
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
       sourcePresetId: 'border',
       sourcePresetName: 'Default Border',

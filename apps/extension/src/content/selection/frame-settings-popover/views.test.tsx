@@ -19,7 +19,7 @@ function createBorderPreset(id: string, name: string) {
     shadow: 0,
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     fillOpacity: 0,
     inheritCustomCss: false,
     strokeOpacity: 100,
