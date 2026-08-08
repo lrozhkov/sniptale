@@ -56,7 +56,6 @@ it('accepts pixelate blur settings and keeps source metadata updates inside the 
     shadow: 0,
     showBorder: false,
     strokeColor: '#475569',
-    strokeOpacity: 1,
     strokeStyle: 'solid',
     strokeWidth: 0,
   });
@@ -78,8 +77,7 @@ function createBorderedBlurObject() {
       radius: 14,
       shadow: 30,
       showBorder: true,
-      strokeColor: '#112233',
-      strokeOpacity: 0.55,
+      strokeColor: '#1122338c',
       strokeStyle: 'dash-dot',
       strokeWidth: 6,
     },
@@ -98,8 +96,7 @@ it('applies rectangle-like border settings while preserving hidden border metada
       radius: 14,
       shadow: 30,
       showBorder: true,
-      strokeColor: '#112233',
-      strokeOpacity: 0.55,
+      strokeColor: '#1122338c',
       strokeStyle: 'dash-dot',
       strokeWidth: 6,
     })
@@ -126,8 +123,7 @@ it('applies rectangle-like border settings while preserving hidden border metada
   expect(blur.shadow).toBeNull();
   expect(getBlurSettings(blur)).toEqual(
     expect.objectContaining({
-      strokeColor: '#112233',
-      strokeOpacity: 0.55,
+      strokeColor: '#1122338c',
       strokeStyle: 'dash-dot',
       strokeWidth: 6,
     })
@@ -204,7 +200,6 @@ it('falls back to default blur settings and exits safely for unchanged owner-loc
     shadow: 0,
     showBorder: true,
     strokeColor: '#475569',
-    strokeOpacity: 1,
     strokeStyle: 'solid',
     strokeWidth: 0,
   });

@@ -75,22 +75,6 @@ function EditorVisualRanges({ state }: { state: EditorState }) {
         displaySuffix="px"
         onChange={state.setRadius}
       />
-      <EditorCompactRangeField
-        label={translate('highlighter.editor.strokeOpacityLabel')}
-        min={0}
-        max={100}
-        value={state.strokeOpacity}
-        displaySuffix="%"
-        onChange={state.setStrokeOpacity}
-      />
-      <EditorCompactRangeField
-        label={translate('highlighter.editor.fillOpacityLabel')}
-        min={0}
-        max={100}
-        value={state.fillOpacity}
-        displaySuffix="%"
-        onChange={state.setFillOpacity}
-      />
     </div>
   );
 }

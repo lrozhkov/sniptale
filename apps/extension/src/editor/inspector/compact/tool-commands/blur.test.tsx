@@ -11,7 +11,6 @@ function createBorderedBlurCommands() {
     shadow: 30,
     showBorder: true,
     strokeColor: '#112233',
-    strokeOpacity: 0.6,
     strokeStyle: 'dash',
     strokeWidth: 5,
   };
@@ -32,7 +31,6 @@ it('adds compact blur frame commands without the border toggle or shadow', () =>
     'blur-stroke-width',
     'blur-stroke-style',
     'blur-stroke-color',
-    'blur-stroke-opacity',
   ]);
 
   const colorControl = ((commands[5]?.content as any).props.children as any).props;
@@ -42,14 +40,12 @@ it('adds compact blur frame commands without the border toggle or shadow', () =>
   commitNumeric(((commands[2]?.content as any).props.children as any).props, 12);
   commitNumeric(((commands[3]?.content as any).props.children as any).props, 9);
   ((commands[4]?.content as any).props.children as any).props.onChange('dash');
-  commitNumeric(((commands[6]?.content as any).props.children as any).props, 90);
 
   expect(params.previewColor).toHaveBeenCalledTimes(2);
   expect(params.updateColor).toHaveBeenCalledTimes(1);
   expect(params.previewBlurPatch).toHaveBeenCalledWith({ showBorder: true, strokeWidth: 9 });
   expect(params.previewBlurPatch).toHaveBeenCalledWith({ radius: 12 });
   expect(params.applyBlurPatch).toHaveBeenCalledWith({ strokeStyle: 'dash' });
-  expect(params.previewBlurPatch).toHaveBeenCalledWith({ strokeOpacity: 0.9 });
 });
 
 it('falls back to legacy blur border defaults for compact commands', () => {

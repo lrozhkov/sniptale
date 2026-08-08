@@ -34,10 +34,7 @@ const BORDER_PRESET: BorderPreset = {
   radius: 4,
   padding: { top: 1, right: 2, bottom: 3, left: 4 },
   shadow: 10,
-  opacity: 100,
-  strokeOpacity: 90,
   fillColor: '#000000',
-  fillOpacity: 20,
   inheritCustomCss: false,
   customCss: '',
 };

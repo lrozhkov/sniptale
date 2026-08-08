@@ -9,6 +9,7 @@ import {
   isSystemBorderPresetKey,
   type BorderPresetEffects,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
 const blurTypes = new Set<BorderPresetEffects['blur']['blurType']>([
@@ -114,7 +115,7 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     !isString(value['color']) ||
     !isString(value['customCss']) ||
     !isNumber(value['radius']) ||
-    !isNumber(value['opacity']) ||
+    (value['opacity'] !== undefined && !isNumber(value['opacity'])) ||
     (value['strokeOpacity'] !== undefined && !isNumber(value['strokeOpacity'])) ||
     (value['fillColor'] !== undefined && !isString(value['fillColor'])) ||
     (value['fillOpacity'] !== undefined && !isNumber(value['fillOpacity'])) ||
@@ -131,21 +132,34 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     return null;
   }
 
+  const color = normalizeColor(value['color']);
+  const fillColor = normalizeColor(isString(value['fillColor']) ? value['fillColor'] : '#00000000');
+  if (!color || !fillColor) return null;
+  const strokeOpacity = isNumber(value['strokeOpacity'])
+    ? value['strokeOpacity'] / 100
+    : isNumber(value['opacity'])
+      ? value['opacity'] <= 1
+        ? value['opacity']
+        : value['opacity'] / 100
+      : 1;
+  const canonicalColor = multiplyColorAlpha(color, strokeOpacity);
+  const canonicalFillColor = isNumber(value['fillOpacity'])
+    ? multiplyColorAlpha(fillColor, value['fillOpacity'] / 100)
+    : fillColor;
+  if (!canonicalColor || !canonicalFillColor) return null;
+
   return normalizeBorderPresetVisualFields({
     customCss: value['customCss'],
     effects,
-    color: value['color'],
-    fillColor: value['fillColor'] ?? '#00000000',
-    fillOpacity: value['fillOpacity'] ?? 0,
+    color: canonicalColor,
+    fillColor: canonicalFillColor,
     id: value['id'],
     inheritCustomCss: value['inheritCustomCss'] ?? false,
     name: value['name'],
-    opacity: value['opacity'],
     order: value['order'],
     padding: value['padding'],
     radius: value['radius'],
     shadow,
-    strokeOpacity: value['strokeOpacity'] ?? value['opacity'],
     style: value['style'] as BorderPreset['style'],
     width: value['width'],
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),

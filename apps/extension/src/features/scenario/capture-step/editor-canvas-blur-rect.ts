@@ -9,7 +9,6 @@ type ResolvedCanvasBlurSettings = BlurSettings & {
   shadow: number;
   showBorder: boolean;
   strokeColor: string;
-  strokeOpacity: number;
   strokeStyle: NonNullable<BlurSettings['strokeStyle']>;
   strokeWidth: number;
 };
@@ -26,7 +25,6 @@ function resolveBlurSettings(
     shadow: overlay.blurSettings.shadow ?? DEFAULT_BLUR_SETTINGS.shadow ?? 0,
     showBorder: overlay.blurSettings.showBorder ?? DEFAULT_BLUR_SETTINGS.showBorder ?? false,
     strokeColor: overlay.blurSettings.strokeColor ?? DEFAULT_BLUR_SETTINGS.strokeColor ?? '#475569',
-    strokeOpacity: overlay.blurSettings.strokeOpacity ?? DEFAULT_BLUR_SETTINGS.strokeOpacity ?? 1,
     strokeStyle: overlay.blurSettings.strokeStyle ?? DEFAULT_BLUR_SETTINGS.strokeStyle ?? 'solid',
     strokeWidth: overlay.blurSettings.strokeWidth ?? DEFAULT_BLUR_SETTINGS.strokeWidth ?? 2,
   };
@@ -65,7 +63,6 @@ export function createBlurRectCanvasObject(args: {
     sniptaleShapeStrokeStyle: blurSettings.strokeStyle,
     sniptaleShapeRadius: blurSettings.radius,
     sniptaleShapeShadow: blurSettings.shadow,
-    sniptaleShapeStrokeOpacity: blurSettings.strokeOpacity,
     sniptaleBlurSourceData: args.assetDataUrl,
     sniptaleBlurSourceLeft: 0,
     sniptaleBlurSourceTop: 0,

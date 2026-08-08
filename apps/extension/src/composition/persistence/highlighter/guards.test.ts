@@ -15,11 +15,9 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
       linkedTemplates: { calloutPresetId: null, stepBadgePresetId: null },
     },
     fillColor: '#00000000',
-    fillOpacity: 0,
     id: 'preset-1',
     inheritCustomCss: false,
     name: 'Preset',
-    opacity: 0.8,
     order: 0,
     padding: {
       bottom: 8,
@@ -29,7 +27,6 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
     },
     radius: 12,
     shadow: 30,
-    strokeOpacity: 0.8,
     style: 'solid',
     width: 4,
     ...overrides,
@@ -39,10 +36,9 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
 function createLegacyBorderPreset() {
   const preset: Record<string, unknown> = createBorderPreset();
   delete preset['fillColor'];
-  delete preset['strokeOpacity'];
-  delete preset['fillOpacity'];
   delete preset['inheritCustomCss'];
   delete preset['effects'];
+  preset['opacity'] = 0.8;
   return preset;
 }
 
@@ -121,7 +117,6 @@ describe('highlighter guards valid payloads', () => {
       shadow: 20,
       showBorder: true,
       strokeColor: '#112233',
-      strokeOpacity: 0.6,
       strokeStyle: 'dash-dot',
       strokeWidth: 0,
     });
@@ -137,10 +132,9 @@ describe('highlighter guards border preset visual fields', () => {
     ).toEqual([
       {
         ...createBorderPreset(),
+        color: '#ff00aacc',
         fillColor: '#00000000',
-        fillOpacity: 0,
         inheritCustomCss: false,
-        strokeOpacity: 0.8,
       },
     ]);
   });
@@ -154,11 +148,23 @@ describe('highlighter guards border preset visual fields', () => {
       strokeOpacity: 65,
     });
 
-    expect(
-      parseStoredHighlighterSettings({
-        borderPresets: [preset],
-      }).value.borderPresets
-    ).toEqual([preset]);
+    const parsed = parseStoredHighlighterSettings({
+      borderPresets: [preset],
+    }).value.borderPresets;
+
+    expect(parsed).toEqual([
+      expect.objectContaining({ color: '#ff00aaa6', fillColor: '#12345659' }),
+    ]);
+    expect(parsed?.[0]).not.toHaveProperty('fillOpacity');
+    expect(parsed?.[0]).not.toHaveProperty('strokeOpacity');
+  });
+
+  it('keeps semantic transparent distinct while normalizing stored presets', () => {
+    const parsed = parseStoredHighlighterSettings({
+      borderPresets: [createBorderPreset({ color: 'transparent' })],
+    });
+
+    expect(parsed.value.borderPresets?.[0]?.color).toBe('transparent');
   });
 
   it('round-trips linked annotation templates and rejects malformed identifiers', () => {
@@ -286,6 +292,21 @@ describe('highlighter guards legacy blur migration', () => {
         },
       },
     });
+  });
+
+  it('folds legacy blur stroke opacity into existing alpha without retaining the field', () => {
+    const parsed = parseStoredHighlighterSettings({
+      defaultBlurSettings: {
+        amount: 12,
+        blurType: 'solid',
+        showBorder: true,
+        strokeColor: '#11223380',
+        strokeOpacity: 0.5,
+      },
+    });
+
+    expect(parsed.value.defaultBlurSettings?.strokeColor).toBe('#11223340');
+    expect(parsed.value.defaultBlurSettings).not.toHaveProperty('strokeOpacity');
   });
 });
 

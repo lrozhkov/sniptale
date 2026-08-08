@@ -199,8 +199,8 @@ export function renderBorderPresetPreview(preset: BorderPreset) {
     <span
       className="block h-4 w-8 rounded-[5px] border"
       style={{
-        backgroundColor: getAlphaColor(preset.fillColor, preset.fillOpacity / 100),
-        borderColor: getAlphaColor(preset.color, preset.strokeOpacity / 100),
+        backgroundColor: preset.fillColor,
+        borderColor: preset.color,
         borderWidth: Math.max(1, Math.min(3, Math.round(preset.width / 2))),
       }}
     />

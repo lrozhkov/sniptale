@@ -10,6 +10,7 @@ export { parseLineSettings } from './line-setting-parser';
 import { isLineStyle } from './line-style-parser';
 export { parseSceneBackgroundSettings } from './scene-background-setting-parser';
 import { parsePresetShadowSettings } from './shadow-setting-parser';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 export { parseTextSettings } from './text-setting-parser';
 
 function isBlurStrokeStyle(value: unknown): value is NonNullable<BlurSettings['strokeStyle']> {
@@ -48,8 +49,14 @@ export function parseBlurSettings(value: unknown): BlurSettings | null {
     ...(value['shadow'] !== undefined ? { shadow: value['shadow'] } : {}),
     showBorder:
       value['showBorder'] ?? (isNumber(value['strokeWidth']) ? value['strokeWidth'] > 0 : false),
-    ...(value['strokeColor'] !== undefined ? { strokeColor: value['strokeColor'] } : {}),
-    ...(value['strokeOpacity'] !== undefined ? { strokeOpacity: value['strokeOpacity'] } : {}),
+    ...(value['strokeColor'] !== undefined
+      ? {
+          strokeColor:
+            (isNumber(value['strokeOpacity'])
+              ? multiplyColorAlpha(value['strokeColor'], value['strokeOpacity'])
+              : normalizeColor(value['strokeColor'])) ?? value['strokeColor'],
+        }
+      : {}),
     ...(value['strokeStyle'] !== undefined ? { strokeStyle: value['strokeStyle'] } : {}),
     ...(value['strokeWidth'] !== undefined ? { strokeWidth: value['strokeWidth'] } : {}),
   };

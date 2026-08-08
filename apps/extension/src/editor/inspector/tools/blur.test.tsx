@@ -36,7 +36,6 @@ function createProps(showBorder: boolean, toolPresetHeader: object | null) {
     shadow: 30,
     showBorder,
     strokeColor: '#112233',
-    strokeOpacity: 0.6,
     strokeStyle: 'dashed',
     strokeWidth: 5,
   };
@@ -116,8 +115,6 @@ describe('blur controls section', () => {
     expect(html).toContain('Эффект');
     expect(html).toContain('aria-label="Толщина"');
     expect(html).toContain('value="5"');
-    expect(html).toContain('aria-label="Прозрачность"');
-    expect(html).toContain('value="60"');
     expect(html).toContain('Скругление углов');
     expect(html).not.toContain('Показать');
     expect(html).not.toContain('Скрыть');
@@ -138,8 +135,6 @@ describe('blur controls defaults', () => {
 
     expect(html).toContain('aria-label="Толщина"');
     expect(html).toContain('value="0"');
-    expect(html).toContain('aria-label="Прозрачность"');
-    expect(html).toContain('value="100"');
     expect(html).toContain('Сплошная');
   });
 });
@@ -162,7 +157,6 @@ describe('blur controls callbacks', () => {
     const strokeWidth = findSection(sections, 'Толщина');
     const style = findSection(sections, 'Стиль');
     const radius = findSection(sections, 'Скругление углов');
-    const strokeOpacity = findSection(sections, 'Прозрачность');
 
     getControl(blurType)?.props.onChange?.('gaussian');
     triggerNumeric(getControl(amount), 18);
@@ -172,7 +166,6 @@ describe('blur controls callbacks', () => {
     triggerNumeric(getControl(strokeWidth), 9);
     getControl(style)?.props.onChange?.('dash-dot');
     triggerNumeric(getControl(radius), 12);
-    triggerNumeric(getControl(strokeOpacity), 90);
 
     expect(props.previewColor).toHaveBeenCalledTimes(2);
     expect(props.updateColor).toHaveBeenCalledTimes(1);
@@ -180,10 +173,9 @@ describe('blur controls callbacks', () => {
     expect(props.previewBlurPatch).toHaveBeenCalledWith({ amount: 18 });
     expect(props.applyBlurPatch).toHaveBeenCalledWith({ strokeColor: '#445566' });
     expect(props.previewBlurPatch).toHaveBeenCalledWith({ showBorder: true, strokeWidth: 9 });
-    expect(props.commitPendingSelectionSettings).toHaveBeenCalledTimes(4);
+    expect(props.commitPendingSelectionSettings).toHaveBeenCalledTimes(3);
     expect(props.applyBlurPatch).toHaveBeenCalledWith({ strokeStyle: 'dash-dot' });
     expect(props.previewBlurPatch).toHaveBeenCalledWith({ radius: 12 });
-    expect(props.previewBlurPatch).toHaveBeenCalledWith({ strokeOpacity: 0.9 });
   });
 });
 

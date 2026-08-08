@@ -1,5 +1,5 @@
 import { resolveFrameSurface } from '../frame-surface';
-import { colorToRgba, resolveBorderPresetVisual, resolveBorderShadowVisual } from '../style';
+import { resolveBorderPresetVisual, resolveBorderShadowVisual } from '../style';
 import type { FrameAnnotationInteractionState, FrameAnnotationVisualState } from './model';
 import {
   getFrameAnnotationFillStyle,
@@ -19,12 +19,8 @@ export function resolveFrameAnnotationVisualScene(params: {
     : null;
   const surface = resolveFrameSurface(frame);
   const borderColor = borderVisual?.strokeColor ?? 'var(--sniptale-color-accent)';
-  const borderCssColor = borderVisual
-    ? colorToRgba(borderVisual.strokeColor, borderVisual.strokeOpacity)
-    : borderColor;
-  const fillCssColor = borderVisual
-    ? colorToRgba(borderVisual.fillColor, borderVisual.fillOpacity)
-    : 'transparent';
+  const borderCssColor = borderVisual?.strokeColor ?? borderColor;
+  const fillCssColor = borderVisual?.fillColor ?? 'transparent';
   const shadowVisual = borderVisual
     ? resolveBorderShadowVisual(borderVisual.shadow, borderColor)
     : null;

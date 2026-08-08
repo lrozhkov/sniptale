@@ -25,9 +25,9 @@ it('normalizes empty, transparent, short, long, and rgb color values', () => {
   expect(normalizeColorSelectorValue('transparent')).toBe('transparent');
   expect(normalizeColorSelectorValue('abc')).toBe('#aabbcc');
   expect(normalizeColorSelectorValue('#ABCDEF')).toBe('#abcdef');
-  expect(normalizeColorSelectorValue('#12345600')).toBe('transparent');
+  expect(normalizeColorSelectorValue('#12345600')).toBe('#12345600');
   expect(normalizeColorSelectorValue('#123456ff')).toBe('#123456');
-  expect(normalizeColorSelectorValue('rgb(12 34 56 / 0.5)')).toBe('#0c2238');
+  expect(normalizeColorSelectorValue('rgb(12 34 56 / 0.5)')).toBe('#0c223880');
 });
 
 it('rejects invalid color strings', () => {

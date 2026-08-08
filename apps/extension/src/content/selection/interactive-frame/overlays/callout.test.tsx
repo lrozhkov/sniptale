@@ -126,7 +126,6 @@ function createFrame(): FrameData {
       color: '#ff671d',
       id: 'preset-1',
       name: 'Preset',
-      opacity: 100,
       radius: 0,
       width: 3,
     }),

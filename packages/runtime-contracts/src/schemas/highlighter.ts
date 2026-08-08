@@ -37,15 +37,12 @@ export const BorderPresetSchema = z.object({
   enabled: z.boolean().optional(),
   order: z.number().int().min(0),
   width: z.number().int().min(1).max(20),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  color: HexColorWithOptionalAlphaSchema,
   style: z.enum(['solid', 'dashed', 'dotted']),
   radius: z.number().int().min(0).max(50),
   padding: BorderPaddingSchema,
   shadow: z.number().int().min(0).max(100),
-  opacity: z.number().int().min(0).max(100),
-  strokeOpacity: z.number().int().min(0).max(100),
   fillColor: HexColorWithOptionalAlphaSchema,
-  fillOpacity: z.number().int().min(0).max(100),
   inheritCustomCss: z.boolean(),
   customCss: z.string().max(1000),
   effects: BorderPresetEffectsSchema.optional(),
@@ -62,11 +59,7 @@ export const BlurSettingsSchema = z.object({
   radius: z.number().int().min(0).max(50).optional(),
   shadow: z.number().int().min(0).max(100).optional(),
   showBorder: z.boolean().optional(),
-  strokeColor: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .optional(),
-  strokeOpacity: z.number().min(0).max(1).optional(),
+  strokeColor: HexColorWithOptionalAlphaSchema.optional(),
   strokeStyle: z
     .enum(['solid', 'dashed', 'dotted', 'dash', 'dot', 'dash-dot', 'long-dash'])
     .optional(),

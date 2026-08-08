@@ -25,7 +25,6 @@ type StepBadgeManualSettingsProps = {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
   isAuto: boolean;
   onAlphabetChange: (alphabet: 'cyrillic' | 'latin') => void;

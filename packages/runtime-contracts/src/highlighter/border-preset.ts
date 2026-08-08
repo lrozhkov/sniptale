@@ -53,10 +53,7 @@ export interface BorderVisualStyle {
   radius: number;
   padding: BorderPadding;
   shadow: number;
-  opacity: number;
-  strokeOpacity: number;
   fillColor: string;
-  fillOpacity: number;
   inheritCustomCss: boolean;
   customCss: string;
   effects?: BorderPresetEffects;
@@ -91,10 +88,7 @@ export function cloneBorderVisualStyle(style: BorderVisualStyle): BorderVisualSt
     radius: style.radius,
     padding: { ...style.padding },
     shadow: style.shadow,
-    opacity: style.opacity,
-    strokeOpacity: style.strokeOpacity,
     fillColor: style.fillColor,
-    fillOpacity: style.fillOpacity,
     inheritCustomCss: style.inheritCustomCss,
     customCss: style.customCss,
     effects: cloneBorderPresetEffects(style.effects),

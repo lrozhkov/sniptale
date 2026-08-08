@@ -32,7 +32,6 @@ export function resolveBlurBorderSettings(settings: BlurSettings) {
     radius: settings.radius ?? DEFAULT_BLUR_SETTINGS.radius ?? 0,
     shadow: settings.shadow ?? DEFAULT_BLUR_SETTINGS.shadow ?? 0,
     strokeColor: settings.strokeColor ?? DEFAULT_BLUR_SETTINGS.strokeColor ?? '#475569',
-    strokeOpacity: settings.strokeOpacity ?? DEFAULT_BLUR_SETTINGS.strokeOpacity ?? 1,
     strokeStyle: resolveBlurControlStrokeStyle(settings.strokeStyle),
     strokeWidth:
       settings.showBorder === false

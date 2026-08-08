@@ -118,7 +118,6 @@ it('wires compact color selectors, ranges, and style controls without compatibil
     colorSelectors[1]?.click();
     setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
     setInputValue(getRangeInput('highlighter.editor.radiusLabel'), '8');
-    setInputValue(getRangeInput('highlighter.editor.strokeOpacityLabel'), '65');
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.textContent?.includes('highlighter.editor.styleSolid'))
       ?.click();
@@ -128,7 +127,6 @@ it('wires compact color selectors, ranges, and style controls without compatibil
   expect(state.setFillColor).toHaveBeenCalledWith('#123456');
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
-  expect(state.setStrokeOpacity).toHaveBeenCalledWith(65);
   expect(state.setStyle).toHaveBeenCalledWith('solid');
 });
 

@@ -163,7 +163,7 @@ function registerPresetSaveSuccessTest() {
 
       expect(storageMocks.addBorderPresetMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          fillColor: '#00ff00',
+          fillColor: '#00ff0000',
           id: 'preset-new',
           color: '#112233',
         })

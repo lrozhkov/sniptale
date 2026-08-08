@@ -177,6 +177,67 @@ it('commits swatch picks immediately from the expanded recent and palette rows',
   expect(onChange).toHaveBeenCalledWith('#111111');
 });
 
+it('restores recent RGBA and preserves current alpha when choosing a palette color', async () => {
+  const onChange = vi.fn();
+  renderSelector({
+    onChange,
+    value: '#12345640',
+    recentColors: ['#11111180'],
+    palette: ['#abcdef'],
+  });
+
+  await openPalette();
+  await act(async () => {
+    (
+      Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
+        (button) => button.getAttribute('title') === 'Grid color: #11111180'
+      ) as HTMLButtonElement | undefined
+    )?.click();
+  });
+  expect(onChange).toHaveBeenLastCalledWith('#11111180');
+
+  await act(async () => {
+    (
+      Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
+        (button) => button.getAttribute('title') === 'Grid color: #abcdef'
+      ) as HTMLButtonElement | undefined
+    )?.click();
+  });
+  expect(onChange).toHaveBeenLastCalledWith('#abcdef80');
+});
+
+it('preserves stored palette alpha instead of replacing it with the current alpha', async () => {
+  const onChange = vi.fn();
+  renderSelector({ onChange, value: '#12345640', palette: ['#abcdef80'] });
+
+  await openPalette();
+  await act(async () => {
+    (
+      Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
+        (button) => button.getAttribute('title') === 'Grid color: #abcdef80'
+      ) as HTMLButtonElement | undefined
+    )?.click();
+  });
+
+  expect(onChange).toHaveBeenCalledWith('#abcdef80');
+});
+
+it('does not inherit zero alpha from the semantic transparent value for palette colors', async () => {
+  const onChange = vi.fn();
+  renderSelector({ onChange, value: 'transparent', palette: ['#abcdef'] });
+
+  await openPalette();
+  await act(async () => {
+    (
+      Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
+        (button) => button.getAttribute('title') === 'Grid color: #abcdef'
+      ) as HTMLButtonElement | undefined
+    )?.click();
+  });
+
+  expect(onChange).toHaveBeenCalledWith('#abcdef');
+});
+
 it('keeps picker edits preview-only until apply, then commits once', async () => {
   const onChange = vi.fn();
   const onPreviewChange = vi.fn();
@@ -192,6 +253,25 @@ it('keeps picker edits preview-only until apply, then commits once', async () =>
 
   expect(onChange).toHaveBeenCalledTimes(1);
   expect(onChange).toHaveBeenCalledWith('#c83456');
+});
+
+it('routes alpha previews through the transactional draft for cancel and apply', async () => {
+  const onChange = vi.fn();
+  const onPreviewChange = vi.fn();
+  const onPreviewReset = vi.fn();
+  renderSelector({ onChange, onPreviewChange, onPreviewReset });
+
+  await openPicker();
+  await changeInput('shared.ui.colorSelectorAlpha', '25');
+  expect(onPreviewChange).toHaveBeenLastCalledWith('#12345640');
+  await clickButton('shared.ui.colorSelectorCancel');
+  expect(onPreviewReset).toHaveBeenLastCalledWith('#123456');
+  expect(onChange).not.toHaveBeenCalled();
+
+  await openPicker();
+  await changeInput('shared.ui.colorSelectorAlpha', '50');
+  await clickButton('shared.ui.colorSelectorApply');
+  expect(onChange).toHaveBeenCalledWith('#12345680');
 });
 
 it('rolls preview back to the committed value when the picker closes without apply', async () => {

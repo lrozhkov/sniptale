@@ -124,7 +124,6 @@ export function renderBlurRectOverlay(
         [
           ' fill="none"',
           ` stroke="${escapeSvgAttribute(selected ? stroke : settings.strokeColor)}"`,
-          ` stroke-opacity="${formatNumber(selected ? 1 : settings.strokeOpacity)}"`,
           ` stroke-width="${formatNumber(strokeWidth)}"`,
           createStrokeDashArray(selected ? 'solid' : settings.strokeStyle, strokeWidth),
           ` rx="${formatNumber(settings.radius)}" ry="${formatNumber(settings.radius)}" />`,

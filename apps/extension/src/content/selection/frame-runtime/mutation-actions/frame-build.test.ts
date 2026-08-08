@@ -46,12 +46,9 @@ function createHighlighterSettings(): HighlighterSettings {
           left: 7,
         },
         shadow: 30,
-        opacity: 90,
         customCss: '',
         fillColor: '#00000000',
-        fillOpacity: 0,
         inheritCustomCss: false,
-        strokeOpacity: 100,
       },
     ],
     defaultBorderPresetId: 'preset-1',
@@ -92,12 +89,9 @@ function createBuildArgs() {
       left: 4,
     },
     shadow: 0,
-    opacity: 100,
     customCss: '',
     fillColor: '#00000000',
-    fillOpacity: 0,
     inheritCustomCss: false,
-    strokeOpacity: 100,
   };
 
   return {

@@ -91,10 +91,7 @@ describe('border preset editor state initialization', () => {
       radius: 12,
       padding: { top: 4, right: 5, bottom: 6, left: 7 },
       shadow: 30,
-      opacity: 84,
-      strokeOpacity: 84,
       fillColor: '#00000000',
-      fillOpacity: 0,
       inheritCustomCss: true,
       customCss: 'background: red;',
     };
@@ -103,7 +100,7 @@ describe('border preset editor state initialization', () => {
 
     expect(getState().name).toBe('Orange border');
     expect(getState().previewStyle).toMatchObject({
-      borderColor: 'rgba(255, 102, 0, 0.84)',
+      borderColor: '#ff6600',
       borderStyle: 'dashed',
       borderWidth: '6px',
       borderRadius: '12px',
@@ -222,12 +219,9 @@ describe('border preset editor save edit flow', () => {
       radius: 8,
       padding: { top: 1, right: 1, bottom: 1, left: 1 },
       shadow: 100,
-      opacity: 75,
       customCss: '',
       fillColor: '#00000000',
-      fillOpacity: 0,
       inheritCustomCss: false,
-      strokeOpacity: 100,
     };
     const onUpdate = vi.fn();
 

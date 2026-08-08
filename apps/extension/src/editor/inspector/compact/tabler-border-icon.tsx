@@ -1,11 +1,12 @@
 import { TablerIcon } from './tabler-icon';
+import { hasVisibleColor } from '@sniptale/foundation/color';
 
 function isTransparentBorder(args: { color?: string; opacity?: number; strokeWidth?: number }) {
   return (
     (args.strokeWidth ?? 1) <= 0 ||
     (args.opacity ?? 1) <= 0.01 ||
     args.color === undefined ||
-    ['transparent', '#0000', '#00000000'].includes(args.color.toLowerCase())
+    !hasVisibleColor(args.color)
   );
 }
 

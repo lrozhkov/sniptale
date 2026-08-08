@@ -28,10 +28,7 @@ function hasBorderSettingsChange(
       prev?.width !== next?.width ||
       prev?.style !== next?.style ||
       prev?.radius !== next?.radius ||
-      prev?.opacity !== next?.opacity ||
-      prev?.strokeOpacity !== next?.strokeOpacity ||
       prev?.fillColor !== next?.fillColor ||
-      prev?.fillOpacity !== next?.fillOpacity ||
       prev?.effects?.capture?.hideFrame !== next?.effects?.capture?.hideFrame ||
       prev?.effects?.linkedTemplates?.calloutPresetId !==
         next?.effects?.linkedTemplates?.calloutPresetId ||

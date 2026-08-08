@@ -7,7 +7,6 @@ import {
 } from '../../platform/frame';
 import { resolveDrawablePageHtmlElement } from '../page-element-target';
 import {
-  colorToRgba,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -81,21 +80,15 @@ function ensurePreview(session: HoverSession): HTMLElement {
     position: fixed;
     box-sizing: content-box;
     pointer-events: none;
-    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-      visual.strokeColor,
-      visual.strokeOpacity
-    )};
+    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
     border-radius: ${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px;
-    background: ${colorToRgba(visual.fillColor, visual.fillOpacity)};
+    background: ${visual.fillColor};
     opacity: 0.88;
     box-shadow: ${resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none'};
   `;
   Object.assign(preview.style, visual.customCssStyles);
   preview.style.boxSizing = 'content-box';
-  preview.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
+  preview.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
   preview.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
   preview.style.margin = '0';
   preview.style.padding = '0';

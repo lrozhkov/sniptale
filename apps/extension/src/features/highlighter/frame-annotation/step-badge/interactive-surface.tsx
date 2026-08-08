@@ -19,7 +19,6 @@ export function FrameStepBadgeInteractiveSurface(props: {
   controlsPortalTarget: Element | DocumentFragment;
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   fillColor?: string;
-  fillOpacity?: number;
   frameRect: StepBadgeFrameRect;
   isSettingsOpen?: boolean;
   onClick?: () => void;
@@ -58,7 +57,6 @@ export function FrameStepBadgeInteractiveSurface(props: {
         ? {}
         : { visualScale: props.chromeScale })}
       {...(props.fillColor ? { fillColor: props.fillColor } : {})}
-      {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
       {...(props.shadow === undefined ? {} : { shadow: props.shadow })}
     />
   );

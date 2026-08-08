@@ -67,7 +67,6 @@ export function FrameCreationPopovers(props: {
             borderColor: props.settings.borderSettings.color,
             borderWidth: props.settings.borderSettings.width,
             fillColor: props.settings.borderSettings.fillColor,
-            fillOpacity: props.settings.borderSettings.fillOpacity,
           }}
           isOpen={props.activeMenu === 'step-badge'}
           onChange={(stepBadge) => props.update({ stepBadge })}

@@ -5,6 +5,7 @@ import type {
 import { isNumber, isRecord, isString } from '../../../../../../contracts/messaging/validators';
 import { parseRect } from '../helpers';
 import type { BlurSettings } from '../../../../../../features/highlighter/contracts';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 
 function parseOptionalBlurBorderFields(parsedBlurSettings: Record<string, unknown>) {
   const nextSettings: Partial<BlurSettings> = {};
@@ -18,10 +19,10 @@ function parseOptionalBlurBorderFields(parsedBlurSettings: Record<string, unknow
   if (isNumber(parsedBlurSettings['radius'])) nextSettings.radius = parsedBlurSettings['radius'];
   if (isNumber(parsedBlurSettings['shadow'])) nextSettings.shadow = parsedBlurSettings['shadow'];
   if (isString(parsedBlurSettings['strokeColor'])) {
-    nextSettings.strokeColor = parsedBlurSettings['strokeColor'];
-  }
-  if (isNumber(parsedBlurSettings['strokeOpacity'])) {
-    nextSettings.strokeOpacity = parsedBlurSettings['strokeOpacity'];
+    nextSettings.strokeColor =
+      (isNumber(parsedBlurSettings['strokeOpacity'])
+        ? multiplyColorAlpha(parsedBlurSettings['strokeColor'], parsedBlurSettings['strokeOpacity'])
+        : normalizeColor(parsedBlurSettings['strokeColor'])) ?? parsedBlurSettings['strokeColor'];
   }
   if (
     parsedBlurSettings['strokeStyle'] === 'solid' ||

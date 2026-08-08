@@ -130,9 +130,6 @@ function FrameAnnotationExportEntry(props: {
           {...(props.frame.borderSettings?.fillColor
             ? { fillColor: props.frame.borderSettings.fillColor }
             : {})}
-          {...(props.frame.borderSettings?.fillOpacity === undefined
-            ? {}
-            : { fillOpacity: props.frame.borderSettings.fillOpacity })}
           {...(props.frame.borderSettings?.shadow === undefined
             ? {}
             : { shadow: props.frame.borderSettings.shadow })}

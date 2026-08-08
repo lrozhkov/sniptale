@@ -27,15 +27,12 @@ const framePosition = vi.hoisted(() => ({
 const logger = vi.hoisted(() => ({ debug: vi.fn(), warn: vi.fn() }));
 const storage = vi.hoisted(() => ({
   DEFAULT_BORDER_PRESET: {
-    color: '#ff0',
+    color: '#ffff00a6',
     customCss: '',
     fillColor: '#00000000',
-    fillOpacity: 0,
     inheritCustomCss: false,
-    strokeOpacity: 100,
     id: 'default',
     name: 'Default',
-    opacity: 80,
     order: 0,
     padding: {
       bottom: 4,
@@ -140,9 +137,7 @@ function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
     { height: 10, width: 12, x: 1, y: 2 },
     {
       ...storage.DEFAULT_BORDER_PRESET,
-      fillColor: '#60A5FA',
-      fillOpacity: 8,
-      strokeOpacity: 65,
+      fillColor: '#60A5FA14',
     }
   );
 
@@ -182,7 +177,7 @@ function shouldKeepCanonicalGeometryAndStrokeWhilePreservingCustomDecoration(): 
   expect(overlay?.style.boxSizing).toBe('content-box');
   expect(overlay?.style.borderWidth).toBe('2px');
   expect(overlay?.style.borderStyle).toBe('solid');
-  expect(overlay?.style.borderColor).toBe('rgb(255, 255, 0)');
+  expect(overlay?.style.borderColor).toBe('rgba(255, 255, 0, 0.65)');
   expect(overlay?.style.borderRadius).toBe('8px');
   expect(overlay?.style.backgroundColor).toBe('red');
   expect(overlay?.style.backgroundImage).toBe('linear-gradient(red, blue)');

@@ -68,7 +68,6 @@ function createFrame(id: string, borderColor: string): FrameData {
       color: borderColor,
       id: `${id}-preset`,
       name: 'Preset',
-      opacity: 100,
       radius: 6,
       width: 3,
     }),
@@ -152,7 +151,6 @@ describe('InteractiveFramePopovers', () => {
       color: '#22c55e',
       id: 'preset-next',
       name: 'Next',
-      opacity: 100,
       radius: 10,
       width: 4,
     });

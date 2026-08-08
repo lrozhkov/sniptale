@@ -35,7 +35,6 @@ export function FutureStepBadgeSettingsPopover(props: {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
   isOpen: boolean;
   onChange: (settings: StepBadgeSettings) => void;

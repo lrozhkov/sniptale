@@ -28,7 +28,6 @@ const PRESET: BorderPreset = {
   color: '#ff00ff',
   id: 'preset-1',
   name: 'Preset',
-  opacity: 100,
   order: 1,
   padding: { bottom: 8, left: 8, right: 8, top: 8 },
   radius: 4,
@@ -37,9 +36,7 @@ const PRESET: BorderPreset = {
   width: 2,
   customCss: '',
   fillColor: '#00000000',
-  fillOpacity: 0,
   inheritCustomCss: false,
-  strokeOpacity: 100,
 };
 
 it('keeps the selected preset in the current tab without saving the global default', () => {

@@ -12,13 +12,10 @@ const editableVisualFields = [
   'customCss',
   'effects',
   'fillColor',
-  'fillOpacity',
   'inheritCustomCss',
-  'opacity',
   'padding',
   'radius',
   'shadow',
-  'strokeOpacity',
   'style',
   'width',
 ] as const;

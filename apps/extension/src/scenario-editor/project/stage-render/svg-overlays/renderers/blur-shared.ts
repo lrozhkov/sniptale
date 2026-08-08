@@ -7,7 +7,6 @@ type ResolvedScenarioBlurSettings = BlurSettings & {
   shadow: number;
   showBorder: boolean;
   strokeColor: string;
-  strokeOpacity: number;
   strokeStyle: NonNullable<BlurSettings['strokeStyle']>;
   strokeWidth: number;
 };
@@ -26,7 +25,6 @@ export function resolveScenarioBlurSettings(settings: BlurSettings): ResolvedSce
     shadow: settings.shadow ?? DEFAULT_BLUR_SETTINGS.shadow ?? 0,
     showBorder: settings.showBorder ?? strokeWidth > 0,
     strokeColor: settings.strokeColor ?? DEFAULT_BLUR_SETTINGS.strokeColor ?? '#475569',
-    strokeOpacity: settings.strokeOpacity ?? DEFAULT_BLUR_SETTINGS.strokeOpacity ?? 1,
     strokeStyle: settings.strokeStyle ?? DEFAULT_BLUR_SETTINGS.strokeStyle ?? 'solid',
     strokeWidth,
   };

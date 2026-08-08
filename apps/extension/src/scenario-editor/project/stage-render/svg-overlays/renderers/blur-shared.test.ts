@@ -14,7 +14,6 @@ it('resolves blur settings with canonical defaults', () => {
     shadow: 0,
     showBorder: false,
     strokeColor: '#475569',
-    strokeOpacity: 1,
     strokeStyle: 'solid',
     strokeWidth: 0,
   });

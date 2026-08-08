@@ -99,14 +99,6 @@ function BorderOutlineSection(props: BorderStyleInspectorProps) {
         onChange={(width) => props.onChange({ width })}
         value={props.style.width}
       />
-      <EditorCompactRangeField
-        displaySuffix="%"
-        label={translate('highlighter.editor.strokeOpacityLabel')}
-        max={100}
-        min={0}
-        onChange={(strokeOpacity) => props.onChange({ strokeOpacity })}
-        value={props.style.strokeOpacity}
-      />
     </div>
   );
 }
@@ -118,14 +110,6 @@ function BorderFillSection(props: BorderStyleInspectorProps) {
         label={translate('highlighter.editor.fillColorLabel')}
         onChange={(fillColor) => props.onChange({ fillColor })}
         value={props.style.fillColor}
-      />
-      <EditorCompactRangeField
-        displaySuffix="%"
-        label={translate('highlighter.editor.fillOpacityLabel')}
-        max={100}
-        min={0}
-        onChange={(fillOpacity) => props.onChange({ fillOpacity })}
-        value={props.style.fillOpacity}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import {
 import { getSettingsCountLabel } from '../../../../section-surface/text.helpers';
 import { usePalettesController } from './controller';
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
+import { CompactColorSelector } from '../../../../../ui/color-selector';
 
 export function PalettesSettings() {
   const state = usePalettesController();
@@ -19,12 +20,13 @@ export function PalettesSettings() {
     meta: (
       <label className="inline-flex items-center gap-2">
         <span>#{index + 1}</span>
-        <input
-          aria-label={`${getEditorPaletteLabel(state.key)} ${index + 1}`}
-          type="color"
+        <CompactColorSelector
+          label={`${getEditorPaletteLabel(state.key)} ${index + 1}`}
+          title={`${getEditorPaletteLabel(state.key)} ${index + 1}`}
           value={color}
-          onChange={(event) => void state.changeColor(index, event.currentTarget.value)}
-          className="h-7 w-9 cursor-pointer rounded border bg-transparent p-0.5"
+          pickerOnly
+          onChange={(value) => void state.changeColor(index, value)}
+          className="w-40"
         />
       </label>
     ),

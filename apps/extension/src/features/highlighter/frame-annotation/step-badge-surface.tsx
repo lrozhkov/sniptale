@@ -45,7 +45,6 @@ export function getStepBadgeStyle(props: {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   settings: StepBadgeSettings;
   shadow?: number;
   zIndex: number;
@@ -61,7 +60,6 @@ export function getStepBadgeStyle(props: {
     borderColor: props.borderColor,
     borderWidth: props.borderWidth,
     ...(props.fillColor ? { fillColor: props.fillColor } : {}),
-    ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
   });
   const position = resolvePosition(props.settings);
   const visualScale = props.visualScale ?? 1;
@@ -129,7 +127,6 @@ export function FrameStepBadgeSurface(props: {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   elementRef?: React.Ref<HTMLDivElement>;
   isDragging?: boolean;
   visualScale?: number;
@@ -159,7 +156,6 @@ export function FrameStepBadgeSurface(props: {
           borderColor: props.borderColor,
           borderWidth: props.borderWidth,
           ...(props.fillColor ? { fillColor: props.fillColor } : {}),
-          ...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity }),
           zIndex: props.zIndex,
           clickable: Boolean(props.onClick),
           ...(props.isDragging === undefined ? {} : { isDragging: props.isDragging }),

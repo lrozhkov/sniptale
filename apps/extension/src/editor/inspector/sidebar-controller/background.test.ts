@@ -3,6 +3,7 @@ import type { EditorShapeSettings } from '../../../features/editor/document/type
 import type { EditorToolSettings } from '../../../features/editor/document/tool-settings-types';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 import { MAX_EDITOR_RASTER_IMAGE_FILE_BYTES } from '../../document/file-actions/raster-intake';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 
 const { readFileAsDataUrlMock } = vi.hoisted(() => ({
   readFileAsDataUrlMock: vi.fn(),
@@ -75,22 +76,25 @@ function registerPresetTargetFallbackTests() {
     expect(targets.shape).toHaveBeenCalledWith({
       borderPresetId: DEFAULT_BORDER_PRESET.id,
       customCss: '',
-      fillColor: DEFAULT_BORDER_PRESET.fillColor,
-      fillOpacity: DEFAULT_BORDER_PRESET.fillOpacity / 100,
+      fillColor: setColorAlpha(DEFAULT_BORDER_PRESET.fillColor, 1),
+      fillOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.fillColor),
       inheritCustomCss: false,
-      opacity: DEFAULT_BORDER_PRESET.strokeOpacity / 100,
+      opacity: 1,
       radius: DEFAULT_BORDER_PRESET.radius,
       shadow: DEFAULT_BORDER_PRESET.shadow,
       shadowAngle: 90,
       shadowBlur: 12,
-      shadowColor: DEFAULT_BORDER_PRESET.color,
+      shadowColor: DEFAULT_BORDER_PRESET.color.toLowerCase(),
       shadowDistance: 4,
-      strokeColor: DEFAULT_BORDER_PRESET.color,
-      strokeOpacity: DEFAULT_BORDER_PRESET.strokeOpacity / 100,
+      strokeColor: setColorAlpha(DEFAULT_BORDER_PRESET.color, 1),
+      strokeOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.color),
       strokeStyle: DEFAULT_BORDER_PRESET.style,
       strokeWidth: DEFAULT_BORDER_PRESET.width,
     });
-    expect(targets.step).toHaveBeenCalledWith({ color: DEFAULT_BORDER_PRESET.color });
+    expect(targets.step).toHaveBeenCalledWith({
+      color: DEFAULT_BORDER_PRESET.color.toLowerCase(),
+      opacity: 1,
+    });
     expect(targets.shape).toHaveBeenCalledTimes(1);
     expect(targets.step).toHaveBeenCalledTimes(1);
     expect(setFrameDraft).toHaveBeenCalledTimes(2);
@@ -106,13 +110,10 @@ function registerPortablePresetProjectionTest() {
   it('maps portable preset visuals through the shared editor projector', () => {
     const preset = {
       ...DEFAULT_BORDER_PRESET,
-      color: '#f97316',
-      fillColor: '#22c55e',
-      fillOpacity: 35,
+      color: '#f97316b3',
+      fillColor: '#22c55e59',
       id: 'preset-shared',
-      opacity: 42,
       radius: 12,
-      strokeOpacity: 70,
       style: 'dashed' as const,
       width: 6,
     };
@@ -135,9 +136,9 @@ function registerPortablePresetProjectionTest() {
       borderPresetId: 'preset-shared',
       customCss: '',
       fillColor: '#22c55e',
-      fillOpacity: 0.35,
+      fillOpacity: 89 / 255,
       inheritCustomCss: false,
-      opacity: 0.7,
+      opacity: 1,
       radius: 12,
       shadow: preset.shadow,
       shadowAngle: 90,
@@ -145,11 +146,11 @@ function registerPortablePresetProjectionTest() {
       shadowColor: '#f97316',
       shadowDistance: 4,
       strokeColor: '#f97316',
-      strokeOpacity: 0.7,
+      strokeOpacity: 179 / 255,
       strokeStyle: 'dashed',
       strokeWidth: 6,
     });
-    expect(targets.step).toHaveBeenCalledWith({ color: '#f97316' });
+    expect(targets.step).toHaveBeenCalledWith({ color: '#f97316', opacity: 179 / 255 });
   });
 }
 
@@ -164,22 +165,22 @@ function registerCombinedPresetTargetTests() {
       shape: {
         borderPresetId: DEFAULT_BORDER_PRESET.id,
         customCss: '',
-        fillColor: DEFAULT_BORDER_PRESET.fillColor,
-        fillOpacity: DEFAULT_BORDER_PRESET.fillOpacity / 100,
+        fillColor: setColorAlpha(DEFAULT_BORDER_PRESET.fillColor, 1),
+        fillOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.fillColor),
         inheritCustomCss: false,
-        opacity: DEFAULT_BORDER_PRESET.strokeOpacity / 100,
+        opacity: 1,
         radius: DEFAULT_BORDER_PRESET.radius,
         shadow: DEFAULT_BORDER_PRESET.shadow,
         shadowAngle: 90,
         shadowBlur: 12,
-        shadowColor: DEFAULT_BORDER_PRESET.color,
+        shadowColor: DEFAULT_BORDER_PRESET.color.toLowerCase(),
         shadowDistance: 4,
-        strokeColor: DEFAULT_BORDER_PRESET.color,
-        strokeOpacity: DEFAULT_BORDER_PRESET.strokeOpacity / 100,
+        strokeColor: setColorAlpha(DEFAULT_BORDER_PRESET.color, 1),
+        strokeOpacity: getColorAlpha(DEFAULT_BORDER_PRESET.color),
         strokeStyle: DEFAULT_BORDER_PRESET.style,
         strokeWidth: DEFAULT_BORDER_PRESET.width,
       },
-      step: { color: DEFAULT_BORDER_PRESET.color },
+      step: { color: DEFAULT_BORDER_PRESET.color.toLowerCase(), opacity: 1 },
     });
     expect(targets.shape).not.toHaveBeenCalled();
     expect(targets.step).not.toHaveBeenCalled();

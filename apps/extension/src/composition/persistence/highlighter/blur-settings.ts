@@ -2,6 +2,7 @@ import type { BlurSettings } from '../../../features/highlighter/contracts';
 import { isStringLiteralValue } from '@sniptale/runtime-contracts/validation/string-literals';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { isBlurStrokeStyle } from './blur-stroke-style';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 
 type ParsedBlurSettings = {
   invalidFieldCount: number;
@@ -63,9 +64,25 @@ function parseModernDefaultBlurSettings(value: Record<string, unknown>): {
   invalidFieldCount += assignParsedBlurBorderSettings(nextValue, value);
   invalidFieldCount += assignOptionalNumber(nextValue, value, 'radius');
   invalidFieldCount += assignOptionalNumber(nextValue, value, 'shadow');
-  invalidFieldCount += assignOptionalNumber(nextValue, value, 'strokeOpacity');
+  invalidFieldCount += foldLegacyStrokeOpacity(nextValue, value);
 
   return { value: nextValue, invalidFieldCount };
+}
+
+function foldLegacyStrokeOpacity(
+  nextValue: Partial<BlurSettings>,
+  value: Record<string, unknown>
+): number {
+  if (value['strokeOpacity'] !== undefined && !isNumber(value['strokeOpacity'])) return 1;
+  if (!isString(value['strokeColor'])) return 0;
+  const color = normalizeColor(value['strokeColor']);
+  if (!color) return 1;
+  const folded = isNumber(value['strokeOpacity'])
+    ? multiplyColorAlpha(color, value['strokeOpacity'])
+    : color;
+  if (!folded) return 1;
+  nextValue.strokeColor = folded;
+  return 0;
 }
 
 function assignParsedBlurCoreSettings(
@@ -92,9 +109,7 @@ function assignParsedBlurBorderSettings(
     if (value['borderPresetId'] !== undefined) nextValue.borderPresetId = null;
   } else if (isString(value['borderPresetId'])) nextValue.borderPresetId = value['borderPresetId'];
   else invalidFieldCount++;
-  if (value['strokeColor'] === undefined || isString(value['strokeColor'])) {
-    if (value['strokeColor'] !== undefined) nextValue.strokeColor = value['strokeColor'];
-  } else invalidFieldCount++;
+  if (value['strokeColor'] !== undefined && !isString(value['strokeColor'])) invalidFieldCount++;
   invalidFieldCount += assignOptionalNumber(nextValue, value, 'strokeWidth');
   if (value['strokeStyle'] === undefined || isBlurStrokeStyle(value['strokeStyle'])) {
     if (value['strokeStyle'] !== undefined) nextValue.strokeStyle = value['strokeStyle'];

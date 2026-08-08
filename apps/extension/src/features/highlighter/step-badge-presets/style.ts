@@ -5,12 +5,12 @@ import type {
   StepBadgeVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { DEFAULT_STEP_BADGE_VISUAL_STYLE } from './catalog';
+import { hasVisibleColor } from '@sniptale/foundation/color';
 
 interface StepBadgeFrameVisuals {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
 }
 
 interface ResolvedStepBadgeVisualStyle {
@@ -41,9 +41,7 @@ function resolveColor(
 ): string {
   if (source === 'frame-border') return frame.borderColor;
   if (source === 'frame-fill') {
-    return frame.fillOpacity && frame.fillOpacity > 0 && frame.fillColor
-      ? frame.fillColor
-      : fallback;
+    return hasVisibleColor(frame.fillColor) ? frame.fillColor! : fallback;
   }
   if (source === 'surface') return 'var(--sniptale-color-surface-base)';
   return fallback;

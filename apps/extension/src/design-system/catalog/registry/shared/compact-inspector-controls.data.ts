@@ -151,7 +151,7 @@ export const SHARED_DESIGN_SYSTEM_COMPACT_INSPECTOR_CONTROLS_REGISTRY: DesignSys
           'Редактор изображения > Inspector controls',
           'Image editor > Inspector controls',
           [
-            'apps/extension/src/editor/chrome/color-control/shared.tsx',
+            'apps/extension/src/ui/color-selector/index.tsx',
             'apps/extension/src/editor/chrome/ui/primitives.tsx',
             'apps/extension/src/editor/chrome/ui/index.tsx',
           ]

@@ -10,12 +10,9 @@ import type { LinkedAnnotationTemplateOptions } from './inspector';
 function applyEditorPatch(state: EditorState, patch: BorderVisualStylePatch) {
   if (patch.color !== undefined) state.setColor(patch.color);
   if (patch.fillColor !== undefined) state.setFillColor(patch.fillColor);
-  if (patch.fillOpacity !== undefined) state.setFillOpacity(patch.fillOpacity);
   if (patch.effects !== undefined) state.setEffects(patch.effects);
-  if (patch.opacity !== undefined) state.setOpacity(patch.opacity);
   if (patch.radius !== undefined) state.setRadius(patch.radius);
   if (patch.shadow !== undefined) state.setShadow(patch.shadow);
-  if (patch.strokeOpacity !== undefined) state.setStrokeOpacity(patch.strokeOpacity);
   if (patch.style !== undefined) state.setStyle(patch.style);
   if (patch.width !== undefined) state.setWidth(patch.width);
   if (patch.inheritCustomCss !== undefined) state.setInheritCustomCss(patch.inheritCustomCss);

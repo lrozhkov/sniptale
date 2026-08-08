@@ -103,7 +103,6 @@ describe('step badge boundary placement', () => {
       borderWidth: 4,
       clickable: false,
       fillColor: '#fedcba',
-      fillOpacity: 1,
       settings: {
         anchor: 'middle-right',
         enabled: true,

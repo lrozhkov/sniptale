@@ -276,9 +276,6 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       {...(props.snapshot.borderSettings?.fillColor
         ? { fillColor: props.snapshot.borderSettings.fillColor }
         : {})}
-      {...(props.snapshot.borderSettings?.fillOpacity === undefined
-        ? {}
-        : { fillOpacity: props.snapshot.borderSettings.fillOpacity })}
       {...(props.snapshot.borderSettings?.shadow === undefined
         ? {}
         : { shadow: props.snapshot.borderSettings.shadow })}

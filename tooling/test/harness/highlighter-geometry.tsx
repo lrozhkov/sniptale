@@ -35,10 +35,7 @@ const THICK_PRESET: BorderPreset = {
   radius: 24,
   padding: { top: 0, right: 0, bottom: 0, left: 0 },
   shadow: 0,
-  opacity: 100,
-  strokeOpacity: 100,
-  fillColor: '#00d4ff',
-  fillOpacity: 25,
+  fillColor: '#00d4ff40',
   inheritCustomCss: false,
   customCss: '',
 };
@@ -130,7 +127,7 @@ function createFrame(testCase: GeometryCase): FrameData {
     effectMode: testCase.effectMode,
     borderSettings: {
       ...THICK_PRESET,
-      fillOpacity: testCase.fillVisible ? THICK_PRESET.fillOpacity : 0,
+      fillColor: testCase.fillVisible ? THICK_PRESET.fillColor : '#00d4ff00',
     },
     blurSettings: {
       amount: 12,

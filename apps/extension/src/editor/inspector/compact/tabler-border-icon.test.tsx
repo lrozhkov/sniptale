@@ -51,6 +51,7 @@ it('shows the transparent-border marker for every invisible border form', () => 
     { color: 'transparent' },
     { color: '#0000' },
     { color: '#00000000' },
+    { color: '#2563eb00' },
   ];
 
   for (const props of invisibleBorders) {

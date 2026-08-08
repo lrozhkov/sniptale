@@ -17,7 +17,8 @@ it('renders recent and palette sections through the shared swatch section', () =
       recentColors={['#111111', '#111111']}
       title="Color"
       value="#111111"
-      onSelect={() => undefined}
+      onPaletteSelect={() => undefined}
+      onRecentSelect={() => undefined}
     />
   );
 

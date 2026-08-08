@@ -82,9 +82,6 @@ export function FrameProjectionSettings(props: {
             ...(props.snapshot.borderSettings?.fillColor
               ? { fillColor: props.snapshot.borderSettings.fillColor }
               : {}),
-            ...(props.snapshot.borderSettings?.fillOpacity === undefined
-              ? {}
-              : { fillOpacity: props.snapshot.borderSettings.fillOpacity }),
           }}
           headerContext="element"
           isOpen={props.menu === 'step'}

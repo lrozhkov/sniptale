@@ -29,12 +29,9 @@ function createPreset(
     radius: overrides.radius ?? 10,
     padding: overrides.padding ?? { top: 1, right: 1, bottom: 1, left: 1 },
     shadow: overrides.shadow ?? 0,
-    opacity: overrides.opacity ?? 80,
     customCss: overrides.customCss ?? '',
     fillColor: overrides.fillColor ?? '#00000000',
-    fillOpacity: overrides.fillOpacity ?? 0,
     inheritCustomCss: overrides.inheritCustomCss ?? false,
-    strokeOpacity: overrides.strokeOpacity ?? 100,
   };
 }
 
@@ -43,8 +40,10 @@ describe('highlighter-section helpers', () => {
 
   it('builds preview styles for each supported shadow level', verifyPreviewShadowStyles);
 
-  it('does not apply the retired compatibility opacity to the preset preview', () => {
-    expect(getHighlighterPresetPreviewStyle(createPreset({ opacity: 20 })).opacity).toBeUndefined();
+  it('uses canonical color alpha in the preset preview', () => {
+    expect(getHighlighterPresetPreviewStyle(createPreset({ color: '#ff660033' })).borderColor).toBe(
+      '#ff660033'
+    );
   });
 
   it('reorders presets and returns null when either id is missing', () => {

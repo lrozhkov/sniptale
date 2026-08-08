@@ -3,6 +3,7 @@ import type {
   CalloutColorSource,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { hasVisibleColor } from '@sniptale/foundation/color';
 
 export type CalloutFrameColors = {
   borderColor?: string | undefined;
@@ -10,11 +11,11 @@ export type CalloutFrameColors = {
 };
 
 export function getCalloutFrameColors(
-  frameStyle: { color: string; fillColor: string; fillOpacity: number } | null | undefined
+  frameStyle: { color: string; fillColor: string } | null | undefined
 ): CalloutFrameColors {
   return {
     borderColor: frameStyle?.color,
-    fillColor: (frameStyle?.fillOpacity ?? 0) > 0 ? frameStyle?.fillColor : undefined,
+    fillColor: hasVisibleColor(frameStyle?.fillColor) ? frameStyle?.fillColor : undefined,
   };
 }
 

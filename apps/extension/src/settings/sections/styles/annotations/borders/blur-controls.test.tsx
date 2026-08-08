@@ -79,12 +79,9 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     radius: overrides.radius ?? 8,
     padding: overrides.padding ?? { top: 1, right: 1, bottom: 1, left: 1 },
     shadow: overrides.shadow ?? 30,
-    opacity: overrides.opacity ?? 80,
     customCss: overrides.customCss ?? '',
     fillColor: overrides.fillColor ?? '#00000000',
-    fillOpacity: overrides.fillOpacity ?? 0,
     inheritCustomCss: overrides.inheritCustomCss ?? false,
-    strokeOpacity: overrides.strokeOpacity ?? 100,
   };
 }
 

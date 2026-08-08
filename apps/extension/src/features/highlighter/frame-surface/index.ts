@@ -1,5 +1,6 @@
 import type { BorderPadding } from '../contracts';
 import type { FrameAnnotationVisualState } from '../frame-annotation/model';
+import { hasVisibleColor } from '@sniptale/foundation/color';
 
 const DEFAULT_STROKE_WIDTH = 3;
 const DEFAULT_RADIUS = 0;
@@ -76,8 +77,8 @@ export function resolveFrameSurface(frame: FrameAnnotationVisualState): FrameSur
     },
     decorationVisible,
     strokeVisible:
-      decorationVisible && strokeWidth > 0 && (frame.borderSettings?.strokeOpacity ?? 100) > 0,
-    fillVisible: decorationVisible && (frame.borderSettings?.fillOpacity ?? 0) > 0,
+      decorationVisible && strokeWidth > 0 && hasVisibleColor(frame.borderSettings?.color),
+    fillVisible: decorationVisible && hasVisibleColor(frame.borderSettings?.fillColor),
   };
 }
 

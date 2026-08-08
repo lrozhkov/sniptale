@@ -53,10 +53,7 @@ const preset = (id: string): BorderPreset => ({
   radius: 4,
   padding: { top: 1, right: 1, bottom: 1, left: 1 },
   shadow: 0,
-  opacity: 100,
-  strokeOpacity: 100,
   fillColor: '#000000',
-  fillOpacity: 0,
   inheritCustomCss: false,
   customCss: '',
 });

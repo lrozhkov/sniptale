@@ -52,7 +52,6 @@ export function StepBadgePopoverContent(props: {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 }) {

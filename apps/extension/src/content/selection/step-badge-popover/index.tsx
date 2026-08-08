@@ -26,7 +26,6 @@ interface StepBadgePopoverProps {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
-    fillOpacity?: number;
   };
 }
 

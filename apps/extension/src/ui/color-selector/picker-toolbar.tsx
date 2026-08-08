@@ -65,6 +65,7 @@ function EyedropperActionButton(props: {
 }
 
 export function PickerToolbar(props: {
+  allowTransparent?: boolean;
   eyedropperAvailable: boolean;
   eyedropperPressed: boolean;
   handleEyedropperPick: () => Promise<void>;
@@ -75,10 +76,12 @@ export function PickerToolbar(props: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <TransparentPreviewButton
-        onClick={props.onSelectTransparent}
-        resolvedColor={props.resolvedColor}
-      />
+      {props.allowTransparent !== false ? (
+        <TransparentPreviewButton
+          onClick={props.onSelectTransparent}
+          resolvedColor={props.resolvedColor}
+        />
+      ) : null}
       <CompactRange
         aria-label={translate('shared.ui.colorSelectorChooseColor')}
         min={0}

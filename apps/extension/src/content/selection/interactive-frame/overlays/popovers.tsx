@@ -100,7 +100,6 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
             borderColor: borderSettings.color,
             borderWidth: borderSettings.width,
             fillColor: borderSettings.fillColor,
-            fillOpacity: borderSettings.fillOpacity,
           },
         }
       : {}),

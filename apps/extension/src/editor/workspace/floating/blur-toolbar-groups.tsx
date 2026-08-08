@@ -7,7 +7,6 @@ import {
   createToolbarGroup,
   getToolbarCommand,
   isToolbarCommand,
-  parseToolbarPercent,
   parseToolbarPixel,
 } from './toolbar-group-builders';
 
@@ -18,7 +17,6 @@ interface BlurToolbarCommands {
   amount: CompactCommand | null;
   radius: CompactCommand | null;
   strokeColor: CompactCommand | null;
-  strokeOpacity: CompactCommand | null;
   strokeStyle: CompactCommand | null;
   strokeWidth: CompactCommand | null;
   template: CompactCommand | null;
@@ -30,7 +28,6 @@ function collectBlurCommands(commands: CompactCommand[]): BlurToolbarCommands {
     amount: getToolbarCommand(commands, 'blur-amount'),
     radius: getToolbarCommand(commands, 'blur-radius'),
     strokeColor: getToolbarCommand(commands, 'blur-stroke-color'),
-    strokeOpacity: getToolbarCommand(commands, 'blur-stroke-opacity'),
     strokeStyle: getToolbarCommand(commands, 'blur-stroke-style'),
     strokeWidth: getToolbarCommand(commands, 'blur-stroke-width'),
     template: getToolbarCommand(commands, 'blur-template'),
@@ -63,7 +60,6 @@ function createBorderTrigger(commands: BlurToolbarCommands) {
 
   return (
     <TablerBorderIcon
-      opacity={parseToolbarPercent(commands.strokeOpacity?.value)}
       strokeStyle={normalizeStrokeStyle(commands.strokeStyle?.value)}
       strokeWidth={parseToolbarPixel(commands.strokeWidth?.value)}
       {...optionalProps}
@@ -116,7 +112,6 @@ export function createBlurToolbarGroups(commands: CompactCommand[]): FloatingToo
         blurCommands.strokeWidth,
         blurCommands.strokeStyle,
         blurCommands.strokeColor,
-        blurCommands.strokeOpacity,
       ].filter(isToolbarCommand),
       trigger: createBorderTrigger(blurCommands),
       width: 'style',

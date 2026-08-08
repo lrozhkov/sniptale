@@ -20,7 +20,6 @@ export const DEFAULT_BLUR_SETTINGS: BlurSettings = {
   shadow: 0,
   showBorder: true,
   strokeColor: '#475569',
-  strokeOpacity: 1,
   strokeStyle: 'solid',
   strokeWidth: 0,
 };

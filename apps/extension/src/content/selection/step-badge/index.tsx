@@ -18,7 +18,6 @@ interface StepBadgeProps {
   borderColor: string;
   borderWidth: number;
   fillColor?: string;
-  fillOpacity?: number;
   shadow?: number;
   frameRect?: StepBadgeFrameRect;
   isSettingsOpen?: boolean;
@@ -41,7 +40,6 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
         settings={props.settings}
         zIndex={FRAME_ANNOTATION_Z_INDEX.stepBadge}
         {...(props.fillColor ? { fillColor: props.fillColor } : {})}
-        {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
         {...(props.shadow === undefined ? {} : { shadow: props.shadow })}
         {...(props.onClick ? { onClick: props.onClick } : {})}
       />
@@ -61,7 +59,6 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
       showSettingsHandle={Boolean(props.showSettingsHandle)}
       surfacePortalTarget={portalTarget}
       {...(props.fillColor ? { fillColor: props.fillColor } : {})}
-      {...(props.fillOpacity === undefined ? {} : { fillOpacity: props.fillOpacity })}
       {...(props.shadow === undefined ? {} : { shadow: props.shadow })}
       {...(props.isSettingsOpen === undefined ? {} : { isSettingsOpen: props.isSettingsOpen })}
       {...(props.onClick ? { onClick: props.onClick } : {})}

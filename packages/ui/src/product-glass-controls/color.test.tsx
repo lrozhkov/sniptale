@@ -34,8 +34,7 @@ describe('ProductGlassColor controls', () => {
     expect(markup).toContain('title="#00ff00"');
   });
 
-  it('forwards native color input changes and preset selection', () => {
-    const onValueChange = vi.fn();
+  it('renders the supplied shared picker trigger and forwards preset selection', () => {
     const onPresetSelect = vi.fn();
 
     container = document.createElement('div');
@@ -48,23 +47,20 @@ describe('ProductGlassColor controls', () => {
           label="Accent"
           value="#111111"
           colors={['#111111', '#222222']}
-          onValueChange={onValueChange}
           onPresetSelect={onPresetSelect}
+          pickerTrigger={<button data-testid="picker-trigger">Picker</button>}
         />
       );
     });
 
-    const input = container.querySelector<HTMLInputElement>('input[type="color"]');
     const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
-    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
     act(() => {
-      valueSetter?.call(input, '#333333');
-      input?.dispatchEvent(new Event('change', { bubbles: true }));
-      buttons[1]?.click();
+      buttons.at(-1)?.click();
     });
 
-    expect(onValueChange).toHaveBeenCalledWith('#333333');
+    expect(container.querySelector('[data-testid="picker-trigger"]')).not.toBeNull();
+    expect(container.querySelector('input[type="color"]')).toBeNull();
     expect(onPresetSelect).toHaveBeenCalledWith('#222222');
   });
 });

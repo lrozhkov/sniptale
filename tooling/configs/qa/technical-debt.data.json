@@ -4779,8 +4779,6 @@
         "apps/extension/src/editor/browser-frame/layout/types.ts",
         "apps/extension/src/editor/chrome/color-control/helpers.ts",
         "apps/extension/src/editor/chrome/color-control/index.tsx",
-        "apps/extension/src/editor/chrome/color-control/parts.tsx",
-        "apps/extension/src/editor/chrome/color-control/shared.tsx",
         "apps/extension/src/editor/chrome/tool-icons.tsx",
         "apps/extension/src/editor/chrome/ui/index.tsx",
         "apps/extension/src/editor/chrome/ui/primitives.tsx",
@@ -12519,6 +12517,7 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "packages/foundation/src/best-effort/index.ts",
+        "packages/foundation/src/color/index.ts",
         "packages/foundation/src/default-owner/index.ts",
         "packages/foundation/src/gradient-stops/index.ts",
         "packages/foundation/src/history/clone.ts",
@@ -12532,6 +12531,7 @@
       ],
       "rolloutFiles": [
         "packages/foundation/src/best-effort/index.ts",
+        "packages/foundation/src/color/index.ts",
         "packages/foundation/src/default-owner/index.ts",
         "packages/foundation/src/gradient-stops/index.ts",
         "packages/foundation/src/history/clone.ts",
@@ -17072,7 +17072,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/highlighter-dynamic-anchor.tsx",
-        "contentHash": "517de580a63f42f7e2e9144681a1313dd51f508618a1cc02313f0e8c81ea8077"
+        "contentHash": "c618d317a137d5e1a9307bf057d0db434ecd9d303625a2c1fd688d36bb7ebf78"
       },
       "consumers": [
         "tooling/test/harness/highlighter-dynamic-anchor.tsx",
@@ -17103,7 +17103,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/highlighter-geometry.tsx",
-        "contentHash": "ee6417da2822bb5e8e66c69cbd81e32c20bbd57039a086c49df59ea866a121c6"
+        "contentHash": "9f8cd14ba46e0b9db0fda272edda5042055e7ab8e4a8f58c7af0dccd8db87ab7"
       },
       "consumers": [
         "tooling/test/harness/highlighter-geometry.tsx"
@@ -17117,7 +17117,7 @@
         "property:createFrame/borderSettings",
         "property:createFrame/focusSettings",
         "property:padding",
-        "property:ViewerParity/anonymous-299/frames"
+        "property:ViewerParity/anonymous-296/frames"
       ]
     },
     {

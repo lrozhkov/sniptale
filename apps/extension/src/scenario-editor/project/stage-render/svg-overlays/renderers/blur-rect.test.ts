@@ -46,7 +46,6 @@ it('clips scenario blur inside configured border styling', () => {
         shadow: 0,
         showBorder: true,
         strokeColor: '#112233',
-        strokeOpacity: 0.6,
         strokeStyle: 'dash-dot',
         strokeWidth: 6,
       },
@@ -59,7 +58,7 @@ it('clips scenario blur inside configured border styling', () => {
   expect(markup).toContain('width="59"');
   expect(markup).toContain('rx="7"');
   expect(markup).toContain('stroke="#112233"');
-  expect(markup).toContain('stroke-opacity="0.6"');
+  expect(markup).not.toContain('stroke-opacity=');
   expect(markup).toContain('stroke-dasharray="18 9.6 6 11.4"');
 });
 

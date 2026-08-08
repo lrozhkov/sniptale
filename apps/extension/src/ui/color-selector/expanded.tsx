@@ -14,7 +14,8 @@ export function ColorSelectorExpandedPanel(props: {
   recentColors: readonly string[];
   title: string;
   value: string;
-  onSelect: (color: string) => void;
+  onPaletteSelect: (color: string) => void;
+  onRecentSelect: (color: string) => void;
 }) {
   const selectedColor = props.value.toLowerCase();
   const recentColors = buildColorOptions(props.recentColors, COLOR_SELECTOR_MAX_OPTIONS);
@@ -28,14 +29,14 @@ export function ColorSelectorExpandedPanel(props: {
           label={translate('shared.ui.colorSelectorRecentColors')}
           selectedColor={selectedColor}
           title={props.title}
-          onSelect={props.onSelect}
+          onSelect={props.onRecentSelect}
         />
         <ColorSelectorSwatchSection
           colors={palette}
           label={translate('shared.ui.colorSelectorPalette')}
           selectedColor={selectedColor}
           title={props.title}
-          onSelect={props.onSelect}
+          onSelect={props.onPaletteSelect}
         />
       </div>
     </div>

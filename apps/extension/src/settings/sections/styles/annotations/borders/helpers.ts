@@ -1,5 +1,5 @@
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
-import { colorToRgba, resolveBorderShadowVisual } from '../../../../../features/highlighter/style';
+import { resolveBorderShadowVisual } from '../../../../../features/highlighter/style';
 import { getSettingsCountLabel } from '../../../../section-surface/text.helpers.ts';
 
 export function getHighlighterPresetCountLabel(count: number) {
@@ -18,9 +18,9 @@ export function getHighlighterPresetPreviewStyle(preset: BorderPreset): React.CS
     height: '24px',
     borderWidth: `${Math.min(preset.width, 4)}px`,
     borderStyle: preset.style,
-    borderColor: colorToRgba(preset.color, preset.strokeOpacity),
+    borderColor: preset.color,
     borderRadius: `${Math.min(preset.radius, 8)}px`,
-    backgroundColor: colorToRgba(preset.fillColor, preset.fillOpacity),
+    backgroundColor: preset.fillColor,
     boxShadow: shadowVisual.settingsRowBoxShadow,
   };
 }

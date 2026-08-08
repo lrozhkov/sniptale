@@ -36,7 +36,6 @@ it('resolves inherited comment colors from the connected frame before rendering'
     borderSettings: createBorderSettingsFixture({
       color: '#112233',
       fillColor: '#445566',
-      fillOpacity: 50,
     }),
     callout: createCalloutSettingsFixture(),
   });

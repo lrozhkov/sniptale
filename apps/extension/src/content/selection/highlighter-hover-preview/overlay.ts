@@ -7,7 +7,6 @@ import { getAbsolutePosition } from '../../platform/frame';
 import { appendToContentOverlayRoot, queryAllContentUiElements } from '../../platform/dom-host';
 import { applyIsolatedContentRootStyle } from '../../platform/dom-host/isolated';
 import {
-  colorToRgba,
   resolveBorderPresetVisual,
   resolveBorderShadowVisual,
 } from '../../../features/highlighter/style';
@@ -41,10 +40,7 @@ function applyHoverVisualDefaults(
   element: HTMLElement,
   visual: ReturnType<typeof resolveBorderPresetVisual>
 ): void {
-  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
   element.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
   element.style.boxSizing = 'content-box';
   element.style.margin = '0';
@@ -53,17 +49,14 @@ function applyHoverVisualDefaults(
   element.style.clipPath = 'none';
   element.style.boxShadow =
     resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
-  element.style.backgroundColor = colorToRgba(visual.fillColor, visual.fillOpacity);
+  element.style.backgroundColor = visual.fillColor;
 }
 
 function applyCanonicalHoverVisual(
   element: HTMLElement,
   visual: ReturnType<typeof resolveBorderPresetVisual>
 ): void {
-  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${colorToRgba(
-    visual.strokeColor,
-    visual.strokeOpacity
-  )}`;
+  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
   element.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
   element.style.boxSizing = 'content-box';
   element.style.margin = '0';

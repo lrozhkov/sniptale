@@ -7,6 +7,7 @@ import {
 } from './highlighter-projection';
 import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
 import { createSystemBorderPresetCatalog } from '../../highlighter/presets/catalog';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 
 function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
   return {
@@ -14,15 +15,12 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     name: 'Preset',
     order: 0,
     width: 6,
-    color: '#2563eb',
+    color: '#2563ebb3',
     style: 'dashed',
     radius: 12,
     padding: { top: 2, right: 4, bottom: 6, left: 8 },
     shadow: BORDER_SHADOW_SOFT_INTENSITY,
-    opacity: 42,
-    strokeOpacity: 70,
-    fillColor: '#16a34a',
-    fillOpacity: 35,
+    fillColor: '#16a34a59',
     inheritCustomCss: true,
     customCss: 'outline: 1px solid red;',
     ...overrides,
@@ -35,9 +33,9 @@ describe('highlighter preset projection', () => {
       borderPresetId: 'preset-1',
       customCss: '',
       fillColor: '#16a34a',
-      fillOpacity: 0.35,
+      fillOpacity: 89 / 255,
       inheritCustomCss: false,
-      opacity: 0.7,
+      opacity: 1,
       radius: 12,
       shadow: BORDER_SHADOW_SOFT_INTENSITY,
       shadowAngle: 90,
@@ -45,7 +43,7 @@ describe('highlighter preset projection', () => {
       shadowColor: '#2563eb',
       shadowDistance: 4,
       strokeColor: '#2563eb',
-      strokeOpacity: 0.7,
+      strokeOpacity: 179 / 255,
       strokeStyle: 'dashed',
       strokeWidth: 6,
     });
@@ -58,17 +56,31 @@ describe('highlighter preset projection', () => {
       expect(projection).toMatchObject({
         borderPresetId: preset.id,
         customCss: '',
-        fillColor: preset.fillColor,
-        fillOpacity: preset.fillOpacity / 100,
+        fillColor: setColorAlpha(preset.fillColor, 1),
+        fillOpacity: getColorAlpha(preset.fillColor),
         inheritCustomCss: false,
         radius: preset.radius,
         shadow: preset.shadow,
-        strokeColor: preset.color,
-        strokeOpacity: preset.strokeOpacity / 100,
+        strokeColor: setColorAlpha(preset.color, 1),
+        strokeOpacity: getColorAlpha(preset.color),
         strokeStyle: preset.style,
         strokeWidth: preset.width,
       });
     }
+  });
+
+  it('keeps invalid legacy color text stable behind the editor projection fallback', () => {
+    const projection = projectBorderPresetToEditorShapeSettings(
+      createPreset({ color: 'var(--legacy-stroke)', fillColor: 'var(--legacy-fill)' })
+    );
+
+    expect(projection).toMatchObject({
+      fillColor: 'var(--legacy-fill)',
+      fillOpacity: 1,
+      shadowColor: 'var(--legacy-stroke)',
+      strokeColor: 'var(--legacy-stroke)',
+      strokeOpacity: 1,
+    });
   });
 });
 
@@ -84,7 +96,6 @@ describe('highlighter default preset projection', () => {
     expect(resolveDefaultBorderPreset(settings, fallbackPreset)).toEqual(selectedPreset);
     expect(resolveDefaultBorderPresetVisual(settings, fallbackPreset)).toMatchObject({
       id: 'selected',
-      opacity: 42,
       strokeColor: '#f97316',
       strokeWidth: 6,
     });

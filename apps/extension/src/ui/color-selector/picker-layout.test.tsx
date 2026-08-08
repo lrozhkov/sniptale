@@ -9,6 +9,9 @@ vi.mock('../../platform/i18n', () => ({
 function createProps() {
   return {
     color: {
+      alphaPercent: 100,
+      handleAlphaChange: vi.fn(),
+      handleChannelColorChange: vi.fn(),
       handleColorChange: vi.fn(),
       handleHueChange: vi.fn(),
       handlePlaneSelectionChange: vi.fn(),
@@ -34,6 +37,7 @@ function createProps() {
       handleManualColorChange: vi.fn(),
       manualColor: '#ABCDEF',
     },
+    onAlphaChange: vi.fn(),
     onCycleFormatMode: vi.fn(),
     onHueChange: vi.fn(),
     onSelectTransparent: vi.fn(),

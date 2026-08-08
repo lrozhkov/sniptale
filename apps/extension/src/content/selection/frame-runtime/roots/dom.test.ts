@@ -22,15 +22,12 @@ function createFrame(id: string): FrameData {
       color: '#000000',
       customCss: '',
       fillColor: '#ffffff',
-      fillOpacity: 0,
       sourcePresetId: 'border',
       inheritCustomCss: false,
       sourcePresetName: 'Default Border',
-      opacity: 1,
       padding: { bottom: 0, left: 0, right: 0, top: 0 },
       radius: 6,
       shadow: 0,
-      strokeOpacity: 1,
       style: 'solid',
       width: 2,
     },
@@ -75,7 +72,7 @@ function expectFrameStateChangesInvalidateDescriptors() {
 function expectFrameBorderVisualChangesInvalidateDescriptors() {
   const initialFrame = createFrame('frame-1');
   const changedFrame = createFrame('frame-1');
-  changedFrame.borderSettings = { ...changedFrame.borderSettings!, fillOpacity: 45 };
+  changedFrame.borderSettings = { ...changedFrame.borderSettings!, fillColor: '#12345673' };
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   const initialDescriptors = buildFrameRenderDescriptors([initialFrame], frameStates);

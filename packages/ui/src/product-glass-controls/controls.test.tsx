@@ -73,7 +73,6 @@ describe('ProductGlassControls', () => {
 });
 
 function renderInteractiveHarness() {
-  const onValueChange = vi.fn();
   const onPresetSelect = vi.fn();
   const onPaletteSelect = vi.fn();
   container = document.createElement('div');
@@ -87,9 +86,8 @@ function renderInteractiveHarness() {
           label="Accent"
           value="#0080ff"
           colors={['#0080ff', '#22c55e']}
-          onValueChange={onValueChange}
           onPresetSelect={onPresetSelect}
-          inputProps={{ 'aria-label': 'Accent picker' }}
+          pickerTrigger={<button aria-label="Accent picker">Picker</button>}
         />
         <ProductGlassColorPalette
           colors={['#0080ff', '#22c55e']}
@@ -105,44 +103,29 @@ function renderInteractiveHarness() {
     );
   });
 
-  return { onPaletteSelect, onPresetSelect, onValueChange };
+  return { onPaletteSelect, onPresetSelect };
 }
 
 function triggerColorInteractions() {
-  const colorInput = container?.querySelector<HTMLInputElement>('input[type="color"]');
   const paletteButtons = container?.querySelectorAll<HTMLButtonElement>(
     '.sniptale-glass-color-option'
   );
 
-  if (!colorInput || !paletteButtons) {
+  if (!paletteButtons) {
     throw new Error('Expected glass color controls');
   }
 
   act(() => {
-    setNativeInputValue(colorInput, '#22c55e');
-    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
-    colorInput.dispatchEvent(new Event('change', { bubbles: true }));
     paletteButtons[1]?.click();
     paletteButtons[3]?.click();
   });
 }
 
-function setNativeInputValue(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-
-  if (!valueSetter) {
-    throw new Error('Expected HTMLInputElement value setter');
-  }
-
-  valueSetter.call(input, value);
-}
-
 function verifyColorFieldBehavior() {
-  const { onPaletteSelect, onPresetSelect, onValueChange } = renderInteractiveHarness();
+  const { onPaletteSelect, onPresetSelect } = renderInteractiveHarness();
 
   triggerColorInteractions();
 
-  expect(onValueChange).toHaveBeenCalledWith('#22c55e');
   expect(onPresetSelect).toHaveBeenCalledWith('#22c55e');
   expect(onPaletteSelect).toHaveBeenCalledWith('#22c55e');
   expect(container?.textContent).toContain('Auto mode');

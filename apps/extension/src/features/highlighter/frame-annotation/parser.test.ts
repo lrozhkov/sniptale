@@ -167,7 +167,10 @@ describe('frame annotation snapshot boundary', () => {
       { id: 'linked-frame', x: 0, y: 0, width: 100, height: 80, borderSettings },
       0
     );
-    expect(parseFrameAnnotationSnapshot(valid)).toEqual(valid);
+    expect(parseFrameAnnotationSnapshot(valid)).toEqual({
+      ...valid,
+      borderSettings: { ...valid.borderSettings!, color: '#f97316' },
+    });
 
     for (const linkedTemplates of [
       'callout',

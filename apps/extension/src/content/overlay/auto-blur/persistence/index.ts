@@ -17,6 +17,7 @@ import {
   isString,
 } from '../../../../composition/persistence/infrastructure/guards/primitives';
 import { createStorageWriteQueue } from '../../../../composition/persistence/infrastructure/write-queue';
+import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 
 export const AUTO_BLUR_SETTINGS_KEY = 'sniptale_auto_blur_settings';
 
@@ -98,7 +99,7 @@ function normalizeCoreBlurSettings(value: Record<string, unknown>): Partial<Blur
 function normalizeBlurBorderSettings(value: Record<string, unknown>): Partial<BlurSettings> {
   return {
     ...normalizeBorderPresetId(value['borderPresetId']),
-    ...normalizeOptionalStringSetting('strokeColor', value['strokeColor']),
+    ...normalizeStrokeColor(value['strokeColor'], value['strokeOpacity']),
     ...normalizeOptionalNumberSetting('strokeWidth', value['strokeWidth']),
     ...normalizeStrokeStyle(value['strokeStyle']),
   };
@@ -108,7 +109,6 @@ function normalizeBlurShadowSettings(value: Record<string, unknown>): Partial<Bl
   return {
     ...normalizeOptionalNumberSetting('radius', value['radius']),
     ...normalizeOptionalNumberSetting('shadow', value['shadow']),
-    ...normalizeOptionalNumberSetting('strokeOpacity', value['strokeOpacity']),
   };
 }
 
@@ -122,12 +122,16 @@ function normalizeBorderPresetId(value: unknown): Partial<BlurSettings> {
   return isString(value) ? { borderPresetId: value } : {};
 }
 
-function normalizeOptionalStringSetting(key: 'strokeColor', value: unknown): Partial<BlurSettings> {
-  return value !== undefined && isString(value) ? { [key]: value } : {};
+function normalizeStrokeColor(colorValue: unknown, opacityValue: unknown): Partial<BlurSettings> {
+  if (!isString(colorValue)) return {};
+  const color = normalizeColor(colorValue);
+  if (!color) return {};
+  const canonicalColor = isNumber(opacityValue) ? multiplyColorAlpha(color, opacityValue) : color;
+  return canonicalColor ? { strokeColor: canonicalColor } : {};
 }
 
 function normalizeOptionalNumberSetting(
-  key: 'radius' | 'shadow' | 'strokeOpacity' | 'strokeWidth',
+  key: 'radius' | 'shadow' | 'strokeWidth',
   value: unknown
 ): Partial<BlurSettings> {
   return value !== undefined && isNumber(value) ? { [key]: value } : {};

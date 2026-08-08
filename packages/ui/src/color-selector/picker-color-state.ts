@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
 import { getPlaneColorFromHue, hexToHsv, hexToRgb, hsvToHex, resolvePickerColor } from './helpers';
 import type { HsvColor } from './math';
+import { getColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 
 type PickerDraftState = {
   hsvColor: HsvColor;
@@ -12,6 +14,7 @@ export function usePickerColorState(color: string) {
     buildPickerDraftState(resolvePickerColor(color))
   );
   const stickyHueRef = useRef(draftState.hsvColor.hue);
+  const alphaRef = useRef(getColorAlpha(draftState.resolvedColor) ?? 1);
 
   const applyPickerDraft = useCallback(
     (nextHsvColor: HsvColor, options?: { rememberHue?: boolean; resolvedColor?: string }) => {
@@ -22,19 +25,25 @@ export function usePickerColorState(color: string) {
         stickyHueRef.current = normalizedHsvColor.hue;
       }
 
-      const resolvedColor = options?.resolvedColor ?? hsvToHex(normalizedHsvColor);
+      const resolvedColor =
+        options?.resolvedColor ??
+        setColorAlpha(hsvToHex(normalizedHsvColor), alphaRef.current) ??
+        hsvToHex(normalizedHsvColor);
+      alphaRef.current = getColorAlpha(resolvedColor) ?? alphaRef.current;
       setDraftState({ hsvColor: normalizedHsvColor, resolvedColor });
       return resolvedColor;
     },
     []
   );
   const pickerActions = usePickerDraftActions({
+    alphaRef,
     applyPickerDraft,
     draftHsvColor: draftState.hsvColor,
   });
 
   return {
     ...pickerActions,
+    alphaPercent: Math.round(alphaRef.current * 100),
     hue: draftState.hsvColor.hue,
     planeColor: getPlaneColorFromHue(draftState.hsvColor.hue),
     resolvedColor: draftState.resolvedColor,
@@ -45,6 +54,7 @@ export function usePickerColorState(color: string) {
 }
 
 function usePickerDraftActions(args: {
+  alphaRef: MutableRefObject<number>;
   applyPickerDraft: (
     nextHsvColor: HsvColor,
     options?: { rememberHue?: boolean; resolvedColor?: string }
@@ -65,6 +75,25 @@ function usePickerDraftActions(args: {
         return applyPickerDraft(nextHsvColor, { resolvedColor });
       },
       [applyPickerDraft]
+    ),
+    handleChannelColorChange: useCallback(
+      (nextColor: string) => {
+        const resolvedColor = setColorAlpha(nextColor, args.alphaRef.current) ?? nextColor;
+        const nextHsvColor = resolvedColor ? hexToHsv(resolvedColor) : null;
+        return nextHsvColor && resolvedColor
+          ? applyPickerDraft(nextHsvColor, { resolvedColor })
+          : null;
+      },
+      [applyPickerDraft, args.alphaRef]
+    ),
+    handleAlphaChange: useCallback(
+      (nextAlpha: string) => {
+        const parsed = Number.parseFloat(nextAlpha);
+        if (!Number.isFinite(parsed)) return null;
+        args.alphaRef.current = Math.max(0, Math.min(100, parsed)) / 100;
+        return applyPickerDraft(draftHsvColor);
+      },
+      [applyPickerDraft, args.alphaRef, draftHsvColor]
     ),
     handleHueChange: useCallback(
       (nextHue: string) => {

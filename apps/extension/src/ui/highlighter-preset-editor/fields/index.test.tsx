@@ -104,7 +104,6 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
     setInputValue(nameInput, 'Updated preset');
     colorSelectors[0]?.click();
     setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
-    setInputValue(getRangeInput('highlighter.editor.strokeOpacityLabel'), '65');
     styleSelect?.click();
   });
   await act(async () => {
@@ -118,7 +117,6 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   expect(container?.textContent).not.toContain('highlighter.editor.noFill');
   await act(async () => {
     queryFieldElements().colorSelectors[0]?.click();
-    setInputValue(getRangeInput('highlighter.editor.fillOpacityLabel'), '55');
   });
 
   selectCategory('highlighter.editor.geometrySection');
@@ -178,8 +176,6 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   expect(state.handleResizeStart).toHaveBeenCalledOnce();
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
-  expect(state.setStrokeOpacity).toHaveBeenCalledWith(65);
-  expect(state.setFillOpacity).toHaveBeenCalledWith(55);
 }
 
 beforeEach(() => {
