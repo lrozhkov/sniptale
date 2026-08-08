@@ -2,7 +2,7 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createDefaultHighlighterSettings } from '../../../../../features/highlighter/style/defaults';
-import { createHighlighterDragActions } from './drag-actions';
+import { createHighlighterOrderingActions } from './ordering-actions';
 import { createHighlighterSettingsActions } from './persistence-actions';
 
 const mocks = vi.hoisted(() => ({
@@ -34,19 +34,11 @@ function createDeferred() {
   return { promise, resolve };
 }
 
-it('keeps the drop command queued behind an in-flight settings mutation', async () => {
+it('keeps the reorder command queued behind an in-flight settings mutation', async () => {
   const settings = createDefaultHighlighterSettings();
   const state = {
-    draggedId: null as string | null,
-    dragOverId: null as string | null,
     settingsPersistenceSession: {},
     settings,
-    setDraggedId(value: string | null) {
-      state.draggedId = value;
-    },
-    setDragOverId(value: string | null) {
-      state.dragOverId = value;
-    },
     setSettings(value: typeof settings | null) {
       if (value) state.settings = value;
     },
@@ -59,55 +51,32 @@ it('keeps the drop command queued behind an in-flight settings mutation', async 
   mocks.reorder.mockResolvedValue(true);
   mocks.load.mockResolvedValue(settings);
   const settingsActions = createHighlighterSettingsActions(state);
-  const dragActions = createHighlighterDragActions(state);
-  const event = { dataTransfer: { effectAllowed: 'none' }, preventDefault: vi.fn() };
+  const orderingActions = createHighlighterOrderingActions(state);
 
   const blur = settingsActions.handleUpdateBlurSettings({
     amount: 7,
     blurType: 'solid',
     showBorder: true,
   });
-  dragActions.handleDragStart(event, 'system-default');
-  const drop = dragActions.handleDrop(event, 'system-soft-highlight');
+  const move = orderingActions.handleMoveBefore('system-default', null);
   await Promise.resolve();
   expect(mocks.reorder).not.toHaveBeenCalled();
 
   gate.resolve();
-  await Promise.all([blur, drop]);
+  await Promise.all([blur, move]);
   expect(mocks.reorder).toHaveBeenCalledOnce();
 });
 
-it('keeps drag hover narrow and resets no-op drops without persisting', async () => {
+it('ignores invalid move anchors without persisting', async () => {
   const settings = createDefaultHighlighterSettings();
   const state = {
-    draggedId: null as string | null,
-    dragOverId: null as string | null,
     settingsPersistenceSession: {},
     settings,
-    setDraggedId(value: string | null) {
-      state.draggedId = value;
-    },
-    setDragOverId(value: string | null) {
-      state.dragOverId = value;
-    },
     setSettings(value: typeof settings | null) {
       if (value) state.settings = value;
     },
   };
-  const actions = createHighlighterDragActions(state);
-  const event = { dataTransfer: { effectAllowed: 'none' }, preventDefault: vi.fn() };
-
-  actions.handleDragOver(event, 'system-soft-highlight');
-  expect(state.dragOverId).toBeNull();
-
-  actions.handleDragStart(event, 'system-default');
-  actions.handleDragOver(event, 'system-default');
-  expect(state.dragOverId).toBeNull();
-  actions.handleDragOver(event, 'system-soft-highlight');
-  expect(state.dragOverId).toBe('system-soft-highlight');
-
-  await actions.handleDrop(event, 'system-default');
+  const actions = createHighlighterOrderingActions(state);
+  await actions.handleMoveBefore('system-default', 'missing');
   expect(mocks.reorder).not.toHaveBeenCalled();
-  expect(state.draggedId).toBeNull();
-  expect(state.dragOverId).toBeNull();
 });

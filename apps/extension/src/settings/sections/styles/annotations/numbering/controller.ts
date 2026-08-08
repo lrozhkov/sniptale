@@ -7,10 +7,7 @@ import {
   subscribeToStepBadgePresetCatalog,
 } from '../../../../../composition/persistence/step-badge-presets';
 import type { StepBadgePresetCatalogController } from './types';
-import {
-  createStepBadgePresetCatalogActions,
-  createStepBadgePresetDragActions,
-} from './controller-actions';
+import { createStepBadgePresetCatalogActions } from './controller-actions';
 
 export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogController {
   const [catalog, setCatalog] = useState<StepBadgePresetCatalog | null>(null);
@@ -20,9 +17,6 @@ export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogCon
   const [editor, setEditor] = useState<StepBadgePresetCatalogController['editor']>({
     isOpen: false,
   });
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const request = useRef(0);
   const queue = useRef(Promise.resolve());
   const refresh = useCallback(async () => {
@@ -87,29 +81,12 @@ export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogCon
     },
     [refresh]
   );
-  const resetDrag = () => {
-    setDraggedId(null);
-    setDragOverId(null);
-  };
   return {
     catalog,
-    draggedId,
-    dragOverId,
     editor,
     error,
-    hoveredId,
     isLoading,
     isSaving,
-    actions: {
-      ...createStepBadgePresetCatalogActions({ catalog, mutate, setEditor, setHoveredId }),
-      ...createStepBadgePresetDragActions({
-        catalog,
-        draggedId,
-        mutate,
-        reset: resetDrag,
-        setDraggedId,
-        setDragOverId,
-      }),
-    },
+    actions: createStepBadgePresetCatalogActions({ catalog, mutate, setEditor }),
   };
 }

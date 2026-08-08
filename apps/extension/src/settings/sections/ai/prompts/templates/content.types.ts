@@ -9,11 +9,9 @@ export interface TemplatesSectionContentProps {
   handleDeleteTemplate: (template: PromptTemplate) => void;
   handleEditTemplate: (template: PromptTemplate) => void;
   handleSaveTemplate: (name: string, content: string) => Promise<void>;
-  hoveredTemplateId: string | null;
   isEditorOpen: boolean;
   isLoading: boolean;
   submitError: string | null;
   openNewTemplateEditor: () => void;
-  setHoveredTemplateId: (id: string | null) => void;
   templates: PromptTemplate[];
 }

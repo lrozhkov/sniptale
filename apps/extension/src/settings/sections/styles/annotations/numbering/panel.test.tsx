@@ -19,13 +19,8 @@ function actions(): StepBadgePresetCatalogController['actions'] {
     add: vi.fn(),
     closeEditor: vi.fn(),
     delete: vi.fn(async () => undefined),
-    dragEnd: vi.fn(),
-    dragLeave: vi.fn(),
-    dragOver: vi.fn(),
-    dragStart: vi.fn(),
-    drop: vi.fn(async () => undefined),
     edit: vi.fn(),
-    hover: vi.fn(),
+    moveBefore: vi.fn(),
     reset: vi.fn(async () => undefined),
     save: vi.fn(async () => undefined),
     setDefault: vi.fn(async () => undefined),
@@ -42,11 +37,8 @@ function controller(): StepBadgePresetCatalogController {
       presets: createSystemStepBadgePresetCatalog(),
       systemCatalogRevision: 1,
     },
-    draggedId: null,
-    dragOverId: null,
     editor: { isOpen: false },
     error: false,
-    hoveredId: null,
     isLoading: false,
     isSaving: false,
   };
@@ -55,7 +47,7 @@ function controller(): StepBadgePresetCatalogController {
 it('renders catalog, loading, error, reset, and user delete states', () => {
   const base = controller();
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
-    'highlighter.stepBadgePresets.defaultBadge'
+    'settings.collection.defaultBadge'
   );
   expect(
     renderToStaticMarkup(<StepBadgePresetsPanel controller={{ ...base, isLoading: true }} />)
@@ -68,13 +60,11 @@ it('renders catalog, loading, error, reset, and user delete states', () => {
   const system = { ...base.catalog!.presets[0]!, customized: true };
   const user = { ...base.catalog!.presets[1]!, id: 'user-1', origin: 'user' as const };
   base.catalog = { ...base.catalog!, presets: [system, user] };
-  base.hoveredId = system.id;
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
-    'highlighter.stepBadgePresets.reset'
+    'settings.collection.actions.reset'
   );
-  base.hoveredId = user.id;
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
-    'highlighter.stepBadgePresets.delete'
+    'settings.collection.actions.delete'
   );
 });
 
@@ -87,14 +77,10 @@ it('routes enabled row and add interactions through controller actions', async (
     origin: 'user' as const,
   };
   value.catalog = { ...value.catalog!, presets: [...value.catalog!.presets, user] };
-  value.hoveredId = user.id;
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => root.render(<StepBadgePresetsPanel controller={value} />));
-  const row = host.querySelector<HTMLElement>('[draggable="true"]');
-  await act(async () => row?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })));
-  await act(async () => row?.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
   for (const button of host.querySelectorAll<HTMLButtonElement>('button')) {
     if (!button.disabled) await act(async () => button.click());
   }

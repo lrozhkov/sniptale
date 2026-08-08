@@ -76,20 +76,12 @@ function createPreset() {
 function createProps() {
   const preset = createPreset();
   const presets: HighlighterSectionContentProps['presets'] = {
-    draggedId: null,
-    dragOverId: null,
     editingPreset: preset,
-    hoveredPresetId: null,
     handleAddPreset: vi.fn(),
     handleCloseEditor: vi.fn(),
     handleDeletePreset: vi.fn(),
-    handleDragEnd: vi.fn(),
-    handleDragLeave: vi.fn(),
-    handleDragOver: vi.fn(),
-    handleDragStart: vi.fn(),
-    handleDrop: vi.fn(),
+    handleMoveBefore: vi.fn(),
     handleEditPreset: vi.fn(),
-    handlePresetHoverChange: vi.fn(),
     handleResetPreset: vi.fn(),
     handleSavePreset: vi.fn(),
     handleSetDefaultPreset: vi.fn(),

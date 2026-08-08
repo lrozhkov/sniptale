@@ -62,23 +62,19 @@ export function createDefaultQuickAction(): QuickAction {
   };
 }
 
-export function reorderQuickActions(
+export function reorderQuickActionsBefore(
   actions: QuickAction[],
-  draggedId: string,
-  targetId: string
-): QuickAction[] | null {
-  const draggedIndex = actions.findIndex((action) => action.id === draggedId);
-  const targetIndex = actions.findIndex((action) => action.id === targetId);
-
-  if (draggedIndex === -1 || targetIndex === -1) {
-    return null;
-  }
-
-  const nextActions = [...actions];
-  const [draggedAction] = nextActions.splice(draggedIndex, 1);
-  if (!draggedAction) {
-    return null;
-  }
-  nextActions.splice(targetIndex, 0, draggedAction);
-  return nextActions;
+  actionId: string,
+  beforeActionId: string | null
+) {
+  const next = actions.filter((action) => action.id !== actionId);
+  const moved = actions.find((action) => action.id === actionId);
+  if (!moved) return null;
+  const target =
+    beforeActionId === null
+      ? next.length
+      : next.findIndex((action) => action.id === beforeActionId);
+  if (target < 0) return null;
+  next.splice(target, 0, moved);
+  return next;
 }

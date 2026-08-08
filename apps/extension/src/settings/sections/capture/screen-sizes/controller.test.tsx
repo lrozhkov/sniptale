@@ -161,7 +161,7 @@ it('creates, edits across target groups, moves, and selects presets through atom
     target: 'window',
   });
 
-  await act(async () => requireState().list.onMove('window-1', -1));
+  await act(async () => requireState().list.onMoveBefore('window-1', null));
   await act(async () => requireState().defaultField.onChange('window-1'));
   expect(requireState().defaultField.selectedPresetId).toBe('window-1');
   expect(updateSettings).toHaveBeenCalledWith({ defaultViewportPresetId: 'window-1' });
@@ -241,7 +241,7 @@ it('blocks overlapping mutations so a failed optimistic write cannot be resurrec
     first = requireState().list.onToggle(viewportPreset);
   });
   expect(requireState().model.isLoading).toBe(true);
-  await act(async () => requireState().list.onMove(windowPreset.id, -1));
+  await act(async () => requireState().list.onMoveBefore(windowPreset.id, null));
   expect(updateSettings).toHaveBeenCalledTimes(1);
 
   rejectWrite(new Error('storage failed'));

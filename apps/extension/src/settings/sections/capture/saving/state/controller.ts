@@ -7,7 +7,6 @@ import {
   shouldConfirmDelete,
 } from '.';
 import { useSavePresetDialogs } from '../actions/dialogs';
-import { useSavePresetDragState } from './drag';
 import { useSavePresetsSync } from '../actions/sync';
 
 function resolveSavePresetsDialogState(dialogState: ReturnType<typeof useSavePresetDialogs>) {
@@ -37,14 +36,13 @@ function resolveSavePresetsDialogState(dialogState: ReturnType<typeof useSavePre
 
 export function useSavePresetsSection() {
   const sync = useSavePresetsSync();
-  const dragState = useSavePresetDragState();
   const dialogState = useSavePresetDialogs();
   const resolvedDialogState = resolveSavePresetsDialogState(dialogState);
-  const actions = createSavePresetsActions(sync, resolvedDialogState, dragState);
+  const actions = createSavePresetsActions(sync, resolvedDialogState);
   const viewModel = buildSavePresetsViewModel(sync);
   const defaultPresetHandlers = createDefaultPresetHandlers(sync, actions);
-  const savePresetsState = createSavePresetsState(sync, dragState, resolvedDialogState, viewModel);
-  const savePresetsMutators = createSavePresetsMutators(dragState, resolvedDialogState);
+  const savePresetsState = createSavePresetsState(sync, resolvedDialogState, viewModel);
+  const savePresetsMutators = createSavePresetsMutators(resolvedDialogState);
 
   const handleDeletePreset = (preset: SavePreset) => {
     actions.handleDeletePreset(preset);
@@ -61,7 +59,7 @@ export function useSavePresetsSection() {
     handleCaptureActionChange: actions.handleCaptureActionChange,
     ...defaultPresetHandlers,
     handleDeletePreset,
-    handleDrop: actions.handleDrop,
+    handleMoveBefore: actions.handleMoveBefore,
     handleSavePreset: actions.handleSavePreset,
     handleTogglePresetEnabled: actions.handleTogglePresetEnabled,
     handleToggleSaveToGallery: actions.handleToggleSaveToGallery,

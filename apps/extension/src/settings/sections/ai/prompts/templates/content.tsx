@@ -2,30 +2,20 @@ import { translate } from '../../../../../platform/i18n';
 import { PromptTemplateEditor } from '../../../../../features/prompt-templates/editor';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { settingsSectionClassName } from '../../../../section-surface';
-import {
-  AddTemplateButton,
-  TemplatesHeader,
-  TemplatesList,
-  TemplatesSummary,
-} from './content.sections.tsx';
+import { TemplatesHeader, TemplatesList } from './content.sections.tsx';
 import type { TemplatesSectionContentProps } from './content.types.ts';
 
 export function TemplatesSectionContent(props: TemplatesSectionContentProps) {
   return (
     <div className={settingsSectionClassName}>
       <TemplatesHeader />
-      <TemplatesSummary count={props.templates.length} />
-
       <TemplatesList
-        hoveredTemplateId={props.hoveredTemplateId}
         isLoading={props.isLoading}
         onDelete={props.handleDeleteTemplate}
         onEdit={props.handleEditTemplate}
-        onHoverChange={props.setHoveredTemplateId}
+        onAdd={props.openNewTemplateEditor}
         templates={props.templates}
       />
-
-      <AddTemplateButton disabled={props.isLoading} onClick={props.openNewTemplateEditor} />
 
       <PromptTemplateEditor
         isOpen={props.isEditorOpen}

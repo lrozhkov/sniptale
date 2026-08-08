@@ -7,7 +7,7 @@ import {
 } from '../../../../features/viewport-presets/operations';
 import {
   createViewportPreset,
-  moveViewportPreset,
+  moveViewportPresetBefore,
   updateViewportPreset,
   type ViewportPresetDraft,
 } from './helpers';
@@ -135,9 +135,12 @@ export function useViewportPresetActions(
       dialogs.setEditingViewport(preset);
       dialogs.setIsViewportEditorOpen(true);
     },
-    handleMoveViewportPreset: async (presetId: string, direction: -1 | 1) => {
+    handleMoveViewportPresetBefore: async (presetId: string, beforePresetId: string | null) => {
       await runMutation(sync, () =>
-        commitPresets(sync, moveViewportPreset(sync.viewportPresets, presetId, direction))
+        commitPresets(
+          sync,
+          moveViewportPresetBefore(sync.viewportPresets, presetId, beforePresetId)
+        )
       );
     },
     handleResetViewportPreset: async (preset: ViewportPreset) => {

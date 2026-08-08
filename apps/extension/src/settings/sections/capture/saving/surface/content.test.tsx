@@ -10,7 +10,6 @@ const { bodyPropsSpy, listPropsSpy } = vi.hoisted(() => ({
 }));
 
 vi.mock('./cards', () => ({
-  addButtonClassName: 'add-button',
   CaptureActionCard: (props: unknown) => {
     bodyPropsSpy({ type: 'capture', props });
     return <div data-testid="capture-card" />;
@@ -27,9 +26,13 @@ vi.mock('./cards', () => ({
 }));
 
 vi.mock('./list/root', () => ({
-  PresetsList: (props: unknown) => {
+  PresetsList: (props: { onEdit: () => void }) => {
     listPropsSpy(props);
-    return <div data-testid="presets-list" />;
+    return (
+      <button data-testid="presets-list" onClick={() => props.onEdit()}>
+        add
+      </button>
+    );
   },
 }));
 
@@ -51,8 +54,6 @@ function createProps(
     defaultExportPresetId: null,
     defaultImagePresetId: null,
     defaultVideoPresetId: null,
-    draggedId: null,
-    dragOverId: null,
     handleCaptureActionChange: vi.fn(async () => undefined),
     handleDefaultExportChange: vi.fn(async () => undefined),
     handleDefaultImageChange: vi.fn(async () => undefined),
@@ -61,20 +62,14 @@ function createProps(
     handleTogglePresetEnabled: vi.fn(async () => undefined),
     handleToggleSaveToGallery: vi.fn(async () => undefined),
     handleSavePreset: vi.fn(async () => undefined),
-    hoveredPresetId: null,
+    onMoveBefore: vi.fn(async () => undefined),
     isEditorOpen: false,
     isLoading: false,
-    onDragEnd: vi.fn(),
-    onDragLeave: vi.fn(),
-    onDragOver: vi.fn(),
-    onDragStart: vi.fn(),
-    onDrop: vi.fn(),
     openEditor: vi.fn(),
     presetCountLabel: 'presets',
     presetOptions: [],
     presets: [],
     saveCapturesToGallery: false,
-    setHoveredPresetId: vi.fn(),
     ...overrides,
   };
 }
@@ -142,7 +137,6 @@ function verifySavePresetsSectionComposition() {
       onCloseEditor: props.closeEditor,
       onDelete: props.handleDeletePreset,
       onEdit: props.openEditor,
-      onHoverChange: props.setHoveredPresetId,
       onSavePreset: props.handleSavePreset,
       onToggleEnabled: props.handleTogglePresetEnabled,
       presetCountLabel: 'presets',

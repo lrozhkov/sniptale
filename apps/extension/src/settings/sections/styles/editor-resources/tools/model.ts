@@ -1,14 +1,14 @@
-export function reorderToolPresetIds(
+export function reorderToolPresetIdsBefore(
   items: ReadonlyArray<{ id: string }>,
-  draggedId: string,
-  targetId: string
+  itemId: string,
+  beforeItemId: string | null
 ) {
-  const next = [...items];
-  const from = next.findIndex((item) => item.id === draggedId);
-  const to = next.findIndex((item) => item.id === targetId);
-  if (from < 0 || to < 0 || from === to) return null;
-  const [item] = next.splice(from, 1);
-  if (!item) return null;
-  next.splice(to, 0, item);
-  return next.map(({ id }) => id);
+  const ids = items.map((item) => item.id);
+  const from = ids.indexOf(itemId);
+  if (from < 0) return null;
+  ids.splice(from, 1);
+  const to = beforeItemId === null ? ids.length : ids.indexOf(beforeItemId);
+  if (to < 0) return null;
+  ids.splice(to, 0, itemId);
+  return ids;
 }

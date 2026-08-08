@@ -75,13 +75,12 @@ function createProps() {
     },
     list: {
       countLabel: 'viewportPresets.section.countFew',
-      hoveredPresetId: viewportOne.id,
       onDelete: vi.fn(),
       onEdit: vi.fn(),
-      onHoverChange: vi.fn(),
-      onMove: vi.fn().mockResolvedValue(undefined),
+      onMoveBefore: vi.fn().mockResolvedValue(undefined),
       onReset: vi.fn().mockResolvedValue(undefined),
       onToggle: vi.fn().mockResolvedValue(undefined),
+      onSetDefault: vi.fn().mockResolvedValue(undefined),
     },
     model: { isLoading: false, presets: [viewportOne, viewportTwo, systemWindow] },
   };
@@ -138,36 +137,36 @@ it('groups viewport/window rows and renders type, size, disabled state, and frie
   expect(mocks.dialogs.mock.calls.at(-1)?.[0]).not.toHaveProperty('editingViewport');
 });
 
-it('routes hover, toggle, movement, edit, reset, delete, and add controls', () => {
+it('routes toggle, movement, edit, reset, delete, and add collection intents', () => {
   const props = createProps();
   act(() => root?.render(<PresetsSectionContent {...props} />));
 
-  const button = (title: string, index = 0) =>
-    container?.querySelectorAll<HTMLButtonElement>(`button[title="${title}"]`)[index] ?? null;
+  const labelledButton = (label: string, index = 0) =>
+    container?.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`)[index] ?? null;
+  const textButton = (text: string, index = 0) =>
+    [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].filter((button) =>
+      button.textContent?.includes(text)
+    )[index] ?? null;
   act(() => {
-    button('viewportPresets.actions.disable')?.click();
-    button('viewportPresets.actions.moveUp', 1)?.click();
-    button('viewportPresets.actions.moveDown')?.click();
-    button('common.actions.edit')?.click();
-    button('common.actions.delete')?.click();
-    button('viewportPresets.actions.reset')?.click();
+    labelledButton('settings.collection.actions.disable')?.click();
+    textButton('settings.collection.actions.moveUp', 1)?.click();
+    textButton('settings.collection.actions.moveDown')?.click();
+    labelledButton('settings.collection.actions.edit')?.click();
+    textButton('settings.collection.actions.delete')?.click();
+    textButton('settings.collection.actions.reset')?.click();
     const add = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((item) =>
       item.textContent?.includes('viewportPresets.section.addButton')
     );
     add?.click();
-    container
-      ?.querySelector('[class*="group"]')
-      ?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
   });
 
   expect(props.list.onToggle).toHaveBeenCalledWith(viewportOne);
-  expect(props.list.onMove).toHaveBeenCalledWith(viewportTwo.id, -1);
-  expect(props.list.onMove).toHaveBeenCalledWith(viewportOne.id, 1);
+  expect(props.list.onMoveBefore).toHaveBeenCalledWith(viewportTwo.id, viewportOne.id);
+  expect(props.list.onMoveBefore).toHaveBeenCalledWith(viewportOne.id, null);
   expect(props.list.onEdit).toHaveBeenCalledWith(viewportOne);
   expect(props.list.onDelete).toHaveBeenCalledWith(viewportOne);
   expect(props.list.onReset).toHaveBeenCalledWith(systemWindow);
   expect(props.editor.onAdd).toHaveBeenCalledOnce();
-  expect(props.list.onHoverChange).toHaveBeenCalled();
 
   act(() =>
     root?.render(

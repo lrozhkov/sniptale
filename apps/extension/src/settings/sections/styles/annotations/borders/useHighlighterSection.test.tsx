@@ -16,8 +16,8 @@ vi.mock('./crud-actions', () => ({
   createHighlighterCrudActions: (state: unknown) => createCrudActionsSpy(state),
 }));
 
-vi.mock('./drag-actions', () => ({
-  createHighlighterDragActions: (state: unknown) => createDragActionsSpy(state),
+vi.mock('./ordering-actions', () => ({
+  createHighlighterOrderingActions: (state: unknown) => createDragActionsSpy(state),
 }));
 
 vi.mock('./persistence-actions', () => ({
@@ -83,7 +83,7 @@ describe('useHighlighterSection', () => {
       handleCloseEditor: vi.fn(),
     };
     const dragActions = {
-      handleDragEnd: vi.fn(),
+      handleMoveBefore: vi.fn(),
     };
     const settingsActions = {
       handleSetDefaultPreset: vi.fn(),
@@ -109,9 +109,6 @@ describe('useHighlighterSection', () => {
     expect(createDragActionsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         ...persistenceState,
-        draggedId: null,
-        setDraggedId: expect.any(Function),
-        setDragOverId: expect.any(Function),
       })
     );
     expect(createSettingsActionsSpy).toHaveBeenCalledWith(persistenceState);
@@ -124,14 +121,10 @@ describe('useHighlighterSection', () => {
         presets: expect.objectContaining({
           ...crudActions,
           ...dragActions,
-          draggedId: null,
-          dragOverId: null,
           editingPreset: undefined,
-          hoveredPresetId: null,
           isEditorOpen: false,
           handleSetDefaultPreset: settingsActions.handleSetDefaultPreset,
           handleTogglePresetEnabled: settingsActions.handleTogglePresetEnabled,
-          handlePresetHoverChange: expect.any(Function),
         }),
         status: {
           isLoading: false,
@@ -143,11 +136,5 @@ describe('useHighlighterSection', () => {
     expect(latestState?.presets).not.toHaveProperty('setSettings');
     expect(latestState?.presets).not.toHaveProperty('setDraggedId');
     expect(latestState?.presets).not.toHaveProperty('setEditingPreset');
-
-    await act(async () => {
-      latestState?.presets.handlePresetHoverChange('preset-1');
-    });
-
-    expect(latestState?.presets.hoveredPresetId).toBe('preset-1');
   });
 });

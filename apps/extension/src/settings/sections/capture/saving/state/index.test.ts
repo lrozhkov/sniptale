@@ -7,12 +7,7 @@ import {
   createSavePresetsState,
   shouldConfirmDelete,
 } from '.';
-import type {
-  SavePresetsActions,
-  SavePresetsDialogsState,
-  SavePresetsDragUiState,
-  SavePresetsSyncState,
-} from './types';
+import type { SavePresetsActions, SavePresetsDialogsState, SavePresetsSyncState } from './types';
 
 function createPreset(id: string): SavePreset {
   return {
@@ -58,24 +53,13 @@ function createDialogState(): SavePresetsDialogsState {
   };
 }
 
-function createDragState(): SavePresetsDragUiState {
-  return {
-    dragOverId: 'drag-over',
-    draggedId: 'dragged',
-    hoveredPresetId: 'hovered',
-    setDragOverId: vi.fn(),
-    setDraggedId: vi.fn(),
-    setHoveredPresetId: vi.fn(),
-  };
-}
-
 function createActions(): SavePresetsActions {
   return {
     confirmDeletePreset: vi.fn(async () => undefined),
     handleCaptureActionChange: vi.fn(async () => undefined),
     handleDefaultPresetChange: vi.fn(async () => undefined),
     handleDeletePreset: vi.fn(),
-    handleDrop: vi.fn(async () => undefined),
+    handleMoveBefore: vi.fn(async () => undefined),
     handleSavePreset: vi.fn(async () => undefined),
     handleTogglePresetEnabled: vi.fn(async () => undefined),
     handleToggleSaveToGallery: vi.fn(async () => undefined),
@@ -101,7 +85,6 @@ describe('save-presets section state helpers', () => {
 async function verifySplitStateHelpers(): Promise<void> {
   const sync = createSyncState();
   const dialogState = createDialogState();
-  const dragState = createDragState();
   const actions = createActions();
   const viewModel = {
     captureActionOptions: [{ label: 'Default', value: 'download_default' as const }],
@@ -119,29 +102,26 @@ async function verifySplitStateHelpers(): Promise<void> {
     'image',
     'savePresets.messages.defaultImageUpdated'
   );
-  expectCreatedSavePresetState(sync, dragState, dialogState, viewModel);
+  expectCreatedSavePresetState(sync, dialogState, viewModel);
 }
 
 function expectCreatedSavePresetState(
   sync: SavePresetsSyncState,
-  dragState: SavePresetsDragUiState,
   dialogState: SavePresetsDialogsState,
-  viewModel: Parameters<typeof createSavePresetsState>[3]
+  viewModel: Parameters<typeof createSavePresetsState>[2]
 ): void {
-  expect(createSavePresetsState(sync, dragState, dialogState, viewModel)).toEqual(
+  expect(createSavePresetsState(sync, dialogState, viewModel)).toEqual(
     expect.objectContaining({
-      draggedId: 'dragged',
       editingPreset: dialogState.editingPreset,
-      hoveredPresetId: 'hovered',
       presetCountLabel: '1 preset',
       presets: sync.presets,
     })
   );
-  expect(createSavePresetsMutators(dragState, dialogState)).toEqual(
+  expect(createSavePresetsMutators(dialogState)).toEqual(
     expect.objectContaining({
       closeDeleteDialog: dialogState.closeDeleteDialog,
       openEditor: dialogState.openEditor,
-      setHoveredPresetId: dragState.setHoveredPresetId,
+      closeEditor: dialogState.closeEditor,
     })
   );
 }

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { reorderPalette } from './model';
+import { reorderPaletteBefore } from './model';
 
 it('reorders one palette without mutating the source', () => {
   const palette = {
@@ -10,7 +10,14 @@ it('reorders one palette without mutating the source', () => {
     sceneBackground: [],
   };
   expect(
-    reorderPalette({ draggedIndex: 0, palette, key: 'shapeStroke', targetIndex: 1 })?.shapeStroke
+    reorderPaletteBefore({ itemIndex: 0, beforeIndex: null, palette, key: 'shapeStroke' })
+      ?.shapeStroke
   ).toEqual(['#2', '#1']);
   expect(palette.shapeStroke).toEqual(['#1', '#2']);
+  expect(
+    reorderPaletteBefore({ itemIndex: 9, beforeIndex: null, palette, key: 'shapeStroke' })
+  ).toBeNull();
+  expect(
+    reorderPaletteBefore({ itemIndex: 0, beforeIndex: 1, palette, key: 'shapeStroke' })?.shapeStroke
+  ).toEqual(['#1', '#2']);
 });

@@ -8,10 +8,7 @@ import {
 } from '@sniptale/ui/product-form-controls';
 import {
   settingsAddButtonClassName,
-  settingsDangerIconButtonClassName,
   settingsEmptyStateClassName,
-  settingsInfoIconButtonClassName,
-  settingsListRowClassName,
   settingsModalFieldSurfaceClassName,
   settingsNeutralBadgeClassName,
   settingsPanelClassName,
@@ -21,21 +18,11 @@ import {
 export const settingsCardClassName = settingsPanelClassName;
 export {
   settingsAddButtonClassName,
-  settingsDangerIconButtonClassName,
   settingsEmptyStateClassName,
-  settingsInfoIconButtonClassName,
-  settingsListRowClassName,
   settingsModalFieldSurfaceClassName,
   settingsNeutralBadgeClassName,
   settingsSuccessBadgeClassName,
 };
-
-export function getSettingsHoverActionsClassName(visible: boolean) {
-  return [
-    'ml-auto flex flex-shrink-0 items-center gap-1 self-center transition-opacity',
-    visible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-  ].join(' ');
-}
 
 export function SettingsSwitch({
   checked,

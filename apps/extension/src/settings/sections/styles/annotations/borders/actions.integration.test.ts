@@ -2,7 +2,7 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createDefaultHighlighterSettings } from '../../../../../features/highlighter/style/defaults';
-import { createHighlighterDragActions } from './drag-actions';
+import { createHighlighterOrderingActions } from './ordering-actions';
 import { createHighlighterSettingsActions } from './persistence-actions';
 
 const mocks = vi.hoisted(() => ({
@@ -33,16 +33,8 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 function createState() {
   const state = {
-    draggedId: null as string | null,
-    dragOverId: null as string | null,
     settingsPersistenceSession: {},
     settings: createDefaultHighlighterSettings(),
-    setDraggedId(value: string | null) {
-      state.draggedId = value;
-    },
-    setDragOverId(value: string | null) {
-      state.dragOverId = value;
-    },
     setSettings(value: ReturnType<typeof createDefaultHighlighterSettings> | null) {
       if (value) state.settings = value;
     },
@@ -61,12 +53,9 @@ beforeEach(() => {
 
 it('routes reorder/default/blur/focus through canonical owner commands', async () => {
   const state = createState();
-  const drag = createHighlighterDragActions(state);
+  const ordering = createHighlighterOrderingActions(state);
   const settings = createHighlighterSettingsActions(state);
-  const event = { dataTransfer: { effectAllowed: 'none' }, preventDefault: vi.fn() };
-
-  drag.handleDragStart(event, 'system-default');
-  await drag.handleDrop(event, 'system-soft-highlight');
+  await ordering.handleMoveBefore('system-default', 'system-marker');
   expect(mocks.reorder).toHaveBeenCalledWith([
     'system-soft-highlight',
     'system-default',
@@ -77,8 +66,6 @@ it('routes reorder/default/blur/focus through canonical owner commands', async (
     'system-light-ui',
     'system-dark-ui',
   ]);
-  expect(state.draggedId).toBeNull();
-
   await settings.handleSetDefaultPreset('system-soft-highlight');
   await settings.handleUpdateBlurSettings({ amount: 8, blurType: 'solid', showBorder: true });
   await settings.handleUpdateFocusSettings({ opacity: 0.7, showBorder: false });

@@ -14,13 +14,11 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../section-surface/panel-controls', () => ({
-  getSettingsHoverActionsClassName: (visible: boolean) => (visible ? 'visible' : 'hidden'),
   settingsAddButtonClassName: 'add-button',
   settingsCardClassName: 'settings-card',
   settingsDangerIconButtonClassName: 'danger-button',
   settingsEmptyStateClassName: 'empty-state',
   settingsInfoIconButtonClassName: 'info-button',
-  settingsListRowClassName: 'list-row',
   settingsModalFieldSurfaceClassName: 'field-surface',
   settingsNeutralBadgeClassName: 'neutral-badge',
   settingsSuccessBadgeClassName: 'success-badge',
@@ -106,21 +104,13 @@ function createSettings(overrides: Partial<HighlighterSettings> = {}): Highlight
 
 function createPresets(): HighlighterPresetController {
   return {
-    draggedId: 'preset-custom',
-    dragOverId: 'preset-custom',
     editingPreset: undefined,
-    hoveredPresetId: 'preset-custom',
     isEditorOpen: false,
     handleAddPreset: vi.fn<() => void>(),
     handleCloseEditor: vi.fn<() => void>(),
     handleDeletePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
-    handleDragEnd: vi.fn<() => void>(),
-    handleDragLeave: vi.fn<() => void>(),
-    handleDragOver: vi.fn<(event: React.DragEvent, presetId: string) => void>(),
-    handleDragStart: vi.fn<(event: React.DragEvent, presetId: string) => void>(),
-    handleDrop: vi.fn<(event: React.DragEvent, targetId: string) => Promise<void>>(),
+    handleMoveBefore: vi.fn<(presetId: string, beforePresetId: string | null) => Promise<void>>(),
     handleEditPreset: vi.fn<(preset: BorderPreset) => void>(),
-    handlePresetHoverChange: vi.fn<(presetId: string | null) => void>(),
     handleResetPreset: vi.fn<(presetId: string) => Promise<void>>(),
     handleSavePreset: vi.fn<(preset: BorderPreset) => Promise<void>>(),
     handleSetDefaultPreset: vi.fn<(presetId: string) => Promise<void>>(),
@@ -169,29 +159,25 @@ async function renderPanel(props: HighlighterPresetsPanelProps = createProps()) 
   return props;
 }
 
-function createDragEvent(type: string) {
-  return new Event(type, { bubbles: true, cancelable: true });
-}
-
 function queryPanelControls() {
-  const [defaultRow, customRow] = Array.from(container?.querySelectorAll('.list-row') ?? []);
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
 
   return {
     addButton: buttons.find((button) =>
       button.textContent?.includes('highlighter.section.addButton')
     ),
-    customRow,
-    defaultRow,
     disabledEditButton: buttons.find((button) =>
       button.getAttribute('title')?.includes('highlighter.section.systemPresetEditDisabled')
     ),
-    editButton: buttons.find((button) =>
-      button.getAttribute('title')?.includes('common.actions.edit')
+    editButton: buttons.find(
+      (button) => button.getAttribute('aria-label') === 'settings.collection.actions.edit'
     ),
-    makeDefaultButton: buttons.find((button) =>
-      button.getAttribute('title')?.includes('highlighter.section.makeDefaultTitle')
+    makeDefaultButton: buttons.find(
+      (button) => button.textContent === 'settings.collection.actions.setDefault'
     ),
+    moveUpButton: buttons.filter(
+      (button) => button.textContent === 'settings.collection.actions.moveUp'
+    )[1],
   };
 }
 
@@ -202,13 +188,7 @@ async function triggerPanelInteractions() {
     controls.addButton?.click();
     controls.makeDefaultButton?.click();
     controls.editButton?.click();
-    controls.customRow?.dispatchEvent(createDragEvent('dragstart'));
-    controls.customRow?.dispatchEvent(createDragEvent('dragover'));
-    controls.customRow?.dispatchEvent(createDragEvent('dragleave'));
-    controls.customRow?.dispatchEvent(createDragEvent('drop'));
-    controls.customRow?.dispatchEvent(createDragEvent('dragend'));
-    controls.defaultRow?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    controls.defaultRow?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+    controls.moveUpButton?.click();
   });
 
   return controls;
@@ -234,7 +214,7 @@ describe('HighlighterPresetsPanel', () => {
     const controls = await triggerPanelInteractions();
 
     expect(container?.textContent).toContain('highlighter.section.presetsLabel');
-    expect(container?.textContent).toContain('highlighter.section.defaultBadge');
+    expect(container?.textContent).toContain('settings.collection.defaultBadge');
     expect(container?.textContent).toContain('highlighter.section.systemBadge');
     expect(container?.textContent).toContain('highlighter.section.countFew');
     expect(props.presets.handleAddPreset).toHaveBeenCalledOnce();
@@ -242,13 +222,7 @@ describe('HighlighterPresetsPanel', () => {
     expect(props.presets.handleEditPreset).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'preset-default', origin: 'system' })
     );
-    expect(props.presets.handleDragStart).toHaveBeenCalled();
-    expect(props.presets.handleDragOver).toHaveBeenCalled();
-    expect(props.presets.handleDragLeave).toHaveBeenCalled();
-    expect(props.presets.handleDrop).toHaveBeenCalled();
-    expect(props.presets.handleDragEnd).toHaveBeenCalled();
-    expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith('preset-default');
-    expect(props.presets.handlePresetHoverChange).toHaveBeenCalledWith(null);
+    expect(props.presets.handleMoveBefore).toHaveBeenCalledWith('preset-custom', 'preset-default');
     expect(controls.disabledEditButton).toBeUndefined();
   });
 
@@ -265,17 +239,16 @@ describe('HighlighterPresetsPanel', () => {
       defaultBorderPresetId: system.id,
     });
     const presets = createPresets();
-    presets.hoveredPresetId = system.id;
     await renderPanel({ presets, settings });
 
     const toggle = container?.querySelector<HTMLButtonElement>(
       'button[title="highlighter.section.lastEnabledPresetDisabled"]'
     );
-    const reset = container?.querySelector<HTMLButtonElement>(
-      'button[title="highlighter.section.resetSystemPresetTitle"]'
+    const reset = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+      (button) => button.textContent === 'settings.collection.actions.reset'
     );
     expect(toggle?.disabled).toBe(true);
-    expect(container?.querySelector('button[title="common.actions.delete"]')).toBeNull();
+    expect(container?.textContent).not.toContain('settings.collection.actions.delete');
 
     await act(async () => reset?.click());
     expect(presets.handleResetPreset).toHaveBeenCalledWith('system-default');

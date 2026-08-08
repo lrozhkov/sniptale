@@ -1,11 +1,6 @@
 import type { SavePreset } from '../../../../../contracts/settings';
 import type { buildSavePresetsViewModel } from './view-model';
-import type {
-  SavePresetsActions,
-  SavePresetsDialogsState,
-  SavePresetsDragUiState,
-  SavePresetsSyncState,
-} from './types';
+import type { SavePresetsActions, SavePresetsDialogsState, SavePresetsSyncState } from './types';
 
 export function shouldConfirmDelete(preset: SavePreset, sync: SavePresetsSyncState): boolean {
   return (
@@ -60,7 +55,6 @@ export function createDefaultPresetHandlers(
 
 export function createSavePresetsState(
   sync: SavePresetsSyncState,
-  dragState: SavePresetsDragUiState,
   dialogState: SavePresetsDialogsState,
   viewModel: ReturnType<typeof buildSavePresetsViewModel>
 ) {
@@ -71,10 +65,7 @@ export function createSavePresetsState(
     defaultExportPresetId: sync.defaultExportPresetId,
     defaultImagePresetId: sync.defaultImagePresetId,
     defaultVideoPresetId: sync.defaultVideoPresetId,
-    draggedId: dragState.draggedId,
-    dragOverId: dragState.dragOverId,
     editingPreset: dialogState.editingPreset,
-    hoveredPresetId: dragState.hoveredPresetId,
     isEditorOpen: dialogState.isEditorOpen,
     isLoading: sync.isLoading,
     presetCountLabel: viewModel.presetCountLabel,
@@ -84,17 +75,11 @@ export function createSavePresetsState(
   };
 }
 
-export function createSavePresetsMutators(
-  dragState: SavePresetsDragUiState,
-  dialogState: SavePresetsDialogsState
-) {
+export function createSavePresetsMutators(dialogState: SavePresetsDialogsState) {
   return {
     closeDeleteDialog: dialogState.closeDeleteDialog,
     closeEditor: dialogState.closeEditor,
     openEditor: dialogState.openEditor,
-    setDraggedId: dragState.setDraggedId,
-    setDragOverId: dragState.setDragOverId,
     setEditingPreset: dialogState.setEditingPreset,
-    setHoveredPresetId: dragState.setHoveredPresetId,
   };
 }

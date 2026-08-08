@@ -29,23 +29,19 @@ export function normalizeHighlighterPresetOrders(presets: BorderPreset[]) {
   return presets.map((preset, index) => ({ ...preset, order: index }));
 }
 
-export function reorderHighlighterPresets(
+export function reorderHighlighterPresetsBefore(
   presets: BorderPreset[],
-  draggedId: string,
-  targetId: string
+  presetId: string,
+  beforePresetId: string | null
 ) {
-  const nextPresets = [...presets];
-  const draggedIndex = nextPresets.findIndex((preset) => preset.id === draggedId);
-  const targetIndex = nextPresets.findIndex((preset) => preset.id === targetId);
-
-  if (draggedIndex < 0 || targetIndex < 0) {
-    return null;
-  }
-
-  const [removed] = nextPresets.splice(draggedIndex, 1);
-  if (!removed) {
-    return null;
-  }
-  nextPresets.splice(targetIndex, 0, removed);
-  return normalizeHighlighterPresetOrders(nextPresets);
+  const next = presets.filter((preset) => preset.id !== presetId);
+  const moved = presets.find((preset) => preset.id === presetId);
+  if (!moved) return null;
+  const target =
+    beforePresetId === null
+      ? next.length
+      : next.findIndex((preset) => preset.id === beforePresetId);
+  if (target < 0) return null;
+  next.splice(target, 0, moved);
+  return normalizeHighlighterPresetOrders(next);
 }

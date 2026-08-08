@@ -117,18 +117,7 @@ describe('useCalloutPresetCatalogController', () => {
     await act(async () => latest?.actions.toggle(user.id));
     await act(async () => latest?.actions.reset(catalog.presets[0]!.id));
     await act(async () => latest?.actions.delete(user));
-    act(() =>
-      latest?.actions.dragStart(
-        { dataTransfer: { effectAllowed: '' }, preventDefault: vi.fn() },
-        catalog.presets[0]!.id
-      )
-    );
-    await act(async () =>
-      latest?.actions.drop(
-        { dataTransfer: { effectAllowed: '' }, preventDefault: vi.fn() },
-        catalog.presets[1]!.id
-      )
-    );
+    await act(async () => latest?.actions.moveBefore(catalog.presets[0]!.id, null));
 
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({ id: user.id, name: user.name })

@@ -21,13 +21,13 @@ it('routes palette edits through the existing persistence owner', async () => {
     sceneBackground: [],
   };
   const actions = createPaletteActions({
-    draggedIndex: 0,
     key: 'shapeStroke',
     palette,
-    clearDrag: vi.fn(),
   });
   await actions.changeColor(0, '#3');
-  await actions.dropColor(1);
+  await actions.moveColor(0, null);
   expect(save).toHaveBeenNthCalledWith(1, expect.objectContaining({ shapeStroke: ['#3', '#2'] }));
   expect(save).toHaveBeenNthCalledWith(2, expect.objectContaining({ shapeStroke: ['#2', '#1'] }));
+  await actions.moveColor(8, null);
+  expect(save).toHaveBeenCalledTimes(2);
 });

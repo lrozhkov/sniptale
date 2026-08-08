@@ -25,13 +25,11 @@ vi.mock('./blur-controls', () => ({
 }));
 
 vi.mock('../../../../section-surface/panel-controls', () => ({
-  getSettingsHoverActionsClassName: (visible: boolean) => (visible ? 'visible' : 'hidden'),
   settingsAddButtonClassName: 'add-button',
   settingsCardClassName: 'settings-card',
   settingsDangerIconButtonClassName: 'danger-button',
   settingsEmptyStateClassName: 'empty-state',
   settingsInfoIconButtonClassName: 'info-button',
-  settingsListRowClassName: 'list-row',
   settingsModalFieldSurfaceClassName: 'field-surface',
   settingsNeutralBadgeClassName: 'neutral-badge',
   settingsSuccessBadgeClassName: 'success-badge',

@@ -8,11 +8,8 @@ type QuickActionsSectionCoreState = {
   confirmDelete: QuickAction | null;
   confirmationMessage: string | null;
   displayMode: 'list' | 'hidden';
-  draggedId: string | null;
-  dragOverId: string | null;
   editingId: string | null;
   editForm: QuickAction | null;
-  hoveredId: string | null;
   isLoading: boolean;
 };
 
@@ -26,21 +23,11 @@ type QuickActionsSectionActionState = {
   handleToggleStatus: (id: string) => Promise<void>;
   setConfirmDelete: (action: QuickAction | null) => void;
   setDisplayMode: (value: 'list' | 'hidden') => Promise<void>;
-  setHoveredId: (value: string | null) => void;
   updateFormField: (field: string, value: unknown) => void;
 };
 
-type QuickActionsSectionDragState = {
-  handleDragEnd: (event?: unknown) => void;
-  handleDragLeave: (event?: unknown) => void;
-  handleDragOver: (event: unknown, actionId: string) => void;
-  handleDragStart: (event: unknown, actionId: string) => void;
-  handleDrop: (event: unknown, actionId: string) => Promise<void>;
-};
-
 export type QuickActionsSectionHarnessState = QuickActionsSectionCoreState &
-  QuickActionsSectionActionState &
-  QuickActionsSectionDragState;
+  QuickActionsSectionActionState;
 
 function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
   return {
@@ -126,28 +113,20 @@ export function createSectionState(
         ? 'Quick action saved'
         : overrides.confirmationMessage,
     displayMode: overrides.displayMode ?? 'list',
-    draggedId: overrides.draggedId === undefined ? null : overrides.draggedId,
-    dragOverId: overrides.dragOverId === undefined ? null : overrides.dragOverId,
     editingId: overrides.editingId === undefined ? userAction.id : overrides.editingId,
     editForm:
       overrides.editForm === undefined ? createDefaultEditForm(userAction) : overrides.editForm,
     handleAdd: overrides.handleAdd ?? vi.fn(),
     handleCancelEdit: overrides.handleCancelEdit ?? vi.fn(),
     handleDelete: overrides.handleDelete ?? vi.fn().mockResolvedValue(undefined),
-    handleDragEnd: overrides.handleDragEnd ?? vi.fn(),
-    handleDragLeave: overrides.handleDragLeave ?? vi.fn(),
-    handleDragOver: overrides.handleDragOver ?? vi.fn(),
-    handleDragStart: overrides.handleDragStart ?? vi.fn(),
-    handleDrop: overrides.handleDrop ?? vi.fn().mockResolvedValue(undefined),
+    handleMoveBefore: overrides.handleMoveBefore ?? vi.fn().mockResolvedValue(undefined),
     handleEdit: overrides.handleEdit ?? vi.fn(),
     handleHotkeyError: overrides.handleHotkeyError ?? vi.fn(),
     handleSaveEdit: overrides.handleSaveEdit ?? vi.fn().mockResolvedValue(undefined),
     handleToggleStatus: overrides.handleToggleStatus ?? vi.fn().mockResolvedValue(undefined),
-    hoveredId: overrides.hoveredId === undefined ? userAction.id : overrides.hoveredId,
     isLoading: overrides.isLoading ?? false,
     setConfirmDelete: overrides.setConfirmDelete ?? vi.fn(),
     setDisplayMode: overrides.setDisplayMode ?? vi.fn().mockResolvedValue(undefined),
-    setHoveredId: overrides.setHoveredId ?? vi.fn(),
     updateFormField: overrides.updateFormField ?? vi.fn(),
   };
 }

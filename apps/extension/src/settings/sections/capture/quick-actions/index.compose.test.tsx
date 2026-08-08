@@ -83,7 +83,6 @@ vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) =
 
 import {
   createSectionState,
-  dispatchUiEvent,
   getQuickActionsContainer,
   renderQuickActionsSection,
   setSelectValue,
@@ -115,8 +114,12 @@ function updateEditorSelections(
 
 function triggerQuickActionsButtons(container: HTMLDivElement) {
   act(() => {
-    container.querySelector<HTMLButtonElement>('button[title="common.actions.edit"]')?.click();
-    container.querySelector<HTMLButtonElement>('button[title="common.actions.delete"]')?.click();
+    container
+      .querySelector<HTMLButtonElement>('button[aria-label="settings.collection.actions.edit"]')
+      ?.click();
+    [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'settings.collection.actions.delete')
+      ?.click();
     container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[0]?.click();
     container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[1]?.click();
     container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[2]?.click();
@@ -137,15 +140,10 @@ function triggerQuickActionsButtons(container: HTMLDivElement) {
 }
 
 function triggerQuickActionsDragInteractions(container: HTMLDivElement) {
-  const firstRow = container.querySelector('.settings-list-row');
-  const firstDragHandle = container.querySelector('[draggable="true"]');
-
-  dispatchUiEvent('mouseover', firstRow!);
-  dispatchUiEvent('mouseout', firstRow!);
-  dispatchUiEvent('dragover', firstRow!);
-  dispatchUiEvent('drop', firstRow!);
-  dispatchUiEvent('dragstart', firstDragHandle!);
-  dispatchUiEvent('dragend', firstDragHandle!);
+  const moveDown = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'settings.collection.actions.moveDown'
+  );
+  act(() => moveDown?.click());
 }
 
 async function triggerConfirmDialog(container: HTMLDivElement) {
@@ -179,21 +177,7 @@ function expectComposeHandlers(state: ReturnType<typeof createSectionState>) {
   expect(state.handleAdd).toHaveBeenCalled();
   expect(state.handleSaveEdit).toHaveBeenCalled();
   expect(state.handleDelete).toHaveBeenCalledWith('user-action');
-  expect(state.handleDragOver).toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'dragover' }),
-    'user-action'
-  );
-  expect(state.handleDrop).toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'drop' }),
-    'user-action'
-  );
-  expect(state.handleDragStart).toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'dragstart' }),
-    'user-action'
-  );
-  expect(state.handleDragEnd).toHaveBeenCalled();
-  expect(state.setHoveredId).toHaveBeenCalledWith('user-action');
-  expect(state.setHoveredId).toHaveBeenCalledWith(null);
+  expect(state.handleMoveBefore).toHaveBeenCalledWith('user-action', null);
 }
 
 describe('QuickActionsSection compose tree', () => {

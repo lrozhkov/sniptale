@@ -1,240 +1,84 @@
-import { Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
-
-import { translate } from '../../../../../platform/i18n';
-import { getHighlighterPresetCountLabel } from './helpers';
-import { HighlighterPresetRowContent } from './preset-row-content';
+import { translate, useAppLocale } from '../../../../../platform/i18n';
+import { getBorderPresetDisplayName } from '../../../../../features/highlighter/presets/display-name';
 import {
-  getSettingsHoverActionsClassName,
-  settingsAddButtonClassName,
-  settingsDangerIconButtonClassName,
-  settingsInfoIconButtonClassName,
-  settingsListRowClassName,
-  settingsNeutralBadgeClassName,
-  settingsSuccessBadgeClassName,
-  SettingsDragHandle,
-  SettingsSwitch,
-} from '../../../../section-surface/panel-controls';
+  SettingsCollection,
+  type SettingsCollectionAction,
+  type SettingsCollectionItem,
+  type SettingsCollectionMoveIntent,
+} from '../../../../section-surface';
+import { getHighlighterPresetCountLabel, getHighlighterPresetPreviewStyle } from './helpers';
 import type { HighlighterPresetsProps } from './types';
 
-type BorderPresetItem = HighlighterPresetsProps['settings']['borderPresets'][number];
-type HighlighterPresetRowState = {
-  isDefault: boolean;
-  isDragOver: boolean;
-  isDragging: boolean;
-  isHovered: boolean;
-};
-
-function HighlighterPresetBadge({
-  copyKey,
-  tone,
-}: {
-  copyKey: 'highlighter.section.defaultBadge' | 'highlighter.section.systemBadge';
-  tone: 'neutral' | 'success';
-}) {
-  const badgeClassName =
-    tone === 'success' ? settingsSuccessBadgeClassName : settingsNeutralBadgeClassName;
-
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs ${badgeClassName}`}>
-      {translate(copyKey)}
-    </span>
-  );
-}
-
-function getHighlighterPresetSwitchTitle(enabled: boolean | undefined): string {
-  return enabled === false
-    ? translate('savePresets.section.toggleShownTitle')
-    : translate('savePresets.section.toggleHiddenTitle');
-}
-
-function MakeDefaultPresetButton(props: { disabled: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={props.onClick}
-      disabled={props.disabled}
-      className={settingsInfoIconButtonClassName}
-      title={translate('highlighter.section.makeDefaultTitle')}
-    >
-      <Check size={14} />
-    </button>
-  );
-}
-
-function HighlighterPresetActions({
-  enabledPresetCount,
-  isDefault,
-  preset,
-  presets,
-}: {
-  enabledPresetCount: number;
-  isDefault: boolean;
-  preset: BorderPresetItem;
-  presets: HighlighterPresetsProps['presets'];
-}) {
-  const isVisible = presets.hoveredPresetId === preset.id;
-  const isLastEnabled = preset.enabled !== false && enabledPresetCount <= 1;
-
-  return (
-    <div className={getSettingsHoverActionsClassName(isVisible)}>
-      <SettingsSwitch
-        checked={preset.enabled !== false}
-        size="sm"
-        onClick={() => void presets.handleTogglePresetEnabled(preset.id)}
-        disabled={isLastEnabled}
-        title={
-          isLastEnabled
-            ? translate('highlighter.section.lastEnabledPresetDisabled')
-            : getHighlighterPresetSwitchTitle(preset.enabled)
-        }
-      />
-      {!isDefault ? (
-        <MakeDefaultPresetButton
-          disabled={preset.enabled === false}
-          onClick={() => presets.handleSetDefaultPreset(preset.id)}
-        />
-      ) : null}
-      <button
-        onClick={() => presets.handleEditPreset(preset)}
-        className={settingsInfoIconButtonClassName}
-        title={translate('common.actions.edit')}
-      >
-        <Pencil size={14} />
-      </button>
-      {preset.origin === 'system' && preset.customized === true ? (
-        <button
-          onClick={() => void presets.handleResetPreset(preset.id)}
-          className={settingsInfoIconButtonClassName}
-          title={translate('highlighter.section.resetSystemPresetTitle')}
-        >
-          <RotateCcw size={14} />
-        </button>
-      ) : null}
-      {preset.origin !== 'system' ? (
-        <button
-          onClick={() => presets.handleDeletePreset(preset)}
-          className={settingsDangerIconButtonClassName}
-          title={translate('common.actions.delete')}
-        >
-          <Trash2 size={14} />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function getHighlighterPresetRowState(
-  preset: BorderPresetItem,
-  props: HighlighterPresetsProps
-): HighlighterPresetRowState {
-  return {
-    isDefault: props.settings.defaultBorderPresetId === preset.id,
-    isDragOver: props.presets.dragOverId === preset.id,
-    isDragging: props.presets.draggedId === preset.id,
-    isHovered: props.presets.hoveredPresetId === preset.id,
-  };
-}
-
-function getHighlighterPresetRowClassName(state: HighlighterPresetRowState): string {
-  return [
-    settingsListRowClassName,
-    'cursor-grab',
-    state.isDragging ? 'scale-[0.98] opacity-50' : '',
-    state.isDragOver
-      ? 'border-[color:color-mix(in_srgb,var(--sniptale-color-success)_36%,var(--sniptale-color-border-soft)_64%)]'
-      : '',
-    state.isDragOver
-      ? 'bg-[color:color-mix(in_srgb,var(--sniptale-color-success)_8%,transparent)]'
-      : '',
-    state.isHovered && !state.isDragging
-      ? [
-          'border-[var(--sniptale-color-border-strong)]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_72%,transparent)]',
-        ].join(' ')
-      : '',
-  ].join(' ');
-}
-
-function AddHighlighterPresetButton(props: { onClick: () => void }) {
-  return (
-    <button onClick={props.onClick} className={settingsAddButtonClassName}>
-      <Plus size={16} />
-      {translate('highlighter.section.addButton')}
-    </button>
-  );
-}
-
-function HighlighterPresetRow({
-  enabledPresetCount,
-  preset,
-  settings,
-  presets,
-}: HighlighterPresetsProps & { enabledPresetCount: number; preset: BorderPresetItem }) {
-  const rowState = getHighlighterPresetRowState(preset, { presets, settings });
-  const rowClassName = getHighlighterPresetRowClassName(rowState);
-
-  return (
-    <div
-      draggable={true}
-      onDragStart={(e) => presets.handleDragStart(e, preset.id)}
-      onDragOver={(e) => presets.handleDragOver(e, preset.id)}
-      onDragLeave={presets.handleDragLeave}
-      onDrop={(e) => presets.handleDrop(e, preset.id)}
-      onDragEnd={presets.handleDragEnd}
-      onMouseEnter={() => presets.handlePresetHoverChange(preset.id)}
-      onMouseLeave={() => presets.handlePresetHoverChange(null)}
-      className={rowClassName}
-    >
-      <div className="flex w-full min-w-0 items-start gap-3">
-        <SettingsDragHandle />
-        <HighlighterPresetRowContent preset={preset} />
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 pt-0.5">
-          {rowState.isDefault ? (
-            <HighlighterPresetBadge tone="success" copyKey="highlighter.section.defaultBadge" />
-          ) : null}
-          {preset.origin === 'system' ? (
-            <HighlighterPresetBadge tone="neutral" copyKey="highlighter.section.systemBadge" />
-          ) : null}
-        </div>
-        <HighlighterPresetActions
-          enabledPresetCount={enabledPresetCount}
-          isDefault={rowState.isDefault}
-          preset={preset}
-          presets={presets}
-        />
-      </div>
-    </div>
-  );
-}
-
 export function HighlighterPresetsPanel({ presets, settings }: HighlighterPresetsProps) {
-  const enabledPresetCount = settings.borderPresets.filter(
-    (preset) => preset.enabled !== false
-  ).length;
+  const locale = useAppLocale();
+  const enabledCount = settings.borderPresets.filter((preset) => preset.enabled !== false).length;
+  const items: readonly SettingsCollectionItem[] = settings.borderPresets.map((preset) => {
+    const styleLabel = translate(
+      preset.style === 'solid'
+        ? 'highlighter.editor.styleSolid'
+        : preset.style === 'dashed'
+          ? 'highlighter.editor.styleDashed'
+          : 'highlighter.editor.styleDotted'
+    );
+    return {
+      id: preset.id,
+      title: getBorderPresetDisplayName(preset, locale),
+      meta: [
+        `${preset.width}${translate('highlighter.section.unitPxSuffix')}, ${styleLabel}, `,
+        `${preset.radius}${translate('highlighter.section.unitPxSuffix')} `,
+        translate('highlighter.section.radiusSuffix'),
+      ].join(''),
+      preview: <span className="h-full w-full" style={getHighlighterPresetPreviewStyle(preset)} />,
+      enabled: preset.enabled !== false,
+      isDefault: settings.defaultBorderPresetId === preset.id,
+      badges:
+        preset.origin === 'system'
+          ? [{ id: 'system', label: translate('highlighter.section.systemBadge'), tone: 'neutral' }]
+          : [],
+      capabilities: {
+        edit: true,
+        toggle: true,
+        setDefault: settings.defaultBorderPresetId !== preset.id,
+        reset: preset.origin === 'system' && preset.customized === true,
+        delete: preset.origin !== 'system',
+        reorder: true,
+      },
+      disabledActions: {
+        ...(preset.enabled !== false && enabledCount <= 1
+          ? { toggle: translate('highlighter.section.lastEnabledPresetDisabled') }
+          : {}),
+        ...(preset.enabled === false
+          ? { 'set-default': translate('highlighter.section.makeDefaultTitle') }
+          : {}),
+      },
+    };
+  });
+  const byId = new Map(settings.borderPresets.map((preset) => [preset.id, preset]));
+  const onAction = (action: SettingsCollectionAction) => {
+    const preset = byId.get(action.itemId);
+    if (!preset) return;
+    if (action.type === 'toggle') void presets.handleTogglePresetEnabled(preset.id);
+    if (action.type === 'set-default') void presets.handleSetDefaultPreset(preset.id);
+    if (action.type === 'edit') presets.handleEditPreset(preset);
+    if (action.type === 'reset') void presets.handleResetPreset(preset.id);
+    if (action.type === 'delete') void presets.handleDeletePreset(preset);
+  };
   return (
     <div className="mb-8">
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-[var(--sniptale-color-text-dim)]">
-          {translate('highlighter.section.presetsLabel')}
-        </span>
-        <span className="text-xs text-[var(--sniptale-color-text-dim)]">
-          {settings.borderPresets.length}{' '}
-          {getHighlighterPresetCountLabel(settings.borderPresets.length)}
-        </span>
-      </div>
-
-      <div className="mb-4 space-y-2">
-        {settings.borderPresets.map((preset) => (
-          <HighlighterPresetRow
-            key={preset.id}
-            enabledPresetCount={enabledPresetCount}
-            preset={preset}
-            presets={presets}
-            settings={settings}
-          />
-        ))}
-      </div>
-
-      <AddHighlighterPresetButton onClick={presets.handleAddPreset} />
+      <SettingsCollection
+        ariaLabel={translate('highlighter.section.presetsLabel')}
+        title={translate('highlighter.section.presetsLabel')}
+        items={items}
+        countLabel={`${items.length} ${getHighlighterPresetCountLabel(items.length)}`}
+        addAction={{
+          label: translate('highlighter.section.addButton'),
+          onInvoke: presets.handleAddPreset,
+        }}
+        onAction={onAction}
+        onMove={(intent: SettingsCollectionMoveIntent) =>
+          void presets.handleMoveBefore(intent.itemId, intent.beforeItemId)
+        }
+      />
     </div>
   );
 }

@@ -21,13 +21,12 @@ export type PresetsSectionContentProps = {
   };
   list: {
     countLabel: string;
-    hoveredPresetId: string | null;
     onDelete: (preset: ViewportPreset) => void;
     onEdit: (preset: ViewportPreset) => void;
-    onHoverChange: (id: string | null) => void;
-    onMove: (presetId: string, direction: -1 | 1) => Promise<void>;
+    onMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
     onReset: (preset: ViewportPreset) => Promise<void>;
     onToggle: (preset: ViewportPreset) => Promise<void>;
+    onSetDefault: (presetId: string | null) => Promise<void>;
   };
   model: {
     isLoading: boolean;

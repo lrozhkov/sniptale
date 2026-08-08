@@ -11,12 +11,7 @@ const state = vi.hoisted(() => ({
     key: 'shapeStroke',
     setKey: vi.fn(),
     colors: ['#123456'],
-    draggedIndex: null,
-    dragOverIndex: null,
-    setDraggedIndex: vi.fn(),
-    setDragOverIndex: vi.fn(),
-    clearDrag: vi.fn(),
-    dropColor: vi.fn(),
+    moveColor: vi.fn(),
     changeColor: vi.fn(),
   } as any,
 }));
@@ -31,30 +26,23 @@ it('renders palette colors in the standard preview area', () => {
 });
 
 it('forwards palette selection, reorder, and color updates', () => {
-  state.value.draggedIndex = 0;
-  state.value.dragOverIndex = 0;
   state.value.colors = ['#123456', '#654321'];
   const node = document.createElement('div');
   const root = createRoot(node);
   act(() => root.render(<PalettesSettings />));
   const ownerButtons = node.querySelectorAll('section > div button');
-  const rows = node.querySelectorAll('[draggable="true"]');
   const input = node.querySelector('input');
   act(() => {
     (ownerButtons[1] as HTMLElement | undefined)?.click();
-    rows[0]?.dispatchEvent(new Event('dragstart', { bubbles: true }));
-    rows[1]?.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
-    rows[0]?.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
-    rows[0]?.dispatchEvent(new Event('dragend', { bubbles: true }));
+    [...node.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.includes('settings.collection.actions.moveDown'))
+      ?.click();
     if (input) {
       input.value = '#abcdef';
       input.dispatchEvent(new Event('change', { bubbles: true }));
     }
   });
   expect(state.value.setKey).toHaveBeenCalled();
-  expect(state.value.setDraggedIndex).toHaveBeenCalledWith(0);
-  expect(state.value.setDragOverIndex).toHaveBeenCalledWith(1);
-  expect(state.value.dropColor).toHaveBeenCalledWith(0);
-  expect(state.value.clearDrag).toHaveBeenCalled();
+  expect(state.value.moveColor).toHaveBeenCalledWith(0, null);
   act(() => root.unmount());
 });

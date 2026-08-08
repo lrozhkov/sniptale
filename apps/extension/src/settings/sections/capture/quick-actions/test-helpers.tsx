@@ -21,14 +21,9 @@ export { useQuickActionsControllerSpy };
 
 function createSettingsPanelControlMocks() {
   return {
-    getSettingsHoverActionsClassName: (isHovered: boolean) =>
-      isHovered ? 'hover-actions' : 'hidden',
     settingsAddButtonClassName: 'settings-add-button',
     settingsCardClassName: 'settings-card',
-    settingsDangerIconButtonClassName: 'settings-danger-icon-button',
     settingsEmptyStateClassName: 'settings-empty-state',
-    settingsInfoIconButtonClassName: 'settings-info-icon-button',
-    settingsListRowClassName: 'settings-list-row',
     settingsModalFieldSurfaceClassName: 'settings-modal-field-surface',
     SettingsDragHandle: () => <span data-testid="settings-drag-handle">drag</span>,
     SettingsSwitch: (props: {
@@ -126,14 +121,6 @@ export function setSelectValue(select: HTMLSelectElement, value: string) {
   act(() => {
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-}
-
-export function dispatchUiEvent(type: string, element: Element) {
-  const event = new Event(type, { bubbles: true, cancelable: true });
-
-  act(() => {
-    element.dispatchEvent(event);
   });
 }
 

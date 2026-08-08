@@ -76,26 +76,38 @@ export function createViewportPreset(
   });
 }
 
-export function moveViewportPreset(
+export function moveViewportPresetBefore(
   presets: readonly ViewportPreset[],
   presetId: string,
-  direction: -1 | 1
+  beforePresetId: string | null
 ): ViewportPreset[] {
   const preset = presets.find((item) => item.id === presetId);
-  if (!preset) return presets.map((item) => ({ ...item }));
-  const group = presets
-    .filter((item) => item.target === preset.target)
-    .sort((left, right) => left.order - right.order);
-  const index = group.findIndex((item) => item.id === presetId);
-  const swapWith = group[index + direction];
-  if (!swapWith) return presets.map((item) => ({ ...item }));
-  return normalizeViewportPresetOrder(
-    presets.map((item) => {
-      if (item.id === preset.id) return { ...item, order: swapWith.order };
-      if (item.id === swapWith.id) return { ...item, order: preset.order };
-      return { ...item };
-    })
+  if (!preset) return [...presets];
+  const target =
+    beforePresetId === null ? null : presets.find((item) => item.id === beforePresetId);
+  if (target && target.target !== preset.target) return [...presets];
+  const sameTarget = presets.filter(
+    (item) => item.target === preset.target && item.id !== presetId
   );
+  const insertionIndex =
+    beforePresetId === null
+      ? sameTarget.length
+      : sameTarget.findIndex((item) => item.id === beforePresetId);
+  if (insertionIndex < 0) return [...presets];
+  sameTarget.splice(insertionIndex, 0, preset);
+  const byTarget = new Map<ViewportPresetTarget, ViewportPreset[]>([
+    [
+      'viewport',
+      preset.target === 'viewport'
+        ? sameTarget
+        : presets.filter((item) => item.target === 'viewport'),
+    ],
+    [
+      'window',
+      preset.target === 'window' ? sameTarget : presets.filter((item) => item.target === 'window'),
+    ],
+  ]);
+  return normalizeViewportPresetOrder([...byTarget.get('viewport')!, ...byTarget.get('window')!]);
 }
 
 export function getDeleteMessage(preset?: ViewportPreset): string {

@@ -93,21 +93,10 @@ function createSyncState(settings: Settings) {
   };
   return sync;
 }
-function createDragState(draggedId: string | null) {
-  const dragState = {
-    draggedId,
-    setDraggedId: vi.fn((value: string | null) => {
-      dragState.draggedId = value;
-    }),
-    setDragOverId: vi.fn(),
-  };
-  return dragState;
-}
 function createHarness(overrides?: {
   presets?: SavePreset[];
   confirmDelete?: SavePreset | null;
   editingPreset?: SavePreset;
-  draggedId?: string | null;
   saveCapturesToGallery?: boolean;
 }) {
   const settings = createSettings({
@@ -121,12 +110,10 @@ function createHarness(overrides?: {
     confirmDelete: overrides?.confirmDelete ?? null,
     ...(overrides?.editingPreset === undefined ? {} : { editingPreset: overrides.editingPreset }),
   };
-  const dragState = createDragState(overrides?.draggedId ?? null);
   return {
     sync,
     dialogState,
-    dragState,
-    actions: createSavePresetsActions(sync, dialogState, dragState),
+    actions: createSavePresetsActions(sync, dialogState),
   };
 }
 beforeEach(() => {
@@ -210,21 +197,15 @@ describe('save presets section change and reorder actions', () => {
     expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.captureActionUpdated');
   });
 
-  it('reorders presets on drop and resets drag state even for ignored drops', async () => {
-    const { sync, dragState, actions } = createHarness({ draggedId: 'a' });
+  it('reorders presets through the canonical insertion intent', async () => {
+    const { sync, actions } = createHarness();
 
-    await actions.handleDrop('b');
+    await actions.handleMoveBefore('a', null);
 
     expect(sync.presets.map((preset) => ({ id: preset.id, order: preset.order }))).toEqual([
       { id: 'b', order: 0 },
       { id: 'a', order: 1 },
     ]);
-    expect(dragState.setDraggedId).toHaveBeenCalledWith(null);
-    expect(dragState.setDragOverId).toHaveBeenCalledWith(null);
-
-    dragState.draggedId = 'b';
-    await actions.handleDrop('b');
-
     expect(sync.updateSettings).toHaveBeenCalledTimes(1);
   });
 });

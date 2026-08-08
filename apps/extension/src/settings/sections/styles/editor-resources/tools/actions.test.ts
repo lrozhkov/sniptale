@@ -23,35 +23,27 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ toast: { error: 
 import { createToolPresetActions } from './actions';
 beforeEach(() => vi.clearAllMocks());
 it('routes tool deletion and reorder to the existing persistence owner', async () => {
-  const clearDrag = vi.fn();
   const actions = createToolPresetActions({
     currentPresets: [{ id: 'a' }, { id: 'b' }],
-    draggedId: 'a',
     owner: 'pencil',
-    clearDrag,
   });
   await actions.deletePreset('a');
-  await actions.dropPreset('b');
+  await actions.movePreset('a', null);
   expect(mocks.deletePreset).toHaveBeenCalledWith('pencil', 'a');
   expect(mocks.reorder).toHaveBeenCalledWith('pencil', ['b', 'a']);
-  expect(clearDrag).toHaveBeenCalled();
 });
 
-it('routes toggle/default actions, suppresses no-op drops, and surfaces persistence failures', async () => {
+it('routes toggle/default actions, suppresses invalid moves, and surfaces persistence failures', async () => {
   mocks.toggle.mockRejectedValueOnce(new Error('failed'));
-  const clearDrag = vi.fn();
   const actions = createToolPresetActions({
     currentPresets: [{ id: 'a' }, { id: 'b' }],
-    draggedId: null,
     owner: 'pencil',
-    clearDrag,
   });
   await actions.makeDefault('b');
   await actions.togglePreset('a', false);
-  await actions.dropPreset('b');
+  await actions.movePreset('missing', null);
   expect(mocks.makeDefault).toHaveBeenCalledWith('pencil', 'b');
   expect(mocks.toggle).toHaveBeenCalledWith('pencil', 'a', false);
   expect(mocks.toast).toHaveBeenCalledWith('common.states.error');
   expect(mocks.reorder).not.toHaveBeenCalled();
-  expect(clearDrag).toHaveBeenCalledOnce();
 });

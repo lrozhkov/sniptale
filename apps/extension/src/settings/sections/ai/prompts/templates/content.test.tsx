@@ -82,12 +82,10 @@ function createProps(overrides: Partial<Parameters<typeof TemplatesSectionConten
     handleDeleteTemplate: vi.fn(),
     handleEditTemplate: vi.fn(),
     handleSaveTemplate: vi.fn(async () => undefined),
-    hoveredTemplateId: null,
     isEditorOpen: false,
     isLoading: false,
     submitError: null,
     openNewTemplateEditor: vi.fn(),
-    setHoveredTemplateId: vi.fn(),
     templates: [],
     ...(overrides.editingTemplate === undefined
       ? overrides
@@ -109,10 +107,6 @@ function renderSection(overrides: Partial<Parameters<typeof TemplatesSectionCont
   });
 
   return props;
-}
-
-function getButtonByTitle(title: string) {
-  return container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`) ?? null;
 }
 
 beforeEach(() => {
@@ -155,18 +149,18 @@ function verifyTemplateRowActionsAndDialogs() {
   const props = renderSection({
     confirmState: { isOpen: true, template },
     editingTemplate: { id: template.id, name: template.name, content: template.content },
-    hoveredTemplateId: template.id,
     isEditorOpen: true,
     templates: [template],
   });
-  const row = container?.textContent?.includes(template.name)
-    ? container?.querySelector(`div[class*="group"]`)
-    : null;
-
   act(() => {
-    row?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    getButtonByTitle(translate('common.actions.edit'))?.click();
-    getButtonByTitle(translate('common.actions.delete'))?.click();
+    container
+      ?.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('settings.collection.actions.edit')}"]`
+      )
+      ?.click();
+    [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+      .find((button) => button.textContent === translate('settings.collection.actions.delete'))
+      ?.click();
     container?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
       if (button.textContent === translate('common.actions.delete')) {
         button.click();
@@ -175,13 +169,10 @@ function verifyTemplateRowActionsAndDialogs() {
         button.click();
       }
     });
-    row?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
   });
 
   expect(props.handleEditTemplate).toHaveBeenCalledWith(template);
   expect(props.handleDeleteTemplate).toHaveBeenCalledWith(template);
-  expect(props.setHoveredTemplateId).toHaveBeenCalledWith(template.id);
-  expect(props.setHoveredTemplateId).toHaveBeenCalledWith(null);
   expect(props.confirmDelete).toHaveBeenCalledTimes(1);
   expect(props.closeDeleteDialog).toHaveBeenCalledTimes(1);
   expect(promptTemplateEditorPropsSpy).toHaveBeenLastCalledWith(
@@ -200,14 +191,7 @@ function verifyTemplateRowActionsAndDialogs() {
 
 function verifyTemplatesLoadingStateDelay() {
   renderSection({ isLoading: true });
-
-  expect(container?.querySelectorAll('.animate-pulse')).toHaveLength(0);
-
-  act(() => {
-    vi.advanceTimersByTime(350);
-  });
-
-  expect(container?.querySelectorAll('.animate-pulse')).toHaveLength(4);
+  expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeTruthy();
   expect(container?.textContent).not.toContain(translate('templates.section.emptyTitle'));
 }
 

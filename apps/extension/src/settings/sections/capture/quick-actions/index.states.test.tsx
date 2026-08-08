@@ -101,7 +101,6 @@ async function verifyDelayedLoadingBranch() {
       confirmationMessage: null,
       editingId: null,
       editForm: null,
-      hoveredId: null,
       isLoading: true,
     })
   );
@@ -119,7 +118,6 @@ async function verifyEmptyState() {
       confirmationMessage: null,
       editingId: null,
       editForm: null,
-      hoveredId: null,
     })
   );
   expect(container?.textContent).toContain('settings.quickActions.emptyTitle');
@@ -135,7 +133,6 @@ async function verifyDraftState() {
       confirmDelete: null,
       confirmationMessage: null,
       editingId: 'draft-action',
-      hoveredId: null,
     })
   );
   expect(container?.textContent).toContain('settings.quickActions.newTitle');

@@ -447,7 +447,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Highlighter persistence queue ownership is covered by queue and session regression suites.',
     testFiles: [
-      'apps/extension/src/settings/sections/styles/annotations/borders/drag-actions.queue.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.queue.test.ts',
       'apps/extension/src/settings/sections/styles/annotations/borders/persistence-actions.behavior.test.ts',
       'apps/extension/src/settings/sections/styles/annotations/borders/persistence-session.test.ts',
       'apps/extension/src/settings/sections/styles/annotations/borders/persistence.test.ts',
@@ -473,13 +473,14 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'settings-highlighter-drag-actions',
+    owner: 'settings-highlighter-ordering-actions',
     productionFile:
-      'apps/extension/src/settings/sections/styles/annotations/borders/drag-actions.ts',
-    reason: 'Highlighter drag persistence ordering is covered by drag queue and integration tests.',
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.ts',
+    reason:
+      'Highlighter insertion-intent persistence ordering is covered by queue and integration tests.',
     testFiles: [
       'apps/extension/src/settings/sections/styles/annotations/borders/actions.integration.test.ts',
-      'apps/extension/src/settings/sections/styles/annotations/borders/drag-actions.queue.test.ts',
+      'apps/extension/src/settings/sections/styles/annotations/borders/ordering-actions.queue.test.ts',
     ],
   },
   {

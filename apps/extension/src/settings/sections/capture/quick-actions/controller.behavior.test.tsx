@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { QuickAction } from '../../../../contracts/settings';
 import { useQuickActionsController } from './controller';
-import type { QuickActionsDragEvent } from './drag';
 
 const {
   getQuickActionsDisplayModeMock,
@@ -97,17 +96,6 @@ async function flushEffects() {
   await act(async () => {
     await Promise.resolve();
   });
-}
-
-function createDragEvent() {
-  return {
-    dataTransfer: {
-      dropEffect: 'none',
-      effectAllowed: 'none',
-      setData: vi.fn(),
-    },
-    preventDefault: vi.fn(),
-  } satisfies QuickActionsDragEvent;
 }
 
 beforeEach(() => {
@@ -204,30 +192,17 @@ it('blocks invalid and bundled quick-action mutations', async () => {
 it('reorders quick actions and surfaces hotkey errors through the toast seam', async () => {
   const firstAction = createQuickAction({ id: 'action-1', name: 'First' });
   const secondAction = createQuickAction({ id: 'action-2', name: 'Second' });
-  const dragEvent = createDragEvent();
 
   await loadController([firstAction, secondAction]);
 
-  act(() => {
-    latestState?.handleDragStart(dragEvent, 'action-1');
-    latestState?.handleDragOver(dragEvent, 'action-2');
-  });
-
-  expect(latestState?.draggedId).toBe('action-1');
-  expect(latestState?.dragOverId).toBe('action-2');
-  expect(dragEvent.dataTransfer.setData).toHaveBeenCalledWith('text/plain', 'action-1');
-
   await act(async () => {
-    await latestState?.handleDrop(dragEvent, 'action-2');
+    await latestState?.handleMoveBefore('action-1', null);
   });
 
   expect(saveQuickActionsMock).toHaveBeenLastCalledWith([
     expect.objectContaining({ id: 'action-2' }),
     expect.objectContaining({ id: 'action-1' }),
   ]);
-  expect(latestState?.draggedId).toBeNull();
-  expect(latestState?.dragOverId).toBeNull();
-
   act(() => {
     latestState?.handleHotkeyError('hotkey failed');
   });
@@ -235,9 +210,7 @@ it('reorders quick actions and surfaces hotkey errors through the toast seam', a
   expect(toastErrorMock).toHaveBeenCalledWith('hotkey failed');
 });
 
-it('resets editor and drag UI state through no-op branches', async () => {
-  const dragEvent = createDragEvent();
-
+it('resets editor state through its cancel branch', async () => {
   await loadController([
     createQuickAction({ id: 'action-1', name: 'First' }),
     createQuickAction({ id: 'action-2', name: 'Second' }),
@@ -248,21 +221,4 @@ it('resets editor and drag UI state through no-op branches', async () => {
     latestState?.handleCancelEdit();
   });
   expect(latestState?.editingId).toBeNull();
-
-  act(() => {
-    latestState?.handleDragStart(dragEvent, 'action-1');
-  });
-  await flushEffects();
-
-  act(() => {
-    latestState?.handleDragOver(dragEvent, 'action-1');
-  });
-  expect(latestState?.dragOverId).toBeNull();
-
-  act(() => {
-    latestState?.handleDragLeave();
-    latestState?.handleDragEnd();
-  });
-  expect(latestState?.draggedId).toBeNull();
-  expect(latestState?.dragOverId).toBeNull();
 });

@@ -35,12 +35,7 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   },
 }));
 
-import {
-  getSettingsHoverActionsClassName,
-  SettingsDragHandle,
-  SettingsRange,
-  SettingsSwitch,
-} from './panel-controls';
+import { SettingsDragHandle, SettingsRange, SettingsSwitch } from './panel-controls';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -72,11 +67,6 @@ afterEach(() => {
   container = null;
   vi.unstubAllGlobals();
 });
-
-function verifyHoverActionsClassNames() {
-  expect(getSettingsHoverActionsClassName(true)).toContain('opacity-100');
-  expect(getSettingsHoverActionsClassName(false)).toContain('group-hover:opacity-100');
-}
 
 function verifySettingsSwitchAndRange() {
   const onClick = vi.fn();
@@ -118,10 +108,6 @@ function verifyDragHandleRendering() {
 }
 
 function runSettingsPanelControlsSuite() {
-  it(
-    'builds hover-action class names for visible and deferred states',
-    verifyHoverActionsClassNames
-  );
   it(
     'passes switch and range props through to the shared matte controls',
     verifySettingsSwitchAndRange

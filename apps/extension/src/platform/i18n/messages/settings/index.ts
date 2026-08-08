@@ -10,8 +10,10 @@ import { settingsPrivacyMessages } from './privacy';
 import { settingsQuickActionsMessages } from './quick-actions';
 import { settingsVideoQualityMessages } from './video-quality';
 import { settingsVoiceInputMessages } from './voice-input';
+import { settingsCollectionMessages } from './collection';
 
 export const settingsMessages = defineMessageSource({
+  collection: settingsCollectionMessages,
   appearance: settingsAppearanceMessages,
   navigation: settingsNavigationMessages,
   nativeApp: settingsNativeAppMessages,

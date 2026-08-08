@@ -19,14 +19,14 @@ export function PresetsSectionContent(props: PresetsSectionContentProps) {
       <div className={`mb-6 ${settingsDividerClassName}`} />
 
       <PresetsList
+        defaultPresetId={props.defaultField.selectedPresetId}
         isLoading={props.model.isLoading}
-        hoveredViewportId={props.list.hoveredPresetId}
         onDelete={props.list.onDelete}
         onEdit={props.list.onEdit}
-        onMove={props.list.onMove}
+        onMoveBefore={props.list.onMoveBefore}
         onReset={props.list.onReset}
         onToggle={props.list.onToggle}
-        onHoverChange={props.list.onHoverChange}
+        onSetDefault={props.list.onSetDefault}
         onAdd={props.editor.onAdd}
         presetsCountLabel={props.list.countLabel}
         viewportPresets={props.model.presets}

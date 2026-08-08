@@ -1,14 +1,8 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { CaptureActionType } from '../../../../../contracts/settings';
-import {
-  settingsAddButtonClassName,
-  settingsCardClassName,
-  SettingsSwitch,
-} from '../../../../section-surface/panel-controls';
+import { settingsCardClassName, SettingsSwitch } from '../../../../section-surface/panel-controls';
 import { settingsMetaLabelClassName, SettingsSectionHeader } from '../../../../section-surface';
-
-export const addButtonClassName = settingsAddButtonClassName;
 
 export function SavePresetsHeader() {
   return (

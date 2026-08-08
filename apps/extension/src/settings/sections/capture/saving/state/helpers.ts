@@ -36,24 +36,19 @@ export function isPresetUsed(
   );
 }
 
-export function reorderPresets(
+export function reorderPresetsBefore(
   presets: SavePreset[],
-  draggedId: string,
-  targetId: string
-): SavePreset[] | null {
-  const nextPresets = [...presets];
-  const fromIndex = nextPresets.findIndex((preset) => preset.id === draggedId);
-  const toIndex = nextPresets.findIndex((preset) => preset.id === targetId);
-
-  if (fromIndex < 0 || toIndex < 0) {
-    return null;
-  }
-
-  const [removedPreset] = nextPresets.splice(fromIndex, 1);
-  if (!removedPreset) {
-    return null;
-  }
-  nextPresets.splice(toIndex, 0, removedPreset);
-
-  return nextPresets.map((preset, index) => ({ ...preset, order: index }));
+  presetId: string,
+  beforePresetId: string | null
+) {
+  const next = presets.filter((preset) => preset.id !== presetId);
+  const moved = presets.find((preset) => preset.id === presetId);
+  if (!moved) return null;
+  const target =
+    beforePresetId === null
+      ? next.length
+      : next.findIndex((preset) => preset.id === beforePresetId);
+  if (target < 0) return null;
+  next.splice(target, 0, moved);
+  return next.map((preset, order) => ({ ...preset, order }));
 }

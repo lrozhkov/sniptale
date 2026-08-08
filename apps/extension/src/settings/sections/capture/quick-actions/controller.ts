@@ -4,7 +4,7 @@ import type { QuickAction, QuickActionsDisplayMode } from '../../../../contracts
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { createQuickActionsCrud } from './crud';
 import { persistDisplayMode } from './display-mode';
-import { useQuickActionsDrag } from './drag';
+import { createQuickActionsOrdering } from './ordering';
 import { useQuickActionsLoader } from './loader';
 import { useQuickActionsEditorState, useQuickActionsUiState } from './state';
 import { useSettingsInlineConfirmation } from './inline-confirmation/hook';
@@ -13,7 +13,7 @@ type QuickActionsControllerModelParams = {
   actions: QuickAction[];
   confirmationMessage: string | null;
   crud: ReturnType<typeof createQuickActionsCrud>;
-  drag: ReturnType<typeof useQuickActionsDrag>;
+  ordering: ReturnType<typeof createQuickActionsOrdering>;
   editorState: ReturnType<typeof useQuickActionsEditorState>;
   showConfirmation: (message: string) => void;
   uiState: ReturnType<typeof useQuickActionsUiState>;
@@ -25,11 +25,8 @@ function createQuickActionsControllerModel(params: QuickActionsControllerModelPa
     confirmationMessage: params.confirmationMessage,
     confirmDelete: params.uiState.confirmDelete,
     displayMode: params.uiState.displayMode,
-    dragOverId: params.uiState.dragOverId,
-    draggedId: params.uiState.draggedId,
     editForm: params.editorState.editForm,
     editingId: params.editorState.editingId,
-    hoveredId: params.uiState.hoveredId,
     isLoading: params.uiState.isLoading,
     setConfirmDelete: params.uiState.setConfirmDelete,
     setDisplayMode: async (value: QuickActionsDisplayMode) =>
@@ -39,12 +36,11 @@ function createQuickActionsControllerModel(params: QuickActionsControllerModelPa
         params.uiState.setDisplayModeState,
         params.showConfirmation
       ),
-    setHoveredId: params.uiState.setHoveredId,
     handleHotkeyError: (message: string) => {
       toast.error(message);
     },
     ...params.crud,
-    ...params.drag,
+    ...params.ordering,
   };
 }
 
@@ -70,19 +66,16 @@ export function useQuickActionsController() {
     showConfirmation,
   });
 
-  const drag = useQuickActionsDrag({
+  const ordering = createQuickActionsOrdering({
     actions,
-    draggedId: uiState.draggedId,
     setActions,
-    setDraggedId: uiState.setDraggedId,
-    setDragOverId: uiState.setDragOverId,
   });
 
   return createQuickActionsControllerModel({
     actions,
     confirmationMessage,
     crud,
-    drag,
+    ordering,
     editorState,
     showConfirmation,
     uiState,

@@ -2,7 +2,7 @@ import type { EditorPaletteSettings } from '../../../../../features/editor/docum
 import { saveEditorPaletteSettings } from '../../../../../composition/persistence/editor-presets';
 import { translate } from '../../../../../platform/i18n';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
-import { reorderPalette } from './model';
+import { reorderPaletteBefore } from './model';
 import type { EditorPaletteKey } from './types';
 
 async function save(palette: EditorPaletteSettings) {
@@ -14,10 +14,8 @@ async function save(palette: EditorPaletteSettings) {
 }
 
 export function createPaletteActions(args: {
-  draggedIndex: number | null;
   key: EditorPaletteKey;
   palette: EditorPaletteSettings;
-  clearDrag: () => void;
 }) {
   return {
     changeColor: (index: number, color: string) =>
@@ -27,9 +25,8 @@ export function createPaletteActions(args: {
           itemIndex === index ? color : item
         ),
       }),
-    dropColor: async (targetIndex: number) => {
-      const next = reorderPalette({ ...args, targetIndex });
-      args.clearDrag();
+    moveColor: async (itemIndex: number, beforeIndex: number | null) => {
+      const next = reorderPaletteBefore({ ...args, itemIndex, beforeIndex });
       if (next) await save(next);
     },
   };

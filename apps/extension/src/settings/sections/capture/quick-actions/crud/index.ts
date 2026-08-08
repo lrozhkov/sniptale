@@ -7,14 +7,13 @@ import {
   updateQuickActionField,
 } from './editing';
 import { persistQuickActions } from './persistence';
-import { reorderAndSaveQuickActions, toggleQuickActionStatus } from './ordering';
+import { toggleQuickActionStatus } from './ordering';
 
 export {
   beginEditQuickAction,
   beginNewQuickAction,
   deleteQuickAction,
   persistQuickActions,
-  reorderAndSaveQuickActions,
   saveEditedQuickAction,
   toggleQuickActionStatus,
   updateQuickActionField,

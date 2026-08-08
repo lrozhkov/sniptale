@@ -1,5 +1,3 @@
-import type { DragEvent, ReactNode } from 'react';
-
 import type { Settings } from '../../../../../contracts/settings';
 import type { CaptureActionType, SavePreset } from '../../../../../contracts/settings';
 
@@ -42,18 +40,6 @@ export interface SavePresetsDialogsState extends SavePresetsDialogState {
   setIsEditorOpen: (value: boolean) => void;
 }
 
-export interface SavePresetsDragState {
-  draggedId: string | null;
-  setDraggedId: (value: string | null) => void;
-  setDragOverId: (value: string | null) => void;
-}
-
-export interface SavePresetsDragUiState extends SavePresetsDragState {
-  dragOverId: string | null;
-  hoveredPresetId: string | null;
-  setHoveredPresetId: (value: string | null) => void;
-}
-
 export interface SavePresetsActions {
   confirmDeletePreset: () => Promise<void>;
   handleCaptureActionChange: (value: CaptureActionType) => Promise<void>;
@@ -68,49 +54,19 @@ export interface SavePresetsActions {
       | 'savePresets.messages.defaultVideoUpdated'
   ) => Promise<void>;
   handleDeletePreset: (preset: SavePreset) => void;
-  handleDrop: (targetId: string) => Promise<void>;
+  handleMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
   handleSavePreset: (name: string, path: string, enabled: boolean) => Promise<void>;
   handleTogglePresetEnabled: (preset: SavePreset) => Promise<void>;
   handleToggleSaveToGallery: () => Promise<void>;
 }
 
-interface SavePresetsRowDragHandlers {
-  onDragEnd: () => void;
-  onDragLeave: () => void;
-  onDragOver: (event: DragEvent<HTMLDivElement>, id: string) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>, id: string) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>, id: string) => void;
-}
-
-export interface SavePresetsRowHandlers extends SavePresetsRowDragHandlers {
+export interface SavePresetsRowHandlers {
   onDelete: (preset: SavePreset) => void;
   onEdit: (preset?: SavePreset) => void;
-  onHoverChange: (id: string | null) => void;
   onToggleEnabled: (preset: SavePreset) => Promise<void>;
 }
 
-interface SavePresetsRowState {
-  draggedId: string | null;
-  dragOverId: string | null;
-  hoveredPresetId: string | null;
-}
-
-export interface SavePresetsRowProps extends SavePresetsRowHandlers, SavePresetsRowState {
-  preset: SavePreset;
-}
-
-export interface SavePresetsRowShellProps extends SavePresetsRowDragHandlers {
-  children: ReactNode;
-  className: string;
-  onHoverChange: (id: string | null) => void;
-  presetId: string;
-}
-
-export interface SavePresetsListBodyProps extends SavePresetsRowHandlers, SavePresetsRowState {
-  presets: SavePreset[];
-}
-
-export interface SavePresetsListProps extends SavePresetsListBodyProps {
+export interface SavePresetsListProps extends SavePresetsRowHandlers {
   confirmDelete: SavePreset | null;
   confirmDeletePreset: () => Promise<void>;
   editingPreset?: SavePreset;
@@ -119,4 +75,6 @@ export interface SavePresetsListProps extends SavePresetsListBodyProps {
   onCloseEditor: () => void;
   onSavePreset: (name: string, path: string, enabled: boolean) => Promise<void>;
   presetCountLabel: string;
+  presets: SavePreset[];
+  onMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
 }

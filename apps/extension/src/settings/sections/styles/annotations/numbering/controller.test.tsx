@@ -52,20 +52,7 @@ let container: HTMLDivElement | null = null;
 function Harness() {
   const controller = useStepBadgePresetCatalogController();
   latest = controller;
-  return (
-    <>
-      <div
-        data-testid="drag-source"
-        draggable
-        onDragStart={(event) => controller.actions.dragStart(event, 'system-classic')}
-      />
-      <div
-        data-testid="drag-target"
-        onDragOver={(event) => controller.actions.dragOver(event, 'system-outline')}
-        onDrop={(event) => void controller.actions.drop(event, 'system-outline')}
-      />
-    </>
-  );
+  return null;
 }
 
 beforeEach(() => {
@@ -129,24 +116,7 @@ describe('useStepBadgePresetCatalogController', () => {
     act(() => latest?.actions.add());
     act(() => latest?.actions.closeEditor());
     act(() => latest?.actions.edit(user));
-    act(() => latest?.actions.hover(user.id));
-    const dragStart = new Event('dragstart', { bubbles: true });
-    Object.defineProperty(dragStart, 'dataTransfer', {
-      value: { effectAllowed: 'none' },
-    });
-    await act(async () =>
-      container?.querySelector('[data-testid="drag-source"]')?.dispatchEvent(dragStart)
-    );
-    await act(async () =>
-      container
-        ?.querySelector('[data-testid="drag-target"]')
-        ?.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }))
-    );
-    await act(async () =>
-      container
-        ?.querySelector('[data-testid="drag-target"]')
-        ?.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))
-    );
+    await act(async () => latest?.actions.moveBefore('system-classic', null));
     expect(mocks.update).toHaveBeenCalled();
     expect(mocks.toggle).toHaveBeenCalledWith(user.id, false);
     expect(mocks.setDefault).toHaveBeenCalledWith(user.id);

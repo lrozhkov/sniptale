@@ -11,7 +11,6 @@ export const SETTINGS_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/capture/screen-sizes/index.test.tsx',
       'apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.test.tsx',
       'apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/empty-state.test.tsx',
-      'apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/shell.test.tsx',
     ],
   },
   {

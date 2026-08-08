@@ -1,12 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type { SystemViewportPreset, UserViewportPreset } from '../../../../contracts/settings';
-import {
-  createViewportPreset,
-  getDeleteMessage,
-  moveViewportPreset,
-  updateViewportPreset,
-} from './helpers';
+import { createViewportPreset, getDeleteMessage, updateViewportPreset } from './helpers';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -82,19 +77,12 @@ it('does not persist a stale localized system label during a dimension-only edit
   expect(updated).not.toHaveProperty('nameOverride');
 });
 
-it('creates presets and handles missing, boundary, and successful moves', () => {
+it('creates presets in the next group position', () => {
   const presets = [viewportPreset, secondViewportPreset, systemWindowPreset];
 
   expect(
     createViewportPreset({ height: 844, name: 'Phone', target: 'viewport', width: 390 }, presets)
   ).toMatchObject({ id: 'created-preset', name: 'Phone', order: 2 });
-  expect(moveViewportPreset(presets, 'missing', 1)).toEqual(presets);
-  expect(moveViewportPreset(presets, viewportPreset.id, -1)).toEqual(presets);
-  expect(moveViewportPreset(presets, secondViewportPreset.id, -1)).toEqual([
-    expect.objectContaining({ id: secondViewportPreset.id, order: 0 }),
-    expect.objectContaining({ id: viewportPreset.id, order: 1 }),
-    expect.objectContaining({ id: systemWindowPreset.id, order: 0 }),
-  ]);
 });
 
 it('accepts an 80-character name and rejects 81 characters at the mutation boundary', () => {

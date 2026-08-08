@@ -1,97 +1,97 @@
-import { Plus, Zap } from 'lucide-react';
+import { Camera, Zap } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../contracts/settings';
-import { getQuickActionCountLabel } from './section/helpers';
-import { QuickActionRow } from './list-row';
-import { DelayedSettingsCardLoadingState } from '../../../section-surface/loading-state';
 import {
-  settingsAddButtonClassName,
-  settingsEmptyStateClassName,
-} from '../../../section-surface/panel-controls';
-import { type QuickActionsSectionState } from './controller';
-
-function QuickActionsListEmptyState(props: { editingId: string | null; isLoading: boolean }) {
-  if (props.isLoading) {
-    return <DelayedSettingsCardLoadingState />;
-  }
-
-  if (props.editingId) {
-    return null;
-  }
-
-  return (
-    <div className={`${settingsEmptyStateClassName} mb-6`}>
-      <Zap size={32} className="mx-auto mb-3 text-[var(--sniptale-color-text-dim)]" />
-      <p className="mb-1 text-sm text-[var(--sniptale-color-text-muted)]">
-        {translate('settings.quickActions.emptyTitle')}
-      </p>
-      <p className="text-xs text-[var(--sniptale-color-text-dim)]">
-        {translate('settings.quickActions.emptyDescriptionPrefix')} "
-        {translate('common.actions.add')}"{' '}
-        {translate('settings.quickActions.emptyDescriptionSuffix')}
-      </p>
-    </div>
-  );
-}
+  getQuickActionDisplayName,
+  isBundledQuickAction,
+} from '../../../../features/quick-actions-presets/catalog';
+import { formatHotkey } from '../../../../features/keyboard-shortcuts/hotkey-format';
+import {
+  SettingsCollection,
+  type SettingsCollectionAction,
+  type SettingsCollectionItem,
+  type SettingsCollectionMoveIntent,
+} from '../../../section-surface';
+import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from './section/constants';
+import { getDelayLabel, getQuickActionCountLabel, getViewportPresetLabel } from './section/helpers';
+import type { QuickActionsSectionState } from './controller';
 
 export function QuickActionsList(props: {
   state: QuickActionsSectionState;
   viewportPresets: ViewportPreset[] | undefined;
 }) {
-  const { state, viewportPresets } = props;
-
+  const items: readonly SettingsCollectionItem[] = props.state.actions.map((action) => {
+    const Icon = quickActionIconMap[action.icon] ?? Camera;
+    const meta = [
+      screenshotModeLabels[action.screenshotMode],
+      action.viewportPresetId
+        ? getViewportPresetLabel(props.viewportPresets, action.viewportPresetId)
+        : null,
+      action.delay === null || action.delay === undefined ? null : getDelayLabel(action.delay),
+      action.imageFormat?.toUpperCase() ?? null,
+      afterCaptureLabels[action.afterCapture ?? 'download_default'],
+      action.hotkey ? formatHotkey(action.hotkey) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return {
+      id: action.id,
+      title: getQuickActionDisplayName(action),
+      meta,
+      preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-accent)]" />,
+      enabled: action.status,
+      busy: props.state.isLoading,
+      badges: isBundledQuickAction(action)
+        ? [
+            {
+              id: 'bundled',
+              label: translate('settings.quickActions.bundledBadge'),
+              tone: 'neutral',
+            },
+          ]
+        : [],
+      capabilities: {
+        edit: !isBundledQuickAction(action),
+        toggle: true,
+        delete: !isBundledQuickAction(action),
+        reorder: true,
+      },
+    };
+  });
+  const byId = new Map(props.state.actions.map((action) => [action.id, action]));
+  const onAction = (intent: SettingsCollectionAction) => {
+    const action = byId.get(intent.itemId);
+    if (!action) return;
+    if (intent.type === 'toggle') void props.state.handleToggleStatus(action.id);
+    if (intent.type === 'edit') props.state.handleEdit(action);
+    if (intent.type === 'delete') props.state.setConfirmDelete(action);
+  };
   return (
-    <>
-      <QuickActionsListHeader actionCount={state.actions.length} />
-
-      {state.actions.length === 0 ? (
-        <QuickActionsListEmptyState editingId={state.editingId} isLoading={state.isLoading} />
-      ) : (
-        <div className="mb-6 space-y-2">
-          {state.actions.map((action) => (
-            <QuickActionRow
-              key={action.id}
-              action={action}
-              hoveredId={state.hoveredId}
-              draggedId={state.draggedId}
-              dragOverId={state.dragOverId}
-              onDeleteConfirm={() => state.setConfirmDelete(action)}
-              onEdit={() => state.handleEdit(action)}
-              onHoverChange={state.setHoveredId}
-              onToggleStatus={() => state.handleToggleStatus(action.id)}
-              onDragStart={state.handleDragStart}
-              onDragEnd={state.handleDragEnd}
-              onDragOver={state.handleDragOver}
-              onDragLeave={state.handleDragLeave}
-              onDrop={state.handleDrop}
-              viewportPresets={viewportPresets}
-            />
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={state.handleAdd}
-        disabled={state.isLoading}
-        className={`${settingsAddButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
-      >
-        <Plus size={16} />
-        {translate('settings.quickActions.addButton')}
-      </button>
-    </>
-  );
-}
-
-function QuickActionsListHeader(props: { actionCount: number }) {
-  return (
-    <div className="mb-4 flex items-center justify-between">
-      <span className="text-xs font-bold uppercase tracking-wider text-[var(--sniptale-color-text-dim)]">
-        {translate('settings.quickActions.savedActionsLabel')}
-      </span>
-      <span className="text-xs text-[var(--sniptale-color-text-dim)]">
-        {props.actionCount} {getQuickActionCountLabel(props.actionCount)}
-      </span>
-    </div>
+    <SettingsCollection
+      ariaLabel={translate('settings.quickActions.savedActionsLabel')}
+      title={translate('settings.quickActions.savedActionsLabel')}
+      items={items}
+      countLabel={`${items.length} ${getQuickActionCountLabel(items.length)}`}
+      state={props.state.isLoading ? 'loading' : 'ready'}
+      emptyState={
+        props.state.editingId ? null : (
+          <div>
+            <Zap size={32} className="mx-auto mb-3" />
+            <p>{translate('settings.quickActions.emptyTitle')}</p>
+            <p>{translate('settings.quickActions.emptyDescriptionPrefix')}</p>
+          </div>
+        )
+      }
+      addAction={{
+        label: translate('settings.quickActions.addButton'),
+        disabled: props.state.isLoading,
+        onInvoke: props.state.handleAdd,
+      }}
+      onAction={onAction}
+      onMove={(intent: SettingsCollectionMoveIntent) =>
+        void props.state.handleMoveBefore(intent.itemId, intent.beforeItemId)
+      }
+    />
   );
 }

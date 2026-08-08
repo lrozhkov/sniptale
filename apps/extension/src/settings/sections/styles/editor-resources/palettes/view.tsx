@@ -1,29 +1,48 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { settingsPanelClassName } from '../../../../section-surface';
 import {
-  settingsListRowClassName,
-  SettingsDragHandle,
-} from '../../../../section-surface/panel-controls';
+  SettingsCollection,
+  settingsPanelClassName,
+  type SettingsCollectionItem,
+  type SettingsCollectionMoveIntent,
+} from '../../../../section-surface';
 import { getSettingsCountLabel } from '../../../../section-surface/text.helpers';
 import { usePalettesController } from './controller';
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
 
 export function PalettesSettings() {
   const state = usePalettesController();
+  const items: readonly SettingsCollectionItem[] = state.colors.map((color, index) => ({
+    id: `${state.key}:${index}`,
+    title: color,
+    preview: <span className="h-full w-full" style={{ backgroundColor: color }} />,
+    meta: (
+      <label className="inline-flex items-center gap-2">
+        <span>#{index + 1}</span>
+        <input
+          aria-label={`${getEditorPaletteLabel(state.key)} ${index + 1}`}
+          type="color"
+          value={color}
+          onChange={(event) => void state.changeColor(index, event.currentTarget.value)}
+          className="h-7 w-9 cursor-pointer rounded border bg-transparent p-0.5"
+        />
+      </label>
+    ),
+    capabilities: { reorder: true },
+  }));
+  const parseIndex = (id: string | null) => {
+    if (id === null) return null;
+    const value = Number(id.slice(id.lastIndexOf(':') + 1));
+    return Number.isInteger(value) ? value : null;
+  };
+  const onMove = (intent: SettingsCollectionMoveIntent) => {
+    const itemIndex = parseIndex(intent.itemId);
+    if (itemIndex === null) return;
+    void state.moveColor(itemIndex, parseIndex(intent.beforeItemId));
+  };
+
   return (
     <section className={`${settingsPanelClassName} space-y-4`}>
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-sm font-semibold">{translate('settings.editor.paletteTitle')}</h2>
-        <span className="text-xs text-[var(--sniptale-color-text-dim)]">
-          {state.colors.length}{' '}
-          {getSettingsCountLabel(state.colors.length, {
-            one: 'settings.editor.colorCountOne',
-            few: 'settings.editor.colorCountFew',
-            many: 'settings.editor.colorCountMany',
-          })}
-        </span>
-      </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {EDITOR_PALETTE_KEYS.map((key) => (
           <ProductActionButton
@@ -37,42 +56,18 @@ export function PalettesSettings() {
           </ProductActionButton>
         ))}
       </div>
-      <div className="space-y-2">
-        {state.colors.map((color, index) => (
-          <div
-            key={`${state.key}-${index}-${color}`}
-            draggable
-            onDragStart={() => state.setDraggedIndex(index)}
-            onDragOver={(event) => {
-              event.preventDefault();
-              if (state.draggedIndex !== index) state.setDragOverIndex(index);
-            }}
-            onDragEnd={state.clearDrag}
-            onDrop={(event) => {
-              event.preventDefault();
-              void state.dropColor(index);
-            }}
-            className={[
-              settingsListRowClassName,
-              state.dragOverIndex === index ? 'border-[var(--sniptale-color-border-strong)]' : '',
-            ].join(' ')}
-          >
-            <SettingsDragHandle />
-            <span className="h-8 w-8 rounded-lg border" style={{ backgroundColor: color }} />
-            <div className="min-w-0 flex-1">
-              <div className="text-xs text-[var(--sniptale-color-text-dim)]">#{index + 1}</div>
-              <div className="truncate text-sm font-medium">{color}</div>
-            </div>
-            <input
-              aria-label={`${getEditorPaletteLabel(state.key)} ${index + 1}`}
-              type="color"
-              value={color}
-              onChange={(event) => void state.changeColor(index, event.currentTarget.value)}
-              className="h-10 w-10 cursor-pointer rounded-lg border bg-transparent p-1"
-            />
-          </div>
-        ))}
-      </div>
+      <SettingsCollection
+        ariaLabel={translate('settings.editor.paletteTitle')}
+        title={translate('settings.editor.paletteTitle')}
+        items={items}
+        countLabel={`${items.length} ${getSettingsCountLabel(items.length, {
+          one: 'settings.editor.colorCountOne',
+          few: 'settings.editor.colorCountFew',
+          many: 'settings.editor.colorCountMany',
+        })}`}
+        onAction={() => undefined}
+        onMove={onMove}
+      />
     </section>
   );
 }

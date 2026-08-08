@@ -12,8 +12,3 @@ export const aiProvidersAddButtonClassName = [
   'hover:border-[var(--sniptale-color-border-accent-strong)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]',
 ].join(' ');
-
-export const aiProvidersAddButtonDisabledClassName = [
-  aiProvidersAddButtonClassName,
-  'disabled:cursor-not-allowed disabled:opacity-50',
-].join(' ');

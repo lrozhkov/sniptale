@@ -1,27 +1,14 @@
 import type { Settings } from '../../../../../../contracts/settings';
-import { reorderPresets } from '../../state/helpers';
-import type { SavePresetsDragState, SavePresetsSyncState } from '../../state/types';
+import { reorderPresetsBefore } from '../../state/helpers';
+import type { SavePresetsSyncState } from '../../state/types';
 
-export function createDropPresetAction(
+export function createMovePresetBeforeAction(
   sync: SavePresetsSyncState,
-  dragState: SavePresetsDragState,
   persistSettings: (partialSettings: Partial<Settings>) => Promise<void>
 ) {
-  return async (targetId: string) => {
-    if (!dragState.draggedId || dragState.draggedId === targetId) {
-      dragState.setDraggedId(null);
-      dragState.setDragOverId(null);
-      return;
-    }
-
-    const nextPresets = reorderPresets(sync.presets, dragState.draggedId, targetId);
-
-    if (!nextPresets) {
-      dragState.setDraggedId(null);
-      dragState.setDragOverId(null);
-      return;
-    }
-
+  return async (presetId: string, beforePresetId: string | null) => {
+    const nextPresets = reorderPresetsBefore(sync.presets, presetId, beforePresetId);
+    if (!nextPresets) return;
     const previousPresets = sync.presets;
     sync.setPresets(nextPresets);
     try {
@@ -30,7 +17,5 @@ export function createDropPresetAction(
       sync.setPresets(previousPresets);
       throw error;
     }
-    dragState.setDraggedId(null);
-    dragState.setDragOverId(null);
   };
 }

@@ -1,8 +1,8 @@
-import { useState, type DragEvent } from 'react';
+import { useState } from 'react';
 
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
 import { createHighlighterCrudActions } from './crud-actions';
-import { createHighlighterDragActions } from './drag-actions';
+import { createHighlighterOrderingActions } from './ordering-actions';
 import { createHighlighterSettingsActions } from './persistence-actions';
 import { useHighlighterSectionState } from './state';
 
@@ -11,24 +11,14 @@ type HighlighterSectionStatus = Pick<
   'isLoading' | 'settings'
 >;
 type HighlighterPresetViewState = {
-  draggedId: string | null;
-  dragOverId: string | null;
   editingPreset: BorderPreset | undefined;
-  hoveredPresetId: string | null;
   isEditorOpen: boolean;
 };
 type HighlighterSectionActions = ReturnType<typeof createHighlighterCrudActions> &
-  ReturnType<typeof createHighlighterDragActions>;
+  ReturnType<typeof createHighlighterOrderingActions>;
 type HighlighterSettingsActions = ReturnType<typeof createHighlighterSettingsActions>;
-type HighlighterSectionPublicActions = Omit<
-  HighlighterSectionActions,
-  'handleDragOver' | 'handleDragStart' | 'handleDrop'
-> & {
-  handleDragOver: (event: DragEvent, presetId: string) => void;
-  handleDragStart: (event: DragEvent, presetId: string) => void;
-  handleDrop: (event: DragEvent, targetId: string) => Promise<void>;
-  handlePresetHoverChange: (presetId: string | null) => void;
-} & Pick<HighlighterSettingsActions, 'handleSetDefaultPreset' | 'handleTogglePresetEnabled'>;
+type HighlighterSectionPublicActions = HighlighterSectionActions &
+  Pick<HighlighterSettingsActions, 'handleSetDefaultPreset' | 'handleTogglePresetEnabled'>;
 
 export type HighlighterPresetController = HighlighterPresetViewState &
   HighlighterSectionPublicActions;
@@ -44,36 +34,26 @@ type HighlighterSectionController = {
 
 export function useHighlighterSection(): HighlighterSectionController {
   const persistenceState = useHighlighterSectionState();
-  const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<BorderPreset | undefined>(undefined);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const crudActions = createHighlighterCrudActions({
     ...persistenceState,
     setEditingPreset,
     setIsEditorOpen,
   });
-  const dragActions = createHighlighterDragActions({
+  const orderingActions = createHighlighterOrderingActions({
     ...persistenceState,
-    draggedId,
-    setDraggedId,
-    setDragOverId,
   });
   const settingsActions = createHighlighterSettingsActions(persistenceState);
 
   const presets = {
-    draggedId,
-    dragOverId,
     editingPreset,
-    hoveredPresetId,
     isEditorOpen,
     ...crudActions,
-    ...dragActions,
+    ...orderingActions,
     handleSetDefaultPreset: settingsActions.handleSetDefaultPreset,
     handleTogglePresetEnabled: settingsActions.handleTogglePresetEnabled,
-    handlePresetHoverChange: setHoveredPresetId,
   };
 
   return {

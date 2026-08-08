@@ -9,7 +9,7 @@ import {
   getHighlighterPresetCountLabel,
   getHighlighterPresetPreviewStyle,
   normalizeHighlighterPresetOrders,
-  reorderHighlighterPresets,
+  reorderHighlighterPresetsBefore,
 } from './helpers';
 import {
   BORDER_SHADOW_HARD_INTENSITY,
@@ -52,13 +52,15 @@ describe('highlighter-section helpers', () => {
     const second = createPreset({ id: 'preset-2', order: 1 });
     const third = createPreset({ id: 'preset-3', order: 2 });
 
-    expect(reorderHighlighterPresets([first, second], 'missing', 'preset-2')).toBeNull();
-    expect(reorderHighlighterPresets([first, second], 'preset-1', 'missing')).toBeNull();
-    expect(reorderHighlighterPresets([first, second, third], 'preset-3', 'preset-1')).toEqual([
-      expect.objectContaining({ id: 'preset-3', order: 0 }),
-      expect.objectContaining({ id: 'preset-1', order: 1 }),
-      expect.objectContaining({ id: 'preset-2', order: 2 }),
-    ]);
+    expect(reorderHighlighterPresetsBefore([first, second], 'missing', 'preset-2')).toBeNull();
+    expect(reorderHighlighterPresetsBefore([first, second], 'preset-1', 'missing')).toBeNull();
+    expect(reorderHighlighterPresetsBefore([first, second, third], 'preset-3', 'preset-1')).toEqual(
+      [
+        expect.objectContaining({ id: 'preset-3', order: 0 }),
+        expect.objectContaining({ id: 'preset-1', order: 1 }),
+        expect.objectContaining({ id: 'preset-2', order: 2 }),
+      ]
+    );
   });
 
   it('normalizes preset order values from the current array position', () => {

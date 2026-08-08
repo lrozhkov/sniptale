@@ -27,30 +27,13 @@ let root: Root | null = null;
 
 function createSectionState() {
   return {
-    draggedId: 'preset-1',
-    dragOverId: null,
-    handleDrop: vi.fn(async () => undefined),
-    setDraggedId: vi.fn(),
-    setDragOverId: vi.fn(),
+    handleMoveBefore: vi.fn(async () => undefined),
   };
-}
-
-function createDragEvent() {
-  return {
-    dataTransfer: {
-      effectAllowed: 'copy',
-    },
-    preventDefault: vi.fn(),
-  } as unknown as React.DragEvent<HTMLDivElement>;
 }
 
 function getContentProps() {
   return savePresetsSectionContentSpy.mock.calls[0]?.[0] as {
-    onDragEnd: () => void;
-    onDragLeave: () => void;
-    onDragOver: (event: React.DragEvent<HTMLDivElement>, id: string) => void;
-    onDragStart: (event: React.DragEvent<HTMLDivElement>, id: string) => void;
-    onDrop: (event: React.DragEvent<HTMLDivElement>, id: string) => Promise<void>;
+    onMoveBefore: (id: string, beforeId: string | null) => Promise<void>;
   };
 }
 
@@ -83,34 +66,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('wires drag state handlers through the save presets shell', async () => {
+it('forwards the canonical insertion action through the save presets shell', async () => {
   const sectionState = createSectionState();
   useSavePresetsSectionSpy.mockReturnValue(sectionState);
 
   await renderSection();
 
   const props = getContentProps();
-  const startEvent = createDragEvent();
-  const blockedDragOverEvent = createDragEvent();
-  const activeDragOverEvent = createDragEvent();
-  const dropEvent = createDragEvent();
+  await props.onMoveBefore('preset-1', null);
 
-  props.onDragStart(startEvent, 'preset-1');
-  props.onDragOver(blockedDragOverEvent, 'preset-1');
-  props.onDragOver(activeDragOverEvent, 'preset-2');
-  await props.onDrop(dropEvent, 'preset-2');
-  props.onDragLeave();
-  props.onDragEnd();
-
-  expect(sectionState.setDraggedId).toHaveBeenCalledWith('preset-1');
-  expect(startEvent.dataTransfer.effectAllowed).toBe('move');
-  expect(blockedDragOverEvent.preventDefault).toHaveBeenCalled();
-  expect(activeDragOverEvent.preventDefault).toHaveBeenCalled();
-  expect(sectionState.setDragOverId).toHaveBeenCalledWith('preset-2');
-  expect(sectionState.handleDrop).toHaveBeenCalledWith('preset-2');
-  expect(dropEvent.preventDefault).toHaveBeenCalled();
-  expect(sectionState.setDragOverId).toHaveBeenCalledWith(null);
-  expect(sectionState.setDraggedId).toHaveBeenCalledWith(null);
+  expect(sectionState.handleMoveBefore).toHaveBeenCalledWith('preset-1', null);
 });
 
 it('forwards the editing preset only when the controller exposes it', async () => {

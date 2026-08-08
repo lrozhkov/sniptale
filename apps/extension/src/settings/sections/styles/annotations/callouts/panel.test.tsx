@@ -22,24 +22,16 @@ function createController(): CalloutPresetCatalogController {
       presets: createSystemCalloutPresetCatalog(),
       systemCatalogRevision: 1,
     },
-    draggedId: null,
-    dragOverId: null,
     editor: { isOpen: false },
     error: false,
-    hoveredId: null,
     isLoading: false,
     isSaving: false,
     actions: {
       add: vi.fn(),
       closeEditor: vi.fn(),
       delete: vi.fn(),
-      dragEnd: vi.fn(),
-      dragLeave: vi.fn(),
-      dragOver: vi.fn(),
-      dragStart: vi.fn(),
-      drop: vi.fn(),
       edit: vi.fn(),
-      hover: vi.fn(),
+      moveBefore: vi.fn(),
       reset: vi.fn(),
       save: vi.fn(),
       setDefault: vi.fn(),
@@ -52,7 +44,7 @@ describe('CalloutPresetsPanel', () => {
   it('renders all six system previews, default state, and catalog controls', () => {
     const markup = renderToStaticMarkup(<CalloutPresetsPanel controller={createController()} />);
     expect(markup.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(6);
-    expect(markup).toContain('highlighter.calloutPresets.defaultBadge');
+    expect(markup).toContain('settings.collection.defaultBadge');
     expect(markup).toContain('highlighter.calloutPresets.systemBadge');
     expect(markup).toContain('highlighter.calloutPresets.add');
   });
@@ -81,19 +73,16 @@ describe('CalloutPresetsPanel', () => {
       systemPresetKey: undefined,
     };
     controller.catalog = { ...controller.catalog!, presets: [system, user] };
-    controller.hoveredId = system.id;
     const systemMarkup = renderToStaticMarkup(<CalloutPresetsPanel controller={controller} />);
-    expect(systemMarkup).toContain('highlighter.calloutPresets.reset');
+    expect(systemMarkup).toContain('settings.collection.actions.reset');
 
-    controller.hoveredId = user.id;
     const userMarkup = renderToStaticMarkup(<CalloutPresetsPanel controller={controller} />);
-    expect(userMarkup).toContain('common.actions.delete');
-    expect(userMarkup).toContain('highlighter.calloutPresets.makeDefault');
+    expect(userMarkup).toContain('settings.collection.actions.delete');
+    expect(userMarkup).toContain('settings.collection.actions.setDefault');
   });
 
   it('routes row and add interactions through the controller actions', async () => {
     const controller = createController();
-    controller.hoveredId = controller.catalog!.presets[1]!.id;
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);

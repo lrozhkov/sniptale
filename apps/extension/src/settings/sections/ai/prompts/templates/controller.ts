@@ -1,17 +1,14 @@
-import { useState } from 'react';
-
 import { useTemplateActions } from './actions';
 import { useTemplateDeleteState } from './delete-state';
 import { useTemplateEditorState } from './editor-state';
 import { usePromptTemplates } from '../../../../../features/prompt-templates/hooks/use-prompt-templates';
 
 /**
- * Owns settings prompt template CRUD, hover state, and modal flows.
+ * Owns settings prompt template CRUD and modal flows.
  */
 export function useTemplatesSection() {
   const { templates, isLoading, isMutating, error, addTemplate, updateTemplate, removeTemplate } =
     usePromptTemplates();
-  const [hoveredTemplateId, setHoveredTemplateId] = useState<string | null>(null);
   const editorState = useTemplateEditorState();
   const deleteState = useTemplateDeleteState();
   const { confirmDelete, handleSaveTemplate } = useTemplateActions(
@@ -42,11 +39,9 @@ export function useTemplatesSection() {
     handleDeleteTemplate: deleteState.openDeleteDialog,
     handleEditTemplate: editorState.openTemplateEditor,
     handleSaveTemplate,
-    hoveredTemplateId,
     isEditorOpen: editorState.isEditorOpen,
     isLoading: isLoading || isMutating,
     submitError: error,
-    setHoveredTemplateId,
     templates,
     closeDeleteDialog: deleteState.closeDeleteDialog,
     closeTemplateEditor: editorState.closeTemplateEditor,

@@ -21,51 +21,22 @@ import type { CalloutPresetCatalogController } from './types';
 
 const logger = createLogger({ namespace: 'SettingsCalloutPresets' });
 
-function reorderPresets(presets: CalloutPreset[], sourceId: string, targetId: string) {
-  const sourceIndex = presets.findIndex((item) => item.id === sourceId);
-  const targetIndex = presets.findIndex((item) => item.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0) return presets;
-  const next = [...presets];
-  const [moved] = next.splice(sourceIndex, 1);
+function reorderPresetsBefore(
+  presets: readonly CalloutPreset[],
+  sourceId: string,
+  beforeId: string | null
+) {
+  const next = presets.filter((preset) => preset.id !== sourceId);
+  const moved = presets.find((preset) => preset.id === sourceId);
   if (!moved) return presets;
-  next.splice(targetIndex, 0, moved);
+  const target =
+    beforeId === null ? next.length : next.findIndex((preset) => preset.id === beforeId);
+  if (target < 0) return presets;
+  next.splice(target, 0, moved);
   return next;
 }
 
 type ControllerActions = CalloutPresetCatalogController['actions'];
-
-function createDragActions(args: {
-  catalog: CalloutPresetCatalog | null;
-  draggedId: string | null;
-  mutate: (operation: () => Promise<{ outcome: string }>) => Promise<boolean>;
-  setDraggedId: (id: string | null) => void;
-  setDragOverId: (id: string | null) => void;
-}): Pick<ControllerActions, 'dragEnd' | 'dragLeave' | 'dragOver' | 'dragStart' | 'drop'> {
-  const reset = () => {
-    args.setDraggedId(null);
-    args.setDragOverId(null);
-  };
-  return {
-    dragEnd: reset,
-    dragLeave: () => args.setDragOverId(null),
-    dragOver: (event, id) => {
-      event.preventDefault();
-      if (args.draggedId && args.draggedId !== id) args.setDragOverId(id);
-    },
-    dragStart: (event, id) => {
-      event.dataTransfer.effectAllowed = 'move';
-      args.setDraggedId(id);
-    },
-    drop: async (event, id) => {
-      event.preventDefault();
-      if (args.catalog && args.draggedId && args.draggedId !== id) {
-        const ordered = reorderPresets(args.catalog.presets, args.draggedId, id);
-        await args.mutate(() => updateCalloutPresetsOrder(ordered.map((preset) => preset.id)));
-      }
-      reset();
-    },
-  };
-}
 
 function createCatalogActions(args: {
   catalog: CalloutPresetCatalog | null;
@@ -74,8 +45,7 @@ function createCatalogActions(args: {
     successKey?: Parameters<typeof translate>[0]
   ) => Promise<boolean>;
   setEditor: (state: CalloutPresetCatalogController['editor']) => void;
-  setHoveredId: (id: string | null) => void;
-}): Omit<ControllerActions, 'dragEnd' | 'dragLeave' | 'dragOver' | 'dragStart' | 'drop'> {
+}): ControllerActions {
   return {
     add: () => args.setEditor({ isOpen: true }),
     closeEditor: () => args.setEditor({ isOpen: false }),
@@ -87,7 +57,11 @@ function createCatalogActions(args: {
       );
     },
     edit: (preset) => args.setEditor({ isOpen: true, preset }),
-    hover: args.setHoveredId,
+    moveBefore: async (id, beforeId) => {
+      if (!args.catalog) return;
+      const ordered = reorderPresetsBefore(args.catalog.presets, id, beforeId);
+      await args.mutate(() => updateCalloutPresetsOrder(ordered.map((preset) => preset.id)));
+    },
     reset: async (id) => {
       await args.mutate(
         () => resetSystemCalloutPreset(id),
@@ -138,9 +112,6 @@ export function useCalloutPresetCatalogController(): CalloutPresetCatalogControl
   const [error, setError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editor, setEditor] = useState<CalloutPresetCatalogController['editor']>({ isOpen: false });
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const latestRequestRef = useRef(0);
   const mutationQueueRef = useRef(Promise.resolve());
 
@@ -216,18 +187,12 @@ export function useCalloutPresetCatalogController(): CalloutPresetCatalogControl
     [refresh]
   );
 
-  const actions = {
-    ...createCatalogActions({ catalog, mutate, setEditor, setHoveredId }),
-    ...createDragActions({ catalog, draggedId, mutate, setDraggedId, setDragOverId }),
-  };
+  const actions = createCatalogActions({ catalog, mutate, setEditor });
 
   return {
     catalog,
-    draggedId,
-    dragOverId,
     editor,
     error,
-    hoveredId,
     isLoading,
     isSaving,
     actions,

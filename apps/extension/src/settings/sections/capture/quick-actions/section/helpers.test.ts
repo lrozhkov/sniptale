@@ -7,7 +7,7 @@ import {
   getDelayLabel,
   getViewportPresetLabel,
   getQuickActionCountLabel,
-  reorderQuickActions,
+  reorderQuickActionsBefore,
 } from './helpers';
 
 function verifyEmulationAndDelayLabels() {
@@ -61,13 +61,13 @@ function verifyQuickActionReorder() {
     { id: 'three', name: 'Three' },
   ] as never;
 
-  expect(reorderQuickActions(actions, 'one', 'three')?.map((action) => action.id)).toEqual([
+  expect(reorderQuickActionsBefore(actions, 'one', null)?.map((action) => action.id)).toEqual([
     'two',
     'three',
     'one',
   ]);
-  expect(reorderQuickActions(actions, 'missing', 'three')).toBeNull();
-  expect(reorderQuickActions(actions, 'one', 'missing')).toBeNull();
+  expect(reorderQuickActionsBefore(actions, 'missing', 'three')).toBeNull();
+  expect(reorderQuickActionsBefore(actions, 'one', 'missing')).toBeNull();
 }
 
 function runQuickActionsSectionHelpersSuite() {
@@ -83,7 +83,7 @@ function runQuickActionsSectionHelpersSuite() {
     'builds quick-action count copy and a default quick-action payload',
     verifyQuickActionCountAndDefaultAction
   );
-  it('reorders quick actions only when both ids exist', verifyQuickActionReorder);
+  it('reorders quick actions only when the moved and anchor ids exist', verifyQuickActionReorder);
 }
 
 describe('quick-actions section helpers', runQuickActionsSectionHelpersSuite);

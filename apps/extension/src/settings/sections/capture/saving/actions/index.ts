@@ -5,22 +5,17 @@ import {
 } from './defaults';
 import { createConfirmDeletePresetAction } from './preset/confirm-delete';
 import { createDeletePresetGuard } from './preset/delete-guard';
-import { createDropPresetAction } from './preset/drop';
+import { createMovePresetBeforeAction } from './preset/drop';
 import { createSavePresetAction } from './preset/save';
 import { createTogglePresetEnabledAction } from './preset/toggle-enabled';
-import type {
-  SavePresetsDialogState,
-  SavePresetsDragState,
-  SavePresetsSyncState,
-} from '../state/types';
+import type { SavePresetsDialogState, SavePresetsSyncState } from '../state/types';
 import { buildSavePresetsViewModel, createSettingsPersister } from '../state/view-model';
 
 export { buildSavePresetsViewModel, createSettingsPersister };
 
 export function createSavePresetsActions(
   sync: SavePresetsSyncState,
-  dialogState: SavePresetsDialogState,
-  dragState: SavePresetsDragState
+  dialogState: SavePresetsDialogState
 ) {
   const persistSettings = createSettingsPersister(sync);
 
@@ -29,7 +24,7 @@ export function createSavePresetsActions(
     handleCaptureActionChange: createCaptureActionChangeAction(sync, persistSettings),
     handleDefaultPresetChange: createDefaultPresetChangeAction(persistSettings),
     handleDeletePreset: createDeletePresetGuard(sync),
-    handleDrop: createDropPresetAction(sync, dragState, persistSettings),
+    handleMoveBefore: createMovePresetBeforeAction(sync, persistSettings),
     handleSavePreset: createSavePresetAction(sync, dialogState, persistSettings),
     handleTogglePresetEnabled: createTogglePresetEnabledAction(sync, persistSettings),
     handleToggleSaveToGallery: createToggleSaveToGalleryAction(sync, persistSettings),

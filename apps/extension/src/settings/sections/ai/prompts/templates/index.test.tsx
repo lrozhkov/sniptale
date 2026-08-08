@@ -64,12 +64,10 @@ it('forwards template section state into the templates content shell', async () 
     handleDeleteTemplate: vi.fn(),
     handleEditTemplate: vi.fn(),
     handleSaveTemplate: vi.fn(async () => undefined),
-    hoveredTemplateId: null,
     isEditorOpen: false,
     isLoading: false,
     submitError: null,
     openNewTemplateEditor: vi.fn(),
-    setHoveredTemplateId: vi.fn(),
     templates: [],
   };
 
@@ -91,11 +89,9 @@ it('forwards the editing template only when the controller exposes one', async (
     handleDeleteTemplate: vi.fn(),
     handleEditTemplate: vi.fn(),
     handleSaveTemplate: vi.fn(async () => undefined),
-    hoveredTemplateId: null,
     isEditorOpen: true,
     isLoading: false,
     openNewTemplateEditor: vi.fn(),
-    setHoveredTemplateId: vi.fn(),
     submitError: null,
     templates: [],
   });

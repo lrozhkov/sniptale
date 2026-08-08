@@ -77,6 +77,17 @@ function getButtons() {
   return Array.from(container?.querySelectorAll('button') ?? []);
 }
 
+async function openFirstActionMenu() {
+  await act(async () => {
+    getButtons()
+      .find(
+        (button) =>
+          button.getAttribute('aria-label') === translate('settings.collection.actions.menu')
+      )
+      ?.click();
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -97,11 +108,21 @@ it('renders provider rows and wires provider add, edit, and delete callbacks', a
   expect(container?.textContent).toContain('OpenAI');
   expect(container?.textContent).toContain('openai-compatible');
 
+  await openFirstActionMenu();
+
   await act(async () => {
-    getButtons()[0]?.click();
     getButtons()
-      .slice(-2)
-      .forEach((button) => button.click());
+      .find((button) => button.textContent === translate('common.actions.add'))
+      ?.click();
+    getButtons()
+      .find(
+        (button) =>
+          button.getAttribute('aria-label') === translate('settings.collection.actions.edit')
+      )
+      ?.click();
+    getButtons()
+      .find((button) => button.textContent === translate('settings.collection.actions.delete'))
+      ?.click();
   });
 
   expect(state.modals.openProviderModal).toHaveBeenCalledTimes(2);
@@ -113,12 +134,13 @@ it('renders a compact clear-secret action only for providers with a stored key',
   const state = createState();
   await renderUi(<AIProvidersProvidersCard state={state} />);
 
+  await openFirstActionMenu();
+
   await act(async () => {
     getButtons()
       .find(
         (button) =>
-          button.getAttribute('aria-label') ===
-          translate('settings.aiProviders.providerSecretClearAction')
+          button.textContent === translate('settings.aiProviders.providerSecretClearAction')
       )
       ?.click();
   });
@@ -135,25 +157,35 @@ it('renders a compact clear-secret action only for providers with a stored key',
 
   expect(
     getButtons().some(
-      (button) =>
-        button.getAttribute('aria-label') ===
-        translate('settings.aiProviders.providerSecretClearAction')
+      (button) => button.textContent === translate('settings.aiProviders.providerSecretClearAction')
     )
   ).toBe(false);
 });
 
 it('renders model rows, default actions, and empty states when providers are unavailable', async () => {
-  const state = createState();
+  const state = createState({ defaultModelId: null });
   await renderUi(<AIProvidersModelsCard state={state} />);
 
   expect(container?.textContent).toContain('GPT 4.1');
-  expect(container?.textContent).toContain(translate('settings.aiProviders.modelDefaultBadge'));
+
+  await openFirstActionMenu();
 
   await act(async () => {
-    getButtons()[0]?.click();
     getButtons()
-      .slice(-3)
-      .forEach((button) => button.click());
+      .find((button) => button.textContent === translate('common.actions.add'))
+      ?.click();
+    getButtons()
+      .find((button) => button.textContent === translate('settings.collection.actions.setDefault'))
+      ?.click();
+    getButtons()
+      .find(
+        (button) =>
+          button.getAttribute('aria-label') === translate('settings.collection.actions.edit')
+      )
+      ?.click();
+    getButtons()
+      .find((button) => button.textContent === translate('settings.collection.actions.delete'))
+      ?.click();
   });
 
   expect(state.modals.openModelModal).toHaveBeenCalledTimes(2);

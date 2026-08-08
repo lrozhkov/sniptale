@@ -1,10 +1,6 @@
-import { Plus } from 'lucide-react';
-
-import { translate } from '../../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../../contracts/settings';
 import { settingsSectionClassName } from '../../../../section-surface';
 import {
-  addButtonClassName,
   CaptureActionCard,
   DefaultPresetsCard,
   GalleryToggleCard,
@@ -33,21 +29,13 @@ type SavePresetsSectionContentProps = {
   openEditor: SavePresetsRowHandlers['onEdit'];
   presetOptions: { value: string; label: string }[];
   saveCapturesToGallery: boolean;
-  setHoveredPresetId: SavePresetsRowHandlers['onHoverChange'];
 } & Pick<
   SavePresetsListProps,
   | 'confirmDelete'
   | 'confirmDeletePreset'
-  | 'draggedId'
-  | 'dragOverId'
   | 'editingPreset'
-  | 'hoveredPresetId'
   | 'isEditorOpen'
-  | 'onDragEnd'
-  | 'onDragLeave'
-  | 'onDragOver'
-  | 'onDragStart'
-  | 'onDrop'
+  | 'onMoveBefore'
   | 'presetCountLabel'
   | 'presets'
 >;
@@ -56,35 +44,18 @@ function buildPresetsListProps(props: SavePresetsSectionContentProps): SavePrese
   return {
     confirmDelete: props.confirmDelete,
     confirmDeletePreset: props.confirmDeletePreset,
-    draggedId: props.draggedId,
-    dragOverId: props.dragOverId,
-    hoveredPresetId: props.hoveredPresetId,
     isEditorOpen: props.isEditorOpen,
     onCloseDeleteDialog: props.closeDeleteDialog,
     onCloseEditor: props.closeEditor,
     onDelete: props.handleDeletePreset,
-    onDragEnd: props.onDragEnd,
-    onDragLeave: props.onDragLeave,
-    onDragOver: props.onDragOver,
-    onDragStart: props.onDragStart,
-    onDrop: props.onDrop,
+    onMoveBefore: props.onMoveBefore,
     onEdit: props.openEditor,
-    onHoverChange: props.setHoveredPresetId,
     onSavePreset: props.handleSavePreset,
     onToggleEnabled: props.handleTogglePresetEnabled,
     presetCountLabel: props.presetCountLabel,
     presets: props.presets,
     ...(props.editingPreset === undefined ? {} : { editingPreset: props.editingPreset }),
   };
-}
-
-function AddPresetButton(props: { onAdd: () => void }) {
-  return (
-    <button type="button" onClick={props.onAdd} className={addButtonClassName}>
-      <Plus size={16} />
-      {translate('savePresets.section.addButton')}
-    </button>
-  );
 }
 
 function SavePresetsSectionBody(props: SavePresetsSectionContentProps) {
@@ -122,7 +93,6 @@ export function SavePresetsSectionContent(props: SavePresetsSectionContentProps)
     <div className={settingsSectionClassName}>
       <SavePresetsHeader />
       <SavePresetsSectionBody {...props} />
-      <AddPresetButton onAdd={() => props.openEditor()} />
     </div>
   );
 }

@@ -15,58 +15,22 @@ type StepBadgePresetMutate = (
   success?: Parameters<typeof import('../../../../../platform/i18n').translate>[0]
 ) => Promise<boolean>;
 
-function reorder(catalog: StepBadgePresetCatalog, sourceId: string, targetId: string) {
-  const source = catalog.presets.findIndex((preset) => preset.id === sourceId);
-  const target = catalog.presets.findIndex((preset) => preset.id === targetId);
-  if (source < 0 || target < 0) return catalog.presets;
-  const next = [...catalog.presets];
-  const [moved] = next.splice(source, 1);
-  if (moved) next.splice(target, 0, moved);
+function reorderBefore(catalog: StepBadgePresetCatalog, sourceId: string, beforeId: string | null) {
+  const next = catalog.presets.filter((preset) => preset.id !== sourceId);
+  const moved = catalog.presets.find((preset) => preset.id === sourceId);
+  if (!moved) return catalog.presets;
+  const target =
+    beforeId === null ? next.length : next.findIndex((preset) => preset.id === beforeId);
+  if (target < 0) return catalog.presets;
+  next.splice(target, 0, moved);
   return next;
-}
-
-export function createStepBadgePresetDragActions(args: {
-  catalog: StepBadgePresetCatalog | null;
-  draggedId: string | null;
-  mutate: StepBadgePresetMutate;
-  reset: () => void;
-  setDraggedId: (id: string | null) => void;
-  setDragOverId: (id: string | null) => void;
-}): Pick<
-  StepBadgePresetCatalogController['actions'],
-  'dragEnd' | 'dragLeave' | 'dragOver' | 'dragStart' | 'drop'
-> {
-  return {
-    dragEnd: args.reset,
-    dragLeave: () => args.setDragOverId(null),
-    dragOver: (event, id) => {
-      event.preventDefault();
-      if (args.draggedId && args.draggedId !== id) args.setDragOverId(id);
-    },
-    dragStart: (event, id) => {
-      event.dataTransfer.effectAllowed = 'move';
-      args.setDraggedId(id);
-    },
-    drop: async (event, id) => {
-      event.preventDefault();
-      if (args.catalog && args.draggedId && args.draggedId !== id) {
-        const next = reorder(args.catalog, args.draggedId, id);
-        await args.mutate(() => updateStoredStepBadgePresetOrder(next.map((preset) => preset.id)));
-      }
-      args.reset();
-    },
-  };
 }
 
 export function createStepBadgePresetCatalogActions(args: {
   catalog: StepBadgePresetCatalog | null;
   mutate: StepBadgePresetMutate;
   setEditor: (editor: StepBadgePresetCatalogController['editor']) => void;
-  setHoveredId: (id: string | null) => void;
-}): Omit<
-  StepBadgePresetCatalogController['actions'],
-  'dragEnd' | 'dragLeave' | 'dragOver' | 'dragStart' | 'drop'
-> {
+}): StepBadgePresetCatalogController['actions'] {
   return {
     add: () => args.setEditor({ isOpen: true }),
     closeEditor: () => args.setEditor({ isOpen: false }),
@@ -78,7 +42,11 @@ export function createStepBadgePresetCatalogActions(args: {
         );
     },
     edit: (preset) => args.setEditor({ isOpen: true, preset }),
-    hover: args.setHoveredId,
+    moveBefore: async (id, beforeId) => {
+      if (!args.catalog) return;
+      const next = reorderBefore(args.catalog, id, beforeId);
+      await args.mutate(() => updateStoredStepBadgePresetOrder(next.map((preset) => preset.id)));
+    },
     reset: async (id) => {
       await args.mutate(
         () => resetStoredSystemStepBadgePreset(id),

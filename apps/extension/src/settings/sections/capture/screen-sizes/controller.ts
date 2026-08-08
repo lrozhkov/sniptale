@@ -37,13 +37,12 @@ export function useViewportPresetsSection() {
     },
     list: {
       countLabel: getViewportPresetCountLabel(sync.viewportPresets.length),
-      hoveredPresetId: dialogs.hoveredViewportId,
       onDelete: actions.handleDeleteViewportPreset,
       onEdit: actions.handleEditViewportPreset,
-      onHoverChange: dialogs.setHoveredViewportId,
-      onMove: actions.handleMoveViewportPreset,
+      onMoveBefore: actions.handleMoveViewportPresetBefore,
       onReset: actions.handleResetViewportPreset,
       onToggle: actions.handleToggleViewportPreset,
+      onSetDefault: actions.handleDefaultViewportChange,
     },
     model: {
       isLoading: sync.isLoading,

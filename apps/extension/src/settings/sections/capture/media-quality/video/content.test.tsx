@@ -127,15 +127,23 @@ it('renders profile groups and forwards profile, editor, and delete actions', ()
   expect(container?.textContent).toContain('Review');
   expect(container?.textContent).toContain('720p · MP4 · H.264 (AVC) · 30 fps');
   expect(container?.textContent).toContain('save error');
-  expect(container?.textContent).toContain('settings.videoQuality.activeBadge');
+  expect(container?.textContent).toContain('settings.collection.defaultBadge');
 
   const addButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
     button.textContent?.includes('settings.videoQuality.addProfile')
   );
   act(() => addButton?.click());
-  clickByLabel('settings.videoQuality.useProfile');
-  clickByLabel('settings.videoQuality.editProfile');
-  clickByLabel('settings.videoQuality.deleteProfile');
+  act(() =>
+    Array.from(container?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent === 'settings.collection.actions.setDefault')
+      ?.click()
+  );
+  clickByLabel('settings.collection.actions.edit');
+  act(() =>
+    Array.from(container?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent === 'settings.collection.actions.delete')
+      ?.click()
+  );
   act(() =>
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.textContent === 'save-editor')
