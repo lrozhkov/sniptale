@@ -2,6 +2,7 @@ import type { PolicyStateId } from '../../../routing-contracts/policy-state';
 
 export const BACKGROUND_OWNED_POLICY_STATE_IDS = [
   'ai-secret-unlock-requests',
+  'annotation-fork-sessions',
   'content-action-activation-keys',
   'content-action-auto-start-grants',
   'content-action-capabilities',

@@ -17,6 +17,7 @@ import {
   type AutoBlurFrameManager,
 } from './operations';
 import { reportAutoBlurApplyResult } from './feedback';
+import { isAutoBlurScanAbortError } from '../../../selection/auto-blur-runtime';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 const APPLY_ERROR_MESSAGE_KEY = 'content.autoBlur.applyError' satisfies TranslationKey;
@@ -25,6 +26,7 @@ const APPLY_ONCE_ERROR_MESSAGE_KEY = 'content.autoBlur.applyOnceError' satisfies
 interface ApplyActionArgs {
   blurSettings: BlurSettings;
   autoApplyEnabled: boolean;
+  enableAutoApplyOnApply: boolean;
   beginApplying: () => void;
   close: () => void;
   failApplying: (message: TranslationKey) => void;
@@ -32,6 +34,7 @@ interface ApplyActionArgs {
   matches: AutoBlurMatch[];
   selectedCategories: Set<AutoBlurCategory>;
   selectedMatchIds: Set<string>;
+  setAutoApplyEnabled: (enabled: boolean) => void;
 }
 
 function createSelectedTargets(args: {
@@ -46,7 +49,6 @@ async function persistAndApplyTargets(args: {
   autoApplyEnabled: boolean;
   borderSettings: AppliedBorderSettings;
   blurSettings: BlurSettings;
-  close: () => void;
   frameManager: AutoBlurFrameManager;
   selectedCategories: Set<AutoBlurCategory>;
   selectedMatches: AutoBlurMatch[];
@@ -57,7 +59,6 @@ async function persistAndApplyTargets(args: {
     blurSettings: args.blurSettings,
     targets: createTargets(args.selectedMatches),
   });
-  args.close();
 }
 
 async function applySelectedAutoBlurTargets(args: {
@@ -65,16 +66,28 @@ async function applySelectedAutoBlurTargets(args: {
   borderSettings: AppliedBorderSettings;
   blurSettings: BlurSettings;
   close: () => void;
+  enableAutoApplyOnApply: boolean;
   frameManager: AutoBlurFrameManager;
   matches: AutoBlurMatch[];
   selectedCategories: Set<AutoBlurCategory>;
   selectedMatchIds: Set<string>;
+  setAutoApplyEnabled: (enabled: boolean) => void;
 }) {
+  const autoApplyEnabled = args.autoApplyEnabled || args.enableAutoApplyOnApply;
+  if (args.enableAutoApplyOnApply) {
+    await persistSettings({
+      autoApplyEnabled: true,
+      blurSettings: args.blurSettings,
+      selectedCategories: args.selectedCategories,
+    });
+    args.setAutoApplyEnabled(true);
+    args.close();
+    return;
+  }
   await persistAndApplyTargets({
-    autoApplyEnabled: args.autoApplyEnabled,
+    autoApplyEnabled,
     borderSettings: args.borderSettings,
     blurSettings: args.blurSettings,
-    close: args.close,
     frameManager: args.frameManager,
     selectedCategories: args.selectedCategories,
     selectedMatches: createSelectedTargets({
@@ -83,6 +96,10 @@ async function applySelectedAutoBlurTargets(args: {
       selectedMatchIds: args.selectedMatchIds,
     }),
   });
+  if (autoApplyEnabled !== args.autoApplyEnabled) {
+    args.setAutoApplyEnabled(autoApplyEnabled);
+  }
+  args.close();
 }
 
 export function useApplyAction(args: ApplyActionArgs) {
@@ -91,11 +108,13 @@ export function useApplyAction(args: ApplyActionArgs) {
     beginApplying,
     blurSettings,
     close,
+    enableAutoApplyOnApply,
     failApplying,
     frameManager,
     matches,
     selectedCategories,
     selectedMatchIds,
+    setAutoApplyEnabled,
   } = args;
 
   return useCallback(
@@ -108,10 +127,12 @@ export function useApplyAction(args: ApplyActionArgs) {
           borderSettings,
           blurSettings,
           close,
+          enableAutoApplyOnApply,
           frameManager,
           matches,
           selectedCategories,
           selectedMatchIds,
+          setAutoApplyEnabled,
         });
       } catch (error) {
         logger.error('Failed to apply auto-blur targets', error);
@@ -123,11 +144,13 @@ export function useApplyAction(args: ApplyActionArgs) {
       beginApplying,
       blurSettings,
       close,
+      enableAutoApplyOnApply,
       failApplying,
       frameManager,
       matches,
       selectedCategories,
       selectedMatchIds,
+      setAutoApplyEnabled,
     ]
   );
 }
@@ -137,30 +160,38 @@ export function useApplyOnceAction(args: {
   failApplying: (message: TranslationKey) => void;
   finishApplying: () => void;
   frameManager: AutoBlurFrameManager;
+  runFullPageScan: <T>(
+    owner: 'apply-once' | 'auto-apply',
+    operation: (signal: AbortSignal) => Promise<T>
+  ) => Promise<T>;
 }) {
-  const { beginApplying, failApplying, finishApplying, frameManager } = args;
+  const { beginApplying, failApplying, finishApplying, frameManager, runFullPageScan } = args;
 
   return useCallback(async () => {
     beginApplying();
 
     try {
-      const settings = await loadSettingsOrDefault();
-      const result = await applyAutoBlurWithSettings({
-        blurSettings: settings.blurSettings,
-        frameManager,
-        frames: frameManager.frames,
-        scanMode: 'full-page',
-        selectedCategories: settings.selectedCategories,
+      const result = await runFullPageScan('apply-once', async (signal) => {
+        const settings = await loadSettingsOrDefault();
+        return applyAutoBlurWithSettings({
+          blurSettings: settings.blurSettings,
+          frameManager,
+          frames: frameManager.frames,
+          scanMode: 'full-page',
+          selectedCategories: settings.selectedCategories,
+          signal,
+        });
       });
       reportAutoBlurApplyResult(result.addedCount);
     } catch (error) {
+      if (isAutoBlurScanAbortError(error)) return;
       logger.error('Failed to apply auto-blur once', error);
       failApplying(APPLY_ERROR_MESSAGE_KEY);
       showToast(translate(APPLY_ONCE_ERROR_MESSAGE_KEY), 'error');
     } finally {
       finishApplying();
     }
-  }, [beginApplying, failApplying, finishApplying, frameManager]);
+  }, [beginApplying, failApplying, finishApplying, frameManager, runFullPageScan]);
 }
 
 export function useClearAutoBlurAction(args: {

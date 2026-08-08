@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-import type { TranslationKey } from '../../../platform/i18n';
+import type { AppLocale, TranslationKey } from '../../../platform/i18n';
 import type {
   StepBadgeAnchor,
   StepBadgeAlphabet,
@@ -35,6 +35,10 @@ export const DEFAULT_STEP_BADGE_SETTINGS: StepBadgeSettings = {
   sizeLevel: SIZE_LEVEL_DEFAULT,
   auto: true,
 };
+
+export function getDefaultStepBadgeAlphabet(locale: AppLocale): StepBadgeAlphabet {
+  return locale === 'ru' ? 'cyrillic' : 'latin';
+}
 
 export function normalizeStepBadgeFromProp(
   stepBadge: StepBadgeSettings | undefined

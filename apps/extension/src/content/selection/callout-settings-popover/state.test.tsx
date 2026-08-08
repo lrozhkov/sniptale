@@ -109,6 +109,33 @@ describe('useCalloutSettingsPopoverState', () => {
     cleanup();
   });
 
+  it('forks an inactive preset as a temporary copy while preserving the existing position', () => {
+    settings = createDefaultCalloutSettings(undefined, 'system-callout-bubble');
+    settings.placement = {
+      ...settings.placement,
+      manualPlacement: { centerOffsetX: 20, centerOffsetY: 30 },
+    };
+    const preset = createSystemCalloutPresetCatalog()[1]!;
+    const listener = vi.fn();
+    const cleanup = addCalloutPopoverSettingsChangedListener(listener);
+    renderHarness();
+
+    act(() => latestState?.forkPreset(preset));
+
+    expect(latestState?.localSettings.sourcePresetId).toBeUndefined();
+    expect(latestState?.localSettings.style).toEqual(preset.style);
+    expect(latestState?.localSettings.placement).toEqual(settings.placement);
+    expect(listener).toHaveBeenCalledWith({
+      frameId: 'frame-1',
+      settings: expect.objectContaining({
+        content: { titleText: preset.content.titleText },
+        sourcePresetId: undefined,
+        style: preset.style,
+      }),
+    });
+    cleanup();
+  });
+
   it('routes preset changes to the selected additional comment', () => {
     calloutIndex = 3;
     settings = createDefaultCalloutSettings();

@@ -14,6 +14,8 @@ const runtimeTokenContract =
   runtimeActionCoreMessageContracts[MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN];
 const contentRuntimeWakeupContract =
   runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP];
+const annotationForkSessionContract =
+  runtimeActionCoreMessageContracts[MessageType.ANNOTATION_FORK_SESSION];
 const offscreenPageStorageContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE];
 const unattendedFullPageContract =
@@ -22,6 +24,28 @@ const frameAnnotationRasterContract =
   runtimeActionCoreMessageContracts[MessageType.FRAME_ANNOTATION_RASTERIZE];
 const offscreenFrameAnnotationRasterContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE];
+const aiSettingsNavigationContract =
+  runtimeActionCoreMessageContracts[MessageType.AI_SETTINGS_NAVIGATION];
+
+it('bounds AI settings navigation to the two modal-owned destinations', () => {
+  expect(
+    aiSettingsNavigationContract.parseRequest({
+      contentIntent: { requestId: 'request-1', token: 'token-1' },
+      section: 'ai-prompts',
+      type: MessageType.AI_SETTINGS_NAVIGATION,
+    })
+  ).toEqual({
+    contentIntent: { requestId: 'request-1', token: 'token-1' },
+    section: 'ai-prompts',
+    type: MessageType.AI_SETTINGS_NAVIGATION,
+  });
+  expect(() =>
+    aiSettingsNavigationContract.parseRequest({
+      section: 'annotations',
+      type: MessageType.AI_SETTINGS_NAVIGATION,
+    })
+  ).toThrow();
+});
 
 it('parses bounded frame-annotation raster references and authoritative results', () => {
   const reference = { inputSha256: 'a'.repeat(64), jobId: 'job-1', revision: 1 };
@@ -238,6 +262,32 @@ it('parses a capability-bound pin-to-tab activation request', () => {
     pinToTab: true,
     type: MessageType.CONTENT_RUNTIME_WAKEUP,
   });
+});
+
+it('bounds tab-scoped annotation fork session operations', () => {
+  expect(
+    annotationForkSessionContract.parseRequest({
+      expectedRevision: 2,
+      operation: 'write',
+      payload: '{"version":1}',
+      type: MessageType.ANNOTATION_FORK_SESSION,
+    })
+  ).toMatchObject({ operation: 'write' });
+  expect(() =>
+    annotationForkSessionContract.parseRequest({
+      expectedRevision: 2,
+      operation: 'write',
+      payload: 'x'.repeat(500_001),
+      type: MessageType.ANNOTATION_FORK_SESSION,
+    })
+  ).toThrow();
+  expect(() =>
+    annotationForkSessionContract.parseRequest({
+      operation: 'read',
+      payload: '{}',
+      type: MessageType.ANNOTATION_FORK_SESSION,
+    })
+  ).toThrow();
 });
 
 it('parses content runtime wake-up requests', () => {

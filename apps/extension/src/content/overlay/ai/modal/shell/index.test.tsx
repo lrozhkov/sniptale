@@ -181,7 +181,7 @@ async function clickElement(element: Element | null | undefined) {
 }
 
 async function expandDataPanel() {
-  await clickElement(container?.querySelector('.sniptale-spoiler-header'));
+  await clickElement(container?.querySelector('.sniptale-ai-spoiler-toggle'));
 }
 
 async function toggleJsonPreview() {

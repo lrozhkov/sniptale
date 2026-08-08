@@ -6,16 +6,16 @@ export const contentToolbarDesignReviewMessages = defineMessageSource({
     en: 'Export design review',
   },
   annotationExportDownloadLabel: {
-    ru: 'Скачать дизайн-ревью',
-    en: 'Download design review',
+    ru: 'Скачать отчёт',
+    en: 'Download report',
   },
   annotationExportDownloadHint: {
     ru: 'Скачать комментарии, действия и изменённые свойства без снимка страницы',
     en: 'Download comments, actions, and changed properties without a screenshot',
   },
   annotationExportCopyLabel: {
-    ru: 'Копировать дизайн-ревью',
-    en: 'Copy design review',
+    ru: 'Копировать отчёт',
+    en: 'Copy report',
   },
   annotationExportCopyHint: {
     ru: 'Скопировать комментарии, действия и изменённые свойства',
@@ -26,28 +26,44 @@ export const contentToolbarDesignReviewMessages = defineMessageSource({
     en: 'Export page',
   },
   annotationExportOpenHint: {
-    ru: 'Открыть полный экспорт страницы со всеми параметрами',
-    en: 'Open full page export with all options',
+    ru: 'Сразу скачать полный архив страницы со всеми включёнными данными',
+    en: 'Download the complete page archive with all included data',
+  },
+  annotationExportConfigureLabel: {
+    ru: 'Настроить экспорт страницы',
+    en: 'Configure page export',
+  },
+  annotationExportConfigureHint: {
+    ru: 'Открыть параметры и выбрать содержимое архива',
+    en: 'Open settings and choose the archive contents',
   },
   annotationExportDownloadSuccess: {
-    ru: 'Дизайн-ревью отправлено в загрузки',
-    en: 'Design review sent to Downloads',
+    ru: 'Отчёт отправлен в загрузки',
+    en: 'Report sent to Downloads',
   },
   annotationExportCopySuccess: {
-    ru: 'Дизайн-ревью скопировано',
-    en: 'Design review copied',
+    ru: 'Отчёт скопирован',
+    en: 'Report copied',
+  },
+  annotationExportPageSuccess: {
+    ru: 'Полный архив страницы отправлен в загрузки',
+    en: 'Complete page archive sent to Downloads',
   },
   annotationExportOpenSuccess: {
     ru: 'Открыт экспорт страницы',
     en: 'Page export opened',
   },
   annotationExportCopyError: {
-    ru: 'Не удалось скопировать дизайн-ревью. Проверьте доступ к буферу обмена.',
-    en: 'Could not copy the design review. Check clipboard access.',
+    ru: 'Не удалось скопировать отчёт. Проверьте доступ к буферу обмена.',
+    en: 'Could not copy the report. Check clipboard access.',
   },
   annotationExportDownloadError: {
-    ru: 'Не удалось скачать дизайн-ревью. Попробуйте ещё раз.',
-    en: 'Could not download the design review. Try again.',
+    ru: 'Не удалось скачать отчёт. Попробуйте ещё раз.',
+    en: 'Could not download the report. Try again.',
+  },
+  annotationExportPageError: {
+    ru: 'Не удалось скачать полный архив страницы. Попробуйте ещё раз.',
+    en: 'Could not download the complete page archive. Try again.',
   },
   annotationExportOpenError: {
     ru: 'Не удалось открыть экспорт страницы. Попробуйте ещё раз.',

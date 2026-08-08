@@ -203,6 +203,18 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
         source={style.outlineColorSource}
         colorRole="outline"
       />
+      <NumericRow
+        appearance="plain"
+        label={translate('content.stepBadge.outlineWidth')}
+        min={0}
+        max={20}
+        step={1}
+        unit="px"
+        value={style.outlineWidth ?? 2}
+        scrub={{ min: 0, max: 20, step: 1 }}
+        onPreviewValue={(outlineWidth) => updateStyle({ outlineWidth })}
+        onCommitValue={(outlineWidth) => updateStyle({ outlineWidth })}
+      />
     </div>
   );
   return props.embedded ? (

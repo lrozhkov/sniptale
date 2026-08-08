@@ -92,6 +92,49 @@ function authorizePageAccessRoute(
   return AUTHORIZED;
 }
 
+function authorizeAiSettingsNavigationRoute(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  const senderDecision = authorizeContentSender(request.sender);
+  if (!senderDecision.allowed) {
+    return reject('Unauthorized AI settings navigation sender');
+  }
+  const senderBinding = consumeContentPrivilegedActionCapabilityBinding({
+    actionType: MessageType.AI_SETTINGS_NAVIGATION,
+    contentIntent: request.message['contentIntent'],
+    resolvedTabId: senderDecision.principal.tabId,
+    sender: request.sender,
+  });
+  if (!senderBinding) {
+    return reject('Unauthorized AI settings navigation intent');
+  }
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: { kind: 'background-owned-route-policy' },
+      message: request.message,
+      senderClassification: 'content-tab-runtime',
+    })
+  );
+}
+
+function authorizeAnnotationForkSessionRoute(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  const senderDecision = authorizeContentSender(request.sender);
+  if (!senderDecision.allowed) return reject('Unauthorized annotation fork session sender');
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: { kind: 'annotation-fork-session', senderBinding: senderDecision.principal },
+      message: request.message,
+      senderClassification: 'content-tab-runtime',
+    })
+  );
+}
+
 function authorizeFrameAnnotationRasterRoute(
   request: BackgroundOwnedAuthorizationRequest
 ): IpcAuthorizationResult {
@@ -251,6 +294,10 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizeAiSettingsQueryRoute;
     case 'ai-settings-mutation':
       return authorizeAiSettingsMutationRoute;
+    case 'ai-settings-navigation':
+      return authorizeAiSettingsNavigationRoute;
+    case 'annotation-fork-session':
+      return authorizeAnnotationForkSessionRoute;
     case 'content-action-capability-issuance':
       return authorizeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':

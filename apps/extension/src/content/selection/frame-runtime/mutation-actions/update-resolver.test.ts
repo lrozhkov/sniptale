@@ -210,6 +210,83 @@ function expectResolverAppliesPaddingToManualFrame() {
   anchorNode.remove();
 }
 
+function expectResolverAppliesPaddingToAnchoredFrameWithoutCreatingAnOffset() {
+  const frame = createFrame();
+  const anchorNode = document.createElement('div');
+  document.body.appendChild(anchorNode);
+  const expandedCoords = { x: 32, y: 42, width: 136, height: 106 };
+  coordsMocks.calculateFrameViewportCoords.mockReturnValue(expandedCoords);
+
+  const updated = resolveUpdatedFrame({
+    frame,
+    frameId: frame.id,
+    anchorNode,
+    newFrame: {
+      ...frame,
+      borderSettings: {
+        ...frame.borderSettings!,
+        padding: { top: 8, right: 8, bottom: 8, left: 8 },
+      },
+    },
+  });
+
+  expect(coordsMocks.calculateFrameViewportCoords).toHaveBeenCalledWith(
+    anchorNode,
+    expect.objectContaining({ padding: { top: 8, right: 8, bottom: 8, left: 8 } })
+  );
+  expect(coordsMocks.calculateFrameOffsetFromElement).not.toHaveBeenCalled();
+  expect(updated).toMatchObject(expandedCoords);
+  expect(updated.offset).toBeUndefined();
+  anchorNode.remove();
+}
+
+function expectResolverRestoresAnchoredGeometryAfterPaddingRoundTrip() {
+  const frame = createFrame();
+  const anchorNode = document.createElement('div');
+  document.body.appendChild(anchorNode);
+  const expandedCoords = { x: 32, y: 42, width: 136, height: 106 };
+  coordsMocks.calculateFrameViewportCoords.mockReturnValueOnce(expandedCoords);
+
+  const expanded = resolveUpdatedFrame({
+    frame,
+    frameId: frame.id,
+    anchorNode,
+    newFrame: {
+      ...frame,
+      borderSettings: {
+        ...frame.borderSettings!,
+        padding: { top: 8, right: 8, bottom: 8, left: 8 },
+      },
+    },
+  });
+
+  coordsMocks.calculateFrameViewportCoords.mockReturnValueOnce({
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+  });
+  const restored = resolveUpdatedFrame({
+    frame: expanded,
+    frameId: frame.id,
+    anchorNode,
+    newFrame: {
+      ...expanded,
+      borderSettings: frame.borderSettings!,
+    },
+  });
+
+  expect(restored).toMatchObject({
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+    borderSettings: frame.borderSettings,
+  });
+  expect(restored.offset).toBeUndefined();
+  anchorNode.remove();
+}
+
 describe('frame-mutation-actions-update-resolver', () => {
   it(
     'preserves existing overlay state when a disconnected update omits linked-element data',
@@ -279,5 +356,13 @@ describe('frame-mutation-actions-update-resolver', () => {
   it(
     'expands a manually positioned frame when its padding changes',
     expectResolverAppliesPaddingToManualFrame
+  );
+  it(
+    'applies padding to a linked frame without converting it to a manual offset',
+    expectResolverAppliesPaddingToAnchoredFrameWithoutCreatingAnOffset
+  );
+  it(
+    'restores linked frame geometry after a padding round trip',
+    expectResolverRestoresAnchoredGeometryAfterPaddingRoundTrip
   );
 });

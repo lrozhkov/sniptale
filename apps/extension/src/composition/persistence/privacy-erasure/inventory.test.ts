@@ -47,6 +47,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.session).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);
   expect(plan.sessionPrefixes).toContain('scenarioPresentationSession:');
   expect(plan.sessionPrefixes).toContain('sniptale.content.pin-to-tab:tab:');
+  expect(plan.sessionPrefixes).toContain('sniptale.annotation-fork-drafts:tab:');
   expect(plan.sync).toEqual([]);
 });
 

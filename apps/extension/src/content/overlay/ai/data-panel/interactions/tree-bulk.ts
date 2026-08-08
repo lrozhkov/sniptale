@@ -1,6 +1,8 @@
 import type React from 'react';
 import type { ParsedDOMTree, TableNode } from '@sniptale/runtime-contracts/dom-tree';
 import type { TreeNodeState } from '../types';
+import { getAIModalTreeNodeIds } from '../tree/filter';
+import { syncAncestorSelection } from '../tree/mutation';
 
 function setNodeSelected(next: Map<string, TreeNodeState>, id: string, selected: boolean): void {
   const node = next.get(id);
@@ -47,23 +49,22 @@ export function createToggleSelectAllHandler(props: {
   setTreeState: React.Dispatch<React.SetStateAction<Map<string, TreeNodeState>>>;
   treeData: ParsedDOMTree | null;
 }) {
-  return () => {
-    const { treeData } = props;
+  return (scopeTreeData?: ParsedDOMTree) => {
+    const treeData = scopeTreeData ?? props.treeData;
     if (!treeData) {
       return;
     }
 
-    const newValue = !props.isAnySelected;
-
     props.setTreeState((prev) => {
       const next = new Map(prev);
+      const scopeIds = getAIModalTreeNodeIds(treeData);
+      const newValue = !scopeIds.every((id) => next.get(id)?.selected === true);
       setTreeDataSelected(treeData, next, newValue);
+      if (props.treeData) syncAncestorSelection(next, props.treeData);
       return next;
     });
 
-    if (newValue) {
-      props.setExcludedColumns(new Map());
-    }
+    props.setExcludedColumns(new Map());
   };
 }
 

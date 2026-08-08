@@ -258,6 +258,10 @@ function isStepBadgeStyle(value: unknown): boolean {
     isSafeCssColor(value['textColor']) &&
     isOneOf(value['outlineColorSource'], ['custom', 'frame-border', 'frame-fill', 'surface']) &&
     isSafeCssColor(value['outlineColor']) &&
+    (value['outlineWidth'] === undefined ||
+      (isFiniteNumber(value['outlineWidth']) &&
+        value['outlineWidth'] >= 0 &&
+        value['outlineWidth'] <= 20)) &&
     (value['customCss'] === undefined ||
       (typeof value['customCss'] === 'string' &&
         validateStepBadgeCustomCss(value['customCss']).error === null))

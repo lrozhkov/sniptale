@@ -26,6 +26,7 @@ describe('getCalloutLayoutState', () => {
     expect(editing.cloudStyle.boxSizing).toBe('border-box');
     expect(editing.cloudStyle.width).toBe('max-content');
     expect(editing.cloudStyle.maxWidth).toBe(settings.style.typography.maxWidth);
+    expect(editing.editableStyle.minWidth).toBe('1ch');
   });
 
   it('caps a viewing callout at the annotation-content layer', () => {

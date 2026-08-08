@@ -98,6 +98,17 @@ describe('quick edit keydown, pointer, and session flows', () => {
     expect(options.disableRequested).toHaveBeenCalledOnce();
   });
 
+  it('keeps quick edit active when toolbar UI already claimed Escape', () => {
+    const options = createKeyboardOptions();
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    event.preventDefault();
+
+    handleQuickEditKeyDown(event, options);
+
+    expect(options.disableDocumentMode).not.toHaveBeenCalled();
+    expect(options.disableRequested).not.toHaveBeenCalled();
+  });
+
   it('disables document mode first when Escape is pressed', () => {
     const options = createKeyboardOptions();
     options.isDocumentModeEnabled.mockReturnValue(true);

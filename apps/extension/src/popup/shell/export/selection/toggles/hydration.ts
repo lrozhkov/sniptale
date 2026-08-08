@@ -7,8 +7,30 @@ import {
 } from '../../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportPreferenceSetters, PopupExportSelection } from '../../session/types';
 import { applyPopupExportSelection, toPopupExportSelection } from './selection';
+import { consumePopupExportLaunchSelection } from '../launch-selection';
 
 const logger = createLogger({ namespace: 'PopupExportToggles' });
+
+type PopupExportHydrationApplyParams = {
+  committedPreferencesRef: MutableRefObject<PopupExportSelection | null>;
+  hasLoadedPreferencesRef: MutableRefObject<boolean>;
+  onHydrated?: (() => void) | undefined;
+  preferences: PopupExportPreferenceSetters;
+};
+
+function applyHydratedPopupExportPreferences(
+  storedPreferences: PopupExportSelection,
+  params: PopupExportHydrationApplyParams
+): void {
+  const preferences = {
+    ...storedPreferences,
+    ...consumePopupExportLaunchSelection(),
+  };
+  applyPopupExportSelection(preferences, params.preferences);
+  params.committedPreferencesRef.current = toPopupExportSelection(preferences);
+  params.hasLoadedPreferencesRef.current = true;
+  params.onHydrated?.();
+}
 
 export function hydratePopupExportPreferences(params: {
   committedPreferencesRef: MutableRefObject<PopupExportSelection | null>;
@@ -30,10 +52,7 @@ export function hydratePopupExportPreferences(params: {
   void loadPreferences()
     .then((storedPreferences) => {
       if (!cancelled) {
-        applyPopupExportSelection(storedPreferences, params.preferences);
-        params.committedPreferencesRef.current = toPopupExportSelection(storedPreferences);
-        params.hasLoadedPreferencesRef.current = true;
-        params.onHydrated?.();
+        applyHydratedPopupExportPreferences(storedPreferences, params);
       }
     })
     .catch((error) => {
@@ -42,11 +61,7 @@ export function hydratePopupExportPreferences(params: {
       }
 
       log.debug('Failed to hydrate export preferences', error);
-      params.committedPreferencesRef.current = toPopupExportSelection(
-        DEFAULT_POPUP_EXPORT_PREFERENCES
-      );
-      params.hasLoadedPreferencesRef.current = true;
-      params.onHydrated?.();
+      applyHydratedPopupExportPreferences(DEFAULT_POPUP_EXPORT_PREFERENCES, params);
     });
 
   return () => {

@@ -12,7 +12,7 @@ type SystemCalloutPreset = CalloutPreset & {
   systemPresetKey: SystemCalloutPresetKey;
 };
 
-export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 7;
+export const SYSTEM_CALLOUT_PRESET_CATALOG_REVISION = 8;
 
 const DEFAULT_PRESET_PLACEMENT = {
   anchor: 'top-center',
@@ -43,7 +43,7 @@ const baseStyle: CalloutVisualStyle = {
     placement: 'title-start',
     shape: 'rounded',
     size: 20,
-    text: '1',
+    text: '',
     textColor: '#ffffff',
     textColorSource: 'custom',
   },

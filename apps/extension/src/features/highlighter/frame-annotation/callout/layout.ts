@@ -9,7 +9,7 @@ import { projectCalloutPerimeterPosition, resolveCalloutAttachmentPosition } fro
 import { FRAME_ANNOTATION_Z_INDEX } from '../interaction/z-index';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
-const MIN_CALLOUT_CONTENT_WIDTH = 40;
+const MIN_CALLOUT_CONTENT_WIDTH = '1ch';
 
 export function getCalloutLayoutState(args: {
   dimensions: { width: number; height: number };

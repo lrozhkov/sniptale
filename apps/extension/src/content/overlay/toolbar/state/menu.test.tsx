@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useToolbarMenuState, type ToolbarMenuState } from './menu';
+import { registerToolbarMenuEscapeOwner, useToolbarMenuState, type ToolbarMenuState } from './menu';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -88,5 +88,53 @@ describe('useToolbarMenuState', () => {
 
     act(() => getCurrentState().toggleMenu('scenario-mode'));
     expect(getCurrentState().activeMenuType).toBe('scenario-mode');
+  });
+
+  it('consumes the first Escape for any active menu and leaves the next Escape to the mode', () => {
+    const modeEscapeHandler = vi.fn();
+    const handleModeEscape = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented) {
+        modeEscapeHandler();
+      }
+    };
+    window.addEventListener('keydown', handleModeEscape, { capture: true });
+    act(() => getCurrentState().toggleMenu('timer'));
+
+    const menuEscape = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    act(() => window.dispatchEvent(menuEscape));
+
+    expect(getCurrentState().activeMenuType).toBeNull();
+    expect(menuEscape.defaultPrevented).toBe(true);
+    expect(modeEscapeHandler).not.toHaveBeenCalled();
+
+    const modeEscape = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    act(() => window.dispatchEvent(modeEscape));
+
+    expect(modeEscapeHandler).toHaveBeenCalledOnce();
+    window.removeEventListener('keydown', handleModeEscape, { capture: true });
+  });
+
+  it('restores focus through the registered owner when Escape closes a menu', () => {
+    const trigger = document.createElement('button');
+    const menuItem = document.createElement('button');
+    document.body.append(trigger, menuItem);
+    const escapeOwner = vi.fn(() => {
+      getCurrentState().closeMenu('auto-blur');
+      trigger.focus();
+    });
+    const unregister = registerToolbarMenuEscapeOwner(escapeOwner);
+    act(() => getCurrentState().toggleMenu('auto-blur'));
+    menuItem.focus();
+
+    act(() =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }))
+    );
+
+    expect(getCurrentState().activeMenuType).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(escapeOwner).toHaveBeenCalledOnce();
+    unregister();
+    trigger.remove();
+    menuItem.remove();
   });
 });

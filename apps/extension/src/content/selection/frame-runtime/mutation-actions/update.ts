@@ -1,5 +1,5 @@
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { resolveUpdatedFrame } from './update-resolver';
+import { haveFramePaddingChanged, resolveUpdatedFrame } from './update-resolver';
 
 type FrameSetter = React.Dispatch<React.SetStateAction<FrameData[]>>;
 
@@ -17,6 +17,7 @@ export function createUpdateFrameHandler({
   return (frameId: string, newFrame: FrameData) => {
     const anchorNode = hostLayoutServiceRef.current.getNode(frameId) ?? undefined;
     const currentFrame = framesRef.current.find((frame) => frame.id === frameId);
+    const paddingChanged = currentFrame ? haveFramePaddingChanged(currentFrame, newFrame) : false;
     const resolveFrame = (frame: FrameData) =>
       resolveUpdatedFrame({
         frame,
@@ -30,6 +31,7 @@ export function createUpdateFrameHandler({
         currentFrame,
         frameId,
         hostLayoutServiceRef,
+        paddingChanged,
         projectedFrame,
         ...(anchorNode === undefined ? {} : { anchorNode }),
       });
@@ -49,8 +51,12 @@ function resolveCommitSafeFrame(args: {
   hostLayoutServiceRef: React.MutableRefObject<
     import('../host-layout/service').FrameHostLayoutService
   >;
+  paddingChanged: boolean;
   projectedFrame: FrameData;
 }): FrameData {
+  if (args.paddingChanged) {
+    return args.projectedFrame;
+  }
   if (
     !args.currentFrame.linkedElementSelector ||
     !haveFrameGeometryChanged(args.currentFrame, args.projectedFrame)

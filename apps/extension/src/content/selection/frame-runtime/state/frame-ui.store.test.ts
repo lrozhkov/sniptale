@@ -83,6 +83,25 @@ describe('frame UI store visibility hierarchy', () => {
     });
   });
 
+  it('hands off a selected frame toolbar and its menu to quick annotation settings', () => {
+    const store = useFrameUIStore.getState();
+
+    store.selectFrame('frame-a', { x: 30, y: 12 });
+    store.togglePopover('frame-a', 'callout-settings', 0);
+    store.toggleQuickPopover('frame-a', 'callout-settings', 0);
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      toolbarAnchorOffset: null,
+      activePopover: {
+        frameId: 'frame-a',
+        kind: 'callout-settings',
+        calloutIndex: 0,
+      },
+      resizeFrameId: null,
+    });
+  });
+
   it('switches popover families atomically for one selected frame', () => {
     const store = useFrameUIStore.getState();
     store.selectFrame('frame-a');

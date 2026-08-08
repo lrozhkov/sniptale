@@ -16,6 +16,7 @@ import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/h
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
 import { createTemplateSourceAction, type TemplateSourceControl } from '../popover/template-source';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
+import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
 
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
@@ -40,6 +41,7 @@ export function CalloutSettingsPopoverContent(props: {
   presetError: string | null;
   saveSection: CalloutSaveSectionProps;
   onClose: () => void;
+  onApplyToFuture?: () => void;
   templateSourceControl?: TemplateSourceControl;
 }) {
   const workflow = useTemplateForkWorkflow({
@@ -51,6 +53,7 @@ export function CalloutSettingsPopoverContent(props: {
     onShowTemplates: props.onShowPresets,
     templates: props.presets,
   });
+  const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
   return (
     <>
       <SettingsPopoverHeader
@@ -59,6 +62,16 @@ export function CalloutSettingsPopoverContent(props: {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
                 onClick: workflow.requestTemplates,
+              },
+            }
+          : {})}
+        {...(workflow.mode === 'temporary' &&
+        props.headerContext === 'element' &&
+        props.onApplyToFuture
+          ? {
+              applyToFutureAction: {
+                label: translate('content.templateFork.applyToFuture'),
+                onClick: applyToFuture.request,
               },
             }
           : {})}
@@ -80,12 +93,14 @@ export function CalloutSettingsPopoverContent(props: {
           : {})}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
-        {...(workflow.mode === 'temporary'
-          ? { status: translate('content.templateFork.temporaryStatus') }
-          : {})}
         title={translate('content.callout.settingsTitle')}
       />
-      {workflow.confirmingReturn ? (
+      {applyToFuture.confirming ? (
+        <ApplyToFutureFramesGuard
+          onCancel={applyToFuture.cancel}
+          onConfirm={applyToFuture.confirm}
+        />
+      ) : workflow.confirmingReturn ? (
         <TemplateForkReturnGuard
           onContinue={workflow.continueEditing}
           onDiscard={workflow.discard}
@@ -116,6 +131,9 @@ export function CalloutSettingsPopoverContent(props: {
         <CalloutManualSettings
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
+          {...(workflow.mode === 'temporary'
+            ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
+            : {})}
           {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
           positionSection={
             <CalloutPositionSection

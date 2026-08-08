@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Copy, Download, ExternalLink, FileCheck2 } from 'lucide-react';
+import { Archive, Copy, Download, Settings2 } from 'lucide-react';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -30,12 +30,9 @@ type AnnotationExportMenuProps = {
 };
 
 const ANNOTATION_EXPORT_OPTIONS: Array<{
-  action: ToolbarAnnotationExportAction;
-  hintKey: 'annotationExportCopyHint' | 'annotationExportDownloadHint' | 'annotationExportOpenHint';
-  labelKey:
-    | 'annotationExportCopyLabel'
-    | 'annotationExportDownloadLabel'
-    | 'annotationExportOpenLabel';
+  action: Extract<ToolbarAnnotationExportAction, 'copy' | 'download'>;
+  hintKey: 'annotationExportCopyHint' | 'annotationExportDownloadHint';
+  labelKey: 'annotationExportCopyLabel' | 'annotationExportDownloadLabel';
   icon: typeof Copy;
 }> = [
   {
@@ -49,12 +46,6 @@ const ANNOTATION_EXPORT_OPTIONS: Array<{
     hintKey: 'annotationExportCopyHint',
     icon: Copy,
     labelKey: 'annotationExportCopyLabel',
-  },
-  {
-    action: 'open-export',
-    hintKey: 'annotationExportOpenHint',
-    icon: ExternalLink,
-    labelKey: 'annotationExportOpenLabel',
   },
 ];
 
@@ -105,6 +96,34 @@ function AnnotationExportDropdown(
             </ProductToolbarMenuItem>
           );
         })}
+        <div className="flex items-stretch gap-1" role="group">
+          <ProductToolbarMenuItem
+            className="min-w-0 flex-1"
+            dataUi="content.toolbar.annotation-export.export-page"
+            disabled={props.busyAction !== null}
+            onClick={(event) => props.onSelect('export-page', event)}
+            onMouseDown={preventToolbarMenuClick}
+          >
+            <Archive aria-hidden="true" className="sniptale-popover-icon" />
+            <ProductToolbarMenuItemCopy
+              hint={translate('content.toolbar.annotationExportOpenHint')}
+              label={translate('content.toolbar.annotationExportOpenLabel')}
+            />
+          </ProductToolbarMenuItem>
+          <button
+            type="button"
+            className="sniptale-btn shrink-0"
+            data-ui="content.toolbar.annotation-export.configure-export"
+            disabled={props.busyAction !== null}
+            aria-label={translate('content.toolbar.annotationExportConfigureLabel')}
+            title={translate('content.toolbar.annotationExportConfigureHint')}
+            style={{ alignSelf: 'stretch', height: 'auto', minWidth: 38, padding: 0 }}
+            onClick={(event) => props.onSelect('configure-export', event)}
+            onMouseDown={preventToolbarMenuClick}
+          >
+            <Settings2 aria-hidden="true" size={16} />
+          </button>
+        </div>
       </ProductToolbarMenu>
     </ToolbarMenuDropdown>
   );
@@ -113,12 +132,14 @@ function AnnotationExportDropdown(
 function getSuccessMessage(action: ToolbarAnnotationExportAction): string {
   if (action === 'copy') return translate('content.toolbar.annotationExportCopySuccess');
   if (action === 'download') return translate('content.toolbar.annotationExportDownloadSuccess');
+  if (action === 'export-page') return translate('content.toolbar.annotationExportPageSuccess');
   return translate('content.toolbar.annotationExportOpenSuccess');
 }
 
 function getErrorMessage(action: ToolbarAnnotationExportAction): string {
   if (action === 'copy') return translate('content.toolbar.annotationExportCopyError');
   if (action === 'download') return translate('content.toolbar.annotationExportDownloadError');
+  if (action === 'export-page') return translate('content.toolbar.annotationExportPageError');
   return translate('content.toolbar.annotationExportOpenError');
 }
 
@@ -133,6 +154,10 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   }, [props.toolbarMenuState]);
   const closeMenuWithoutFocus = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
+  }, [props.toolbarMenuState]);
+  const closeMenuAfterAction = useCallback(() => {
+    props.toolbarMenuState.closeMenu('annotations-export');
+    queueMicrotask(() => triggerRef.current?.blur());
   }, [props.toolbarMenuState]);
 
   useToolbarFloatingMenuDismissal({
@@ -159,7 +184,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
       void executeToolbarAnnotationExportAction(action, contentIntentSource)
         .then(() => {
           showToast(getSuccessMessage(action), 'success');
-          closeMenu();
+          closeMenuAfterAction();
         })
         .catch(() => {
           showToast(getErrorMessage(action), 'error');
@@ -168,7 +193,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
           setBusyAction(null);
         });
     },
-    [busyAction, closeMenu]
+    [busyAction, closeMenuAfterAction]
   );
 
   return (
@@ -176,7 +201,6 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
       <ContentToolbarButton
         ref={triggerRef}
         type="button"
-        active={open}
         aria-expanded={open}
         aria-haspopup="menu"
         data-menu-open={open ? 'true' : 'false'}
@@ -189,7 +213,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         }}
         title={translate('content.toolbar.annotationExportMenuTitle')}
       >
-        <FileCheck2 size={20} strokeWidth={2} />
+        <Archive size={20} strokeWidth={2} />
       </ContentToolbarButton>
       {open ? (
         <AnnotationExportDropdown

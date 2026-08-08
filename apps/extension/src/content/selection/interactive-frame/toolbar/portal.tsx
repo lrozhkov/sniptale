@@ -75,7 +75,7 @@ export function InteractiveFrameToolbarPortal(props: {
   return createPortal(
     <div
       ref={toolbarRef}
-      className="sniptale-toolbar-portal-wrapper"
+      className="sniptale-toolbar-portal-wrapper sniptale-content-ui-positioner"
       data-frame-id={frameId}
       data-placement-side={coords.side}
       data-theme={props.portalTheme ?? undefined}
@@ -86,17 +86,17 @@ export function InteractiveFrameToolbarPortal(props: {
         width: 'max-content',
         height: 'max-content',
         pointerEvents: 'auto',
-        maxHeight: 'calc(var(--sniptale-content-ui-viewport-height) - 16px)',
-        overflowY: 'auto',
         zIndex: Z_INDEX_FLOATING_UI,
       })}
       onMouseDown={props.onWrapperMouseDown}
       onClick={props.onWrapperClick}
     >
       <ProductGlassToolbar
-        className="sniptale-action-toolbar"
+        className="sniptale-action-toolbar sniptale-content-ui-zoom-surface"
         style={{
           maxWidth: 'calc(var(--sniptale-content-ui-viewport-width) - 16px)',
+          maxHeight: 'calc(var(--sniptale-content-ui-viewport-height) - 16px)',
+          overflowY: 'auto',
           flexWrap: 'wrap',
         }}
         onMouseDown={props.onToolbarMouseDown}

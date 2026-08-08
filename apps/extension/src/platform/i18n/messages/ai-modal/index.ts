@@ -26,16 +26,12 @@ export const aiModalMessages = defineMessageSource({
     en: 'Select a model to submit the request',
   },
   title: {
-    ru: 'AI-редактирование контента',
-    en: 'AI content editing',
+    ru: 'AI-редактор контента',
+    en: 'AI content editor',
   },
   closeTitle: {
     ru: 'Закрыть (Escape)',
     en: 'Close (Escape)',
-  },
-  promptLabel: {
-    ru: 'Промпт для AI',
-    en: 'Prompt for AI',
   },
   promptPlaceholder: {
     ru: 'Опишите, что нужно сделать с выбранными данными...',
@@ -69,10 +65,6 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Отмена',
     en: 'Cancel',
   },
-  processingButton: {
-    ru: 'Обработка...',
-    en: 'Processing...',
-  },
   waitingCancelButton: {
     ru: 'Отменить ожидание',
     en: 'Cancel waiting',
@@ -85,73 +77,61 @@ export const aiModalMessages = defineMessageSource({
     ru: 'Ожидаем ответ от AI',
     en: 'Waiting for AI response',
   },
-  submitButton: {
-    ru: 'Отправить',
-    en: 'Submit',
+  disclosureCompactExternal: {
+    ru: 'Отправить промпт и выбранные данные страницы в настроенную AI-модель.',
+    en: 'Send the prompt and selected page data to the configured AI model.',
   },
-  disclosureTitle: {
-    ru: 'Перед отправкой',
-    en: 'Before sending',
-  },
-  disclosureProviderLabel: {
-    ru: 'Провайдер',
-    en: 'Provider',
-  },
-  disclosureModelLabel: {
-    ru: 'Модель',
-    en: 'Model',
-  },
-  disclosureDataClassesLabel: {
-    ru: 'Данные',
-    en: 'Data',
-  },
-  disclosureDataClassesFields: {
-    ru: 'editable fields',
-    en: 'editable fields',
-  },
-  disclosureDataClassesTableRows: {
-    ru: 'table rows',
-    en: 'table rows',
-  },
-  disclosureDataClassesFieldsAndTableRows: {
-    ru: 'editable fields and table rows',
-    en: 'editable fields and table rows',
-  },
-  disclosureDataClassesSelectedPageData: {
-    ru: 'selected page data',
-    en: 'selected page data',
-  },
-  disclosureProviderChrome: {
-    ru: 'Chrome AI на устройстве',
-    en: 'Chrome AI on-device',
-  },
-  disclosureProviderLocalCustom: {
-    ru: 'локальный или частный endpoint',
-    en: 'local or private endpoint',
-  },
-  disclosureProviderExternal: {
-    ru: 'внешний provider endpoint',
-    en: 'external provider endpoint',
-  },
-  disclosurePayloadCopy: {
-    ru: 'Будут отправлены выбранные данные страницы и ваш промпт.',
-    en: 'Selected page data and your prompt will be sent.',
-  },
-  disclosureExternalCopy: {
-    ru: 'Для внешнего провайдера данные покидают браузер через настроенный provider URL.',
-    en: 'For an external provider, data leaves the browser through the configured provider URL.',
-  },
-  disclosureLocalCopy: {
-    ru: 'Для Chrome AI или локального endpoint данные не отправляются на внешний provider URL.',
-    en: 'For Chrome AI or a local endpoint, data is not sent to an external provider URL.',
-  },
-  disclosureHistoryCopy: {
-    ru: 'История AI хранит только метаданные запроса, без промпта и данных страницы.',
-    en: 'AI history stores request metadata only, not the prompt or page data.',
+  disclosureCompactLocal: {
+    ru: 'Обработать промпт и выбранные данные страницы локально.',
+    en: 'Process the prompt and selected page data locally.',
   },
   templatesLabel: {
     ru: 'Шаблоны',
     en: 'Templates',
+  },
+  chooseTemplate: {
+    ru: 'Выбрать шаблон',
+    en: 'Choose template',
+  },
+  templatesLoadingCompact: {
+    ru: 'Загрузка шаблонов...',
+    en: 'Loading templates...',
+  },
+  openPromptTemplatesSettings: {
+    ru: 'Открыть настройки промптов и шаблонов',
+    en: 'Open prompt and template settings',
+  },
+  openModelSettings: {
+    ru: 'Открыть настройки подключений и моделей',
+    en: 'Open connection and model settings',
+  },
+  openSettingsFailed: {
+    ru: 'Не удалось открыть настройки AI',
+    en: 'AI settings could not be opened',
+  },
+  disclosureLocalDestination: {
+    ru: 'локальная модель Chrome',
+    en: 'local Chrome model',
+  },
+  disclosureExternalDestination: {
+    ru: 'настроенный AI-провайдер',
+    en: 'configured AI provider',
+  },
+  disclosureSelectedData: {
+    ru: 'промпт и выбранные данные страницы',
+    en: 'the prompt and selected page data',
+  },
+  disclosureNoPageData: {
+    ru: 'промпт без данных страницы',
+    en: 'the prompt without page data',
+  },
+  disclosureSummary: {
+    ru: 'Отправка: {data} → {destination}, модель {model}.',
+    en: 'Sending: {data} → {destination}, model {model}.',
+  },
+  disclosureHistory: {
+    ru: 'В истории сохраняются только метаданные запроса.',
+    en: 'Only request metadata is retained in history.',
   },
   templatesDescription: {
     ru: 'Выберите готовый запрос или создайте свой.',
@@ -266,8 +246,28 @@ export const aiModalMessages = defineMessageSource({
     en: 'Expand',
   },
   dataForProcessingLabel: {
-    ru: 'Данные для обработки:',
-    en: 'Data for processing:',
+    ru: 'Данные для обработки',
+    en: 'Data for processing',
+  },
+  searchDataLabel: {
+    ru: 'Поиск в данных для обработки',
+    en: 'Search data for processing',
+  },
+  searchDataPlaceholder: {
+    ru: 'Найти данные...',
+    en: 'Find data...',
+  },
+  clearSearchLabel: {
+    ru: 'Очистить поиск',
+    en: 'Clear search',
+  },
+  showSelectedOnlyLabel: {
+    ru: 'Скрыть невыбранные элементы',
+    en: 'Hide unselected items',
+  },
+  showAllDataLabel: {
+    ru: 'Показать все элементы',
+    en: 'Show all items',
   },
   collapseAllGroupsTitle: {
     ru: 'Свернуть все группы',

@@ -1,4 +1,5 @@
 export interface CalloutHandleKeyboardEvent {
+  ctrlKey?: boolean;
   key: string;
   shiftKey: boolean;
   preventDefault(): void;

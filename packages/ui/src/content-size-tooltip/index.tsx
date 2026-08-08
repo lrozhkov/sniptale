@@ -11,23 +11,29 @@ export function ContentSizeTooltip(props: ContentSizeTooltipProps) {
     <>
       <style>{CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT}</style>
       <div
-        className="sniptale-content-size-tooltip"
-        data-theme={props.portalTheme ?? undefined}
-        data-variant={props.variant ?? 'default'}
-        style={
-          mergeStyleRecords(getContentSizeTooltipSurfaceStyle(props.variant), {
-            top: `${props.position.y}px`,
-            left: `${props.position.x}px`,
-          }) as CSSProperties
-        }
-        onMouseDown={(event) => {
-          event.stopPropagation();
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
+        className="sniptale-content-size-tooltip-positioner"
+        style={{ position: 'fixed', top: props.position.y, left: props.position.x }}
       >
-        <ContentSizeTooltipContent {...props} canToggleAspectRatio={canToggleAspectRatio} />
+        <div
+          className="sniptale-content-size-tooltip sniptale-content-ui-zoom-surface"
+          data-theme={props.portalTheme ?? undefined}
+          data-variant={props.variant ?? 'default'}
+          style={
+            mergeStyleRecords(getContentSizeTooltipSurfaceStyle(props.variant), {
+              position: 'relative',
+              top: 'auto',
+              left: 'auto',
+            }) as CSSProperties
+          }
+          onMouseDown={(event) => {
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <ContentSizeTooltipContent {...props} canToggleAspectRatio={canToggleAspectRatio} />
+        </div>
       </div>
     </>
   );

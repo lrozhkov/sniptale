@@ -144,15 +144,6 @@ export function FrameAnnotationToolbarActionButtons(props: {
         </ProductGlassToolbarButton>
       ) : null}
       <ProductGlassToolbarDivider />
-      <ProductGlassToolbarButton
-        danger
-        onClick={props.onDelete}
-        onMouseDown={props.onMouseDown}
-        title={labels.get('delete')}
-      >
-        <Trash2 size={18} />
-      </ProductGlassToolbarButton>
-      <ProductGlassToolbarDivider />
       {props.onCaptureVisibilityChange ? (
         <ProductGlassToolbarButton
           active={props.captureHidden === true}
@@ -165,6 +156,15 @@ export function FrameAnnotationToolbarActionButtons(props: {
           {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
         </ProductGlassToolbarButton>
       ) : null}
+      <ProductGlassToolbarButton
+        danger
+        onClick={props.onDelete}
+        onMouseDown={props.onMouseDown}
+        title={labels.get('delete')}
+      >
+        <Trash2 size={18} />
+      </ProductGlassToolbarButton>
+      <ProductGlassToolbarDivider />
       <ProductGlassToolbarButton
         onClick={props.onClose}
         onMouseDown={props.onMouseDown}

@@ -1,6 +1,7 @@
 export type PolicyStateId =
   | 'ai-settings-mutation-queue'
   | 'ai-secret-unlock-requests'
+  | 'annotation-fork-sessions'
   | 'capture-download-jobs'
   | 'full-page-capture-leases'
   | 'capture-surface-leases'

@@ -181,10 +181,38 @@ function registerSkipNextClickTest() {
   });
 }
 
+function registerAnchorDragFallbackTest() {
+  it('finishes a dragged region from an anchor even when the host suppresses intermediate moves', () => {
+    const anchor = document.createElement('a');
+    anchor.href = '/target';
+    const state = createState({
+      currentState: 'hover',
+      hoveredElement: anchor,
+      mouseDownPoint: { x: 20, y: 30 },
+    });
+    const options = createOptions();
+    const mouseUp = new MouseEvent('mouseup', {
+      cancelable: true,
+      clientX: 140,
+      clientY: 120,
+    });
+    vi.spyOn(mouseUp, 'preventDefault');
+
+    handleSelectionModeMouseUp(mouseUp, state, options);
+
+    expect(options.startDragSelection).toHaveBeenCalledWith(20, 30);
+    expect(options.updateDragSelection).toHaveBeenCalledWith(140, 120);
+    expect(options.finalizeDragSelection).toHaveBeenCalledOnce();
+    expect(state.skipNextClick).toBe(true);
+    expect(mouseUp.preventDefault).toHaveBeenCalledOnce();
+  });
+}
+
 describe('selection-mode pointer events', () => {
   registerHideHoverTest();
   registerThresholdDragTest();
   registerConfirmedMotionTest();
   registerDragFinalizeTest();
   registerSkipNextClickTest();
+  registerAnchorDragFallbackTest();
 });

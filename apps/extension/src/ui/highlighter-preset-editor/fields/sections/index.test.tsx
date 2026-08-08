@@ -68,11 +68,17 @@ function setInputValue(element: HTMLInputElement | HTMLTextAreaElement, value: s
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function getRangeInput(label: string) {
-  const input = Array.from(
-    container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []
-  ).find((candidate) => candidate.getAttribute('aria-label') === label);
-  if (!input) throw new Error(`Missing range input: ${label}`);
+function setNumericInputValue(element: HTMLInputElement, value: string) {
+  element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  setInputValue(element, value);
+  element.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+}
+
+function getNumericInput(label: string) {
+  const input = container?.querySelector<HTMLInputElement>(
+    `input[type="text"][aria-label="${label}"]`
+  );
+  if (!input) throw new Error(`Missing numeric input: ${label}`);
   return input;
 }
 
@@ -102,7 +108,7 @@ it('renders the text-backed preview state and error feedback', async () => {
   expect(container?.querySelector('.border-2')).toBeTruthy();
 });
 
-it('wires compact color selectors, ranges, and style controls without compatibility', async () => {
+it('wires compact color selectors, numeric inspectors, and style controls', async () => {
   const state = createState({ fillColor: 'transparent' });
 
   await renderUi(<EditorBasicSettings state={state} />);
@@ -116,8 +122,10 @@ it('wires compact color selectors, ranges, and style controls without compatibil
   await act(async () => {
     colorSelectors[0]?.click();
     colorSelectors[1]?.click();
-    setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
-    setInputValue(getRangeInput('highlighter.editor.radiusLabel'), '8');
+    const widthInput = getNumericInput('highlighter.editor.widthLabel');
+    const radiusInput = getNumericInput('highlighter.editor.radiusLabel');
+    setNumericInputValue(widthInput, '7');
+    setNumericInputValue(radiusInput, '8');
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.textContent?.includes('highlighter.editor.styleSolid'))
       ?.click();
@@ -146,10 +154,8 @@ it('wires shadow, padding, and custom-css controls', async () => {
   );
 
   await act(async () => {
-    setInputValue(
-      container?.querySelector<HTMLInputElement>('input[type="range"]') as HTMLInputElement,
-      '100'
-    );
+    const shadowInput = getNumericInput('highlighter.editor.shadowLabel');
+    setNumericInputValue(shadowInput, '100');
     setInputValue(numberInputs[0] as HTMLInputElement, '11');
     setInputValue(numberInputs[3] as HTMLInputElement, '14');
     setInputValue(container?.querySelector('textarea') as HTMLTextAreaElement, 'border: 1px solid');

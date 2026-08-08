@@ -258,8 +258,9 @@ function registerStepBadgeSharedViewActionsTest(): void {
       valueInput?.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(onApply).toHaveBeenCalledWith(presets[0]);
-    expect(onFork).toHaveBeenCalledOnce();
+    expect(onFork).toHaveBeenCalledTimes(2);
     expect(onFork).toHaveBeenCalledWith(presets[0]);
+    expect(onFork).toHaveBeenCalledWith(presets[1]);
     expect(onReset).toHaveBeenCalledWith(presets[0]);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onAutoModeChange).toHaveBeenCalledWith(true);

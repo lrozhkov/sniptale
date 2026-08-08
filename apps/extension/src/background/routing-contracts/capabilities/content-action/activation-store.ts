@@ -67,6 +67,7 @@ function getPurposeActionTypes(
     MessageType.SAVE_SCREENSHOT_TO_GALLERY,
     MessageType.TRIGGER_QUICK_ACTION,
     MessageType.CONTENT_RUNTIME_WAKEUP,
+    MessageType.AI_SETTINGS_NAVIGATION,
   ];
 }
 

@@ -129,6 +129,46 @@ describe('frame mutation actions update', () => {
     expect(framesRef.current[0]).toMatchObject({ x: 300, y: 400 });
   });
 
+  it('applies linked-frame padding live without treating derived geometry as a manual move', () => {
+    const { anchorNode, frame, framesRef, hostLayoutService, updateFrame } =
+      createLinkedUpdateScenario();
+    const recordManualPlacement = vi.spyOn(hostLayoutService, 'recordManualPlacement');
+
+    updateFrame(frame.id, {
+      ...frame,
+      borderSettings: {
+        ...frame.borderSettings!,
+        padding: { top: 8, right: 8, bottom: 8, left: 8 },
+      },
+    });
+
+    expect(framesRef.current[0]).toMatchObject({
+      x: 2,
+      y: 12,
+      width: 136,
+      height: 96,
+      borderSettings: { padding: { top: 8, right: 8, bottom: 8, left: 8 } },
+    });
+
+    updateFrame(frame.id, {
+      ...framesRef.current[0]!,
+      borderSettings: {
+        ...framesRef.current[0]!.borderSettings!,
+        padding: { top: 12, right: 12, bottom: 12, left: 12 },
+      },
+    });
+
+    expect(framesRef.current[0]).toMatchObject({
+      x: -2,
+      y: 8,
+      width: 144,
+      height: 104,
+      borderSettings: { padding: { top: 12, right: 12, bottom: 12, left: 12 } },
+    });
+    expect(recordManualPlacement).not.toHaveBeenCalled();
+    anchorNode.remove();
+  });
+
   it.each([
     ['zero width', { width: 0 }],
     ['non-finite x', { x: Number.NaN }],

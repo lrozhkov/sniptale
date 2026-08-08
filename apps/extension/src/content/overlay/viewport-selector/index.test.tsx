@@ -192,18 +192,23 @@ it('renders the selector without a synthetic loading contract and opens the menu
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 410));
   });
-  expect(container?.textContent).toContain('viewportPresets.availability.checking');
-  expect(container?.querySelectorAll('.sniptale-toolbar-menu-detail')).toHaveLength(1);
-  const status = container?.querySelector('.sniptale-toolbar-menu-detail');
-  expect(
-    status && presetButton
-      ? Boolean(status.compareDocumentPosition(presetButton) & Node.DOCUMENT_POSITION_FOLLOWING)
-      : false
-  ).toBe(true);
+  expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
+  expect(container?.querySelectorAll('.sniptale-toolbar-menu-detail')).toHaveLength(0);
   expect(container?.textContent?.split('viewportPresets.hints.viewport')).toHaveLength(2);
   expect(
     container?.querySelector('.sniptale-popover-menu')?.querySelector('.sniptale-popover-icon')
   ).toBeNull();
+});
+
+it('hides group hints in compact menu view', async () => {
+  await renderSelector({ compactMenus: true });
+
+  await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
+
+  expect(container?.textContent).toContain('viewportPresets.groups.window');
+  expect(container?.textContent).toContain('viewportPresets.groups.viewport');
+  expect(container?.textContent).not.toContain('viewportPresets.hints.window');
+  expect(container?.textContent).not.toContain('viewportPresets.hints.viewport');
 });
 
 it('does not republish an unchanged open state when the parent callback changes', async () => {

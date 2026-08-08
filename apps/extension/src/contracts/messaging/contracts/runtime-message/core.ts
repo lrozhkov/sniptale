@@ -149,6 +149,14 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       toolbarVisible?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };
+    [MessageType.ANNOTATION_FORK_SESSION]:
+      | { type: typeof MessageType.ANNOTATION_FORK_SESSION; operation: 'read' }
+      | {
+          type: typeof MessageType.ANNOTATION_FORK_SESSION;
+          operation: 'write' | 'clear';
+          expectedRevision: number;
+          payload?: string;
+        };
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimePopupExportProgressMessage;
     [MessageType.EXPORT_POPUP_RESULT]: RuntimePopupExportResultMessage;
     [CaptureMessageType.CAPTURE_VISIBLE]: {
@@ -200,6 +208,11 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
       pinToTabAvailable: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
+    }>;
+    [MessageType.ANNOTATION_FORK_SESSION]: RuntimeMessageResponse<{
+      payload?: string;
+      result: 'read' | 'written' | 'cleared' | 'stale' | 'stale-document';
+      revision: number;
     }>;
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimeAckResponse;
     [MessageType.EXPORT_POPUP_RESULT]: RuntimeAckResponse;

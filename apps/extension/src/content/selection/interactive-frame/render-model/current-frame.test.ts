@@ -143,3 +143,23 @@ it('renders the complete pending callout draft until external props acknowledge 
     })
   ).toBe(tempFrame);
 });
+
+it('renders optimistic frame geometry while frame settings are open', () => {
+  const tempFrame = {
+    ...baseFrame,
+    x: 2,
+    y: 12,
+    width: 116,
+    height: 96,
+  };
+
+  expect(
+    resolveInteractiveCurrentFrame({
+      frame: baseFrame,
+      tempFrame,
+      state: 'hover',
+      isCalloutEditing: false,
+      isFrameSettingsPopoverOpen: true,
+    })
+  ).toBe(tempFrame);
+});

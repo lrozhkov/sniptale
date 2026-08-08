@@ -1,6 +1,7 @@
 import React from 'react';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { getCalloutFrameColors } from '../../../../features/highlighter/callout-color-bindings';
+import { reprojectFrameSurfacePadding } from '../../../../features/highlighter/frame-surface';
 import { CalloutSettingsPopover } from '../../callout-settings-popover';
 import { FrameSettingsPopover } from '../../frame-settings-popover';
 import { StepBadgePopover } from '../../step-badge-popover';
@@ -53,6 +54,28 @@ function applyFrameSettingsPatch(
   };
 }
 
+function applyFrameSettingsPreviewPatch(
+  frame: FrameData,
+  settings: Parameters<typeof applyFrameSettingsPatch>[1]
+): FrameData {
+  const nextFrame = applyFrameSettingsPatch(frame, settings);
+  const previousPadding = frame.borderSettings?.padding;
+  const nextPadding = nextFrame.borderSettings?.padding;
+  if (!previousPadding || !nextPadding) return nextFrame;
+  if (
+    previousPadding.top === nextPadding.top &&
+    previousPadding.right === nextPadding.right &&
+    previousPadding.bottom === nextPadding.bottom &&
+    previousPadding.left === nextPadding.left
+  ) {
+    return nextFrame;
+  }
+  return {
+    ...nextFrame,
+    ...reprojectFrameSurfacePadding(frame, previousPadding, nextPadding),
+  };
+}
+
 function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
   return {
     isOpen: props.isPopoverOpen,
@@ -68,8 +91,8 @@ function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
       blurSettings?: FrameData['blurSettings'];
       focusSettings?: FrameData['focusSettings'];
     }) => {
-      const nextFrame = applyFrameSettingsPatch(props.currentFrame, settings);
-      props.setTempFrame(nextFrame);
+      const nextFrame = applyFrameSettingsPreviewPatch(props.currentFrame, settings);
+      props.setTempFrame((current) => applyFrameSettingsPreviewPatch(current, settings));
       props.onUpdate(nextFrame);
     },
     anchorEl: props.popoverAnchorRef.current,

@@ -84,13 +84,14 @@ function startDrag(clientX = 185, clientY = 4) {
   });
 }
 
-function dispatchPointer(type: string, x: number, y: number, shiftKey = false) {
+function dispatchPointer(type: string, x: number, y: number, shiftKey = false, ctrlKey = false) {
   act(() => {
     document.dispatchEvent(
       new TestPointerEvent(type, {
         button: 0,
         clientX: x,
         clientY: y,
+        ctrlKey,
         pointerId: 7,
         shiftKey,
       })
@@ -135,15 +136,16 @@ it('moves a perpendicular-route control point along both axes', () => {
 it('uses strict 15 degree snapping for an angled route while Shift is held', () => {
   const angleSnap = {
     fixedPoint: { x: 220, y: 100 },
+    fixedSide: 'right' as const,
     railPoint: { x: 185, y: 4 },
     side: 'top' as const,
   };
-  renderHarness('y', angleSnap);
+  renderHarness('both', angleSnap);
   startDrag();
-  dispatchPointer('pointermove', 900, -47, true);
+  dispatchPointer('pointermove', 260, -47, true);
 
   const point = snapPolylineControlPoint({
-    point: { x: 185, y: -47 },
+    point: { x: 260, y: -47 },
     snap: angleSnap,
     strict: true,
   });
@@ -151,6 +153,38 @@ it('uses strict 15 degree snapping for an angled route while Shift is held', () 
     centerOffsetX: point.x - 180,
     centerOffsetY: point.y - 160,
   });
+});
+
+it('snaps an angled route point to a perpendicular endpoint rail by default', () => {
+  const angleSnap = {
+    fixedPoint: { x: 220, y: 100 },
+    fixedSide: 'right' as const,
+    railPoint: { x: 185, y: 4 },
+    side: 'top' as const,
+  };
+  renderHarness('both', angleSnap);
+  startDrag();
+  dispatchPointer('pointermove', 191, -47);
+
+  expect(drag?.draftPosition).toEqual({ centerOffsetX: 5, centerOffsetY: -207 });
+  dispatchPointer('pointerup', 191, -47);
+  expect(onChange).toHaveBeenCalledWith({ centerOffsetX: 5, centerOffsetY: -207 });
+});
+
+it('moves an angled route point freely while Ctrl disables endpoint magnets', () => {
+  const angleSnap = {
+    fixedPoint: { x: 220, y: 100 },
+    fixedSide: 'right' as const,
+    railPoint: { x: 185, y: 4 },
+    side: 'top' as const,
+  };
+  renderHarness('both', angleSnap);
+  startDrag();
+  dispatchPointer('pointermove', 191, -47, false, true);
+
+  expect(drag?.draftPosition).toEqual({ centerOffsetX: 11, centerOffsetY: -207 });
+  dispatchPointer('pointerup', 191, -47, false, true);
+  expect(onChange).toHaveBeenCalledWith({ centerOffsetX: 11, centerOffsetY: -207 });
 });
 
 it('pins an orthogonal corner at its valid limit and keeps dragging after capture is lost', () => {

@@ -34,6 +34,7 @@ function createProps() {
       autoApplyEnabled: false,
       isApplying: false,
       onApplyOnce: vi.fn(async () => undefined),
+      onOpenAutoApplySettings: vi.fn(),
       onOpenSettings: vi.fn(),
       onToggleAutoApply: vi.fn(async () => undefined),
     },
@@ -102,6 +103,7 @@ describe('ToolbarUtilityButtons', () => {
     await act(async () => {
       autoBlurButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+    expect(autoBlurButton?.getAttribute('data-active')).toBeNull();
     expect(
       container
         ?.querySelector('[data-ui="content.toolbar.auto-blur-toggle"] svg')
@@ -156,6 +158,44 @@ describe('ToolbarUtilityButtons', () => {
     ).toContain('sniptale-toolbar-menu-item-hint--show-compact');
   });
 
+  it('opens configuration before enabling auto-blur and directly toggles only an enabled mode', async () => {
+    const props = createProps();
+    await renderUtilities(props);
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-toggle"]')
+        ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    expect(props.autoBlur.onOpenAutoApplySettings).toHaveBeenCalledOnce();
+    expect(props.autoBlur.onToggleAutoApply).not.toHaveBeenCalled();
+
+    props.autoBlur.autoApplyEnabled = true;
+    await renderUtilities(props);
+    expect(
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.getAttribute('data-active')
+    ).toBe('true');
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-toggle"]')
+        ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    expect(props.autoBlur.onToggleAutoApply).toHaveBeenCalledOnce();
+  });
+
   it('closes the sensitive-data blur menu when the pointer moves far away', async () => {
     await renderUtilities(createProps());
     await act(async () => {
@@ -186,5 +226,32 @@ describe('ToolbarUtilityButtons', () => {
     });
 
     expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-menu"]')).toBeNull();
+  });
+
+  it('closes the menu before a full-page blur scan begins waiting', async () => {
+    let finishScan!: () => void;
+    const props = createProps();
+    props.autoBlur.onApplyOnce.mockImplementation(
+      () =>
+        new Promise<undefined>((resolve) => {
+          finishScan = () => resolve(undefined);
+        })
+    );
+    await renderUtilities(props);
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-apply-once"]')
+        ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+
+    expect(props.autoBlur.onApplyOnce).toHaveBeenCalledOnce();
+    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-menu"]')).toBeNull();
+    finishScan();
   });
 });

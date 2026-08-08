@@ -17,6 +17,18 @@ export const contentAutoBlurMessages = defineMessageSource({
     ru: 'Поиск сущностей',
     en: 'Scanning entities',
   },
+  fullPageScanTitle: {
+    ru: 'Поиск данных для авто-размытия',
+    en: 'Scanning data for auto-blur',
+  },
+  fullPageScanHint: {
+    ru: 'Проверяем всю страницу. Прокрутка вернётся в исходное положение.',
+    en: 'Checking the full page. The scroll position will be restored.',
+  },
+  cancelScan: {
+    ru: 'Остановить',
+    en: 'Stop',
+  },
   empty: {
     ru: 'Сущности не найдены',
     en: 'No entities found',
@@ -48,6 +60,14 @@ export const contentAutoBlurMessages = defineMessageSource({
   categoriesTitle: {
     ru: 'Всегда применять категории',
     en: 'Always apply categories',
+  },
+  autoApplyCategoriesTitle: {
+    ru: 'Категории для авто-размытия',
+    en: 'Auto-blur categories',
+  },
+  autoApplyCategoriesDescription: {
+    ru: 'Выбранные типы данных будут автоматически скрываться при следующих проходах по странице.',
+    en: 'Selected data types will be hidden automatically during future page scans.',
   },
   rowsTitle: {
     ru: 'Элементы текущей страницы',

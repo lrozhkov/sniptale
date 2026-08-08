@@ -71,6 +71,37 @@ describe('bulk tree selection actions', () => {
     expect(setTreeState).not.toHaveBeenCalled();
     expect(setExcludedColumns).not.toHaveBeenCalled();
   });
+
+  it('selects only the filtered scope and preserves hidden node selection', () => {
+    const setTreeState = vi.fn();
+    const handler = createToggleSelectAllHandler({
+      isAnySelected: true,
+      setExcludedColumns: vi.fn(),
+      setTreeState,
+      treeData: createTreeData(),
+    });
+    const originalTree = createTreeData();
+    const originalSection = originalTree.structure[0];
+    if (!originalSection) throw new Error('Expected fixture section');
+    const filteredScope: ParsedDOMTree = {
+      ...originalTree,
+      structure: [{ ...originalSection, children: originalSection.children.slice(0, 1) }],
+    };
+
+    handler(filteredScope);
+    const next = applyUpdater(
+      setTreeState,
+      new Map([
+        ['section-1', { expanded: true, id: 'section-1', selected: false }],
+        ['field-1', { expanded: true, id: 'field-1', selected: false }],
+        ['row-1', { expanded: true, id: 'row-1', selected: true }],
+      ])
+    );
+
+    expect(next.get('section-1')?.selected).toBe(true);
+    expect(next.get('field-1')?.selected).toBe(true);
+    expect(next.get('row-1')?.selected).toBe(true);
+  });
 });
 
 describe('bulk tree expansion actions', () => {

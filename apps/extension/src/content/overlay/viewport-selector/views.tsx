@@ -20,9 +20,6 @@ import { formatViewportPresetDimensions } from '../../../features/viewport-prese
 import { PopoverCheckIcon } from '../icons/icons';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 import { groupViewportPresetsForSelector } from '../../../features/viewport-presets/operations';
-import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
-
-const AVAILABILITY_STATUS_DELAY_MS = 400;
 
 type CurrentViewport = {
   presetId?: string;
@@ -160,6 +157,7 @@ function PresetGroup(props: {
   onSelectPreset: (preset: ViewportPreset, event: MouseEvent<HTMLButtonElement>) => void;
   onHighlightDetail: (detail: string | null) => void;
   presets: ViewportPreset[];
+  showHint: boolean;
   target: ViewportPreset['target'];
 }) {
   if (props.presets.length === 0) return null;
@@ -168,7 +166,7 @@ function PresetGroup(props: {
       <ProductToolbarMenuGroupLabel>
         <ProductToolbarMenuGroupCopy
           label={props.label}
-          hint={translate(`viewportPresets.hints.${props.target}`)}
+          {...(props.showHint ? { hint: translate(`viewportPresets.hints.${props.target}`) } : {})}
         />
       </ProductToolbarMenuGroupLabel>
       {props.presets.map((preset) => (
@@ -202,9 +200,6 @@ export function ViewportSelectorMenu(props: {
   const [highlightedDetail, setHighlightedDetail] = useState<string | null | undefined>(undefined);
   const presetGroups = groupViewportPresetsForSelector(props.presets);
   const detailId = 'sniptale-viewport-menu-detail';
-  const checkingAvailability = props.presets.some(
-    (preset) => !props.availabilityById.has(preset.id)
-  );
   const firstUnavailableDetail = props.presets
     .map((preset) => availabilityDetail(preset, props.availabilityById.get(preset.id), locale))
     .find((detail): detail is string => detail !== null);
@@ -218,16 +213,6 @@ export function ViewportSelectorMenu(props: {
       variant="viewport"
       placement={props.menuPlacement}
     >
-      {checkingAvailability ? (
-        <DelayedLoadingFallback
-          delayMs={AVAILABILITY_STATUS_DELAY_MS}
-          fallback={
-            <ProductToolbarMenuDetail id="sniptale-viewport-menu-status">
-              {translate('viewportPresets.availability.checking')}
-            </ProductToolbarMenuDetail>
-          }
-        />
-      ) : null}
       {visibleDetail ? (
         <ProductToolbarMenuDetail id={detailId}>{visibleDetail}</ProductToolbarMenuDetail>
       ) : null}
@@ -249,6 +234,7 @@ export function ViewportSelectorMenu(props: {
             onHighlightDetail={setHighlightedDetail}
             onSelectPreset={props.onSelectPreset}
             presets={group.presets}
+            showHint={!props.compactMenus}
             target={group.target}
           />
         </Fragment>

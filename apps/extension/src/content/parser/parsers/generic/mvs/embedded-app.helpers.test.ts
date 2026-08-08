@@ -19,7 +19,8 @@ const { getIframeDocumentMock } = vi.hoisted(() => ({
   getIframeDocumentMock: vi.fn<(iframe: HTMLIFrameElement) => Document | null>(),
 }));
 
-vi.mock('../../../../platform/frame', () => ({
+vi.mock('../../../../platform/frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/frame')>()),
   getIframeDocument: getIframeDocumentMock,
 }));
 

@@ -2,6 +2,7 @@
 
 import { expect, it, vi } from 'vitest';
 import { createDomHelpersTextResolverController } from './dom-helpers-text-resolver.controller';
+import { releaseSniptaleId, retainSniptaleId } from '../../platform/frame';
 
 it('assigns sniptale ids to the resolved original element when the resolver returns a mapped node', () => {
   const controller = createDomHelpersTextResolverController();
@@ -53,4 +54,16 @@ it('warns for disconnected virtual elements without an original match and keeps 
       id: 'field-3',
     })
   );
+});
+
+it('preserves a history-owned id when a later parser pass revisits the same element', () => {
+  const controller = createDomHelpersTextResolverController();
+  const element = document.createElement('div');
+  element.dataset['sniptaleId'] = 'history-1';
+  retainSniptaleId('history-1');
+
+  controller.assignSniptaleId(element, 'field-4');
+
+  expect(element.dataset['sniptaleId']).toBe('history-1');
+  releaseSniptaleId('history-1');
 });

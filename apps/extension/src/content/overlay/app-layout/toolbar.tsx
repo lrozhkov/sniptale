@@ -133,6 +133,7 @@ function createToolbarAutoBlurProps(
     autoApplyEnabled: autoBlurController.autoApplyEnabled,
     isApplying: autoBlurController.isApplying,
     onApplyOnce: autoBlurController.applyOnce,
+    onOpenAutoApplySettings: autoBlurController.openForAutoApply,
     onOpenSettings: autoBlurController.open,
     onToggleAutoApply: autoBlurController.toggleAutoApply,
   };

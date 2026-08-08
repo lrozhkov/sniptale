@@ -155,7 +155,7 @@ describe('InteractiveFramePopovers', () => {
       width: 4,
     });
     const onUpdate = vi.fn();
-    const setTempFrame = vi.fn() as React.Dispatch<React.SetStateAction<FrameData>>;
+    const setTempFrame = vi.fn<React.Dispatch<React.SetStateAction<FrameData>>>();
 
     renderPopovers(frame, currentFrame, { onUpdate, setTempFrame });
     const frameSettingsProps = getFrameSettingsPopoverProps();
@@ -169,8 +169,56 @@ describe('InteractiveFramePopovers', () => {
       borderSettings: nextBorderSettings,
     };
 
-    expect(setTempFrame).toHaveBeenCalledWith(expectedFrame);
+    const previewUpdater = setTempFrame.mock.calls[0]?.[0];
+    expect(typeof previewUpdater).toBe('function');
+    expect((previewUpdater as (frame: FrameData) => FrameData)(currentFrame)).toEqual(
+      expectedFrame
+    );
     expect(onUpdate).toHaveBeenCalledWith(expectedFrame);
+  });
+
+  it('reprojects the optimistic frame immediately when template padding changes', () => {
+    const frame = createFrame('frame-1', '#2563eb');
+    const currentFrame = {
+      ...frame,
+      x: 95,
+      y: 96,
+      width: 190,
+      height: 110,
+      borderSettings: {
+        ...frame.borderSettings!,
+        padding: { top: 4, right: 5, bottom: 6, left: 5 },
+      },
+    };
+    const nextBorderSettings = {
+      ...currentFrame.borderSettings!,
+      padding: { top: 12, right: 13, bottom: 14, left: 11 },
+    };
+    const onUpdate = vi.fn();
+    const setTempFrame = vi.fn<React.Dispatch<React.SetStateAction<FrameData>>>();
+
+    renderPopovers(frame, currentFrame, { onUpdate, setTempFrame });
+    act(() => {
+      getFrameSettingsPopoverProps().onApplyToFrame({ borderSettings: nextBorderSettings });
+    });
+
+    const previewUpdater = setTempFrame.mock.calls[0]?.[0];
+    expect(typeof previewUpdater).toBe('function');
+    expect((previewUpdater as (frame: FrameData) => FrameData)(currentFrame)).toMatchObject({
+      x: 89,
+      y: 88,
+      width: 204,
+      height: 126,
+      borderSettings: nextBorderSettings,
+    });
+    expect(onUpdate).toHaveBeenCalledWith({
+      ...currentFrame,
+      x: 89,
+      y: 88,
+      width: 204,
+      height: 126,
+      borderSettings: nextBorderSettings,
+    });
   });
 
   it('opens quick step and callout settings popovers without selecting the frame', () => {

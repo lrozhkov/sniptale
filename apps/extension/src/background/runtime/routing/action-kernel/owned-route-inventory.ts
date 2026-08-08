@@ -5,6 +5,7 @@ import {
 } from '../../../ai/llm/route-descriptors';
 import {
   aiSecretUnlockRouteDescriptor,
+  aiSettingsNavigationRouteDescriptor,
   aiSettingsMutationRouteDescriptor,
   aiSettingsQueryRouteDescriptor,
 } from '../../../ai/settings/route-descriptors';
@@ -19,11 +20,14 @@ import { popupTabRouteCapabilityIssuanceDescriptor } from '../capabilities/popup
 import type { BackgroundOwnedRouteDescriptor } from './route-descriptors';
 import { voiceInputOffscreenEventRouteDescriptor } from '../../../voice-input/route-descriptors';
 import { frameAnnotationRasterRouteDescriptor } from '../../../frame-annotation-raster/route-descriptors';
+import { annotationForkSessionRouteDescriptor } from '../../../annotation-fork-session/route-descriptors';
 
 export const backgroundOwnedRouteInventory = [
   llmSessionRouteDescriptor,
   aiSettingsQueryRouteDescriptor,
   aiSettingsMutationRouteDescriptor,
+  aiSettingsNavigationRouteDescriptor,
+  annotationForkSessionRouteDescriptor,
   aiSecretUnlockRouteDescriptor,
   nativeAppRouteDescriptor,
   pageAccessRouteDescriptor,

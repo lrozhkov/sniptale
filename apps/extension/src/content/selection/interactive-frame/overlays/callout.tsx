@@ -82,7 +82,6 @@ function createCalloutActions(args: {
 /** Renders the editable callout overlay and keeps its update/delete behavior local to the callout seam. */
 export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOverlayProps) {
   const calloutIndex = props.calloutIndex ?? 0;
-  const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
   const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
   const localSettingsAnchorRef = React.useRef<HTMLButtonElement | null>(null);
   const callout =
@@ -133,7 +132,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
         toggleSettings: toggleQuickPopover,
       })}
       settingsAnchorRef={localSettingsAnchorRef}
-      showSettingsHandle={!isAnyFrameSelected}
+      showSettingsHandle
     />
   );
 }

@@ -257,7 +257,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupKeydown = addEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
     (event) => {
-      if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
+      if (event.defaultPrevented || !isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
       if (

@@ -8,6 +8,13 @@ it('strictly parses valid templates and rejects unsafe colors and duplicate syst
     userPresets: [{ id: 'user-one', name: 'One', settings }],
   });
   expect(valid).toMatchObject({ hasInvalidRoot: false, invalidFieldCount: 0 });
+  const { outlineWidth: _legacyOutlineWidth, ...legacyStyle } = settings.style;
+  const legacy = parseStoredStepBadgePresetCatalog({
+    userPresets: [
+      { id: 'legacy-outline', name: 'Legacy', settings: { ...settings, style: legacyStyle } },
+    ],
+  });
+  expect(legacy.value.userPresets?.[0]?.settings.style.outlineWidth).toBe(2);
   const unsafe = parseStoredStepBadgePresetCatalog({
     userPresets: [
       {
@@ -28,6 +35,16 @@ it('strictly parses valid templates and rejects unsafe colors and duplicate syst
     ],
   });
   expect(oversizedCss.invalidFieldCount).toBe(1);
+  const invalidOutline = parseStoredStepBadgePresetCatalog({
+    userPresets: [
+      {
+        id: 'invalid-outline',
+        name: 'Invalid outline',
+        settings: { ...settings, style: { ...settings.style, outlineWidth: 21 } },
+      },
+    ],
+  });
+  expect(invalidOutline.invalidFieldCount).toBe(1);
   for (const customCss of [
     '[badge]\nbackground: url(https://example.com/tracker.png);',
     '[badge]\nbackground: src("https://example.com/tracker.png");',

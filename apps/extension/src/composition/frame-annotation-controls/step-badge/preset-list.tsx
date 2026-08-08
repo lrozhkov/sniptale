@@ -53,18 +53,17 @@ export function StepBadgePresetSection(props: {
                 </ProductGlassPresetMeta>
               </ProductGlassPresetItem>
               <span className="sniptale-callout-preset-actions">
-                {props.activePresetId === preset.id ? (
-                  <button
-                    aria-label={translate('content.templateFork.fork')}
-                    className="sniptale-callout-preset-action"
-                    disabled={pending}
-                    onClick={() => props.onFork(preset)}
-                    title={translate('content.templateFork.fork')}
-                    type="button"
-                  >
-                    <CopyPlus size={15} />
-                  </button>
-                ) : null}
+                <button
+                  aria-label={translate('content.templateFork.fork')}
+                  className="sniptale-callout-preset-action"
+                  data-template-fork-source={preset.id}
+                  disabled={pending}
+                  onClick={() => props.onFork(preset)}
+                  title={translate('content.templateFork.fork')}
+                  type="button"
+                >
+                  <CopyPlus size={15} />
+                </button>
                 {preset.origin === 'system' && preset.customized === true ? (
                   <button
                     className="sniptale-callout-preset-action"

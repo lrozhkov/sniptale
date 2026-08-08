@@ -112,7 +112,8 @@ it('uses the canonical toolbar trigger and horizontally aligns the menu with its
   expect(commands.map((command) => command.getAttribute('data-ui'))).toEqual([
     'content.toolbar.annotation-export.download',
     'content.toolbar.annotation-export.copy',
-    'content.toolbar.annotation-export.open-export',
+    'content.toolbar.annotation-export.export-page',
+    'content.toolbar.annotation-export.configure-export',
   ]);
   expect(commands.every((command) => !command.hasAttribute('data-sniptale-content-chrome'))).toBe(
     true
@@ -130,9 +131,34 @@ it('uses the canonical toolbar trigger and horizontally aligns the menu with its
   );
   expect(trigger?.className).toContain('sniptale-glass-toolbar-button');
   expect(trigger?.className).toContain('sniptale-toggle');
-  expect(trigger?.dataset['active']).toBe('true');
+  expect(trigger?.dataset['active']).toBeUndefined();
   expect(trigger?.dataset['menuIndicator']).toBe('true');
-  expect(trigger?.querySelector('.lucide-file-check-corner')).not.toBeNull();
+  expect(trigger?.querySelector('.lucide-archive')).not.toBeNull();
+});
+
+it('exports the complete page directly and reserves the settings button for popup configuration', async () => {
+  mocks.executeAction.mockResolvedValue(undefined);
+  const view = renderMenu();
+  const exportPage = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export.export-page"]'
+  )!;
+
+  await act(async () => exportPage.click());
+  expect(mocks.executeAction).toHaveBeenCalledWith('export-page', {
+    kind: 'trusted-content-event',
+  });
+
+  const trigger = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export-button"]'
+  )!;
+  act(() => trigger.click());
+  const configure = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export.configure-export"]'
+  )!;
+  await act(async () => configure.click());
+  expect(mocks.executeAction).toHaveBeenLastCalledWith('configure-export', {
+    kind: 'trusted-content-event',
+  });
 });
 
 it('places the menu beside a vertical toolbar and clears the trigger highlight when closed', () => {
@@ -148,7 +174,7 @@ it('places the menu beside a vertical toolbar and clears the trigger highlight w
   expect(menu?.className).toContain('sniptale-popover-side');
   expect(menu?.style.left).toBe('calc(100% + 10px)');
   expect(menu?.style.top).toBe('0px');
-  expect(trigger?.dataset['active']).toBe('true');
+  expect(trigger?.dataset['active']).toBeUndefined();
 
   act(() => trigger?.click());
 
@@ -157,7 +183,7 @@ it('places the menu beside a vertical toolbar and clears the trigger highlight w
   expect(trigger?.dataset['active']).toBeUndefined();
 });
 
-it('runs one trusted action, disables duplicates, reports success, and restores focus', async () => {
+it('runs one trusted action, disables duplicates, reports success, and clears trigger focus', async () => {
   let resolveAction!: () => void;
   mocks.executeAction.mockImplementation(
     () => new Promise<void>((resolve) => (resolveAction = resolve))
@@ -189,7 +215,8 @@ it('runs one trusted action, disables duplicates, reports success, and restores 
     'content.toolbar.annotationExportDownloadSuccess',
     'success'
   );
-  expect(document.activeElement).toBe(trigger);
+  expect(document.activeElement).not.toBe(trigger);
+  expect(trigger.matches(':focus')).toBe(false);
 });
 
 it('keeps a failed action retryable and rejects untrusted privileged clicks', async () => {

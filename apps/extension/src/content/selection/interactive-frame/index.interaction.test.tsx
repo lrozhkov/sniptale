@@ -23,6 +23,12 @@ import {
   removeFrameCallout,
   setFrameCallout,
 } from '../../../features/highlighter/frame-annotation/callout/collection';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import type {
+  PagePreparationHistoryBridge,
+  PagePreparationSessionSnapshot,
+} from '../../parser/page-preparation/history';
 
 const highlighterMocks = vi.hoisted(() => ({
   clearFrameEditing: vi.fn(),
@@ -204,6 +210,30 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+function createHistorySnapshot(): PagePreparationSessionSnapshot {
+  return {
+    annotations: {
+      domRecords: [],
+      frameOrders: [],
+      nextAnnotationId: 1,
+      nextCreationOrder: 1,
+      nextMarkerNumber: 1,
+      schemaVersion: 1,
+    },
+    frameSession: {
+      frames: [],
+      globalEffectMode: 'border',
+      globalStepBadgeSettings: { autoMode: true },
+      sessionBlurSettings: { amount: 8, blurType: 'gaussian', showBorder: true },
+      sessionBorderPreset: DEFAULT_BORDER_PRESET,
+      sessionCalloutStyle: null,
+      sessionFocusSettings: { opacity: 0.5, showBorder: false },
+      sessionStepBadgeTemplate: null,
+      stepBadgeOrder: [],
+    },
+  };
+}
+
 function openFrameSizeEditor() {
   act(() => {
     useFrameUIStore.getState().selectFrame('frame-1');
@@ -231,6 +261,7 @@ function openFrameSizeEditor() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   useFrameUIStore.getState().reset();
+  pagePreparationHistory.clear();
   deferredFrameUpdates = [];
 });
 
@@ -242,6 +273,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   useFrameUIStore.getState().reset();
+  pagePreparationHistory.clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -304,6 +336,7 @@ describe('InteractiveFrame callout collection interactions', () => {
       findToolbarButton(/Add comment|Добавить комментарий/).click();
     });
 
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(1);
     const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
     expect(editable).toBeInstanceOf(HTMLElement);
     expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
@@ -311,6 +344,45 @@ describe('InteractiveFrame callout collection interactions', () => {
     act(() => editable?.blur());
 
     expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(0);
+  });
+
+  it('re-adds and focuses a primary comment after outside-click discards an empty draft', () => {
+    const snapshot = createHistorySnapshot();
+    const historyBridge: PagePreparationHistoryBridge = {
+      applySnapshot: vi.fn(),
+      captureSnapshot: () => snapshot,
+    };
+    pagePreparationHistory.registerBridge(historyBridge);
+    renderControlledCalloutFrame();
+    act(() => useFrameUIStore.getState().hoverFrame('frame-1'));
+
+    act(() => {
+      findToolbarButton(/Add comment|Добавить комментарий/).click();
+    });
+    expect(pagePreparationHistory.hasOpenTransactions()).toBe(true);
+
+    const blockingOverlay = queryContentUiElement<HTMLElement>('.sniptale-blocking-overlay');
+    expect(blockingOverlay).toBeInstanceOf(HTMLElement);
+    act(() => {
+      blockingOverlay?.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, cancelable: true })
+      );
+    });
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(0);
+    expect(pagePreparationHistory.hasOpenTransactions()).toBe(false);
+
+    act(() => useFrameUIStore.getState().hoverFrame('frame-1'));
+    act(() => {
+      findToolbarButton(/Add comment|Добавить комментарий/).click();
+    });
+
+    const editable = queryAllContentUiElements<HTMLElement>('[contenteditable="true"]')[0];
+    expect(editable).toBeInstanceOf(HTMLElement);
+    expect((editable?.getRootNode() as ShadowRoot).activeElement).toBe(editable);
+    act(() => editable?.blur());
+    expect(pagePreparationHistory.hasOpenTransactions()).toBe(false);
+    pagePreparationHistory.unregisterBridge(historyBridge);
   });
 
   it('adds four independent comments and disables only the selected additional comment', () => {
@@ -401,9 +473,9 @@ describe('InteractiveFrame toolbar and size interactions', () => {
       translate('content.interactiveFrame.decreaseFrame'),
       translate('content.interactiveFrame.increaseFrame'),
       translate('content.interactiveFrame.editButton'),
-      translate('content.interactiveFrame.deleteButton'),
       translate('content.interactiveFrame.hideDuringCapture'),
-      translate('common.actions.close'),
+      translate('content.interactiveFrame.deleteButton'),
+      translate('content.interactiveFrame.closeToolbar'),
     ]);
     expect(toolbar?.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(5);
     expect(

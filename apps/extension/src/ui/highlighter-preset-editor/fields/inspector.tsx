@@ -2,7 +2,17 @@ import type {
   BorderVisualStyle,
   BorderVisualStylePatch,
 } from '../../../features/highlighter/contracts';
-import { Braces, Box, PaintBucket, Save, Sparkles, Square } from 'lucide-react';
+import {
+  Braces,
+  Box,
+  Droplet,
+  Focus,
+  Layers3,
+  PaintBucket,
+  Save,
+  Settings2,
+  Square,
+} from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
@@ -36,7 +46,16 @@ const BORDER_PALETTE = [
   '#f8fafc',
 ] as const;
 
-type BorderInspectorSection = 'outline' | 'fill' | 'geometry' | 'effects' | 'css' | 'save';
+type BorderInspectorSection =
+  | 'outline'
+  | 'fill'
+  | 'geometry'
+  | 'shadow'
+  | 'blur'
+  | 'focus'
+  | 'behavior'
+  | 'css'
+  | 'save';
 
 type BorderStyleInspectorProps = {
   cssDraft: string;
@@ -46,6 +65,7 @@ type BorderStyleInspectorProps = {
   onCssDraftChange: (value: string) => void;
   onCssResizeStart?: (event: MouseEvent<HTMLDivElement>) => void;
   saveSection?: ReactNode;
+  saveSectionStatus?: string;
   style: BorderVisualStyle;
   linkedTemplateOptions?: LinkedAnnotationTemplateOptions;
   saveSectionRequest?: number;
@@ -134,7 +154,20 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
   );
 }
 
-function BorderEffectsSection(props: BorderStyleInspectorProps) {
+function BorderShadowSection(props: BorderStyleInspectorProps) {
+  return (
+    <EditorCompactRangeField
+      displaySuffix="%"
+      label={translate('highlighter.editor.shadowLabel')}
+      max={100}
+      min={0}
+      onChange={(shadow) => props.onChange({ shadow })}
+      value={props.style.shadow}
+    />
+  );
+}
+
+function BorderBlurSection(props: BorderStyleInspectorProps) {
   const effects = cloneBorderPresetEffects(props.style.effects);
   const blurTypeLabels = {
     gaussian: translate('highlighter.editor.blurTypeGaussian'),
@@ -144,77 +177,82 @@ function BorderEffectsSection(props: BorderStyleInspectorProps) {
   return (
     <div className="grid gap-3">
       <EditorCompactRangeField
+        label={translate('highlighter.editor.blurStrengthLabel')}
+        max={25}
+        min={1}
+        onChange={(amount) =>
+          props.onChange({ effects: { ...effects, blur: { ...effects.blur, amount } } })
+        }
+        value={effects.blur.amount}
+      />
+      <PropertyField label={translate('highlighter.editor.blurTypeLabel')}>
+        <CompactSelect
+          appearance="plain"
+          aria-label={translate('highlighter.editor.blurTypeLabel')}
+          onChange={(blurType) =>
+            props.onChange({ effects: { ...effects, blur: { ...effects.blur, blurType } } })
+          }
+          options={AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
+            label: blurTypeLabels[value],
+            value,
+          }))}
+          value={effects.blur.blurType}
+        />
+      </PropertyField>
+    </div>
+  );
+}
+
+function BorderFocusSection(props: BorderStyleInspectorProps) {
+  const effects = cloneBorderPresetEffects(props.style.effects);
+  return (
+    <div className="grid gap-3">
+      <EditorCompactRangeField
         displaySuffix="%"
-        label={translate('highlighter.editor.shadowLabel')}
+        label={translate('highlighter.editor.focusDimmingLabel')}
         max={100}
         min={0}
-        onChange={(shadow) => props.onChange({ shadow })}
-        value={props.style.shadow}
+        onChange={(opacity) =>
+          props.onChange({
+            effects: { ...effects, focus: { ...effects.focus, opacity: opacity / 100 } },
+          })
+        }
+        value={Math.round(effects.focus.opacity * 100)}
       />
-      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate('highlighter.editor.blurDefaultsTitle')}
-        </div>
-        <EditorCompactRangeField
-          label={translate('highlighter.editor.blurStrengthLabel')}
-          max={25}
-          min={1}
-          onChange={(amount) =>
-            props.onChange({ effects: { ...effects, blur: { ...effects.blur, amount } } })
-          }
-          value={effects.blur.amount}
-        />
-        <PropertyField label={translate('highlighter.editor.blurTypeLabel')}>
-          <CompactSelect
-            appearance="plain"
-            aria-label={translate('highlighter.editor.blurTypeLabel')}
-            onChange={(blurType) =>
-              props.onChange({ effects: { ...effects, blur: { ...effects.blur, blurType } } })
-            }
-            options={AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
-              label: blurTypeLabels[value],
-              value,
-            }))}
-            value={effects.blur.blurType}
-          />
-        </PropertyField>
-      </div>
-      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate('highlighter.editor.focusDefaultsTitle')}
-        </div>
-        <EditorCompactRangeField
-          displaySuffix="%"
-          label={translate('highlighter.editor.focusDimmingLabel')}
-          max={100}
-          min={0}
-          onChange={(opacity) =>
-            props.onChange({
-              effects: { ...effects, focus: { ...effects.focus, opacity: opacity / 100 } },
-            })
-          }
-          value={Math.round(effects.focus.opacity * 100)}
-        />
-        <EditorCompactRangeField
-          displaySuffix="px"
-          label={translate('highlighter.editor.focusBlurLabel')}
-          max={25}
-          min={0}
-          onChange={(blurAmount) =>
-            props.onChange({
-              effects: { ...effects, focus: { ...effects.focus, blurAmount } },
-            })
-          }
-          value={effects.focus.blurAmount}
-        />
-      </div>
-      <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <EditorCompactRangeField
+        displaySuffix="px"
+        label={translate('highlighter.editor.focusBlurLabel')}
+        max={25}
+        min={0}
+        onChange={(blurAmount) =>
+          props.onChange({
+            effects: { ...effects, focus: { ...effects.focus, blurAmount } },
+          })
+        }
+        value={effects.focus.blurAmount}
+      />
+    </div>
+  );
+}
+
+function BorderBehaviorSection(props: BorderStyleInspectorProps) {
+  const effects = cloneBorderPresetEffects(props.style.effects);
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-2">
         <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
           {translate('highlighter.editor.captureDefaultsTitle')}
         </div>
-        <PropertyField label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}>
+        <div
+          className="flex min-w-0 items-center justify-between gap-3"
+          data-ui="highlighter.editor.capture-hide-frame"
+        >
+          <span className="min-w-0 flex-1 text-[11px] text-[var(--sniptale-color-text-secondary)]">
+            {translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+          </span>
           <ProductGlassSwitch
             aria-label={translate('highlighter.editor.hideFrameDuringCaptureLabel')}
+            className="shrink-0"
             on={effects.capture.hideFrame}
             onClick={() =>
               props.onChange({
@@ -225,7 +263,7 @@ function BorderEffectsSection(props: BorderStyleInspectorProps) {
               })
             }
           />
-        </PropertyField>
+        </div>
       </div>
       <div className="grid gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
@@ -325,7 +363,10 @@ function renderBorderSection(section: BorderInspectorSection, props: BorderStyle
   if (section === 'outline') return <BorderOutlineSection {...props} />;
   if (section === 'fill') return <BorderFillSection {...props} />;
   if (section === 'geometry') return <BorderGeometrySection {...props} />;
-  if (section === 'effects') return <BorderEffectsSection {...props} />;
+  if (section === 'shadow') return <BorderShadowSection {...props} />;
+  if (section === 'blur') return <BorderBlurSection {...props} />;
+  if (section === 'focus') return <BorderFocusSection {...props} />;
+  if (section === 'behavior') return <BorderBehaviorSection {...props} />;
   if (section === 'css') return <BorderCssSection {...props} />;
   return props.saveSection ?? null;
 }
@@ -335,12 +376,27 @@ export function BorderStyleInspector(props: BorderStyleInspectorProps) {
     { icon: Square, id: 'outline', label: translate('highlighter.editor.outlineSection') },
     { icon: PaintBucket, id: 'fill', label: translate('highlighter.editor.fillSection') },
     { icon: Box, id: 'geometry', label: translate('highlighter.editor.geometrySection') },
-    { icon: Sparkles, id: 'effects', label: translate('highlighter.editor.effectsSection') },
+    { icon: Layers3, id: 'shadow', label: translate('highlighter.editor.shadowSection') },
+    { icon: Droplet, id: 'blur', label: translate('highlighter.editor.blurSection') },
+    { icon: Focus, id: 'focus', label: translate('highlighter.editor.focusSection') },
+    { icon: Settings2, id: 'behavior', label: translate('highlighter.editor.behaviorSection') },
     { icon: Braces, id: 'css', label: translate('highlighter.editor.customCssLabel') },
     ...(props.saveSection
-      ? [{ icon: Save, id: 'save', label: translate('highlighter.editor.saveSection') } as const]
+      ? [
+          {
+            icon: Save,
+            id: 'save',
+            label: translate('highlighter.editor.saveSection'),
+            ...(props.saveSectionStatus ? { status: props.saveSectionStatus } : {}),
+          } as const,
+        ]
       : []),
-  ] satisfies Array<{ icon: typeof Square; id: BorderInspectorSection; label: string }>;
+  ] satisfies Array<{
+    icon: typeof Square;
+    id: BorderInspectorSection;
+    label: string;
+    status?: string;
+  }>;
   return (
     <CategorizedInspector
       {...(props.saveSectionRequest === undefined

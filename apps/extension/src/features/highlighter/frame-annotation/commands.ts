@@ -27,6 +27,6 @@ export function getFrameAnnotationCommandSchema(): FrameAnnotationCommand[] {
     { id: 'increase', label: translate('content.interactiveFrame.increaseFrame') },
     { id: 'edit', label: translate('content.interactiveFrame.editButton') },
     { id: 'delete', label: translate('content.interactiveFrame.deleteButton') },
-    { id: 'close', label: translate('common.actions.close') },
+    { id: 'close', label: translate('content.interactiveFrame.closeToolbar') },
   ];
 }

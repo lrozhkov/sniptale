@@ -109,7 +109,9 @@ function requestTrustedEventProof(
   return readTrustedEventProof(sendResponse);
 }
 
-function issueTrustedContentIntent(actionType = CaptureMessageType.CAPTURE_VISIBLE) {
+function issueTrustedContentIntent(
+  actionType: CaptureMessageType | MessageType = CaptureMessageType.CAPTURE_VISIBLE
+) {
   const proof = requestTrustedEventProof({ actionType, requestId: 'request-1' });
   const message = {
     actionType,
@@ -177,6 +179,26 @@ it('issues and consumes a sender-bound one-shot content action capability', () =
   expect(
     consumeContentPrivilegedActionCapability({
       actionType: CaptureMessageType.CAPTURE_VISIBLE,
+      contentIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toBe(false);
+});
+
+it('binds AI settings navigation to one trusted activation, sender, and action', () => {
+  const contentIntent = issueTrustedContentIntent(MessageType.AI_SETTINGS_NAVIGATION);
+  expect(
+    consumeContentPrivilegedActionCapability({
+      actionType: MessageType.AI_SETTINGS_NAVIGATION,
+      contentIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toBe(true);
+  expect(
+    consumeContentPrivilegedActionCapability({
+      actionType: MessageType.AI_SETTINGS_NAVIGATION,
       contentIntent,
       resolvedTabId: 7,
       sender: contentSender(),

@@ -18,8 +18,9 @@ vi.mock('../../step-badge', () => ({
   StepBadge: (props: {
     onPositionChange: (placement: { position: number; side: 'bottom' }) => void;
     onSettingsClick: () => void;
+    showSettingsHandle: boolean;
   }) => (
-    <div data-ui="step-badge">
+    <div data-ui="step-badge" data-show-settings={String(props.showSettingsHandle)}>
       <button
         type="button"
         data-ui="move-step"
@@ -149,6 +150,7 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     });
     const stepBadgeListener = vi.fn();
     const cleanupStepBadgeListener = addFrameStepBadgeChangedListener(stepBadgeListener);
+    useFrameUIStore.getState().selectFrame(frame.id, { x: 20, y: 10 });
 
     act(() => {
       root.render(
@@ -191,6 +193,9 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(stroke?.style.borderRadius).toBe('8px');
     expect(fill?.dataset['hideDuringCapture']).toBe('true');
     expect(stroke?.dataset['hideDuringCapture']).toBe('true');
+    expect(host.querySelector('[data-ui="step-badge"]')?.getAttribute('data-show-settings')).toBe(
+      'true'
+    );
     for (const [name, value] of Object.entries(PASSIVE_CONTENT_CHROME)) {
       expect(container?.getAttribute(name)).toBe(value);
       expect(surface?.getAttribute(name)).toBe(value);
@@ -218,6 +223,10 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(useFrameUIStore.getState().activePopover).toEqual({
       frameId: frame.id,
       kind: 'step-badge',
+    });
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      toolbarAnchorOffset: null,
     });
     cleanupStepBadgeListener();
   });

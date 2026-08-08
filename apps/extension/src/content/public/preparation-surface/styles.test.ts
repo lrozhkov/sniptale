@@ -50,8 +50,18 @@ describe('content entrypoint styles', () => {
     expect(hostStyles).toContain(':host {');
     expect(hostStyles).toContain('--sniptale-content-ui-scale: 1;');
     expect(effectsStyles).toContain('scale: var(--sniptale-content-ui-scale);');
+    expect(effectsStyles).toContain(
+      '.sniptale-content-ui-zoom-surface {\n  zoom: var(--sniptale-content-ui-scale);'
+    );
+    expect(effectsStyles).not.toContain(
+      '.sniptale-toolbar,\n.sniptale-show-toolbar-button,\n.sniptale-toolbar-portal-wrapper'
+    );
     expect(effectsStyles).toContain('.sniptale-resize-handle');
     expect(effectsStyles).toContain('.sniptale-toolbar-portal-wrapper');
+    expect(effectsStyles).toContain('.sniptale-content-ui-positioner');
+    expect(effectsStyles).not.toMatch(
+      /\.sniptale-frame-toolbar-bridge,[\s\S]*?scale: var\(--sniptale-content-ui-scale\)/
+    );
     expect(effectsStyles).toContain('scrollbar-width: thin;');
     expect(effectsStyles).toContain('::-webkit-scrollbar');
     expect(frameSettingsStyles).toContain('.sniptale-frame-style-preset-row');

@@ -10,6 +10,18 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 
+const calloutPreset = vi.hoisted(() => ({
+  content: { titleText: 'Inactive template title' },
+  customized: false,
+  enabled: true,
+  id: 'inactive-template',
+  name: 'Inactive template',
+  order: 1,
+  origin: 'user' as const,
+  placement: { anchor: 'bottom-right' as const, side: 'bottom' as const },
+  style: { surface: { backgroundColor: '#123456' } },
+}));
+
 vi.mock('../../../composition/persistence/callout-presets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/callout-presets')>()),
   createUserCalloutPreset: mocks.create,
@@ -18,8 +30,36 @@ vi.mock('../../../composition/persistence/callout-presets', async (importOrigina
   updateCalloutPreset: mocks.update,
 }));
 
+vi.mock('./body', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./body')>()),
+  CalloutSettingsPopoverContent: (props: Record<string, any>) => (
+    <button data-action="fork-inactive" onClick={() => props['onForkPreset'](calloutPreset)}>
+      fork
+    </button>
+  ),
+}));
+
+vi.mock('./preset-controller', () => ({
+  useCalloutPresetPopoverController: () => ({
+    catalog: {
+      create: vi.fn(),
+      error: null,
+      isSaving: false,
+      overwrite: vi.fn(),
+      pendingPresetIds: new Set(),
+      presets: [calloutPreset],
+      refresh: vi.fn(),
+      toggle: vi.fn(),
+      visiblePresets: [calloutPreset],
+    },
+    editor: { reset: vi.fn() },
+  }),
+}));
+
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
+import { createDefaultFrameCallout } from '../../../features/highlighter/frame-annotation/defaults';
 import { useCalloutPresetPopoverMutations } from './preset-mutations';
+import { FutureCalloutSettingsPopover } from './popover';
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -69,6 +109,38 @@ it('drops a completed save from a stale popover session', async () => {
   sessionGenerationRef!.current += 1;
   resolveCreate?.({ outcome: 'applied' });
   await expect(pending).resolves.toBeNull();
+});
+
+it('forks a requested inactive creation template into live temporary settings', async () => {
+  const anchor = document.createElement('button');
+  document.body.append(anchor);
+  const onChange = vi.fn();
+
+  await act(async () =>
+    root?.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={onChange}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        settings={createDefaultFrameCallout()}
+      />
+    )
+  );
+  act(() => document.querySelector<HTMLButtonElement>('[data-action="fork-inactive"]')?.click());
+
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      content: expect.objectContaining({ titleText: calloutPreset.content.titleText }),
+      placement: expect.objectContaining(calloutPreset.placement),
+      style: expect.objectContaining({
+        surface: expect.objectContaining({ backgroundColor: '#123456' }),
+      }),
+    })
+  );
+  expect(onChange.mock.calls[0]?.[0].sourcePresetId).toBeUndefined();
+  anchor.remove();
 });
 
 afterEach(() => {

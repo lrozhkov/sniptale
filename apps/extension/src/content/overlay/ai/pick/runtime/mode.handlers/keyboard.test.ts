@@ -2,6 +2,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
+import { createAiPickDomState } from '../dom-state';
+import type { AiPickModeState } from '../mode.types';
 
 const {
   dispatchContentModeDisabledMock,
@@ -37,14 +39,15 @@ function createParsedTree(): ParsedDOMTree {
   } as unknown as ParsedDOMTree;
 }
 
-function createState() {
+function createState(): AiPickModeState {
   return {
-    domState: { elementIndex: { token: 'index' } },
+    domState: createAiPickDomState(),
     enableSequence: 0,
     isEnabled: true,
     onContentSelect: vi.fn(),
     parsedTree: createParsedTree(),
     pendingEnable: null,
+    source: null,
   };
 }
 
@@ -55,6 +58,18 @@ beforeEach(() => {
 });
 
 describe('ai-pick keyboard handler', () => {
+  it('keeps ai-pick active when toolbar UI already claimed Escape', () => {
+    const state = createState();
+    const disable = vi.fn();
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    event.preventDefault();
+
+    createKeyDownHandler(state, disable)(event);
+
+    expect(disable).not.toHaveBeenCalled();
+    expect(dispatchContentModeDisabledMock).not.toHaveBeenCalled();
+  });
+
   it('disables ai-pick mode and dispatches the shared event on Escape', () => {
     const state = createState();
     const disable = vi.fn();
@@ -64,7 +79,7 @@ describe('ai-pick keyboard handler', () => {
       stopPropagation: vi.fn(),
     } as unknown as KeyboardEvent;
 
-    createKeyDownHandler(state as never, disable)(event);
+    createKeyDownHandler(state, disable)(event);
 
     expect(disable).toHaveBeenCalledTimes(1);
     expect(dispatchContentModeDisabledMock).toHaveBeenCalledWith({ mode: 'ai-pick' });
@@ -84,7 +99,7 @@ describe('ai-pick keyboard handler', () => {
     getContentEventTargetElementMock.mockReturnValue(modalTarget);
     isExtensionUIElementMock.mockReturnValue(true);
 
-    createKeyDownHandler(state as never, disable)(event);
+    createKeyDownHandler(state, disable)(event);
 
     expect(disable).not.toHaveBeenCalled();
     expect(dispatchContentModeDisabledMock).not.toHaveBeenCalled();

@@ -4,6 +4,7 @@ import {
   resolvePageScrollRoot,
   writePageScroll,
 } from '../../platform/page-scroll';
+import { createAutoBlurScanAbortError, throwIfAutoBlurScanAborted } from './cancellation';
 
 const VIEWPORT_OVERLAP_CSS_PX = 64;
 const MAX_AUTO_BLUR_VIEWPORTS = 256;
@@ -52,19 +53,39 @@ function assertTraversalBudget(xCount: number, yCount: number): void {
   }
 }
 
-function waitForViewportRender(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+function waitForViewportRender(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const handleAbort = () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      reject(createAutoBlurScanAbortError());
+    };
+    const complete = () => {
+      signal?.removeEventListener('abort', handleAbort);
+      resolve();
+    };
+    signal?.addEventListener('abort', handleAbort, { once: true });
+    if (signal?.aborted) {
+      handleAbort();
+      return;
+    }
+    firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(complete);
+    });
   });
 }
 
 export async function visitAutoBlurPageViewports(
-  visit: (scrollDelta: { x: number; y: number }) => void
+  visit: (scrollDelta: { x: number; y: number }) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const root = resolvePageScrollRoot();
   const originalScroll = readPageScroll(root);
 
   try {
+    throwIfAutoBlurScanAborted(signal);
     const geometry = measurePageScrollGeometry(root);
     const xPlan = getScrollPositionPlan(
       geometry.extentWidth,
@@ -81,8 +102,10 @@ export async function visitAutoBlurPageViewports(
     const yPositions = createScrollPositions(yPlan);
     for (const y of yPositions) {
       for (const x of xPositions) {
+        throwIfAutoBlurScanAborted(signal);
         writePageScroll(root, x, y);
-        await waitForViewportRender();
+        await waitForViewportRender(signal);
+        throwIfAutoBlurScanAborted(signal);
         const currentScroll = readPageScroll(root);
         visit({
           x: currentScroll.x - originalScroll.x,

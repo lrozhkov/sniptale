@@ -5,7 +5,7 @@ export function handleQuickEditKeyDown(
   event: KeyboardEvent,
   options: QuickEditRuntimeEventOptions
 ): void {
-  if (!options.isEnabled()) {
+  if (event.defaultPrevented || !options.isEnabled()) {
     return;
   }
 

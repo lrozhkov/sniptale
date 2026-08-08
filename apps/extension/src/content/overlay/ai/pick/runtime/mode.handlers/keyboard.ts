@@ -6,7 +6,7 @@ import { aiPickModeLogger } from './shared';
 
 export function createKeyDownHandler(state: AiPickModeState, disable: () => void) {
   return (event: KeyboardEvent): void => {
-    if (!state.isEnabled || event.key !== 'Escape') {
+    if (event.defaultPrevented || !state.isEnabled || event.key !== 'Escape') {
       return;
     }
 

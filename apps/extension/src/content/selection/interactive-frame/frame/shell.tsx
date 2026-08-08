@@ -34,7 +34,6 @@ interface InteractiveFrameFrameShellProps {
 
 /** Renders the fixed frame container, resize handles, and optional step badge. */
 export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProps) {
-  const isAnyFrameSelected = useFrameUIStore((state) => state.selectedFrameId !== null);
   const toggleQuickPopover = useFrameUIStore((state) => state.toggleQuickPopover);
   const fillRef = useRef<HTMLDivElement>(null);
   const strokeRef = useRef<HTMLDivElement>(null);
@@ -108,7 +107,7 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
           }}
           onSettingsClick={() => toggleQuickPopover(props.frame.id, 'step-badge')}
           settingsAnchorRef={props.stepBadgePopoverAnchorRef}
-          showSettingsHandle={!isAnyFrameSelected}
+          showSettingsHandle
           {...(props.borderShadow === undefined ? {} : { shadow: props.borderShadow })}
         />
       )}

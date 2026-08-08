@@ -175,11 +175,11 @@ export function useInteractiveFramePropSync(params: {
       return;
     }
     if (isCalloutEditing) {
-      setTempFrame((current) =>
-        current.callout === undefined && frame.callout !== undefined
-          ? { ...current, callout: frame.callout }
-          : current
-      );
+      setTempFrame((current) => {
+        const enabledPrimaryCallout = frame.callout?.enabled ? frame.callout : undefined;
+        if (!enabledPrimaryCallout || current.callout?.enabled) return current;
+        return { ...current, callout: enabledPrimaryCallout };
+      });
       return;
     }
     if (state === 'resizing' && isResizingRef.current) return;

@@ -34,6 +34,12 @@
   ],
   "sensitiveRetentionOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/content-pin-session/annotation-fork.ts",
+      "owner": "annotation-fork-session",
+      "justification": "The annotation fork session owner retains unsaved visual template adjustments across reloads for one browser tab.",
+      "reviewNote": "Only text-free frame, callout, and numbering visual settings may persist in session storage; content, titles, labels, instance identities, and manual numbering values are excluded. Records are revisioned, tab-scoped, removed on tab close, and included in verified local-data erasure."
+    },
+    {
       "file": "apps/extension/src/composition/persistence/frame-annotation-raster-jobs/index.ts",
       "owner": "frame-annotation-raster-jobs",
       "justification": "The frame annotation raster owner temporarily stages bounded page-derived PNG input, sanitized annotation snapshots, and derived PNG output for one local offscreen export.",

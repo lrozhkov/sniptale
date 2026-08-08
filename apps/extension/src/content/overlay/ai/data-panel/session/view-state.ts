@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import type { TreeNodeState } from '../types';
 import { getSummaryToneClass } from '../interactions/panel';
 
@@ -10,7 +11,7 @@ type DataPanelActions = {
   toggleColumnExclusion: (tableId: string, column: string) => void;
   toggleExpandAll: () => void;
   toggleExpanded: (nodeId: string) => void;
-  toggleSelectAll: () => void;
+  toggleSelectAll: (scopeTreeData?: ParsedDOMTree) => void;
   toggleSelected: (nodeId: string) => void;
 };
 

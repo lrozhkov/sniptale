@@ -62,7 +62,11 @@ function parseContentRuntimeWakeupMessage(message: unknown): ContentRuntimeWakeu
   try {
     const parsed =
       runtimeActionCoreMessageContracts[MessageType.CONTENT_RUNTIME_WAKEUP].parseRequest(message);
-    if (parsed.pinToTab !== undefined && parsed.toolbarVisible !== undefined) {
+    const sessionOperationCount = [
+      parsed.pinToTab !== undefined,
+      parsed.toolbarVisible !== undefined,
+    ].filter(Boolean).length;
+    if (sessionOperationCount > 1) {
       return null;
     }
     return parsed;

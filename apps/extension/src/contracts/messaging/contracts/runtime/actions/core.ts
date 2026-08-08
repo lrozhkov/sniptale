@@ -54,8 +54,37 @@ import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import { contentActionRuntimeContracts } from './content-action';
 import { pageAccessRuntimeContracts } from './page-access';
 
+function isAiSettingsNavigationSection(value: unknown): value is 'ai-connections' | 'ai-prompts' {
+  return value === 'ai-connections' || value === 'ai-prompts';
+}
+
 function isContentRuntimeWakeupReason(value: unknown): value is 'pin-to-tab' | 'scenario' {
   return value === 'pin-to-tab' || value === 'scenario';
+}
+
+function isAnnotationForkSessionPayload(value: unknown): value is string {
+  return isString(value) && value.length <= 500_000;
+}
+
+type AnnotationForkSessionMessage =
+  | { type: typeof MessageType.ANNOTATION_FORK_SESSION; operation: 'read' }
+  | {
+      type: typeof MessageType.ANNOTATION_FORK_SESSION;
+      operation: 'clear' | 'write';
+      expectedRevision: number;
+      payload?: string;
+    };
+
+function isAnnotationForkSessionMessage(value: unknown): value is AnnotationForkSessionMessage {
+  if (!isRecord(value) || value['type'] !== MessageType.ANNOTATION_FORK_SESSION) return false;
+  if (value['operation'] === 'read') return Object.keys(value).length === 2;
+  if (value['operation'] !== 'write' && value['operation'] !== 'clear') return false;
+  if (!isNumber(value['expectedRevision']) || !Number.isSafeInteger(value['expectedRevision'])) {
+    return false;
+  }
+  return value['operation'] === 'write'
+    ? Object.keys(value).length === 4 && isAnnotationForkSessionPayload(value['payload'])
+    : Object.keys(value).length === 3;
 }
 
 type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
@@ -124,6 +153,20 @@ function isFrameAnnotationRasterResponse(
 }
 
 export const runtimeActionCoreMessageContracts = {
+  [MessageType.AI_SETTINGS_NAVIGATION]: {
+    parseRequest: createGuardParser(
+      'runtime AI_SETTINGS_NAVIGATION message',
+      createMessageGuard({
+        type: MessageType.AI_SETTINGS_NAVIGATION,
+        required: { section: isAiSettingsNavigationSection },
+        optional: { contentIntent: isContentPrivilegedActionCapability },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime AI_SETTINGS_NAVIGATION response',
+      createRuntimeResponseGuard({ optional: { result: (value) => value === 'accepted' } })
+    ),
+  },
   [MessageType.FRAME_ANNOTATION_RASTERIZE]: {
     parseRequest: createGuardParser(
       'runtime FRAME_ANNOTATION_RASTERIZE message',
@@ -246,6 +289,27 @@ export const runtimeActionCoreMessageContracts = {
     parseResponse: createGuardParser(
       'runtime CONTENT_RUNTIME_WAKEUP response',
       isContentRuntimeWakeupResponse
+    ),
+  },
+  [MessageType.ANNOTATION_FORK_SESSION]: {
+    parseRequest: createGuardParser(
+      'runtime ANNOTATION_FORK_SESSION message',
+      isAnnotationForkSessionMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime ANNOTATION_FORK_SESSION response',
+      createRuntimeResponseGuard({
+        optional: {
+          payload: isAnnotationForkSessionPayload,
+          result: (value) =>
+            value === 'read' ||
+            value === 'written' ||
+            value === 'cleared' ||
+            value === 'stale' ||
+            value === 'stale-document',
+          revision: isNumber,
+        },
+      })
     ),
   },
   [MessageType.ERASE_LOCAL_EXTENSION_DATA]: {

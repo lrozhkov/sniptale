@@ -48,7 +48,7 @@ export function handleSelectionModeKeyDown(
   state: SelectionModeInteractionState,
   options: SelectionModeEventOptions
 ): void {
-  if (!state.isActive) {
+  if (event.defaultPrevented || !state.isActive) {
     return;
   }
 

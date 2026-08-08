@@ -112,6 +112,10 @@ export function parseStepBadgeTemplateSettings(value: unknown): StepBadgeTemplat
     !isString(style['outlineColorSource']) ||
     !outlineSources.has(style['outlineColorSource']) ||
     !isColor(style['outlineColor']) ||
+    (style['outlineWidth'] !== undefined &&
+      (!isNumber(style['outlineWidth']) ||
+        style['outlineWidth'] < 0 ||
+        style['outlineWidth'] > 20)) ||
     (style['customCss'] !== undefined &&
       (!isString(style['customCss']) ||
         validateStepBadgeCustomCss(style['customCss']).error !== null))
@@ -139,6 +143,7 @@ export function parseStepBadgeTemplateSettings(value: unknown): StepBadgeTemplat
         'outlineColorSource'
       ] as StepBadgeTemplateSettings['style']['outlineColorSource'],
       outlineColor: style['outlineColor'],
+      outlineWidth: isNumber(style['outlineWidth']) ? style['outlineWidth'] : 2,
       customCss: isString(style['customCss']) ? style['customCss'] : '',
     },
   };

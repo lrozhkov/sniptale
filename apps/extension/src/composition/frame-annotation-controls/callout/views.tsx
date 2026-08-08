@@ -61,18 +61,17 @@ export function CalloutPresetSection(props: {
                 </ProductGlassPresetMeta>
               </ProductGlassPresetItem>
               <span className="sniptale-callout-preset-actions">
-                {props.activePresetId === preset.id ? (
-                  <button
-                    aria-label={translate('content.templateFork.fork')}
-                    className="sniptale-callout-preset-action"
-                    disabled={pending}
-                    onClick={() => props.onForkPreset(preset)}
-                    title={translate('content.templateFork.fork')}
-                    type="button"
-                  >
-                    <CopyPlus size={15} />
-                  </button>
-                ) : null}
+                <button
+                  aria-label={translate('content.templateFork.fork')}
+                  className="sniptale-callout-preset-action"
+                  data-template-fork-source={preset.id}
+                  disabled={pending}
+                  onClick={() => props.onForkPreset(preset)}
+                  title={translate('content.templateFork.fork')}
+                  type="button"
+                >
+                  <CopyPlus size={15} />
+                </button>
                 {preset.origin === 'system' && preset.customized === true && props.onResetPreset ? (
                   <button
                     aria-label={translate('highlighter.calloutPresets.reset')}

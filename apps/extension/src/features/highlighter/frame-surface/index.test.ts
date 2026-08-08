@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FrameData } from '../contracts';
-import { projectElementFrameSurface, resolveFrameSurface } from '.';
+import { projectElementFrameSurface, reprojectFrameSurfacePadding, resolveFrameSurface } from '.';
 
 function createFrame(overrides: Partial<FrameData> = {}): FrameData {
   return {
@@ -85,5 +85,15 @@ describe('frame-surface projectElementFrameSurface', () => {
         }
       )
     ).toEqual({ x: 35, y: 26, width: 171, height: 101 });
+  });
+
+  it('reprojects an existing surface when template padding changes', () => {
+    expect(
+      reprojectFrameSurfacePadding(
+        { x: 35, y: 26, width: 171, height: 101 },
+        { top: 4, right: 6, bottom: 7, left: 5 },
+        { top: 10, right: 12, bottom: 13, left: 11 }
+      )
+    ).toEqual({ x: 29, y: 20, width: 183, height: 113 });
   });
 });

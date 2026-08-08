@@ -35,8 +35,10 @@ vi.mock('../../callout', () => ({
       placement: { centerOffsetX: number; centerOffsetY: number }
     ) => void;
     isFrameEditing: boolean;
+    showSettingsHandle: boolean;
   }) => (
     <>
+      <output data-ui="callout-show-settings">{String(props.showSettingsHandle)}</output>
       <button data-ui="callout-settings" onClick={props.onSettingsClick} type="button">
         settings
       </button>
@@ -349,6 +351,7 @@ describe('interactive frame callout overlay', () => {
   it('opens comment settings through the quick-popover transition', () => {
     const frame = createFrame();
     useFrameUIStore.getState().reset();
+    useFrameUIStore.getState().selectFrame(frame.id, { x: 24, y: 16 });
 
     renderNode(
       <InteractiveFrameCalloutOverlay
@@ -363,6 +366,8 @@ describe('interactive frame callout overlay', () => {
       />
     );
 
+    expect(container?.querySelector('[data-ui="callout-show-settings"]')?.textContent).toBe('true');
+
     act(() => {
       container?.querySelector<HTMLButtonElement>('[data-ui="callout-settings"]')?.click();
     });
@@ -371,6 +376,10 @@ describe('interactive frame callout overlay', () => {
       calloutIndex: 0,
       frameId: frame.id,
       kind: 'callout-settings',
+    });
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      toolbarAnchorOffset: null,
     });
   });
 });

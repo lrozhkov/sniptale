@@ -7,6 +7,7 @@ export {
 export { scanAutoBlurTargets } from './scan';
 export { collectVisibleAutoBlurTextSources } from './visible-text';
 export { ruleAutoBlurDetector } from './detectors/rule-detector';
+export { isAutoBlurScanAbortError, throwIfAutoBlurScanAborted } from './cancellation';
 export type {
   AutoBlurApplyInput,
   AutoBlurApplyResult,

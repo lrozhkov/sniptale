@@ -10,6 +10,7 @@ const contentModeEventsMocks = vi.hoisted(() => ({
   dispatchContentModeDisabledMock: vi.fn(),
   dispatchExitFrameEditingMock: vi.fn(),
 }));
+const domHostMocks = vi.hoisted(() => ({ contentOwnedEvent: false }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
@@ -22,12 +23,18 @@ vi.mock('../../platform/page-context/mode-events', async (importOriginal) => ({
   dispatchExitFrameEditing: contentModeEventsMocks.dispatchExitFrameEditingMock,
 }));
 
+vi.mock('../../platform/dom-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/dom-host')>()),
+  isContentOwnedEvent: () => domHostMocks.contentOwnedEvent,
+}));
+
 import { createHighlighterRuntimeEscapeKeyHandler } from './runtime-listeners';
 
 beforeEach(() => {
   loggerMock.debug.mockClear();
   contentModeEventsMocks.dispatchContentModeDisabledMock.mockClear();
   contentModeEventsMocks.dispatchExitFrameEditingMock.mockClear();
+  domHostMocks.contentOwnedEvent = false;
   Object.defineProperty(document, 'activeElement', {
     configurable: true,
     value: document.body,
@@ -85,6 +92,37 @@ function focusCalloutActiveElement() {
 }
 
 describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
+  it('ignores an Escape already claimed by toolbar UI', () => {
+    const disableHighlighterMode = vi.fn();
+    const handler = createHighlighterRuntimeEscapeKeyHandler({
+      disableHighlighterMode,
+      hasActivePopover: () => false,
+      isAnyFrameEditing: () => false,
+    });
+
+    handler({ defaultPrevented: true, key: 'Escape' } as KeyboardEvent);
+
+    expect(disableHighlighterMode).not.toHaveBeenCalled();
+    expect(contentModeEventsMocks.dispatchContentModeDisabledMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves Escape from an extension-owned modal to the modal dismissal owner', () => {
+    const disableHighlighterMode = vi.fn();
+    const handler = createHighlighterRuntimeEscapeKeyHandler({
+      disableHighlighterMode,
+      hasActivePopover: () => false,
+      isAnyFrameEditing: () => false,
+    });
+    domHostMocks.contentOwnedEvent = true;
+
+    const { preventDefault, stopPropagation } = dispatchEscape(handler);
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
+    expect(disableHighlighterMode).not.toHaveBeenCalled();
+    expect(contentModeEventsMocks.dispatchContentModeDisabledMock).not.toHaveBeenCalled();
+  });
+
   it('ignores non-Escape events and callout-focused Escape events', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({

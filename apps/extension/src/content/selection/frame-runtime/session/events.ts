@@ -1,6 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type {
   BlurSettings,
+  EffectMode,
   FocusSettings,
   FrameData,
   GlobalStepBadgeSettings,
@@ -23,6 +24,7 @@ import {
 export function buildFrameSessionWindowListeners(args: {
   syncFocusOpacity: (sourceFrameId: string, newOpacity: number) => void;
   sessionBlurSettingsRef: MutableRefObject<BlurSettings>;
+  globalEffectModeRef: MutableRefObject<EffectMode>;
   sessionDefaultsInitializedRef: MutableRefObject<boolean>;
   sessionFocusSettingsRef: MutableRefObject<FocusSettings>;
   updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
@@ -30,6 +32,7 @@ export function buildFrameSessionWindowListeners(args: {
   reorderStepBadge: (frameId: string, direction: 'up' | 'down') => void;
   setFrames: Dispatch<SetStateAction<FrameData[]>>;
   sessionCalloutStyleRef: MutableRefObject<CalloutVisualStyle | null>;
+  sessionStepBadgeTemplateRef?: MutableRefObject<StepBadgeSettings | null>;
   withHistoryCommit: WithHistoryCommit;
 }) {
   const frameCalloutHandlers = createFrameCalloutHandlers(args);
@@ -39,8 +42,13 @@ export function buildFrameSessionWindowListeners(args: {
     frameCalloutHandlers,
     frameStepBadgeHandlers,
     sessionBlurSettingsRef: args.sessionBlurSettingsRef,
+    globalEffectModeRef: args.globalEffectModeRef,
     sessionDefaultsInitializedRef: args.sessionDefaultsInitializedRef,
     sessionFocusSettingsRef: args.sessionFocusSettingsRef,
+    sessionCalloutStyleRef: args.sessionCalloutStyleRef,
+    ...(args.sessionStepBadgeTemplateRef
+      ? { sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef }
+      : {}),
     syncFocusOpacity: args.withHistoryCommit(args.syncFocusOpacity),
   });
 }

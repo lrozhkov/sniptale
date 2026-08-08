@@ -1,11 +1,9 @@
-import { type PointerEvent, useState } from 'react';
+import { useState } from 'react';
 import { cx, type CompactInspectorNumericScrub, type CompactInspectorUnit } from './shared';
 import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
-
-const NUMERIC_ROW_RANGE_HOT_EDGE_PX = 12;
 
 export interface NumericValueFieldProps {
   className?: string | undefined;
@@ -133,7 +131,7 @@ export function NumericRow({
       data-ui="shared.ui.compact-inspector.numeric-row"
       data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
-      onPointerMove={range.handlePointerMove}
+      onPointerMove={range.show}
       onPointerLeave={range.hide}
       className={cx(
         'group/compact-numeric-row relative min-h-10 items-center gap-2',
@@ -179,18 +177,17 @@ function useNumericRowRangeState(
 ) {
   const [hot, setHot] = useState(false);
   const [active, setActive] = useState(false);
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+  const show = () => {
     if (!scrub || disabled) {
       return;
     }
-    const rect = event.currentTarget.getBoundingClientRect();
-    setHot(rect.bottom - event.clientY <= NUMERIC_ROW_RANGE_HOT_EDGE_PX);
+    setHot(true);
   };
   const hide = () => {
     setHot(false);
   };
 
-  return { active, handlePointerMove, hide, setActive, visible: hot || active };
+  return { active, hide, setActive, show, visible: hot || active };
 }
 
 function NumericRowLabel({

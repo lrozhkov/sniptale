@@ -9,6 +9,7 @@ import {
   type AutoBlurFrameManager,
 } from './operations';
 import { reportAutoBlurApplyResult } from './feedback';
+import { isAutoBlurScanAbortError } from '../../../selection/auto-blur-runtime';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 export function useAutoBlurAutoApplyEffect(args: {
@@ -17,9 +18,24 @@ export function useAutoBlurAutoApplyEffect(args: {
   frameManager: AutoBlurFrameManager;
   isApplying: boolean;
   isOpen: boolean;
+  cancelFullPageScan: (owner?: 'apply-once' | 'auto-apply') => void;
+  runFullPageScan: <T>(
+    owner: 'apply-once' | 'auto-apply',
+    operation: (signal: AbortSignal) => Promise<T>
+  ) => Promise<T>;
 }) {
-  const { autoApplyAllowed, autoApplyEnabled, frameManager, isApplying, isOpen } = args;
+  const {
+    autoApplyAllowed,
+    autoApplyEnabled,
+    cancelFullPageScan,
+    frameManager,
+    isApplying,
+    isOpen,
+    runFullPageScan,
+  } = args;
   const appliedForCurrentAvailabilityRef = useRef(false);
+  const frameManagerRef = useRef(frameManager);
+  frameManagerRef.current = frameManager;
 
   useEffect(() => {
     if (!autoApplyEnabled || !autoApplyAllowed) {
@@ -32,24 +48,33 @@ export function useAutoBlurAutoApplyEffect(args: {
 
     appliedForCurrentAvailabilityRef.current = true;
     let cancelled = false;
-    void loadSettingsOrDefault()
-      .then(async (settings) => {
-        if (cancelled) return;
-        const result = await applyAutoBlurWithSettings({
-          blurSettings: settings.blurSettings,
-          frameManager,
-          frames: frameManager.frames,
-          scanMode: 'full-page',
-          selectedCategories: settings.selectedCategories,
-        });
+    const activeFrameManager = frameManagerRef.current;
+    void runFullPageScan('auto-apply', async (signal) => {
+      const settings = await loadSettingsOrDefault();
+      if (cancelled) throw new DOMException('Auto-blur scan was cancelled.', 'AbortError');
+      return applyAutoBlurWithSettings({
+        blurSettings: settings.blurSettings,
+        frameManager: activeFrameManager,
+        frames: activeFrameManager.frames,
+        scanMode: 'full-page',
+        selectedCategories: settings.selectedCategories,
+        signal,
+      });
+    })
+      .then((result) => {
         if (!cancelled) reportAutoBlurApplyResult(result.addedCount);
       })
-      .catch((error) => logger.warn('Failed to auto-apply auto-blur targets', error));
+      .catch((error) => {
+        if (!isAutoBlurScanAbortError(error)) {
+          logger.warn('Failed to auto-apply auto-blur targets', error);
+        }
+      });
 
     return () => {
       cancelled = true;
+      cancelFullPageScan('auto-apply');
     };
-  }, [autoApplyAllowed, autoApplyEnabled, frameManager, isApplying, isOpen]);
+  }, [autoApplyAllowed, autoApplyEnabled, cancelFullPageScan, isApplying, isOpen, runFullPageScan]);
 }
 
 export function useAutoBlurSettingsBootstrapEffect(args: {
@@ -105,15 +130,16 @@ export function useAutoBlurScanEffect(args: {
 }
 
 export function useHighlighterModeCloseEffect(args: {
+  autoApplyAllowed: boolean;
   closeForMode: () => void;
   highlighterMode: boolean;
   isOpen: boolean;
 }) {
-  const { closeForMode, highlighterMode, isOpen } = args;
+  const { autoApplyAllowed, closeForMode, highlighterMode, isOpen } = args;
 
   useEffect(() => {
-    if (!highlighterMode && isOpen) {
+    if (!highlighterMode && !autoApplyAllowed && isOpen) {
       closeForMode();
     }
-  }, [closeForMode, highlighterMode, isOpen]);
+  }, [autoApplyAllowed, closeForMode, highlighterMode, isOpen]);
 }

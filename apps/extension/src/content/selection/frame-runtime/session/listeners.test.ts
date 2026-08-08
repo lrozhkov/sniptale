@@ -7,6 +7,7 @@ const listenerMocks = vi.hoisted(() => ({
   addCalloutDeleteListener: vi.fn(),
   addCalloutPopoverSettingsChangedListener: vi.fn(),
   addFocusOpacityChangedListener: vi.fn(),
+  addFutureFrameDefaultsChangedListener: vi.fn(),
   addFrameCalloutChangedListener: vi.fn(),
   addFrameStepBadgeChangedListener: vi.fn(),
   addSessionBlurSettingsChangedListener: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('../../../platform/page-context/frame-events', async (importOriginal) =>
   addCalloutDeleteListener: listenerMocks.addCalloutDeleteListener,
   addCalloutPopoverSettingsChangedListener: listenerMocks.addCalloutPopoverSettingsChangedListener,
   addFocusOpacityChangedListener: listenerMocks.addFocusOpacityChangedListener,
+  addFutureFrameDefaultsChangedListener: listenerMocks.addFutureFrameDefaultsChangedListener,
   addFrameCalloutChangedListener: listenerMocks.addFrameCalloutChangedListener,
   addFrameStepBadgeChangedListener: listenerMocks.addFrameStepBadgeChangedListener,
   addSessionBlurSettingsChangedListener: listenerMocks.addSessionBlurSettingsChangedListener,
@@ -32,11 +34,12 @@ import {
 } from './listeners';
 
 function stubListenerRegistrations() {
-  const cleanups = Array.from({ length: 8 }, () => vi.fn());
+  const cleanups = Array.from({ length: 9 }, () => vi.fn());
   const registrars = [
     listenerMocks.addFocusOpacityChangedListener,
     listenerMocks.addSessionBlurSettingsChangedListener,
     listenerMocks.addSessionFocusSettingsChangedListener,
+    listenerMocks.addFutureFrameDefaultsChangedListener,
     listenerMocks.addFrameStepBadgeChangedListener,
     listenerMocks.addStepBadgeReorderListener,
     listenerMocks.addFrameCalloutChangedListener,
@@ -57,7 +60,9 @@ function createSessionRefs() {
   const focus: FocusSettings = { opacity: 0.5, showBorder: false };
 
   return {
+    globalEffectModeRef: { current: 'border' as const },
     sessionBlurSettingsRef: { current: blur },
+    sessionCalloutStyleRef: { current: null },
     sessionDefaultsInitializedRef: { current: false },
     sessionFocusSettingsRef: { current: focus },
   };
@@ -99,6 +104,8 @@ function expectCleanupAssemblyAndForwarding() {
     frameCalloutHandlers: createFrameCalloutHandlers(),
     frameStepBadgeHandlers: createFrameStepBadgeHandlers(),
     sessionBlurSettingsRef: refs.sessionBlurSettingsRef,
+    globalEffectModeRef: refs.globalEffectModeRef,
+    sessionCalloutStyleRef: refs.sessionCalloutStyleRef,
     sessionDefaultsInitializedRef: refs.sessionDefaultsInitializedRef,
     sessionFocusSettingsRef: refs.sessionFocusSettingsRef,
     syncFocusOpacity,
@@ -129,9 +136,10 @@ function expectCleanupList(
   cleanups: ReturnType<typeof stubListenerRegistrations>,
   listeners: Array<() => void>
 ) {
-  expect(listeners).toHaveLength(9);
+  expect(listeners).toHaveLength(10);
   expect(listeners.slice(0, 3)).toEqual(cleanups.slice(0, 3));
-  expect(listeners.slice(4)).toEqual(cleanups.slice(3));
+  expect(listeners.slice(3, 4)).toEqual(cleanups.slice(3, 4));
+  expect(listeners.slice(5)).toEqual(cleanups.slice(4));
 }
 
 function triggerRegisteredListeners() {

@@ -39,6 +39,7 @@ const treeData = {
 function createProps() {
   return {
     dataContainerRef: { current: null },
+    filterQuery: '',
     getSummaryToneClass: () => 'tone-ok',
     handleDataResizeStart: vi.fn(),
     handleToggleSpoiler: vi.fn(),
@@ -47,6 +48,9 @@ function createProps() {
     isDataResizing: false,
     isDataSpoilerOpen: true,
     isLoading: false,
+    setFilterQuery: vi.fn(),
+    setShowSelectedOnly: vi.fn(),
+    showSelectedOnly: false,
     spoilerSummary: 'summary',
     toggleExpandAll: vi.fn(),
     toggleSelectAll: vi.fn(),
@@ -101,10 +105,14 @@ describe('DataSelectionPreview', () => {
     expect(headerMock).toHaveBeenCalledWith({
       getSummaryToneClass: props.getSummaryToneClass,
       handleToggleSpoiler: props.handleToggleSpoiler,
+      filterQuery: props.filterQuery,
       isAnyExpanded: props.isAnyExpanded,
       isAnySelected: props.isAnySelected,
       isDataSpoilerOpen: props.isDataSpoilerOpen,
       isLoading: props.isLoading,
+      setFilterQuery: props.setFilterQuery,
+      setShowSelectedOnly: props.setShowSelectedOnly,
+      showSelectedOnly: props.showSelectedOnly,
       spoilerSummary: props.spoilerSummary,
       toggleExpandAll: props.toggleExpandAll,
       toggleSelectAll: props.toggleSelectAll,

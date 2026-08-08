@@ -47,6 +47,7 @@ type StepBadgeManualSettingsProps = {
   presets: StepBadgePreset[];
   settings: StepBadgeSettings;
   saveSectionRequest?: number;
+  saveSectionStatus?: string;
   templateSettings: StepBadgeTemplateSettings;
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 };
@@ -60,7 +61,12 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
     { icon: Maximize2, id: 'size', label: translate('content.stepBadge.sizeSection') },
     { icon: Palette, id: 'colors', label: translate('content.stepBadge.colorsSection') },
     { icon: Braces, id: 'css', label: translate('content.stepBadge.cssSection') },
-    { icon: Save, id: 'save', label: translate('content.stepBadge.saveSection') },
+    {
+      icon: Save,
+      id: 'save',
+      label: translate('content.stepBadge.saveSection'),
+      ...(props.saveSectionStatus ? { status: props.saveSectionStatus } : {}),
+    },
   ] as const;
   const renderSection = (section: ManualSection) => {
     if (section === 'numbering') {

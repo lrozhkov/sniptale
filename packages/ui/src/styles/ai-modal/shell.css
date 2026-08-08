@@ -32,6 +32,7 @@
   overflow: hidden;
   animation: sniptale-scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: inherit;
+  overscroll-behavior: contain;
 }
 
 .sniptale-modal-header {
@@ -60,6 +61,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overscroll-behavior: contain;
 }
 
 .sniptale-modal-body-sm {

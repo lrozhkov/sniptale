@@ -104,13 +104,15 @@ describe('FrameSettingsPopoverContent', () => {
     expect(markup).toContain('Default');
   });
 
-  it('exposes a fork only for the selected template and retains visibility actions', () => {
+  it('exposes a one-click fork for every template and retains visibility actions', () => {
     const markup = renderContent('border');
 
     expect(markup).toContain('sniptale-frame-style-section');
     expect(markup).toContain('sniptale-glass-preset-list--scroll');
     expect(markup).toContain('sniptale-frame-style-preset-actions');
     expect(markup).toContain(translate('content.templateFork.fork'));
+    expect(markup.match(/data-frame-style-action="fork"/g)).toHaveLength(2);
+    expect(markup).toContain('data-template-fork-source="preset-2"');
     expect(markup).toContain(translate('content.overlayControls.hideFrameStyle'));
     expect(markup).not.toContain(translate('content.overlayControls.addFrameStyle'));
     expect(markup).not.toContain('sniptale-frame-style-add');

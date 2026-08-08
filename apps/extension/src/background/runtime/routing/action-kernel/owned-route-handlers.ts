@@ -6,6 +6,7 @@ import {
   routeLlmSessionMessage,
   routeScenarioEditorLlmMessage,
 } from '../../../ai/routes';
+import { routeAiSettingsNavigationMessage } from '../../../ai/settings/navigation-route';
 import { routePageAccessMessage } from '../../page-access/route';
 import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
@@ -15,6 +16,7 @@ import { routePopupTabRouteCapabilityRequest } from '../capabilities/popup-tab/r
 import * as contentCaps from '../../../routing-contracts/capabilities/content-action/route';
 import type { ContentSenderBinding } from '../../../routing-contracts/capabilities/content-action/capability-store';
 import {
+  getAnnotationForkSessionSenderBinding,
   getContentActionCapabilityIssuanceSenderBinding,
   getContentRuntimeWakeupSenderBinding,
   type BackgroundOwnedRouteContext,
@@ -24,6 +26,7 @@ import type { BackgroundOwnedRouteHandlerId } from '../../../routing-contracts/o
 import type { ActionResult, BackgroundOwnedAction } from './types';
 import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
+import { routeAnnotationForkSessionMessage } from '../../../annotation-fork-session/route';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -67,6 +70,10 @@ function getBackgroundOwnedRouteHandler(
       return routeAiSettingsQueryAction;
     case 'ai-settings-mutation':
       return routeAiSettingsMutationAction;
+    case 'ai-settings-navigation':
+      return routeAiSettingsNavigationAction;
+    case 'annotation-fork-session':
+      return routeAnnotationForkSessionAction;
     case 'content-action-capability-issuance':
       return routeContentActionCapabilityIssuance;
     case 'content-runtime-wakeup':
@@ -135,6 +142,28 @@ function routeAiSettingsMutationAction(action: BackgroundOwnedAction): ActionRes
       action.context.sender,
       action.context.sendResponse
     )
+  );
+}
+
+function routeAiSettingsNavigationAction(
+  action: BackgroundOwnedAction,
+  routeContext: BackgroundOwnedRouteContext | null
+): ActionResult | null {
+  return keepOpen(
+    routeAiSettingsNavigationMessage(action.message, action.context.sendResponse, routeContext)
+  );
+}
+
+function routeAnnotationForkSessionAction(
+  action: BackgroundOwnedAction,
+  routeContext: BackgroundOwnedRouteContext | null
+): ActionResult | null {
+  return keepOpen(
+    routeAnnotationForkSessionMessage({
+      message: action.message,
+      senderBinding: getAnnotationForkSessionSenderBinding(routeContext, action.message),
+      sendResponse: action.context.sendResponse,
+    })
   );
 }
 

@@ -12,9 +12,16 @@ import { useInteractiveFramePropSync } from './lifecycle';
 let latestIsCalloutEditing = false;
 let latestViewState: ReturnType<typeof useInteractiveFrameViewState> | null = null;
 
-function Harness(props: { frameId: string; withCallout?: boolean }) {
+function Harness(props: { calloutEnabled?: boolean; frameId: string; withCallout?: boolean }) {
   const frame = createFrameDataFixture(props.frameId, {
-    ...(props.withCallout ? { callout: createDefaultFrameCallout() } : {}),
+    ...(props.withCallout
+      ? {
+          callout: {
+            ...createDefaultFrameCallout(),
+            enabled: props.calloutEnabled ?? true,
+          },
+        }
+      : {}),
   });
   latestViewState = useInteractiveFrameViewState({
     defaultEffectMode: 'border',
@@ -67,6 +74,22 @@ it('adopts a newly enabled primary callout while its editor is already requested
   act(() => root.render(<Harness frameId="frame-1" />));
   act(() => latestViewState?.setIsCalloutEditing(true));
   act(() => root.render(<Harness frameId="frame-1" withCallout />));
+
+  expect(latestViewState?.isCalloutEditing).toBe(true);
+  expect(latestViewState?.tempFrame.callout).toMatchObject({ enabled: true });
+
+  act(() => root.unmount());
+});
+
+it('replaces a disabled local primary callout when the owner enables it again', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  act(() => root.render(<Harness calloutEnabled={false} frameId="frame-1" withCallout />));
+  act(() => latestViewState?.setIsCalloutEditing(true));
+  act(() => root.render(<Harness calloutEnabled frameId="frame-1" withCallout />));
 
   expect(latestViewState?.isCalloutEditing).toBe(true);
   expect(latestViewState?.tempFrame.callout).toMatchObject({ enabled: true });

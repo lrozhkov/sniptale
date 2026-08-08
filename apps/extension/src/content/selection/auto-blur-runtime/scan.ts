@@ -7,6 +7,7 @@ import type { AutoBlurDetectionCandidate, AutoBlurMatch, AutoBlurScanInput } fro
 import { collectVisibleAutoBlurTextSources, getAutoBlurTextSourceRangeRects } from './visible-text';
 import { ruleAutoBlurDetector } from './detectors/rule-detector';
 import { visitAutoBlurPageViewports } from './full-page';
+import { throwIfAutoBlurScanAborted } from './cancellation';
 
 function createDetectionCandidate(
   detection: AutoBlurDetection,
@@ -82,8 +83,10 @@ export async function scanAutoBlurTargets(
   input: AutoBlurScanInput,
   detector: AutoBlurDetector = ruleAutoBlurDetector
 ) {
+  throwIfAutoBlurScanAborted(input.signal);
   const candidates: AutoBlurDetectionCandidate[] = [];
   const collectCandidates = (scrollDelta: { x: number; y: number }) => {
+    throwIfAutoBlurScanAborted(input.signal);
     const sources = collectVisibleAutoBlurTextSources();
     candidates.push(
       ...detector
@@ -94,7 +97,7 @@ export async function scanAutoBlurTargets(
   };
 
   if (input.mode === 'full-page') {
-    await visitAutoBlurPageViewports(collectCandidates);
+    await visitAutoBlurPageViewports(collectCandidates, input.signal);
   } else {
     collectCandidates({ x: 0, y: 0 });
   }

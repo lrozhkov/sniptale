@@ -116,6 +116,10 @@ export function retainSniptaleId(id: string): void {
   }
 }
 
+export function isSniptaleIdRetained(id: string | null | undefined): boolean {
+  return Boolean(id && retainedSniptaleIds.has(id));
+}
+
 export function releaseSniptaleId(id: string): void {
   retainedSniptaleIds.delete(id);
 }

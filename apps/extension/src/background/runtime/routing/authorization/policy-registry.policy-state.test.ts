@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 
 import { authorizationPolicyRegistry } from './policy-registry';
+import { backgroundOwnedRouteInventory } from '../action-kernel/owned-route-inventory';
+import { BACKGROUND_OWNED_POLICY_STATE_IDS } from './policy-registry.policy-state';
 import {
   hasPolicyStateDescriptor,
   policyStateRegistry,
@@ -34,4 +36,19 @@ it('references policy-state ids with exactly one descriptor', () => {
       expect(descriptorCountById.get(policyStateId), `${entry.key}:${policyStateId}`).toBe(1);
     }
   }
+});
+
+it('includes annotation-fork route policy state in background-owned authorization state', () => {
+  const annotationForkRoute = backgroundOwnedRouteInventory.find(
+    (entry) => entry.handlerId === 'annotation-fork-session'
+  );
+  if (!annotationForkRoute) {
+    throw new Error('Expected annotation fork route inventory entry');
+  }
+  const authorizedPolicyStateIds = new Set(BACKGROUND_OWNED_POLICY_STATE_IDS);
+  const missingPolicyStateIds = annotationForkRoute.policyStateIds.filter(
+    (policyStateId) => !authorizedPolicyStateIds.has(policyStateId)
+  );
+
+  expect(missingPolicyStateIds).toEqual([]);
 });

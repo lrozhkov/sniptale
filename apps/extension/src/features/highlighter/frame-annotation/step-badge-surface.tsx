@@ -89,7 +89,7 @@ export function getStepBadgeStyle(props: {
     pointerEvents: 'auto',
     cursor: props.clickable ? 'pointer' : 'default',
     boxShadow: shadow?.stepBadgeBoxShadow,
-    border: `2px solid ${visual.outlineColor}`,
+    border: `${visual.outlineWidth}px solid ${visual.outlineColor}`,
     userSelect: 'none',
     WebkitUserSelect: 'none',
     transition: props.isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.15s ease-out',

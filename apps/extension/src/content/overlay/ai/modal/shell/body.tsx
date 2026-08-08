@@ -48,9 +48,7 @@ export function AIModalContent({
         promptField={renderAIModalPromptField({
           disabled: Boolean(isLoading),
           handleKeyDown,
-          onSubmit: handleSubmit,
           state,
-          submitDisabled: footerProps.disabledSubmit,
         })}
         state={state}
         title={<AIModalHeaderTitle {...(treeData === undefined ? {} : { treeData })} />}
@@ -59,7 +57,7 @@ export function AIModalContent({
         {...(onCancelLoading === undefined ? {} : { onCancelLoading })}
         {...(treeData === undefined ? {} : { treeData })}
       >
-        <AIModalFooter {...footerProps} />
+        {isLoading ? null : <AIModalFooter {...footerProps} />}
       </AIModalDialog>
       <AIModalTemplateEditor
         onClose={() => state.setIsEditorOpen(false)}

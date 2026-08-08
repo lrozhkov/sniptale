@@ -14,6 +14,7 @@ type AutoBlurStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 type AutoBlurSessionState = {
   autoApplyEnabled: boolean;
   blurSettings: BlurSettings;
+  enableAutoApplyOnApply: boolean;
   errorMessage: TranslationKey | null;
   isApplying: boolean;
   isOpen: boolean;
@@ -32,6 +33,7 @@ type AutoBlurSessionAction =
   | { type: 'closed' }
   | { type: 'error-reported'; message: TranslationKey }
   | { type: 'mode-closed' }
+  | { type: 'opened-for-auto-apply' }
   | { type: 'opened' }
   | { type: 'scan-failed' }
   | { type: 'scan-started'; settings: AutoBlurSettings }
@@ -45,6 +47,7 @@ function createInitialState(): AutoBlurSessionState {
   return {
     autoApplyEnabled: DEFAULT_AUTO_BLUR_SETTINGS.autoApplyEnabled,
     blurSettings: { ...DEFAULT_AUTO_BLUR_SETTINGS.blurSettings },
+    enableAutoApplyOnApply: false,
     errorMessage: null,
     isApplying: false,
     isOpen: false,
@@ -59,10 +62,14 @@ function resetSelection(
   state: AutoBlurSessionState,
   settings: AutoBlurSettings
 ): AutoBlurSessionState {
+  const blurSettings = {
+    ...settings.blurSettings,
+    ...(state.enableAutoApplyOnApply ? { showBorder: false } : {}),
+  };
   return {
     ...state,
     autoApplyEnabled: settings.autoApplyEnabled,
-    blurSettings: { ...settings.blurSettings },
+    blurSettings,
     selectedCategories: new Set(settings.selectedCategories),
     selectedMatchIds: new Set(),
   };
@@ -97,13 +104,26 @@ function reduceAutoBlurSession(
     case 'blur-settings-changed':
       return { ...state, blurSettings: action.settings };
     case 'closed':
-      return { ...state, errorMessage: null, isApplying: false, isOpen: false };
+      return {
+        ...state,
+        enableAutoApplyOnApply: false,
+        errorMessage: null,
+        isApplying: false,
+        isOpen: false,
+      };
     case 'error-reported':
       return { ...state, errorMessage: action.message };
     case 'mode-closed':
-      return { ...state, isOpen: false };
+      return { ...state, enableAutoApplyOnApply: false, isOpen: false };
+    case 'opened-for-auto-apply':
+      return {
+        ...state,
+        blurSettings: { ...state.blurSettings, showBorder: false },
+        enableAutoApplyOnApply: true,
+        isOpen: true,
+      };
     case 'opened':
-      return { ...state, isOpen: true };
+      return { ...state, enableAutoApplyOnApply: false, isOpen: true };
     case 'scan-failed':
       return { ...state, matches: [], status: 'error' };
     case 'scan-started':
@@ -170,6 +190,7 @@ export function useAutoBlurSession() {
       failScan: useCallback(() => dispatch({ type: 'scan-failed' }), []),
       finishApplying: useCallback(() => dispatch({ type: 'apply-finished' }), []),
       open: useCallback(() => dispatch({ type: 'opened' }), []),
+      openForAutoApply: useCallback(() => dispatch({ type: 'opened-for-auto-apply' }), []),
       reportError: useCallback(
         (message: TranslationKey) => dispatch({ type: 'error-reported', message }),
         []

@@ -9,6 +9,10 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     ru: 'Открыть панель действий рамки',
     en: 'Open frame actions',
   },
+  closeToolbar: {
+    ru: 'Закрыть панель',
+    en: 'Close toolbar',
+  },
   frameSettings: {
     ru: 'Настройки рамки',
     en: 'Frame settings',
@@ -118,8 +122,8 @@ export const contentInteractiveFrameMessages = defineMessageSource({
     en: 'Move the pointer end along the frame edge',
   },
   moveCommentRoutePoint: {
-    ru: 'Переместить точку маршрута · Shift — шаг 15° · Delete или двойной клик — сбросить',
-    en: 'Move route point · Shift snaps by 15° · Delete or double-click resets it',
+    ru: 'Переместить точку маршрута · Привязка к прямому входу · Ctrl — свободно · Shift — шаг 15° · Delete или двойной клик — сбросить',
+    en: 'Move route point · Snaps to perpendicular entry · Ctrl moves freely · Shift snaps by 15° · Delete or double-click resets it',
   },
   moveCommentCurveStart: {
     ru: 'Изменить начало кривой',

@@ -10,22 +10,12 @@
  * This is the interactive-chrome subset of the capture-hidden contract below. Geometry previews
  * stay in page scale so their rectangles keep matching the DOM; controls remain physically stable.
  */
-.sniptale-toolbar,
 .sniptale-show-toolbar-button,
-.sniptale-toolbar-portal-wrapper,
-.sniptale-main-toolbar-popover,
-.sniptale-frame-toolbar-bridge,
-.sniptale-frame-settings-popover,
 .sniptale-frame-style-editor-layer,
 [data-floating-ui-capture-transient='true'],
-.sniptale-step-badge-popover,
-.sniptale-callout-settings-popover,
 .sniptale-callout-format-toolbar,
-.sniptale-content-size-tooltip,
 .sniptale-resize-handle,
-.sniptale-callout-adjacent-controls,
 .sniptale-callout-tail-handle,
-.sniptale-step-badge-controls,
 .sniptale-modal,
 .sniptale-scenario-recorder-sidebar,
 [data-ui='content.design-review.popover'],
@@ -36,6 +26,42 @@
   scale: var(--sniptale-content-ui-scale);
 }
 
+/*
+ * Toolbar and settings surfaces use layout zoom inside an unscaled positioner. Unlike a
+ * compositor scale, this keeps borders, controls, text and native scrollbars rasterized at their
+ * final physical size even at Chrome's 25% page zoom.
+ */
+.sniptale-content-ui-zoom-surface {
+  zoom: var(--sniptale-content-ui-scale);
+}
+
+.sniptale-toolbar-positioner,
+.sniptale-content-popover-positioner,
+.sniptale-content-ui-positioner,
+.sniptale-content-size-tooltip-positioner {
+  transform: none;
+  scale: none;
+  transform-origin: top left;
+}
+
+.sniptale-toolbar-positioner {
+  display: inline-block;
+  width: max-content;
+  height: max-content;
+}
+
+.sniptale-content-ui-positioner,
+.sniptale-content-size-tooltip-positioner {
+  display: inline-block;
+  width: max-content;
+  height: max-content;
+}
+
+.sniptale-toolbar-positioner > .sniptale-toolbar {
+  position: relative;
+  inset: auto;
+}
+
 [data-floating-ui-capture-transient='true'] {
   transform-origin: top left;
 }
@@ -43,7 +69,6 @@
 .sniptale-toolbar,
 .sniptale-toolbar-portal-wrapper,
 .sniptale-main-toolbar-popover,
-.sniptale-frame-toolbar-bridge,
 .sniptale-frame-settings-popover,
 .sniptale-step-badge-popover,
 .sniptale-callout-settings-popover,
@@ -126,6 +151,18 @@
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
+}
+
+:where(
+    .sniptale-main-toolbar-popover,
+    .sniptale-frame-settings-popover,
+    .sniptale-step-badge-popover,
+    .sniptale-callout-settings-popover
+  )
+  ::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,

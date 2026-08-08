@@ -88,4 +88,31 @@ describe('toolbar system tooltips', () => {
     expect(settingsButton?.getAttribute('title')).toBe('Настройки панели');
     expect(settingsButton?.getAttribute('data-tooltip')).toBeNull();
   });
+
+  it('does not present the settings trigger as an active mode while its menu is open', () => {
+    const toolbarMenuState = createClosedToolbarMenuState();
+    toolbarMenuState.activeMenuType = 'settings';
+    renderNode(
+      <ToolbarSettingsMenu
+        compactMenus={false}
+        pinToTab={false}
+        pinToTabAvailable={true}
+        pinToTabLocked={false}
+        screenshotMode
+        displayMode="horizontal"
+        toolbarMenuState={toolbarMenuState}
+        onClose={() => undefined}
+        onCompactMenusChange={() => undefined}
+        onDisableScreenshotMode={() => undefined}
+        onDisplayModeChange={() => undefined}
+        onPinToTabChange={() => undefined}
+      />
+    );
+
+    const settingsButton = document.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.settings-button"]'
+    );
+    expect(settingsButton?.getAttribute('aria-expanded')).toBe('true');
+    expect(settingsButton?.getAttribute('data-active')).toBeNull();
+  });
 });

@@ -37,6 +37,24 @@ describe('callout settings views', () => {
     });
   });
 
+  it('offers creating a copy from every template, including the inactive ones', () => {
+    const presets = createSystemCalloutPresetCatalog().slice(0, 2);
+    const markup = renderToStaticMarkup(
+      <CalloutPresetSection
+        activePresetId={presets[0]!.id}
+        error={null}
+        onApplyPreset={vi.fn()}
+        onForkPreset={vi.fn()}
+        onTogglePreset={vi.fn()}
+        pendingPresetIds={new Set()}
+        presets={presets}
+      />
+    );
+
+    expect(markup.match(/data-template-fork-source=/g)).toHaveLength(2);
+    expect(markup).toContain(`data-template-fork-source="${presets[1]!.id}"`);
+  });
+
   it('renders the two editing modes without preset persistence controls', () => {
     const markup = renderToStaticMarkup(
       <CalloutSettingsPopoverContent
@@ -107,6 +125,8 @@ describe('callout settings views', () => {
     expect(markup).toContain('aria-label="Параметры комментария"');
     expect(markup).toContain('Назад к шаблонам');
     expect(markup).toContain('Не сохранено');
+    expect(markup).toContain('data-ui="shared.categorized-inspector.section-status"');
+    expect(markup).not.toContain('sniptale-settings-popover-status');
     expect(markup).toContain('data-ui="shared.highlighter-manual-inspector-surface"');
     expect(markup).toContain('data-ui="shared.categorized-inspector.section-heading"');
     expect(markup).toContain('>Текст</span>');
@@ -233,8 +253,9 @@ describe('callout settings shared interactions', () => {
     });
 
     expect(onApplyPreset).toHaveBeenCalledWith(presets[0]);
-    expect(onForkPreset).toHaveBeenCalledOnce();
+    expect(onForkPreset).toHaveBeenCalledTimes(2);
     expect(onForkPreset).toHaveBeenCalledWith(presets[0]);
+    expect(onForkPreset).toHaveBeenCalledWith(presets[1]);
     expect(onResetPreset).toHaveBeenCalledWith(presets[0]);
     expect(onTogglePreset).toHaveBeenCalledTimes(1);
     expect(host.querySelector('[role="alert"]')?.textContent).toBe('catalog failed');

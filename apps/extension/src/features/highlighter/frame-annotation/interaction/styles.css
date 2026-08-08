@@ -36,6 +36,7 @@
 .sniptale-step-badge-settings-handle:focus-visible,
 .sniptale-callout-tail-handle:hover,
 .sniptale-callout-tail-handle:focus-visible {
+  outline: none !important;
   border-color: var(--sniptale-color-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 20%, transparent) !important;
 }

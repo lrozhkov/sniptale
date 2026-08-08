@@ -193,6 +193,12 @@ async function verifiesLegacyStrokeOpacityFoldAndCanonicalSave() {
 }
 
 describe('auto-blur storage', () => {
+  it('keeps frame and fill disabled in the auto-blur defaults', async () => {
+    const module = await loadStorage();
+
+    expect(module.DEFAULT_AUTO_BLUR_SETTINGS.blurSettings.showBorder).toBe(false);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();

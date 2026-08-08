@@ -1,8 +1,14 @@
 import { expect, it, vi } from 'vitest';
 
 const pinSessionMocks = vi.hoisted(() => ({
+  clearAnnotationForkSessionForTab: vi.fn(),
   clearPinnedToolbarOperationState: vi.fn(),
   clearPinToTabSessionStorageState: vi.fn(),
+}));
+
+vi.mock('../../../annotation-fork-session/route', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../annotation-fork-session/route')>()),
+  clearAnnotationForkSessionForTab: pinSessionMocks.clearAnnotationForkSessionForTab,
 }));
 
 vi.mock(
@@ -37,6 +43,7 @@ const logger = {
 it('restores screenshot ownership before clearing mode state on tab removal', async () => {
   const state = createModeState();
   pinSessionMocks.clearPinToTabSessionStorageState.mockResolvedValue(undefined);
+  pinSessionMocks.clearAnnotationForkSessionForTab.mockResolvedValue(undefined);
 
   registerTabLifecycleListeners(state, logger);
   removedListenerRef.current?.(7);
@@ -56,6 +63,7 @@ it('restores screenshot ownership before clearing mode state on tab removal', as
   expect(handleTabClose).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearPinnedToolbarOperationState).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearPinToTabSessionStorageState).toHaveBeenCalledWith(7);
+  expect(pinSessionMocks.clearAnnotationForkSessionForTab).toHaveBeenCalledWith(7);
   expect(logger.log).toHaveBeenCalledWith('Tab closed, state cleared', 7);
 });
 

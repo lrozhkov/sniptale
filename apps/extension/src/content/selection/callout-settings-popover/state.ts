@@ -148,10 +148,18 @@ export function useCalloutSettingsPopoverState(args: {
     });
   };
 
+  const forkPreset = (preset: CalloutPreset) => {
+    handleSettingChange({
+      content: { titleText: preset.content.titleText },
+      sourcePresetId: undefined,
+      style: cloneCalloutStyle(preset.style),
+    });
+  };
+
   return {
     handleSettingChange,
     applyPreset,
-    forkPreset: (_preset: CalloutPreset) => handleSettingChange({ sourcePresetId: undefined }),
+    forkPreset,
     markTemplateCreated: (sourcePresetId: string) => handleSettingChange({ sourcePresetId }),
     localSettings,
   };

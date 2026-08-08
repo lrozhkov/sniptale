@@ -3,6 +3,7 @@ import { contentCalloutMessages } from './callout';
 import { contentInteractiveFrameMessages } from './interactive-frame';
 import { contentOverlayControlsMessages } from './overlay-controls';
 import { contentDesignReviewMessages } from './design-review';
+import { contentExportReadmeMessages } from './export-readme';
 import { contentRuntimeMessages } from './runtime';
 import { contentSaveDialogMessages } from './save-dialog';
 import { contentStepBadgeMessages } from './step-badge';
@@ -21,4 +22,5 @@ export const contentMessages = defineMessageSource({
   interactiveFrame: contentInteractiveFrameMessages,
   overlayControls: contentOverlayControlsMessages,
   designReview: contentDesignReviewMessages,
+  exportReadme: contentExportReadmeMessages,
 });

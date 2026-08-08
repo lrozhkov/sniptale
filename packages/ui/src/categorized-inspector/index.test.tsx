@@ -82,6 +82,27 @@ it('optionally shows the active section label above its controls', () => {
   expect(container.querySelector('[data-heading-control="fill"]')).not.toBeNull();
 });
 
+it('shows a compact section status in the navigation instead of consuming header space', () => {
+  act(() => {
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Template settings"
+        initialSection="outline"
+        renderSection={(section) => <div data-section={section}>{section}</div>}
+        sections={[
+          sections[0],
+          { id: 'save', label: 'Save', icon: () => <span>S</span>, status: 'Unsaved' },
+        ]}
+      />
+    );
+  });
+
+  const status = container.querySelector('[data-ui="shared.categorized-inspector.section-status"]');
+  expect(status?.textContent).toBe('Unsaved');
+  expect(status?.getAttribute('title')).toBe('Unsaved');
+  expect(status?.closest('nav')).not.toBeNull();
+});
+
 it('wraps arrow navigation and ignores unrelated keys', () => {
   act(() => {
     root.render(

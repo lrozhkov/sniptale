@@ -65,6 +65,8 @@ describe('callout interaction handles', () => {
     const markup = renderToStaticMarkup(renderCalloutInteractionHandles(createProps()));
 
     expect(markup).toContain('sniptale-callout-adjacent-controls');
+    expect(markup).toContain('sniptale-callout-adjacent-controls-positioner');
+    expect(markup).toContain('sniptale-content-ui-zoom-surface');
     expect(markup).toContain('sniptale-callout-drag-handle');
     expect(markup).toContain('sniptale-callout-settings-handle');
     expect(markup).toContain('sniptale-callout-tail-handle');

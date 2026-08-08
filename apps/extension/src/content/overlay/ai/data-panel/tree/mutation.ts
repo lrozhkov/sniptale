@@ -12,7 +12,7 @@ function isNodeSelected(next: Map<string, TreeNodeState>, id: string, fallback =
   return next.get(id)?.selected ?? fallback;
 }
 
-function syncAncestorSelection(next: Map<string, TreeNodeState>, treeData: ParsedDOMTree) {
+export function syncAncestorSelection(next: Map<string, TreeNodeState>, treeData: ParsedDOMTree) {
   treeData.structure.forEach((section) => {
     const sectionSelected = section.children.some((child) => {
       if (child.type === 'field') {

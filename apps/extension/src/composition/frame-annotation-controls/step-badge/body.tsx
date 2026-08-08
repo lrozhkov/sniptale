@@ -12,6 +12,7 @@ import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/h
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
 import { createTemplateSourceAction, type TemplateSourceControl } from '../popover/template-source';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
+import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
 
 export function StepBadgePopoverContent(props: {
   frameId: string;
@@ -20,6 +21,7 @@ export function StepBadgePopoverContent(props: {
   isAuto: boolean;
   localStepBadgeSettings: StepBadgeSettings;
   onClose: () => void;
+  onApplyToFuture?: () => void;
   onFloatingInteractionChange?: (open: boolean) => void;
   onAlphabetChange: (alphabet: 'cyrillic' | 'latin') => void;
   onAnchorChange: (anchor: StepBadgeAnchor) => void;
@@ -64,6 +66,7 @@ export function StepBadgePopoverContent(props: {
     onShowTemplates: props.onShowPresets,
     templates: props.presets,
   });
+  const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
 
   return (
     <>
@@ -73,6 +76,16 @@ export function StepBadgePopoverContent(props: {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
                 onClick: workflow.requestTemplates,
+              },
+            }
+          : {})}
+        {...(workflow.mode === 'temporary' &&
+        props.headerContext === 'element' &&
+        props.onApplyToFuture
+          ? {
+              applyToFutureAction: {
+                label: translate('content.templateFork.applyToFuture'),
+                onClick: applyToFuture.request,
               },
             }
           : {})}
@@ -94,12 +107,14 @@ export function StepBadgePopoverContent(props: {
           : {})}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
-        {...(workflow.mode === 'temporary'
-          ? { status: translate('content.templateFork.temporaryStatus') }
-          : {})}
         title={translate('content.stepBadge.settingsTitle')}
       />
-      {workflow.confirmingReturn ? (
+      {applyToFuture.confirming ? (
+        <ApplyToFutureFramesGuard
+          onCancel={applyToFuture.cancel}
+          onConfirm={applyToFuture.confirm}
+        />
+      ) : workflow.confirmingReturn ? (
         <TemplateForkReturnGuard
           onContinue={workflow.continueEditing}
           onDiscard={workflow.discard}
@@ -128,6 +143,9 @@ export function StepBadgePopoverContent(props: {
       ) : (
         <StepBadgeManualSettings
           {...props}
+          {...(workflow.mode === 'temporary'
+            ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
+            : {})}
           onTemplateCreated={(templateId) => {
             props.onTemplateCreated?.(templateId);
             workflow.completeSave();

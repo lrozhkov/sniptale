@@ -55,6 +55,7 @@ export interface ToolbarAutoBlurProps {
   autoApplyEnabled: boolean;
   isApplying: boolean;
   onApplyOnce: () => Promise<void>;
+  onOpenAutoApplySettings: () => void;
   onOpenSettings: () => void;
   onToggleAutoApply: () => Promise<void>;
 }

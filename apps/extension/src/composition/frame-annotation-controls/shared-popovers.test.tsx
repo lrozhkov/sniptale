@@ -147,9 +147,9 @@ it('renders both shared element popovers as interactive draggable surfaces', asy
 
   const popovers = portal?.querySelectorAll<HTMLElement>('.sniptale-content-popover');
   expect(popovers).toHaveLength(3);
-  expect(Array.from(popovers ?? []).every((item) => item.style.pointerEvents === 'auto')).toBe(
-    true
-  );
+  expect(
+    Array.from(popovers ?? []).every((item) => item.parentElement?.style.pointerEvents === 'auto')
+  ).toBe(true);
   expect(
     Array.from(popovers ?? []).every(
       (item) =>

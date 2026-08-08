@@ -38,10 +38,17 @@ function createProps() {
     isAnySelected: false,
     isDataResizing: false,
     isDataSpoilerOpen: true,
+    isFilteredSelectionComplete: false,
     isLoading: false,
     spoilerSummary: 'summary',
+    filterQuery: '',
+    filteredTreeData: treeData,
+    setFilterQuery: vi.fn(),
+    setShowSelectedOnly: vi.fn(),
+    showSelectedOnly: false,
     toggleExpandAll: vi.fn(),
     toggleSelectAll: vi.fn(),
+    toggleSelectFiltered: vi.fn(),
     treeData,
     treeRenderProps: {
       excludedColumns: new Map(),
@@ -88,6 +95,18 @@ describe('DataSelectionArea', () => {
 
     await renderNode(<DataSelectionArea {...props} />);
 
-    expect(previewMock).toHaveBeenCalledWith(props);
+    const {
+      filteredTreeData,
+      isFilteredSelectionComplete: _isFilteredSelectionComplete,
+      toggleSelectFiltered,
+      toggleSelectAll: _toggleSelectAll,
+      ...rest
+    } = props;
+    expect(previewMock).toHaveBeenCalledWith({
+      ...rest,
+      isAnySelected: props.isFilteredSelectionComplete,
+      toggleSelectAll: toggleSelectFiltered,
+      treeData: filteredTreeData,
+    });
   });
 });

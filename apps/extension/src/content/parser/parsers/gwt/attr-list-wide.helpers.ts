@@ -147,7 +147,7 @@ export function buildVirtualWideField(
   const field = buildWideAttributeField(ctx, valueEl, label, embeddedContent, {
     evidenceSource: 'virtual-dom',
   });
-  wideCell.setAttribute('data-sniptale-id', `${field.id}_wide`);
+  setSniptaleId(wideCell, `${field.id}_wide`);
   return [field];
 }
 

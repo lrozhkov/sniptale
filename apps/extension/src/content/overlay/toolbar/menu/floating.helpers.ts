@@ -7,6 +7,7 @@ import {
   readContentUiScaleCompensation,
   resolveContentUiViewport,
 } from '@sniptale/ui/floating-interactions/scale';
+import { registerToolbarMenuEscapeOwner } from '../state/menu';
 
 const TOOLBAR_MENU_GAP_PX = 10;
 export const TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX = 250;
@@ -177,7 +178,6 @@ function resolveVerticalToolbarFloatingMenuTop(
 }
 
 function bindToolbarFloatingMenuDismissalHandlers(handlers: {
-  handleEscape: (event: KeyboardEvent) => void;
   handleFocusIn: (event: FocusEvent) => void;
   handlePointerDown: (event: PointerEvent) => void;
   handlePointerMove?: ((event: MouseEvent) => void) | undefined;
@@ -188,7 +188,6 @@ function bindToolbarFloatingMenuDismissalHandlers(handlers: {
     document.addEventListener('mousemove', handlers.handlePointerMove);
   }
   document.addEventListener('focusin', handlers.handleFocusIn, true);
-  window.addEventListener('keydown', handlers.handleEscape, true);
   window.addEventListener('resize', handlers.handleViewportChange);
   window.addEventListener('scroll', handlers.handleViewportChange, true);
 
@@ -198,7 +197,6 @@ function bindToolbarFloatingMenuDismissalHandlers(handlers: {
       document.removeEventListener('mousemove', handlers.handlePointerMove);
     }
     document.removeEventListener('focusin', handlers.handleFocusIn, true);
-    window.removeEventListener('keydown', handlers.handleEscape, true);
     window.removeEventListener('resize', handlers.handleViewportChange);
     window.removeEventListener('scroll', handlers.handleViewportChange, true);
   };
@@ -240,12 +238,6 @@ export function useToolbarFloatingMenuDismissal(params: {
       }
     };
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
     const handleViewportChange = () => {
       onClose();
     };
@@ -264,12 +256,16 @@ export function useToolbarFloatingMenuDismissal(params: {
         }
       : undefined;
 
-    return bindToolbarFloatingMenuDismissalHandlers({
-      handleEscape,
+    const unregisterEscapeOwner = registerToolbarMenuEscapeOwner(onClose);
+    const unbindHandlers = bindToolbarFloatingMenuDismissalHandlers({
       handleFocusIn,
       handlePointerDown,
       handlePointerMove,
       handleViewportChange,
     });
+    return () => {
+      unregisterEscapeOwner();
+      unbindHandlers();
+    };
   }, [closeOnFarPointer, menuRef, onClose, onFarPointerClose, open, triggerRef]);
 }

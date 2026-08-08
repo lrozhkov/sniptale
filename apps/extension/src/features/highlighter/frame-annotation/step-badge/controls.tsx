@@ -67,60 +67,63 @@ export function FrameStepBadgeControls(props: {
   };
   return createPortal(
     <div
-      className="sniptale-step-badge-controls"
+      className="sniptale-step-badge-controls-positioner sniptale-content-ui-positioner"
       data-theme={props.portalTheme ?? undefined}
       style={mergeThemeScopedStyle(props.portalTheme, {
         position: 'fixed',
         left: props.position.x,
         top: props.position.y,
-        display: 'flex',
-        gap: 4,
         zIndex: FRAME_ANNOTATION_Z_INDEX.stepBadge,
         opacity: props.visibility.isVisible ? 1 : 0,
         pointerEvents: props.visibility.isVisible ? 'auto' : 'none',
       })}
-      onMouseEnter={props.visibility.handleMouseEnter}
-      onMouseLeave={props.visibility.handleMouseLeave}
     >
-      <button
-        type="button"
-        className="sniptale-step-badge-move-handle"
-        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-        aria-label={translate('content.interactiveFrame.moveStepBadge')}
-        title={translate('content.interactiveFrame.moveStepBadge')}
-        style={{ ...buttonStyle, cursor: props.drag.isDragging ? 'grabbing' : 'grab' }}
-        onPointerDown={props.drag.handlePointerDown}
-        onKeyDown={props.drag.handleKeyDown}
-        onFocus={props.visibility.handleFocus}
-        onBlur={props.visibility.handleBlur}
+      <div
+        className="sniptale-step-badge-controls sniptale-content-ui-zoom-surface"
+        style={{ display: 'flex', gap: 4 }}
+        onMouseEnter={props.visibility.handleMouseEnter}
+        onMouseLeave={props.visibility.handleMouseLeave}
       >
-        <Move size={14} aria-hidden="true" />
-      </button>
-      {props.showSettingsHandle ? (
         <button
-          {...(props.settingsAnchorRef ? { ref: props.settingsAnchorRef } : {})}
           type="button"
-          className="sniptale-step-badge-settings-handle"
-          aria-label={translate('content.interactiveFrame.stepBadgeSettings')}
-          title={translate('content.interactiveFrame.stepBadgeSettings')}
-          style={{ ...buttonStyle, cursor: 'pointer' }}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            event.nativeEvent.stopImmediatePropagation();
-          }}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            event.nativeEvent.stopImmediatePropagation();
-            props.onSettingsClick?.();
-          }}
+          className="sniptale-step-badge-move-handle"
+          aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+          aria-label={translate('content.interactiveFrame.moveStepBadge')}
+          title={translate('content.interactiveFrame.moveStepBadge')}
+          style={{ ...buttonStyle, cursor: props.drag.isDragging ? 'grabbing' : 'grab' }}
+          onPointerDown={props.drag.handlePointerDown}
+          onKeyDown={props.drag.handleKeyDown}
           onFocus={props.visibility.handleFocus}
           onBlur={props.visibility.handleBlur}
         >
-          <Settings2 size={15} aria-hidden="true" />
+          <Move size={14} aria-hidden="true" />
         </button>
-      ) : null}
+        {props.showSettingsHandle ? (
+          <button
+            {...(props.settingsAnchorRef ? { ref: props.settingsAnchorRef } : {})}
+            type="button"
+            className="sniptale-step-badge-settings-handle"
+            aria-label={translate('content.interactiveFrame.stepBadgeSettings')}
+            title={translate('content.interactiveFrame.stepBadgeSettings')}
+            style={{ ...buttonStyle, cursor: 'pointer' }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.nativeEvent.stopImmediatePropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.nativeEvent.stopImmediatePropagation();
+              props.onSettingsClick?.();
+            }}
+            onFocus={props.visibility.handleFocus}
+            onBlur={props.visibility.handleBlur}
+          >
+            <Settings2 size={15} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
     </div>,
     props.portalTarget
   );

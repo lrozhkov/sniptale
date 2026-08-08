@@ -155,6 +155,17 @@ function registerSelectionAndResetTest() {
 }
 
 function registerKeyboardCommandTest() {
+  it('keeps selection mode active when toolbar UI already claimed Escape', () => {
+    const state = createState({ currentState: 'confirmed' });
+    const options = createOptions();
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    event.preventDefault();
+
+    handleSelectionModeKeyDown(event, state, options);
+
+    expect(options.cancelSelection).not.toHaveBeenCalled();
+  });
+
   it('ignores editor inputs and maps Escape and Enter to cancel and confirm', () => {
     const input = document.createElement('input');
     const inputEvent = {

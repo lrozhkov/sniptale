@@ -6,9 +6,17 @@
   cursor: text;
 }
 
+.sniptale-input::placeholder,
+.sniptale-textarea::placeholder {
+  color: var(--sniptale-color-text-dim);
+  font-style: italic;
+  opacity: 0.72;
+}
+
 .sniptale-input:focus::placeholder,
 .sniptale-textarea:focus::placeholder {
   color: transparent;
+  opacity: 0;
 }
 
 .sniptale-input.sniptale-input-compact {

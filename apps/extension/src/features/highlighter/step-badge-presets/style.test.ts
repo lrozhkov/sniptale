@@ -31,3 +31,17 @@ it('resolves semantic colors and uses fallback for transparent frame fill', () =
     }).backgroundColor
   ).toBe('#fedcba');
 });
+
+it('resolves a configurable outline width and preserves the legacy 2px fallback', () => {
+  const settings = createStepBadgeSettingsFromTemplate(
+    createSystemStepBadgePresetCatalog()[0]!.settings
+  );
+  settings.style.outlineWidth = 6;
+  expect(
+    resolveStepBadgeVisualStyle(settings, { borderColor: '#123456', borderWidth: 4 }).outlineWidth
+  ).toBe(6);
+  delete settings.style.outlineWidth;
+  expect(
+    resolveStepBadgeVisualStyle(settings, { borderColor: '#123456', borderWidth: 4 }).outlineWidth
+  ).toBe(2);
+});

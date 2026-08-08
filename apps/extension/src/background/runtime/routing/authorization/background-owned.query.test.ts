@@ -4,6 +4,17 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { AiSettingsQueryMessage } from '../../../../contracts/messaging/ai-settings-runtime';
 import type { BackgroundOwnedAuthorizationRequest } from './background-owned.types';
 
+vi.mock('../../../routing-contracts/capabilities/content-action/route', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../routing-contracts/capabilities/content-action/route')
+  >()),
+  consumeContentPrivilegedActionCapabilityBinding: vi.fn((args) =>
+    args.contentIntent?.token === 'valid-token'
+      ? { documentId: 'document-7', frameId: 0, senderUrl: 'https://page.test', tabId: 7 }
+      : null
+  ),
+}));
+
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
   runtimeInfo: {
@@ -62,6 +73,33 @@ it('rejects cross-owner AI settings queries that would reveal privileged setting
   });
 });
 
+it('authorizes AI settings navigation only from an owned top-frame content runtime', () => {
+  const message = {
+    contentIntent: { requestId: 'request-1', token: 'valid-token' },
+    section: 'ai-prompts' as const,
+    type: MessageType.AI_SETTINGS_NAVIGATION,
+  };
+  expect(
+    authorizeBackgroundOwnedRoute({ kind: 'background-owned', message, sender: contentSender() })
+  ).toEqual(expect.objectContaining({ authorized: true }));
+  expect(
+    authorizeBackgroundOwnedRoute({ kind: 'background-owned', message, sender: settingsSender() })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized AI settings navigation sender',
+  });
+  expect(
+    authorizeBackgroundOwnedRoute({
+      kind: 'background-owned',
+      message: { ...message, contentIntent: { requestId: 'request-1', token: 'replayed' } },
+      sender: contentSender(),
+    })
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized AI settings navigation intent',
+  });
+});
+
 function authorizeQuery(
   operation: Exclude<AiSettingsQueryMessage['operation'], 'read-chrome-ai-content-system-prompt'>,
   sender: chrome.runtime.MessageSender
@@ -78,7 +116,12 @@ function authorizeQuery(
 }
 
 function contentSender(): chrome.runtime.MessageSender {
-  return { tab: { id: 7 } as chrome.tabs.Tab, url: 'https://page.test' };
+  return {
+    documentId: 'document-7',
+    frameId: 0,
+    tab: { id: 7 } as chrome.tabs.Tab,
+    url: 'https://page.test',
+  };
 }
 
 function scenarioSender(): chrome.runtime.MessageSender {

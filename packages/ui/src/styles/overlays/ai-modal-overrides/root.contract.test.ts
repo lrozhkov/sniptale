@@ -46,6 +46,9 @@ describe('overlays.ai-modal-overrides contract', () => {
       '.sniptale-ai-modal-root .sniptale-label,',
       '.sniptale-ai-modal-root .sniptale-data-container {',
       '.sniptale-ai-modal-root .sniptale-soft-divider {',
+      '.sniptale-ai-modal-template-menu {',
+      '.sniptale-ai-data-selected-filter {',
+      '.sniptale-ai-modal-root .sniptale-ai-modal-prompt-textarea {',
     ]);
   });
 

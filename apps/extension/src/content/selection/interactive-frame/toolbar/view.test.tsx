@@ -9,6 +9,7 @@ import {
 } from '../../frame-runtime/test-support';
 import { InteractiveFrameToolbarContent } from './view';
 import type { InteractiveFrameToolbarProps } from './types';
+import { translate } from '../../../../platform/i18n';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -51,9 +52,22 @@ it('delegates selected-frame capture visibility to the shared floating state', (
   const button = container.querySelector<HTMLButtonElement>(
     '[data-ui="content.interactive-frame.capture-visibility"]'
   );
+  const deleteButton = container.querySelector<SVGElement>('.lucide-trash-2')?.closest('button');
+  const closeButton = container.querySelector<SVGElement>('.lucide-x')?.closest('button');
 
   expect(button?.getAttribute('aria-pressed')).toBe('false');
   expect(button?.querySelector('.lucide-eye')).not.toBeNull();
+  expect(button?.previousElementSibling).toHaveProperty(
+    'className',
+    'sniptale-glass-toolbar-divider'
+  );
+  expect(button?.nextElementSibling).toBe(deleteButton);
+  expect(deleteButton?.nextElementSibling).toHaveProperty(
+    'className',
+    'sniptale-glass-toolbar-divider'
+  );
+  expect(deleteButton?.nextElementSibling?.nextElementSibling).toBe(closeButton);
+  expect(closeButton?.title).toBe(translate('content.interactiveFrame.closeToolbar'));
   act(() => button?.click());
   expect(props.captureVisibility.toggle).toHaveBeenCalledOnce();
   expect(onUpdate).not.toHaveBeenCalled();

@@ -65,7 +65,6 @@ function expectPostAddSideEffectsScheduleBadgeRecalc() {
     isAutoMode: true,
     recalculateStepBadgesRef,
   });
-  vi.runAllTimers();
 
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);
   expect(recalculateStepBadgesRef.current).toHaveBeenCalledWith();
@@ -91,7 +90,6 @@ function expectPostAddSkipsBadgeRecalcWhenFrameHasNoBadge() {
     isAutoMode: true,
     recalculateStepBadgesRef,
   });
-  vi.runAllTimers();
 
   expect(recalculateStepBadgesRef.current).not.toHaveBeenCalled();
   expect(invalidateFrameCache).toHaveBeenCalledTimes(1);

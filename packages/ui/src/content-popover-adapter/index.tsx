@@ -44,6 +44,20 @@ function resolvePopoverStyle(theme: 'light' | 'dark' | null, style?: CSSProperti
   return { ...style, colorScheme: theme };
 }
 
+function resolvePositionerStyle(style?: CSSProperties): CSSProperties {
+  const { width: _width, ...positionerStyle } = style ?? {};
+  return {
+    display: 'inline-block',
+    width: 'max-content',
+    ...positionerStyle,
+  };
+}
+
+function resolveZoomSurfaceStyle(theme: 'light' | 'dark' | null, width?: CSSProperties['width']) {
+  const style = width === undefined ? undefined : ({ width } satisfies CSSProperties);
+  return resolvePopoverStyle(theme, style);
+}
+
 export function ContentPopoverAdapter({
   isOpen,
   anchorEl,
@@ -66,16 +80,21 @@ export function ContentPopoverAdapter({
   return (
     <>
       {createPortal(
-        <div
-          ref={surfaceRef}
-          className={joinClassNames('sniptale-content-popover', className)}
-          data-ui={dataUi ?? 'shared.ui.content-popover'}
-          data-theme={portalTheme ?? undefined}
-          style={resolvePopoverStyle(portalTheme, style)}
-          onMouseDown={stopPopoverEventPropagation}
-          onClick={stopPopoverEventPropagation}
-        >
-          <div className="sniptale-content-popover-body">{children}</div>
+        <div className="sniptale-content-popover-positioner" style={resolvePositionerStyle(style)}>
+          <div
+            ref={surfaceRef}
+            className={joinClassNames(
+              'sniptale-content-popover sniptale-content-ui-zoom-surface',
+              className
+            )}
+            data-ui={dataUi ?? 'shared.ui.content-popover'}
+            data-theme={portalTheme ?? undefined}
+            style={resolveZoomSurfaceStyle(portalTheme, style?.width)}
+            onMouseDown={stopPopoverEventPropagation}
+            onClick={stopPopoverEventPropagation}
+          >
+            <div className="sniptale-content-popover-body">{children}</div>
+          </div>
         </div>,
         resolvedPortalTarget
       )}
