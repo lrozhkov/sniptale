@@ -232,21 +232,24 @@ function renderCalloutAdjacentControls(props: CalloutInteractionHandleProps) {
   };
   return (
     <div
-      className="sniptale-callout-adjacent-controls"
+      className="sniptale-callout-adjacent-controls-positioner sniptale-content-ui-positioner"
       data-theme={props.portalTheme ?? undefined}
       style={mergeThemeScopedStyle(props.portalTheme, {
         position,
         left,
         top,
         zIndex,
-        display: 'flex',
-        gap: 4,
       })}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
     >
-      {renderCalloutMoveHandle(groupedProps)}
-      {renderCalloutSettingsHandle(groupedProps)}
+      <div
+        className="sniptale-callout-adjacent-controls sniptale-content-ui-zoom-surface"
+        style={{ display: 'flex', gap: 4 }}
+        onMouseEnter={props.handleMouseEnter}
+        onMouseLeave={props.handleMouseLeave}
+      >
+        {renderCalloutMoveHandle(groupedProps)}
+        {renderCalloutSettingsHandle(groupedProps)}
+      </div>
     </div>
   );
 }

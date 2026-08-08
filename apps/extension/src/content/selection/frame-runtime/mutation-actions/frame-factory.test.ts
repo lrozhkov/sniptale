@@ -17,6 +17,7 @@ import { setFrameSessionBorderPreset } from '../session/border-preset';
 import { createFrameHostLayoutService } from '../host-layout/service';
 import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
 import { setFutureFrameCallout } from '../session/future-callout';
+import { applyAutoStepBadgeValues } from '../../../../features/highlighter/frame-annotation/step-badge/auto-values';
 
 const invalidateFrameCache = vi.hoisted(() => vi.fn());
 
@@ -89,7 +90,11 @@ function createOptions(initialFrames: Array<ReturnType<typeof createFrameDataFix
     currentFrames = typeof updater === 'function' ? updater(currentFrames) : updater;
   });
   const hostLayoutServiceRef = { current: createFrameHostLayoutService() };
-  const recalculateStepBadgesRef = { current: vi.fn<(excludeFrameId?: string) => void>() };
+  const recalculateStepBadgesRef = {
+    current: vi.fn<(excludeFrameId?: string) => void>((excludeFrameId) => {
+      setFrames((frames) => applyAutoStepBadgeValues(frames, new Map(), excludeFrameId));
+    }),
+  };
   const highlighterSettings = createHighlighterSettings();
   setFrameSessionBorderPreset(highlighterSettings.borderPresets[0]!);
 
@@ -257,13 +262,15 @@ describe('frame mutation action frame factory', () => {
   });
 
   it('copies the enabled session comment into a new frame and requests immediate editing', () => {
-    const { options } = createOptions();
+    const { currentFrames, options, recalculateStepBadgesRef } = createOptions();
     const settings = createDefaultCalloutSettings();
     setFutureFrameCallout(settings);
     const frame = createAddFrameHandler(options)(createVisibleElement());
 
     expect(frame?.callout).toEqual(settings);
     expect(frame?.callout).not.toBe(settings);
+    expect(recalculateStepBadgesRef.current).toHaveBeenCalledOnce();
+    expect(currentFrames()[0]?.stepBadge?.value).toBe('1');
     expect(consumeFrameCalloutEditRequest('frame-1')).toBe(true);
     expect(consumeFrameCalloutEditRequest('frame-1')).toBe(false);
   });

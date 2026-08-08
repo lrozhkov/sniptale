@@ -67,10 +67,13 @@ describe('ToolbarShellContent', () => {
   });
 
   it('projects logical toolbar coordinates back into the scaled client surface', () => {
-    const markup = renderToolbarShell(true, null, 0.5);
+    const markup = renderToolbarShell(true, null, 4);
 
-    expect(markup).toContain('top:6px');
-    expect(markup).toContain('left:12px');
+    expect(markup).toContain('sniptale-toolbar-positioner');
+    expect(markup).toContain('sniptale-content-ui-zoom-surface');
+    expect(markup).toContain('top:48px');
+    expect(markup).toContain('left:96px');
+    expect(markup).toContain('position:fixed');
   });
 
   it('owns a viewport interaction guard while a main-toolbar menu is open', () => {

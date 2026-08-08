@@ -32,6 +32,7 @@ import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/h
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
 import { useOpeningPresetOrder } from '../popover/preset-order';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
+import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
 import {
   FrameBlurControls,
   FrameDecorationToggle,
@@ -67,6 +68,7 @@ interface FrameSettingsPopoverContentProps {
   headerContext: SettingsPopoverContext;
   headerDrag?: FloatingPopoverDrag;
   onClose: () => void;
+  onApplyToFuture?: () => void;
   onEffectModeChange?: (mode: EffectMode) => void;
   onShowPresets: () => void | Promise<void>;
   onFloatingInteractionChange?: (open: boolean) => void;
@@ -89,6 +91,7 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
     onShowTemplates: props.onShowPresets,
     templates: props.globalSettings.borderPresets,
   });
+  const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
 
   return (
     <>
@@ -101,16 +104,28 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
               },
             }
           : {})}
+        {...(workflow.mode === 'temporary' &&
+        props.headerContext === 'element' &&
+        props.onApplyToFuture
+          ? {
+              applyToFutureAction: {
+                label: translate('content.templateFork.applyToFuture'),
+                onClick: applyToFuture.request,
+              },
+            }
+          : {})}
         closeLabel={translate('content.interactiveFrame.closeEffectSettings')}
         context={props.headerContext}
         {...(props.headerDrag ? { drag: props.headerDrag } : {})}
         onClose={props.onClose}
-        {...(workflow.mode === 'temporary'
-          ? { status: translate('content.templateFork.temporaryStatus') }
-          : {})}
         title={getFrameEffectTitle(props.effectMode)}
       />
-      {workflow.confirmingReturn ? (
+      {applyToFuture.confirming ? (
+        <ApplyToFutureFramesGuard
+          onCancel={applyToFuture.cancel}
+          onConfirm={applyToFuture.confirm}
+        />
+      ) : workflow.confirmingReturn ? (
         <TemplateForkReturnGuard
           onContinue={workflow.continueEditing}
           onDiscard={workflow.discard}
@@ -166,6 +181,9 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
             localBorderSettings={props.localBorderSettings}
             linkedTemplateOptions={props.linkedTemplateOptions ?? { callouts: [], stepBadges: [] }}
             manual={props.manual}
+            {...(workflow.mode === 'temporary'
+              ? { manualStatus: translate('content.templateFork.temporaryStatus') }
+              : {})}
             mode={workflow.mode === 'templates' ? 'preset' : 'manual'}
             onForkPreset={workflow.fork}
             onCreated={workflow.completeSave}
@@ -201,6 +219,7 @@ function FrameBorderSection(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  manualStatus?: string;
   onCreated: () => void;
   onForkPreset: (preset: BorderPreset) => void;
   saveSectionRequest?: number;
@@ -318,23 +337,22 @@ function FramePresetRow(props: {
         </ProductGlassPresetMeta>
       </ProductGlassPresetItem>
       <span className="sniptale-frame-style-preset-actions">
-        {props.selected ? (
-          <button
-            aria-label={translate('content.templateFork.fork')}
-            className="sniptale-frame-style-preset-action"
-            data-frame-style-action="fork"
-            disabled={props.pending}
-            onClick={(event) => {
-              if (acceptFrameSettingsAction(event.nativeEvent, props.acceptAction)) {
-                props.onForkPreset(props.preset);
-              }
-            }}
-            title={translate('content.templateFork.fork')}
-            type="button"
-          >
-            <CopyPlus size={15} />
-          </button>
-        ) : null}
+        <button
+          aria-label={translate('content.templateFork.fork')}
+          className="sniptale-frame-style-preset-action"
+          data-frame-style-action="fork"
+          data-template-fork-source={props.preset.id}
+          disabled={props.pending}
+          onClick={(event) => {
+            if (acceptFrameSettingsAction(event.nativeEvent, props.acceptAction)) {
+              props.onForkPreset(props.preset);
+            }
+          }}
+          title={translate('content.templateFork.fork')}
+          type="button"
+        >
+          <CopyPlus size={15} />
+        </button>
         <button
           aria-label={visibilityActionLabel}
           className="sniptale-frame-style-preset-action"
@@ -374,6 +392,7 @@ function FrameManualMode(props: {
     onCssDraftChange: (value: string) => void;
     save: (input: { name?: string; overwrite?: BorderPreset }) => Promise<boolean>;
   };
+  manualStatus?: string;
   onCreated: () => void;
   saveSectionRequest?: number;
   onFloatingInteractionChange?: (open: boolean) => void;
@@ -401,6 +420,7 @@ function FrameManualMode(props: {
             presets={props.borderPresets}
           />
         }
+        {...(props.manualStatus ? { saveSectionStatus: props.manualStatus } : {})}
         style={props.localBorderSettings}
         linkedTemplateOptions={props.linkedTemplateOptions}
       />

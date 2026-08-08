@@ -88,6 +88,9 @@ function useInteractiveFrameRuntimeState(params: {
   frame: FrameData;
   viewState: ReturnType<typeof useInteractiveFrameViewState>;
 }) {
+  const isPopoverOpen =
+    params.viewState.activePopover?.frameId === params.frame.id &&
+    params.viewState.activePopover.kind === 'frame-settings';
   const frameWithoutLinkedElement = React.useMemo(
     () => cloneFrameData(params.frame),
     [params.frame]
@@ -98,6 +101,7 @@ function useInteractiveFrameRuntimeState(params: {
     state: params.viewState.state,
     isCalloutEditing: params.viewState.isCalloutEditing,
     isCalloutDraftPending: params.viewState.pendingCalloutFrameRef.current !== null,
+    isFrameSettingsPopoverOpen: isPopoverOpen,
   });
   const normalizedCurrentFrame = cloneFrameData(currentFrame);
   const { sizePanelCoords, toolbarCoords } = useInteractiveFrameFloatingUiLayout({
@@ -116,9 +120,7 @@ function useInteractiveFrameRuntimeState(params: {
     isHovered: params.viewState.hoveredFrameId === params.frame.id,
     isSelected: params.viewState.selectedFrameId === params.frame.id,
     isResizeHovered: params.viewState.resizeFrameId === params.frame.id,
-    isPopoverOpen:
-      params.viewState.activePopover?.frameId === params.frame.id &&
-      params.viewState.activePopover.kind === 'frame-settings',
+    isPopoverOpen,
     isStepBadgePopoverOpen:
       params.viewState.activePopover?.frameId === params.frame.id &&
       params.viewState.activePopover.kind === 'step-badge',

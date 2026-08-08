@@ -60,12 +60,12 @@ describe('line callout connector', () => {
 
     expect(line.routePoints).toHaveLength(3);
     expect(line.routePoints[0]?.y).toBe(line.routePoints[1]?.y);
-    expect(line.routeControlAxis).toBe('x');
+    expect(line.routeControlAxis).toBe('both');
     expect(line.routeControlAngle).not.toBeNull();
     expect(line.routeControlAngleSnap).not.toBeNull();
   });
 
-  it('keeps a moved angled-route control on the landing rail', () => {
+  it('keeps a moved angled-route control at its explicit free position', () => {
     const line = getLineConnectorState({
       ...base,
       placement: {
@@ -78,7 +78,9 @@ describe('line callout connector', () => {
     });
 
     expect(line.routePoints).toHaveLength(3);
-    expect(line.routePoints[0]?.y).toBe(line.routePoints[1]?.y);
+    expect(line.routeControlAxis).toBe('both');
+    expect(line.routeControlPoint).toEqual({ x: 360, y: 0 });
+    expect(line.routePoints[1]).toEqual({ x: 360, y: 0 });
   });
 
   it('uses a movable safe channel for parallel offset endpoints', () => {

@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 
-import { act, type ButtonHTMLAttributes, type PropsWithChildren } from 'react';
+import { act, type PropsWithChildren } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-type MockActionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  active?: boolean;
-  compact?: boolean;
-  tone?: string;
-};
+const { openAIModalSettingsMock } = vi.hoisted(() => ({
+  openAIModalSettingsMock: vi.fn(),
+}));
 
+vi.mock('./settings-navigation', () => ({
+  openAIModalSettings: openAIModalSettingsMock,
+}));
 vi.mock('../../../../../features/ai/model-selector', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../features/ai/model-selector')>()),
   AIModelSelector: (props: { selectedModelId: string | null }) => (
@@ -18,179 +19,106 @@ vi.mock('../../../../../features/ai/model-selector', async (importOriginal) => (
     </button>
   ),
 }));
-
-vi.mock('@sniptale/ui/product-modal/actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-modal/actions')>()),
+vi.mock('@sniptale/ui/product-modal/actions', () => ({
   ProductActionButton: ({
-    active: _active,
     children,
-    compact: _compact,
-    disabled,
-    onClick,
-    tone: _tone,
     ...props
-  }: PropsWithChildren<MockActionButtonProps>) => (
-    <button type="button" disabled={disabled} onClick={onClick} {...props}>
+  }: PropsWithChildren<React.ComponentProps<'button'>>) => (
+    <button type="button" {...props}>
       {children}
     </button>
   ),
 }));
-
-vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-modal')>()),
+vi.mock('@sniptale/ui/product-modal', () => ({
   ProductModalFooter: ({ children }: PropsWithChildren) => <footer>{children}</footer>,
 }));
 
-import {
-  CHROME_AI_MODEL_ID,
-  mergeChromeAiProviderSelectorEntries,
-} from '../../../../../features/ai/chrome/constants';
-import type { AIProviderSelectorEntry } from '../../../../../contracts/messaging/ai-settings-runtime';
-import type { AIModel } from '../../../../../contracts/settings';
 import { AIModalFooter } from './footer';
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
+let container: HTMLDivElement;
+let root: Root;
 
-function createProvider(overrides: Partial<AIProviderSelectorEntry> = {}): AIProviderSelectorEntry {
-  return {
-    connectionType: 'openai-compatible',
-    createdAt: 1,
-    destinationKind: 'external',
-    hasStoredApiKey: true,
-    id: 'provider-1',
-    name: 'Provider',
-    ...overrides,
-  };
-}
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  openAIModalSettingsMock.mockClear();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
 
-function createModel(overrides: Partial<AIModel> = {}): AIModel {
-  return {
-    displayName: 'Model',
-    id: 'model-1',
-    modelCode: 'model-code',
-    providerId: 'provider-1',
-    systemPrompt: '',
-    ...overrides,
-  };
-}
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
 
-async function renderFooter(args: {
-  disabledSubmit?: boolean;
-  isLoading?: boolean;
-  models?: AIModel[];
-  providers?: AIProviderSelectorEntry[];
-  selectedData?: string;
-  selectedModelId?: string | null;
-}) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
+async function renderFooter(
+  models = [
+    {
+      displayName: 'Model',
+      id: 'model-1',
+      modelCode: 'model',
+      providerId: 'provider-1',
+      systemPrompt: '',
+    },
+  ]
+) {
   await act(async () => {
-    root?.render(
+    root.render(
       <AIModalFooter
-        availableModels={args.models ?? [createModel()]}
-        disabledSubmit={args.disabledSubmit ?? false}
-        isLoading={args.isLoading ?? false}
+        availableModels={models}
+        disabledSubmit={models.length === 0}
+        isLoading={false}
         onClose={vi.fn()}
         onSelectModel={vi.fn()}
         onSubmit={vi.fn()}
-        providers={args.providers ?? [createProvider()]}
-        selectedData={
-          args.selectedData ??
-          JSON.stringify({ f: [{ id: 'field-1' }], t: [{ r: [{ id: 'row-1' }] }] })
-        }
-        selectedModelId={args.selectedModelId ?? 'model-1'}
+        providers={[]}
+        selectedData=""
+        selectedModelId={models.length ? 'model-1' : null}
         totalTokens={12}
       />
     );
   });
 }
 
-beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+it('renders the submit action after Cancel and opens model settings from a subtle action', async () => {
+  await renderFooter();
+
+  const footerButtons = Array.from(
+    container.querySelectorAll('.sniptale-ai-modal-footer-actions > button')
+  );
+  expect(footerButtons.map((button) => button.textContent)).toEqual(['Отмена', 'Отправить запрос']);
+  const settings = container.querySelector<HTMLButtonElement>(
+    '[aria-label="Открыть настройки подключений и моделей"]'
+  );
+  act(() => settings?.click());
+
+  expect(openAIModalSettingsMock).toHaveBeenCalledWith(
+    { section: 'ai-connections' },
+    expect.any(Event)
+  );
 });
 
-afterEach(() => {
-  act(() => root?.unmount());
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
-});
-
-function getSubmitButton() {
-  return Array.from(container?.querySelectorAll('button') ?? []).at(-1) ?? null;
-}
-
-function getSubmitTip() {
-  return container?.querySelector<HTMLElement>('[data-ui="ai-modal.submit-tip"]') ?? null;
-}
-
-it('moves the before-sending copy into the submit tip without provider, model, or data rows', async () => {
-  await renderFooter({});
-
-  const submitButton = getSubmitButton();
-  const submitTip = getSubmitTip();
-
-  expect(container?.querySelector('[data-ui="ai-modal.disclosure"]')).toBeNull();
-  expect(submitTip?.id).toBeTruthy();
-  expect(submitButton?.getAttribute('aria-describedby')).toBe(submitTip?.id);
-  expect(submitTip?.textContent).toContain('Перед отправкой');
-  expect(submitTip?.textContent).toContain('выбранные данные страницы');
-  expect(submitTip?.textContent).toContain('ваш промпт');
-  expect(submitTip?.textContent).toContain('данные покидают браузер');
-  expect(submitTip?.textContent).not.toContain('Провайдер');
-  expect(submitTip?.textContent).not.toContain('Provider ·');
-  expect(submitTip?.textContent).not.toContain('Модель');
-  expect(submitTip?.textContent).not.toContain('Model');
-  expect(submitTip?.textContent).not.toContain('editable fields and table rows');
-});
-
-it('shows local custom provider egress in the submit tip', async () => {
-  await renderFooter({
-    providers: [createProvider({ destinationKind: 'local-custom', name: 'Ollama' })],
-  });
-
-  const submitTip = getSubmitTip();
-
-  expect(submitTip?.textContent).not.toContain('Ollama');
-  expect(submitTip?.textContent).toContain('не отправляются на внешний provider URL');
-});
-
-it('shows Chrome AI egress in the submit tip', async () => {
-  const chromeEntries = mergeChromeAiProviderSelectorEntries({ models: [], providers: [] });
-
-  await renderFooter({
-    models: chromeEntries.models,
-    providers: chromeEntries.providers,
-    selectedModelId: CHROME_AI_MODEL_ID,
-  });
-
-  const submitTip = getSubmitTip();
-
-  expect(submitTip?.textContent).not.toContain('Google');
-  expect(submitTip?.textContent).toContain('не отправляются на внешний provider URL');
-});
-
-it('keeps the submit tip attached when submit is disabled', async () => {
-  await renderFooter({ disabledSubmit: true });
-
-  const submitButton = getSubmitButton();
-  const submitTip = getSubmitTip();
-
-  expect(submitButton?.disabled).toBe(true);
-  expect(submitButton?.getAttribute('aria-describedby')).toBe(submitTip?.id);
+it('disables the footer submit action when submission preconditions are not met', async () => {
+  await renderFooter([]);
+  expect(
+    Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.sniptale-ai-modal-footer-actions > button')
+    ).find((button) => button.textContent === 'Отправить запрос')?.disabled
+  ).toBe(true);
 });
 
 it('shows an explicit blocking reason when no model is configured', async () => {
-  await renderFooter({ disabledSubmit: true, models: [], providers: [], selectedModelId: null });
-
-  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+  await renderFooter([]);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
     'Сначала настройте хотя бы одну AI-модель'
   );
-  expect(getSubmitButton()?.disabled).toBe(true);
+});
+
+it('discloses the selected destination, page-data inclusion, and metadata-only history', async () => {
+  await renderFooter();
+  const disclosure = container.querySelector('[data-ui="ai-modal.disclosure"]')?.textContent;
+  expect(disclosure).toContain('настроенный AI-провайдер');
+  expect(disclosure).toContain('промпт без данных страницы');
+  expect(disclosure).toContain('только метаданные запроса');
 });

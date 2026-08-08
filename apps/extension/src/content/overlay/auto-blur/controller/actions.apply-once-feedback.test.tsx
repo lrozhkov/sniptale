@@ -47,6 +47,7 @@ function Harness() {
     failApplying,
     finishApplying,
     frameManager,
+    runFullPageScan: (_owner, operation) => operation(new AbortController().signal),
   });
   return null;
 }

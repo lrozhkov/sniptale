@@ -20,6 +20,7 @@ import {
 import { parseTopLevelDocumentNavigation, parseTopLevelNavigation } from './parsers';
 import type { BackgroundModeState } from './shared';
 import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { bindAnnotationForkSessionDocument } from '../../../annotation-fork-session/route';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeNavigationWiring' });
 
@@ -79,6 +80,11 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
   browserWebNavigation.subscribeToCommitted((details: unknown) => {
     const navigation = parseTopLevelDocumentNavigation(details);
     if (!navigation) return;
+    void bindAnnotationForkSessionDocument(navigation.tabId, navigation.documentId).catch(
+      (error) => {
+        logger.warn('Failed to bind annotation fork session document', error);
+      }
+    );
     runWithVideoLeaseHydrationFallback('bind recording navigation document', () =>
       handleTabRecordingNavigationCommitted(navigation.tabId, navigation.documentId)
     );

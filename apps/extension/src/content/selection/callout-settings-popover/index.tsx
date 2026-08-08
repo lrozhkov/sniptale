@@ -16,6 +16,8 @@ import { useCalloutPresetPopoverController } from '../../../composition/frame-an
 import { useFloatingPopoverDrag } from '../../../composition/frame-annotation-controls/popover/drag';
 import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 import { createCalloutSaveSection } from '../../../composition/frame-annotation-controls/callout/save-section';
+import { dispatchFutureFrameDefaultsChanged } from '../../platform/page-context/frame-events';
+import { createDefaultCalloutSettings } from '../../../features/highlighter/frame-annotation/callout/model';
 
 interface CalloutSettingsPopoverProps {
   calloutIndex?: number;
@@ -72,6 +74,21 @@ function CalloutSettingsPopoverSurface(props: {
         localSettings={props.state.localSettings}
         onApplyPreset={props.state.applyPreset}
         onForkPreset={props.state.forkPreset}
+        onApplyToFuture={() =>
+          dispatchFutureFrameDefaultsChanged({
+            kind: 'callout',
+            settings: createDefaultCalloutSettings(
+              props.state.localSettings.style,
+              props.state.localSettings.sourcePresetId,
+              {
+                anchor: props.state.localSettings.placement.anchor,
+                connectorAttachments: props.state.localSettings.placement.connectorAttachments,
+                side: props.state.localSettings.placement.side,
+              },
+              { titleText: props.state.localSettings.content.titleText }
+            ),
+          })
+        }
         onResetPreset={(preset) => {
           void props.presets.editor.reset(preset).then((restored) => {
             if (restored) props.state.applyPreset(restored);

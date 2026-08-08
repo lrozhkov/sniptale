@@ -6,6 +6,8 @@ export type BackgroundOwnedRouteHandlerId =
   | 'ai-secret-unlock'
   | 'ai-settings-query'
   | 'ai-settings-mutation'
+  | 'ai-settings-navigation'
+  | 'annotation-fork-session'
   | 'content-action-capability-issuance'
   | 'content-runtime-wakeup'
   | 'frame-annotation-raster'
@@ -31,6 +33,10 @@ export type BackgroundOwnedRouteInventoryEntry = {
 type BackgroundOwnedRoutePreauthorizationHandle =
   | { readonly kind: 'ai-secret-unlock-route' }
   | { readonly kind: 'background-owned-route-policy' }
+  | {
+      readonly kind: 'annotation-fork-session';
+      readonly senderBinding: ContentSenderBinding;
+    }
   | {
       readonly kind: 'content-action-capability-issuance';
       readonly senderBinding: ContentSenderBinding;
@@ -151,6 +157,23 @@ export function getContentRuntimeWakeupSenderBinding(
     return null;
   }
 
+  return preauthorization.senderBinding;
+}
+
+export function getAnnotationForkSessionSenderBinding(
+  routeContext: BackgroundOwnedRouteContext | null,
+  message: { type: string } & Record<string, unknown>
+): ContentSenderBinding | null {
+  const preauthorization = routeContext?.preauthorization;
+  if (
+    !routeContext ||
+    preauthorization?.kind !== 'annotation-fork-session' ||
+    routeContext.ownerRoute.handlerId !== 'annotation-fork-session' ||
+    !routeContext.ownerRoute.messageTypes.includes(message.type as MessageType) ||
+    !doesMessageBindingMatch(routeContext.messageBinding, message)
+  ) {
+    return null;
+  }
   return preauthorization.senderBinding;
 }
 

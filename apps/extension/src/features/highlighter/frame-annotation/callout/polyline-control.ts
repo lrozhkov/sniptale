@@ -4,13 +4,13 @@ type Point = { x: number; y: number };
 
 const DEFAULT_LANDING_LENGTH = 24;
 const MAX_AUTOMATIC_LANDING_LENGTH = 96;
-const MAX_MANUAL_LANDING_LENGTH = 240;
-const MANUAL_LANDING_HEADROOM = 24;
 const MIN_LANDING_LENGTH = 8;
-const MAGNETIC_SNAP_DISTANCE = 8;
+const MANUAL_ANGLE_STEP = 15;
+const ENDPOINT_RAIL_SNAP_DISTANCE = 10;
 
 export type PolylineAngleSnap = {
   fixedPoint: Point;
+  fixedSide: ConnectorSide;
   railPoint: Point;
   side: ConnectorSide;
 };
@@ -29,35 +29,6 @@ function getRailAxis(point: Point, side: ConnectorSide) {
 
 function createRailPoint(axis: number, railPoint: Point, side: ConnectorSide): Point {
   return isVerticalSide(side) ? { x: railPoint.x, y: axis } : { x: axis, y: railPoint.y };
-}
-
-function getMaximumLandingLength(args: PolylineAngleSnap) {
-  const routeDistance = Math.hypot(
-    args.fixedPoint.x - args.railPoint.x,
-    args.fixedPoint.y - args.railPoint.y
-  );
-  return Math.min(
-    MAX_MANUAL_LANDING_LENGTH,
-    Math.max(MAX_AUTOMATIC_LANDING_LENGTH, routeDistance + MANUAL_LANDING_HEADROOM)
-  );
-}
-
-function constrainToOutwardRail(
-  point: Point,
-  railPoint: Point,
-  side: ConnectorSide,
-  maximumLandingLength: number
-): Point {
-  const direction = getOutwardDirection(side);
-  const railStart = getRailAxis(railPoint, side);
-  const requested = getRailAxis(point, side);
-  const requestedLandingLength = (requested - railStart) * direction;
-  const landingLength = Math.min(
-    maximumLandingLength,
-    Math.max(MIN_LANDING_LENGTH, requestedLandingLength)
-  );
-  const axis = railStart + direction * landingLength;
-  return createRailPoint(axis, railPoint, side);
 }
 
 function getAngleCandidates(args: PolylineAngleSnap, angle: number): Point[] {
@@ -102,36 +73,43 @@ function getNearestRailPoint(point: Point, candidates: Point[], side: ConnectorS
 }
 
 export function snapPolylineControlPoint(args: {
+  disableMagnetism?: boolean;
   point: Point;
   snap: PolylineAngleSnap;
   strict: boolean;
 }): Point {
-  const maximumLandingLength = getMaximumLandingLength(args.snap);
-  const constrained = constrainToOutwardRail(
-    args.point,
-    args.snap.railPoint,
-    args.snap.side,
-    maximumLandingLength
+  if (!args.strict) {
+    return args.disableMagnetism ? args.point : snapToEndpointRail(args.point, args.snap);
+  }
+  const deltaX = args.point.x - args.snap.fixedPoint.x;
+  const deltaY = args.point.y - args.snap.fixedPoint.y;
+  const distance = Math.hypot(deltaX, deltaY);
+  if (distance < 0.001) return args.point;
+  const step = (MANUAL_ANGLE_STEP * Math.PI) / 180;
+  const angle = Math.round(Math.atan2(deltaY, deltaX) / step) * step;
+  return {
+    x: args.snap.fixedPoint.x + Math.cos(angle) * distance,
+    y: args.snap.fixedPoint.y + Math.sin(angle) * distance,
+  };
+}
+
+function getPerpendicularRailCandidate(point: Point, endpoint: Point, side: ConnectorSide) {
+  return isVerticalSide(side) ? { x: endpoint.x, y: point.y } : { x: point.x, y: endpoint.y };
+}
+
+function snapToEndpointRail(point: Point, snap: PolylineAngleSnap): Point {
+  const candidates = [
+    getPerpendicularRailCandidate(point, snap.railPoint, snap.side),
+    getPerpendicularRailCandidate(point, snap.fixedPoint, snap.fixedSide),
+  ];
+  const nearest = candidates.reduce<{ distance: number; point: Point } | null>(
+    (best, candidate) => {
+      const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+      return best === null || distance < best.distance ? { distance, point: candidate } : best;
+    },
+    null
   );
-  const angles = args.strict
-    ? Array.from({ length: 7 }, (_, index) => index * 15)
-    : [0, 30, 45, 60, 90];
-  const nearest = getNearestRailPoint(
-    constrained,
-    getValidAngleCandidates(args.snap, angles),
-    args.snap.side
-  );
-  if (!nearest) return constrained;
-  const distance = Math.abs(
-    getRailAxis(nearest, args.snap.side) - getRailAxis(constrained, args.snap.side)
-  );
-  const resolved = args.strict || distance <= MAGNETIC_SNAP_DISTANCE ? nearest : constrained;
-  return constrainToOutwardRail(
-    resolved,
-    args.snap.railPoint,
-    args.snap.side,
-    maximumLandingLength
-  );
+  return nearest && nearest.distance <= ENDPOINT_RAIL_SNAP_DISTANCE ? nearest.point : point;
 }
 
 function getAutomaticControlPoint(args: PolylineAngleSnap) {
@@ -162,10 +140,12 @@ export function getPolylineRouteState(args: {
   blockPoint: Point;
   blockSide: ConnectorSide;
   framePoint: Point;
+  frameSide: ConnectorSide;
   waypoint?: Point;
 }) {
   const angleSnap: PolylineAngleSnap = {
     fixedPoint: args.framePoint,
+    fixedSide: args.frameSide,
     railPoint: args.blockPoint,
     side: args.blockSide,
   };
@@ -182,18 +162,11 @@ export function getPolylineRouteState(args: {
       route: [args.blockPoint, args.framePoint],
     };
   }
-  const point = args.waypoint
-    ? constrainToOutwardRail(
-        args.waypoint,
-        args.blockPoint,
-        args.blockSide,
-        getMaximumLandingLength(angleSnap)
-      )
-    : getAutomaticControlPoint(angleSnap);
+  const point = args.waypoint ?? getAutomaticControlPoint(angleSnap);
   return {
     angle: getPolylineAngle(point, args.framePoint),
     angleSnap,
-    axis: isVerticalSide(args.blockSide) ? ('y' as const) : ('x' as const),
+    axis: 'both' as const,
     point,
     route: [args.blockPoint, point, args.framePoint],
   };

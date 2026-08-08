@@ -182,6 +182,8 @@ export function createFrameSelectionEventHandlers(params: {
       );
     },
     keyDown: (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (queryContentUiElement('[data-ui^="content.toolbar."] .sniptale-popover-menu')) return;
       const selectedFrameId = params.selectedFrameIdRef.current;
       if (event.key !== 'Escape' || !selectedFrameId || hasActiveFrameInteraction()) return;
       if (params.activePopoverRef.current?.frameId === selectedFrameId) {

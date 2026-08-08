@@ -263,7 +263,11 @@ it('keeps open main-toolbar menus above the page without disabling toolbar contr
   expect(toolbarMenuSurfaceStylesheet).toMatch(
     /\.sniptale-toolbar\[data-menu-open='true'\][^{]*\.sniptale-popover-menu\s*\{[^}]*pointer-events:\s*auto\s*!important;/su
   );
+  expect(toolbarMenuSurfaceStylesheet).toMatch(
+    /\.sniptale-toolbar-positioner:has\(> \.sniptale-toolbar\[data-menu-open='true'\]\)\s*\{[^}]*z-index:\s*2147483646;[^}]*pointer-events:\s*auto;/su
+  );
   expect(toolbarMenuSurfaceStylesheet).toContain('.sniptale-main-toolbar-popover');
+  expect(toolbarMenuSurfaceStylesheet).toContain(':has(> .sniptale-main-toolbar-popover)');
   expect(toolbarMenuSurfaceStylesheet).toContain(':not(.sniptale-modal)');
   expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-modal-backdrop\s*\)/su);
   expect(toolbarMenuSurfaceStylesheet).toMatch(

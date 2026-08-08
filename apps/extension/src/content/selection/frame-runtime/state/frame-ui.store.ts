@@ -177,8 +177,8 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
     toggleQuickPopover: (frameId: string, kind: FramePopoverKind, calloutIndex?: number) => {
       const state = get();
       const activePopover = state.activePopover;
-      if (state.selectedFrameId !== null) return;
       if (
+        state.selectedFrameId === null &&
         activePopover?.frameId === frameId &&
         activePopover.kind === kind &&
         activePopover.calloutIndex === calloutIndex
@@ -187,6 +187,8 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
         return;
       }
       set({
+        selectedFrameId: null,
+        toolbarAnchorOffset: null,
         activePopover: { frameId, kind, ...(calloutIndex === undefined ? {} : { calloutIndex }) },
         resizeFrameId: null,
       });

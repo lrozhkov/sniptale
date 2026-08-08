@@ -69,6 +69,7 @@ export function setupFrameSessionSyncListeners({
   });
   const handleStorageChanged = createFrameSessionStorageChangedHandler(loadSettings);
   const windowListeners = buildFrameSessionWindowListeners({
+    globalEffectModeRef,
     syncFocusOpacity,
     sessionBlurSettingsRef,
     sessionDefaultsInitializedRef,
@@ -79,6 +80,7 @@ export function setupFrameSessionSyncListeners({
     withHistoryCommit,
     setFrames,
     sessionCalloutStyleRef,
+    ...(sessionStepBadgeTemplateRef ? { sessionStepBadgeTemplateRef } : {}),
   });
 
   loadSettings();

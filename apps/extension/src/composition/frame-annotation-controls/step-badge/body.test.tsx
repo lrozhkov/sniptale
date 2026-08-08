@@ -26,10 +26,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('forks the active template, guards unsaved return, and opens saving only on request', async () => {
-  const preset = createSystemStepBadgePresetCatalog()[0]!;
+it('forks any template in one click, guards unsaved return, and opens saving only on request', async () => {
+  const catalog = createSystemStepBadgePresetCatalog();
+  const preset = catalog[0]!;
+  const inactivePreset = catalog[1]!;
   const settings = createStepBadgeSettingsFromTemplate(preset.settings, preset.id);
   const onForkPreset = vi.fn();
+  const onApplyToFuture = vi.fn();
   const onShowPresets = vi.fn();
   const onTemplateCreated = vi.fn();
 
@@ -44,6 +47,7 @@ it('forks the active template, guards unsaved return, and opens saving only on r
         onAlphabetChange={vi.fn()}
         onAnchorChange={vi.fn()}
         onApplyPreset={vi.fn()}
+        onApplyToFuture={onApplyToFuture}
         onAutoModeChange={vi.fn()}
         onClose={vi.fn()}
         onCreatePreset={vi.fn(async () => ({ id: 'saved', outcome: 'applied' }))}
@@ -60,21 +64,43 @@ it('forks the active template, guards unsaved return, and opens saving only on r
         onValueChange={vi.fn()}
         pendingPresetIds={new Set()}
         presetError={null}
-        presets={[preset]}
+        presets={[preset, inactivePreset]}
         templateSettings={preset.settings}
       />
     )
   );
 
   const fork = host.querySelector<HTMLButtonElement>(
-    `button[aria-label="${translate('content.templateFork.fork')}"]`
+    `button[data-template-fork-source="${inactivePreset.id}"]`
   )!;
   act(() => fork.click());
-  expect(onForkPreset).toHaveBeenCalledWith(preset);
+  expect(onForkPreset).toHaveBeenCalledWith(inactivePreset);
   expect(host.querySelector('[data-ui="content.step-badge.manual-section"]')).not.toBeNull();
+  const temporaryStatus = host.querySelector(
+    '[data-ui="shared.categorized-inspector.section-status"]'
+  );
+  expect(temporaryStatus?.textContent).toBe(translate('content.templateFork.temporaryStatus'));
+  expect(temporaryStatus?.closest('nav')).not.toBeNull();
+  expect(host.querySelector('.sniptale-settings-popover-header')?.contains(temporaryStatus)).toBe(
+    false
+  );
   expect(host.querySelector('[aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
     translate('content.stepBadge.numberingSection')
   );
+
+  const applyToFuture = host.querySelector<HTMLButtonElement>(
+    '[data-settings-action="apply-to-future"]'
+  )!;
+  act(() => applyToFuture.click());
+  expect(onApplyToFuture).not.toHaveBeenCalled();
+  expect(
+    host.querySelector('[data-ui="content.template-fork.apply-to-future-guard"]')
+  ).not.toBeNull();
+  const confirmApply = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === translate('content.templateFork.applyToFutureConfirm')
+  )!;
+  act(() => confirmApply.click());
+  expect(onApplyToFuture).toHaveBeenCalledOnce();
 
   const back = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === translate('content.templateFork.backToTemplates')

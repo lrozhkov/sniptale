@@ -21,7 +21,12 @@ it('finalizes a drag and clears pointer state on mouse up', async () => {
   const options = {
     finalizeDragSelection: vi.fn(),
     flushFinalFrameUpdate: vi.fn(),
-  } satisfies Pick<SelectionModeEventOptions, 'finalizeDragSelection' | 'flushFinalFrameUpdate'>;
+    startDragSelection: vi.fn(),
+    updateDragSelection: vi.fn(),
+  } satisfies Pick<
+    SelectionModeEventOptions,
+    'finalizeDragSelection' | 'flushFinalFrameUpdate' | 'startDragSelection' | 'updateDragSelection'
+  >;
 
   const event = new MouseEvent('mouseup', { cancelable: true });
   const preventDefault = vi.spyOn(event, 'preventDefault');

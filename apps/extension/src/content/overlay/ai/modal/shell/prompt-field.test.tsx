@@ -36,11 +36,12 @@ function createState(
     handleKeyDown: vi.fn(),
     handleResizeStart: vi.fn(),
     isResizing: false,
-    onSubmit: submit,
+    onSelectTemplate: vi.fn(async () => undefined),
     prompt: 'Keep suffix',
     setPrompt,
-    submitDisabled: false,
     textareaRef,
+    templates: [],
+    templatesLoading: false,
     voice: {
       actions: { start, stop },
       state: {
@@ -127,25 +128,39 @@ describe('AI Modal prompt voice control', () => {
     );
   });
 
-  it('disables the microphone while the prompt is disabled', () => {
+  it('removes composer actions while the prompt is disabled', () => {
     renderField(createState(), true);
 
     expect(
       container.querySelector<HTMLButtonElement>('[data-ui="content.ai-modal.prompt-voice-input"]')
-        ?.disabled
-    ).toBe(true);
+    ).toBeNull();
+    expect(container.querySelector('.sniptale-ai-modal-prompt-submit')).toBeNull();
   });
 
-  it('renders the compact Enter action and submits from the prompt corner', () => {
+  it('renders a passive Enter hint next to voice input without a composer submit button', () => {
     renderField();
-    const submitButton = container.querySelector<HTMLButtonElement>(
-      '.sniptale-ai-modal-prompt-submit'
-    );
-
-    act(() => submitButton?.click());
-
-    expect(submitButton?.getAttribute('title')).toBe('Отправить запрос');
-    expect(submit).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.sniptale-ai-modal-prompt-submit-hint')).not.toBeNull();
+    expect(container.querySelector('.sniptale-ai-modal-prompt-submit')).toBeNull();
+    expect(submit).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain('Ctrl+Enter');
+  });
+
+  it('grows the prompt until five compact lines and then enables internal scrolling', () => {
+    renderField();
+    const textarea = container.querySelector<HTMLTextAreaElement>('#ai-prompt');
+    if (!textarea) throw new Error('Expected prompt textarea');
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 180 });
+
+    act(() => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value'
+      )?.set;
+      valueSetter?.call(textarea, 'A long prompt');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    expect(textarea.style.height).toBe('136px');
+    expect(textarea.style.overflowY).toBe('auto');
   });
 });

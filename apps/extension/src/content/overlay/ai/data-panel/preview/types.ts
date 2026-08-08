@@ -13,6 +13,10 @@ export type DataSelectionPreviewProps = {
   isDataSpoilerOpen: boolean;
   isLoading: boolean;
   spoilerSummary: string;
+  filterQuery: string;
+  setFilterQuery: React.Dispatch<React.SetStateAction<string>>;
+  setShowSelectedOnly: React.Dispatch<React.SetStateAction<boolean>>;
+  showSelectedOnly: boolean;
   toggleExpandAll: () => void;
   toggleSelectAll: () => void;
   treeData: ParsedDOMTree;

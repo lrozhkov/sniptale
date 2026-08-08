@@ -109,8 +109,12 @@ describe('ContentSizeTooltip', () => {
       expect.objectContaining({ canToggleAspectRatio: true })
     );
     expect(surface?.dataset['theme']).toBe('dark');
-    expect(surface?.style.top).toBe('15px');
-    expect(surface?.style.left).toBe('25px');
+    expect(surface?.style.top).toBe('auto');
+    expect(surface?.style.left).toBe('auto');
+    expect(surface?.classList).toContain('sniptale-content-ui-zoom-surface');
+    expect(surface?.parentElement?.classList).toContain('sniptale-content-size-tooltip-positioner');
+    expect(surface?.parentElement?.style.top).toBe('15px');
+    expect(surface?.parentElement?.style.left).toBe('25px');
     expect(container?.querySelector('style')?.textContent).toBeTruthy();
   });
 

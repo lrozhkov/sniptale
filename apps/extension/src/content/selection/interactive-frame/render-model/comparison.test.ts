@@ -75,6 +75,24 @@ describe('areInteractiveFramePropsEqual', () => {
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
 
+  it('treats frame padding as a render-critical change', () => {
+    const prevProps = createProps();
+    const borderSettings = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);
+    prevProps.frame.borderSettings = borderSettings;
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        borderSettings: {
+          ...borderSettings,
+          padding: { ...borderSettings.padding, top: borderSettings.padding.top + 8 },
+        },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
+
   it('treats linked annotation templates and focus blur as render-critical changes', () => {
     const prevProps = createProps();
     const borderSettings = projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET);

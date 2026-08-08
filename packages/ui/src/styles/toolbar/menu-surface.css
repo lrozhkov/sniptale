@@ -14,6 +14,11 @@
   background: transparent;
 }
 
+.sniptale-toolbar-positioner:has(> .sniptale-toolbar[data-menu-open='true']) {
+  z-index: 2147483646;
+  pointer-events: auto;
+}
+
 .sniptale-toolbar[data-menu-open='true'] {
   z-index: 2147483646;
   pointer-events: auto !important;
@@ -32,23 +37,29 @@
 
 #sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
   ~ #sniptale-content-overlay-root
-  > :not(.sniptale-main-toolbar-popover):not(.sniptale-modal):not(.sniptale-modal-backdrop):not(
-    .sniptale-blur-overlay
-  ):not(.sniptale-focus-overlay):not(:has(.sniptale-modal)) {
+  > :not(.sniptale-main-toolbar-popover):not(:has(> .sniptale-main-toolbar-popover)):not(
+    .sniptale-modal
+  ):not(.sniptale-modal-backdrop):not(.sniptale-blur-overlay):not(.sniptale-focus-overlay):not(
+    :has(.sniptale-modal)
+  ) {
   z-index: 2147483645 !important;
   pointer-events: none !important;
 }
 
 #sniptale-content-app-root:has(.sniptale-auto-blur-modal)
   ~ #sniptale-content-overlay-root
-  > :not(.sniptale-modal):not(.sniptale-modal-backdrop):not(:has(.sniptale-modal)) {
+  > :not(.sniptale-modal):not(.sniptale-modal-backdrop):not(:has(.sniptale-modal)),
+#sniptale-content-app-root:has(.sniptale-auto-blur-modal)
+  ~ #sniptale-content-overlay-root
+  > :not(.sniptale-modal):not(.sniptale-modal-backdrop):not(:has(.sniptale-modal))
+  * {
   z-index: 2147483645 !important;
   pointer-events: none !important;
 }
 
 #sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
   ~ #sniptale-content-overlay-root
-  > .sniptale-main-toolbar-popover {
+  > :is(.sniptale-main-toolbar-popover, :has(> .sniptale-main-toolbar-popover)) {
   z-index: 2147483647 !important;
   pointer-events: auto !important;
 }

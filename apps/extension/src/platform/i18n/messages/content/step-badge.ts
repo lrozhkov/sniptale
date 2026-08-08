@@ -59,6 +59,7 @@ export const contentStepBadgeMessages = defineMessageSource({
   background: { ru: 'Фон', en: 'Background' },
   textColor: { ru: 'Текст', en: 'Text' },
   outline: { ru: 'Обводка', en: 'Outline' },
+  outlineWidth: { ru: 'Толщина обводки', en: 'Outline width' },
   colorSourceLabel: { ru: 'Источник цвета', en: 'Color source' },
   colorSource: {
     custom: { ru: 'Свой цвет', en: 'Custom color' },

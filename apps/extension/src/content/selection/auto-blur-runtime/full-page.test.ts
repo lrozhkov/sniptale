@@ -81,3 +81,16 @@ it('restores the original scroll position when scanning fails', async () => {
   expect(pageScrollMocks.writePageScroll).toHaveBeenLastCalledWith(pageScrollMocks.root, 25, 500);
   expect(pageScrollMocks.current).toEqual({ x: 25, y: 500 });
 });
+
+it('stops between viewports and restores the original scroll position when cancelled', async () => {
+  const controller = new AbortController();
+  const visit = vi.fn(() => controller.abort());
+
+  await expect(visitAutoBlurPageViewports(visit, controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+
+  expect(visit).toHaveBeenCalledOnce();
+  expect(pageScrollMocks.writePageScroll).toHaveBeenLastCalledWith(pageScrollMocks.root, 25, 500);
+  expect(pageScrollMocks.current).toEqual({ x: 25, y: 500 });
+});

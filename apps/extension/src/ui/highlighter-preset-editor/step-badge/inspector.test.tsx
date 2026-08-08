@@ -22,6 +22,7 @@ it('renders linked size and semantic color controls', () => {
   expect(markup).toContain('Размер и цвета');
   expect(markup).toContain('От рамки');
   expect(markup).toContain('Цвет рамки');
+  expect(markup).toContain('Толщина обводки');
 });
 
 it('stores only valid safe custom CSS', async () => {

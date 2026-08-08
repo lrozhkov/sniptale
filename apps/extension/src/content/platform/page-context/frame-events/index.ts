@@ -26,3 +26,8 @@ export {
   dispatchSessionBlurSettingsChanged,
   dispatchSessionFocusSettingsChanged,
 } from './session';
+export {
+  addFutureFrameDefaultsChangedListener,
+  dispatchFutureFrameDefaultsChanged,
+  type FutureFrameDefaultsChangedDetail,
+} from './future-defaults';

@@ -140,7 +140,7 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
 
   return createPortal(
     <div
-      className="sniptale-frame-toolbar-bridge"
+      className="sniptale-frame-toolbar-bridge-positioner sniptale-content-ui-positioner"
       data-frame-id={props.frame.id}
       data-frame-control="trigger"
       data-placement-side={position.side}
@@ -149,29 +149,37 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
         position: 'fixed',
         left: position.x - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
         top: position.y - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
-        padding: FRAME_TRIGGER_BRIDGE_PADDING,
-        display: 'flex',
-        flexDirection: position.direction,
-        gap: FRAME_TRIGGER_CONTROL_GAP,
         pointerEvents: 'auto',
         zIndex: Z_INDEX_FLOATING_UI,
       })}
-      onPointerEnter={onFocus}
-      onPointerLeave={onBlur}
     >
-      <FrameQuickActionButtons
-        actions={visibleQuickActions}
-        frameId={props.frame.id}
-        onBlur={onBlur}
-        onFocus={onFocus}
-      />
-      <FrameToolbarTriggerButton
-        frame={props.frame}
-        label={translate('content.interactiveFrame.openToolbar')}
-        onBlur={onBlur}
-        onFocus={onFocus}
-        selectFrame={props.selectFrame}
-      />
+      <div
+        className="sniptale-frame-toolbar-bridge sniptale-content-ui-zoom-surface"
+        data-frame-id={props.frame.id}
+        data-frame-control="trigger"
+        style={{
+          padding: FRAME_TRIGGER_BRIDGE_PADDING,
+          display: 'flex',
+          flexDirection: position.direction,
+          gap: FRAME_TRIGGER_CONTROL_GAP,
+        }}
+        onPointerEnter={onFocus}
+        onPointerLeave={onBlur}
+      >
+        <FrameQuickActionButtons
+          actions={visibleQuickActions}
+          frameId={props.frame.id}
+          onBlur={onBlur}
+          onFocus={onFocus}
+        />
+        <FrameToolbarTriggerButton
+          frame={props.frame}
+          label={translate('content.interactiveFrame.openToolbar')}
+          onBlur={onBlur}
+          onFocus={onFocus}
+          selectFrame={props.selectFrame}
+        />
+      </div>
     </div>,
     resolveContentPortalTarget()
   );

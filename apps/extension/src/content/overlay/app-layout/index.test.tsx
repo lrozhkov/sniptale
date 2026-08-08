@@ -55,6 +55,7 @@ function createAutoBlurController(): AutoBlurController {
   return {
     apply: vi.fn(async () => undefined),
     applyOnce: vi.fn(async () => undefined),
+    cancelFullPageScan: vi.fn(),
     autoApplyAllowed: true,
     autoApplyEnabled: false,
     blurSettings: {
@@ -63,11 +64,14 @@ function createAutoBlurController(): AutoBlurController {
       showBorder: false,
     },
     close: vi.fn(),
+    configurationMode: 'review',
     errorMessage: null,
     isApplying: false,
+    isFullPageScanning: false,
     isOpen: false,
     matches: [],
     open: vi.fn(),
+    openForAutoApply: vi.fn(),
     reset: vi.fn(),
     selectedCategories: new Set(),
     selectedMatchIds: new Set(),

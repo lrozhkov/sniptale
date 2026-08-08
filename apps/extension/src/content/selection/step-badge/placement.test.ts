@@ -112,6 +112,7 @@ describe('step badge boundary placement', () => {
           diameter: 40,
           outlineColor: '#000000',
           outlineColorSource: 'frame-border',
+          outlineWidth: 5,
           sizeSource: 'custom',
           textColor: '#000000',
           textColorSource: 'frame-border',
@@ -124,7 +125,7 @@ describe('step badge boundary placement', () => {
 
     expect(style).toMatchObject({
       backgroundColor: '#fedcba',
-      border: '2px solid #123456',
+      border: '5px solid #123456',
       color: '#123456',
       height: '40px',
       left: '100%',

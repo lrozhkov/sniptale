@@ -22,11 +22,22 @@ import {
   getAnnotationTemplateSources,
   resetAnnotationTemplateSources,
 } from '../../../selection/frame-runtime/session/annotation-template-source';
+import { dispatchFutureFrameDefaultsChanged } from '../../../platform/page-context/frame-events';
 
 const popoverMocks = vi.hoisted(() => ({
   props: null as Record<string, unknown> | null,
   calloutProps: null as Record<string, unknown> | null,
   stepBadgeProps: null as Record<string, unknown> | null,
+}));
+const forkSessionMocks = vi.hoisted(() => ({
+  load: vi.fn().mockReturnValue(new Promise(() => undefined)),
+  persist: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./annotation-fork-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./annotation-fork-session')>()),
+  loadAnnotationForkDrafts: forkSessionMocks.load,
+  persistAnnotationForkDrafts: forkSessionMocks.persist,
 }));
 
 vi.mock('../../../selection/frame-settings-popover', () => ({
@@ -104,6 +115,8 @@ beforeEach(() => {
   popoverMocks.props = null;
   popoverMocks.calloutProps = null;
   popoverMocks.stepBadgeProps = null;
+  forkSessionMocks.load.mockReset().mockReturnValue(new Promise(() => undefined));
+  forkSessionMocks.persist.mockReset().mockResolvedValue(undefined);
   resetFrameSessionBorderPreset();
   resetAnnotationTemplateSources();
 });
@@ -296,4 +309,87 @@ it('keeps capture visibility out of the future-frame toolbar', () => {
     container?.querySelector('[data-ui="content.toolbar.future-frame-capture-visibility"]')
   ).toBeNull();
   expect(getFrameSessionBorderPreset().effects?.capture).toEqual({ hideFrame: false });
+});
+
+it('updates the visible toolbar defaults after an element fork is promoted', () => {
+  const callout = createDefaultCalloutSettings();
+  callout.style.surface.backgroundColor = '#123456';
+  const baseStepBadge = createDefaultFrameStepBadge();
+  const stepBadge = {
+    ...baseStepBadge,
+    style: { ...baseStepBadge.style, diameter: 30 },
+  };
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <Harness
+        futureFrameCalloutActions={{ enable: () => callout, set: vi.fn() }}
+        futureFrameStepBadgeActions={{ enable: () => stepBadge, set: vi.fn() }}
+        futureFrameStyle={createStyle('border')}
+        onFutureFrameEffectModeChange={vi.fn()}
+      />
+    );
+  });
+
+  act(() => dispatchFutureFrameDefaultsChanged({ kind: 'callout', settings: callout }));
+  expect(
+    container
+      ?.querySelector('[data-ui="content.toolbar.future-frame-callout"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(popoverMocks.calloutProps?.['settings']).toMatchObject({
+    style: { surface: { backgroundColor: '#123456' } },
+  });
+
+  act(() => dispatchFutureFrameDefaultsChanged({ kind: 'stepBadge', settings: stepBadge }));
+  expect(
+    container
+      ?.querySelector('[data-ui="content.toolbar.future-frame-step-badge"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(popoverMocks.stepBadgeProps?.['settings']).toMatchObject({ style: { diameter: 30 } });
+
+  act(() =>
+    dispatchFutureFrameDefaultsChanged({
+      kind: 'frame',
+      settings: {
+        blurSettings: { amount: 9, blurType: 'distortion', showBorder: false },
+        borderSettings: { ...DEFAULT_BORDER_PRESET, width: 6 },
+        effectMode: 'focus',
+        focusSettings: { blurAmount: 3, opacity: 0.25, showBorder: true },
+      },
+    })
+  );
+  expect(
+    container
+      ?.querySelector('[data-ui="content.toolbar.future-frame-style"]')
+      ?.getAttribute('title')
+  ).toBe('content.interactiveFrame.effectFocus');
+  expect(popoverMocks.props).toMatchObject({ effectMode: 'focus' });
+});
+
+it('restores a tab-scoped frame fork after the toolbar remounts', async () => {
+  forkSessionMocks.load.mockResolvedValueOnce({
+    frame: {
+      blurSettings: { amount: 12, blurType: 'gaussian', showBorder: false },
+      borderSettings: { ...DEFAULT_BORDER_PRESET, sourcePresetId: undefined, width: 9 },
+      effectMode: 'focus',
+      focusSettings: { blurAmount: 4, opacity: 0.2, showBorder: true },
+    },
+  });
+
+  renderControls(createStyle('border'), vi.fn());
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(
+    container
+      ?.querySelector('[data-ui="content.toolbar.future-frame-style"]')
+      ?.getAttribute('title')
+  ).toBe('content.interactiveFrame.effectFocus');
+  expect(forkSessionMocks.persist).not.toHaveBeenCalled();
 });

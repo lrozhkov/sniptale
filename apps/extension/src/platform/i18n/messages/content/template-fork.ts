@@ -10,6 +10,16 @@ export const contentTemplateForkMessages = defineMessageSource({
     en: 'Changes are applied only in this session. Save them as a template or return to the original style.',
   },
   goToSave: { ru: 'Перейти к сохранению', en: 'Go to saving' },
-  discard: { ru: 'Отбросить изменения', en: 'Discard changes' },
+  discard: { ru: 'Сбросить изменения', en: 'Discard changes' },
   continueEditing: { ru: 'Продолжить настройку', en: 'Continue editing' },
+  applyToFuture: { ru: 'Для следующих', en: 'Use for next' },
+  applyToFutureTitle: {
+    ru: 'Применить к следующим рамкам?',
+    en: 'Use these settings for next frames?',
+  },
+  applyToFutureDescription: {
+    ru: 'Текущие настройки основного тулбара будут заменены. Новые рамки получат этот стиль; уже установленные рамки не изменятся.',
+    en: 'Current main-toolbar settings will be replaced. New frames will use this style; existing frames will not change.',
+  },
+  applyToFutureConfirm: { ru: 'Применить', en: 'Apply' },
 });

@@ -18,7 +18,11 @@ import {
   saveAutoBlurSettings,
 } from '../persistence';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { scanAutoBlurTargets, type AutoBlurMatch } from '../../../selection/auto-blur-runtime';
+import {
+  scanAutoBlurTargets,
+  throwIfAutoBlurScanAborted,
+  type AutoBlurMatch,
+} from '../../../selection/auto-blur-runtime';
 import type { useContentAppBindings } from '../../app/bindings';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
@@ -60,18 +64,22 @@ export async function applyAutoBlurWithSettings(args: {
   frames: AutoBlurFrameManager['frames'];
   selectedCategories: Iterable<AutoBlurCategory>;
   scanMode?: 'current-view' | 'full-page';
+  signal?: AbortSignal;
 }) {
   const selectedCategories = new Set(args.selectedCategories);
   const result = await scanAutoBlurTargets({
     frames: args.frames,
     ...(args.scanMode === undefined ? {} : { mode: args.scanMode }),
+    ...(args.signal === undefined ? {} : { signal: args.signal }),
   });
+  throwIfAutoBlurScanAborted(args.signal);
   const selectedMatches = result.matches.filter(
     (match) => !match.alreadyBlurred && selectedCategories.has(match.category)
   );
 
   const borderSettings =
     args.borderSettings ?? (await loadAutoBlurBorderSettings(args.blurSettings.borderPresetId));
+  throwIfAutoBlurScanAborted(args.signal);
 
   return args.frameManager.syncAutoBlurFrames({
     ...(args.scanMode === 'full-page' ? { allowDeferredInitialPlacement: true } : {}),

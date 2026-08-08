@@ -688,6 +688,7 @@ function getLineRouteState(input: {
           blockPoint,
           blockSide,
           framePoint,
+          frameSide,
           ...(waypoint ? { waypoint } : {}),
         })
       : null;

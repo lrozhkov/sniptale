@@ -18,6 +18,7 @@ it('creates the six stable system callout presets with independent styles', () =
   expect(
     presets.every((preset) => preset.basedOnRevision === SYSTEM_CALLOUT_PRESET_CATALOG_REVISION)
   ).toBe(true);
+  expect(presets.every((preset) => preset.style.badge.text === '')).toBe(true);
   presets[0]!.style.surface.radius = 99;
   expect(createSystemCalloutPresetCatalog()[0]!.style.surface.radius).toBe(12);
 });

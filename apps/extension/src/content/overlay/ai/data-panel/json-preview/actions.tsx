@@ -25,7 +25,8 @@ export function JsonPreviewActions({
       <button
         onClick={() => setShowDataPreview((prev) => !prev)}
         disabled={isLoading}
-        className={`sniptale-toggle-btn ${showDataPreview ? 'active' : ''}`}
+        className="sniptale-toggle-btn sniptale-ai-data-preview-toggle"
+        aria-pressed={showDataPreview}
         title={
           showDataPreview ? translate('aiModal.hideJsonTitle') : translate('aiModal.showJsonTitle')
         }

@@ -16,6 +16,16 @@ import type {
   RequestLlmSessionMessage,
   RequestLlmSessionResponse,
 } from '../../llm';
+import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
+import type { ContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+
+export type AiSettingsNavigationMessage = {
+  contentIntent?: ContentPrivilegedActionCapability;
+  section: 'ai-connections' | 'ai-prompts';
+  type: typeof MessageType.AI_SETTINGS_NAVIGATION;
+};
+
+export type AiSettingsNavigationResponse = RuntimeMessageResponse<{ result: 'accepted' }>;
 
 export type RuntimeAiRequestByType = {
   [MessageType.REQUEST_LLM_SESSION]: RequestLlmSessionMessage;
@@ -23,6 +33,7 @@ export type RuntimeAiRequestByType = {
   [MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM]: ProcessScenarioEditorWithLLMMessage;
   [MessageType.AI_SETTINGS_QUERY]: AiSettingsQueryMessage;
   [MessageType.AI_SETTINGS_MUTATION]: AiSettingsMutationMessage;
+  [MessageType.AI_SETTINGS_NAVIGATION]: AiSettingsNavigationMessage;
   [MessageType.AI_SECRET_UNLOCK]: AISecretUnlockMessage;
 };
 
@@ -32,5 +43,6 @@ export type RuntimeAiResponseByType = {
   [MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM]: ProcessScenarioEditorWithLLMResponse;
   [MessageType.AI_SETTINGS_QUERY]: AiSettingsQueryResponse;
   [MessageType.AI_SETTINGS_MUTATION]: AiSettingsMutationResponse;
+  [MessageType.AI_SETTINGS_NAVIGATION]: AiSettingsNavigationResponse;
   [MessageType.AI_SECRET_UNLOCK]: AISecretUnlockResponse;
 };

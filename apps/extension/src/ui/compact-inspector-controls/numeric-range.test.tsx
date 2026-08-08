@@ -87,21 +87,6 @@ function createPointerEvent(type: string, init: PointerEventInit = {}) {
   return event;
 }
 
-function setNumericRowRect(row: HTMLElement) {
-  row.getBoundingClientRect = () =>
-    ({
-      bottom: 40,
-      height: 40,
-      left: 0,
-      right: 240,
-      top: 0,
-      width: 240,
-      x: 0,
-      y: 0,
-      toJSON: () => undefined,
-    }) as DOMRect;
-}
-
 function getRow() {
   const row = container?.querySelector<HTMLElement>(
     '[data-ui="shared.ui.compact-inspector.numeric-row"]'
@@ -220,7 +205,7 @@ it('keeps the range slider on the lower edge of the whole numeric row', () => {
   expect(getRange().className).not.toContain('group-focus-within/compact-numeric-row:opacity-100');
 });
 
-it('reveals the row range only near the lower edge or during active pointer drag', () => {
+it('reveals the row range across the label, spacing, and value area', () => {
   renderNumericRow();
 
   const row = getRow();
@@ -228,8 +213,8 @@ it('reveals the row range only near the lower edge or during active pointer drag
   const scrub = container?.querySelector<HTMLElement>(
     '[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]'
   );
+  const label = row.querySelector<HTMLElement>('span');
   const valueInput = container?.querySelector<HTMLInputElement>('input[aria-label="Opacity"]');
-  setNumericRowRect(row);
 
   act(() => {
     valueInput?.focus();
@@ -246,15 +231,33 @@ it('reveals the row range only near the lower edge or during active pointer drag
   expect(range.className).toContain('pointer-events-none');
 
   act(() => {
-    row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 34 }));
+    label?.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 8 }));
   });
   expect(row.dataset['rangeVisible']).toBe('true');
   expect(scrub?.className).toContain('opacity-100');
   expect(range.className).toContain('pointer-events-auto');
 
   act(() => {
+    row.dispatchEvent(
+      createPointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    );
+    valueInput?.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 20 }));
+  });
+  expect(row.dataset['rangeVisible']).toBe('true');
+
+  act(() => {
+    row.dispatchEvent(
+      createPointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    );
+    row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 20 }));
+  });
+  expect(row.dataset['rangeVisible']).toBe('true');
+
+  act(() => {
     range.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
-    row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 12 }));
+    row.dispatchEvent(
+      createPointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    );
   });
   expect(row.dataset['rangeVisible']).toBe('true');
 

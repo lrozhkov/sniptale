@@ -8,6 +8,8 @@ const {
   routeAISecretUnlockMessageMock,
   routeAiSettingsQueryMessageMock,
   routeAiSettingsMutationMessageMock,
+  routeAiSettingsNavigationMessageMock,
+  routeAnnotationForkSessionMessageMock,
   routeContentActivationKeyRequestMock,
   routeContentCapabilityRequestMock,
   routeContentRuntimeWakeupMessageMock,
@@ -24,6 +26,8 @@ const {
   routeAISecretUnlockMessageMock: vi.fn(),
   routeAiSettingsQueryMessageMock: vi.fn(),
   routeAiSettingsMutationMessageMock: vi.fn(),
+  routeAiSettingsNavigationMessageMock: vi.fn(),
+  routeAnnotationForkSessionMessageMock: vi.fn(),
   routeContentActivationKeyRequestMock: vi.fn(),
   routeContentCapabilityRequestMock: vi.fn(),
   routeContentRuntimeWakeupMessageMock: vi.fn(),
@@ -44,6 +48,16 @@ vi.mock('../../../ai/settings/route', () => ({
 
 vi.mock('../../../ai/settings/query-route', () => ({
   routeAiSettingsQueryMessage: routeAiSettingsQueryMessageMock,
+}));
+
+vi.mock('../../../ai/settings/navigation-route', () => ({
+  routeAiSettingsNavigationMessage: routeAiSettingsNavigationMessageMock,
+}));
+
+vi.mock('../../../annotation-fork-session/route', () => ({
+  bindAnnotationForkSessionDocument: vi.fn(),
+  clearAnnotationForkSessionForTab: vi.fn(),
+  routeAnnotationForkSessionMessage: routeAnnotationForkSessionMessageMock,
 }));
 
 vi.mock('../../../ai/settings/secret-unlock-route', async (importOriginal) => ({
@@ -126,6 +140,23 @@ const contentRuntimeWakeupRouteContext = {
   },
   senderClassification: 'content-runtime-wakeup-content-script',
 } as BackgroundOwnedRouteContext;
+const annotationForkRouteContext = {
+  authorityFamily: 'annotation-fork-session',
+  freshnessReplay: 'sync-policy-approved',
+  messageBinding: { type: MessageType.ANNOTATION_FORK_SESSION },
+  ownerRoute: {
+    handlerId: 'annotation-fork-session',
+    messageTypes: [MessageType.ANNOTATION_FORK_SESSION],
+    ownerModule: 'apps/extension/src/background/annotation-fork-session/route.ts',
+    policyStateIds: ['annotation-fork-sessions'],
+    routeAuthorityFamily: 'background-owned-ipc',
+  },
+  preauthorization: {
+    kind: 'annotation-fork-session',
+    senderBinding: contentRuntimeWakeupSenderBinding,
+  },
+  senderClassification: 'content-tab-runtime',
+} as BackgroundOwnedRouteContext;
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -146,6 +177,8 @@ function primeSingleMessageRouteMocks() {
   routeLlmSessionMessageMock.mockReturnValue(true);
   routeAiSettingsQueryMessageMock.mockReturnValue(true);
   routeAiSettingsMutationMessageMock.mockReturnValue(true);
+  routeAiSettingsNavigationMessageMock.mockReturnValue(true);
+  routeAnnotationForkSessionMessageMock.mockReturnValue(true);
   routeAISecretUnlockMessageMock.mockReturnValue(true);
   routePageAccessMessageMock.mockReturnValue(true);
   routeContentRuntimeWakeupMessageMock.mockReturnValue(true);
@@ -160,6 +193,8 @@ function expectSingleMessageRoutesHandled() {
     [MessageType.REQUEST_LLM_SESSION, null],
     [MessageType.AI_SETTINGS_QUERY, routeContext],
     [MessageType.AI_SETTINGS_MUTATION, null],
+    [MessageType.AI_SETTINGS_NAVIGATION, routeContext],
+    [MessageType.ANNOTATION_FORK_SESSION, annotationForkRouteContext],
     [MessageType.AI_SECRET_UNLOCK, routeContext],
     [MessageType.PAGE_ACCESS, null],
     [MessageType.CONTENT_RUNTIME_WAKEUP, contentRuntimeWakeupRouteContext],
@@ -187,6 +222,11 @@ function expectContextAwareRouteAdaptersCalled() {
   expect(routeAiSettingsQueryMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ type: MessageType.AI_SETTINGS_QUERY }),
     sender,
+    sendResponse,
+    routeContext
+  );
+  expect(routeAiSettingsNavigationMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({ type: MessageType.AI_SETTINGS_NAVIGATION }),
     sendResponse,
     routeContext
   );

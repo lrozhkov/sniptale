@@ -9,7 +9,7 @@ export function readTokenCounter() {
 }
 
 export async function expandBodyDataPanel() {
-  await clickBodyElement('.sniptale-spoiler-header');
+  await clickBodyElement('.sniptale-ai-spoiler-toggle');
 }
 
 export async function toggleBodyJsonPreview() {

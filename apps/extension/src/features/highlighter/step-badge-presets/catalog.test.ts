@@ -19,6 +19,7 @@ it('provides five independent stable system templates', () => {
     24
   );
   expect(presets.find((preset) => preset.id === 'system-large')?.settings.style.diameter).toBe(40);
+  expect(presets[0]?.settings.style.outlineWidth).toBe(2);
   expect(presets.find((preset) => preset.id === 'system-letters')?.settings).toMatchObject({
     alphabet: 'cyrillic',
     auto: true,

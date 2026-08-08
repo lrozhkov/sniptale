@@ -11,7 +11,12 @@ import type {
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import { StepBadgePopoverContent } from './body';
 import { useStepBadgePresetPopoverController } from './preset-controller';
-import { filterStepBadgeValue, toggleStepBadgeOffset } from './helpers';
+import {
+  filterStepBadgeValue,
+  getDefaultStepBadgeAlphabet,
+  toggleStepBadgeOffset,
+} from './helpers';
+import { useAppLocale } from '../../../platform/i18n';
 import {
   createStepBadgeSettingsFromTemplate,
   createStepBadgeTemplateFromSettings,
@@ -47,6 +52,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
 }) {
+  const locale = useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [local, setLocal] = useState(props.settings);
   const presets = useStepBadgePresetPopoverController(props.isOpen);
@@ -104,6 +110,11 @@ export function FutureStepBadgeSettingsPopover(props: {
     setLocal(next);
     props.onChange(next);
   };
+  const forkPreset = (preset: StepBadgePreset) => {
+    const next = createStepBadgeSettingsFromTemplate(preset.settings);
+    setLocal(next);
+    props.onChange(next);
+  };
   const template = createStepBadgeTemplateFromSettings(
     local,
     getLinkedStepBadgeDiameter(props.frameVisuals.borderWidth)
@@ -133,7 +144,7 @@ export function FutureStepBadgeSettingsPopover(props: {
         onAlphabetChange={(alphabet: StepBadgeAlphabet) => commit({ alphabet })}
         onAnchorChange={(anchor: StepBadgeAnchor) => commit({ anchor, manualPlacement: undefined })}
         onApplyPreset={applyPreset}
-        onForkPreset={() => commit({})}
+        onForkPreset={forkPreset}
         onAutoModeChange={(auto) => commit({ auto })}
         onCreatePreset={presets.catalog.create}
         onClose={props.onClose}
@@ -151,7 +162,11 @@ export function FutureStepBadgeSettingsPopover(props: {
         onSettingsChange={commit}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}
         onTemplateCreated={markTemplateCreated}
-        onTypeChange={(type: Extract<StepBadgeType, 'number' | 'letter'>) => commit({ type })}
+        onTypeChange={(type: Extract<StepBadgeType, 'number' | 'letter'>) =>
+          commit(
+            type === 'letter' ? { type, alphabet: getDefaultStepBadgeAlphabet(locale) } : { type }
+          )
+        }
         onUpdatePreset={presets.catalog.update}
         onValueChange={(value) =>
           commit({

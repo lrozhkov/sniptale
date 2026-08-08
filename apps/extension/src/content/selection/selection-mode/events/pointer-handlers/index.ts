@@ -151,10 +151,36 @@ export function handleSelectionModeMouseMove(
   }
 }
 
+function finalizePendingDragWithoutMove(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  options: Pick<
+    SelectionModeEventOptions,
+    'finalizeDragSelection' | 'startDragSelection' | 'updateDragSelection'
+  >
+): void {
+  if (
+    (state.currentState !== 'idle' && state.currentState !== 'hover') ||
+    !state.mouseDownPoint ||
+    (Math.abs(event.clientX - state.mouseDownPoint.x) <= state.dragThreshold &&
+      Math.abs(event.clientY - state.mouseDownPoint.y) <= state.dragThreshold)
+  ) {
+    return;
+  }
+  stopSelectionModeEvent(event);
+  options.startDragSelection(state.mouseDownPoint.x, state.mouseDownPoint.y);
+  options.updateDragSelection(event.clientX, event.clientY);
+  options.finalizeDragSelection();
+  state.skipNextClick = true;
+}
+
 export function handleSelectionModeMouseUp(
   event: MouseEvent,
   state: SelectionModeInteractionState,
-  options: Pick<SelectionModeEventOptions, 'finalizeDragSelection' | 'flushFinalFrameUpdate'>
+  options: Pick<
+    SelectionModeEventOptions,
+    'finalizeDragSelection' | 'flushFinalFrameUpdate' | 'startDragSelection' | 'updateDragSelection'
+  >
 ): void {
   if (!state.isActive) {
     return;
@@ -180,6 +206,8 @@ export function handleSelectionModeMouseUp(
     state.isResizing = false;
     state.resizeDirection = null;
   }
+
+  finalizePendingDragWithoutMove(event, state, options);
 
   state.mouseDownPoint = null;
   state.hasMovedEnough = false;

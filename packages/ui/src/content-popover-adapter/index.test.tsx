@@ -43,6 +43,8 @@ function verifyPortalTargetRender() {
   expect(popover?.dataset['theme']).toBe('dark');
   expect(popover?.className).toContain('custom-popover');
   expect(popover?.className).toContain('sniptale-content-popover');
+  expect(popover?.className).toContain('sniptale-content-ui-zoom-surface');
+  expect(popover?.parentElement?.className).toContain('sniptale-content-popover-positioner');
   expect(popover?.textContent).toContain('Popover content');
   expect(popoverRef.current).toBe(popover);
 }
@@ -70,8 +72,9 @@ function verifyFallbackPortalRender() {
 
   expect(popover).not.toBeNull();
   expect(popover?.className).toContain('fallback-popover');
-  expect(popover?.style.top).toBe('24px');
-  expect(popover?.style.left).toBe('16px');
+  expect(popover?.parentElement?.style.top).toBe('24px');
+  expect(popover?.parentElement?.style.left).toBe('16px');
+  expect(popover?.parentElement?.style.width).toBe('max-content');
   expect(popover?.style.colorScheme).toBe('dark');
 }
 
@@ -131,6 +134,27 @@ describe('ContentPopoverAdapter', () => {
 
   it('falls back to the resolved portal target and merges explicit style with the theme', () => {
     verifyFallbackPortalRender();
+  });
+
+  it('keeps an explicit surface width inside the unscaled positioner', () => {
+    act(() => {
+      root?.render(
+        <ContentPopoverAdapter
+          isOpen
+          anchorEl={anchorEl}
+          portalTarget={portalTarget}
+          style={{ position: 'fixed', left: 12, top: 18, width: 360 }}
+        >
+          <div>Fixed-width content</div>
+        </ContentPopoverAdapter>
+      );
+    });
+
+    const popover = portalTarget?.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.content-popover"]'
+    );
+    expect(popover?.parentElement?.style.width).toBe('max-content');
+    expect(popover?.style.width).toBe('360px');
   });
 
   it('returns null when the popover is closed', () => {

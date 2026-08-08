@@ -7,13 +7,13 @@ export type SettingsPopoverContext = 'element' | 'toolbar';
 
 export function SettingsPopoverHeader(props: {
   action?: { label: string; onClick: () => void };
+  applyToFutureAction?: { label: string; onClick: () => void };
   closeLabel: string;
   context: SettingsPopoverContext;
   destructiveAction?: { label: string; onClick: () => void };
   sourceAction?: { description: string; label: string; onClick: () => void };
   drag?: FloatingPopoverDrag;
   onClose: () => void;
-  status?: string;
   title: string;
 }) {
   const draggable = props.context === 'element' && props.drag !== undefined;
@@ -30,14 +30,13 @@ export function SettingsPopoverHeader(props: {
           }
         : {})}
     >
-      <ProductToolbarMenuGroupLabel>{props.title}</ProductToolbarMenuGroupLabel>
+      <ProductToolbarMenuGroupLabel>
+        <span title={props.title}>{props.title}</span>
+      </ProductToolbarMenuGroupLabel>
       <div
         className="sniptale-settings-popover-header-actions"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        {props.status ? (
-          <span className="sniptale-settings-popover-status">{props.status}</span>
-        ) : null}
         {props.sourceAction ? (
           <button
             aria-label={props.sourceAction.description}
@@ -57,6 +56,17 @@ export function SettingsPopoverHeader(props: {
             type="button"
           >
             {props.destructiveAction.label}
+          </button>
+        ) : null}
+        {props.applyToFutureAction ? (
+          <button
+            className="sniptale-settings-popover-mode-action"
+            data-settings-action="apply-to-future"
+            onClick={props.applyToFutureAction.onClick}
+            title={props.applyToFutureAction.label}
+            type="button"
+          >
+            {props.applyToFutureAction.label}
           </button>
         ) : null}
         {props.action ? (

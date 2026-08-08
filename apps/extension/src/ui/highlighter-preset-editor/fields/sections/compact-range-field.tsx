@@ -1,4 +1,5 @@
-import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { NumericRow } from '../../../compact-inspector-controls';
+import type { CompactInspectorUnit } from '../../../compact-inspector-controls/shared';
 
 export function EditorCompactRangeField({
   displaySuffix,
@@ -8,7 +9,7 @@ export function EditorCompactRangeField({
   onChange,
   value,
 }: {
-  displaySuffix?: string;
+  displaySuffix?: CompactInspectorUnit;
   label: string;
   max: number;
   min: number;
@@ -16,22 +17,17 @@ export function EditorCompactRangeField({
   value: number;
 }) {
   return (
-    <div className="min-w-0 space-y-1.5">
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <label className="truncate text-[var(--sniptale-color-text-secondary)]">{label}</label>
-        <output className="shrink-0 font-medium tabular-nums text-[var(--sniptale-color-text-primary)]">
-          {value}
-          {displaySuffix}
-        </output>
-      </div>
-      <ProductRange
-        aria-label={label}
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-        className="w-full"
-      />
-    </div>
+    <NumericRow
+      appearance="plain"
+      label={label}
+      max={max}
+      min={min}
+      onCommitValue={onChange}
+      onPreviewValue={onChange}
+      scrub={{ max, min, step: 1 }}
+      step={1}
+      unit={displaySuffix}
+      value={value}
+    />
   );
 }

@@ -44,7 +44,7 @@ export interface ProductToolbarMenuGroupLabelProps {
 }
 
 export interface ProductToolbarMenuGroupCopyProps {
-  hint: ReactNode;
+  hint?: ReactNode;
   label: ReactNode;
 }
 
@@ -132,7 +132,7 @@ export function ProductToolbarMenuGroupCopy({ hint, label }: ProductToolbarMenuG
   return (
     <span className="sniptale-toolbar-menu-group-copy">
       <span>{label}</span>
-      <span className="sniptale-toolbar-menu-group-hint">{hint}</span>
+      {hint ? <span className="sniptale-toolbar-menu-group-hint">{hint}</span> : null}
     </span>
   );
 }

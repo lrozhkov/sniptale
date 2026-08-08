@@ -57,6 +57,23 @@ afterEach(() => {
 });
 
 describe('InteractiveFrameToolbarTrigger', () => {
+  it('separates viewport placement from layout zoom', () => {
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{ effectMode: 'border', height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
+          isVisible
+          {...createTriggerProps()}
+        />
+      );
+    });
+
+    const positioner = document.querySelector('.sniptale-frame-toolbar-bridge-positioner');
+    const surface = positioner?.querySelector('.sniptale-frame-toolbar-bridge');
+    expect(positioner?.classList).toContain('sniptale-content-ui-positioner');
+    expect(surface?.classList).toContain('sniptale-content-ui-zoom-surface');
+  });
+
   it('renders a localized native button and keeps the hover corridor owned by its frame', () => {
     const handlers = createTriggerProps();
     act(() => {

@@ -62,6 +62,8 @@ describe('DataSelectionPreviewHeader', () => {
     const handleToggleSpoiler = vi.fn();
     const toggleExpandAll = vi.fn();
     const toggleSelectAll = vi.fn();
+    const setFilterQuery = vi.fn();
+    const setShowSelectedOnly = vi.fn();
 
     await renderNode(
       <DataSelectionPreviewHeader
@@ -72,12 +74,16 @@ describe('DataSelectionPreviewHeader', () => {
         isDataSpoilerOpen={true}
         isLoading={false}
         spoilerSummary="2 groups"
+        filterQuery=""
+        setFilterQuery={setFilterQuery}
+        setShowSelectedOnly={setShowSelectedOnly}
+        showSelectedOnly={false}
         toggleExpandAll={toggleExpandAll}
         toggleSelectAll={toggleSelectAll}
       />
     );
 
-    const header = container?.querySelector('.sniptale-spoiler-header');
+    const header = container?.querySelector('.sniptale-ai-spoiler-toggle');
 
     act(() => {
       header?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -95,13 +101,57 @@ describe('DataSelectionPreviewHeader', () => {
       toggleSelectAll,
     });
     expect(handleToggleSpoiler).toHaveBeenCalledTimes(1);
-    expect(header?.getAttribute('role')).toBe('button');
-    expect(header?.getAttribute('tabindex')).toBe('0');
+    expect(header?.tagName).toBe('BUTTON');
+
+    act(() => {
+      const search = container?.querySelector<HTMLInputElement>(
+        'input[aria-label="aiModal.searchDataLabel"]'
+      );
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(search, 'customer');
+      search?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(setFilterQuery).toHaveBeenCalledWith('customer');
+
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>('[aria-label="aiModal.showSelectedOnlyLabel"]')
+        ?.click()
+    );
+    expect(setShowSelectedOnly).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('shows a dedicated clear action only for a non-empty filter', async () => {
+    const setFilterQuery = vi.fn();
+    await renderNode(
+      <DataSelectionPreviewHeader
+        filterQuery="customer"
+        getSummaryToneClass={() => 'tone-ok'}
+        handleToggleSpoiler={vi.fn()}
+        isAnyExpanded={false}
+        isAnySelected={false}
+        isDataSpoilerOpen={true}
+        isLoading={false}
+        setFilterQuery={setFilterQuery}
+        setShowSelectedOnly={vi.fn()}
+        showSelectedOnly={false}
+        spoilerSummary="2 groups"
+        toggleExpandAll={vi.fn()}
+        toggleSelectAll={vi.fn()}
+      />
+    );
+
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>('[aria-label="aiModal.clearSearchLabel"]')
+        ?.click()
+    );
+    expect(setFilterQuery).toHaveBeenCalledWith('');
   });
 });
 
 describe('DataSelectionPreviewHeader keyboard support', () => {
-  it('supports keyboard toggle semantics for the activatable header', async () => {
+  it('uses a native button for keyboard toggle semantics', async () => {
     const handleToggleSpoiler = vi.fn();
 
     await renderNode(
@@ -113,18 +163,17 @@ describe('DataSelectionPreviewHeader keyboard support', () => {
         isDataSpoilerOpen={false}
         isLoading={false}
         spoilerSummary="idle"
+        filterQuery=""
+        setFilterQuery={vi.fn()}
+        setShowSelectedOnly={vi.fn()}
+        showSelectedOnly={false}
         toggleExpandAll={vi.fn()}
         toggleSelectAll={vi.fn()}
       />
     );
 
-    act(() => {
-      container
-        ?.querySelector('.sniptale-spoiler-header')
-        ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    });
-
-    expect(handleToggleSpoiler).toHaveBeenCalledTimes(1);
+    expect(container?.querySelector('.sniptale-ai-spoiler-toggle')?.tagName).toBe('BUTTON');
+    expect(handleToggleSpoiler).not.toHaveBeenCalled();
   });
 });
 
@@ -139,6 +188,10 @@ describe('DataSelectionPreviewHeader closed state', () => {
         isDataSpoilerOpen={false}
         isLoading={false}
         spoilerSummary="idle"
+        filterQuery=""
+        setFilterQuery={vi.fn()}
+        setShowSelectedOnly={vi.fn()}
+        showSelectedOnly={false}
         toggleExpandAll={vi.fn()}
         toggleSelectAll={vi.fn()}
       />

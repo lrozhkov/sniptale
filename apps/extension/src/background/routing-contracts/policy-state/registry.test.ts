@@ -13,6 +13,7 @@ import {
 const EXPECTED_POLICY_STATE_IDS = [
   'ai-secret-unlock-requests',
   'ai-settings-mutation-queue',
+  'annotation-fork-sessions',
   'capture-download-jobs',
   'capture-surface-leases',
   'content-action-activation-keys',

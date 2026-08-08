@@ -4,7 +4,6 @@ import { PromptTemplateEditor } from '../../../../../features/prompt-templates/e
 import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AIModalDataPanel } from '../../data-panel';
-import { TemplateList } from '../../template-list';
 import type { AIModalProps } from './types';
 import type { useAIModalState } from '../session';
 
@@ -71,14 +70,6 @@ export function AIModalDialog({
       <ProductModalHeader {...headerProps} />
       <ProductModalBody className="sniptale-ai-modal-body sniptale-modal-scroll">
         {promptField}
-        <TemplateList
-          templates={state.templates}
-          isLoading={state.templatesLoading}
-          onSelectTemplate={state.handleSelectTemplate}
-          onEditTemplate={state.handleEditTemplate}
-          onDeleteTemplate={state.handleDeleteTemplate}
-          onAddTemplate={state.handleAddTemplate}
-        />
         <AIModalDataPanel
           treeData={treeData ?? null}
           isLoading={isLoading ?? false}

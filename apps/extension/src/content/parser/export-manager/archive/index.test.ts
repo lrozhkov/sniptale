@@ -13,7 +13,15 @@ const treeData = {
 async function openArchiveWithDiagnostics() {
   const archive = await createExportArchive({
     treeData,
-    data: null,
+    data: {
+      meta: {
+        date: '2026-08-08T00:00:00.000Z',
+        title: 'Example page',
+        url: 'https://example.test/review?token=secret#frame',
+        userAgent: 'test',
+      },
+      sections: [],
+    },
     files: new Map([['attachment.txt', new Blob(['file'])]]),
     errors: ['warning one'],
     options: {
@@ -47,6 +55,11 @@ describe('archive layout for diagnostics artifacts', () => {
     expect(zip.file('logs/errors.log')).toBeTruthy();
     expect(zip.file('page-screenshot.png')).toBeTruthy();
     expect(zip.file('files/attachment.txt')).toBeTruthy();
+    const readme = await zip.file('README.md')?.async('string');
+    expect(readme).toContain('`page-screenshot.png`');
+    expect(readme).toContain('`files/`');
+    expect(readme).toContain('`logs/`');
+    expect(readme).toContain('`https://example.test/review`');
   });
 });
 
@@ -73,5 +86,6 @@ describe('archive layout without warnings', () => {
 
     const zip = await JSZip.loadAsync(archive.blob);
     expect(zip.file('logs/errors.log')).toBeNull();
+    expect(zip.file('README.md')).toBeTruthy();
   });
 });

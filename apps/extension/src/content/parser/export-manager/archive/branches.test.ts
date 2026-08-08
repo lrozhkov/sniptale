@@ -133,4 +133,24 @@ describe('export-manager archive branches', () => {
     expect(zip.file('files/file_download123.png')).toBeTruthy();
     expect(Object.keys(zip.files).some((name) => name.endsWith('.json'))).toBe(false);
   });
+
+  it('rejects a case-insensitive collision with the generated README path', async () => {
+    await expect(
+      createExportArchive({
+        treeData: createArchiveTree(),
+        data: null,
+        files: new Map(),
+        errors: [],
+        options: createArchiveOptions({
+          includeFiles: false,
+          includeImages: false,
+          includeJson: false,
+          includeMarkdown: false,
+        }),
+        previewToDownloadMap: new Map(),
+        urlUuidToFilename: new Map(),
+        extraAssets: [{ path: 'readme.md', content: 'unexpected' }],
+      })
+    ).rejects.toThrow('README.md archive path is reserved');
+  });
 });

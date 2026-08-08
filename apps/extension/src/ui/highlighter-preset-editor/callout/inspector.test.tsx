@@ -461,6 +461,16 @@ it('configures a one-sided accent edge in its own inspector section', async () =
   });
 });
 
+it('places accent edge immediately after the badge section', () => {
+  const labels = [...document.querySelectorAll<HTMLButtonElement>('nav button')].map((button) =>
+    button.getAttribute('aria-label')
+  );
+  const badgeIndex = labels.indexOf('content.callout.manualBadge');
+
+  expect(badgeIndex).toBeGreaterThanOrEqual(0);
+  expect(labels[badgeIndex + 1]).toBe('content.callout.manualAccent');
+});
+
 it('keeps the default-width slider bounded without capping manual input', async () => {
   await openSection('content.callout.manualSize');
   const widthRange = document.querySelector<HTMLInputElement>(

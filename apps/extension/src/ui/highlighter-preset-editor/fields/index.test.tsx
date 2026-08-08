@@ -44,6 +44,12 @@ function setInputValue(element: HTMLInputElement | HTMLTextAreaElement, value: s
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+function setNumericInputValue(element: HTMLInputElement, value: string) {
+  element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  setInputValue(element, value);
+  element.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+}
+
 function createState(overrides: Partial<BorderPresetEditorTestState> = {}) {
   return {
     ...createBaseState(),
@@ -75,7 +81,6 @@ function queryFieldElements() {
     paddingInputs: Array.from(
       container?.querySelectorAll<HTMLInputElement>('[data-padding-side] input') ?? []
     ),
-    ranges: Array.from(container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []),
     resizeHandle: container?.querySelector('div[style*="ns-resize"]') as HTMLDivElement,
     styleSelect: container?.querySelector<HTMLButtonElement>(
       'button[aria-label="highlighter.editor.styleLabel"]'
@@ -84,11 +89,11 @@ function queryFieldElements() {
   };
 }
 
-function getRangeInput(label: string) {
-  const input = Array.from(
-    container?.querySelectorAll<HTMLInputElement>('input[type="range"]') ?? []
-  ).find((candidate) => candidate.getAttribute('aria-label') === label);
-  if (!input) throw new Error(`Missing range input: ${label}`);
+function getNumericInput(label: string) {
+  const input = container?.querySelector<HTMLInputElement>(
+    `input[type="text"][aria-label="${label}"]`
+  );
+  if (!input) throw new Error(`Missing numeric input: ${label}`);
   return input;
 }
 
@@ -103,7 +108,8 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
     const { colorSelectors, nameInput, styleSelect } = queryFieldElements();
     setInputValue(nameInput, 'Updated preset');
     colorSelectors[0]?.click();
-    setInputValue(getRangeInput('highlighter.editor.widthLabel'), '7');
+    const widthInput = getNumericInput('highlighter.editor.widthLabel');
+    setNumericInputValue(widthInput, '7');
     styleSelect?.click();
   });
   await act(async () => {
@@ -139,12 +145,18 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
     leftPadding?.focus();
     setInputValue(leftPadding as HTMLInputElement, '14');
     leftPadding?.blur();
-    setInputValue(getRangeInput('highlighter.editor.radiusLabel'), '8');
+    const radiusInput = getNumericInput('highlighter.editor.radiusLabel');
+    setNumericInputValue(radiusInput, '8');
   });
 
-  selectCategory('highlighter.editor.effectsSection');
+  selectCategory('highlighter.editor.shadowSection');
   await act(async () => {
-    setInputValue(getRangeInput('highlighter.editor.shadowLabel'), '100');
+    const shadowInput = getNumericInput('highlighter.editor.shadowLabel');
+    setNumericInputValue(shadowInput, '100');
+  });
+
+  selectCategory('highlighter.editor.behaviorSection');
+  await act(async () => {
     container
       ?.querySelector<HTMLButtonElement>(
         'button[aria-label="highlighter.editor.hideFrameDuringCaptureLabel"]'
@@ -210,6 +222,33 @@ describe('BorderPresetEditorFields', () => {
     expect(
       container?.querySelector('[data-field-label="highlighter.editor.styleLabel"]')
     ).not.toBeNull();
+    const widthRow = getNumericInput('highlighter.editor.widthLabel').closest<HTMLElement>(
+      '[data-ui="shared.ui.compact-inspector.numeric-row"]'
+    );
+    expect(widthRow).not.toBeNull();
+    expect(
+      widthRow?.querySelector('button[aria-label="highlighter.editor.widthLabel increase"]')
+    ).not.toBeNull();
+    vi.spyOn(widthRow as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      bottom: 40,
+      height: 40,
+      left: 0,
+      right: 240,
+      top: 0,
+      width: 240,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    act(() => {
+      widthRow?.dispatchEvent(
+        new MouseEvent('pointermove', { bubbles: true, clientX: 120, clientY: 35 })
+      );
+    });
+    expect(widthRow?.dataset['rangeVisible']).toBe('true');
+    expect(
+      widthRow?.querySelector('input[aria-label="highlighter.editor.widthLabel range"]')
+    ).not.toBeNull();
 
     await interactWithFields(state);
   });
@@ -267,7 +306,7 @@ describe('BorderPresetEditorFields', () => {
       );
     });
 
-    selectCategory('highlighter.editor.effectsSection');
+    selectCategory('highlighter.editor.blurSection');
     const blurTypeSelect = container.querySelector<HTMLButtonElement>(
       '[aria-label="highlighter.editor.blurTypeLabel"]'
     );
@@ -283,7 +322,7 @@ describe('BorderPresetEditorFields', () => {
     ]);
   });
 
-  it('writes linked comment and numbering template identifiers through the effects section', async () => {
+  it('writes linked comment and numbering template identifiers through the behavior section', async () => {
     const state = createState();
     const onChange = vi.fn();
     if (!container) {
@@ -307,7 +346,7 @@ describe('BorderPresetEditorFields', () => {
       );
     });
 
-    selectCategory('highlighter.editor.effectsSection');
+    selectCategory('highlighter.editor.behaviorSection');
     act(() => {
       container
         ?.querySelector<HTMLButtonElement>(

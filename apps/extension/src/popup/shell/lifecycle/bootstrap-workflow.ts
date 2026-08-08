@@ -7,6 +7,7 @@ import type {
   PopupLifecycleBootstrapParamsGetter,
 } from './contracts';
 import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
+import { stagePopupExportLaunchSelection } from '../export/selection/launch-selection';
 
 const logger = createLogger({ namespace: 'PopupLifecycle' });
 
@@ -88,6 +89,7 @@ export async function bootstrapPopupLifecycle({
 
     applyBootstrapSuccess(getParams(), bootstrapState);
     if (launchPage) {
+      stagePopupExportLaunchSelection({ includeAnnotations: true });
       getParams().setPage(launchPage);
     }
     await refreshPopupSecondaryState({

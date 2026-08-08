@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { LazyAIModal } from '../ai/modal/shell/lazy';
 import { AutoBlurModal } from '../auto-blur/modal';
+import { AutoBlurProgressOverlay } from '../auto-blur/progress-overlay';
 import { CountdownToast } from '../countdown-toast';
 import { SaveDialogModal } from '../save-dialog-modal';
 import { handleContentSaveDialogSave } from './save';
@@ -61,6 +62,11 @@ export function ContentDialogStack(props: { dialogs: ContentAppLayoutDialogsProp
       <ContentAIModal {...dialogs.aiController} />
 
       <AutoBlurModal controller={dialogs.autoBlurController} />
+
+      <AutoBlurProgressOverlay
+        active={dialogs.autoBlurController.isFullPageScanning}
+        onCancel={dialogs.autoBlurController.cancelFullPageScan}
+      />
 
       <ContentSaveDialog {...dialogs} />
 

@@ -161,6 +161,17 @@ function setRangeInputValue(input: HTMLInputElement, value: string) {
   });
 }
 
+function setTextInputValue(input: HTMLInputElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+
+  act(() => {
+    input.focus();
+    valueSetter?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.blur();
+  });
+}
+
 function renderPopover(overrides: Partial<React.ComponentProps<typeof FrameSettingsPopover>> = {}) {
   if (!anchorEl || !container) {
     throw new Error('Frame settings popover test scope is not initialized');
@@ -282,6 +293,7 @@ describe('FrameSettingsPopover loading state', () => {
     expect(popover?.dataset['theme']).toBe('dark');
     expect(popover?.dataset['sniptaleActivationBridge']).toBe('defer');
     expect(popover?.style.width).toBe('400px');
+    expect(popover?.parentElement?.style.width).toBe('');
     expect(
       popover?.querySelector('.sniptale-settings-popover-header')?.getAttribute('data-draggable')
     ).toBe('true');
@@ -311,6 +323,7 @@ describe('FrameSettingsPopover loading state', () => {
     const popover = document.querySelector<HTMLElement>('.sniptale-frame-settings-popover');
     const header = popover?.querySelector('.sniptale-settings-popover-header');
     expect(popover?.style.width).toBe('400px');
+    expect(popover?.parentElement?.style.width).toBe('');
     expect(popover?.classList.contains('sniptale-main-toolbar-popover')).toBe(true);
     expect(header?.hasAttribute('data-draggable')).toBe(false);
     expect(popover?.querySelector('.sniptale-settings-popover-close')).toBeNull();
@@ -640,8 +653,9 @@ describe('FrameSettingsPopover preset catalog actions', () => {
   });
 
   it('forks the selected template into the inline manual editor', async () => {
+    const onApplyToFrame = vi.fn();
     storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
-    renderPopover();
+    renderPopover({ onApplyToFrame });
     await flushAsyncEffects();
 
     clickTrusted(
@@ -654,7 +668,31 @@ describe('FrameSettingsPopover preset catalog actions', () => {
     clickTrusted(forkButton!);
     expect(document.querySelector('[data-ui="shared.border-style-inspector"]')).not.toBeNull();
     expect(document.body.textContent).toContain(translate('content.templateFork.temporaryStatus'));
+    const temporaryStatus = document.querySelector(
+      '[data-ui="shared.categorized-inspector.section-status"]'
+    );
+    expect(temporaryStatus?.closest('nav')).not.toBeNull();
+    expect(
+      document.querySelector('.sniptale-settings-popover-header')?.contains(temporaryStatus)
+    ).toBe(false);
     expect(document.querySelector('.sniptale-modal')).toBeNull();
     expect(document.querySelector('[data-frame-style-action="add"]')).toBeNull();
+
+    clickTrusted(
+      document.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('highlighter.editor.geometrySection')}"]`
+      )!
+    );
+    const paddingInput = document.querySelector<HTMLInputElement>(
+      '[data-padding-side="top"] input'
+    );
+    expect(paddingInput).not.toBeNull();
+    setTextInputValue(paddingInput!, '17');
+
+    expect(onApplyToFrame).toHaveBeenLastCalledWith({
+      borderSettings: expect.objectContaining({
+        padding: { top: 17, right: 17, bottom: 17, left: 17 },
+      }),
+    });
   });
 });

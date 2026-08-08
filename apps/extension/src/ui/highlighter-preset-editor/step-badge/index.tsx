@@ -35,6 +35,7 @@ import { StepBadgeCssSection } from './inspector-css';
 import { StepBadgePositionGrid } from './position-grid';
 import { StepBadgePresetPreview } from './thumbnail';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
+import { getDefaultStepBadgeAlphabet } from '../../../composition/frame-annotation-controls/step-badge/helpers';
 
 type StepBadgePresetEditorProps = {
   isNew?: boolean;
@@ -127,6 +128,7 @@ function StepBadgePresetNumberingSection(props: {
   onPatch: (value: Partial<StepBadgeSettings>) => void;
   settings: StepBadgeSettings;
 }) {
+  const locale = useAppLocale();
   const isAuto = props.settings.auto !== false;
   return (
     <div className="grid gap-3">
@@ -149,7 +151,13 @@ function StepBadgePresetNumberingSection(props: {
                   active={props.settings.type === type}
                   className="sniptale-step-badge-chip"
                   key={type}
-                  onClick={() => props.onPatch({ type })}
+                  onClick={() =>
+                    props.onPatch(
+                      type === 'letter'
+                        ? { type, alphabet: getDefaultStepBadgeAlphabet(locale) }
+                        : { type }
+                    )
+                  }
                 >
                   {translate(
                     type === 'number'

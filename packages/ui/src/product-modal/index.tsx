@@ -1,4 +1,27 @@
+import { useEffect } from 'react';
 import type { CSSProperties, FormEventHandler, ReactNode } from 'react';
+
+let modalScrollLockCount = 0;
+let originalDocumentOverflow = '';
+let originalBodyOverflow = '';
+
+function acquireModalScrollLock(): () => void {
+  if (typeof document === 'undefined') return () => undefined;
+  if (modalScrollLockCount === 0) {
+    originalDocumentOverflow = document.documentElement.style.overflow;
+    originalBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+  modalScrollLockCount += 1;
+  return () => {
+    modalScrollLockCount = Math.max(0, modalScrollLockCount - 1);
+    if (modalScrollLockCount === 0) {
+      document.documentElement.style.overflow = originalDocumentOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+    }
+  };
+}
 
 export interface ProductModalProps {
   isOpen?: boolean;
@@ -85,6 +108,8 @@ export function ProductModal({
   labelledBy,
   onKeyDown,
 }: ProductModalProps) {
+  useEffect(() => (isOpen ? acquireModalScrollLock() : undefined), [isOpen]);
+
   if (!isOpen) {
     return null;
   }

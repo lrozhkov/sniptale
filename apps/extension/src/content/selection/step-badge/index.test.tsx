@@ -68,6 +68,7 @@ it('renders hover-only move and settings controls for an enabled badge', () => {
     HTMLButtonElement
   );
   const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
+  const controlsPositioner = controls?.parentElement;
   const moveHandle = controls?.querySelector<HTMLElement>('.sniptale-step-badge-move-handle');
   const settingsHandle = controls?.querySelector<HTMLElement>(
     '.sniptale-step-badge-settings-handle'
@@ -76,7 +77,8 @@ it('renders hover-only move and settings controls for an enabled badge', () => {
   expect(moveHandle?.querySelector('.lucide-move')).not.toBeNull();
   expect(moveHandle?.querySelector('.lucide-grip-vertical')).toBeNull();
   expect(settingsHandle?.style.width).toBe('26px');
-  expect(controls?.style.zIndex).toBe('2147483645');
+  expect(controlsPositioner?.style.zIndex).toBe('2147483645');
+  expect(controls?.classList).toContain('sniptale-content-ui-zoom-surface');
 
   act(() => root.unmount());
   document.body.replaceChildren();
@@ -108,13 +110,14 @@ it('keeps closed controls keyboard-reachable and reveals them on focus', () => {
     '.sniptale-step-badge-settings-handle'
   );
   const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
+  const controlsPositioner = controls?.parentElement;
 
   expect(moveHandle).toBeInstanceOf(HTMLButtonElement);
   expect(settingsHandle).toBeInstanceOf(HTMLButtonElement);
-  expect(controls?.style.opacity).toBe('0');
+  expect(controlsPositioner?.style.opacity).toBe('0');
 
   act(() => moveHandle?.focus());
-  expect(controls?.style.opacity).toBe('1');
+  expect(controlsPositioner?.style.opacity).toBe('1');
 
   act(() => settingsHandle?.click());
   expect(onSettingsClick).toHaveBeenCalledOnce();
@@ -182,14 +185,15 @@ it('reanchors move and settings controls after scroll updates the frame geometry
 
   act(() => renderBadge(80));
   const controls = document.querySelector<HTMLElement>('.sniptale-step-badge-controls');
-  expect(controls?.style.left).toBe('136px');
-  expect(controls?.style.top).toBe('50px');
+  const controlsPositioner = controls?.parentElement;
+  expect(controlsPositioner?.style.left).toBe('136px');
+  expect(controlsPositioner?.style.top).toBe('50px');
 
   act(() => window.dispatchEvent(new Event('scroll')));
   badgeRect = new DOMRect(100, 30, 30, 30);
   act(() => renderBadge(30));
 
-  expect(controls?.style.top).toBe('64px');
+  expect(controlsPositioner?.style.top).toBe('64px');
   expect(controls?.querySelector('.sniptale-step-badge-move-handle')).toBeInstanceOf(
     HTMLButtonElement
   );

@@ -29,7 +29,7 @@ describe('callout intrinsic text width', () => {
       width: 'max-content',
     });
     expect(layout.editableStyle).toMatchObject({
-      minWidth: 40,
+      minWidth: '1ch',
       overflowWrap: 'normal',
       wordBreak: 'normal',
     });

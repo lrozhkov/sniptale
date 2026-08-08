@@ -203,12 +203,16 @@ async function expectChildExclusionFlow() {
   });
 }
 
-async function expectModeCloseFlow() {
+async function expectModeAvailabilityFlow() {
   await renderHarness();
   await openAndFlushScan();
   expect(latestController?.isOpen).toBe(true);
 
   await renderHarness(false);
+
+  expect(latestController?.isOpen).toBe(true);
+
+  await renderHarness(false, false);
 
   expect(latestController?.isOpen).toBe(false);
 }
@@ -230,6 +234,7 @@ async function expectAutoApplyAllowedGate() {
   expect(controllerMocks.scanAutoBlurTargets).toHaveBeenCalledWith({
     frames: [],
     mode: 'full-page',
+    signal: expect.any(AbortSignal),
   });
   expect(controllerMocks.showToast).toHaveBeenCalledTimes(1);
 
@@ -303,6 +308,116 @@ async function expectStaleScanIgnoredAfterClose() {
   expect(latestController?.matches).toEqual([]);
 }
 
+function registerAutoBlurRunTests() {
+  it('enables auto-apply only after its configuration is confirmed', async () => {
+    await renderHarness();
+
+    act(() => latestController?.openForAutoApply());
+    await act(async () => Promise.resolve());
+    expect(latestController?.isOpen).toBe(true);
+    expect(latestController?.configurationMode).toBe('auto-apply');
+    expect(latestController?.autoApplyEnabled).toBe(false);
+    expect(controllerMocks.scanAutoBlurTargets).not.toHaveBeenCalled();
+
+    act(() => latestController?.close());
+    expect(latestController?.autoApplyEnabled).toBe(false);
+    expect(controllerMocks.saveAutoBlurSettings).not.toHaveBeenCalled();
+
+    act(() => latestController?.openForAutoApply());
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      await latestController?.apply(BORDER_SETTINGS);
+    });
+
+    expect(controllerMocks.saveAutoBlurSettings).toHaveBeenCalledWith({
+      ...controllerMocks.defaultSettings,
+      autoApplyEnabled: true,
+    });
+    expect(latestController?.autoApplyEnabled).toBe(true);
+    expect(latestController?.isOpen).toBe(false);
+  });
+
+  it('reports a completed automatic pass after its frame sync replaces the manager props', async () => {
+    const scan = createDeferred<{ matches: AutoBlurMatch[] }>();
+    controllerMocks.loadAutoBlurSettings.mockResolvedValue({
+      ...controllerMocks.defaultSettings,
+      autoApplyEnabled: true,
+    });
+    controllerMocks.scanAutoBlurTargets.mockReturnValue(scan.promise);
+    await renderHarness();
+    await act(async () => Promise.resolve());
+
+    frameManager = { ...frameManager, frames: [] };
+    await renderHarness();
+    await act(async () => {
+      scan.resolve({ matches: [createMatch()] });
+      await scan.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(controllerMocks.showToast).toHaveBeenCalledOnce();
+  });
+
+  it('starts enable-auto-blur configuration with frame and fill turned off', async () => {
+    const savedSettings = {
+      ...controllerMocks.defaultSettings,
+      blurSettings: {
+        ...controllerMocks.defaultSettings.blurSettings,
+        borderPresetId: 'saved-frame-template',
+        showBorder: true,
+      },
+    };
+    controllerMocks.getLoadedAutoBlurSettingsSnapshot.mockReturnValue(savedSettings);
+    controllerMocks.loadAutoBlurSettings.mockResolvedValue(savedSettings);
+    await renderHarness(false, true);
+
+    act(() => latestController?.openForAutoApply());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(latestController?.isOpen).toBe(true);
+    expect(latestController?.blurSettings).toEqual({
+      ...savedSettings.blurSettings,
+      showBorder: false,
+    });
+  });
+
+  it('cancels a full-page pass without syncing frames or reporting success', async () => {
+    controllerMocks.scanAutoBlurTargets.mockImplementation(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise((_, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('cancelled', 'AbortError')),
+            { once: true }
+          );
+        })
+    );
+    await renderHarness();
+
+    let applyPromise: Promise<void> | undefined;
+    await act(async () => {
+      applyPromise = latestController?.applyOnce();
+      await Promise.resolve();
+    });
+    expect(latestController?.isFullPageScanning).toBe(true);
+
+    await act(async () => {
+      latestController?.cancelFullPageScan();
+      await applyPromise;
+    });
+
+    expect(latestController?.isFullPageScanning).toBe(false);
+    expect(latestController?.isApplying).toBe(false);
+    expect(syncAutoBlurFrameCalls).toHaveLength(0);
+    expect(controllerMocks.showToast).not.toHaveBeenCalled();
+    expect(latestController?.errorMessage).toBeNull();
+  });
+}
+
 describe('useAutoBlurController', () => {
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -356,8 +471,8 @@ describe('useAutoBlurController', () => {
     });
   });
 
-  it('cancels an open scan when highlighter mode is turned off', async () => {
-    await expectModeCloseFlow();
+  it('keeps configuration open in cursor mode while auto-blur is allowed', async () => {
+    await expectModeAvailabilityFlow();
   });
 
   it('auto-applies stored settings only when auto mode is allowed', async () => {
@@ -463,6 +578,8 @@ describe('useAutoBlurController', () => {
     });
     expect(syncAutoBlurFrameCalls).toHaveLength(1);
   });
+
+  registerAutoBlurRunTests();
 
   it('keeps toggle disabled behind the allowed gate and settles persistence failure', async () => {
     await renderHarness(true, false);

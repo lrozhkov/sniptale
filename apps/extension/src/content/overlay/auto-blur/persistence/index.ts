@@ -36,7 +36,7 @@ const enqueueAutoBlurWrite = createStorageWriteQueue();
 export const DEFAULT_AUTO_BLUR_SETTINGS: AutoBlurSettings = {
   autoApplyEnabled: false,
   selectedCategories: [...AUTO_BLUR_CATEGORY_ORDER],
-  blurSettings: { ...DEFAULT_BLUR_SETTINGS },
+  blurSettings: { ...DEFAULT_BLUR_SETTINGS, showBorder: false },
 };
 
 function cloneAutoBlurSettings(settings: AutoBlurSettings): AutoBlurSettings {

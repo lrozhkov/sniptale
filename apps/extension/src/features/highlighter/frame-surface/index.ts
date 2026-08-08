@@ -105,3 +105,22 @@ export function projectElementFrameSurface(
     height: elementRect.height + settings.padding.top + settings.padding.bottom,
   };
 }
+
+export function reprojectFrameSurfacePadding(
+  surfaceRect: FrameSurfaceRect,
+  previousPadding: BorderPadding,
+  nextPadding: BorderPadding
+): FrameSurfaceRect {
+  const elementRect = {
+    x: surfaceRect.x + previousPadding.left,
+    y: surfaceRect.y + previousPadding.top,
+    width: Math.max(0, surfaceRect.width - previousPadding.left - previousPadding.right),
+    height: Math.max(0, surfaceRect.height - previousPadding.top - previousPadding.bottom),
+  };
+  const projected = projectElementFrameSurface(elementRect, { padding: nextPadding });
+  return {
+    ...projected,
+    width: Math.max(1, projected.width),
+    height: Math.max(1, projected.height),
+  };
+}

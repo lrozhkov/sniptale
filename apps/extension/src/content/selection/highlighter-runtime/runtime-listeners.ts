@@ -8,6 +8,7 @@ import {
   dispatchExitFrameEditing,
 } from '../../platform/page-context/mode-events';
 import type { HoverController } from '../highlighter-hover-preview';
+import { isContentOwnedEvent } from '../../platform/dom-host';
 
 const logger = createLogger({ namespace: 'ContentHighlighter:Runtime' });
 
@@ -31,7 +32,13 @@ export function createHighlighterRuntimeEscapeKeyHandler(props: {
   cancelDrawing?: (reason: 'escape') => boolean;
 }) {
   return (event: KeyboardEvent) => {
-    if (event.key !== 'Escape' || isCalloutEscapeTarget(event) || props.hasActivePopover()) {
+    if (
+      event.defaultPrevented ||
+      event.key !== 'Escape' ||
+      isContentOwnedEvent(event) ||
+      isCalloutEscapeTarget(event) ||
+      props.hasActivePopover()
+    ) {
       return;
     }
 

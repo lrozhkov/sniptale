@@ -35,42 +35,120 @@
 }
 
 .sniptale-ai-modal-root .sniptale-ai-modal-prompt-textarea {
-  padding-right: 86px;
-  padding-bottom: 44px;
+  padding-right: 78px;
+  padding-bottom: 52px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-input) 78%,
+    var(--sniptale-color-surface-panel) 22%
+  );
+}
+
+.sniptale-ai-modal-template-picker {
+  position: absolute;
+  bottom: 11px;
+  left: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 104px);
+}
+
+.sniptale-ai-modal-template-select {
+  width: 146px;
+  max-width: calc(100% - 34px);
+}
+
+.sniptale-ai-modal-template-select .sniptale-select-sm {
+  --sniptale-field-height: 30px;
+  --sniptale-field-padding-block: 4px;
+  --sniptale-field-padding-inline-start: 8px;
+  --sniptale-field-padding-inline-end: 28px;
+  --sniptale-field-radius: 7px;
+  --sniptale-field-font-size: 12px;
+}
+
+.sniptale-ai-modal-template-menu {
+  width: min(620px, calc(100vw - 24px)) !important;
+  max-height: 286px;
+  overflow-x: hidden;
+}
+
+.sniptale-ai-modal-template-menu .sniptale-select-option {
+  border-color: transparent;
+}
+
+.sniptale-ai-modal-template-menu .sniptale-select-option:hover,
+.sniptale-ai-modal-template-menu .sniptale-select-option:focus-visible {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sniptale-color-border-subtle) 58%, transparent);
+  outline: none;
+}
+
+.sniptale-ai-modal-template-menu .sniptale-select-option-description {
+  display: block;
+  overflow: hidden;
+  color: var(--sniptale-color-text-dim);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sniptale-ai-modal-template-menu .sniptale-select-value-label-menu {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-line-clamp: unset;
+}
+
+.sniptale-ai-modal-inline-settings {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sniptale-color-text-dim);
+  cursor: pointer;
+}
+
+.sniptale-ai-modal-inline-settings:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 80%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 64%, transparent);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-inline-settings:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 .sniptale-ai-modal-prompt-voice-control {
   position: absolute;
-  right: 46px;
+  right: 42px;
   bottom: 12px;
   z-index: 20;
 }
 
-.sniptale-ai-modal-prompt-submit {
+.sniptale-ai-modal-prompt-submit-hint {
   position: absolute;
   right: 10px;
-  bottom: 12px;
+  bottom: 13px;
   z-index: 20;
-  width: 30px;
-  height: 30px;
   display: inline-flex;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 86%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 74%, transparent);
-  color: var(--sniptale-color-text-secondary);
-  cursor: pointer;
-}
-
-.sniptale-ai-modal-prompt-submit:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 48%, transparent);
-  color: var(--sniptale-color-accent);
-}
-
-.sniptale-ai-modal-prompt-submit:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
+  color: var(--sniptale-color-text-dim);
 }
 
 .sniptale-ai-modal-prompt-voice-error {
@@ -105,7 +183,7 @@
 }
 
 .sniptale-ai-modal-root .sniptale-soft-divider {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent),
@@ -115,20 +193,130 @@
 }
 
 .sniptale-ai-modal-root .sniptale-spoiler-header {
-  min-height: 40px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sniptale-color-text-primary) 5%, transparent);
-  border-top-color: color-mix(in srgb, var(--sniptale-color-text-primary) 8%, transparent);
+  min-height: 34px;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .sniptale-ai-modal-root .sniptale-spoiler-header:hover {
-  background: color-mix(in srgb, var(--sniptale-color-text-primary) 5%, transparent);
-  border-color: color-mix(in srgb, var(--sniptale-color-text-primary) 10%, transparent);
+  background: transparent;
+  border-color: transparent;
+}
+
+.sniptale-ai-spoiler-toggle {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sniptale-ai-spoiler-header-tools {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.sniptale-ai-data-search {
+  display: flex;
+  width: 156px;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 76%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--sniptale-color-surface-input) 54%, transparent);
+  color: var(--sniptale-color-text-dim);
+}
+
+.sniptale-ai-data-search:focus-within {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 42%, transparent);
+}
+
+.sniptale-ai-data-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.sniptale-ai-data-search input::placeholder {
+  color: var(--sniptale-color-text-dim);
+  font-size: 10px;
+  font-style: italic;
+  opacity: 0.72;
+}
+
+.sniptale-ai-data-search input:focus::placeholder {
+  color: transparent;
+  opacity: 0;
+}
+
+.sniptale-ai-data-search-clear {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--sniptale-color-text-dim);
+  cursor: pointer;
+}
+
+.sniptale-ai-data-search-clear:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 72%, transparent);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-data-selected-filter {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sniptale-color-text-dim);
+  cursor: pointer;
+}
+
+.sniptale-ai-data-selected-filter:hover:not(:disabled),
+.sniptale-ai-data-selected-filter.active {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 34%, transparent);
+  color: var(--sniptale-color-accent);
+}
+
+.sniptale-ai-data-selected-filter:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 .sniptale-ai-modal-root .sniptale-data-container {
-  margin-top: 10px;
-  padding: 12px;
+  margin-top: 4px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }

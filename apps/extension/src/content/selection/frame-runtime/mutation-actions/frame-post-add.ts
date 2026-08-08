@@ -5,7 +5,6 @@ import type {
   FocusSettings,
   FrameData,
 } from '../../../../features/highlighter/contracts';
-import { scheduleStepBadgeRecalculation } from '../../frame-dom-driver/timing';
 import { invalidateFrameCache } from '../../highlighter';
 import type { MutableRef } from './types';
 
@@ -17,7 +16,7 @@ export function applyAddedFrameSideEffects(args: {
   recalculateStepBadgesRef: MutableRef<(excludeFrameId?: string) => void>;
 }) {
   invalidateFrameCache();
-  queueStepBadgeRecalculation(args.frameData, args.isAutoMode, args.recalculateStepBadgesRef);
+  initializeStepBadgeValue(args.frameData, args.isAutoMode, args.recalculateStepBadgesRef);
   logAddedFrame(
     args.frameData,
     args.frameData.borderSettings!,
@@ -26,7 +25,7 @@ export function applyAddedFrameSideEffects(args: {
   );
 }
 
-function queueStepBadgeRecalculation(
+function initializeStepBadgeValue(
   frameData: FrameData,
   isAutoMode: boolean,
   recalculateStepBadgesRef: MutableRef<(excludeFrameId?: string) => void>
@@ -35,7 +34,7 @@ function queueStepBadgeRecalculation(
     return;
   }
 
-  scheduleStepBadgeRecalculation(recalculateStepBadgesRef);
+  recalculateStepBadgesRef.current();
 }
 
 function logAddedFrame(

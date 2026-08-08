@@ -49,6 +49,7 @@ function createController(overrides: Partial<AutoBlurController> = {}): AutoBlur
   return {
     apply: vi.fn(async () => undefined),
     applyOnce: vi.fn(async () => undefined),
+    cancelFullPageScan: vi.fn(),
     autoApplyAllowed: true,
     autoApplyEnabled: false,
     blurSettings: {
@@ -57,11 +58,14 @@ function createController(overrides: Partial<AutoBlurController> = {}): AutoBlur
       showBorder: false,
     },
     close: vi.fn(),
+    configurationMode: 'review',
     errorMessage: null,
     isApplying: false,
+    isFullPageScanning: false,
     isOpen: true,
     matches: [createMatch(), createMatch({ alreadyBlurred: true, id: 'blurred-match' })],
     open: vi.fn(),
+    openForAutoApply: vi.fn(),
     reset: vi.fn(),
     selectedCategories: new Set([AUTO_BLUR_CATEGORIES.email]),
     selectedMatchIds: new Set(),
@@ -173,6 +177,28 @@ async function expectModalStates() {
   expect(container?.textContent).toContain('content.autoBlur.scanError');
 }
 
+async function expectAutoApplyCategoryConfiguration() {
+  const controller = createController({ configurationMode: 'auto-apply', status: 'idle' });
+  await renderModal(controller);
+
+  expect(container?.querySelector('[role="treegrid"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="content.auto-blur.auto-apply-categories"]')
+  ).not.toBeNull();
+  expect(container?.textContent).not.toContain('john.doe@example.com');
+  expect(container?.textContent).not.toContain('content.autoBlur.collapseAllButton');
+  expect(container?.textContent).not.toContain('content.autoBlur.clearSelectionButton');
+  expect(container?.textContent).not.toContain('content.autoBlur.reset');
+  expect(container?.querySelector<HTMLElement>('[role="dialog"]')?.style.maxWidth).toBe('450px');
+
+  const phoneCategory = container?.querySelector<HTMLInputElement>(
+    'input[aria-label="content.autoBlur.categoryPhone"]'
+  );
+  expect(phoneCategory?.closest('label')?.className).not.toContain('accent-soft');
+  act(() => phoneCategory?.click());
+  expect(controller.toggleCategory).toHaveBeenCalledWith(AUTO_BLUR_CATEGORIES.phone);
+}
+
 describe('AutoBlurModal', () => {
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -247,5 +273,66 @@ describe('AutoBlurModal', () => {
 
   it('renders loading, empty, and failure states without table actions', async () => {
     await expectModalStates();
+  });
+
+  it('uses a compact category-only surface when auto-apply is being enabled', async () => {
+    await expectAutoApplyCategoryConfiguration();
+  });
+
+  it('keeps review Apply disabled until a successful scan has selected targets', async () => {
+    for (const controller of [
+      createController({ status: 'error', selectedTargetCount: 0 }),
+      createController({ status: 'empty', selectedTargetCount: 0 }),
+      createController({ status: 'ready', selectedTargetCount: 0 }),
+    ]) {
+      await renderModal(controller);
+      expect(
+        Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+          (button) => button.textContent === 'content.autoBlur.apply'
+        )?.disabled
+      ).toBe(true);
+    }
+  });
+
+  it('keeps configuration Apply available without current-page matches', async () => {
+    await renderModal(
+      createController({ configurationMode: 'auto-apply', status: 'idle', selectedTargetCount: 0 })
+    );
+    expect(
+      Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+        (button) => button.textContent === 'content.autoBlur.apply'
+      )?.disabled
+    ).toBe(false);
+  });
+
+  it('keeps frame template selectable when frame and fill are turned off', async () => {
+    await renderModal(createController());
+
+    const templateSelect = container?.querySelector<HTMLElement>(
+      '[aria-label="content.autoBlur.frameTemplate"]'
+    );
+
+    expect(templateSelect).not.toBeNull();
+    expect(templateSelect?.hasAttribute('disabled')).toBe(false);
+    expect(templateSelect?.getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  it('allows applying configuration when the scan found no targets', async () => {
+    const controller = createController({
+      configurationMode: 'auto-apply',
+      matches: [],
+      selectedTargetCount: 0,
+      status: 'empty',
+    });
+    await renderModal(controller);
+
+    const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'content.autoBlur.apply'
+    );
+    expect((applyButton as HTMLButtonElement | undefined)?.disabled).toBe(false);
+
+    clickButton('content.autoBlur.apply');
+
+    expect(controller.apply).toHaveBeenCalledTimes(1);
   });
 });

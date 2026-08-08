@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { TraversalContext } from '../types';
 import { parseAttributes } from './attr-list.helpers';
+import { releaseSniptaleId, retainSniptaleId } from '../../../platform/frame';
 
 function createTraversalContext(): TraversalContext {
   return {
@@ -148,6 +149,24 @@ function registerFallbackWideIframeTest() {
   });
 }
 
+function registerRetainedWideFieldIdentityTest() {
+  it('preserves history-owned identity while parsing a plain virtual wide field', () => {
+    const table = buildVirtualWideAttrList((value) => {
+      value.textContent = 'Описание для истории';
+    });
+    const wideCell = table.querySelector<HTMLElement>('.attrWide');
+    if (!wideCell) throw new Error('Expected wide attribute cell');
+    wideCell.dataset['sniptaleId'] = 'history-wide-field';
+    retainSniptaleId('history-wide-field');
+
+    const fields = parseAttributes(table, createTraversalContext());
+
+    expect(fields).toHaveLength(1);
+    expect(wideCell.dataset['sniptaleId']).toBe('history-wide-field');
+    releaseSniptaleId('history-wide-field');
+  });
+}
+
 describe('gwt attr list wide consumer paths', () => {
   afterEach(() => {
     document.body.replaceChildren();
@@ -156,4 +175,5 @@ describe('gwt attr list wide consumer paths', () => {
   registerVirtualWideRichTextTest();
   registerVirtualWideRichTextImageTest();
   registerFallbackWideIframeTest();
+  registerRetainedWideFieldIdentityTest();
 });

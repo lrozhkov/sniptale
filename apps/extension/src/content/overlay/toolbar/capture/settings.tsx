@@ -50,7 +50,6 @@ export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
       <ContentToolbarButton
         ref={bindings.triggerRef}
         type="button"
-        active={bindings.open}
         dataUi="content.toolbar.settings-button"
         menuIndicator
         title={translate('content.toolbar.settingsLabel')}

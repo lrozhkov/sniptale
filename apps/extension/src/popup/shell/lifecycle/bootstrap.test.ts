@@ -4,11 +4,17 @@ const mocks = vi.hoisted(() => ({
   bootstrapPopupStateMock: vi.fn(),
   consumePopupExportLaunchIntentMock: vi.fn<() => Promise<'export' | null>>(async () => null),
   errorMock: vi.fn(),
+  stagePopupExportLaunchSelectionMock: vi.fn(),
   translateMock: vi.fn((key: string) => `translated:${key}`),
 }));
 
 vi.mock('../export/runtime/tab-message-routing', (_importOriginal) => ({
   consumePopupExportLaunchIntentForActiveTab: mocks.consumePopupExportLaunchIntentMock,
+}));
+
+vi.mock('../export/selection/launch-selection', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../export/selection/launch-selection')>()),
+  stagePopupExportLaunchSelection: mocks.stagePopupExportLaunchSelectionMock,
 }));
 
 vi.mock('../../../platform/i18n', (_importOriginal) => ({
@@ -122,6 +128,7 @@ beforeEach(() => {
   mocks.consumePopupExportLaunchIntentMock.mockReset();
   mocks.consumePopupExportLaunchIntentMock.mockResolvedValue(null);
   mocks.errorMock.mockReset();
+  mocks.stagePopupExportLaunchSelectionMock.mockReset();
   mocks.translateMock.mockClear();
 });
 
@@ -240,6 +247,9 @@ it('applies a consumed export launch intent before popup readiness', async () =>
   });
 
   expect(params.setPage).toHaveBeenCalledWith('export');
+  expect(mocks.stagePopupExportLaunchSelectionMock).toHaveBeenCalledWith({
+    includeAnnotations: true,
+  });
   expect(params.setPage.mock.invocationCallOrder[0]).toBeLessThan(
     params.setIsReady.mock.invocationCallOrder[0]!
   );

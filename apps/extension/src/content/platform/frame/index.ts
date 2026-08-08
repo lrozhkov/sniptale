@@ -32,6 +32,7 @@ export {
   clearRetainedSniptaleIds,
   findElementBySniptaleId,
   getSniptaleIdCleanupGeneration,
+  isSniptaleIdRetained,
   releaseSniptaleId,
   retainSniptaleId,
 } from './sniptale';

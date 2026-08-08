@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Check, ScanSearch, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -108,6 +108,11 @@ function AutoBlurToggleItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoading' 
       showHintInCompact={toggleDisabled && !props.autoBlur.autoApplyAllowed}
       selected={props.autoBlur.autoApplyEnabled}
       onSelect={async () => {
+        if (!props.autoBlur.autoApplyEnabled) {
+          props.autoBlur.onOpenAutoApplySettings();
+          props.onClose();
+          return;
+        }
         await props.autoBlur.onToggleAutoApply();
         props.onClose();
       }}
@@ -123,9 +128,9 @@ function AutoBlurApplyOnceItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoadin
       icon={<ScanSearch className="h-4 w-4" />}
       label={translate('content.autoBlur.applyOnce')}
       hint={translate('content.autoBlur.applyOnceHint')}
-      onSelect={async () => {
-        await props.autoBlur.onApplyOnce();
+      onSelect={() => {
         props.onClose();
+        void props.autoBlur.onApplyOnce();
       }}
     />
   );
@@ -195,15 +200,20 @@ function useAutoBlurMenuBindings(props: AutoBlurMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const open = props.toolbarMenuState.activeMenuType === 'auto-blur';
 
+  const closeMenu = useCallback(() => {
+    props.toolbarMenuState.closeMenu('auto-blur');
+    queueMicrotask(() => triggerRef.current?.focus());
+  }, [props.toolbarMenuState]);
+
   useToolbarFloatingMenuDismissal({
     closeOnFarPointer: true,
     menuRef,
-    onClose: () => props.toolbarMenuState.closeMenu('auto-blur'),
+    onClose: closeMenu,
     open,
     triggerRef,
   });
 
-  return { menuRef, open, triggerRef };
+  return { closeMenu, menuRef, open, triggerRef };
 }
 
 function renderAutoBlurDropdown(
@@ -221,7 +231,7 @@ function renderAutoBlurDropdown(
       displayMode={props.displayMode}
       isLoading={props.isLoading}
       menuRef={bindings.menuRef}
-      onClose={() => props.toolbarMenuState.closeMenu('auto-blur')}
+      onClose={bindings.closeMenu}
       sidebarVisible={props.sidebarVisible}
       triggerRef={bindings.triggerRef}
     />
@@ -235,7 +245,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
     <div className="relative sniptale-toolbar-privacy-group-start">
       <ContentToolbarButton
         ref={bindings.triggerRef}
-        active={bindings.open || props.autoBlur?.autoApplyEnabled === true}
+        active={props.autoBlur?.autoApplyEnabled === true}
         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
           event.stopPropagation();
           props.toolbarMenuState.toggleMenu('auto-blur');

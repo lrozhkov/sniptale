@@ -81,6 +81,11 @@ describe('product-form-controls contract', () => {
     expect(productFormControlsStylesheet).toContain(
       '.sniptale-input:focus::placeholder,\n.sniptale-textarea:focus::placeholder {'
     );
+    expect(productFormControlsStylesheet).toContain(
+      '.sniptale-input::placeholder,\n.sniptale-textarea::placeholder {'
+    );
+    expect(productFormControlsStylesheet).toContain('font-style: italic;');
+    expect(productFormControlsStylesheet).toContain('opacity: 0;');
     expect(productFormControlsStylesheet).toContain('.sniptale-input.sniptale-input-compact {');
     expect(productFormControlsStylesheet).toContain('min-height: 32px;');
   });

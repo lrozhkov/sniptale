@@ -88,7 +88,7 @@ export function TemplateForkReturnGuard(props: {
         <ProductActionButton compact onClick={props.onGoToSave}>
           {translate('content.templateFork.goToSave')}
         </ProductActionButton>
-        <ProductActionButton compact onClick={props.onDiscard} tone="secondary">
+        <ProductActionButton compact onClick={props.onDiscard} tone="danger">
           {translate('content.templateFork.discard')}
         </ProductActionButton>
         <ProductActionButton compact onClick={props.onContinue} tone="secondary">

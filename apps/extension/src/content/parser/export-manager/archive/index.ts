@@ -22,6 +22,7 @@ import {
   type ArchiveArtifact,
   type ExportArtifact,
 } from './artifacts';
+import { createExportArchiveReadme } from './readme';
 export { createExportArchiveBlob, MAX_EXPORT_ARCHIVE_INPUT_BYTES } from './generation';
 export type {
   ArchiveAsset,
@@ -182,6 +183,18 @@ export async function buildExportPagePackage(artifact: ExportArtifact): Promise<
   for (const asset of artifact.extraAssets) {
     await appendAssetEntry(pagePackage.entries, asset.path, asset.content, binaryMode);
   }
+
+  if (pagePackage.entries.some((entry) => entry.path.toLowerCase() === 'readme.md')) {
+    throw new Error('The README.md archive path is reserved.');
+  }
+  const pageUrl = artifact.data?.meta.url ?? artifact.capture.treeData.meta?.url;
+  pagePackage.entries.unshift({
+    path: 'README.md',
+    textContent: createExportArchiveReadme(
+      pagePackage.entries,
+      pageUrl === undefined ? {} : { pageUrl }
+    ),
+  });
 
   return createArchiveArtifact({
     archiveBaseName,

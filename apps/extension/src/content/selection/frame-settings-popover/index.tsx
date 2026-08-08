@@ -7,6 +7,7 @@ import {
 import { useFrameSettingsPopoverController } from './controller';
 import type { FrameSettingsPopoverProps } from './types';
 import { FrameSettingsPopoverContent } from '../../../composition/frame-annotation-controls/frame/views';
+import { dispatchFutureFrameDefaultsChanged } from '../../platform/page-context/frame-events';
 import { useFramePopoverPosition } from '../interactive-frame/layout/popover-position';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import {
@@ -31,7 +32,6 @@ function FrameSettingsPopoverSurface(props: {
   controller: FrameSettingsPopoverController;
   drag: FloatingPopoverDrag;
   popoverRef: React.Ref<HTMLDivElement>;
-  popoverStyle: React.CSSProperties;
   request: FrameSettingsPopoverProps;
   linkedTemplateOptions: ReturnType<typeof useLinkedAnnotationTemplateOptions>;
 }) {
@@ -44,6 +44,7 @@ function FrameSettingsPopoverSurface(props: {
         'sniptale-frame-settings-popover',
         'sniptale-glass-popover',
         'sniptale-content-popover',
+        'sniptale-content-ui-zoom-surface',
         'sniptale-content-popover--toolbar-menu',
         props.request.scope === 'session' ? 'sniptale-main-toolbar-popover' : '',
         props.request.compact ? 'sniptale-content-popover--compact' : '',
@@ -53,7 +54,7 @@ function FrameSettingsPopoverSurface(props: {
       data-frame-id={props.request.frameId}
       onMouseDown={stopPopoverPropagation}
       onClick={stopPopoverPropagation}
-      style={getThemedPortalStyle(surface.portalTheme, props.popoverStyle)}
+      style={getThemedPortalStyle(surface.portalTheme, { width: SETTINGS_POPOVER_WIDTH })}
     >
       <div className="sniptale-content-popover-body">
         <FrameSettingsPopoverContent
@@ -68,6 +69,17 @@ function FrameSettingsPopoverSurface(props: {
           handleFocusChange={handlers.handleFocusChange}
           handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
           handleForkPreset={handlers.handleForkPreset}
+          onApplyToFuture={() =>
+            dispatchFutureFrameDefaultsChanged({
+              kind: 'frame',
+              settings: {
+                blurSettings: settings.localBlur,
+                borderSettings: settings.localBorder,
+                effectMode: props.request.effectMode,
+                focusSettings: settings.localFocus,
+              },
+            })
+          }
           handleManualBorderChange={handlers.handleManualBorderChange}
           handleSelectPreset={handlers.handleSelectPreset}
           handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
@@ -117,7 +129,6 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   const popoverStyle = {
     ...canonicalStyle,
     ...(props.scope === 'session' ? {} : drag.position),
-    width: SETTINGS_POPOVER_WIDTH,
   };
 
   if (!props.isOpen) {
@@ -125,16 +136,15 @@ export function FrameSettingsPopover(props: FrameSettingsPopoverProps) {
   }
 
   return createPortal(
-    <>
+    <div className="sniptale-content-popover-positioner" style={popoverStyle}>
       <FrameSettingsPopoverSurface
         controller={state}
         drag={drag}
         popoverRef={popoverRef}
-        popoverStyle={popoverStyle}
         request={props}
         linkedTemplateOptions={linkedTemplateOptions}
       />
-    </>,
+    </div>,
     resolveContentPortalTarget(props.anchorEl)
   );
 }

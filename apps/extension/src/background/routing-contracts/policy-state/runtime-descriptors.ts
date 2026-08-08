@@ -5,6 +5,25 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'annotation-fork-session',
+    failClosedOnRestart: false,
+    id: 'annotation-fork-sessions',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/annotation-fork-session/route.ts',
+    proofModules: [
+      'apps/extension/src/background/annotation-fork-session/route.test.ts',
+      'apps/extension/src/composition/persistence/content-pin-session/annotation-fork.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Session storage retains the tab-scoped text-free draft and revision across worker restart;',
+      'the first authorized top-frame document reconstructs the document binding before mutation.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'browser-session-storage',
+  },
+  {
     authorityFamily: 'ai-settings-persistence',
     failClosedOnRestart: false,
     id: 'ai-settings-mutation-queue',

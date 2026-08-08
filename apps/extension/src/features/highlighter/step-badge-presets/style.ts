@@ -17,6 +17,7 @@ interface ResolvedStepBadgeVisualStyle {
   backgroundColor: string;
   diameter: number;
   outlineColor: string;
+  outlineWidth: number;
   textColor: string;
 }
 
@@ -60,5 +61,6 @@ export function resolveStepBadgeVisualStyle(
     backgroundColor: resolveColor(style.backgroundColorSource, style.backgroundColor, frame),
     textColor: resolveColor(style.textColorSource, style.textColor, frame),
     outlineColor: resolveColor(style.outlineColorSource, style.outlineColor, frame),
+    outlineWidth: Math.max(0, Math.min(20, style.outlineWidth ?? 2)),
   };
 }

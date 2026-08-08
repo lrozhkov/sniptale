@@ -1,11 +1,10 @@
-import { useId } from 'react';
-
 import { translate } from '../../../../../platform/i18n';
 import { ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { Settings2 } from 'lucide-react';
 import { ModelSelector } from './model-selector';
-import { AIModalSubmitTip } from './submit-tip';
 import type { useAIModalState } from '../session';
+import { openAIModalSettings } from './settings-navigation';
 
 export function AIModalFooter({
   availableModels,
@@ -16,6 +15,7 @@ export function AIModalFooter({
   onSubmit,
   providers,
   selectedModelId,
+  selectedData,
   totalTokens,
 }: {
   availableModels: ReturnType<typeof useAIModalState>['availableModels'];
@@ -32,23 +32,75 @@ export function AIModalFooter({
   return (
     <ProductModalFooter>
       <AIModalTokenCounter totalTokens={totalTokens} />
-      <ModelSelector
-        models={availableModels}
-        providers={providers}
-        selectedModelId={selectedModelId}
-        onSelect={onSelectModel}
-        disabled={isLoading}
-      />
-      <AIModalFooterActions
+      <div className="sniptale-ai-modal-model-controls">
+        <ModelSelector
+          models={availableModels}
+          providers={providers}
+          selectedModelId={selectedModelId}
+          onSelect={onSelectModel}
+          disabled={isLoading}
+        />
+        <button
+          aria-label={translate('aiModal.openModelSettings')}
+          className="sniptale-ai-modal-inline-settings"
+          onClick={(event) =>
+            void openAIModalSettings({ section: 'ai-connections' }, event.nativeEvent)
+          }
+          title={translate('aiModal.openModelSettings')}
+          type="button"
+        >
+          <Settings2 aria-hidden="true" size={14} />
+        </button>
+      </div>
+      <AIModalDisclosure
         availableModels={availableModels}
-        disabledSubmit={disabledSubmit}
-        isLoading={isLoading}
-        onClose={onClose}
-        onSubmit={onSubmit}
         providers={providers}
+        selectedData={selectedData}
         selectedModelId={selectedModelId}
       />
+      <div className="sniptale-ai-modal-footer-actions">
+        <ProductActionButton onClick={onClose} tone="secondary">
+          {translate('aiModal.cancelButton')}
+        </ProductActionButton>
+        <ProductActionButton disabled={disabledSubmit} onClick={onSubmit} tone="primary">
+          {translate('aiModal.submitShortcutTitle')}
+        </ProductActionButton>
+      </div>
     </ProductModalFooter>
+  );
+}
+
+function AIModalDisclosure({
+  availableModels,
+  providers,
+  selectedData,
+  selectedModelId,
+}: {
+  availableModels: ReturnType<typeof useAIModalState>['availableModels'];
+  providers: ReturnType<typeof useAIModalState>['providers'];
+  selectedData: string;
+  selectedModelId: string | null;
+}) {
+  const model = availableModels.find((candidate) => candidate.id === selectedModelId);
+  const provider = providers.find((candidate) => candidate.id === model?.providerId);
+  const destination =
+    provider?.connectionType === 'chrome-built-in'
+      ? translate('aiModal.disclosureLocalDestination')
+      : (provider?.name ?? translate('aiModal.disclosureExternalDestination'));
+  const summary = translate('aiModal.disclosureSummary')
+    .replace(
+      '{data}',
+      selectedData
+        ? translate('aiModal.disclosureSelectedData')
+        : translate('aiModal.disclosureNoPageData')
+    )
+    .replace('{destination}', destination)
+    .replace('{model}', model?.displayName ?? translate('aiModal.modelNotSelected'));
+  return (
+    <div className="sniptale-ai-modal-disclosure" data-ui="ai-modal.disclosure">
+      {summary}
+      <span>{translate('aiModal.disclosureHistory')}</span>
+    </div>
   );
 }
 
@@ -77,79 +129,5 @@ function AIModalTokenCounter({ totalTokens }: { totalTokens: number }) {
         </span>
       </div>
     </div>
-  );
-}
-
-function AIModalFooterActions({
-  availableModels,
-  disabledSubmit,
-  isLoading,
-  onClose,
-  onSubmit,
-  providers,
-  selectedModelId,
-}: {
-  availableModels: ReturnType<typeof useAIModalState>['availableModels'];
-  disabledSubmit: boolean;
-  isLoading: boolean;
-  onClose: () => void;
-  onSubmit: () => void;
-  providers: ReturnType<typeof useAIModalState>['providers'];
-  selectedModelId: string | null;
-}) {
-  const submitTipId = useId();
-
-  return (
-    <div className="sniptale-ai-modal-footer-actions">
-      <ProductActionButton onClick={onClose} disabled={isLoading} tone="secondary">
-        {translate('aiModal.cancelButton')}
-      </ProductActionButton>
-      <span className="sniptale-ai-modal-submit-tip-anchor">
-        <ProductActionButton
-          aria-describedby={submitTipId}
-          onClick={onSubmit}
-          disabled={disabledSubmit}
-          tone="primary"
-        >
-          {isLoading ? <AIModalLoadingLabel /> : <AIModalSubmitLabel />}
-        </ProductActionButton>
-        <AIModalSubmitTip
-          availableModels={availableModels}
-          id={submitTipId}
-          providers={providers}
-          selectedModelId={selectedModelId}
-        />
-      </span>
-    </div>
-  );
-}
-
-function AIModalLoadingLabel() {
-  return (
-    <>
-      <div className="sniptale-spinner-inline" />
-      {translate('aiModal.processingButton')}
-    </>
-  );
-}
-
-function AIModalSubmitLabel() {
-  return (
-    <>
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <line x1="22" y1="2" x2="11" y2="13" />
-        <polygon points="22 2 15 22 11 13 2 9 22 2" />
-      </svg>
-      {translate('aiModal.submitButton')}
-    </>
   );
 }

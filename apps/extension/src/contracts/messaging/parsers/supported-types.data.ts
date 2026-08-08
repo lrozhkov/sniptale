@@ -27,6 +27,8 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
   MessageType.AI_SETTINGS_QUERY,
   MessageType.AI_SETTINGS_MUTATION,
+  MessageType.AI_SETTINGS_NAVIGATION,
+  MessageType.ANNOTATION_FORK_SESSION,
   MessageType.AI_SECRET_UNLOCK,
   MessageType.NATIVE_APP_QUERY,
   MessageType.NATIVE_APP_MUTATION,

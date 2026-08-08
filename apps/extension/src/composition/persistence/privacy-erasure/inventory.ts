@@ -110,6 +110,7 @@ const localSensitiveKeyPrefixes = ['sniptale_video_editor_track_panel_prefs:'] a
 const sessionSensitiveKeyPrefixes = [
   'scenarioPresentationSession:',
   'sniptale.content.pin-to-tab:tab:',
+  'sniptale.annotation-fork-drafts:tab:',
 ] as const;
 
 function uniqueStrings(values: readonly string[]): string[] {

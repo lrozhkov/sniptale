@@ -126,6 +126,7 @@ describe('CalloutSettingsPopover', () => {
     expect(popover?.classList.contains('sniptale-content-popover--toolbar-menu')).toBe(true);
     expect(popover?.classList.contains('sniptale-content-popover--scroll')).toBe(true);
     expect((popover as HTMLElement | null)?.style.width).toBe('400px');
+    expect((popover as HTMLElement | null)?.parentElement?.style.width).toBe('max-content');
 
     act(() => {
       vi.advanceTimersByTime(150);

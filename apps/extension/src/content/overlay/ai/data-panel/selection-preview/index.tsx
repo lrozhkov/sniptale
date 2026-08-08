@@ -13,6 +13,10 @@ export function DataSelectionPreview({
   isDataSpoilerOpen,
   isLoading,
   spoilerSummary,
+  filterQuery,
+  setFilterQuery,
+  setShowSelectedOnly,
+  showSelectedOnly,
   toggleExpandAll,
   toggleSelectAll,
   treeData,
@@ -29,6 +33,10 @@ export function DataSelectionPreview({
         isDataSpoilerOpen={isDataSpoilerOpen}
         isLoading={isLoading}
         spoilerSummary={spoilerSummary}
+        filterQuery={filterQuery}
+        setFilterQuery={setFilterQuery}
+        setShowSelectedOnly={setShowSelectedOnly}
+        showSelectedOnly={showSelectedOnly}
         toggleExpandAll={toggleExpandAll}
         toggleSelectAll={toggleSelectAll}
       />

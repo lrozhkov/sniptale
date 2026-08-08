@@ -72,7 +72,6 @@ export function AutoBlurBlurControls(props: {
           <CompactSelect
             appearance="plain"
             aria-label={translate('content.autoBlur.frameTemplate')}
-            disabled={!showBorder}
             onChange={(borderPresetId) => updateBlurSettings({ borderPresetId })}
             options={props.borderPresets.map((preset) => ({
               label: getBorderPresetDisplayName(preset, locale),

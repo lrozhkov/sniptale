@@ -21,6 +21,8 @@ function hasBorderSettingsChange(
 ) {
   const prev = prevProps.frame.borderSettings;
   const next = nextProps.frame.borderSettings;
+  const prevPadding = prev?.padding;
+  const nextPadding = next?.padding;
   return (
     prevProps.frame.borderSettings !== nextProps.frame.borderSettings &&
     (prev?.sourcePresetId !== next?.sourcePresetId ||
@@ -28,6 +30,10 @@ function hasBorderSettingsChange(
       prev?.width !== next?.width ||
       prev?.style !== next?.style ||
       prev?.radius !== next?.radius ||
+      prevPadding?.top !== nextPadding?.top ||
+      prevPadding?.right !== nextPadding?.right ||
+      prevPadding?.bottom !== nextPadding?.bottom ||
+      prevPadding?.left !== nextPadding?.left ||
       prev?.fillColor !== next?.fillColor ||
       prev?.effects?.capture?.hideFrame !== next?.effects?.capture?.hideFrame ||
       prev?.effects?.linkedTemplates?.calloutPresetId !==

@@ -54,7 +54,9 @@ it('keeps a temporary fork isolated until it is saved or explicitly discarded', 
   expect(restore).not.toHaveBeenCalled();
 
   click(host, '[data-action="back"]');
-  clickButton(host, 'Отбросить изменения');
+  const discardButton = findButton(host, 'Сбросить изменения');
+  expect(discardButton?.className).toContain('var(--sniptale-color-danger)');
+  act(() => discardButton?.click());
   expect(restore).toHaveBeenCalledWith({ id: 'template-a' });
   expect(refresh).toHaveBeenCalledTimes(1);
   expect(host.querySelector('output')?.getAttribute('data-mode')).toBe('templates');
@@ -67,6 +69,10 @@ function click(host: HTMLElement, selector: string) {
 }
 
 function clickButton(host: HTMLElement, label: string) {
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent === label);
+  const button = findButton(host, label);
   act(() => button?.click());
+}
+
+function findButton(host: HTMLElement, label: string) {
+  return [...host.querySelectorAll('button')].find((item) => item.textContent === label);
 }

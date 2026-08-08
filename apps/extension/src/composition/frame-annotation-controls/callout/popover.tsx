@@ -104,6 +104,23 @@ export function FutureCalloutSettingsPopover(props: {
       })
     );
   };
+  const forkPreset = (preset: CalloutPreset) => {
+    commit(
+      applyCalloutSettingsPatch(localSettings, {
+        content: { titleText: preset.content.titleText },
+        placement: {
+          ...preset.placement,
+          connectorBasePosition: undefined,
+          connectorBaseWidth: undefined,
+          connectorFramePosition: undefined,
+          connectorWaypoint: undefined,
+          manualPlacement: undefined,
+        },
+        sourcePresetId: undefined,
+        style: cloneCalloutStyle(preset.style),
+      })
+    );
+  };
 
   return (
     <ContentPopoverAdapter
@@ -127,7 +144,7 @@ export function FutureCalloutSettingsPopover(props: {
         {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
         localSettings={localSettings}
         onApplyPreset={applyPreset}
-        onForkPreset={() => handleSettingChange({ sourcePresetId: undefined })}
+        onForkPreset={forkPreset}
         onClose={props.onClose}
         onResetPreset={(preset) => void presets.editor.reset(preset)}
         onShowPresets={presets.catalog.refresh}

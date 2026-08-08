@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 
 const restorePinnedToolbarAfterNavigation = vi.hoisted(() => vi.fn(async () => true));
 const invalidatePinnedToolbarOperations = vi.hoisted(() => vi.fn());
+const bindAnnotationForkSessionDocument = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock('../../page-access/pinned-toolbar-restore', () => ({
   restorePinnedToolbarAfterNavigation,
@@ -10,6 +11,11 @@ vi.mock('../../page-access/pinned-toolbar-restore', () => ({
 vi.mock('../../page-access/pinned-toolbar-operation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../page-access/pinned-toolbar-operation')>()),
   invalidatePinnedToolbarOperations,
+}));
+
+vi.mock('../../../annotation-fork-session/route', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../annotation-fork-session/route')>()),
+  bindAnnotationForkSessionDocument,
 }));
 
 import {
@@ -81,6 +87,7 @@ it('hydrates the persisted recording lease before routing tab and navigation eve
   navigationErrorListenerRef.current?.({ documentId: 'document-1', frameId: 0, tabId: 7 });
   await flushMicrotasks();
   expect(handleTabRecordingNavigationCommitted).toHaveBeenCalledWith(7, 'document-1');
+  expect(bindAnnotationForkSessionDocument).toHaveBeenCalledWith(7, 'document-1');
   expect(handleTabRecordingNavigationCompleted).toHaveBeenCalledWith(
     7,
     'document-1',

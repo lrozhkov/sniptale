@@ -1,5 +1,6 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { clearPinToTabSessionStorageState } from '../../../../composition/persistence/content-pin-session/index';
+import { clearAnnotationForkSessionForTab } from '../../../annotation-fork-session/route';
 import { clearPinnedToolbarOperationState } from '../../page-access/pinned-toolbar-operation';
 import { clearBackgroundRuntimeTabState } from '../../../application/runtime-state';
 import { handleTabClose } from '../../../media/lifecycle';
@@ -33,6 +34,9 @@ export function registerTabLifecycleListeners(
     })();
     void clearPinToTabSessionStorageState(tabId).catch((error) => {
       logger.warn('Failed to clear pin-to-tab state after tab close', error);
+    });
+    void clearAnnotationForkSessionForTab(tabId).catch((error) => {
+      logger.warn('Failed to clear annotation fork drafts after tab close', error);
     });
     logger.log('Tab closed, state cleared', tabId);
   });

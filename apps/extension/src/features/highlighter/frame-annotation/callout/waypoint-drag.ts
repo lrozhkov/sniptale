@@ -48,6 +48,7 @@ function snapWaypoint(point: Point, snapPoints: Point[], visualScale: number) {
 
 function resolveWaypointPoint(args: {
   angleSnap: PolylineAngleSnap | null | undefined;
+  disableAngleMagnetism: boolean;
   elbowConstraint: ElbowWaypointConstraint | null | undefined;
   point: Point;
   snapPoints: Point[];
@@ -56,6 +57,7 @@ function resolveWaypointPoint(args: {
 }) {
   if (args.angleSnap) {
     return snapPolylineControlPoint({
+      disableMagnetism: args.disableAngleMagnetism,
       point: args.point,
       snap: args.angleSnap,
       strict: args.strictAngleSnap,
@@ -220,6 +222,7 @@ function useWaypointPointerSession(input: {
         input.args.frameRect,
         resolveWaypointPoint({
           angleSnap: input.args.angleSnap,
+          disableAngleMagnetism: event.ctrlKey,
           elbowConstraint: input.args.elbowConstraint,
           point: pointerPoint,
           snapPoints: input.args.snapPoints,
@@ -316,6 +319,7 @@ function moveWaypointWithKeyboard(
       args.frameRect,
       resolveWaypointPoint({
         angleSnap: args.angleSnap,
+        disableAngleMagnetism: event.ctrlKey === true,
         elbowConstraint: args.elbowConstraint,
         point: nextPoint,
         snapPoints: args.snapPoints,

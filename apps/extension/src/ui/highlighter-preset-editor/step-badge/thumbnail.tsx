@@ -53,7 +53,7 @@ export function StepBadgePresetPreview(props: {
         style={{
           alignItems: 'center',
           background: visualStyle.backgroundColor,
-          border: `2px solid ${visualStyle.outlineColor}`,
+          border: `${visualStyle.outlineWidth}px solid ${visualStyle.outlineColor}`,
           borderRadius: '50%',
           boxSizing: 'border-box',
           color: visualStyle.textColor,

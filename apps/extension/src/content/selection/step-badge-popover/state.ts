@@ -8,10 +8,12 @@ import type {
   StepBadgeSizeLevel,
   StepBadgeType,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type { AppLocale } from '../../../platform/i18n';
 import { createStepBadgeSettingsFromTemplate } from '../../../features/highlighter/step-badge-presets/catalog';
 import {
   DEFAULT_STEP_BADGE_SETTINGS,
   filterStepBadgeValue,
+  getDefaultStepBadgeAlphabet,
   normalizeStepBadgeFromProp,
   toggleStepBadgeOffset,
 } from '../../../composition/frame-annotation-controls/step-badge/helpers';
@@ -27,6 +29,7 @@ function createStepBadgeHandlers(props: {
   localStepBadgeSettings: StepBadgeSettings;
   onClose: () => void;
   setLocalStepBadgeSettings: React.Dispatch<React.SetStateAction<StepBadgeSettings>>;
+  locale: AppLocale;
 }) {
   const updateSettings = (patch: Partial<StepBadgeSettings>) => {
     const manualPatch = { ...patch, sourcePresetId: undefined };
@@ -34,27 +37,39 @@ function createStepBadgeHandlers(props: {
     dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: manualPatch });
   };
 
+  const createPresetSettings = (preset: StepBadgePreset, sourcePresetId?: string) => {
+    return {
+      ...createStepBadgeSettingsFromTemplate(preset.settings, sourcePresetId),
+      // Automatic templates intentionally store an empty value: the concrete
+      // number belongs to the frame, not to the reusable visual template.
+      // Keep that runtime value while changing the badge appearance.
+      value:
+        preset.settings.auto !== false && !preset.settings.value
+          ? props.localStepBadgeSettings.value
+          : preset.settings.value,
+      anchor: props.localStepBadgeSettings.anchor ?? preset.settings.anchor,
+      offsetDirections: [...(props.localStepBadgeSettings.offsetDirections ?? [])],
+      ...(props.localStepBadgeSettings.manualPlacement === undefined
+        ? {}
+        : { manualPlacement: { ...props.localStepBadgeSettings.manualPlacement } }),
+    };
+  };
+
+  const applyPreset = (preset: StepBadgePreset) => {
+    const next = createPresetSettings(preset, preset.id);
+    props.setLocalStepBadgeSettings(next);
+    dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
+  };
+
+  const forkPreset = (preset: StepBadgePreset) => {
+    const next = createPresetSettings(preset);
+    props.setLocalStepBadgeSettings(next);
+    dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
+  };
+
   return {
-    applyPreset: (preset: StepBadgePreset) => {
-      const next = {
-        ...createStepBadgeSettingsFromTemplate(preset.settings, preset.id),
-        // Automatic templates intentionally store an empty value: the concrete
-        // number belongs to the frame, not to the reusable visual template.
-        // Keep that runtime value while changing the badge appearance.
-        value:
-          preset.settings.auto !== false && !preset.settings.value
-            ? props.localStepBadgeSettings.value
-            : preset.settings.value,
-        anchor: props.localStepBadgeSettings.anchor ?? preset.settings.anchor,
-        offsetDirections: [...(props.localStepBadgeSettings.offsetDirections ?? [])],
-        ...(props.localStepBadgeSettings.manualPlacement === undefined
-          ? {}
-          : { manualPlacement: { ...props.localStepBadgeSettings.manualPlacement } }),
-      };
-      props.setLocalStepBadgeSettings(next);
-      dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: next });
-    },
-    forkPreset: (_preset: StepBadgePreset) => updateSettings({}),
+    applyPreset,
+    forkPreset,
     markTemplateCreated: (sourcePresetId: string) => {
       props.setLocalStepBadgeSettings((previous) => ({ ...previous, sourcePresetId }));
       dispatchFrameStepBadgeChanged({ frameId: props.frameId, settings: { sourcePresetId } });
@@ -78,7 +93,10 @@ function createStepBadgeHandlers(props: {
       });
     },
     handleSizeLevelChange: (sizeLevel: StepBadgeSizeLevel) => updateSettings({ sizeLevel }),
-    handleTypeChange: (type: StepBadgeType) => updateSettings({ type }),
+    handleTypeChange: (type: StepBadgeType) =>
+      updateSettings(
+        type === 'letter' ? { type, alphabet: getDefaultStepBadgeAlphabet(props.locale) } : { type }
+      ),
     handleValueChange: (value: string) => {
       const nextValue = filterStepBadgeValue({
         auto: props.localStepBadgeSettings.auto !== false,
@@ -132,6 +150,7 @@ export function useStepBadgePopoverState(props: {
   isDismissalEnabled?: boolean;
   onClose: () => void;
   stepBadge?: StepBadgeSettings;
+  locale: AppLocale;
 }) {
   const { frameId, isOpen, onClose, stepBadge } = props;
   const [localStepBadgeSettings, setLocalStepBadgeSettings] = useState<StepBadgeSettings>({
@@ -161,6 +180,7 @@ export function useStepBadgePopoverState(props: {
     localStepBadgeSettings,
     onClose,
     setLocalStepBadgeSettings,
+    locale: props.locale,
   });
 
   return {

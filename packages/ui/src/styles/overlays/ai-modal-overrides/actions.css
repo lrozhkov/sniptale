@@ -23,9 +23,9 @@
 .sniptale-ai-modal-root .sniptale-ctrl-btn.active,
 .sniptale-ai-modal-root .sniptale-copy-btn.copied {
   border-color: color-mix(in srgb, var(--sniptale-color-accent) 42%, transparent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
+  background: transparent;
   color: var(--sniptale-color-accent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
+  box-shadow: none;
 }
 
 .sniptale-ai-modal-root .sniptale-add-btn,

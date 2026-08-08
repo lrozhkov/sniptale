@@ -15,6 +15,7 @@ function getToolbarVisibilityStyle(
   uiScale: number
 ) {
   return {
+    position: 'fixed',
     top: `${position.y * uiScale}px`,
     left: `${position.x * uiScale}px`,
     visibility: positionReady ? 'visible' : 'hidden',
@@ -38,37 +39,42 @@ export function ToolbarShellContent(props: {
   return (
     <>
       {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
-      <ContentToolbarShell
-        ref={derivedState.toolbarRef}
-        dragging={derivedState.isDragging}
-        dataUi="content.toolbar.root"
-        data-display-mode={derivedState.displayMode}
-        data-menu-open={menuOpen ? 'true' : undefined}
+      <div
+        className="sniptale-toolbar-positioner"
         style={getToolbarVisibilityStyle(
           derivedState.positionReady,
           derivedState.position,
           uiScale
         )}
-        onMouseOverCapture={onHoverCapture}
       >
-        <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-            <circle cx="9" cy="12" r="1" />
-            <circle cx="9" cy="5" r="1" />
-            <circle cx="9" cy="19" r="1" />
-            <circle cx="15" cy="12" r="1" />
-            <circle cx="15" cy="5" r="1" />
-            <circle cx="15" cy="19" r="1" />
-          </svg>
-        </ContentToolbarDragHandle>
+        <ContentToolbarShell
+          ref={derivedState.toolbarRef}
+          className="sniptale-content-ui-zoom-surface"
+          dragging={derivedState.isDragging}
+          dataUi="content.toolbar.root"
+          data-display-mode={derivedState.displayMode}
+          data-menu-open={menuOpen ? 'true' : undefined}
+          onMouseOverCapture={onHoverCapture}
+        >
+          <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+              <circle cx="9" cy="12" r="1" />
+              <circle cx="9" cy="5" r="1" />
+              <circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="12" r="1" />
+              <circle cx="15" cy="5" r="1" />
+              <circle cx="15" cy="19" r="1" />
+            </svg>
+          </ContentToolbarDragHandle>
 
-        <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-        <ToolbarSecondaryControls
-          toolbarProps={toolbarProps}
-          viewModel={viewModel}
-          onViewportChange={onViewportChange}
-        />
-      </ContentToolbarShell>
+          <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+          <ToolbarSecondaryControls
+            toolbarProps={toolbarProps}
+            viewModel={viewModel}
+            onViewportChange={onViewportChange}
+          />
+        </ContentToolbarShell>
+      </div>
     </>
   );
 }

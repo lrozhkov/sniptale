@@ -71,7 +71,8 @@ describe('JsonPreviewActions', () => {
     });
 
     expect(buttons[0]?.getAttribute('title')).toBe('aiModal.hideJsonTitle');
-    expect(buttons[0]?.className).toContain('active');
+    expect(buttons[0]?.className).not.toContain('active');
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(buttons[1]?.className).toContain('sniptale-copy-btn');
     expect(setShowDataPreview).toHaveBeenCalled();
     expect(copyFormattedJson).toHaveBeenCalled();

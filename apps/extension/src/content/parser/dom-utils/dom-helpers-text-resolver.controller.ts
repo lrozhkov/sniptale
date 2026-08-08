@@ -1,4 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { isSniptaleIdRetained } from '../../platform/frame';
 
 type OriginalElementResolver = (node: Node) => Node | null;
 
@@ -40,6 +41,13 @@ function warnMissingOriginalElement(element: HTMLElement, id: string): void {
   });
 }
 
+function assignParserSniptaleId(element: HTMLElement, id: string): void {
+  if (isSniptaleIdRetained(element.dataset['sniptaleId'])) {
+    return;
+  }
+  element.dataset['sniptaleId'] = id;
+}
+
 /**
  * Creates a controller that owns original-element resolver state for sniptale ids.
  */
@@ -60,7 +68,7 @@ export function createDomHelpersTextResolverController(): DomHelpersTextResolver
         const original = resolver(element);
         if (original && original !== element) {
           logVirtualToOriginalAssignment(element, id, original);
-          (original as HTMLElement).dataset['sniptaleId'] = id;
+          assignParserSniptaleId(original as HTMLElement, id);
           return;
         }
 
@@ -71,7 +79,7 @@ export function createDomHelpersTextResolverController(): DomHelpersTextResolver
         logger.warn('Original element resolver is not set');
       }
 
-      element.dataset['sniptaleId'] = id;
+      assignParserSniptaleId(element, id);
     },
   };
 }

@@ -54,4 +54,20 @@ describe('ProductModal', () => {
     expect(container?.querySelector('.sniptale-modal-accent')).toBeNull();
     expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();
   });
+
+  it('locks background document scrolling for the modal lifetime and restores host styles', () => {
+    document.documentElement.style.overflow = 'clip';
+    document.body.style.overflow = 'scroll';
+    renderModal();
+
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    act(() => root?.unmount());
+    root = null;
+    expect(document.documentElement.style.overflow).toBe('clip');
+    expect(document.body.style.overflow).toBe('scroll');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  });
 });

@@ -24,6 +24,7 @@ export const DEFAULT_STEP_BADGE_VISUAL_STYLE: StepBadgeVisualStyle = {
   textColor: '#ffffff',
   outlineColorSource: 'surface',
   outlineColor: '#ffffff',
+  outlineWidth: 2,
   customCss: '',
 };
 

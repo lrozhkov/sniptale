@@ -22,3 +22,18 @@ it('keeps adjacent move and settings icons visually consistent', () => {
   expect(source).toContain('height: 14px;');
   expect(source).toContain('stroke-width: 1.75;');
 });
+
+it('replaces the native focus outline on adjacent controls with the themed focus ring', () => {
+  const source = readFileSync(
+    new URL(
+      '../../../features/highlighter/frame-annotation/interaction/styles.css',
+      import.meta.url
+    ),
+    'utf8'
+  );
+
+  expect(source).toContain('.sniptale-callout-settings-handle:focus-visible,');
+  expect(source).toContain('.sniptale-step-badge-settings-handle:focus-visible,');
+  expect(source).toContain('outline: none !important;');
+  expect(source).toContain('border-color: var(--sniptale-color-accent) !important;');
+});

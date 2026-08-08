@@ -18,6 +18,15 @@ export const aiSettingsMutationRouteDescriptor = {
   routeAuthorityFamily: 'background-owned-ipc',
 } as const;
 
+export const aiSettingsNavigationRouteDescriptor = {
+  handlerId: 'ai-settings-navigation',
+  messageTypes: [MessageType.AI_SETTINGS_NAVIGATION],
+  ownerModule: 'apps/extension/src/background/ai/settings/navigation-route.ts',
+  policyAuthorityFamily: 'ai-settings-navigation-authority',
+  policyStateIds: [],
+  routeAuthorityFamily: 'background-owned-ipc',
+} as const;
+
 export const aiSecretUnlockRouteDescriptor = {
   handlerId: 'ai-secret-unlock',
   messageTypes: [MessageType.AI_SECRET_UNLOCK],

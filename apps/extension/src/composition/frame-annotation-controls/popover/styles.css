@@ -3,6 +3,8 @@
   min-height: 22px;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
+  gap: 6px;
   padding-bottom: 4px;
   cursor: default !important;
   user-select: none;
@@ -23,7 +25,16 @@
 
 .sniptale-settings-popover-header .sniptale-toolbar-menu-title {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   cursor: inherit !important;
+}
+
+.sniptale-settings-popover-header .sniptale-toolbar-menu-title > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sniptale-settings-popover-header-actions {
@@ -31,18 +42,9 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 78%;
   cursor: default !important;
-}
-
-.sniptale-settings-popover-status {
-  padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--sniptale-color-warning) 40%, transparent);
-  border-radius: 999px;
-  color: var(--sniptale-color-warning);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 14px;
-  white-space: nowrap;
 }
 
 .sniptale-settings-popover-mode-action {
@@ -57,6 +59,9 @@
   font-weight: 600;
   line-height: 16px;
   white-space: nowrap;
+  max-width: 112px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer !important;
 }
 
@@ -72,6 +77,9 @@
   font-weight: 600;
   line-height: 16px;
   white-space: nowrap;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer !important;
 }
 

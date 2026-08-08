@@ -69,6 +69,8 @@ export interface StepBadgeVisualStyle {
   textColor: string;
   outlineColorSource: StepBadgeOutlineColorSource;
   outlineColor: string;
+  /** Outline thickness in CSS pixels. Missing legacy values resolve to 2px. */
+  outlineWidth?: number;
   /** Optional safe decorative CSS for the badge and its text. */
   customCss?: string;
 }

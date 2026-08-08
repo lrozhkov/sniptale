@@ -68,4 +68,15 @@ describe('ProductToolbarMenu', () => {
     );
     expect(markup).not.toContain('sniptale-popover-up');
   });
+
+  it('renders a compact group label without an empty hint row', () => {
+    const markup = renderToStaticMarkup(
+      <ProductToolbarMenuGroupLabel>
+        <ProductToolbarMenuGroupCopy label="Browser window" />
+      </ProductToolbarMenuGroupLabel>
+    );
+
+    expect(markup).toContain('Browser window');
+    expect(markup).not.toContain('sniptale-toolbar-menu-group-hint');
+  });
 });

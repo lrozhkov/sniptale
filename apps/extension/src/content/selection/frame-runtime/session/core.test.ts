@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { FrameData, HighlighterSettings } from '../../../../features/highlighter/contracts';
+import type {
+  EffectMode,
+  FrameData,
+  HighlighterSettings,
+} from '../../../../features/highlighter/contracts';
 
 const storageMocks = vi.hoisted(() => ({
   subscribeToChangesMock: vi.fn(() => vi.fn()),
@@ -29,6 +33,7 @@ import {
   dispatchCalloutDelete,
   dispatchCalloutPopoverSettingsChanged,
   dispatchFocusOpacityChanged,
+  dispatchFutureFrameDefaultsChanged,
   dispatchFrameCalloutChanged,
   dispatchFrameStepBadgeChanged,
   dispatchSessionBlurSettingsChanged,
@@ -37,6 +42,13 @@ import {
 } from '../../../platform/page-context/frame-events';
 import { setupFrameSessionSyncListeners } from './core';
 import { createDefaultCalloutSettings } from '../../../../features/highlighter/frame-annotation/callout/model';
+import { createDefaultFrameStepBadge } from '../../../../features/highlighter/frame-annotation/defaults';
+import { getFutureFrameCallout } from './future-callout';
+import { getFrameSessionBorderPreset } from './border-preset';
+import {
+  getAnnotationTemplateSources,
+  resetAnnotationTemplateSources,
+} from './annotation-template-source';
 
 const DEFAULT_SETTINGS: HighlighterSettings = {
   borderPresets: [
@@ -116,6 +128,7 @@ function dispatchFrameSessionEvents() {
 beforeEach(() => {
   settingsMocks.loadHighlighterSettingsMock.mockReset();
   storageMocks.subscribeToChangesMock.mockClear();
+  resetAnnotationTemplateSources();
   settingsMocks.loadHighlighterSettingsMock.mockResolvedValue(DEFAULT_SETTINGS);
 });
 
@@ -188,6 +201,65 @@ it('wraps only discrete non-step-badge session handlers with history commits', a
   await Promise.resolve();
 
   expect(withHistoryCommit).toHaveBeenCalledTimes(4);
+
+  cleanup();
+});
+
+it('promotes confirmed element snapshots to future-frame session defaults', async () => {
+  const framesStore = createFramesStore();
+  const globalEffectModeRef: { current: EffectMode } = { current: 'border' };
+  const sessionBlurSettingsRef = { current: DEFAULT_SETTINGS.defaultBlurSettings };
+  const sessionCalloutStyleRef = { current: null };
+  const sessionDefaultsInitializedRef = { current: false };
+  const sessionFocusSettingsRef = { current: DEFAULT_SETTINGS.defaultFocusSettings };
+  const sessionStepBadgeTemplateRef = { current: null };
+  const cleanup = setupFrameSessionSyncListeners({
+    globalEffectModeRef,
+    highlighterSettingsCacheRef: { current: null },
+    reorderStepBadge: vi.fn(),
+    sessionBlurSettingsRef,
+    sessionCalloutStyleRef,
+    sessionDefaultsInitializedRef,
+    sessionFocusSettingsRef,
+    sessionStepBadgeTemplateRef,
+    setFrames: framesStore.setFrames,
+    syncFocusOpacity: vi.fn(),
+    updateFrameStepBadge: vi.fn(),
+    updateGlobalStepBadgeSettings: vi.fn(),
+    withHistoryCommit: <T extends (...args: never[]) => unknown>(action: T) => action,
+  });
+  await Promise.resolve();
+
+  const callout = createDefaultCalloutSettings();
+  callout.style.surface.backgroundColor = '#123456';
+  dispatchFutureFrameDefaultsChanged({ kind: 'callout', settings: callout });
+  const stepBadge = createDefaultFrameStepBadge();
+  stepBadge.style = { ...stepBadge.style, diameter: 28 };
+  dispatchFutureFrameDefaultsChanged({ kind: 'stepBadge', settings: stepBadge });
+  dispatchFutureFrameDefaultsChanged({
+    kind: 'frame',
+    settings: {
+      blurSettings: { amount: 19, blurType: 'distortion', showBorder: false },
+      borderSettings: { ...DEFAULT_SETTINGS.borderPresets[0]!, width: 7 },
+      effectMode: 'focus',
+      focusSettings: { blurAmount: 4, opacity: 0.2, showBorder: true },
+    },
+  });
+
+  expect(getFutureFrameCallout()?.style.surface.backgroundColor).toBe('#123456');
+  expect(sessionCalloutStyleRef.current).toMatchObject({
+    surface: { backgroundColor: '#123456' },
+  });
+  expect(sessionStepBadgeTemplateRef.current).toMatchObject({
+    enabled: true,
+    style: { diameter: 28 },
+  });
+  expect(getAnnotationTemplateSources()).toEqual({ callout: 'forced', stepBadge: 'forced' });
+  expect(globalEffectModeRef.current).toBe('focus');
+  expect(sessionBlurSettingsRef.current.amount).toBe(19);
+  expect(sessionFocusSettingsRef.current).toMatchObject({ blurAmount: 4, opacity: 0.2 });
+  expect(sessionDefaultsInitializedRef.current).toBe(true);
+  expect(getFrameSessionBorderPreset().width).toBe(7);
 
   cleanup();
 });

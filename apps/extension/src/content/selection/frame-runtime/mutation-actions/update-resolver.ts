@@ -1,5 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { FrameData } from '../../../../features/highlighter/contracts';
+import { reprojectFrameSurfacePadding } from '../../../../features/highlighter/frame-surface';
 import { calculateFrameOffsetFromElement, calculateFrameViewportCoords } from '../manager/coords';
 import { createDocumentPagePlacement, updateDocumentPagePlacement } from '../../../platform/frame';
 
@@ -11,17 +12,6 @@ export function resolveUpdatedFrame(args: {
   frameId: string;
   newFrame: FrameData;
 }): FrameData {
-  if (haveFramePaddingChanged(args.frame, args.newFrame)) {
-    return resolveCoordsUpdatedFrame({
-      ...args,
-      newFrame: applyFramePaddingChange(args.frame, args.newFrame),
-    });
-  }
-
-  if (haveFrameCoordsChanged(args.frame, args.newFrame)) {
-    return resolveCoordsUpdatedFrame(args);
-  }
-
   if (
     args.anchorNode?.isConnected &&
     args.frame.offset === undefined &&
@@ -31,6 +21,17 @@ export function resolveUpdatedFrame(args: {
       ...args,
       anchorNode: args.anchorNode,
     });
+  }
+
+  if (haveFramePaddingChanged(args.frame, args.newFrame)) {
+    return resolveCoordsUpdatedFrame({
+      ...args,
+      newFrame: applyFramePaddingChange(args.frame, args.newFrame),
+    });
+  }
+
+  if (haveFrameCoordsChanged(args.frame, args.newFrame)) {
+    return resolveCoordsUpdatedFrame(args);
   }
 
   if (args.anchorNode?.isConnected) {
@@ -109,7 +110,7 @@ function resolveCoordsUpdatedFrame(args: {
   };
 }
 
-function haveFramePaddingChanged(frame: FrameData, newFrame: FrameData) {
+export function haveFramePaddingChanged(frame: FrameData, newFrame: FrameData) {
   const oldPadding = frame.borderSettings?.padding;
   const newPadding = newFrame.borderSettings?.padding;
   return (
@@ -123,14 +124,10 @@ function haveFramePaddingChanged(frame: FrameData, newFrame: FrameData) {
 function applyFramePaddingChange(frame: FrameData, newFrame: FrameData): FrameData {
   const oldPadding = frame.borderSettings?.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const newPadding = newFrame.borderSettings?.padding ?? oldPadding;
-  const leftDelta = newPadding.left - oldPadding.left;
-  const topDelta = newPadding.top - oldPadding.top;
+  const projected = reprojectFrameSurfacePadding(frame, oldPadding, newPadding);
   return {
     ...newFrame,
-    x: frame.x - leftDelta,
-    y: frame.y - topDelta,
-    width: Math.max(1, frame.width + leftDelta + newPadding.right - oldPadding.right),
-    height: Math.max(1, frame.height + topDelta + newPadding.bottom - oldPadding.bottom),
+    ...projected,
   };
 }
 

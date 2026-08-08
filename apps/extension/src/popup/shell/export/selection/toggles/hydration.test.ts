@@ -1,9 +1,17 @@
 import type { MutableRefObject } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hydratePopupExportPreferences } from './hydration';
 import type { PopupExportPreferences } from '../../../../../composition/persistence/popup-export-preferences';
 import type { PopupExportPreferenceSetters, PopupExportSelection } from '../../session/types';
+import {
+  resetPopupExportLaunchSelectionForTests,
+  stagePopupExportLaunchSelection,
+} from '../launch-selection';
+
+afterEach(() => {
+  resetPopupExportLaunchSelectionForTests();
+});
 
 function createSetters(): PopupExportPreferenceSetters {
   return {
@@ -123,6 +131,36 @@ describe('usePopupExportToggles hydration', () => {
 
   it('does not hydrate when already loaded', () => {
     verifySkipWhenLoaded();
+  });
+
+  it('applies the one-time Design Review annotations selection over stored preferences', async () => {
+    stagePopupExportLaunchSelection({ includeAnnotations: true });
+    const setters = createSetters();
+    const committedPreferencesRef = {
+      current: null,
+    } as MutableRefObject<PopupExportSelection | null>;
+    const loadedRef = { current: false } as MutableRefObject<boolean>;
+
+    hydratePopupExportPreferences({
+      committedPreferencesRef,
+      hasLoadedPreferencesRef: loadedRef,
+      loadPreferences: vi.fn().mockResolvedValue({
+        includeAnnotations: false,
+        includeBasicLogs: false,
+        includeCssDiagnostics: false,
+        includeFiles: true,
+        includeFullPageScreenshot: false,
+        includeHarDomLogs: false,
+        includeImages: true,
+        includeJson: true,
+        includeMarkdown: true,
+      }),
+      preferences: setters,
+    });
+    await Promise.resolve();
+
+    expect(setters.setIncludeAnnotations).toHaveBeenCalledWith(true);
+    expect(committedPreferencesRef.current?.includeAnnotations).toBe(true);
   });
 
   it(

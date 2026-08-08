@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
       contentIntent: { requestId: 'request-1', token: 'token-1' },
     };
   }),
+  createExportManagerService: vi.fn(),
+  exportPage: vi.fn(),
+  persistArchive: vi.fn(),
   prepareText: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   writeText: vi.fn(),
@@ -39,13 +42,25 @@ vi.mock('../../../application/privileged-action-intent', async (importOriginal) 
   attachContentActionIntent: mocks.attachContentActionIntent,
 }));
 
+vi.mock('../../../parser/export-manager/service', () => ({
+  createExportManagerService: mocks.createExportManagerService,
+}));
+
+vi.mock('../../../parser/popup-export/helpers/archive/persist', () => ({
+  persistPopupExportArchive: mocks.persistArchive,
+}));
+
 import { executeToolbarAnnotationExportAction } from './export-actions';
 
 beforeEach(() => {
   mocks.attachContentActionIntent.mockClear();
   mocks.prepareText.mockReset();
+  mocks.createExportManagerService.mockReset();
+  mocks.exportPage.mockReset();
+  mocks.persistArchive.mockReset();
   mocks.sendRuntimeMessage.mockReset();
   mocks.writeText.mockReset();
+  mocks.createExportManagerService.mockReturnValue({ export: mocks.exportPage });
 });
 
 it('starts clipboard writing in the initiating action turn with one immutable artifact', async () => {
@@ -146,7 +161,7 @@ it('rejects clipboard and download oversize before their effects', async () => {
   expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
 });
 
-it('surfaces runtime rejection and opens full export without formatting annotations', async () => {
+it('surfaces runtime rejection and opens configurable export without formatting annotations', async () => {
   mocks.prepareText.mockReturnValue('annotations');
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ error: 'denied', success: false });
 
@@ -156,7 +171,7 @@ it('surfaces runtime rejection and opens full export without formatting annotati
 
   mocks.prepareText.mockClear();
   mocks.sendRuntimeMessage.mockResolvedValueOnce({ success: true });
-  const openPromise = executeToolbarAnnotationExportAction('open-export', {
+  const openPromise = executeToolbarAnnotationExportAction('configure-export', {
     kind: 'trusted-content-event',
   });
 
@@ -166,4 +181,74 @@ it('surfaces runtime rejection and opens full export without formatting annotati
     { kind: 'trusted-content-event' }
   );
   await openPromise;
+});
+
+it('downloads a complete page archive directly with every export option enabled', async () => {
+  const archive = {
+    blob: new Blob(['zip']),
+    errors: [],
+    filename: 'page.zip',
+    stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+    success: true,
+  };
+  mocks.exportPage.mockResolvedValue(archive);
+  mocks.persistArchive.mockResolvedValue([]);
+  const source = { kind: 'trusted-content-event' } as const;
+
+  await executeToolbarAnnotationExportAction('export-page', source);
+
+  expect(mocks.createExportManagerService).toHaveBeenCalledOnce();
+  expect(mocks.exportPage).toHaveBeenCalledWith(
+    {
+      includeAnnotations: true,
+      includeBasicLogs: true,
+      includeCssDiagnostics: true,
+      includeFiles: true,
+      includeFullPageScreenshot: true,
+      includeHarDomLogs: true,
+      includeImages: true,
+      includeJson: true,
+      includeMarkdown: true,
+    },
+    { contentIntentSource: source }
+  );
+  expect(mocks.persistArchive).toHaveBeenCalledWith(archive);
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+});
+
+it('rejects an untrusted complete export before scanning the page', async () => {
+  await expect(executeToolbarAnnotationExportAction('export-page')).rejects.toThrow(
+    'trusted user event'
+  );
+
+  expect(mocks.createExportManagerService).not.toHaveBeenCalled();
+  expect(mocks.exportPage).not.toHaveBeenCalled();
+  expect(mocks.persistArchive).not.toHaveBeenCalled();
+});
+
+it('surfaces complete-export preparation and archive persistence failures', async () => {
+  const source = { kind: 'trusted-content-event' } as const;
+  mocks.exportPage.mockResolvedValueOnce({
+    errors: ['scan failed'],
+    stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+    success: false,
+  });
+
+  await expect(executeToolbarAnnotationExportAction('export-page', source)).rejects.toThrow(
+    'scan failed'
+  );
+  expect(mocks.persistArchive).not.toHaveBeenCalled();
+
+  mocks.exportPage.mockResolvedValueOnce({
+    blob: new Blob(['zip']),
+    errors: [],
+    filename: 'page.zip',
+    stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
+    success: true,
+  });
+  mocks.persistArchive.mockResolvedValueOnce(['download failed']);
+
+  await expect(executeToolbarAnnotationExportAction('export-page', source)).rejects.toThrow(
+    'download failed'
+  );
 });

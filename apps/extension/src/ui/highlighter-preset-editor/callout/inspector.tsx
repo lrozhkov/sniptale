@@ -60,7 +60,6 @@ const MANUAL_SECTIONS: ManualSectionOption[] = [
   { icon: Heading, id: 'title', labelKey: 'content.callout.manualTitle' },
   { icon: Maximize2, id: 'size', labelKey: 'content.callout.manualSize' },
   { icon: PaintBucket, id: 'background', labelKey: 'content.callout.manualBackground' },
-  { icon: PanelTop, id: 'accent', labelKey: 'content.callout.manualAccent' },
   { icon: Cable, id: 'connector', labelKey: 'content.callout.manualConnector' },
   { icon: Square, id: 'border', labelKey: 'content.callout.manualBorder' },
   { icon: Braces, id: 'css', labelKey: 'content.callout.manualCss' },
@@ -107,12 +106,14 @@ export function CalloutManualSettings(
     positionSection?: ReactNode;
     saveSection?: CalloutSaveSectionProps;
     saveSectionRequest?: number;
+    saveSectionStatus?: string;
   }
 ) {
   const sections: ManualSectionOption[] = [
     MANUAL_SECTIONS[0]!,
     MANUAL_SECTIONS[1]!,
     { icon: Tag, id: 'badge', labelKey: 'content.callout.manualBadge' },
+    { icon: PanelTop, id: 'accent', labelKey: 'content.callout.manualAccent' },
     ...(props.settings.style.title.enabled
       ? ([
           { icon: Minus, id: 'divider', labelKey: 'content.callout.manualDivider' },
@@ -134,6 +135,7 @@ export function CalloutManualSettings(
     icon,
     id,
     label: translate(labelKey),
+    ...(id === 'save' && props.saveSectionStatus ? { status: props.saveSectionStatus } : {}),
   }));
   const renderSectionHeadingControl = (section: ManualSection) => {
     if (section === 'title') {

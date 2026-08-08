@@ -53,7 +53,7 @@ describe('auto-blur-modal/controls', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses the compact blur controls and disables the frame template until decoration is enabled', async () => {
+  it('uses compact blur controls and keeps the frame template available without decoration', async () => {
     const setBlurSettings = await renderControls();
     const typeSelect = container?.querySelector<HTMLButtonElement>(
       '[aria-label="content.autoBlur.blurType"]'
@@ -66,7 +66,7 @@ describe('auto-blur-modal/controls', () => {
     );
 
     expect(typeSelect).toBeTruthy();
-    expect(templateSelect?.disabled).toBe(true);
+    expect(templateSelect?.disabled).toBe(false);
     act(() => frameSwitch?.click());
     expect(setBlurSettings).toHaveBeenCalledWith({
       amount: 12,

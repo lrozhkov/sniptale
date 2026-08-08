@@ -27,6 +27,7 @@ function Harness() {
 
   latestState = useStepBadgePopoverState({
     ...props,
+    locale: 'ru',
   });
 
   return null;
@@ -205,9 +206,63 @@ function verifyPresetApplicationPreservesExistingPlacement() {
   cleanup();
 }
 
+function verifyInactivePresetForkUsesTheRequestedTemplate() {
+  const listener = vi.fn();
+  const cleanup = addFrameStepBadgeChangedListener(listener);
+  renderHarness({
+    anchor: 'bottom-center',
+    enabled: true,
+    offsetDirections: ['down'],
+    sourcePresetId: 'system-classic',
+    type: 'number',
+    value: '2',
+  });
+  const preset = createSystemStepBadgePresetCatalog().find(
+    (candidate) => candidate.id === 'system-outline'
+  )!;
+
+  act(() => latestState?.forkPreset(preset));
+
+  expect(latestState?.localStepBadgeSettings).toEqual(
+    expect.objectContaining({
+      anchor: 'bottom-center',
+      offsetDirections: ['down'],
+      style: preset.settings.style,
+      value: '2',
+    })
+  );
+  expect(latestState?.localStepBadgeSettings.sourcePresetId).toBeUndefined();
+  expect(listener).toHaveBeenCalledWith({
+    frameId: 'frame-1',
+    settings: expect.objectContaining({
+      style: preset.settings.style,
+    }),
+  });
+  expect(listener.mock.calls[0]?.[0].settings.sourcePresetId).toBeUndefined();
+  cleanup();
+}
+
+function verifyLocaleDefaultAlphabet() {
+  const listener = vi.fn();
+  const cleanup = addFrameStepBadgeChangedListener(listener);
+  renderHarness({ enabled: true, type: 'number', value: '2' });
+
+  act(() => latestState?.handleTypeChange('letter'));
+
+  expect(listener).toHaveBeenCalledWith({
+    frameId: 'frame-1',
+    settings: { alphabet: 'cyrillic', sourcePresetId: undefined, type: 'letter' },
+  });
+  cleanup();
+}
+
 describe('useStepBadgePopoverState', () => {
   it('dispatches frame step-badge changes and closes when disabled', verifyDisablesBadgeAndCloses);
   it('dispatches manual value changes through the shared event seam', verifyManualValueDispatch);
+  it(
+    'forks an inactive preset into an unsaved copy',
+    verifyInactivePresetForkUsesTheRequestedTemplate
+  );
   it(
     'returns to canonical placement when the anchor changes',
     verifyCanonicalPositionClearsManualPlacement
@@ -215,6 +270,10 @@ describe('useStepBadgePopoverState', () => {
   it(
     'preserves an existing badge placement when a preset is applied',
     verifyPresetApplicationPreservesExistingPlacement
+  );
+  it(
+    'uses the interface locale as the default alphabet for letter numbering',
+    verifyLocaleDefaultAlphabet
   );
   it(
     'opens and commits a grouped history transaction around the popover session',

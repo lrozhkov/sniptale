@@ -166,7 +166,7 @@ describe('AIModalDialog', () => {
     await renderDialog();
 
     expect(container?.querySelector('[data-ui="ai-modal.prompt-field"]')).not.toBeNull();
-    expect(container?.querySelector('[data-ui="ai-modal.template-list"]')).not.toBeNull();
+    expect(container?.querySelector('[data-ui="ai-modal.template-list"]')).toBeNull();
     expect(container?.querySelector('[data-ui="ai-modal.data-panel"]')).not.toBeNull();
     expect(container?.querySelector('[data-ui="ai-modal.loading-state"]')).toBeNull();
   });

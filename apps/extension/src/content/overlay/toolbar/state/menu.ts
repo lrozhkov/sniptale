@@ -1,4 +1,11 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 export type ToolbarPopoverMenu =
   | 'auto-blur'
@@ -33,6 +40,15 @@ export interface ToolbarMenuState {
   toggleMenu: (menu: ToolbarPopoverMenu) => void;
 }
 
+let escapeOwner: (() => void) | null = null;
+
+export function registerToolbarMenuEscapeOwner(owner: () => void): () => void {
+  escapeOwner = owner;
+  return () => {
+    if (escapeOwner === owner) escapeOwner = null;
+  };
+}
+
 function setMenuOpen(
   setActiveMenuType: Dispatch<SetStateAction<ToolbarPopoverMenu | null>>,
   menu: ToolbarPopoverMenu,
@@ -49,6 +65,30 @@ function setMenuOpen(
 
 export function useToolbarMenuState(): ToolbarMenuState {
   const [activeMenuType, setActiveMenuType] = useState<ToolbarPopoverMenu | null>(null);
+  const activeMenuTypeRef = useRef(activeMenuType);
+  activeMenuTypeRef.current = activeMenuType;
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      const menu = activeMenuTypeRef.current;
+      if (event.key !== 'Escape' || menu === null) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      if (escapeOwner) {
+        escapeOwner();
+      } else {
+        setActiveMenuType(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape, { capture: true });
+    return () => window.removeEventListener('keydown', handleEscape, { capture: true });
+  }, []);
+
   const closeMenu = useCallback((menu: ToolbarPopoverMenu) => {
     setMenuOpen(setActiveMenuType, menu, false);
   }, []);

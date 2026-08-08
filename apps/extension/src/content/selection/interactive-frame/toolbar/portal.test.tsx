@@ -10,7 +10,9 @@ const layoutMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@sniptale/ui/product-glass-toolbar', () => ({
-  ProductGlassToolbar: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ProductGlassToolbar: ({ children, className }: { children: ReactNode; className?: string }) => (
+    <div className={className}>{children}</div>
+  ),
 }));
 
 vi.mock('../layout/portal', async (importOriginal) => ({
@@ -72,5 +74,9 @@ describe('InteractiveFrameToolbarPortal', () => {
     expect(layoutMocks.collectExclusions).toHaveBeenCalledWith('frame-7', {
       includeFrameGeometry: false,
     });
+    const positioner = document.querySelector('.sniptale-toolbar-portal-wrapper');
+    const toolbar = positioner?.querySelector('.sniptale-action-toolbar');
+    expect(positioner?.classList).toContain('sniptale-content-ui-positioner');
+    expect(toolbar?.classList).toContain('sniptale-content-ui-zoom-surface');
   });
 });

@@ -14,6 +14,8 @@ import {
 } from '../../../composition/frame-annotation-controls/popover/surface';
 import { usePopoverInteractionDismissal } from '../../../composition/frame-annotation-controls/popover/interaction-dismissal';
 import { dispatchStepBadgeReorder } from '../../platform/page-context/frame-events';
+import { dispatchFutureFrameDefaultsChanged } from '../../platform/page-context/frame-events';
+import { createStepBadgeTemplateSnapshot } from '../frame-runtime/session/step-badge-defaults';
 
 interface StepBadgePopoverProps {
   anchorEl: HTMLElement | null;
@@ -90,6 +92,15 @@ function StepBadgePopoverSurface(props: {
           if (anchor) props.state.handleAnchorChange(anchor);
         }}
         onApplyPreset={props.state.applyPreset}
+        onApplyToFuture={() =>
+          dispatchFutureFrameDefaultsChanged({
+            kind: 'stepBadge',
+            settings: {
+              ...createStepBadgeTemplateSnapshot(props.state.localStepBadgeSettings),
+              enabled: true,
+            },
+          })
+        }
         onForkPreset={props.state.forkPreset}
         onAutoModeChange={props.state.handleAutoModeChange}
         onCreatePreset={props.presets.catalog.create}
@@ -119,7 +130,7 @@ function StepBadgePopoverSurface(props: {
 
 export function StepBadgePopover(props: StepBadgePopoverProps) {
   const { anchorEl, frameId, frameRect, frameVisuals, isOpen, onClose, stepBadge } = props;
-  useAppLocale();
+  const locale = useAppLocale();
   const presets = useStepBadgePresetPopoverController(isOpen);
   const dismissal = usePopoverInteractionDismissal({ blocked: presets.editor.isOpen, isOpen });
   const stepBadgeState = useStepBadgePopoverState({
@@ -128,6 +139,7 @@ export function StepBadgePopover(props: StepBadgePopoverProps) {
     isDismissalEnabled: dismissal.isDismissalEnabled,
     isOpen,
     onClose,
+    locale,
     ...(stepBadge === undefined ? {} : { stepBadge }),
   });
   const { popoverRef } = stepBadgeState;

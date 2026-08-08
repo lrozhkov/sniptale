@@ -113,9 +113,23 @@ function DataPanelStateHarness(props: {
       >
         toggle role column
       </button>
+      <button id="filter-status" onClick={() => state.setFilterQuery('Status')}>
+        filter status
+      </button>
+      <button id="filter-owner" onClick={() => state.setFilterQuery('Owner')}>
+        filter owner
+      </button>
+      <button id="show-selected" onClick={() => state.setShowSelectedOnly(true)}>
+        show selected
+      </button>
       <div data-state={String(tableExpanded)} id="expanded-state" />
       <div data-state={String(rowSelected)} id="selected-state" />
       <div data-state={String(roleIncluded)} id="role-column-state" />
+      <div data-state={String(state.isFilteredSelectionComplete)} id="filter-selection-state" />
+      <div
+        data-state={String(state.filteredTreeData?.structure.length ?? 0)}
+        id="visible-sections"
+      />
     </div>
   );
 }
@@ -198,4 +212,24 @@ describe('useAIModalDataPanelState', () => {
     'propagates updated JSON when table column inclusion changes',
     expectColumnInclusionToPropagateJson
   );
+
+  it('derives Select All state from the visible filtered scope', async () => {
+    await renderDataPanelStateHarness();
+
+    clickHarnessButton('#filter-status');
+    expect(readFlag('#filter-selection-state')).toBe('true');
+
+    clickHarnessButton('#filter-owner');
+    expect(readFlag('#filter-selection-state')).toBe('false');
+  });
+
+  it('can hide unselected data without mutating the selection state', async () => {
+    await renderDataPanelStateHarness();
+    expect(readFlag('#selected-state')).toBe('false');
+
+    clickHarnessButton('#show-selected');
+
+    expect(readFlag('#selected-state')).toBe('false');
+    expect(readFlag('#visible-sections')).toBe('1');
+  });
 });

@@ -63,6 +63,7 @@ export interface AutoBlurSyncResult extends AutoBlurApplyResult {
 export interface AutoBlurScanInput {
   frames: FrameData[];
   mode?: 'current-view' | 'full-page';
+  signal?: AbortSignal;
 }
 
 export interface AutoBlurApplyInput {
