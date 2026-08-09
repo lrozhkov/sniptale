@@ -1,51 +1,94 @@
 import {
-  EDITOR_SESSIONS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { listEditorSessionDrafts } from '../editor-sessions';
-import { parseEditorSessionEntry } from '../editor-sessions/index.guards';
+import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
+import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
+import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read-guards';
 import { parseRecordingEntry } from '../recordings/index.guards';
-import { parseScenarioProjectEntry } from '../scenario/read-guards';
-import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import { createLibraryLifecycle, promoteLibraryLifecycle } from './contracts';
 import { collectVideoProjectReferences } from './references';
 
 export type LibraryLifecycleTarget =
-  | { kind: 'editor-session'; id: string }
   | { kind: 'media'; id: string }
   | { kind: 'scenario-project'; id: string }
   | { kind: 'video-project'; id: string };
 
 export async function promoteStoredItem(target: LibraryLifecycleTarget): Promise<void> {
   if (target.kind === 'media') {
-    await promoteMediaAndWorkspace(target.id);
-    return;
-  }
-  if (target.kind === 'editor-session') {
-    await promoteEditorSession(target.id);
+    await promoteMediaAggregate(target.id);
     return;
   }
   if (target.kind === 'video-project') {
     await promoteVideoProjectGraph(target.id);
     return;
   }
+  await promoteScenarioAggregate(target.id);
+}
+
+function assertCurrentPresentation(args: {
+  aggregateId: string;
+  aggregateKind: 'image' | 'scenario' | 'video-project';
+  presentation: unknown;
+  workspaceRevision: number;
+}): void {
+  const presentation = parseAggregatePresentationEntry(args.presentation);
+  if (
+    !presentation ||
+    presentation.aggregateId !== args.aggregateId ||
+    presentation.aggregateKind !== args.aggregateKind ||
+    presentation.presentationRevision !== args.workspaceRevision
+  ) {
+    throw new Error(`Stored ${args.aggregateKind} ${args.aggregateId} presentation is stale.`);
+  }
+}
+
+async function promoteScenarioAggregate(projectId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(SCENARIO_PROJECTS_STORE, 'readwrite');
+    const tx = db.transaction(
+      [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE, AGGREGATE_PRESENTATIONS_STORE],
+      'readwrite'
+    );
     const store = tx.objectStore(SCENARIO_PROJECTS_STORE);
-    const value: unknown = await store.get(target.id);
-    const parsed = parseScenarioProjectEntry(value);
-    if (!parsed) throw new Error(`Stored ${target.kind} ${target.id} was not found.`);
-    const lifecycle = parsed.lifecycle!;
-    if (lifecycle.storageClass === 'temporary') {
-      await store.put({ ...parsed, lifecycle: promoteLibraryLifecycle(lifecycle) });
+    const project = parseScenarioProjectEntry(await store.get(projectId));
+    if (!project) throw new Error(`Stored scenario-project ${projectId} was not found.`);
+    const lifecycle = project.lifecycle ?? createLibraryLifecycle('library', project.updatedAt);
+    if (lifecycle.storageClass === 'library') {
+      await tx.done;
+      return;
     }
+    assertCurrentPresentation({
+      aggregateId: projectId,
+      aggregateKind: 'scenario',
+      presentation: await tx
+        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+        .get(createAggregatePresentationKey({ id: projectId, kind: 'scenario' })),
+      workspaceRevision: project.workspaceRevision ?? 0,
+    });
+    const referencedAssetIds =
+      project.project.version === 3
+        ? project.project.slides.flatMap((slide) =>
+            slide.source?.kind === 'capture' ? [slide.source.assetId] : []
+          )
+        : project.project.steps.flatMap((step) => (step.kind === 'capture' ? [step.assetId] : []));
+    const assetStore = tx.objectStore(SCENARIO_ASSETS_STORE);
+    for (const assetId of new Set(referencedAssetIds)) {
+      const asset = parseScenarioAssetEntry(await assetStore.get(assetId));
+      if (!asset || asset.projectId !== projectId) {
+        throw new Error(`Linked scenario asset ${assetId} was not found.`);
+      }
+    }
+    await store.put({ ...project, lifecycle: promoteLibraryLifecycle(lifecycle) });
     await tx.done;
   });
 }
@@ -53,17 +96,34 @@ export async function promoteStoredItem(target: LibraryLifecycleTarget): Promise
 async function promoteVideoProjectGraph(projectId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
-      [VIDEO_PROJECTS_STORE, STORE_NAME, MEDIA_LIBRARY_STORE, PROJECT_ASSETS_STORE],
+      [
+        VIDEO_PROJECTS_STORE,
+        STORE_NAME,
+        MEDIA_LIBRARY_STORE,
+        PROJECT_ASSETS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
       'readwrite'
     );
     const projectStore = tx.objectStore(VIDEO_PROJECTS_STORE);
     const project = parseVideoProjectEntry(await projectStore.get(projectId));
     if (!project) throw new Error(`Stored video-project ${projectId} was not found.`);
-    const existingProjectLifecycle =
+    const existingLifecycle =
       project.lifecycle ?? createLibraryLifecycle('library', project.updatedAt);
-    const projectNeedsPromotion = existingProjectLifecycle.storageClass === 'temporary';
+    if (existingLifecycle.storageClass === 'library') {
+      await tx.done;
+      return;
+    }
+    assertCurrentPresentation({
+      aggregateId: projectId,
+      aggregateKind: 'video-project',
+      presentation: await tx
+        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+        .get(createAggregatePresentationKey({ id: projectId, kind: 'video-project' })),
+      workspaceRevision: project.workspaceRevision ?? 0,
+    });
+
     const promotedAt = Date.now();
-    const lifecycle = promoteLibraryLifecycle(existingProjectLifecycle, promotedAt);
     const { recordingIds, projectAssetIds } = collectVideoProjectReferences(project);
     const recordingStore = tx.objectStore(STORE_NAME);
     const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
@@ -87,10 +147,9 @@ async function promoteVideoProjectGraph(projectId: string): Promise<void> {
         ),
       });
     }
-    const mediaRows = (await mediaStore.getAll())
+    for (const media of (await mediaStore.getAll())
       .map(parseMediaLibraryEntry)
-      .filter((media): media is NonNullable<typeof media> => media !== null);
-    for (const media of mediaRows) {
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)) {
       const linkedRecording =
         media.source.kind === 'recording' && recordingIds.has(media.source.recordingId);
       const linkedProjectAsset =
@@ -105,31 +164,60 @@ async function promoteVideoProjectGraph(projectId: string): Promise<void> {
         });
       }
     }
-    if (projectNeedsPromotion) await projectStore.put({ ...project, lifecycle });
+    await projectStore.put({
+      ...project,
+      lifecycle: promoteLibraryLifecycle(existingLifecycle, promotedAt),
+    });
     await tx.done;
   });
 }
 
-async function promoteMediaAndWorkspace(assetId: string): Promise<void> {
+async function promoteMediaAggregate(assetId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
-      [MEDIA_LIBRARY_STORE, STORE_NAME, EDITOR_SESSIONS_STORE, PROJECT_ASSETS_STORE],
+      [
+        MEDIA_LIBRARY_STORE,
+        STORE_NAME,
+        PROJECT_ASSETS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
       'readwrite'
     );
     const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
     const media = parseMediaLibraryEntry(await mediaStore.get(assetId));
     if (!media) throw new Error(`Stored media ${assetId} was not found.`);
-    const promotedAt = Date.now();
-    const promotedLifecycle = promoteLibraryLifecycle(
-      media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt),
-      promotedAt
-    );
+    const lifecycle = media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt);
+    if (lifecycle.storageClass === 'library') {
+      await tx.done;
+      return;
+    }
 
+    if (media.kind === 'image' || media.kind === 'screenshot') {
+      const workspaceRevision = media.workspaceRevision ?? 0;
+      const workspace = parseImageWorkspaceEntry(
+        await tx.objectStore(IMAGE_WORKSPACES_STORE).get(assetId)
+      );
+      if (workspace && workspace.revision !== workspaceRevision) {
+        throw new Error(`Stored image ${assetId} workspace is stale.`);
+      }
+      assertCurrentPresentation({
+        aggregateId: assetId,
+        aggregateKind: 'image',
+        presentation: await tx
+          .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+          .get(createAggregatePresentationKey({ id: assetId, kind: 'image' })),
+        workspaceRevision,
+      });
+    }
+
+    const promotedAt = Date.now();
     if (media.source.kind === 'recording') {
       const recordingStore = tx.objectStore(STORE_NAME);
       const recording = parseRecordingEntry(await recordingStore.get(media.source.recordingId));
-      if (!recording)
+      if (!recording) {
         throw new Error(`Linked recording ${media.source.recordingId} was not found.`);
+      }
       await recordingStore.put({
         ...recording,
         lifecycle: promoteLibraryLifecycle(
@@ -142,76 +230,14 @@ async function promoteMediaAndWorkspace(assetId: string): Promise<void> {
       const projectAsset = parseProjectAssetEntry(
         await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId)
       );
-      if (!projectAsset)
+      if (!projectAsset) {
         throw new Error(`Linked project asset ${media.source.projectAssetId} was not found.`);
-    }
-
-    await mediaStore.put({ ...media, lifecycle: promotedLifecycle });
-
-    const editorStore = tx.objectStore(EDITOR_SESSIONS_STORE);
-    const rawSessions: unknown[] = await editorStore.getAll();
-    for (const rawSession of rawSessions) {
-      const session = parseEditorSessionEntry(rawSession);
-      if (session?.assetId === assetId) {
-        await editorStore.put({
-          ...session,
-          lifecycle: promoteLibraryLifecycle(
-            session.lifecycle ?? createLibraryLifecycle('library', session.updatedAt),
-            promotedAt
-          ),
-        });
       }
     }
-    await tx.done;
-  });
-}
-
-async function promoteEditorSession(sessionId: string): Promise<void> {
-  const snapshot = (await listEditorSessionDrafts()).find((entry) => entry.sessionId === sessionId);
-  if (!snapshot) throw new Error(`Stored editor-session ${sessionId} was not found.`);
-  if (snapshot.assetId) {
-    await promoteMediaAndWorkspace(snapshot.assetId);
-    return;
-  }
-  const blob = await dataUrlToBlob(snapshot.document.sourceImageData);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([EDITOR_SESSIONS_STORE, MEDIA_LIBRARY_STORE], 'readwrite');
-    const store = tx.objectStore(EDITOR_SESSIONS_STORE);
-    const session = parseEditorSessionEntry(await store.get(sessionId));
-    if (!session) throw new Error(`Stored editor-session ${sessionId} was not found.`);
-    if (session.assetId) {
-      throw new Error('Editor session changed while it was being promoted. Try again.');
-    }
-    if (session.updatedAt !== snapshot.updatedAt)
-      throw new Error('Editor session changed while it was being promoted. Try again.');
-    const now = Date.now();
-    const assetId = `editor-draft:${sessionId}`;
-    const lifecycle = promoteLibraryLifecycle(session.lifecycle!, now);
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-    if ((await mediaStore.get(assetId)) !== undefined) {
-      throw new Error(`Media asset ${assetId} already exists.`);
-    }
     await mediaStore.put({
-      id: assetId,
-      blob,
-      kind: 'image',
-      source: { kind: 'screenshot' },
-      filename: session.document.sourceName ?? 'Draft image',
-      originalFilename: session.document.sourceName ?? 'Draft image',
-      createdAt: session.createdAt,
-      updatedAt: now,
-      size: blob.size,
-      mimeType: blob.type || 'image/png',
-      width: session.document.sourceWidth,
-      height: session.document.sourceHeight,
-      duration: null,
-      sourceUrl: session.sourceUrl,
-      sourceTitle: session.sourceTitle,
-      sourceFavicon: null,
-      tags: [],
-      lifecycle,
+      ...media,
+      lifecycle: promoteLibraryLifecycle(lifecycle, promotedAt),
     });
-    await store.put({ ...session, assetId, lifecycle, updatedAt: now });
     await tx.done;
   });
 }

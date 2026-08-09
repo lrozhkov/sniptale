@@ -167,36 +167,4 @@ export const runtimeActionSaveMessageContracts = {
     ),
   },
   ...runtimeActionWebSnapshotSaveMessageContracts,
-  [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: {
-    parseRequest: createGuardParser(
-      'runtime REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY message',
-      createMessageGuard({
-        type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-        required: { assetId: isString, editorSessionId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY response',
-      createRuntimeResponseGuard({ optional: { updateCapabilityToken: isString } })
-    ),
-  },
-  [MessageType.UPDATE_GALLERY_IMAGE_ASSET]: {
-    parseRequest: createGuardParser(
-      'runtime UPDATE_GALLERY_IMAGE_ASSET message',
-      createMessageGuard({
-        type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-        required: {
-          assetId: isString,
-          dataUrl: isImageDataUrl,
-          editorSessionId: isString,
-          updateCapabilityToken: isString,
-        },
-        optional: { filename: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime UPDATE_GALLERY_IMAGE_ASSET response',
-      createRuntimeResponseGuard({ optional: { assetId: isString } })
-    ),
-  },
 } satisfies PartialRuntimeRegistry;

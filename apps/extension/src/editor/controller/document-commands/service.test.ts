@@ -58,21 +58,7 @@ it('runs open, load, close, export, render, and copy through injected operations
   );
   expect(operations.copyRenderedImage).toHaveBeenCalledWith({ adapter: true }, undefined);
   expect(controller.autosaveService.persistSnapshot).toHaveBeenCalledTimes(2);
-  expect(controller.autosaveService.discardDraft).toHaveBeenCalledOnce();
+  expect(controller.autosaveService.discardDraft).not.toHaveBeenCalled();
   expect(exported).toEqual(createEditorDocumentFixture());
   expect(rendered).toBe('data:image/png;base64,rendered');
-});
-
-it('logs draft discard failures without blocking close', async () => {
-  const error = new Error('delete failed');
-  const logDiscardDraftError = vi.fn();
-  const service = createEditorDocumentCommandService({ logDiscardDraftError, operations });
-  const controller = createController();
-  controller.autosaveService.discardDraft.mockRejectedValue(error);
-
-  service.closeDocument(controller);
-  await Promise.resolve();
-
-  expect(operations.closeDocument).toHaveBeenCalledWith({ adapter: true });
-  expect(logDiscardDraftError).toHaveBeenCalledWith(error);
 });

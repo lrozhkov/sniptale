@@ -4,18 +4,10 @@ import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
-import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createScenarioCaptureStep } from '../../../features/scenario/project/public';
 
 const persistenceMocks = vi.hoisted(() => ({
-  getMediaThumbnail: vi.fn(),
-  listEditorSessionDrafts: vi.fn(),
-  listMediaLibrary: vi.fn(),
-  listScenarioAssets: vi.fn(),
-  listScenarioExports: vi.fn(),
-  listScenarioProjectEntries: vi.fn(),
-  listScenarioStepEditorDocuments: vi.fn(),
-  listVideoProjectEntries: vi.fn(),
   runWithIndexedDbMutation: vi.fn(),
 }));
 
@@ -23,112 +15,118 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
 }));
 
-vi.mock('../editor-sessions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../editor-sessions')>()),
-  listEditorSessionDrafts: persistenceMocks.listEditorSessionDrafts,
-}));
-vi.mock('../media-library', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../media-library')>()),
-  getMediaThumbnail: persistenceMocks.getMediaThumbnail,
-  listMediaLibrary: persistenceMocks.listMediaLibrary,
-}));
-vi.mock('../scenario/editor-documents', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../scenario/editor-documents')>()),
-  listScenarioStepEditorDocuments: persistenceMocks.listScenarioStepEditorDocuments,
-}));
-vi.mock('../projects', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../projects')>()),
-  listVideoProjectEntries: persistenceMocks.listVideoProjectEntries,
-}));
-vi.mock('../scenario/projects', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../scenario/projects')>()),
-  listScenarioAssets: persistenceMocks.listScenarioAssets,
-  listScenarioExports: persistenceMocks.listScenarioExports,
-  listScenarioProjectEntries: persistenceMocks.listScenarioProjectEntries,
-}));
 import { createLibraryLifecycle, promoteStoredItem } from '.';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([]);
-  persistenceMocks.getMediaThumbnail.mockResolvedValue(undefined);
-  persistenceMocks.listMediaLibrary.mockResolvedValue([]);
-  persistenceMocks.listScenarioAssets.mockResolvedValue([]);
-  persistenceMocks.listScenarioExports.mockResolvedValue([]);
-  persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
-  persistenceMocks.listScenarioStepEditorDocuments.mockResolvedValue([]);
-  persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
-  persistenceMocks.runWithIndexedDbMutation.mockResolvedValue(true);
 });
 
-describe('library lifecycle project and editor promotion', () => {
-  it('promotes temporary scenario rows and leaves library rows unchanged', async () => {
-    const project = createScenarioProject('Scenario');
-    const temporary = {
+function installTransaction(stores: Record<string, object>): void {
+  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
+    effect({
+      transaction: vi.fn(() => ({
+        done: Promise.resolve(),
+        objectStore: vi.fn((name: string) => stores[name]),
+      })),
+    })
+  );
+}
+
+function presentation(args: {
+  id: string;
+  kind: 'image' | 'scenario' | 'video-project';
+  revision: number;
+}) {
+  return {
+    aggregateId: args.id,
+    aggregateKind: args.kind,
+    presentationRevision: args.revision,
+    thumbnailBlob: new Blob(['preview']),
+    updatedAt: 10,
+  };
+}
+
+describe('aggregate lifecycle promotion replay', () => {
+  it('promotes a scenario only when its presentation matches the root revision', async () => {
+    const scenario = createScenarioProject('Scenario');
+    const root = {
       createdAt: 10,
-      id: project.id,
+      id: scenario.id,
       lifecycle: createLibraryLifecycle('temporary', 10),
-      project,
+      project: scenario,
       updatedAt: 10,
+      workspaceRevision: 4,
     };
-    const library = { ...temporary, lifecycle: createLibraryLifecycle('library', 10) };
-    const values = [temporary, library];
     const put = vi.fn();
-    persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn(() => ({ get: vi.fn(async () => values.shift()), put })),
-        })),
-      })
-    );
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () => presentation({ id: root.id, kind: 'scenario', revision: 4 })),
+      },
+      scenario_assets: { get: vi.fn() },
+      scenario_projects: { get: vi.fn(async () => root), put },
+    });
 
-    await promoteStoredItem({ id: project.id, kind: 'scenario-project' });
-    await promoteStoredItem({ id: project.id, kind: 'scenario-project' });
-
-    expect(put).toHaveBeenCalledOnce();
+    await promoteStoredItem({ id: root.id, kind: 'scenario-project' });
     expect(put).toHaveBeenCalledWith(
       expect.objectContaining({ lifecycle: expect.objectContaining({ storageClass: 'library' }) })
     );
+
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () => presentation({ id: root.id, kind: 'scenario', revision: 3 })),
+      },
+      scenario_assets: { get: vi.fn() },
+      scenario_projects: { get: vi.fn(async () => root), put },
+    });
+    await expect(promoteStoredItem({ id: root.id, kind: 'scenario-project' })).rejects.toThrow(
+      'presentation is stale'
+    );
   });
 
-  it('promotes project rows in place and treats legacy rows as already saved', async () => {
+  it('rejects scenario promotion when a referenced capture asset is unavailable', async () => {
+    const scenario = createScenarioProject('Scenario');
+    scenario.steps = [createScenarioCaptureStep({ assetId: 'asset-missing' })];
+    const root = {
+      createdAt: 10,
+      id: scenario.id,
+      lifecycle: createLibraryLifecycle('temporary', 10),
+      project: scenario,
+      updatedAt: 10,
+      workspaceRevision: 1,
+    };
     const put = vi.fn();
-    const temporary = createVideoProjectEntry(
-      {},
-      { lifecycle: createLibraryLifecycle('temporary', 10) }
-    );
-    const library = createVideoProjectEntry({ id: 'library-project' }, { id: 'library-project' });
-    const values = [temporary, library];
-    persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) => {
-      const value = values.shift();
-      return effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'video_projects'
-              ? { get: vi.fn(async () => value), put }
-              : name === 'media_library'
-                ? { getAll: vi.fn(async () => []), put }
-                : { get: vi.fn(async () => undefined), put }
-          ),
-        })),
-      });
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () => presentation({ id: root.id, kind: 'scenario', revision: 1 })),
+      },
+      scenario_assets: { get: vi.fn(async () => undefined) },
+      scenario_projects: { get: vi.fn(async () => root), put },
     });
 
-    await promoteStoredItem({ id: temporary.id, kind: 'video-project' });
-    await promoteStoredItem({ id: library.id, kind: 'video-project' });
-
-    expect(put).toHaveBeenCalledTimes(1);
-    expect(put).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: temporary.id,
-        lifecycle: expect.objectContaining({ storageClass: 'library' }),
-      })
+    await expect(promoteStoredItem({ id: root.id, kind: 'scenario-project' })).rejects.toThrow(
+      'Linked scenario asset asset-missing was not found'
     );
+    expect(put).not.toHaveBeenCalled();
   });
 
-  it('preserves independently saved recording and project-asset child lifecycles', async () => {
+  it('treats a legacy or already-library project as an idempotent saved aggregate', async () => {
+    const library = createVideoProjectEntry({ id: 'library-project' }, { id: 'library-project' });
+    const put = vi.fn();
+    installTransaction({
+      aggregate_presentations: { get: vi.fn() },
+      media_library: { getAll: vi.fn(), put: vi.fn() },
+      project_assets: { get: vi.fn() },
+      recordings: { get: vi.fn(), put: vi.fn() },
+      video_projects: { get: vi.fn(async () => library), put },
+    });
+
+    await expect(
+      promoteStoredItem({ id: library.id, kind: 'video-project' })
+    ).resolves.toBeUndefined();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('promotes a video graph while preserving independently saved child lifecycles', async () => {
     const base = createVideoProjectEntryWithMediaClip();
     const project = {
       ...base,
@@ -138,6 +136,7 @@ describe('library lifecycle project and editor promotion', () => {
         baseRecordingId: 'recording-1',
         source: { kind: 'recording' as const, recordingId: 'recording-1' },
       },
+      workspaceRevision: 2,
     };
     const recordingLifecycle = createLibraryLifecycle('library', 700);
     const assetLifecycle = createLibraryLifecycle('library', 800);
@@ -165,30 +164,25 @@ describe('library lifecycle project and editor promotion', () => {
     const recordingPut = vi.fn();
     const mediaPut = vi.fn();
     vi.spyOn(Date, 'now').mockReturnValue(999);
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'video_projects'
-              ? { get: vi.fn(async () => project), put: projectPut }
-              : name === 'recordings'
-                ? { get: vi.fn(async () => recording), put: recordingPut }
-                : name === 'project_assets'
-                  ? {
-                      get: vi.fn(async () => ({
-                        blob: new Blob(['asset']),
-                        createdAt: 10,
-                        id: 'project-asset-1',
-                        mimeType: 'image/png',
-                        size: 5,
-                      })),
-                    }
-                  : { getAll: vi.fn(async () => mediaRows), put: mediaPut }
-          ),
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () =>
+          presentation({ id: project.id, kind: 'video-project', revision: 2 })
+        ),
+      },
+      media_library: { getAll: vi.fn(async () => mediaRows), put: mediaPut },
+      project_assets: {
+        get: vi.fn(async () => ({
+          blob: new Blob(['asset']),
+          createdAt: 10,
+          id: 'project-asset-1',
+          mimeType: 'image/png',
+          size: 5,
         })),
-      })
-    );
+      },
+      recordings: { get: vi.fn(async () => recording), put: recordingPut },
+      video_projects: { get: vi.fn(async () => project), put: projectPut },
+    });
 
     await promoteStoredItem({ id: project.id, kind: 'video-project' });
 
@@ -210,239 +204,55 @@ describe('library lifecycle project and editor promotion', () => {
     );
   });
 
-  it('reconciles temporary children when the video project is already in the library', async () => {
-    const project = createVideoProjectEntry(
-      { baseRecordingId: 'recording-1' },
-      { lifecycle: createLibraryLifecycle('library', 100) }
-    );
-    const temporary = createLibraryLifecycle('temporary', 10);
-    const recording = {
-      blob: new Blob(['recording']),
-      createdAt: 10,
-      filename: 'recording.webm',
-      id: 'recording-1',
-      lifecycle: temporary,
-      size: 9,
-    };
-    const recordingPut = vi.fn();
-    const projectPut = vi.fn();
-    vi.spyOn(Date, 'now').mockReturnValue(999);
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'video_projects'
-              ? { get: vi.fn(async () => project), put: projectPut }
-              : name === 'recordings'
-                ? { get: vi.fn(async () => recording), put: recordingPut }
-                : name === 'media_library'
-                  ? { getAll: vi.fn(async () => []), put: vi.fn() }
-                  : { get: vi.fn(async () => undefined) }
-          ),
-        })),
-      })
-    );
-
-    await promoteStoredItem({ id: project.id, kind: 'video-project' });
-
-    expect(recordingPut).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lifecycle: { savedAt: 999, storageClass: 'library', updatedAt: 999 },
-      })
-    );
-    expect(projectPut).not.toHaveBeenCalled();
-  });
-
-  it('fails promotion closed when the target row is absent', async () => {
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn(() => ({ get: vi.fn(async () => undefined), put: vi.fn() })),
-        })),
-      })
-    );
-
-    await expect(promoteStoredItem({ id: 'missing', kind: 'scenario-project' })).rejects.toThrow(
-      'was not found'
-    );
-  });
-
-  it('fails editor promotion before mutation when the workspace is absent', async () => {
-    await expect(promoteStoredItem({ id: 'missing', kind: 'editor-session' })).rejects.toThrow(
-      'was not found'
-    );
-    expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
-  });
-
-  it('fails video-project promotion when the project row is absent', async () => {
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn(() => ({ get: vi.fn(async () => undefined) })),
-        })),
-      })
-    );
-
-    await expect(promoteStoredItem({ id: 'missing', kind: 'video-project' })).rejects.toThrow(
-      'was not found'
-    );
-  });
-
-  it('fails media promotion when the media row is absent', async () => {
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn(() => ({ get: vi.fn(async () => undefined) })),
-        })),
-      })
-    );
-
-    await expect(promoteStoredItem({ id: 'missing', kind: 'media' })).rejects.toThrow(
-      'was not found'
-    );
-  });
-});
-
-describe('library lifecycle editor promotion', () => {
-  it('promotes an unlinked editor session without replacing its workspace id', async () => {
-    const session = {
-      assetId: null,
-      createdAt: 10,
-      dirty: true,
-      document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('temporary', 10),
-      sessionId: 'session-1',
-      sourceTitle: null,
-      sourceUrl: null,
-      updatedAt: 10,
+  it('requires an image presentation at the same revision and keeps the aggregate id', async () => {
+    const media = {
+      ...createMediaLibraryEntry({
+        id: 'image-1',
+        lifecycle: createLibraryLifecycle('temporary', 10),
+        source: { kind: 'screenshot' },
+      }),
+      workspaceRevision: 5,
     };
     const put = vi.fn();
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([session]);
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'editor_sessions'
-              ? { get: vi.fn(async () => session), put }
-              : { get: vi.fn(async () => undefined), put }
-          ),
-        })),
-      })
-    );
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () => presentation({ id: media.id, kind: 'image', revision: 5 })),
+      },
+      image_workspaces: { get: vi.fn(async () => undefined) },
+      media_library: { get: vi.fn(async () => media), put },
+      project_assets: { get: vi.fn() },
+      recordings: { get: vi.fn(), put: vi.fn() },
+    });
 
-    await promoteStoredItem({ id: session.sessionId, kind: 'editor-session' });
-
+    await promoteStoredItem({ id: media.id, kind: 'media' });
     expect(put).toHaveBeenCalledWith(
       expect.objectContaining({
-        sessionId: 'session-1',
-        assetId: 'editor-draft:session-1',
+        id: media.id,
         lifecycle: expect.objectContaining({ storageClass: 'library' }),
       })
     );
-  });
 
-  it('does not overwrite a colliding media row during editor-session promotion', async () => {
-    const session = {
-      assetId: null,
-      createdAt: 10,
-      dirty: true,
-      document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('temporary', 10),
-      sessionId: 'collision',
-      sourceTitle: null,
-      sourceUrl: null,
-      updatedAt: 10,
-    };
-    const put = vi.fn();
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([session]);
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'editor_sessions'
-              ? { get: vi.fn(async () => session), put }
-              : { get: vi.fn(async () => ({ id: 'editor-draft:collision' })), put }
-          ),
-        })),
-      })
-    );
-
-    await expect(
-      promoteStoredItem({ id: session.sessionId, kind: 'editor-session' })
-    ).rejects.toThrow('already exists');
-    expect(put).not.toHaveBeenCalled();
-  });
-
-  it('rejects editor promotion when the workspace changes after its snapshot', async () => {
-    const snapshot = {
-      assetId: null,
-      createdAt: 10,
-      dirty: true,
-      document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('temporary', 10),
-      sessionId: 'changed',
-      sourceTitle: null,
-      sourceUrl: null,
-      updatedAt: 10,
-    };
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([snapshot]);
-    for (const current of [
-      { ...snapshot, assetId: 'new-asset' },
-      { ...snapshot, updatedAt: 11 },
-    ]) {
-      persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-        effect({
-          transaction: vi.fn(() => ({
-            done: Promise.resolve(),
-            objectStore: vi.fn(() => ({ get: vi.fn(async () => current), put: vi.fn() })),
-          })),
-        })
-      );
-      await expect(
-        promoteStoredItem({ id: snapshot.sessionId, kind: 'editor-session' })
-      ).rejects.toThrow('changed while it was being promoted');
-    }
-  });
-
-  it('treats a repeated editor-session promotion as an idempotent library operation', async () => {
-    const session = {
-      assetId: 'editor-draft:replay',
-      createdAt: 10,
-      dirty: false,
-      document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('library', 10),
-      sessionId: 'replay',
-      sourceTitle: null,
-      sourceUrl: null,
-      updatedAt: 10,
-    };
-    const media = createMediaLibraryEntry({
-      id: session.assetId,
-      lifecycle: createLibraryLifecycle('library', 10),
-      source: { kind: 'screenshot' },
+    installTransaction({
+      aggregate_presentations: {
+        get: vi.fn(async () => presentation({ id: media.id, kind: 'image', revision: 4 })),
+      },
+      image_workspaces: { get: vi.fn(async () => undefined) },
+      media_library: { get: vi.fn(async () => media), put },
+      project_assets: { get: vi.fn() },
+      recordings: { get: vi.fn(), put: vi.fn() },
     });
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([session]);
-    persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-      effect({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'media_library'
-              ? { get: vi.fn(async () => media), put: vi.fn() }
-              : { getAll: vi.fn(async () => [session]), put: vi.fn() }
-          ),
-        })),
-      })
+    await expect(promoteStoredItem({ id: media.id, kind: 'media' })).rejects.toThrow(
+      'presentation is stale'
     );
+  });
 
-    await expect(
-      promoteStoredItem({ id: session.sessionId, kind: 'editor-session' })
-    ).resolves.toBeUndefined();
+  it('fails closed when an aggregate root is absent', async () => {
+    installTransaction({
+      aggregate_presentations: { get: vi.fn() },
+      scenario_projects: { get: vi.fn(async () => undefined), put: vi.fn() },
+    });
+    await expect(promoteStoredItem({ id: 'missing', kind: 'scenario-project' })).rejects.toThrow(
+      'was not found'
+    );
   });
 });

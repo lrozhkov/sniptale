@@ -1,10 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createScenarioV3ImageAsset } from './image-assets';
+import { prepareScenarioV3ImageAsset } from './image-assets';
 
 const imageAssetMocks = vi.hoisted(() => ({
   dataUrlToBlob: vi.fn(),
   measureImageBlob: vi.fn(),
-  saveScenarioAsset: vi.fn(),
 }));
 
 vi.mock('../../../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -17,26 +16,20 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
   measureImageBlob: imageAssetMocks.measureImageBlob,
 }));
 
-vi.mock('../../projects', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../projects')>()),
-  saveScenarioAsset: imageAssetMocks.saveScenarioAsset,
-}));
-
 beforeEach(() => {
   vi.clearAllMocks();
   imageAssetMocks.dataUrlToBlob.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
   imageAssetMocks.measureImageBlob.mockResolvedValue({ height: 480, width: 640 });
-  imageAssetMocks.saveScenarioAsset.mockResolvedValue(undefined);
 });
 
-it('saves a v3 image layer asset with project dimensions and returns metadata', async () => {
-  const asset = await createScenarioV3ImageAsset({
+it('prepares a v3 image layer asset with project dimensions for aggregate commit', async () => {
+  const prepared = await prepareScenarioV3ImageAsset({
     dataUrl: 'data:image/png;base64,aW1n',
     projectId: 'project-1',
   });
 
   expect(imageAssetMocks.dataUrlToBlob).toHaveBeenCalledWith('data:image/png;base64,aW1n');
-  expect(imageAssetMocks.saveScenarioAsset).toHaveBeenCalledWith(
+  expect(prepared.entry).toEqual(
     expect.objectContaining({
       blob: expect.any(Blob),
       galleryAssetId: null,
@@ -47,7 +40,7 @@ it('saves a v3 image layer asset with project dimensions and returns metadata', 
       width: 640,
     })
   );
-  expect(asset).toEqual(
+  expect(prepared.asset).toEqual(
     expect.objectContaining({
       galleryAssetId: null,
       height: 480,
@@ -69,7 +62,7 @@ it('rejects unsafe image data urls before decode, measurement, or persistence', 
 
   for (const dataUrl of unsafeDataUrls) {
     await expect(
-      createScenarioV3ImageAsset({
+      prepareScenarioV3ImageAsset({
         dataUrl,
         projectId: 'project-1',
       })
@@ -78,5 +71,4 @@ it('rejects unsafe image data urls before decode, measurement, or persistence', 
 
   expect(imageAssetMocks.dataUrlToBlob).not.toHaveBeenCalled();
   expect(imageAssetMocks.measureImageBlob).not.toHaveBeenCalled();
-  expect(imageAssetMocks.saveScenarioAsset).not.toHaveBeenCalled();
 });

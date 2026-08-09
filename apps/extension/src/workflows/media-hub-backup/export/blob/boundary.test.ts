@@ -123,9 +123,19 @@ describe('media hub backup export blob boundaries', () => {
     const entry = createMediaEntry();
     listMediaLibraryMock.mockResolvedValue([entry]);
     initDBMock.mockResolvedValue({
-      get: vi.fn(async (storeName: string) =>
-        storeName === 'media_library' ? entry : { assetId: entry.id, blob: createOversizedBlob() }
-      ),
+      get: vi.fn(async (storeName: string) => {
+        if (storeName === 'media_library') return entry;
+        if (storeName === 'aggregate_presentations') {
+          return {
+            aggregateId: entry.id,
+            aggregateKind: 'image',
+            presentationRevision: 0,
+            thumbnailBlob: createOversizedBlob(),
+            updatedAt: entry.updatedAt,
+          };
+        }
+        return undefined;
+      }),
       getAll: vi.fn().mockResolvedValue([]),
       getAllFromIndex: vi.fn().mockResolvedValue([]),
     });

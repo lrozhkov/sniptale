@@ -1,5 +1,4 @@
-import { deleteScenarioAssetRecord } from '../../../../../composition/persistence/scenario/store/project-records/assets';
-import { deleteScenarioStepEditorDocumentRecord } from '../../../../../composition/persistence/scenario/store/step-editor-documents';
+import { commitScenarioAggregateSnapshotMutation } from '../../../../../composition/persistence/scenario/aggregate-mutations';
 import type {
   ScenarioCaptureStep,
   ScenarioProject,
@@ -48,26 +47,25 @@ export function createClearTrashAction(args: ScenarioProjectSelectionActionArgs)
     args.setError(null);
 
     try {
-      await Promise.all([
-        ...clearedAssetIds.map((assetId) => deleteScenarioAssetRecord(assetId)),
-        ...clearedCaptureStepIds.map((stepId) => deleteScenarioStepEditorDocumentRecord(stepId)),
-      ]);
+      const nextProject = {
+        ...currentProject,
+        trash: currentProject.trash.filter((entry) => !clearedTrashStepIds.has(entry.step.id)),
+        updatedAt: getScenarioMutationTimestamp(),
+      };
+      const result = await commitScenarioAggregateSnapshotMutation({
+        baseProject: currentProject,
+        children: {
+          assetDeletes: clearedAssetIds,
+          editorDocumentDeletes: clearedCaptureStepIds,
+        },
+        nextProject,
+      });
+      args.updateProject((project) =>
+        Object.is(project, currentProject) ? result.project : project
+      );
     } catch (error) {
       args.setError(resolveScenarioActionErrorMessage(error, 'Failed to clear scenario trash'));
       return;
     }
-
-    args.updateProject((project) => {
-      const nextTrash = project.trash.filter((entry) => !clearedTrashStepIds.has(entry.step.id));
-      if (nextTrash.length === project.trash.length) {
-        return project;
-      }
-
-      return {
-        ...project,
-        trash: nextTrash,
-        updatedAt: getScenarioMutationTimestamp(),
-      };
-    });
   };
 }

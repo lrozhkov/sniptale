@@ -54,9 +54,12 @@ function createActions(): UseGalleryAppActionsResult {
       close: vi.fn(async () => undefined),
       copy: vi.fn(),
       download: vi.fn(),
+      downloadOriginal: vi.fn(),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
+      restoreOriginal: vi.fn(),
+      saveCopy: vi.fn(),
       saveMetadata: vi.fn(async () => undefined),
     },
     selection: {
@@ -79,7 +82,6 @@ function createBackupActions(): UseGalleryAppActionsResult['backup'] {
       approximateSizeBytes: 0,
       assetCount: 0,
       dataClasses: {
-        editorDrafts: false,
         mediaAssets: false,
         recordings: false,
         scenarioProjects: false,
@@ -89,7 +91,6 @@ function createBackupActions(): UseGalleryAppActionsResult['backup'] {
         videoProjects: false,
         webSnapshots: false,
       },
-      editorDraftCount: 0,
       recordingCount: 0,
       scenarioProjectCount: 0,
       selectedCount: 0,

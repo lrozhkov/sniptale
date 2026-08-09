@@ -131,8 +131,7 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
     collectProjectAssetId(asset, createdProjectAssetIds);
     const sidecarVideos = await loadWebcamSidecarVideos(sourceRecordingId, createdProjectAssetIds);
     const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
-    await commitVideoProjectMutation(nextProject, { baseRevision: null });
-    return nextProject;
+    return await commitVideoProjectMutation(nextProject, { baseRevision: null });
   } catch (saveError) {
     await cleanupProjectAssetCopies(createdProjectAssetIds);
     throw saveError;
@@ -192,13 +191,11 @@ async function migratePersistedRecordingAssets(project: VideoProject): Promise<V
   };
 
   try {
-    await commitVideoProjectMutation(migratedProject, { baseRevision: project.updatedAt });
+    return await commitVideoProjectMutation(migratedProject, { baseRevision: project.updatedAt });
   } catch (saveError) {
     await cleanupProjectAssetCopies(createdProjectAssetIds);
     throw saveError;
   }
-
-  return migratedProject;
 }
 
 /**
@@ -207,8 +204,7 @@ async function migratePersistedRecordingAssets(project: VideoProject): Promise<V
 export async function createBlankProject(): Promise<VideoProject> {
   const nextProject = createEmptyVideoProject();
 
-  await commitVideoProjectMutation(nextProject, { baseRevision: null });
-  return nextProject;
+  return commitVideoProjectMutation(nextProject, { baseRevision: null });
 }
 
 /**

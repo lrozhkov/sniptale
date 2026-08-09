@@ -52,6 +52,8 @@ function createAutosaveService(
     discardDraft: vi.fn(async () => undefined),
     dispose: vi.fn(),
     flushAutosave: vi.fn(async () => undefined),
+    getDurableRevision: vi.fn(() => 0),
+    getLastWriteError: vi.fn(() => null),
     persistSnapshot: vi.fn(async (read) => {
       read();
     }),
@@ -85,7 +87,7 @@ it('delegates document operations through the public adapter and persists autosa
   );
   expect(mocks.loadEditorDocumentViaController).toHaveBeenCalledOnce();
   expect(autosaveService.persistSnapshot).toHaveBeenCalledTimes(2);
-  expect(autosaveService.discardDraft).toHaveBeenCalledOnce();
+  expect(autosaveService.discardDraft).not.toHaveBeenCalled();
   expect(mocks.closeEditorDocumentViaController).toHaveBeenCalledWith(expect.any(Object));
   expect(exportDocumentForController(controller)).toEqual({ version: 1 });
   expect(mocks.renderEditorControllerToDataUrl).toHaveBeenCalledWith(expect.any(Object), {
@@ -99,7 +101,7 @@ it('delegates document operations through the public adapter and persists autosa
   expect(rendered).toBe('data:image/png;base64,rendered');
 });
 
-it('handles draft discard failures explicitly when closing a document', async () => {
+it('keeps the persisted workspace when closing a document', async () => {
   const error = new Error('delete failed');
   const controller = createImageEditorController();
   const autosaveService = createAutosaveService({
@@ -112,7 +114,7 @@ it('handles draft discard failures explicitly when closing a document', async ()
   closeDocumentForController(controller);
   await Promise.resolve();
 
-  expect(autosaveService.discardDraft).toHaveBeenCalledOnce();
+  expect(autosaveService.discardDraft).not.toHaveBeenCalled();
   expect(mocks.closeEditorDocumentViaController).toHaveBeenCalledWith(expect.any(Object));
-  expect(mocks.loggerError).toHaveBeenCalledWith('Failed to discard editor draft on close', error);
+  expect(mocks.loggerError).not.toHaveBeenCalled();
 });

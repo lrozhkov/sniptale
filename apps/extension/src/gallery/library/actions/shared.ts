@@ -13,6 +13,8 @@ type GalleryConfirmDialogController = {
 export function openGalleryConfirmDialog(
   controller: GalleryConfirmDialogController,
   params: {
+    cancelText?: string;
+    confirmText?: string;
     message: string;
     onConfirm: () => Promise<void>;
     title?: string;
@@ -21,8 +23,8 @@ export function openGalleryConfirmDialog(
   controller.actions.surface.setConfirmDialog({
     title: params.title ?? translate('common.actions.delete'),
     message: params.message,
-    confirmText: translate('common.actions.delete'),
-    cancelText: translate('common.actions.cancel'),
+    confirmText: params.confirmText ?? translate('common.actions.delete'),
+    cancelText: params.cancelText ?? translate('common.actions.cancel'),
     onConfirm: async () => {
       await params.onConfirm();
       controller.actions.surface.setConfirmDialog(null);

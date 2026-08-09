@@ -4,6 +4,7 @@ export interface LibraryThumbnailItem {
   mimeType: string | null;
   sourceMediaId: string | null;
   thumbnailId: string;
+  workspaceRevision?: number;
 }
 
 export interface LibraryThumbnailViewState {

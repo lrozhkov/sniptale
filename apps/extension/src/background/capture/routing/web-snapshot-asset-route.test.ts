@@ -14,7 +14,6 @@ const {
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
   handleReleaseWebSnapshotStagedBlobsMock,
-  handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
   handleReleaseRecordingDownloadMock,
   handleSaveRecordingForDownloadMock,
@@ -23,7 +22,6 @@ const {
   handleStageRecordingDownloadChunkMock,
   handleStageWebSnapshotBlobChunkMock,
   handleTriggerQuickActionMock,
-  handleUpdateGalleryImageAssetMock,
   handleVisibleCaptureForCropMock,
   handleVisibleCaptureMock,
 } = vi.hoisted(() => ({
@@ -36,7 +34,6 @@ const {
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
   handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
-  handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleReleaseRecordingDownloadMock: vi.fn(),
   handleSaveRecordingForDownloadMock: vi.fn(),
@@ -45,7 +42,6 @@ const {
   handleStageRecordingDownloadChunkMock: vi.fn(),
   handleStageWebSnapshotBlobChunkMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
-  handleUpdateGalleryImageAssetMock: vi.fn(),
   handleVisibleCaptureForCropMock: vi.fn(),
   handleVisibleCaptureMock: vi.fn(),
 }));
@@ -79,9 +75,7 @@ vi.mock('./actions.export', () => ({
 }));
 
 vi.mock('./actions.gallery-update', () => ({
-  handleRequestGalleryImageUpdateCapability: handleRequestGalleryImageUpdateCapabilityMock,
   handleSaveScreenshotToGallery: handleSaveScreenshotToGalleryMock,
-  handleUpdateGalleryImageAsset: handleUpdateGalleryImageAssetMock,
 }));
 
 vi.mock('./actions.quick-action', () => ({
@@ -161,14 +155,10 @@ beforeEach(() => {
     handleExportStopHarMock
   );
   mockRoutesAsHandled(handleFetchWebSnapshotAssetMock, handleOpenEditorWithImageMock);
-  mockRoutesAsHandled(
-    handleRegisterWebSnapshotAssetsMock,
-    handleReleaseWebSnapshotStagedBlobsMock,
-    handleRequestGalleryImageUpdateCapabilityMock
-  );
+  mockRoutesAsHandled(handleRegisterWebSnapshotAssetsMock, handleReleaseWebSnapshotStagedBlobsMock);
   mockRoutesAsHandled(handleSaveRecordingForDownloadMock, handleSaveScreenshotToGalleryMock);
   mockRoutesAsHandled(handleSaveWebSnapshotToGalleryMock, handleStageWebSnapshotBlobChunkMock);
-  mockRoutesAsHandled(handleTriggerQuickActionMock, handleUpdateGalleryImageAssetMock);
+  mockRoutesAsHandled(handleTriggerQuickActionMock);
   mockRoutesAsHandled(handleVisibleCaptureForCropMock, handleVisibleCaptureMock);
 });
 
@@ -259,43 +249,5 @@ it('routes web snapshot messages through the shared helper branch', () => {
     expect.objectContaining({ assetUrls: ['https://cdn.example.com/image.png'] }),
     42,
     registerAssets.sendResponse
-  );
-});
-
-it('routes gallery update capability messages with the editor sender', () => {
-  const sender = {
-    documentId: 'document-1',
-    url: 'chrome-extension://test/apps/extension/src/editor/index.html?assetId=asset-1&session=session-1',
-  };
-  const capabilityRequest = routeMessage(
-    {
-      type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-      assetId: 'asset-1',
-      editorSessionId: 'session-1',
-    },
-    sender
-  );
-  const update = routeMessage(
-    {
-      type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-      assetId: 'asset-1',
-      dataUrl: 'data:image/png;base64,3',
-      editorSessionId: 'session-1',
-      updateCapabilityToken: 'token-1',
-    },
-    sender
-  );
-
-  expect(capabilityRequest.routed).toBe(true);
-  expect(update.routed).toBe(true);
-  expect(handleRequestGalleryImageUpdateCapabilityMock).toHaveBeenCalledWith(
-    expect.objectContaining({ assetId: 'asset-1' }),
-    sender,
-    capabilityRequest.sendResponse
-  );
-  expect(handleUpdateGalleryImageAssetMock).toHaveBeenCalledWith(
-    expect.objectContaining({ assetId: 'asset-1' }),
-    sender,
-    update.sendResponse
   );
 });

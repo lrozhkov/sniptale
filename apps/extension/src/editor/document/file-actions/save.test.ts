@@ -100,46 +100,19 @@ it('distinguishes generic runtime errors from storage prompt failures', () => {
   expect(editorFileSave.isEditorStoragePromptError(new Error('boom'))).toBe(false);
 });
 
-it('throws a typed storage prompt error when gallery save fails', async () => {
-  mockSendRuntimeMessage.mockResolvedValueOnce({
-    success: true,
-    updateCapabilityToken: 'update-token-1',
-  });
-  mockSendRuntimeMessage.mockResolvedValueOnce({
-    error: 'Disk full',
-    success: false,
-  });
+it('throws a typed storage prompt error when explicit export fails', async () => {
+  mockSendRuntimeMessage.mockResolvedValueOnce({ error: 'Disk full', success: false });
 
   const caughtError = await captureSaveFailure();
 
   expect(editorFileSave.isEditorStoragePromptError(caughtError)).toBe(true);
   expect((caughtError as Error).message).toBe('Disk full');
-  expect(mockSendRuntimeMessage).toHaveBeenNthCalledWith(1, {
-    assetId: 'asset-1',
-    editorSessionId: 'session-1',
-    type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-  });
-  expect(mockSendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-    assetId: 'asset-1',
-    dataUrl: 'data:image/png;base64,abc',
-    editorSessionId: 'session-1',
-    filename: undefined,
-    type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-    updateCapabilityToken: 'update-token-1',
-  });
-});
-
-it('throws a typed storage prompt error when gallery update capability is missing', async () => {
-  mockSendRuntimeMessage.mockResolvedValueOnce({ success: true });
-
-  const caughtError = await captureSaveFailure();
-
-  expect(editorFileSave.isEditorStoragePromptError(caughtError)).toBe(true);
-  expect(mockSendRuntimeMessage).toHaveBeenCalledTimes(1);
   expect(mockSendRuntimeMessage).toHaveBeenCalledWith({
-    assetId: 'asset-1',
-    editorSessionId: 'session-1',
-    type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
+    actionType: 'download_default',
+    dataUrl: 'data:image/png;base64,abc',
+    filename: expect.stringMatching(/_edited\.webp$/),
+    presetId: 'preset-default',
+    type: MessageType.EXECUTE_SAVE,
   });
 });
 

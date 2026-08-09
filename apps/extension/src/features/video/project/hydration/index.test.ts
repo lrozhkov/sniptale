@@ -235,6 +235,12 @@ function expectScenarioNormalization(hydrated: ReturnType<typeof hydrateVideoPro
 }
 
 describe('hydrateVideoProject legacy normalization', () => {
+  it('preserves the durable mutation timestamp while normalizing the project', () => {
+    const project = createLegacyHydrationProject();
+
+    expect(hydrateVideoProject(project).updatedAt).toBe(project.updatedAt);
+  });
+
   it('hydrates linked video clips, legacy labels, and normalized peaks', () => {
     expectLegacyHydrationShape(
       hydrateVideoProject(createLegacyHydrationProject(), {

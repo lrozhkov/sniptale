@@ -1,4 +1,10 @@
-import { initDB, MEDIA_LIBRARY_STORE, THUMBNAILS_STORE } from '../infrastructure/indexed-db/core';
+import {
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  initDB,
+  MEDIA_LIBRARY_STORE,
+  THUMBNAILS_STORE,
+} from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { deleteProjectAsset, deleteProjectExport, getProjectAsset } from '../projects/index';
 import { deleteRecording, getRecording } from '../recordings/index';
@@ -8,7 +14,7 @@ import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
-import { updateLibraryLifecycle } from '../library-lifecycle/contracts';
+import { createAggregatePresentationKey } from '../aggregate-presentations';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -124,9 +130,6 @@ export async function updateMediaLibraryEntry(
         ? {}
         : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
       updatedAt,
-      ...(existing.lifecycle
-        ? { lifecycle: updateLibraryLifecycle(existing.lifecycle, updatedAt) }
-        : {}),
       tags: patch.tags ?? existing.tags,
     });
   });
@@ -153,9 +156,6 @@ export async function addMediaLibraryEntryTags(
       ...existing,
       tags: nextTags,
       updatedAt,
-      ...(existing.lifecycle
-        ? { lifecycle: updateLibraryLifecycle(existing.lifecycle, updatedAt) }
-        : {}),
     };
     await db.put(MEDIA_LIBRARY_STORE, nextEntry);
     return nextEntry;
@@ -199,10 +199,22 @@ async function deleteLinkedMediaSource(entry: MediaLibraryEntry): Promise<void> 
 
 async function deleteMediaLibraryRows(assetId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, THUMBNAILS_STORE], 'readwrite');
+    const tx = db.transaction(
+      [
+        MEDIA_LIBRARY_STORE,
+        THUMBNAILS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+      ],
+      'readwrite'
+    );
     try {
       await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
       await tx.objectStore(THUMBNAILS_STORE).delete(assetId);
+      await tx.objectStore(IMAGE_WORKSPACES_STORE).delete(assetId);
+      await tx
+        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+        .delete(createAggregatePresentationKey({ id: assetId, kind: 'image' }));
       await tx.done;
     } catch (error) {
       throw new MediaLibraryDeleteError(assetId, 'media-library-transaction', error);

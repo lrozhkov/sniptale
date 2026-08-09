@@ -9,7 +9,7 @@ function createMinimalScenarioItem(id: string): GalleryItem {
     updatedAt: 0,
     hasThumbnail: false,
     kind: 'scenario',
-    project: { id, name: id, createdAt: 0, updatedAt: 0 },
+    project: { id, name: id, createdAt: 0, updatedAt: 0, workspaceRevision: 0 },
     size: 0,
     sourceFavicon: null,
     sourceTitle: null,
@@ -34,7 +34,7 @@ function createMinimalScenarioExportItem(id: string): GalleryItem {
     updatedAt: 0,
     hasThumbnail: false,
     kind: 'scenario-export',
-    project: { id, name: id, createdAt: 0, updatedAt: 0 },
+    project: { id, name: id, createdAt: 0, updatedAt: 0, workspaceRevision: 0 },
     size: 0,
     sourceFavicon: null,
     sourceTitle: null,
@@ -70,6 +70,7 @@ function createMinimalVideoProjectItem(id: string): GalleryItem {
       thumbnailId: `video-project:${id}`,
       thumbnailSourceMediaId: null,
       retentionKind: 'ordinary',
+      workspaceRevision: 0,
     },
     size: 0,
     sourceFavicon: null,
@@ -88,10 +89,7 @@ function createMinimalVideoProjectItem(id: string): GalleryItem {
 
 function createMinimalMediaItem(
   id: string,
-  kind: Exclude<
-    GalleryItemKind,
-    'editor-session' | 'scenario' | 'scenario-export' | 'video-project'
-  >
+  kind: Exclude<GalleryItemKind, 'scenario' | 'scenario-export' | 'video-project'>
 ): GalleryItem {
   return {
     id,
@@ -113,10 +111,7 @@ function createMinimalMediaItem(
   };
 }
 
-export function createMediaThumbFallbackItem(
-  kind: Exclude<GalleryItemKind, 'editor-session'>,
-  id: string
-): GalleryItem {
+export function createMediaThumbFallbackItem(kind: GalleryItemKind, id: string): GalleryItem {
   if (kind === 'scenario') {
     return createMinimalScenarioItem(id);
   }

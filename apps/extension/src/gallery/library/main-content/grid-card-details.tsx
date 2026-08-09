@@ -15,6 +15,21 @@ function GalleryLifecycleLabel({ item }: Pick<GalleryCardDetailsProps, 'item'>) 
   );
 }
 
+function GalleryPresentationLabel({ item }: Pick<GalleryCardDetailsProps, 'item'>) {
+  if (
+    item.workspaceRevision === undefined ||
+    item.presentationRevision === undefined ||
+    item.presentationRevision === item.workspaceRevision
+  ) {
+    return null;
+  }
+  return (
+    <span className="text-[var(--sniptale-color-info)]">
+      {translate('gallery.app.updatingPreview')}
+    </span>
+  );
+}
+
 interface GalleryCardDetailsProps {
   item: GalleryItem;
   onPreviewOpen: (item: GalleryItem) => void;
@@ -49,6 +64,7 @@ export function GalleryListDetails(props: GalleryCardDetailsProps) {
       <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]" title={dateLabel}>
         {dateLabel}
         <GalleryLifecycleLabel item={props.item} />
+        <GalleryPresentationLabel item={props.item} />
       </div>
       <div className="text-right text-xs text-[var(--sniptale-color-text-muted)]">
         {props.item.size > 0 ? formatBytes(props.item.size) : '—'}
@@ -78,6 +94,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
         <span>{props.item.size > 0 ? formatBytes(props.item.size) : '—'}</span>
       </div>
       <GalleryLifecycleLabel item={props.item} />
+      <GalleryPresentationLabel item={props.item} />
       {props.item.tags.length > 0 ? (
         <div className="mt-2 truncate text-xs text-[var(--sniptale-color-info)]" title={tagsLabel}>
           {tagsLabel}

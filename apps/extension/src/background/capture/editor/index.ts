@@ -1,6 +1,5 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { persistPendingEditorBootstrapPayload } from '../../../workflows/editor/bootstrap/index';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -92,7 +91,6 @@ function createEditorTabUrl(bootstrapId: string | null, assetId?: string): strin
   return buildEditorUrl({
     ...(assetId ? { assetId } : {}),
     bootstrapId,
-    sessionId: createEditorSessionId(),
   });
 }
 

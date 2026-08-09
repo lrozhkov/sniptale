@@ -22,9 +22,12 @@ const actionMocks = vi.hoisted(() => ({
   createImportActionMock: vi.fn(),
   createImportSelectedFileActionMock: vi.fn(),
   createSaveMetadataActionMock: vi.fn(),
+  createRestoreOriginalActionMock: vi.fn(),
+  createSaveImageCopyActionMock: vi.fn(),
   createSelectionZipActionMock: vi.fn(),
   createStorageCleanupActionMock: vi.fn(),
   downloadPreviewItemMock: vi.fn(async () => undefined),
+  downloadOriginalPreviewItemMock: vi.fn(async () => undefined),
   openInEditorMock: vi.fn(),
   openSnapshotScreenshotInEditorMock: vi.fn(async () => undefined),
   resetPreviewChangesMock: vi.fn(),
@@ -43,7 +46,10 @@ vi.mock('./preview', () => ({
   copyPreviewItem: actionMocks.copyPreviewItemMock,
   createClosePreviewAction: actionMocks.createClosePreviewActionMock,
   createSaveMetadataAction: actionMocks.createSaveMetadataActionMock,
+  createRestoreOriginalAction: actionMocks.createRestoreOriginalActionMock,
+  createSaveImageCopyAction: actionMocks.createSaveImageCopyActionMock,
   downloadPreviewItem: actionMocks.downloadPreviewItemMock,
+  downloadOriginalPreviewItem: actionMocks.downloadOriginalPreviewItemMock,
   openInEditor: actionMocks.openInEditorMock,
   resetPreviewChanges: actionMocks.resetPreviewChangesMock,
 }));
@@ -78,6 +84,8 @@ function prepareActionFactoryMocks() {
   actionMocks.createSelectionZipActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createSaveMetadataActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createApplySelectionTagActionMock.mockReturnValue(vi.fn(async () => undefined));
+  actionMocks.createRestoreOriginalActionMock.mockReturnValue(vi.fn());
+  actionMocks.createSaveImageCopyActionMock.mockReturnValue(vi.fn(async () => undefined));
 }
 
 describe('useGalleryAppActions', () => {
@@ -90,7 +98,6 @@ describe('useGalleryAppActions', () => {
     const actions = useGalleryAppActions(controller);
     const backupOptions = {
       scope: 'all' as const,
-      includeEditorDrafts: true,
       includeSourceMetadata: true,
       includeTelemetry: true,
       includeWebSnapshots: true,
@@ -108,6 +115,9 @@ describe('useGalleryAppActions', () => {
     await actions.selection.applyTag();
     actions.preview.copy();
     actions.preview.download();
+    actions.preview.downloadOriginal();
+    actions.preview.restoreOriginal();
+    actions.preview.saveCopy();
     actions.preview.openSnapshotScreenshotInEditor();
     actions.preview.openInEditor(createMediaItem({ id: 'asset-3' }));
 
@@ -115,6 +125,18 @@ describe('useGalleryAppActions', () => {
     expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
     expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
     expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
+    expect(actionMocks.downloadOriginalPreviewItemMock).toHaveBeenCalledWith(
+      controller,
+      runBusyAction
+    );
+    expect(actionMocks.createRestoreOriginalActionMock).toHaveBeenCalledWith(
+      controller,
+      runBusyAction
+    );
+    expect(actionMocks.createSaveImageCopyActionMock).toHaveBeenCalledWith(
+      controller,
+      runBusyAction
+    );
     expect(actionMocks.openSnapshotScreenshotInEditorMock).toHaveBeenCalledWith(
       controller,
       runBusyAction

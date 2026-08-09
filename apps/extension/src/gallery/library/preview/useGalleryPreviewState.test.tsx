@@ -4,9 +4,18 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { getMediaAssetBlobMock, loadWebSnapshotScreenshotBlobMock } = vi.hoisted(() => ({
-  getMediaAssetBlobMock: vi.fn(),
-  loadWebSnapshotScreenshotBlobMock: vi.fn(),
+const { getAggregatePreviewBlobMock, getMediaAssetBlobMock, loadWebSnapshotScreenshotBlobMock } =
+  vi.hoisted(() => ({
+    getAggregatePreviewBlobMock: vi.fn(),
+    getMediaAssetBlobMock: vi.fn(),
+    loadWebSnapshotScreenshotBlobMock: vi.fn(),
+  }));
+
+vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/aggregate-presentations')
+  >()),
+  getAggregatePreviewBlob: getAggregatePreviewBlobMock,
 }));
 
 vi.mock(
@@ -120,7 +129,7 @@ afterEach(() => {
 it('loads preview blobs and seeds filename and tag drafts from the selected item', async () => {
   const blob = new Blob(['preview'], { type: 'image/png' });
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
-  getMediaAssetBlobMock.mockResolvedValue(blob);
+  getAggregatePreviewBlobMock.mockResolvedValue(blob);
 
   act(() => {
     root?.render(<HookProbe onValue={(value) => values.push(value)} />);
@@ -132,7 +141,7 @@ it('loads preview blobs and seeds filename and tag drafts from the selected item
   });
   await flushEffects();
 
-  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('asset-1');
+  expect(getAggregatePreviewBlobMock).toHaveBeenCalledWith({ id: 'asset-1', kind: 'image' });
   expect(latest()?.state.draft.filename).toBe('preview.png');
   expect(latest()?.state.draft.tags).toEqual(['alpha']);
   expect(latest()?.state.session.url).toBe('blob:preview');
@@ -141,7 +150,9 @@ it('loads preview blobs and seeds filename and tag drafts from the selected item
 
 it('clears preview url when no item is selected and tolerates null or failed blob loads', async () => {
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
-  getMediaAssetBlobMock.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('blob failed'));
+  getAggregatePreviewBlobMock
+    .mockResolvedValueOnce(null)
+    .mockRejectedValueOnce(new Error('blob failed'));
 
   act(() => {
     root?.render(<HookProbe onValue={(value) => values.push(value)} />);
@@ -176,7 +187,7 @@ it('revokes the previous object url when the selected item changes or the hook u
     .mockReturnValueOnce('blob:first')
     .mockReturnValueOnce('blob:second');
 
-  getMediaAssetBlobMock.mockResolvedValueOnce(firstBlob).mockResolvedValueOnce(secondBlob);
+  getAggregatePreviewBlobMock.mockResolvedValueOnce(firstBlob).mockResolvedValueOnce(secondBlob);
 
   act(() => {
     root?.render(<HookProbe onValue={(value) => values.push(value)} />);
@@ -212,7 +223,7 @@ it('clears carried preview urls synchronously when the selected item changes', a
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
   let resolveSecondBlobLoad!: (blob: Blob | null) => void;
 
-  getMediaAssetBlobMock
+  getAggregatePreviewBlobMock
     .mockResolvedValueOnce(new Blob(['first'], { type: 'image/png' }))
     .mockImplementationOnce(
       () =>
@@ -255,7 +266,7 @@ it('ignores stale blob-load failures after the preview item changes', async () =
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
   let rejectFirstBlobLoad!: (error: Error) => void;
 
-  getMediaAssetBlobMock
+  getAggregatePreviewBlobMock
     .mockImplementationOnce(
       () =>
         new Promise<Blob | null>((_, reject) => {

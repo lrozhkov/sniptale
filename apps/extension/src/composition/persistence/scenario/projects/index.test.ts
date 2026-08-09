@@ -10,12 +10,8 @@ it('re-exports scenario project store roles through the canonical facade', () =>
   expect(scenarioProjectsFacade.getScenarioProject).toBe(scenarioProjects.getScenarioProject);
   expect(scenarioProjectsFacade.listScenarioProjects).toBe(scenarioProjects.listScenarioProjects);
   expect(scenarioProjectsFacade.deleteScenarioProject).toBe(scenarioProjects.deleteScenarioProject);
-  expect(scenarioProjectsFacade.saveScenarioAsset).toBe(scenarioProjectAssets.saveScenarioAsset);
   expect(scenarioProjectsFacade.getScenarioAsset).toBe(scenarioProjectAssets.getScenarioAsset);
   expect(scenarioProjectsFacade.listScenarioAssets).toBe(scenarioProjectAssets.listScenarioAssets);
-  expect(scenarioProjectsFacade.deleteScenarioAsset).toBe(
-    scenarioProjectAssets.deleteScenarioAsset
-  );
   expect(scenarioProjectsFacade.savePendingScenarioAsset).toBe(
     scenarioProjectAssets.savePendingScenarioAsset
   );

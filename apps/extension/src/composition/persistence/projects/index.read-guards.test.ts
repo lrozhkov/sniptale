@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   PROJECT_EXPORTS_STORE: 'project_exports',
@@ -118,6 +119,7 @@ it('parses media library entries across supported source kinds', async () => {
     sourceEntries.map((entry) => ({
       ...entry,
       lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+      workspaceRevision: 0,
     }))
   );
   const entry = createMediaLibraryEntry();
@@ -145,6 +147,7 @@ it('keeps hydratable persisted video projects visible before export-ready valida
     },
     project: hydratableEntry.project,
     status: 'ready',
+    workspaceRevision: 0,
   });
   await expect(listVideoProjects()).resolves.toEqual([
     expect.objectContaining({ id: hydratableEntry.id }),
@@ -305,6 +308,7 @@ it('parses scenario project and asset rows directly', async () => {
   expect(parseScenarioProjectEntry(entry)).toEqual({
     ...entry,
     lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+    workspaceRevision: 0,
   });
   expect(parseScenarioProjectEntry({ ...entry, project: { id: project.id } })).toBeNull();
   expect(parseScenarioAssetEntry(asset)).toEqual(asset);

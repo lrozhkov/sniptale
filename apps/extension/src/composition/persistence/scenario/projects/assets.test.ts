@@ -22,13 +22,11 @@ vi.mock('../../infrastructure/indexed-db/core', async () => {
 
 import {
   deletePendingScenarioAsset,
-  deleteScenarioAsset,
   getPendingScenarioAsset,
   getScenarioAsset,
   listPendingScenarioAssets,
   listScenarioAssets,
   savePendingScenarioAsset,
-  saveScenarioAsset,
 } from './assets';
 
 beforeEach(() => {
@@ -71,7 +69,7 @@ function createPendingScenarioAssetRow(overrides: Record<string, unknown> = {}) 
   };
 }
 
-it('stores and loads scenario assets', async () => {
+it('loads scenario assets through the read-only child-store seam', async () => {
   const assetBlob = new Blob(['asset'], { type: 'image/png' });
   dbGetMock.mockResolvedValueOnce({
     id: 'asset-1',
@@ -98,27 +96,12 @@ it('stores and loads scenario assets', async () => {
     },
   ]);
 
-  await saveScenarioAsset({
-    id: 'asset-1',
-    projectId: 'project-1',
-    galleryAssetId: null,
-    blob: assetBlob,
-    mimeType: 'image/png',
-    width: 100,
-    height: 50,
-    createdAt: 10,
-    size: assetBlob.size,
-  });
-
-  expect(dbPutMock).toHaveBeenCalledTimes(1);
   await expect(getScenarioAsset('asset-1')).resolves.toEqual(
     expect.objectContaining({ id: 'asset-1', mimeType: 'image/png' })
   );
   await expect(listScenarioAssets('project-1')).resolves.toEqual([
     expect.objectContaining({ id: 'asset-1', projectId: 'project-1' }),
   ]);
-  await deleteScenarioAsset('asset-1');
-  expect(dbDeleteMock).toHaveBeenCalledWith('scenario_assets', 'asset-1');
 });
 
 it('filters malformed scenario asset rows at the DB boundary', async () => {

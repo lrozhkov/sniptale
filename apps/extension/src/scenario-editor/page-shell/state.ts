@@ -21,6 +21,8 @@ import {
 } from './project-echo';
 import type { ScenarioV3EditorShellProps } from './types';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
+import { commitScenarioAggregateSnapshotMutation } from '../../composition/persistence/scenario/aggregate-mutations';
+import type { CommitScenarioV3AggregateMutation } from './types';
 
 export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
   const { onProjectChange, project: initialProject } = props;
@@ -35,6 +37,25 @@ export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const selection = getEditorSelection(session);
+  const commitAggregateMutation: CommitScenarioV3AggregateMutation = async (
+    mutateSession,
+    children
+  ) => {
+    const baseSession = sessionRef.current;
+    const nextSession = mutateSession(baseSession);
+    if (Object.is(nextSession, baseSession)) return;
+    const result = await commitScenarioAggregateSnapshotMutation({
+      baseProject: baseSession.project,
+      children,
+      nextProject: nextSession.project,
+    });
+    if (!Object.is(sessionRef.current, baseSession)) {
+      throw new Error('Scenario project changed while the operation was being saved.');
+    }
+    const committedSession = { ...nextSession, project: result.project };
+    sessionRef.current = committedSession;
+    setSession(committedSession);
+  };
 
   useScenarioV3ProjectChangeEmitter({
     emittedProjectEchoRef,
@@ -56,8 +77,11 @@ export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
     canUndo: session.history.past.length > 0,
     elements: selection.selectedSlide.elements,
     history: createHistoryCommands(setSession),
-    getCurrentProject: () => sessionRef.current.project,
-    projectActions: createProjectCommands(setSession),
+    projectActions: {
+      ...createProjectCommands(setSession),
+      commitAggregateMutation,
+      getCurrentProject: () => sessionRef.current.project,
+    },
     project: session.project,
     selectedElement: selection.selectedElement,
     selectedElementId: session.selectedElementId,
@@ -67,7 +91,8 @@ export function useScenarioV3EditorState(props: ScenarioV3EditorShellProps) {
       setSession,
       session.project.id,
       () => sessionRef.current,
-      setOperationError
+      setOperationError,
+      commitAggregateMutation
     ),
     operationError,
   };

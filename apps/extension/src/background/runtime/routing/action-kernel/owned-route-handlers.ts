@@ -27,6 +27,7 @@ import type { ActionResult, BackgroundOwnedAction } from './types';
 import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
 import { routeAnnotationForkSessionMessage } from '../../../annotation-fork-session/route';
+import { routeAggregatePromotionMessage } from '../../../application/aggregate-promotion/route';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -64,6 +65,8 @@ function getBackgroundOwnedRouteHandler(
   handlerId: BackgroundOwnedRouteHandlerId
 ): BackgroundOwnedRouteHandler {
   switch (handlerId) {
+    case 'aggregate-promotion':
+      return routeAggregatePromotionAction;
     case 'ai-secret-unlock':
       return routeAiSecretUnlockAction;
     case 'ai-settings-query':
@@ -99,6 +102,10 @@ function getBackgroundOwnedRouteHandler(
     case 'voice-input-offscreen-event':
       return routeVoiceInputOffscreenEventAction;
   }
+}
+
+function routeAggregatePromotionAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(routeAggregatePromotionMessage(action.message, action.context.sendResponse));
 }
 
 function routeFrameAnnotationRasterAction(action: BackgroundOwnedAction): ActionResult | null {

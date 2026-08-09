@@ -17,7 +17,7 @@ import {
   DEFAULT_LOCAL_STORAGE_POLICY,
   getDraftRetentionMs,
 } from '../../composition/persistence/library-lifecycle';
-import { listEditorSessionDrafts } from '../../composition/persistence/editor-sessions';
+import { listAggregatePresentations } from '../../composition/persistence/aggregate-presentations';
 
 async function loadScenarioExports(projectId: string) {
   return [projectId, await listScenarioExportRecords(projectId)] as const;
@@ -38,7 +38,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     estimate,
     videoProjects,
     settings,
-    editorSessions,
+    presentations,
   ] = await Promise.all([
     listMediaLibrary(),
     listScenarioProjectSummaries(),
@@ -46,7 +46,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     getStorageEstimateInfo(),
     listVideoProjects(),
     loadSettings().catch(() => ({ localStoragePolicy: DEFAULT_LOCAL_STORAGE_POLICY })),
-    listEditorSessionDrafts(),
+    listAggregatePresentations(),
   ]);
   const scenarioExportsByProject = await loadScenarioExportsByProject(
     scenarioProjects.map((project) => project.id)
@@ -56,7 +56,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     estimate,
     nextItems: createGalleryItems({
       mediaItems,
-      editorSessions: editorSessions.filter((session) => session.assetId === null),
+      presentations,
       scenarioExportsByProjectId: new Map(scenarioExportsByProject),
       scenarioProjects,
       thumbnailIds: new Set(thumbnailIds),

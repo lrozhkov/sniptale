@@ -15,7 +15,9 @@ const projectsDbMocks = vi.hoisted(() => ({
   txPutMock: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   VIDEO_PROJECTS_STORE: 'video_projects',
@@ -73,6 +75,39 @@ it('rejects stale video project saves inside the write transaction before writes
   expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+});
+
+it('uses the integer workspace revision as the authoritative compare-and-swap token', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const project = createVideoProject({ updatedAt: 10 });
+  projectsDbMocks.txGetMock.mockResolvedValue(
+    createVideoProjectEntry({ updatedAt: 10 }, { workspaceRevision: 4 })
+  );
+
+  await expect(saveVideoProject(project, { expectedWorkspaceRevision: 3 })).rejects.toMatchObject({
+    name: 'StaleVideoProjectSaveError',
+  });
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+
+  await expect(saveVideoProject(project, { expectedWorkspaceRevision: 4 })).resolves.toMatchObject({
+    workspaceRevision: 5,
+  });
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({ workspaceRevision: 5 })
+  );
+});
+
+it('accepts only a null expected workspace revision when creating a project', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const project = createVideoProject({ id: 'new-project' });
+  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+
+  await expect(saveVideoProject(project, { expectedWorkspaceRevision: 0 })).rejects.toMatchObject({
+    name: 'StaleVideoProjectSaveError',
+  });
+  await expect(
+    saveVideoProject(project, { expectedWorkspaceRevision: null })
+  ).resolves.toMatchObject({ workspaceRevision: 1 });
 });
 
 it('removes project-owned assets that are no longer referenced by the saved project', async () => {

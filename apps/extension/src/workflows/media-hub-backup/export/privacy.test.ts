@@ -73,7 +73,7 @@ function createScenarioProjectEntry(): ScenarioProjectEntry {
     trash: [{ deletedAt: 3, originalIndex: 0, slide }],
   };
 
-  return { createdAt: 1, id: project.id, project, updatedAt: 2 };
+  return { createdAt: 1, id: project.id, project, updatedAt: 2, workspaceRevision: 1 };
 }
 
 function createLegacyCaptureStep(id: string, page: ScenarioPageDescriptor): ScenarioStep {
@@ -121,7 +121,6 @@ it('strips source metadata from scenario v3 slide and image capture contexts', (
   const entry = createScenarioProjectEntry();
 
   const result = applyScenarioProjectPrivacyOptions(entry, {
-    includeEditorDrafts: true,
     includeSourceMetadata: false,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -156,7 +155,6 @@ it('strips media library source metadata when source metadata export is disabled
         width: 100,
       },
       {
-        includeEditorDrafts: true,
         includeSourceMetadata: false,
         includeTelemetry: true,
         includeWebSnapshots: true,
@@ -166,11 +164,10 @@ it('strips media library source metadata when source metadata export is disabled
   ).toEqual(expect.objectContaining({ sourceFavicon: null, sourceTitle: null, sourceUrl: null }));
 });
 
-it('drops scenario v3 image edit document references when editor drafts are excluded', () => {
+it('keeps authoritative scenario image edit document references', () => {
   const entry = createScenarioProjectEntry();
 
   const result = applyScenarioProjectPrivacyOptions(entry, {
-    includeEditorDrafts: false,
     includeSourceMetadata: false,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -183,7 +180,7 @@ it('drops scenario v3 image edit document references when editor drafts are excl
 
   expect(result.project.slides[0]?.elements[0]).toMatchObject({
     captureContext: { page: { title: null, url: null } },
-    editDocumentId: null,
+    editDocumentId: 'doc-1',
   });
 });
 
@@ -191,7 +188,6 @@ it('sanitizes scenario v3 page URLs when source metadata is retained', () => {
   const entry = createScenarioProjectEntry();
 
   const result = applyScenarioProjectPrivacyOptions(entry, {
-    includeEditorDrafts: true,
     includeSourceMetadata: true,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -235,10 +231,15 @@ it('leaves non-image scenario v3 elements unchanged while stripping slide source
       }),
     ],
   };
-  const entry: ScenarioProjectEntry = { createdAt: 1, id: project.id, project, updatedAt: 2 };
+  const entry: ScenarioProjectEntry = {
+    createdAt: 1,
+    id: project.id,
+    project,
+    updatedAt: 2,
+    workspaceRevision: 1,
+  };
 
   const result = applyScenarioProjectPrivacyOptions(entry, {
-    includeEditorDrafts: false,
     includeSourceMetadata: false,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -286,7 +287,6 @@ it('sanitizes editor document browser URLs when source metadata is included', ()
   };
 
   const result = applyScenarioStepDocumentPrivacyOptions(entry, {
-    includeEditorDrafts: true,
     includeSourceMetadata: true,
     includeTelemetry: true,
     includeWebSnapshots: true,

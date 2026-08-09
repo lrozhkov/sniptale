@@ -11,6 +11,7 @@ import {
 } from '.';
 
 const EXPECTED_POLICY_STATE_IDS = [
+  'aggregate-editor-presence',
   'ai-secret-unlock-requests',
   'ai-settings-mutation-queue',
   'annotation-fork-sessions',
@@ -24,7 +25,6 @@ const EXPECTED_POLICY_STATE_IDS = [
   'diagnostics-erasure-exclusion',
   'frame-annotation-raster-jobs',
   'full-page-capture-leases',
-  'gallery-image-update-capabilities',
   'gradient-preset-mutation-queue',
   'llm-session-tokens',
   'native-ingestion-erasure-exclusion',
@@ -108,7 +108,6 @@ it('marks delete-on-consume capability states as one-shot', () => {
     'content-action-runtime-tokens',
     'content-action-trusted-event-proofs',
     'frame-annotation-raster-jobs',
-    'gallery-image-update-capabilities',
     'llm-session-tokens',
     'offscreen-command-capability-generations',
     'popup-tab-route-capabilities',

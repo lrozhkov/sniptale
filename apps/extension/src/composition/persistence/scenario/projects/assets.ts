@@ -8,10 +8,6 @@ import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives'
 import { parsePendingScenarioAssetEntry, parseScenarioAssetEntry } from '../read-guards';
 import type { PendingScenarioAssetEntry, ScenarioAssetEntry } from '../contracts';
 
-export async function saveScenarioAsset(entry: ScenarioAssetEntry): Promise<void> {
-  await runWithIndexedDbMutation((db) => db.put(SCENARIO_ASSETS_STORE, entry));
-}
-
 export async function getScenarioAsset(id: string): Promise<ScenarioAssetEntry | undefined> {
   const db = await initDB();
   return parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, id)) ?? undefined;
@@ -23,10 +19,6 @@ export async function listScenarioAssets(projectId: string): Promise<ScenarioAss
     await db.getAllFromIndex(SCENARIO_ASSETS_STORE, 'projectId', projectId),
     parseScenarioAssetEntry
   );
-}
-
-export async function deleteScenarioAsset(id: string): Promise<void> {
-  await runWithIndexedDbMutation((db) => db.delete(SCENARIO_ASSETS_STORE, id));
 }
 
 export async function savePendingScenarioAsset(entry: PendingScenarioAssetEntry): Promise<void> {

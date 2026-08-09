@@ -1,12 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
 
 const persistenceMocks = vi.hoisted(() => ({
-  listEditorSessionDrafts: vi.fn(),
   listMediaLibrary: vi.fn(),
   listScenarioProjectEntries: vi.fn(),
   listVideoProjectEntries: vi.fn(),
@@ -15,10 +13,6 @@ const persistenceMocks = vi.hoisted(() => ({
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
-}));
-vi.mock('../editor-sessions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../editor-sessions')>()),
-  listEditorSessionDrafts: persistenceMocks.listEditorSessionDrafts,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -37,29 +31,14 @@ import { cleanupDrafts, createLibraryLifecycle, DEFAULT_LOCAL_STORAGE_POLICY } f
 
 const day = 24 * 60 * 60 * 1000;
 
-function createSession(args: { assetId: string | null; sessionId: string; updatedAt: number }) {
-  return {
-    assetId: args.assetId,
-    createdAt: 1,
-    dirty: true,
-    document: createEditorDocumentFixture(),
-    lifecycle: createLibraryLifecycle('temporary', args.updatedAt),
-    sessionId: args.sessionId,
-    sourceTitle: null,
-    sourceUrl: null,
-    updatedAt: args.updatedAt,
-  };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([]);
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('keeps expired media when its linked editor session was recently autosaved', async () => {
+it('expires image aggregates from the root lifecycle and removes their sidecars', async () => {
   const now = 40 * day;
   const media = {
     createdAt: 1,
@@ -80,11 +59,6 @@ it('keeps expired media when its linked editor session was recently autosaved', 
     updatedAt: 1,
     width: 1,
   };
-  const freshSession = createSession({
-    assetId: media.id,
-    sessionId: 'fresh-linked-session',
-    updatedAt: now - day,
-  });
   persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
   const deletes = vi.fn();
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
@@ -94,46 +68,18 @@ it('keeps expired media when its linked editor session was recently autosaved', 
         objectStore: vi.fn((name: string) => ({
           delete: vi.fn((id: string) => deletes(name, id)),
           get: vi.fn(async () => (name === 'media_library' ? media : undefined)),
-          getAll: vi.fn(async () => (name === 'editor_sessions' ? [freshSession] : [])),
+          getAll: vi.fn(async () => []),
         })),
       })),
     })
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
+    deletedCount: 1,
+    deletedIds: [media.id],
   });
-  expect(deletes).not.toHaveBeenCalled();
-});
-
-it('keeps a session that became linked after the cleanup snapshot', async () => {
-  const now = 40 * day;
-  const snapshot = createSession({
-    assetId: null,
-    sessionId: 'linked-during-cleanup',
-    updatedAt: 1,
-  });
-  const current = { ...snapshot, assetId: 'draft-image' };
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([snapshot]);
-  const deleteSession = vi.fn();
-  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
-    effect({
-      transaction: vi.fn(() => ({
-        done: Promise.resolve(),
-        objectStore: vi.fn(() => ({
-          delete: deleteSession,
-          get: vi.fn(async () => current),
-        })),
-      })),
-    })
-  );
-
-  await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 0,
-    deletedIds: [],
-  });
-  expect(deleteSession).not.toHaveBeenCalled();
+  expect(deletes).toHaveBeenCalledWith('image_workspaces', media.id);
+  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', media.id]);
 });
 
 it.each([
@@ -193,11 +139,7 @@ it.each([
   expect(deletes).not.toHaveBeenCalled();
 });
 
-async function runExpiredVideoProjectCleanup(args: {
-  mediaUpdatedAt: number;
-  now: number;
-  session?: ReturnType<typeof createSession>;
-}) {
+async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now: number }) {
   const project = {
     ...createVideoProjectEntryWithMediaClip(),
     lifecycle: createLibraryLifecycle('temporary', 1),
@@ -223,13 +165,11 @@ async function runExpiredVideoProjectCleanup(args: {
   };
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([project]);
   persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue(args.session ? [args.session] : []);
   const deletes = vi.fn();
   const valuesByStore = new Map<string, Map<string, unknown>>([
     ['video_projects', new Map([[project.id, project]])],
     ['media_library', new Map([[media.id, media]])],
     ['project_assets', new Map([['project-asset-1', { id: 'project-asset-1' }]])],
-    ['editor_sessions', new Map(args.session ? [[args.session.sessionId, args.session]] : [])],
   ]);
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
     effect({
@@ -266,24 +206,6 @@ it('keeps a fresh temporary child when its video project has expired', async () 
   expect(deletes).toHaveBeenCalledWith('video_projects', project.id);
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
-});
-
-it('keeps an expired child protected by a recently autosaved linked session', async () => {
-  const now = 40 * day;
-  const session = createSession({
-    assetId: 'project-asset:project-asset-1',
-    sessionId: 'fresh-project-session',
-    updatedAt: now - day,
-  });
-  const { deletes, media } = await runExpiredVideoProjectCleanup({
-    mediaUpdatedAt: 1,
-    now,
-    session,
-  });
-
-  expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
-  expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
-  expect(deletes).not.toHaveBeenCalledWith('editor_sessions', session.sessionId);
 });
 
 it('removes recording telemetry and the project thumbnail with an expired recording graph', async () => {
@@ -330,7 +252,6 @@ it('removes recording telemetry and the project thumbnail with an expired record
     ['video_projects', new Map([[project.id, project]])],
     ['media_library', new Map([[media.id, media]])],
     ['recordings', new Map([[recording.id, recording]])],
-    ['editor_sessions', new Map()],
   ]);
   persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (effect) =>
     effect({

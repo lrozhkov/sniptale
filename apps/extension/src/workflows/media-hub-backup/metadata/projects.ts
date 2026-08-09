@@ -26,6 +26,7 @@ import type {
   EffectSnapshotBackupDescriptor,
   VideoBackupProjectDescriptor,
 } from '../contracts/types';
+import { tryNormalizeAggregatePresentation } from './presentation';
 export { normalizeScenarioProject } from './scenario-projects';
 
 function normalizeVideoProjectEntry(value: unknown): VideoProjectEntry {
@@ -84,6 +85,10 @@ export function normalizeVideoProject(value: JsonRecord): VideoBackupProjectDesc
       ? undefined
       : normalizeEffectProjectDescriptor(field(value, 'effectProject'), prefix);
   assertVideoProjectEffectReferences(entry, effectProject);
+  const presentation =
+    field(value, 'presentation') === undefined
+      ? undefined
+      : tryNormalizeAggregatePresentation(field(value, 'presentation'));
   const descriptor = {
     entry,
     ...(effectProject ? { effectProject } : {}),
@@ -107,6 +112,7 @@ export function normalizeVideoProject(value: JsonRecord): VideoBackupProjectDesc
     ...(field(value, 'thumbnail') === undefined
       ? {}
       : { thumbnail: normalizeBlobDescriptor(field(value, 'thumbnail'), [prefix]) }),
+    ...(presentation ? { presentation } : {}),
   };
   assertVideoProjectDescriptorReferences(descriptor);
   return descriptor;

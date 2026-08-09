@@ -30,6 +30,7 @@ function createTransaction(stores: Map<string, ReturnType<typeof createStore>>):
 
 function createStores() {
   return new Map([
+    ['aggregate_presentations', createStore()],
     ['media_library', createStore()],
     ['project_assets', createStore()],
     ['project_exports', createStore([createStaleProjectExport()])],
@@ -88,6 +89,10 @@ describe('backup project replace cleanup', () => {
     expect(stores.get('recordings')?.delete).toHaveBeenCalledWith('stale-recording');
     expect(stores.get('media_library')?.delete).toHaveBeenCalledWith('export:stale-export');
     expect(stores.get('thumbnails')?.delete).toHaveBeenCalledWith('video-project:video-1');
+    expect(stores.get('aggregate_presentations')?.delete).toHaveBeenCalledWith([
+      'video-project',
+      'video-1',
+    ]);
   });
 
   it('clears stale video exports when the old project row is already missing', async () => {
@@ -118,5 +123,9 @@ describe('backup scenario project replace cleanup', () => {
       'broken-step'
     );
     expect(stores.get('thumbnails')?.delete).toHaveBeenCalledWith('scenario:scenario-1');
+    expect(stores.get('aggregate_presentations')?.delete).toHaveBeenCalledWith([
+      'scenario',
+      'scenario-1',
+    ]);
   });
 });

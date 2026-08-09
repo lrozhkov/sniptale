@@ -43,8 +43,6 @@ const captureMessageTypes = [
   MessageType.FETCH_WEB_SNAPSHOT_ASSET,
   MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK,
   MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS,
-  MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-  MessageType.UPDATE_GALLERY_IMAGE_ASSET,
 ] as const satisfies ReadonlyArray<RouteCaptureMessage['type']>;
 
 const scenarioMessageTypes = scenarioRouteMessageTypes satisfies ReadonlyArray<

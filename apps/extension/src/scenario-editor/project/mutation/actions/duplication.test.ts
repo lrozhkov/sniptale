@@ -6,9 +6,25 @@ import type {
 } from '../../../../features/scenario/contracts/types/project';
 import { createScenarioEditorProjectActions } from '.';
 
-const { cloneScenarioStepEditorDocumentRecordMock } = vi.hoisted(() => ({
-  cloneScenarioStepEditorDocumentRecordMock: vi.fn(),
+const {
+  commitScenarioAggregateSnapshotMutationMock,
+  getScenarioStepEditorDocumentRecordMock,
+  prepareScenarioStepEditorDocumentRecordMock,
+} = vi.hoisted(() => ({
+  commitScenarioAggregateSnapshotMutationMock: vi.fn(),
+  getScenarioStepEditorDocumentRecordMock: vi.fn(),
+  prepareScenarioStepEditorDocumentRecordMock: vi.fn(),
 }));
+
+vi.mock(
+  '../../../../composition/persistence/scenario/aggregate-mutations',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/scenario/aggregate-mutations')
+    >()),
+    commitScenarioAggregateSnapshotMutation: commitScenarioAggregateSnapshotMutationMock,
+  })
+);
 
 vi.mock(
   '../../../../composition/persistence/scenario/store/step-editor-documents',
@@ -16,9 +32,8 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../../../../composition/persistence/scenario/store/step-editor-documents')
     >()),
-    cloneScenarioStepEditorDocumentRecord: cloneScenarioStepEditorDocumentRecordMock,
-    deleteScenarioStepEditorDocumentRecord: vi.fn(),
-    saveScenarioStepEditorDocumentRecord: vi.fn(),
+    getScenarioStepEditorDocumentRecord: getScenarioStepEditorDocumentRecordMock,
+    prepareScenarioStepEditorDocumentRecord: prepareScenarioStepEditorDocumentRecordMock,
   })
 );
 
@@ -121,11 +136,23 @@ function createHarness(project = createProject()) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  cloneScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
+  getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
+  prepareScenarioStepEditorDocumentRecordMock.mockImplementation((entry) => ({
+    ...entry,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }));
+  commitScenarioAggregateSnapshotMutationMock.mockImplementation(async ({ nextProject }) => ({
+    project: nextProject,
+    workspaceRevision: 1,
+  }));
 });
 
 async function verifiesCaptureStepDuplication() {
   vi.spyOn(Date, 'now').mockReturnValue(500);
+  getScenarioStepEditorDocumentRecordMock.mockResolvedValue({
+    document: { version: 1 },
+  });
   const harness = createHarness();
 
   await harness.actions.duplicateStep('step-capture');
@@ -143,11 +170,16 @@ async function verifiesCaptureStepDuplication() {
   expect(duplicatedStep.updatedAt).toBe(500);
   expect(duplicatedStep.overlays[0]?.id).not.toBe('overlay-1');
   expect(harness.selectedStepIds).toEqual([duplicatedStep.id]);
-  expect(cloneScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith({
-    nextProjectId: 'project-1',
-    nextStepId: duplicatedStep.id,
-    sourceStepId: 'step-capture',
-  });
+  expect(getScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith('step-capture');
+  expect(prepareScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith(
+    expect.objectContaining({ projectId: 'project-1', stepId: duplicatedStep.id })
+  );
+  expect(commitScenarioAggregateSnapshotMutationMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      baseProject: expect.objectContaining({ id: 'project-1' }),
+      children: expect.objectContaining({ editorDocumentPuts: [expect.any(Object)] }),
+    })
+  );
   expect(harness.setError).toHaveBeenCalledWith(null);
 }
 
@@ -173,7 +205,7 @@ async function verifiesNoteStepDuplication() {
 }
 
 async function verifiesCaptureStepDuplicationFailure() {
-  cloneScenarioStepEditorDocumentRecordMock.mockRejectedValueOnce(new Error('clone failed'));
+  commitScenarioAggregateSnapshotMutationMock.mockRejectedValueOnce(new Error('clone failed'));
   const harness = createHarness();
 
   await harness.actions.duplicateStep('step-capture');

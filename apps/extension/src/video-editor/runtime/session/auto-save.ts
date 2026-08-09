@@ -1,9 +1,8 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { getVideoProject } from '../../../composition/persistence/projects/index';
 import { resolveVideoProjectReadResult } from '../../../composition/persistence/projects/contracts';
-import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
+import { commitVideoProjectWorkspaceMutation } from '../../../composition/persistence/projects/index-mutations';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { VideoProjectAsset } from '../../../features/video/project/types/index';
 import type { VideoProject } from '../../../features/video/project/types/index';
 import type { VideoEditorLibrariesState } from '../app-model/types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
@@ -23,8 +22,9 @@ export function useVideoEditorAutoSave(
 ): void {
   const saveGenerationRef = useRef(0);
   const revisionSyncRef = useRef<{ id: string; revision: number } | null>(null);
+  const initialProjectUpdatedAtRef = useRef<number | null>(null);
   const persistedProjectIdRef = useRef<string | null>(null);
-  const persistedRevisionRef = useRef<number | null>(null);
+  const persistedRevisionRef = useRef<number | null | undefined>(undefined);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -34,6 +34,7 @@ export function useVideoEditorAutoSave(
     return scheduleVideoEditorAutoSave({
       persistedProjectIdRef,
       persistedRevisionRef,
+      initialProjectUpdatedAtRef,
       project,
       recordingId,
       refreshProjects,
@@ -47,8 +48,9 @@ export function useVideoEditorAutoSave(
 }
 
 function scheduleVideoEditorAutoSave(args: {
+  initialProjectUpdatedAtRef: MutableRefObject<number | null>;
   persistedProjectIdRef: MutableRefObject<string | null>;
-  persistedRevisionRef: MutableRefObject<number | null>;
+  persistedRevisionRef: MutableRefObject<number | null | undefined>;
   project: VideoProject;
   recordingId: string | null;
   refreshProjects: VideoEditorLibrariesState['refreshProjects'];
@@ -60,6 +62,7 @@ function scheduleVideoEditorAutoSave(args: {
 }): () => void {
   resetAutosaveRevisionForProject(
     args.project,
+    args.initialProjectUpdatedAtRef,
     args.persistedProjectIdRef,
     args.persistedRevisionRef
   );
@@ -102,8 +105,9 @@ function runScheduledVideoProjectSave(
 }
 
 function queueVideoProjectSave(args: {
+  initialProjectUpdatedAtRef: MutableRefObject<number | null>;
   persistedProjectIdRef: MutableRefObject<string | null>;
-  persistedRevisionRef: MutableRefObject<number | null>;
+  persistedRevisionRef: MutableRefObject<number | null | undefined>;
   project: VideoProject;
   revisionSyncRef: MutableRefObject<{ id: string; revision: number } | null>;
   saveQueueRef: MutableRefObject<Promise<void>>;
@@ -112,18 +116,26 @@ function queueVideoProjectSave(args: {
   const savePromise = args.saveQueueRef.current
     .catch(() => undefined)
     .then(async () => {
-      const baseRevision = args.persistedRevisionRef.current ?? args.project.updatedAt;
-      const savedProject = await commitAutosaveProjectMutation(args.project, baseRevision);
-      if (args.persistedProjectIdRef.current === savedProject.id) {
-        args.persistedRevisionRef.current = savedProject.updatedAt;
+      const expectedWorkspaceRevision =
+        args.persistedRevisionRef.current === undefined
+          ? await resolveInitialWorkspaceRevision(
+              args.project,
+              args.initialProjectUpdatedAtRef.current
+            )
+          : args.persistedRevisionRef.current;
+      const saved = await commitVideoProjectWorkspaceMutation(args.project, {
+        expectedWorkspaceRevision,
+      });
+      if (args.persistedProjectIdRef.current === saved.project.id) {
+        args.persistedRevisionRef.current = saved.workspaceRevision;
       }
       syncSavedProjectRevision({
         project: args.project,
         revisionSyncRef: args.revisionSyncRef,
-        savedProject,
+        savedProject: saved.project,
         ...(args.syncProjectRevision ? { syncProjectRevision: args.syncProjectRevision } : {}),
       });
-      return savedProject;
+      return saved.project;
     });
   args.saveQueueRef.current = savePromise.then(
     () => undefined,
@@ -132,62 +144,36 @@ function queueVideoProjectSave(args: {
   return savePromise;
 }
 
-async function commitAutosaveProjectMutation(
+async function resolveInitialWorkspaceRevision(
   project: VideoProject,
-  baseRevision: number
-): Promise<VideoProject> {
-  try {
-    return await commitVideoProjectMutation(project, { baseRevision });
-  } catch (error) {
-    if (!isStaleVideoProjectSaveError(error)) {
-      throw error;
-    }
-    return retryStaleAutosaveProjectMutation(project);
+  initialProjectUpdatedAt: number | null
+): Promise<number | null> {
+  const stored = await getVideoProject(project.id);
+  if (stored.status === 'notFound') return null;
+  if (stored.status !== 'ready') {
+    throw new Error(`Video project ${project.id} is unavailable`);
   }
-}
-
-async function retryStaleAutosaveProjectMutation(project: VideoProject): Promise<VideoProject> {
-  const latestProject = await getVideoProject(project.id);
-  const resolvedProject = resolveVideoProjectReadResult(latestProject);
-  if (!resolvedProject) {
-    throw new Error(`Video project ${project.id} no longer exists`);
+  const storedProject = resolveVideoProjectReadResult(stored);
+  if (!storedProject || storedProject.updatedAt !== initialProjectUpdatedAt) {
+    const error = new Error(`Video project ${project.id} changed in another editor`);
+    error.name = 'StaleVideoProjectSaveError';
+    throw error;
   }
-  const rebasedProject = rebaseAutosaveProject(project, resolvedProject);
-  return commitVideoProjectMutation(rebasedProject, {
-    baseRevision: resolvedProject.updatedAt,
-  });
-}
-
-function rebaseAutosaveProject(project: VideoProject, latestProject: VideoProject): VideoProject {
-  return {
-    ...project,
-    assets: mergeVideoProjectAssets(project.assets, latestProject.assets),
-    updatedAt: latestProject.updatedAt,
-  };
-}
-
-function mergeVideoProjectAssets(
-  projectAssets: VideoProjectAsset[],
-  latestAssets: VideoProjectAsset[]
-): VideoProjectAsset[] {
-  const assetIds = new Set(projectAssets.map((asset) => asset.id));
-  return [...projectAssets, ...latestAssets.filter((asset) => !assetIds.has(asset.id))];
-}
-
-function isStaleVideoProjectSaveError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'StaleVideoProjectSaveError';
+  return stored.workspaceRevision;
 }
 
 function resetAutosaveRevisionForProject(
   project: VideoProject,
+  initialProjectUpdatedAtRef: MutableRefObject<number | null>,
   projectIdRef: MutableRefObject<string | null>,
-  revisionRef: MutableRefObject<number | null>
+  revisionRef: MutableRefObject<number | null | undefined>
 ): void {
   if (projectIdRef.current === project.id) {
     return;
   }
   projectIdRef.current = project.id;
-  revisionRef.current = null;
+  initialProjectUpdatedAtRef.current = project.updatedAt;
+  revisionRef.current = undefined;
 }
 
 function consumeAutosaveRevisionSync(

@@ -27,6 +27,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/contracts/aggregate-promotion.ts",
+      "ownerId": "app-core.aggregate-promotion-contract",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/contracts/ai",
       "ownerId": "app-core.ai-wire-policy",
       "ownerClass": "app-core"
@@ -217,6 +222,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/workflows/aggregate-editor-presence",
+      "ownerId": "workflow.aggregate-editor-presence",
+      "ownerClass": "workflow"
+    },
+    {
       "sourcePrefix": "apps/extension/src/workflows/ai-session",
       "ownerId": "workflow.ai-session",
       "ownerClass": "workflow"
@@ -312,8 +322,18 @@
       "ownerClass": "persistence"
     },
     {
-      "sourcePrefix": "apps/extension/src/composition/persistence/editor-sessions",
-      "ownerId": "persistence.editor-sessions",
+      "sourcePrefix": "apps/extension/src/composition/persistence/image-workspaces",
+      "ownerId": "persistence.image-workspaces",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/aggregate-presentations",
+      "ownerId": "persistence.aggregate-presentations",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/image-aggregates",
+      "ownerId": "persistence.image-aggregates",
       "ownerClass": "persistence"
     },
     {
@@ -494,9 +514,19 @@
       "stateKind": "authoritative-durable"
     },
     {
-      "id": "editor-sessions",
-      "path": "apps/extension/src/composition/persistence/editor-sessions",
-      "stateKind": "recovery-session"
+      "id": "image-workspaces",
+      "path": "apps/extension/src/composition/persistence/image-workspaces",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "aggregate-presentations",
+      "path": "apps/extension/src/composition/persistence/aggregate-presentations",
+      "stateKind": "rebuildable-cache"
+    },
+    {
+      "id": "image-aggregates",
+      "path": "apps/extension/src/composition/persistence/image-aggregates",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "highlighter",

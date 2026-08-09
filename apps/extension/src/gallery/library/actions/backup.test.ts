@@ -65,7 +65,6 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
     approximateSizeBytes: 4096,
     assetCount: 2,
     dataClasses: {
-      editorDrafts: true,
       mediaAssets: true,
       recordings: true,
       scenarioProjects: true,
@@ -75,7 +74,6 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
       videoProjects: true,
       webSnapshots: true,
     },
-    editorDraftCount: 1,
     recordingCount: 1,
     scenarioProjectCount: 0,
     selectedCount: 0,
@@ -88,7 +86,6 @@ function createLocalBackupSummary(): MediaHubLocalBackupSummary {
 
 function createAllBackupOptions() {
   return {
-    includeEditorDrafts: true,
     includeSourceMetadata: false,
     includeTelemetry: true,
     includeWebSnapshots: true,

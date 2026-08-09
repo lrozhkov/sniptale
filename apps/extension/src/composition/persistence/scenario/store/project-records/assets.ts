@@ -1,4 +1,4 @@
-import { deleteScenarioAsset, getScenarioAsset } from '../../projects';
+import { getScenarioAsset } from '../../projects';
 import type { ScenarioAssetEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import { mapScenarioAssetEntry } from './helpers';
 
@@ -14,9 +14,4 @@ export async function getScenarioAssetEntry(
 ): Promise<ScenarioAssetEntry | undefined> {
   const entry = await getScenarioAsset(assetId);
   return entry ? mapScenarioAssetEntry(entry) : undefined;
-}
-
-/** Deletes a scenario-local asset. */
-export function deleteScenarioAssetRecord(assetId: string): Promise<void> {
-  return deleteScenarioAsset(assetId);
 }

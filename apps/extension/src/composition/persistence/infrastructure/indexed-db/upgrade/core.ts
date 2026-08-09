@@ -1,7 +1,8 @@
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
-  EDITOR_SESSIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -41,6 +42,7 @@ export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
   applyNativeTransferStoresUpgrade(db, oldVersion);
   applyProjectExportInputsStoreUpgrade(db, oldVersion);
   applyFrameAnnotationRasterJobsStoreUpgrade(db, oldVersion);
+  applyVersion24Changes(db, oldVersion);
   removeLegacyAnnotationPacksStore(db, oldVersion);
   removeRetiredPageStyleAssetsStore(db, oldVersion);
 }
@@ -114,11 +116,35 @@ function applyVersion7Changes(db: UpgradeDatabase, oldVersion: number) {
     return;
   }
 
-  if (!db.objectStoreNames.contains(EDITOR_SESSIONS_STORE)) {
-    const editorSessionsStore = db.createObjectStore(EDITOR_SESSIONS_STORE, {
+  if (!db.objectStoreNames.contains('editor_sessions')) {
+    const editorSessionsStore = db.createObjectStore('editor_sessions', {
       keyPath: 'sessionId',
     });
     editorSessionsStore.createIndex('updatedAt', 'updatedAt');
+  }
+}
+
+function applyVersion24Changes(db: UpgradeDatabase, oldVersion: number) {
+  if (oldVersion >= 24) {
+    return;
+  }
+
+  if (db.objectStoreNames.contains('editor_sessions')) {
+    db.deleteObjectStore('editor_sessions');
+  }
+
+  if (!db.objectStoreNames.contains(IMAGE_WORKSPACES_STORE)) {
+    const workspaceStore = db.createObjectStore(IMAGE_WORKSPACES_STORE, {
+      keyPath: 'aggregateId',
+    });
+    workspaceStore.createIndex('updatedAt', 'updatedAt');
+  }
+
+  if (!db.objectStoreNames.contains(AGGREGATE_PRESENTATIONS_STORE)) {
+    const presentationStore = db.createObjectStore(AGGREGATE_PRESENTATIONS_STORE, {
+      keyPath: ['aggregateKind', 'aggregateId'],
+    });
+    presentationStore.createIndex('updatedAt', 'updatedAt');
   }
 }
 

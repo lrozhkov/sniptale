@@ -5,7 +5,6 @@ import type {
 } from '../contracts/types';
 
 interface MediaHubBackupDataClassContent {
-  editorDraftCount?: number;
   mediaAssetCount?: number;
   recordingCount?: number;
   scenarioProjectCount?: number;
@@ -18,7 +17,6 @@ interface MediaHubBackupDataClassContent {
 
 export const FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions = {
   scope: 'all',
-  includeEditorDrafts: true,
   includeSourceMetadata: true,
   includeTelemetry: true,
   includeWebSnapshots: true,
@@ -26,7 +24,6 @@ export const FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions =
 
 export const SUPPORT_MEDIA_HUB_BACKUP_EXPORT_OPTIONS: MediaHubBackupExportOptions = {
   scope: 'all',
-  includeEditorDrafts: false,
   includeSourceMetadata: false,
   includeTelemetry: false,
   includeWebSnapshots: false,
@@ -39,8 +36,13 @@ export function createMediaHubBackupExportOptions(
     options.selected === undefined ? undefined : normalizeSelectedScope(options.selected);
 
   return {
-    ...FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS,
-    ...options,
+    scope: options.scope ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.scope,
+    includeSourceMetadata:
+      options.includeSourceMetadata ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.includeSourceMetadata,
+    includeTelemetry:
+      options.includeTelemetry ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.includeTelemetry,
+    includeWebSnapshots:
+      options.includeWebSnapshots ?? FULL_MEDIA_HUB_BACKUP_EXPORT_OPTIONS.includeWebSnapshots,
     ...(normalizedSelected === undefined ? {} : { selected: normalizedSelected }),
   };
 }
@@ -50,7 +52,6 @@ export function createMediaHubBackupDataClassFlags(
   content: MediaHubBackupDataClassContent = {}
 ): MediaHubBackupDataClassFlags {
   return {
-    editorDrafts: options.includeEditorDrafts && hasContent(content.editorDraftCount),
     mediaAssets: hasContent(content.mediaAssetCount),
     recordings: hasContent(content.recordingCount),
     scenarioProjects: hasContent(content.scenarioProjectCount),

@@ -24,6 +24,9 @@ import {
   createClosePreviewAction,
   createSaveMetadataAction,
   downloadPreviewItem,
+  downloadOriginalPreviewItem,
+  createRestoreOriginalAction,
+  createSaveImageCopyAction,
   openInEditor,
   resetPreviewChanges,
 } from './preview';
@@ -81,10 +84,13 @@ function buildGalleryAppActionsResult(args: {
       close: args.handlePreviewClose,
       copy: () => void copyPreviewItem(controller, withBusy),
       download: () => void downloadPreviewItem(controller, withBusy),
+      downloadOriginal: () => void downloadOriginalPreviewItem(controller, withBusy),
       openInEditor,
       openSnapshotScreenshotInEditor: () =>
         void openSnapshotScreenshotInEditor(controller, withBusy),
       resetChanges: () => resetPreviewChanges(controller),
+      restoreOriginal: createRestoreOriginalAction(controller, withBusy),
+      saveCopy: () => void createSaveImageCopyAction(controller, withBusy)(),
       saveMetadata: args.handleSaveMetadata,
     },
     selection: {

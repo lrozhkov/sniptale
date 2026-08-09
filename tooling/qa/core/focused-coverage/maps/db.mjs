@@ -78,10 +78,33 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'shared-db-editor-session-provenance',
-    productionFile: 'apps/extension/src/composition/persistence/editor-sessions/index.ts',
-    reason: 'Editor session provenance writes are covered by focused editor session tests.',
-    testFiles: ['apps/extension/src/composition/persistence/editor-sessions/index.test.ts'],
+    owner: 'shared-db-image-workspace-provenance',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
+    reason: 'Image workspace provenance maintenance is covered by focused maintenance tests.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-db-image-workspace-aggregate',
+    productionPrefix: 'apps/extension/src/composition/persistence/image-workspaces/',
+    reason:
+      'Image workspace contracts, parser, and reads are covered through aggregate CAS and provenance suites.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-db-scenario-aggregate-mutations',
+    productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts',
+    reason: 'Scenario suites cover aggregate CAS, rollback, and graph deletion.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/scenario/store/v3/capture.test.ts',
+      'apps/extension/src/composition/persistence/scenario/store/project-records/delete.test.ts',
+      'apps/extension/src/scenario-editor/project/mutation/actions/steps/index.test.ts',
+    ],
   },
   {
     owner: 'shared-db-editor-custom-shapes',

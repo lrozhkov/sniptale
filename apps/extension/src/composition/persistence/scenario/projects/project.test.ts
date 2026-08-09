@@ -8,6 +8,7 @@ const {
   initDBMock,
   txDeleteMock,
   txGetMock,
+  txIndexGetAllMock,
   txPutMock,
 } = vi.hoisted(() => ({
   dbGetAllFromIndexMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   initDBMock: vi.fn(),
   txDeleteMock: vi.fn(),
   txGetMock: vi.fn(),
+  txIndexGetAllMock: vi.fn(),
   txPutMock: vi.fn(),
 }));
 
@@ -95,6 +97,7 @@ beforeEach(() => {
       objectStore: vi.fn(() => ({
         delete: txDeleteMock,
         get: txGetMock,
+        index: vi.fn(() => ({ getAll: txIndexGetAllMock })),
         put: txPutMock,
       })),
     })),
@@ -150,7 +153,7 @@ it('lists and cascade-deletes stored scenario projects', async () => {
     createProjectRecord('project-1', 'Existing', 10, 12345),
     createProjectRecord('project-2', 'Older', 5, 20),
   ]);
-  dbGetAllFromIndexMock
+  txIndexGetAllMock
     .mockResolvedValueOnce([
       createScenarioAssetRecord('asset-1'),
       { ...createScenarioAssetRecord('asset-2'), blob: 'not-a-blob' },
@@ -159,7 +162,7 @@ it('lists and cascade-deletes stored scenario projects', async () => {
       createScenarioExportRecord('export-1'),
       { ...createScenarioExportRecord('export-2'), format: 'pdf' },
     ])
-    .mockResolvedValueOnce([{ stepId: 'step-1' }]);
+    .mockResolvedValueOnce([{ projectId: 'project-1', stepId: 'step-1' }]);
 
   await expect(listScenarioProjects()).resolves.toEqual([
     {
@@ -169,6 +172,7 @@ it('lists and cascade-deletes stored scenario projects', async () => {
       updatedAt: 12345,
       tags: [],
       lifecycle: { savedAt: 12345, storageClass: 'library', updatedAt: 12345 },
+      workspaceRevision: 0,
     },
     {
       id: 'project-2',
@@ -177,6 +181,7 @@ it('lists and cascade-deletes stored scenario projects', async () => {
       updatedAt: 20,
       tags: [],
       lifecycle: { savedAt: 20, storageClass: 'library', updatedAt: 20 },
+      workspaceRevision: 0,
     },
   ]);
   await deleteScenarioProject('project-1');
@@ -187,6 +192,7 @@ it('lists and cascade-deletes stored scenario projects', async () => {
   expect(txDeleteMock).toHaveBeenNthCalledWith(4, 'export-1');
   expect(txDeleteMock).toHaveBeenNthCalledWith(5, 'export-2');
   expect(txDeleteMock).toHaveBeenNthCalledWith(6, 'step-1');
+  expect(txDeleteMock).toHaveBeenNthCalledWith(7, ['scenario', 'project-1']);
 });
 
 it('handles missing project records and guarded fresh project timestamps', async () => {
@@ -225,6 +231,7 @@ it('returns raw scenario project entries for restore ownership checks', async ()
   await expect(getScenarioProjectEntry('project-raw')).resolves.toEqual({
     ...record,
     lifecycle: { savedAt: record.updatedAt, storageClass: 'library', updatedAt: record.updatedAt },
+    workspaceRevision: 0,
   });
   expect(dbGetMock).toHaveBeenCalledWith('scenario_projects', 'project-raw');
 });
@@ -269,6 +276,47 @@ it('rejects stale scenario project saves inside the write transaction before wri
 
   expect(dbGetMock).not.toHaveBeenCalledWith('scenario_projects', 'project-1');
   expect(txGetMock).toHaveBeenCalledWith('project-1');
+  expect(txPutMock).not.toHaveBeenCalled();
+});
+
+it('uses the persisted workspace revision as the canonical CAS token', async () => {
+  const existing = {
+    ...createProjectRecord('project-1', 'Existing', 10, 100),
+    workspaceRevision: 4,
+  };
+  txGetMock.mockResolvedValueOnce(existing);
+
+  await expect(
+    saveScenarioProject(
+      {
+        ...existing.project,
+        name: 'Revision guarded',
+      },
+      { expectedRevision: 4 }
+    )
+  ).resolves.toEqual(expect.objectContaining({ name: 'Revision guarded' }));
+
+  expect(txPutMock).toHaveBeenCalledWith(expect.objectContaining({ workspaceRevision: 5 }));
+
+  txGetMock.mockResolvedValueOnce({ ...existing, workspaceRevision: 5 });
+  txPutMock.mockClear();
+  await expect(
+    saveScenarioProject({ ...existing.project, name: 'Actually stale' }, { expectedRevision: 4 })
+  ).rejects.toMatchObject({ name: 'StaleScenarioAggregateRevisionError' });
+  expect(txPutMock).not.toHaveBeenCalled();
+});
+
+it('accepts an exact autosave replay without advancing the workspace revision', async () => {
+  const existing = {
+    ...createProjectRecord('project-1', 'Existing', 10, 100),
+    workspaceRevision: 5,
+  };
+  txGetMock.mockResolvedValueOnce(existing);
+
+  await expect(
+    saveScenarioProject(existing.project, { expectedRevision: 4, baseUpdatedAt: 50 })
+  ).resolves.toEqual(existing.project);
+
   expect(txPutMock).not.toHaveBeenCalled();
 });
 

@@ -21,8 +21,10 @@ import type { BackgroundOwnedRouteDescriptor } from './route-descriptors';
 import { voiceInputOffscreenEventRouteDescriptor } from '../../../voice-input/route-descriptors';
 import { frameAnnotationRasterRouteDescriptor } from '../../../frame-annotation-raster/route-descriptors';
 import { annotationForkSessionRouteDescriptor } from '../../../annotation-fork-session/route-descriptors';
+import { aggregatePromotionRouteDescriptor } from '../../../application/aggregate-promotion/route-descriptors';
 
 export const backgroundOwnedRouteInventory = [
+  aggregatePromotionRouteDescriptor,
   llmSessionRouteDescriptor,
   aiSettingsQueryRouteDescriptor,
   aiSettingsMutationRouteDescriptor,

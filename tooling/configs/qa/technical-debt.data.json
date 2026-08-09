@@ -610,6 +610,11 @@
         "apps/extension/src/background/ai/settings/secret-unlock-route.ts",
         "apps/extension/src/background/annotation-fork-session/route-descriptors.ts",
         "apps/extension/src/background/annotation-fork-session/route.ts",
+        "apps/extension/src/background/application/aggregate-promotion/coordinator.ts",
+        "apps/extension/src/background/application/aggregate-promotion/ports.ts",
+        "apps/extension/src/background/application/aggregate-promotion/presence-registry.ts",
+        "apps/extension/src/background/application/aggregate-promotion/route-descriptors.ts",
+        "apps/extension/src/background/application/aggregate-promotion/route.ts",
         "apps/extension/src/background/application/privacy-erasure/composition.ts",
         "apps/extension/src/background/application/privacy-erasure/page-local-storage.ts",
         "apps/extension/src/background/application/privacy-erasure/ports.ts",
@@ -735,9 +740,7 @@
         "apps/extension/src/background/capture/routing/actions.quick-action.ts",
         "apps/extension/src/background/capture/routing/actions.web-snapshot.ts",
         "apps/extension/src/background/capture/routing/authorization/content-action.ts",
-        "apps/extension/src/background/capture/routing/authorization/gallery-update.ts",
         "apps/extension/src/background/capture/routing/delivery-response.ts",
-        "apps/extension/src/background/capture/routing/gallery-update-capabilities.ts",
         "apps/extension/src/background/capture/routing/guard.ts",
         "apps/extension/src/background/capture/routing/handlers.full.ts",
         "apps/extension/src/background/capture/routing/handlers.shared.ts",
@@ -1273,6 +1276,11 @@
         "apps/extension/src/background/ai/settings/secret-unlock-route.ts",
         "apps/extension/src/background/annotation-fork-session/route-descriptors.ts",
         "apps/extension/src/background/annotation-fork-session/route.ts",
+        "apps/extension/src/background/application/aggregate-promotion/coordinator.ts",
+        "apps/extension/src/background/application/aggregate-promotion/ports.ts",
+        "apps/extension/src/background/application/aggregate-promotion/presence-registry.ts",
+        "apps/extension/src/background/application/aggregate-promotion/route-descriptors.ts",
+        "apps/extension/src/background/application/aggregate-promotion/route.ts",
         "apps/extension/src/background/application/privacy-erasure/composition.ts",
         "apps/extension/src/background/application/privacy-erasure/page-local-storage.ts",
         "apps/extension/src/background/application/privacy-erasure/ports.ts",
@@ -1398,9 +1406,7 @@
         "apps/extension/src/background/capture/routing/actions.quick-action.ts",
         "apps/extension/src/background/capture/routing/actions.web-snapshot.ts",
         "apps/extension/src/background/capture/routing/authorization/content-action.ts",
-        "apps/extension/src/background/capture/routing/authorization/gallery-update.ts",
         "apps/extension/src/background/capture/routing/delivery-response.ts",
-        "apps/extension/src/background/capture/routing/gallery-update-capabilities.ts",
         "apps/extension/src/background/capture/routing/guard.ts",
         "apps/extension/src/background/capture/routing/handlers.full.ts",
         "apps/extension/src/background/capture/routing/handlers.shared.ts",
@@ -2051,6 +2057,22 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/aggregate-presentations",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/aggregate-presentations/contracts.ts",
+        "apps/extension/src/composition/persistence/aggregate-presentations/index.ts",
+        "apps/extension/src/composition/persistence/aggregate-presentations/parser.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/aggregate-presentations/contracts.ts",
+        "apps/extension/src/composition/persistence/aggregate-presentations/index.ts",
+        "apps/extension/src/composition/persistence/aggregate-presentations/parser.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/ai-settings",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -2259,22 +2281,6 @@
       "unownedFocusedFiles": []
     },
     {
-      "owner": "apps/extension/src/composition/persistence/editor-sessions",
-      "disposition": "rollout",
-      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
-      "productionFiles": [
-        "apps/extension/src/composition/persistence/editor-sessions/contracts.ts",
-        "apps/extension/src/composition/persistence/editor-sessions/index.guards.ts",
-        "apps/extension/src/composition/persistence/editor-sessions/index.ts"
-      ],
-      "rolloutFiles": [
-        "apps/extension/src/composition/persistence/editor-sessions/contracts.ts",
-        "apps/extension/src/composition/persistence/editor-sessions/index.guards.ts",
-        "apps/extension/src/composition/persistence/editor-sessions/index.ts"
-      ],
-      "unownedFocusedFiles": []
-    },
-    {
       "owner": "apps/extension/src/composition/persistence/effect-bundles",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -2375,6 +2381,38 @@
         "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
         "apps/extension/src/composition/persistence/highlighter/preset-mutations.ts",
         "apps/extension/src/composition/persistence/highlighter/resolved.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/image-aggregates",
+      "disposition": "rollout",
+      "reason": "The new image aggregate mutation owner is explicitly tracked while focused proof is added.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/image-aggregates/errors.ts",
+        "apps/extension/src/composition/persistence/image-aggregates/index.ts",
+        "apps/extension/src/composition/persistence/image-aggregates/mutations.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/image-aggregates/errors.ts",
+        "apps/extension/src/composition/persistence/image-aggregates/index.ts",
+        "apps/extension/src/composition/persistence/image-aggregates/mutations.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/persistence/image-workspaces",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/image-workspaces/contracts.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/index.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/parser.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/image-workspaces/contracts.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/index.ts",
+        "apps/extension/src/composition/persistence/image-workspaces/parser.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -2685,6 +2723,7 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
+        "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -2749,6 +2788,7 @@
         "apps/extension/src/composition/persistence/scenario/store/v3/project-records/store.ts"
       ],
       "rolloutFiles": [
+        "apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts",
         "apps/extension/src/composition/persistence/scenario/contracts.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.guards.ts",
         "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
@@ -4457,6 +4497,18 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/contracts/aggregate-promotion.ts",
+      "disposition": "rollout",
+      "reason": "The aggregate promotion boundary is covered by deterministic parser, authorization, port-presence, and coordinator tests.",
+      "productionFiles": [
+        "apps/extension/src/contracts/aggregate-promotion.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/contracts/aggregate-promotion.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/contracts/ai",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -5544,7 +5596,6 @@
         "apps/extension/src/editor/document/canvas-ready/handoff.ts",
         "apps/extension/src/editor/document/file-actions/canvas-ready.ts",
         "apps/extension/src/editor/document/file-actions/file-reader.ts",
-        "apps/extension/src/editor/document/file-actions/gallery-update.ts",
         "apps/extension/src/editor/document/file-actions/import-session.ts",
         "apps/extension/src/editor/document/file-actions/index.ts",
         "apps/extension/src/editor/document/file-actions/open-trace.ts",
@@ -6948,7 +6999,6 @@
         "apps/extension/src/editor/document/canvas-ready/handoff.ts",
         "apps/extension/src/editor/document/file-actions/canvas-ready.ts",
         "apps/extension/src/editor/document/file-actions/file-reader.ts",
-        "apps/extension/src/editor/document/file-actions/gallery-update.ts",
         "apps/extension/src/editor/document/file-actions/import-session.ts",
         "apps/extension/src/editor/document/file-actions/index.ts",
         "apps/extension/src/editor/document/file-actions/open-trace.ts",
@@ -9140,6 +9190,7 @@
         "apps/extension/src/gallery/library/actions/useGalleryAppActions.ts",
         "apps/extension/src/gallery/library/items/adapters.ts",
         "apps/extension/src/gallery/library/items/index.ts",
+        "apps/extension/src/gallery/library/items/legacy-thumbnails.ts",
         "apps/extension/src/gallery/library/items/thumbnails.ts",
         "apps/extension/src/gallery/library/items/types.ts",
         "apps/extension/src/gallery/library/main-content/empty-state.tsx",
@@ -9210,6 +9261,7 @@
         "apps/extension/src/gallery/library/actions/useGalleryAppActions.ts",
         "apps/extension/src/gallery/library/items/adapters.ts",
         "apps/extension/src/gallery/library/items/index.ts",
+        "apps/extension/src/gallery/library/items/legacy-thumbnails.ts",
         "apps/extension/src/gallery/library/items/thumbnails.ts",
         "apps/extension/src/gallery/library/items/types.ts",
         "apps/extension/src/gallery/library/main-content/empty-state.tsx",
@@ -9717,12 +9769,14 @@
         "apps/extension/src/platform/navigation/extension-pages/editor.ts",
         "apps/extension/src/platform/navigation/extension-pages/index.ts",
         "apps/extension/src/platform/navigation/extension-pages/scenario-editor.ts",
+        "apps/extension/src/platform/navigation/extension-pages/sender-url.ts",
         "apps/extension/src/platform/navigation/extension-pages/settings-route/codec.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/platform/navigation/extension-pages/editor.ts",
         "apps/extension/src/platform/navigation/extension-pages/index.ts",
         "apps/extension/src/platform/navigation/extension-pages/scenario-editor.ts",
+        "apps/extension/src/platform/navigation/extension-pages/sender-url.ts",
         "apps/extension/src/platform/navigation/extension-pages/settings-route/codec.ts"
       ],
       "unownedFocusedFiles": []
@@ -10490,6 +10544,7 @@
         "apps/extension/src/scenario-editor/project/mutation/history/step/history.ts",
         "apps/extension/src/scenario-editor/project/mutation/history/step/index.ts",
         "apps/extension/src/scenario-editor/project/mutation/timestamps.ts",
+        "apps/extension/src/scenario-editor/project/presentation.ts",
         "apps/extension/src/scenario-editor/project/stage-render/arrow-head.ts",
         "apps/extension/src/scenario-editor/project/stage-render/overlays.ts",
         "apps/extension/src/scenario-editor/project/stage-render/slide/assets.ts",
@@ -10855,6 +10910,7 @@
         "apps/extension/src/scenario-editor/project/mutation/history/step/history.ts",
         "apps/extension/src/scenario-editor/project/mutation/history/step/index.ts",
         "apps/extension/src/scenario-editor/project/mutation/timestamps.ts",
+        "apps/extension/src/scenario-editor/project/presentation.ts",
         "apps/extension/src/scenario-editor/project/stage-render/arrow-head.ts",
         "apps/extension/src/scenario-editor/project/stage-render/overlays.ts",
         "apps/extension/src/scenario-editor/project/stage-render/slide/assets.ts",
@@ -11974,6 +12030,7 @@
         "apps/extension/src/video-editor/library/panel/sections.tsx",
         "apps/extension/src/video-editor/library/panel/state.ts",
         "apps/extension/src/video-editor/library/panel/thumbnails/ensure.ts",
+        "apps/extension/src/video-editor/library/panel/thumbnails/legacy-media.ts",
         "apps/extension/src/video-editor/library/panel/thumbnails/types.ts",
         "apps/extension/src/video-editor/library/panel/thumbnails/use-thumbnails.ts",
         "apps/extension/src/video-editor/library/template-preview.tsx",
@@ -12340,6 +12397,7 @@
         "apps/extension/src/video-editor/workspace/floating/index.tsx",
         "apps/extension/src/video-editor/workspace/floating/inspector-stack.tsx",
         "apps/extension/src/video-editor/workspace/floating/media-import.ts",
+        "apps/extension/src/video-editor/workspace/floating/storage-promotion.ts",
         "apps/extension/src/video-editor/workspace/floating/storage-status.tsx",
         "apps/extension/src/video-editor/workspace/floating/top-panels.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/contracts/index.ts",
@@ -12568,6 +12626,16 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/workflows/aggregate-editor-presence",
+      "disposition": "unmapped",
+      "reason": "The thin browser-port client is exercised through aggregate promotion integration tests; add a local threshold only if the workflow gains independent policy or recovery behavior.",
+      "productionFiles": [
+        "apps/extension/src/workflows/aggregate-editor-presence/client.ts"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/workflows/ai-session",
       "disposition": "unmapped",
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
@@ -12630,6 +12698,7 @@
         "apps/extension/src/workflows/media-hub-backup/export/manifest.ts",
         "apps/extension/src/workflows/media-hub-backup/export/options.ts",
         "apps/extension/src/workflows/media-hub-backup/export/package-profile.ts",
+        "apps/extension/src/workflows/media-hub-backup/export/presentation.ts",
         "apps/extension/src/workflows/media-hub-backup/export/privacy.ts",
         "apps/extension/src/workflows/media-hub-backup/export/projects/scenario-descriptors.ts",
         "apps/extension/src/workflows/media-hub-backup/export/projects/test-support.ts",
@@ -12651,6 +12720,7 @@
         "apps/extension/src/workflows/media-hub-backup/metadata/effect-bundles.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/index.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/path-segments.ts",
+        "apps/extension/src/workflows/media-hub-backup/metadata/presentation.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/project-entry-fields.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/project-references.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/projects.ts",
@@ -12658,9 +12728,11 @@
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-export-thumbnails.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-project-version.ts",
         "apps/extension/src/workflows/media-hub-backup/metadata/scenario-projects.ts",
+        "apps/extension/src/workflows/media-hub-backup/restore/archive-reader.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/batches.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/index.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/prepare/index.ts",
+        "apps/extension/src/workflows/media-hub-backup/restore/presentation.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/project/blobs.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/project/conflicts.ts",
         "apps/extension/src/workflows/media-hub-backup/restore/project/effect-bundle-writer.ts",
@@ -13463,7 +13535,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "0a153abd56e27d9831d03f80c35b311a0fed67bf2a9b5b277f77179666cd6b9a"
+        "contentHash": "b1628bc0ec8c4b35b5f843fbfaa4567fea8ea313a10622a2d9574597039c8a61"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -15237,7 +15309,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.chrome.ts",
-        "contentHash": "ce69bd46335960ac56d19e5efa55f827d93487aba96a909d8f475c6fd8b8dd4d"
+        "contentHash": "6edea7f55955e466d5bdca12cc9395a7991e815bc27e1edf50635e60f938b04a"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.chrome.test.ts",
@@ -15259,7 +15331,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/browser-mocks.media-library.ts",
-        "contentHash": "5acfb3c6793579a36de207073f0ef7bf6e399ee859e2507096695d14b217b36a"
+        "contentHash": "568fa57662b08e4f501834c441cad1dd08a499ca62babba11d5e0e66496df68b"
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.media-library.ts",
@@ -15283,6 +15355,7 @@
       },
       "consumers": [
         "tooling/test/harness/browser-mocks.chrome.test.ts",
+        "tooling/test/harness/browser-mocks.chrome.ts",
         "tooling/test/harness/browser-mocks.shared.ts",
         "tooling/test/harness/browser-mocks.storage.test.ts",
         "tooling/test/harness/browser-mocks.storage.ts",
@@ -16042,7 +16115,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/db.mjs",
-        "contentHash": "568a34e0a411dacf5a221f45693e07abd6b2877c12db3f0081e33d0441c4cc6c"
+        "contentHash": "b4deac8fb2529fa0d0a7a5fdadca08a8e0f91016f780f11ea201eac30defa29c"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/db.mjs",
@@ -16061,7 +16134,9 @@
         "property:testFiles[16]",
         "property:testFiles[17]",
         "property:testFiles[18]",
+        "property:testFiles[19]",
         "property:testFiles[2]",
+        "property:testFiles[20]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -18139,7 +18214,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/messaging.mjs",
-        "contentHash": "09a9337d420e3a596db143469c9599a0e9be391bbf939c181eed7431a2157573"
+        "contentHash": "e24e62e2fe38c38b201ffff3f7fa71a0b9ab250d8842b5883ca1543a813f1bff"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18148,7 +18223,9 @@
       "surfaces": [
         "binding:MESSAGING_OWNER_MAPPINGS",
         "property:testFiles",
-        "property:testFiles[1]"
+        "property:testFiles[1]",
+        "property:testFiles[2]",
+        "property:testFiles[3]"
       ]
     },
     {
@@ -23006,7 +23083,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/web-snapshot.mjs",
-        "contentHash": "a81ae0f89839facc1f99e1a935150eb256786fd9281f5e8f4ea97d83f073c926"
+        "contentHash": "522edf62833bfae2316fb65956b986867b4c47f6234dc2bceb9ade29fb1ac158"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",

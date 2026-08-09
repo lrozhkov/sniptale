@@ -1,5 +1,4 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   EditorRenderedImageOptions,
   EditorRenderToDataUrlOptions,
@@ -60,12 +59,7 @@ export interface EditorDocumentCommandService<TAdapter = EditorControllerPublicA
 }
 
 interface EditorDocumentCommandServiceDependencies<TAdapter> {
-  logDiscardDraftError?: (error: unknown) => void;
   operations: EditorDocumentCommandOperations<TAdapter>;
-}
-
-interface EditorDocumentCommandDefaultDependencies {
-  logDiscardDraftError?: (error: unknown) => void;
 }
 
 const defaultOperations: EditorDocumentCommandOperations = {
@@ -77,8 +71,6 @@ const defaultOperations: EditorDocumentCommandOperations = {
   renderToDataUrl: renderEditorControllerToDataUrl,
 };
 
-const logger = createLogger({ namespace: 'EditorControllerDocument' });
-
 function persistAutosaveSnapshot<TAdapter>(
   controller: EditorDocumentCommandController<TAdapter>
 ): Promise<void> {
@@ -88,20 +80,7 @@ function persistAutosaveSnapshot<TAdapter>(
   );
 }
 
-function discardDraftOnClose<TAdapter>(
-  controller: EditorDocumentCommandController<TAdapter>,
-  logDiscardDraftError: (error: unknown) => void
-): void {
-  const discardDraftPromise = controller.autosaveService?.discardDraft();
-  if (!discardDraftPromise) {
-    return;
-  }
-
-  void discardDraftPromise.catch(logDiscardDraftError);
-}
-
 function buildEditorDocumentCommandService<TAdapter>(args: {
-  logDiscardDraftError: (error: unknown) => void;
   operations: EditorDocumentCommandOperations<TAdapter>;
 }): EditorDocumentCommandService<TAdapter> {
   return {
@@ -121,7 +100,6 @@ function buildEditorDocumentCommandService<TAdapter>(args: {
     },
 
     closeDocument(controller) {
-      discardDraftOnClose(controller, args.logDiscardDraftError);
       args.operations.closeDocument(controller.getPublicApiAdapter());
     },
 
@@ -138,38 +116,20 @@ function buildEditorDocumentCommandService<TAdapter>(args: {
   };
 }
 
-function resolveDiscardDraftLogger(
-  dependencies: EditorDocumentCommandDefaultDependencies
-): (error: unknown) => void {
-  return (
-    dependencies.logDiscardDraftError ??
-    ((error: unknown) => {
-      logger.error('Failed to discard editor draft on close', error);
-    })
-  );
-}
-
-export function createEditorDocumentCommandService(
-  dependencies?: EditorDocumentCommandDefaultDependencies
-): EditorDocumentCommandService;
+export function createEditorDocumentCommandService(): EditorDocumentCommandService;
 export function createEditorDocumentCommandService<TAdapter>(
   dependencies: EditorDocumentCommandServiceDependencies<TAdapter>
 ): EditorDocumentCommandService<TAdapter>;
 export function createEditorDocumentCommandService<TAdapter>(
-  dependencies:
-    | EditorDocumentCommandDefaultDependencies
-    | EditorDocumentCommandServiceDependencies<TAdapter> = {}
+  dependencies?: EditorDocumentCommandServiceDependencies<TAdapter>
 ): EditorDocumentCommandService | EditorDocumentCommandService<TAdapter> {
-  const logDiscardDraftError = resolveDiscardDraftLogger(dependencies);
-  if ('operations' in dependencies) {
+  if (dependencies) {
     return buildEditorDocumentCommandService({
-      logDiscardDraftError,
       operations: dependencies.operations,
     });
   }
 
   return buildEditorDocumentCommandService({
-    logDiscardDraftError,
     operations: defaultOperations,
   });
 }

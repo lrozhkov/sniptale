@@ -82,21 +82,3 @@ export const webSnapshotRouteDescriptor = {
   ],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.web-snapshot.ts',
 } as const;
-
-export const galleryUpdateCapabilityIssuanceRouteDescriptor = {
-  actionKind: 'tab',
-  authorityFamily: 'gallery-update-capability-issuance',
-  handlerAdapter: 'routeTabAction',
-  keepChannelBehaviorSource: 'tab-routing-adapter',
-  messageTypes: [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY],
-  ownerModule: 'apps/extension/src/background/capture/routing/actions.gallery-update.ts',
-} as const;
-
-export const galleryUpdateCapabilityRouteDescriptor = {
-  actionKind: 'tab',
-  authorityFamily: 'gallery-update-capability',
-  handlerAdapter: 'routeTabAction',
-  keepChannelBehaviorSource: 'tab-routing-adapter',
-  messageTypes: [MessageType.UPDATE_GALLERY_IMAGE_ASSET],
-  ownerModule: 'apps/extension/src/background/capture/routing/actions.gallery-update.ts',
-} as const;

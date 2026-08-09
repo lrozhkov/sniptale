@@ -1,7 +1,6 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import { persistPendingEditorBootstrapPayload } from '../../../workflows/editor/bootstrap/index';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import type { GalleryPreviewController } from './controller-types';
 import { isGalleryMediaItem } from '../items';
@@ -43,7 +42,6 @@ export async function openSnapshotScreenshotInEditor(
     await browserTabs.create({
       url: buildEditorUrl({
         bootstrapId,
-        sessionId: createEditorSessionId(),
       }),
     });
   });

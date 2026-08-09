@@ -87,6 +87,20 @@ function isAnnotationForkSessionMessage(value: unknown): value is AnnotationFork
     : Object.keys(value).length === 3;
 }
 
+function isEditableAggregateRef(value: unknown): value is {
+  id: string;
+  kind: 'image' | 'scenario' | 'video-project';
+} {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isString(value['id']) &&
+    value['id'].length > 0 &&
+    value['id'].length <= 256 &&
+    (value['kind'] === 'image' || value['kind'] === 'scenario' || value['kind'] === 'video-project')
+  );
+}
+
 type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
   pinToTab: boolean;
   pinToTabAvailable: boolean;
@@ -310,6 +324,19 @@ export const runtimeActionCoreMessageContracts = {
           revision: isNumber,
         },
       })
+    ),
+  },
+  [MessageType.PROMOTE_AGGREGATE_TO_LIBRARY]: {
+    parseRequest: createGuardParser(
+      'runtime PROMOTE_AGGREGATE_TO_LIBRARY message',
+      createMessageGuard({
+        type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+        required: { aggregate: isEditableAggregateRef },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime PROMOTE_AGGREGATE_TO_LIBRARY response',
+      createRuntimeResponseGuard({ optional: { result: (value) => value === 'promoted' } })
     ),
   },
   [MessageType.ERASE_LOCAL_EXTENSION_DATA]: {

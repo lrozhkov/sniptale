@@ -179,6 +179,7 @@ export function PreviewActions(props: PreviewPanelProps) {
   const canDelete = !isGalleryScenarioExportItem(item);
   const canDownload = isGalleryMediaItem(item);
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
+  const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
 
   return (
@@ -210,9 +211,24 @@ export function PreviewActions(props: PreviewPanelProps) {
           {translate('gallery.preview.download')}
         </PreviewActionButton>
       ) : null}
+      {canUseImageAggregateActions && props.onDownloadOriginal ? (
+        <PreviewActionButton onClick={() => void props.onDownloadOriginal?.()}>
+          {translate('gallery.preview.downloadOriginal')}
+        </PreviewActionButton>
+      ) : null}
       {canCopy ? (
         <PreviewActionButton onClick={() => void onCopy()}>
           {translate('gallery.preview.copy')}
+        </PreviewActionButton>
+      ) : null}
+      {canUseImageAggregateActions && props.onSaveCopy ? (
+        <PreviewActionButton onClick={() => void props.onSaveCopy?.()}>
+          {translate('gallery.preview.saveCopy')}
+        </PreviewActionButton>
+      ) : null}
+      {canUseImageAggregateActions && props.onRestoreOriginal ? (
+        <PreviewActionButton onClick={() => props.onRestoreOriginal?.()}>
+          {translate('gallery.preview.restoreOriginal')}
         </PreviewActionButton>
       ) : null}
       {canDelete ? (

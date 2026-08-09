@@ -15,9 +15,8 @@ import type { useScenarioV3EditorState } from './state';
 type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
 
 const editedAssetMock = vi.hoisted(() => ({
-  createScenarioEditedCaptureAsset: vi.fn(),
-  deleteScenarioEditedCaptureAsset: vi.fn(),
-  saveScenarioStepEditorDocumentRecord: vi.fn(),
+  prepareScenarioEditedCaptureAsset: vi.fn(),
+  prepareScenarioStepEditorDocumentRecord: vi.fn(),
 }));
 const hostMock = vi.hoisted(() => ({
   lastApply: null as
@@ -25,9 +24,9 @@ const hostMock = vi.hoisted(() => ({
     | ((payload: { dataUrl: string; document: EditorDocument }) => Promise<void>),
 }));
 
-vi.mock('../../workflows/scenario-capture-edit/edits', () => ({
-  createScenarioEditedCaptureAsset: editedAssetMock.createScenarioEditedCaptureAsset,
-  deleteScenarioEditedCaptureAsset: editedAssetMock.deleteScenarioEditedCaptureAsset,
+vi.mock('../../workflows/scenario-capture-edit/edits', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../workflows/scenario-capture-edit/edits')>()),
+  prepareScenarioEditedCaptureAsset: editedAssetMock.prepareScenarioEditedCaptureAsset,
 }));
 vi.mock(
   '../../composition/persistence/scenario/store/step-editor-documents',
@@ -35,7 +34,8 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../../composition/persistence/scenario/store/step-editor-documents')
     >()),
-    saveScenarioStepEditorDocumentRecord: editedAssetMock.saveScenarioStepEditorDocumentRecord,
+    prepareScenarioStepEditorDocumentRecord:
+      editedAssetMock.prepareScenarioStepEditorDocumentRecord,
   })
 );
 vi.mock('../workspace/embedded-editor-host/ScenarioImageElementEditorHost', () => ({
@@ -69,6 +69,11 @@ function createEditor(): ScenarioV3EditorState {
     elementActions: { updateElement: vi.fn() },
     elements: [image],
     project,
+    projectActions: {
+      applyProject: vi.fn(),
+      commitAggregateMutation: vi.fn().mockResolvedValue(undefined),
+      getCurrentProject: () => project,
+    },
   } as unknown as ScenarioV3EditorState;
 }
 
@@ -92,12 +97,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   hostMock.lastApply = null;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  editedAssetMock.createScenarioEditedCaptureAsset.mockResolvedValue({
-    galleryAssetId: 'gallery-edited',
-    id: 'asset-edited',
+  editedAssetMock.prepareScenarioEditedCaptureAsset.mockResolvedValue({
+    asset: { galleryAssetId: 'gallery-edited', id: 'asset-edited' },
+    entry: { id: 'asset-edited', projectId: 'project-1' },
   });
-  editedAssetMock.deleteScenarioEditedCaptureAsset.mockResolvedValue(undefined);
-  editedAssetMock.saveScenarioStepEditorDocumentRecord.mockResolvedValue(undefined);
+  editedAssetMock.prepareScenarioStepEditorDocumentRecord.mockImplementation((value) => value);
 });
 
 afterEach(() => {
@@ -120,20 +124,19 @@ it('applies embedded image edits atomically to the selected image element', asyn
     });
   });
 
-  expect(editedAssetMock.createScenarioEditedCaptureAsset).toHaveBeenCalledWith({
+  expect(editedAssetMock.prepareScenarioEditedCaptureAsset).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,edited',
     galleryAssetId: 'gallery-1',
     projectId: 'project-1',
   });
-  expect(editedAssetMock.saveScenarioStepEditorDocumentRecord).toHaveBeenCalledWith({
+  expect(editedAssetMock.prepareScenarioStepEditorDocumentRecord).toHaveBeenCalledWith({
     document: createEditorDocument(),
     projectId: 'project-1',
     stepId: 'doc-1',
   });
-  expect(editor.elementActions.updateElement).toHaveBeenCalledWith('image-1', {
-    assetRef: { assetId: 'asset-edited', galleryAssetId: 'gallery-edited' },
-    contentTransform: { scale: 1, x: 0, y: 0 },
-    editDocumentId: 'doc-1',
+  expect(editor.projectActions.commitAggregateMutation).toHaveBeenCalledWith(expect.any(Function), {
+    assetPuts: [expect.objectContaining({ id: 'asset-edited' })],
+    editorDocumentPuts: [expect.objectContaining({ stepId: 'doc-1' })],
   });
 });
 
@@ -144,11 +147,11 @@ it('does not mount the host when no selected image element exists', () => {
   expect(hostMock.lastApply).toBeNull();
 });
 
-it('rolls back a created edited asset when editor document persistence fails', async () => {
+it('does not mutate the editor when aggregate persistence fails', async () => {
   const editor = createEditor();
   const error = new Error('document failed');
   renderMount(editor);
-  editedAssetMock.saveScenarioStepEditorDocumentRecord.mockRejectedValue(error);
+  vi.mocked(editor.projectActions.commitAggregateMutation).mockRejectedValue(error);
 
   await expect(
     act(async () => {
@@ -159,7 +162,6 @@ it('rolls back a created edited asset when editor document persistence fails', a
     })
   ).rejects.toThrow('document failed');
 
-  expect(editedAssetMock.deleteScenarioEditedCaptureAsset).toHaveBeenCalledWith('asset-edited');
   expect(editor.elementActions.updateElement).not.toHaveBeenCalled();
 });
 

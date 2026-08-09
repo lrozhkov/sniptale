@@ -7,7 +7,6 @@ type StorageCleanupGroupId =
   | 'orphaned-project-assets'
   | 'broken-media-mirrors'
   | 'orphaned-thumbnails'
-  | 'stale-editor-drafts'
   | 'orphaned-scenario-pending-assets'
   | 'orphaned-scenario-artifacts'
   | 'old-diagnostics';
@@ -17,7 +16,6 @@ type StorageCleanupTarget =
   | 'recording'
   | 'project-asset'
   | 'thumbnail'
-  | 'editor-session'
   | 'scenario-pending-asset'
   | 'scenario-asset'
   | 'scenario-export'
@@ -33,7 +31,6 @@ export interface StorageCleanupCandidate {
     | MediaAssetKind
     | 'recording'
     | 'thumbnail'
-    | 'editor-session'
     | 'scenario-asset'
     | 'scenario-export'
     | 'scenario-step-document'

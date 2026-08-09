@@ -17,7 +17,6 @@ export interface BackupProjectDescriptorSet {
 }
 
 interface BackupManifestContentCounts {
-  editorDraftCount: number;
   mediaAssetCount: number;
   recordingCount: number;
   scenarioProjectCount: number;
@@ -64,10 +63,6 @@ function createBackupManifestContentCounts(args: {
   const { assets, projects, thumbnailCount } = args;
   const { scenarioProjects, videoProjects } = projects;
   return {
-    editorDraftCount: scenarioProjects.reduce(
-      (count, project) => count + project.stepDocuments.length,
-      0
-    ),
     mediaAssetCount: assets.length,
     recordingCount: countBackupRecordings(assets, videoProjects),
     scenarioProjectCount: scenarioProjects.length,
@@ -83,13 +78,17 @@ function countProjectThumbnails({
   scenarioProjects,
   videoProjects,
 }: BackupProjectDescriptorSet): number {
-  const videoProjectThumbnails = videoProjects.filter((project) => project.thumbnail).length;
+  const videoProjectThumbnails = videoProjects.filter(
+    (project) => project.presentation ?? project.thumbnail
+  ).length;
   const videoExportThumbnails = videoProjects.reduce(
     (count, project) =>
       count + project.projectExports.filter((projectExport) => projectExport.thumbnail).length,
     0
   );
-  const scenarioProjectThumbnails = scenarioProjects.filter((project) => project.thumbnail).length;
+  const scenarioProjectThumbnails = scenarioProjects.filter(
+    (project) => project.presentation ?? project.thumbnail
+  ).length;
   const scenarioExportThumbnails = scenarioProjects.reduce(
     (count, project) => count + (project.exportThumbnails?.length ?? 0),
     0

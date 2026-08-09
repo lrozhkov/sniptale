@@ -3,13 +3,11 @@ export {
   createScenarioExportGalleryItem,
   createScenarioGalleryItem,
   createVideoProjectGalleryItem,
-  createEditorSessionGalleryItem,
 } from './adapters';
 export { ensureGalleryItemThumbnail } from './thumbnails';
 export {
   createGalleryMediaItem,
   isGalleryMediaItem,
-  isGalleryEditorSessionItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
@@ -18,7 +16,6 @@ export {
 } from './types';
 export type {
   GalleryItem,
-  GalleryEditorSessionItem,
   GalleryItemKind,
   GalleryMediaItem,
   GalleryScenarioExportItem,

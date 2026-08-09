@@ -124,12 +124,24 @@ export function parseVideoProjectEntryResult(value: unknown): VideoProjectEntryR
   if (lifecycle === null) {
     return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
   }
+  const workspaceRevision = value['workspaceRevision'];
+  if (
+    workspaceRevision !== undefined &&
+    !(
+      typeof workspaceRevision === 'number' &&
+      Number.isInteger(workspaceRevision) &&
+      workspaceRevision >= 0
+    )
+  ) {
+    return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
+  }
   return {
     entry: {
       createdAt: value['createdAt'],
       id: value['id'],
       project: value['project'],
       updatedAt: value['updatedAt'],
+      workspaceRevision: workspaceRevision ?? 0,
       ...(lifecycle === undefined ? {} : { lifecycle }),
     },
     status: 'ready',

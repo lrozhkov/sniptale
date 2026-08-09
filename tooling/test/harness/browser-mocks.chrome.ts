@@ -7,6 +7,7 @@ import {
   DEFAULT_HARNESS_API_BEHAVIOR,
 } from './browser-mocks.types';
 import { createHarnessStorageMock } from './browser-mocks.storage';
+import { ChromeEvent } from './browser-mocks.shared';
 
 type ChromeMockController = {
   getActiveTab: () => HarnessActiveTab;
@@ -193,7 +194,27 @@ function createRuntimeMock(
   runtimeOnMessage: typeof chrome.runtime.onMessage,
   controller: ChromeMockController
 ) {
+  const connect = (connectInfo?: chrome.runtime.ConnectInfo): chrome.runtime.Port => {
+    const onDisconnect = new ChromeEvent<[chrome.runtime.Port]>();
+    const onMessage = new ChromeEvent<[unknown, chrome.runtime.Port]>();
+    let disconnected = false;
+    const port = {
+      name: connectInfo?.name ?? '',
+      onDisconnect,
+      onMessage,
+      postMessage: () => undefined,
+      disconnect: () => {
+        if (disconnected) return;
+        disconnected = true;
+        onDisconnect.emit(port);
+      },
+    } as chrome.runtime.Port;
+
+    return port;
+  };
+
   return {
+    connect,
     id: 'playwright-ui-harness',
     lastError: null,
     getManifest: () => createHarnessManifest(),

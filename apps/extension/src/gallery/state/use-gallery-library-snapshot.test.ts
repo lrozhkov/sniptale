@@ -9,7 +9,7 @@ const {
   listScenarioExportRecordsMock,
   listScenarioProjectSummariesMock,
   loadSettingsMock,
-  listEditorSessionDraftsMock,
+  listAggregatePresentationsMock,
 } = vi.hoisted(() => ({
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
@@ -19,12 +19,14 @@ const {
   listScenarioExportRecordsMock: vi.fn(),
   listScenarioProjectSummariesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
-  listEditorSessionDraftsMock: vi.fn().mockResolvedValue([]),
+  listAggregatePresentationsMock: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../../composition/persistence/editor-sessions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/editor-sessions')>()),
-  listEditorSessionDrafts: listEditorSessionDraftsMock,
+vi.mock('../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/aggregate-presentations')
+  >()),
+  listAggregatePresentations: listAggregatePresentationsMock,
 }));
 
 vi.mock('../../composition/persistence/settings', async (importOriginal) => ({
@@ -111,8 +113,8 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(listMediaThumbnailIdsMock).toHaveBeenCalledTimes(1);
     expect(getStorageEstimateInfoMock).toHaveBeenCalledTimes(1);
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
-      editorSessions: [],
       mediaItems,
+      presentations: [],
       scenarioExportsByProjectId: new Map([['project-1', scenarioExports]]),
       scenarioProjects,
       thumbnailIds: new Set(thumbnailIds),

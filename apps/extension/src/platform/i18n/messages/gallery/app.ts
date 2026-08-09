@@ -37,6 +37,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Без срока удаления',
     en: 'No expiration',
   },
+  updatingPreview: {
+    ru: 'Обновляем превью…',
+    en: 'Updating preview…',
+  },
   storageTitle: {
     ru: 'Хранилище',
     en: 'Storage',

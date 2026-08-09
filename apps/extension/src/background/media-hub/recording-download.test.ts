@@ -66,7 +66,6 @@ vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   saveScreenshotMediaAssetSafely: vi.fn(),
   saveWebSnapshotMediaAssetSafely: vi.fn(),
   updateMediaLibraryEntrySafely: vi.fn(),
-  updateScreenshotMediaAssetSafely: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/settings', async (importOriginal) => ({

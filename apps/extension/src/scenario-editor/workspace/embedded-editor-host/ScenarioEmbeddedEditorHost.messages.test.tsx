@@ -16,14 +16,12 @@ import { createScenarioCaptureStep } from '../../../features/scenario/project/pu
 const {
   blobToDataUrlMock,
   buildEditorUrlMock,
-  createEditorSessionIdMock,
   getScenarioAssetBlobMock,
   getScenarioStepEditorDocumentRecordMock,
   persistPendingEditorBootstrapPayloadMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   buildEditorUrlMock: vi.fn(),
-  createEditorSessionIdMock: vi.fn(),
   getScenarioAssetBlobMock: vi.fn(),
   getScenarioStepEditorDocumentRecordMock: vi.fn(),
   persistPendingEditorBootstrapPayloadMock: vi.fn(),
@@ -50,11 +48,6 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (importO
 vi.mock('../../../workflows/editor/bootstrap', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/editor/bootstrap')>()),
   persistPendingEditorBootstrapPayload: persistPendingEditorBootstrapPayloadMock,
-}));
-
-vi.mock('@sniptale/platform/security/secure-random-id', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/security/secure-random-id')>()),
-  createSecureRandomUuid: createEditorSessionIdMock,
 }));
 
 vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
@@ -188,8 +181,7 @@ beforeEach(() => {
   getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,abc');
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
-  createEditorSessionIdMock.mockReturnValue('session-1');
-  buildEditorUrlMock.mockReturnValue('/editor/index.html?sessionId=session-1&embed=scenario');
+  buildEditorUrlMock.mockReturnValue('/editor/index.html?bootstrap=bootstrap-1&embed=scenario');
 });
 
 afterEach(() => {

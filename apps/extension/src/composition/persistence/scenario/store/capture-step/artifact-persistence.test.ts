@@ -95,8 +95,8 @@ beforeEach(() => {
   initDBMock.mockResolvedValue({
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
-        get: txGetMock,
+      objectStore: vi.fn((storeName: string) => ({
+        get: storeName === 'scenario_projects' ? txGetMock : vi.fn(),
         put: txPutMock,
       })),
     })),
@@ -132,6 +132,7 @@ async function verifyArtifactPersistenceWithDocument() {
       updatedAt: 11,
     },
     updatedAt: 11,
+    workspaceRevision: 1,
   });
   expect(txPutMock).toHaveBeenNthCalledWith(3, {
     stepId: 'step-1',

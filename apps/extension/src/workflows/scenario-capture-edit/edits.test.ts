@@ -6,18 +6,9 @@ import {
 import { createScenarioCaptureStep } from '../../features/scenario/project/public';
 import { type ScenarioCaptureStep } from '../../features/scenario/contracts/types/project';
 
-const { dataUrlToBlobMock, deleteScenarioAssetMock, measureImageBlobMock, saveScenarioAssetMock } =
-  vi.hoisted(() => ({
-    dataUrlToBlobMock: vi.fn(),
-    deleteScenarioAssetMock: vi.fn(),
-    measureImageBlobMock: vi.fn(),
-    saveScenarioAssetMock: vi.fn(),
-  }));
-
-vi.mock('../../composition/persistence/scenario/projects', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/scenario/projects')>()),
-  deleteScenarioAsset: deleteScenarioAssetMock,
-  saveScenarioAsset: saveScenarioAssetMock,
+const { dataUrlToBlobMock, measureImageBlobMock } = vi.hoisted(() => ({
+  dataUrlToBlobMock: vi.fn(),
+  measureImageBlobMock: vi.fn(),
 }));
 
 vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -30,11 +21,7 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
   measureImageBlob: measureImageBlobMock,
 }));
 
-import {
-  buildScenarioEditedCaptureStep,
-  createScenarioEditedCaptureAsset,
-  deleteScenarioEditedCaptureAsset,
-} from './edits';
+import { buildScenarioEditedCaptureStep, prepareScenarioEditedCaptureAsset } from './edits';
 
 function createEditorDocument() {
   return {
@@ -61,20 +48,18 @@ function registerCaptureStepEditsScope() {
     vi.spyOn(Date, 'now').mockReturnValue(123);
     dataUrlToBlobMock.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
     measureImageBlobMock.mockResolvedValue({ width: 1440, height: 900 });
-    deleteScenarioAssetMock.mockResolvedValue(undefined);
-    saveScenarioAssetMock.mockResolvedValue(undefined);
   });
 }
 
 async function verifiesEditedAssetCreation() {
-  const asset = await createScenarioEditedCaptureAsset({
+  const prepared = await prepareScenarioEditedCaptureAsset({
     dataUrl: 'data:image/png;base64,abc',
     galleryAssetId: 'gallery-1',
     projectId: 'project-1',
   });
 
   expect(dataUrlToBlobMock).toHaveBeenCalledWith('data:image/png;base64,abc');
-  expect(saveScenarioAssetMock).toHaveBeenCalledWith(
+  expect(prepared.entry).toEqual(
     expect.objectContaining({
       projectId: 'project-1',
       galleryAssetId: 'gallery-1',
@@ -85,7 +70,7 @@ async function verifiesEditedAssetCreation() {
       size: 5,
     })
   );
-  expect(asset).toEqual(
+  expect(prepared.asset).toEqual(
     expect.objectContaining({
       projectId: 'project-1',
       galleryAssetId: 'gallery-1',
@@ -101,19 +86,19 @@ async function verifiesEditedAssetCreation() {
 async function verifiesFallbackAssetMetadata() {
   dataUrlToBlobMock.mockResolvedValue(new Blob(['fallback']));
 
-  const asset = await createScenarioEditedCaptureAsset({
+  const prepared = await prepareScenarioEditedCaptureAsset({
     dataUrl: 'data:image/png;base64,fallback',
     projectId: 'project-2',
   });
 
-  expect(saveScenarioAssetMock).toHaveBeenCalledWith(
+  expect(prepared.entry).toEqual(
     expect.objectContaining({
       projectId: 'project-2',
       galleryAssetId: null,
       mimeType: 'image/png',
     })
   );
-  expect(asset).toEqual(
+  expect(prepared.asset).toEqual(
     expect.objectContaining({
       projectId: 'project-2',
       galleryAssetId: null,
@@ -163,12 +148,6 @@ function verifiesEditedCaptureStepReset() {
   );
 }
 
-async function verifiesEditedAssetDeletion() {
-  await deleteScenarioEditedCaptureAsset('asset-edited');
-
-  expect(deleteScenarioAssetMock).toHaveBeenCalledWith('asset-edited');
-}
-
 function runCaptureStepEditsSuite() {
   registerCaptureStepEditsScope();
 
@@ -184,7 +163,6 @@ function runCaptureStepEditsSuite() {
     'repoints the capture step to the new asset and resets editor-owned transforms',
     verifiesEditedCaptureStepReset
   );
-  it('deletes edited assets through the capture-step edit seam', verifiesEditedAssetDeletion);
 }
 
 describe('capture step edits', runCaptureStepEditsSuite);

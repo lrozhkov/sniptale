@@ -44,11 +44,14 @@ export interface GalleryAppLayoutProps {
   onPreviewResetChanges?: () => void;
   onSaveMetadata?: () => void;
   onPreviewDownload: () => void;
+  onPreviewDownloadOriginal: () => void;
   onPreviewCopy: () => void;
   onPreviewEdit: (item: GalleryItem) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewDelete: (item: GalleryItem) => void;
   onPreviewPromote?: (item: GalleryItem) => Promise<void>;
+  onPreviewRestoreOriginal: () => void;
+  onPreviewSaveCopy: () => void;
   onScenarioPreviewClose?: () => void;
   onFolderFilterChange: Dispatch<SetStateAction<FolderFilter>>;
   onScopeChange?: Dispatch<SetStateAction<GalleryScope>>;

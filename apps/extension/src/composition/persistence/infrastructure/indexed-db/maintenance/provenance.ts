@@ -1,4 +1,4 @@
-import { EDITOR_SESSIONS_STORE, MEDIA_LIBRARY_STORE } from '../core.stores.ts';
+import { IMAGE_WORKSPACES_STORE, MEDIA_LIBRARY_STORE } from '../core.stores.ts';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { patchRecord } from './record-patch';
 import { sanitizeWebSnapshotStoreProvenanceUrls } from '../../../web-snapshots/maintenance/provenance';
@@ -12,7 +12,7 @@ type MaintenanceSanitizeResult = {
 
 export async function runProvenanceUrlMaintenance(db: MaintenanceDatabase): Promise<void> {
   await sanitizeStoreProvenanceUrls(db, MEDIA_LIBRARY_STORE, sanitizeMediaLibraryRecord);
-  await sanitizeStoreProvenanceUrls(db, EDITOR_SESSIONS_STORE, sanitizeEditorSessionRecord);
+  await sanitizeStoreProvenanceUrls(db, IMAGE_WORKSPACES_STORE, sanitizeImageWorkspaceRecord);
   await sanitizeWebSnapshotStoreProvenanceUrls(db);
 }
 
@@ -35,7 +35,7 @@ function sanitizeMediaLibraryRecord(value: unknown): MaintenanceSanitizeResult {
   });
 }
 
-function sanitizeEditorSessionRecord(value: unknown): MaintenanceSanitizeResult {
+function sanitizeImageWorkspaceRecord(value: unknown): MaintenanceSanitizeResult {
   if (!isRecord(value)) {
     return unchangedResult(value);
   }

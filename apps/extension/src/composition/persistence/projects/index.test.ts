@@ -28,6 +28,7 @@ const projectsDbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   PROJECT_EXPORTS_STORE: 'project_exports',
@@ -141,6 +142,7 @@ async function verifyProjectSaveRefreshesUpdatedAt() {
     },
     project: expect.objectContaining({ id: 'project-1', updatedAt: 999 }),
     updatedAt: 999,
+    workspaceRevision: 1,
   });
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',

@@ -7,6 +7,8 @@ export interface VideoProjectEntry {
   createdAt: number;
   updatedAt: number;
   lifecycle?: LibraryLifecycle;
+  /** Missing only on legacy rows; parsed as revision 0. */
+  workspaceRevision?: number;
 }
 
 export interface UnsupportedVideoProjectMetadata {
@@ -52,7 +54,12 @@ export type VideoProjectEntryReadResult =
     };
 
 export type VideoProjectReadResult =
-  | { lifecycle?: LibraryLifecycle; project: VideoProject; status: 'ready' }
+  | {
+      lifecycle?: LibraryLifecycle;
+      project: VideoProject;
+      status: 'ready';
+      workspaceRevision: number;
+    }
   | Exclude<VideoProjectEntryReadResult, { status: 'ready' }>;
 
 export function resolveVideoProjectReadResult(result: VideoProjectReadResult): VideoProject | null {

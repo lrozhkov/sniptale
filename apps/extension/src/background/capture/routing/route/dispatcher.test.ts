@@ -12,13 +12,11 @@ const {
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
   handleReleaseWebSnapshotStagedBlobsMock,
-  handleRequestGalleryImageUpdateCapabilityMock,
   handleRequestExportHarStartCapabilityMock,
   handleSaveScreenshotToGalleryMock,
   handleSaveWebSnapshotToGalleryMock,
   handleStageWebSnapshotBlobChunkMock,
   handleTriggerQuickActionMock,
-  handleUpdateGalleryImageAssetMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
 } = vi.hoisted(() => ({
@@ -33,13 +31,11 @@ const {
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
   handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
-  handleRequestGalleryImageUpdateCapabilityMock: vi.fn(),
   handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
   handleSaveWebSnapshotToGalleryMock: vi.fn(),
   handleStageWebSnapshotBlobChunkMock: vi.fn(),
   handleTriggerQuickActionMock: vi.fn(),
-  handleUpdateGalleryImageAssetMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
 }));
@@ -72,9 +68,7 @@ vi.mock('../actions.export', () => ({
 }));
 
 vi.mock('../actions.gallery-update', () => ({
-  handleRequestGalleryImageUpdateCapability: handleRequestGalleryImageUpdateCapabilityMock,
   handleSaveScreenshotToGallery: handleSaveScreenshotToGalleryMock,
-  handleUpdateGalleryImageAsset: handleUpdateGalleryImageAssetMock,
 }));
 
 vi.mock('../actions.quick-action', () => ({
@@ -134,11 +128,9 @@ beforeEach(() => {
   handleOpenEditorWithImageMock.mockReturnValue(true);
   handleRegisterWebSnapshotAssetsMock.mockReturnValue(true);
   handleReleaseWebSnapshotStagedBlobsMock.mockReturnValue(true);
-  handleRequestGalleryImageUpdateCapabilityMock.mockReturnValue(true);
   handleSaveScreenshotToGalleryMock.mockReturnValue(true);
   handleSaveWebSnapshotToGalleryMock.mockReturnValue(true);
   handleStageWebSnapshotBlobChunkMock.mockReturnValue(true);
-  handleUpdateGalleryImageAssetMock.mockReturnValue(true);
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
@@ -300,16 +292,6 @@ const routeCases: Array<[RouteCaptureMessage, Mock]> = [
       url: 'https://example.test/a.png',
     },
     handleFetchWebSnapshotAssetMock,
-  ],
-  [
-    {
-      type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-      assetId: 'asset-1',
-      dataUrl: 'data:image/png;base64,1',
-      editorSessionId: 'session-1',
-      updateCapabilityToken: 'token-1',
-    },
-    handleUpdateGalleryImageAssetMock,
   ],
 ];
 

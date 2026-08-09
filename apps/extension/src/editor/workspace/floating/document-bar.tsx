@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -15,9 +15,19 @@ import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
-import { getEditorSessionDraft } from '../../../composition/persistence/editor-sessions';
-import { promoteStoredItem } from '../../../composition/persistence/library-lifecycle';
+import {
+  commitImagePresentation,
+  promoteImageAggregate,
+  saveImageAggregateCopyFromDocument,
+  StaleImageWorkspaceError,
+} from '../../../composition/persistence/image-aggregates';
 import type { LibraryStorageClass } from '../../../contracts/settings/library-lifecycle';
+import { useEditorController } from '../../application/controller-context';
+import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
+import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
+import { replaceEditorPageAggregateId } from '../../document/page-session';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
@@ -52,35 +62,95 @@ function useDocumentBarState() {
   );
 }
 
-function useDocumentStorageClass(sessionId: string | null) {
+function useDocumentStorageClass(aggregateId: string | null, pageTitle: string) {
+  const editorController = useEditorController();
   const [storageClass, setStorageClass] = useState<LibraryStorageClass>('temporary');
   const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
-  const assetId = new URLSearchParams(window.location.search).get('assetId');
 
   useEffect(() => {
-    void (
-      assetId ? getMediaLibraryEntry(assetId) : sessionId ? getEditorSessionDraft(sessionId) : null
-    )?.then((entry) => setStorageClass(entry?.lifecycle?.storageClass ?? 'temporary'));
-  }, [assetId, sessionId]);
+    void (aggregateId ? getMediaLibraryEntry(aggregateId) : null)?.then((entry) =>
+      setStorageClass(entry?.lifecycle?.storageClass ?? 'temporary')
+    );
+  }, [aggregateId]);
 
-  const promote = async () => {
-    const target = assetId
-      ? { kind: 'media' as const, id: assetId }
-      : sessionId
-        ? { kind: 'editor-session' as const, id: sessionId }
-        : null;
-    if (!target) return;
+  const promote = useCallback(async () => {
+    if (!aggregateId || !editorController.autosaveService) return;
     setPromotionState('saving');
     try {
-      await promoteStoredItem(target);
+      await editorController.autosaveService.flushAutosave(() => editorController.exportDocument());
+      const revision = editorController.autosaveService.getDurableRevision();
+      if (revision === null) throw new Error('Image workspace revision is unavailable.');
+      const previewBlob = await dataUrlToBlob(
+        await editorController.renderForExport({ format: 'png', quality: 1 })
+      );
+      await commitImagePresentation({
+        aggregateId,
+        expectedWorkspaceRevision: revision,
+        previewBlob,
+        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
+      });
+      await promoteImageAggregate(aggregateId, revision);
       setStorageClass('library');
       setPromotionState('idle');
-    } catch {
+    } catch (error) {
       setPromotionState('error');
+      throw error;
     }
-  };
+  }, [aggregateId, editorController]);
 
-  return { promote, promotionState, storageClass };
+  const saveConflictCopy = useCallback(async () => {
+    if (!editorController.autosaveService) return;
+    setPromotionState('saving');
+    try {
+      const document = editorController.exportDocument();
+      const previewBlob = await dataUrlToBlob(
+        await editorController.renderForExport({ format: 'png', quality: 1 })
+      );
+      const targetAggregateId = createSecureRandomUuid(
+        'Secure random image copy IDs are unavailable.'
+      );
+      await saveImageAggregateCopyFromDocument({
+        document,
+        previewBlob,
+        sourceTitle: pageTitle,
+        targetAggregateId,
+        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
+      });
+      replaceEditorPageAggregateId(targetAggregateId);
+      editorController.autosaveService.activate({
+        aggregateId: targetAggregateId,
+        durableRevision: 1,
+        renderPresentation: () => editorController.renderForExport({ format: 'png', quality: 1 }),
+        sourceTitle: pageTitle,
+        sourceUrl: null,
+      });
+      useEditorStore.getState().setSaveErrorMessage(null);
+      useEditorStore.getState().setSaveState('saved');
+      setStorageClass('library');
+      setPromotionState('idle');
+    } catch (error) {
+      setPromotionState('error');
+      throw error;
+    }
+  }, [editorController, pageTitle]);
+
+  useEffect(() => {
+    if (!aggregateId) return;
+    const presence = connectAggregateEditorPresence({
+      aggregate: { id: aggregateId, kind: 'image' },
+      promote,
+    });
+    return () => presence.dispose();
+  }, [aggregateId, promote]);
+
+  return {
+    hasStaleConflict:
+      editorController.autosaveService?.getLastWriteError() instanceof StaleImageWorkspaceError,
+    promote,
+    promotionState,
+    saveConflictCopy,
+    storageClass,
+  };
 }
 
 function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
@@ -145,7 +215,10 @@ function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
 }) {
-  const storage = useDocumentStorageClass(props.documentState.sessionId);
+  const storage = useDocumentStorageClass(
+    props.documentState.sessionId,
+    props.documentState.pageTitle
+  );
   return (
     <div className={DOCUMENT_TITLE_CLASS_NAME}>
       <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
@@ -168,7 +241,7 @@ function EditorFloatingDocumentSummary(props: {
             type="button"
             className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
             disabled={storage.promotionState === 'saving'}
-            onClick={() => void storage.promote()}
+            onClick={() => void storage.promote().catch(() => undefined)}
           >
             {translate('editor.documentActions.saveToLibrary')}
           </button>
@@ -177,6 +250,25 @@ function EditorFloatingDocumentSummary(props: {
           <span role="alert">{translate('editor.documentActions.saveToLibraryError')}</span>
         ) : null}
       </div>
+      {storage.hasStaleConflict ? (
+        <div className="mt-1 flex items-center gap-2 text-[11px]">
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            onClick={() => window.location.reload()}
+          >
+            {translate('editor.documentActions.reloadLatest')}
+          </button>
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            disabled={storage.promotionState === 'saving'}
+            onClick={() => void storage.saveConflictCopy().catch(() => undefined)}
+          >
+            {translate('editor.documentActions.saveCopy')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

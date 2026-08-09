@@ -76,7 +76,6 @@ describe('media-hub-cleanup-report', () => {
       'heavy-files',
       'old-screenshots',
       'orphaned-thumbnails',
-      'stale-editor-drafts',
       'orphaned-scenario-pending-assets',
       'orphaned-scenario-artifacts',
       'old-diagnostics',

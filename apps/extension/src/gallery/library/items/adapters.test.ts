@@ -45,6 +45,15 @@ it('creates a mixed gallery list with scenario and export items sorted by freshn
 
   const items = createGalleryItems({
     mediaItems: [createMediaLibraryItem()],
+    presentations: [
+      {
+        aggregateId: 'project-1',
+        aggregateKind: 'scenario',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['scenario']),
+        updatedAt: 25,
+      },
+    ],
     scenarioExportsByProjectId: new Map([[scenarioProject.id, [exportEntry]]]),
     scenarioProjects: [scenarioProject],
     thumbnailIds: new Set(['scenario:project-1', 'scenario-export:export-1']),
@@ -106,6 +115,15 @@ it('keeps scenario projects in the gallery even when exports or tags are missing
 it('creates video project gallery items with stable project thumbnails', () => {
   const items = createGalleryItems({
     mediaItems: [],
+    presentations: [
+      {
+        aggregateId: 'project-1',
+        aggregateKind: 'video-project',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['video']),
+        updatedAt: 20,
+      },
+    ],
     scenarioExportsByProjectId: new Map(),
     scenarioProjects: [],
     thumbnailIds: new Set(['video-project:project-1']),
@@ -142,67 +160,4 @@ it('creates video project gallery items with stable project thumbnails', () => {
   expect(isGalleryVideoProjectItem(items[0]!)).toBe(true);
   expect(isGallerySelectableItem(items[0]!)).toBe(true);
   expect(isGalleryMediaItem(items[0]!)).toBe(false);
-});
-
-it('projects unlinked editor sessions as reachable drafts with stable promotion identity', () => {
-  const lifecycle = createLibraryLifecycle('temporary', 20);
-  const items = createGalleryItems({
-    editorSessions: [
-      {
-        assetId: null,
-        createdAt: 10,
-        dirty: true,
-        document: {
-          version: 1,
-          canvasHeight: 80,
-          canvasJson: '{"objects":[]}',
-          canvasWidth: 100,
-          frame: {
-            backgroundColor: '#fff',
-            backgroundGradientAngle: 0,
-            backgroundGradientFrom: '#fff',
-            backgroundGradientTo: '#000',
-            backgroundImageData: null,
-            backgroundImageFit: 'cover',
-            backgroundMode: 'color',
-            browserMode: false,
-            browserTitle: '',
-            browserUrl: '',
-            layoutMode: 'fit-image',
-            paddingBottom: 0,
-            paddingLeft: 0,
-            paddingRight: 0,
-            paddingTop: 0,
-          },
-          sourceDisplayHeight: 80,
-          sourceDisplayWidth: 100,
-          sourceHeight: 80,
-          sourceImageData: 'data:image/png;base64,YQ==',
-          sourceLeft: 0,
-          sourceName: 'Draft.png',
-          sourceTop: 0,
-          sourceWidth: 100,
-        },
-        lifecycle,
-        sessionId: 'session-1',
-        sourceTitle: null,
-        sourceUrl: null,
-        updatedAt: 20,
-      },
-    ],
-    mediaItems: [],
-    scenarioExportsByProjectId: new Map(),
-    scenarioProjects: [],
-    thumbnailIds: new Set(),
-    videoProjects: [],
-  });
-
-  expect(items).toEqual([
-    expect.objectContaining({
-      entityId: 'session-1',
-      id: 'editor-draft:session-1',
-      lifecycle,
-      type: 'editor-session',
-    }),
-  ]);
 });

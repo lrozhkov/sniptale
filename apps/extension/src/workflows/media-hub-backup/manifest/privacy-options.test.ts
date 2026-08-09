@@ -80,7 +80,6 @@ function createPrivacyManifest(): Record<string, unknown> {
     effectBundleCount: 0,
     version: 4,
     dataClasses: {
-      editorDrafts: false,
       mediaAssets: true,
       recordings: true,
       scenarioProjects: true,
@@ -97,7 +96,6 @@ function createPrivacyManifest(): Record<string, unknown> {
         scenarioProjectIds: ['scenario-1'],
         videoProjectIds: ['video-project-1'],
       },
-      includeEditorDrafts: false,
       includeSourceMetadata: false,
       includeTelemetry: false,
       includeWebSnapshots: false,
@@ -112,7 +110,6 @@ it('parses optional backup privacy disclosure fields', async () => {
     expect.objectContaining({
       manifest: expect.objectContaining({
         dataClasses: expect.objectContaining({
-          editorDrafts: false,
           sourceMetadata: false,
           telemetry: false,
           webSnapshots: false,
@@ -128,4 +125,14 @@ it('parses optional backup privacy disclosure fields', async () => {
       }),
     })
   );
+});
+
+it('does not carry legacy v4 draft switches into the current parsed contract', async () => {
+  const { loadBackupParts } = await import('.');
+  const manifest = createPrivacyManifest();
+  (manifest['privacyOptions'] as Record<string, unknown>)['includeEditor' + 'Drafts'] = true;
+
+  const parts = await loadBackupParts(createBackupArchive(manifest));
+
+  expect(parts.manifest.privacyOptions).not.toHaveProperty('includeEditor' + 'Drafts');
 });

@@ -46,6 +46,11 @@ function isOptionalBlob(value: unknown): value is Blob | undefined {
   return value === undefined || value instanceof Blob;
 }
 
+function parseWorkspaceRevision(value: unknown): number | null {
+  if (value === undefined) return 0;
+  return Number.isInteger(value) && typeof value === 'number' && value >= 0 ? value : null;
+}
+
 function parseMediaAssetKind(value: unknown): MediaAssetKind | null {
   switch (value) {
     case 'screenshot':
@@ -126,7 +131,8 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
 
   const kind = parseMediaAssetKind(value['kind']);
   const source = parseMediaAssetSource(value['source']);
-  if (!kind || !MEDIA_ASSET_KINDS.has(kind) || !source) {
+  const workspaceRevision = parseWorkspaceRevision(value['workspaceRevision']);
+  if (!kind || !MEDIA_ASSET_KINDS.has(kind) || !source || workspaceRevision === null) {
     return null;
   }
 
@@ -157,6 +163,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     ...(lifecycle === undefined ? {} : { lifecycle }),
     updatedAt: value['updatedAt'],
     width: value['width'],
+    workspaceRevision,
     ...(value['blob'] === undefined ? {} : { blob: value['blob'] }),
   };
 }

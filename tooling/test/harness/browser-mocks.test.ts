@@ -62,6 +62,21 @@ it('allows explicit typed-success runtime fallback through harness bootstrap', a
   });
 });
 
+it('provides lifecycle-safe runtime ports for aggregate editor presence', async () => {
+  await loadHarness();
+  const port = chrome.runtime.connect({ name: 'aggregate-editor-presence' });
+  const onDisconnect = vi.fn();
+  port.onDisconnect.addListener(onDisconnect);
+
+  expect(port.name).toBe('aggregate-editor-presence');
+  expect(() => port.postMessage({ type: 'register' })).not.toThrow();
+  port.disconnect();
+  port.disconnect();
+
+  expect(onDisconnect).toHaveBeenCalledOnce();
+  expect(onDisconnect).toHaveBeenCalledWith(port);
+});
+
 it('returns the current parsed recording-state contract from the default harness', async () => {
   await loadHarness();
 

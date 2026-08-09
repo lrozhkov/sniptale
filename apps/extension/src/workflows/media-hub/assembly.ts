@@ -1,6 +1,5 @@
 import {
   DIAGNOSTICS_META_STORE,
-  EDITOR_SESSIONS_STORE,
   initDB,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
@@ -35,7 +34,6 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
   const db = await initDB();
   const [
     diagnostics,
-    editorSessions,
     pendingScenarioAssets,
     scenarioAssets,
     scenarioExports,
@@ -46,7 +44,6 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
     webSnapshots,
   ] = await Promise.all([
     db.getAll(DIAGNOSTICS_META_STORE),
-    db.getAll(EDITOR_SESSIONS_STORE),
     db.getAll(SCENARIO_PENDING_ASSETS_STORE),
     db.getAll(SCENARIO_ASSETS_STORE),
     db.getAll(SCENARIO_EXPORTS_STORE),
@@ -59,7 +56,6 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
 
   return {
     diagnostics: diagnostics as StorageCleanupInventory['diagnostics'],
-    editorSessions: editorSessions as StorageCleanupInventory['editorSessions'],
     pendingScenarioAssets: parseDbEntries(pendingScenarioAssets, parsePendingScenarioAssetEntry),
     scenarioAssets: parseDbEntries(scenarioAssets, parseScenarioAssetEntry),
     scenarioExports: parseDbEntries(scenarioExports, parseScenarioExportEntry),

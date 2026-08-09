@@ -22,4 +22,5 @@ export interface ProjectListItem {
   trackCount: number;
   updatedAt: number;
   width: number;
+  workspaceRevision?: number;
 }

@@ -54,14 +54,14 @@ export function createEditorPageRuntime(
 }
 
 export function setupEditorPageRuntimeBootstrapTestScope(args: {
-  ensureEditorPageSessionIdMock: ReturnType<typeof vi.fn>;
+  ensureEditorPageAggregateIdMock: ReturnType<typeof vi.fn>;
   readEditorPageLocationStateMock: ReturnType<typeof vi.fn>;
   waitForEditorControllerCanvasMock: ReturnType<typeof vi.fn>;
 }) {
   beforeEach(() => {
     vi.clearAllMocks();
     args.readEditorPageLocationStateMock.mockReturnValue({ assetId: 'asset-1' });
-    args.ensureEditorPageSessionIdMock.mockReturnValue('session-1');
+    args.ensureEditorPageAggregateIdMock.mockReturnValue('session-1');
     args.waitForEditorControllerCanvasMock.mockResolvedValue(undefined);
   });
 }

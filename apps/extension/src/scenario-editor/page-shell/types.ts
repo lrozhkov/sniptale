@@ -4,6 +4,12 @@ import type {
   ScenarioSlide,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { ScenarioV3PageSaveState } from './runtime/types';
+import type { ScenarioAggregateChildMutation } from '../../composition/persistence/scenario/aggregate-mutations';
+
+export type CommitScenarioV3AggregateMutation = (
+  mutateSession: (session: ScenarioV3EditorSession) => ScenarioV3EditorSession,
+  children: ScenarioAggregateChildMutation
+) => Promise<void>;
 
 export interface ScenarioV3EditorSaveStatus {
   error: string | null;

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from '../../../../composition/persistence/media-library/contracts';
 import { createScenarioProjectV3 } from '../../../../features/scenario/project/v3';
 import { createVideoProjectFixture } from '../../export/projects/video-fixture.test-support.ts';
+import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
 
 const { initDBMock, listMediaLibraryMock } = vi.hoisted(() => ({
   initDBMock: vi.fn(),
@@ -110,12 +111,46 @@ async function readInspectionStore(storeName: string, screenshot: MediaLibraryEn
   if (storeName === 'thumbnails') {
     return [{ assetId: screenshot.id, blob: new Blob(['thumb']) }];
   }
+  if (storeName === 'image_workspaces') {
+    return [
+      {
+        aggregateId: screenshot.id,
+        createdAt: 1,
+        document: createEditorDocumentFixture(),
+        revision: 1,
+        sourceTitle: null,
+        sourceUrl: null,
+        updatedAt: 2,
+      },
+    ];
+  }
+  if (storeName === 'aggregate_presentations') {
+    return [
+      createPresentation('image', screenshot.id),
+      createPresentation('video-project', 'video-project-1'),
+      createPresentation('scenario', 'scenario-1'),
+    ];
+  }
   if (storeName === 'scenario_projects') {
     return [createScenarioProjectEntry()];
   }
   return storeName === 'video_projects'
     ? [createVideoProjectEntry()]
     : readStepDocuments(storeName);
+}
+
+function createPresentation(
+  aggregateKind: 'image' | 'scenario' | 'video-project',
+  aggregateId: string
+) {
+  return {
+    aggregateId,
+    aggregateKind,
+    presentationRevision: 0,
+    previewBlob: new Blob([`${aggregateKind}-preview`]),
+    thumbnailBlob: new Blob([`${aggregateKind}-thumbnail`]),
+    updatedAt: 2,
+  };
 }
 
 function createScenarioProjectEntry() {
@@ -171,12 +206,11 @@ describe('inspect local media hub backup', () => {
     expect(summary).toEqual(
       expect.objectContaining({
         assetCount: 1,
-        editorDraftCount: 1,
         recordingCount: 1,
         scenarioProjectCount: 1,
         selectedCount: 3,
         sourceMetadataCount: 1,
-        thumbnailCount: 4,
+        thumbnailCount: 5,
         videoProjectCount: 1,
         webSnapshotCount: 0,
       })

@@ -89,10 +89,7 @@ async function inspectVideoProjectEntry(
   options: MediaHubBackupExportOptions,
   inventory: VideoProjectBackupInspection
 ): Promise<void> {
-  const thumbnail = await getThumbnail(db, `video-project:${project.id}`);
-  if (thumbnail) {
-    inventory.thumbnails.push(thumbnail);
-  }
+  inventory.sizeBytes += getJsonSizeBytes(project);
 
   await inspectVideoProjectAssets(db, project, inventory);
   await inspectVideoProjectExports(db, project, options, inventory);

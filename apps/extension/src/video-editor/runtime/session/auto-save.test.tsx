@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 
 const saveVideoProject = vi.fn();
+const getVideoProject = vi.fn();
 const replaceVideoEditorUrl = vi.fn();
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
@@ -13,6 +14,18 @@ vi.mock('../../../composition/persistence/projects/index-mutations', async (impo
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
   commitVideoProjectMutation: saveVideoProject,
+  commitVideoProjectWorkspaceMutation: async (
+    project: ReturnType<typeof createEmptyVideoProject>,
+    options: { expectedWorkspaceRevision: number | null }
+  ) => ({
+    project: await saveVideoProject(project, options),
+    workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
+  }),
+}));
+
+vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
+  getVideoProject,
 }));
 
 vi.mock('../browser-driver', () => ({
@@ -66,6 +79,8 @@ let root: Root | null = null;
 beforeEach(() => {
   vi.useFakeTimers();
   saveVideoProject.mockReset();
+  getVideoProject.mockReset();
+  getVideoProject.mockResolvedValue({ status: 'notFound' });
   replaceVideoEditorUrl.mockReset();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -102,7 +117,7 @@ it('saves the project after the debounce and refreshes project metadata', async 
   expect(setSaveState).toHaveBeenCalledWith('saving');
   await flushAutoSaveTimers();
 
-  expect(saveVideoProject).toHaveBeenCalledWith(project, { baseRevision: project.updatedAt });
+  expect(saveVideoProject).toHaveBeenCalledWith(project, { expectedWorkspaceRevision: null });
   expect(setSaveState).toHaveBeenCalledWith('saved');
   expect(replaceVideoEditorUrl).toHaveBeenCalledWith(project.id, 'rec-1');
   expect(refreshProjects).toHaveBeenCalledTimes(1);
@@ -133,12 +148,12 @@ it('uses the last persisted revision for subsequent autosaves', async () => {
   await flushAutoSaveTimers();
 
   expect(saveVideoProject).toHaveBeenNthCalledWith(1, project, {
-    baseRevision: project.updatedAt,
+    expectedWorkspaceRevision: null,
   });
   expect(saveVideoProject).toHaveBeenNthCalledWith(
     2,
     expect.objectContaining({ name: 'Autosave revision edited' }),
-    { baseRevision: 200 }
+    { expectedWorkspaceRevision: 1 }
   );
 });
 
@@ -218,7 +233,7 @@ it('queues overlapping same-project autosaves behind the persisted revision upda
   expect(saveVideoProject).toHaveBeenNthCalledWith(
     2,
     expect.objectContaining({ name: 'Autosave overlap edited' }),
-    { baseRevision: 200 }
+    { expectedWorkspaceRevision: 1 }
   );
 });
 

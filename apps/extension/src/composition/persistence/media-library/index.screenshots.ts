@@ -1,30 +1,15 @@
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { MEDIA_LIBRARY_STORE, THUMBNAILS_STORE } from '../infrastructure/indexed-db/core';
+import {
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  MEDIA_LIBRARY_STORE,
+} from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import type {
-  MediaLibraryEntry,
-  MediaThumbnailEntry,
-  SaveScreenshotMediaAssetInput,
-} from './contracts';
-import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
-
-function createScreenshotThumbnailEntry(
-  assetId: string,
-  blob: Blob,
-  createdAt: number,
-  updatedAt: number
-): MediaThumbnailEntry {
-  return {
-    assetId,
-    blob,
-    createdAt,
-    updatedAt,
-    width: 320,
-    height: 180,
-  };
-}
+import type { MediaLibraryEntry, SaveScreenshotMediaAssetInput } from './contracts';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { ImageAggregateCollisionError } from '../image-aggregates/errors';
 
 export async function saveScreenshotMediaAsset(
   input: SaveScreenshotMediaAssetInput
@@ -54,57 +39,38 @@ export async function saveScreenshotMediaAsset(
       sourceFavicon: sanitizeProvenanceUrl(input.sourceFavicon),
       tags: input.tags ?? [],
       lifecycle: createLibraryLifecycle(input.storageClass ?? 'library', now),
+      workspaceRevision: 0,
       blob: input.blob,
     };
 
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, THUMBNAILS_STORE], 'readwrite');
-    await tx.objectStore(MEDIA_LIBRARY_STORE).put(entry);
-    await tx
-      .objectStore(THUMBNAILS_STORE)
-      .put(createScreenshotThumbnailEntry(assetId, thumbnailBlob, createdAt, now));
+    const tx = db.transaction(
+      [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, AGGREGATE_PRESENTATIONS_STORE],
+      'readwrite'
+    );
+    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const workspaceStore = tx.objectStore(IMAGE_WORKSPACES_STORE);
+    const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
+    const occupiedRoot: unknown = await mediaStore.get(assetId);
+    const occupiedWorkspace: unknown = await workspaceStore.get(assetId);
+    const occupiedPresentation: unknown = await presentationStore.get(['image', assetId]);
+    if (
+      occupiedRoot !== undefined ||
+      occupiedWorkspace !== undefined ||
+      occupiedPresentation !== undefined
+    ) {
+      throw new ImageAggregateCollisionError(assetId);
+    }
+    await mediaStore.put(entry);
+    await presentationStore.put({
+      aggregateId: assetId,
+      aggregateKind: 'image',
+      presentationRevision: 0,
+      previewBlob: input.blob,
+      thumbnailBlob,
+      updatedAt: now,
+    });
     await tx.done;
 
     return entry;
-  });
-}
-
-export async function updateScreenshotMediaAsset(
-  assetId: string,
-  blob: Blob,
-  filename?: string
-): Promise<MediaLibraryEntry> {
-  return runWithIndexedDbMutation(async (db) => {
-    const existing = (await db.get(MEDIA_LIBRARY_STORE, assetId)) as MediaLibraryEntry | undefined;
-
-    if (!existing || existing.source.kind !== 'screenshot') {
-      throw new Error(`Скриншотный asset ${assetId} не найден.`);
-    }
-
-    const now = Date.now();
-    const dimensions = await measureImageBlob(blob);
-    const thumbnailBlob = await createImageThumbnailBlob(blob);
-    const nextEntry: MediaLibraryEntry = {
-      ...existing,
-      filename: filename ?? existing.filename,
-      size: blob.size,
-      mimeType: blob.type || existing.mimeType,
-      width: dimensions.width,
-      height: dimensions.height,
-      updatedAt: now,
-      lifecycle: updateLibraryLifecycle(
-        existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt),
-        now
-      ),
-      blob,
-    };
-
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, THUMBNAILS_STORE], 'readwrite');
-    await tx.objectStore(MEDIA_LIBRARY_STORE).put(nextEntry);
-    await tx
-      .objectStore(THUMBNAILS_STORE)
-      .put(createScreenshotThumbnailEntry(assetId, thumbnailBlob, existing.createdAt, now));
-    await tx.done;
-
-    return nextEntry;
   });
 }

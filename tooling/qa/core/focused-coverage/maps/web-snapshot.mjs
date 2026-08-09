@@ -84,7 +84,6 @@ export const WEB_SNAPSHOT_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/capture/routing/actions.gallery.test.ts',
       'apps/extension/src/background/capture/routing/actions.gallery.staged.test.ts',
-      'apps/extension/src/background/capture/routing/gallery-update-capabilities.test.ts',
     ],
   },
   {

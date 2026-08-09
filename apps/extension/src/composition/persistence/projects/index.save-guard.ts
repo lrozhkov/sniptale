@@ -4,6 +4,7 @@ import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 
 export interface SaveVideoProjectOptions {
   baseUpdatedAt?: number | null;
+  expectedWorkspaceRevision?: number | null;
   storageClass?: LibraryStorageClass;
 }
 
@@ -19,6 +20,11 @@ function hasBaseRevisionConflict(args: {
   options: SaveVideoProjectOptions;
   project: VideoProject;
 }): boolean {
+  if (args.options.expectedWorkspaceRevision !== undefined) {
+    return args.existing
+      ? args.options.expectedWorkspaceRevision !== (args.existing.workspaceRevision ?? 0)
+      : args.options.expectedWorkspaceRevision !== null;
+  }
   if (args.options.baseUpdatedAt === undefined) {
     return false;
   }
@@ -36,6 +42,10 @@ function shouldPreservePersistedProjectAssets(args: {
   project: VideoProject;
 }): boolean {
   if (!args.existing) {
+    return false;
+  }
+
+  if (args.options.expectedWorkspaceRevision !== undefined) {
     return false;
   }
 

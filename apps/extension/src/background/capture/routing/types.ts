@@ -126,19 +126,6 @@ export type RouteCaptureMessage =
       snapshotSessionId: string;
     }
   | {
-      type: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY';
-      assetId: string;
-      editorSessionId: string;
-    }
-  | {
-      type: 'UPDATE_GALLERY_IMAGE_ASSET';
-      assetId: string;
-      dataUrl: string;
-      editorSessionId: string;
-      updateCapabilityToken: string;
-      filename?: string;
-    }
-  | {
       type: 'TRIGGER_QUICK_ACTION';
       actionId: string;
       contentIntent?: ContentPrivilegedActionCapability;

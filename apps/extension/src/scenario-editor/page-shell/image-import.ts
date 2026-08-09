@@ -1,6 +1,5 @@
-import { deleteScenarioAsset } from '../../composition/persistence/scenario/projects';
 import { createScenarioImageElement } from '../../features/scenario/project/v3';
-import { createScenarioV3ImageAsset } from '../../composition/persistence/scenario/store/v3';
+import { prepareScenarioV3ImageAsset } from '../../composition/persistence/scenario/store/v3';
 import type { ScenarioAssetEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   ScenarioElementFrame,
@@ -10,6 +9,7 @@ import type {
 import { readScenarioEditorFileAsDataUrl } from './file-reader';
 import { insertSlideElementIntoSession } from './session-element-insert';
 import type { ScenarioV3EditorSession } from './types';
+import type { CommitScenarioV3AggregateMutation } from './types';
 
 type SetSession = (update: (session: ScenarioV3EditorSession) => ScenarioV3EditorSession) => void;
 type GetSession = () => ScenarioV3EditorSession;
@@ -19,6 +19,7 @@ export async function insertImageFileIntoSelectedSlide(args: {
   getSession: GetSession | null;
   projectId: string | null;
   setSession: SetSession;
+  commitAggregateMutation: CommitScenarioV3AggregateMutation | null;
 }): Promise<void> {
   if (!args.file || !args.projectId || !args.getSession) {
     return;
@@ -31,22 +32,21 @@ export async function insertImageFileIntoSelectedSlide(args: {
   }
 
   const dataUrl = await readScenarioEditorFileAsDataUrl(args.file);
-  const asset = await createScenarioV3ImageAsset({ dataUrl, projectId: args.projectId });
+  const prepared = await prepareScenarioV3ImageAsset({ dataUrl, projectId: args.projectId });
   const latestSession = args.getSession();
   const slide = latestSession.project.slides.find((candidate) => candidate.id === slideId);
   if (latestSession.project.id !== args.projectId || !slide) {
-    await deleteScenarioAsset(asset.id);
     return;
   }
-
-  const element = createImportedImageElement(args.file, asset, slide);
-  try {
-    args.setSession((session) =>
-      insertImportedImageElement(session, args.projectId ?? '', slideId, element)
-    );
-  } catch (error: unknown) {
-    await rollbackImportedImageAsset(asset.id, error);
+  if (!args.commitAggregateMutation) {
+    throw new Error('Scenario aggregate mutation owner is unavailable.');
   }
+
+  const element = createImportedImageElement(args.file, prepared.asset, slide);
+  await args.commitAggregateMutation(
+    (session) => insertImportedImageElement(session, args.projectId ?? '', slideId, element),
+    { assetPuts: [prepared.entry] }
+  );
 }
 
 function createImportedImageElement(
@@ -95,20 +95,6 @@ function createCenteredImageFrame(
     x: Math.round((slide.canvas.width - width) / 2),
     y: Math.round((slide.canvas.height - height) / 2),
   };
-}
-
-async function rollbackImportedImageAsset(assetId: string, cause: unknown): Promise<never> {
-  try {
-    await deleteScenarioAsset(assetId);
-  } catch (rollbackError: unknown) {
-    throw new AggregateError(
-      [cause, rollbackError],
-      'Failed to insert scenario image layer and roll back image asset',
-      { cause: rollbackError }
-    );
-  }
-
-  throw cause;
 }
 
 function getImportedImageElementName(file: File): string {

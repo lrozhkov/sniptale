@@ -138,7 +138,7 @@ test('gallery image asset opens the editor from preview actions', async ({ page,
     .toBe(1);
 
   const [createdTab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
-  expect(createdTab?.url).toContain('/apps/extension/src/editor/index.html?session=');
+  expect(createdTab?.url).toContain('/apps/extension/src/editor/index.html?assetId=');
   expect(createdTab?.url).toContain(`assetId=${assetId}`);
 });
 

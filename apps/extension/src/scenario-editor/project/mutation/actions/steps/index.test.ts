@@ -15,20 +15,35 @@ import type {
 
 const {
   buildScenarioEditedCaptureStepMock,
-  cloneScenarioStepEditorDocumentRecordMock,
-  createScenarioEditedCaptureAssetMock,
-  saveScenarioStepEditorDocumentRecordMock,
+  commitScenarioAggregateSnapshotMutationMock,
+  getScenarioStepEditorDocumentRecordMock,
+  prepareScenarioEditedCaptureAssetMock,
+  prepareScenarioStepEditorDocumentRecordMock,
 } = vi.hoisted(() => ({
   buildScenarioEditedCaptureStepMock: vi.fn(),
-  cloneScenarioStepEditorDocumentRecordMock: vi.fn(),
-  createScenarioEditedCaptureAssetMock: vi.fn(),
-  saveScenarioStepEditorDocumentRecordMock: vi.fn(),
+  commitScenarioAggregateSnapshotMutationMock: vi.fn(),
+  getScenarioStepEditorDocumentRecordMock: vi.fn(),
+  prepareScenarioEditedCaptureAssetMock: vi.fn(),
+  prepareScenarioStepEditorDocumentRecordMock: vi.fn(),
 }));
 
-vi.mock('../../../../../workflows/scenario-capture-edit/edits', () => ({
+vi.mock('../../../../../workflows/scenario-capture-edit/edits', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../workflows/scenario-capture-edit/edits')
+  >()),
   buildScenarioEditedCaptureStep: buildScenarioEditedCaptureStepMock,
-  createScenarioEditedCaptureAsset: createScenarioEditedCaptureAssetMock,
+  prepareScenarioEditedCaptureAsset: prepareScenarioEditedCaptureAssetMock,
 }));
+
+vi.mock(
+  '../../../../../composition/persistence/scenario/aggregate-mutations',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../../composition/persistence/scenario/aggregate-mutations')
+    >()),
+    commitScenarioAggregateSnapshotMutation: commitScenarioAggregateSnapshotMutationMock,
+  })
+);
 
 vi.mock(
   '../../../../../composition/persistence/scenario/store/step-editor-documents',
@@ -36,8 +51,8 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../../../../../composition/persistence/scenario/store/step-editor-documents')
     >()),
-    cloneScenarioStepEditorDocumentRecord: cloneScenarioStepEditorDocumentRecordMock,
-    saveScenarioStepEditorDocumentRecord: saveScenarioStepEditorDocumentRecordMock,
+    getScenarioStepEditorDocumentRecord: getScenarioStepEditorDocumentRecordMock,
+    prepareScenarioStepEditorDocumentRecord: prepareScenarioStepEditorDocumentRecordMock,
   })
 );
 
@@ -91,9 +106,16 @@ function createProject(): ScenarioProject {
 
 function resetApplyEditedCaptureStepMocks() {
   vi.clearAllMocks();
-  saveScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
-  cloneScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
-  createScenarioEditedCaptureAssetMock.mockResolvedValue({ id: 'asset-new' });
+  getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
+  prepareScenarioEditedCaptureAssetMock.mockResolvedValue({
+    asset: { id: 'asset-new' },
+    entry: { id: 'asset-new', projectId: 'project-1' },
+  });
+  prepareScenarioStepEditorDocumentRecordMock.mockImplementation((value) => value);
+  commitScenarioAggregateSnapshotMutationMock.mockImplementation(async ({ nextProject }) => ({
+    project: nextProject,
+    workspaceRevision: 2,
+  }));
   buildScenarioEditedCaptureStepMock.mockImplementation((step, assetId) => ({
     ...step,
     assetId,
@@ -104,33 +126,32 @@ function resetApplyEditedCaptureStepMocks() {
 async function verifiesCaptureStepApply() {
   const applyStepReplacement = vi.fn();
   const document = createEditorDocument();
+  let project = createProject();
   const action = createApplyEditedCaptureStepAction({
     applyStepReplacement,
-    project: createProject(),
+    getCurrentProject: () => project,
+    project,
+    updateProject: (updater) => {
+      project = updater(project);
+    },
   });
 
   await action('capture-1', { dataUrl: 'data:image/png;base64,next', document });
 
-  expect(saveScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith({
+  expect(prepareScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith({
     document,
     projectId: 'project-1',
     stepId: 'capture-1',
   });
-  expect(createScenarioEditedCaptureAssetMock).toHaveBeenCalledWith({
+  expect(prepareScenarioEditedCaptureAssetMock).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,next',
     galleryAssetId: 'gallery-1',
     projectId: 'project-1',
   });
-  expect(applyStepReplacement).toHaveBeenCalledWith('capture-1', expect.any(Function));
-
-  const replaceStep = applyStepReplacement.mock.calls[0]?.[1] as (step: unknown) => unknown;
-  expect(
-    replaceStep(
-      createScenarioCaptureStep({
-        assetId: 'asset-1',
-      })
-    )
-  ).toEqual(expect.objectContaining({ assetId: 'asset-new', overlays: [] }));
+  expect(commitScenarioAggregateSnapshotMutationMock).toHaveBeenCalledWith(
+    expect.objectContaining({ baseProject: expect.objectContaining({ id: 'project-1' }) })
+  );
+  expect(project.steps[0]).toEqual(expect.objectContaining({ assetId: 'asset-new', overlays: [] }));
   expect(buildScenarioEditedCaptureStepMock).toHaveBeenCalledWith(
     expect.objectContaining({ kind: 'capture' }),
     'asset-new',
@@ -141,17 +162,20 @@ async function verifiesCaptureStepApply() {
 async function verifiesEarlyApplyReturn() {
   const applyStepReplacement = vi.fn();
   const document = createEditorDocument();
+  const project = createProject();
   const action = createApplyEditedCaptureStepAction({
     applyStepReplacement,
-    project: createProject(),
+    getCurrentProject: () => project,
+    project,
+    updateProject: vi.fn(),
   });
 
   await action('missing-step', { dataUrl: 'data:image/png;base64,next', document });
   await action('note-1', { dataUrl: 'data:image/png;base64,next', document });
 
-  expect(createScenarioEditedCaptureAssetMock).not.toHaveBeenCalled();
+  expect(prepareScenarioEditedCaptureAssetMock).not.toHaveBeenCalled();
   expect(applyStepReplacement).not.toHaveBeenCalled();
-  expect(saveScenarioStepEditorDocumentRecordMock).not.toHaveBeenCalled();
+  expect(prepareScenarioStepEditorDocumentRecordMock).not.toHaveBeenCalled();
 }
 
 describe('createApplyEditedCaptureStepAction', () => {
@@ -174,6 +198,7 @@ describe('createDuplicateStepAction', () => {
     const setSelectedStepId = vi.fn();
     const setError = vi.fn();
     let currentProject: ReturnType<typeof createProject> = createProject();
+    getScenarioStepEditorDocumentRecordMock.mockResolvedValue({ document: createEditorDocument() });
     const action = createDuplicateStepAction({
       getCurrentProject: () => currentProject,
       setError,
@@ -187,11 +212,10 @@ describe('createDuplicateStepAction', () => {
 
     expect(currentProject.steps).toHaveLength(3);
     expect(currentProject.steps[1]?.id).not.toBe('capture-1');
-    expect(cloneScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith({
-      nextProjectId: 'project-1',
-      nextStepId: currentProject.steps[1]?.id,
-      sourceStepId: 'capture-1',
-    });
+    expect(getScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith('capture-1');
+    expect(prepareScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'project-1', stepId: currentProject.steps[1]?.id })
+    );
     expect(setSelectedStepId).toHaveBeenCalledWith(currentProject.steps[1]?.id);
     expect(setError).toHaveBeenCalledWith(null);
   });

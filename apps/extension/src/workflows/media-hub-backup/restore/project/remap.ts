@@ -26,6 +26,7 @@ export function remapVideoProjectEntry(prepared: PreparedVideoProject): VideoPro
 
   return {
     ...prepared.descriptor.entry,
+    workspaceRevision: prepared.descriptor.entry.workspaceRevision ?? 0,
     id: prepared.idChanged ? prepared.projectId : prepared.descriptor.entry.id,
     project: {
       ...prepared.descriptor.entry.project,
@@ -52,5 +53,8 @@ export function remapVideoProjectEntry(prepared: PreparedVideoProject): VideoPro
 export function remapScenarioProjectEntry(prepared: PreparedScenarioProject): ScenarioProjectEntry {
   const entry = prepared.descriptor.entry;
   assertSupportedScenarioBackupProjectEntry(entry);
-  return remapScenarioProjectV3Entry(prepared);
+  return {
+    ...remapScenarioProjectV3Entry(prepared),
+    workspaceRevision: entry.workspaceRevision ?? 0,
+  };
 }

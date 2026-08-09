@@ -3,14 +3,12 @@ import {
   deleteMediaThumbnail,
 } from '../../composition/persistence/media-library/index';
 import { deleteDiagnostics } from '../../composition/persistence/diagnostics/index';
-import { deleteEditorSessionDraft } from '../../composition/persistence/editor-sessions/index';
 import { deleteRecording } from '../../composition/persistence/recordings/index';
-import { deleteScenarioStepEditorDocument } from '../../composition/persistence/scenario/editor-documents/index';
 import {
   deletePendingScenarioAsset,
-  deleteScenarioAsset,
   deleteScenarioExport,
 } from '../../composition/persistence/scenario/projects';
+import { deleteOrphanedScenarioAggregateChild } from '../../composition/persistence/scenario/aggregate-mutations';
 import { deleteProjectAsset } from '../../composition/persistence/projects/index';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { withMediaHubWriteGuard } from '../../features/media-hub/storage-errors';
@@ -32,20 +30,20 @@ async function deleteStorageCleanupCandidate(candidate: StorageCleanupCandidate)
     case 'thumbnail':
       await deleteMediaThumbnail(candidate.id);
       return;
-    case 'editor-session':
-      await deleteEditorSessionDraft(candidate.id);
-      return;
     case 'scenario-pending-asset':
       await deletePendingScenarioAsset(candidate.id);
       return;
     case 'scenario-asset':
-      await deleteScenarioAsset(candidate.id);
+      await deleteOrphanedScenarioAggregateChild({ id: candidate.id, kind: 'asset' });
       return;
     case 'scenario-export':
       await deleteScenarioExport(candidate.id);
       return;
     case 'scenario-step-document':
-      await deleteScenarioStepEditorDocument(candidate.id);
+      await deleteOrphanedScenarioAggregateChild({
+        id: candidate.id,
+        kind: 'editor-document',
+      });
       return;
     case 'diagnostics':
       await deleteDiagnostics(candidate.id);

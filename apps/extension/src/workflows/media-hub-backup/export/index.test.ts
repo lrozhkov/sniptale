@@ -165,8 +165,8 @@ function expectExportedManifest(manifest: MediaHubBackupManifest): void {
       assetCount: 2,
       effectBundleCount: 0,
       format: 'sniptale-media-hub-backup',
-      thumbnailCount: 1,
-      version: 4,
+      thumbnailCount: 0,
+      version: 5,
       videoProjectCount: 0,
       scenarioProjectCount: 0,
     })
@@ -182,7 +182,7 @@ function expectExportedAssets(
     expect.objectContaining({
       assetPath: 'assets/asset-1',
       entry: expect.objectContaining({ id: firstEntryId }),
-      thumbnailPath: 'thumbnails/asset-1',
+      thumbnailPath: null,
     }),
     expect.objectContaining({
       assetPath: 'assets/asset-2',

@@ -236,7 +236,6 @@ function verifyBuildCleanupCandidates() {
     topN: 2,
     rawInventory: {
       diagnostics: [],
-      editorSessions: [],
       scenarioExports: [],
       pendingScenarioAssets: [],
       scenarioAssets: [],

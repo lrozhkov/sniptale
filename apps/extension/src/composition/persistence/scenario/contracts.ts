@@ -10,6 +10,8 @@ export interface ScenarioProjectEntry {
   createdAt: number;
   updatedAt: number;
   lifecycle?: LibraryLifecycle;
+  /** Missing only on legacy rows; parsed as revision 0. */
+  workspaceRevision?: number;
 }
 
 export interface ScenarioAssetEntry {

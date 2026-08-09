@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import {
-  issueGalleryImageUpdateCapability,
-  resetGalleryImageUpdateCapabilitiesForTests,
-} from '../../../capture/routing/gallery-update-capabilities';
 import { createExportHarSession } from '../../../diagnostics/export-har-collector/session-factory';
 import {
   clearExportHarSession,
@@ -16,12 +12,9 @@ import {
   hasPreauthorizedHarStartRouteMessage,
   hasPreauthorizedHarStopRouteMessage,
 } from '../../../diagnostics/export-har-collector/authorization/preauthorization';
-import { hasPreauthorizedGalleryUpdateRouteMessage } from '../../../capture/routing/authorization/gallery-update';
 import { authorizeIPCMessage } from './index';
 
 const CONTENT_URL = 'https://example.test/page';
-const EDITOR_URL =
-  'chrome-extension://test/apps/extension/src/editor/index.html?assetId=asset-1&session=s-1';
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -53,14 +46,10 @@ function contentSender(tabId: number): chrome.runtime.MessageSender {
   });
 }
 
-beforeEach(() => {
-  resetGalleryImageUpdateCapabilitiesForTests();
-  vi.stubGlobal('crypto', { randomUUID: () => 'token-1' });
-});
+beforeEach(() => vi.stubGlobal('crypto', { randomUUID: () => 'token-1' }));
 
 afterEach(() => {
   clearExportHarSession('har-stop-1');
-  resetGalleryImageUpdateCapabilitiesForTests();
   vi.unstubAllGlobals();
 });
 
@@ -128,40 +117,4 @@ it('preauthorizes HAR stop capabilities at the capture route facade', () => {
     })
   ).toEqual({ authorized: true });
   expect(hasPreauthorizedHarStopRouteMessage(stopMessage)).toBe(true);
-});
-
-it('preauthorizes gallery image updates through one-shot document-bound capabilities', () => {
-  const gallerySender = sender({ documentId: 'editor-doc-1', url: EDITOR_URL });
-  const message = {
-    assetId: 'asset-1',
-    dataUrl: 'data:image/png;base64,2',
-    editorSessionId: 's-1',
-    updateCapabilityToken: issueGalleryImageUpdateCapability({
-      assetId: 'asset-1',
-      documentId: 'editor-doc-1',
-      editorSessionId: 's-1',
-      senderUrl: EDITOR_URL,
-    }),
-    type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-  };
-
-  expect(
-    authorizeIPCMessage({
-      family: 'capture',
-      kind: 'privileged-tab-route',
-      message,
-      resolvedTabId: 7,
-      sender: gallerySender,
-    })
-  ).toEqual({ authorized: true });
-  expect(hasPreauthorizedGalleryUpdateRouteMessage(message)).toBe(true);
-  expect(
-    authorizeIPCMessage({
-      family: 'capture',
-      kind: 'privileged-tab-route',
-      message,
-      resolvedTabId: 7,
-      sender: gallerySender,
-    })
-  ).toEqual({ authorized: false, reason: 'Unauthorized gallery image update' });
 });

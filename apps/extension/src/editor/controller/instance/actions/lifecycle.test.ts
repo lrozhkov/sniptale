@@ -164,7 +164,7 @@ describe('editor controller lifecycle actions', () => {
     expect(lifecycleMocks.openEditorImageViaController).toHaveBeenCalledOnce();
     expect(lifecycleMocks.loadEditorDocumentViaController).toHaveBeenCalledOnce();
     expect(controller.autosaveService.persistSnapshot).toHaveBeenCalledTimes(2);
-    expect(controller.autosaveService.discardDraft).toHaveBeenCalledOnce();
+    expect(controller.autosaveService.discardDraft).not.toHaveBeenCalled();
     expect(lifecycleMocks.closeEditorDocumentViaController).toHaveBeenCalledOnce();
     expect(lifecycleMocks.exportEditorDocumentViaController).toHaveBeenCalledOnce();
     expect(lifecycleMocks.renderEditorControllerToDataUrl).toHaveBeenCalledWith(

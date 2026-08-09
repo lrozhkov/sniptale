@@ -95,14 +95,6 @@ export const runtimeAuthorityRestartSemantics = [
     restartClass: 'disposable-fail-closed',
   },
   {
-    authority: 'Gallery image update capabilities',
-    ownerModule: 'apps/extension/src/background/capture/routing/gallery-update-capabilities.ts',
-    proofModule:
-      'apps/extension/src/background/capture/routing/gallery-update-capabilities.owner.test.ts',
-    restartBehavior: 'Disposable editor image-update tokens fail closed after worker restart.',
-    restartClass: 'disposable-fail-closed',
-  },
-  {
     authority: 'Web snapshot staged blobs',
     ownerModule: 'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.ts',
     proofModule: 'apps/extension/src/background/capture/routing/web-snapshot/staged-blobs.test.ts',

@@ -1,6 +1,7 @@
 import type { PolicyStateId } from '../../../routing-contracts/policy-state';
 
 export const BACKGROUND_OWNED_POLICY_STATE_IDS = [
+  'aggregate-editor-presence',
   'ai-secret-unlock-requests',
   'annotation-fork-sessions',
   'content-action-activation-keys',

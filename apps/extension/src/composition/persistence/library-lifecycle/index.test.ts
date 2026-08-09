@@ -8,7 +8,8 @@ import { createScenarioProject } from '../../../features/scenario/project/factor
 
 const persistenceMocks = vi.hoisted(() => ({
   getMediaThumbnail: vi.fn(),
-  listEditorSessionDrafts: vi.fn(),
+  listAggregatePresentations: vi.fn(),
+  listImageWorkspaces: vi.fn(),
   listMediaLibrary: vi.fn(),
   listScenarioAssets: vi.fn(),
   listScenarioExports: vi.fn(),
@@ -22,9 +23,13 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
 }));
 
-vi.mock('../editor-sessions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../editor-sessions')>()),
-  listEditorSessionDrafts: persistenceMocks.listEditorSessionDrafts,
+vi.mock('../aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../aggregate-presentations')>()),
+  listAggregatePresentations: persistenceMocks.listAggregatePresentations,
+}));
+vi.mock('../image-workspaces', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../image-workspaces')>()),
+  listImageWorkspaces: persistenceMocks.listImageWorkspaces,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -53,9 +58,42 @@ import {
   promoteStoredItem,
 } from '.';
 
+function createMissingProjectAssetObjectStore(
+  project: Pick<
+    ReturnType<typeof createVideoProjectEntryWithMediaClip>,
+    'id' | 'workspaceRevision'
+  >,
+  put: ReturnType<typeof vi.fn>
+) {
+  return (name: string) => {
+    switch (name) {
+      case 'video_projects':
+        return { get: vi.fn(async () => project), put };
+      case 'project_assets':
+      case 'image_workspaces':
+        return { get: vi.fn(async () => undefined) };
+      case 'aggregate_presentations':
+        return {
+          get: vi.fn(async () => ({
+            aggregateId: project.id,
+            aggregateKind: 'video-project',
+            presentationRevision: project.workspaceRevision,
+            thumbnailBlob: new Blob(['cover']),
+            updatedAt: 10,
+          })),
+        };
+      case 'media_library':
+        return { getAll: vi.fn(async () => []), put };
+      default:
+        return { get: vi.fn(async () => undefined), put };
+    }
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([]);
+  persistenceMocks.listAggregatePresentations.mockResolvedValue([]);
+  persistenceMocks.listImageWorkspaces.mockResolvedValue([]);
   persistenceMocks.getMediaThumbnail.mockResolvedValue(undefined);
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioAssets.mockResolvedValue([]);
@@ -111,19 +149,6 @@ describe('library lifecycle cleanup and usage', () => {
       { id: 'scenario-fresh', lifecycle: createLibraryLifecycle('temporary', now - day) },
       { id: 'scenario-library', lifecycle: createLibraryLifecycle('library', now - 90 * day) },
     ]);
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([
-      {
-        assetId: 'linked-media',
-        lifecycle: createLibraryLifecycle('temporary', now - 31 * day),
-        sessionId: 'linked-session',
-      },
-      {
-        assetId: null,
-        lifecycle: createLibraryLifecycle('library', now - 90 * day),
-        sessionId: 'library-session',
-      },
-    ]);
-
     await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
       deletedCount: 5,
       deletedIds: [
@@ -137,10 +162,11 @@ describe('library lifecycle cleanup and usage', () => {
   });
 
   it('keeps drafts when cleanup is disabled unless deletion is explicitly requested', async () => {
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([
+    persistenceMocks.listMediaLibrary.mockResolvedValue([
       {
-        sessionId: 'session-1',
+        id: 'media-1',
         lifecycle: createLibraryLifecycle('temporary', 1),
+        source: { kind: 'screenshot' },
       },
     ]);
     const policy = { ...DEFAULT_LOCAL_STORAGE_POLICY, cleanupEnabled: false };
@@ -151,7 +177,7 @@ describe('library lifecycle cleanup and usage', () => {
     });
     await expect(cleanupDrafts({ includeUnexpired: true, now: 10_000, policy })).resolves.toEqual({
       deletedCount: 1,
-      deletedIds: ['editor-session:session-1'],
+      deletedIds: ['media-1'],
     });
   });
 
@@ -160,23 +186,16 @@ describe('library lifecycle cleanup and usage', () => {
       { id: 'usage-video' },
       { lifecycle: createLibraryLifecycle('temporary', 1) }
     );
-    const editorSession = {
-      assetId: null,
+    const imageWorkspace = {
+      aggregateId: 'usage-image',
       createdAt: 1,
-      dirty: true,
       document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('temporary', 1),
-      sessionId: 'usage-session',
+      revision: 1,
       sourceTitle: null,
       sourceUrl: null,
       updatedAt: 1,
     };
     const legacyVideoProject = createVideoProjectEntry({ id: 'usage-video-legacy' });
-    const legacyEditorSession = {
-      ...editorSession,
-      lifecycle: undefined,
-      sessionId: 'usage-session-legacy',
-    };
     const scenarioProject = createScenarioProject('Usage scenario');
     const scenario = {
       createdAt: 1,
@@ -186,7 +205,7 @@ describe('library lifecycle cleanup and usage', () => {
       updatedAt: 1,
     };
     persistenceMocks.listMediaLibrary.mockResolvedValue([
-      { size: 10, lifecycle: createLibraryLifecycle('temporary', 1) },
+      { id: 'usage-image', size: 10, lifecycle: createLibraryLifecycle('temporary', 1) },
       { size: 20, lifecycle: createLibraryLifecycle('library', 1) },
       { size: 5 },
       { size: -10, lifecycle: createLibraryLifecycle('temporary', 1) },
@@ -199,9 +218,38 @@ describe('library lifecycle cleanup and usage', () => {
       { hasThumbnail: true, id: 'missing-thumbnail-media', size: 1 },
     ]);
     persistenceMocks.listVideoProjectEntries.mockResolvedValue([videoProject, legacyVideoProject]);
-    persistenceMocks.listEditorSessionDrafts.mockResolvedValue([
-      editorSession,
-      legacyEditorSession,
+    persistenceMocks.listImageWorkspaces.mockResolvedValue([imageWorkspace]);
+    persistenceMocks.listAggregatePresentations.mockResolvedValue([
+      {
+        aggregateId: 'usage-image',
+        aggregateKind: 'image',
+        presentationRevision: 1,
+        previewBlob: new Blob(['preview']),
+        thumbnailBlob: new Blob(['thumb']),
+        updatedAt: 1,
+      },
+      {
+        aggregateId: videoProject.id,
+        aggregateKind: 'video-project',
+        presentationRevision: 0,
+        previewBlob: new Blob(['video-preview']),
+        thumbnailBlob: new Blob(['video-thumb']),
+        updatedAt: 1,
+      },
+      {
+        aggregateId: scenario.id,
+        aggregateKind: 'scenario',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['scenario-thumb']),
+        updatedAt: 1,
+      },
+      {
+        aggregateId: 'orphan-presentation',
+        aggregateKind: 'image',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['ignored']),
+        updatedAt: 1,
+      },
     ]);
     persistenceMocks.listScenarioProjectEntries.mockResolvedValue([scenario]);
     persistenceMocks.listScenarioAssets.mockResolvedValue([{ size: 7 }]);
@@ -230,17 +278,24 @@ describe('library lifecycle cleanup and usage', () => {
 
     const jsonBytes = (value: unknown) =>
       new TextEncoder().encode(JSON.stringify(value)).byteLength;
-    const expectedDrafts = 18 + jsonBytes(videoProject.project) + jsonBytes(editorSession);
+    const expectedDrafts =
+      18 +
+      jsonBytes(videoProject.project) +
+      jsonBytes(imageWorkspace) +
+      new Blob(['preview']).size +
+      new Blob(['thumb']).size +
+      new Blob(['video-preview']).size +
+      new Blob(['video-thumb']).size;
     const expectedLibrary =
       33 +
       jsonBytes(legacyVideoProject.project) +
-      jsonBytes(legacyEditorSession) +
       jsonBytes(scenario.project) +
       7 +
       3 +
       jsonBytes(stepDocument) +
       4 +
-      3;
+      3 +
+      new Blob(['scenario-thumb']).size;
 
     await expect(getLibraryStorageUsage()).resolves.toEqual({
       draftsBytes: expectedDrafts,
@@ -387,7 +442,17 @@ describe('library lifecycle promotion', () => {
               ? { get: vi.fn(async () => project), put: projectPut }
               : name === 'recordings'
                 ? { get: vi.fn(async () => recordingValue), put: recordingPut }
-                : { getAll: vi.fn(async () => [media]), put: mediaPut }
+                : name === 'aggregate_presentations'
+                  ? {
+                      get: vi.fn(async () => ({
+                        aggregateId: project.id,
+                        aggregateKind: 'video-project',
+                        presentationRevision: project.workspaceRevision,
+                        thumbnailBlob: new Blob(['cover']),
+                        updatedAt: 10,
+                      })),
+                    }
+                  : { getAll: vi.fn(async () => [media]), put: mediaPut }
           ),
         })),
       });
@@ -417,15 +482,7 @@ describe('library lifecycle promotion', () => {
       effect({
         transaction: vi.fn(() => ({
           done: Promise.resolve(),
-          objectStore: vi.fn((name: string) =>
-            name === 'video_projects'
-              ? { get: vi.fn(async () => project), put }
-              : name === 'project_assets'
-                ? { get: vi.fn(async () => undefined) }
-                : name === 'media_library'
-                  ? { getAll: vi.fn(async () => []), put }
-                  : { get: vi.fn(async () => undefined), put }
-          ),
+          objectStore: vi.fn(createMissingProjectAssetObjectStore(project, put)),
         })),
       })
     );
@@ -438,7 +495,7 @@ describe('library lifecycle promotion', () => {
 });
 
 describe('library lifecycle media promotion', () => {
-  it('atomically promotes media, its recording, and linked editor workspaces', async () => {
+  it('atomically promotes media and its recording dependency', async () => {
     const lifecycle = createLibraryLifecycle('temporary', 10);
     const media = {
       blob: new Blob(['media'], { type: 'video/webm' }),
@@ -468,23 +525,8 @@ describe('library lifecycle media promotion', () => {
       lifecycle: createLibraryLifecycle('library', 20),
       size: 5,
     };
-    const linkedSession = {
-      assetId: media.id,
-      createdAt: 10,
-      dirty: true,
-      document: createEditorDocumentFixture(),
-      lifecycle: createLibraryLifecycle('library', 30),
-      sessionId: 'session-1',
-      sourceTitle: null,
-      sourceUrl: null,
-      updatedAt: 10,
-    };
     const puts: unknown[] = [];
     const stores = {
-      editor_sessions: {
-        getAll: vi.fn(async () => [linkedSession, { sessionId: 'invalid' }]),
-        put: vi.fn(async (value) => puts.push(value)),
-      },
       media_library: {
         get: vi.fn(async () => media),
         getAll: vi.fn(async () => [media]),
@@ -506,16 +548,13 @@ describe('library lifecycle media promotion', () => {
 
     await promoteStoredItem({ id: media.id, kind: 'media' });
 
-    expect(puts).toHaveLength(3);
+    expect(puts).toHaveLength(2);
     expect(puts).toEqual([
       expect.objectContaining({
         lifecycle: { savedAt: 20, storageClass: 'library', updatedAt: 20 },
       }),
       expect.objectContaining({
         lifecycle: { savedAt: 50, storageClass: 'library', updatedAt: 50 },
-      }),
-      expect.objectContaining({
-        lifecycle: { savedAt: 30, storageClass: 'library', updatedAt: 30 },
       }),
     ]);
   });
@@ -593,7 +632,19 @@ describe('library lifecycle media promotion', () => {
               ? { get: vi.fn(async () => media), put }
               : name === 'project_assets'
                 ? { get: vi.fn(async () => undefined) }
-                : { getAll: vi.fn(async () => []), put }
+                : name === 'image_workspaces'
+                  ? { get: vi.fn(async () => undefined) }
+                  : name === 'aggregate_presentations'
+                    ? {
+                        get: vi.fn(async () => ({
+                          aggregateId: media.id,
+                          aggregateKind: 'image',
+                          presentationRevision: 0,
+                          thumbnailBlob: new Blob(['preview']),
+                          updatedAt: 10,
+                        })),
+                      }
+                    : { getAll: vi.fn(async () => []), put }
           ),
         })),
       })

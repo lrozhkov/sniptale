@@ -1,5 +1,6 @@
 import {
-  EDITOR_SESSIONS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -12,8 +13,6 @@ import {
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { listEditorSessionDrafts } from '../editor-sessions';
-import { parseEditorSessionEntry } from '../editor-sessions/index.guards';
 import { listMediaLibrary } from '../media-library';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { listVideoProjectEntries } from '../projects';
@@ -29,6 +28,7 @@ import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documen
 import type { LocalStoragePolicy } from '../../../contracts/settings';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { resolveVideoProjectRetentionKind } from '../../../features/media-hub/video-project-list-items';
+import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
 
@@ -55,14 +55,12 @@ export async function cleanupDrafts(args: {
   const now = args.now ?? Date.now();
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
-  const [media, videoProjects, scenarioProjects, editorSessions] = await Promise.all([
+  const [media, videoProjects, scenarioProjects] = await Promise.all([
     listMediaLibrary(),
     listVideoProjectEntries(),
     listScenarioProjectEntries(),
-    listEditorSessionDrafts(),
   ]);
   const deletedIds: string[] = [];
-
   const referencedMediaIds = new Set<string>();
   const referencedRecordingIds = new Set<string>();
   for (const project of videoProjects) {
@@ -72,172 +70,52 @@ export async function cleanupDrafts(args: {
   }
 
   const includeUnexpired = Boolean(args.includeUnexpired);
-  await cleanupVideoProjectDrafts(videoProjects, {
-    deletedIds,
-    includeUnexpired,
-    now,
-    ordinaryRetention,
-    videoRetention,
-  });
-  await cleanupMediaDrafts(media, {
-    deletedIds,
-    includeUnexpired,
-    now,
-    ordinaryRetention,
-    referencedMediaIds,
-    referencedRecordingIds,
-    videoRetention,
-  });
-  await cleanupOrdinaryWorkspaceDrafts(scenarioProjects, editorSessions, {
-    deletedIds,
-    includeUnexpired,
-    now,
-    ordinaryRetention,
-  });
-
-  return { deletedCount: deletedIds.length, deletedIds };
-}
-
-interface CleanupDraftContext {
-  deletedIds: string[];
-  includeUnexpired: boolean;
-  now: number;
-  ordinaryRetention: number | null;
-}
-
-async function cleanupVideoProjectDrafts(
-  entries: Awaited<ReturnType<typeof listVideoProjectEntries>>,
-  context: CleanupDraftContext & { videoRetention: number | null }
-): Promise<void> {
-  for (const entry of entries) {
+  for (const entry of videoProjects) {
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
     const retention =
       resolveVideoProjectRetentionKind(entry.project) === 'video'
-        ? context.videoRetention
-        : context.ordinaryRetention;
-    if (!context.includeUnexpired && !isExpired(lifecycle.updatedAt, retention, context.now))
-      continue;
+        ? videoRetention
+        : ordinaryRetention;
+    if (!includeUnexpired && !isExpired(lifecycle.updatedAt, retention, now)) continue;
     if (
       await deleteExpiredVideoProjectGraph({
         id: entry.id,
-        includeUnexpired: context.includeUnexpired,
-        now: context.now,
-        ordinaryRetention: context.ordinaryRetention,
+        includeUnexpired,
+        now,
         parentRetention: retention,
-        videoRetention: context.videoRetention,
+        videoRetention,
+        ordinaryRetention,
       })
     ) {
-      context.deletedIds.push(`video-project:${entry.id}`);
+      deletedIds.push(`video-project:${entry.id}`);
     }
   }
-}
 
-async function cleanupMediaDrafts(
-  entries: Awaited<ReturnType<typeof listMediaLibrary>>,
-  context: CleanupDraftContext & {
-    referencedMediaIds: Set<string>;
-    referencedRecordingIds: Set<string>;
-    videoRetention: number | null;
-  }
-): Promise<void> {
-  for (const entry of entries) {
+  for (const entry of media) {
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
-    if (context.referencedMediaIds.has(entry.id)) continue;
-    if (
-      entry.source.kind === 'recording' &&
-      context.referencedRecordingIds.has(entry.source.recordingId)
-    )
+    if (referencedMediaIds.has(entry.id)) continue;
+    if (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId)) {
       continue;
-    const retention =
-      entry.source.kind === 'recording' ? context.videoRetention : context.ordinaryRetention;
-    if (!context.includeUnexpired && !isExpired(lifecycle.updatedAt, retention, context.now))
-      continue;
-    if (
-      await deleteExpiredMedia(
-        entry.id,
-        context.now,
-        retention,
-        context.ordinaryRetention,
-        context.includeUnexpired
-      )
-    ) {
-      context.deletedIds.push(entry.id);
+    }
+    const retention = entry.source.kind === 'recording' ? videoRetention : ordinaryRetention;
+    if (!includeUnexpired && !isExpired(lifecycle.updatedAt, retention, now)) continue;
+    if (await deleteExpiredMedia(entry.id, now, retention, includeUnexpired)) {
+      deletedIds.push(entry.id);
     }
   }
-}
 
-async function cleanupOrdinaryWorkspaceDrafts(
-  scenarioProjects: Awaited<ReturnType<typeof listScenarioProjectEntries>>,
-  editorSessions: Awaited<ReturnType<typeof listEditorSessionDrafts>>,
-  context: CleanupDraftContext
-): Promise<void> {
   for (const entry of scenarioProjects) {
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
-    if (
-      !context.includeUnexpired &&
-      !isExpired(lifecycle.updatedAt, context.ordinaryRetention, context.now)
-    )
-      continue;
-    if (
-      await deleteExpiredScenarioProject(
-        entry.id,
-        context.now,
-        context.ordinaryRetention,
-        context.includeUnexpired
-      )
-    ) {
-      context.deletedIds.push(`scenario:${entry.id}`);
+    if (!includeUnexpired && !isExpired(lifecycle.updatedAt, ordinaryRetention, now)) continue;
+    if (await deleteExpiredScenarioProject(entry.id, now, ordinaryRetention, includeUnexpired)) {
+      deletedIds.push(`scenario:${entry.id}`);
     }
   }
-  for (const entry of editorSessions) {
-    const lifecycle = entry.lifecycle;
-    if (!lifecycle || lifecycle.storageClass !== 'temporary' || entry.assetId) continue;
-    if (
-      !context.includeUnexpired &&
-      !isExpired(lifecycle.updatedAt, context.ordinaryRetention, context.now)
-    )
-      continue;
-    if (
-      await deleteExpiredSimple(
-        EDITOR_SESSIONS_STORE,
-        entry.sessionId,
-        context.now,
-        context.ordinaryRetention,
-        context.includeUnexpired
-      )
-    ) {
-      context.deletedIds.push(`editor-session:${entry.sessionId}`);
-    }
-  }
-}
 
-async function deleteExpiredSimple(
-  storeName: typeof EDITOR_SESSIONS_STORE,
-  id: string,
-  now: number,
-  retention: number | null,
-  includeUnexpired: boolean
-): Promise<boolean> {
-  return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-    const current = parseEditorSessionEntry(await store.get(id));
-    if (
-      !current ||
-      current.lifecycle?.storageClass !== 'temporary' ||
-      current.assetId !== null ||
-      (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, now))
-    ) {
-      await tx.done;
-      return false;
-    }
-    await store.delete(id);
-    await tx.done;
-    return true;
-  });
+  return { deletedCount: deletedIds.length, deletedIds };
 }
 
 async function deleteExpiredScenarioProject(
@@ -253,6 +131,7 @@ async function deleteExpiredScenarioProject(
         SCENARIO_ASSETS_STORE,
         SCENARIO_EXPORTS_STORE,
         SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
         THUMBNAILS_STORE,
       ],
       'readwrite'
@@ -289,6 +168,9 @@ async function deleteExpiredScenarioProject(
         document?.projectId === id ? document.stepId : readOwnedChildKey(raw, id, 'stepId');
       if (stepId) await documentStore.delete(stepId);
     }
+    await tx
+      .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+      .delete(createAggregatePresentationKey({ id, kind: 'scenario' }));
     await tx.objectStore(THUMBNAILS_STORE).delete(`scenario:${id}`);
     await projectStore.delete(id);
     await tx.done;
@@ -297,9 +179,8 @@ async function deleteExpiredScenarioProject(
 }
 
 type ParsedMediaEntry = NonNullable<ReturnType<typeof parseMediaLibraryEntry>>;
-type ParsedEditorSession = NonNullable<ReturnType<typeof parseEditorSessionEntry>>;
 type CleanupReadStore = { get(key: string): Promise<unknown>; getAll(): Promise<unknown[]> };
-type CleanupDeleteStore = { delete(key: string): Promise<unknown> };
+type CleanupDeleteStore = { delete(key: IDBValidKey): Promise<unknown> };
 type CleanupMutableStore = CleanupReadStore & CleanupDeleteStore;
 
 function isMediaReferencedByVideoProject(
@@ -318,29 +199,10 @@ function isMediaReferencedByVideoProject(
   });
 }
 
-function editorSessionProtectsMedia(args: {
-  editorRetention: number | null;
-  includeUnexpired: boolean;
-  mediaId: string;
-  now: number;
-  session: ParsedEditorSession;
-}): boolean {
-  if (args.session.assetId !== args.mediaId) return false;
-  if (args.session.lifecycle?.storageClass === 'library') return true;
-  return (
-    !args.includeUnexpired &&
-    args.session.lifecycle?.storageClass === 'temporary' &&
-    !isExpired(args.session.lifecycle.updatedAt, args.editorRetention, args.now)
-  );
-}
-
 function collectProtectedVideoProjectReferences(
   rawProjects: readonly unknown[],
   ownerProjectId: string
-): {
-  protectedProjectAssetIds: Set<string>;
-  protectedRecordingIds: Set<string>;
-} {
+): { protectedProjectAssetIds: Set<string>; protectedRecordingIds: Set<string> } {
   const protectedRecordingIds = new Set<string>();
   const protectedProjectAssetIds = new Set<string>();
   for (const rawProject of rawProjects) {
@@ -353,20 +215,31 @@ function collectProtectedVideoProjectReferences(
   return { protectedProjectAssetIds, protectedRecordingIds };
 }
 
+async function deleteImageAggregateSidecars(args: {
+  aggregateId: string;
+  presentationStore: CleanupDeleteStore;
+  workspaceStore: CleanupDeleteStore;
+}): Promise<void> {
+  await args.workspaceStore.delete(args.aggregateId);
+  await args.presentationStore.delete(
+    createAggregatePresentationKey({ id: args.aggregateId, kind: 'image' })
+  );
+}
+
 async function cleanupVideoProjectMedia(args: {
   context: {
-    editorSessions: readonly ParsedEditorSession[];
     includeUnexpired: boolean;
     now: number;
     ordinaryRetention: number | null;
     videoRetention: number | null;
   };
-  editorStore: CleanupDeleteStore;
   mediaStore: CleanupMutableStore;
+  presentationStore: CleanupDeleteStore;
   protectedProjectAssetIds: Set<string>;
   protectedRecordingIds: Set<string>;
   refs: ReturnType<typeof collectVideoProjectReferences>;
   thumbnailStore: CleanupDeleteStore;
+  workspaceStore: CleanupDeleteStore;
 }): Promise<void> {
   for (const raw of await args.mediaStore.getAll()) {
     const media = parseMediaLibraryEntry(raw);
@@ -389,11 +262,11 @@ async function cleanupVideoProjectMedia(args: {
     if (cleanup.kind !== 'delete') continue;
     await args.mediaStore.delete(media.id);
     await args.thumbnailStore.delete(media.id);
-    for (const session of args.context.editorSessions) {
-      if (session.assetId === media.id && session.lifecycle?.storageClass === 'temporary') {
-        await args.editorStore.delete(session.sessionId);
-      }
-    }
+    await deleteImageAggregateSidecars({
+      aggregateId: media.id,
+      presentationStore: args.presentationStore,
+      workspaceStore: args.workspaceStore,
+    });
   }
 }
 
@@ -420,23 +293,10 @@ async function cleanupVideoProjectRecordings(args: {
   }
 }
 
-async function cleanupVideoProjectAssets(args: {
-  assetIds: ReadonlySet<string>;
-  projectAssetStore: CleanupDeleteStore;
-  protectedProjectAssetIds: ReadonlySet<string>;
-}): Promise<void> {
-  for (const projectAssetId of args.assetIds) {
-    if (!args.protectedProjectAssetIds.has(projectAssetId)) {
-      await args.projectAssetStore.delete(projectAssetId);
-    }
-  }
-}
-
 async function deleteExpiredMedia(
   id: string,
   now: number,
   retention: number | null,
-  editorRetention: number | null,
   includeUnexpired: boolean
 ): Promise<boolean> {
   return runWithIndexedDbMutation(async (db) => {
@@ -444,7 +304,8 @@ async function deleteExpiredMedia(
       [
         MEDIA_LIBRARY_STORE,
         THUMBNAILS_STORE,
-        EDITOR_SESSIONS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
         STORE_NAME,
         VIDEO_PROJECTS_STORE,
         PROJECT_ASSETS_STORE,
@@ -462,19 +323,9 @@ async function deleteExpiredMedia(
       await tx.done;
       return false;
     }
-    const projectStore = tx.objectStore(VIDEO_PROJECTS_STORE);
-    if (isMediaReferencedByVideoProject(current, await projectStore.getAll())) {
-      await tx.done;
-      return false;
-    }
-    const editorStore = tx.objectStore(EDITOR_SESSIONS_STORE);
-    const editorSessions = (await editorStore.getAll())
-      .map(parseEditorSessionEntry)
-      .filter((session) => session !== null);
-    const protectedByEditorSession = editorSessions.some((session) =>
-      editorSessionProtectsMedia({ editorRetention, includeUnexpired, mediaId: id, now, session })
-    );
-    if (protectedByEditorSession) {
+    if (
+      isMediaReferencedByVideoProject(current, await tx.objectStore(VIDEO_PROJECTS_STORE).getAll())
+    ) {
       await tx.done;
       return false;
     }
@@ -491,17 +342,17 @@ async function deleteExpiredMedia(
       await tx.done;
       return false;
     }
+
     await mediaStore.delete(id);
     await tx.objectStore(THUMBNAILS_STORE).delete(id);
-    for (const session of editorSessions) {
-      if (session?.assetId === id && session.lifecycle?.storageClass === 'temporary')
-        await editorStore.delete(session.sessionId);
-    }
-    if (current.source.kind === 'recording') {
-      if (recording?.lifecycle?.storageClass === 'temporary') {
-        await recordingStore.delete(current.source.recordingId);
-        await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(current.source.recordingId);
-      }
+    await deleteImageAggregateSidecars({
+      aggregateId: id,
+      presentationStore: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+      workspaceStore: tx.objectStore(IMAGE_WORKSPACES_STORE),
+    });
+    if (current.source.kind === 'recording' && recording?.lifecycle?.storageClass === 'temporary') {
+      await recordingStore.delete(current.source.recordingId);
+      await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(current.source.recordingId);
     }
     if (current.source.kind === 'project-asset') {
       await tx.objectStore(PROJECT_ASSETS_STORE).delete(current.source.projectAssetId);
@@ -527,7 +378,8 @@ async function deleteExpiredVideoProjectGraph(args: {
         MEDIA_LIBRARY_STORE,
         THUMBNAILS_STORE,
         PROJECT_ASSETS_STORE,
-        EDITOR_SESSIONS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
         RECORDING_TELEMETRY_STORE,
       ],
       'readwrite'
@@ -546,25 +398,16 @@ async function deleteExpiredVideoProjectGraph(args: {
     const refs = collectVideoProjectReferences(current);
     const { protectedProjectAssetIds, protectedRecordingIds } =
       collectProtectedVideoProjectReferences(await projectStore.getAll(), args.id);
-    const editorStore = tx.objectStore(EDITOR_SESSIONS_STORE);
-    const editorSessions = (await editorStore.getAll())
-      .map(parseEditorSessionEntry)
-      .filter((session) => session !== null);
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
     await cleanupVideoProjectMedia({
-      context: {
-        editorSessions,
-        includeUnexpired: args.includeUnexpired,
-        now: args.now,
-        ordinaryRetention: args.ordinaryRetention,
-        videoRetention: args.videoRetention,
-      },
-      editorStore,
-      mediaStore,
+      context: args,
+      mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+      presentationStore,
       protectedProjectAssetIds,
       protectedRecordingIds,
       refs,
       thumbnailStore: tx.objectStore(THUMBNAILS_STORE),
+      workspaceStore: tx.objectStore(IMAGE_WORKSPACES_STORE),
     });
     await cleanupVideoProjectRecordings({
       includeUnexpired: args.includeUnexpired,
@@ -575,11 +418,14 @@ async function deleteExpiredVideoProjectGraph(args: {
       telemetryStore: tx.objectStore(RECORDING_TELEMETRY_STORE),
       videoRetention: args.videoRetention,
     });
-    await cleanupVideoProjectAssets({
-      assetIds: refs.projectAssetIds,
-      projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
-      protectedProjectAssetIds,
-    });
+    for (const projectAssetId of refs.projectAssetIds) {
+      if (!protectedProjectAssetIds.has(projectAssetId)) {
+        await tx.objectStore(PROJECT_ASSETS_STORE).delete(projectAssetId);
+      }
+    }
+    await presentationStore.delete(
+      createAggregatePresentationKey({ id: args.id, kind: 'video-project' })
+    );
     await tx.objectStore(THUMBNAILS_STORE).delete(`video-project:${args.id}`);
     await projectStore.delete(args.id);
     await tx.done;
@@ -593,7 +439,6 @@ function classifyVideoProjectMediaCleanup(
   protectedRecordingIds: ReadonlySet<string>,
   protectedProjectAssetIds: ReadonlySet<string>,
   context: {
-    editorSessions: readonly ParsedEditorSession[];
     includeUnexpired: boolean;
     now: number;
     ordinaryRetention: number | null;
@@ -617,16 +462,14 @@ function classifyVideoProjectMediaCleanup(
   const owned =
     refs.projectAssetIds.has(projectAssetId) && !protectedProjectAssetIds.has(projectAssetId);
   if (!owned) return { kind: 'keep' };
-  if (shouldProtectVideoProjectMedia(media, context)) {
-    return { kind: 'protect-project-asset', projectAssetId };
-  }
-  return { kind: 'delete' };
+  return shouldProtectVideoProjectMedia(media, context)
+    ? { kind: 'protect-project-asset', projectAssetId }
+    : { kind: 'delete' };
 }
 
 function shouldProtectVideoProjectMedia(
   media: ParsedMediaEntry,
   context: {
-    editorSessions: readonly ParsedEditorSession[];
     includeUnexpired: boolean;
     now: number;
     ordinaryRetention: number | null;
@@ -634,19 +477,6 @@ function shouldProtectVideoProjectMedia(
   }
 ): boolean {
   if (media.lifecycle?.storageClass !== 'temporary') return true;
-  if (
-    context.editorSessions.some((session) =>
-      editorSessionProtectsMedia({
-        editorRetention: context.ordinaryRetention,
-        includeUnexpired: context.includeUnexpired,
-        mediaId: media.id,
-        now: context.now,
-        session,
-      })
-    )
-  ) {
-    return true;
-  }
   if (context.includeUnexpired) return false;
   const retention =
     media.source.kind === 'recording' ? context.videoRetention : context.ordinaryRetention;

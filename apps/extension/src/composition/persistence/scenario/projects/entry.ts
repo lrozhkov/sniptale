@@ -41,5 +41,6 @@ export function createScenarioProjectEntry(args: {
           updatedAt
         )
       : createLibraryLifecycle(args.storageClass ?? 'library', updatedAt),
+    workspaceRevision: (args.existing?.workspaceRevision ?? 0) + 1,
   };
 }

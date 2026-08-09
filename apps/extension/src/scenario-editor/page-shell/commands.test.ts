@@ -8,7 +8,7 @@ import { insertImageFileIntoSelectedSlide } from './image-import';
 import type { ScenarioV3EditorSession } from './types';
 
 const imageImportMocks = vi.hoisted(() => ({
-  createScenarioV3ImageAsset: vi.fn(),
+  prepareScenarioV3ImageAsset: vi.fn(),
   createScenarioAssetEntryFromBlob: vi.fn(),
   deleteScenarioAsset: vi.fn(),
   readScenarioEditorFileAsDataUrl: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('./file-reader', () => ({
 
 vi.mock('../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/scenario/store/v3')>()),
-  createScenarioV3ImageAsset: imageImportMocks.createScenarioV3ImageAsset,
+  prepareScenarioV3ImageAsset: imageImportMocks.prepareScenarioV3ImageAsset,
 }));
 
 vi.mock(
@@ -43,15 +43,18 @@ vi.mock('../../composition/persistence/scenario/projects', async (importOriginal
 beforeEach(() => {
   vi.clearAllMocks();
   imageImportMocks.readScenarioEditorFileAsDataUrl.mockResolvedValue('data:image/png;base64,aW1n');
-  imageImportMocks.createScenarioV3ImageAsset.mockResolvedValue({
-    createdAt: 10,
-    galleryAssetId: null,
-    height: 720,
-    id: 'asset-imported',
-    mimeType: 'image/png',
-    projectId: 'project-1',
-    size: 5,
-    width: 1280,
+  imageImportMocks.prepareScenarioV3ImageAsset.mockResolvedValue({
+    asset: {
+      createdAt: 10,
+      galleryAssetId: null,
+      height: 720,
+      id: 'asset-imported',
+      mimeType: 'image/png',
+      projectId: 'project-1',
+      size: 5,
+      width: 1280,
+    },
+    entry: { id: 'asset-imported', projectId: 'project-1' },
   });
   imageImportMocks.createScenarioAssetEntryFromBlob.mockResolvedValue({
     assetEntry: {
@@ -143,7 +146,14 @@ it('imports image files as persisted image layers on the selected slide', async 
   const project = createCommandsTwoSlideProject();
   const harness = createSessionHarness(project);
   const slides = createSlideCommands(harness.setSession);
-  const elements = createElementCommands(harness.setSession, project.id, harness.getSession);
+  const commit = vi.fn(async (mutate) => harness.setSession(mutate));
+  const elements = createElementCommands(
+    harness.setSession,
+    project.id,
+    harness.getSession,
+    null,
+    commit
+  );
   const file = new File(['image'], 'Diagram.png', { type: 'image/png' });
 
   slides.selectSlide('slide-2');
@@ -151,11 +161,14 @@ it('imports image files as persisted image layers on the selected slide', async 
 
   const inserted = harness.getSession().project.slides[1]?.elements.at(-1);
   expect(imageImportMocks.readScenarioEditorFileAsDataUrl).toHaveBeenCalledWith(file);
-  expect(imageImportMocks.createScenarioV3ImageAsset).toHaveBeenCalledWith({
+  expect(imageImportMocks.prepareScenarioV3ImageAsset).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,aW1n',
     projectId: 'project-1',
   });
   expect(imageImportMocks.saveScenarioAsset).not.toHaveBeenCalled();
+  expect(commit).toHaveBeenCalledWith(expect.any(Function), {
+    assetPuts: [expect.objectContaining({ id: 'asset-imported' })],
+  });
   expect(inserted).toEqual(
     expect.objectContaining({
       assetRef: { assetId: 'asset-imported', galleryAssetId: null },
@@ -174,28 +187,26 @@ it('imports image files as persisted image layers on the selected slide', async 
 it('rolls back imported image assets when the project changes before insertion', async () => {
   const project = createCommandsTwoSlideProject();
   const harness = createSessionHarness(project);
-  const elements = createElementCommands(harness.setSession, project.id, harness.getSession);
+  const commit = vi.fn(async (mutate) => harness.setSession(mutate));
+  const elements = createElementCommands(
+    harness.setSession,
+    project.id,
+    harness.getSession,
+    null,
+    commit
+  );
   const file = new File(['image'], 'Stale.png', { type: 'image/png' });
 
-  imageImportMocks.createScenarioV3ImageAsset.mockImplementationOnce(async () => {
+  imageImportMocks.prepareScenarioV3ImageAsset.mockImplementationOnce(async () => {
     harness.setSession((session) => ({
       ...session,
       project: { ...session.project, id: 'project-2' },
     }));
-    return {
-      createdAt: 10,
-      galleryAssetId: null,
-      height: 720,
-      id: 'asset-imported',
-      mimeType: 'image/png',
-      projectId: 'project-1',
-      size: 5,
-      width: 1280,
-    };
+    return { asset: { id: 'asset-imported' }, entry: { id: 'asset-imported' } };
   });
   await elements.insertImageFile(file);
 
-  expect(imageImportMocks.deleteScenarioAsset).toHaveBeenCalledWith('asset-imported');
+  expect(commit).not.toHaveBeenCalled();
   expect(harness.getSession().project.slides[1]?.elements).toHaveLength(1);
   expect(harness.getSession().selectedElementId).toBeNull();
 });
@@ -205,26 +216,22 @@ it('rolls back imported image assets when project mutation throws', async () => 
   const harness = createSessionHarness(project);
   const onOperationError = vi.fn();
   const elements = createElementCommands(
-    () => {
-      throw new Error('mutation failed');
-    },
+    harness.setSession,
     project.id,
     harness.getSession,
-    onOperationError
+    onOperationError,
+    vi.fn().mockRejectedValue(new Error('mutation failed'))
   );
   const file = new File(['image'], 'Rollback.png', { type: 'image/png' });
 
   await expect(elements.insertImageFile(file)).resolves.toBeUndefined();
 
-  expect(imageImportMocks.deleteScenarioAsset).toHaveBeenCalledWith('asset-imported');
   expect(onOperationError).toHaveBeenCalledWith(translate('scenario.editor.v3OperationFailed'));
 });
 
-it('preserves both failures when imported image rollback also fails', async () => {
+it('surfaces an atomic aggregate mutation failure without a compensating delete', async () => {
   const project = createCommandsTwoSlideProject();
   const mutationError = new Error('mutation failed');
-  const rollbackError = new Error('rollback failed');
-  imageImportMocks.deleteScenarioAsset.mockRejectedValueOnce(rollbackError);
 
   await expect(
     insertImageFileIntoSelectedSlide({
@@ -236,14 +243,11 @@ it('preserves both failures when imported image rollback also fails', async () =
         selectedSlideId: 'slide-2',
       }),
       projectId: project.id,
-      setSession: () => {
-        throw mutationError;
-      },
+      setSession: vi.fn(),
+      commitAggregateMutation: vi.fn().mockRejectedValue(mutationError),
     })
-  ).rejects.toMatchObject({
-    cause: rollbackError,
-    errors: [mutationError, rollbackError],
-  });
+  ).rejects.toBe(mutationError);
+  expect(imageImportMocks.deleteScenarioAsset).not.toHaveBeenCalled();
 });
 
 it('preserves selected elements after update and move while they remain reachable', () => {

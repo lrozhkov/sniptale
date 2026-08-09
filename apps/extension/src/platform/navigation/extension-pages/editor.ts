@@ -9,7 +9,6 @@ interface EditorPageUrlOptions {
   assetId?: string | null;
   bootstrapId?: string | null;
   embedMode?: EditorEmbedMode | null;
-  sessionId?: string | null;
 }
 
 export function buildEditorUrl(options: EditorPageUrlOptions = {}): string {
@@ -17,10 +16,6 @@ export function buildEditorUrl(options: EditorPageUrlOptions = {}): string {
     new URL(runtimeInfo.getURL('apps/extension/src/editor/index.html')),
     options.embedMode
   );
-
-  if (options.sessionId) {
-    editorUrl.searchParams.set('session', options.sessionId);
-  }
 
   if (options.bootstrapId) {
     editorUrl.searchParams.set(EDITOR_BOOTSTRAP_QUERY_PARAM, options.bootstrapId);

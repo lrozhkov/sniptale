@@ -1,10 +1,11 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
 
 export interface ActiveEditorSessionContext {
-  sessionId: string;
-  assetId: string | null;
+  aggregateId: string;
+  durableRevision: number;
   sourceUrl: string | null;
   sourceTitle: string | null;
+  renderPresentation: (() => Promise<string> | string) | null;
 }
 
 export type EditorSessionAutosaveState = {
@@ -12,6 +13,7 @@ export type EditorSessionAutosaveState = {
   autosaveRevision: number;
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
+  lastWriteError: unknown | null;
   writeChain: Promise<void>;
 };
 
@@ -21,6 +23,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     autosaveRevision: 0,
     pendingDocument: null,
     pendingTimer: 0,
+    lastWriteError: null,
     writeChain: Promise.resolve(),
   };
 }

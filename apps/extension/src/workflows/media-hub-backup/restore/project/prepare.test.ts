@@ -109,9 +109,10 @@ describe('backup project restore preparation conflict strategies', () => {
     expect(remapVideoProjectEntry(prepared.videoProjects[0]!)).toBe(
       prepared.videoProjects[0]!.descriptor.entry
     );
-    expect(remapScenarioProjectEntry(prepared.scenarioProjects[0]!)).toBe(
-      prepared.scenarioProjects[0]!.descriptor.entry
-    );
+    expect(remapScenarioProjectEntry(prepared.scenarioProjects[0]!)).toEqual({
+      ...prepared.scenarioProjects[0]!.descriptor.entry,
+      workspaceRevision: 0,
+    });
     expect(remapId(prepared.videoProjects[0]!.projectAssetIdMap, 'project-asset-1')).toBe(
       'project-asset-1'
     );

@@ -52,8 +52,6 @@ export function getGalleryItemKindLabel(kind: GalleryItemKind): string {
   switch (kind) {
     case 'screenshot':
       return translate('gallery.preview.folderScreenshot');
-    case 'editor-session':
-      return translate('editor.documentActions.draft');
     case 'recording':
       return translate('gallery.preview.folderRecording');
     case 'export':
@@ -162,7 +160,7 @@ function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
 type MediaThumbProps = {
   assetId?: string;
   item?: GalleryItem;
-  kind?: Exclude<GalleryItemKind, 'editor-session'>;
+  kind?: GalleryItemKind;
 };
 
 function useResolvedMediaThumbItem(props: MediaThumbProps): GalleryItem {

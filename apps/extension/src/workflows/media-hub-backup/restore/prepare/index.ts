@@ -9,6 +9,10 @@ import {
 } from '../../contracts/types';
 import { createBackupWebSnapshotRecord } from '../web-snapshot';
 import { MAX_BACKUP_ENTRY_BYTES } from '../../manifest';
+import type { ImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
+import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
+import { materializeAggregatePresentation } from '../presentation';
+import type { BackupArchiveReader } from '../archive-reader';
 
 export interface PreparedBackupImportAsset {
   assetPath: string | null;
@@ -19,6 +23,8 @@ export interface PreparedBackupImportAsset {
   thumbnailPath: string | null;
   thumbnailBlob: Blob | null;
   webSnapshotRecord: WebSnapshotRecord | null;
+  workspace?: ImageWorkspaceEntry | null;
+  presentation?: AggregatePresentationEntry | null;
 }
 
 export interface BackupImportAssetPlan {
@@ -32,15 +38,11 @@ export interface BackupImportAssetPlan {
     snapshotId: string;
     updatedAt: number;
   } | null;
+  workspace: ImageWorkspaceEntry | null;
+  presentationDescriptor: MediaHubBackupMetadata['assets'][number]['presentation'];
 }
 
-export interface BackupArchiveEntry {
-  async(type: 'blob'): Promise<Blob>;
-}
-
-export interface BackupArchiveReader {
-  file(path: string): BackupArchiveEntry | null;
-}
+export type { BackupArchiveReader } from '../archive-reader';
 
 function remapRecordingTelemetry(
   entry: Omit<MediaLibraryEntry, 'blob'>,
@@ -119,6 +121,17 @@ export async function prepareBackupImportAsset(args: {
       recordingTelemetry: remapRecordingTelemetry(nextEntry, args.asset.recordingTelemetry),
       thumbnailPath: args.asset.thumbnailPath ?? null,
       webSnapshotPackage: createWebSnapshotPackagePlan(nextEntry),
+      workspace:
+        args.asset.workspace?.aggregateId === args.asset.entry.id
+          ? { ...args.asset.workspace, aggregateId: nextEntry.id }
+          : null,
+      presentationDescriptor:
+        args.asset.presentation?.entry.aggregateId === args.asset.entry.id
+          ? {
+              ...args.asset.presentation,
+              entry: { ...args.asset.presentation.entry, aggregateId: nextEntry.id },
+            }
+          : undefined,
     },
     resolvedConflict: existingEntry !== undefined,
   };
@@ -188,6 +201,11 @@ export async function loadBackupImportAssetBatch(args: {
         zip: args.zip,
       });
       const webSnapshotRecord = await createWebSnapshotRecordFromPlan(prepared, assetBlob);
+      const presentation = await materializeAggregatePresentation({
+        descriptor: prepared.presentationDescriptor,
+        ref: { id: prepared.nextEntry.id, kind: 'image' },
+        zip: args.zip,
+      });
       const nextEntry = webSnapshotRecord
         ? { ...prepared.nextEntry, size: webSnapshotRecord.size }
         : prepared.nextEntry;
@@ -198,6 +216,7 @@ export async function loadBackupImportAssetBatch(args: {
         nextEntry,
         thumbnailBlob,
         webSnapshotRecord,
+        presentation,
       };
     })
   );

@@ -137,6 +137,10 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
     en: 'Could not save to the library. Your draft is safe.',
   },
+  saveToLibraryMultipleEditors: {
+    ru: 'Проект открыт в нескольких вкладках. Оставьте одну актуальную вкладку редактора.',
+    en: 'This project is open in multiple tabs. Keep one current editor tab open.',
+  },
   unavailableInvalidProject: {
     ru: 'Проект повреждён и не может быть открыт или отрендерен.',
     en: 'This project is invalid and cannot be opened or rendered.',
@@ -164,6 +168,30 @@ export const galleryPreviewMessages = defineMessageSource({
   download: {
     ru: 'Скачать',
     en: 'Download',
+  },
+  downloadOriginal: {
+    ru: 'Скачать оригинал',
+    en: 'Download original',
+  },
+  saveCopy: {
+    ru: 'Сохранить копию',
+    en: 'Save copy',
+  },
+  restoreOriginal: {
+    ru: 'Вернуть оригинал',
+    en: 'Restore original',
+  },
+  restoreOriginalTitle: {
+    ru: 'Вернуть оригинал?',
+    en: 'Restore original?',
+  },
+  restoreOriginalMessage: {
+    ru: 'Текущие правки будут заменены исходным изображением. Оригинал останется в этом же материале.',
+    en: 'Current edits will be replaced with the original image. The material will keep the same ID.',
+  },
+  restoreOriginalConfirm: {
+    ru: 'Вернуть оригинал',
+    en: 'Restore original',
   },
   downloadZip: {
     ru: 'Скачать ZIP',

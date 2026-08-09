@@ -7,7 +7,6 @@ import {
 function createInventory(now: number): StorageCleanupInventory {
   return {
     diagnostics: createDiagnostics(now),
-    editorSessions: createEditorSessions(now),
     pendingScenarioAssets: createPendingAssets(now),
     scenarioAssets: [createScenarioAsset()],
     scenarioExports: [createScenarioExport()],
@@ -21,21 +20,6 @@ function createInventory(now: number): StorageCleanupInventory {
 function createDiagnostics(now: number) {
   return [
     { createdAt: new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString(), recordingId: 'diag-1' },
-  ];
-}
-
-function createEditorSessions(now: number) {
-  return [
-    {
-      assetId: null,
-      createdAt: 1,
-      dirty: true,
-      document: {} as never,
-      sessionId: 'session-1',
-      sourceTitle: 'Draft',
-      sourceUrl: null,
-      updatedAt: now - 31 * 24 * 60 * 60 * 1000,
-    },
   ];
 }
 
@@ -128,9 +112,6 @@ describe('storage cleanup raw inventory candidates', () => {
     expect(result.oldDiagnostics).toEqual([
       expect.objectContaining({ id: 'diag-1', target: 'diagnostics' }),
     ]);
-    expect(result.staleEditorDrafts).toEqual([
-      expect.objectContaining({ id: 'session-1', target: 'editor-session' }),
-    ]);
   });
 
   it('returns empty candidate groups when raw inventory is unavailable', () => {
@@ -144,7 +125,6 @@ describe('storage cleanup raw inventory candidates', () => {
       orphanedScenarioArtifacts: [],
       orphanedScenarioPendingAssets: [],
       orphanedThumbnails: [],
-      staleEditorDrafts: [],
     });
   });
 });

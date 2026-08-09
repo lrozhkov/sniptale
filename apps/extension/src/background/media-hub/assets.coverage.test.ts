@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   dataUrlToBlobMock: vi.fn(async () => new Blob(['image'])),
   ensureHeadroomMock: vi.fn(async () => undefined),
   saveAssetMock: vi.fn(async () => ({ id: 'saved-id' })),
-  updateAssetMock: vi.fn(async () => ({ id: 'updated-id' })),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -15,7 +14,6 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/media-hub/store')>()),
   saveScreenshotMediaAssetSafely: mocks.saveAssetMock,
-  updateScreenshotMediaAssetSafely: mocks.updateAssetMock,
 }));
 
 vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -28,7 +26,7 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   ensureMediaHubStorageHeadroom: mocks.ensureHeadroomMock,
 }));
 
-import { saveScreenshotToMediaHubFromDataUrl, updateGalleryImageAssetFromDataUrl } from './assets';
+import { saveScreenshotToMediaHubFromDataUrl } from './assets';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -106,12 +104,4 @@ it('normalizes missing tab metadata fields to null', async () => {
       sourceUrl: null,
     })
   );
-});
-
-it('updates gallery image assets from data urls', async () => {
-  await expect(
-    updateGalleryImageAssetFromDataUrl('asset-1', 'data:image/png;base64,abc', 'capture.png')
-  ).resolves.toBe('updated-id');
-
-  expect(mocks.updateAssetMock).toHaveBeenCalledWith('asset-1', expect.any(Blob), 'capture.png');
 });

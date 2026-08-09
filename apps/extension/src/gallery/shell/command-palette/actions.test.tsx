@@ -31,9 +31,12 @@ function createActions(): UseGalleryAppActionsResult {
       close: vi.fn(),
       copy: vi.fn(),
       download: vi.fn(),
+      downloadOriginal: vi.fn(),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
+      restoreOriginal: vi.fn(),
+      saveCopy: vi.fn(),
       saveMetadata: vi.fn(),
     },
     selection: {
@@ -125,6 +128,22 @@ it('disables selection and preview actions without context and enables them when
     previewItem: createVideoProjectItem({ unavailableReason: 'unsupported-engine1' }),
   });
   expect(unavailable.action.disabled).toBe(true);
+
+  const originalDownload = findAction('gallery-preview-download-original', {
+    previewItem: createMediaItem({ id: 'image-original' }),
+  });
+  const saveCopy = findAction('gallery-preview-save-copy', {
+    previewItem: createMediaItem({ id: 'image-copy' }),
+  });
+  const restoreOriginal = findAction('gallery-preview-restore-original', {
+    previewItem: createMediaItem({ id: 'image-restore' }),
+  });
+  originalDownload.action.onSelect?.();
+  saveCopy.action.onSelect?.();
+  restoreOriginal.action.onSelect?.();
+  expect(originalDownload.actions.preview.downloadOriginal).toHaveBeenCalledOnce();
+  expect(saveCopy.actions.preview.saveCopy).toHaveBeenCalledOnce();
+  expect(restoreOriginal.actions.preview.restoreOriginal).toHaveBeenCalledOnce();
 });
 
 it('marks active filters as current context and keeps disabled reasons on guarded actions', () => {

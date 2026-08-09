@@ -23,7 +23,6 @@ const mediaHubStoreMocks = vi.hoisted(() => ({
   saveScreenshotMediaAssetMock: vi.fn(),
   saveWebSnapshotMediaAssetMock: vi.fn(),
   updateMediaLibraryEntryMock: vi.fn(),
-  updateScreenshotMediaAssetMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
 }));
 
@@ -33,7 +32,6 @@ vi.mock('../../composition/persistence/media-library/index', async (importOrigin
   deleteMediaLibraryAsset: mediaHubStoreMocks.deleteMediaLibraryAssetMock,
   saveScreenshotMediaAsset: mediaHubStoreMocks.saveScreenshotMediaAssetMock,
   updateMediaLibraryEntry: mediaHubStoreMocks.updateMediaLibraryEntryMock,
-  updateScreenshotMediaAsset: mediaHubStoreMocks.updateScreenshotMediaAssetMock,
 }));
 
 vi.mock('../../composition/persistence/recordings/index', async (importOriginal) => ({
@@ -107,29 +105,18 @@ async function importMediaHubStoreModule() {
 beforeEach(resetMediaHubStoreMocks);
 
 describe('media-hub-store screenshot save flows', () => {
-  it('saves and updates screenshot assets through the write guard and publishes change events', async () => {
-    const { saveScreenshotMediaAssetSafely, updateScreenshotMediaAssetSafely } =
-      await importMediaHubStoreModule();
+  it('saves screenshot assets through the write guard and publishes change events', async () => {
+    const { saveScreenshotMediaAssetSafely } = await importMediaHubStoreModule();
     const createdEntry = createMediaEntry();
-    const updatedEntry = createMediaEntry({ id: 'asset-2' });
     mediaHubStoreMocks.saveScreenshotMediaAssetMock.mockResolvedValue(createdEntry);
-    mediaHubStoreMocks.updateScreenshotMediaAssetMock.mockResolvedValue(updatedEntry);
 
     await expect(saveScreenshotMediaAssetSafely(createScreenshotInput())).resolves.toEqual(
       createdEntry
     );
-    await expect(
-      updateScreenshotMediaAssetSafely('asset-2', new Blob(['updated']), 'updated.png')
-    ).resolves.toEqual(updatedEntry);
 
     expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenNthCalledWith(
       1,
       'shared.mediaHub.saveScreenshotAction',
-      expect.any(Function)
-    );
-    expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenNthCalledWith(
-      2,
-      'shared.mediaHub.updateScreenshotAction',
       expect.any(Function)
     );
     expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(
@@ -137,12 +124,7 @@ describe('media-hub-store screenshot save flows', () => {
       'create',
       ['asset-1']
     );
-    expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(
-      2,
-      'update',
-      ['asset-2']
-    );
-    expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenCalledTimes(2);
+    expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenCalledTimes(1);
   });
 });
 

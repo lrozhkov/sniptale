@@ -4,8 +4,6 @@ import {
   captureDownloadRouteDescriptor,
   captureExportRouteDescriptor,
   gallerySaveRouteDescriptor,
-  galleryUpdateCapabilityIssuanceRouteDescriptor,
-  galleryUpdateCapabilityRouteDescriptor,
   quickActionRouteDescriptor,
   webSnapshotRouteDescriptor,
 } from '../../../capture/routing/route-descriptors';
@@ -26,7 +24,5 @@ export const tabRouteGroups = [
   captureExportRouteDescriptor,
   gallerySaveRouteDescriptor,
   webSnapshotRouteDescriptor,
-  galleryUpdateCapabilityIssuanceRouteDescriptor,
-  galleryUpdateCapabilityRouteDescriptor,
   videoControlRouteDescriptor,
 ] as const satisfies readonly ActionRouteGroup[];

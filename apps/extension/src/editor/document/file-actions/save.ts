@@ -6,12 +6,10 @@ import {
 } from '../../../features/editor/contracts/embed';
 import { translate } from '../../../platform/i18n';
 import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
-import { readEditorAssetId, readEditorSessionId } from '@sniptale/runtime-contracts/editor/session';
 import { loadEditorExportSettings } from '../../persistence/export-settings';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { generateFilename } from '@sniptale/foundation/utils/filename';
 import type { EditorRenderedImageOptions } from '../model/render-options';
-import { saveToGalleryAsset } from './gallery-update';
 import type { EditorRenderedImagePort } from './ports';
 import { assertBackgroundResponse, EditorStoragePromptError } from './save-errors';
 
@@ -93,21 +91,9 @@ export async function saveEditorRenderedImage(
     : controller.renderToDataUrl(renderOptions);
   const embedMode = readEditorEmbedMode(window.location.search);
   const actionType = options.actionType ?? 'download_default';
-  const assetId = readEditorAssetId(window.location.search);
-  const editorSessionId = readEditorSessionId(window.location.search);
 
   if (embedMode === 'scenario') {
     applyEmbedSave(controller, dataUrl);
-    return;
-  }
-
-  if (assetId && editorSessionId && actionType === 'download_default' && !options.presetId) {
-    await saveToGalleryAsset({
-      assetId,
-      dataUrl,
-      editorSessionId,
-      filename: options.filename,
-    });
     return;
   }
 

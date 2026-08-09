@@ -22,6 +22,10 @@ import {
 } from './readers';
 import type { MediaHubBackupAssetDescriptor, MediaHubBackupMetadata } from '../contracts/types';
 import { normalizeEffectBundleDescriptor } from './effect-bundles';
+import { tryNormalizeAggregatePresentation } from './presentation';
+import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
+import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
+import { parseLibraryLifecycle } from '../../../composition/persistence/library-lifecycle/parser';
 
 const BACKUP_MEDIA_KINDS = new Set<MediaAssetKind>([
   'audio',
@@ -79,6 +83,16 @@ function normalizeMediaLibraryEntry(value: unknown): Omit<MediaLibraryEntry, 'bl
     failMetadata();
   }
 
+  const updatedAt = readNumber(field(entry, 'updatedAt'));
+  const lifecycle = parseLibraryLifecycle(field(entry, 'lifecycle'), {
+    storageClass: 'library',
+    updatedAt,
+  });
+  if (!lifecycle) failMetadata();
+  const workspaceRevisionValue = field(entry, 'workspaceRevision');
+  const workspaceRevision =
+    workspaceRevisionValue === undefined ? 0 : readNumber(workspaceRevisionValue);
+  if (!Number.isInteger(workspaceRevision) || workspaceRevision < 0) failMetadata();
   return {
     createdAt: readNumber(field(entry, 'createdAt')),
     duration: readNullableNumber(field(entry, 'duration')),
@@ -94,19 +108,48 @@ function normalizeMediaLibraryEntry(value: unknown): Omit<MediaLibraryEntry, 'bl
     sourceTitle: readNullableString(field(entry, 'sourceTitle')),
     sourceUrl: sanitizeProvenanceUrl(readNullableString(field(entry, 'sourceUrl'))),
     tags: readStringArray(field(entry, 'tags')),
-    updatedAt: readNumber(field(entry, 'updatedAt')),
+    updatedAt,
     width: readNullableNumber(field(entry, 'width')),
+    workspaceRevision,
+    lifecycle: { ...lifecycle, storageClass: 'library', savedAt: lifecycle.savedAt ?? updatedAt },
   };
 }
 
+function normalizeImageWorkspace(value: unknown): ImageWorkspaceEntry {
+  const parsed = parseImageWorkspaceEntry(value);
+  return parsed ?? failMetadata();
+}
+
 function normalizeAssetDescriptor(value: JsonRecord): MediaHubBackupAssetDescriptor {
+  const entry = normalizeMediaLibraryEntry(field(value, 'entry'));
+  const workspace =
+    field(value, 'workspace') === undefined
+      ? undefined
+      : normalizeImageWorkspace(field(value, 'workspace'));
+  const workspaceRevision = entry.workspaceRevision ?? 0;
+  const isEditableImage =
+    entry.source.kind === 'screenshot' && (entry.kind === 'image' || entry.kind === 'screenshot');
+  if (
+    (!isEditableImage && (workspaceRevision !== 0 || workspace !== undefined)) ||
+    (workspace !== undefined &&
+      (workspace.aggregateId !== entry.id || workspace.revision !== workspaceRevision)) ||
+    (isEditableImage && workspaceRevision > 0 && workspace === undefined)
+  ) {
+    failMetadata();
+  }
+  const presentation =
+    field(value, 'presentation') === undefined
+      ? undefined
+      : tryNormalizeAggregatePresentation(field(value, 'presentation'));
   return {
     assetPath: readNullablePath(field(value, 'assetPath'), ['assets/']),
-    entry: normalizeMediaLibraryEntry(field(value, 'entry')),
+    entry,
     ...(field(value, 'recordingTelemetry') === undefined
       ? {}
       : { recordingTelemetry: normalizeRecordingTelemetry(field(value, 'recordingTelemetry')) }),
     thumbnailPath: readNullablePath(field(value, 'thumbnailPath'), ['thumbnails/']),
+    ...(workspace ? { workspace } : {}),
+    ...(presentation ? { presentation } : {}),
   };
 }
 

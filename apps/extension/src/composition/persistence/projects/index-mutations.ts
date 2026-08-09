@@ -7,7 +7,13 @@ import type { LibraryStorageClass } from '../library-lifecycle';
 
 export interface CommitVideoProjectMutationOptions {
   baseRevision?: number | null;
+  expectedWorkspaceRevision?: number | null;
   storageClass?: LibraryStorageClass;
+}
+
+export interface VideoProjectWorkspaceCommit {
+  project: VideoProject;
+  workspaceRevision: number;
 }
 
 export function commitVideoProjectMutation(
@@ -27,6 +33,9 @@ async function commitVideoProjectMutationAndReadBack(
       : null;
   await saveVideoProject(project, {
     baseUpdatedAt: options.baseRevision ?? null,
+    ...(options.expectedWorkspaceRevision === undefined
+      ? {}
+      : { expectedWorkspaceRevision: options.expectedWorkspaceRevision }),
     storageClass:
       options.storageClass ??
       settings?.localStoragePolicy.defaultDestination ??
@@ -35,4 +44,25 @@ async function commitVideoProjectMutationAndReadBack(
   const result = await getVideoProject(project.id);
   const savedProject = resolveVideoProjectReadResult(result);
   return savedProject ?? project;
+}
+
+export async function commitVideoProjectWorkspaceMutation(
+  project: VideoProject,
+  options: {
+    expectedWorkspaceRevision: number | null;
+    storageClass?: LibraryStorageClass;
+  }
+): Promise<VideoProjectWorkspaceCommit> {
+  const settings =
+    options.storageClass === undefined && options.expectedWorkspaceRevision === null
+      ? await loadSettings().catch(() => null)
+      : null;
+  const entry = await saveVideoProject(project, {
+    expectedWorkspaceRevision: options.expectedWorkspaceRevision,
+    storageClass:
+      options.storageClass ??
+      settings?.localStoragePolicy.defaultDestination ??
+      DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+  });
+  return { project: entry.project, workspaceRevision: entry.workspaceRevision ?? 0 };
 }

@@ -70,10 +70,13 @@ function createProps(overrides: Partial<PreviewPanelProps> = {}): PreviewPanelPr
     onAddTag: vi.fn(),
     onResetChanges: vi.fn(),
     onDownload: vi.fn(async () => undefined),
+    onDownloadOriginal: vi.fn(async () => undefined),
     onCopy: vi.fn(async () => undefined),
     onEdit: vi.fn(),
     onOpenSnapshotScreenshot: vi.fn(async () => undefined),
     onDelete: vi.fn(async () => undefined),
+    onRestoreOriginal: vi.fn(),
+    onSaveCopy: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -233,10 +236,23 @@ it('renders image-only actions conditionally', () => {
 
   expect(imageMarkup).toContain('gallery.preview.openInEditor');
   expect(imageMarkup).toContain('gallery.preview.copy');
+  expect(imageMarkup).toContain('gallery.preview.downloadOriginal');
+  expect(imageMarkup).toContain('gallery.preview.restoreOriginal');
+  expect(imageMarkup).toContain('gallery.preview.saveCopy');
   expect(imageMarkup).toContain('border-none');
   expect(imageMarkup).toContain('h-10 min-h-10');
   expect(videoMarkup).not.toContain('gallery.preview.openInEditor');
   expect(videoMarkup).not.toContain('gallery.preview.copy');
+  const backingImageMarkup = renderToStaticMarkup(
+    <PreviewActions
+      {...createProps({
+        item: createItem({ source: { kind: 'project-asset', projectAssetId: 'asset-1' } }),
+      })}
+    />
+  );
+  expect(backingImageMarkup).not.toContain('gallery.preview.downloadOriginal');
+  expect(backingImageMarkup).not.toContain('gallery.preview.restoreOriginal');
+  expect(backingImageMarkup).not.toContain('gallery.preview.saveCopy');
 });
 
 it('hides destructive and reset actions for scenario exports without pending changes', () => {

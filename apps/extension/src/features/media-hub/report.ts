@@ -15,7 +15,6 @@ type CleanupCandidates = {
   heavyFiles: StorageCleanupCandidate[];
   oldScreenshots: StorageCleanupCandidate[];
   oldDiagnostics?: StorageCleanupCandidate[];
-  staleEditorDrafts?: StorageCleanupCandidate[];
 };
 
 type CleanupReportParams = CleanupCandidates & {
@@ -49,7 +48,6 @@ const CLEANUP_GROUP_CONFIGS: CleanupGroupConfig[] = [
   createCleanupGroupConfig('heavy-files', 'heavyFiles', 'heavyFiles'),
   createCleanupGroupConfig('old-screenshots', 'oldScreenshots', 'oldScreenshots'),
   createCleanupGroupConfig('orphaned-thumbnails', 'orphanedThumbnails', 'orphanedThumbnails'),
-  createCleanupGroupConfig('stale-editor-drafts', 'staleEditorDrafts', 'staleEditorDrafts'),
   createCleanupGroupConfig(
     'orphaned-scenario-pending-assets',
     'orphanedScenarioPendingAssets',
@@ -128,7 +126,6 @@ function normalizeCleanupReportParams(params: CleanupReportParams): NormalizedCl
     orphanedScenarioArtifacts: params.orphanedScenarioArtifacts ?? [],
     orphanedScenarioPendingAssets: params.orphanedScenarioPendingAssets ?? [],
     orphanedThumbnails: params.orphanedThumbnails ?? [],
-    staleEditorDrafts: params.staleEditorDrafts ?? [],
     topN: params.topN ?? 10,
   };
 }

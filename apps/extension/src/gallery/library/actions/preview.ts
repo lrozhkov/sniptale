@@ -1,7 +1,6 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import {
   openScenarioEditorPage,
@@ -12,7 +11,6 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GalleryPreviewController } from './controller-types';
 import {
   isGalleryMediaItem,
-  isGalleryEditorSessionItem,
   isGalleryScenarioItem,
   isGalleryVideoProjectAvailable,
   isGalleryVideoProjectItem,
@@ -26,14 +24,18 @@ import {
   type GalleryBusyAction,
 } from './shared';
 import { updateMediaLibraryEntrySafely } from '../../../workflows/media-hub/store';
+import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
+import {
+  copyImageAggregate,
+  restoreImageAggregateOriginal,
+} from '../../../composition/persistence/image-aggregates';
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
+import { translate } from '../../../platform/i18n';
+import { openGalleryConfirmDialog } from './shared';
 
 type PreviewMediaMetadataPatch = Partial<Pick<MediaLibraryEntry, 'filename' | 'tags'>>;
 
 export function openInEditor(item: GalleryItem) {
-  if (isGalleryEditorSessionItem(item)) {
-    void browserTabs.create({ url: buildEditorUrl({ sessionId: item.entityId }) });
-    return;
-  }
   if (isGalleryScenarioItem(item)) {
     void openScenarioEditorPage(item.entityId);
     return;
@@ -55,7 +57,6 @@ export function openInEditor(item: GalleryItem) {
   void browserTabs.create({
     url: buildEditorUrl({
       assetId: item.entityId ?? item.id,
-      sessionId: createEditorSessionId(),
     }),
   });
 }
@@ -75,7 +76,11 @@ async function withPreviewItemBlob(
   }
 
   await withBusy(async () => {
-    const blob = await getMediaAssetBlob(previewItem.entityId ?? previewItem.id);
+    const assetId = previewItem.entityId ?? previewItem.id;
+    const blob =
+      previewItem.kind === 'image' || previewItem.kind === 'screenshot'
+        ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
+        : await getMediaAssetBlob(assetId);
     if (!blob) {
       throw createMissingBlobError(previewItem.filename);
     }
@@ -91,6 +96,83 @@ export function downloadPreviewItem(
   return withPreviewItemBlob(controller, withBusy, (item, blob) => {
     downloadBlob(blob, item.filename);
   });
+}
+
+function getPreviewImageAggregate(controller: GalleryPreviewController) {
+  const item = controller.state.preview.session.item;
+  return item &&
+    isGalleryMediaItem(item) &&
+    isImageKind(item.kind) &&
+    item.source.kind === 'screenshot'
+    ? item
+    : null;
+}
+
+export function downloadOriginalPreviewItem(
+  controller: GalleryPreviewController,
+  withBusy: GalleryBusyAction
+): Promise<void> {
+  const item = getPreviewImageAggregate(controller);
+  if (!item) return Promise.resolve();
+  return withBusy(async () => {
+    const blob = await getMediaAssetBlob(item.entityId ?? item.id);
+    if (!blob) throw createMissingBlobError(item.originalFilename ?? item.filename);
+    downloadBlob(blob, item.originalFilename ?? item.filename);
+  });
+}
+
+export function createRestoreOriginalAction(
+  controller: GalleryPreviewController,
+  withBusy: GalleryBusyAction
+) {
+  return () => {
+    const item = getPreviewImageAggregate(controller);
+    if (!item) return;
+    openGalleryConfirmDialog(controller, {
+      title: translate('gallery.preview.restoreOriginalTitle'),
+      message: translate('gallery.preview.restoreOriginalMessage'),
+      confirmText: translate('gallery.preview.restoreOriginalConfirm'),
+      onConfirm: async () => {
+        await withBusy(async () => {
+          const result = await restoreImageAggregateOriginal(
+            item.entityId ?? item.id,
+            item.workspaceRevision ?? 0
+          );
+          controller.actions.preview.setPreview((current) => ({
+            ...current,
+            item: current.item
+              ? {
+                  ...current.item,
+                  presentationRevision: result.revision,
+                  updatedAt: result.updatedAt,
+                  workspaceRevision: result.revision,
+                }
+              : null,
+            url: null,
+          }));
+          await controller.actions.storage.refresh();
+        });
+      },
+    });
+  };
+}
+
+export function createSaveImageCopyAction(
+  controller: GalleryPreviewController,
+  withBusy: GalleryBusyAction
+) {
+  return () => {
+    const item = getPreviewImageAggregate(controller);
+    if (!item) return Promise.resolve();
+    return withBusy(async () => {
+      await copyImageAggregate({
+        aggregateId: item.entityId ?? item.id,
+        expectedWorkspaceRevision: item.workspaceRevision ?? 0,
+        targetAggregateId: createSecureRandomUuid(),
+      });
+      await controller.actions.storage.refresh();
+    });
+  };
 }
 
 export function copyPreviewItem(

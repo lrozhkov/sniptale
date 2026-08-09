@@ -1,17 +1,21 @@
 import type { EditorDocument } from '../../../../../features/editor/document/types';
 import {
-  deleteScenarioStepEditorDocument,
   getScenarioStepEditorDocument,
   listScenarioStepEditorDocuments,
-  saveScenarioStepEditorDocument,
 } from '../../editor-documents/index';
+import type { ScenarioStepEditorDocumentEntry } from '../../contracts';
 
-export async function saveScenarioStepEditorDocumentRecord(args: {
+export function prepareScenarioStepEditorDocumentRecord(args: {
   document: EditorDocument;
   projectId: string;
   stepId: string;
-}) {
-  return saveScenarioStepEditorDocument(args);
+}): ScenarioStepEditorDocumentEntry {
+  const now = Date.now();
+  return {
+    ...args,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export function getScenarioStepEditorDocumentRecord(stepId: string) {
@@ -20,25 +24,4 @@ export function getScenarioStepEditorDocumentRecord(stepId: string) {
 
 export function listScenarioStepEditorDocumentRecords(projectId: string) {
   return listScenarioStepEditorDocuments(projectId);
-}
-
-export function deleteScenarioStepEditorDocumentRecord(stepId: string) {
-  return deleteScenarioStepEditorDocument(stepId);
-}
-
-export async function cloneScenarioStepEditorDocumentRecord(args: {
-  nextProjectId: string;
-  nextStepId: string;
-  sourceStepId: string;
-}) {
-  const sourceEntry = await getScenarioStepEditorDocument(args.sourceStepId);
-  if (!sourceEntry) {
-    return undefined;
-  }
-
-  return saveScenarioStepEditorDocument({
-    stepId: args.nextStepId,
-    projectId: args.nextProjectId,
-    document: structuredClone(sourceEntry.document),
-  });
 }

@@ -1,6 +1,6 @@
 // Keep the IndexedDB name stable so existing user media/projects remain readable across rebrands.
 export const DB_NAME = 'sniptale-video-db';
-export const DB_VERSION = 23;
+export const DB_VERSION = 24;
 
 export const STORE_NAME = 'recordings';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
@@ -16,7 +16,8 @@ export const SCENARIO_EXPORTS_STORE = 'scenario_exports';
 export const SCENARIO_STEP_EDITOR_DOCUMENTS_STORE = 'scenario_step_editor_documents';
 export const MEDIA_LIBRARY_STORE = 'media_library';
 export const THUMBNAILS_STORE = 'thumbnails';
-export const EDITOR_SESSIONS_STORE = 'editor_sessions';
+export const IMAGE_WORKSPACES_STORE = 'image_workspaces';
+export const AGGREGATE_PRESENTATIONS_STORE = 'aggregate_presentations';
 export const WEB_SNAPSHOTS_STORE = 'web_snapshots';
 export const VIDEO_EFFECT_BUNDLES_STORE = 'video_effect_bundles';
 export const PROJECT_EXPORT_INPUTS_STORE = 'project_export_inputs';
@@ -41,7 +42,8 @@ export const EXPECTED_STORES = [
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
-  EDITOR_SESSIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
   WEB_SNAPSHOTS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   PROJECT_EXPORT_INPUTS_STORE,
@@ -65,7 +67,8 @@ export const EXPECTED_INDEXES = {
   [SCENARIO_EXPORTS_STORE]: ['projectId', 'createdAt'],
   [SCENARIO_STEP_EDITOR_DOCUMENTS_STORE]: ['projectId', 'updatedAt'],
   [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind'],
-  [EDITOR_SESSIONS_STORE]: ['updatedAt'],
+  [IMAGE_WORKSPACES_STORE]: ['updatedAt'],
+  [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],
   [WEB_SNAPSHOTS_STORE]: ['createdAt'],
   [VIDEO_EFFECT_BUNDLES_STORE]: ['enabled', 'updatedAt'],
   [PROJECT_EXPORT_INPUTS_STORE]: ['createdAt'],

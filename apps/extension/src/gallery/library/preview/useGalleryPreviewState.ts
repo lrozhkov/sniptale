@@ -10,6 +10,7 @@ import { getMediaAssetBlob } from '../../../composition/persistence/media-librar
 import { isGalleryMediaItem } from '../items';
 import type { GalleryPreviewSessionState } from '../types';
 import { loadWebSnapshotScreenshotBlob } from '../../web-snapshot/package';
+import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
 
 const EMPTY_PREVIEW_STATE: GalleryPreviewSessionState = {
   inspectorCollapsed: false,
@@ -65,6 +66,9 @@ async function loadPreviewBlob(
   }
 
   const assetId = previewItem.entityId ?? previewItem.id;
+  if (previewItem.kind === 'image' || previewItem.kind === 'screenshot') {
+    return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
+  }
   if (previewItem.kind === 'web-archive') {
     const packageBlob = await getMediaAssetBlob(assetId);
     return packageBlob ? loadWebSnapshotScreenshotBlob(packageBlob) : null;

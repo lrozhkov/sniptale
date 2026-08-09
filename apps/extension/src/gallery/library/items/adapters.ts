@@ -10,8 +10,8 @@ import type {
 } from './types';
 import { createGalleryMediaItem } from './types';
 import type { LibraryLifecycle } from '../../../contracts/settings/library-lifecycle';
-import type { EditorSessionEntry } from '../../../composition/persistence/editor-sessions/contracts';
-import type { GalleryEditorSessionItem } from './types';
+import type { AggregatePresentationEntry } from '../../../composition/persistence/aggregate-presentations';
+import { serializeAggregateRef } from '../../../composition/persistence/aggregate-presentations';
 
 function resolveLifecycle(
   lifecycle: ScenarioProjectSummary['lifecycle'] | VideoProjectListItem['lifecycle'],
@@ -104,55 +104,57 @@ export function createVideoProjectGalleryItem(
   };
 }
 
-export function createEditorSessionGalleryItem(
-  session: EditorSessionEntry
-): GalleryEditorSessionItem {
-  return {
-    createdAt: session.createdAt,
-    entityId: session.sessionId,
-    expiresAt: null,
-    filename: session.document.sourceName ?? 'Draft image',
-    hasThumbnail: false,
-    id: `editor-draft:${session.sessionId}`,
-    kind: 'editor-session',
-    lifecycle: session.lifecycle!,
-    size: session.document.sourceImageData.length,
-    sourceFavicon: null,
-    sourceTitle: session.sourceTitle,
-    sourceUrl: session.sourceUrl,
-    tags: [],
-    updatedAt: session.updatedAt,
-    width: session.document.sourceWidth,
-    height: session.document.sourceHeight,
-    duration: null,
-    mimeType: 'application/x-sniptale-editor-session',
-    session,
-    type: 'editor-session',
-  };
-}
-
 export function createGalleryItems(args: {
   mediaItems: MediaLibraryItem[];
-  editorSessions?: EditorSessionEntry[];
+  presentations?: AggregatePresentationEntry[];
   scenarioExportsByProjectId: Map<string, ScenarioExportEntry[]>;
   scenarioProjects: ScenarioProjectSummary[];
   thumbnailIds: Set<string>;
   videoProjects: VideoProjectListItem[];
 }): GalleryItem[] {
-  const mediaItems = args.mediaItems.map(createGalleryMediaItem);
-  const editorSessionItems = (args.editorSessions ?? []).map(createEditorSessionGalleryItem);
+  const presentations = new Map(
+    (args.presentations ?? []).map((entry) => [
+      serializeAggregateRef({ id: entry.aggregateId, kind: entry.aggregateKind }),
+      entry,
+    ])
+  );
+  const mediaItems = args.mediaItems
+    .filter((media) => media.source.kind !== 'project-asset')
+    .map((media) => {
+      const item = createGalleryMediaItem(media);
+      if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
+      const presentation = presentations.get(
+        serializeAggregateRef({ id: media.id, kind: 'image' })
+      );
+      return {
+        ...item,
+        hasThumbnail: Boolean(presentation),
+        presentationRevision: presentation?.presentationRevision ?? null,
+        workspaceRevision: media.workspaceRevision ?? 0,
+      };
+    });
   const videoProjectItems = args.videoProjects.map((project) => {
     const item = createVideoProjectGalleryItem(project);
+    const presentation = presentations.get(
+      serializeAggregateRef({ id: project.id, kind: 'video-project' })
+    );
     return {
       ...item,
-      hasThumbnail: args.thumbnailIds.has(item.id),
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: project.workspaceRevision ?? 0,
     };
   });
   const scenarioItems = args.scenarioProjects.map((project) => {
     const item = createScenarioGalleryItem(project);
+    const presentation = presentations.get(
+      serializeAggregateRef({ id: project.id, kind: 'scenario' })
+    );
     return {
       ...item,
-      hasThumbnail: args.thumbnailIds.has(item.id),
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: project.workspaceRevision ?? 0,
     };
   });
   const exportItems = args.scenarioProjects.flatMap((project) =>
@@ -165,13 +167,9 @@ export function createGalleryItems(args: {
     })
   );
 
-  return [
-    ...mediaItems,
-    ...editorSessionItems,
-    ...videoProjectItems,
-    ...scenarioItems,
-    ...exportItems,
-  ].sort((left, right) => {
-    return right.createdAt - left.createdAt;
-  });
+  return [...mediaItems, ...videoProjectItems, ...scenarioItems, ...exportItems].sort(
+    (left, right) => {
+      return right.createdAt - left.createdAt;
+    }
+  );
 }

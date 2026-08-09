@@ -13,7 +13,6 @@ vi.mock('../../composition/persistence/media-library/index', async (importOrigin
   deleteMediaThumbnail: vi.fn(),
   saveScreenshotMediaAsset: vi.fn(),
   updateMediaLibraryEntry: vi.fn(),
-  updateScreenshotMediaAsset: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/recordings/index', async (importOriginal) => ({
@@ -39,11 +38,6 @@ vi.mock('../../composition/persistence/scenario/projects', async (importOriginal
   deletePendingScenarioAsset: vi.fn(),
   deleteScenarioAsset: vi.fn(),
   deleteScenarioExport: vi.fn(),
-}));
-
-vi.mock('../../composition/persistence/editor-sessions/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/editor-sessions/index')>()),
-  deleteEditorSessionDraft: vi.fn(),
 }));
 
 vi.mock('../../composition/persistence/diagnostics/index', async (importOriginal) => ({

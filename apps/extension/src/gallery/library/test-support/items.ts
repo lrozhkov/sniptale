@@ -2,83 +2,10 @@ import type { ScenarioProjectSummary } from '../../../features/scenario/contract
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
   GalleryMediaItem,
-  GalleryEditorSessionItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
   GalleryVideoProjectItem,
 } from '../items';
-
-export function createEditorSessionItem(
-  overrides: Partial<GalleryEditorSessionItem> = {}
-): GalleryEditorSessionItem {
-  const session = overrides.session ?? {
-    assetId: null,
-    createdAt: 1,
-    dirty: true,
-    document: {
-      version: 1,
-      canvasHeight: 80,
-      canvasJson: '{"objects":[]}',
-      canvasWidth: 100,
-      frame: {
-        backgroundColor: '#fff',
-        backgroundGradientAngle: 0,
-        backgroundGradientFrom: '#fff',
-        backgroundGradientTo: '#000',
-        backgroundImageData: null,
-        backgroundImageFit: 'cover',
-        backgroundMode: 'color',
-        browserMode: false,
-        browserTitle: '',
-        browserUrl: '',
-        layoutMode: 'fit-image',
-        paddingBottom: 0,
-        paddingLeft: 0,
-        paddingRight: 0,
-        paddingTop: 0,
-      },
-      sourceDisplayHeight: 80,
-      sourceDisplayWidth: 100,
-      sourceHeight: 80,
-      sourceImageData: 'data:image/png;base64,YQ==',
-      sourceLeft: 0,
-      sourceName: 'Draft.png',
-      sourceTop: 0,
-      sourceWidth: 100,
-    },
-    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
-    sessionId: 'session-draft',
-    sourceTitle: null,
-    sourceUrl: null,
-    updatedAt: 2,
-  };
-  return {
-    createdAt: session.createdAt,
-    duration: null,
-    entityId: session.sessionId,
-    filename: session.document.sourceName ?? 'Draft image',
-    hasThumbnail: false,
-    height: session.document.sourceHeight,
-    id: `editor-draft:${session.sessionId}`,
-    kind: 'editor-session',
-    lifecycle: session.lifecycle ?? {
-      savedAt: null,
-      storageClass: 'temporary',
-      updatedAt: session.updatedAt,
-    },
-    mimeType: 'application/x-sniptale-editor-session',
-    session,
-    size: session.document.sourceImageData.length,
-    sourceFavicon: null,
-    sourceTitle: session.sourceTitle,
-    sourceUrl: session.sourceUrl,
-    tags: [],
-    type: 'editor-session',
-    updatedAt: session.updatedAt,
-    width: session.document.sourceWidth,
-    ...overrides,
-  };
-}
 
 export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): GalleryMediaItem {
   return {
@@ -101,6 +28,12 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     tags: overrides.tags ?? [],
     hasThumbnail: overrides.hasThumbnail ?? false,
     ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
+    ...(overrides.presentationRevision !== undefined
+      ? { presentationRevision: overrides.presentationRevision }
+      : {}),
+    ...(overrides.workspaceRevision !== undefined
+      ? { workspaceRevision: overrides.workspaceRevision }
+      : {}),
     type: overrides.type ?? 'media',
   };
 }

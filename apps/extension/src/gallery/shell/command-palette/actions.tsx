@@ -23,7 +23,8 @@ import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import { SIDEBAR_FOLDERS } from '../../library/constants';
 import type { GalleryCommandPaletteController, SortMode } from '../../state/types';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
-import { FOLDER_LABELS, getKindIcon } from '../../library/ui';
+import { FOLDER_LABELS, getKindIcon, isImageKind } from '../../library/ui';
+import { isGalleryMediaItem } from '../../library/items';
 
 const sortModeIcons: Record<SortMode, typeof Search> = {
   newest: Search,
@@ -174,7 +175,36 @@ function buildGalleryPreviewActions(
   const disabledReason = getCommandPaletteDisabledContextReason();
   const projectUnavailable =
     previewItem?.type === 'video-project' && previewItem.unavailableReason !== null;
+  const imageAggregate =
+    previewItem !== null &&
+    isGalleryMediaItem(previewItem) &&
+    isImageKind(previewItem.kind) &&
+    previewItem.source.kind === 'screenshot';
 
+  return [
+    ...buildGalleryPreviewMediaActions({ actions, disabledReason, imageAggregate, previewItem }),
+    ...buildGalleryPreviewNavigationActions({
+      actions,
+      disabledReason,
+      previewItem,
+      projectUnavailable,
+    }),
+  ];
+}
+
+type GalleryPreviewActionContext = {
+  actions: UseGalleryAppActionsResult;
+  disabledReason: string;
+  imageAggregate: boolean;
+  previewItem: GalleryCommandPaletteController['state']['preview']['session']['item'];
+};
+
+function buildGalleryPreviewMediaActions({
+  actions,
+  disabledReason,
+  imageAggregate,
+  previewItem,
+}: GalleryPreviewActionContext): CommandPaletteAction[] {
   return [
     createCommandPaletteRunAction({
       id: 'gallery-preview-download',
@@ -186,6 +216,15 @@ function buildGalleryPreviewActions(
       onSelect: () => actions.preview.download(),
     }),
     createCommandPaletteRunAction({
+      id: 'gallery-preview-download-original',
+      title: translate('gallery.preview.downloadOriginal'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(Download),
+      disabled: !imageAggregate,
+      disabledReason: !imageAggregate ? disabledReason : undefined,
+      onSelect: () => actions.preview.downloadOriginal(),
+    }),
+    createCommandPaletteRunAction({
       id: 'gallery-preview-copy',
       title: translate('gallery.preview.copy'),
       section: translate('shared.ui.commandPaletteActionsSection'),
@@ -194,6 +233,36 @@ function buildGalleryPreviewActions(
       disabledReason: !previewItem ? disabledReason : undefined,
       onSelect: () => actions.preview.copy(),
     }),
+    createCommandPaletteRunAction({
+      id: 'gallery-preview-save-copy',
+      title: translate('gallery.preview.saveCopy'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(FileStack),
+      disabled: !imageAggregate,
+      disabledReason: !imageAggregate ? disabledReason : undefined,
+      onSelect: () => actions.preview.saveCopy(),
+    }),
+    createCommandPaletteRunAction({
+      id: 'gallery-preview-restore-original',
+      title: translate('gallery.preview.restoreOriginal'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(RefreshCw),
+      disabled: !imageAggregate,
+      disabledReason: !imageAggregate ? disabledReason : undefined,
+      onSelect: () => actions.preview.restoreOriginal(),
+    }),
+  ];
+}
+
+function buildGalleryPreviewNavigationActions({
+  actions,
+  disabledReason,
+  previewItem,
+  projectUnavailable,
+}: Omit<GalleryPreviewActionContext, 'imageAggregate'> & {
+  projectUnavailable: boolean;
+}): CommandPaletteAction[] {
+  return [
     createCommandPaletteRunAction({
       id: 'gallery-preview-open-editor',
       title: translate('gallery.preview.openInEditor'),

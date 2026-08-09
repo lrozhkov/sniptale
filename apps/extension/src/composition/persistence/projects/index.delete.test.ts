@@ -5,12 +5,14 @@ import { createMediaLibraryEntry, createVideoProjectEntry } from './index.test-s
 const deleteMocks = vi.hoisted(() => ({
   createProjectAssetMediaIdMock: vi.fn(),
   initDBMock: vi.fn(),
+  presentationDeleteMock: vi.fn(),
   txDeleteMock: vi.fn(),
   txGetAllMock: vi.fn(),
   txGetMock: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   PROJECT_EXPORTS_STORE: 'project_exports',
@@ -40,8 +42,11 @@ function createDb() {
   return {
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
-        delete: deleteMocks.txDeleteMock,
+      objectStore: vi.fn((storeName: string) => ({
+        delete:
+          storeName === 'aggregate_presentations'
+            ? deleteMocks.presentationDeleteMock
+            : deleteMocks.txDeleteMock,
         get: deleteMocks.txGetMock,
         getAll: deleteMocks.txGetAllMock,
         put: vi.fn(),
@@ -90,6 +95,7 @@ it('deletes project-owned assets and mirrored media entries when removing a proj
   expect(deleteMocks.txDeleteMock).toHaveBeenNthCalledWith(1, 'project-1');
   expect(deleteMocks.txDeleteMock).toHaveBeenNthCalledWith(2, 'asset-1');
   expect(deleteMocks.txDeleteMock).toHaveBeenNthCalledWith(3, 'project-asset:asset-1');
+  expect(deleteMocks.presentationDeleteMock).toHaveBeenCalledWith(['video-project', 'project-1']);
 });
 
 it('preserves shared project-owned assets when another project still references them', async () => {
@@ -121,6 +127,7 @@ it('preserves shared project-owned assets when another project still references 
 
   expect(deleteMocks.txDeleteMock).toHaveBeenCalledOnce();
   expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
+  expect(deleteMocks.presentationDeleteMock).toHaveBeenCalledWith(['video-project', 'project-1']);
   expect(deleteMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-shared');
   expect(deleteMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
 });
@@ -166,4 +173,8 @@ it('deletes the project row when the project payload is already missing', async 
 
   expect(deleteMocks.txDeleteMock).toHaveBeenCalledTimes(1);
   expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('missing-project');
+  expect(deleteMocks.presentationDeleteMock).toHaveBeenCalledWith([
+    'video-project',
+    'missing-project',
+  ]);
 });

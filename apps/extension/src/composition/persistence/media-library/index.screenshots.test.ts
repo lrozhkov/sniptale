@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MediaLibraryEntry, MediaThumbnailEntry } from './contracts';
+import type { MediaLibraryEntry } from './contracts';
 
 const mocks = vi.hoisted(() => ({
   createImageThumbnailBlobMock: vi.fn(),
-  getMock: vi.fn(),
   initDBMock: vi.fn(),
   measureImageBlobMock: vi.fn(),
+  mediaGetMock: vi.fn(),
   mediaPutMock: vi.fn(),
+  presentationGetMock: vi.fn(),
   thumbnailPutMock: vi.fn(),
   transactionMock: vi.fn(),
+  workspaceGetMock: vi.fn(),
 }));
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -38,52 +40,29 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
+  IMAGE_WORKSPACES_STORE: 'image_workspaces',
   MEDIA_LIBRARY_STORE: 'media_library',
-  THUMBNAILS_STORE: 'thumbnails',
   initDB: mocks.initDBMock,
 }));
-
-function createExistingScreenshotEntry(
-  overrides: Partial<MediaLibraryEntry> = {}
-): MediaLibraryEntry {
-  return {
-    blob: new Blob(['existing'], { type: 'image/png' }),
-    createdAt: 111,
-    duration: null,
-    filename: 'capture.png',
-    height: 720,
-    id: 'asset-1',
-    kind: 'screenshot',
-    mimeType: 'image/png',
-    originalFilename: 'capture.png',
-    size: 10,
-    source: { kind: 'screenshot' },
-    sourceFavicon: null,
-    sourceTitle: 'Title',
-    sourceUrl: 'https://example.com',
-    tags: ['tag'],
-    updatedAt: 222,
-    width: 1280,
-    ...overrides,
-  };
-}
 
 function createTransaction() {
   return {
     done: Promise.resolve(),
     objectStore: vi.fn((storeName: string) => {
       if (storeName === 'media_library') {
-        return { put: mocks.mediaPutMock };
+        return { get: mocks.mediaGetMock, put: mocks.mediaPutMock };
       }
-
-      return { put: mocks.thumbnailPutMock };
+      if (storeName === 'image_workspaces') {
+        return { get: mocks.workspaceGetMock };
+      }
+      return { get: mocks.presentationGetMock, put: mocks.thumbnailPutMock };
     }),
   };
 }
 
 function createDb() {
   return {
-    get: mocks.getMock,
     transaction: mocks.transactionMock,
   };
 }
@@ -92,9 +71,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.createImageThumbnailBlobMock.mockResolvedValue(new Blob(['thumb'], { type: 'image/webp' }));
   mocks.measureImageBlobMock.mockResolvedValue({ height: 720, width: 1280 });
-  mocks.getMock.mockResolvedValue(undefined);
+  mocks.mediaGetMock.mockResolvedValue(undefined);
   mocks.mediaPutMock.mockResolvedValue(undefined);
   mocks.thumbnailPutMock.mockResolvedValue(undefined);
+  mocks.presentationGetMock.mockResolvedValue(undefined);
+  mocks.workspaceGetMock.mockResolvedValue(undefined);
   mocks.transactionMock.mockImplementation(() => createTransaction());
   mocks.initDBMock.mockResolvedValue(createDb());
   vi.spyOn(Date, 'now').mockReturnValue(500);
@@ -169,12 +150,11 @@ function expectBasicScreenshotEntry(result: MediaLibraryEntry, blob: Blob): void
 
 function expectBasicScreenshotThumbnail(): void {
   expect(mocks.thumbnailPutMock).toHaveBeenCalledWith(
-    expect.objectContaining<Partial<MediaThumbnailEntry>>({
-      assetId: 'generated-id',
-      createdAt: 500,
-      height: 180,
+    expect.objectContaining({
+      aggregateId: 'generated-id',
+      aggregateKind: 'image',
+      presentationRevision: 0,
       updatedAt: 500,
-      width: 320,
     })
   );
 }
@@ -196,59 +176,40 @@ describe('media-library-db.screenshots save metadata', () => {
     expect(result.mimeType).toBe('image/png');
     expect(mocks.thumbnailPutMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        assetId: 'explicit-id',
-        createdAt: 123,
+        aggregateId: 'explicit-id',
+        aggregateKind: 'image',
+        presentationRevision: 0,
         updatedAt: 500,
       })
     );
   });
 });
 
-describe('media-library-db.screenshots update flow', () => {
-  it('updates existing screenshot entries and preserves immutable metadata', async () => {
-    const { updateScreenshotMediaAsset } = await import('./index.screenshots.ts');
-    const existing = createExistingScreenshotEntry();
-    const blob = new Blob(['updated'], { type: 'image/webp' });
-    mocks.getMock.mockResolvedValue(existing);
+describe('media-library-db.screenshots aggregate identity collisions', () => {
+  it.each([
+    ['media root', 'mediaGetMock', { id: 'occupied-id' }],
+    ['image workspace', 'workspaceGetMock', { aggregateId: 'occupied-id' }],
+    ['aggregate presentation', 'presentationGetMock', { aggregateId: 'occupied-id' }],
+    ['malformed persisted row', 'mediaGetMock', null],
+  ] as const)(
+    'rejects an occupied target in the %s before any put',
+    async (_label, mockName, row) => {
+      mocks[mockName].mockResolvedValueOnce(row);
+      const { saveScreenshotMediaAsset } = await import('./index.screenshots.ts');
 
-    const result = await updateScreenshotMediaAsset('asset-1', blob, 'renamed.webp');
+      await expect(
+        saveScreenshotMediaAsset({
+          blob: new Blob(['image'], { type: 'image/png' }),
+          filename: 'capture.png',
+          id: 'occupied-id',
+        })
+      ).rejects.toMatchObject({
+        aggregateId: 'occupied-id',
+        name: 'ImageAggregateCollisionError',
+      });
 
-    expect(mocks.getMock).toHaveBeenCalledWith('media_library', 'asset-1');
-    expect(result).toEqual(
-      expect.objectContaining({
-        blob,
-        createdAt: 111,
-        filename: 'renamed.webp',
-        id: 'asset-1',
-        mimeType: 'image/webp',
-        updatedAt: 500,
-      })
-    );
-    expect(mocks.mediaPutMock).toHaveBeenCalledWith(result);
-    expect(mocks.thumbnailPutMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assetId: 'asset-1',
-        createdAt: 111,
-        updatedAt: 500,
-      })
-    );
-  });
-
-  it('throws when the asset is missing or not a screenshot', async () => {
-    const { updateScreenshotMediaAsset } = await import('./index.screenshots.ts');
-
-    mocks.getMock.mockResolvedValueOnce(undefined);
-    await expect(updateScreenshotMediaAsset('missing', new Blob(['missing']))).rejects.toThrow(
-      'Скриншотный asset missing не найден.'
-    );
-
-    mocks.getMock.mockResolvedValueOnce(
-      createExistingScreenshotEntry({
-        source: { kind: 'recording', recordingId: 'rec-1' },
-      })
-    );
-    await expect(updateScreenshotMediaAsset('asset-1', new Blob(['wrong-kind']))).rejects.toThrow(
-      'Скриншотный asset asset-1 не найден.'
-    );
-  });
+      expect(mocks.mediaPutMock).not.toHaveBeenCalled();
+      expect(mocks.thumbnailPutMock).not.toHaveBeenCalled();
+    }
+  );
 });

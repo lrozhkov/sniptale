@@ -32,6 +32,7 @@ import {
   classifySettingsPageSenderUrl,
   isPageAccessSenderUrl,
   isImageEditorSenderUrl,
+  isGallerySenderUrl,
   isWebSnapshotViewerSenderUrl,
 } from './sender-classification';
 import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
@@ -150,6 +151,14 @@ function authorizeLocalDataErasureRoute(
   return isOwnedSettingsPage(request.sender.url)
     ? AUTHORIZED
     : reject('Unauthorized local data erasure sender');
+}
+
+function authorizeAggregatePromotionRoute(
+  request: BackgroundOwnedAuthorizationRequest
+): IpcAuthorizationResult {
+  return isGallerySenderUrl(request.sender.url)
+    ? AUTHORIZED
+    : reject('Unauthorized aggregate promotion sender');
 }
 
 function authorizeNativeAppRoute(
@@ -288,6 +297,8 @@ function getBackgroundOwnedAuthorizationHandler(
   handlerId: BackgroundOwnedRouteInventoryEntry['handlerId']
 ): BackgroundOwnedAuthorizationDispatcher['authorize'] {
   switch (handlerId) {
+    case 'aggregate-promotion':
+      return authorizeAggregatePromotionRoute;
     case 'ai-secret-unlock':
       return authorizeAiSecretUnlockRoute;
     case 'ai-settings-query':

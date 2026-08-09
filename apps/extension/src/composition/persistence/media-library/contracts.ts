@@ -34,6 +34,9 @@ export interface MediaLibraryEntry {
   sourceFavicon: string | null;
   tags: string[];
   lifecycle?: LibraryLifecycle;
+  /** Monotonic editable-workspace revision. Original-only media remains at revision zero. */
+  /** Missing only on pre-v24 persisted rows; readers normalize it to revision 0. */
+  workspaceRevision?: number;
   blob?: Blob;
 }
 

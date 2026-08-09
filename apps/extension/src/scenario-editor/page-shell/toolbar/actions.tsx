@@ -101,6 +101,7 @@ function ScenarioToolbarStatusActions(props: {
   onOpenVideoEditor: () => void;
   saveState: 'error' | 'saved' | 'saving';
   projectId: string | null;
+  projectUpdatedAt: number | null;
 }) {
   const statusMeta = getScenarioToolbarStatusMeta(props.saveState);
 
@@ -114,7 +115,11 @@ function ScenarioToolbarStatusActions(props: {
         <CheckCircle2 className="h-3.5 w-3.5" />
         {statusMeta.label}
       </ValueBadge>
-      <ScenarioProjectStorageStatus projectId={props.projectId} />
+      <ScenarioProjectStorageStatus
+        projectId={props.projectId}
+        projectUpdatedAt={props.projectUpdatedAt}
+        saveState={props.saveState}
+      />
       <button
         type="button"
         onClick={props.onOpenVideoEditor}
@@ -150,6 +155,7 @@ export function ScenarioToolbarActions(props: { controller: ScenarioEditorToolba
         onExport={() => props.controller.ui.setExportDialogOpen(true)}
         onOpenVideoEditor={() => void props.controller.projectCrud.openVideoEditor()}
         projectId={props.controller.project.project?.id ?? null}
+        projectUpdatedAt={props.controller.project.project?.updatedAt ?? null}
         saveState={props.controller.project.saveState}
       />
     </div>

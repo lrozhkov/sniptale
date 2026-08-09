@@ -152,11 +152,23 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
     updatedAt: value['updatedAt'],
   });
   if (lifecycle === null) return null;
+  const workspaceRevision = value['workspaceRevision'];
+  if (
+    workspaceRevision !== undefined &&
+    !(
+      typeof workspaceRevision === 'number' &&
+      Number.isInteger(workspaceRevision) &&
+      workspaceRevision >= 0
+    )
+  ) {
+    return null;
+  }
   return {
     createdAt: value['createdAt'],
     id: value['id'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
     project,
     updatedAt: value['updatedAt'],
+    workspaceRevision: workspaceRevision ?? 0,
   };
 }

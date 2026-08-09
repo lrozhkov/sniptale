@@ -14,21 +14,41 @@ import { useScenarioV3EditorState } from './state';
 const imageImportMock = vi.hoisted(() => ({
   insertImageFileIntoSelectedSlide: vi.fn(),
 }));
+const aggregateMutationMock = vi.hoisted(() => ({
+  commitScenarioAggregateSnapshotMutation: vi.fn(),
+}));
 
 vi.mock('./image-import', () => ({
   insertImageFileIntoSelectedSlide: imageImportMock.insertImageFileIntoSelectedSlide,
 }));
+vi.mock('../../composition/persistence/scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/scenario/aggregate-mutations')
+  >()),
+  commitScenarioAggregateMutation: vi.fn(),
+  commitScenarioAggregateSnapshotMutation:
+    aggregateMutationMock.commitScenarioAggregateSnapshotMutation,
+  deleteOrphanedScenarioAggregateChild: vi.fn(),
+  deleteScenarioAggregate: vi.fn(),
+}));
+
+type ScenarioEditorState = ReturnType<typeof useScenarioV3EditorState>;
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let parentProject: ScenarioProjectV3;
 let changedProjects: ScenarioProjectV3[] = [];
+let latestEditor: ScenarioEditorState | null = null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   imageImportMock.insertImageFileIntoSelectedSlide.mockResolvedValue(undefined);
   parentProject = createProject();
   changedProjects = [];
+  latestEditor = null;
+  aggregateMutationMock.commitScenarioAggregateSnapshotMutation.mockImplementation(
+    async ({ nextProject }) => ({ project: nextProject, workspaceRevision: 2 })
+  );
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -150,6 +170,42 @@ it('surfaces image import operation failures without emitting project changes', 
   );
 });
 
+it('skips aggregate persistence when a mutation returns the current session', async () => {
+  renderHarness();
+  await act(async () => {
+    await latestEditor?.projectActions.commitAggregateMutation((session) => session, {});
+  });
+  expect(aggregateMutationMock.commitScenarioAggregateSnapshotMutation).not.toHaveBeenCalled();
+});
+
+it('commits a durable aggregate project and rejects a stale async result', async () => {
+  renderHarness();
+  await act(async () => {
+    await latestEditor?.projectActions.commitAggregateMutation(
+      (session) => ({ ...session, project: { ...session.project, name: 'Durable' } }),
+      {}
+    );
+  });
+  expect(changedProjects.at(-1)?.name).toBe('Durable');
+
+  const deferred: {
+    resolve: ((value: { project: ScenarioProjectV3; workspaceRevision: number }) => void) | null;
+  } = { resolve: null };
+  aggregateMutationMock.commitScenarioAggregateSnapshotMutation.mockImplementationOnce(
+    ({ nextProject }) =>
+      new Promise((resolve) => {
+        deferred.resolve = () => resolve({ project: nextProject, workspaceRevision: 3 });
+      })
+  );
+  const pending = latestEditor!.projectActions.commitAggregateMutation(
+    (session) => ({ ...session, project: { ...session.project, name: 'Pending' } }),
+    {}
+  );
+  clickButton('Update selected');
+  deferred.resolve?.({ project: parentProject, workspaceRevision: 3 });
+  await expect(pending).rejects.toThrow('changed while the operation was being saved');
+});
+
 function renderHarness() {
   act(() => {
     root?.render(
@@ -168,6 +224,7 @@ function EditorHarness(props: {
   project: ScenarioProjectV3;
 }) {
   const editor = useScenarioV3EditorState(props);
+  latestEditor = editor;
 
   return (
     <div>
@@ -176,8 +233,6 @@ function EditorHarness(props: {
     </div>
   );
 }
-
-type ScenarioEditorState = ReturnType<typeof useScenarioV3EditorState>;
 
 function ScenarioEditorStateReadout({ editor }: { editor: ScenarioEditorState }) {
   return (

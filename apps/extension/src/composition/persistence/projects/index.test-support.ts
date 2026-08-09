@@ -53,6 +53,7 @@ export function createVideoProjectEntry(
     id: project.id,
     project,
     updatedAt: project.updatedAt,
+    workspaceRevision: 0,
     ...overrides,
   };
 }

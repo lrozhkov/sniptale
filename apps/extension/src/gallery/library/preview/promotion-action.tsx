@@ -8,7 +8,7 @@ type PromotionActionProps = {
 };
 
 export function PromotionAction({ className, onPromote, visible }: PromotionActionProps) {
-  const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'saving' | 'error' | 'multiple-editors'>('idle');
 
   if (!visible || !onPromote) {
     return null;
@@ -24,8 +24,12 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
           try {
             await onPromote();
             setState('idle');
-          } catch {
-            setState('error');
+          } catch (error) {
+            setState(
+              error instanceof Error && error.message.includes('multiple editor tabs')
+                ? 'multiple-editors'
+                : 'error'
+            );
           }
         }}
         className={className}
@@ -34,6 +38,9 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
       </button>
       {state === 'error' ? (
         <p role="alert">{translate('gallery.preview.saveToLibraryError')}</p>
+      ) : null}
+      {state === 'multiple-editors' ? (
+        <p role="alert">{translate('gallery.preview.saveToLibraryMultipleEditors')}</p>
       ) : null}
     </>
   );

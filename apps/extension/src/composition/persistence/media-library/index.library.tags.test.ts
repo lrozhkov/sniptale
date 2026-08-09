@@ -82,7 +82,7 @@ it('merges added tags with the current media record tags', async () => {
     expect.objectContaining({
       tags: ['remote', 'demo'],
       updatedAt: 999,
-      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 999 },
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
     })
   );
 });

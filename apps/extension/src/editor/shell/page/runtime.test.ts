@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createEditorSessionAutosaveServiceMock,
   createImageEditorControllerMock,
-  ensureEditorPageSessionIdMock,
+  ensureEditorPageAggregateIdMock,
   loadEditorPresetStateMock,
   loadEditorWorkspaceDefaultsMock,
   loadHighlighterSettingsMock,
@@ -13,7 +13,7 @@ const {
 } = vi.hoisted(() => ({
   createEditorSessionAutosaveServiceMock: vi.fn(),
   createImageEditorControllerMock: vi.fn(),
-  ensureEditorPageSessionIdMock: vi.fn(),
+  ensureEditorPageAggregateIdMock: vi.fn(),
   loadEditorPresetStateMock: vi.fn(),
   loadEditorWorkspaceDefaultsMock: vi.fn(),
   loadHighlighterSettingsMock: vi.fn(),
@@ -36,8 +36,9 @@ vi.mock('../../document/session-autosave', async (importOriginal) => ({
   createEditorSessionAutosaveService: createEditorSessionAutosaveServiceMock,
 }));
 
-vi.mock('../../document/page-session', () => ({
-  ensureEditorPageSessionId: ensureEditorPageSessionIdMock,
+vi.mock('../../document/page-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/page-session')>()),
+  ensureEditorPageAggregateId: ensureEditorPageAggregateIdMock,
   readEditorPageLocationState: readEditorPageLocationStateMock,
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
@@ -99,7 +100,7 @@ function useEditorPageRuntimeTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
     readEditorPageLocationStateMock.mockReturnValue({ assetId: 'asset-1' });
-    ensureEditorPageSessionIdMock.mockReturnValue('session-1');
+    ensureEditorPageAggregateIdMock.mockReturnValue('session-1');
     loadEditorPresetStateMock.mockResolvedValue({
       arrow: { defaultPresetId: 'arrow-default', presets: [] },
       ellipse: { defaultPresetId: 'ellipse-default', presets: [] },
@@ -154,8 +155,8 @@ function verifiesSessionSeed() {
   const seed = resolveEditorPageSessionSeed();
 
   expect(seed).toEqual({
+    aggregateId: 'session-1',
     locationState: { assetId: 'asset-1' },
-    sessionId: 'session-1',
   });
 }
 

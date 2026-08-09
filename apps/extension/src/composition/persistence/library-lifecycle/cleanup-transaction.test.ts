@@ -4,7 +4,6 @@ import { createEditorDocumentFixture } from '../../../editor/document/page-sessi
 import { createScenarioProject } from '../../../features/scenario/project/factories/project';
 
 const persistenceMocks = vi.hoisted(() => ({
-  listEditorSessionDrafts: vi.fn(),
   listMediaLibrary: vi.fn(),
   listScenarioProjectEntries: vi.fn(),
   listVideoProjectEntries: vi.fn(),
@@ -13,10 +12,6 @@ const persistenceMocks = vi.hoisted(() => ({
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
-}));
-vi.mock('../editor-sessions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../editor-sessions')>()),
-  listEditorSessionDrafts: persistenceMocks.listEditorSessionDrafts,
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -35,13 +30,12 @@ import { cleanupDrafts, createLibraryLifecycle, DEFAULT_LOCAL_STORAGE_POLICY } f
 
 beforeEach(() => {
   vi.clearAllMocks();
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([]);
   persistenceMocks.listMediaLibrary.mockResolvedValue([]);
   persistenceMocks.listScenarioProjectEntries.mockResolvedValue([]);
   persistenceMocks.listVideoProjectEntries.mockResolvedValue([]);
 });
 
-it('removes standalone media dependencies and unlinked editor workspaces atomically', async () => {
+it('removes standalone media dependency graphs and aggregate sidecars atomically', async () => {
   const lifecycle = createLibraryLifecycle('temporary', 1);
   const createMedia = (
     id: string,
@@ -75,19 +69,6 @@ it('removes standalone media dependencies and unlinked editor workspaces atomica
     kind: 'project-asset',
     projectAssetId: 'asset-1',
   });
-  const createSession = (sessionId: string, assetId: string | null) => ({
-    assetId,
-    createdAt: 1,
-    dirty: true,
-    document: createEditorDocumentFixture(),
-    lifecycle,
-    sessionId,
-    sourceTitle: null,
-    sourceUrl: null,
-    updatedAt: 1,
-  });
-  const linkedSession = createSession('linked-session', recordingMedia.id);
-  const standaloneSession = createSession('standalone-session', null);
   const recording = {
     blob: new Blob(['video'], { type: 'video/webm' }),
     createdAt: 1,
@@ -97,7 +78,6 @@ it('removes standalone media dependencies and unlinked editor workspaces atomica
     size: 5,
   };
   persistenceMocks.listMediaLibrary.mockResolvedValue([recordingMedia, projectAssetMedia]);
-  persistenceMocks.listEditorSessionDrafts.mockResolvedValue([linkedSession, standaloneSession]);
 
   const deletes = vi.fn();
   const valuesByStore = new Map<string, Map<string, unknown>>([
@@ -110,13 +90,6 @@ it('removes standalone media dependencies and unlinked editor workspaces atomica
     ],
     ['recordings', new Map([[recording.id, recording]])],
     ['project_assets', new Map([['asset-1', { id: 'asset-1' }]])],
-    [
-      'editor_sessions',
-      new Map([
-        [linkedSession.sessionId, linkedSession],
-        [standaloneSession.sessionId, standaloneSession],
-      ]),
-    ],
     ['video_projects', new Map()],
   ]);
   persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
@@ -138,14 +111,16 @@ it('removes standalone media dependencies and unlinked editor workspaces atomica
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 3,
-    deletedIds: [recordingMedia.id, projectAssetMedia.id, 'editor-session:standalone-session'],
+    deletedCount: 2,
+    deletedIds: [recordingMedia.id, projectAssetMedia.id],
   });
   expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
   expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
   expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
-  expect(deletes).toHaveBeenCalledWith('editor_sessions', linkedSession.sessionId);
-  expect(deletes).toHaveBeenCalledWith('editor_sessions', standaloneSession.sessionId);
+  expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);
+  expect(deletes).toHaveBeenCalledWith('image_workspaces', projectAssetMedia.id);
+  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', recordingMedia.id]);
+  expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', projectAssetMedia.id]);
 });
 
 it('commits expired linked and standalone draft cleanup through current transactional rows', async () => {

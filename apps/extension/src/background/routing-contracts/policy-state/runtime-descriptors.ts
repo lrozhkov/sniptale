@@ -5,6 +5,26 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'aggregate-promotion-authority',
+    failClosedOnRestart: false,
+    id: 'aggregate-editor-presence',
+    oneShot: false,
+    ownerModule:
+      'apps/extension/src/background/application/aggregate-promotion/presence-registry.ts',
+    proofModules: [
+      'apps/extension/src/background/application/aggregate-promotion/coordinator.test.ts',
+      'apps/extension/src/background/application/aggregate-promotion/ports.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Worker restart disconnects editor ports and reconstructs presence from reconnecting documents;',
+      'until then promotion uses durable revision checks and therefore fails closed on stale presentation.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'annotation-fork-session',
     failClosedOnRestart: false,
     id: 'annotation-fork-sessions',

@@ -8,7 +8,6 @@ const entry = {
   source: { kind: 'project-asset' as const, projectAssetId: 'asset-saved' },
 };
 const allOptions = {
-  includeEditorDrafts: false,
   includeSourceMetadata: false,
   includeTelemetry: false,
   includeWebSnapshots: true,

@@ -12,7 +12,10 @@ const dbMocks = vi.hoisted(() => ({
   txDoneMock: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
+  IMAGE_WORKSPACES_STORE: 'image_workspaces',
   MEDIA_LIBRARY_STORE: 'media_library',
   THUMBNAILS_STORE: 'thumbnails',
   initDB: dbMocks.initDBMock,
@@ -149,7 +152,7 @@ function registerUpdateMediaLibraryEntryTests() {
         sourceTitle: 'After',
         tags: ['old'],
         updatedAt: 999,
-        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 999 },
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
       })
     );
   });

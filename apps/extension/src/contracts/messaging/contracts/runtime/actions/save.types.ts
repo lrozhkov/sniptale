@@ -10,7 +10,6 @@ import type {
   SavePopupExportArchiveMessage,
   SaveScreenshotToGalleryMessage,
   StagePopupExportArchiveChunkMessage,
-  UpdateGalleryImageAssetMessage,
 } from '../../types';
 import type { SaveAssetResponse } from '../../response-types';
 
@@ -44,16 +43,6 @@ type StageWebSnapshotBlobChunkResponse = RuntimeMessageResponse<{
   stagedBlobId?: string;
 }>;
 
-type RequestGalleryImageUpdateCapabilityMessage = {
-  type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY;
-  assetId: string;
-  editorSessionId: string;
-};
-
-type RequestGalleryImageUpdateCapabilityResponse = RuntimeMessageResponse<{
-  updateCapabilityToken?: string;
-}>;
-
 type RegisterWebSnapshotAssetsResponse = RuntimeMessageResponse<{
   snapshotSessionId?: string;
 }>;
@@ -84,8 +73,6 @@ export type RuntimeActionSaveRequestByType = {
   [MessageType.FETCH_WEB_SNAPSHOT_ASSET]: FetchWebSnapshotAssetMessage;
   [MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK]: StageWebSnapshotBlobChunkMessage;
   [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: ReleaseWebSnapshotStagedBlobsMessage;
-  [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: RequestGalleryImageUpdateCapabilityMessage;
-  [MessageType.UPDATE_GALLERY_IMAGE_ASSET]: UpdateGalleryImageAssetMessage;
 };
 
 export type RuntimeActionSaveResponseByType = {
@@ -99,6 +86,4 @@ export type RuntimeActionSaveResponseByType = {
   [MessageType.FETCH_WEB_SNAPSHOT_ASSET]: FetchWebSnapshotAssetResponse;
   [MessageType.STAGE_WEB_SNAPSHOT_BLOB_CHUNK]: StageWebSnapshotBlobChunkResponse;
   [MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS]: RuntimeMessageResponse<{ result?: string }>;
-  [MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY]: RequestGalleryImageUpdateCapabilityResponse;
-  [MessageType.UPDATE_GALLERY_IMAGE_ASSET]: SaveAssetResponse;
 };

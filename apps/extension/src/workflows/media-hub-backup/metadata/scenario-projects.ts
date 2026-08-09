@@ -22,6 +22,7 @@ import {
 } from './readers';
 import { normalizeBlobDescriptor } from './blobs';
 import type { BackupBlobDescriptor, ScenarioBackupProjectDescriptor } from '../contracts/types';
+import { tryNormalizeAggregatePresentation } from './presentation';
 
 function readBackupBlobDescriptorId(entry: BackupBlobDescriptor['entry']): string {
   if ('id' in entry && typeof entry.id === 'string') {
@@ -86,6 +87,10 @@ function normalizeStepDocument(value: unknown): ScenarioStepEditorDocumentEntry 
 export function normalizeScenarioProject(value: JsonRecord): ScenarioBackupProjectDescriptor {
   const entry = normalizeScenarioProjectEntry(field(value, 'entry'));
   const prefix = `scenario-projects/${entry.id}/`;
+  const presentation =
+    field(value, 'presentation') === undefined
+      ? undefined
+      : tryNormalizeAggregatePresentation(field(value, 'presentation'));
   const descriptor = {
     assets: readRecordArray(field(value, 'assets')).map((descriptor) =>
       normalizeScenarioAssetBlobDescriptor(descriptor, [prefix])
@@ -103,6 +108,7 @@ export function normalizeScenarioProject(value: JsonRecord): ScenarioBackupProje
             normalizeBlobDescriptor(descriptor, [prefix])
           ),
         }),
+    ...(presentation ? { presentation } : {}),
   };
   assertScenarioExportThumbnailOwnership(descriptor);
   assertScenarioProjectDescriptorReferences(descriptor);

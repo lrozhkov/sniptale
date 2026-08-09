@@ -3,6 +3,7 @@ import type { PolicyStateId } from './policy-state';
 import type { ContentSenderBinding } from './capabilities/content-action/capability-store';
 
 export type BackgroundOwnedRouteHandlerId =
+  | 'aggregate-promotion'
   | 'ai-secret-unlock'
   | 'ai-settings-query'
   | 'ai-settings-mutation'

@@ -45,13 +45,13 @@ export { InvalidVideoProjectError, UnsupportedEngine1VideoProjectError } from '.
 export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
-): Promise<void> {
+): Promise<VideoProjectEntry> {
   const candidate = withVideoProjectCreatedAt(project);
   if (!isHydratableVideoProject(candidate)) {
     throw new Error('Invalid video project payload');
   }
   await verifyVideoProjectEffectSnapshotIntegrity(candidate);
-  await runWithIndexedDbMutation(async (db) => {
+  return runWithIndexedDbMutation(async (db) => {
     const { mediaLibraryStore, projectAssetStore, projectStore, tx } =
       createProjectMutationStores(db);
     const existing = parseVideoProjectEntry(await projectStore.get(project.id));
@@ -82,6 +82,7 @@ export async function saveVideoProject(
             now
           )
         : createLibraryLifecycle(options.storageClass ?? 'library', now),
+      workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
     };
 
     await projectStore.put(entry);
@@ -104,6 +105,7 @@ export async function saveVideoProject(
     publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
       `video-project:${candidate.id}`,
     ]);
+    return entry;
   });
 }
 
@@ -121,6 +123,7 @@ export async function getVideoProject(id: string): Promise<VideoProjectReadResul
       ...(result.entry.lifecycle ? { lifecycle: result.entry.lifecycle } : {}),
       project: result.entry.project,
       status: 'ready',
+      workspaceRevision: result.entry.workspaceRevision ?? 0,
     };
   } catch {
     return {
@@ -136,7 +139,7 @@ export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
   return verified
     .flatMap((result, index) =>
       result.status === 'ready'
-        ? [createVideoProjectListItem(result.project, result.lifecycle)]
+        ? [createVideoProjectListItem(result.project, result.lifecycle, result.workspaceRevision)]
         : result.status === 'unsupported'
           ? [createUnsupportedVideoProjectListItem(result.metadata)]
           : result.status === 'invalid'
@@ -161,6 +164,7 @@ export async function listVideoProjectReadResults(): Promise<VideoProjectReadRes
         ...(result.entry.lifecycle ? { lifecycle: result.entry.lifecycle } : {}),
         project: result.entry.project,
         status: 'ready',
+        workspaceRevision: result.entry.workspaceRevision ?? 0,
       });
     } catch {
       verified.push({
