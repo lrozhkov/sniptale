@@ -28,26 +28,27 @@ it('renders a compact callout scene with a target, connector, and styled surface
   expect(markup).toContain('shared.callout-preview.target');
   expect(markup).toContain('<svg');
   expect(markup).toContain('M 50 19 L 50 28 L 29 35 Z');
-  expect(markup).toContain(style.surface.backgroundColor);
+  expect(markup).toContain('#2b3038ff');
+  expect(markup).toContain('shared.callout-preview.surface-html');
   expect(markup).toContain('h-9 w-16');
   expect(markup).toContain('shared.callout-preview.outline');
   expect(markup).toContain('stroke-dasharray="8 5"');
-  expect(markup).toContain('stroke="#2563eb"');
+  expect(markup).toContain('border-bottom:2px dotted #2563eb');
 });
 
-it('shows transparent surfaces with a checker pattern instead of an empty thumbnail', () => {
+it('shows transparent surfaces through the shared HTML/CSS card projection', () => {
   const preset = createSystemCalloutPresetCatalog()[0]!;
   const markup = renderToStaticMarkup(
     <CalloutPresetPreview
       style={{
         ...preset.style,
-        surface: { ...preset.style.surface, backgroundColor: 'transparent' },
+        surface: { ...preset.style.surface, fillPaint: { kind: 'solid', color: '#00000000' } },
       }}
     />
   );
 
-  expect(markup).toContain('<pattern');
-  expect(markup).toContain('fill="url(#callout-checker-');
+  expect(markup).toContain('background:#00000000');
+  expect(markup).toContain('<foreignObject');
 });
 
 it('renders the angled connector preview as a short landing followed by a diagonal', () => {

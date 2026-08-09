@@ -25,23 +25,35 @@ describe('frame-events callout family', () => {
 
     dispatchFrameCalloutChanged({
       frameId: 'frame-1',
-      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
+      settings: {
+        enabled: true,
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
+      },
     });
     dispatchCalloutDelete({ frameId: 'frame-1' });
     dispatchCalloutPopoverSettingsChanged({
       frameId: 'frame-2',
-      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
+      settings: {
+        enabled: true,
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
+      },
     });
     dispatchCalloutBlurRequest({ frameId: 'frame-2' });
 
     expect(changeListener).toHaveBeenCalledWith({
       frameId: 'frame-1',
-      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
+      settings: {
+        enabled: true,
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
+      },
     });
     expect(deleteListener).toHaveBeenCalledWith({ frameId: 'frame-1' });
     expect(popoverListener).toHaveBeenCalledWith({
       frameId: 'frame-2',
-      settings: { enabled: true, style: { surface: { backgroundColor: 'transparent' } } },
+      settings: {
+        enabled: true,
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
+      },
     });
     expect(blurListener).toHaveBeenCalledWith({ frameId: 'frame-2' });
 

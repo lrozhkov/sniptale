@@ -79,13 +79,13 @@ it('provides distinct annotation roles and a ring-dot endpoint preset', () => {
   });
   expect(info.style).toMatchObject({
     connector: { frameMarker: 'square', routing: 'polyline', width: 2 },
-    surface: { backgroundColor: '#F8FAFC', borderColor: '#486581' },
+    surface: { fillPaint: { kind: 'solid', color: '#f8fafcff' }, borderColor: '#486581' },
     title: { backgroundColor: '#243B53', dividerColor: '#243B53', dividerWidth: 2, enabled: true },
   });
   expect(warning.style).toMatchObject({
     accentEdge: { color: '#D99000', enabled: true, side: 'left' },
     connector: { color: '#8A5A00', frameMarker: 'diamond', width: 2 },
-    surface: { backgroundColor: '#FFF9E8', borderColor: '#E8C56A' },
+    surface: { fillPaint: { kind: 'solid', color: '#fff9e8ff' }, borderColor: '#E8C56A' },
     title: { dividerColor: '#D99000', dividerWidth: 2, enabled: true },
   });
   expect(warning.style.connector.frameMarker).not.toBe('arrow');

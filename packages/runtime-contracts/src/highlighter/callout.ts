@@ -1,4 +1,5 @@
 import type { StepBadgeAnchor } from './step-badge';
+import type { Paint } from '@sniptale/foundation/paint';
 
 export type CalloutAnchor = StepBadgeAnchor;
 export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
@@ -72,7 +73,7 @@ export interface CalloutPlacement {
 }
 
 export interface CalloutSurfaceStyle {
-  backgroundColor: string;
+  fillPaint: Paint;
   borderColor: string;
   borderStyle: CalloutLineStyle;
   borderWidth: number;

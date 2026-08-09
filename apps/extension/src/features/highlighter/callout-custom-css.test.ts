@@ -22,6 +22,15 @@ stroke-dasharray: 6 3;
   expect(resolved.styles.connector).toEqual({ stroke: '#ff0000', strokeDasharray: '6 3' });
 });
 
+it('projects canonical backdrop-filter to the React property without losing other sections', () => {
+  const resolved = resolveCalloutCustomCss(
+    '[card]\nbackdrop-filter: blur(16px) saturate(1.2);\n[title]\nopacity: .8;'
+  );
+  expect(resolved.error).toBeNull();
+  expect(resolved.styles.card).toEqual({ backdropFilter: 'blur(16px) saturate(1.2)' });
+  expect(resolved.styles.title).toEqual({ opacity: '0.8' });
+});
+
 it('treats declarations without a section as card styles', () => {
   expect(resolveCalloutCustomCss('filter: drop-shadow(0 2px 3px #000);').styles.card).toEqual({
     filter: 'drop-shadow(0 2px 3px #000)',

@@ -70,6 +70,6 @@ it('resolves inherited comment colors from the connected frame before rendering'
   expect(renderedSettings?.style.connector.color).toBe('#112233');
   expect(renderedSettings?.style.accentEdge.color).toBe('#112233');
   expect(renderedSettings?.style.surface.borderColor).toBe('#112233');
-  expect(renderedSettings?.style.surface.backgroundColor).toBe('#445566ff');
+  expect(renderedSettings?.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#445566ff' });
   act(() => root.unmount());
 });

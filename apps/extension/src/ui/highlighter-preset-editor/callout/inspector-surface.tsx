@@ -2,15 +2,15 @@ import type { CalloutShadowColorSource } from '@sniptale/runtime-contracts/highl
 import { PaintBucket, Palette, Square } from 'lucide-react';
 import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
-import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
+import { CALLOUT_TEXT_PRESETS } from './inspector-palettes';
 import {
-  BoundColorField,
   ColorField,
   NumericProperty,
   SettingsStack,
   type ManualContentProps,
 } from './inspector-fields';
 import { resolveCalloutColorBindings } from '../../../features/highlighter/callout-color-bindings';
+import { CalloutBackgroundSettings as SharedCalloutBackgroundSettings } from '../../callout-background-settings';
 
 const SHADOW_COLOR_SOURCES: CalloutShadowColorSource[] = [
   'custom',
@@ -90,18 +90,10 @@ export function CalloutBackgroundSettings(props: ManualContentProps) {
   const surface = props.settings.style.surface;
   return (
     <SettingsStack>
-      <BoundColorField
-        customColor={surface.backgroundColor}
-        frameColors={props.frameColors}
-        label={translate('content.callout.backgroundLabel')}
-        palette={CALLOUT_BACKGROUND_PRESETS}
-        source={props.settings.style.colorBindings.surfaceBackground}
-        onColorChange={(backgroundColor) =>
-          props.onChange({ style: { surface: { backgroundColor } } })
-        }
-        onSourceChange={(surfaceBackground) =>
-          props.onChange({ style: { colorBindings: { surfaceBackground } } })
-        }
+      <SharedCalloutBackgroundSettings
+        style={props.settings.style}
+        onChange={(style) => props.onChange({ style })}
+        {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}
       />
       <NumericProperty
         label={translate('content.callout.shadowLabel')}

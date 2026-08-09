@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
@@ -40,6 +40,7 @@ function CalloutSettingsPopoverSurface(props: {
   presets: ReturnType<typeof useCalloutPresetPopoverController>;
   request: CalloutSettingsPopoverProps;
   state: ReturnType<typeof useCalloutSettingsPopoverState>;
+  onNestedLayerChange: (open: boolean) => void;
 }) {
   const { frameColors, isOpen, onClose } = props.request;
   const saveSection = createCalloutSaveSection({
@@ -101,6 +102,7 @@ function CalloutSettingsPopoverSurface(props: {
         presetError={props.presets.catalog.error}
         saveSection={saveSection}
         onClose={onClose}
+        onNestedLayerChange={props.onNestedLayerChange}
       />
     </ContentPopoverAdapter>
   );
@@ -140,6 +142,7 @@ export function CalloutSettingsPopover(props: CalloutSettingsPopoverProps) {
   const { anchorEl, frameId, frameRect, isOpen, onClose, settings } = props;
   useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [nestedLayerOpen, setNestedLayerOpen] = useState(false);
   const presentation = useCalloutPopoverPresentation({
     anchorEl,
     frameId,
@@ -157,7 +160,15 @@ export function CalloutSettingsPopover(props: CalloutSettingsPopoverProps) {
   const presets = useCalloutPresetPopoverController(isOpen);
   const portalTarget = resolveContentPortalTarget(anchorEl);
 
-  usePopoverEscapeClose({ anchorEl, isOpen: isOpen && !presets.editor.isOpen, onClose });
+  useEffect(() => {
+    if (!isOpen) setNestedLayerOpen(false);
+  }, [isOpen]);
+
+  usePopoverEscapeClose({
+    anchorEl,
+    isOpen: isOpen && !presets.editor.isOpen && !nestedLayerOpen,
+    onClose,
+  });
 
   const handleDelete = () => {
     props.onDelete?.();
@@ -177,6 +188,7 @@ export function CalloutSettingsPopover(props: CalloutSettingsPopoverProps) {
       presets={presets}
       request={props}
       state={state}
+      onNestedLayerChange={setNestedLayerOpen}
     />
   );
 }

@@ -260,7 +260,7 @@ function expectBridgeSnapshotCapture() {
   refs.sessionSettingsRefs.focusSettings.current = { opacity: 0.4, showBorder: true };
   refs.sessionCalloutStyleRef.current = {
     ...CALLOUT_STYLE,
-    surface: { ...CALLOUT_STYLE.surface, backgroundColor: '#ffffff' },
+    surface: { ...CALLOUT_STYLE.surface, fillPaint: { kind: 'solid', color: '#ffffffff' } },
   };
   refs.stepBadgeOrderRef.current = new Map([['frame-1', 1]]);
   mocks.captureFrameSessionSnapshot.mockReturnValue(expectedSnapshot);

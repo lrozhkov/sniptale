@@ -13,6 +13,7 @@ export type PolicyStateId =
   | 'diagnostics-erasure-exclusion'
   | 'frame-annotation-raster-jobs'
   | 'gradient-preset-mutation-queue'
+  | 'surface-style-preset-mutation-queue'
   | 'gallery-image-update-capabilities'
   | 'llm-session-tokens'
   | 'native-ingestion-erasure-exclusion'

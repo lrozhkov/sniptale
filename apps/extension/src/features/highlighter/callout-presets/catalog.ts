@@ -3,6 +3,7 @@ import type {
   CalloutVisualStyle,
   SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { clonePaint, createSolidPaint } from '@sniptale/foundation/paint';
 
 type SystemCalloutPreset = CalloutPreset & {
   basedOnRevision: number;
@@ -76,7 +77,7 @@ const baseStyle: CalloutVisualStyle = {
   },
   customCss: '',
   surface: {
-    backgroundColor: '#1F2937',
+    fillPaint: createSolidPaint('#1F2937'),
     borderColor: 'transparent',
     borderStyle: 'solid',
     borderWidth: 0,
@@ -142,7 +143,11 @@ export function cloneCalloutVisualStyle(style: CalloutVisualStyle): CalloutVisua
       spacing: { ...baseStyle.connector.spacing, ...style.connector?.spacing },
     },
     customCss: style.customCss ?? baseStyle.customCss,
-    surface: { ...baseStyle.surface, ...style.surface },
+    surface: {
+      ...baseStyle.surface,
+      ...style.surface,
+      fillPaint: clonePaint(style.surface?.fillPaint ?? baseStyle.surface.fillPaint),
+    },
     title: { ...baseStyle.title, ...style.title },
     typography: { ...baseStyle.typography, ...style.typography },
   };
@@ -191,7 +196,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     connector: { ...baseStyle.connector, color: '#2b3038', kind: 'wedge' },
     surface: {
       ...baseStyle.surface,
-      backgroundColor: '#2b3038',
+      fillPaint: createSolidPaint('#2b3038'),
       radius: 12,
       shadow: 12,
       textColor: '#f8fafc',
@@ -203,7 +208,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ...cloneCalloutVisualStyle(baseStyle),
     surface: {
       ...baseStyle.surface,
-      backgroundColor: '#FFFFFF',
+      fillPaint: createSolidPaint('#FFFFFF'),
       borderColor: '#CBD5E1',
       borderWidth: 1,
       textColor: '#0F172A',
@@ -214,7 +219,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ...cloneCalloutVisualStyle(baseStyle),
     surface: {
       ...baseStyle.surface,
-      backgroundColor: 'transparent',
+      fillPaint: createSolidPaint('transparent'),
       paddingX: 0,
       paddingY: 0,
       radius: 0,
@@ -243,7 +248,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ].join('\n'),
     surface: {
       ...baseStyle.surface,
-      backgroundColor: 'transparent',
+      fillPaint: createSolidPaint('transparent'),
       paddingX: 8,
       paddingY: 6,
       radius: 0,
@@ -283,7 +288,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ].join('\n'),
     surface: {
       ...baseStyle.surface,
-      backgroundColor: '#F8FAFC',
+      fillPaint: createSolidPaint('#F8FAFC'),
       borderColor: '#486581',
       borderWidth: 1,
       paddingX: 14,
@@ -330,7 +335,7 @@ const canonicalCatalog: readonly SystemCalloutPreset[] = [
     ].join('\n'),
     surface: {
       ...baseStyle.surface,
-      backgroundColor: '#FFF9E8',
+      fillPaint: createSolidPaint('#FFF9E8'),
       borderColor: '#E8C56A',
       borderWidth: 1,
       paddingX: 14,

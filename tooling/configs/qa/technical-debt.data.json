@@ -2853,6 +2853,26 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/surface-style-presets",
+      "disposition": "rollout",
+      "reason": "The revisioned Surface Style preset authority has owner-local parser, mutation, concurrency, recovery, and failure proof in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/surface-style-presets/catalog.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/contracts.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/index.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/storage.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/surface-style-presets/catalog.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/contracts.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/index.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
+        "apps/extension/src/composition/persistence/surface-style-presets/storage.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/video-editor-preview-preferences",
       "disposition": "rollout",
       "reason": "Validated preview preferences have complete owner-local model and storage proof.",
@@ -2917,6 +2937,18 @@
         "apps/extension/src/composition/persistence/web-snapshots/media-entry.ts",
         "apps/extension/src/composition/persistence/web-snapshots/provenance-state.ts",
         "apps/extension/src/composition/persistence/web-snapshots/records.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/composition/surface-style-preset-resources",
+      "disposition": "rollout",
+      "reason": "The Surface Style resource adapter has focused stale-result, subscription, and mutation feedback proof in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/surface-style-preset-resources/use-surface-style-preset-catalog.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/surface-style-preset-resources/use-surface-style-preset-catalog.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -8090,7 +8122,13 @@
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
         "apps/extension/src/features/highlighter/style/shadow.ts",
-        "apps/extension/src/features/highlighter/style/visual.ts"
+        "apps/extension/src/features/highlighter/style/visual.ts",
+        "apps/extension/src/features/highlighter/surface-style/card-projection.ts",
+        "apps/extension/src/features/highlighter/surface-style/card-section.ts",
+        "apps/extension/src/features/highlighter/surface-style/operations.ts",
+        "apps/extension/src/features/highlighter/surface-style/style.ts",
+        "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
+        "apps/extension/src/features/highlighter/surface-style/system-presets.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/features/highlighter/blur-types.ts",
@@ -8189,7 +8227,13 @@
         "apps/extension/src/features/highlighter/style/index.ts",
         "apps/extension/src/features/highlighter/style/public.ts",
         "apps/extension/src/features/highlighter/style/shadow.ts",
-        "apps/extension/src/features/highlighter/style/visual.ts"
+        "apps/extension/src/features/highlighter/style/visual.ts",
+        "apps/extension/src/features/highlighter/surface-style/card-projection.ts",
+        "apps/extension/src/features/highlighter/surface-style/card-section.ts",
+        "apps/extension/src/features/highlighter/surface-style/operations.ts",
+        "apps/extension/src/features/highlighter/surface-style/style.ts",
+        "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
+        "apps/extension/src/features/highlighter/surface-style/system-presets.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -11560,6 +11604,17 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/ui/callout-background-settings",
+      "disposition": "unmapped",
+      "reason": "This owner family has focused integration proof but remains outside the hard coverage rollout; add an explicit rollout target before enabling thresholds.",
+      "productionFiles": [
+        "apps/extension/src/ui/callout-background-settings/index.tsx",
+        "apps/extension/src/ui/callout-background-settings/view.tsx"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/ui/color-selector",
       "disposition": "unmapped",
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
@@ -11811,6 +11866,22 @@
         "apps/extension/src/ui/popup-shell/footer/theme-toggle.tsx",
         "apps/extension/src/ui/popup-shell/icon-state-button/index.tsx",
         "apps/extension/src/ui/popup-shell/select/index.tsx"
+      ],
+      "rolloutFiles": [],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/ui/surface-style-selector",
+      "disposition": "unmapped",
+      "reason": "This controlled selector has focused interaction proof but remains outside the hard coverage rollout; add an explicit rollout target before enabling thresholds.",
+      "productionFiles": [
+        "apps/extension/src/ui/surface-style-selector/controller.ts",
+        "apps/extension/src/ui/surface-style-selector/draft.ts",
+        "apps/extension/src/ui/surface-style-selector/editor-panel.tsx",
+        "apps/extension/src/ui/surface-style-selector/index.tsx",
+        "apps/extension/src/ui/surface-style-selector/layer-lifecycle.ts",
+        "apps/extension/src/ui/surface-style-selector/preset-grid.tsx",
+        "apps/extension/src/ui/surface-style-selector/types.ts"
       ],
       "rolloutFiles": [],
       "unownedFocusedFiles": []
@@ -12959,6 +13030,7 @@
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
+        "packages/runtime-contracts/src/highlighter/surface-style.ts",
         "packages/runtime-contracts/src/messaging/capture-messages.ts",
         "packages/runtime-contracts/src/messaging/contracts/response.ts",
         "packages/runtime-contracts/src/messaging/contracts/runtime-message/content-action.ts",
@@ -13081,6 +13153,7 @@
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
+        "packages/runtime-contracts/src/highlighter/surface-style.ts",
         "packages/runtime-contracts/src/messaging/capture-messages.ts",
         "packages/runtime-contracts/src/messaging/contracts/response.ts",
         "packages/runtime-contracts/src/messaging/contracts/runtime-message/content-action.ts",
@@ -13390,7 +13463,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "1e087dfec9387d3b0675c4b11137dcfae9e237ef0d2a20aa6940f07109c0ceb6"
+        "contentHash": "0a153abd56e27d9831d03f80c35b311a0fed67bf2a9b5b277f77179666cd6b9a"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

@@ -4,11 +4,17 @@ import type {
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { hasVisibleColor } from '@sniptale/foundation/color';
-import { getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
+import {
+  clonePaint,
+  createSolidPaint,
+  getRepresentativeColor,
+  type Paint,
+} from '@sniptale/foundation/paint';
 
 export type CalloutFrameColors = {
   borderColor?: string | undefined;
   fillColor?: string | undefined;
+  fillPaint?: Paint | undefined;
 };
 
 export function getCalloutFrameColors(
@@ -16,11 +22,27 @@ export function getCalloutFrameColors(
 ): CalloutFrameColors {
   return {
     borderColor: frameStyle?.color,
+    fillPaint: frameStyle ? clonePaint(frameStyle.fillPaint) : undefined,
     fillColor:
       frameStyle && hasVisibleColor(getRepresentativeColor(frameStyle.fillPaint))
         ? getRepresentativeColor(frameStyle.fillPaint)
         : undefined,
   };
+}
+
+function resolveCalloutBoundPaint(
+  source: CalloutColorSource,
+  customPaint: Paint,
+  frameColors: CalloutFrameColors
+): Paint {
+  if (source === 'frame-fill' && frameColors.fillPaint) return clonePaint(frameColors.fillPaint);
+  if (source === 'frame-fill' && frameColors.fillColor) {
+    return createSolidPaint(frameColors.fillColor);
+  }
+  if (source === 'frame-border' && frameColors.borderColor) {
+    return createSolidPaint(frameColors.borderColor);
+  }
+  return clonePaint(customPaint);
 }
 
 function resolveBadgeColor(
@@ -60,11 +82,12 @@ export function resolveCalloutColorBindings(
     style.accentEdge.color,
     frameColors
   );
-  const surfaceBackgroundColor = resolveCalloutBoundColor(
+  const surfaceFillPaint = resolveCalloutBoundPaint(
     colorBindings.surfaceBackground,
-    style.surface.backgroundColor,
+    style.surface.fillPaint,
     frameColors
   );
+  const surfaceBackgroundColor = getRepresentativeColor(surfaceFillPaint);
   const surfaceBorderColor = resolveCalloutBoundColor(
     colorBindings.surfaceBorder,
     style.surface.borderColor,
@@ -110,7 +133,7 @@ export function resolveCalloutColorBindings(
     },
     surface: {
       ...style.surface,
-      backgroundColor: surfaceBackgroundColor,
+      fillPaint: surfaceFillPaint,
       borderColor: surfaceBorderColor,
       shadowColor,
     },

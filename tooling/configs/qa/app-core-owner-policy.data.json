@@ -17,6 +17,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/surface-style-preset-resources",
+      "ownerId": "composition.surface-style-preset-resources",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/voice-input",
       "ownerId": "app-core.voice-input",
       "ownerClass": "app-core"
@@ -182,6 +187,16 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/callout-background-settings",
+      "ownerId": "ui.callout-background-settings",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/surface-style-selector",
+      "ownerId": "ui.surface-style-selector",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/keyboard",
       "ownerId": "app-core.keyboard-ui",
       "ownerClass": "app-core"
@@ -309,6 +324,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/gradient-presets",
       "ownerId": "persistence.gradient-presets",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/surface-style-presets",
+      "ownerId": "persistence.surface-style-presets",
       "ownerClass": "persistence"
     },
     {
@@ -486,6 +506,11 @@
     {
       "id": "gradient-presets",
       "path": "apps/extension/src/composition/persistence/gradient-presets",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "surface-style-presets",
+      "path": "apps/extension/src/composition/persistence/surface-style-presets",
       "stateKind": "authoritative-durable"
     },
     {
@@ -684,6 +709,8 @@
     "apps/extension/src/ui/glass-select",
     "apps/extension/src/ui/gradient-preset-grid",
     "apps/extension/src/ui/highlighter-preset-editor",
+    "apps/extension/src/ui/callout-background-settings",
+    "apps/extension/src/ui/surface-style-selector",
     "apps/extension/src/ui/paint-selector",
     "apps/extension/src/ui/keyboard",
     "apps/extension/src/ui/page-bootstrap",

@@ -113,7 +113,7 @@ function dispatchFrameSessionEvents() {
   });
   dispatchCalloutPopoverSettingsChanged({
     frameId: 'frame-1',
-    settings: { style: { surface: { backgroundColor: 'transparent' } } },
+    settings: { style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } } },
   });
   dispatchCalloutDelete({ frameId: 'frame-1' });
   dispatchFocusOpacityChanged({ frameId: 'frame-1', opacity: 0.7 });
@@ -166,7 +166,7 @@ it('syncs frame and callout events through the shared frame-event seam', async (
     content: { bodyHtml: 'next' },
     enabled: false,
     placement: { anchor: 'top-left', side: 'top' },
-    style: { surface: { backgroundColor: 'transparent' } },
+    style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
   });
 
   cleanup();
@@ -231,7 +231,7 @@ it('promotes confirmed element snapshots to future-frame session defaults', asyn
   await Promise.resolve();
 
   const callout = createDefaultCalloutSettings();
-  callout.style.surface.backgroundColor = '#123456';
+  callout.style.surface.fillPaint = { kind: 'solid', color: '#123456ff' };
   dispatchFutureFrameDefaultsChanged({ kind: 'callout', settings: callout });
   const stepBadge = createDefaultFrameStepBadge();
   stepBadge.style = { ...stepBadge.style, diameter: 28 };
@@ -246,9 +246,12 @@ it('promotes confirmed element snapshots to future-frame session defaults', asyn
     },
   });
 
-  expect(getFutureFrameCallout()?.style.surface.backgroundColor).toBe('#123456');
+  expect(getFutureFrameCallout()?.style.surface.fillPaint).toEqual({
+    kind: 'solid',
+    color: '#123456ff',
+  });
   expect(sessionCalloutStyleRef.current).toMatchObject({
-    surface: { backgroundColor: '#123456' },
+    surface: { fillPaint: { kind: 'solid', color: '#123456ff' } },
   });
   expect(sessionStepBadgeTemplateRef.current).toMatchObject({
     enabled: true,

@@ -4,6 +4,7 @@ import {
   SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
 } from '../../../features/highlighter/callout-presets/catalog';
 import { resolveStoredCalloutPresetCatalog, serializeCalloutPresetCatalog } from './migration';
+import { parseStoredCalloutPresetCatalog } from './parser';
 
 it('creates a fully enabled default catalog and compactly round-trips it', () => {
   const fresh = resolveStoredCalloutPresetCatalog({});
@@ -133,4 +134,29 @@ it('round-trips the template title without persisting comment body content', () 
     titleText: 'Template heading',
   });
   expect(JSON.stringify(stored)).not.toContain('bodyHtml');
+});
+
+it('reads legacy surface backgroundColor as Solid Paint and never writes the legacy field', () => {
+  const canonicalStyle = createSystemCalloutPresetCatalog()[0]!.style;
+  const { fillPaint: _fillPaint, ...legacySurface } = canonicalStyle.surface;
+  const style = {
+    ...canonicalStyle,
+    surface: { ...legacySurface, backgroundColor: '#123456' },
+  };
+  const parsed = parseStoredCalloutPresetCatalog({
+    userPresets: [{ id: 'user-legacy-color', name: 'Legacy color', style }],
+  });
+  expect(parsed.invalidFieldCount).toBe(0);
+  const migrated = resolveStoredCalloutPresetCatalog(parsed.value);
+  expect(
+    migrated.presets.find((preset) => preset.id === 'user-legacy-color')?.style.surface.fillPaint
+  ).toEqual({
+    kind: 'solid',
+    color: '#123456ff',
+  });
+  const stored = serializeCalloutPresetCatalog(migrated);
+  const storedSurface = stored.userPresets?.find((preset) => preset.id === 'user-legacy-color')
+    ?.style.surface;
+  expect(storedSurface?.fillPaint).toEqual({ kind: 'solid', color: '#123456ff' });
+  expect(storedSurface).not.toHaveProperty('backgroundColor');
 });

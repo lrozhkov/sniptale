@@ -41,6 +41,7 @@ export function CalloutSettingsPopoverContent(props: {
   presetError: string | null;
   saveSection: CalloutSaveSectionProps;
   onClose: () => void;
+  onNestedLayerChange?: ((open: boolean) => void) | undefined;
   onApplyToFuture?: () => void;
   templateSourceControl?: TemplateSourceControl;
 }) {
@@ -131,6 +132,7 @@ export function CalloutSettingsPopoverContent(props: {
         <CalloutManualSettings
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
+          {...(props.onNestedLayerChange ? { onNestedLayerChange: props.onNestedLayerChange } : {})}
           {...(workflow.mode === 'temporary'
             ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
             : {})}

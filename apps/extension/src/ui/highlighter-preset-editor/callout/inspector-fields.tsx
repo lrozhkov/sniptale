@@ -27,6 +27,7 @@ import { translate } from '../../../platform/i18n';
 
 export type ManualContentProps = {
   frameColors?: CalloutFrameColors | undefined;
+  onNestedLayerChange?: ((open: boolean) => void) | undefined;
   onChange: (patch: CalloutSettingsPatch) => void;
   settings: CalloutSettings;
 };

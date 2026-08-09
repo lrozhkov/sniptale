@@ -56,7 +56,7 @@ describe('getCalloutLayoutState', () => {
       zIndex: 20,
     });
 
-    expect(layout.wrapperStyle.filter).toContain('#ff0000');
+    expect(layout.cloudStyle.boxShadow).toContain('#ff0000');
   });
 
   it('leaves the HTML cloud transparent for the flush combined bubble and wedge contour', () => {
@@ -78,7 +78,7 @@ describe('getCalloutLayoutState', () => {
       throw new Error('Expected a wedge connector');
     }
     expect(layout.cloudStyle.border).toBe('4px solid transparent');
-    expect(layout.cloudStyle.backgroundColor).toBe('transparent');
+    expect(layout.cloudStyle.background).toBe('transparent');
     expect(layout.cloudStyle.backgroundClip).toBeUndefined();
     expect(layout.dynamicTail.outlinePath).toContain('Z');
   });

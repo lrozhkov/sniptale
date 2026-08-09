@@ -335,9 +335,10 @@ function isCalloutSurface(value: unknown): boolean {
     hasFields(
       value,
       ['borderWidth', 'paddingX', 'paddingY', 'radius', 'shadow'],
-      ['backgroundColor', 'borderColor', 'borderStyle', 'shadowColor', 'textColor']
+      ['borderColor', 'borderStyle', 'shadowColor', 'textColor']
     ) &&
-    hasSafeColorFields(value, ['backgroundColor', 'borderColor', 'shadowColor', 'textColor']) &&
+    hasSafeColorFields(value, ['borderColor', 'shadowColor', 'textColor']) &&
+    (parsePaint(value['fillPaint']) !== null || isSafeCssColor(value['backgroundColor'])) &&
     isOneOf(value['borderStyle'], ['solid', 'dashed', 'dotted'])
   );
 }
@@ -515,6 +516,23 @@ export function isCalloutSettings(value: unknown): boolean {
     isCalloutColorBindings(style['colorBindings']) &&
     isCalloutConnector(style['connector'])
   );
+}
+
+export function normalizeCalloutSettings(value: unknown) {
+  if (value === undefined) return undefined;
+  if (!isCalloutSettings(value) || !isRecord(value)) return null;
+  const style = value['style'] as Record<string, unknown>;
+  const surface = style['surface'] as Record<string, unknown>;
+  const fillPaint =
+    parsePaint(surface['fillPaint']) ?? createSolidPaint(surface['backgroundColor'] as string);
+  const { backgroundColor: _legacyBackgroundColor, ...surfaceWithoutLegacy } = surface;
+  return {
+    ...structuredClone(value),
+    style: {
+      ...structuredClone(style),
+      surface: { ...structuredClone(surfaceWithoutLegacy), fillPaint },
+    },
+  } as unknown as import('@sniptale/runtime-contracts/highlighter/callout').CalloutSettings;
 }
 import { containsUnsafeCssSyntax } from '@sniptale/platform/security/css-safety';
 import { validateCalloutCustomCss } from '../callout-custom-css';

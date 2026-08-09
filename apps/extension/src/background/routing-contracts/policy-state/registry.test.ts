@@ -36,6 +36,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'popup-tab-route-capabilities',
   'project-export-capabilities',
   'project-export-job-ledger',
+  'surface-style-preset-mutation-queue',
   'tab-mode-runtime-state',
   'video-camera-recorder-grant',
   'video-capture-surface-sessions',

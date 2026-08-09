@@ -4,6 +4,7 @@ import { translate } from '../../../../platform/i18n';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import { ProductGlassToolbar, ProductGlassToolbarButton } from '@sniptale/ui/product-glass-toolbar';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 import type { getDynamicTailState } from './dynamic-tail';
 import type { getLineConnectorState } from './line-connector';
 import type {
@@ -169,7 +170,7 @@ export function renderDynamicCalloutTail(
         <path
           data-ui="content.callout.tail-outline"
           d={tail.outlinePath}
-          fill={style.surface.backgroundColor}
+          fill={getRepresentativeColor(style.surface.fillPaint)}
           pointerEvents="none"
           stroke={style.surface.borderColor}
           strokeDasharray={getCalloutStrokeDasharray(
@@ -184,7 +185,7 @@ export function renderDynamicCalloutTail(
       ) : (
         <path
           d={tail.path}
-          fill={style.surface.backgroundColor}
+          fill={getRepresentativeColor(style.surface.fillPaint)}
           pointerEvents="none"
           style={customStyles?.connector}
         />

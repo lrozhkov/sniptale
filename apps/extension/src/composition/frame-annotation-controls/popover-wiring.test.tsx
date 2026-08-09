@@ -77,6 +77,12 @@ vi.mock('./callout/body', async (importOriginal) => ({
       <button onClick={() => props['onShowPresets']()}>refresh</button>
       <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
       <button onClick={() => props['handleDelete']()}>disable</button>
+      <button data-ui="nested-surface-open" onClick={() => props['onNestedLayerChange']?.(true)}>
+        nested-open
+      </button>
+      <button data-ui="nested-surface-close" onClick={() => props['onNestedLayerChange']?.(false)}>
+        nested-close
+      </button>
     </div>
   ),
 }));
@@ -288,6 +294,62 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+});
+
+it('keeps parent Escape dismissal disabled until the nested Surface layer closes', async () => {
+  const onClose = vi.fn();
+  await act(async () =>
+    root.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={onClose}
+        onDisable={vi.fn()}
+        portalTarget={portal}
+        settings={createDefaultFrameCallout()}
+      />
+    )
+  );
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-open"]')!.click()
+  );
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-close"]')!.click()
+  );
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('clears nested Surface dismissal suppression when the parent closes and reopens', async () => {
+  const onClose = vi.fn();
+  const renderPopover = (isOpen: boolean) => (
+    <FutureCalloutSettingsPopover
+      anchorEl={anchor}
+      isOpen={isOpen}
+      onChange={vi.fn()}
+      onClose={onClose}
+      onDisable={vi.fn()}
+      portalTarget={portal}
+      settings={createDefaultFrameCallout()}
+    />
+  );
+  await act(async () => root.render(renderPopover(true)));
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-open"]')!.click()
+  );
+  await act(async () => root.render(renderPopover(false)));
+  await act(async () => root.render(renderPopover(true)));
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 it('wires every callout and numbering mutation through the shared popover owners', async () => {

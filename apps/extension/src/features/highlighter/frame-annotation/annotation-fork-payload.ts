@@ -3,6 +3,7 @@ import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/
 import type { AppliedBorderSettings, BlurSettings, EffectMode, FocusSettings } from '../contracts';
 import {
   isCalloutSettings,
+  normalizeCalloutSettings,
   isFocusSettings,
   isStepBadgeSettings,
   parseBlurSettings,
@@ -149,18 +150,21 @@ const calloutShape: ExactShape = {
       spacing: leaf('blockGap', 'frameGap', 'minimumEndSegment', 'obstacleMargin'),
     },
     customCss: true,
-    surface: leaf(
-      'backgroundColor',
-      'borderColor',
-      'borderStyle',
-      'borderWidth',
-      'paddingX',
-      'paddingY',
-      'radius',
-      'shadow',
-      'shadowColor',
-      'textColor'
-    ),
+    surface: {
+      ...leaf(
+        'backgroundColor',
+        'borderColor',
+        'borderStyle',
+        'borderWidth',
+        'paddingX',
+        'paddingY',
+        'radius',
+        'shadow',
+        'shadowColor',
+        'textColor'
+      ),
+      fillPaint: paintShape,
+    },
     title: leaf(
       'backgroundColor',
       'direction',
@@ -317,11 +321,10 @@ export function parseAnnotationForkDraftPayload(payload: string): AnnotationFork
   ) {
     return null;
   }
+  const normalizedCallout = normalizeCalloutSettings(calloutForValidation);
   return {
     ...(frame ? { frame } : {}),
-    ...(calloutForValidation
-      ? { callout: structuredClone(calloutForValidation) as unknown as CalloutSettings }
-      : {}),
+    ...(normalizedCallout ? { callout: normalizedCallout } : {}),
     ...(stepBadgeForValidation
       ? { stepBadge: structuredClone(stepBadgeForValidation) as unknown as StepBadgeSettings }
       : {}),

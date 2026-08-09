@@ -18,6 +18,7 @@ import { usePopoverDistanceClose, usePopoverEscapeClose } from '../popover/hooks
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
+import type { CalloutFrameColors } from '../../../features/highlighter/callout-color-bindings';
 
 export function FutureCalloutSettingsPopover(props: {
   anchorEl: HTMLElement | null;
@@ -30,9 +31,11 @@ export function FutureCalloutSettingsPopover(props: {
   headerContext?: SettingsPopoverContext;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
+  frameColors?: CalloutFrameColors;
 }) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [localSettings, setLocalSettings] = useState(props.settings);
+  const [nestedLayerOpen, setNestedLayerOpen] = useState(false);
   const presets = useCalloutPresetPopoverController(props.isOpen);
   const saveSection = createCalloutSaveSection({
     create: presets.catalog.create,
@@ -61,15 +64,16 @@ export function FutureCalloutSettingsPopover(props: {
 
   useEffect(() => {
     if (props.isOpen) setLocalSettings(props.settings);
+    else setNestedLayerOpen(false);
   }, [props.isOpen, props.settings]);
   usePopoverDistanceClose({
-    isOpen: props.isOpen,
+    isOpen: props.isOpen && !nestedLayerOpen,
     onClose: props.onClose,
     popoverRef,
   });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
-    isOpen: props.isOpen,
+    isOpen: props.isOpen && !nestedLayerOpen,
     onClose: props.onClose,
   });
 
@@ -138,6 +142,7 @@ export function FutureCalloutSettingsPopover(props: {
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <CalloutSettingsPopoverContent
+        {...(props.frameColors ? { frameColors: props.frameColors } : {})}
         handleDelete={props.onDisable}
         handleSettingChange={handleSettingChange}
         headerContext={headerContext}
@@ -146,6 +151,7 @@ export function FutureCalloutSettingsPopover(props: {
         onApplyPreset={applyPreset}
         onForkPreset={forkPreset}
         onClose={props.onClose}
+        onNestedLayerChange={setNestedLayerOpen}
         onResetPreset={(preset) => void presets.editor.reset(preset)}
         onShowPresets={presets.catalog.refresh}
         onTogglePreset={(preset) => void presets.catalog.toggle(preset)}

@@ -17,6 +17,27 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+vi.mock(
+  '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    useSurfaceStylePresetCatalog: () => ({
+      actions: {
+        onCreate: vi.fn(),
+        onDelete: vi.fn(),
+        onDuplicate: vi.fn(),
+        onRename: vi.fn(),
+        onReorder: vi.fn(),
+        onReset: vi.fn(),
+        onToggleFavorite: vi.fn(),
+        onUpdate: vi.fn(),
+      },
+      catalog: { catalogRevision: 0, unsafeForWrite: false },
+      presets: [],
+    }),
+  })
+);
+
 vi.mock('../../color-selector', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../color-selector')>()),
   CompactColorSelector: (props: {
@@ -286,7 +307,7 @@ it('edits every shared callout inspector section and connector mode', async () =
   expect(latestSettings.style.customCss).toBe('[title]\ntext-transform: uppercase;');
   expect(document.querySelector('textarea')?.getAttribute('aria-invalid')).toBe('true');
 
-  expect(latestSettings.style.surface.backgroundColor).toBe('#123456');
+  expect(latestSettings.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#f8fafcff' });
   expect(latestSettings.style.connector.kind).toBe('none');
 });
 
@@ -320,11 +341,10 @@ it('stores a semantic frame color source and disables the custom picker', async 
 
   expect(latestSettings.style.colorBindings.surfaceBackground).toBe('frame-fill');
   const backgroundPicker = document.querySelector<HTMLButtonElement>(
-    '[data-color-field="content.callout.backgroundLabel"]'
+    '[data-ui="shared.ui.surface-style-selector"] > button'
   );
-  expect(backgroundPicker?.closest('fieldset')?.disabled).toBe(true);
   expect(backgroundPicker?.disabled).toBe(true);
-  expect(latestSettings.style.surface.backgroundColor).not.toBe('#fedcba');
+  expect(latestSettings.style.surface.fillPaint).not.toEqual({ kind: 'solid', color: '#fedcbaff' });
 });
 
 it('inherits the shadow color from the resolved comment background and border', async () => {

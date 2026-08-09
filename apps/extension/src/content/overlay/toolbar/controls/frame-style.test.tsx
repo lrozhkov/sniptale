@@ -313,7 +313,7 @@ it('keeps capture visibility out of the future-frame toolbar', () => {
 
 it('updates the visible toolbar defaults after an element fork is promoted', () => {
   const callout = createDefaultCalloutSettings();
-  callout.style.surface.backgroundColor = '#123456';
+  callout.style.surface.fillPaint = { kind: 'solid', color: '#123456ff' };
   const baseStepBadge = createDefaultFrameStepBadge();
   const stepBadge = {
     ...baseStepBadge,
@@ -340,7 +340,7 @@ it('updates the visible toolbar defaults after an element fork is promoted', () 
       ?.getAttribute('aria-pressed')
   ).toBe('true');
   expect(popoverMocks.calloutProps?.['settings']).toMatchObject({
-    style: { surface: { backgroundColor: '#123456' } },
+    style: { surface: { fillPaint: { kind: 'solid', color: '#123456ff' } } },
   });
 
   act(() => dispatchFutureFrameDefaultsChanged({ kind: 'stepBadge', settings: stepBadge }));

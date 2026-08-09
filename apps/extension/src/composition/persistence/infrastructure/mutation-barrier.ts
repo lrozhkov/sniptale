@@ -124,6 +124,7 @@ export type PersistenceMutationDomain =
   | 'gradient-presets'
   | 'highlighter-settings'
   | 'step-badge-presets'
+  | 'surface-style-presets'
   | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(
