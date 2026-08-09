@@ -2,12 +2,14 @@ import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 export interface ScenarioProjectEntry {
   id: string;
   project: ScenarioProject | ScenarioProjectV3;
   createdAt: number;
   updatedAt: number;
+  lifecycle?: LibraryLifecycle;
 }
 
 export interface ScenarioAssetEntry {

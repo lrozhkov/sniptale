@@ -69,6 +69,7 @@ function createMinimalVideoProjectItem(id: string): GalleryItem {
       trackCount: 0,
       thumbnailId: `video-project:${id}`,
       thumbnailSourceMediaId: null,
+      retentionKind: 'ordinary',
     },
     size: 0,
     sourceFavicon: null,
@@ -87,7 +88,10 @@ function createMinimalVideoProjectItem(id: string): GalleryItem {
 
 function createMinimalMediaItem(
   id: string,
-  kind: Exclude<GalleryItemKind, 'scenario' | 'scenario-export' | 'video-project'>
+  kind: Exclude<
+    GalleryItemKind,
+    'editor-session' | 'scenario' | 'scenario-export' | 'video-project'
+  >
 ): GalleryItem {
   return {
     id,
@@ -109,7 +113,10 @@ function createMinimalMediaItem(
   };
 }
 
-export function createMediaThumbFallbackItem(kind: GalleryItemKind, id: string): GalleryItem {
+export function createMediaThumbFallbackItem(
+  kind: Exclude<GalleryItemKind, 'editor-session'>,
+  id: string
+): GalleryItem {
   if (kind === 'scenario') {
     return createMinimalScenarioItem(id);
   }

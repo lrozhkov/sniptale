@@ -7,10 +7,12 @@ export type ContentSenderBinding = {
   frameId: number;
   senderUrl: string;
   tabId: number;
+  libraryDestinationAuthorized?: true;
 };
 
 export type ContentActionCapabilityPayload = {
   actionType: ContentPrivilegedActionType;
+  libraryDestinationAuthorized?: boolean;
   requestId: string;
 };
 
@@ -29,10 +31,12 @@ export function createContentPolicySenderBinding(senderBinding: ContentSenderBin
 
 export function createContentActionCapabilityPayload(args: {
   actionType: ContentPrivilegedActionType;
+  libraryDestinationAuthorized?: boolean;
   requestId: string;
 }): ContentActionCapabilityPayload {
   return {
     actionType: args.actionType,
+    ...(args.libraryDestinationAuthorized ? { libraryDestinationAuthorized: true } : {}),
     requestId: args.requestId,
   };
 }

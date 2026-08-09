@@ -10,9 +10,10 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(12);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(13);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
       annotations: ['borders', 'callouts', 'numbering'],
+      'storage-drafts': [],
       'media-quality': ['image', 'video'],
       'editor-resources': ['tools', 'palettes'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],

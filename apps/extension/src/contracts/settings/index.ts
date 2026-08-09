@@ -53,10 +53,21 @@ export interface ContentToolbarPreferences {
   position: ContentToolbarPosition | null;
 }
 
+export type LocalStorageDestination = 'temporary' | 'library';
+
+export interface LocalStoragePolicy {
+  cleanupEnabled: boolean;
+  defaultDestination: LocalStorageDestination;
+  draftRetentionDays: number;
+  videoDraftRetentionDays: number;
+}
+
 export interface Settings {
   captureAction: CaptureActionType;
   contentToolbar?: ContentToolbarPreferences;
   contextMenu: ContextMenuSettings;
+  localStoragePolicy?: LocalStoragePolicy;
+  /** @deprecated Read compatibility for settings written before localStoragePolicy. */
   saveCapturesToGallery: boolean;
   viewportPresets: ViewportPreset[];
   defaultViewportPresetId: string | null;
@@ -74,13 +85,16 @@ export interface Settings {
   voiceInput?: VoiceInputPreferences;
 }
 
+export type NormalizedSettings = Settings & { localStoragePolicy: LocalStoragePolicy };
+
 export type SettingsPatch = Omit<
   Partial<Settings>,
-  'contentToolbar' | 'contextMenu' | 'fullPageCapture' | 'voiceInput'
+  'contentToolbar' | 'contextMenu' | 'fullPageCapture' | 'localStoragePolicy' | 'voiceInput'
 > & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
+  localStoragePolicy?: Partial<LocalStoragePolicy>;
   voiceInput?: Partial<VoiceInputPreferences>;
 };
 

@@ -3,6 +3,12 @@ import type { VideoProjectEntry } from './contracts';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from './read-guards';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+  type LibraryLifecycle,
+} from '../library-lifecycle/contracts';
 
 type ProjectAssetDeleteStore = {
   delete(key: string): Promise<unknown>;
@@ -10,6 +16,11 @@ type ProjectAssetDeleteStore = {
 
 type ProjectAssetReferenceProjectStore = {
   getAll(): Promise<unknown[]>;
+};
+
+type ProjectAssetMediaStore = ProjectAssetDeleteStore & {
+  get(key: string): Promise<unknown>;
+  put(value: unknown): Promise<unknown>;
 };
 
 export function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
@@ -46,7 +57,7 @@ function collectAssetIdsReferencedByOtherProjects(
 
 async function deleteUnreferencedProjectAssets(
   projectAssetStore: ProjectAssetDeleteStore,
-  mediaLibraryStore: ProjectAssetDeleteStore,
+  mediaLibraryStore: ProjectAssetMediaStore,
   projectAssetIds: string[],
   referencedAssetIds: ReadonlySet<string>
 ): Promise<string[]> {
@@ -57,8 +68,14 @@ async function deleteUnreferencedProjectAssets(
       continue;
     }
 
+    const mediaId = createProjectAssetMediaId(projectAssetId);
+    const media = parseMediaLibraryEntry(await mediaLibraryStore.get(mediaId));
+    if (media && media.lifecycle?.storageClass !== 'temporary') {
+      continue;
+    }
+
     await projectAssetStore.delete(projectAssetId);
-    await mediaLibraryStore.delete(createProjectAssetMediaId(projectAssetId));
+    await mediaLibraryStore.delete(mediaId);
     deletedAssetIds.push(projectAssetId);
   }
 
@@ -66,7 +83,7 @@ async function deleteUnreferencedProjectAssets(
 }
 
 export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
-  mediaLibraryStore: ProjectAssetDeleteStore;
+  mediaLibraryStore: ProjectAssetMediaStore;
   ownerProjectId: string;
   projectAssetIds: string[];
   projectAssetStore: ProjectAssetDeleteStore;
@@ -87,4 +104,47 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
     args.projectAssetIds,
     referencedAssetIds
   );
+}
+
+export async function syncProjectAssetMirrorLifecycles(args: {
+  lifecycle: LibraryLifecycle;
+  mediaLibraryStore: ProjectAssetMediaStore;
+  now: number;
+  ownerProjectId: string;
+  projectAssetIds: ReadonlySet<string>;
+  projectStore: ProjectAssetReferenceProjectStore;
+}): Promise<void> {
+  const libraryAssetIds = new Set<string>();
+  for (const otherProject of parseDbEntries(
+    await args.projectStore.getAll(),
+    parseVideoProjectEntry
+  )) {
+    if (
+      otherProject.id === args.ownerProjectId ||
+      otherProject.lifecycle?.storageClass === 'temporary'
+    ) {
+      continue;
+    }
+    for (const projectAssetId of collectProjectOwnedAssetIds(otherProject.project)) {
+      libraryAssetIds.add(projectAssetId);
+    }
+  }
+
+  for (const projectAssetId of args.projectAssetIds) {
+    const media = parseMediaLibraryEntry(
+      await args.mediaLibraryStore.get(createProjectAssetMediaId(projectAssetId))
+    );
+    if (!media) continue;
+    const belongsToLibrary =
+      media.lifecycle?.storageClass === 'library' ||
+      args.lifecycle.storageClass === 'library' ||
+      libraryAssetIds.has(projectAssetId);
+    const lifecycle = belongsToLibrary
+      ? promoteLibraryLifecycle(
+          media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt),
+          args.now
+        )
+      : createLibraryLifecycle('temporary', args.now);
+    await args.mediaLibraryStore.put({ ...media, lifecycle });
+  }
 }

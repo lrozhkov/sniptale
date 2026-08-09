@@ -1,5 +1,6 @@
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import type { MediaAssetKind } from '../../../features/media-hub/media-types';
+import type { LibraryLifecycle, LibraryStorageClass } from '../library-lifecycle/contracts';
 
 export type { MediaAssetKind } from '../../../features/media-hub/media-types';
 
@@ -32,6 +33,7 @@ export interface MediaLibraryEntry {
   sourceTitle: string | null;
   sourceFavicon: string | null;
   tags: string[];
+  lifecycle?: LibraryLifecycle;
   blob?: Blob;
 }
 
@@ -57,6 +59,7 @@ export interface SaveScreenshotMediaAssetInput {
   sourceTitle?: string | null;
   sourceFavicon?: string | null;
   tags?: string[];
+  storageClass?: LibraryStorageClass;
 }
 
 export interface SaveWebSnapshotMediaAssetInput {

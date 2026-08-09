@@ -22,6 +22,22 @@ const mocks = vi.hoisted(() => ({
     imageFormat: 'png' as 'png' | 'jpeg' | 'webp',
     isClipboardCopySupported: true,
   },
+  getEditorSessionDraft: vi.fn(),
+  getMediaLibraryEntry: vi.fn(),
+  promoteStoredItem: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/media-library', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/media-library')>()),
+  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
+}));
+vi.mock('../../../composition/persistence/editor-sessions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/editor-sessions')>()),
+  getEditorSessionDraft: mocks.getEditorSessionDraft,
+}));
+vi.mock('../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/library-lifecycle')>()),
+  promoteStoredItem: mocks.promoteStoredItem,
 }));
 
 const storeState = vi.hoisted(() => ({
@@ -116,6 +132,10 @@ beforeEach(() => {
   mocks.embed.mode = null;
   mocks.embed.onApply = null;
   mocks.embed.onClose = null;
+  mocks.getMediaLibraryEntry.mockResolvedValue({
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  });
+  mocks.promoteStoredItem.mockResolvedValue(undefined);
   storeState.value = {
     pageTitle: 'Captured page',
     saveErrorMessage: null,
@@ -159,6 +179,23 @@ it('renders document title, status, and document quick actions next to the title
   expect(
     getButton('editor.floating.document-bar.copy-button').getAttribute('data-copy-status')
   ).toBe('saved');
+});
+
+it('shows storage state separately and promotes a linked draft without changing its id', async () => {
+  window.history.replaceState(null, '', '?assetId=asset-1');
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+
+  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  const promote = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (candidate) =>
+      candidate.textContent?.includes(translate('editor.documentActions.saveToLibrary'))
+  );
+  await act(async () => promote?.click());
+
+  expect(mocks.promoteStoredItem).toHaveBeenCalledWith({ id: 'asset-1', kind: 'media' });
+  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  window.history.replaceState(null, '', '/');
 });
 
 it('opens the existing full document actions menu from the file button', () => {

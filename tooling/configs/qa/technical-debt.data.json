@@ -2439,6 +2439,34 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/library-lifecycle",
+      "disposition": "rollout",
+      "reason": "The lifecycle coordinator has deterministic owner-local coverage for contracts, parsing, policy, promotion, and cleanup.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/library-lifecycle/cleanup.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/contracts.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/index.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/parser.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/policy.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/promotion.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/references.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/service.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/usage.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/library-lifecycle/cleanup.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/contracts.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/index.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/parser.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/policy.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/promotion.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/references.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/service.ts",
+        "apps/extension/src/composition/persistence/library-lifecycle/usage.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/media-library",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -4630,10 +4658,12 @@
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
-        "apps/extension/src/contracts/settings/index.ts"
+        "apps/extension/src/contracts/settings/index.ts",
+        "apps/extension/src/contracts/settings/library-lifecycle.ts"
       ],
       "rolloutFiles": [
-        "apps/extension/src/contracts/settings/index.ts"
+        "apps/extension/src/contracts/settings/index.ts",
+        "apps/extension/src/contracts/settings/library-lifecycle.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -9037,6 +9067,7 @@
         "apps/extension/src/gallery/library/modals/types.ts",
         "apps/extension/src/gallery/library/preview/index.tsx",
         "apps/extension/src/gallery/library/preview/media.tsx",
+        "apps/extension/src/gallery/library/preview/promotion-action.tsx",
         "apps/extension/src/gallery/library/preview/scenario-preview.tsx",
         "apps/extension/src/gallery/library/preview/scenario-stage.tsx",
         "apps/extension/src/gallery/library/preview/scenario-step-card.tsx",
@@ -9106,6 +9137,7 @@
         "apps/extension/src/gallery/library/modals/types.ts",
         "apps/extension/src/gallery/library/preview/index.tsx",
         "apps/extension/src/gallery/library/preview/media.tsx",
+        "apps/extension/src/gallery/library/preview/promotion-action.tsx",
         "apps/extension/src/gallery/library/preview/scenario-preview.tsx",
         "apps/extension/src/gallery/library/preview/scenario-stage.tsx",
         "apps/extension/src/gallery/library/preview/scenario-step-card.tsx",
@@ -10258,6 +10290,7 @@
         "apps/extension/src/scenario-editor/page-shell/toolbar/insert-menu.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/project-summary.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/shell.tsx",
+        "apps/extension/src/scenario-editor/page-shell/toolbar/storage-status.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/test-support.ts",
         "apps/extension/src/scenario-editor/page-shell/toolbar/types.ts",
         "apps/extension/src/scenario-editor/page-shell/types.ts",
@@ -10622,6 +10655,7 @@
         "apps/extension/src/scenario-editor/page-shell/toolbar/insert-menu.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/project-summary.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/shell.tsx",
+        "apps/extension/src/scenario-editor/page-shell/toolbar/storage-status.tsx",
         "apps/extension/src/scenario-editor/page-shell/toolbar/test-support.ts",
         "apps/extension/src/scenario-editor/page-shell/toolbar/types.ts",
         "apps/extension/src/scenario-editor/page-shell/types.ts",
@@ -11040,6 +11074,9 @@
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/types.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/sync.ts",
+        "apps/extension/src/settings/sections/capture/storage-drafts/content.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -11349,6 +11386,9 @@
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/types.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/sync.ts",
+        "apps/extension/src/settings/sections/capture/storage-drafts/content.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
@@ -12182,6 +12222,7 @@
         "apps/extension/src/video-editor/workspace/floating/index.tsx",
         "apps/extension/src/video-editor/workspace/floating/inspector-stack.tsx",
         "apps/extension/src/video-editor/workspace/floating/media-import.ts",
+        "apps/extension/src/video-editor/workspace/floating/storage-status.tsx",
         "apps/extension/src/video-editor/workspace/floating/top-panels.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/contracts/index.ts",
         "apps/extension/src/video-editor/workspace/sidebar/contracts/panel-content.ts",
@@ -13302,7 +13343,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "aaf8a4bccc350099348c8994521de1af09b75efe40b9885118362f8d3a27e9df"
+        "contentHash": "27305ea126f2af5811020129965aece13bd1085a318cbb7cec1300f6e16796f0"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

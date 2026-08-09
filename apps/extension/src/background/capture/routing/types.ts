@@ -94,6 +94,7 @@ export type RouteCaptureMessage =
     }
   | {
       type: 'OPEN_EDITOR_WITH_IMAGE';
+      assetId?: string;
       dataUrl: string;
       contentIntent?: ContentPrivilegedActionCapability;
     }
@@ -101,6 +102,7 @@ export type RouteCaptureMessage =
       type: 'SAVE_SCREENSHOT_TO_GALLERY';
       dataUrl: string;
       filename: string;
+      storageClass?: 'temporary' | 'library';
       contentIntent?: ContentPrivilegedActionCapability;
     }
   | ({

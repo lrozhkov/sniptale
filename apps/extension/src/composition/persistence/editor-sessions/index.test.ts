@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { dbGetMock, dbPutMock, initDBMock, openCursorMock, transactionMock } = vi.hoisted(() => ({
-  dbDeleteMock: vi.fn(),
-  dbGetMock: vi.fn(),
-  dbPutMock: vi.fn(),
-  initDBMock: vi.fn(),
-  openCursorMock: vi.fn(),
-  transactionMock: vi.fn(),
-}));
+const { dbGetAllMock, dbGetMock, dbPutMock, initDBMock, openCursorMock, transactionMock } =
+  vi.hoisted(() => ({
+    dbDeleteMock: vi.fn(),
+    dbGetAllMock: vi.fn(),
+    dbGetMock: vi.fn(),
+    dbPutMock: vi.fn(),
+    initDBMock: vi.fn(),
+    openCursorMock: vi.fn(),
+    transactionMock: vi.fn(),
+  }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
   EDITOR_SESSIONS_STORE: 'editor_sessions',
+  MEDIA_LIBRARY_STORE: 'media_library',
   initDB: initDBMock,
 }));
 import { type EditorDocument } from '../../../features/editor/document/types';
@@ -55,6 +58,11 @@ function resetEditorSessionsDbMocks() {
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   transactionMock.mockReturnValue({
     done: Promise.resolve(),
+    objectStore: vi.fn((name: string) =>
+      name === 'editor_sessions'
+        ? { get: dbGetMock, put: dbPutMock }
+        : { get: vi.fn().mockResolvedValue(undefined) }
+    ),
     store: {
       index: vi.fn().mockReturnValue({
         openCursor: openCursorMock,
@@ -63,6 +71,7 @@ function resetEditorSessionsDbMocks() {
   });
   initDBMock.mockResolvedValue({
     get: dbGetMock,
+    getAll: dbGetAllMock,
     put: dbPutMock,
     transaction: transactionMock,
   });
@@ -116,12 +125,17 @@ async function verifySaveDraftFlowDropsInvalidExistingPayloads() {
     createdAt: now,
     updatedAt: now,
     dirty: true,
+    lifecycle: {
+      savedAt: null,
+      storageClass: 'temporary',
+      updatedAt: now,
+    },
   });
 
-  expect(transactionMock).toHaveBeenCalledWith('editor_sessions', 'readwrite');
-  expect(IDBKeyRange.upperBound).toHaveBeenCalledWith(now - 30 * 24 * 60 * 60 * 1000);
-  expect(expiredCursor.delete).toHaveBeenCalledTimes(1);
-  expect(dbPutMock).toHaveBeenCalledWith('editor_sessions', {
+  expect(transactionMock).toHaveBeenCalledWith(['editor_sessions', 'media_library'], 'readwrite');
+  expect(IDBKeyRange.upperBound).not.toHaveBeenCalled();
+  expect(expiredCursor.delete).not.toHaveBeenCalled();
+  expect(dbPutMock).toHaveBeenCalledWith({
     sessionId: 'session-1',
     document: createEditorDocument(),
     assetId: null,
@@ -130,6 +144,11 @@ async function verifySaveDraftFlowDropsInvalidExistingPayloads() {
     createdAt: now,
     updatedAt: now,
     dirty: true,
+    lifecycle: {
+      savedAt: null,
+      storageClass: 'temporary',
+      updatedAt: now,
+    },
   });
   expect(warnSpy).toHaveBeenNthCalledWith(
     1,
@@ -153,7 +172,7 @@ async function verifyInvalidDraftReadFallsBackToUndefined() {
   );
 }
 
-async function verifyCleanupRunsAtMostOncePerWindow() {
+async function verifyAutosaveDoesNotRunRetentionCleanup() {
   const now = 31 * 24 * 60 * 60 * 1000 + 5000;
   vi.spyOn(Date, 'now').mockReturnValue(now);
   dbGetMock.mockResolvedValue(undefined);
@@ -173,8 +192,8 @@ async function verifyCleanupRunsAtMostOncePerWindow() {
     document: createEditorDocument(),
   });
 
-  expect(transactionMock).toHaveBeenCalledTimes(1);
-  expect(IDBKeyRange.upperBound).toHaveBeenCalledTimes(1);
+  expect(transactionMock).toHaveBeenCalledTimes(2);
+  expect(IDBKeyRange.upperBound).not.toHaveBeenCalled();
 }
 
 async function verifySensitiveSourceUrlIsSanitizedBeforeSave() {
@@ -196,12 +215,51 @@ async function verifySensitiveSourceUrlIsSanitizedBeforeSave() {
   });
 
   expect(dbPutMock).toHaveBeenCalledWith(
-    'editor_sessions',
     expect.objectContaining({
       sourceTitle: 'Draft title',
       sourceUrl: 'https://example.com/',
     })
   );
+}
+
+async function verifyExistingLifecycleAndListOrdering() {
+  const document = createEditorDocument();
+  dbGetMock.mockResolvedValueOnce({
+    assetId: null,
+    createdAt: 10,
+    dirty: false,
+    document,
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 20 },
+    sessionId: 'session-existing',
+    sourceTitle: null,
+    sourceUrl: null,
+    updatedAt: 20,
+  });
+  vi.spyOn(Date, 'now').mockReturnValue(30);
+  const { listEditorSessionDrafts, saveEditorSessionDraft } = await import('./index');
+
+  const saved = await saveEditorSessionDraft({
+    document,
+    dirty: false,
+    sessionId: 'session-existing',
+  });
+  expect(saved).toEqual(
+    expect.objectContaining({
+      createdAt: 10,
+      dirty: false,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 30 },
+    })
+  );
+
+  dbGetAllMock.mockResolvedValueOnce([
+    saved,
+    { ...saved, sessionId: 'session-newer', updatedAt: 40 },
+    { sessionId: 'invalid' },
+  ]);
+  await expect(listEditorSessionDrafts()).resolves.toEqual([
+    expect.objectContaining({ sessionId: 'session-newer' }),
+    expect.objectContaining({ sessionId: 'session-existing' }),
+  ]);
 }
 
 describe('editor-sessions-db', () => {
@@ -216,11 +274,15 @@ describe('editor-sessions-db', () => {
     verifyInvalidDraftReadFallsBackToUndefined
   );
   it(
-    'limits editor-session cleanup scans to one run per cleanup window',
-    verifyCleanupRunsAtMostOncePerWindow
+    'does not run retention cleanup from the autosave writer',
+    verifyAutosaveDoesNotRunRetentionCleanup
   );
   it(
     'sanitizes sensitive source URLs before saving drafts',
     verifySensitiveSourceUrlIsSanitizedBeforeSave
+  );
+  it(
+    'updates existing lifecycle metadata and lists valid drafts newest first',
+    verifyExistingLifecycleAndListOrdering
   );
 });

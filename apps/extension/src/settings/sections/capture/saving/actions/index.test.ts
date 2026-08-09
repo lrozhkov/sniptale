@@ -132,6 +132,7 @@ describe('save presets section view model and persister', () => {
       'ask_system',
       'edit',
       'copy',
+      'save_to_library',
     ]);
     expect(model.presetOptions).toEqual([
       { value: '', label: 'savePresets.section.unsetOption' },

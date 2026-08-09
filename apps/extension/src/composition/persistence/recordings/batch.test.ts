@@ -99,8 +99,17 @@ describe('recording batch persistence', () => {
       'readwrite'
     );
     expect(entries).toEqual([
-      { ...inputs[0], createdAt: 1_700, size: 5 },
-      { ...inputs[1], size: 5 },
+      {
+        ...inputs[0],
+        createdAt: 1_700,
+        lifecycle: { savedAt: 1_700, storageClass: 'library', updatedAt: 1_700 },
+        size: 5,
+      },
+      {
+        ...inputs[1],
+        lifecycle: { savedAt: 1_800, storageClass: 'library', updatedAt: 1_800 },
+        size: 5,
+      },
     ]);
     expect(harness.mediaPut).toHaveBeenNthCalledWith(
       1,

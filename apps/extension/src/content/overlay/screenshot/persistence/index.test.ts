@@ -140,6 +140,33 @@ it('skips save dispatch when the run goes stale during content-intent attachment
   expect(hasRuntimeDispatch(MessageType.EXECUTE_SAVE)).toBe(false);
 });
 
+it('requests a library-bound capability for an explicit manual library save', async () => {
+  sendRuntimeMessageMock.mockImplementation(async (message: { type?: string }) =>
+    message.type === MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY
+      ? {
+          contentIntent: { requestId: 'request-1', token: 'capability-1' },
+          success: true,
+        }
+      : { assetId: 'asset-1', success: true }
+  );
+  await persistSelectionCapture({
+    actionType: 'save_to_library',
+    contentIntentSource: { kind: 'trusted-content-event-proof', proofToken: 'proof-1' },
+    dataUrl: 'data:image/png;base64,selection',
+    mode: 'selection',
+    sessionActivePresetId: null,
+    setSaveDialogState: vi.fn(),
+  });
+
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      libraryDestinationRequested: true,
+      type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
+    })
+  );
+});
+
 it('skips save dialog mutation when background ask-preset capture becomes stale', async () => {
   const setSaveDialogState = vi.fn();
   const { assertFresh, staleError } = createStaleGuard();

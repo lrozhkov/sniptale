@@ -19,6 +19,7 @@ import { parseScenarioProject } from './guards/project/root/parse';
 
 export interface SaveScenarioProjectOptions {
   baseUpdatedAt?: number | null;
+  storageClass?: import('../../library-lifecycle/contracts').LibraryStorageClass;
 }
 
 class StaleScenarioProjectSaveError extends Error {
@@ -69,7 +70,11 @@ export async function saveScenarioProject(
     const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
     const existing = parseScenarioProjectEntry(await projectStore.get(project.id)) ?? undefined;
     assertScenarioProjectBaseRevision({ existing, options, projectId: project.id });
-    const entry = createScenarioProjectEntry({ existing, project });
+    const entry = createScenarioProjectEntry({
+      existing,
+      project,
+      ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
+    });
     await projectStore.put(entry);
     await tx.done;
     return parseScenarioProject(entry.project) ?? project;
@@ -95,15 +100,22 @@ export async function listScenarioProjects(): Promise<
   const db = await initDB();
   const all = parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry);
   return all
-    .map(({ project }) => project)
-    .map((project) => ({
+    .map(({ lifecycle, project }) => ({
       id: project.id,
       name: project.name,
       updatedAt: project.updatedAt,
       createdAt: project.createdAt,
       tags: project.tags ?? [],
+      lifecycle,
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function listScenarioProjectEntries(): Promise<ScenarioProjectEntry[]> {
+  const db = await initDB();
+  return parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry).sort(
+    (left, right) => right.updatedAt - left.updatedAt
+  );
 }
 
 export async function deleteScenarioProject(id: string): Promise<void> {

@@ -61,6 +61,7 @@ function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibr
     sourceTitle: overrides.sourceTitle ?? null,
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
+    ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
     ...(overrides.blob === undefined ? {} : { blob: overrides.blob }),
   };
 }
@@ -124,7 +125,11 @@ beforeEach(() => {
 
 function registerUpdateMediaLibraryEntryTests() {
   it('updates media metadata while preserving existing tags and refresh timestamps', async () => {
-    const existingEntry = createMediaEntry({ tags: ['old'], sourceTitle: 'Before' });
+    const existingEntry = createMediaEntry({
+      tags: ['old'],
+      sourceTitle: 'Before',
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
+    });
     dbMocks.getMock.mockResolvedValue(existingEntry);
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(999);
 
@@ -144,6 +149,7 @@ function registerUpdateMediaLibraryEntryTests() {
         sourceTitle: 'After',
         tags: ['old'],
         updatedAt: 999,
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 999 },
       })
     );
   });

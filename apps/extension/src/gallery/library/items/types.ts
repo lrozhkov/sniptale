@@ -7,15 +7,24 @@ import type { VideoProjectListItem } from '../../../features/media-hub/video-pro
 import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
+import type { LibraryLifecycle } from '../../../contracts/settings/library-lifecycle';
+import type { EditorSessionEntry } from '../../../composition/persistence/editor-sessions/contracts';
 
-export type GalleryItemKind = MediaAssetKind | 'scenario' | 'scenario-export' | 'video-project';
+export type GalleryItemKind =
+  | MediaAssetKind
+  | 'editor-session'
+  | 'scenario'
+  | 'scenario-export'
+  | 'video-project';
 
 interface GalleryItemBase {
   createdAt: number;
+  expiresAt?: number | null;
   filename: string;
   hasThumbnail: boolean;
   id: string;
   kind: GalleryItemKind;
+  lifecycle?: LibraryLifecycle;
   originalFilename?: string;
   size: number;
   sourceFavicon: string | null;
@@ -73,14 +82,30 @@ export interface GalleryVideoProjectItem extends GalleryItemBase {
   width: number;
 }
 
+export interface GalleryEditorSessionItem extends GalleryItemBase {
+  duration: null;
+  entityId: string;
+  height: number;
+  kind: 'editor-session';
+  mimeType: 'application/x-sniptale-editor-session';
+  session: EditorSessionEntry;
+  type: 'editor-session';
+  width: number;
+}
+
 export type GalleryItem =
   | GalleryMediaItem
+  | GalleryEditorSessionItem
   | GalleryScenarioItem
   | GalleryScenarioExportItem
   | GalleryVideoProjectItem;
 
 export function isGalleryMediaItem(item: GalleryItem): item is GalleryMediaItem {
   return item.type === 'media';
+}
+
+export function isGalleryEditorSessionItem(item: GalleryItem): item is GalleryEditorSessionItem {
+  return item.type === 'editor-session';
 }
 
 export function isGalleryScenarioItem(item: GalleryItem): item is GalleryScenarioItem {
@@ -108,7 +133,13 @@ export function isGallerySelectableItem(
 export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem {
   return {
     ...item,
+    lifecycle: item.lifecycle ?? {
+      savedAt: item.updatedAt,
+      storageClass: 'library',
+      updatedAt: item.updatedAt,
+    },
     entityId: item.id,
+    expiresAt: null,
     type: 'media',
   };
 }

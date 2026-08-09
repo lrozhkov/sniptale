@@ -17,6 +17,7 @@ type ContentPrivilegedActionActivationKeyRequest = {
 
 export type ContentPrivilegedActionCapabilityRequest = {
   actionType: ContentPrivilegedActionType;
+  libraryDestinationRequested?: true;
   requestId: string;
   source: ContentPrivilegedActionRequestSource;
   type: typeof MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY;
@@ -107,13 +108,18 @@ export function parseContentPrivilegedActionCapabilityRequest(
     message['type'] !== MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY ||
     !isContentPrivilegedActionType(message['actionType']) ||
     typeof message['requestId'] !== 'string' ||
-    !isContentPrivilegedActionRequestSource(message['source'])
+    !isContentPrivilegedActionRequestSource(message['source']) ||
+    (message['libraryDestinationRequested'] !== undefined &&
+      message['libraryDestinationRequested'] !== true)
   ) {
     return null;
   }
 
   return {
     actionType: message['actionType'],
+    ...(message['libraryDestinationRequested'] === true
+      ? { libraryDestinationRequested: true as const }
+      : {}),
     requestId: message['requestId'],
     source: message['source'],
     type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,

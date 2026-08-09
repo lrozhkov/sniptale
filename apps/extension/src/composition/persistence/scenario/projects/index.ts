@@ -1,6 +1,7 @@
 export {
   deleteScenarioProject,
   getScenarioProject,
+  listScenarioProjectEntries,
   listScenarioProjects,
   saveScenarioProject,
 } from './project';

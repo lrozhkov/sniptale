@@ -34,11 +34,16 @@ type ProtectedContentActionMessage = {
   type: ContentPrivilegedActionType;
 };
 
+export type ContentActionIntentOptions = {
+  libraryDestinationRequested?: boolean;
+};
+
 export type ContentActionIntentClient = {
   attachContentActionIntent<TMessage extends ProtectedContentActionMessage>(
     message: TMessage,
     source: ContentPrivilegedActionIntentSource | null | undefined,
-    requestIdOverride?: string
+    requestIdOverride?: string,
+    options?: ContentActionIntentOptions
   ): Promise<TMessage>;
   createBackgroundAutoStartContentActionIntentSource(
     grantToken: string
@@ -103,7 +108,8 @@ class ContentActionIntentClientImpl implements ContentActionIntentClient {
   async attachContentActionIntent<TMessage extends ProtectedContentActionMessage>(
     message: TMessage,
     source: ContentPrivilegedActionIntentSource | null | undefined,
-    requestIdOverride?: string
+    requestIdOverride?: string,
+    options?: ContentActionIntentOptions
   ): Promise<TMessage> {
     if (!source) {
       return message;
@@ -117,6 +123,7 @@ class ContentActionIntentClientImpl implements ContentActionIntentClient {
     });
     const contentIntent = await this.requestContentActionCapability({
       actionType: message.type,
+      libraryDestinationRequested: options?.libraryDestinationRequested === true,
       requestId,
       source: requestSource,
     });
@@ -257,12 +264,14 @@ class ContentActionIntentClientImpl implements ContentActionIntentClient {
 
   private async requestContentActionCapability(args: {
     actionType: ContentPrivilegedActionType;
+    libraryDestinationRequested: boolean;
     requestId: string;
     source: ContentPrivilegedActionRequestSource;
   }): Promise<ContentPrivilegedActionCapability> {
     const response = await sendContentActionIntentMessage(this.sendMessage, {
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
       actionType: args.actionType,
+      ...(args.libraryDestinationRequested ? { libraryDestinationRequested: true as const } : {}),
       requestId: args.requestId,
       source: args.source,
     });

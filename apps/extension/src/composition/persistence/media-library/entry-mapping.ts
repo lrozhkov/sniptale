@@ -5,6 +5,7 @@ import {
   createProjectAssetMediaId,
   createRecordingMediaId,
 } from '../../../features/media-hub/media-id';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 type RecordingMediaEntryInput = Omit<RecordingEntry, 'blob'> & {
   blob?: Blob;
@@ -44,6 +45,7 @@ export function mergeMediaEntry(
 
   return {
     ...baseEntry,
+    ...(existing.lifecycle ? { lifecycle: existing.lifecycle } : {}),
     filename: wasRenamed ? existing.filename : baseEntry.filename,
     tags: existing.tags ?? baseEntry.tags,
     sourceUrl: existing.sourceUrl ?? baseEntry.sourceUrl,
@@ -78,6 +80,7 @@ export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): Media
     sourceTitle: null,
     sourceFavicon: null,
     tags: [],
+    lifecycle: entry.lifecycle ?? createLibraryLifecycle('library', entry.createdAt),
   };
 }
 
@@ -104,6 +107,7 @@ export function buildProjectExportMediaEntry(entry: ProjectExportEntry): MediaLi
     sourceTitle: null,
     sourceFavicon: null,
     tags: [],
+    lifecycle: createLibraryLifecycle('library', entry.createdAt),
   };
 }
 
@@ -130,5 +134,6 @@ export function buildProjectAssetMediaEntry(
     sourceTitle: null,
     sourceFavicon: null,
     tags: [],
+    lifecycle: createLibraryLifecycle('temporary', entry.createdAt),
   };
 }

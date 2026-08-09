@@ -51,6 +51,19 @@ it('saves screenshots without tab metadata when no tab id is provided', async ()
   );
 });
 
+it('passes an explicit draft destination to the authoritative media writer', async () => {
+  await saveScreenshotToMediaHubFromDataUrl(
+    'data:image/png;base64,abc',
+    'capture.png',
+    undefined,
+    'temporary'
+  );
+
+  expect(mocks.saveAssetMock).toHaveBeenCalledWith(
+    expect.objectContaining({ storageClass: 'temporary' })
+  );
+});
+
 it('falls back to null tab metadata when tab lookup fails', async () => {
   mocks.browserGetMock.mockRejectedValueOnce(new Error('missing tab'));
 

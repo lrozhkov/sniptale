@@ -1,6 +1,7 @@
 export { createController } from './controller';
 export { createCleanupGroup } from './fixtures';
 export {
+  createEditorSessionItem,
   createMediaItem,
   createScenarioExportItem,
   createScenarioItem,

@@ -5,6 +5,7 @@ const CAPTURE_ACTION_TYPES = [
   'scenario',
   'edit',
   'copy',
+  'save_to_library',
 ] as const;
 
 export type CaptureActionType = (typeof CAPTURE_ACTION_TYPES)[number];

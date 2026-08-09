@@ -4,6 +4,7 @@ import type {
   MediaLibraryEntry,
   MediaThumbnailEntry,
 } from './contracts';
+import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 
 type MediaLibraryEntryFields = Omit<MediaLibraryEntry, 'kind' | 'source'>;
 
@@ -132,6 +133,11 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
   if (!hasMediaLibraryEntryFields(value)) {
     return null;
   }
+  const lifecycle = parseLibraryLifecycle(value['lifecycle'], {
+    storageClass: 'library',
+    updatedAt: value['updatedAt'],
+  });
+  if (lifecycle === null) return null;
 
   return {
     createdAt: value['createdAt'],
@@ -148,6 +154,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     sourceTitle: value['sourceTitle'],
     sourceUrl: value['sourceUrl'],
     tags: value['tags'],
+    ...(lifecycle === undefined ? {} : { lifecycle }),
     updatedAt: value['updatedAt'],
     width: value['width'],
     ...(value['blob'] === undefined ? {} : { blob: value['blob'] }),

@@ -1,6 +1,7 @@
 import type { StorageCleanupGroup } from '../../../../features/media-hub/types';
 
 export {
+  createEditorSessionItem,
   createMediaItem,
   createScenarioExportItem,
   createScenarioItem,

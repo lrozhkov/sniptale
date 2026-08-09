@@ -69,7 +69,10 @@ describe('editor session entry guards valid payloads', () => {
   it('accepts entries with nullable metadata fields', () => {
     const entry = createEditorSessionEntryFixture();
 
-    expect(parseEditorSessionEntry(entry)).toEqual(entry);
+    expect(parseEditorSessionEntry(entry)).toEqual({
+      ...entry,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: entry.updatedAt },
+    });
     expect(
       parseEditorSessionEntry({
         ...entry,
@@ -77,6 +80,7 @@ describe('editor session entry guards valid payloads', () => {
       })
     ).toEqual({
       ...entry,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: entry.updatedAt },
       sourceTitle: null,
     });
   });
@@ -88,7 +92,10 @@ describe('editor session entry guards valid payloads', () => {
       sourceTitle: 'Example',
     });
 
-    expect(parseEditorSessionEntry(entry)).toEqual(entry);
+    expect(parseEditorSessionEntry(entry)).toEqual({
+      ...entry,
+      lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+    });
   });
 
   it('accepts entries with empty nullable metadata strings', () => {
@@ -98,7 +105,10 @@ describe('editor session entry guards valid payloads', () => {
       sourceTitle: '',
     });
 
-    expect(parseEditorSessionEntry(entry)).toEqual(entry);
+    expect(parseEditorSessionEntry(entry)).toEqual({
+      ...entry,
+      lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+    });
   });
 });
 

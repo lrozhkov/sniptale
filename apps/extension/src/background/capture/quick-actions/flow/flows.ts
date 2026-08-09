@@ -38,6 +38,8 @@ async function sendQuickActionMessage(
     type: MessageType.ENABLE_SCREENSHOT_MODE,
     contentIntentGrant: contentCaps.issueContentPrivilegedActionAutoStartGrant({
       actionTypes: resolveContentIntentGrantActionTypes(args, message),
+      libraryActionTypes:
+        args.afterCapture === 'save_to_library' ? [MessageType.SAVE_SCREENSHOT_TO_GALLERY] : [],
       tabId: args.tabId,
     }),
     quickActionOverlay: buildQuickActionOverlay(args),
@@ -104,9 +106,7 @@ function resolveSelectionFollowupActionTypes(
   args: QuickActionFlowArgs
 ): ContentPrivilegedActionType[] {
   const actionTypes: ContentPrivilegedActionType[] = [];
-  if (args.settings.saveCapturesToGallery) {
-    actionTypes.push(MessageType.SAVE_SCREENSHOT_TO_GALLERY);
-  }
+  actionTypes.push(MessageType.SAVE_SCREENSHOT_TO_GALLERY);
   if (args.afterCapture === 'edit') {
     actionTypes.push(MessageType.OPEN_EDITOR_WITH_IMAGE);
   }

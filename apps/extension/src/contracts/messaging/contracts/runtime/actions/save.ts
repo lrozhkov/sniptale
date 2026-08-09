@@ -156,7 +156,9 @@ export const runtimeActionSaveMessageContracts = {
       createMessageGuard({
         type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
         required: { dataUrl: isImageDataUrl, filename: isString },
-        optional: { contentIntent: isContentPrivilegedActionCapability },
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+        },
       })
     ),
     parseResponse: createGuardParser(

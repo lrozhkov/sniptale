@@ -35,6 +35,7 @@ export type RuntimeContentActionRequestByType = {
     actionType: ContentPrivilegedActionType;
     requestId: string;
     source: ContentPrivilegedActionRequestSource;
+    libraryDestinationRequested?: true;
   };
   [MessageType.OPEN_EDITOR_WITH_IMAGE]: {
     type: typeof MessageType.OPEN_EDITOR_WITH_IMAGE;

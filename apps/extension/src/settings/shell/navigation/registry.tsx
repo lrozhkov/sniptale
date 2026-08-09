@@ -1,6 +1,7 @@
 import {
   Bot,
   FolderOpen,
+  Database,
   Image,
   MessageSquare,
   Mic,
@@ -49,6 +50,7 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
       { id: 'screen-sizes', label: 'settings.navigation.screenSizes', icon: Monitor },
       { id: 'media-quality', label: 'settings.navigation.mediaQuality', icon: Image },
       { id: 'saving', label: 'settings.navigation.saving', icon: FolderOpen },
+      { id: 'storage-drafts', label: 'settings.navigation.storageDrafts', icon: Database },
     ],
   },
   {
@@ -108,6 +110,10 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   saving: {
     load: () => import('../../sections/capture/saving'),
     exportName: 'SavePresetsSection',
+  },
+  'storage-drafts': {
+    load: () => import('../../sections/capture/storage-drafts'),
+    exportName: 'StorageDraftsSection',
   },
   annotations: {
     load: () => import('../../sections/styles/annotations'),

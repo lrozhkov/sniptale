@@ -9,17 +9,12 @@ import {
 } from './extension-smoke.helpers';
 
 const SETTINGS_AI_LABEL = translate('settings.navigation.ai', 'ru');
+const SETTINGS_AI_NAV_LABEL = translate('settings.navigation.aiConnections', 'ru');
+const SETTINGS_AI_PROMPTS_NAV_LABEL = translate('settings.navigation.aiPrompts', 'ru');
 const SETTINGS_AI_PROVIDERS_TITLE = translate('settings.aiProviders.providersTitle', 'ru');
 const SETTINGS_AI_MODELS_TITLE = translate('settings.aiProviders.modelsTitle', 'ru');
-const SETTINGS_AI_GLOBAL_PROMPT_TITLE = translate('settings.aiProviders.globalPromptTitle', 'ru');
-const SETTINGS_AI_GLOBAL_PROMPT_DESCRIPTION = translate(
-  'settings.aiProviders.globalPromptDescription',
-  'ru'
-);
-const SETTINGS_AI_SAVE_PROMPT_LABEL = translate(
-  'settings.aiProviders.globalPromptSaveButton',
-  'ru'
-);
+const SETTINGS_AI_PROMPTS_TITLE = translate('settings.navigation.templates', 'ru');
+const SETTINGS_AI_SAVED_PROMPTS_LABEL = translate('templates.section.savedLabel', 'ru');
 const POPUP_HARNESS_PATH = '/tooling/test/harness/popup.html';
 const POPUP_HOME_TAB_LABEL = translate('popup.tabs.home', 'ru');
 const POPUP_VIDEO_TAB_LABEL = translate('popup.tabs.video', 'ru');
@@ -226,7 +221,7 @@ for (const extensionPage of extensionPages) {
   });
 }
 
-test('settings AI section renders provider, model, and global prompt surfaces', async ({
+test('settings AI sections render provider, model, and prompt template surfaces', async ({
   page,
   hostOrigin,
 }) => {
@@ -236,7 +231,7 @@ test('settings AI section renders provider, model, and global prompt surfaces', 
   });
   await page.locator('[data-ui="settings.page.root"]').waitFor({ state: 'visible' });
 
-  await page.getByRole('button', { name: SETTINGS_AI_LABEL, exact: true }).click();
+  await page.getByRole('button', { name: SETTINGS_AI_NAV_LABEL, exact: true }).click();
 
   const settingsContent = page.locator('[data-ui="settings.page.content"]');
   await expect(settingsContent.getByText(SETTINGS_AI_LABEL, { exact: true })).toBeVisible();
@@ -247,18 +242,10 @@ test('settings AI section renders provider, model, and global prompt surfaces', 
     page.getByRole('heading', { name: SETTINGS_AI_MODELS_TITLE, exact: true })
   ).toBeVisible();
 
-  const globalPromptToggle = page
-    .locator('button')
-    .filter({ hasText: SETTINGS_AI_GLOBAL_PROMPT_TITLE })
-    .first();
-  await expect(globalPromptToggle).toBeVisible();
-  await globalPromptToggle.click();
-
+  await page.getByRole('button', { name: SETTINGS_AI_PROMPTS_NAV_LABEL, exact: true }).click();
+  await expect(settingsContent.getByText(SETTINGS_AI_PROMPTS_TITLE, { exact: true })).toBeVisible();
   await expect(
-    page.getByText(SETTINGS_AI_GLOBAL_PROMPT_DESCRIPTION, { exact: true })
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: SETTINGS_AI_SAVE_PROMPT_LABEL, exact: true })
+    settingsContent.getByText(SETTINGS_AI_SAVED_PROMPTS_LABEL, { exact: true })
   ).toBeVisible();
 });
 

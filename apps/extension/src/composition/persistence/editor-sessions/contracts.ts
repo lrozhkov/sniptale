@@ -1,4 +1,5 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 export interface EditorSessionEntry {
   sessionId: string;
@@ -9,4 +10,5 @@ export interface EditorSessionEntry {
   createdAt: number;
   updatedAt: number;
   dirty: boolean;
+  lifecycle?: LibraryLifecycle;
 }

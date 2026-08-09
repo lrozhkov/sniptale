@@ -88,8 +88,9 @@ async function persistEditorBootstrapId(payload: {
   }
 }
 
-function createEditorTabUrl(bootstrapId: string | null): string {
+function createEditorTabUrl(bootstrapId: string | null, assetId?: string): string {
   return buildEditorUrl({
+    ...(assetId ? { assetId } : {}),
     bootstrapId,
     sessionId: createEditorSessionId(),
   });
@@ -97,7 +98,12 @@ function createEditorTabUrl(bootstrapId: string | null): string {
 
 export async function openEditorWithImage(
   dataUrl: string,
-  sourceContext?: { tabId?: number; url?: string | null; title?: string | null }
+  sourceContext?: {
+    assetId?: string;
+    tabId?: number;
+    url?: string | null;
+    title?: string | null;
+  }
 ): Promise<void> {
   const { sourceFaviconUrl, sourceUrl, sourceTitle } =
     await resolveEditorSourceMetadata(sourceContext);
@@ -107,5 +113,5 @@ export async function openEditorWithImage(
     url: sourceUrl,
     title: sourceTitle,
   });
-  await browserTabs.create({ url: createEditorTabUrl(bootstrapId) });
+  await browserTabs.create({ url: createEditorTabUrl(bootstrapId, sourceContext?.assetId) });
 }

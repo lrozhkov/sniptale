@@ -45,7 +45,11 @@ export async function saveScenarioProjectV3(
     const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
     const existing = parseScenarioProjectEntry(await projectStore.get(project.id)) ?? undefined;
     assertScenarioProjectV3BaseRevision({ existing, options, projectId: project.id });
-    const entry = createScenarioProjectEntry({ existing, project });
+    const entry = createScenarioProjectEntry({
+      existing,
+      project,
+      ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
+    });
     await projectStore.put(entry);
     await tx.done;
     return isScenarioProjectV3(entry.project) ? entry.project : project;

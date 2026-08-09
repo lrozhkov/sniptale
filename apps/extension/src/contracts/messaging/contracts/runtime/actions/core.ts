@@ -389,6 +389,7 @@ export const runtimeActionCoreMessageContracts = {
         type: MessageType.OPEN_EDITOR_WITH_IMAGE,
         required: { dataUrl: isImageDataUrl },
         optional: {
+          assetId: isString,
           contentIntent: isContentPrivilegedActionCapability,
           title: isString,
           url: isString,

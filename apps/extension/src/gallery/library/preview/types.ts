@@ -22,4 +22,5 @@ export interface PreviewPanelProps {
   onEdit: () => void;
   onOpenSnapshotScreenshot?: () => Promise<void>;
   onDelete: () => Promise<void>;
+  onPromote?: () => Promise<void>;
 }

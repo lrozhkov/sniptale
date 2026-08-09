@@ -1,10 +1,12 @@
 import type { VideoExportFormat, VideoProject } from '../../../features/video/project/types';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 export interface VideoProjectEntry {
   id: string;
   project: VideoProject;
   createdAt: number;
   updatedAt: number;
+  lifecycle?: LibraryLifecycle;
 }
 
 export interface UnsupportedVideoProjectMetadata {
@@ -50,7 +52,7 @@ export type VideoProjectEntryReadResult =
     };
 
 export type VideoProjectReadResult =
-  | { project: VideoProject; status: 'ready' }
+  | { lifecycle?: LibraryLifecycle; project: VideoProject; status: 'ready' }
   | Exclude<VideoProjectEntryReadResult, { status: 'ready' }>;
 
 export function resolveVideoProjectReadResult(result: VideoProjectReadResult): VideoProject | null {

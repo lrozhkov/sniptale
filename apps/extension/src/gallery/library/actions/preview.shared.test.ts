@@ -5,6 +5,7 @@ import { copyPreviewItem, downloadPreviewItem, openInEditor } from './preview';
 import { createBusyActionRunner } from './shared';
 import {
   createController,
+  createEditorSessionItem,
   createMediaItem,
   createScenarioItem,
   createVideoProjectItem,
@@ -154,6 +155,7 @@ async function verifyPreviewErrorBannerFlow() {
 }
 
 function verifyOpenInEditorFlow() {
+  openInEditor(createEditorSessionItem({ entityId: 'session-draft' }));
   openInEditor(createMediaItem({ id: 'asset-1', kind: 'image' }));
   openInEditor(createMediaItem({ id: 'asset-2', kind: 'recording' }));
   openInEditor(createScenarioItem({ entityId: 'project-1', id: 'scenario:project-1' }));
@@ -162,7 +164,10 @@ function verifyOpenInEditorFlow() {
     createVideoProjectItem({ entityId: 'invalid-project', unavailableReason: 'invalid' })
   );
 
-  expect(browserTabsCreateMock).toHaveBeenCalledTimes(1);
+  expect(browserTabsCreateMock).toHaveBeenCalledTimes(2);
+  expect(browserTabsCreateMock).toHaveBeenCalledWith(
+    expect.objectContaining({ url: expect.stringContaining('session=session-draft') })
+  );
   expect(browserTabsCreateMock).toHaveBeenCalledWith(
     expect.objectContaining({ url: expect.stringContaining('assetId=asset-1') })
   );

@@ -38,19 +38,34 @@ it('budgets auto-start grants by sender tab and action type', () => {
       senderBinding,
       source,
     })
-  ).toBe(true);
+  ).toEqual({ authorized: true, libraryDestinationAuthorized: false });
   expect(
     consumeAutoStartGrantForCapabilityRequest({
       actionType: CaptureMessageType.CAPTURE_FULL,
       senderBinding,
       source,
     })
-  ).toBe(false);
+  ).toEqual({ authorized: false, libraryDestinationAuthorized: false });
   expect(
     consumeAutoStartGrantForCapabilityRequest({
       actionType: MessageType.EXECUTE_SAVE,
       senderBinding: { ...senderBinding, tabId: 8 },
       source,
     })
-  ).toBe(false);
+  ).toEqual({ authorized: false, libraryDestinationAuthorized: false });
+});
+
+it('binds library retention authority to an explicitly scoped auto-start grant', () => {
+  const grant = issueContentPrivilegedActionAutoStartGrant({
+    actionTypes: [MessageType.SAVE_SCREENSHOT_TO_GALLERY],
+    libraryActionTypes: [MessageType.SAVE_SCREENSHOT_TO_GALLERY],
+    tabId: 7,
+  });
+  expect(
+    consumeAutoStartGrantForCapabilityRequest({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      senderBinding,
+      source: { grantToken: grant.grantToken, kind: 'background-auto-start' },
+    })
+  ).toEqual({ authorized: true, libraryDestinationAuthorized: true });
 });

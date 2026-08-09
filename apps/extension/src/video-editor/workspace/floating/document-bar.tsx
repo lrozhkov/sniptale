@@ -4,6 +4,7 @@ import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
+import { VideoProjectStorageStatus } from './storage-status';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
   'absolute left-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)] items-center'
@@ -69,6 +70,7 @@ export function VideoEditorFloatingDocumentBar({ header }: VideoEditorDocumentBa
           onRenameProject={header.onRenameProject}
         />
         <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
+        <VideoProjectStorageStatus />
         <EditorDivider className="mx-1 h-7" />
         <ContentToolbarButton
           title={translate('videoEditor.app.libraryButton')}

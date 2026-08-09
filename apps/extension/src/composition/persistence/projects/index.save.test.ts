@@ -4,6 +4,7 @@ import {
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
 import { createVideoProject, createVideoProjectEntry } from './index.test-support.ts';
+import { createMediaLibraryEntry } from './index.test-support.ts';
 
 const projectsDbMocks = vi.hoisted(() => ({
   buildProjectAssetMediaEntryMock: vi.fn(),
@@ -148,6 +149,25 @@ it('preserves removed project-owned assets while another project references them
   );
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-shared');
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
+});
+
+it('preserves a removed project asset that was saved independently to the library', async () => {
+  const { saveVideoProject } = await import('./index');
+  const savedAsset = createProjectOwnedVideoAsset('asset-saved');
+  const existingProject = createVideoProject({ assets: [savedAsset] });
+  projectsDbMocks.txGetMock
+    .mockResolvedValueOnce(createVideoProjectEntry(existingProject))
+    .mockResolvedValueOnce(
+      createMediaLibraryEntry({
+        id: 'project-asset:asset-saved',
+        source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
+      })
+    );
+
+  await saveVideoProject({ ...existingProject, assets: [] });
+
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-saved');
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-saved');
 });
 
 it('preserves newer persisted project-owned assets for legacy unguarded saves', async () => {

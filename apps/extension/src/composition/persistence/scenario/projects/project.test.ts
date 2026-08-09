@@ -162,8 +162,22 @@ it('lists and cascade-deletes stored scenario projects', async () => {
     .mockResolvedValueOnce([{ stepId: 'step-1' }]);
 
   await expect(listScenarioProjects()).resolves.toEqual([
-    { id: 'project-1', name: 'Existing', createdAt: 10, updatedAt: 12345, tags: [] },
-    { id: 'project-2', name: 'Older', createdAt: 5, updatedAt: 20, tags: [] },
+    {
+      id: 'project-1',
+      name: 'Existing',
+      createdAt: 10,
+      updatedAt: 12345,
+      tags: [],
+      lifecycle: { savedAt: 12345, storageClass: 'library', updatedAt: 12345 },
+    },
+    {
+      id: 'project-2',
+      name: 'Older',
+      createdAt: 5,
+      updatedAt: 20,
+      tags: [],
+      lifecycle: { savedAt: 20, storageClass: 'library', updatedAt: 20 },
+    },
   ]);
   await deleteScenarioProject('project-1');
 
@@ -208,7 +222,10 @@ it('returns raw scenario project entries for restore ownership checks', async ()
   const record = createProjectRecord('project-raw', 'Raw', 10, 20);
   dbGetMock.mockResolvedValueOnce(record);
 
-  await expect(getScenarioProjectEntry('project-raw')).resolves.toEqual(record);
+  await expect(getScenarioProjectEntry('project-raw')).resolves.toEqual({
+    ...record,
+    lifecycle: { savedAt: record.updatedAt, storageClass: 'library', updatedAt: record.updatedAt },
+  });
   expect(dbGetMock).toHaveBeenCalledWith('scenario_projects', 'project-raw');
 });
 

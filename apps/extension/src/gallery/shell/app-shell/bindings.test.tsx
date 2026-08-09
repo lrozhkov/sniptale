@@ -8,8 +8,14 @@ import type { UseGalleryAppActionsResult } from '../../library/actions/useGaller
 import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
-const { layoutPropsMock } = vi.hoisted(() => ({
+const { layoutPropsMock, promoteStoredItemMock } = vi.hoisted(() => ({
   layoutPropsMock: vi.fn(),
+  promoteStoredItemMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/library-lifecycle')>()),
+  promoteStoredItem: promoteStoredItemMock,
 }));
 
 vi.mock('./layout', () => ({
@@ -44,6 +50,7 @@ type TestLayoutProps = {
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
+  onPreviewPromote: (item: unknown) => Promise<void>;
   onPreviewResetChanges: () => void;
   onRefresh: () => void;
   onRemoveTag: (tag: string) => void;
@@ -217,4 +224,40 @@ it('deduplicates tags when the add-tag action runs repeatedly', () => {
   });
 
   expect(getState().preview.draft.tags).toEqual(['beta']);
+});
+
+it('promotes each supported gallery owner and refreshes the active scope', async () => {
+  const { controller, layoutProps } = renderBindings();
+  promoteStoredItemMock.mockResolvedValue(undefined);
+  const items = [
+    createMediaItem({ id: 'media-1' }),
+    { entityId: 'scenario-1', id: 'scenario:scenario-1', type: 'scenario' },
+    { entityId: 'video-1', id: 'video-project:video-1', type: 'video-project' },
+    {
+      entityId: 'export-1',
+      id: 'scenario-export:export-1',
+      project: { id: 'scenario-2' },
+      type: 'scenario-export',
+    },
+  ];
+
+  for (const item of items) {
+    await act(async () => layoutProps.onPreviewPromote(item));
+  }
+
+  expect(promoteStoredItemMock).toHaveBeenNthCalledWith(1, { id: 'media-1', kind: 'media' });
+  expect(promoteStoredItemMock).toHaveBeenNthCalledWith(2, {
+    id: 'scenario-1',
+    kind: 'scenario-project',
+  });
+  expect(promoteStoredItemMock).toHaveBeenNthCalledWith(3, {
+    id: 'video-1',
+    kind: 'video-project',
+  });
+  expect(promoteStoredItemMock).toHaveBeenNthCalledWith(4, {
+    id: 'scenario-2',
+    kind: 'scenario-project',
+  });
+  expect(promoteStoredItemMock).toHaveBeenCalledTimes(4);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(4);
 });

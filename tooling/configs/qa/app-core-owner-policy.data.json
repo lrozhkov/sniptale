@@ -312,6 +312,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/library-lifecycle",
+      "ownerId": "persistence.library-lifecycle",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/media-library",
       "ownerId": "persistence.media-library",
       "ownerClass": "persistence"

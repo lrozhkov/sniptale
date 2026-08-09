@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoProjectAssetType } from '../../../features/video/project/types/index';
-import { createVideoProjectEntry } from './index.test-support.ts';
+import { createMediaLibraryEntry, createVideoProjectEntry } from './index.test-support.ts';
 
 const deleteMocks = vi.hoisted(() => ({
   createProjectAssetMediaIdMock: vi.fn(),
@@ -123,6 +123,39 @@ it('preserves shared project-owned assets when another project still references 
   expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
   expect(deleteMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-shared');
   expect(deleteMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
+});
+
+it('preserves a project asset saved independently to the library when its draft is deleted', async () => {
+  const { deleteVideoProject } = await import('./index');
+  const asset = {
+    createdAt: 1,
+    id: 'asset-saved',
+    metadata: {
+      audioPeaks: null,
+      duration: 4,
+      hasAudio: false,
+      height: 720,
+      mimeType: 'video/mp4',
+      size: 10,
+      width: 1280,
+    },
+    name: 'Saved project asset',
+    source: { kind: 'project-asset' as const, projectAssetId: 'asset-saved' },
+    type: VideoProjectAssetType.VIDEO,
+  };
+  deleteMocks.txGetMock
+    .mockResolvedValueOnce(createVideoProjectEntry({ assets: [asset] }))
+    .mockResolvedValueOnce(
+      createMediaLibraryEntry({
+        id: 'project-asset:asset-saved',
+        source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
+      })
+    );
+
+  await deleteVideoProject('project-1');
+
+  expect(deleteMocks.txDeleteMock).toHaveBeenCalledOnce();
+  expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
 });
 
 it('deletes the project row when the project payload is already missing', async () => {

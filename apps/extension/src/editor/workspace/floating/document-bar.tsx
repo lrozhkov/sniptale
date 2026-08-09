@@ -14,6 +14,10 @@ import { EditorInspectorDocumentActions } from '../../inspector/document-actions
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
+import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
+import { getEditorSessionDraft } from '../../../composition/persistence/editor-sessions';
+import { promoteStoredItem } from '../../../composition/persistence/library-lifecycle';
+import type { LibraryStorageClass } from '../../../contracts/settings/library-lifecycle';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
@@ -43,8 +47,40 @@ function useDocumentBarState() {
       pageTitle: state.pageTitle,
       saveErrorMessage: state.saveErrorMessage,
       saveState: state.saveState,
+      sessionId: state.sessionId,
     }))
   );
+}
+
+function useDocumentStorageClass(sessionId: string | null) {
+  const [storageClass, setStorageClass] = useState<LibraryStorageClass>('temporary');
+  const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const assetId = new URLSearchParams(window.location.search).get('assetId');
+
+  useEffect(() => {
+    void (
+      assetId ? getMediaLibraryEntry(assetId) : sessionId ? getEditorSessionDraft(sessionId) : null
+    )?.then((entry) => setStorageClass(entry?.lifecycle?.storageClass ?? 'temporary'));
+  }, [assetId, sessionId]);
+
+  const promote = async () => {
+    const target = assetId
+      ? { kind: 'media' as const, id: assetId }
+      : sessionId
+        ? { kind: 'editor-session' as const, id: sessionId }
+        : null;
+    if (!target) return;
+    setPromotionState('saving');
+    try {
+      await promoteStoredItem(target);
+      setStorageClass('library');
+      setPromotionState('idle');
+    } catch {
+      setPromotionState('error');
+    }
+  };
+
+  return { promote, promotionState, storageClass };
 }
 
 function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
@@ -68,7 +104,7 @@ function resolveDocumentStatus(state: ReturnType<typeof useDocumentBarState>) {
     return state.saveErrorMessage ?? translate('common.states.error');
   }
 
-  return translate('common.states.draft');
+  return translate('common.states.saved');
 }
 
 function useDismissableMenu(open: boolean, onClose: () => void) {
@@ -109,6 +145,7 @@ function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
 }) {
+  const storage = useDocumentStorageClass(props.documentState.sessionId);
   return (
     <div className={DOCUMENT_TITLE_CLASS_NAME}>
       <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
@@ -117,6 +154,28 @@ function EditorFloatingDocumentSummary(props: {
       <div data-state={props.documentState.saveState} className={DOCUMENT_STATUS_CLASS_NAME}>
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
         <span className="truncate">{resolveDocumentStatus(props.documentState)}</span>
+      </div>
+      <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--sniptale-color-text-muted)]">
+        <span>
+          {translate(
+            storage.storageClass === 'library'
+              ? 'editor.documentActions.inLibrary'
+              : 'editor.documentActions.draft'
+          )}
+        </span>
+        {storage.storageClass === 'temporary' ? (
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            disabled={storage.promotionState === 'saving'}
+            onClick={() => void storage.promote()}
+          >
+            {translate('editor.documentActions.saveToLibrary')}
+          </button>
+        ) : null}
+        {storage.promotionState === 'error' ? (
+          <span role="alert">{translate('editor.documentActions.saveToLibraryError')}</span>
+        ) : null}
       </div>
     </div>
   );

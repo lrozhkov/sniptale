@@ -60,7 +60,14 @@ it('parses hydratable video project entries without requiring export-ready refer
   const validEntry = createVideoProjectEntry();
   const mismatchedEntry = createVideoProjectEntry({}, { id: 'other-project' });
 
-  expect(parseVideoProjectEntry(validEntry)).toEqual(validEntry);
+  expect(parseVideoProjectEntry(validEntry)).toEqual({
+    ...validEntry,
+    lifecycle: {
+      savedAt: validEntry.updatedAt,
+      storageClass: 'library',
+      updatedAt: validEntry.updatedAt,
+    },
+  });
   expect(parseVideoProjectEntry(mismatchedEntry)).toBeNull();
   expect(parseVideoProjectEntry({ ...validEntry, project: { id: validEntry.id } })).toBeNull();
   const missingAssetReference = createVideoProjectEntryWithMediaClip();
@@ -71,6 +78,11 @@ it('parses hydratable video project entries without requiring export-ready refer
     })
   ).toEqual({
     ...missingAssetReference,
+    lifecycle: {
+      savedAt: missingAssetReference.updatedAt,
+      storageClass: 'library',
+      updatedAt: missingAssetReference.updatedAt,
+    },
     project: { ...missingAssetReference.project, assets: [] },
   });
 });
@@ -102,7 +114,12 @@ it('parses media library entries across supported source kinds', async () => {
     }),
   ];
 
-  expect(sourceEntries.map(parseMediaLibraryEntry)).toEqual(sourceEntries);
+  expect(sourceEntries.map(parseMediaLibraryEntry)).toEqual(
+    sourceEntries.map((entry) => ({
+      ...entry,
+      lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+    }))
+  );
   const entry = createMediaLibraryEntry();
   expect(parseMediaLibraryEntry(null)).toBeNull();
   expect(parseMediaLibraryEntry({ ...entry, source: { kind: 'recording' } })).toBeNull();
@@ -121,6 +138,11 @@ it('keeps hydratable persisted video projects visible before export-ready valida
   mocks.dbGet.mockResolvedValue(hydratableEntry);
   mocks.dbGetAll.mockResolvedValue([hydratableEntry]);
   await expect(getVideoProject(hydratableEntry.id)).resolves.toEqual({
+    lifecycle: {
+      savedAt: hydratableEntry.updatedAt,
+      storageClass: 'library',
+      updatedAt: hydratableEntry.updatedAt,
+    },
     project: hydratableEntry.project,
     status: 'ready',
   });
@@ -280,7 +302,10 @@ it('parses scenario project and asset rows directly', async () => {
   const project = { ...createScenarioProject('Scenario'), id: 'scenario-1' };
   const entry = { createdAt: 1, id: project.id, project, updatedAt: 2 };
 
-  expect(parseScenarioProjectEntry(entry)).toEqual(entry);
+  expect(parseScenarioProjectEntry(entry)).toEqual({
+    ...entry,
+    lifecycle: { savedAt: entry.updatedAt, storageClass: 'library', updatedAt: entry.updatedAt },
+  });
   expect(parseScenarioProjectEntry({ ...entry, project: { id: project.id } })).toBeNull();
   expect(parseScenarioAssetEntry(asset)).toEqual(asset);
   expect(parseScenarioAssetEntry({ ...asset, blob: {} })).toBeNull();

@@ -39,6 +39,7 @@ function getDerivedFilteredGalleryItems(args: {
   folderFilter: GalleryFiltersState['state']['folderFilter'];
   items: GalleryLibraryState['items'];
   search: GalleryFiltersState['state']['search'];
+  scope: GalleryFiltersState['state']['scope'];
   sortMode: GalleryFiltersState['state']['sortMode'];
 }) {
   return getFilteredGalleryItems({
@@ -46,6 +47,7 @@ function getDerivedFilteredGalleryItems(args: {
     activeTags: args.activeTags,
     folderFilter: args.folderFilter,
     search: args.search,
+    scope: args.scope,
     sortMode: args.sortMode,
   });
 }
@@ -72,8 +74,15 @@ function useGalleryFilterDerivedState(props: {
 }) {
   const { filters, library } = props;
 
-  const counts = useMemo(() => getGalleryCounts(library.items), [library.items]);
-  const allTags = useMemo(() => getAllGalleryTags(library.items), [library.items]);
+  const scopedItems = useMemo(
+    () =>
+      library.items.filter(
+        (item) => (item.lifecycle?.storageClass ?? 'library') === (filters.state.scope ?? 'library')
+      ),
+    [filters.state.scope, library.items]
+  );
+  const counts = useMemo(() => getGalleryCounts(scopedItems), [scopedItems]);
+  const allTags = useMemo(() => getAllGalleryTags(scopedItems), [scopedItems]);
   const filteredItems = useMemo(
     () =>
       getDerivedFilteredGalleryItems({
@@ -81,12 +90,14 @@ function useGalleryFilterDerivedState(props: {
         folderFilter: filters.state.folderFilter,
         items: library.items,
         search: filters.state.search,
+        scope: filters.state.scope,
         sortMode: filters.state.sortMode,
       }),
     [
       filters.state.activeTags,
       filters.state.folderFilter,
       filters.state.search,
+      filters.state.scope,
       filters.state.sortMode,
       library.items,
     ]

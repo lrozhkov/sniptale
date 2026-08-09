@@ -12,6 +12,7 @@ import { createProjectAssetMediaId } from '../../../features/media-hub/media-id'
 import {
   collectProjectOwnedAssetIds,
   deleteProjectAssetsUnreferencedByOtherProjects,
+  syncProjectAssetMirrorLifecycles,
 } from './asset-references';
 import {
   type ProjectAssetEntry,
@@ -35,6 +36,7 @@ import {
 } from './read-guards';
 import { isHydratableVideoProject } from '../../../features/video/project/validation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
+import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
 
 export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
@@ -74,9 +76,23 @@ export async function saveVideoProject(
       },
       createdAt: existing?.createdAt ?? candidate.createdAt,
       updatedAt: now,
+      lifecycle: existing
+        ? updateLibraryLifecycle(
+            existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt),
+            now
+          )
+        : createLibraryLifecycle(options.storageClass ?? 'library', now),
     };
 
     await projectStore.put(entry);
+    await syncProjectAssetMirrorLifecycles({
+      lifecycle: entry.lifecycle!,
+      mediaLibraryStore,
+      now,
+      ownerProjectId: project.id,
+      projectAssetIds: nextProjectAssetIds,
+      projectStore,
+    });
     await deleteProjectAssetsUnreferencedByOtherProjects({
       mediaLibraryStore,
       ownerProjectId: project.id,
@@ -101,7 +117,11 @@ export async function getVideoProject(id: string): Promise<VideoProjectReadResul
   if (result.status !== 'ready') return result;
   try {
     await verifyVideoProjectEffectSnapshotIntegrity(result.entry.project);
-    return { project: result.entry.project, status: 'ready' };
+    return {
+      ...(result.entry.lifecycle ? { lifecycle: result.entry.lifecycle } : {}),
+      project: result.entry.project,
+      status: 'ready',
+    };
   } catch {
     return {
       diagnostics: ['invalid-video-project-entry'],
@@ -116,7 +136,7 @@ export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
   return verified
     .flatMap((result, index) =>
       result.status === 'ready'
-        ? [createVideoProjectListItem(result.project)]
+        ? [createVideoProjectListItem(result.project, result.lifecycle)]
         : result.status === 'unsupported'
           ? [createUnsupportedVideoProjectListItem(result.metadata)]
           : result.status === 'invalid'
@@ -137,7 +157,11 @@ export async function listVideoProjectReadResults(): Promise<VideoProjectReadRes
     }
     try {
       await verifyVideoProjectEffectSnapshotIntegrity(result.entry.project);
-      verified.push({ project: result.entry.project, status: 'ready' });
+      verified.push({
+        ...(result.entry.lifecycle ? { lifecycle: result.entry.lifecycle } : {}),
+        project: result.entry.project,
+        status: 'ready',
+      });
     } catch {
       verified.push({
         diagnostics: ['invalid-video-project-entry'],
@@ -147,6 +171,14 @@ export async function listVideoProjectReadResults(): Promise<VideoProjectReadRes
     }
   }
   return verified;
+}
+
+export async function listVideoProjectEntries(): Promise<VideoProjectEntry[]> {
+  const db = await initDB();
+  return (await db.getAll(VIDEO_PROJECTS_STORE))
+    .map(parseVideoProjectEntry)
+    .filter((entry): entry is VideoProjectEntry => entry !== null)
+    .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 export async function saveProjectAsset(

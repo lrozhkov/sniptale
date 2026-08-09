@@ -8,6 +8,8 @@ const {
   listVideoProjectsMock,
   listScenarioExportRecordsMock,
   listScenarioProjectSummariesMock,
+  loadSettingsMock,
+  listEditorSessionDraftsMock,
 } = vi.hoisted(() => ({
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
@@ -16,6 +18,18 @@ const {
   listVideoProjectsMock: vi.fn(),
   listScenarioExportRecordsMock: vi.fn(),
   listScenarioProjectSummariesMock: vi.fn(),
+  loadSettingsMock: vi.fn(),
+  listEditorSessionDraftsMock: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../../composition/persistence/editor-sessions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/editor-sessions')>()),
+  listEditorSessionDrafts: listEditorSessionDraftsMock,
+}));
+
+vi.mock('../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
 }));
 
 vi.mock('../../composition/persistence/media-library/index.library.ts', async (importOriginal) => ({
@@ -80,6 +94,14 @@ describe('loadGalleryLibrarySnapshot', () => {
     listMediaThumbnailIdsMock.mockResolvedValue(thumbnailIds);
     getStorageEstimateInfoMock.mockResolvedValue(estimate);
     createGalleryItemsMock.mockReturnValue(nextItems);
+    loadSettingsMock.mockResolvedValue({
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'temporary',
+        draftRetentionDays: 30,
+        videoDraftRetentionDays: 7,
+      },
+    });
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toEqual({ estimate, nextItems });
     expect(listMediaLibraryMock).toHaveBeenCalledTimes(1);
@@ -89,11 +111,55 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(listMediaThumbnailIdsMock).toHaveBeenCalledTimes(1);
     expect(getStorageEstimateInfoMock).toHaveBeenCalledTimes(1);
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
+      editorSessions: [],
       mediaItems,
       scenarioExportsByProjectId: new Map([['project-1', scenarioExports]]),
       scenarioProjects,
       thumbnailIds: new Set(thumbnailIds),
       videoProjects,
     });
+  });
+
+  it('computes separate expiration dates for ordinary and recording drafts', async () => {
+    listMediaLibraryMock.mockResolvedValue([]);
+    listVideoProjectsMock.mockResolvedValue([]);
+    listScenarioProjectSummariesMock.mockResolvedValue([]);
+    listMediaThumbnailIdsMock.mockResolvedValue([]);
+    getStorageEstimateInfoMock.mockResolvedValue({ quota: 100, usage: 20 });
+    loadSettingsMock.mockResolvedValue({
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'temporary',
+        draftRetentionDays: 30,
+        videoDraftRetentionDays: 7,
+      },
+    });
+    createGalleryItemsMock.mockReturnValue([
+      {
+        id: 'image-1',
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1_000 },
+        source: { kind: 'screenshot' },
+        type: 'media',
+      },
+      {
+        id: 'video-1',
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2_000 },
+        source: { kind: 'recording', recordingId: 'recording-1' },
+        type: 'media',
+      },
+      {
+        id: 'library-1',
+        lifecycle: { savedAt: 3_000, storageClass: 'library', updatedAt: 3_000 },
+        source: { kind: 'screenshot' },
+        type: 'media',
+      },
+    ]);
+
+    const result = await loadGalleryLibrarySnapshot();
+    expect(result.nextItems).toEqual([
+      expect.objectContaining({ expiresAt: 1_000 + 30 * 24 * 60 * 60 * 1_000 }),
+      expect.objectContaining({ expiresAt: 2_000 + 7 * 24 * 60 * 60 * 1_000 }),
+      expect.objectContaining({ id: 'library-1' }),
+    ]);
   });
 });

@@ -11,6 +11,7 @@ import {
 import { translate } from '../../../platform/i18n';
 import { EditorDivider, EditorIconButton, ValueBadge } from '@sniptale/ui/editor-chrome';
 import type { ScenarioEditorToolbarController } from './types';
+import { ScenarioProjectStorageStatus } from './storage-status';
 
 function ScenarioToolbarPanelActions(props: { controller: ScenarioEditorToolbarController }) {
   const togglePanelMode = (mode: 'projects' | 'ai-editor') => {
@@ -99,6 +100,7 @@ function ScenarioToolbarStatusActions(props: {
   onExport: () => void;
   onOpenVideoEditor: () => void;
   saveState: 'error' | 'saved' | 'saving';
+  projectId: string | null;
 }) {
   const statusMeta = getScenarioToolbarStatusMeta(props.saveState);
 
@@ -112,6 +114,7 @@ function ScenarioToolbarStatusActions(props: {
         <CheckCircle2 className="h-3.5 w-3.5" />
         {statusMeta.label}
       </ValueBadge>
+      <ScenarioProjectStorageStatus projectId={props.projectId} />
       <button
         type="button"
         onClick={props.onOpenVideoEditor}
@@ -146,6 +149,7 @@ export function ScenarioToolbarActions(props: { controller: ScenarioEditorToolba
         error={props.controller.project.error}
         onExport={() => props.controller.ui.setExportDialogOpen(true)}
         onOpenVideoEditor={() => void props.controller.projectCrud.openVideoEditor()}
+        projectId={props.controller.project.project?.id ?? null}
         saveState={props.controller.project.saveState}
       />
     </div>

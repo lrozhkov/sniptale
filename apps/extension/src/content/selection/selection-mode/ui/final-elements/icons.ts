@@ -39,6 +39,14 @@ const CAPTURE_ACTION_ICONS: Record<CaptureActionType, IconDefinition> = {
     name: 'pencil',
     paths: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'],
   },
+  save_to_library: {
+    name: 'save',
+    paths: [
+      'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z',
+      'M17 21v-8H7v8',
+      'M7 3v5h8',
+    ],
+  },
 };
 
 function createSelectionToolbarSvg(paths: string[], size: number, name: string): SVGSVGElement {

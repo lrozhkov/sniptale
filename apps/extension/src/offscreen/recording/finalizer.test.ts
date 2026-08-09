@@ -4,10 +4,17 @@ import type {
   RecordingStagingCoordinator,
 } from '../../composition/persistence/recordings/staging';
 
-const { persistStaticFrameSignalsMock, saveBatchMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
-  persistStaticFrameSignalsMock: vi.fn(),
-  saveBatchMock: vi.fn(),
-  sendRuntimeMessageMock: vi.fn(),
+const { loadSettingsMock, persistStaticFrameSignalsMock, saveBatchMock, sendRuntimeMessageMock } =
+  vi.hoisted(() => ({
+    loadSettingsMock: vi.fn(),
+    persistStaticFrameSignalsMock: vi.fn(),
+    saveBatchMock: vi.fn(),
+    sendRuntimeMessageMock: vi.fn(),
+  }));
+
+vi.mock('../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
 }));
 
 vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
@@ -58,6 +65,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   saveBatchMock.mockResolvedValue(undefined);
   sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
+  loadSettingsMock.mockRejectedValue(new Error('settings unavailable'));
 });
 
 describe('recording finalizer', () => {
@@ -65,6 +73,9 @@ describe('recording finalizer', () => {
     const staging = createStaging();
     const primary = createArtifact('finalizer-batch-primary');
     const webcam = createArtifact('finalizer-batch-webcam');
+    loadSettingsMock.mockResolvedValueOnce({
+      localStoragePolicy: { defaultDestination: 'temporary' },
+    });
 
     await expect(
       finalizeRecording({
@@ -77,8 +88,18 @@ describe('recording finalizer', () => {
 
     expect(saveBatchMock).toHaveBeenCalledWith(
       [
-        { blob: primary.file, filename: primary.filename, id: primary.artifactId },
-        { blob: webcam.file, filename: webcam.filename, id: webcam.artifactId },
+        {
+          blob: primary.file,
+          filename: primary.filename,
+          id: primary.artifactId,
+          storageClass: 'temporary',
+        },
+        {
+          blob: webcam.file,
+          filename: webcam.filename,
+          id: webcam.artifactId,
+          storageClass: 'temporary',
+        },
       ],
       {
         primaryRecordingId: primary.artifactId,
@@ -152,5 +173,20 @@ describe('recording finalizer', () => {
       })
     ).rejects.toThrow('Primary recording artifact is unavailable');
     expect(saveBatchMock).not.toHaveBeenCalled();
+  });
+
+  it('supports silent finalization without saved or stopped notifications', async () => {
+    const staging = createStaging();
+    const artifact = createArtifact('finalizer-silent');
+
+    await finalizeRecording({
+      artifacts: [artifact],
+      discard: false,
+      options: { notifySaved: false, notifyStopped: false },
+      primaryRecordingId: artifact.artifactId,
+      staging,
+    });
+
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
   });
 });

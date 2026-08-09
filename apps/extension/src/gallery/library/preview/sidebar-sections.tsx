@@ -7,6 +7,7 @@ import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, isGalleryScenarioExportItem, isGalleryScenarioItem } from '../items';
 import { GalleryTagInput } from '../tags/input';
 import { formatDate, getGalleryItemKindLabel, isImageKind } from '../ui';
+import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
 
 const previewMetadataCardClassName =
@@ -182,6 +183,11 @@ export function PreviewActions(props: PreviewPanelProps) {
 
   return (
     <div className="grid gap-2 pt-2">
+      <PromotionAction
+        className={previewPrimaryActionButtonClassName}
+        {...(props.onPromote ? { onPromote: props.onPromote } : {})}
+        visible={item.lifecycle?.storageClass === 'temporary'}
+      />
       {(isGalleryScenarioItem(item) || canCopy || canOpenWebSnapshot) && (
         <button type="button" onClick={onEdit} className={previewPrimaryActionButtonClassName}>
           {translate(

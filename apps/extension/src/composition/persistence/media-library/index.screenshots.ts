@@ -8,6 +8,7 @@ import type {
   MediaThumbnailEntry,
   SaveScreenshotMediaAssetInput,
 } from './contracts';
+import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
 
 function createScreenshotThumbnailEntry(
   assetId: string,
@@ -52,6 +53,7 @@ export async function saveScreenshotMediaAsset(
       sourceTitle: input.sourceTitle ?? null,
       sourceFavicon: sanitizeProvenanceUrl(input.sourceFavicon),
       tags: input.tags ?? [],
+      lifecycle: createLibraryLifecycle(input.storageClass ?? 'library', now),
       blob: input.blob,
     };
 
@@ -89,6 +91,10 @@ export async function updateScreenshotMediaAsset(
       width: dimensions.width,
       height: dimensions.height,
       updatedAt: now,
+      lifecycle: updateLibraryLifecycle(
+        existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt),
+        now
+      ),
       blob,
     };
 

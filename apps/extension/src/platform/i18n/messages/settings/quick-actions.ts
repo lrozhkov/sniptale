@@ -181,6 +181,10 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Записать в сценарий',
     en: 'Record to scenario',
   },
+  afterCaptureSaveToLibrary: {
+    ru: 'Сохранить в библиотеку',
+    en: 'Save to library',
+  },
   delayNone: {
     ru: 'Без задержки',
     en: 'No delay',

@@ -12,6 +12,7 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GalleryPreviewController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryEditorSessionItem,
   isGalleryScenarioItem,
   isGalleryVideoProjectAvailable,
   isGalleryVideoProjectItem,
@@ -29,6 +30,10 @@ import { updateMediaLibraryEntrySafely } from '../../../workflows/media-hub/stor
 type PreviewMediaMetadataPatch = Partial<Pick<MediaLibraryEntry, 'filename' | 'tags'>>;
 
 export function openInEditor(item: GalleryItem) {
+  if (isGalleryEditorSessionItem(item)) {
+    void browserTabs.create({ url: buildEditorUrl({ sessionId: item.entityId }) });
+    return;
+  }
   if (isGalleryScenarioItem(item)) {
     void openScenarioEditorPage(item.entityId);
     return;

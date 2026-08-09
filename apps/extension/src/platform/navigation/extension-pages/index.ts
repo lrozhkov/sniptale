@@ -70,6 +70,7 @@ function buildGalleryPageUrl(options: {
   folder?: string | null;
   openStorageManager?: boolean;
   recordingId?: string | null;
+  scope?: 'library' | 'temporary';
 }) {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/gallery/index.html'));
   if (options.folder) {
@@ -82,6 +83,7 @@ function buildGalleryPageUrl(options: {
   if (options.openStorageManager) {
     url.searchParams.set('storageManager', '1');
   }
+  if (options.scope) url.searchParams.set('scope', options.scope);
 
   return url.toString();
 }
@@ -158,7 +160,11 @@ export async function openCameraRecorderPage(params: {
 }
 
 export async function openGalleryPage(
-  options: { openStorageManager?: boolean; recordingId?: string | null } = {}
+  options: {
+    openStorageManager?: boolean;
+    recordingId?: string | null;
+    scope?: 'library' | 'temporary';
+  } = {}
 ): Promise<void> {
   await browserTabs.create({ url: buildGalleryPageUrl(options) });
 }

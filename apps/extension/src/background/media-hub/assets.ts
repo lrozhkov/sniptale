@@ -49,7 +49,8 @@ async function ensureScreenshotStorageHeadroom(): Promise<void> {
 export async function saveScreenshotToMediaHubFromDataUrl(
   dataUrl: string,
   filename: string,
-  tabId?: number
+  tabId?: number,
+  storageClass: 'temporary' | 'library' = 'temporary'
 ): Promise<string> {
   await ensureScreenshotStorageHeadroom();
   const [blob, sourceMeta] = await Promise.all([
@@ -63,6 +64,7 @@ export async function saveScreenshotToMediaHubFromDataUrl(
     sourceUrl: sourceMeta.sourceUrl,
     sourceTitle: sourceMeta.sourceTitle,
     sourceFavicon: sourceMeta.sourceFavicon,
+    storageClass,
   });
 
   return entry.id;

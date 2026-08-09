@@ -1,15 +1,19 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { EDITOR_SESSIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
+import {
+  EDITOR_SESSIONS_STORE,
+  MEDIA_LIBRARY_STORE,
+  initDB,
+} from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseEditorSessionEntry } from './index.guards.ts';
 import type { EditorSessionEntry } from './contracts';
+import type { LibraryStorageClass } from '../library-lifecycle/contracts';
+import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 
-const EDITOR_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const EDITOR_SESSION_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const logger = createLogger({ namespace: 'SharedEditorSessionsDb' });
-let lastEditorSessionCleanupAt = 0;
 
 export interface SaveEditorSessionDraftInput {
   sessionId: string;
@@ -18,34 +22,7 @@ export interface SaveEditorSessionDraftInput {
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   dirty?: boolean;
-}
-
-async function cleanupExpiredEditorSessionDrafts(
-  db: Awaited<ReturnType<typeof initDB>>
-): Promise<void> {
-  const cutoff = Date.now() - EDITOR_SESSION_TTL_MS;
-  const tx = db.transaction(EDITOR_SESSIONS_STORE, 'readwrite');
-  const index = tx.store.index('updatedAt');
-  let cursor = await index.openCursor(IDBKeyRange.upperBound(cutoff));
-
-  while (cursor) {
-    await cursor.delete();
-    cursor = await cursor.continue();
-  }
-
-  await tx.done;
-}
-
-async function maybeCleanupExpiredEditorSessionDrafts(
-  db: Awaited<ReturnType<typeof initDB>>,
-  now: number
-): Promise<void> {
-  if (now - lastEditorSessionCleanupAt < EDITOR_SESSION_CLEANUP_INTERVAL_MS) {
-    return;
-  }
-
-  await cleanupExpiredEditorSessionDrafts(db);
-  lastEditorSessionCleanupAt = now;
+  storageClass?: LibraryStorageClass;
 }
 
 /**
@@ -55,7 +32,9 @@ export async function saveEditorSessionDraft(
   input: SaveEditorSessionDraftInput
 ): Promise<EditorSessionEntry> {
   return runWithIndexedDbMutation(async (db) => {
-    const rawExisting: unknown = await db.get(EDITOR_SESSIONS_STORE, input.sessionId);
+    const tx = db.transaction([EDITOR_SESSIONS_STORE, MEDIA_LIBRARY_STORE], 'readwrite');
+    const editorStore = tx.objectStore(EDITOR_SESSIONS_STORE);
+    const rawExisting: unknown = await editorStore.get(input.sessionId);
     const existing = parseEditorSessionEntry(rawExisting);
     const now = Date.now();
 
@@ -65,12 +44,14 @@ export async function saveEditorSessionDraft(
       });
     }
 
-    await maybeCleanupExpiredEditorSessionDrafts(db, now);
-
+    const assetId = input.assetId ?? existing?.assetId ?? null;
+    const linkedMedia = assetId
+      ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(assetId))
+      : null;
     const entry: EditorSessionEntry = {
       sessionId: input.sessionId,
       document: input.document,
-      assetId: input.assetId ?? existing?.assetId ?? null,
+      assetId,
       sourceUrl:
         input.sourceUrl === undefined
           ? sanitizeProvenanceUrl(existing?.sourceUrl)
@@ -79,9 +60,19 @@ export async function saveEditorSessionDraft(
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       dirty: input.dirty ?? existing?.dirty ?? true,
+      lifecycle: existing
+        ? updateLibraryLifecycle(
+            existing.lifecycle ??
+              createLibraryLifecycle(existing.assetId === null ? 'temporary' : 'library', now),
+            now
+          )
+        : linkedMedia?.lifecycle
+          ? updateLibraryLifecycle(linkedMedia.lifecycle, now)
+          : createLibraryLifecycle(input.storageClass ?? 'temporary', now),
     };
 
-    await db.put(EDITOR_SESSIONS_STORE, entry);
+    await editorStore.put(entry);
+    await tx.done;
     return entry;
   });
 }
@@ -103,6 +94,15 @@ export async function getEditorSessionDraft(
   }
 
   return entry ?? undefined;
+}
+
+export async function listEditorSessionDrafts(): Promise<EditorSessionEntry[]> {
+  const db = await initDB();
+  const entries = await db.getAll(EDITOR_SESSIONS_STORE);
+  return entries
+    .map(parseEditorSessionEntry)
+    .filter((entry): entry is EditorSessionEntry => entry !== null)
+    .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 /**

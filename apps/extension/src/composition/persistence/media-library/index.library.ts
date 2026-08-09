@@ -8,6 +8,7 @@ import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
+import { updateLibraryLifecycle } from '../library-lifecycle/contracts';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -112,6 +113,7 @@ export async function updateMediaLibraryEntry(
       throw new Error(`Asset ${assetId} не найден.`);
     }
 
+    const updatedAt = Date.now();
     await db.put(MEDIA_LIBRARY_STORE, {
       ...existing,
       ...patch,
@@ -121,7 +123,10 @@ export async function updateMediaLibraryEntry(
       ...(patch.sourceFavicon === undefined
         ? {}
         : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
-      updatedAt: Date.now(),
+      updatedAt,
+      ...(existing.lifecycle
+        ? { lifecycle: updateLibraryLifecycle(existing.lifecycle, updatedAt) }
+        : {}),
       tags: patch.tags ?? existing.tags,
     });
   });
@@ -143,10 +148,14 @@ export async function addMediaLibraryEntryTags(
       return existing;
     }
 
+    const updatedAt = Date.now();
     const nextEntry = {
       ...existing,
       tags: nextTags,
-      updatedAt: Date.now(),
+      updatedAt,
+      ...(existing.lifecycle
+        ? { lifecycle: updateLibraryLifecycle(existing.lifecycle, updatedAt) }
+        : {}),
     };
     await db.put(MEDIA_LIBRARY_STORE, nextEntry);
     return nextEntry;

@@ -13,6 +13,30 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Все сохранённые скриншоты, видеозаписи и экспорты в одном месте.',
     en: 'All saved screenshots, recordings, and exports in one place.',
   },
+  storageClasses: {
+    ru: 'Раздел хранилища',
+    en: 'Storage section',
+  },
+  library: {
+    ru: 'Библиотека',
+    en: 'Library',
+  },
+  drafts: {
+    ru: 'Черновики',
+    en: 'Drafts',
+  },
+  draftUpdated: {
+    ru: 'Изменён:',
+    en: 'Updated:',
+  },
+  draftExpires: {
+    ru: 'Удаление:',
+    en: 'Deletes:',
+  },
+  draftNoExpiration: {
+    ru: 'Без срока удаления',
+    en: 'No expiration',
+  },
   storageTitle: {
     ru: 'Хранилище',
     en: 'Storage',

@@ -4,9 +4,17 @@ import type { VideoProjectEntry } from '../../../composition/persistence/project
 import type { MediaHubBackupExportOptions } from '../contracts/types';
 
 export function shouldExportMediaEntry(
-  entry: Pick<MediaLibraryEntry, 'id' | 'source'>,
-  options: MediaHubBackupExportOptions
+  entry: Pick<MediaLibraryEntry, 'id' | 'lifecycle' | 'source'>,
+  options: MediaHubBackupExportOptions,
+  projectAssetIdsExportedWithProjects: ReadonlySet<string> = new Set()
 ): boolean {
+  if (entry.lifecycle?.storageClass === 'temporary') return false;
+  if (
+    entry.source.kind === 'project-asset' &&
+    projectAssetIdsExportedWithProjects.has(entry.source.projectAssetId)
+  ) {
+    return false;
+  }
   if (!options.includeWebSnapshots && entry.source.kind === 'web-snapshot') {
     return false;
   }
@@ -19,9 +27,10 @@ export function shouldExportMediaEntry(
 }
 
 export function shouldExportVideoProject(
-  entry: Pick<VideoProjectEntry, 'id'>,
+  entry: Pick<VideoProjectEntry, 'id' | 'lifecycle'>,
   options: MediaHubBackupExportOptions
 ): boolean {
+  if (entry.lifecycle?.storageClass === 'temporary') return false;
   if (options.scope !== 'selected') {
     return true;
   }
@@ -30,9 +39,10 @@ export function shouldExportVideoProject(
 }
 
 export function shouldExportScenarioProject(
-  entry: Pick<ScenarioProjectEntry, 'id'>,
+  entry: Pick<ScenarioProjectEntry, 'id' | 'lifecycle'>,
   options: MediaHubBackupExportOptions
 ): boolean {
+  if (entry.lifecycle?.storageClass === 'temporary') return false;
   if (options.scope !== 'selected') {
     return true;
   }

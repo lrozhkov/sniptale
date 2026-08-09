@@ -129,6 +129,14 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Открыть в редакторе',
     en: 'Open in editor',
   },
+  saveToLibrary: {
+    ru: 'Сохранить в библиотеку',
+    en: 'Save to library',
+  },
+  saveToLibraryError: {
+    ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
+    en: 'Could not save to the library. Your draft is safe.',
+  },
   unavailableInvalidProject: {
     ru: 'Проект повреждён и не может быть открыт или отрендерен.',
     en: 'This project is invalid and cannot be opened or rendered.',

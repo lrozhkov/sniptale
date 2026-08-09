@@ -15,6 +15,7 @@ export type {
 export type {
   ContentActionIntentClient,
   ContentActionIntentClientDeps,
+  ContentActionIntentOptions,
   ContentPrivilegedActionIntentSource,
 } from '../../platform/privileged-action-intent/client';
 export { createContentActionIntentClient };
@@ -47,7 +48,14 @@ export function resetContentActionIntentRuntimeForTests(): void {
 
 export function attachContentActionIntent<TMessage extends AttachContentActionIntentParams[0]>(
   message: TMessage,
-  source: ContentPrivilegedActionIntentSource | null | undefined
+  source: ContentPrivilegedActionIntentSource | null | undefined,
+  requestIdOverride?: AttachContentActionIntentParams[2],
+  options?: AttachContentActionIntentParams[3]
 ): Promise<TMessage> {
-  return getContentActionIntentClient().attachContentActionIntent(message, source);
+  return getContentActionIntentClient().attachContentActionIntent(
+    message,
+    source,
+    requestIdOverride,
+    options
+  );
 }

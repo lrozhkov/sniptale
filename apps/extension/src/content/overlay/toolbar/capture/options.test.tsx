@@ -92,6 +92,7 @@ function registerCaptureActionOptionTests() {
       'ask_system',
       'ask_preset',
       'scenario',
+      'save_to_library',
     ]);
   });
 

@@ -1,8 +1,10 @@
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
+import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 
 export interface SaveVideoProjectOptions {
   baseUpdatedAt?: number | null;
+  storageClass?: LibraryStorageClass;
 }
 
 class StaleVideoProjectSaveError extends Error {

@@ -128,6 +128,10 @@ export const savePresetsMessages = defineMessageSource({
       ru: 'Копировать в буфер обмена',
       en: 'Copy to clipboard',
     },
+    captureActionSaveToLibrary: {
+      ru: 'Сохранить в библиотеку',
+      en: 'Save to library',
+    },
   },
   editor: {
     editTitle: {

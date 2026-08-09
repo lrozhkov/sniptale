@@ -133,6 +133,7 @@ it('grants visible auto-start access to content-owned preset-session saves', asy
 
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [CaptureMessageType.CAPTURE_VISIBLE, MessageType.EXECUTE_SAVE],
+    libraryActionTypes: [],
     tabId: 21,
   });
   expect(sendTabMessageMock).toHaveBeenCalledWith(
@@ -149,6 +150,7 @@ it('grants full auto-start access to content-owned preset-session saves', async 
 
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [CaptureMessageType.CAPTURE_FULL, MessageType.EXECUTE_SAVE],
+    libraryActionTypes: [],
     tabId: 21,
   });
   expect(sendTabMessageMock).toHaveBeenCalledWith(

@@ -126,6 +126,11 @@ async function verifyArtifactPersistenceWithDocument() {
     id: project.id,
     project: { ...project, updatedAt: 11 },
     createdAt: project.createdAt,
+    lifecycle: {
+      savedAt: 10,
+      storageClass: 'library',
+      updatedAt: 11,
+    },
     updatedAt: 11,
   });
   expect(txPutMock).toHaveBeenNthCalledWith(3, {

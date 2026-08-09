@@ -87,6 +87,7 @@ function configureFilterHookMock() {
       setActiveTags: vi.fn(),
       setFolderFilter: galleryActionMocks.setFolderFilter,
       setSearch: vi.fn(),
+      setScope: vi.fn(),
       setSelectedIds: createSelectedIdsSetter(),
       setSelectionTagDraft: vi.fn(),
       setSortMode: vi.fn(),
@@ -95,6 +96,7 @@ function configureFilterHookMock() {
       activeTags: ['alpha'],
       folderFilter: 'all',
       search: 'needle',
+      scope: 'temporary',
       selectedIds: currentSelectedIds,
       selectionTagDraft: 'batch-tag',
       sortMode: 'newest',
@@ -234,6 +236,7 @@ it('builds derived gallery state from owner subhooks and selectors', () => {
       activeTags: ['alpha'],
       folderFilter: 'all',
       search: 'needle',
+      scope: 'temporary',
       sortMode: 'newest',
     })
   );
@@ -281,4 +284,23 @@ it('selects the full filtered range for shift-toggle and skips non-selectable it
     controller.actions.selection.toggleSelection('asset-4', { shiftKey: true });
   });
   expect(Array.from(currentSelectedIds)).toEqual(['asset-1', 'scenario:project-1', 'asset-4']);
+});
+
+it('opens the requested recording once when gallery is entered from a recording route', () => {
+  window.history.pushState({}, '', '/gallery.html?recordingId=recording-1');
+  const recording = createItem({
+    id: 'recording:recording-1',
+    kind: 'recording',
+    source: { kind: 'recording', recordingId: 'recording-1' },
+  });
+  getFilteredGalleryItemsMock.mockReturnValue([recording]);
+
+  renderHook();
+
+  expect(galleryActionMocks.setFolderFilter).toHaveBeenCalledWith('recording');
+  expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
+    inspectorCollapsed: false,
+    item: recording,
+    url: null,
+  });
 });

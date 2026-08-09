@@ -72,6 +72,7 @@ import {
   handleSaveScreenshotToGallery,
   handleSaveWebSnapshotToGallery,
 } from './actions.gallery';
+import { markPreauthorizedContentActionRouteMessage } from './authorization/content-action';
 
 function createWebSnapshotManifest(): WebSnapshotManifest {
   return {
@@ -148,9 +149,32 @@ it('saves screenshots into the gallery', async () => {
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
     'data:image/png;base64,1',
     'gallery.png',
-    42
+    42,
+    'temporary'
   );
   expect(saveResponse).toHaveBeenCalledWith({ success: true, assetId: 'asset-1' });
+});
+
+it('saves a manually authorized screenshot directly to the library', async () => {
+  const saveResponse = vi.fn();
+  const payload = { dataUrl: 'data:image/png;base64,2', filename: 'library.png' };
+  markPreauthorizedContentActionRouteMessage(payload, {
+    documentId: 'document-1',
+    frameId: 0,
+    libraryDestinationAuthorized: true,
+    senderUrl: 'https://example.com',
+    tabId: 42,
+  });
+
+  expect(handleSaveScreenshotToGallery(payload, 42, saveResponse)).toBe(true);
+  await flushPromises();
+
+  expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
+    payload.dataUrl,
+    payload.filename,
+    42,
+    'library'
+  );
 });
 
 it('saves web snapshot packages into the gallery', async () => {

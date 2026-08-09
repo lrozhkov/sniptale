@@ -3,6 +3,7 @@ import type {
   ContentToolbarDisplayMode,
   ContentToolbarPreferences,
   FullPageCapturePreferences,
+  LocalStoragePolicy,
   Settings,
 } from '../../../contracts/settings';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
@@ -11,6 +12,7 @@ import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-in
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
 import { assignParsedContextMenuSettings } from './context-menu.guards.ts';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
 
 interface ParsedSettingsStorageValue {
   hasInvalidRoot: boolean;
@@ -21,6 +23,7 @@ interface ParsedSettingsStorageValue {
 const INVALID_FIELD = Symbol('invalid-field');
 const contentToolbarDisplayModes = new Set<ContentToolbarDisplayMode>(['horizontal', 'vertical']);
 const imageFormats = new Set<Settings['imageFormat']>(['png', 'jpeg', 'webp']);
+const retentionDays = new Set([1, 3, 7, 14, 30, 60, 90, 180, 365]);
 
 type ParsedFieldValue<TValue> = TValue | undefined | typeof INVALID_FIELD;
 
@@ -149,6 +152,32 @@ function parseOptionalVoiceInput(value: unknown): ParsedFieldValue<VoiceInputPre
   return parseVoiceInputPreferences(value) ?? INVALID_FIELD;
 }
 
+function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<LocalStoragePolicy> {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return INVALID_FIELD;
+  const defaultDestination = value['defaultDestination'];
+  const cleanupEnabled = value['cleanupEnabled'];
+  const draftRetentionDays = value['draftRetentionDays'];
+  const videoDraftRetentionDays = value['videoDraftRetentionDays'];
+  return {
+    defaultDestination:
+      defaultDestination === 'temporary' || defaultDestination === 'library'
+        ? defaultDestination
+        : DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+    cleanupEnabled: isBoolean(cleanupEnabled)
+      ? cleanupEnabled
+      : DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,
+    draftRetentionDays:
+      isNumber(draftRetentionDays) && retentionDays.has(draftRetentionDays)
+        ? draftRetentionDays
+        : DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    videoDraftRetentionDays:
+      isNumber(videoDraftRetentionDays) && retentionDays.has(videoDraftRetentionDays)
+        ? videoDraftRetentionDays
+        : DEFAULT_LOCAL_STORAGE_POLICY.videoDraftRetentionDays,
+  };
+}
+
 function assignParsedSettingsField<TKey extends keyof Settings>(
   target: Partial<Settings>,
   key: TKey,
@@ -245,6 +274,11 @@ function parseScalarSettingsFields(
     nextValue,
     'voiceInput',
     parseOptionalVoiceInput(value['voiceInput'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'localStoragePolicy',
+    parseOptionalLocalStoragePolicy(value['localStoragePolicy'])
   );
   invalidFieldCount += assignParsedContextMenuSettings(nextValue, value['contextMenu']);
   invalidFieldCount += assignParsedSettingsField(

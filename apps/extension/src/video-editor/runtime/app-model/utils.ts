@@ -63,7 +63,7 @@ export function getSaveStateMeta(saveState: 'idle' | 'saving' | 'saved' | 'error
   }
 
   return {
-    label: translate('common.states.draft'),
+    label: translate('common.states.saved'),
     className:
       'border-[var(--sniptale-color-border-soft)] ' +
       'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_78%,transparent)] ' +

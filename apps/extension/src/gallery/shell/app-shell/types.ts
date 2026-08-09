@@ -6,7 +6,13 @@ import type {
 } from '../../../workflows/media-hub-backup/index';
 import type { StorageCleanupGroup } from '../../../features/media-hub/types';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
-import type { FolderFilter, GalleryAppState, GalleryViewMode, SortMode } from '../../state/types';
+import type {
+  FolderFilter,
+  GalleryAppState,
+  GalleryScope,
+  GalleryViewMode,
+  SortMode,
+} from '../../state/types';
 import type { GalleryItem } from '../../library/items';
 
 export interface GalleryAppLayoutProps {
@@ -42,8 +48,10 @@ export interface GalleryAppLayoutProps {
   onPreviewEdit: (item: GalleryItem) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewDelete: (item: GalleryItem) => void;
+  onPreviewPromote?: (item: GalleryItem) => Promise<void>;
   onScenarioPreviewClose?: () => void;
   onFolderFilterChange: Dispatch<SetStateAction<FolderFilter>>;
+  onScopeChange?: Dispatch<SetStateAction<GalleryScope>>;
   onActiveTagsChange: Dispatch<SetStateAction<string[]>>;
   onExportBackup: () => void;
   onImportBackupClick: () => void;

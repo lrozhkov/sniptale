@@ -76,6 +76,11 @@ async function verifySaveRecordingFlow() {
     blob,
     filename: 'capture.webm',
     createdAt: 1700,
+    lifecycle: {
+      storageClass: 'library',
+      updatedAt: 1700,
+      savedAt: 1700,
+    },
     size: blob.size,
   });
   expect(mediaPutMock).toHaveBeenCalledWith({
@@ -98,6 +103,11 @@ async function verifySaveRecordingFlow() {
     sourceTitle: null,
     sourceFavicon: null,
     tags: [],
+    lifecycle: {
+      storageClass: 'library',
+      updatedAt: 1700,
+      savedAt: 1700,
+    },
   });
 }
 
@@ -163,7 +173,14 @@ async function verifyValidRecordingReadsAndDeleteFlow() {
 
   const { deleteRecording, getRecording } = await import('./index');
 
-  await expect(getRecording('recording-2')).resolves.toEqual(entry);
+  await expect(getRecording('recording-2')).resolves.toEqual({
+    ...entry,
+    lifecycle: {
+      storageClass: 'library',
+      updatedAt: 1000,
+      savedAt: 1000,
+    },
+  });
 
   await deleteRecording('recording-2');
 

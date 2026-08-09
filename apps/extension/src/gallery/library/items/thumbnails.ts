@@ -27,6 +27,10 @@ function createThumbnailEntry(assetId: string, createdAt: number, blob: Blob): M
 }
 
 async function buildMediaThumbnail(item: GalleryItem): Promise<Blob | null> {
+  if (item.type === 'editor-session') {
+    const blob = await dataUrlToBlob(item.session.document.sourceImageData);
+    return createImageThumbnailBlob(blob, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+  }
   if (item.type !== 'media' && item.type !== 'video-project') {
     return null;
   }

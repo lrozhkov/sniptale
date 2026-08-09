@@ -12,6 +12,7 @@ import type {
   VideoProjectEntry,
   VideoProjectEntryReadResult,
 } from './contracts';
+import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || isString(value);
@@ -116,12 +117,20 @@ export function parseVideoProjectEntryResult(value: unknown): VideoProjectEntryR
       status: 'invalid',
     };
   }
+  const lifecycle = parseLibraryLifecycle(value['lifecycle'], {
+    storageClass: 'library',
+    updatedAt: value['updatedAt'],
+  });
+  if (lifecycle === null) {
+    return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
+  }
   return {
     entry: {
       createdAt: value['createdAt'],
       id: value['id'],
       project: value['project'],
       updatedAt: value['updatedAt'],
+      ...(lifecycle === undefined ? {} : { lifecycle }),
     },
     status: 'ready',
   };

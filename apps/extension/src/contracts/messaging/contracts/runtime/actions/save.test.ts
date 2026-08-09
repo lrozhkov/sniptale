@@ -14,6 +14,9 @@ it('requires filenames for screenshot gallery save runtime messages', () => {
   expect(() => contract.parseRequest({ dataUrl: request.dataUrl, type: request.type })).toThrow(
     'runtime SAVE_SCREENSHOT_TO_GALLERY message'
   );
+  expect(() => contract.parseRequest({ ...request, storageClass: 'library' })).toThrow(
+    'runtime SAVE_SCREENSHOT_TO_GALLERY message'
+  );
 });
 
 it('requires gallery update capabilities for editor asset update messages', () => {

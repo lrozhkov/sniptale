@@ -100,6 +100,7 @@ export const afterCaptureLabels: Record<CaptureActionType, string> = {
   edit: translate('settings.quickActions.afterCaptureEdit'),
   copy: translate('settings.quickActions.afterCaptureCopy'),
   scenario: translate('settings.quickActions.afterCaptureScenario'),
+  save_to_library: translate('settings.quickActions.afterCaptureSaveToLibrary'),
 };
 
 export const delayOptions: { value: QuickActionDelay; label: string }[] = [

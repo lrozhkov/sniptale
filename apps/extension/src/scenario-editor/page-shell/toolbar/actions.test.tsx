@@ -4,6 +4,22 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const storageMocks = vi.hoisted(() => ({
+  getScenarioProjectEntry: vi.fn(),
+  promoteStoredItem: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/scenario/projects/project', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/projects/project')
+  >()),
+  getScenarioProjectEntry: storageMocks.getScenarioProjectEntry,
+}));
+vi.mock('../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/library-lifecycle')>()),
+  promoteStoredItem: storageMocks.promoteStoredItem,
+}));
+
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -41,6 +57,10 @@ function clickByText(text: string) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  storageMocks.getScenarioProjectEntry.mockResolvedValue({
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  });
+  storageMocks.promoteStoredItem.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -116,4 +136,22 @@ it('renders saved, saving, and titled error status families', () => {
   renderActions(failed);
   expect(container?.textContent).toContain('common.states.error');
   expect(container?.querySelector('[title="Save failed"]')).not.toBeNull();
+});
+
+it('shows draft storage independently and promotes the project in place', async () => {
+  const controller = createScenarioEditorToolbarController();
+  renderActions(controller);
+  await act(async () => Promise.resolve());
+
+  const promote = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (candidate) => candidate.textContent?.includes('gallery.preview.saveToLibrary')
+  );
+  expect(promote).toBeDefined();
+  await act(async () => promote?.click());
+
+  expect(storageMocks.promoteStoredItem).toHaveBeenCalledWith({
+    id: controller.project.project?.id,
+    kind: 'scenario-project',
+  });
+  expect(container?.textContent).toContain('editor.documentActions.inLibrary');
 });

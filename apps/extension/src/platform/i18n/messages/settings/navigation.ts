@@ -43,6 +43,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Сохранение',
     en: 'Saving',
   },
+  storageDrafts: {
+    ru: 'Хранилище и черновики',
+    en: 'Storage and drafts',
+  },
   annotations: {
     ru: 'Рамки и аннотации',
     en: 'Frames and annotations',

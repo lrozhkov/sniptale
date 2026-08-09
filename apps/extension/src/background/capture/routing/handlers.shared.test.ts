@@ -106,12 +106,21 @@ it('routes capture persistence helper decisions', async () => {
     42
   );
 
-  expect(noGallery).toBeNull();
+  expect(noGallery).toBe('asset-1');
   expect(withGallery).toBe('asset-1');
-  expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
+  expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenNthCalledWith(
+    1,
+    'data:image/png;base64,1',
+    'visible.png',
+    42,
+    'temporary'
+  );
+  expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenNthCalledWith(
+    2,
     'data:image/png;base64,2',
     'visible.png',
-    42
+    42,
+    'library'
   );
 });
 
@@ -227,7 +236,8 @@ it('persists gallery and scenario payloads before returning the captured data ur
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
     'data:image/png;base64,9',
     'visible.png',
-    42
+    42,
+    'library'
   );
   expect(persistScenarioCaptureFromBackgroundMock).toHaveBeenCalledWith(
     expect.objectContaining({
