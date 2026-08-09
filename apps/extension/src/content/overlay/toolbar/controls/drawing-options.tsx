@@ -1,275 +1,394 @@
-import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
+import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
+import { useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
-  DRAWING_MARKER_OPACITIES,
+  DRAWING_ARROW_WIDTHS,
   DRAWING_MARKER_WIDTHS,
   DRAWING_OUTLINE_WIDTHS,
   DRAWING_PENCIL_WIDTHS,
-  DRAWING_TEXT_SIZES,
   type DrawingObject,
   type DrawingSessionSnapshot,
-  type DrawingTool,
+  type DrawingShapeKind,
+  type DrawingShapeObject,
 } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
+import {
+  ArrowWidthModeOptions,
+  DrawingColorOptions,
+  DrawingDeselectOption,
+  DrawingShapeOptions,
+  DrawingTextOptions,
+  DrawingWidthOptions,
+  MarkerOpacityOptions,
+} from './drawing-option-controls';
+import {
+  resolveToolbarFloatingMenuStyle,
+  resolveToolbarMenuPlacement,
+} from '../menu/floating.helpers';
+import { getToolbarMenuPosition } from '../menu/position';
 
-const DRAWING_SELECT_CLASS_NAME =
-  'h-8 rounded-md border border-[var(--sniptale-color-border)] ' +
-  'bg-[var(--sniptale-color-surface)] px-2 text-xs';
+type ConfigurableDrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
+type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur';
+type SelectedQuickDrawingObject =
+  | Extract<DrawingObject, { kind: 'pencil' | 'marker' | 'arrow' | 'text' }>
+  | DrawingShapeObject
+  | null;
+type QuickToolUpdate = {
+  color?: string;
+  backgroundColor?: string | null;
+  dynamicWidth?: boolean;
+  fontSize?: number;
+  kind?: DrawingShapeKind;
+  opacity?: number;
+  width?: number;
+};
 
-function DrawingColorInput(props: {
-  color: string;
-  palette: readonly string[];
-  transparent?: boolean;
-  onChange: (color: string | null) => void;
+const DRAWING_OPTIONS_DIMENSIONS: Record<
+  DrawingQuickOptionsTool,
+  { height: number; width: number }
+> = {
+  arrow: { height: 48, width: 520 },
+  blur: { height: 48, width: 48 },
+  marker: { height: 48, width: 520 },
+  pencil: { height: 48, width: 300 },
+  shape: { height: 48, width: 560 },
+  text: { height: 88, width: 480 },
+};
+
+function useDrawingOptionsLayout(args: {
+  displayMode: 'horizontal' | 'vertical';
+  tool: DrawingQuickOptionsTool;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  return (
-    <select
-      aria-label={translate('content.toolbar.drawingColor')}
-      title={translate('content.toolbar.drawingColor')}
-      value={props.color}
-      onChange={(event) =>
-        props.onChange(event.target.value === 'transparent' ? null : event.target.value)
-      }
-      className="h-8 w-16 cursor-pointer rounded border border-[var(--sniptale-color-border)] px-1 text-xs"
-      style={{
-        backgroundColor: props.color === 'transparent' ? 'transparent' : props.color,
-        color: props.color === '#ffffff' ? '#111827' : '#ffffff',
-      }}
-    >
-      {props.transparent ? <option value="transparent">Ø</option> : null}
-      {props.palette.map((color) => (
-        <option key={color} value={color}>
-          {color}
-        </option>
-      ))}
-    </select>
-  );
+  const [, setViewportRevision] = useState(0);
+  useLayoutEffect(() => {
+    const refresh = () => setViewportRevision((value) => value + 1);
+    refresh();
+    window.addEventListener('resize', refresh);
+    window.addEventListener('scroll', refresh, true);
+    return () => {
+      window.removeEventListener('resize', refresh);
+      window.removeEventListener('scroll', refresh, true);
+    };
+  }, []);
+  const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.tool];
+  const menuWidth = Math.min(dimensions.width, Math.max(0, window.innerWidth - 16));
+  const placement = getToolbarMenuPosition(args.triggerRef.current, dimensions.height);
+  const positioned = resolveToolbarFloatingMenuStyle({
+    anchorEl: args.triggerRef.current,
+    displayMode: args.displayMode,
+    menuHeight: dimensions.height,
+    menuWidth,
+    placement,
+  });
+  const fallback: CSSProperties =
+    args.displayMode === 'vertical'
+      ? { left: 'calc(100% + 10px)', top: 0 }
+      : { left: 0, top: 'calc(100% + 10px)' };
+  return {
+    placement: resolveToolbarMenuPlacement(args.displayMode, placement),
+    style: {
+      ...(positioned ?? fallback),
+      maxWidth: 'calc(100vw - 16px)',
+      minWidth: 0,
+      overflowX: 'auto',
+      padding: '8px',
+    } satisfies CSSProperties,
+  };
 }
 
-function DrawingNumberSelect(props: {
-  label: string;
-  value: number;
-  values: readonly number[];
-  formatValue?: (value: number) => string;
-  onChange: (value: number) => void;
+function resolveSelectedQuickObject(
+  object: DrawingObject | undefined,
+  tool: ConfigurableDrawingQuickOptionsTool
+): SelectedQuickDrawingObject {
+  if (tool === 'pencil' && object?.kind === 'pencil') return object;
+  if (tool === 'marker' && object?.kind === 'marker') return object;
+  if (tool === 'arrow' && object?.kind === 'arrow') return object;
+  if (tool === 'text' && object?.kind === 'text') return object;
+  if (
+    tool === 'shape' &&
+    (object?.kind === 'rectangle' ||
+      object?.kind === 'ellipse' ||
+      object?.kind === 'triangle' ||
+      object?.kind === 'parallelogram')
+  ) {
+    return object;
+  }
+  return null;
+}
+
+function resolveSelectedShapeKind(selected: SelectedQuickDrawingObject): DrawingShapeKind | null {
+  if (
+    selected?.kind === 'rectangle' ||
+    selected?.kind === 'ellipse' ||
+    selected?.kind === 'triangle' ||
+    selected?.kind === 'parallelogram'
+  ) {
+    return selected.kind;
+  }
+  return null;
+}
+
+function replaceSelectedQuickObject(
+  controller: ContentDrawingController,
+  selected: Exclude<SelectedQuickDrawingObject, null>,
+  update: QuickToolUpdate
+) {
+  if (selected.kind === 'pencil') {
+    controller.session.replaceObject({
+      ...selected,
+      color: update.color ?? selected.color,
+      width: update.width ?? selected.width,
+    });
+    return;
+  }
+  if (selected.kind === 'marker') {
+    controller.session.replaceObject({
+      ...selected,
+      color: update.color ?? selected.color,
+      opacity: update.opacity ?? selected.opacity,
+      width: update.width ?? selected.width,
+    });
+    return;
+  }
+  if (selected.kind === 'arrow') {
+    controller.session.replaceObject({
+      ...selected,
+      color: update.color ?? selected.color,
+      dynamicWidth: update.dynamicWidth ?? selected.dynamicWidth,
+      width: update.width ?? selected.width,
+    });
+    return;
+  }
+  if (selected.kind === 'text') {
+    controller.session.replaceObject({
+      ...selected,
+      backgroundColor:
+        update.backgroundColor === undefined ? selected.backgroundColor : update.backgroundColor,
+      color: update.color ?? selected.color,
+      fontSize: update.fontSize ?? selected.fontSize,
+    });
+    return;
+  }
+  controller.session.replaceObject({
+    bounds: selected.bounds,
+    color: update.color ?? selected.color,
+    id: selected.id,
+    kind: update.kind ?? selected.kind,
+    width: update.width ?? selected.width,
+  });
+}
+
+function updateQuickToolOption(args: {
+  controller: ContentDrawingController;
+  selected: SelectedQuickDrawingObject;
+  snapshot: DrawingSessionSnapshot;
+  tool: ConfigurableDrawingQuickOptionsTool;
+  update: QuickToolUpdate;
 }) {
-  return (
-    <select
-      aria-label={props.label}
-      title={props.label}
-      value={props.value}
-      onChange={(event) => props.onChange(Number(event.target.value))}
-      className={DRAWING_SELECT_CLASS_NAME}
-    >
-      {props.values.map((value) => (
-        <option key={value} value={value}>
-          {props.formatValue?.(value) ?? value}
-        </option>
-      ))}
-    </select>
+  const { controller, selected, snapshot, tool, update } = args;
+  if (tool === 'pencil') {
+    controller.session.setDefaults({
+      ...snapshot.defaults,
+      pencil: { ...snapshot.defaults.pencil, ...update },
+    });
+  } else if (tool === 'marker') {
+    controller.session.setDefaults({
+      ...snapshot.defaults,
+      marker: { ...snapshot.defaults.marker, ...update },
+    });
+  } else if (tool === 'shape') {
+    controller.session.setDefaults({
+      ...snapshot.defaults,
+      shape: { ...snapshot.defaults.shape, ...update },
+    });
+  } else if (tool === 'arrow') {
+    controller.session.setDefaults({
+      ...snapshot.defaults,
+      arrow: {
+        ...snapshot.defaults.arrow,
+        color: update.color ?? snapshot.defaults.arrow.color,
+        dynamicWidth: update.dynamicWidth ?? snapshot.defaults.arrow.dynamicWidth,
+        width: update.width ?? snapshot.defaults.arrow.width,
+      },
+    });
+  } else {
+    controller.session.setDefaults({
+      ...snapshot.defaults,
+      text: {
+        ...snapshot.defaults.text,
+        backgroundColor:
+          update.backgroundColor === undefined
+            ? snapshot.defaults.text.backgroundColor
+            : update.backgroundColor,
+        color: update.color ?? snapshot.defaults.text.color,
+        fontSize: update.fontSize ?? snapshot.defaults.text.fontSize,
+      },
+    });
+  }
+  if (selected) replaceSelectedQuickObject(controller, selected, update);
+}
+
+export function resolveDrawingQuickOptionsTool(
+  snapshot: DrawingSessionSnapshot
+): DrawingQuickOptionsTool | null {
+  const selected = snapshot.document.objects.find(
+    (object) => object.id === snapshot.selectedObjectId
   );
+  if (selected?.kind === 'pencil' || selected?.kind === 'marker') return selected.kind;
+  if (selected?.kind === 'blur') return 'blur';
+  if (selected?.kind === 'arrow') return 'arrow';
+  if (selected?.kind === 'text') return 'text';
+  if (
+    selected?.kind === 'rectangle' ||
+    selected?.kind === 'ellipse' ||
+    selected?.kind === 'triangle' ||
+    selected?.kind === 'parallelogram'
+  ) {
+    return 'shape';
+  }
+  return snapshot.activeTool === 'pencil' ||
+    snapshot.activeTool === 'marker' ||
+    snapshot.activeTool === 'shape' ||
+    snapshot.activeTool === 'arrow' ||
+    snapshot.activeTool === 'text'
+    ? snapshot.activeTool
+    : null;
 }
 
 export function ToolbarDrawingOptions(props: {
   controller: ContentDrawingController;
+  displayMode: 'horizontal' | 'vertical';
   snapshot: DrawingSessionSnapshot;
+  tool: DrawingQuickOptionsTool;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { controller, snapshot } = props;
-  const selected = snapshot.document.objects.find(
+  const { controller, displayMode, snapshot, tool } = props;
+  const layout = useDrawingOptionsLayout({ displayMode, tool, triggerRef: props.triggerRef });
+  const selectedObject = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );
-  const effectiveTool = selected?.kind ?? snapshot.activeTool;
-  const defaults = snapshot.defaults;
-  const color = resolveDrawingColor(selected, effectiveTool, defaults);
-  const changeColor = (next: string | null) =>
-    applyDrawingColor({ controller, defaults, effectiveTool, next, selected });
+  if (tool === 'blur') {
+    return (
+      <ProductToolbarMenu
+        compact
+        className="sniptale-drawing-options-popover"
+        placement={layout.placement}
+        style={layout.style}
+      >
+        <div
+          role="group"
+          aria-label={translate('content.toolbar.drawingOptions')}
+          data-ui="content.toolbar.drawing-options.blur"
+          className="flex items-center gap-2"
+        >
+          <DrawingDeselectOption onClick={() => controller.session.select(null)} />
+        </div>
+      </ProductToolbarMenu>
+    );
+  }
+  const selected = resolveSelectedQuickObject(selectedObject, tool);
+  const values = selected ?? snapshot.defaults[tool];
+  const width = 'width' in values ? values.width : snapshot.defaults.pencil.width;
+  const update = (next: QuickToolUpdate) =>
+    updateQuickToolOption({ controller, selected, snapshot, tool, update: next });
 
   return (
-    <ContentToolbarGroup aria-label={translate('content.toolbar.drawingOptions')}>
-      {color ? (
-        <DrawingColorInput color={color} palette={controller.getPalette()} onChange={changeColor} />
-      ) : null}
-      <DrawingToolSpecificOptions
-        controller={controller}
-        effectiveTool={effectiveTool}
-        selected={selected}
-        defaults={defaults}
-      />
-    </ContentToolbarGroup>
-  );
-}
-
-function DrawingToolSpecificOptions(props: {
-  controller: ContentDrawingController;
-  defaults: DrawingDefaults;
-  effectiveTool: DrawingTool;
-  selected: SelectedDrawingObject;
-}) {
-  const { controller, defaults, effectiveTool, selected } = props;
-  const updateNumber = (
-    kind: 'pencil' | 'marker' | 'rectangle' | 'ellipse',
-    key: 'width' | 'opacity',
-    value: number
-  ) => applyDrawingNumber({ controller, defaults, key, kind, selected, value });
-  const changeText = (key: 'fontSize' | 'backgroundColor', value: number | string | null) =>
-    applyDrawingTextOption({ controller, defaults, key, selected, value });
-  switch (effectiveTool) {
-    case 'pencil':
-      return (
-        <DrawingNumberSelect
-          label={translate('content.toolbar.drawingWidth')}
-          value={selected?.kind === 'pencil' ? selected.width : defaults.pencil.width}
-          values={DRAWING_PENCIL_WIDTHS}
-          onChange={(value) => updateNumber('pencil', 'width', value)}
-        />
-      );
-    case 'marker':
-      return (
-        <>
-          <DrawingNumberSelect
-            label={translate('content.toolbar.drawingWidth')}
-            value={selected?.kind === 'marker' ? selected.width : defaults.marker.width}
-            values={DRAWING_MARKER_WIDTHS}
-            onChange={(value) => updateNumber('marker', 'width', value)}
-          />
-          <DrawingNumberSelect
-            label={translate('content.toolbar.drawingOpacity')}
-            value={selected?.kind === 'marker' ? selected.opacity : defaults.marker.opacity}
-            values={DRAWING_MARKER_OPACITIES}
-            formatValue={(value) => `${Math.round(value * 100)}%`}
-            onChange={(value) => updateNumber('marker', 'opacity', value)}
-          />
-        </>
-      );
-    case 'rectangle':
-    case 'ellipse':
-      return (
-        <DrawingNumberSelect
-          label={translate('content.toolbar.drawingWidth')}
-          value={selected?.kind === effectiveTool ? selected.width : defaults[effectiveTool].width}
-          values={DRAWING_OUTLINE_WIDTHS}
-          onChange={(value) => updateNumber(effectiveTool, 'width', value)}
-        />
-      );
-    case 'text':
-      return (
-        <>
-          <DrawingNumberSelect
-            label={translate('content.toolbar.drawingTextSize')}
-            value={selected?.kind === 'text' ? selected.fontSize : defaults.text.fontSize}
-            values={DRAWING_TEXT_SIZES}
-            onChange={(value) => changeText('fontSize', value)}
-          />
-          <DrawingColorInput
-            color={
-              (selected?.kind === 'text'
+    <ProductToolbarMenu
+      compact
+      className="sniptale-drawing-options-popover"
+      placement={layout.placement}
+      style={layout.style}
+    >
+      <div
+        role="group"
+        aria-label={translate('content.toolbar.drawingOptions')}
+        data-ui={`content.toolbar.drawing-options.${tool}`}
+        className="flex items-center gap-2"
+      >
+        {tool === 'text' ? (
+          <DrawingTextOptions
+            backgroundColor={
+              selected?.kind === 'text'
                 ? selected.backgroundColor
-                : defaults.text.backgroundColor) ?? 'transparent'
+                : snapshot.defaults.text.backgroundColor
             }
-            palette={controller.getPalette()}
-            transparent
-            onChange={(value) => changeText('backgroundColor', value)}
+            color={values.color}
+            colors={controller.getPalette()}
+            fontSize={
+              selected?.kind === 'text' ? selected.fontSize : snapshot.defaults.text.fontSize
+            }
+            onBackgroundColorChange={(backgroundColor) => update({ backgroundColor })}
+            onColorChange={(color) => update({ color })}
+            onFontSizeChange={(fontSize) => update({ fontSize })}
           />
-        </>
-      );
-    case 'arrow':
-    case 'blur':
-    case 'select':
-      return null;
-  }
-}
-
-type DrawingDefaults = DrawingSessionSnapshot['defaults'];
-type SelectedDrawingObject = DrawingObject | undefined;
-
-function resolveDrawingColor(
-  selected: SelectedDrawingObject,
-  tool: DrawingTool,
-  defaults: DrawingDefaults
-): string | null {
-  if (selected && 'color' in selected) return selected.color;
-  switch (tool) {
-    case 'pencil':
-      return defaults.pencil.color;
-    case 'marker':
-      return defaults.marker.color;
-    case 'rectangle':
-      return defaults.rectangle.color;
-    case 'ellipse':
-      return defaults.ellipse.color;
-    case 'arrow':
-      return defaults.arrow.color;
-    case 'text':
-      return defaults.text.color;
-    case 'blur':
-    case 'select':
-      return null;
-  }
-}
-
-function applyDrawingColor(args: {
-  controller: ContentDrawingController;
-  defaults: DrawingDefaults;
-  effectiveTool: DrawingTool;
-  next: string | null;
-  selected: SelectedDrawingObject;
-}) {
-  const { controller, defaults, effectiveTool, next, selected } = args;
-  if (!next) return;
-  switch (effectiveTool) {
-    case 'pencil':
-      controller.session.setDefaults({ ...defaults, pencil: { ...defaults.pencil, color: next } });
-      break;
-    case 'marker':
-      controller.session.setDefaults({ ...defaults, marker: { ...defaults.marker, color: next } });
-      break;
-    case 'rectangle':
-      controller.session.setDefaults({
-        ...defaults,
-        rectangle: { ...defaults.rectangle, color: next },
-      });
-      break;
-    case 'ellipse':
-      controller.session.setDefaults({
-        ...defaults,
-        ellipse: { ...defaults.ellipse, color: next },
-      });
-      break;
-    case 'arrow':
-      controller.session.setDefaults({ ...defaults, arrow: { color: next } });
-      break;
-    case 'text':
-      controller.session.setDefaults({ ...defaults, text: { ...defaults.text, color: next } });
-      break;
-    case 'blur':
-    case 'select':
-      break;
-  }
-  if (selected && 'color' in selected)
-    controller.session.replaceObject({ ...selected, color: next });
-}
-
-function applyDrawingNumber(args: {
-  controller: ContentDrawingController;
-  defaults: DrawingDefaults;
-  kind: 'pencil' | 'marker' | 'rectangle' | 'ellipse';
-  key: 'width' | 'opacity';
-  selected: SelectedDrawingObject;
-  value: number;
-}) {
-  const { controller, defaults, key, kind, selected, value } = args;
-  controller.session.setDefaults({ ...defaults, [kind]: { ...defaults[kind], [key]: value } });
-  if (selected?.kind === kind) controller.session.replaceObject({ ...selected, [key]: value });
-}
-
-function applyDrawingTextOption(args: {
-  controller: ContentDrawingController;
-  defaults: DrawingDefaults;
-  key: 'fontSize' | 'backgroundColor';
-  selected: SelectedDrawingObject;
-  value: number | string | null;
-}) {
-  const { controller, defaults, key, selected, value } = args;
-  controller.session.setDefaults({ ...defaults, text: { ...defaults.text, [key]: value } });
-  if (selected?.kind === 'text') controller.session.replaceObject({ ...selected, [key]: value });
+        ) : (
+          <>
+            {tool === 'shape' ? (
+              <>
+                <DrawingShapeOptions
+                  value={resolveSelectedShapeKind(selected) ?? snapshot.defaults.shape.kind}
+                  onChange={(kind) => update({ kind })}
+                />
+                <span aria-hidden className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" />
+              </>
+            ) : null}
+            <DrawingColorOptions
+              colors={[...controller.getPalette()]}
+              label={translate('content.toolbar.drawingColor')}
+              value={values.color}
+              onSelect={(color) => update({ color })}
+            />
+            <span aria-hidden className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" />
+            <DrawingWidthOptions
+              tool={tool}
+              value={width}
+              values={
+                tool === 'pencil'
+                  ? DRAWING_PENCIL_WIDTHS
+                  : tool === 'marker'
+                    ? DRAWING_MARKER_WIDTHS
+                    : tool === 'arrow'
+                      ? DRAWING_ARROW_WIDTHS
+                      : DRAWING_OUTLINE_WIDTHS
+              }
+              onChange={(width) => update({ width })}
+            />
+            {tool === 'marker' ? (
+              <>
+                <span aria-hidden className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" />
+                <MarkerOpacityOptions
+                  value={
+                    selected?.kind === 'marker'
+                      ? selected.opacity
+                      : snapshot.defaults.marker.opacity
+                  }
+                  onChange={(opacity) => update({ opacity })}
+                />
+              </>
+            ) : null}
+            {tool === 'arrow' ? (
+              <>
+                <span aria-hidden className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" />
+                <ArrowWidthModeOptions
+                  dynamic={
+                    selected?.kind === 'arrow'
+                      ? selected.dynamicWidth
+                      : snapshot.defaults.arrow.dynamicWidth
+                  }
+                  onChange={(dynamicWidth) => update({ dynamicWidth })}
+                />
+              </>
+            ) : null}
+          </>
+        )}
+        {selected ? (
+          <>
+            <span aria-hidden className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" />
+            <DrawingDeselectOption onClick={() => controller.session.select(null)} />
+          </>
+        ) : null}
+      </div>
+    </ProductToolbarMenu>
+  );
 }

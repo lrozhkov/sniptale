@@ -48,7 +48,6 @@ export function useDrawingModeIntegration(args: {
   useEffect(() => {
     if (previousScreenshotModeRef.current && !screenshotMode) {
       disableDrawing();
-      controller.session.reset();
     }
     previousScreenshotModeRef.current = screenshotMode;
   }, [controller, disableDrawing, screenshotMode]);
@@ -110,7 +109,6 @@ export function createDrawingModeController(args: {
     handleToggleScreenshotMode: (enabled) => {
       if (!enabled) {
         disableDrawing();
-        controller.session.reset();
       }
       baseModeController.handleToggleScreenshotMode(enabled);
     },

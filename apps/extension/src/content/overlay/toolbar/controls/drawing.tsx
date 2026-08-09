@@ -1,16 +1,15 @@
 import {
-  Circle,
-  Eraser,
+  BrushCleaning,
+  Droplet,
   Highlighter,
   MousePointer2,
   Pencil,
-  Redo2,
-  Square,
-  TextCursorInput,
+  Shapes,
+  Type,
   Trash2,
-  Undo2,
   ArrowUpRight,
 } from 'lucide-react';
+import { useRef } from 'react';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -20,63 +19,91 @@ import type { ContentDrawingController } from '../../../drawing/controller';
 import { useDrawingSessionSnapshot } from '../../../drawing/controller';
 import type { DrawingTool } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
-import { ToolbarDrawingOptions } from './drawing-options';
+import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
 
 const tools: readonly { tool: DrawingTool; icon: typeof Pencil; label: string }[] = [
   { tool: 'select', icon: MousePointer2, label: 'content.toolbar.drawingSelect' },
   { tool: 'pencil', icon: Pencil, label: 'content.toolbar.drawingPencil' },
   { tool: 'marker', icon: Highlighter, label: 'content.toolbar.drawingMarker' },
-  { tool: 'rectangle', icon: Square, label: 'content.toolbar.drawingRectangle' },
-  { tool: 'ellipse', icon: Circle, label: 'content.toolbar.drawingEllipse' },
+  { tool: 'shape', icon: Shapes, label: 'content.toolbar.drawingShape' },
   { tool: 'arrow', icon: ArrowUpRight, label: 'content.toolbar.drawingArrow' },
-  { tool: 'blur', icon: Eraser, label: 'content.toolbar.drawingBlur' },
-  { tool: 'text', icon: TextCursorInput, label: 'content.toolbar.drawingText' },
+  { tool: 'blur', icon: Droplet, label: 'content.toolbar.drawingBlur' },
+  { tool: 'text', icon: Type, label: 'content.toolbar.drawingText' },
 ];
 
-export function ToolbarDrawingControls(props: { controller: ContentDrawingController }) {
+function DrawingToolControl(props: {
+  controller: ContentDrawingController;
+  displayMode: 'horizontal' | 'vertical';
+  icon: typeof Pencil;
+  label: string;
+  optionsTool: ReturnType<typeof resolveDrawingQuickOptionsTool>;
+  showOptions: boolean;
+  snapshot: ReturnType<typeof useDrawingSessionSnapshot>;
+  tool: DrawingTool;
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const Icon = props.icon;
+  return (
+    <div className="relative flex">
+      <ContentToolbarButton
+        ref={triggerRef}
+        type="button"
+        active={props.snapshot.activeTool === props.tool}
+        aria-pressed={props.snapshot.activeTool === props.tool}
+        aria-label={translate(props.label as Parameters<typeof translate>[0])}
+        title={translate(props.label as Parameters<typeof translate>[0])}
+        dataUi={`content.toolbar.drawing.${props.tool}`}
+        onClick={() => props.controller.session.setActiveTool(props.tool)}
+      >
+        <Icon size={18} />
+      </ContentToolbarButton>
+      {props.optionsTool && props.showOptions ? (
+        <ToolbarDrawingOptions
+          controller={props.controller}
+          displayMode={props.displayMode}
+          snapshot={props.snapshot}
+          tool={props.optionsTool}
+          triggerRef={triggerRef}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function ToolbarDrawingControls(props: {
+  controller: ContentDrawingController;
+  displayMode: 'horizontal' | 'vertical';
+}) {
   const { controller } = props;
   const snapshot = useDrawingSessionSnapshot(controller.session);
+  const optionsTool = resolveDrawingQuickOptionsTool(snapshot);
+  const optionsAnchorTool =
+    snapshot.activeTool === 'select' && snapshot.selectedObjectId ? 'select' : optionsTool;
   return (
     <>
-      <ContentToolbarDivider />
-      <ContentToolbarGroup aria-label={translate('content.toolbar.drawingTools')}>
-        {tools.map(({ tool, icon: Icon, label }) => (
-          <ContentToolbarButton
+      <ContentToolbarGroup
+        aria-label={translate('content.toolbar.drawingTools')}
+        dataUi="content.toolbar.drawing-tools-group"
+      >
+        {tools.map(({ tool, icon, label }) => (
+          <DrawingToolControl
             key={tool}
-            type="button"
-            active={snapshot.activeTool === tool}
-            aria-pressed={snapshot.activeTool === tool}
-            aria-label={translate(label as Parameters<typeof translate>[0])}
-            title={translate(label as Parameters<typeof translate>[0])}
-            dataUi={`content.toolbar.drawing.${tool}`}
-            onClick={() => controller.session.setActiveTool(tool)}
-          >
-            <Icon size={18} />
-          </ContentToolbarButton>
+            controller={controller}
+            displayMode={props.displayMode}
+            icon={icon}
+            label={label}
+            optionsTool={optionsTool}
+            showOptions={optionsAnchorTool === tool}
+            snapshot={snapshot}
+            tool={tool}
+          />
         ))}
       </ContentToolbarGroup>
-      <ContentToolbarDivider />
-      <ToolbarDrawingOptions controller={controller} snapshot={snapshot} />
-      <ContentToolbarDivider />
-      <ContentToolbarGroup aria-label={translate('content.toolbar.drawingHistory')}>
-        <ContentToolbarButton
-          type="button"
-          disabled={!snapshot.canUndo}
-          aria-label={translate('content.toolbar.drawingUndo')}
-          title={translate('content.toolbar.drawingUndo')}
-          onClick={() => controller.session.undo()}
-        >
-          <Undo2 size={18} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          type="button"
-          disabled={!snapshot.canRedo}
-          aria-label={translate('content.toolbar.drawingRedo')}
-          title={translate('content.toolbar.drawingRedo')}
-          onClick={() => controller.session.redo()}
-        >
-          <Redo2 size={18} />
-        </ContentToolbarButton>
+      <ContentToolbarDivider dataUi="content.toolbar.drawing-actions-divider" />
+      <ContentToolbarGroup
+        aria-label={translate('content.toolbar.drawingActions')}
+        dataUi="content.toolbar.drawing-actions-group"
+      >
         <ContentToolbarButton
           type="button"
           disabled={!snapshot.selectedObjectId}
@@ -93,7 +120,7 @@ export function ToolbarDrawingControls(props: { controller: ContentDrawingContro
           title={translate('content.toolbar.drawingClear')}
           onClick={() => controller.session.clear()}
         >
-          <Eraser size={18} />
+          <BrushCleaning size={18} strokeWidth={2} />
         </ContentToolbarButton>
       </ContentToolbarGroup>
     </>

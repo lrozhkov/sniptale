@@ -63,10 +63,8 @@ function createDrawingObject(
       return { id, kind: 'pencil', samples: [{ ...point, t: timestamp }], ...defaults.pencil };
     case 'marker':
       return { id, kind: 'marker', samples: [{ ...point, t: timestamp }], ...defaults.marker };
-    case 'rectangle':
-      return { id, kind: 'rectangle', bounds, ...defaults.rectangle };
-    case 'ellipse':
-      return { id, kind: 'ellipse', bounds, ...defaults.ellipse };
+    case 'shape':
+      return { id, bounds, ...defaults.shape };
     case 'arrow':
       return { id, kind: 'arrow', start: point, end: point, ...defaults.arrow };
     case 'blur':
@@ -95,7 +93,13 @@ export function updateCreatedDrawingObject(args: {
   if (object.kind === 'arrow') return { ...object, end: point };
   if ('bounds' in object) {
     let end = point;
-    if (square && (object.kind === 'rectangle' || object.kind === 'ellipse')) {
+    if (
+      square &&
+      (object.kind === 'rectangle' ||
+        object.kind === 'ellipse' ||
+        object.kind === 'triangle' ||
+        object.kind === 'parallelogram')
+    ) {
       const size = Math.max(Math.abs(point.x - start.x), Math.abs(point.y - start.y));
       end = {
         x: start.x + Math.sign(point.x - start.x || 1) * size,
@@ -210,7 +214,9 @@ export function commitDrawingPointerDraft(
       bounds.width >= 3 ||
       bounds.height >= 3
     ) {
-      session.commitObject(draft.object);
+      session.commitObject(draft.object, {
+        select: draft.object.kind !== 'pencil' && draft.object.kind !== 'marker',
+      });
     }
     return;
   }

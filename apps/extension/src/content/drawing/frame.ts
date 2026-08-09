@@ -3,6 +3,7 @@ import type { PageScrollRoot } from '../platform/page-scroll';
 import type { PointerDraft } from './interaction';
 import { getDrawingViewportProjection } from './interaction';
 import { renderDrawingObject, renderDrawingSelection } from './render';
+import { resolveDrawingFrameRenderables } from './frame-renderables';
 
 export function drawDrawingFrame(args: {
   canvas: HTMLCanvasElement;
@@ -34,8 +35,9 @@ export function drawDrawingFrame(args: {
     context.rect(rect.left, rect.top, rect.width, rect.height);
     context.clip();
   }
-  objects.forEach((object) => renderDrawingObject(context, object, projection));
-  if (draft?.kind === 'create') renderDrawingObject(context, draft.object, projection);
+  resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) =>
+    renderDrawingObject(context, object, projection, preview ? { preview: true } : {})
+  );
   if (showChrome && selectedId) {
     const selected =
       draft && draft.kind !== 'create' && draft.object.id === selectedId

@@ -154,7 +154,10 @@ export function ToolbarSecondaryControls(props: {
         />
       ) : null}
       {toolbarProps.drawingMode && toolbarProps.drawingController ? (
-        <ToolbarDrawingControls controller={toolbarProps.drawingController} />
+        <ToolbarDrawingControls
+          controller={toolbarProps.drawingController}
+          displayMode={viewModel.derivedState.displayMode}
+        />
       ) : null}
       <ToolbarUtilityButtons
         {...createUtilityButtonsProps({

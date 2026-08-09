@@ -1,4 +1,5 @@
 import type { DrawingPoint, DrawingSample } from './model';
+import { memoizeDrawingStrokeOutline } from './freehand-cache';
 
 interface DynamicStrokePoint extends DrawingPoint {
   width: number;
@@ -10,6 +11,7 @@ const SPEED_TO_THINNESS = 1.35;
 const START_AVERAGE_DISTANCE_PX = 32;
 const EDGE_WIDTH_DISTANCE_PX = 24;
 const SMOOTHING_STEP_PX = 2;
+const PREVIEW_SMOOTHING_STEP_PX = 4;
 const DEFAULT_SMOOTHING_WEIGHT = 0.25;
 const SHARP_CORNER_SMOOTHING_WEIGHT = 0.08;
 const DYNAMIC_WIDTH_MIN_SAMPLE_DISTANCE_PX = 2;
@@ -23,18 +25,31 @@ export function appendDrawingSample(
   sample: DrawingSample,
   dynamicWidth: boolean
 ): DrawingSample[] {
-  if (dynamicWidth && samples.length >= 2) {
-    const previous = samples[samples.length - 2]!;
-    const last = samples[samples.length - 1]!;
-    if (
-      distance(last, sample) < DYNAMIC_WIDTH_MIN_SAMPLE_DISTANCE_PX &&
-      distance(previous, sample) < DYNAMIC_WIDTH_MIN_SAMPLE_DISTANCE_PX
-    ) {
-      return [...samples.slice(0, -1), sample];
+  return appendDrawingSamples(samples, [sample], dynamicWidth);
+}
+
+export function appendDrawingSamples(
+  samples: readonly DrawingSample[],
+  additions: readonly DrawingSample[],
+  dynamicWidth: boolean
+): DrawingSample[] {
+  const result = [...samples];
+  additions.forEach((sample) => {
+    if (dynamicWidth && result.length >= 2) {
+      const previous = result[result.length - 2]!;
+      const last = result[result.length - 1]!;
+      if (
+        distance(last, sample) < DYNAMIC_WIDTH_MIN_SAMPLE_DISTANCE_PX &&
+        distance(previous, sample) < DYNAMIC_WIDTH_MIN_SAMPLE_DISTANCE_PX
+      ) {
+        result[result.length - 1] = sample;
+        return;
+      }
     }
-  }
-  const last = samples[samples.length - 1];
-  return last && last.x === sample.x && last.y === sample.y ? [...samples] : [...samples, sample];
+    const last = result[result.length - 1];
+    if (!last || last.x !== sample.x || last.y !== sample.y) result.push(sample);
+  });
+  return result;
 }
 
 function resolveSpeedRatios(samples: readonly DrawingSample[]): number[] {
@@ -98,7 +113,7 @@ function interpolate(start: DynamicStrokePoint, end: DynamicStrokePoint, value: 
   };
 }
 
-function resample(points: readonly DynamicStrokePoint[]) {
+function resample(points: readonly DynamicStrokePoint[], step: number) {
   const first = points[0];
   if (!first || points.length < 2) return points.map((point) => ({ ...point }));
   const result: DynamicStrokePoint[] = [{ ...first }];
@@ -108,12 +123,12 @@ function resample(points: readonly DynamicStrokePoint[]) {
     const end = points[index]!;
     const segment = distance(start, end);
     if (segment <= 0) continue;
-    let nextDistance = SMOOTHING_STEP_PX - carry;
+    let nextDistance = step - carry;
     while (nextDistance < segment) {
       result.push(interpolate(start, end, nextDistance));
-      nextDistance += SMOOTHING_STEP_PX;
+      nextDistance += step;
     }
-    carry = segment - (nextDistance - SMOOTHING_STEP_PX);
+    carry = segment - (nextDistance - step);
   }
   const last = points[points.length - 1]!;
   const previous = result[result.length - 1];
@@ -126,15 +141,15 @@ function isSharp(previous: DrawingPoint, current: DrawingPoint, next: DrawingPoi
   const outgoing = { x: next.x - current.x, y: next.y - current.y };
   const lengths = Math.hypot(incoming.x, incoming.y) * Math.hypot(outgoing.x, outgoing.y);
   if (lengths <= 0) return false;
-  const cosine = clamp((incoming.x * outgoing.x + incoming.y * outgoing.y) / lengths, -1, 1);
-  return Math.acos(cosine) <= Math.PI / 2;
+  return incoming.x * outgoing.x + incoming.y * outgoing.y >= 0;
 }
 
-function smooth(points: readonly DynamicStrokePoint[], level: number) {
-  let result = resample(points);
+function smooth(points: readonly DynamicStrokePoint[], level: number, step: number) {
+  let result = resample(points, step);
   const iterations = Math.round(clamp(level, 0, 10) * 3);
+  let buffer = result.map((point) => ({ ...point }));
   for (let iteration = 0; iteration < iterations && result.length >= 3; iteration += 1) {
-    const next = [result[0]!];
+    Object.assign(buffer[0]!, result[0]!);
     for (let index = 1; index < result.length - 1; index += 1) {
       const previous = result[index - 1]!;
       const current = result[index]!;
@@ -142,15 +157,14 @@ function smooth(points: readonly DynamicStrokePoint[], level: number) {
       const weight = isSharp(previous, current, following)
         ? SHARP_CORNER_SMOOTHING_WEIGHT
         : DEFAULT_SMOOTHING_WEIGHT;
-      next.push({
-        x: previous.x * weight + current.x * (1 - weight * 2) + following.x * weight,
-        y: previous.y * weight + current.y * (1 - weight * 2) + following.y * weight,
-        width:
-          previous.width * weight + current.width * (1 - weight * 2) + following.width * weight,
-      });
+      const target = buffer[index]!;
+      target.x = previous.x * weight + current.x * (1 - weight * 2) + following.x * weight;
+      target.y = previous.y * weight + current.y * (1 - weight * 2) + following.y * weight;
+      target.width =
+        previous.width * weight + current.width * (1 - weight * 2) + following.width * weight;
     }
-    next.push(result[result.length - 1]!);
-    result = next;
+    Object.assign(buffer[result.length - 1]!, result[result.length - 1]!);
+    [result, buffer] = [buffer, result];
   }
   return result;
 }
@@ -244,11 +258,39 @@ function dot(points: readonly DynamicStrokePoint[]) {
 export function buildDrawingStrokeOutline(
   samples: readonly DrawingSample[],
   width: number,
-  options: { readonly dynamicWidth: boolean; readonly smoothingLevel?: number }
+  options: {
+    readonly dynamicWidth: boolean;
+    readonly preview?: boolean;
+    readonly smoothingLevel?: number;
+  }
 ): DrawingPoint[] {
   if (samples.length === 0) return [];
+  const cacheKey = [
+    width,
+    options.dynamicWidth ? 1 : 0,
+    options.preview ? 1 : 0,
+    options.smoothingLevel ?? 10,
+  ].join(':');
+  return memoizeDrawingStrokeOutline(samples, cacheKey, () =>
+    computeDrawingStrokeOutline(samples, width, options)
+  );
+}
+
+function computeDrawingStrokeOutline(
+  samples: readonly DrawingSample[],
+  width: number,
+  options: {
+    readonly dynamicWidth: boolean;
+    readonly preview?: boolean;
+    readonly smoothingLevel?: number;
+  }
+): DrawingPoint[] {
   const points = stabilizeEndpoints(
-    smooth(resolveDynamicPoints(samples, width, options.dynamicWidth), options.smoothingLevel ?? 10)
+    smooth(
+      resolveDynamicPoints(samples, width, options.dynamicWidth),
+      options.smoothingLevel ?? 10,
+      options.preview ? PREVIEW_SMOOTHING_STEP_PX : SMOOTHING_STEP_PX
+    )
   );
   const length = points.reduce((sum, point, index) => {
     const previous = points[index - 1];

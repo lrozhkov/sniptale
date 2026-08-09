@@ -5,6 +5,7 @@ import {
   notifyHistoryReachabilityChanged,
   publishHistoryState,
   readHistoryState,
+  type HistoryClearListener,
   type HistoryListener,
   type HistoryStoreRuntimeState,
 } from './store-state';
@@ -43,6 +44,9 @@ function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
 function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
   return {
     redo(): void {
+      if (state.isApplying) {
+        return;
+      }
       const previousPast = state.past;
       const previousFuture = state.future;
       const next = previousFuture[0];
@@ -71,6 +75,9 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
       publishHistoryState(state);
     },
     undo(): void {
+      if (state.isApplying) {
+        return;
+      }
       const previousPast = state.past;
       const previousFuture = state.future;
       const next = previousPast[previousPast.length - 1];
@@ -111,6 +118,12 @@ function createHistoryStoreSubscriptionApi(state: HistoryStoreRuntimeState) {
       state.listeners.add(listener);
       return () => {
         state.listeners.delete(listener);
+      };
+    },
+    subscribeToClear(listener: HistoryClearListener): () => void {
+      state.clearListeners.add(listener);
+      return () => {
+        state.clearListeners.delete(listener);
       };
     },
     unregisterBridge(nextBridge: PagePreparationHistoryBridge): void {

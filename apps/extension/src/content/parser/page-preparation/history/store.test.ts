@@ -328,6 +328,18 @@ describe('pagePreparationHistory store', () => {
     expect(onHistoryCleared).toHaveBeenCalledTimes(1);
   });
 
+  it('notifies owner-scoped clear subscribers until they unsubscribe', () => {
+    const store = createPagePreparationHistoryStore();
+    const listener = vi.fn();
+    const unsubscribe = store.subscribeToClear(listener);
+
+    store.clear();
+    unsubscribe();
+    store.clear();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('retires frame identities that become unreachable on a divergent redo branch', () => {
     const store = createPagePreparationHistoryStore();
     let current = createSnapshot('a');

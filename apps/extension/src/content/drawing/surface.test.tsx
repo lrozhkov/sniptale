@@ -6,6 +6,13 @@ import { createDrawingSession } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface, getDrawingViewportProjection, toDrawingScenePoint } from './surface';
 
+const domHostMocks = vi.hoisted(() => ({ toggleContentHostClass: vi.fn() }));
+
+vi.mock('../platform/dom-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../platform/dom-host')>()),
+  toggleContentHostClass: domHostMocks.toggleContentHostClass,
+}));
+
 function createCanvasContextFixture(): CanvasRenderingContext2D {
   const context: Partial<CanvasRenderingContext2D> = {
     arc: vi.fn(),
@@ -34,8 +41,14 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
 const context = createCanvasContextFixture();
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'object-id') });
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context);
   Object.defineProperty(HTMLCanvasElement.prototype, 'setPointerCapture', {
     configurable: true,
@@ -46,6 +59,143 @@ beforeEach(() => {
     innerHeight: { configurable: true, value: 600 },
     devicePixelRatio: { configurable: true, value: 2 },
   });
+});
+
+it('renders every unified outline shape without filling it', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const shapes = ['rectangle', 'ellipse', 'triangle', 'parallelogram'] as const;
+  shapes.forEach((kind) =>
+    session.commitObject({
+      bounds: { x: 10, y: 20, width: 80, height: 40 },
+      color: '#ef4444',
+      id: kind,
+      kind,
+      width: 4,
+    })
+  );
+  session.setActiveTool('shape');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+
+  expect(context.stroke).toHaveBeenCalledTimes(4);
+  expect(context.ellipse).toHaveBeenCalledOnce();
+  expect(context.moveTo).toHaveBeenCalledTimes(3);
+  expect(context.fill).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('renders an arrow as the filled editor-style shaft and head profile', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    color: '#ef4444',
+    dynamicWidth: true,
+    end: { x: 200, y: 40 },
+    id: 'arrow',
+    kind: 'arrow',
+    start: { x: 20, y: 40 },
+    width: 18,
+  });
+  session.setActiveTool('arrow');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(context.moveTo).toHaveBeenCalledOnce();
+  expect(context.lineTo).toHaveBeenCalledTimes(6);
+  expect(context.stroke).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('shows only two endpoint handles without a dashed selection box for an arrow', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    color: '#ef4444',
+    dynamicWidth: true,
+    end: { x: 200, y: 40 },
+    id: 'selected-arrow',
+    kind: 'arrow',
+    start: { x: 20, y: 40 },
+    width: 18,
+  });
+  session.setActiveTool('select');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+
+  expect(host.querySelector<HTMLCanvasElement>('canvas')?.style.cursor).toBe('default');
+  expect(context.arc).toHaveBeenCalledTimes(2);
+  expect(context.strokeRect).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('isolates annotation chrome only while the Drawing surface is active', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  expect(domHostMocks.toggleContentHostClass).toHaveBeenLastCalledWith(
+    'sniptale-drawing-mode-active',
+    true
+  );
+
+  act(() =>
+    root.render(<DrawingSurface active={false} chromeHidden={false} controller={controller} />)
+  );
+  expect(domHostMocks.toggleContentHostClass).toHaveBeenLastCalledWith(
+    'sniptale-drawing-mode-active',
+    false
+  );
+  act(() => root.unmount());
+  expect(domHostMocks.toggleContentHostClass).toHaveBeenLastCalledWith(
+    'sniptale-drawing-mode-active',
+    false
+  );
 });
 
 afterEach(() => {
@@ -75,7 +225,7 @@ it('projects viewport and internal-scroll coordinates into one scene space', () 
 });
 
 it('commits a speed-sampled pencil object and becomes click-through outside Drawing mode', () => {
-  const session = createDrawingSession();
+  const session = createDrawingSession({ onDocumentCommit: () => true });
   let finalizer: (() => void) | null = null;
   const controller: ContentDrawingController = {
     session,
@@ -93,6 +243,7 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
   const root = createRoot(host);
   act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
   const canvas = host.querySelector('canvas')!;
+  expect(canvas.style.cursor).toBe('crosshair');
   const hostPointer = vi.fn();
   const hostClick = vi.fn();
   const hostContextMenu = vi.fn();
@@ -136,10 +287,20 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
 
   act(() => {
     session.setActiveTool('text');
-    dispatchPointer('pointerdown', 120, 90);
+    canvas.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        button: 0,
+        cancelable: true,
+        clientX: 120,
+        clientY: 90,
+      })
+    );
   });
+  expect(canvas.style.cursor).toBe('text');
   const textEditor = host.querySelector('textarea');
   expect(textEditor).not.toBeNull();
+  expect(document.activeElement).toBe(textEditor);
   act(() => {
     textEditor?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     textEditor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
@@ -147,12 +308,23 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
   expect(hostClick).not.toHaveBeenCalled();
   expect(hostContextMenu).not.toHaveBeenCalled();
 
-  act(() =>
-    root.render(<DrawingSurface active={false} chromeHidden={false} controller={controller} />)
-  );
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  act(() => {
+    valueSetter?.call(textEditor, 'Persistent note');
+    textEditor?.dispatchEvent(new Event('input', { bubbles: true }));
+    root.render(<DrawingSurface active={false} chromeHidden={false} controller={controller} />);
+  });
+  expect(host.querySelector('textarea')).toBeNull();
+  expect(session.getSnapshot().document.objects.at(-1)).toMatchObject({
+    kind: 'text',
+    text: 'Persistent note',
+  });
+  expect(context.fillText).toHaveBeenCalledWith('Persistent note', 126, 96);
+
   expect(
     host.querySelector<HTMLElement>('[data-ui="content.drawing.surface"]')?.style.pointerEvents
   ).toBe('none');
-  expect(session.getSnapshot().document.objects).toHaveLength(2);
+  expect(canvas.style.cursor).toBe('default');
+  expect(session.getSnapshot().document.objects).toHaveLength(3);
   act(() => root.unmount());
 });

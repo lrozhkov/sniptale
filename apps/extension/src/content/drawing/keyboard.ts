@@ -1,4 +1,3 @@
-import type { KeyboardEvent } from 'react';
 import {
   translateDrawingObject,
   type DrawingSession,
@@ -7,7 +6,11 @@ import {
 } from '../../features/drawing/public';
 
 export function handleDrawingKeyDown(args: {
-  event: KeyboardEvent<HTMLCanvasElement>;
+  event: {
+    key: string;
+    shiftKey: boolean;
+    preventDefault(): void;
+  };
   hasDraft: boolean;
   onCancelDraft: () => void;
   onEditText: (object: DrawingTextObject) => void;
@@ -16,18 +19,6 @@ export function handleDrawingKeyDown(args: {
   snapshot: DrawingSessionSnapshot;
 }): void {
   const { event, session, snapshot } = args;
-  const modifier = event.metaKey || event.ctrlKey;
-  if (modifier && event.key.toLowerCase() === 'z') {
-    event.preventDefault();
-    if (event.shiftKey) session.redo();
-    else session.undo();
-    return;
-  }
-  if (modifier && event.key.toLowerCase() === 'y') {
-    event.preventDefault();
-    session.redo();
-    return;
-  }
   if (event.key === 'Delete' || event.key === 'Backspace') {
     event.preventDefault();
     session.deleteSelected();

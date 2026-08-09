@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   createDefaultDrawingToolDefaults,
-  createDrawingSession,
   DEFAULT_DRAWING_COLORS,
   type DrawingSession,
   type DrawingSessionSnapshot,
@@ -11,6 +10,7 @@ import {
   subscribeToDrawingPaletteState,
 } from '../../composition/persistence/drawing-palette';
 import { resolvePageScrollRoot, type PageScrollRoot } from '../platform/page-scroll';
+import { createPagePreparationDrawingSession } from './history';
 
 export interface ContentDrawingController {
   readonly session: DrawingSession;
@@ -30,7 +30,7 @@ export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessi
 
 export function useContentDrawingController(): ContentDrawingController {
   const controller = useMemo<ContentDrawingController>(() => {
-    const session = createDrawingSession();
+    const session = createPagePreparationDrawingSession();
     let root: PageScrollRoot = { kind: 'viewport', element: null };
     let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
     let finalizer: (() => void) | null = null;

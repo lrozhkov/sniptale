@@ -4,7 +4,7 @@ import type { ContentDrawingController } from './controller';
 import { createDrawingModeController } from './mode';
 
 function createHarness(activationAllowed: boolean) {
-  const session = createDrawingSession();
+  const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
     session,
     applyPalette: vi.fn(),
@@ -65,7 +65,7 @@ it('does not enable drawing when sibling-mode cleanup fails', () => {
   expect(harness.setNavigationLockEnabled).not.toHaveBeenCalledWith(true);
 });
 
-it('owns activation, sibling-mode cleanup, and preparation-session reset', () => {
+it('owns activation and sibling-mode cleanup without discarding shared-history state', () => {
   const harness = createHarness(true);
   harness.mode.handleToggleDrawingMode?.(true);
   expect(harness.base.handleEnableCursorMode).toHaveBeenCalledTimes(1);
@@ -76,8 +76,12 @@ it('owns activation, sibling-mode cleanup, and preparation-session reset', () =>
   expect(harness.disableDrawing).toHaveBeenCalledTimes(1);
   expect(harness.base.handleToggleHighlighterMode).toHaveBeenCalledWith(true);
 
-  const reset = vi.spyOn(harness.session, 'reset');
+  harness.session.commitObject({
+    id: 'retained',
+    kind: 'blur',
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+  });
   harness.mode.handleToggleScreenshotMode(false);
-  expect(reset).toHaveBeenCalledTimes(1);
+  expect(harness.session.getSnapshot().document.objects).toHaveLength(1);
   expect(harness.base.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
 });

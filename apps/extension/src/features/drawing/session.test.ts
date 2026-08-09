@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { appendDrawingSample, buildDrawingStrokeOutline } from './freehand';
+import { appendDrawingSample, appendDrawingSamples, buildDrawingStrokeOutline } from './freehand';
 import { createDefaultDrawingToolDefaults } from './model';
-import { createDrawingSession } from './session';
+import { createDrawingSession, type DrawingDocumentCommit } from './session';
 
 describe('drawing session', () => {
   it('keeps the drawing tool active while selecting a newly committed object', () => {
-    const session = createDrawingSession();
+    const session = createDrawingSession({ onDocumentCommit: () => true });
     session.commitObject({
       id: 'line',
       kind: 'pencil',
@@ -19,8 +19,9 @@ describe('drawing session', () => {
     expect(session.getSnapshot()).toMatchObject({ activeTool: 'pencil', selectedObjectId: 'line' });
   });
 
-  it('groups object replacements into reversible committed states', () => {
-    const session = createDrawingSession({ historyLimit: 2 });
+  it('publishes document commits and accepts external history replay without recommitting', () => {
+    const onDocumentCommit = vi.fn<(commit: DrawingDocumentCommit) => boolean>(() => true);
+    const session = createDrawingSession({ onDocumentCommit });
     session.commitObject({
       id: 'blur',
       kind: 'blur',
@@ -31,10 +32,25 @@ describe('drawing session', () => {
       kind: 'blur',
       bounds: { x: 10, y: 0, width: 20, height: 20 },
     });
-    session.undo();
+    expect(onDocumentCommit).toHaveBeenCalledTimes(2);
+    const replacement = onDocumentCommit.mock.calls[1]?.[0];
+    expect(replacement?.before.objects[0]).toMatchObject({ bounds: { x: 0 } });
+    expect(replacement?.after.objects[0]).toMatchObject({ bounds: { x: 10 } });
+    expect(replacement!.replay(replacement!.before)).toBe(true);
     expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 0 } });
-    session.redo();
+    expect(replacement!.replay(replacement!.after)).toBe(true);
     expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 10 } });
+    expect(onDocumentCommit).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the document unchanged when the external history owner rejects a commit', () => {
+    const session = createDrawingSession({ onDocumentCommit: () => false });
+    session.commitObject({
+      id: 'rejected',
+      kind: 'blur',
+      bounds: { x: 0, y: 0, width: 10, height: 10 },
+    });
+    expect(session.getSnapshot().document.objects).toEqual([]);
   });
 
   it('coalesces dense velocity samples without reading pointer pressure', () => {
@@ -66,6 +82,46 @@ describe('drawing session', () => {
     expect(slow).not.toEqual(fast);
   });
 
+  it('batches coalesced samples and reuses completed-stroke geometry', () => {
+    const seed = [
+      { x: 0, y: 0, t: 0 },
+      { x: 4, y: 0, t: 4 },
+    ];
+    const additions = [
+      { x: 5, y: 0, t: 5 },
+      { x: 12, y: 2, t: 12 },
+      { x: 20, y: 4, t: 20 },
+    ];
+    const sequential = additions.reduce(
+      (samples, sample) => appendDrawingSample(samples, sample, true),
+      seed
+    );
+    const batched = appendDrawingSamples(seed, additions, true);
+    expect(batched).toEqual(sequential);
+
+    const first = buildDrawingStrokeOutline(batched, 8, { dynamicWidth: true });
+    const cached = buildDrawingStrokeOutline(batched, 8, { dynamicWidth: true });
+    const differentWidth = buildDrawingStrokeOutline(batched, 16, { dynamicWidth: true });
+    expect(cached).toBe(first);
+    expect(differentWidth).not.toBe(first);
+
+    const longSamples = Array.from({ length: 200 }, (_, index) => ({
+      x: index * 3,
+      y: Math.sin(index / 8) * 30,
+      t: index * 4,
+    }));
+    const finalOutline = buildDrawingStrokeOutline(longSamples, 16, {
+      dynamicWidth: true,
+      smoothingLevel: 10,
+    });
+    const previewOutline = buildDrawingStrokeOutline(longSamples, 16, {
+      dynamicWidth: true,
+      preview: true,
+      smoothingLevel: 4,
+    });
+    expect(previewOutline.length).toBeLessThan(finalOutline.length);
+  });
+
   it('covers duplicate samples, static strokes, dots, and sharp joins', () => {
     const seed = [{ x: 0, y: 0, t: 0 }];
     expect(appendDrawingSample(seed, { x: 0, y: 0, t: 1 }, false)).toEqual(seed);
@@ -88,7 +144,7 @@ describe('drawing session', () => {
   });
 
   it('notifies subscribers and clears them on disposal', () => {
-    const session = createDrawingSession();
+    const session = createDrawingSession({ onDocumentCommit: () => true });
     const listener = vi.fn();
     session.subscribe(listener);
     session.setActiveTool('marker');
@@ -98,11 +154,9 @@ describe('drawing session', () => {
   });
 
   it('covers selection, defaults, deletion, clearing, reset, and guarded no-ops', () => {
-    const session = createDrawingSession();
+    const session = createDrawingSession({ onDocumentCommit: () => true });
     const listener = vi.fn();
     const unsubscribe = session.subscribe(listener);
-    session.undo();
-    session.redo();
     session.deleteSelected();
     session.clear();
     session.setActiveTool('pencil');
@@ -126,28 +180,27 @@ describe('drawing session', () => {
     session.select('box');
     session.deleteSelected();
     session.clear();
-    session.reset();
     unsubscribe();
     session.setActiveTool('marker');
     expect(session.getSnapshot()).toMatchObject({
       activeTool: 'marker',
-      canRedo: false,
-      canUndo: false,
       document: { objects: [] },
     });
     expect(listener).toHaveBeenCalled();
   });
 
-  it('uses provided initial state and trims both history directions', () => {
+  it('uses provided initial state and disposes its document', () => {
     const initial = {
       version: 1 as const,
       objects: [{ id: 'one', kind: 'blur' as const, bounds: { x: 0, y: 0, width: 1, height: 1 } }],
     };
-    const session = createDrawingSession({ initialDocument: initial, historyLimit: 1 });
+    const session = createDrawingSession({
+      initialDocument: initial,
+      onDocumentCommit: () => true,
+    });
     session.clear();
-    session.undo();
-    session.redo();
-    session.redo();
+    expect(session.getSnapshot().document.objects).toEqual([]);
+    session.dispose();
     expect(session.getSnapshot().document.objects).toEqual([]);
   });
 });

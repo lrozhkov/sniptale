@@ -5,11 +5,14 @@ import {
   hitTestDrawingDocument,
   type DrawingObject,
   type DrawingPoint,
+  type DrawingSessionSnapshot,
+  type DrawingTool,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { useDrawingSessionSnapshot } from './controller';
 import { translate } from '../../platform/i18n';
 import { drawDrawingFrame } from './frame';
+import { resolveDrawingFrameRenderables } from './frame-renderables';
 import { handleDrawingKeyDown } from './keyboard';
 import {
   getDrawingViewportProjection,
@@ -18,10 +21,20 @@ import {
 } from './interaction';
 import { useDrawingPointerRuntime } from './pointer-runtime';
 import { DrawingTextEditor, useDrawingTextEditor } from './text-editor';
+import type { PageScrollRoot } from '../platform/page-scroll';
+import { toggleContentHostClass } from '../platform/dom-host';
 
 export { getDrawingViewportProjection, toDrawingScenePoint } from './interaction';
 
 type DrawingPointerRuntime = ReturnType<typeof useDrawingPointerRuntime>;
+type DrawingTextEditorRuntime = ReturnType<typeof useDrawingTextEditor>;
+
+const DRAWING_MODE_HOST_CLASS = 'sniptale-drawing-mode-active';
+
+function resolveDrawingCanvasCursor(active: boolean, tool: DrawingTool): string {
+  if (!active || tool === 'select') return 'default';
+  return tool === 'text' ? 'text' : 'crosshair';
+}
 
 function stopDrawingHostEvent(event: React.SyntheticEvent<Element>): void {
   event.stopPropagation();
@@ -30,6 +43,22 @@ function stopDrawingHostEvent(event: React.SyntheticEvent<Element>): void {
 function blockDrawingHostEvent(event: React.SyntheticEvent<HTMLCanvasElement>): void {
   event.preventDefault();
   event.stopPropagation();
+}
+
+function handleDrawingCanvasClick(args: {
+  controller: ContentDrawingController;
+  event: React.MouseEvent<HTMLCanvasElement>;
+  hasTextDraft: boolean;
+  root: ReturnType<ContentDrawingController['getScrollRoot']>;
+  setTextDraft: (draft: { id: null; point: DrawingPoint; value: '' }) => void;
+}): void {
+  blockDrawingHostEvent(args.event);
+  if (args.hasTextDraft || args.controller.session.getSnapshot().activeTool !== 'text') return;
+  args.setTextDraft({
+    id: null,
+    point: toDrawingScenePoint(args.event, args.root),
+    value: '',
+  });
 }
 
 const DRAWING_SURFACE_EVENT_SHIELD = {
@@ -66,6 +95,79 @@ function createDrawingPointerHandlers(pointer: DrawingPointerRuntime) {
   };
 }
 
+function DrawingCanvasLayer(props: {
+  active: boolean;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  controller: ContentDrawingController;
+  onExit?: () => void;
+  pointer: DrawingPointerRuntime;
+  root: PageScrollRoot;
+  snapshot: DrawingSessionSnapshot;
+  textEditor: DrawingTextEditorRuntime;
+}) {
+  const pointerHandlers = createDrawingPointerHandlers(props.pointer);
+  return (
+    <canvas
+      ref={props.canvasRef}
+      tabIndex={props.active ? 0 : -1}
+      aria-label={translate('content.toolbar.drawingCanvas')}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        touchAction: props.active ? 'none' : 'auto',
+        pointerEvents: props.active ? 'auto' : 'none',
+        cursor: resolveDrawingCanvasCursor(props.active, props.snapshot.activeTool),
+      }}
+      {...pointerHandlers}
+      onMouseDown={stopDrawingHostEvent}
+      onMouseUp={stopDrawingHostEvent}
+      onClick={(event) =>
+        handleDrawingCanvasClick({
+          controller: props.controller,
+          event,
+          hasTextDraft: Boolean(props.textEditor.draft),
+          root: props.root,
+          setTextDraft: props.textEditor.setDraft,
+        })
+      }
+      onAuxClick={blockDrawingHostEvent}
+      onContextMenu={blockDrawingHostEvent}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const point = toDrawingScenePoint(event, props.root);
+        const object = hitTestDrawingDocument(props.snapshot.document.objects, point);
+        if (object?.kind === 'text') {
+          props.controller.session.select(object.id);
+          props.textEditor.edit(object);
+        }
+      }}
+      onWheel={(event) => {
+        const scrollRoot = props.controller.getScrollRoot();
+        if (scrollRoot.kind === 'element') {
+          event.preventDefault();
+          scrollRoot.element.scrollBy({
+            left: event.deltaX,
+            top: event.deltaY,
+            behavior: 'instant',
+          });
+        }
+      }}
+      onKeyDown={(event) =>
+        handleDrawingKeyDown({
+          event,
+          hasDraft: Boolean(props.pointer.draftRef.current || props.textEditor.draft),
+          onCancelDraft: props.pointer.cancelDraft,
+          onEditText: props.textEditor.edit,
+          ...(props.onExit === undefined ? {} : { onExit: props.onExit }),
+          session: props.controller.session,
+          snapshot: props.snapshot,
+        })
+      }
+    />
+  );
+}
+
 export function DrawingSurface(props: {
   active: boolean;
   chromeHidden: boolean;
@@ -81,7 +183,6 @@ export function DrawingSurface(props: {
     cancel: cancelText,
     commit: commitText,
     draft: textDraft,
-    edit: editText,
     finalize: finalizeText,
     setDraft: setTextDraft,
   } = textEditor;
@@ -93,8 +194,12 @@ export function DrawingSurface(props: {
     onCancelText: cancelText,
     onText: setTextDraft,
   });
-  const pointerHandlers = createDrawingPointerHandlers(pointer);
-  const { cancelDraft, draftRef, draftRevision, finalizeDraft } = pointer;
+  const { draftRef, draftRevision, finalizeDraft } = pointer;
+
+  useEffect(() => {
+    toggleContentHostClass(DRAWING_MODE_HOST_CLASS, active);
+    return () => toggleContentHostClass(DRAWING_MODE_HOST_CLASS, false);
+  }, [active]);
 
   useDrawingFrameRedraw({
     active,
@@ -124,16 +229,12 @@ export function DrawingSurface(props: {
       });
     }
   }, [canvasRef, controller, finalizeDraft, finalizeText]);
-  useDrawingInteractionLifecycle({ active, cancelDraft, controller, finalizeInteraction });
+  useDrawingInteractionLifecycle({ active, controller, finalizeInteraction });
 
-  const blurDraft =
-    draftRef.current?.kind === 'create' && draftRef.current.object.kind === 'blur'
-      ? draftRef.current.object
-      : null;
-  const blurObjects = [
-    ...snapshot.document.objects.filter((object) => object.kind === 'blur'),
-    ...(blurDraft ? [blurDraft] : []),
-  ];
+  const blurObjects = resolveDrawingFrameRenderables(
+    snapshot.document.objects,
+    draftRef.current
+  ).flatMap(({ object }) => (object.kind === 'blur' ? [object] : []));
   const projection = getDrawingViewportProjection(root);
   void viewportRevision;
   return (
@@ -144,54 +245,15 @@ export function DrawingSurface(props: {
       {...DRAWING_SURFACE_EVENT_SHIELD}
     >
       <DrawingBlurLayer objects={blurObjects} projection={projection} root={root} />
-      <canvas
-        ref={canvasRef}
-        tabIndex={active ? 0 : -1}
-        aria-label={translate('content.toolbar.drawingCanvas')}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          touchAction: active ? 'none' : 'auto',
-          pointerEvents: active ? 'auto' : 'none',
-        }}
-        {...pointerHandlers}
-        onMouseDown={stopDrawingHostEvent}
-        onMouseUp={stopDrawingHostEvent}
-        onClick={blockDrawingHostEvent}
-        onAuxClick={blockDrawingHostEvent}
-        onContextMenu={blockDrawingHostEvent}
-        onDoubleClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const point = toDrawingScenePoint(event, root);
-          const object = hitTestDrawingDocument(snapshot.document.objects, point);
-          if (object?.kind === 'text') {
-            controller.session.select(object.id);
-            editText(object);
-          }
-        }}
-        onWheel={(event) => {
-          const scrollRoot = controller.getScrollRoot();
-          if (scrollRoot.kind === 'element') {
-            event.preventDefault();
-            scrollRoot.element.scrollBy({
-              left: event.deltaX,
-              top: event.deltaY,
-              behavior: 'instant',
-            });
-          }
-        }}
-        onKeyDown={(event) =>
-          handleDrawingKeyDown({
-            event,
-            hasDraft: Boolean(draftRef.current || textDraft),
-            onCancelDraft: cancelDraft,
-            onEditText: editText,
-            ...(props.onExit === undefined ? {} : { onExit: props.onExit }),
-            session: controller.session,
-            snapshot,
-          })
-        }
+      <DrawingCanvasLayer
+        active={active}
+        canvasRef={canvasRef}
+        controller={controller}
+        pointer={pointer}
+        root={root}
+        snapshot={snapshot}
+        textEditor={textEditor}
+        {...(props.onExit === undefined ? {} : { onExit: props.onExit })}
       />
       {active && textDraft ? (
         <DrawingTextEditor
@@ -215,18 +277,17 @@ export function DrawingSurface(props: {
 
 function useDrawingInteractionLifecycle(args: {
   active: boolean;
-  cancelDraft: () => void;
   controller: ContentDrawingController;
   finalizeInteraction: () => void;
 }) {
-  const { active, cancelDraft, controller, finalizeInteraction } = args;
+  const { active, controller, finalizeInteraction } = args;
   useEffect(() => {
     controller.registerInteractionFinalizer(finalizeInteraction);
     return () => controller.registerInteractionFinalizer(null);
   }, [controller, finalizeInteraction]);
   useEffect(() => {
-    if (!active) cancelDraft();
-  }, [active, cancelDraft]);
+    if (!active) finalizeInteraction();
+  }, [active, finalizeInteraction]);
 }
 
 function useDrawingFrameRedraw(args: {

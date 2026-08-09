@@ -1,12 +1,4 @@
-export type DrawingTool =
-  | 'select'
-  | 'pencil'
-  | 'marker'
-  | 'rectangle'
-  | 'ellipse'
-  | 'arrow'
-  | 'blur'
-  | 'text';
+export type DrawingTool = 'select' | 'pencil' | 'marker' | 'shape' | 'arrow' | 'blur' | 'text';
 
 export interface DrawingPoint {
   readonly x: number;
@@ -55,11 +47,33 @@ export interface DrawingEllipseObject extends DrawingObjectBase {
   readonly width: number;
 }
 
+export interface DrawingTriangleObject extends DrawingObjectBase {
+  readonly kind: 'triangle';
+  readonly bounds: DrawingBounds;
+  readonly color: string;
+  readonly width: number;
+}
+
+export interface DrawingParallelogramObject extends DrawingObjectBase {
+  readonly kind: 'parallelogram';
+  readonly bounds: DrawingBounds;
+  readonly color: string;
+  readonly width: number;
+}
+
+export type DrawingShapeObject =
+  | DrawingRectangleObject
+  | DrawingEllipseObject
+  | DrawingTriangleObject
+  | DrawingParallelogramObject;
+
 export interface DrawingArrowObject extends DrawingObjectBase {
   readonly kind: 'arrow';
   readonly start: DrawingPoint;
   readonly end: DrawingPoint;
   readonly color: string;
+  readonly dynamicWidth: boolean;
+  readonly width: number;
 }
 
 export interface DrawingBlurObject extends DrawingObjectBase {
@@ -79,8 +93,7 @@ export interface DrawingTextObject extends DrawingObjectBase {
 export type DrawingObject =
   | DrawingPencilObject
   | DrawingMarkerObject
-  | DrawingRectangleObject
-  | DrawingEllipseObject
+  | DrawingShapeObject
   | DrawingArrowObject
   | DrawingBlurObject
   | DrawingTextObject;
@@ -97,9 +110,16 @@ export interface DrawingToolDefaults {
     readonly opacity: number;
     readonly width: number;
   };
-  readonly rectangle: { readonly color: string; readonly width: number };
-  readonly ellipse: { readonly color: string; readonly width: number };
-  readonly arrow: { readonly color: string };
+  readonly shape: {
+    readonly color: string;
+    readonly kind: DrawingShapeKind;
+    readonly width: number;
+  };
+  readonly arrow: {
+    readonly color: string;
+    readonly dynamicWidth: boolean;
+    readonly width: number;
+  };
   readonly text: {
     readonly color: string;
     readonly backgroundColor: string | null;
@@ -107,9 +127,12 @@ export interface DrawingToolDefaults {
   };
 }
 
+export type DrawingShapeKind = 'rectangle' | 'ellipse' | 'triangle' | 'parallelogram';
+
 export const DRAWING_PENCIL_WIDTHS = [2, 4, 8, 16] as const;
 export const DRAWING_MARKER_WIDTHS = [16, 28, 44] as const;
 export const DRAWING_OUTLINE_WIDTHS = [2, 4, 8] as const;
+export const DRAWING_ARROW_WIDTHS = [8, 12, 18, 24] as const;
 export const DRAWING_MARKER_OPACITIES = [0.3, 0.6, 1] as const;
 export const DRAWING_TEXT_SIZES = [16, 24, 36] as const;
 
@@ -135,9 +158,8 @@ export function createDefaultDrawingToolDefaults(
   return {
     pencil: { color: red, width: 4 },
     marker: { color: yellow, opacity: 0.3, width: 28 },
-    rectangle: { color: red, width: 4 },
-    ellipse: { color: red, width: 4 },
-    arrow: { color: red },
+    shape: { color: red, kind: 'rectangle', width: 4 },
+    arrow: { color: red, dynamicWidth: true, width: 18 },
     text: { color: dark, backgroundColor: null, fontSize: 24 },
   };
 }

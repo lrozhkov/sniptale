@@ -57,7 +57,7 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         scenario={props.scenario}
         toolbar={props.toolbar}
       />
-      {props.toolbar.modes.screenshotMode ? (
+      {props.toolbar.modes.screenshotMode && props.toolbar.modes.drawingMode !== true ? (
         <DesignReviewSurface controller={designReview} showChrome={!isCaptureUiHidden} />
       ) : null}
       <ContentScenarioRecorderSidebarSlot

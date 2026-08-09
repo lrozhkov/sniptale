@@ -1,6 +1,8 @@
 import {
   buildDrawingStrokeOutline,
+  buildDrawingArrowOutline,
   getDrawingObjectBounds,
+  getDrawingShapePoints,
   type DrawingObject,
   type DrawingPoint,
 } from '../../features/drawing/public';
@@ -68,30 +70,59 @@ function drawText(
   lines.forEach((line, index) => context.fillText(line, x + 6, y + 6 + index * lineHeight));
 }
 
+function strokePolygon(
+  context: CanvasRenderingContext2D,
+  object: Extract<DrawingObject, { kind: 'rectangle' | 'triangle' | 'parallelogram' }>,
+  projection: DrawingViewportProjection
+) {
+  const points = getDrawingShapePoints(object);
+  const first = points[0];
+  if (!first) return;
+  const start = viewportPoint(first, projection);
+  context.beginPath();
+  context.moveTo(start.x, start.y);
+  points.slice(1).forEach((point) => {
+    const next = viewportPoint(point, projection);
+    context.lineTo(next.x, next.y);
+  });
+  context.closePath();
+  context.stroke();
+}
+
+function drawFreehand(
+  context: CanvasRenderingContext2D,
+  object: Extract<DrawingObject, { kind: 'pencil' | 'marker' }>,
+  projection: DrawingViewportProjection,
+  preview: boolean
+) {
+  const outline = buildDrawingStrokeOutline(object.samples, object.width, {
+    dynamicWidth: object.kind === 'pencil',
+    smoothingLevel: preview ? 4 : 10,
+    ...(preview ? { preview: true } : {}),
+  });
+  context.fillStyle = object.color;
+  context.globalAlpha = object.kind === 'marker' ? object.opacity : 1;
+  fillPolygon(context, outline, projection);
+}
+
 export function renderDrawingObject(
   context: CanvasRenderingContext2D,
   object: DrawingObject,
-  projection: DrawingViewportProjection
+  projection: DrawingViewportProjection,
+  options: { readonly preview?: boolean } = {}
 ): void {
   context.save();
   if (object.kind === 'pencil' || object.kind === 'marker') {
-    const outline = buildDrawingStrokeOutline(object.samples, object.width, {
-      dynamicWidth: object.kind === 'pencil',
-      smoothingLevel: 10,
-    });
-    context.fillStyle = object.color;
-    context.globalAlpha = object.kind === 'marker' ? object.opacity : 1;
-    fillPolygon(context, outline, projection);
-  } else if (object.kind === 'rectangle') {
-    const bounds = getDrawingObjectBounds(object);
+    drawFreehand(context, object, projection, options.preview === true);
+  } else if (
+    object.kind === 'rectangle' ||
+    object.kind === 'triangle' ||
+    object.kind === 'parallelogram'
+  ) {
     context.strokeStyle = object.color;
     context.lineWidth = object.width;
-    context.strokeRect(
-      bounds.x - projection.x,
-      bounds.y - projection.y,
-      bounds.width,
-      bounds.height
-    );
+    context.lineJoin = 'round';
+    strokePolygon(context, object, projection);
   } else if (object.kind === 'ellipse') {
     const bounds = getDrawingObjectBounds(object);
     context.strokeStyle = object.color;
@@ -108,30 +139,8 @@ export function renderDrawingObject(
     );
     context.stroke();
   } else if (object.kind === 'arrow') {
-    const start = viewportPoint(object.start, projection);
-    const end = viewportPoint(object.end, projection);
-    const angle = Math.atan2(end.y - start.y, end.x - start.x);
-    const head = Math.min(22, Math.max(12, Math.hypot(end.x - start.x, end.y - start.y) * 0.28));
-    context.strokeStyle = object.color;
     context.fillStyle = object.color;
-    context.lineWidth = 8;
-    context.lineCap = 'round';
-    context.beginPath();
-    context.moveTo(start.x, start.y);
-    context.lineTo(end.x - Math.cos(angle) * head * 0.6, end.y - Math.sin(angle) * head * 0.6);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(end.x, end.y);
-    context.lineTo(
-      end.x - Math.cos(angle - Math.PI / 6) * head,
-      end.y - Math.sin(angle - Math.PI / 6) * head
-    );
-    context.lineTo(
-      end.x - Math.cos(angle + Math.PI / 6) * head,
-      end.y - Math.sin(angle + Math.PI / 6) * head
-    );
-    context.closePath();
-    context.fill();
+    fillPolygon(context, buildDrawingArrowOutline(object), projection);
   } else if (object.kind === 'text') {
     drawText(context, object, projection);
   }
@@ -149,9 +158,11 @@ export function renderDrawingSelection(
   context.save();
   context.strokeStyle = '#2563eb';
   context.lineWidth = 1;
-  context.setLineDash([4, 3]);
-  context.strokeRect(x, y, bounds.width, bounds.height);
-  context.setLineDash([]);
+  if (object.kind !== 'arrow') {
+    context.setLineDash([4, 3]);
+    context.strokeRect(x, y, bounds.width, bounds.height);
+    context.setLineDash([]);
+  }
   const handles =
     object.kind === 'arrow'
       ? [viewportPoint(object.start, projection), viewportPoint(object.end, projection)]

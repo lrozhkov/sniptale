@@ -1,5 +1,6 @@
 import { buildDrawingStrokeOutline } from './freehand';
-import type { DrawingBounds, DrawingObject, DrawingPoint } from './model';
+import { buildDrawingArrowOutline } from './arrow';
+import type { DrawingBounds, DrawingObject, DrawingPoint, DrawingShapeObject } from './model';
 
 export type DrawingResizeHandle =
   | 'nw'
@@ -31,10 +32,12 @@ export function createDrawingBounds(start: DrawingPoint, end: DrawingPoint): Dra
 
 export function getDrawingObjectBounds(object: DrawingObject): DrawingBounds {
   if ('bounds' in object) return normalizeBounds(object.bounds);
-  if (object.kind === 'arrow') return createDrawingBounds(object.start, object.end);
-  const outline = buildDrawingStrokeOutline(object.samples, object.width, {
-    dynamicWidth: object.kind === 'pencil',
-  });
+  const outline =
+    object.kind === 'arrow'
+      ? buildDrawingArrowOutline(object)
+      : buildDrawingStrokeOutline(object.samples, object.width, {
+          dynamicWidth: object.kind === 'pencil',
+        });
   if (outline.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
   const xs = outline.map((point) => point.x);
   const ys = outline.map((point) => point.y);
@@ -48,6 +51,54 @@ const containsBounds = (bounds: DrawingBounds, point: DrawingPoint, tolerance: n
   point.x <= bounds.x + bounds.width + tolerance &&
   point.y >= bounds.y - tolerance &&
   point.y <= bounds.y + bounds.height + tolerance;
+
+export function getDrawingShapePoints(object: Exclude<DrawingShapeObject, { kind: 'ellipse' }>) {
+  const { x, y, width, height } = getDrawingObjectBounds(object);
+  switch (object.kind) {
+    case 'triangle':
+      return [
+        { x: x + width / 2, y },
+        { x: x + width, y: y + height },
+        { x, y: y + height },
+      ];
+    case 'parallelogram': {
+      const offset = width * 0.22;
+      return [
+        { x: x + offset, y },
+        { x: x + width, y },
+        { x: x + width - offset, y: y + height },
+        { x, y: y + height },
+      ];
+    }
+    case 'rectangle':
+      return [
+        { x, y },
+        { x: x + width, y },
+        { x: x + width, y: y + height },
+        { x, y: y + height },
+      ];
+  }
+}
+
+function pointInPolygon(point: DrawingPoint, vertices: readonly DrawingPoint[]): boolean {
+  let inside = false;
+  for (
+    let current = 0, previous = vertices.length - 1;
+    current < vertices.length;
+    previous = current, current += 1
+  ) {
+    const currentPoint = vertices[current]!;
+    const previousPoint = vertices[previous]!;
+    const crosses =
+      currentPoint.y > point.y !== previousPoint.y > point.y &&
+      point.x <
+        ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) /
+          (previousPoint.y - currentPoint.y) +
+          currentPoint.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
 
 function distanceToSegment(point: DrawingPoint, start: DrawingPoint, end: DrawingPoint) {
   const lengthSquared = (end.x - start.x) ** 2 + (end.y - start.y) ** 2;
@@ -73,13 +124,24 @@ export function hitTestDrawingObject(
 ): boolean {
   const bounds = getDrawingObjectBounds(object);
   if (!containsBounds(bounds, point, tolerance)) return false;
-  if (object.kind === 'arrow')
-    return distanceToSegment(point, object.start, object.end) <= tolerance + 8;
+  if (object.kind === 'arrow') {
+    return (
+      pointInPolygon(point, buildDrawingArrowOutline(object)) ||
+      distanceToSegment(point, object.start, object.end) <= tolerance
+    );
+  }
   if (object.kind === 'ellipse') {
     if (bounds.width === 0 || bounds.height === 0) return false;
     const dx = (point.x - (bounds.x + bounds.width / 2)) / (bounds.width / 2);
     const dy = (point.y - (bounds.y + bounds.height / 2)) / (bounds.height / 2);
     return dx * dx + dy * dy <= 1.25;
+  }
+  if (
+    object.kind === 'rectangle' ||
+    object.kind === 'triangle' ||
+    object.kind === 'parallelogram'
+  ) {
+    return pointInPolygon(point, getDrawingShapePoints(object));
   }
   return true;
 }
@@ -112,8 +174,18 @@ export function replaceDrawingObjectBounds(
   object: DrawingObject,
   nextBounds: DrawingBounds
 ): DrawingObject {
-  const previous = getDrawingObjectBounds(object);
   const target = normalizeBounds(nextBounds);
+  if (object.kind === 'arrow') {
+    const previous = createDrawingBounds(object.start, object.end);
+    const scaleX = previous.width === 0 ? 1 : target.width / previous.width;
+    const scaleY = previous.height === 0 ? 1 : target.height / previous.height;
+    const projectEndpoint = (point: DrawingPoint) => ({
+      x: target.x + (point.x - previous.x) * scaleX,
+      y: target.y + (point.y - previous.y) * scaleY,
+    });
+    return { ...object, start: projectEndpoint(object.start), end: projectEndpoint(object.end) };
+  }
+  const previous = getDrawingObjectBounds(object);
   const scaleX = previous.width === 0 ? 1 : target.width / previous.width;
   const scaleY = previous.height === 0 ? 1 : target.height / previous.height;
   const project = (point: DrawingPoint) => ({
@@ -126,8 +198,6 @@ export function replaceDrawingObjectBounds(
       samples: object.samples.map((sample) => ({ ...project(sample), t: sample.t })),
     };
   }
-  if (object.kind === 'arrow')
-    return { ...object, start: project(object.start), end: project(object.end) };
   if (object.kind === 'text') {
     const scale = Math.max(0.25, Math.min(scaleX, scaleY));
     return {

@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { translateDrawingObject, type DrawingPoint } from '../../features/drawing/public';
+import {
+  appendDrawingSamples,
+  translateDrawingObject,
+  type DrawingPoint,
+} from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import {
   beginDrawingPointer,
@@ -72,15 +76,29 @@ export function useDrawingPointerRuntime(args: {
             ? event.nativeEvent.getCoalescedEvents()
             : [event.nativeEvent];
         let object = draft.object;
-        samples.forEach((sample) => {
-          object = updateCreatedDrawingObject({
-            object,
-            start: draft.start,
-            point: toDrawingScenePoint(sample, root),
-            timestamp: sample.timeStamp,
-            square: event.shiftKey,
+        if (object.kind === 'pencil' || object.kind === 'marker') {
+          object = {
+            ...object,
+            samples: appendDrawingSamples(
+              object.samples,
+              samples.map((sample) => ({
+                ...toDrawingScenePoint(sample, root),
+                t: sample.timeStamp,
+              })),
+              object.kind === 'pencil'
+            ),
+          };
+        } else {
+          samples.forEach((sample) => {
+            object = updateCreatedDrawingObject({
+              object,
+              start: draft.start,
+              point: toDrawingScenePoint(sample, root),
+              timestamp: sample.timeStamp,
+              square: event.shiftKey,
+            });
           });
-        });
+        }
         draftRef.current = { ...draft, object };
       } else if (draft.kind === 'move') {
         draftRef.current = {

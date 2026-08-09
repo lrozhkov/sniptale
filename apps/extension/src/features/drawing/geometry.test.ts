@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   createDrawingBounds,
   getDrawingObjectBounds,
+  getDrawingShapePoints,
   hitTestDrawingDocument,
   hitTestDrawingObject,
   replaceDrawingObjectBounds,
@@ -33,6 +34,8 @@ it('handles every geometry family and rejects misses', () => {
     start: { x: 5, y: 5 },
     end: { x: 25, y: 5 },
     color: '#000000',
+    dynamicWidth: true,
+    width: 18,
   };
   const ellipse = {
     id: 'ellipse',
@@ -41,7 +44,7 @@ it('handles every geometry family and rejects misses', () => {
     color: '#000000',
     width: 2,
   };
-  expect(getDrawingObjectBounds(arrow)).toEqual({ x: 5, y: 5, width: 20, height: 0 });
+  expect(getDrawingObjectBounds(arrow)).toEqual({ x: 5, y: -13, width: 20, height: 36 });
   expect(hitTestDrawingObject(arrow, { x: 15, y: 6 })).toBe(true);
   expect(hitTestDrawingObject({ ...arrow, end: arrow.start }, { x: 5, y: 5 })).toBe(true);
   expect(hitTestDrawingObject(ellipse, { x: 10, y: 5 })).toBe(true);
@@ -62,6 +65,32 @@ it('handles every geometry family and rejects misses', () => {
   ).toEqual({ x: 0, y: 0, width: 0, height: 0 });
 });
 
+it('builds and hit-tests triangle and parallelogram geometry inside their bounds', () => {
+  const triangle = {
+    id: 'triangle',
+    kind: 'triangle' as const,
+    bounds: { x: 0, y: 0, width: 100, height: 80 },
+    color: '#000000',
+    width: 4,
+  };
+  const parallelogram = { ...triangle, id: 'parallelogram', kind: 'parallelogram' as const };
+  expect(getDrawingShapePoints(triangle)).toEqual([
+    { x: 50, y: 0 },
+    { x: 100, y: 80 },
+    { x: 0, y: 80 },
+  ]);
+  expect(getDrawingShapePoints(parallelogram)).toEqual([
+    { x: 22, y: 0 },
+    { x: 100, y: 0 },
+    { x: 78, y: 80 },
+    { x: 0, y: 80 },
+  ]);
+  expect(hitTestDrawingObject(triangle, { x: 50, y: 40 })).toBe(true);
+  expect(hitTestDrawingObject(triangle, { x: 5, y: 5 })).toBe(false);
+  expect(hitTestDrawingObject(parallelogram, { x: 50, y: 40 })).toBe(true);
+  expect(hitTestDrawingObject(parallelogram, { x: 2, y: 2 })).toBe(false);
+});
+
 it('translates and resizes arrows, text, and bounded objects', () => {
   const arrow = {
     id: 'arrow',
@@ -69,6 +98,8 @@ it('translates and resizes arrows, text, and bounded objects', () => {
     start: { x: 0, y: 0 },
     end: { x: 10, y: 10 },
     color: '#000000',
+    dynamicWidth: true,
+    width: 18,
   };
   expect(translateDrawingObject(arrow, { x: 2, y: 3 })).toMatchObject({ start: { x: 2, y: 3 } });
   expect(replaceDrawingObjectBounds(arrow, { x: 10, y: 10, width: 20, height: 20 })).toMatchObject({

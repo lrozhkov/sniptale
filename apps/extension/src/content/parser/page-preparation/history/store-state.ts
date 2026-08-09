@@ -22,6 +22,7 @@ type OpenTransaction = {
 };
 
 export type HistoryListener = () => void;
+export type HistoryClearListener = () => void;
 
 export type HistoryStoreRuntimeState = {
   bridge: PagePreparationHistoryBridge | null;
@@ -29,6 +30,7 @@ export type HistoryStoreRuntimeState = {
   deferredCommits: Map<number, DeferredCommit>;
   future: PagePreparationHistoryEntry[];
   isApplying: boolean;
+  clearListeners: Set<HistoryClearListener>;
   listeners: Set<HistoryListener>;
   past: PagePreparationHistoryEntry[];
   revision: number;
@@ -42,6 +44,7 @@ export function createHistoryStoreState(): HistoryStoreRuntimeState {
     deferredCommits: new Map<number, DeferredCommit>(),
     future: [],
     isApplying: false,
+    clearListeners: new Set<HistoryClearListener>(),
     listeners: new Set<HistoryListener>(),
     past: [],
     revision: 0,
@@ -161,6 +164,21 @@ function notifyListeners(state: HistoryStoreRuntimeState): void {
       listener();
     } catch (error) {
       logger.error('Page-preparation history listener failed', error);
+    }
+  });
+}
+
+export function notifyHistoryCleared(state: HistoryStoreRuntimeState): void {
+  try {
+    state.bridge?.onHistoryCleared?.();
+  } catch (error) {
+    logger.error('Page-preparation history bridge clear listener failed', error);
+  }
+  state.clearListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (error) {
+      logger.error('Page-preparation history clear listener failed', error);
     }
   });
 }
