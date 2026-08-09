@@ -8,6 +8,7 @@ import { useToolbarRefsAndPosition } from './refs-and-position';
 type ToolbarDerivedStateParams = {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   quickEditMode: boolean;
@@ -31,6 +32,7 @@ export function useToolbarDerivedState(params: ToolbarDerivedStateParams) {
 
   const navigation = useToolbarNavigationLock({
     designReviewMode: params.designReviewMode,
+    drawingMode: params.drawingMode,
     highlighterMode: params.highlighterMode,
     isCursorMode: params.isCursorMode,
     quickEditMode: params.quickEditMode,

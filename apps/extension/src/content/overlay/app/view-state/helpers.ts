@@ -34,6 +34,7 @@ export function buildContentModeFlags(modeState: ContentAppModeStateValue): Cont
   return {
     aiPickMode: modeState.aiPickMode,
     designReviewMode: modeState.designReviewMode,
+    ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
     highlighterMode: modeState.highlighterMode,
     quickEditDocumentMode: modeState.quickEditDocumentMode,
     quickEditMode: modeState.quickEditMode,
@@ -47,6 +48,7 @@ export function buildContentModeControls(
   return {
     setAiPickMode: modeState.setAiPickMode,
     setDesignReviewMode: modeState.setDesignReviewMode,
+    ...(modeState.setDrawingMode === undefined ? {} : { setDrawingMode: modeState.setDrawingMode }),
     setHighlighterMode: modeState.setHighlighterMode,
     setQuickEditDocumentMode: modeState.setQuickEditDocumentMode,
     setIsToolbarVisible: modeState.setIsToolbarVisible,

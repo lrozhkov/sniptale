@@ -134,7 +134,7 @@ function createCursorModeHandler({
 
     if (quickEditMode) {
       if (!resetQuickEditDocumentMode(setQuickEditDocumentMode)) {
-        return;
+        return false;
       }
       disableQuickEditMode();
       setQuickEditMode(false);
@@ -151,6 +151,7 @@ function createCursorModeHandler({
     }
 
     setNavigationLockEnabled(false);
+    return true;
   };
 }
 

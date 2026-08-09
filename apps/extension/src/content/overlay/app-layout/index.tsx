@@ -5,6 +5,7 @@ import { LazyContentScenarioRecorderSidebar } from './sidebar-lazy';
 import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility';
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutProps } from './types';
+import { DrawingSurface } from '../../drawing/surface';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
@@ -41,6 +42,16 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
 
   return (
     <>
+      {props.toolbar.modes.screenshotMode && props.toolbar.drawingController ? (
+        <DrawingSurface
+          active={props.toolbar.modes.drawingMode === true}
+          chromeHidden={isCaptureUiHidden}
+          controller={props.toolbar.drawingController}
+          {...(props.toolbar.modeController.handleToggleDrawingMode === undefined
+            ? {}
+            : { onExit: () => props.toolbar.modeController.handleToggleDrawingMode?.(false) })}
+        />
+      ) : null}
       <ContentToolbarShell
         designReview={designReview}
         scenario={props.scenario}

@@ -1,15 +1,17 @@
 import { translate } from '../../../../../platform/i18n';
-import type { EditorPaletteKey } from './types';
+import type { PaletteSettingsKey } from './types';
 
-export const EDITOR_PALETTE_KEYS: readonly EditorPaletteKey[] = [
+export const EDITOR_PALETTE_KEYS: readonly PaletteSettingsKey[] = [
+  'drawing',
   'shapeStroke',
   'shapeFill',
   'textColor',
   'textBackground',
   'sceneBackground',
 ];
-export function getEditorPaletteLabel(key: EditorPaletteKey): string {
+export function getEditorPaletteLabel(key: PaletteSettingsKey): string {
   const suffix = {
+    drawing: 'Drawing',
     shapeStroke: 'ShapeStroke',
     shapeFill: 'ShapeFill',
     textColor: 'TextColor',

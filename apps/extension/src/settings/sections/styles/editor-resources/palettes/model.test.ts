@@ -1,23 +1,25 @@
 import { expect, it } from 'vitest';
 import { reorderPaletteBefore } from './model';
 
-it('reorders one palette without mutating the source', () => {
+it('reorders editor palette families and rejects missing source colors', () => {
   const palette = {
-    shapeStroke: ['#1', '#2'],
+    shapeStroke: ['a', 'b', 'c'],
     shapeFill: [],
     textColor: [],
     textBackground: [],
     sceneBackground: [],
   };
   expect(
-    reorderPaletteBefore({ itemIndex: 0, beforeIndex: null, palette, key: 'shapeStroke' })
+    reorderPaletteBefore({ itemIndex: 0, beforeIndex: 2, key: 'shapeStroke', palette })?.shapeStroke
+  ).toEqual(['b', 'a', 'c']);
+  expect(
+    reorderPaletteBefore({ itemIndex: 2, beforeIndex: 0, key: 'shapeStroke', palette })?.shapeStroke
+  ).toEqual(['c', 'a', 'b']);
+  expect(
+    reorderPaletteBefore({ itemIndex: 0, beforeIndex: null, key: 'shapeStroke', palette })
       ?.shapeStroke
-  ).toEqual(['#2', '#1']);
-  expect(palette.shapeStroke).toEqual(['#1', '#2']);
+  ).toEqual(['b', 'c', 'a']);
   expect(
-    reorderPaletteBefore({ itemIndex: 9, beforeIndex: null, palette, key: 'shapeStroke' })
+    reorderPaletteBefore({ itemIndex: 9, beforeIndex: null, key: 'shapeStroke', palette })
   ).toBeNull();
-  expect(
-    reorderPaletteBefore({ itemIndex: 0, beforeIndex: 1, palette, key: 'shapeStroke' })?.shapeStroke
-  ).toEqual(['#1', '#2']);
 });

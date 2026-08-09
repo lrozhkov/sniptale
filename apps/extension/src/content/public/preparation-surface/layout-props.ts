@@ -11,12 +11,14 @@ import type { useScreenshotController } from '../../../content/overlay/screensho
 import type { useToolbarModeController } from '../../../content/overlay/toolbar/mode-controller';
 import type { useFrameManager } from '../../../content/selection/frame-runtime/react/useFrameManager';
 import type { PreparationHostPorts } from './types';
+import type { ContentDrawingController } from '../../../content/drawing/controller';
 
 type FrameManager = ReturnType<typeof useFrameManager>;
 
 export type PreparationSurfaceControllers = {
   aiController: ReturnType<typeof useAiPickController>;
   autoBlurController: ReturnType<typeof useAutoBlurController>;
+  drawingController: ContentDrawingController;
   modeController: ReturnType<typeof useToolbarModeController>;
   scenarioController: ReturnType<typeof useScenarioController>;
   screenshotController: ReturnType<typeof useScreenshotController>;
@@ -90,6 +92,7 @@ function projectPreparationToolbar(
     autoBlurController: controllers.autoBlurController,
     captureAction: modeState.captureAction,
     currentViewport: modeState.currentViewport,
+    drawingController: controllers.drawingController,
     frameCount: frameManager.frames.length,
     futureFrameStyle: frameManager.getFutureFrameStyle(),
     handleTakeScreenshot: controllers.screenshotController.handleTakeScreenshot,
@@ -98,12 +101,14 @@ function projectPreparationToolbar(
       !modeState.highlighterMode &&
       !modeState.quickEditMode &&
       !modeState.aiPickMode &&
-      !modeState.designReviewMode,
+      !modeState.designReviewMode &&
+      !modeState.drawingMode,
     isToolbarVisible: modeState.isToolbarVisible,
     modeController: controllers.modeController,
     modes: {
       aiPickMode: modeState.aiPickMode,
       designReviewMode: modeState.designReviewMode,
+      ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
       highlighterMode: modeState.highlighterMode,
       quickEditDocumentMode: modeState.quickEditDocumentMode,
       quickEditMode: modeState.quickEditMode,

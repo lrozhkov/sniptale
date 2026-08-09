@@ -2,8 +2,8 @@ import { defineMessageSource } from '../source';
 
 export const settingsEditorMessages = defineMessageSource({
   subtitle: {
-    ru: 'Пресеты инструментов и палитра редактора изображений.',
-    en: 'Tool presets and palette settings for the image editor.',
+    ru: 'Пресеты инструментов и палитры редактора изображений и рисования на странице.',
+    en: 'Tool presets and palettes for the image editor and page drawing.',
   },
   toolPresetsTitle: {
     ru: 'Настройки инструментов',
@@ -68,5 +68,13 @@ export const settingsEditorMessages = defineMessageSource({
   paletteSceneBackground: {
     ru: 'Фон сцены',
     en: 'Scene background',
+  },
+  paletteDrawing: {
+    ru: 'Рисование',
+    en: 'Drawing',
+  },
+  paletteSaveError: {
+    ru: 'Не удалось сохранить палитру рисования',
+    en: 'Could not save the drawing palette',
   },
 });

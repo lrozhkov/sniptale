@@ -1,4 +1,10 @@
-type ContentMode = 'highlighter' | 'quick-edit' | 'ai-pick' | 'selection-mode' | 'design-review';
+type ContentMode =
+  | 'highlighter'
+  | 'quick-edit'
+  | 'ai-pick'
+  | 'selection-mode'
+  | 'design-review'
+  | 'drawing';
 
 type DisableHandler = () => void;
 
@@ -8,6 +14,7 @@ const modeState: Record<ContentMode, boolean> = {
   'ai-pick': false,
   'selection-mode': false,
   'design-review': false,
+  drawing: false,
 };
 
 const disableHandlers: Partial<Record<ContentMode, DisableHandler>> = {};

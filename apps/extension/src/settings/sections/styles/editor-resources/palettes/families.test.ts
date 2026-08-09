@@ -5,6 +5,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
 it('exposes every palette family with canonical labels', () => {
-  expect(EDITOR_PALETTE_KEYS).toHaveLength(5);
+  expect(EDITOR_PALETTE_KEYS).toHaveLength(6);
+  expect(getEditorPaletteLabel('drawing')).toBe('settings.editor.paletteDrawing');
   expect(getEditorPaletteLabel('shapeStroke')).toBe('settings.editor.paletteShapeStroke');
 });

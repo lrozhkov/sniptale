@@ -18,9 +18,11 @@ let root: Root | null = null;
 function ModeButtonsHarness(params: {
   aiPickMode?: boolean;
   designReviewMode?: boolean;
+  drawingMode?: boolean;
   onDisableAiPickMode?: () => void;
   onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
   onToggleDesignReview?: () => void;
+  onToggleDrawing?: () => void;
   onToggleQuickEdit?: () => void;
   pendingMode?: 'quick-edit' | 'highlighter' | null;
   quickEditDocumentMode?: boolean;
@@ -31,6 +33,7 @@ function ModeButtonsHarness(params: {
     isCursorMode: true,
     aiPickMode: params.aiPickMode ?? false,
     designReviewMode: params.designReviewMode ?? false,
+    drawingMode: params.drawingMode ?? false,
     compactMenus: true,
     displayMode: 'vertical',
     sidebarVisible: true,
@@ -43,6 +46,7 @@ function ModeButtonsHarness(params: {
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
+    onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
     onToggleQuickEdit: params.onToggleQuickEdit ?? vi.fn(),
     onToggleHighlighter: vi.fn(),
   };
@@ -54,9 +58,11 @@ function renderModeButtons(
   params: {
     aiPickMode?: boolean;
     designReviewMode?: boolean;
+    drawingMode?: boolean;
     onDisableAiPickMode?: () => void;
     onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
     onToggleDesignReview?: () => void;
+    onToggleDrawing?: () => void;
     onToggleQuickEdit?: () => void;
     pendingMode?: 'quick-edit' | 'highlighter' | null;
     quickEditDocumentMode?: boolean;
@@ -86,6 +92,18 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', 1240);
   vi.stubGlobal('innerHeight', 900);
+});
+
+it('activates Drawing through its distinct Working Mode option', () => {
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ onToggleDrawing });
+  act(() => queryModeSelectorButton()?.click());
+  act(() => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.mode-option.drawing"]')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  });
+  expect(onToggleDrawing).toHaveBeenCalledTimes(1);
 });
 
 afterEach(() => {
@@ -148,7 +166,7 @@ it('selects a mode option from the menu mousedown action', () => {
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
 });
 
-it('orders Working Mode options as Cursor, Annotations, Content Editing, and Design Review', () => {
+it('orders Working Mode options as Cursor, Drawing, Annotations, Content Editing, and Design Review', () => {
   renderModeButtons();
 
   expect(
@@ -165,6 +183,7 @@ it('orders Working Mode options as Cursor, Annotations, Content Editing, and Des
   ).map((option) => option.dataset['ui']);
   expect(modes).toEqual([
     'content.toolbar.mode-option.cursor',
+    'content.toolbar.mode-option.drawing',
     'content.toolbar.mode-option.highlighter',
     'content.toolbar.mode-option.quick-edit',
     'content.toolbar.mode-option.design-review',

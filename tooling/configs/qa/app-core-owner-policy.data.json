@@ -62,6 +62,11 @@
       "ownerClass": "feature"
     },
     {
+      "sourcePrefix": "apps/extension/src/features/drawing",
+      "ownerId": "feature.drawing",
+      "ownerClass": "feature"
+    },
+    {
       "sourcePrefix": "apps/extension/src/features/editor",
       "ownerId": "feature.editor",
       "ownerClass": "feature"
@@ -274,6 +279,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/diagnostics",
       "ownerId": "persistence.diagnostics",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/drawing-palette",
+      "ownerId": "persistence.drawing-palette",
       "ownerClass": "persistence"
     },
     {
@@ -655,6 +665,7 @@
   ],
   "featurePublicEntrypoints": [
     "apps/extension/src/features/ai/schemas/public.ts",
+    "apps/extension/src/features/drawing/public.ts",
     "apps/extension/src/features/editor/document/public.ts",
     "apps/extension/src/features/highlighter/contracts/index.ts",
     "apps/extension/src/features/highlighter/style/public.ts",

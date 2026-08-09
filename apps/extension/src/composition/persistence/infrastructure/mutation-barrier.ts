@@ -120,6 +120,7 @@ export function runWithPersistentDataErasureBarrier<T>(
 
 export type PersistenceMutationDomain =
   | 'callout-presets'
+  | 'drawing-palette'
   | 'gradient-presets'
   | 'highlighter-settings'
   | 'step-badge-presets'

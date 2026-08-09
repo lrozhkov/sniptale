@@ -6,18 +6,20 @@ export interface ToolbarModeButtonsProps {
   isCursorMode: boolean;
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode?: boolean;
   compactMenus?: boolean;
   displayMode?: ContentToolbarDisplayMode;
   sidebarVisible?: boolean;
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
   highlighterMode: boolean;
-  pendingMode?: 'ai' | 'cursor' | 'design-review' | 'highlighter' | 'quick-edit' | null;
+  pendingMode?: 'ai' | 'cursor' | 'design-review' | 'drawing' | 'highlighter' | 'quick-edit' | null;
   toolbarMenuState: ToolbarMenuState;
   onEnableCursorMode?: () => void;
   onDisableAiPickMode?: () => void;
   onSelectPageEditingMode: (mode: ToolbarPageEditingMode) => void;
   onToggleDesignReview: () => void;
+  onToggleDrawing?: () => void;
   onToggleQuickEdit: () => void;
   onToggleHighlighter: () => void;
 }

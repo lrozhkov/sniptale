@@ -2187,6 +2187,22 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/drawing-palette",
+      "disposition": "rollout",
+      "reason": "The versioned drawing palette has deterministic parser, mutation, subscription, and failure proof.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/drawing-palette/contracts.ts",
+        "apps/extension/src/composition/persistence/drawing-palette/index.ts",
+        "apps/extension/src/composition/persistence/drawing-palette/parser.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/drawing-palette/contracts.ts",
+        "apps/extension/src/composition/persistence/drawing-palette/index.ts",
+        "apps/extension/src/composition/persistence/drawing-palette/parser.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/editor-bootstrap",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -2945,6 +2961,15 @@
         "apps/extension/src/content/application/mode-session/session.ts",
         "apps/extension/src/content/application/privileged-action-intent/index.ts",
         "apps/extension/src/content/application/runtime-services/services.ts",
+        "apps/extension/src/content/drawing/controller.ts",
+        "apps/extension/src/content/drawing/frame.ts",
+        "apps/extension/src/content/drawing/interaction.ts",
+        "apps/extension/src/content/drawing/keyboard.ts",
+        "apps/extension/src/content/drawing/mode.ts",
+        "apps/extension/src/content/drawing/pointer-runtime.ts",
+        "apps/extension/src/content/drawing/render.ts",
+        "apps/extension/src/content/drawing/surface.tsx",
+        "apps/extension/src/content/drawing/text-editor.tsx",
         "apps/extension/src/content/index.tsx",
         "apps/extension/src/content/overlay/ai/data-panel/content.tsx",
         "apps/extension/src/content/overlay/ai/data-panel/data-selection-area.tsx",
@@ -3327,6 +3352,8 @@
         "apps/extension/src/content/overlay/toolbar/controls/annotation-fork-session.ts",
         "apps/extension/src/content/overlay/toolbar/controls/auto-blur-menu.tsx",
         "apps/extension/src/content/overlay/toolbar/controls/design-review.tsx",
+        "apps/extension/src/content/overlay/toolbar/controls/drawing-options.tsx",
+        "apps/extension/src/content/overlay/toolbar/controls/drawing.tsx",
         "apps/extension/src/content/overlay/toolbar/controls/frame-style.tsx",
         "apps/extension/src/content/overlay/toolbar/controls/mode-selector-button.tsx",
         "apps/extension/src/content/overlay/toolbar/controls/mode-types.ts",
@@ -7805,6 +7832,26 @@
         "apps/extension/src/features/ai/schemas/ai-utils.ts",
         "apps/extension/src/features/ai/schemas/public.ts",
         "apps/extension/src/features/ai/selection.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/features/drawing",
+      "disposition": "rollout",
+      "reason": "The reusable drawing model, geometry, freehand mechanics, and session history have deterministic owner-local proof.",
+      "productionFiles": [
+        "apps/extension/src/features/drawing/freehand.ts",
+        "apps/extension/src/features/drawing/geometry.ts",
+        "apps/extension/src/features/drawing/model.ts",
+        "apps/extension/src/features/drawing/public.ts",
+        "apps/extension/src/features/drawing/session.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/features/drawing/freehand.ts",
+        "apps/extension/src/features/drawing/geometry.ts",
+        "apps/extension/src/features/drawing/model.ts",
+        "apps/extension/src/features/drawing/public.ts",
+        "apps/extension/src/features/drawing/session.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -13343,7 +13390,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "27305ea126f2af5811020129965aece13bd1085a318cbb7cec1300f6e16796f0"
+        "contentHash": "1e087dfec9387d3b0675c4b11137dcfae9e237ef0d2a20aa6940f07109c0ceb6"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

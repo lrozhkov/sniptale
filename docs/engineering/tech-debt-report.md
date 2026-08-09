@@ -17,8 +17,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Focused coverage rollout
 
-- Owner disposition: partial=4, rollout=71, unmapped=21.
-- Registry disposition: partial=4, rollout=71, unmapped=21.
+- Owner disposition: partial=4, rollout=73, unmapped=21.
+- Registry disposition: partial=4, rollout=73, unmapped=21.
 - Owners with unowned focused rollout files:
 
 ## Registered policy dispositions

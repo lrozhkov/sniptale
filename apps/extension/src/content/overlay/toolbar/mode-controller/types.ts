@@ -10,10 +10,11 @@ export interface UseToolbarModeControllerParams extends ContentAppRuntimeModeCon
 
 export interface UseToolbarModeControllerResult {
   handleClearHighlights: () => void;
-  handleEnableCursorMode: () => void;
+  handleEnableCursorMode: () => boolean;
   handleHideToolbar: () => void;
   handleToggleHighlighterMode: (enabled: boolean) => void;
   handleToggleDesignReviewMode: (enabled: boolean) => void;
+  handleToggleDrawingMode?: (enabled: boolean) => void;
   handleToggleNavigationLock: (enabled: boolean) => void;
   handleToggleQuickEditDocumentMode: (enabled: boolean) => void;
   handleToggleQuickEditMode: (enabled: boolean) => void;

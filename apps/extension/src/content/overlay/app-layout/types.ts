@@ -17,6 +17,7 @@ import type { UseToolbarModeControllerResult } from '../toolbar/mode-controller/
 import type { ToolbarViewportSelection } from '../toolbar/types';
 import type { ToolbarFutureFrameCalloutActions, ToolbarFutureFrameStyle } from '../toolbar/types';
 import type { EffectMode } from '../../../features/highlighter/contracts';
+import type { ContentDrawingController } from '../../drawing/controller';
 
 type ContentAppAiController = Omit<UseAiPickControllerResult, 'handleCancelAIPrompt'> & {
   handleCancelAIPrompt?: UseAiPickControllerResult['handleCancelAIPrompt'];
@@ -27,6 +28,7 @@ export type ContentAppModeController = UseToolbarModeControllerResult;
 type ContentAppModes = {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode?: boolean;
   highlighterMode: boolean;
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
@@ -81,6 +83,7 @@ export type ContentAppLayoutToolbarProps = {
   autoBlurController: AutoBlurController;
   captureAction: CaptureActionType;
   currentViewport: { width: number; height: number } | null;
+  drawingController?: ContentDrawingController;
   frameCount: number;
   futureFrameStyle: ToolbarFutureFrameStyle;
   handleTakeScreenshot: (

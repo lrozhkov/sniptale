@@ -9,6 +9,7 @@ import type {
 } from '../../../features/highlighter/contracts';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type { ContentDrawingController } from '../../drawing/controller';
 
 export type ToolbarViewportSelection = {
   presetId?: string;
@@ -85,11 +86,14 @@ export interface ToolbarProps {
   onToggleScreenshotMode: (enabled: boolean) => void;
   onToggleHighlighterMode: (enabled: boolean) => void;
   onToggleDesignReviewMode: (enabled: boolean) => void;
+  onToggleDrawingMode?: (enabled: boolean) => void;
   onToggleQuickEditDocumentMode: (enabled: boolean) => void;
   onToggleQuickEditMode: (enabled: boolean) => void;
   onAiPickContentStart: () => void;
   aiPickMode?: boolean;
   designReviewMode?: boolean;
+  drawingMode?: boolean;
+  drawingController?: ContentDrawingController;
   designReviewPanelOpen?: boolean;
   highlighterMode?: boolean;
   quickEditDocumentMode?: boolean;

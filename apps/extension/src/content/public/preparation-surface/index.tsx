@@ -18,6 +18,11 @@ import { useContentScreenshotAutoStart } from '../../../content/overlay/screensh
 import { useScreenshotController } from '../../../content/overlay/screenshot/controller';
 import { useToolbarModeController } from '../../../content/overlay/toolbar/mode-controller';
 import {
+  useContentDrawingController,
+  type ContentDrawingController,
+} from '../../../content/drawing/controller';
+import { useDrawingModeIntegration } from '../../../content/drawing/mode';
+import {
   disableHighlighterMode,
   registerFrameCallbacks,
 } from '../../../content/selection/highlighter';
@@ -119,7 +124,8 @@ function usePreparationScreenshotController(
   captureAdapter: ReturnType<PreparationHostPorts['createCaptureAdapter']>,
   modeState: ContentAppModeState,
   aiController: PreparationSurfaceControllers['aiController'],
-  scenarioController: PreparationSurfaceControllers['scenarioController']
+  scenarioController: PreparationSurfaceControllers['scenarioController'],
+  drawingController: ContentDrawingController
 ): PreparationSurfaceControllers['screenshotController'] {
   return useScreenshotController({
     captureAdapter,
@@ -127,6 +133,11 @@ function usePreparationScreenshotController(
     editingModes: {
       aiPickMode: modeState.aiPickMode,
       designReviewMode: modeState.designReviewMode,
+      ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
+      disableDrawingMode: () => {
+        drawingController.finalizeInteraction();
+        modeState.setDrawingMode?.(false);
+      },
       disableAiPickMode: aiController.handleDisableAiPickMode,
       disableDesignReviewMode,
       disableHighlighterMode: () => {
@@ -141,6 +152,9 @@ function usePreparationScreenshotController(
       quickEditMode: modeState.quickEditMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
+      ...(modeState.setDrawingMode === undefined
+        ? {}
+        : { setDrawingMode: modeState.setDrawingMode }),
       setHighlighterMode: modeState.setHighlighterMode,
       setQuickEditMode: modeState.setQuickEditMode,
     },
@@ -205,6 +219,7 @@ function usePreparationScenarioController(args: {
     autoClickBlocked:
       modeState.aiPickMode ||
       modeState.designReviewMode ||
+      modeState.drawingMode ||
       modeState.highlighterMode ||
       modeState.quickEditMode,
     captureActionRef: modeState.captureActionRef,
@@ -224,7 +239,8 @@ function usePreparationScenarioController(args: {
 function usePreparationControllers(
   modeState: ContentAppModeState,
   frameManager: FrameManager,
-  ports: PreparationHostPorts
+  ports: PreparationHostPorts,
+  drawingController: ContentDrawingController
 ): PreparationSurfaceControllers {
   const captureAdapter = usePreparationCaptureAdapter(ports, frameManager);
   const aiController = usePreparationAiController(modeState, ports);
@@ -237,14 +253,15 @@ function usePreparationControllers(
     captureAdapter,
     modeState,
     aiController,
-    scenarioController
+    scenarioController,
+    drawingController
   );
   const autoBlurController = useAutoBlurController({
     autoApplyAllowed: false,
     frameManager,
     highlighterMode: modeState.highlighterMode,
   });
-  const modeController = useToolbarModeController({
+  const baseModeController = useToolbarModeController({
     ...buildContentModeControls(modeState),
     aiPickMode: modeState.aiPickMode,
     designReviewMode: modeState.designReviewMode,
@@ -252,10 +269,25 @@ function usePreparationControllers(
     highlighterMode: modeState.highlighterMode,
     quickEditMode: modeState.quickEditMode,
   });
+  const { disableDrawing, modeController } = useDrawingModeIntegration({
+    baseModeController,
+    controller: drawingController,
+    modeState,
+  });
+  const drawingAwareAiController = {
+    ...aiController,
+    handleAiPickContentStart: (
+      ...args: Parameters<typeof aiController.handleAiPickContentStart>
+    ) => {
+      disableDrawing();
+      return aiController.handleAiPickContentStart(...args);
+    },
+  };
 
   return {
-    aiController,
+    aiController: drawingAwareAiController,
     autoBlurController,
+    drawingController,
     modeController,
     scenarioController,
     screenshotController,
@@ -293,8 +325,14 @@ function usePreparationModeState(): ContentAppModeState {
 
 export function PreparationSurface(props: PreparationSurfaceProps) {
   const modeState = usePreparationModeState();
+  const drawingController = useContentDrawingController();
   const frameManager = usePreparationFrameManager(modeState);
-  const controllers = usePreparationControllers(modeState, frameManager, props.ports);
+  const controllers = usePreparationControllers(
+    modeState,
+    frameManager,
+    props.ports,
+    drawingController
+  );
   const layout = createPreparationLayoutProjection({
     controllers,
     frameManager,

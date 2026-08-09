@@ -28,14 +28,17 @@ export class StaleScreenshotRunError extends Error {
 type ScreenshotEditingModeControls = {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode?: boolean;
   disableAiPickMode: () => void;
   disableDesignReviewMode: () => void;
+  disableDrawingMode?: () => void;
   disableHighlighterMode: () => void;
   disableQuickEditMode: () => void;
   highlighterMode: boolean;
   quickEditMode: boolean;
   setAiPickMode: (enabled: boolean) => void;
   setDesignReviewMode: (enabled: boolean) => void;
+  setDrawingMode?: (enabled: boolean) => void;
   setHighlighterMode: (enabled: boolean) => void;
   setQuickEditMode: (enabled: boolean) => void;
 };
@@ -63,6 +66,11 @@ function disableEditingModes(params: ScreenshotControllerParams): void {
   editingModes.disableQuickEditMode();
   editingModes.setQuickEditMode(false);
 
+  if (editingModes.drawingMode) {
+    editingModes.disableDrawingMode?.();
+    editingModes.setDrawingMode?.(false);
+  }
+
   if (editingModes.designReviewMode) {
     editingModes.disableDesignReviewMode();
     editingModes.setDesignReviewMode(false);
@@ -84,6 +92,7 @@ function hasModeOwnedNavigationLock(params: ScreenshotControllerParams): boolean
   return (
     editingModes.aiPickMode ||
     editingModes.designReviewMode ||
+    editingModes.drawingMode ||
     editingModes.highlighterMode ||
     editingModes.quickEditMode
   );

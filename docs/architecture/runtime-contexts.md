@@ -26,6 +26,8 @@ The content entrypoint is `apps/extension/src/content/index.tsx`. This runtime o
 
 Content UI treats the host page as untrusted input. DOM-derived payloads stay `unknown` until parsed, page events do not create privilege by themselves, and cleanup restores any page state changed for capture.
 
+Page-preparation drawing keeps its renderer-neutral document, geometry, transforms, and history under `apps/extension/src/features/drawing`; this owner has no DOM, Canvas, Fabric, browser, or persistence authority. The content-only adapter under `apps/extension/src/content/drawing` owns viewport projection, Canvas2D rendering, blur and text DOM, pointer input, and preparation-session lifecycle. Drawing objects use scroll-root content coordinates rather than DOM anchors, remain visible but non-interactive outside Drawing mode, and are disposable when the preparation surface ends. Only the shared drawing palette is durable, through its named local persistence owner.
+
 ## Extension pages
 
 - `apps/extension/src/popup/index.tsx` owns the popup shell and popup-scoped workflows.
