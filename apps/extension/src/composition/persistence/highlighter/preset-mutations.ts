@@ -20,6 +20,13 @@ const editableVisualFields = [
   'width',
 ] as const;
 
+function tagsEqual(left: BorderPreset, right: BorderPreset): boolean {
+  return (
+    left.tagIds.length === right.tagIds.length &&
+    left.tagIds.every((tagId, index) => tagId === right.tagIds[index])
+  );
+}
+
 function editableVisualsEqual(left: BorderPreset, right: BorderPreset): boolean {
   return editableVisualFields.every((field) => {
     if (field === 'padding') {
@@ -85,7 +92,7 @@ function updateSystemPreset(current: BorderPreset, incoming: BorderPreset): Bord
   const incomingName = incoming.name.trim();
   const nameChanged = incomingName !== displayName;
   const visualChanged = !editableVisualsEqual(current, incoming);
-  if (!nameChanged && !visualChanged) return null;
+  if (!nameChanged && !visualChanged && tagsEqual(current, incoming)) return null;
 
   const updated = cloneBorderPreset(incoming);
   return {
@@ -119,7 +126,8 @@ export function updateExistingBorderPreset(
   if (
     current.origin !== 'system' &&
     current.name === updated.name &&
-    editableVisualsEqual(current, updated)
+    editableVisualsEqual(current, updated) &&
+    tagsEqual(current, updated)
   ) {
     return null;
   }
@@ -227,7 +235,8 @@ export function resetSystemBorderPresetToCanonical(
   if (
     current.customized !== true &&
     current.name === reset.name &&
-    editableVisualsEqual(current, reset)
+    editableVisualsEqual(current, reset) &&
+    tagsEqual(current, reset)
   ) {
     return null;
   }

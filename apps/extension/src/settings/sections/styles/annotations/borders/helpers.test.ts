@@ -23,6 +23,7 @@ function createPreset(
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
     order: overrides.order ?? 0,
+    tagIds: overrides.tagIds ?? [],
     width: overrides.width ?? 6,
     color: overrides.color ?? '#ff6600',
     style: overrides.style ?? 'solid',

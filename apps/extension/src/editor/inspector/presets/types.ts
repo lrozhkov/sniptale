@@ -24,6 +24,7 @@ export interface EditorInspectorTemplateCardState {
   preview: React.ReactNode;
   selected: boolean;
   system?: boolean;
+  tagIds?: readonly string[];
   onApply: () => void;
 }
 
@@ -34,6 +35,7 @@ export interface EditorInspectorTemplateGroupState {
 }
 
 export interface EditorInspectorPresetHeaderState {
+  annotationTagFiltering?: boolean;
   activeView: EditorInspectorPresetViewMode;
   groups?: EditorInspectorTemplateGroupState[];
   savePanel: EditorInspectorPresetSavePanelState | null;

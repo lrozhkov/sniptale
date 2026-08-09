@@ -37,6 +37,7 @@ export function createBorderSettingsFixture(overrides: Partial<BorderPreset> = {
     id: 'border',
     name: 'Default Border',
     order: 0,
+    tagIds: [],
     fillPaint: { kind: 'solid' as const, color: '#00000000' },
     inheritCustomCss: false,
     padding: { bottom: 0, left: 0, right: 0, top: 0 },

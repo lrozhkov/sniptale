@@ -15,6 +15,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     id: 'preset-1',
     name: 'Preset',
     order: 0,
+    tagIds: [],
     width: 6,
     color: '#2563ebb3',
     style: 'dashed',

@@ -36,6 +36,7 @@ function createSystemPreset(
     systemPresetKey: key,
     basedOnRevision: SYSTEM_BORDER_PRESET_CATALOG_REVISION,
     customized: false,
+    tagIds: [],
     ...visual,
   };
 }
@@ -121,6 +122,7 @@ export function cloneBorderPreset(preset: BorderPreset): BorderPreset {
     effects: cloneBorderPresetEffects(preset.effects),
     padding: { ...preset.padding },
     fillPaint: clonePaint(preset.fillPaint),
+    tagIds: [...preset.tagIds],
   };
 }
 

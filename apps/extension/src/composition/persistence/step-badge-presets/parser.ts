@@ -6,6 +6,7 @@ import {
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { validateStepBadgeCustomCss } from '../../../features/highlighter/step-badge-custom-css';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
+import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
 
 export const STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION = 1;
 export const MAX_USER_STEP_BADGE_PRESETS = 16;
@@ -15,6 +16,7 @@ interface StoredPlacement {
   enabled: boolean;
   id: string;
   order: number;
+  tagIds?: string[];
 }
 
 interface StoredSystemOverride {
@@ -161,18 +163,27 @@ function parsePlacements(
   const ids = new Set<string>();
   const parsed: StoredPlacement[] = [];
   for (const item of value) {
+    const tagIds = isPlainRecord(item)
+      ? parseAnnotationTemplateTagIds(item['tagIds'])
+      : { invalid: true, value: [] };
     if (
       !isPlainRecord(item) ||
       !isString(item['id']) ||
       ids.has(item['id']) ||
       !isNonNegativeInteger(item['order']) ||
-      !isBoolean(item['enabled'])
+      !isBoolean(item['enabled']) ||
+      tagIds.invalid
     ) {
       invalid.count += 1;
       continue;
     }
     ids.add(item['id']);
-    parsed.push({ id: item['id'], order: item['order'], enabled: item['enabled'] });
+    parsed.push({
+      id: item['id'],
+      order: item['order'],
+      enabled: item['enabled'],
+      ...(item['tagIds'] === undefined ? {} : { tagIds: tagIds.value }),
+    });
   }
   return parsed;
 }

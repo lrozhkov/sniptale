@@ -27,6 +27,7 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
         {item.meta === undefined ? null : (
           <div className="truncate text-xs text-[var(--sniptale-color-text-dim)]">{item.meta}</div>
         )}
+        {item.supplement === undefined ? null : <div className="mt-1">{item.supplement}</div>}
         <div className="mt-1 flex flex-wrap gap-1.5">
           {item.badges?.map((badge) => (
             <span

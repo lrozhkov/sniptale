@@ -11,6 +11,7 @@ function createBorderPreset(id: string, name: string) {
     id,
     name,
     order: 0,
+    tagIds: [],
     color: '#ff7a1a',
     width: 2,
     style: 'solid' as const,

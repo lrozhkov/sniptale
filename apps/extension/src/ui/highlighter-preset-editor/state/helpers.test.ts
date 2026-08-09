@@ -54,6 +54,7 @@ describe('border-preset-editor-state draft setters', () => {
       id: 'preset',
       name: 'Preset',
       order: 1,
+      tagIds: [],
       width: 5,
       color: '#ff660080',
       style: 'dashed',

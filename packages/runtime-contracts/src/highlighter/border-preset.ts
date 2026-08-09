@@ -1,3 +1,5 @@
+import type { AnnotationTemplateTagId } from './annotation-template-tags';
+
 export const SYSTEM_BORDER_PRESET_KEYS = [
   'system-default',
   'system-soft-highlight',
@@ -68,6 +70,7 @@ export interface BorderPreset extends BorderVisualStyle {
   systemPresetKey?: SystemBorderPresetKey;
   basedOnRevision?: number;
   customized?: boolean;
+  tagIds: AnnotationTemplateTagId[];
 }
 
 /** A frame-owned visual snapshot. Catalog metadata never becomes runtime state authority. */

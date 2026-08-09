@@ -47,6 +47,7 @@ const preset = (id: string): BorderPreset => ({
   id,
   name: id,
   order: 0,
+  tagIds: [],
   width: 2,
   color: '#ff0000',
   style: 'solid',

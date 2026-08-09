@@ -79,12 +79,14 @@ function createCatalogActions(args: {
                 name: preset.name,
                 placement: preset.placement,
                 style: preset.style,
+                tagIds: preset.tagIds,
               })
             : createUserCalloutPreset({
                 content: preset.content,
                 name: preset.name,
                 placement: preset.placement,
                 style: preset.style,
+                tagIds: preset.tagIds,
               }),
         exists
           ? 'highlighter.calloutPresets.messages.updated'

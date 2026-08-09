@@ -68,6 +68,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     ...(overrides.customized === undefined ? {} : { customized: overrides.customized }),
     ...(overrides.enabled === undefined ? {} : { enabled: overrides.enabled }),
     order: overrides.order ?? 0,
+    tagIds: overrides.tagIds ?? [],
     width: overrides.width ?? 4,
     color: overrides.color ?? '#ff6600',
     style: overrides.style ?? 'solid',

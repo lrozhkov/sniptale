@@ -14,6 +14,7 @@ interface CalloutPresetUpdate {
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
+  tagIds?: readonly string[];
 }
 
 function withCustomization(catalog: CalloutPresetCatalog): CalloutPresetCatalog {
@@ -33,7 +34,7 @@ function resolveDefaultId(presets: CalloutPreset[], requestedId: string): string
 export function addUserPreset(
   catalog: CalloutPresetCatalog,
   preset: Pick<CalloutPreset, 'id' | 'name' | 'placement' | 'style'> &
-    Partial<Pick<CalloutPreset, 'content'>>
+    Partial<Pick<CalloutPreset, 'content'>> & { tagIds?: readonly string[] }
 ): CalloutPresetCatalog | null {
   if (catalog.presets.some((current) => current.id === preset.id)) return null;
   const order =
@@ -51,6 +52,7 @@ export function addUserPreset(
         origin: 'user',
         placement: { ...preset.placement },
         style: cloneCalloutVisualStyle(preset.style),
+        tagIds: [...(preset.tagIds ?? [])],
       },
     ],
   };
@@ -67,7 +69,8 @@ export function updatePreset(
     current.name === name &&
     JSON.stringify(current.content) === JSON.stringify(update.content ?? current.content) &&
     JSON.stringify(current.placement) === JSON.stringify(update.placement) &&
-    JSON.stringify(current.style) === JSON.stringify(update.style)
+    JSON.stringify(current.style) === JSON.stringify(update.style) &&
+    JSON.stringify(current.tagIds) === JSON.stringify(update.tagIds ?? current.tagIds)
   ) {
     return null;
   }
@@ -78,6 +81,7 @@ export function updatePreset(
     name,
     placement: { ...update.placement },
     style: cloneCalloutVisualStyle(update.style),
+    tagIds: [...(update.tagIds ?? current.tagIds)],
   };
   return {
     ...withCustomization(catalog),
@@ -166,7 +170,8 @@ export function resetSystemPreset(
     JSON.stringify(current.content) === JSON.stringify(canonical.content) &&
     current.name === canonical.name &&
     JSON.stringify(current.placement) === JSON.stringify(canonical.placement) &&
-    JSON.stringify(current.style) === JSON.stringify(canonical.style)
+    JSON.stringify(current.style) === JSON.stringify(canonical.style) &&
+    current.tagIds.length === 0
   ) {
     return null;
   }

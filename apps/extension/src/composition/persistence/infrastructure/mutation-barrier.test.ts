@@ -7,6 +7,7 @@ import {
   runWithPersistenceMutationPermit,
   runWithPersistenceMutationTransition,
   runWithPersistenceDomainMutationLock,
+  runWithPersistenceDomainMutationLocks,
   runWithPersistentDataErasureBarrier,
   type PersistenceLockManager,
 } from './mutation-barrier';
@@ -216,6 +217,29 @@ it('serializes gradient preset mutations through their cross-context domain', as
   });
   await Promise.all([first, second]);
   expect(calls).toEqual(['first', 'second']);
+});
+
+it('acquires multi-domain mutations in canonical order and blocks overlapping owners', async () => {
+  let releaseBatch!: () => void;
+  const batchGate = new Promise<void>((resolve) => {
+    releaseBatch = resolve;
+  });
+  const batch = vi.fn(async () => batchGate);
+  const single = vi.fn(async () => undefined);
+
+  const batchMutation = runWithPersistenceDomainMutationLocks(
+    ['step-badge-presets', 'annotation-template-tags', 'callout-presets'],
+    batch
+  );
+  await vi.waitFor(() => expect(batch).toHaveBeenCalledOnce());
+  const singleMutation = runWithPersistenceDomainMutationLock('callout-presets', single);
+  await Promise.resolve();
+  expect(single).not.toHaveBeenCalled();
+
+  releaseBatch();
+  await batchMutation;
+  await singleMutation;
+  expect(single).toHaveBeenCalledOnce();
 });
 
 it('keeps a domain read-modify-write admitted until privacy erasure can begin', async () => {

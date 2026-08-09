@@ -9,6 +9,36 @@ import {
 } from '../shared/blur-controls';
 
 export const highlighterMessages = defineMessageSource({
+  templateTags: {
+    tab: { ru: 'Теги', en: 'Tags' },
+    title: { ru: 'Теги шаблонов', en: 'Template tags' },
+    description: {
+      ru: 'Общий справочник для рамок, нумерации и комментариев.',
+      en: 'A shared catalog for frames, numbering, and comments.',
+    },
+    searchLabel: { ru: 'Поиск шаблонов', en: 'Search templates' },
+    searchPlaceholder: { ru: 'Название или тег', en: 'Name or tag' },
+    filterLabel: { ru: 'Фильтр по тегам', en: 'Filter by tags' },
+    clearSearch: { ru: 'Очистить поиск', en: 'Clear search' },
+    clearFilter: { ru: 'Сбросить теги', en: 'Clear tags' },
+    noMatches: { ru: 'Подходящих шаблонов нет', en: 'No matching templates' },
+    assignmentLabel: { ru: 'Теги', en: 'Tags' },
+    assignmentEmpty: { ru: 'Теги ещё не созданы', en: 'No tags created yet' },
+    add: { ru: 'Создать тег', en: 'Create tag' },
+    name: { ru: 'Название тега', en: 'Tag name' },
+    usage: { ru: 'Используется: {count}', en: 'Used: {count}' },
+    rename: { ru: 'Переименовать', en: 'Rename' },
+    merge: { ru: 'Объединить', en: 'Merge' },
+    mergeTarget: { ru: 'Объединить с', en: 'Merge into' },
+    delete: { ru: 'Удалить', en: 'Delete' },
+    deleteTitle: { ru: 'Удалить тег?', en: 'Delete tag?' },
+    deleteDescription: {
+      ru: 'Тег будет снят со всех шаблонов.',
+      en: 'The tag will be removed from every template.',
+    },
+    saveError: { ru: 'Не удалось изменить теги', en: 'Could not update tags' },
+    loadError: { ru: 'Не удалось загрузить теги', en: 'Could not load tags' },
+  },
   paintPicker: {
     mode: { ru: 'Тип заливки', en: 'Fill type' },
     solid: { ru: 'Цвет', en: 'Solid' },

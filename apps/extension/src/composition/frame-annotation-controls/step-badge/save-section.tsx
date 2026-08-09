@@ -11,7 +11,8 @@ export function StepBadgeSaveSection(props: {
   embedded?: boolean;
   onCreate: (
     name: string,
-    settings: StepBadgeTemplateSettings
+    settings: StepBadgeTemplateSettings,
+    tagIds?: readonly string[]
   ) => Promise<{ id?: string; outcome: string }>;
   onFloatingInteractionChange?: (open: boolean) => void;
   onCreated?: (templateId: string) => void;
@@ -21,6 +22,7 @@ export function StepBadgeSaveSection(props: {
   ) => Promise<{ outcome: string }>;
   presets: StepBadgePreset[];
   settings: StepBadgeTemplateSettings;
+  createTagIds?: readonly string[];
 }) {
   const locale = useAppLocale();
   const content = (
@@ -30,7 +32,10 @@ export function StepBadgeSaveSection(props: {
       duplicateNameErrorLabel={translate('content.stepBadge.templateNameExists')}
       nameLabel={translate('content.stepBadge.templateName')}
       onCreate={(name) =>
-        props.onCreate(name, props.settings).then((result) => {
+        (props.createTagIds
+          ? props.onCreate(name, props.settings, props.createTagIds)
+          : props.onCreate(name, props.settings)
+        ).then((result) => {
           if (result.outcome !== 'applied') return false;
           if (result.id) props.onCreated?.(result.id);
           return true;

@@ -96,6 +96,13 @@ describe('callout preset catalog mutations', () => {
     })!;
     const reset = resetSystemPreset(customized, ids[0]!)!;
     expect(reset.presets[0]).toMatchObject({ customized: false, name: ids[0] });
+    const tagged = {
+      ...catalog,
+      presets: catalog.presets.map((preset, index) =>
+        index === 0 ? { ...preset, tagIds: ['tag-one'] } : preset
+      ),
+    };
+    expect(resetSystemPreset(tagged, ids[0]!)?.presets[0]!.tagIds).toEqual([]);
   });
 
   it('rejects deleting the final enabled user preset', () => {
@@ -112,6 +119,7 @@ describe('callout preset catalog mutations', () => {
           name: 'One',
           order: 0,
           origin: 'user',
+          tagIds: [],
           placement: catalog.presets[0]!.placement,
           style,
         },

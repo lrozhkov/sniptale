@@ -26,7 +26,11 @@ it('keeps a temporary fork isolated until it is saved or explicitly discarded', 
     });
     return (
       <div>
-        <output data-mode={workflow.mode} data-save-request={workflow.saveRequest} />
+        <output
+          data-mode={workflow.session.mode}
+          data-save-request={workflow.saveRequest}
+          data-source={workflow.session.sourceTemplate?.id ?? ''}
+        />
         <button data-action="fork" onClick={() => workflow.fork()} />
         <button data-action="back" onClick={workflow.requestTemplates} />
         <button data-action="complete" onClick={workflow.completeSave} />
@@ -46,6 +50,7 @@ it('keeps a temporary fork isolated until it is saved or explicitly discarded', 
   click(host, '[data-action="fork"]');
   expect(fork).toHaveBeenCalledWith({ id: 'template-a' });
   expect(host.querySelector('output')?.getAttribute('data-mode')).toBe('temporary');
+  expect(host.querySelector('output')?.getAttribute('data-source')).toBe('template-a');
 
   click(host, '[data-action="back"]');
   expect(host.querySelector('[data-ui="content.template-fork.return-guard"]')).not.toBeNull();

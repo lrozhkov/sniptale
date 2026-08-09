@@ -24,6 +24,7 @@ export type SettingsCollectionItem = {
   id: string;
   title: ReactNode;
   meta?: ReactNode;
+  supplement?: ReactNode;
   preview?: ReactNode;
   badges?: readonly {
     id: string;

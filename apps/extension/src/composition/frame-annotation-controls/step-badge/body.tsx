@@ -35,7 +35,8 @@ export function StepBadgePopoverContent(props: {
   onForkPreset?: (preset: StepBadgePreset) => void;
   onCreatePreset: (
     name: string,
-    settings: StepBadgeTemplateSettings
+    settings: StepBadgeTemplateSettings,
+    tagIds?: readonly string[]
   ) => Promise<{ id?: string; outcome: string }>;
   onTemplateCreated?: (templateId: string) => void;
   onUpdatePreset: (
@@ -71,7 +72,7 @@ export function StepBadgePopoverContent(props: {
   return (
     <>
       <SettingsPopoverHeader
-        {...(workflow.mode === 'temporary'
+        {...(workflow.session.mode === 'temporary'
           ? {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
@@ -79,7 +80,7 @@ export function StepBadgePopoverContent(props: {
               },
             }
           : {})}
-        {...(workflow.mode === 'temporary' &&
+        {...(workflow.session.mode === 'temporary' &&
         props.headerContext === 'element' &&
         props.onApplyToFuture
           ? {
@@ -120,7 +121,7 @@ export function StepBadgePopoverContent(props: {
           onDiscard={workflow.discard}
           onGoToSave={workflow.goToSave}
         />
-      ) : workflow.mode === 'templates' ? (
+      ) : workflow.session.mode === 'templates' ? (
         <StepBadgePresetSection
           {...(props.localStepBadgeSettings.sourcePresetId
             ? { activePresetId: props.localStepBadgeSettings.sourcePresetId }
@@ -143,13 +144,16 @@ export function StepBadgePopoverContent(props: {
       ) : (
         <StepBadgeManualSettings
           {...props}
-          {...(workflow.mode === 'temporary'
+          {...(workflow.session.mode === 'temporary'
             ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
             : {})}
           onTemplateCreated={(templateId) => {
             props.onTemplateCreated?.(templateId);
             workflow.completeSave();
           }}
+          {...(workflow.session.sourceTemplate
+            ? { createTagIds: workflow.session.sourceTemplate.tagIds }
+            : {})}
           {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
           settings={props.localStepBadgeSettings}
         />

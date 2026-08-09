@@ -81,6 +81,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.local).toContain(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
   expect(plan.localPrefixes).toContain('sniptale_video_editor_track_panel_prefs:');
   expect(plan.sync).toContain('sniptale_settings');
+  expect(plan.sync).toContain('sniptale_annotation_template_tags');
   expect(plan.sync).toContain('sniptale_auto_blur_settings');
   expect(plan.sync).toContain('sniptale_callout_presets');
   expect(plan.sync).toContain('sniptale_gradient_presets');

@@ -34,6 +34,7 @@ export function useBorderPresetSaveHandler({
       effects: draft.effects,
       inheritCustomCss: draft.inheritCustomCss,
       customCss: draft.customCss,
+      tagIds: preset?.tagIds ?? [],
       ...(preset
         ? {
             ...(preset.origin === undefined ? {} : { origin: preset.origin }),

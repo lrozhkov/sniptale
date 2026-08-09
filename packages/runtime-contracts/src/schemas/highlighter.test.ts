@@ -37,6 +37,7 @@ function registerBorderPresetSchemaTests() {
         systemPresetKey: 'system-review',
         basedOnRevision: 1,
         customized: true,
+        tagIds: ['review'],
         effects: {
           blur: { amount: 10, blurType: 'gaussian' },
           focus: { blurAmount: 2, opacity: 0.5 },
@@ -52,6 +53,7 @@ function registerBorderPresetSchemaTests() {
         fillPaint: gradient,
         origin: 'system',
         systemPresetKey: 'system-review',
+        tagIds: ['review'],
         effects: expect.objectContaining({
           linkedTemplates: {
             calloutPresetId: 'system-callout-card',
@@ -79,8 +81,34 @@ function registerBorderPresetSchemaTests() {
       customCss: '',
     });
     expect(parsed.fillPaint).toEqual({ kind: 'solid', color: '#44556640' });
+    expect(parsed.tagIds).toEqual([]);
     expect(parsed).not.toHaveProperty('fillColor');
     expect(parsed).not.toHaveProperty('fillOpacity');
+  });
+
+  it('rejects duplicate or oversized annotation template tag references', () => {
+    const base = {
+      id: 'tagged',
+      name: 'Tagged',
+      order: 0,
+      width: 4,
+      color: '#112233',
+      style: 'solid',
+      radius: 8,
+      padding: { top: 1, right: 2, bottom: 3, left: 4 },
+      shadow: 0,
+      fillPaint: { kind: 'solid', color: '#00000000' },
+      inheritCustomCss: false,
+      customCss: '',
+    };
+
+    expect(() => BorderPresetSchema.parse({ ...base, tagIds: ['same', 'same'] })).toThrow();
+    expect(() =>
+      BorderPresetSchema.parse({
+        ...base,
+        tagIds: Array.from({ length: 9 }, (_, index) => `tag-${index}`),
+      })
+    ).toThrow();
   });
 
   it('rejects arbitrary storage-owned system translation keys', () => {

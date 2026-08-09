@@ -28,6 +28,7 @@ function createBorderPreset(overrides: Record<string, unknown> = {}) {
     radius: 12,
     shadow: 30,
     style: 'solid',
+    tagIds: [],
     width: 4,
     ...overrides,
   };

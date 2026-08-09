@@ -6,7 +6,7 @@ import { TemplateSaveSettings } from '../template-save-settings';
 export type CalloutSaveSectionProps = {
   error: string | null;
   isSaving: boolean;
-  onCreate: (name: string) => Promise<boolean>;
+  onCreate: (name: string, tagIds?: readonly string[]) => Promise<boolean>;
   onCreated?: () => void;
   onOverwrite: (presetId: string) => Promise<boolean>;
   onOverwritten?: (templateId: string) => void;

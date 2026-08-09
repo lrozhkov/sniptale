@@ -167,6 +167,7 @@ export function cloneCalloutPreset(preset: CalloutPreset): CalloutPreset {
       },
     },
     style: cloneCalloutVisualStyle(preset.style),
+    tagIds: [...preset.tagIds],
   };
 }
 
@@ -187,6 +188,7 @@ function createSystemPreset(
     placement: { ...DEFAULT_PRESET_PLACEMENT },
     style: cloneCalloutVisualStyle(style),
     systemPresetKey,
+    tagIds: [],
   };
 }
 

@@ -289,6 +289,7 @@ it('projects callout save actions through the canonical shared settings snapshot
     name: 'Preset',
     order: 0,
     origin: 'user' as const,
+    tagIds: [],
   };
   const create = vi.fn(async () => ({ id: 'created-callout', outcome: 'applied' }));
   const overwrite = vi.fn(async () => true);

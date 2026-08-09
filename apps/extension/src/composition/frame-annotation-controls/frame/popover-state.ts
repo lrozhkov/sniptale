@@ -55,7 +55,11 @@ export function useFrameCreationPopoverState(props: {
     applyBorderStylePatch(props.settings, patch, apply);
   const selectPreset = (preset: BorderPreset) => selectBorderPreset(props.settings, preset, apply);
   const forkPreset = (preset: BorderPreset) => forkBorderPreset(props.settings, preset, apply);
-  const savePreset = (input: { name?: string; overwrite?: BorderPreset }) =>
+  const savePreset = (input: {
+    name?: string;
+    overwrite?: BorderPreset;
+    tagIds?: readonly string[];
+  }) =>
     saveBorderPreset(
       input,
       props.settings,
@@ -171,7 +175,7 @@ function forkBorderPreset(
 }
 
 async function saveBorderPreset(
-  input: { name?: string; overwrite?: BorderPreset },
+  input: { name?: string; overwrite?: BorderPreset; tagIds?: readonly string[] },
   settings: FrameAnnotationStyleSettings,
   setSaving: (value: boolean) => void,
   setCatalog: (settings: HighlighterSettings) => void,
@@ -200,6 +204,7 @@ async function saveBorderPreset(
       enabled: true,
       order: input.overwrite?.order ?? 0,
       origin: input.overwrite?.origin ?? 'user',
+      tagIds: [...(input.overwrite?.tagIds ?? input.tagIds ?? [])],
     };
     const outcome = input.overwrite
       ? await updateBorderPresetWithOutcome(preset)

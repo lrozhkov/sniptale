@@ -58,6 +58,7 @@ function createPreset() {
     id: 'preset-1',
     name: 'Glow',
     order: 0,
+    tagIds: [],
     width: 4,
     color: '#ff6600',
     style: 'solid' as const,

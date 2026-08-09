@@ -67,6 +67,7 @@ export function useFrameStyleCatalog(args: {
   const saveManualPreset = async (input: {
     name?: string;
     overwrite?: BorderPreset;
+    tagIds?: readonly string[];
     style: BorderVisualStyle;
   }): Promise<BorderPreset | null> => {
     if (manualSavingRef.current) return null;
@@ -76,7 +77,7 @@ export function useFrameStyleCatalog(args: {
     const id = input.overwrite?.id ?? crypto.randomUUID();
     const visualStyle = cloneBorderVisualStyle(input.style);
     const preset: BorderPreset = input.overwrite
-      ? { ...input.overwrite, ...visualStyle }
+      ? { ...input.overwrite, ...visualStyle, tagIds: [...(input.overwrite.tagIds ?? [])] }
       : {
           ...visualStyle,
           id,
@@ -84,6 +85,7 @@ export function useFrameStyleCatalog(args: {
           enabled: true,
           order: 0,
           origin: 'user',
+          tagIds: [...(input.tagIds ?? [])],
         };
     try {
       const result = await runSerializedMutation(async () => {

@@ -58,7 +58,7 @@ export function CalloutSettingsPopoverContent(props: {
   return (
     <>
       <SettingsPopoverHeader
-        {...(workflow.mode === 'temporary'
+        {...(workflow.session.mode === 'temporary'
           ? {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
@@ -66,7 +66,7 @@ export function CalloutSettingsPopoverContent(props: {
               },
             }
           : {})}
-        {...(workflow.mode === 'temporary' &&
+        {...(workflow.session.mode === 'temporary' &&
         props.headerContext === 'element' &&
         props.onApplyToFuture
           ? {
@@ -107,7 +107,7 @@ export function CalloutSettingsPopoverContent(props: {
           onDiscard={workflow.discard}
           onGoToSave={workflow.goToSave}
         />
-      ) : workflow.mode === 'templates' ? (
+      ) : workflow.session.mode === 'templates' ? (
         <CalloutPresetSection
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           {...(props.localSettings.sourcePresetId
@@ -133,7 +133,7 @@ export function CalloutSettingsPopoverContent(props: {
           {...(props.frameColors ? { frameColors: props.frameColors } : {})}
           settings={props.localSettings}
           {...(props.onNestedLayerChange ? { onNestedLayerChange: props.onNestedLayerChange } : {})}
-          {...(workflow.mode === 'temporary'
+          {...(workflow.session.mode === 'temporary'
             ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
             : {})}
           {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
@@ -150,6 +150,8 @@ export function CalloutSettingsPopoverContent(props: {
           }
           saveSection={{
             ...props.saveSection,
+            onCreate: (name) =>
+              props.saveSection.onCreate(name, workflow.session.sourceTemplate?.tagIds ?? []),
             onCreated: workflow.completeSave,
             onOverwritten: workflow.completeSave,
           }}

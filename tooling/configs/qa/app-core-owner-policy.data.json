@@ -192,6 +192,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/annotation-template-query",
+      "ownerId": "app-core.annotation-template-query-ui",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/callout-background-settings",
       "ownerId": "ui.callout-background-settings",
       "ownerClass": "app-core"
@@ -275,6 +280,11 @@
       "sourcePrefix": "apps/extension/src/workflows/voice-input",
       "ownerId": "workflow.voice-input",
       "ownerClass": "workflow"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/annotation-template-tags",
+      "ownerId": "persistence.annotation-template-tags",
+      "ownerClass": "persistence"
     },
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
@@ -472,6 +482,11 @@
       "id": "state-manager-infrastructure",
       "path": "apps/extension/src/composition/persistence/infrastructure/state-manager",
       "stateKind": "authoritative-adapter"
+    },
+    {
+      "id": "annotation-template-tags",
+      "path": "apps/extension/src/composition/persistence/annotation-template-tags",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "ai-settings-secrets",
@@ -733,6 +748,7 @@
     ]
   ],
   "retainedAppUiRoots": [
+    "apps/extension/src/ui/annotation-template-query",
     "apps/extension/src/ui/color-selector",
     "apps/extension/src/ui/command-palette",
     "apps/extension/src/ui/compact-inspector-controls",

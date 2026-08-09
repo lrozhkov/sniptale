@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { translate, useAppLocale } from '../../../../../platform/i18n';
 import { getStepBadgePresetDisplayName } from '../../../../../features/highlighter/step-badge-presets/display-name';
 import { StepBadgePresetPreview } from '../../../../../ui/highlighter-preset-editor/step-badge/thumbnail';
@@ -8,6 +9,14 @@ import {
   type SettingsCollectionMoveIntent,
 } from '../../../../section-surface';
 import type { StepBadgePresetCatalogController } from './types';
+import {
+  AnnotationTemplateQueryControls,
+  AnnotationTemplateQueryEmpty,
+  AnnotationTemplateTagChips,
+  queryAnnotationTemplateValues,
+  resolveAnnotationTemplateTags,
+  useAnnotationTemplateTagState,
+} from '../../../../../ui/annotation-template-query';
 
 export function StepBadgePresetsPanel({
   controller,
@@ -15,8 +24,21 @@ export function StepBadgePresetsPanel({
   controller: StepBadgePresetCatalogController;
 }) {
   const locale = useAppLocale();
-  const presets = controller.catalog?.presets ?? [];
-  const enabledCount = presets.filter((preset) => preset.enabled !== false).length;
+  const [query, setQuery] = useState('');
+  const tagState = useAnnotationTemplateTagState();
+  const sourcePresets = controller.catalog?.presets ?? [];
+  const presets = queryAnnotationTemplateValues({
+    activeFilterTagIds: tagState.state.activeFilterTagIds,
+    ...(controller.catalog?.defaultPresetId
+      ? { activeTemplateId: controller.catalog.defaultPresetId }
+      : {}),
+    getDisplayName: (preset) => getStepBadgePresetDisplayName(preset, locale),
+    getTagIds: (preset) => preset.tagIds,
+    query,
+    tags: tagState.state.tags,
+    values: sourcePresets,
+  });
+  const enabledCount = sourcePresets.filter((preset) => preset.enabled !== false).length;
   const items: readonly SettingsCollectionItem[] = presets.map((preset) => ({
     id: preset.id,
     title: getStepBadgePresetDisplayName(preset, locale),
@@ -25,6 +47,11 @@ export function StepBadgePresetsPanel({
         ? translate('content.stepBadge.sizeFromFrame')
         : `${preset.settings.style.diameter} px`,
     preview: <StepBadgePresetPreview settings={preset.settings} />,
+    supplement: (
+      <AnnotationTemplateTagChips
+        tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
+      />
+    ),
     enabled: preset.enabled !== false,
     isDefault: controller.catalog?.defaultPresetId === preset.id,
     busy: controller.isSaving,
@@ -66,22 +93,42 @@ export function StepBadgePresetsPanel({
     if (action.type === 'delete') void controller.actions.delete(preset);
   };
   return (
-    <SettingsCollection
-      ariaLabel={translate('highlighter.stepBadgePresets.title')}
-      title={translate('highlighter.stepBadgePresets.title')}
-      description={translate('highlighter.stepBadgePresets.description')}
-      items={items}
-      state={controller.isLoading ? 'loading' : controller.error ? 'error' : 'ready'}
-      errorState={translate('highlighter.stepBadgePresets.messages.loadError')}
-      addAction={{
-        label: translate('highlighter.stepBadgePresets.add'),
-        disabled: controller.isSaving,
-        onInvoke: controller.actions.add,
-      }}
-      onAction={onAction}
-      onMove={(intent: SettingsCollectionMoveIntent) =>
-        void controller.actions.moveBefore(intent.itemId, intent.beforeItemId)
-      }
-    />
+    <div className="space-y-3">
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={tagState.state.activeFilterTagIds}
+        disabled={tagState.isLoading || tagState.error}
+        onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        onQueryChange={setQuery}
+        query={query}
+        tags={tagState.state.tags}
+      />
+      <SettingsCollection
+        ariaLabel={translate('highlighter.stepBadgePresets.title')}
+        title={translate('highlighter.stepBadgePresets.title')}
+        description={translate('highlighter.stepBadgePresets.description')}
+        items={items}
+        state={controller.isLoading ? 'loading' : controller.error ? 'error' : 'ready'}
+        errorState={translate('highlighter.stepBadgePresets.messages.loadError')}
+        addAction={{
+          label: translate('highlighter.stepBadgePresets.add'),
+          disabled: controller.isSaving,
+          onInvoke: controller.actions.add,
+        }}
+        emptyState={
+          sourcePresets.length > 0 ? (
+            <AnnotationTemplateQueryEmpty
+              hasFilter={tagState.state.activeFilterTagIds.length > 0}
+              onClearFilter={() => void tagState.setActiveFilterTagIds([])}
+              onClearQuery={() => setQuery('')}
+              query={query}
+            />
+          ) : undefined
+        }
+        onAction={onAction}
+        onMove={(intent: SettingsCollectionMoveIntent) =>
+          void controller.actions.moveBefore(intent.itemId, intent.beforeItemId)
+        }
+      />
+    </div>
   );
 }

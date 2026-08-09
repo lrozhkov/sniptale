@@ -53,6 +53,7 @@ const localPreferenceKeys = [
 
 const syncPreferenceKeys = [
   'sniptale_settings',
+  'sniptale_annotation_template_tags',
   'sniptale_highlighter_settings',
   'sniptale_callout_presets',
   'sniptale_step_badge_presets',

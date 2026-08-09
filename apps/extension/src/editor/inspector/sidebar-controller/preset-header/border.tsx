@@ -40,6 +40,7 @@ function buildBorderTemplateCards(args: {
     label: getBorderPresetDisplayName(preset),
     preview: renderBorderPresetPreview(preset),
     selected: preset.id === args.selectedPresetId,
+    tagIds: preset.tagIds,
     ...(preset.origin === 'system' ? { system: true } : {}),
     onApply: createBorderPresetApplyHandler({
       applySettings: args.applySettings,
@@ -95,6 +96,7 @@ function useBorderPresetHeaderModel(args: {
 
   return {
     activeView: viewMode,
+    annotationTagFiltering: true,
     groups: createEditorInspectorTemplateGroups(templates),
     onOpenSavePanel: saveDraft.openSavePanel,
     onViewChange: setViewMode,

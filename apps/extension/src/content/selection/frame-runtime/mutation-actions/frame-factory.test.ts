@@ -60,6 +60,7 @@ function createHighlighterSettings(): HighlighterSettings {
         id: 'preset-1',
         name: 'Orange',
         order: 0,
+        tagIds: [],
         width: 3,
         color: '#ff671d',
         style: 'solid',

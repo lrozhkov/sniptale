@@ -60,6 +60,7 @@ const DEFAULT_SETTINGS: HighlighterSettings = {
       id: 'preset-1',
       name: 'Preset',
       order: 1,
+      tagIds: [],
       padding: { bottom: 8, left: 8, right: 8, top: 8 },
       radius: 4,
       shadow: 30,

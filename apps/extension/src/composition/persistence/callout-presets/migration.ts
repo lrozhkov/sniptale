@@ -57,6 +57,7 @@ export function resolveStoredCalloutPresetCatalog(
         ...canonical,
         enabled: placement?.enabled ?? (!hasStoredCatalog || !customized),
         order: placement?.order ?? nextOrder + index,
+        tagIds: [...(placement?.tagIds ?? [])],
       };
     }
     return {
@@ -83,6 +84,7 @@ export function resolveStoredCalloutPresetCatalog(
       origin: 'user',
       placement: { ...(user.placement ?? { anchor: 'top-center', side: 'top' }) },
       style: cloneCalloutVisualStyle(user.style),
+      tagIds: [...(placement?.tagIds ?? [])],
     };
   });
   const presets = enforceEnabledInvariant([...systems, ...users]).toSorted(comparePlacement);
@@ -108,6 +110,7 @@ export function serializeCalloutPresetCatalog(
       enabled: preset.enabled !== false,
       id: preset.id,
       order: preset.order,
+      tagIds: [...preset.tagIds],
     })),
     schemaVersion: CALLOUT_PRESET_STORAGE_SCHEMA_VERSION,
     systemCatalogRevision: SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,

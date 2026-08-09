@@ -26,3 +26,14 @@ export function useOpeningPresetOrder<Preset extends { id: string }>(
   const openingActivePresetId = useRef(activePresetId);
   return prioritizeActivePreset(presets, openingActivePresetId.current);
 }
+
+export function useOpeningPresetSelection<Preset extends { id: string }>(
+  presets: readonly Preset[],
+  activePresetId: string | undefined
+) {
+  const openingActivePresetId = useRef(activePresetId).current;
+  return {
+    openingActivePresetId,
+    orderedPresets: prioritizeActivePreset(presets, openingActivePresetId),
+  };
+}

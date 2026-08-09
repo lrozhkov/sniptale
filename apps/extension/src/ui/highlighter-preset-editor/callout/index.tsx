@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   CalloutAnchor,
   CalloutPreset,
@@ -21,6 +21,7 @@ import { useCalloutPresetEditorDraft } from './draft';
 import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
 import { Eye } from 'lucide-react';
 import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
+import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
 
 function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
   if (anchor === 'middle-left') return { anchor, side: 'left' };
@@ -181,8 +182,12 @@ function PresetEditorFooter(props: {
 export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
   const locale = useAppLocale();
   const modalRootRef = useRef<HTMLDivElement>(null);
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const source = props.preset;
   const draft = useCalloutPresetEditorDraft({ isOpen: props.isOpen, locale, source });
+  useEffect(() => {
+    if (props.isOpen) setTagIds(props.isNew ? [] : (source.tagIds ?? []));
+  }, [props.isNew, props.isOpen, source.id, source.tagIds]);
   usePresetEditorModalLifecycle({
     isOpen: props.isOpen && Boolean(draft.style && draft.preset),
     modalRootRef,
@@ -220,13 +225,16 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           setStyle={draft.setStyle}
           style={draft.style}
         />
+        <div className="px-4 pb-4">
+          <AnnotationTemplateTagAssignment onChange={setTagIds} value={tagIds} />
+        </div>
         <PresetEditorFooter
           canReset={source.origin === 'system' && source.customized === true}
           isSaving={props.isSaving}
           name={draft.name}
           onClose={props.onClose}
           {...(props.onReset ? { onReset: props.onReset } : {})}
-          onSave={() => void props.onSave(preset)}
+          onSave={() => void props.onSave({ ...preset, tagIds })}
         />
       </ProductModal>
     </div>

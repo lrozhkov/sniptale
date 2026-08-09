@@ -14,6 +14,13 @@ it('creates a fully enabled default catalog and compactly round-trips it', () =>
   expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(fresh))).toEqual(fresh);
 });
 
+it('migrates absent tag metadata and compactly round-trips assigned tags', () => {
+  const legacy = resolveStoredCalloutPresetCatalog({});
+  expect(legacy.presets.every((preset) => preset.tagIds.length === 0)).toBe(true);
+  legacy.presets[0]!.tagIds = ['tag-one'];
+  expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(legacy))).toEqual(legacy);
+});
+
 it('preserves customized systems and appends missing canonical systems disabled', () => {
   const bubble = createSystemCalloutPresetCatalog()[0]!;
   const style = { ...bubble.style, surface: { ...bubble.style.surface, radius: 33 } };

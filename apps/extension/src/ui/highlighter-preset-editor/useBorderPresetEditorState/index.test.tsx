@@ -103,6 +103,7 @@ async function verifyExistingPresetEditBranch() {
     id: 'preset-1',
     name: 'Existing border',
     order: 3,
+    tagIds: [],
     width: 5,
     color: '#00aaff8c',
     style: 'solid' as const,

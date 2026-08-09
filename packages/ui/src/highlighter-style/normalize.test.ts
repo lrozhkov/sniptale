@@ -16,6 +16,7 @@ const PRESET: BorderPreset = {
   inheritCustomCss: true,
   name: 'Preset',
   order: 0,
+  tagIds: [],
   padding: { bottom: 0, left: 0, right: 0, top: 0 },
   radius: 4,
   shadow: 30,

@@ -58,6 +58,7 @@ const testBorderSettings: BorderPreset = {
   id: 'preset-1',
   name: 'Preset',
   order: 0,
+  tagIds: [],
   padding: {
     top: 2,
     right: 5,

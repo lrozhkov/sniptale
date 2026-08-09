@@ -58,9 +58,12 @@ export function useTemplateForkWorkflow<Preset extends { id: string }>(args: {
     discard,
     fork,
     goToSave,
-    mode,
     requestTemplates,
     saveRequest,
+    session: {
+      mode,
+      sourceTemplate: args.templates.find((item) => item.id === sourceTemplateId.current) ?? null,
+    },
   };
 }
 

@@ -1,4 +1,8 @@
 import { expect, expectTypeOf, it } from 'vitest';
+import {
+  ANNOTATION_TEMPLATE_TAG_LIMITS,
+  cloneAnnotationTemplateTagState,
+} from './annotation-template-tags';
 
 import type {
   CalloutAnchor,
@@ -49,6 +53,7 @@ const BORDER_PRESET: BorderPreset = {
   },
   inheritCustomCss: false,
   customCss: '',
+  tagIds: ['tag-one'],
 };
 
 it('keeps highlighter alphabets and shared anchors canonical', () => {
@@ -80,6 +85,25 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
   }>();
 });
 
+it('clones annotation template tag state without sharing mutable arrays', () => {
+  const source = {
+    activeFilterTagIds: ['tag-one'],
+    schemaVersion: 1,
+    tags: [{ id: 'tag-one', label: 'Review' }],
+  };
+  const clone = cloneAnnotationTemplateTagState(source);
+
+  expect(ANNOTATION_TEMPLATE_TAG_LIMITS).toEqual({
+    maximumLabelLength: 32,
+    maximumTags: 32,
+    maximumTagsPerTemplate: 8,
+  });
+  expect(clone).toEqual(source);
+  expect(clone.activeFilterTagIds).not.toBe(source.activeFilterTagIds);
+  expect(clone.tags).not.toBe(source.tags);
+  expect(clone.tags[0]).not.toBe(source.tags[0]);
+});
+
 it('recognizes only canonical system step badge preset keys', () => {
   for (const key of SYSTEM_STEP_BADGE_PRESET_KEYS) {
     expect(isSystemStepBadgePresetKey(key)).toBe(true);
@@ -104,6 +128,7 @@ it('projects catalog presets into independent applied border snapshots', () => {
   });
   expect(applied).not.toHaveProperty('id');
   expect(applied).not.toHaveProperty('name');
+  expect(applied).not.toHaveProperty('tagIds');
   expect(applied.padding).not.toBe(BORDER_PRESET.padding);
   expect(applied.fillPaint).not.toBe(BORDER_PRESET.fillPaint);
 });

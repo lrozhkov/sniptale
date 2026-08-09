@@ -62,8 +62,13 @@ export function createStepBadgePresetCatalogActions(args: {
                 id: preset.id,
                 name: preset.name,
                 settings: preset.settings,
+                tagIds: preset.tagIds,
               })
-            : createUserStepBadgePreset({ name: preset.name, settings: preset.settings }),
+            : createUserStepBadgePreset({
+                name: preset.name,
+                settings: preset.settings,
+                tagIds: preset.tagIds,
+              }),
         exists
           ? 'highlighter.stepBadgePresets.messages.updated'
           : 'highlighter.stepBadgePresets.messages.created'

@@ -56,6 +56,7 @@ function createSettings(): HighlighterSettings {
         origin: 'system',
         systemPresetKey: 'system-default',
         order: 0,
+        tagIds: [],
         width: 2,
         color: '#ff0000',
         style: 'solid',

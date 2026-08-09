@@ -50,6 +50,7 @@ function createBorderPreset(id: string, color: string, enabled = true, system = 
     id,
     name: id,
     order: id === 'border-1' ? 0 : 1,
+    tagIds: [],
     enabled,
     color,
     width: 4,

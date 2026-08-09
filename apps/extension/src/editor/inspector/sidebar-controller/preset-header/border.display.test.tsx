@@ -63,6 +63,7 @@ function Harness() {
         id: 'system-default',
         name: 'shared.defaults.defaultBorderPresetName',
         order: 0,
+        tagIds: [],
         enabled: true,
         origin: 'system',
         systemPresetKey: 'system-default',

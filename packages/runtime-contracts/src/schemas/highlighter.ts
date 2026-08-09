@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { multiplyColorAlpha } from '@sniptale/foundation/color';
 import { parsePaint, type Paint } from '@sniptale/foundation/paint';
 import { SYSTEM_BORDER_PRESET_KEYS } from '../highlighter/border-preset';
+import { ANNOTATION_TEMPLATE_TAG_LIMITS } from '../highlighter/annotation-template-tags';
 
 export const BorderPaddingSchema = z.object({
   top: z.number().int().min(0).max(50),
@@ -59,28 +60,36 @@ const CanonicalBorderPresetSchema = z.object({
   systemPresetKey: z.enum(SYSTEM_BORDER_PRESET_KEYS).optional(),
   basedOnRevision: z.number().int().min(0).optional(),
   customized: z.boolean().optional(),
+  tagIds: z
+    .array(z.string().min(1))
+    .max(ANNOTATION_TEMPLATE_TAG_LIMITS.maximumTagsPerTemplate)
+    .refine((tagIds) => new Set(tagIds).size === tagIds.length),
 });
 
-function migrateLegacyFillPaint(value: unknown): unknown {
+function migrateLegacyBorderPreset(value: unknown): unknown {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
   const input = value as Record<string, unknown>;
-  if (input['fillPaint'] !== undefined || typeof input['fillColor'] !== 'string') return value;
+  const withTags = input['tagIds'] === undefined ? { ...input, tagIds: [] } : input;
+  if (input['fillPaint'] !== undefined || typeof input['fillColor'] !== 'string') return withTags;
   const fillOpacity = input['fillOpacity'];
   if (
     fillOpacity !== undefined &&
     (typeof fillOpacity !== 'number' || !Number.isFinite(fillOpacity))
   ) {
-    return value;
+    return withTags;
   }
   const color =
     typeof fillOpacity === 'number'
       ? multiplyColorAlpha(input['fillColor'], fillOpacity / 100)
       : input['fillColor'];
-  if (!color) return value;
-  return { ...input, fillPaint: { kind: 'solid', color } };
+  if (!color) return withTags;
+  return { ...withTags, fillPaint: { kind: 'solid', color } };
 }
 
-export const BorderPresetSchema = z.preprocess(migrateLegacyFillPaint, CanonicalBorderPresetSchema);
+export const BorderPresetSchema = z.preprocess(
+  migrateLegacyBorderPreset,
+  CanonicalBorderPresetSchema
+);
 
 export const BlurSettingsSchema = z.object({
   amount: z.number().int().min(1).max(50),

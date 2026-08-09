@@ -38,6 +38,7 @@ const PRESET: BorderPreset = {
   id: 'preset-1',
   name: 'Preset',
   order: 0,
+  tagIds: [],
   width: 2,
   color: '#ff6600',
   style: 'solid',

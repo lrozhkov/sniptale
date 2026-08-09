@@ -20,6 +20,7 @@ function createBorderPreset(overrides: Partial<BorderPreset> = {}): BorderPreset
     inheritCustomCss: true,
     name: 'Default',
     order: 0,
+    tagIds: [],
     padding: {
       bottom: 4,
       left: 3,

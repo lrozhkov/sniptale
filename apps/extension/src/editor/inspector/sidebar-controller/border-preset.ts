@@ -37,6 +37,7 @@ export function createBorderPresetFromShapeSettings(
     id: crypto.randomUUID(),
     name: createRectanglePresetName(borderPresets),
     order,
+    tagIds: [],
     enabled: true,
     width: Math.max(1, Math.round(shapeSettings.strokeWidth)),
     color:

@@ -7,6 +7,7 @@ import {
 import { HighlighterSection } from './borders';
 import { CalloutPresetCatalogSettings, useCalloutPresetCatalogController } from './callouts';
 import { StepBadgePresetCatalogSettings, useStepBadgePresetCatalogController } from './numbering';
+import { AnnotationTemplateTagsSettings } from './tags';
 
 function CalloutsSection() {
   const controller = useCalloutPresetCatalogController();
@@ -32,8 +33,8 @@ export function AnnotationsSection(props: {
   onViewChange?: (view: string) => void;
   view?: string;
 }) {
-  const view = ['callouts', 'numbering'].includes(props.view ?? '')
-    ? (props.view as 'callouts' | 'numbering')
+  const view = ['callouts', 'numbering', 'tags'].includes(props.view ?? '')
+    ? (props.view as 'callouts' | 'numbering' | 'tags')
     : 'borders';
   return (
     <div className="space-y-5">
@@ -44,10 +45,13 @@ export function AnnotationsSection(props: {
           { id: 'borders', label: translate('settings.navigation.views.borders') },
           { id: 'callouts', label: translate('settings.navigation.views.callouts') },
           { id: 'numbering', label: translate('settings.navigation.views.numbering') },
+          { id: 'tags', label: translate('highlighter.templateTags.tab') },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'callouts' ? (
+      {view === 'tags' ? (
+        <AnnotationTemplateTagsSettings />
+      ) : view === 'callouts' ? (
         <CalloutsSection />
       ) : view === 'numbering' ? (
         <NumberingSection />

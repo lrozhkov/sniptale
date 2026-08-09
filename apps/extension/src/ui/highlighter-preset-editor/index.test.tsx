@@ -81,6 +81,7 @@ describe('BorderPresetEditor opened state', () => {
       id: 'preset-1',
       name: 'Preset',
       order: 0,
+      tagIds: [],
       width: 3,
       color: '#ff6600',
       style: 'solid' as const,
@@ -102,12 +103,15 @@ describe('BorderPresetEditor opened state', () => {
       preset,
     });
 
-    expect(editorContentPropsSpy).toHaveBeenCalledWith({
-      isSaving: false,
-      onClose,
-      preset,
-      state: derivedState,
-    });
+    expect(editorContentPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isSaving: false,
+        onClose,
+        preset,
+        state: derivedState,
+        tagIds: [],
+      })
+    );
   });
 
   it('forwards the persistence busy state to the modal content', async () => {

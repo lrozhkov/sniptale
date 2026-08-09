@@ -42,6 +42,7 @@ export function EditorInspectorPresetHeader(props: {
       />
       {state.activeView === 'templates' ? (
         <EditorInspectorTemplateCards
+          annotationTagFiltering={state.annotationTagFiltering}
           templates={state.templates}
           saveDisabled={state.saveDisabled}
           savePanel={state.savePanel}

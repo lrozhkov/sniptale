@@ -2127,6 +2127,28 @@
       "unownedFocusedFiles": []
     },
     {
+      "owner": "apps/extension/src/composition/persistence/annotation-template-tags",
+      "disposition": "rollout",
+      "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
+      "productionFiles": [
+        "apps/extension/src/composition/persistence/annotation-template-tags/index.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/known-ids.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/owner.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/parser.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/storage.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/tag-ids.ts"
+      ],
+      "rolloutFiles": [
+        "apps/extension/src/composition/persistence/annotation-template-tags/index.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/known-ids.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/owner.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/parser.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/storage.ts",
+        "apps/extension/src/composition/persistence/annotation-template-tags/tag-ids.ts"
+      ],
+      "unownedFocusedFiles": []
+    },
+    {
       "owner": "apps/extension/src/composition/persistence/callout-presets",
       "disposition": "rollout",
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
@@ -11260,6 +11282,8 @@
         "apps/extension/src/settings/sections/styles/annotations/numbering/index.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/types.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/controller.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/actions.ts",
@@ -11572,6 +11596,8 @@
         "apps/extension/src/settings/sections/styles/annotations/numbering/index.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/types.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/controller.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/actions.ts",
@@ -11657,6 +11683,21 @@
         "apps/extension/src/settings/shell/page/sections.tsx",
         "apps/extension/src/settings/shell/route/history.ts"
       ],
+      "unownedFocusedFiles": []
+    },
+    {
+      "owner": "apps/extension/src/ui/annotation-template-query",
+      "disposition": "unmapped",
+      "reason": "This owner family has focused model and interaction proof but remains outside the hard coverage rollout; add an explicit rollout target before enabling thresholds.",
+      "productionFiles": [
+        "apps/extension/src/ui/annotation-template-query/assignment.tsx",
+        "apps/extension/src/ui/annotation-template-query/chips.tsx",
+        "apps/extension/src/ui/annotation-template-query/filter.tsx",
+        "apps/extension/src/ui/annotation-template-query/index.ts",
+        "apps/extension/src/ui/annotation-template-query/model.ts",
+        "apps/extension/src/ui/annotation-template-query/state.ts"
+      ],
+      "rolloutFiles": [],
       "unownedFocusedFiles": []
     },
     {
@@ -13099,6 +13140,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/highlighter/annotation-template-tags.ts",
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
@@ -13222,6 +13264,7 @@
         "packages/runtime-contracts/src/effect-v1/validation/scene.ts",
         "packages/runtime-contracts/src/effect-v1/validation/shared.ts",
         "packages/runtime-contracts/src/export/index.ts",
+        "packages/runtime-contracts/src/highlighter/annotation-template-tags.ts",
         "packages/runtime-contracts/src/highlighter/border-preset.ts",
         "packages/runtime-contracts/src/highlighter/callout.ts",
         "packages/runtime-contracts/src/highlighter/step-badge.ts",
@@ -13535,7 +13578,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "b1628bc0ec8c4b35b5f843fbfaa4567fea8ea313a10622a2d9574597039c8a61"
+        "contentHash": "d52cb3ff26bd0d9a06f8d28670491ad55ad1ea99f5eb2729e5ce163790b7561c"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",

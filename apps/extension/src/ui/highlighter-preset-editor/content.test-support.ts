@@ -60,6 +60,7 @@ export function createPreset(): BorderPreset {
     id: 'preset-2',
     name: 'Existing',
     order: 1,
+    tagIds: [],
     width: 4,
     color: '#ffaa00',
     style: 'dashed',

@@ -4,6 +4,27 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../document/constants';
 import { renderBorderPresetPreview, renderEditorPresetPreview } from './preview';
 
+function renderBorderPreview(): string {
+  return ReactDOMServer.renderToStaticMarkup(
+    renderBorderPresetPreview({
+      id: 'border',
+      name: 'Border',
+      order: 0,
+      tagIds: [],
+      enabled: true,
+      width: 4,
+      color: '#777777',
+      style: 'solid',
+      radius: 0,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      shadow: 0,
+      fillPaint: { kind: 'solid' as const, color: '#888888' },
+      inheritCustomCss: false,
+      customCss: '',
+    })
+  );
+}
+
 describe('editor preset preview renderer', () => {
   it('renders previews for every editor preset family and the border preset seam', () => {
     const pencil = ReactDOMServer.renderToStaticMarkup(
@@ -201,23 +222,7 @@ describe('editor preset preview renderer', () => {
         },
       })
     );
-    const border = ReactDOMServer.renderToStaticMarkup(
-      renderBorderPresetPreview({
-        id: 'border',
-        name: 'Border',
-        order: 0,
-        enabled: true,
-        width: 4,
-        color: '#777777',
-        style: 'solid',
-        radius: 0,
-        padding: { top: 0, right: 0, bottom: 0, left: 0 },
-        shadow: 0,
-        fillPaint: { kind: 'solid' as const, color: '#888888' },
-        inheritCustomCss: false,
-        customCss: '',
-      })
-    );
+    const border = renderBorderPreview();
     const sceneColor = ReactDOMServer.renderToStaticMarkup(
       renderEditorPresetPreview('sceneBackground', {
         id: 'scene-color',
