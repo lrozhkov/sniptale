@@ -44,6 +44,7 @@ export interface UseVideoEditorRuntimeParams {
   projectState: {
     setProject: VideoEditorSessionActions['setProject'];
     updateProject: VideoEditorSessionActions['updateProject'];
+    syncProjectRevision: VideoEditorSessionActions['syncProjectRevision'];
     setReady: VideoEditorSessionActions['setReady'];
     setError: VideoEditorSessionActions['setError'];
     setSaveState: VideoEditorSessionActions['setSaveState'];

@@ -7,10 +7,18 @@ import type { VideoEditorExportRuntimeState } from './export-state';
 import type { VideoEditorSaveState } from './session-state';
 import type { VideoEditorPlacementMode } from './placement';
 import type { VideoEditorSelection } from './selection';
+import type {
+  VideoEditorProjectHistoryActions,
+  VideoEditorProjectHistoryStatus,
+} from './commands/history';
 
 /** Explicit port selected by the Zustand composition adapter for runtime controllers. */
 export interface VideoEditorControllerStorePort
-  extends VideoEditorProjectActions, VideoEditorSessionActions, VideoEditorExportActions {
+  extends
+    VideoEditorProjectActions,
+    VideoEditorProjectHistoryActions,
+    VideoEditorSessionActions,
+    VideoEditorExportActions {
   currentTime: number;
   diagnosticsOpen: boolean;
   error: string | null;
@@ -20,6 +28,7 @@ export interface VideoEditorControllerStorePort
   pixelsPerSecond: number;
   placementMode: VideoEditorPlacementMode | null;
   project: VideoProject | null;
+  projectHistoryStatus: VideoEditorProjectHistoryStatus;
   recordingId: string | null;
   recordingTelemetry: RecordingTelemetryEntry | null;
   saveState: VideoEditorSaveState;

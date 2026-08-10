@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { requestVideoEditorSaveRetry } from './save-retry';
+import { useVideoEditorStore } from '../../state/store';
 
 const saveVideoProject = vi.fn();
 const getVideoProject = vi.fn();
@@ -44,9 +45,8 @@ type AutoSaveHarnessProps = {
   root: Root | null;
   setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void;
   syncProjectRevision?: (
-    updater: (
-      project: ReturnType<typeof createEmptyVideoProject>
-    ) => ReturnType<typeof createEmptyVideoProject>
+    expectedProject: ReturnType<typeof createEmptyVideoProject>,
+    persistedUpdatedAt: number
   ) => void;
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave'];
 };
@@ -88,6 +88,7 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  useVideoEditorStore.setState(useVideoEditorStore.getInitialState(), true);
 });
 
 afterEach(() => {
@@ -99,7 +100,26 @@ afterEach(() => {
   container = null;
   vi.restoreAllMocks();
   vi.useRealTimers();
+  useVideoEditorStore.setState(useVideoEditorStore.getInitialState(), true);
 });
+
+function StoreAutoSaveHarness(props: {
+  refreshProjects: () => Promise<void>;
+  useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave'];
+}) {
+  const project = useVideoEditorStore((state) => state.project);
+  const recordingId = useVideoEditorStore((state) => state.recordingId);
+  const setSaveState = useVideoEditorStore((state) => state.setSaveState);
+  const syncProjectRevision = useVideoEditorStore((state) => state.syncProjectRevision);
+  props.useVideoEditorAutoSave(
+    project,
+    recordingId,
+    setSaveState,
+    props.refreshProjects,
+    syncProjectRevision
+  );
+  return null;
+}
 
 it('saves the project after the debounce and refreshes project metadata', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
@@ -208,8 +228,10 @@ it('syncs the saved revision into editor state without triggering a duplicate au
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
   const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
   const syncProjectRevision = vi.fn(
-    (updater: (project: typeof currentProject) => typeof currentProject) => {
-      currentProject = updater(currentProject);
+    (expectedProject: typeof currentProject, persistedUpdatedAt: number) => {
+      if (currentProject === expectedProject) {
+        currentProject = { ...currentProject, updatedAt: persistedUpdatedAt };
+      }
     }
   );
   const Harness = () => {
@@ -241,6 +263,80 @@ it('syncs the saved revision into editor state without triggering a duplicate au
   expect(syncProjectRevision).toHaveBeenCalledOnce();
   expect(currentProject.updatedAt).toBe(200);
   expect(saveVideoProject).toHaveBeenCalledTimes(1);
+});
+
+it('persists an undone project without recording autosave revision sync as another edit', async () => {
+  const useVideoEditorAutoSave = await importAutoSaveHook();
+  const project = createEmptyVideoProject('History autosave');
+  const refreshProjects = vi.fn().mockResolvedValue(undefined);
+  saveVideoProject.mockImplementation(async (candidate) => ({
+    ...candidate,
+    updatedAt: candidate.updatedAt + 1,
+  }));
+  useVideoEditorStore.getState().setProject(project, 'rec-1');
+  act(() => {
+    root?.render(
+      <StoreAutoSaveHarness
+        refreshProjects={refreshProjects}
+        useVideoEditorAutoSave={useVideoEditorAutoSave}
+      />
+    );
+  });
+
+  act(() => useVideoEditorStore.getState().renameProject('History autosave edited'));
+  act(() => useVideoEditorStore.getState().undoProject());
+  await flushAutoSaveTimers();
+  await act(async () => undefined);
+
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(saveVideoProject).toHaveBeenCalledWith(
+    expect.objectContaining({ id: project.id, name: 'History autosave' }),
+    { expectedWorkspaceRevision: null }
+  );
+  expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('rejects a stale real-store autosave revision after project replacement', async () => {
+  const useVideoEditorAutoSave = await importAutoSaveHook();
+  const projectA = createEmptyVideoProject('Project A');
+  const projectB = createEmptyVideoProject('Project B');
+  const refreshProjects = vi.fn().mockResolvedValue(undefined);
+  let resolveSave: ((project: typeof projectA) => void) | null = null;
+  saveVideoProject.mockImplementationOnce(
+    () =>
+      new Promise<typeof projectA>((resolve) => {
+        resolveSave = resolve;
+      })
+  );
+  useVideoEditorStore.getState().setProject(projectA, 'rec-a');
+  act(() => {
+    root?.render(
+      <StoreAutoSaveHarness
+        refreshProjects={refreshProjects}
+        useVideoEditorAutoSave={useVideoEditorAutoSave}
+      />
+    );
+  });
+  act(() => useVideoEditorStore.getState().renameProject('Project A edited'));
+  await flushAutoSaveTimers();
+
+  act(() => useVideoEditorStore.getState().setProject(projectB, 'rec-b'));
+  const activeProjectB = useVideoEditorStore.getState().project;
+  const projectBHistory = useVideoEditorStore.getState().projectHistory;
+  await act(async () => {
+    resolveSave?.({ ...projectA, name: 'Project A edited', updatedAt: 500 });
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(useVideoEditorStore.getState().project).toBe(activeProjectB);
+  expect(useVideoEditorStore.getState().project).toMatchObject({
+    id: projectB.id,
+    name: 'Project B',
+    updatedAt: projectB.updatedAt,
+  });
+  expect(useVideoEditorStore.getState().projectHistory).toBe(projectBHistory);
 });
 
 it('queues overlapping same-project autosaves behind the persisted revision update', async () => {

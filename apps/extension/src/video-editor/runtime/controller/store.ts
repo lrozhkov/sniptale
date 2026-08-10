@@ -18,6 +18,7 @@ function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
     isPlaying: state.isPlaying,
     pixelsPerSecond: state.pixelsPerSecond,
     project: state.project,
+    projectHistory: state.projectHistory,
     recordingTelemetry: state.recordingTelemetry,
     recordingId: state.recordingId,
     selectedClipId: state.selectedClipId,
@@ -26,9 +27,12 @@ function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
     setError: state.setError,
     setPlaying: state.setPlaying,
     setProject: state.setProject,
+    syncProjectRevision: state.syncProjectRevision,
     setRecordingTelemetry: state.setRecordingTelemetry,
     setReady: state.setReady,
     setSaveState: state.setSaveState,
+    undoProject: state.undoProject,
+    redoProject: state.redoProject,
     splitClipAt: state.splitClipAt,
     updateExportStatus: state.updateExportStatus,
   };
@@ -178,12 +182,18 @@ function selectVideoEditorActionStoreSlice(state: VideoEditorState) {
 function selectVideoEditorControllerStorePort(
   state: VideoEditorState
 ): VideoEditorControllerStorePort {
+  const runtime = selectVideoEditorRuntimeStoreSlice(state);
   return {
-    ...selectVideoEditorRuntimeStoreSlice(state),
+    ...runtime,
     ...selectVideoEditorWorkspaceSceneStoreSlice(state),
     ...selectVideoEditorWorkspaceSelectionStoreSlice(state),
     ...selectVideoEditorShellStoreSlice(state),
     ...selectVideoEditorActionStoreSlice(state),
+    projectHistoryStatus: {
+      canUndo: runtime.projectHistory.past.length > 0,
+      canRedo: runtime.projectHistory.future.length > 0,
+      error: runtime.projectHistory.error,
+    },
   };
 }
 

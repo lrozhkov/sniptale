@@ -65,6 +65,7 @@ function createProjectState(): UseVideoEditorRuntimeParams['projectState'] {
   return {
     setProject: fn(),
     updateProject: fn(),
+    syncProjectRevision: fn(),
     setReady: fn(),
     setError: fn(),
     setSaveState: fn(),

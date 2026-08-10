@@ -14,11 +14,13 @@ import type { VideoEditorState } from './types';
 import { create } from 'zustand';
 import { createVideoEditorTimelineState } from './root-state';
 import { createExportStateActions } from './export-state';
+import { createVideoEditorProjectHistoryActions } from './history-actions';
 
 function createTimelineStore() {
   return create<VideoEditorState>()((set, get) => ({
     ...createVideoEditorTimelineState(set),
     ...createVideoEditorProjectActions(set, get),
+    ...createVideoEditorProjectHistoryActions(set),
     ...createExportStateActions(set),
   }));
 }

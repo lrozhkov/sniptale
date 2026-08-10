@@ -20,7 +20,7 @@ export function useVideoEditorAutoSave(
   recordingId: string | null,
   setSaveState: VideoEditorSessionActions['setSaveState'],
   refreshProjects: VideoEditorLibrariesState['refreshProjects'],
-  syncProjectRevision?: VideoEditorSessionActions['updateProject']
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision']
 ): void {
   const retryGeneration = useVideoEditorSaveRetryGeneration();
   const saveGenerationRef = useRef(0);
@@ -61,7 +61,7 @@ function scheduleVideoEditorAutoSave(args: {
   saveGenerationRef: MutableRefObject<number>;
   saveQueueRef: MutableRefObject<Promise<void>>;
   setSaveState: VideoEditorSessionActions['setSaveState'];
-  syncProjectRevision?: VideoEditorSessionActions['updateProject'];
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision'];
 }): () => void {
   const projectChanged = resetAutosaveRevisionForProject(
     args.project,
@@ -210,7 +210,7 @@ function syncSavedProjectRevision(args: {
   project: VideoProject;
   revisionSyncRef: MutableRefObject<{ id: string; revision: number } | null>;
   savedProject: VideoProject;
-  syncProjectRevision?: VideoEditorSessionActions['updateProject'];
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision'];
 }): void {
   if (!args.syncProjectRevision || args.savedProject.updatedAt === args.project.updatedAt) {
     return;
@@ -220,9 +220,5 @@ function syncSavedProjectRevision(args: {
     id: args.savedProject.id,
     revision: args.savedProject.updatedAt,
   };
-  args.syncProjectRevision((currentProject) =>
-    currentProject === args.project
-      ? { ...currentProject, updatedAt: args.savedProject.updatedAt }
-      : currentProject
-  );
+  args.syncProjectRevision(args.project, args.savedProject.updatedAt);
 }

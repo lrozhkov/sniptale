@@ -1,4 +1,15 @@
-import { Bug, Copy, Download, PanelsLeftRight, Pause, Play, Scissors, Trash2 } from 'lucide-react';
+import {
+  Bug,
+  Copy,
+  Download,
+  PanelsLeftRight,
+  Pause,
+  Play,
+  Redo2,
+  Scissors,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import {
@@ -6,12 +17,40 @@ import {
   createCommandPaletteRunAction,
   createCommandPaletteToggleAction,
 } from '../../../ui/command-palette/action-builders';
+import type { VideoEditorProjectHistoryController } from '../../contracts/commands/history';
 import type { VideoEditorCommandPaletteController } from '../../runtime/controller/contracts/surface';
 
 function buildVideoEditorProjectActions(
-  controller: VideoEditorCommandPaletteController
+  controller: VideoEditorCommandPaletteController,
+  history: VideoEditorProjectHistoryController
 ): CommandPaletteAction[] {
   return [
+    createCommandPaletteRunAction({
+      id: 'video-editor-undo',
+      title: translate('videoEditor.app.undo'),
+      section: translate('shared.ui.commandPaletteProjectSection'),
+      icon: commandPaletteIcon(Undo2),
+      disabled: !history.canUndo,
+      disabledReason: !history.canUndo
+        ? translate(
+            history.error ? 'videoEditor.app.historyError' : 'videoEditor.app.nothingToUndo'
+          )
+        : undefined,
+      onSelect: history.onUndo,
+    }),
+    createCommandPaletteRunAction({
+      id: 'video-editor-redo',
+      title: translate('videoEditor.app.redo'),
+      section: translate('shared.ui.commandPaletteProjectSection'),
+      icon: commandPaletteIcon(Redo2),
+      disabled: !history.canRedo,
+      disabledReason: !history.canRedo
+        ? translate(
+            history.error ? 'videoEditor.app.historyError' : 'videoEditor.app.nothingToRedo'
+          )
+        : undefined,
+      onSelect: history.onRedo,
+    }),
     createCommandPaletteRunAction({
       id: 'video-editor-open-export',
       title: translate('videoEditor.app.exportButton'),
@@ -107,10 +146,11 @@ function buildVideoEditorTimelineActions(
 }
 
 export function buildVideoEditorCommandPaletteActions(
-  controller: VideoEditorCommandPaletteController
+  controller: VideoEditorCommandPaletteController,
+  history: VideoEditorProjectHistoryController
 ): CommandPaletteAction[] {
   return [
-    ...buildVideoEditorProjectActions(controller),
+    ...buildVideoEditorProjectActions(controller, history),
     ...buildVideoEditorPlaybackActions(controller),
     ...buildVideoEditorTimelineActions(controller),
   ];

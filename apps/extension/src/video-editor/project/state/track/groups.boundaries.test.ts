@@ -4,12 +4,14 @@ import { getSortedTracks } from '../../../../features/video/project/timeline';
 import { VideoTrackKind } from '../../../../features/video/project/types';
 import { createProjectTrackStructureActions, createProjectTrackToggleActions } from './groups';
 import type { VideoEditorProjectState } from '../contracts';
+import { resetVideoEditorProjectHistory } from '../../history';
 
 function createState(): VideoEditorProjectState {
   const project = createEmptyVideoProject('Draft');
   return {
     currentTime: 0,
     project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
     selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,
     selection: { kind: 'scene' },

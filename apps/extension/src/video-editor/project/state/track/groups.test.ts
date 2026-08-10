@@ -6,6 +6,7 @@ import {
 import { VideoProjectAssetType, VideoTrackKind } from '../../../../features/video/project/types';
 import { createProjectTrackStructureActions, createProjectTrackToggleActions } from './groups';
 import type { VideoEditorProjectState } from '../contracts';
+import { resetVideoEditorProjectHistory } from '../../history';
 
 function createState(): VideoEditorProjectState {
   const project = createEmptyVideoProject('Draft');
@@ -13,6 +14,7 @@ function createState(): VideoEditorProjectState {
   return {
     currentTime: 0,
     project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
     selection: { kind: 'scene' },
     selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,

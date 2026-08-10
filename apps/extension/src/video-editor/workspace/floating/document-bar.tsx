@@ -1,4 +1,4 @@
-import { Clapperboard, FolderKanban, Pencil } from 'lucide-react';
+import { Clapperboard, FolderKanban, Pencil, Redo2, Undo2 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -21,6 +21,7 @@ const PROJECT_TITLE_CLASS_NAME = [
 
 type VideoEditorDocumentBarProps = {
   header: VideoEditorWorkspaceController['header'];
+  history: VideoEditorWorkspaceController['history'];
 };
 
 function VideoEditorProjectTitle({
@@ -73,7 +74,7 @@ function VideoEditorSaveStateBadge({
   );
 }
 
-export function VideoEditorFloatingDocumentBar({ header }: VideoEditorDocumentBarProps) {
+export function VideoEditorFloatingDocumentBar({ header, history }: VideoEditorDocumentBarProps) {
   return (
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar
@@ -86,6 +87,30 @@ export function VideoEditorFloatingDocumentBar({ header }: VideoEditorDocumentBa
         />
         <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
         <VideoProjectStorageStatus />
+        <EditorDivider className="mx-1 h-7" />
+        <ContentToolbarButton
+          title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
+          disabled={!history.canUndo}
+          onClick={history.onUndo}
+          dataUi="video-editor.floating.document-bar.undo"
+        >
+          <Undo2 size={17} strokeWidth={2.1} />
+        </ContentToolbarButton>
+        <ContentToolbarButton
+          title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
+          disabled={!history.canRedo}
+          onClick={history.onRedo}
+          dataUi="video-editor.floating.document-bar.redo"
+        >
+          <Redo2 size={17} strokeWidth={2.1} />
+        </ContentToolbarButton>
+        {history.error ? (
+          <span role="alert">
+            <ValueBadge className="text-[var(--sniptale-color-danger)]">
+              {translate('videoEditor.app.historyError')}
+            </ValueBadge>
+          </span>
+        ) : null}
         <EditorDivider className="mx-1 h-7" />
         <ContentToolbarButton
           title={translate('videoEditor.app.libraryButton')}

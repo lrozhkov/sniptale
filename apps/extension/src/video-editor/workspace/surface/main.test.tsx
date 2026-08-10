@@ -49,6 +49,13 @@ function createWorkspaceController() {
   return {
     diagnostics: {} as never,
     header: createHeaderController(),
+    history: {
+      canUndo: false,
+      canRedo: false,
+      error: null,
+      onUndo: vi.fn(),
+      onRedo: vi.fn(),
+    },
     layout: createLayoutController(),
     preview: createPreviewController(),
     sidebar: createSidebarController(projectActions),

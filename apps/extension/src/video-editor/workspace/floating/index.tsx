@@ -23,7 +23,7 @@ export function VideoEditorFloatingWorkspace({
 }: VideoEditorFloatingWorkspaceProps) {
   return (
     <FloatingChromeRoot dataUi="video-editor.floating-workspace">
-      <VideoEditorFloatingDocumentBar header={controller.header} />
+      <VideoEditorFloatingDocumentBar header={controller.header} history={controller.history} />
       <VideoEditorFloatingInsertPanel
         activeInsertKind={activeInsertKind}
         controller={controller}

@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
+import type { VideoEditorProjectHistoryController } from '../../contracts/commands/history';
 import type { VideoEditorCommandPaletteController } from '../../runtime/controller/contracts/surface';
 import { buildVideoEditorCommandPaletteActions } from './actions';
 
@@ -21,8 +22,16 @@ function createPaletteController(): VideoEditorCommandPaletteController {
   };
 }
 
-function selectAction(controller: VideoEditorCommandPaletteController, actionId: string) {
-  const action = buildVideoEditorCommandPaletteActions(controller).find(
+function createHistoryController(): VideoEditorProjectHistoryController {
+  return { canUndo: true, canRedo: false, error: null, onUndo: vi.fn(), onRedo: vi.fn() };
+}
+
+function selectAction(
+  controller: VideoEditorCommandPaletteController,
+  actionId: string,
+  history = createHistoryController()
+) {
+  const action = buildVideoEditorCommandPaletteActions(controller, history).find(
     ({ id }) => id === actionId
   );
 
@@ -35,14 +44,18 @@ function selectAction(controller: VideoEditorCommandPaletteController, actionId:
 
 it('routes project and playback actions without retired annotation tools', () => {
   const controller = createPaletteController();
+  const history = createHistoryController();
 
-  selectAction(controller, 'video-editor-open-export').onSelect();
+  selectAction(controller, 'video-editor-open-export', history).onSelect();
+  selectAction(controller, 'video-editor-undo', history).onSelect();
   selectAction(controller, 'video-editor-toggle-sidebar').onSelect();
   selectAction(controller, 'video-editor-toggle-diagnostics').onSelect();
   selectAction(controller, 'video-editor-toggle-playback').onSelect();
-  const actions = buildVideoEditorCommandPaletteActions(controller);
+  const actions = buildVideoEditorCommandPaletteActions(controller, history);
 
   expect(controller.onOpenExportDialog).toHaveBeenCalledTimes(1);
+  expect(history.onUndo).toHaveBeenCalledTimes(1);
+  expect(selectAction(controller, 'video-editor-redo', history).disabled).toBe(true);
   expect(controller.toggleSidebarCollapsed).toHaveBeenCalledTimes(1);
   expect(controller.toggleDiagnostics).toHaveBeenCalledTimes(1);
   expect(controller.togglePlaying).toHaveBeenCalledTimes(1);
@@ -69,7 +82,7 @@ it('keeps timeline actions disabled when there is no selected clip', () => {
   const controller = createPaletteController();
   controller.selectedClipId = null;
 
-  const actions = buildVideoEditorCommandPaletteActions(controller);
+  const actions = buildVideoEditorCommandPaletteActions(controller, createHistoryController());
 
   expect(actions.find((action) => action.id === 'video-editor-split-clip')?.disabled).toBe(true);
   expect(actions.find((action) => action.id === 'video-editor-duplicate-clip')?.disabled).toBe(
@@ -81,11 +94,27 @@ it('keeps timeline actions disabled when there is no selected clip', () => {
   );
 });
 
+it('reports history failures instead of presenting failed commands as empty history', () => {
+  const controller = createPaletteController();
+  const history = {
+    ...createHistoryController(),
+    canUndo: false,
+    error: 'snapshotFailed' as const,
+  };
+
+  expect(selectAction(controller, 'video-editor-undo', history).disabledReason).toBe(
+    translate('videoEditor.app.historyError')
+  );
+  expect(selectAction(controller, 'video-editor-redo', history).disabledReason).toBe(
+    translate('videoEditor.app.historyError')
+  );
+});
+
 it('uses toggle subtitles for playback and diagnostics actions', () => {
   const controller = createPaletteController();
   controller.isPlaying = true;
 
-  const actions = buildVideoEditorCommandPaletteActions(controller);
+  const actions = buildVideoEditorCommandPaletteActions(controller, createHistoryController());
 
   expect(actions.find((action) => action.id === 'video-editor-toggle-playback')?.subtitle).toBe(
     translate('shared.ui.commandPaletteCurrentContextHint')

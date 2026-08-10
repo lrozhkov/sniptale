@@ -5,6 +5,7 @@ import type { VideoEditorProjectActions } from '../contracts/commands/project';
 import type { VideoEditorSessionActions } from '../contracts/commands/session';
 import type { VideoEditorSaveState } from '../contracts/session-state';
 import type { VideoEditorProjectSliceState } from '../project/state/contracts';
+import type { VideoEditorProjectHistoryActions } from '../contracts/commands/history';
 
 interface VideoEditorTimelineState extends VideoEditorProjectSliceState {
   recordingId: string | null;
@@ -24,4 +25,5 @@ export interface VideoEditorState
     VideoEditorTimelineState,
     VideoEditorSessionActions,
     VideoEditorProjectActions,
+    VideoEditorProjectHistoryActions,
     VideoEditorExportActions {}

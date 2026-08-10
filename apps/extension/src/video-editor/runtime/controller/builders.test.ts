@@ -8,6 +8,7 @@ import {
 } from '../../../features/video/project/types';
 import { createSceneSelection } from '../../project/selection/model';
 import type { VideoEditorState } from '../../state/store';
+import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 import {
   createVideoEditorCommandPaletteController,
   createVideoEditorOverlaysController,
@@ -27,11 +28,13 @@ function createStoreActions() {
   ) as unknown as Pick<VideoEditorState, (typeof BUILDER_STORE_ACTION_NAMES)[number]>;
 }
 
-function createStoreOverrides(): VideoEditorState {
+function createStoreOverrides(): VideoEditorState & VideoEditorControllerStorePort {
   const project = createEmptyVideoProject('Builder Test');
 
   return {
     project,
+    projectHistory: { projectId: project.id, past: [], future: [], error: null },
+    projectHistoryStatus: { canUndo: false, canRedo: false, error: null },
     recordingId: 'recording-1',
     isReady: true,
     error: null,
@@ -112,10 +115,11 @@ function createLibrariesState(store: VideoEditorState) {
   };
 }
 
-function createWorkspaceArgs(store: VideoEditorState) {
+function createWorkspaceArgs(store: VideoEditorState & VideoEditorControllerStorePort) {
   return {
     actions: createBuilderActions(),
     diagnosticsContent: 'diagnostics',
+    historyCommandsEnabled: true,
     libraries: createLibrariesState(store),
     runtime: createBuilderRuntimeState(),
     saveStateMeta: {
@@ -171,6 +175,19 @@ function verifyWorkspaceController() {
   expect(controller.timeline.state.magnetEnabled).toBe(true);
 }
 
+function verifyBlockedHistoryController() {
+  const store = createStoreOverrides();
+  store.projectHistoryStatus = { canUndo: true, canRedo: true, error: null };
+  const args = { ...createWorkspaceArgs(store), historyCommandsEnabled: false };
+  const controller = createVideoEditorWorkspaceController(args);
+
+  expect(controller?.history).toMatchObject({ canUndo: false, canRedo: false, error: null });
+  controller?.history.onUndo();
+  controller?.history.onRedo();
+  expect(store.undoProject).not.toHaveBeenCalled();
+  expect(store.redoProject).not.toHaveBeenCalled();
+}
+
 function verifyOverlayAndPaletteControllers() {
   const store = createStoreOverrides();
   store.selectedClipId = 'clip-1';
@@ -197,7 +214,7 @@ function verifyOverlayAndPaletteControllers() {
   expect(store.setDiagnosticsOpen).toHaveBeenCalledWith(true);
 }
 
-function createTestOverlaysController(store: VideoEditorState) {
+function createTestOverlaysController(store: VideoEditorState & VideoEditorControllerStorePort) {
   return createVideoEditorOverlaysController({
     actions: {
       handleCancelExport: vi.fn(),
@@ -219,7 +236,9 @@ function createTestOverlaysController(store: VideoEditorState) {
   });
 }
 
-function createTestCommandPaletteController(store: VideoEditorState) {
+function createTestCommandPaletteController(
+  store: VideoEditorState & VideoEditorControllerStorePort
+) {
   return createVideoEditorCommandPaletteController({
     runtime: {
       togglePlayback: vi.fn(),
@@ -234,6 +253,11 @@ function createTestCommandPaletteController(store: VideoEditorState) {
 
 describe('video editor controller builders', () => {
   it('builds workspace slices and keeps selected-clip actions guarded', verifyWorkspaceController);
+
+  it(
+    'disables and guards history commands while interaction is blocked',
+    verifyBlockedHistoryController
+  );
 
   it(
     'builds overlay and command-palette slices from owned runtime state',

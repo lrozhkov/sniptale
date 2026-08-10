@@ -42,6 +42,7 @@ Viewer preparation has one sanctioned one-way exception: `apps/extension/src/web
 
 - `apps/extension/src/editor/index.tsx` owns image workspace state, Fabric integration, editing commands, and editor persistence adapters. Its document-load path retains the owner-local legacy Fabric arrow-group compatibility backend.
 - `apps/extension/src/video-editor/index.tsx` owns video workspace state, timeline editing, project persistence adapters, and the parent-side EffectV1 preview adapter.
+- The video editor's project-history owner retains at most 100 undoable actions for the active project in memory. It resets on accepted project replacement and never becomes a durable project or persistence authority.
 - `apps/extension/src/video-editor/contracts/**` is the page-local exchange seam for cross-owner DTOs and command ports. It stays independent of React, Zustand, and video-editor product surfaces; `apps/extension/src/video-editor/runtime/controller/store.ts` is the sole runtime adapter from the full Zustand state to the explicit controller port.
 - `apps/extension/src/scenario-editor/index.tsx` owns scenario authoring, presentation, and scenario-specific project adapters. Shared scenario contracts and projections remain under named app-core owners rather than direct editor imports.
 

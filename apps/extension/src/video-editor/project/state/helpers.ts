@@ -22,6 +22,7 @@ import {
   resolveSelectedTrackIdFromSelection,
   resolveSelectionAfterProjectUpdate,
 } from './selection';
+import { recordVideoEditorProjectHistory } from '../history';
 
 export { isSourceTimedClip, updateSourceTimedClipTiming };
 
@@ -73,7 +74,25 @@ export function applyProjectUpdate(
     return {};
   }
 
-  const nextProject = syncProjectDuration(updater(state.project));
+  const updatedProject = updater(state.project);
+  if (updatedProject === state.project) {
+    return {};
+  }
+  const nextProject = syncProjectDuration(updatedProject);
+  return {
+    ...applyProjectSnapshot(state, nextProject),
+    projectHistory: recordVideoEditorProjectHistory(
+      state.projectHistory,
+      state.project,
+      nextProject
+    ),
+  };
+}
+
+export function applyProjectSnapshot(
+  state: VideoEditorProjectState,
+  nextProject: VideoProject
+): Partial<VideoEditorProjectState> {
   const nextTime = clampNumber(state.currentTime, 0, Math.max(0, nextProject.duration));
   const selectedClipStillExists = state.selectedClipId
     ? nextProject.clips.some((clip) => clip.id === state.selectedClipId)

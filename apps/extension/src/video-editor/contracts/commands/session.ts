@@ -5,6 +5,7 @@ import type { VideoEditorSaveState } from '../session-state';
 export interface VideoEditorSessionActions {
   setProject: (project: VideoProject, recordingId?: string | null) => void;
   updateProject: (updater: (project: VideoProject) => VideoProject) => void;
+  syncProjectRevision: (expectedProject: VideoProject, persistedUpdatedAt: number) => void;
   setReady: (ready: boolean) => void;
   setError: (error: string | null) => void;
   setSaveState: (state: VideoEditorSaveState) => void;

@@ -212,6 +212,13 @@ export function createFloatingWorkspaceController(): VideoEditorWorkspaceControl
   return {
     diagnostics: { isOpen: false, onClose: noop(), recordingId: null },
     header: createHeaderController(),
+    history: {
+      canUndo: false,
+      canRedo: false,
+      error: null,
+      onUndo: noop(),
+      onRedo: noop(),
+    },
     layout: {
       audioRecordingDialogOpen: false,
       closeAudioRecordingDialog: noop(),

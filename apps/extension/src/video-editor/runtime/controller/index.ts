@@ -17,6 +17,7 @@ import {
 import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 import type { VideoEditorController } from './contracts/surface';
 import { useRecordingTelemetry } from './recording-telemetry';
+import { useVideoEditorProjectHistoryShortcuts } from '../session/history-shortcuts';
 
 function buildRuntimeParams(
   store: VideoEditorControllerStorePort,
@@ -68,6 +69,7 @@ function buildRuntimeProjectStateParams(store: VideoEditorControllerStorePort) {
   return {
     setProject: store.setProject,
     updateProject: store.updateProject,
+    syncProjectRevision: store.syncProjectRevision,
     setReady: store.setReady,
     setError: store.setError,
     setSaveState: store.setSaveState,
@@ -107,9 +109,11 @@ function useBlockingOverlayOpen(
   store: VideoEditorControllerStorePort
 ): boolean {
   return (
+    workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
     workspace.libraryPanelOpen ||
     store.exportState.dialogOpen ||
+    store.exportState.error !== null ||
     store.exportState.isRunning
   );
 }
@@ -132,6 +136,13 @@ export function useVideoEditorController(): VideoEditorController {
   const libraries = useVideoEditorLibraries();
   const workspace = useVideoEditorWorkspaceState();
   const blockingOverlayOpen = useBlockingOverlayOpen(workspace, store);
+
+  useVideoEditorProjectHistoryShortcuts({
+    enabled: store.project !== null && !blockingOverlayOpen,
+    status: store.projectHistoryStatus,
+    undo: store.undoProject,
+    redo: store.redoProject,
+  });
 
   usePlaybackRangeSanity({
     project: store.project,
@@ -165,6 +176,7 @@ export function useVideoEditorController(): VideoEditorController {
   return createVideoEditorController({
     actions,
     diagnosticsContent: null,
+    historyCommandsEnabled: !blockingOverlayOpen,
     libraries,
     runtime,
     saveStateMeta,

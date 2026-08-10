@@ -39,6 +39,13 @@ describe('VideoEditorWorkspace', () => {
               recordingId: null,
             },
             header: {} as never,
+            history: {
+              canUndo: false,
+              canRedo: false,
+              error: null,
+              onUndo: vi.fn(),
+              onRedo: vi.fn(),
+            },
             layout: {
               audioRecordingDialogOpen: false,
               closeAudioRecordingDialog: vi.fn(),

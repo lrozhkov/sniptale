@@ -12,6 +12,7 @@ import type { VideoEditorController } from './contracts/surface';
 import type { VideoEditorWorkspaceController } from './contracts/workspace';
 import {
   createVideoEditorCommandPaletteController,
+  createVideoEditorHistoryController,
   createVideoEditorOverlaysController,
   createVideoEditorShellController,
 } from './shell';
@@ -27,6 +28,7 @@ import {
 interface CreateVideoEditorControllerArgs {
   actions: VideoEditorActionHandlers;
   diagnosticsContent: React.ReactNode;
+  historyCommandsEnabled: boolean;
   libraries: VideoEditorLibrariesState;
   runtime: VideoEditorRuntimeController;
   saveStateMeta: SaveStateMeta;
@@ -56,6 +58,7 @@ export function createVideoEditorWorkspaceController(
   return {
     diagnostics: createWorkspaceDiagnosticsController(args.store),
     header: createWorkspaceHeaderController(args, workspaceProject),
+    history: createVideoEditorHistoryController(args.store, args.historyCommandsEnabled),
     layout: createWorkspaceLayoutController(args.workspace),
     preview: createWorkspacePreviewController(
       args,

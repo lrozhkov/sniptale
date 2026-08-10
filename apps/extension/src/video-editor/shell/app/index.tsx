@@ -49,6 +49,7 @@ export const App: React.FC = () => {
       <VideoEditorWorkspace controller={readyController} />
       <VideoEditorCommandPalette
         controller={controller.palette}
+        history={readyController.workspace.history}
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />

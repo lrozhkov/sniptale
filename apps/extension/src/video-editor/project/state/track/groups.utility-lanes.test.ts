@@ -3,11 +3,14 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { createProjectTrackToggleActions } from './groups';
 import type { VideoEditorProjectState } from '../contracts';
+import { resetVideoEditorProjectHistory } from '../../history';
 
 function createMutableState() {
+  const project = createEmptyVideoProject('Draft');
   let state = {
     currentTime: 0,
-    project: createEmptyVideoProject('Draft'),
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
     selectedClipId: null,
     selectedTrackId: null,
     selection: { kind: 'scene' },

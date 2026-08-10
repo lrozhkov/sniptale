@@ -7,6 +7,7 @@ import type { VideoEditorState } from './types';
 import { createInitialExportState } from './export-state';
 import { applyProjectUpdate } from '../project/state/actions';
 import { isVideoEditorPresentedTrack } from '../project/operations/presented-tracks';
+import { resetVideoEditorProjectHistory } from '../project/history';
 
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 type RecordingTelemetryState = Parameters<VideoEditorState['setRecordingTelemetry']>[0];
@@ -37,6 +38,7 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
           : null;
       set({
         project: hydratedProject,
+        projectHistory: resetVideoEditorProjectHistory(hydratedProject.id),
         recordingId,
         saveState: 'saved',
         isReady: true,
@@ -59,10 +61,22 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
       });
     },
     updateProject: (updater: Parameters<VideoEditorState['updateProject']>[0]) =>
-      set(
-        (state): Partial<VideoEditorState> =>
-          applyProjectUpdate(state, (project) => hydrateVideoProject(updater(project)))
-      ),
+      set((state): Partial<VideoEditorState> => {
+        if (!state.project) return {};
+        const updatedProject = updater(state.project);
+        if (updatedProject === state.project) return {};
+        return applyProjectUpdate(state, () => hydrateVideoProject(updatedProject));
+      }),
+    syncProjectRevision: (
+      expectedProject: Parameters<VideoEditorState['syncProjectRevision']>[0],
+      persistedUpdatedAt: Parameters<VideoEditorState['syncProjectRevision']>[1]
+    ) =>
+      set((state) => {
+        if (state.project !== expectedProject) {
+          return {};
+        }
+        return { project: { ...expectedProject, updatedAt: persistedUpdatedAt } };
+      }),
     setReady: (isReady: boolean) => set({ isReady }),
     setError: (error: string | null) => set({ error }),
     setSaveState: (saveState: VideoEditorState['saveState']) => set({ saveState }),

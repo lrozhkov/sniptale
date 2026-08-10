@@ -66,7 +66,7 @@ function useVideoEditorRuntimeProjectEffects(
     recordingId: params.recordingId,
     getActiveExportJobId: params.exportState.getActiveJobId,
     setSaveState: params.projectState.setSaveState,
-    syncProjectRevision: params.projectState.updateProject,
+    syncProjectRevision: params.projectState.syncProjectRevision,
     libraries: params.libraries,
     setError: params.projectState.setError,
     setReady: params.projectState.setReady,

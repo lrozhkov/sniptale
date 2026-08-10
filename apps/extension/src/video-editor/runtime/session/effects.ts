@@ -13,7 +13,7 @@ interface RuntimeEffectsParams {
   recordingId: string | null;
   getActiveExportJobId: () => string | null;
   setSaveState: VideoEditorSessionActions['setSaveState'];
-  syncProjectRevision: VideoEditorSessionActions['updateProject'];
+  syncProjectRevision: VideoEditorSessionActions['syncProjectRevision'];
   libraries: VideoEditorLibrariesState;
   setError: VideoEditorSessionActions['setError'];
   setReady: VideoEditorSessionActions['setReady'];

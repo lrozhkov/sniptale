@@ -12,6 +12,7 @@ import {
   VideoTransitionKind,
 } from '../../../features/video/project/types';
 import { applyProjectUpdate } from './helpers';
+import { resetVideoEditorProjectHistory } from '../history';
 import type { VideoEditorProjectState } from './contracts';
 
 function createVideoSelectionClip(trackId: string) {
@@ -184,6 +185,7 @@ function expectSceneSelectionAfterProjectUpdate(
       {
         currentTime: 0,
         project,
+        projectHistory: resetVideoEditorProjectHistory(project.id),
         selectedClipId: null,
         selectedTrackId,
         selection,
