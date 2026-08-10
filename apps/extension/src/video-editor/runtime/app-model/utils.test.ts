@@ -28,6 +28,7 @@ describe('video editor app-model utilities', () => {
 
   it.each([
     ['idle', 'common.states.saved'],
+    ['dirty', 'common.states.dirty'],
     ['saving', 'common.states.saving'],
     ['saved', 'common.states.saved'],
     ['error', 'common.states.error'],

@@ -20,23 +20,38 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  root?.unmount();
+  act(() => root?.unmount());
   root = null;
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
 });
 
-it('opens the media library as a full-height left drawer without a modal backdrop', () => {
+it('opens the media library as a modal drawer with a dismissible dimmed remainder', () => {
   renderPanel(true);
 
   const drawer = container?.querySelector('[data-ui="video-editor.library.drawer"]');
+  const modal = drawer?.closest('.sniptale-modal');
   expect(drawer).not.toBeNull();
-  expect(drawer?.className).toContain('fixed bottom-0 left-0 top-0');
-  expect(drawer?.className).toContain('w-[min(760px,calc(100vw-24px))]');
-  expect(drawer?.className).toContain('rounded-r-[14px]');
-  expect(container?.querySelector('.sniptale-modal-backdrop')).toBeNull();
+  expect(modal?.className).toContain('!bottom-0');
+  expect((modal as HTMLElement | null)?.style.width).toContain('860px');
+  expect(drawer?.getAttribute('aria-modal')).toBe('true');
+  expect(container?.querySelector('.sniptale-modal-backdrop')).not.toBeNull();
   expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();
+});
+
+it('moves focus into the open drawer and restores its trigger on close', async () => {
+  const trigger = document.createElement('button');
+  document.body.appendChild(trigger);
+  trigger.focus();
+  renderPanel(true);
+
+  await act(async () => Promise.resolve());
+  expect(container?.contains(document.activeElement)).toBe(true);
+
+  renderPanel(false);
+  expect(document.activeElement).toBe(trigger);
+  trigger.remove();
 });
 
 it('renders nothing while the drawer is closed', () => {

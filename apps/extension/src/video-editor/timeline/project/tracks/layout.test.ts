@@ -15,7 +15,7 @@ import {
 } from './layout';
 import { createTimelineZoneAsset } from './zones/test-support';
 
-it('keeps transition junctions inside clip logical row geometry', () => {
+it('collapses persisted logical lanes into one physical track row', () => {
   const project = createOverlappingTransitionProject();
   const trackId = project.tracks[0]!.id;
   const layoutModel = buildTimelineTrackLayoutModel({
@@ -27,8 +27,9 @@ it('keeps transition junctions inside clip logical row geometry', () => {
   const audioLayout = layoutModel.layoutByTrackId.get(project.tracks[1]!.id);
 
   expect(primaryLayout?.transitionRowCount).toBe(0);
-  expect(primaryLayout?.logicalRows).toBe(3);
-  expect(primaryLayout?.rowHeight).toBe((TRACK_ROW_HEIGHT + 18) * 3);
+  expect(primaryLayout?.logicalRows).toBe(1);
+  expect(primaryLayout?.logicalLaneMetrics.size).toBe(1);
+  expect(primaryLayout?.rowHeight).toBe(TRACK_ROW_HEIGHT + 18);
   expect(primaryLayout?.junctionZones).toEqual([]);
   expect(audioLayout?.rowHeight).toBe(TRACK_ROW_HEIGHT);
 });
@@ -67,7 +68,7 @@ it('uses quarter-step track height multipliers for row geometry', () => {
   );
 });
 
-it('maps vertical clip drag to a logical line inside the target track', () => {
+it('keeps vertical clip drag on the canonical lane of the containing physical track', () => {
   const project = createOverlappingTransitionProject();
   const trackId = project.tracks[0]!.id;
   const layoutModel = buildTimelineTrackLayoutModel({
@@ -78,15 +79,15 @@ it('maps vertical clip drag to a logical line inside the target track', () => {
 
   expect(
     resolveTrackPlacementFromClientY({
-      currentClientY: 60,
+      currentClientY: 30,
       layoutModel,
       originalClientY: 20,
       originalTrackId: trackId,
     })
-  ).toEqual({ timelineLaneId: 'line-3', trackId });
+  ).toEqual({ timelineLaneId: 'line-1', trackId });
 });
 
-it('maps vertical clip drag to an empty persisted logical line', () => {
+it('ignores empty persisted logical lines during vertical placement', () => {
   const project = createOverlappingTransitionProject();
   const trackId = project.tracks[1]!.id;
   project.tracks[1] = {
@@ -102,21 +103,22 @@ it('maps vertical clip drag to an empty persisted logical line', () => {
 
   expect(
     resolveTrackPlacementFromClientY({
-      currentClientY: targetLayout.top + targetLayout.logicalRowHeight - 12,
+      currentClientY: targetLayout.top + 10,
       layoutModel,
       originalClientY: targetLayout.top + 10,
       originalTrackId: trackId,
     })
-  ).toEqual({ timelineLaneId: 'line-2', trackId });
+  ).toEqual({ timelineLaneId: 'line-1', trackId });
 });
 
-it('maps vertical clip drag below existing rows to the next logical line', () => {
+it('maps vertical clip drag below a row to the next physical track', () => {
   const project = createEmptyVideoProject('Single track lane drag', 1280, 720);
   const trackId = project.tracks[0]!.id;
+  const nextTrackId = project.tracks[1]!.id;
   const layoutModel = buildTimelineTrackLayoutModel({
     project,
     trackHeightByTrackId: {},
-    tracks: [project.tracks[0]!],
+    tracks: project.tracks,
   });
   const targetLayout = layoutModel.layoutByTrackId.get(trackId)!;
 
@@ -127,10 +129,10 @@ it('maps vertical clip drag below existing rows to the next logical line', () =>
       originalClientY: targetLayout.top + 10,
       originalTrackId: trackId,
     })
-  ).toEqual({ timelineLaneId: 'line-2', trackId });
+  ).toEqual({ timelineLaneId: 'line-1', trackId: nextTrackId });
 });
 
-it('keeps multi-line drag creation on the original track before falling to the lower track', () => {
+it('does not extend persisted logical lanes during a long vertical drag', () => {
   const project = createEmptyVideoProject('Multi-line placement drag', 1280, 720);
   const trackId = project.tracks[0]!.id;
   project.tracks[0] = {
@@ -151,7 +153,7 @@ it('keeps multi-line drag creation on the original track before falling to the l
       originalTimelineLaneId: 'line-2',
       originalTrackId: trackId,
     })
-  ).toEqual({ timelineLaneId: 'line-4', trackId });
+  ).toEqual({ timelineLaneId: 'line-1', trackId: project.tracks.at(-1)!.id });
 });
 
 function createOverlappingTransitionProject() {

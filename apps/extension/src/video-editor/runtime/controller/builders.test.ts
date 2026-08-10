@@ -115,22 +115,6 @@ function createLibrariesState(store: VideoEditorState) {
 function createWorkspaceArgs(store: VideoEditorState) {
   return {
     actions: createBuilderActions(),
-    cursorDetection: {
-      cancel: vi.fn(),
-      runForClip: vi.fn(),
-      runForSelectedClip: vi.fn(),
-      runLocalRecalculation: vi.fn(),
-      selectedClipAvailability: { canRun: false, reason: 'not-video' as const },
-      state: {
-        clipId: null,
-        error: null,
-        processedFrames: 0,
-        progress: 0,
-        status: 'idle' as const,
-        totalFrames: 0,
-        trackId: null,
-      },
-    },
     diagnosticsContent: 'diagnostics',
     libraries: createLibrariesState(store),
     runtime: createBuilderRuntimeState(),

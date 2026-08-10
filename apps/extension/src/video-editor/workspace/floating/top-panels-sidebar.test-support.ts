@@ -6,25 +6,6 @@ import { createSceneSelection } from '../../project/selection/model';
 const noop = () => vi.fn();
 type SidebarProjectActions = VideoEditorWorkspaceController['sidebar']['projectActions'];
 
-function createCursorDetection(): VideoEditorWorkspaceController['sidebar']['cursorDetection'] {
-  return {
-    cancel: noop(),
-    runForClip: vi.fn(async () => undefined),
-    runForSelectedClip: vi.fn(async () => undefined),
-    runLocalRecalculation: vi.fn(async () => undefined),
-    selectedClipAvailability: { canRun: false, reason: null },
-    state: {
-      clipId: null,
-      error: null,
-      processedFrames: 0,
-      progress: 0,
-      status: 'idle',
-      totalFrames: 0,
-      trackId: null,
-    },
-  };
-}
-
 function createProjectCrudActions(): Pick<
   SidebarProjectActions,
   | 'onCreateProject'
@@ -155,7 +136,6 @@ export function createSidebarController(
 ): VideoEditorWorkspaceController['sidebar'] {
   return {
     clipActions: createClipActions(),
-    cursorDetection: createCursorDetection(),
     projectActions: createSidebarProjectActions(),
     state: {
       activeProjectId: project.id,

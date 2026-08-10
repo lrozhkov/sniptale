@@ -33,7 +33,6 @@ function getWorkspaceSidebarStateProps(
   | 'recordings'
   | 'selection'
   | 'placementMode'
-  | 'cursorDetection'
 > {
   return {
     activeProjectId: controller.sidebar.state.activeProjectId,
@@ -45,7 +44,6 @@ function getWorkspaceSidebarStateProps(
     recentColors: controller.sidebar.state.recentColors,
     project: controller.sidebar.state.project,
     placementMode: controller.sidebar.state.placementMode,
-    cursorDetection: controller.sidebar.cursorDetection,
     projects: controller.sidebar.state.projects,
     recordingId: controller.sidebar.state.recordingId,
     recordings: controller.sidebar.state.recordings,

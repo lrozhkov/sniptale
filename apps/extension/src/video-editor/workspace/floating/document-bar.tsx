@@ -5,6 +5,7 @@ import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/fl
 import { translate } from '../../../platform/i18n';
 import type { VideoEditorWorkspaceController } from '../../runtime/controller/contracts/workspace';
 import { VideoProjectStorageStatus } from './storage-status';
+import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
   'absolute left-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)] items-center'
@@ -47,13 +48,27 @@ function VideoEditorProjectTitle({
 function VideoEditorSaveStateBadge({
   saveStateMeta,
 }: Pick<VideoEditorDocumentBarProps['header'], 'saveStateMeta'>) {
+  const dotClassName =
+    saveStateMeta.state === 'error'
+      ? 'bg-[var(--sniptale-color-danger)]'
+      : saveStateMeta.state === 'saving'
+        ? 'animate-pulse bg-[var(--sniptale-color-info)]'
+        : saveStateMeta.state === 'dirty'
+          ? 'bg-[var(--sniptale-color-warning)]'
+          : 'bg-[var(--sniptale-color-success)]';
   return (
     <ValueBadge className={saveStateMeta.className}>
-      <span
-        aria-hidden="true"
-        className="mr-1.5 h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-success)]"
-      />
-      {saveStateMeta.label}
+      <span aria-hidden="true" className={`mr-1.5 h-1.5 w-1.5 rounded-full ${dotClassName}`} />
+      <span aria-live="polite">{saveStateMeta.label}</span>
+      {saveStateMeta.state === 'error' ? (
+        <button
+          type="button"
+          className="ml-2 font-semibold underline underline-offset-2"
+          onClick={requestVideoEditorSaveRetry}
+        >
+          {translate('common.actions.retry')}
+        </button>
+      ) : null}
     </ValueBadge>
   );
 }

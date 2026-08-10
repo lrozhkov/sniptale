@@ -1,6 +1,5 @@
 import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
-import { VideoProjectShapeType } from '../../../features/video/project/types';
 import type { VideoEditorCommandPaletteController } from '../../runtime/controller/contracts/surface';
 import { buildVideoEditorCommandPaletteActions } from './actions';
 
@@ -34,24 +33,24 @@ function selectAction(controller: VideoEditorCommandPaletteController, actionId:
   return action;
 }
 
-it('routes project, playback, and tool actions through narrow controller callbacks', () => {
+it('routes project and playback actions without retired annotation tools', () => {
   const controller = createPaletteController();
 
   selectAction(controller, 'video-editor-open-export').onSelect();
   selectAction(controller, 'video-editor-toggle-sidebar').onSelect();
   selectAction(controller, 'video-editor-toggle-diagnostics').onSelect();
   selectAction(controller, 'video-editor-toggle-playback').onSelect();
-  selectAction(controller, 'video-editor-add-text').onSelect();
-  selectAction(controller, 'video-editor-add-rectangle').onSelect();
-  selectAction(controller, 'video-editor-add-ellipse').onSelect();
+  const actions = buildVideoEditorCommandPaletteActions(controller);
 
   expect(controller.onOpenExportDialog).toHaveBeenCalledTimes(1);
   expect(controller.toggleSidebarCollapsed).toHaveBeenCalledTimes(1);
   expect(controller.toggleDiagnostics).toHaveBeenCalledTimes(1);
   expect(controller.togglePlaying).toHaveBeenCalledTimes(1);
-  expect(controller.onAddTextOverlay).toHaveBeenCalledTimes(1);
-  expect(controller.onAddShapeOverlay).toHaveBeenNthCalledWith(1, VideoProjectShapeType.RECTANGLE);
-  expect(controller.onAddShapeOverlay).toHaveBeenNthCalledWith(2, VideoProjectShapeType.ELLIPSE);
+  expect(actions.some((action) => action.id === 'video-editor-add-text')).toBe(false);
+  expect(actions.some((action) => action.id === 'video-editor-add-rectangle')).toBe(false);
+  expect(actions.some((action) => action.id === 'video-editor-add-ellipse')).toBe(false);
+  expect(controller.onAddTextOverlay).not.toHaveBeenCalled();
+  expect(controller.onAddShapeOverlay).not.toHaveBeenCalled();
 });
 
 it('routes timeline actions through narrow controller callbacks', () => {

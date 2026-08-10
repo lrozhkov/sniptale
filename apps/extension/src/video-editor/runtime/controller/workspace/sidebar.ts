@@ -156,7 +156,6 @@ export function createWorkspaceSidebarController(
 ): VideoEditorSidebarController {
   return {
     clipActions: createWorkspaceSidebarClipActions(args.store),
-    cursorDetection: args.cursorDetection,
     projectActions: createWorkspaceSidebarProjectActions({
       actions: args.actions,
       projectUpdaters,

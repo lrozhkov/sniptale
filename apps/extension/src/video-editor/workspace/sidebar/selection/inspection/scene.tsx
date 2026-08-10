@@ -103,10 +103,6 @@ function SceneInfo(props: {
           value={getProjectSourceLabel(props.project.source.kind)}
         />
         <DetailItem
-          label={translate('videoEditor.timeline.cursorLane')}
-          value={getCursorSummaryLabel(props.project)}
-        />
-        <DetailItem
           label={translate('videoEditor.timeline.actionsLane')}
           value={getActionSummaryLabel(props.project)}
         />
@@ -173,18 +169,6 @@ function getProjectSourceLabel(
     case 'manual':
       return translate('videoEditor.sidebar.projectSourceManual');
   }
-}
-
-function getCursorSummaryLabel(project: WorkspaceSidebarSelectionPanelProps['project']) {
-  if (!project.cursorTrack) {
-    return project.source.kind === 'recording'
-      ? translate('videoEditor.sidebar.cursorTrackUnavailable')
-      : translate('videoEditor.sidebar.cursorTrackNotAdded');
-  }
-
-  return project.cursorTrack.captureMode === 'embedded-fallback'
-    ? translate('videoEditor.sidebar.cursorTrackEmbedded')
-    : translate('videoEditor.sidebar.cursorTrackSeparate');
 }
 
 function getActionSummaryLabel(project: WorkspaceSidebarSelectionPanelProps['project']) {

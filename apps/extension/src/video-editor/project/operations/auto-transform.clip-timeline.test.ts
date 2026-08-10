@@ -96,6 +96,26 @@ describe('auto transform clip timeline', () => {
     expect(mapSourceTimeToProjectTime(project, 'rec-asset-video', 20)).toBeNull();
   });
 
+  it('is idempotent when the same source transform is applied again', () => {
+    const candidates = [
+      {
+        action: VideoAutoProcessingAction.SPEED_UP,
+        endTime: 6,
+        playbackRate: 2,
+        startTime: 2,
+      },
+    ];
+    const first = applyAutoTransformClipTimeline(
+      createRecordingProject(),
+      'rec-asset-video',
+      candidates
+    );
+    const second = applyAutoTransformClipTimeline(first, 'rec-asset-video', candidates);
+
+    expect(second.clips).toEqual(first.clips);
+    expect(second.duration).toBe(first.duration);
+  });
+
   it('removes selected source ranges and drops source-time mappings inside the cut', () => {
     const project = applyAutoTransformClipTimeline(createRecordingProject(), 'rec-asset-video', [
       {

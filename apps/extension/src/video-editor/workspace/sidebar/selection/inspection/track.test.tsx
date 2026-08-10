@@ -87,20 +87,18 @@ function createProps(kind: VideoTrackKind = VideoTrackKind.SUBTITLE, isRoot = fa
 }
 
 describe('workspace-sidebar/selection/inspect-track', () => {
-  it('renders grouped track inspector controls and keeps subtitle fields behind group switching', () => {
+  it('does not render controls for persisted subtitle tracks', () => {
     const markup = renderToStaticMarkup(<WorkspaceSidebarInspectPanel {...createProps()} />);
 
-    expect(markup).toContain('videoEditor.sidebar.inspectorGroupGeneral');
-    expect(markup).toContain('videoEditor.sidebar.inspectorGroupLayout');
-    expect(markup).toContain('videoEditor.sidebar.inspectorGroupStyle');
-    expect(markup).not.toContain('videoEditor.sidebar.trackNameLabel');
-    expect(markup).not.toContain('value="Subtitles"');
+    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupGeneral');
     expect(markup).not.toContain('videoEditor.sidebar.subtitlePlacementLabel');
-    expect(markup).not.toContain('type="range"');
+    expect(markup).not.toContain('videoEditor.timeline.deleteTrackTitle');
   });
 
   it('renders deletable tracks with the shared danger action style', () => {
-    const markup = renderToStaticMarkup(<WorkspaceSidebarInspectPanel {...createProps()} />);
+    const markup = renderToStaticMarkup(
+      <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.OVERLAY)} />
+    );
 
     expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
     expect(markup).toContain('hover:text-[var(--sniptale-color-danger)]');

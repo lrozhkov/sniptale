@@ -1,28 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
+import { ProductModal } from '@sniptale/ui/product-modal';
+import { translate } from '../../../platform/i18n';
 import { VideoEditorLibraryPanelBody } from './body';
 import type { VideoEditorLibraryPanelProps } from '../contracts/panel';
-
-function useEscapeClose(isOpen: boolean, onClose: () => void): void {
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
-      event.preventDefault();
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-}
+import { useLibraryDrawerLifecycle } from './lifecycle';
 
 function useInputRefs() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -45,26 +26,37 @@ export function VideoEditorLibraryPanel({
   ...props
 }: VideoEditorLibraryPanelProps): React.JSX.Element | null {
   const inputRefs = useInputRefs();
-  useEscapeClose(isOpen, onClose);
+  const panelRef = useRef<HTMLElement | null>(null);
+  useLibraryDrawerLifecycle({ isOpen, onClose, panelRef });
 
   if (!isOpen) {
     return null;
   }
 
   return (
-    <aside
-      data-ui="video-editor.library.drawer"
-      role="dialog"
-      aria-modal="false"
-      className={[
-        'fixed bottom-0 left-0 top-0 z-[60] flex w-[min(760px,calc(100vw-24px))] min-w-0 flex-col',
-        'overflow-hidden rounded-r-[14px] border border-l-0',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]',
-        'bg-[color:var(--sniptale-color-surface-canvas)]',
-        'shadow-[0_20px_48px_color-mix(in_srgb,var(--sniptale-color-overlay)_24%,transparent)]',
+    <ProductModal
+      onClose={onClose}
+      width="min(860px, calc(100vw - 24px))"
+      maxWidth="calc(100vw - 24px)"
+      maxHeight="100vh"
+      role="presentation"
+      backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_48%,transparent)]"
+      dialogClassName={[
+        '!bottom-0 !left-0 !top-0 !h-screen !translate-x-0 !translate-y-0 !rounded-none',
+        '!border-l-0 !bg-[color:var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
     >
-      <VideoEditorLibraryPanelBody {...props} inputRefs={inputRefs} onClose={onClose} />
-    </aside>
+      <aside
+        ref={panelRef}
+        data-ui="video-editor.library.drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={translate('videoEditor.app.libraryTitle')}
+        tabIndex={-1}
+        className="flex h-full min-w-0 flex-col overflow-hidden"
+      >
+        <VideoEditorLibraryPanelBody {...props} inputRefs={inputRefs} onClose={onClose} />
+      </aside>
+    </ProductModal>
   );
 }

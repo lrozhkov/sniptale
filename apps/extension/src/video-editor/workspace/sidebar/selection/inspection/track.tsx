@@ -3,30 +3,18 @@ import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/select
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { SelectionEmptyState } from './helpers';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
-import { resolveTrackInspectorControls } from '../track/controls';
-import {
-  TrackGeneralFields,
-  TrackPanelDeleteButton,
-  TrackSubtitleLayoutFields,
-  TrackSubtitleStyleFields,
-} from '../track/sections';
+import { TrackGeneralFields, TrackPanelDeleteButton } from '../track/sections';
+import { isVideoEditorPresentedTrack } from '../../../../project/operations/presented-tracks';
 
 export function InspectTrackPanel({
   onDeleteTrack,
-  onUpdateSubtitleTrackStyle,
   selectedTrack,
 }: WorkspaceSidebarSelectionPanelProps) {
-  if (!selectedTrack) {
+  if (!selectedTrack || !isVideoEditorPresentedTrack(selectedTrack)) {
     return <SelectionEmptyState />;
   }
 
-  return (
-    <TrackInspectorContent
-      selectedTrack={selectedTrack}
-      onDeleteTrack={onDeleteTrack}
-      onUpdateSubtitleTrackStyle={onUpdateSubtitleTrackStyle}
-    />
-  );
+  return <TrackInspectorContent selectedTrack={selectedTrack} onDeleteTrack={onDeleteTrack} />;
 }
 
 function TrackInspectorContent(props: {
@@ -34,13 +22,11 @@ function TrackInspectorContent(props: {
   onUpdateSubtitleTrackStyle?: WorkspaceSidebarSelectionPanelProps['onUpdateSubtitleTrackStyle'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
-  const controls = resolveTrackInspectorControls(props.selectedTrack);
-
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <InspectorGroupedPanel groups={createTrackGroups(props, controls)} />
+      <InspectorGroupedPanel groups={createTrackGroups(props)} />
       <TrackPanelDeleteButton
-        canDeleteTrack={controls.canDeleteTrack}
+        canDeleteTrack={!props.selectedTrack.isRoot}
         trackId={props.selectedTrack.id}
         onDeleteTrack={props.onDeleteTrack}
       />
@@ -48,10 +34,7 @@ function TrackInspectorContent(props: {
   );
 }
 
-function createTrackGroups(
-  props: TrackGroupProps,
-  controls: ReturnType<typeof resolveTrackInspectorControls>
-) {
+function createTrackGroups(props: TrackGroupProps) {
   return [
     {
       id: 'info',
@@ -63,49 +46,12 @@ function createTrackGroups(
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
       defaultActive: true,
       content: <TrackGeneralFields selectedTrack={props.selectedTrack} />,
-      visible: controls.showGeneralGroup,
     },
-    ...createSubtitleTrackGroups(props, controls),
   ] as const;
 }
 
 interface TrackGroupProps {
-  onUpdateSubtitleTrackStyle?: WorkspaceSidebarSelectionPanelProps['onUpdateSubtitleTrackStyle'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
-}
-
-function createSubtitleTrackGroups(
-  props: TrackGroupProps,
-  controls: ReturnType<typeof resolveTrackInspectorControls>
-) {
-  return [
-    {
-      id: 'layout',
-      label: translate('videoEditor.sidebar.inspectorGroupLayout'),
-      content: (
-        <TrackSubtitleLayoutFields
-          controls={controls}
-          style={props.selectedTrack.subtitleStyle}
-          trackId={props.selectedTrack.id}
-          onUpdateSubtitleTrackStyle={props.onUpdateSubtitleTrackStyle}
-        />
-      ),
-      visible: controls.showLayoutGroup,
-    },
-    {
-      id: 'style',
-      label: translate('videoEditor.sidebar.inspectorGroupStyle'),
-      content: (
-        <TrackSubtitleStyleFields
-          controls={controls}
-          style={props.selectedTrack.subtitleStyle}
-          trackId={props.selectedTrack.id}
-          onUpdateSubtitleTrackStyle={props.onUpdateSubtitleTrackStyle}
-        />
-      ),
-      visible: controls.showStyleGroup,
-    },
-  ] as const;
 }
 
 function TrackInfo(props: {

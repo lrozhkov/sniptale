@@ -2,6 +2,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
 import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 
+export function getCurrentVideoEditorProjectSnapshot() {
+  return useVideoEditorStore.getState().project;
+}
+
 function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
   return {
     cancelExport: state.cancelExport,

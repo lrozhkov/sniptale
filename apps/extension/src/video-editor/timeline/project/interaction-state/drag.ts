@@ -6,6 +6,7 @@ import { startWindowPointerSession } from '../../../interaction/pointer-session'
 import { buildTimelineTrackLayoutModel } from '../tracks/layout';
 import type { DragMode, TimelineClipDragGhost, TimelineInteraction } from '../types';
 import { applyTimelineDragMove, type MoveClipHandler } from './drag-move';
+import { isVideoEditorPresentedTrack } from '../../../project/operations/presented-tracks';
 
 interface UseProjectTimelineDragOptions {
   pixelsPerSecond: number;
@@ -164,7 +165,10 @@ function useTimelineDragModel(
   project: VideoProject,
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>
 ) {
-  const tracks = useMemo(() => getSortedTracks(project), [project]);
+  const tracks = useMemo(
+    () => getSortedTracks(project).filter(isVideoEditorPresentedTrack),
+    [project]
+  );
   const trackLayoutModel = useMemo(
     () => buildTimelineTrackLayoutModel({ project, trackHeightByTrackId, tracks }),
     [project, trackHeightByTrackId, tracks]

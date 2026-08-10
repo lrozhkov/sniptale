@@ -189,7 +189,7 @@ it('wires track creation from the leading side', () => {
   expect(container?.textContent).toContain('videoEditor.timeline.addVideoTrack');
   expect(container?.textContent).toContain('videoEditor.timeline.addAudioTrack');
   expect(container?.textContent).toContain('videoEditor.timeline.addOverlayTrack');
-  expect(container?.textContent).toContain('videoEditor.timeline.addSubtitleTrack');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.addSubtitleTrack');
 
   act(() => {
     getButtonByText('videoEditor.timeline.addAudioTrack').click();

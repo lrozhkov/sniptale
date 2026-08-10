@@ -1,5 +1,4 @@
-import { useEffect, useMemo } from 'react';
-import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
+import { useMemo } from 'react';
 import { getSaveStateMeta } from '../app-model/utils';
 import type { VideoEditorLibrariesState } from '../app-model/types';
 import { useVideoEditorActionHandlers } from '../commands';
@@ -7,7 +6,6 @@ import { useVideoEditorLibraries } from './libraries';
 import { useVideoEditorOverlayPlayback } from './overlay-playback';
 import { usePlaybackRangeSanity } from './playback-range';
 import { useVideoEditorRuntime, type VideoEditorRuntimeController } from '../session';
-import { useCursorDetectionAnalysis } from '../cursor-detection/analysis';
 import { useVideoEditorWorkspaceState } from './workspace-state';
 import { useVideoEditorSelections } from './selections';
 import { createVideoEditorController } from './builders';
@@ -18,6 +16,7 @@ import {
 } from './store';
 import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 import type { VideoEditorController } from './contracts/surface';
+import { useRecordingTelemetry } from './recording-telemetry';
 
 function buildRuntimeParams(
   store: VideoEditorControllerStorePort,
@@ -124,51 +123,6 @@ function useControllerSelections(store: VideoEditorControllerStorePort) {
   );
 }
 
-function useRecordingTelemetry(
-  sourceRecordingId: string | null,
-  setRecordingTelemetry: VideoEditorControllerStorePort['setRecordingTelemetry']
-) {
-  useEffect(() => {
-    let disposed = false;
-    if (!sourceRecordingId) {
-      setRecordingTelemetry(null);
-      return () => {
-        disposed = true;
-      };
-    }
-
-    void getRecordingTelemetry(sourceRecordingId)
-      .then((recordingTelemetry) => {
-        if (!disposed) {
-          setRecordingTelemetry(recordingTelemetry ?? null);
-        }
-      })
-      .catch(() => {
-        if (!disposed) {
-          setRecordingTelemetry(null);
-        }
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, [setRecordingTelemetry, sourceRecordingId]);
-}
-
-function useControllerCursorDetection(
-  store: VideoEditorControllerStorePort,
-  runtime: VideoEditorRuntimeController
-) {
-  return useCursorDetectionAnalysis({
-    assetUrls: runtime.assetUrls,
-    currentTime: store.currentTime,
-    onSelectObjectTrack: store.selectObjectTrack,
-    onUpsertObjectTrack: store.upsertObjectTrack,
-    project: store.project,
-    selectedClipId: store.selectedClipId,
-  });
-}
-
 /**
  * Composes store state, runtime effects, and shell handlers for the entrypoint component.
  */
@@ -190,8 +144,6 @@ export function useVideoEditorController(): VideoEditorController {
   const runtime = useVideoEditorRuntime(
     buildRuntimeParams(store, libraries, workspace, selections)
   );
-  const cursorDetection = useControllerCursorDetection(store, runtime);
-
   useVideoEditorOverlayPlayback({
     blockingOverlayOpen,
     enabled: store.project !== null,
@@ -212,7 +164,6 @@ export function useVideoEditorController(): VideoEditorController {
 
   return createVideoEditorController({
     actions,
-    cursorDetection,
     diagnosticsContent: null,
     libraries,
     runtime,

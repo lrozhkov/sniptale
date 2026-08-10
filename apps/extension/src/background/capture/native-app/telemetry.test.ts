@@ -42,7 +42,7 @@ it('normalizes native telemetry monotonic timestamps relative to the recording t
   expect(telemetry?.signals[0]).toEqual(expect.objectContaining({ endTime: 140, startTime: 100 }));
 });
 
-it('keeps telemetry unchanged without a valid timebase and returns null for missing telemetry', () => {
+it('returns null for missing telemetry and rejects invalid fallback temporal values', () => {
   expect(
     mapNativeRecordingTelemetry({
       createdAt: 10,
@@ -72,7 +72,7 @@ it('keeps telemetry unchanged without a valid timebase and returns null for miss
       },
       updatedAt: 20,
     })
-  ).toEqual(expect.objectContaining({ signals: [expect.objectContaining({ startTime: -1 })] }));
+  ).toBeNull();
 });
 
 function createActionEvent(time: number) {

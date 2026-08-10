@@ -11,6 +11,7 @@ import type {
   VideoEditorPreviewStatus,
 } from '../../../contracts/preview-runtime';
 import { PreviewStageControls } from './controls';
+import { PreviewStageZoomNavigator } from './navigator';
 
 const PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME = 'absolute inset-4 min-h-0';
 
@@ -208,13 +209,17 @@ function PreviewStageContent(props: {
   previewZoom: VideoEditorPreviewZoom;
 }) {
   const fit = props.previewZoom === 'fit';
+  const viewportRef = React.useRef<HTMLDivElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
   return (
     <div className={PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME}>
       <div
+        ref={viewportRef}
         className={`h-full w-full [container-type:size] ${fit ? 'overflow-hidden' : 'overflow-auto'}`}
         data-ui="video.preview.viewport"
       >
         <div
+          ref={contentRef}
           className={
             fit ? 'flex h-full w-full items-center justify-center' : 'flex min-h-full min-w-full'
           }
@@ -222,6 +227,7 @@ function PreviewStageContent(props: {
           {props.children}
         </div>
       </div>
+      {fit ? null : <PreviewStageZoomNavigator contentRef={contentRef} viewportRef={viewportRef} />}
     </div>
   );
 }

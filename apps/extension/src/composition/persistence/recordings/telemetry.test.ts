@@ -70,4 +70,40 @@ describe('shared recording telemetry db', () => {
       }
     );
   });
+
+  it('rejects invalid writes and entries stored under a mismatched recording identity', async () => {
+    const db = createDb();
+    db.get.mockResolvedValue({
+      actionEvents: [],
+      captureMode: null,
+      createdAt: 1,
+      cursorTrack: null,
+      recordingId: 'recording-stale',
+      signals: [],
+      updatedAt: 2,
+      viewport: null,
+    });
+    initDbMock.mockResolvedValue(db);
+    const { getRecordingTelemetry, saveRecordingTelemetry } = await import('./telemetry');
+
+    await expect(
+      saveRecordingTelemetry({
+        actionEvents: [],
+        captureMode: null,
+        createdAt: 2,
+        cursorTrack: null,
+        recordingId: 'recording-1',
+        signals: [],
+        updatedAt: 1,
+        viewport: null,
+      })
+    ).rejects.toThrow('Invalid recording telemetry entry.');
+    expect(db.put).not.toHaveBeenCalled();
+
+    await expect(getRecordingTelemetry('recording-1')).resolves.toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Ignoring invalid recording telemetry entry from IndexedDB',
+      { recordingId: 'recording-1' }
+    );
+  });
 });

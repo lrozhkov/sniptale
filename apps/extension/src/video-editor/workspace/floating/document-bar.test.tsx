@@ -24,7 +24,7 @@ function createHeaderProps() {
     onToggleSidebar: vi.fn(),
     projectExportsCount: 2,
     projectName: 'Product Demo Recording',
-    saveStateMeta: { className: 'is-saved', label: 'Saved' },
+    saveStateMeta: { className: 'is-saved', label: 'Saved', state: 'saved' as const },
   };
 }
 
@@ -41,4 +41,18 @@ it('renders project identity and keeps export/library actions in the floating do
   expect(markup).not.toContain('data-ui="video-editor.floating.document-bar.menu"');
   expect(markup).not.toContain('title="videoEditor.app.title"');
   expect(markup).not.toContain('Sniptale');
+});
+
+it('exposes an explicit retry action for an autosave error', () => {
+  const markup = renderToStaticMarkup(
+    <VideoEditorFloatingDocumentBar
+      header={{
+        ...createHeaderProps(),
+        saveStateMeta: { className: 'is-error', label: 'Error', state: 'error' },
+      }}
+    />
+  );
+
+  expect(markup).toContain('common.actions.retry');
+  expect(markup).toContain('<button');
 });

@@ -176,6 +176,11 @@ describe('media-hub-store recording and asset save flows', () => {
       'create',
       ['recording:recording-1']
     );
+    expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(
+      2,
+      'update',
+      ['recording:recording-1']
+    );
   });
 
   it('commits recording batches through one guarded repository call and publishes after success', async () => {

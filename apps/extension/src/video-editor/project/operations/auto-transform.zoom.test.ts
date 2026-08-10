@@ -12,12 +12,14 @@ const {
   mapSourceTimeToProjectTimeMock,
   normalizeRecordingActionEventsToProjectSpaceMock,
   normalizeRecordingCursorTrackToProjectSpaceMock,
+  telemetryEligibilityMock,
 } = vi.hoisted(() => ({
   applyAutoTransformClipTimelineMock: vi.fn(),
   getRecordingTelemetryMock: vi.fn(),
   mapSourceTimeToProjectTimeMock: vi.fn(),
   normalizeRecordingActionEventsToProjectSpaceMock: vi.fn(),
   normalizeRecordingCursorTrackToProjectSpaceMock: vi.fn(),
+  telemetryEligibilityMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
@@ -30,6 +32,10 @@ vi.mock('../../../composition/persistence/recordings/telemetry', async (importOr
 vi.mock('./auto-transform.clip-timeline', () => ({
   applyAutoTransformClipTimeline: applyAutoTransformClipTimelineMock,
   mapSourceTimeToProjectTime: mapSourceTimeToProjectTimeMock,
+}));
+
+vi.mock('./telemetry-eligibility', () => ({
+  isRecordingTelemetryEligibleForAutoProcessing: telemetryEligibilityMock,
 }));
 
 vi.mock('./telemetry', () => ({
@@ -81,6 +87,7 @@ function createTelemetryEntry() {
 
 function resetZoomHeuristicsMocks() {
   vi.clearAllMocks();
+  telemetryEligibilityMock.mockReturnValue(true);
   applyAutoTransformClipTimelineMock.mockImplementation((project) => project);
   mapSourceTimeToProjectTimeMock.mockImplementation(
     (_project: unknown, _recordingId: unknown, sourceTime: number) => sourceTime

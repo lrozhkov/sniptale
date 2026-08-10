@@ -10,10 +10,7 @@ import {
   ProductModalHeader,
 } from '@sniptale/ui/product-modal';
 import { OptionRow, PanelSection } from '../../../ui/compact-inspector-controls';
-import {
-  VideoExportFormat,
-  VideoSubtitleSidecarFormat,
-} from '../../../features/video/project/types';
+import { VideoExportFormat } from '../../../features/video/project/types';
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
@@ -119,48 +116,6 @@ function ExportDialogDownloadToggle({
   );
 }
 
-function ExportDialogSubtitleToggle({
-  settings,
-  onChange,
-}: {
-  settings: VideoProjectExportSettings;
-  onChange: (patch: VideoProjectExportSettingsPatch) => void;
-}) {
-  const enabled = (settings.subtitleSidecarFormats?.length ?? 0) > 0;
-
-  return (
-    <ExportDialogBooleanToggle
-      checked={enabled}
-      icon={<FileOutput size={16} strokeWidth={2} />}
-      label={translate('videoEditor.exportDialog.exportSubtitleFiles')}
-      onClick={() =>
-        onChange({
-          subtitleSidecarFormats: enabled
-            ? []
-            : [VideoSubtitleSidecarFormat.SRT, VideoSubtitleSidecarFormat.VTT],
-        })
-      }
-    />
-  );
-}
-
-function ExportDialogBurnInToggle({
-  settings,
-  onChange,
-}: {
-  settings: VideoProjectExportSettings;
-  onChange: (patch: VideoProjectExportSettingsPatch) => void;
-}) {
-  return (
-    <ExportDialogBooleanToggle
-      checked={settings.burnInSubtitles === true}
-      icon={<FileOutput size={16} strokeWidth={2} />}
-      label={translate('videoEditor.exportDialog.burnInSubtitles')}
-      onClick={() => onChange({ burnInSubtitles: !settings.burnInSubtitles })}
-    />
-  );
-}
-
 function ExportDialogActions(props: {
   disabled?: boolean;
   onClose: () => void;
@@ -221,8 +176,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           capabilityError={capabilityError}
           settings={settings}
         />
-        <ExportDialogBurnInToggle settings={settings} onChange={onChange} />
-        <ExportDialogSubtitleToggle settings={settings} onChange={onChange} />
         <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
       </ProductModalBody>
       <ProductModalFooter>

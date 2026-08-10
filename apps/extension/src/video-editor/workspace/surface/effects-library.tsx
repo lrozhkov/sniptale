@@ -29,13 +29,6 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
       isLoading={props.effectBundles.isLoading}
       isOpen={props.isOpen}
       operations={props.effectOperations}
-      onAddAnnotation={(input) =>
-        controller.preview.editing.onAddAnnotationOverlay(
-          undefined,
-          controller.preview.transport.currentTime,
-          input
-        )
-      }
       onApplyEffect={controller.sidebar.projectActions.onApplyEffectDocument}
       onClose={() => props.onOpenChange(false)}
       onDeleteEffectBundle={props.effectBundles.onDeleteEffectBundle}

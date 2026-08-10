@@ -8,7 +8,6 @@ import type { VideoEditorInspectorMode } from '../../../contracts/workspace';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoObjectTrack } from '../../../../features/video/project/object-tracks';
 import type { VideoObjectTrackCorrectionAnchor } from '../../../../features/video/project/object-tracks';
-import type { VideoEditorCursorDetectionController } from '../../../runtime/cursor-detection/analysis';
 import type {
   VideoProject,
   VideoProjectAnnotationClip,
@@ -35,7 +34,6 @@ import type { ProjectListItem, RecordingListItem } from '../../../library/contra
 export interface WorkspaceSidebarProps {
   activeProjectId: string;
   collapsed: boolean;
-  cursorDetection?: VideoEditorCursorDetectionController;
   diagnosticsContent: ReactNode;
   diagnosticsOpen: boolean;
   gridSettings: WorkspaceSidebarGridSettings;

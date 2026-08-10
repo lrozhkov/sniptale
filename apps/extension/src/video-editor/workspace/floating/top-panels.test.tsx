@@ -28,7 +28,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('activates canvas-point insert tools instead of immediately inserting text and shapes', () => {
+it('keeps temporary point-annotation tools out of the production insert panel', () => {
   const controller = createFloatingWorkspaceController();
   const onActiveInsertKindChange = vi.fn();
   render(
@@ -43,17 +43,13 @@ it('activates canvas-point insert tools instead of immediately inserting text an
     </>
   );
 
-  clickByLabel(translate('videoEditor.stage.addText'));
-  clickByLabel(translate('videoEditor.stage.addRectangle'));
-  clickByLabel(translate('videoEditor.stage.addLine'));
-  clickByLabel(translate('videoEditor.stage.addArrow'));
   clickByLabel(translate('videoEditor.app.selectMoveButton'));
 
-  expect(onActiveInsertKindChange).toHaveBeenNthCalledWith(1, 'text');
-  expect(onActiveInsertKindChange).toHaveBeenNthCalledWith(2, 'shape');
-  expect(onActiveInsertKindChange).toHaveBeenNthCalledWith(3, 'line');
-  expect(onActiveInsertKindChange).toHaveBeenNthCalledWith(4, 'arrow');
-  expect(onActiveInsertKindChange).toHaveBeenNthCalledWith(5, null);
+  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addText'));
+  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addRectangle'));
+  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addLine'));
+  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addArrow'));
+  expect(onActiveInsertKindChange).toHaveBeenCalledWith(null);
   expect(controller.timeline.actions.insertion.onAddTextOverlay).not.toHaveBeenCalled();
   expect(controller.timeline.actions.insertion.onAddShapeOverlay).not.toHaveBeenCalled();
   expect(queryUi('video-editor.floating.tool-rail')).toBeNull();

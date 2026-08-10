@@ -7,12 +7,18 @@ import { createInitialExportState } from '../../state/export-state';
 const mockCreateBlankProject = vi.fn();
 const mockDeletePersistedProject = vi.fn();
 const mockOpenPersistedProject = vi.fn();
+const mockWaitForVideoEditorSave = vi.fn();
 
 vi.mock('../../project/operations/ops', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../project/operations/ops')>()),
   createBlankProject: mockCreateBlankProject,
   deletePersistedProject: mockDeletePersistedProject,
   openPersistedProject: mockOpenPersistedProject,
+}));
+
+vi.mock('../session/save-readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../session/save-readiness')>()),
+  waitForVideoEditorSave: mockWaitForVideoEditorSave,
 }));
 
 function createProjectListItem(overrides: {
@@ -102,6 +108,7 @@ function createProjectHandlerParams(): UseVideoEditorActionHandlersParams {
 describe('deleteProjectWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWaitForVideoEditorSave.mockResolvedValue(undefined);
   });
 
   it('skips deletion when the user cancels the confirm dialog', async () => {
@@ -135,5 +142,66 @@ describe('deleteProjectWorkspace', () => {
     expect(params.libraries.refreshProjects).toHaveBeenCalledTimes(1);
     expect(mockOpenPersistedProject).not.toHaveBeenCalled();
     expect(mockCreateBlankProject).not.toHaveBeenCalled();
+  });
+
+  it('waits for the active project save before opening another project', async () => {
+    const { loadProjectWorkspace } = await import('./project');
+    const params = createProjectHandlerParams();
+    const nextProject = { ...createCurrentProject(), id: 'other-project', name: 'Project B' };
+    mockOpenPersistedProject.mockResolvedValue(nextProject);
+    await loadProjectWorkspace('other-project', params);
+
+    expect(mockWaitForVideoEditorSave).toHaveBeenCalledWith('current-project');
+    expect(mockOpenPersistedProject).toHaveBeenCalledWith('other-project');
+    expect(params.applyLoadedProject).toHaveBeenCalledWith(nextProject, null);
+    expect(mockWaitForVideoEditorSave.mock.invocationCallOrder[0]).toBeLessThan(
+      mockOpenPersistedProject.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('keeps the active project open when its pending save fails', async () => {
+    const { loadProjectWorkspace } = await import('./project');
+    const params = createProjectHandlerParams();
+    mockWaitForVideoEditorSave.mockRejectedValue(new Error('Unsaved changes'));
+    await expect(loadProjectWorkspace('other-project', params)).rejects.toThrow('Unsaved changes');
+
+    expect(mockOpenPersistedProject).not.toHaveBeenCalled();
+    expect(params.applyLoadedProject).not.toHaveBeenCalled();
+  });
+
+  it('applies only the latest project when different opens resolve out of order', async () => {
+    const { loadProjectWorkspace } = await import('./project');
+    const params = createProjectHandlerParams();
+    const resolvers = new Map<string, (project: ReturnType<typeof createCurrentProject>) => void>();
+    mockOpenPersistedProject.mockImplementation(
+      (projectId: string) =>
+        new Promise((resolve) => {
+          resolvers.set(projectId, resolve);
+        })
+    );
+
+    const first = loadProjectWorkspace('other-project', params);
+    await Promise.resolve();
+    const second = loadProjectWorkspace('latest-project', params);
+    await Promise.resolve();
+    resolvers.get('latest-project')?.({
+      ...createCurrentProject(),
+      id: 'latest-project',
+      name: 'Latest',
+    });
+    await second;
+    resolvers.get('other-project')?.({
+      ...createCurrentProject(),
+      id: 'other-project',
+      name: 'Older',
+    });
+    await first;
+
+    expect(params.applyLoadedProject).toHaveBeenCalledTimes(1);
+    expect(params.applyLoadedProject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'latest-project' }),
+      null
+    );
+    expect(params.libraries.refreshProjects).toHaveBeenCalledTimes(1);
   });
 });

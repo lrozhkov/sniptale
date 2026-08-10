@@ -1,8 +1,7 @@
 import type { VideoCompositionTransitionSegment } from '../../../../features/video/composition/types';
 import { getTrackClips } from '../../../../features/video/project/timeline';
 import {
-  assignVideoProjectClipsToLogicalLanes,
-  getVideoProjectTrackLogicalLaneIds,
+  DEFAULT_LOGICAL_LANE_ID,
   type VideoProjectClipLogicalLaneAssignment,
 } from '../../../../features/video/project/timeline/logical-lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -27,14 +26,20 @@ export function buildTimelineTrackClipRows(
   project: VideoProject,
   trackId: string
 ): Map<string, TimelineLogicalRowAssignment> {
-  return assignVideoProjectClipsToLogicalLanes(
-    getTrackClips(project, trackId),
-    getVideoProjectTrackLogicalLaneIds(project, trackId)
+  return new Map(
+    getTrackClips(project, trackId).map((clip) => [
+      clip.id,
+      {
+        logicalLaneId: DEFAULT_LOGICAL_LANE_ID,
+        rowCount: 1,
+        rowIndex: 0,
+      },
+    ])
   );
 }
 
-export function getTimelineTrackLogicalRowCount(project: VideoProject, trackId: string): number {
-  return Math.max(1, getVideoProjectTrackLogicalLaneIds(project, trackId).length);
+export function getTimelineTrackLogicalRowCount(_project: VideoProject, _trackId: string): number {
+  return 1;
 }
 
 export function getTimelineTrackLogicalLaneMetrics(params: {
@@ -45,7 +50,7 @@ export function getTimelineTrackLogicalLaneMetrics(params: {
   clipRows?: ReadonlyMap<string, TimelineLogicalRowAssignment>;
 }): Map<string, TimelineLogicalLaneMetrics> {
   const clipRows = params.clipRows ?? buildTimelineTrackClipRows(params.project, params.trackId);
-  const laneIds = getVideoProjectTrackLogicalLaneIds(params.project, params.trackId);
+  const laneIds = [DEFAULT_LOGICAL_LANE_ID];
   const transitionLaneIds = getTimelineTrackTransitionLogicalLaneIds(
     params.transitionSegments,
     clipRows

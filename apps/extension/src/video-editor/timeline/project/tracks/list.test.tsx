@@ -90,7 +90,7 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]').length).toBe(4);
 });
 
-it('shows explicit clip logical lane rails without text labels or a separate add-line button', () => {
+it('keeps persisted clip logical lanes inside one physical track row', () => {
   const project = createEmptyVideoProject('Logical lanes');
   project.tracks[0] = {
     ...project.tracks[0]!,
@@ -99,9 +99,27 @@ it('shows explicit clip logical lane rails without text labels or a separate add
 
   renderTrackList(project, { showTelemetryLane: false });
 
-  expect(container?.textContent).not.toContain('videoEditor.timeline.logicalLaneLabel');
-  expect(container?.querySelectorAll('[data-project-timeline-logical-lane-rail]')).toHaveLength(2);
+  expect(container?.querySelectorAll('[data-project-timeline-logical-lane-rail]')).toHaveLength(0);
+  expect(
+    buildTimelineTrackLayoutModel({
+      project,
+      trackHeightByTrackId: {},
+      tracks: project.tracks,
+    }).layoutByTrackId.get(project.tracks[0]!.id)?.logicalRows
+  ).toBe(1);
   expect(container?.querySelector('[data-ui="video-editor.timeline.add-logical-lane"]')).toBeNull();
+});
+
+it('omits unavailable cursor controls from both rail and expanded panel', () => {
+  const project = createEmptyVideoProject('No cursor lane');
+
+  renderTrackList(project, {
+    cursorLaneVisible: false,
+    panelExpanded: true,
+    showTelemetryLane: false,
+  });
+
+  expect(container?.textContent).not.toContain('videoEditor.timeline.cursorLane');
 });
 
 it('never creates a version-specific rail for effect instances', () => {
@@ -134,15 +152,15 @@ function renderTrackList(
   project: ReturnType<typeof createEmptyVideoProject>,
   options: {
     compactRows?: boolean;
+    cursorLaneVisible?: boolean;
     panelExpanded?: boolean;
     showTelemetryLane: boolean;
-    onAddTrackLogicalLane?: (trackId: string) => void;
   }
 ) {
   act(() => {
     root?.render(
       <ProjectTimelineTrackList
-        cursorLaneVisible={true}
+        cursorLaneVisible={options.cursorLaneVisible ?? true}
         project={project}
         selectedTrackId={project.tracks[0]?.id ?? null}
         showTelemetryLane={options.showTelemetryLane}
@@ -158,7 +176,6 @@ function renderTrackList(
         })}
         tracks={project.tracks}
         onClearUtilityLane={vi.fn()}
-        onAddTrackLogicalLane={options.onAddTrackLogicalLane ?? vi.fn()}
         onDeleteTrack={vi.fn()}
         onMoveTrack={vi.fn()}
         onScroll={vi.fn()}

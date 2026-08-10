@@ -56,7 +56,7 @@ it('keeps explicit overlapping clips on the same logical line', () => {
   expect(rows.get('clip-b')).toEqual({ logicalLaneId: 'line-1', rowCount: 1, rowIndex: 0 });
 });
 
-it('places explicit clip lanes as nested rows inside a track', () => {
+it('collapses explicit legacy clip lanes into one visual row', () => {
   const project = createEmptyVideoProject('Explicit rows');
   const trackId = project.tracks[0]!.id;
   const firstClip = createClip('clip-a', trackId, 0, 4);
@@ -67,11 +67,11 @@ it('places explicit clip lanes as nested rows inside a track', () => {
 
   const rows = buildTimelineTrackClipRows(project, trackId);
 
-  expect(rows.get('clip-a')).toEqual({ logicalLaneId: 'line-1', rowCount: 2, rowIndex: 0 });
-  expect(rows.get('clip-b')).toEqual({ logicalLaneId: 'line-2', rowCount: 2, rowIndex: 1 });
+  expect(rows.get('clip-a')).toEqual({ logicalLaneId: 'line-1', rowCount: 1, rowIndex: 0 });
+  expect(rows.get('clip-b')).toEqual({ logicalLaneId: 'line-1', rowCount: 1, rowIndex: 0 });
 });
 
-it('counts empty persisted logical lanes before clips are placed on them', () => {
+it('ignores empty persisted logical lanes in visual row assignment', () => {
   const project = createEmptyVideoProject('Empty logical row');
   const trackId = project.tracks[0]!.id;
   project.tracks[0] = {
@@ -82,5 +82,5 @@ it('counts empty persisted logical lanes before clips are placed on them', () =>
 
   const rows = buildTimelineTrackClipRows(project, trackId);
 
-  expect(rows.get('clip-a')).toEqual({ logicalLaneId: 'line-1', rowCount: 2, rowIndex: 0 });
+  expect(rows.get('clip-a')).toEqual({ logicalLaneId: 'line-1', rowCount: 1, rowIndex: 0 });
 });

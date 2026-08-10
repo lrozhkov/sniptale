@@ -1,49 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
-import { createProjectStateActions } from './project-actions';
-import { createSelectionStateActions } from './selection-actions';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../features/video/project/factories/creation';
+import {
+  createSubtitleClip,
+  createTextClip,
+} from '../../features/video/project/factories/overlay-clip';
+import { VideoTrackKind } from '../../features/video/project/types';
+import { createVideoEditorProjectActions } from '../project/state/actions';
 import type { VideoEditorState } from './types';
+import { create } from 'zustand';
+import { createVideoEditorTimelineState } from './root-state';
+import { createExportStateActions } from './export-state';
 
 function createTimelineStore() {
-  let state = {} as VideoEditorState;
-  const set = (
-    partial: Partial<VideoEditorState> | ((state: VideoEditorState) => Partial<VideoEditorState>)
-  ) => {
-    const nextState = typeof partial === 'function' ? partial(state) : partial;
-    state = { ...state, ...nextState };
-  };
-
-  state = {
-    project: null,
-    recordingId: null,
-    isReady: false,
-    error: null,
-    saveState: 'idle',
-    currentTime: 0,
-    isPlaying: false,
-    pixelsPerSecond: 90,
-    placementMode: null,
-    recordingTelemetry: null,
-    selection: { kind: 'scene' },
-    selectedTrackId: null,
-    selectedClipId: null,
-    telemetryLaneVisible: false,
-    diagnosticsOpen: false,
-    exportState: {
-      dialogOpen: false,
-      isRunning: false,
-      jobId: null,
-      status: null,
-      settings: null,
-      error: null,
-      lastResult: null,
-    },
-    ...createProjectStateActions(set as never),
-    ...createSelectionStateActions(set as never),
-  } as VideoEditorState;
-
-  return { getState: () => state };
+  return create<VideoEditorState>()((set, get) => ({
+    ...createVideoEditorTimelineState(set),
+    ...createVideoEditorProjectActions(set, get),
+    ...createExportStateActions(set),
+  }));
 }
 
 describe('video editor timeline project state', () => {
@@ -72,6 +49,7 @@ describe('video editor timeline project state', () => {
   it('resets and reopens telemetry lane visibility from recording telemetry lifecycle', () => {
     const store = createTimelineStore();
     const project = createEmptyVideoProject('Timeline');
+    project.baseRecordingId = 'rec-1';
     const telemetry = createRecordingTelemetryEntry('rec-1');
 
     store.getState().setProject(project, 'recording-1');
@@ -85,10 +63,32 @@ describe('video editor timeline project state', () => {
     expect(store.getState().telemetryLaneVisible).toBe(false);
 
     store.getState().setRecordingTelemetry(createRecordingTelemetryEntry('rec-2'));
-    expect(store.getState().telemetryLaneVisible).toBe(true);
+    expect(store.getState().recordingTelemetry).toBeNull();
+    expect(store.getState().telemetryLaneVisible).toBe(false);
 
     store.getState().setRecordingTelemetry(null);
     expect(store.getState().telemetryLaneVisible).toBe(false);
+  });
+
+  it('hydrates subtitle-first projects with one presented selection authority', () => {
+    const store = createTimelineStore();
+    const project = createEmptyVideoProject('Subtitle-first');
+    const subtitleTrack = createVideoProjectTrack('Subtitles', 4, VideoTrackKind.SUBTITLE);
+    const overlayTrack = project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!;
+    const subtitleClip = createSubtitleClip(subtitleTrack.id, project.width, project.height, 0);
+    const visibleClip = createTextClip(overlayTrack.id, project.width, project.height, 0);
+    project.tracks.push(subtitleTrack);
+    project.clips = [subtitleClip, visibleClip];
+
+    store.getState().setProject(project);
+    expect(store.getState()).toMatchObject({
+      selectedClipId: visibleClip.id,
+      selectedTrackId: overlayTrack.id,
+      selection: { kind: 'clip', clipId: visibleClip.id },
+    });
+
+    store.getState().deleteClip(store.getState().selectedClipId!);
+    expect(store.getState().project?.clips.map((clip) => clip.id)).toEqual([subtitleClip.id]);
   });
 });
 

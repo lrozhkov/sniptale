@@ -130,15 +130,6 @@ function ObjectTrackCorrectionPanel({ props }: { props: WorkspaceSidebarSelectio
         >
           {translate('videoEditor.sidebar.objectTrackCorrectionPlace')}
         </ProductActionButton>
-        <ProductActionButton
-          compact
-          data-ui="video-editor.object-track.recalculate"
-          disabled={!track.analysis}
-          type="button"
-          onClick={() => void props.cursorDetection?.runLocalRecalculation(track.id)}
-        >
-          {translate('videoEditor.sidebar.objectTrackRecalculateLocal')}
-        </ProductActionButton>
       </div>
     </div>
   );

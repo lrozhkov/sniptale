@@ -1,5 +1,6 @@
 import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
+import { parseRecordingTelemetryEntry } from '../../../composition/persistence/recordings/telemetry.guards';
 import type {
   NativeRecordingTelemetrySnapshot,
   NativeRecordingTimebase,
@@ -56,7 +57,7 @@ export function mapNativeRecordingTelemetry(params: {
   }
   const telemetry = normalizeTelemetrySnapshot(params.telemetry, params.timebase);
 
-  return {
+  return parseRecordingTelemetryEntry({
     actionEvents: telemetry.actionEvents,
     captureMode: CaptureMode.SCREEN,
     createdAt: params.createdAt,
@@ -69,5 +70,5 @@ export function mapNativeRecordingTelemetry(params: {
     signals: telemetry.signals,
     updatedAt: params.updatedAt,
     viewport: telemetry.viewport,
-  };
+  });
 }

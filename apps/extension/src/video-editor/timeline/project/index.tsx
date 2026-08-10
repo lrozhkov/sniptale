@@ -22,7 +22,11 @@ function ProjectTimelineLayout(
       <ProjectTimelineBody
         {...props}
         cursorLaneVisible={props.panelPrefs.cursorLaneVisible}
-        telemetryLaneVisible={props.panelPrefs.telemetryLaneVisible}
+        telemetryLaneVisible={
+          props.telemetryLaneVisible &&
+          props.recordingTelemetry !== null &&
+          props.panelPrefs.telemetryLaneVisible
+        }
         trackPanelPrefs={props.panelPrefs}
       />
     </ProjectTimelineSurface>

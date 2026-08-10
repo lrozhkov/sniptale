@@ -1,18 +1,5 @@
-import {
-  Bug,
-  Circle,
-  Copy,
-  Download,
-  PanelsLeftRight,
-  Pause,
-  Play,
-  Scissors,
-  Square,
-  Trash2,
-  Type,
-} from 'lucide-react';
+import { Bug, Copy, Download, PanelsLeftRight, Pause, Play, Scissors, Trash2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { VideoProjectShapeType } from '../../../features/video/project/types';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import {
   commandPaletteIcon,
@@ -76,40 +63,6 @@ function buildVideoEditorPlaybackActions(
   ];
 }
 
-function buildVideoEditorStageActions(
-  controller: VideoEditorCommandPaletteController
-): CommandPaletteAction[] {
-  return [
-    createCommandPaletteRunAction({
-      id: 'video-editor-add-text',
-      title: translate('videoEditor.stage.addText'),
-      section: translate('shared.ui.commandPaletteToolsSection'),
-      icon: commandPaletteIcon(Type),
-      onSelect: () => {
-        controller.onAddTextOverlay();
-      },
-    }),
-    createCommandPaletteRunAction({
-      id: 'video-editor-add-rectangle',
-      title: translate('videoEditor.stage.addRectangle'),
-      section: translate('shared.ui.commandPaletteToolsSection'),
-      icon: commandPaletteIcon(Square),
-      onSelect: () => {
-        void controller.onAddShapeOverlay(VideoProjectShapeType.RECTANGLE);
-      },
-    }),
-    createCommandPaletteRunAction({
-      id: 'video-editor-add-ellipse',
-      title: translate('videoEditor.stage.addEllipse'),
-      section: translate('shared.ui.commandPaletteToolsSection'),
-      icon: commandPaletteIcon(Circle),
-      onSelect: () => {
-        void controller.onAddShapeOverlay(VideoProjectShapeType.ELLIPSE);
-      },
-    }),
-  ];
-}
-
 function buildVideoEditorTimelineActions(
   controller: VideoEditorCommandPaletteController
 ): CommandPaletteAction[] {
@@ -159,7 +112,6 @@ export function buildVideoEditorCommandPaletteActions(
   return [
     ...buildVideoEditorProjectActions(controller),
     ...buildVideoEditorPlaybackActions(controller),
-    ...buildVideoEditorStageActions(controller),
     ...buildVideoEditorTimelineActions(controller),
   ];
 }

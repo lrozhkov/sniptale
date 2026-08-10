@@ -18,6 +18,7 @@ import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
 } from './telemetry';
+import { isRecordingTelemetryEligibleForAutoProcessing } from './telemetry-eligibility';
 
 function resolveAutoTransformSettings(
   settings: VideoAutoProcessingSettings | undefined
@@ -102,7 +103,7 @@ export async function autoTransformRecordingProject(
   }
 
   const telemetry = await getRecordingTelemetry(recordingId);
-  if (!telemetry) {
+  if (!isRecordingTelemetryEligibleForAutoProcessing(project, telemetry)) {
     return null;
   }
 

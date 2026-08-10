@@ -11,8 +11,11 @@ function isRecordingTelemetryEntry(value: unknown): value is StoredRecordingTele
   return (
     isRecord(value) &&
     isString(value['recordingId']) &&
+    value['recordingId'].trim().length > 0 &&
     isNumber(value['createdAt']) &&
+    value['createdAt'] >= 0 &&
     isNumber(value['updatedAt']) &&
+    value['updatedAt'] >= value['createdAt'] &&
     (value['captureMode'] === null || isString(value['captureMode'])) &&
     (value['displaySurface'] === undefined ||
       value['displaySurface'] === null ||

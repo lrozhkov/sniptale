@@ -99,6 +99,8 @@ it('renders inside the shared modal shell and wires close, export, select, and t
 
   expect(container?.querySelector('[role="dialog"]')).not.toBeNull();
   expect(container?.textContent).toContain('videoEditor.exportDialog.titlePrefix');
+  expect(container?.textContent).not.toContain('videoEditor.exportDialog.exportSubtitleFiles');
+  expect(container?.textContent).not.toContain('videoEditor.exportDialog.burnInSubtitles');
 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   const closeButton = container?.querySelector<HTMLButtonElement>('.sniptale-modal-close');

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { requestVideoEditorSaveRetry } from './save-retry';
 
 const saveVideoProject = vi.fn();
 const getVideoProject = vi.fn();
@@ -36,32 +37,34 @@ async function importAutoSaveHook() {
   return (await import('./auto-save')).useVideoEditorAutoSave;
 }
 
-function renderAutoSaveHarness(props: {
+type AutoSaveHarnessProps = {
   project: ReturnType<typeof createEmptyVideoProject>;
   projectId: string | null;
   refreshProjects: () => Promise<void>;
   root: Root | null;
-  setSaveState: (state: 'saved' | 'saving' | 'error' | 'idle') => void;
+  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void;
   syncProjectRevision?: (
     updater: (
       project: ReturnType<typeof createEmptyVideoProject>
     ) => ReturnType<typeof createEmptyVideoProject>
   ) => void;
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave'];
-}) {
-  const Harness = () => {
-    props.useVideoEditorAutoSave(
-      props.project,
-      props.projectId,
-      props.setSaveState,
-      props.refreshProjects,
-      props.syncProjectRevision
-    );
-    return null;
-  };
+};
 
+function AutoSaveHarness(props: AutoSaveHarnessProps) {
+  props.useVideoEditorAutoSave(
+    props.project,
+    props.projectId,
+    props.setSaveState,
+    props.refreshProjects,
+    props.syncProjectRevision
+  );
+  return null;
+}
+
+function renderAutoSaveHarness(props: AutoSaveHarnessProps) {
   act(() => {
-    props.root?.render(<Harness />);
+    props.root?.render(<AutoSaveHarness {...props} />);
   });
 }
 
@@ -101,7 +104,7 @@ afterEach(() => {
 it('saves the project after the debounce and refreshes project metadata', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave');
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
 
   saveVideoProject.mockResolvedValue({ ...project, updatedAt: 200 });
@@ -114,20 +117,51 @@ it('saves the project after the debounce and refreshes project metadata', async 
     useVideoEditorAutoSave,
   });
 
-  expect(setSaveState).toHaveBeenCalledWith('saving');
+  const editedProject = { ...project, name: 'Autosave edited' };
+  renderAutoSaveHarness({
+    project: editedProject,
+    projectId: 'rec-1',
+    refreshProjects,
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+
+  expect(setSaveState).toHaveBeenLastCalledWith('dirty');
   await flushAutoSaveTimers();
 
-  expect(saveVideoProject).toHaveBeenCalledWith(project, { expectedWorkspaceRevision: null });
+  expect(saveVideoProject).toHaveBeenCalledWith(editedProject, { expectedWorkspaceRevision: null });
+  expect(setSaveState).toHaveBeenCalledWith('saving');
   expect(setSaveState).toHaveBeenCalledWith('saved');
   expect(replaceVideoEditorUrl).toHaveBeenCalledWith(project.id, 'rec-1');
   expect(refreshProjects).toHaveBeenCalledTimes(1);
+});
+
+it('treats a freshly loaded persisted project as saved until it is actually edited', async () => {
+  const useVideoEditorAutoSave = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Already persisted');
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
+
+  renderAutoSaveHarness({
+    project,
+    projectId: null,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+  await flushAutoSaveTimers();
+
+  expect(setSaveState).toHaveBeenCalledWith('saved');
+  expect(setSaveState).not.toHaveBeenCalledWith('saving');
+  expect(saveVideoProject).not.toHaveBeenCalled();
 });
 
 it('uses the last persisted revision for subsequent autosaves', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave revision');
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
   let currentProject = project;
   const Harness = () => {
     useVideoEditorAutoSave(currentProject, 'rec-1', setSaveState, refreshProjects);
@@ -141,15 +175,26 @@ it('uses the last persisted revision for subsequent autosaves', async () => {
     root?.render(<Harness />);
   });
   await flushAutoSaveTimers();
+  currentProject = { ...project, name: 'Autosave revision first edit' };
+  act(() => {
+    root?.render(<Harness />);
+  });
+  await flushAutoSaveTimers();
   currentProject = { ...project, name: 'Autosave revision edited' };
   act(() => {
     root?.render(<Harness />);
   });
   await flushAutoSaveTimers();
 
-  expect(saveVideoProject).toHaveBeenNthCalledWith(1, project, {
-    expectedWorkspaceRevision: null,
-  });
+  expect(saveVideoProject).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({
+      name: 'Autosave revision first edit',
+    }),
+    {
+      expectedWorkspaceRevision: null,
+    }
+  );
   expect(saveVideoProject).toHaveBeenNthCalledWith(
     2,
     expect.objectContaining({ name: 'Autosave revision edited' }),
@@ -161,7 +206,7 @@ it('syncs the saved revision into editor state without triggering a duplicate au
   const useVideoEditorAutoSave = await importAutoSaveHook();
   let currentProject = createEmptyVideoProject('Autosave revision sync');
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
   const syncProjectRevision = vi.fn(
     (updater: (project: typeof currentProject) => typeof currentProject) => {
       currentProject = updater(currentProject);
@@ -183,6 +228,11 @@ it('syncs the saved revision into editor state without triggering a duplicate au
     root?.render(<Harness />);
   });
   await flushAutoSaveTimers();
+  currentProject = { ...currentProject, name: 'Autosave revision sync edited' };
+  act(() => {
+    root?.render(<Harness />);
+  });
+  await flushAutoSaveTimers();
   act(() => {
     root?.render(<Harness />);
   });
@@ -197,7 +247,7 @@ it('queues overlapping same-project autosaves behind the persisted revision upda
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave overlap');
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
   let currentProject = project;
   let resolveFirstSave: ((project: typeof currentProject) => void) | null = null;
   const Harness = () => {
@@ -213,6 +263,11 @@ it('queues overlapping same-project autosaves behind the persisted revision upda
         })
     )
     .mockResolvedValueOnce({ ...project, updatedAt: 300 });
+  act(() => {
+    root?.render(<Harness />);
+  });
+  await flushAutoSaveTimers();
+  currentProject = { ...project, name: 'Autosave overlap first edit' };
   act(() => {
     root?.render(<Harness />);
   });
@@ -240,11 +295,20 @@ it('queues overlapping same-project autosaves behind the persisted revision upda
 it('marks the save state as error when persistence fails', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Broken autosave');
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
 
   saveVideoProject.mockRejectedValue(new Error('persist failed'));
   renderAutoSaveHarness({
     project,
+    projectId: null,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+
+  renderAutoSaveHarness({
+    project: { ...project, name: 'Broken autosave edited' },
     projectId: null,
     refreshProjects: vi.fn().mockResolvedValue(undefined),
     root,
@@ -257,17 +321,56 @@ it('marks the save state as error when persistence fails', async () => {
   expect(setSaveState).toHaveBeenCalledWith('error');
 });
 
+it('retries the current authoritative snapshot after a transient save failure', async () => {
+  const useVideoEditorAutoSave = await importAutoSaveHook();
+  const project = createEmptyVideoProject('Retry autosave');
+  const editedProject = { ...project, name: 'Retry autosave edited' };
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
+
+  saveVideoProject
+    .mockRejectedValueOnce(new Error('transient failure'))
+    .mockResolvedValueOnce({ ...editedProject, updatedAt: 300 });
+  renderAutoSaveHarness({
+    project,
+    projectId: null,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+  renderAutoSaveHarness({
+    project: editedProject,
+    projectId: null,
+    refreshProjects: vi.fn().mockResolvedValue(undefined),
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+  await flushAutoSaveTimers();
+  expect(setSaveState).toHaveBeenLastCalledWith('error');
+
+  act(() => requestVideoEditorSaveRetry());
+  expect(setSaveState).toHaveBeenLastCalledWith('dirty');
+  await flushAutoSaveTimers();
+
+  expect(saveVideoProject).toHaveBeenCalledTimes(2);
+  expect(saveVideoProject).toHaveBeenLastCalledWith(editedProject, {
+    expectedWorkspaceRevision: null,
+  });
+  expect(setSaveState).toHaveBeenLastCalledWith('saved');
+});
+
 it('ignores stale save completions after the editor switches to a newer project', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const projectA = createEmptyVideoProject('Project A');
   const projectB = createEmptyVideoProject('Project B');
   const refreshProjects = vi.fn().mockResolvedValue(undefined);
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
-  let resolveFirstSave: (() => void) | null = null;
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
+  let resolveFirstSave: ((savedProject: typeof projectA) => void) | null = null;
 
   saveVideoProject.mockImplementationOnce(
     () =>
-      new Promise<void>((resolve) => {
+      new Promise<typeof projectA>((resolve) => {
         resolveFirstSave = resolve;
       })
   );
@@ -275,6 +378,14 @@ it('ignores stale save completions after the editor switches to a newer project'
 
   renderAutoSaveHarness({
     project: projectA,
+    projectId: 'rec-a',
+    refreshProjects,
+    root,
+    setSaveState,
+    useVideoEditorAutoSave,
+  });
+  renderAutoSaveHarness({
+    project: { ...projectA, name: 'Project A edited' },
     projectId: 'rec-a',
     refreshProjects,
     root,
@@ -290,12 +401,11 @@ it('ignores stale save completions after the editor switches to a newer project'
     setSaveState,
     useVideoEditorAutoSave,
   });
-  await flushAutoSaveTimers();
   await act(async () => {
-    resolveFirstSave?.();
+    resolveFirstSave?.({ ...projectA, updatedAt: 200 });
     await Promise.resolve();
   });
 
-  expect(replaceVideoEditorUrl).toHaveBeenLastCalledWith(projectB.id, 'rec-b');
-  expect(refreshProjects).toHaveBeenCalledTimes(1);
+  expect(replaceVideoEditorUrl).not.toHaveBeenCalled();
+  expect(refreshProjects).not.toHaveBeenCalled();
 });

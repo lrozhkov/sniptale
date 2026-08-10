@@ -4,7 +4,7 @@ import { getRecording } from '../../../composition/persistence/recordings/index'
 import { getScenarioAsset } from '../../../composition/persistence/scenario/projects';
 import type { VideoProject } from '../../../features/video/project/types/index';
 
-export async function loadVideoEditorAssetUrl(
+async function loadVideoEditorAssetUrl(
   asset: VideoProject['assets'][number]
 ): Promise<readonly [string, string] | null> {
   if (asset.source.kind === 'recording') {
@@ -21,7 +21,7 @@ export async function loadVideoEditorAssetUrl(
   return entry ? [asset.id, URL.createObjectURL(entry.blob)] : null;
 }
 
-export function revokeVideoEditorAssetUrl(url: string): void {
+function revokeVideoEditorAssetUrl(url: string): void {
   if (url.startsWith('blob:')) {
     URL.revokeObjectURL(url);
   }

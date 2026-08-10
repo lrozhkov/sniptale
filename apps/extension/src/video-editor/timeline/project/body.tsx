@@ -19,7 +19,6 @@ type ProjectTimelineBodyProps = Pick<
   | 'insertion'
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
-  | 'onAddTrackLogicalLane'
   | 'onDeleteTrack'
   | 'onMoveTrack'
   | 'onClearUtilityLane'
@@ -105,7 +104,6 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
-    onAddTrackLogicalLane: props.onAddTrackLogicalLane,
     onClearUtilityLane: props.onClearUtilityLane,
     onDeleteTrack: props.onDeleteTrack,
     onMoveTrack: props.onMoveTrack,

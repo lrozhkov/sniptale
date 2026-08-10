@@ -26,6 +26,10 @@ export const commonMessages = defineMessageSource({
       ru: 'Закрыть',
       en: 'Close',
     },
+    retry: {
+      ru: 'Повторить',
+      en: 'Retry',
+    },
   },
   bootstrap: {
     errorBody: {
@@ -49,6 +53,10 @@ export const commonMessages = defineMessageSource({
     saving: {
       ru: 'Сохраняется',
       en: 'Saving',
+    },
+    dirty: {
+      ru: 'Есть изменения',
+      en: 'Unsaved changes',
     },
     error: {
       ru: 'Ошибка',

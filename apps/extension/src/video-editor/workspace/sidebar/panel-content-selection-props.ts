@@ -72,7 +72,6 @@ export function createSelectionPanelOptionalProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
-  | 'cursorDetection'
   | 'onAddActionEvent'
   | 'onAddMotionRegion'
   | 'onDeleteActionEvent'
@@ -91,7 +90,6 @@ export function createSelectionPanelOptionalProps(
 > &
   Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'onDeleteTrack'>> {
   return {
-    cursorDetection: props.cursorDetection,
     onAddActionEvent: props.onAddActionEvent ?? (() => undefined),
     onAddMotionRegion: props.onAddMotionRegion ?? (() => undefined),
     onDeleteActionEvent: props.onDeleteActionEvent ?? (() => undefined),

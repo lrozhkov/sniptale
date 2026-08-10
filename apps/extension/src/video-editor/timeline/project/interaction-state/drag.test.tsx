@@ -219,7 +219,7 @@ it('moves clips to the intended track when rows have mixed heights', () => {
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 5, project.tracks[1]!.id, 'line-1');
 });
 
-it('resolves the drag target logical lane while a clip is moved', () => {
+it('maps vertical movement to the physical track and its base lane', () => {
   const project = createEmptyVideoProject('Drag ghost');
   const clip = createClip(project.tracks[0]!.id);
   project.tracks[0] = {
@@ -251,7 +251,7 @@ it('resolves the drag target logical lane while a clip is moved', () => {
     dispatchTimelinePointerMove(130, 53);
   });
 
-  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 8, project.tracks[0]!.id, 'line-2');
+  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 8, project.tracks[1]!.id, 'line-1');
 });
 
 it('keeps the current logical lane during horizontal clip drags', () => {

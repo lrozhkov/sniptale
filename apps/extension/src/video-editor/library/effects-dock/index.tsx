@@ -1,13 +1,6 @@
 import { InspectorShellPanel } from '@sniptale/ui/inspector-shell';
 
-import {
-  BUILT_IN_VIDEO_ANNOTATION_PACKS,
-  type VideoAnnotationPack,
-  type VideoAnnotationTemplate,
-} from '../../../features/video/project/annotation-engine';
-import type { VideoAnnotationTemplateCreateInput } from '../../../features/video/project/annotation/template-input';
 import { translate } from '../../../platform/i18n';
-import { resolveLocalizedText } from '../../../platform/i18n/localized-text';
 import { VIDEO_EDITOR_PANEL_STYLE } from '../../chrome/styles';
 import { CatalogSection } from './catalog-section';
 import type { EffectLibraryOperationError } from './operations';
@@ -53,7 +46,6 @@ export function VideoEditorEffectsLibraryDock(
             aria-busy={disabled || props.isLoading}
           >
             <CatalogSection {...props} disabled={disabled} run={run} />
-            <NativeAnnotationSection disabled={disabled} onAdd={props.onAddAnnotation} />
           </div>
         </div>
       </InspectorShellPanel>
@@ -110,45 +102,4 @@ function formatOperationError(error: EffectLibraryOperationError): string {
           ? translate('videoEditor.effectsLibrary.deleteFailedWithDetail')
           : translate('videoEditor.effectsLibrary.updateFailedWithDetail');
   return message.replace('{detail}', error.code);
-}
-
-function NativeAnnotationSection(props: {
-  disabled: boolean;
-  onAdd(input: VideoAnnotationTemplateCreateInput): void;
-}): React.JSX.Element {
-  return (
-    <section aria-labelledby="native-annotation-heading" className="space-y-2">
-      <h3 id="native-annotation-heading" className="text-sm font-semibold">
-        {translate('videoEditor.effectsLibrary.nativeAnnotationsTitle')}
-      </h3>
-      {BUILT_IN_VIDEO_ANNOTATION_PACKS.flatMap((pack) =>
-        Object.values(pack.templates).flatMap((templates) =>
-          templates.map((template) => (
-            <button
-              type="button"
-              className="mr-2 rounded-lg border px-2 py-1 text-xs"
-              disabled={props.disabled}
-              key={`${pack.packId}:${template.id}`}
-              onClick={() => props.onAdd(createAnnotationInput(pack, template))}
-            >
-              {resolveLocalizedText(template.label)}
-            </button>
-          ))
-        )
-      )}
-    </section>
-  );
-}
-
-function createAnnotationInput(
-  pack: VideoAnnotationPack,
-  template: VideoAnnotationTemplate
-): VideoAnnotationTemplateCreateInput {
-  return {
-    pack,
-    packLabel: pack.label,
-    packTheme: pack.theme,
-    template,
-    templateRef: { packId: pack.packId, templateId: template.id },
-  };
 }

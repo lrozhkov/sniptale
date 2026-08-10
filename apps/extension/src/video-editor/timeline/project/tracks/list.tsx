@@ -18,7 +18,6 @@ interface ProjectTimelineTrackListProps {
   trackListRef: MutableRefObject<HTMLDivElement | null>;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   tracks: VideoProject['tracks'];
-  onAddTrackLogicalLane: (trackId: string) => void;
   onMoveTrack: (trackId: string, direction: 'up' | 'down') => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onDeleteTrack: (trackId: string) => void;
@@ -95,7 +94,6 @@ function ProjectTimelineRailRows(props: {
   trackLayoutModel: TimelineTrackLayoutModel;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   tracks: VideoProject['tracks'];
-  onAddTrackLogicalLane: (trackId: string) => void;
   onSelectTrack: (trackId: string) => void;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
@@ -116,7 +114,6 @@ function ProjectTimelineRailRows(props: {
           isSelected={props.selectedTrackId === track.id}
           trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
           track={track}
-          onAddTrackLogicalLane={props.onAddTrackLogicalLane}
           onSelectTrack={props.onSelectTrack}
           onToggleTrackLock={props.onToggleTrackLock}
           onToggleTrackVisibility={props.onToggleTrackVisibility}

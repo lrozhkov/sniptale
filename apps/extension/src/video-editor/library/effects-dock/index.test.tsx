@@ -195,7 +195,6 @@ function DroppedEffectOperationHarness(props: {
         isLoading={false}
         isOpen
         operations={operations}
-        onAddAnnotation={vi.fn()}
         onApplyEffect={props.onApplyEffect}
         onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
@@ -220,7 +219,6 @@ function renderDock(
         isLoading={false}
         isOpen
         operations={createOperations()}
-        onAddAnnotation={vi.fn()}
         onApplyEffect={vi.fn(async () => null)}
         onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}

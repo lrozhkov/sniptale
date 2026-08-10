@@ -1,10 +1,7 @@
 import { ImagePlus, LayoutTemplate, MonitorCog } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import type { TranslationKey } from '../../../platform/i18n';
-import {
-  createCommonCanvasPointInsertAction,
-  type CanvasToolAction,
-} from '@sniptale/ui/canvas-tools';
+import type { CanvasToolAction } from '@sniptale/ui/canvas-tools';
 import {
   createCanvasFileToolAction,
   createCanvasToolAction,
@@ -26,12 +23,8 @@ export function buildVideoInsertActions(args: {
   insertion: VideoEditorWorkspaceController['timeline']['actions']['insertion'];
   onActiveInsertKindChange: (kind: VideoPreviewCanvasInsertKind | null) => void;
 }) {
-  const toggleCanvasInsert = (kind: VideoPreviewCanvasInsertKind) =>
-    args.onActiveInsertKindChange(args.activeInsertKind === kind ? null : kind);
-
   return [
     createSelectMoveAction(args.activeInsertKind, args.onActiveInsertKindChange),
-    ...buildVideoPointInsertActions(args.activeInsertKind, toggleCanvasInsert),
     createMediaInsertAction(args.insertion),
     createTemplatesInsertAction(args.effectsLibraryDock),
   ] satisfies CanvasToolAction[];
@@ -73,29 +66,6 @@ function createSelectMoveAction(
     label: translate('videoEditor.app.selectMoveButton'),
     onSelect: () => onActiveInsertKindChange(null),
   });
-}
-
-function buildVideoPointInsertActions(
-  activeInsertKind: VideoPreviewCanvasInsertKind | null,
-  toggleCanvasInsert: (kind: VideoPreviewCanvasInsertKind) => void
-) {
-  const actions = [
-    ['text', 'videoEditor.stage.addText', 'text'],
-    ['shape', 'videoEditor.stage.addRectangle', 'shape'],
-    ['line', 'videoEditor.stage.addLine', 'line'],
-    ['arrow', 'videoEditor.stage.addArrow', 'arrow'],
-  ] as const;
-
-  return actions.map(([kind, labelKey, target]) =>
-    createCommonCanvasPointInsertAction({
-      active: activeInsertKind === kind,
-      group: 'secondary',
-      kind,
-      label: translate(labelKey),
-      target,
-      onSelect: toggleCanvasInsert,
-    })
-  );
 }
 
 function createMediaInsertAction(

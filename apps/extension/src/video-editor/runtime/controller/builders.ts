@@ -2,7 +2,6 @@ import type React from 'react';
 import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
 import type { SaveStateMeta, VideoEditorLibrariesState } from '../app-model/types';
 import type { VideoEditorActionHandlers } from '../commands';
-import type { VideoEditorCursorDetectionController } from '../cursor-detection/analysis';
 import type { VideoEditorRuntimeController } from '../session';
 import type { VideoEditorSelections } from './selections';
 import type { VideoEditorWorkspaceState } from './workspace-state';
@@ -27,7 +26,6 @@ import {
 
 interface CreateVideoEditorControllerArgs {
   actions: VideoEditorActionHandlers;
-  cursorDetection: VideoEditorCursorDetectionController;
   diagnosticsContent: React.ReactNode;
   libraries: VideoEditorLibrariesState;
   runtime: VideoEditorRuntimeController;

@@ -10,7 +10,6 @@ import type {
   VideoProjectSceneBackground,
 } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
-import type { VideoEditorCursorDetectionController } from '../../cursor-detection/analysis';
 import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
@@ -128,7 +127,6 @@ interface VideoEditorSidebarClipActions {
 
 export interface VideoEditorSidebarController {
   clipActions: VideoEditorSidebarClipActions;
-  cursorDetection: VideoEditorCursorDetectionController;
   projectActions: VideoEditorSidebarProjectActions;
   state: VideoEditorSidebarState;
 }

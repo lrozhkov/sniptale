@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Film, Image, Library, Trash2, FolderOpen } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { EmptyState } from '../../../ui/compact-inspector-controls';
+import { useProjectTransitionPending } from '../../runtime/commands/project-transition';
 
 type LibraryItemVariant = 'row' | 'card';
 type LibraryItemActionTone = 'neutral' | 'danger' | 'accent';
@@ -173,15 +174,32 @@ export function OpenProjectAction(props: {
   projectId: string;
   variant: LibraryItemVariant;
 }) {
+  const [opening, setOpening] = useState(false);
+  const openingRef = useRef(false);
+  const transitionPending = useProjectTransitionPending();
+  const openProject = async () => {
+    if (openingRef.current) return;
+    openingRef.current = true;
+    setOpening(true);
+    try {
+      await props.onOpenProject(props.projectId);
+    } catch {
+      // The runtime command owns user-visible failure feedback; keep the drawer open for retry.
+    } finally {
+      openingRef.current = false;
+      setOpening(false);
+    }
+  };
+
   return (
     <LibraryItemActionButton
-      disabled={props.disabled}
+      disabled={props.disabled || opening || transitionPending}
       icon={<FolderOpen size={ACTION_ICON_SIZE[props.variant]} strokeWidth={2} />}
-      onClick={() => void props.onOpenProject(props.projectId)}
+      onClick={() => void openProject()}
       tone="neutral"
       variant={props.variant}
     >
-      {translate('videoEditor.sidebar.openButton')}
+      {opening ? translate('common.states.loading') : translate('videoEditor.sidebar.openButton')}
     </LibraryItemActionButton>
   );
 }

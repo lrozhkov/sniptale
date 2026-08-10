@@ -12,6 +12,10 @@ import type {
 import { findVisibleProjectActionEvent } from '../../project/operations/action-events';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
+import {
+  isVideoEditorPresentedClip,
+  isVideoEditorPresentedTrack,
+} from '../../project/operations/presented-tracks';
 
 export interface VideoEditorSelections {
   selection: VideoEditorSelection;
@@ -87,11 +91,19 @@ export function useVideoEditorSelections(
   selectedTrackId: string | null
 ): VideoEditorSelections {
   const selectedClip = useMemo(
-    () => project?.clips.find((clip) => clip.id === selectedClipId) ?? null,
+    () =>
+      project
+        ? (project.clips.find(
+            (clip) => clip.id === selectedClipId && isVideoEditorPresentedClip(project, clip)
+          ) ?? null)
+        : null,
     [project, selectedClipId]
   );
   const selectedTrack = useMemo(
-    () => project?.tracks.find((track) => track.id === selectedTrackId) ?? null,
+    () =>
+      project?.tracks.find(
+        (track) => track.id === selectedTrackId && isVideoEditorPresentedTrack(track)
+      ) ?? null,
     [project, selectedTrackId]
   );
   const selectedTransition = useSelectedTransition(project, selection);
