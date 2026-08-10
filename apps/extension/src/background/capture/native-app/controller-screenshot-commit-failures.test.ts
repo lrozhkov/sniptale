@@ -25,7 +25,7 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 
 vi.mock('@sniptale/platform/security/secure-random-id', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/security/secure-random-id')>()),
-  createSecureRandomUuid: () => 'editor-session-1',
+  createSecureRandomUuid: () => 'image-aggregate-1',
 }));
 
 vi.mock('../../../platform/navigation/extension-pages/editor', async (importOriginal) => ({

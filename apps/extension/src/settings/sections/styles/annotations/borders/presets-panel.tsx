@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { translate, useAppLocale } from '../../../../../platform/i18n';
 import { getBorderPresetDisplayName } from '../../../../../features/highlighter/presets/display-name';
 import {
@@ -8,11 +9,30 @@ import {
 } from '../../../../section-surface';
 import { getHighlighterPresetCountLabel, getHighlighterPresetPreviewStyle } from './helpers';
 import type { HighlighterPresetsProps } from './types';
+import {
+  AnnotationTemplateQueryControls,
+  AnnotationTemplateQueryEmpty,
+  AnnotationTemplateTagChips,
+  queryAnnotationTemplateValues,
+  resolveAnnotationTemplateTags,
+  useAnnotationTemplateTagState,
+} from '../../../../../ui/annotation-template-query';
 
 export function HighlighterPresetsPanel({ presets, settings }: HighlighterPresetsProps) {
   const locale = useAppLocale();
+  const [query, setQuery] = useState('');
+  const tagState = useAnnotationTemplateTagState();
   const enabledCount = settings.borderPresets.filter((preset) => preset.enabled !== false).length;
-  const items: readonly SettingsCollectionItem[] = settings.borderPresets.map((preset) => {
+  const filteredPresets = queryAnnotationTemplateValues({
+    activeFilterTagIds: tagState.state.activeFilterTagIds,
+    activeTemplateId: settings.defaultBorderPresetId,
+    getDisplayName: (preset) => getBorderPresetDisplayName(preset, locale),
+    getTagIds: (preset) => preset.tagIds,
+    query,
+    tags: tagState.state.tags,
+    values: settings.borderPresets,
+  });
+  const items: readonly SettingsCollectionItem[] = filteredPresets.map((preset) => {
     const styleLabel = translate(
       preset.style === 'solid'
         ? 'highlighter.editor.styleSolid'
@@ -29,6 +49,11 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
         translate('highlighter.section.radiusSuffix'),
       ].join(''),
       preview: <span className="h-full w-full" style={getHighlighterPresetPreviewStyle(preset)} />,
+      supplement: (
+        <AnnotationTemplateTagChips
+          tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
+        />
+      ),
       enabled: preset.enabled !== false,
       isDefault: settings.defaultBorderPresetId === preset.id,
       badges:
@@ -64,7 +89,15 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
     if (action.type === 'delete') void presets.handleDeletePreset(preset);
   };
   return (
-    <div className="mb-8">
+    <div className="mb-8 space-y-3">
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={tagState.state.activeFilterTagIds}
+        disabled={tagState.isLoading || tagState.error}
+        onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        onQueryChange={setQuery}
+        query={query}
+        tags={tagState.state.tags}
+      />
       <SettingsCollection
         ariaLabel={translate('highlighter.section.presetsLabel')}
         title={translate('highlighter.section.presetsLabel')}
@@ -74,6 +107,16 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
           label: translate('highlighter.section.addButton'),
           onInvoke: presets.handleAddPreset,
         }}
+        emptyState={
+          settings.borderPresets.length > 0 ? (
+            <AnnotationTemplateQueryEmpty
+              hasFilter={tagState.state.activeFilterTagIds.length > 0}
+              onClearFilter={() => void tagState.setActiveFilterTagIds([])}
+              onClearQuery={() => setQuery('')}
+              query={query}
+            />
+          ) : undefined
+        }
         onAction={onAction}
         onMove={(intent: SettingsCollectionMoveIntent) =>
           void presets.handleMoveBefore(intent.itemId, intent.beforeItemId)

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createLegacyScenarioProjectMetadata } from '../restore/project/prepare.test-support.ts';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -11,7 +12,9 @@ interface BackupAssetMetadataFixture {
   assets: Array<{
     assetPath: string;
     entry: Record<string, unknown>;
+    presentation?: unknown;
     thumbnailPath: string | null;
+    workspace?: unknown;
   }>;
 }
 
@@ -119,9 +122,64 @@ describe('media hub backup metadata parser', () => {
       })
     );
   });
+
+  it('drops malformed derived presentation metadata without changing authority', async () => {
+    const { parseBackupMetadata } = await import('.');
+    const metadata = createBackupAssetMetadata();
+    metadata.assets[0]!.presentation = {
+      entry: {
+        aggregateId: 'asset-1',
+        aggregateKind: 'image',
+        presentationRevision: -1,
+        updatedAt: 2,
+      },
+      previewPath: '../manifest.json',
+      thumbnailPath: '../manifest.json',
+    };
+
+    expect(parseBackupMetadata(metadata).assets[0]).not.toHaveProperty('presentation');
+  });
 });
 
 describe('media hub backup metadata rejection boundaries', () => {
+  it('rejects image workspace authority that is incompatible with its root', async () => {
+    const { parseBackupMetadata } = await import('.');
+    const createWorkspace = (revision: number) => ({
+      aggregateId: 'asset-1',
+      createdAt: 1,
+      document: createEditorDocumentFixture(),
+      revision,
+      sourceTitle: null,
+      sourceUrl: null,
+      updatedAt: 2,
+    });
+
+    const incompatibleRoot = createBackupAssetMetadata();
+    incompatibleRoot.assets[0]!.entry = {
+      ...incompatibleRoot.assets[0]!.entry,
+      kind: 'recording',
+      source: { kind: 'recording', recordingId: 'recording-1' },
+      workspaceRevision: 1,
+    };
+    incompatibleRoot.assets[0]!.workspace = createWorkspace(1);
+    expect(() => parseBackupMetadata(incompatibleRoot)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+
+    const missingWorkspace = createBackupAssetMetadata();
+    missingWorkspace.assets[0]!.entry['workspaceRevision'] = 2;
+    expect(() => parseBackupMetadata(missingWorkspace)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+
+    const mismatchedRevision = createBackupAssetMetadata();
+    mismatchedRevision.assets[0]!.entry['workspaceRevision'] = 2;
+    mismatchedRevision.assets[0]!.workspace = createWorkspace(1);
+    expect(() => parseBackupMetadata(mismatchedRevision)).toThrow(
+      'shared.mediaHub.backupMetadataCorrupted'
+    );
+  });
+
   it('rejects malformed source, unsafe paths, and raw blob fields', async () => {
     const { parseBackupMetadata } = await import('.');
     const baseAsset = createBackupAssetMetadata().assets[0]!;

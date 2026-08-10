@@ -4,6 +4,29 @@ const migrateHighlighterSystemPresetCatalog = vi.hoisted(() => vi.fn(async () =>
 const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const migrateStepBadgeSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
+const cleanupDrafts = vi.hoisted(() => vi.fn(async () => undefined));
+const loadSettings = vi.hoisted(() =>
+  vi.fn(async () => ({
+    localStoragePolicy: {
+      cleanupEnabled: true,
+      defaultDestination: 'temporary' as const,
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+    },
+  }))
+);
+
+vi.mock('../../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/library-lifecycle')
+  >()),
+  cleanupDrafts,
+}));
+
+vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
+  loadSettings,
+}));
 
 vi.mock('../../../../composition/persistence/highlighter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/highlighter')>()),
@@ -30,7 +53,6 @@ vi.mock('../../page-access/service', async (importOriginal) => ({
 import {
   cleanupCapture,
   cleanupExpiredProjectExportInputs,
-  cleanupOldRecordings,
   flushMicrotasks,
   initializeBackgroundRuntimeWiringMocks,
   initializeAiStorageAccess,
@@ -54,7 +76,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   initializeBackgroundRuntimeWiringMocks.ensurePersistentStorage.mockRejectedValue(
     new Error('persist failed')
   );
-  cleanupOldRecordings.mockRejectedValue(new Error('cleanup failed'));
+  cleanupDrafts.mockRejectedValue(new Error('cleanup failed'));
   cleanupExpiredProjectExportInputs.mockRejectedValue(new Error('export input cleanup failed'));
   recoverInterruptedSessions.mockRejectedValue(new Error('recovery failed'));
   recoverVideoCaptureSurfaceOnStartup.mockRejectedValue(new Error('surface recovery failed'));
@@ -65,7 +87,14 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   runStartupMaintenance(state, logger);
   await flushMicrotasks();
 
-  expect(cleanupOldRecordings).toHaveBeenCalledWith(7);
+  expect(cleanupDrafts).toHaveBeenCalledWith({
+    policy: {
+      cleanupEnabled: true,
+      defaultDestination: 'temporary',
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+    },
+  });
   expect(cleanupExpiredProjectExportInputs).toHaveBeenCalledOnce();
   expect(recoverInterruptedSessions).toHaveBeenCalledOnce();
   expect(reconcileCaptureJobsOnStartup).toHaveBeenCalledWith({
@@ -82,7 +111,10 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
     'Failed to request persistent storage',
     expect.any(Error)
   );
-  expect(logger.warn).toHaveBeenCalledWith('IDB cleanup failed (non-critical)', expect.any(Error));
+  expect(logger.warn).toHaveBeenCalledWith(
+    'Draft cleanup failed (non-critical)',
+    expect.any(Error)
+  );
   expect(logger.warn).toHaveBeenCalledWith(
     'Project export input cleanup failed (non-critical)',
     expect.any(Error)
@@ -107,6 +139,22 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
     'Capture surface recovery failed; new preset mutations remain blocked',
     expect.any(Error)
   );
+});
+
+it('does not schedule draft cleanup when automatic cleanup is disabled', async () => {
+  loadSettings.mockResolvedValueOnce({
+    localStoragePolicy: {
+      cleanupEnabled: false,
+      defaultDestination: 'temporary',
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+    },
+  });
+
+  runStartupMaintenance(createModeState(), logger);
+  await flushMicrotasks();
+
+  expect(cleanupDrafts).not.toHaveBeenCalled();
 });
 
 it('resets reconstructible and disposable state during startup maintenance', () => {

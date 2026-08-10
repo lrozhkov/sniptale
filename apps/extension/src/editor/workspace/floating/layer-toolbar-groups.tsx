@@ -6,13 +6,7 @@ import {
   type FloatingToolbarGroupKind,
   getCanvasToolbarGroupTrigger,
 } from './canvas-toolbar-model';
-import { createArrowToolbarGroups } from './arrow-toolbar-groups';
-import { createBlurToolbarGroups } from './blur-toolbar-groups';
-import { createBrushToolbarGroups } from './brush-toolbar-groups';
-import { createLineToolbarGroups } from './line-toolbar-groups';
-import { createShapeToolbarGroups } from './shape-toolbar-groups';
 import { createStepToolbarGroups } from './step-toolbar-groups';
-import { createTextToolbarGroups } from './text-toolbar-groups';
 import { createToolbarGroup } from './toolbar-group-builders';
 
 const LAYER_TOOLBAR_GROUP_ORDER: FloatingToolbarGroupKind[] = [
@@ -153,14 +147,7 @@ export function sortLayerToolbarGroups(groups: FloatingToolbarGroup[]): Floating
 export function createLayerToolbarCommandGroups(
   commands: CompactCommand[]
 ): FloatingToolbarGroup[] {
-  const specializedGroups =
-    createBrushToolbarGroups(commands) ??
-    createBlurToolbarGroups(commands) ??
-    createLineToolbarGroups(commands) ??
-    createArrowToolbarGroups(commands) ??
-    createShapeToolbarGroups(commands) ??
-    createStepToolbarGroups(commands) ??
-    createTextToolbarGroups(commands);
+  const specializedGroups = createStepToolbarGroups(commands);
   if (specializedGroups) {
     return specializedGroups;
   }

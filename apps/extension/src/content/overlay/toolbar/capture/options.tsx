@@ -38,6 +38,8 @@ function getCaptureActionMenuIcon(captureAction: CaptureActionType) {
       return <FileStack {...iconProps} />;
     case 'edit':
       return <Pencil {...iconProps} />;
+    case 'save_to_library':
+      return <Save {...iconProps} />;
     case 'download_default':
     default:
       return <Download {...iconProps} />;
@@ -78,6 +80,8 @@ export function getCaptureActionIcon(captureAction: CaptureActionType) {
       return <FileStack {...iconProps} />;
     case 'edit':
       return <Pencil {...iconProps} />;
+    case 'save_to_library':
+      return <Save {...iconProps} />;
     case 'ask_preset':
       return <FolderInput {...iconProps} />;
     case 'ask_system':
@@ -96,6 +100,8 @@ export function getCaptureActionTooltip(captureAction: CaptureActionType) {
       return translate('content.toolbar.afterCaptureScenario');
     case 'edit':
       return translate('content.toolbar.afterCaptureEdit');
+    case 'save_to_library':
+      return translate('content.toolbar.afterCaptureSaveToLibrary');
     case 'ask_preset':
       return translate('content.toolbar.afterCaptureAskPreset');
     case 'ask_system':

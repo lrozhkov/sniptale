@@ -21,7 +21,7 @@ export function resolveEditorPresetDefaultId<TPreset extends DefaultableEditorPr
   return presets.find((preset) => preset.enabled)?.id ?? presets[0]?.id ?? 'system-default';
 }
 
-export function replaceEditorPresetCollection<TKey extends EditorPresetFamily>(
+function replaceEditorPresetCollection<TKey extends EditorPresetFamily>(
   settings: EditorPresetStorageState,
   family: TKey,
   collection: EditorPresetStorageState[TKey]

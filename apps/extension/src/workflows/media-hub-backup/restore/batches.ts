@@ -59,7 +59,9 @@ async function restorePreparedAssetsInTransaction(
       prepared.assetBlob,
       prepared.thumbnailBlob,
       prepared.recordingTelemetry,
-      prepared.webSnapshotRecord
+      prepared.webSnapshotRecord,
+      prepared.workspace ?? null,
+      prepared.presentation ?? null
     );
     imported += 1;
   }

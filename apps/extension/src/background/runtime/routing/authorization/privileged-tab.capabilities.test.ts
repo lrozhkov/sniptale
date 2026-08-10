@@ -4,17 +4,10 @@ import type { RouteCaptureMessage } from '../../../capture/routing';
 
 const capabilityMocks = vi.hoisted(() => ({
   consumeExportHarStartCapability: vi.fn(),
-  consumeGalleryImageUpdateCapability: vi.fn(),
   getUnauthorizedPrivilegedTabRouteSenderReason: vi.fn(),
   isExportHarStopCapabilityAuthorized: vi.fn(),
 }));
 
-vi.mock('../../../capture/routing/gallery-update-capabilities', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../capture/routing/gallery-update-capabilities')
-  >()),
-  consumeGalleryImageUpdateCapability: capabilityMocks.consumeGalleryImageUpdateCapability,
-}));
 vi.mock('../../../diagnostics/export-har-collector/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../diagnostics/export-har-collector/session')>()),
   isExportHarStopCapabilityAuthorized: capabilityMocks.isExportHarStopCapabilityAuthorized,
@@ -35,7 +28,6 @@ import {
   getPreauthorizedHarStartRouteMessage,
   hasPreauthorizedHarStopRouteMessage,
 } from '../../../diagnostics/export-har-collector/authorization/preauthorization';
-import { hasPreauthorizedGalleryUpdateRouteMessage } from '../../../capture/routing/authorization/gallery-update';
 import { authorizePrivilegedTabRoute } from './privileged-tab';
 import type { ExportHarStartPreauthorization } from '../../../diagnostics/export-har-collector/start-capability';
 
@@ -123,33 +115,3 @@ it('authorizes and rejects HAR stop capabilities', () => {
     reason: 'Unauthorized HAR capability',
   });
 });
-
-it('authorizes gallery update capabilities and rejects missing sender bindings', () => {
-  const message = {
-    assetId: 'asset-1',
-    dataUrl: 'data:image/png;base64,1',
-    editorSessionId: 'editor-session-1',
-    type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-    updateCapabilityToken: 'gallery-token-1',
-  } satisfies RouteCaptureMessage;
-  capabilityMocks.consumeGalleryImageUpdateCapability.mockReturnValueOnce(true);
-
-  expect(authorizeCaptureMessage(message)).toEqual({ authorized: true });
-  expect(hasPreauthorizedGalleryUpdateRouteMessage(message)).toBe(true);
-
-  capabilityMocks.consumeGalleryImageUpdateCapability.mockReturnValueOnce(false);
-  expect(
-    authorizePrivilegedTabRoute({
-      family: 'capture',
-      kind: 'privileged-tab-route',
-      message: { ...message },
-      resolvedTabId: 7,
-      sender: createSenderWithoutDocumentId(),
-    })
-  ).toEqual({ authorized: false, reason: 'Unauthorized gallery image update' });
-});
-
-function createSenderWithoutDocumentId(): chrome.runtime.MessageSender {
-  const { documentId: _documentId, ...sender } = contentSender();
-  return sender;
-}

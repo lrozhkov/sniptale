@@ -1,53 +1,6 @@
-import { EDITOR_TOOL_SHAPE_STROKE_PALETTE } from '../../../../features/editor/document/constants';
-import {
-  CompactColorSwatchTrigger,
-  CompactCommandField,
-  CompactCommandToken,
-  type CompactCommand,
-} from '..';
-import { ColorField, NumericRow, type NumericRowProps } from '../../../chrome/ui';
+import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
+import { NumericRow, type NumericRowProps } from '../../../chrome/ui';
 import type React from 'react';
-
-import type { ToolCommandParams } from './types';
-
-export function buildToolColorCompactCommand(args: {
-  id: string;
-  fieldLabel?: string;
-  onPreviewChange?: (color: string) => void;
-  onPreviewReset?: (color: string) => void;
-  opacity?: number;
-  title: string;
-  value: string;
-  params: ToolCommandParams;
-  onChange: (color: string) => void;
-}): CompactCommand {
-  return {
-    id: args.id,
-    icon: 'color',
-    title: args.title,
-    trigger: (
-      <CompactColorSwatchTrigger
-        color={args.value}
-        {...(args.opacity === undefined ? {} : { opacity: args.opacity })}
-      />
-    ),
-    value: args.value,
-    content: (
-      <CompactCommandField label={args.fieldLabel ?? args.title} value={args.value}>
-        <ColorField
-          title={args.title}
-          label={args.fieldLabel ?? args.title}
-          value={args.value}
-          recentColors={args.params.recentColors}
-          palette={EDITOR_TOOL_SHAPE_STROKE_PALETTE}
-          onChange={args.onChange}
-          {...(args.onPreviewChange ? { onPreviewChange: args.onPreviewChange } : {})}
-          {...(args.onPreviewReset ? { onPreviewReset: args.onPreviewReset } : {})}
-        />
-      </CompactCommandField>
-    ),
-  };
-}
 
 export function buildRangeCompactCommand(args: {
   id: string;

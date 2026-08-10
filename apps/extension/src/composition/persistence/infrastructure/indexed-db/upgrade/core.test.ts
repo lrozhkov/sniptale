@@ -11,7 +11,8 @@ const COMPLETE_STORES = [
   'project_exports',
   'media_library',
   'thumbnails',
-  'editor_sessions',
+  'image_workspaces',
+  'aggregate_presentations',
   'scenario_projects',
   'scenario_assets',
   'scenario_pending_assets',
@@ -36,8 +37,12 @@ it('creates stores for the expected schema versions', () => {
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('recording_telemetry', {
     keyPath: 'recordingId',
   });
-  expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('editor_sessions', {
-    keyPath: 'sessionId',
+  expect(upgradeDb.deleteObjectStore).toHaveBeenCalledWith('editor_sessions');
+  expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('image_workspaces', {
+    keyPath: 'aggregateId',
+  });
+  expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('aggregate_presentations', {
+    keyPath: ['aggregateKind', 'aggregateId'],
   });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('web_snapshots', { keyPath: 'id' });
   expect(upgradeDb.createObjectStore).toHaveBeenCalledWith('video_effect_bundles', {
@@ -117,10 +122,33 @@ it('creates the job-scoped project export input handoff during the v21 upgrade',
 it('skips store creation when existing stores already cover the upgrade', () => {
   const existingDb = createMockDb(COMPLETE_STORES);
 
-  handleDatabaseUpgrade(existingDb, 0);
-  handleDatabaseUpgrade(existingDb, 7);
+  handleDatabaseUpgrade(existingDb, 24);
 
   expect(existingDb.createObjectStore).not.toHaveBeenCalled();
+});
+
+it('replaces editor sessions with aggregate-owned image stores during the v24 upgrade', () => {
+  const legacyDb = createMockDb([
+    ...COMPLETE_STORES.filter(
+      (store) => store !== 'image_workspaces' && store !== 'aggregate_presentations'
+    ),
+    'editor_sessions',
+  ]);
+
+  handleDatabaseUpgrade(legacyDb, 23);
+
+  expect(legacyDb.deleteObjectStore).toHaveBeenCalledWith('editor_sessions');
+  expect(legacyDb.objectStoreNames).not.toContain('editor_sessions');
+  expect(legacyDb.objectStoreNames).toContain('image_workspaces');
+  expect(legacyDb.objectStoreNames).toContain('aggregate_presentations');
+  expect(legacyDb.storeIndexes.get('image_workspaces')?.createIndex).toHaveBeenCalledWith(
+    'updatedAt',
+    'updatedAt'
+  );
+  expect(legacyDb.storeIndexes.get('aggregate_presentations')?.createIndex).toHaveBeenCalledWith(
+    'updatedAt',
+    'updatedAt'
+  );
 });
 
 it('removes the legacy annotation pack store during the v16 upgrade', () => {

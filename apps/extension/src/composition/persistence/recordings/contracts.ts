@@ -8,6 +8,7 @@ import type {
   VideoProjectActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
+import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 export interface RecordingEntry {
   id: string;
@@ -15,6 +16,7 @@ export interface RecordingEntry {
   filename: string;
   createdAt: number;
   size: number;
+  lifecycle?: LibraryLifecycle;
 }
 
 export interface RecordingTelemetryEntry {

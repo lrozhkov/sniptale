@@ -10,6 +10,8 @@ import {
   DEFAULT_BORDER_PRESET,
 } from '../../features/highlighter/style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getCalloutFrameColors } from '../../features/highlighter/callout-color-bindings';
 import {
   getFrameCallout,
   removeFrameCallout,
@@ -53,6 +55,7 @@ export function FrameProjectionSettings(props: {
           portalTarget={props.controlsRoot}
           resetKey={`${props.snapshot.id}:${activeCallout.instanceId ?? props.activeCalloutIndex}`}
           settings={activeCallout}
+          frameColors={getCalloutFrameColors(props.snapshot.borderSettings)}
         />
       ) : null}
       <FrameAnnotationCreationFramePopover
@@ -79,8 +82,8 @@ export function FrameProjectionSettings(props: {
           frameVisuals={{
             borderColor: props.scene.borderColor,
             borderWidth: props.scene.borderWidth,
-            ...(props.snapshot.borderSettings?.fillColor
-              ? { fillColor: props.snapshot.borderSettings.fillColor }
+            ...(props.snapshot.borderSettings?.fillPaint
+              ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
               : {}),
           }}
           headerContext="element"

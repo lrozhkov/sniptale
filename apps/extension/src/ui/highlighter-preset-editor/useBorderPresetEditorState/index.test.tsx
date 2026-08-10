@@ -103,13 +103,14 @@ async function verifyExistingPresetEditBranch() {
     id: 'preset-1',
     name: 'Existing border',
     order: 3,
+    tagIds: [],
     width: 5,
     color: '#00aaff8c',
     style: 'solid' as const,
     radius: 8,
     padding: { top: 2, right: 3, bottom: 4, left: 5 },
     shadow: 100,
-    fillColor: '#00ff0040',
+    fillPaint: { kind: 'solid' as const, color: '#00ff0040' },
     inheritCustomCss: true,
     customCss: 'box-shadow: none;',
   };
@@ -124,7 +125,7 @@ async function verifyExistingPresetEditBranch() {
 
   expect(getState().name).toBe('Existing border');
   expect(getState().previewStyle).toMatchObject({
-    backgroundColor: '#00ff0040',
+    background: '#00ff0040',
     borderColor: '#00aaff8c',
     borderWidth: '5px',
   });

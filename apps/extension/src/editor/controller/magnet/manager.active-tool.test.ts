@@ -10,7 +10,7 @@ function createRect(options: { height: number; left: number; top: number; width:
     height: options.height,
     strokeWidth: 0,
   });
-  rect.sniptaleType = 'rectangle';
+  rect.sniptaleType = 'shape';
   rect.isOnScreen = () => true;
   rect.setCoords();
   return rect;
@@ -60,7 +60,7 @@ it('keeps magnet snapping active while selected objects move outside select mode
   const canvas = createCanvas([movingTarget, sibling]);
   const manager = createEditorMagnetManager({
     canvas: canvas as never,
-    getActiveTool: () => 'rectangle',
+    getActiveTool: () => 'shape',
     getCanvasDocumentSize: () => ({ width: 100, height: 80 }),
     getCropGuide: () => null,
     getWorkspace: () => ({

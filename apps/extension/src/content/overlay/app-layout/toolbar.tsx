@@ -163,6 +163,13 @@ function renderToolbarShell(args: {
         onAiPickContentStart={args.toolbar.aiController.handleAiPickContentStart}
         aiPickMode={modes.aiPickMode}
         designReviewMode={modes.designReviewMode}
+        {...(modeController.handleToggleDrawingMode === undefined
+          ? {}
+          : { onToggleDrawingMode: modeController.handleToggleDrawingMode })}
+        {...(modes.drawingMode === undefined ? {} : { drawingMode: modes.drawingMode })}
+        {...(args.toolbar.drawingController === undefined
+          ? {}
+          : { drawingController: args.toolbar.drawingController })}
         designReviewPanelOpen={args.designReview.panel.open}
         highlighterMode={modes.highlighterMode}
         quickEditDocumentMode={modes.quickEditDocumentMode}

@@ -72,17 +72,22 @@ export async function runStartCaptureUseCase(
 }
 
 export async function maybePersistScreenshotInMediaHub(
-  settings: { saveCapturesToGallery?: boolean },
+  settings: {
+    localStoragePolicy?: Settings['localStoragePolicy'];
+    saveCapturesToGallery?: boolean;
+  },
   dataUrl: string,
   filename: string,
   tabId: number,
+  captureAction: CaptureActionType = 'download_default',
   ports: Pick<StartCapturePorts, 'saveScreenshotToMediaHubFromDataUrl'> = defaultStartCapturePorts
 ): Promise<string | null> {
-  if (!settings.saveCapturesToGallery) {
-    return null;
-  }
-
-  return ports.saveScreenshotToMediaHubFromDataUrl(dataUrl, filename, tabId);
+  const storageClass =
+    captureAction === 'save_to_library'
+      ? 'library'
+      : (settings.localStoragePolicy?.defaultDestination ??
+        (settings.saveCapturesToGallery ? 'library' : 'temporary'));
+  return ports.saveScreenshotToMediaHubFromDataUrl(dataUrl, filename, tabId, storageClass);
 }
 
 export function resolveScenarioCaptureForAction(args: {
@@ -112,8 +117,11 @@ export function createCaptureDeliveryPromise(
   const ports = args.ports ?? defaultStartCapturePorts;
   return capturePromise.then(async (payload) => {
     const { dataUrl, jobId } = readCaptureDeliveryPayload(payload);
-    await persistCaptureDeliveryPayload({ ...args, dataUrl, jobId, ports });
-    return jobId === undefined ? dataUrl : { dataUrl, jobId };
+    const assetId = await persistCaptureDeliveryPayload({ ...args, dataUrl, jobId, ports });
+    if (assetId && args.captureAction === 'edit') {
+      return { assetId, dataUrl, ...(jobId ? { jobId } : {}) };
+    }
+    return jobId ? { dataUrl, jobId } : dataUrl;
   });
 }
 
@@ -131,14 +139,15 @@ async function persistCaptureDeliveryPayload(args: {
   captureAction: CaptureActionType;
   scenarioCapture: ScenarioRuntimeCapturePayload | undefined;
   scenarioSessionService: ScenarioSessionService;
-  settings: Pick<Settings, 'defaultImagePresetId' | 'saveCapturesToGallery'>;
-}): Promise<void> {
+  settings: Pick<Settings, 'defaultImagePresetId' | 'localStoragePolicy' | 'saveCapturesToGallery'>;
+}): Promise<string | null> {
   try {
     const galleryAssetId = await maybePersistScreenshotInMediaHub(
       args.settings,
       args.dataUrl,
       args.filename,
       args.resolvedTabId,
+      args.captureAction,
       args.ports
     );
     const scenarioCapture = resolveScenarioCaptureForAction({
@@ -153,6 +162,7 @@ async function persistCaptureDeliveryPayload(args: {
       tabId: args.resolvedTabId,
       scenarioSessionService: args.scenarioSessionService,
     });
+    return galleryAssetId;
   } catch (error) {
     if (args.jobId) {
       await args.ports

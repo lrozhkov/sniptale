@@ -1,5 +1,4 @@
 import type React from 'react';
-import type { BorderPreset } from '../../../features/highlighter/contracts';
 import type { SavePreset } from '../../../contracts/settings';
 import type {
   BrowserFrameState,
@@ -86,9 +85,7 @@ interface EditorInspectorCompactStyleOptionParams
     Pick<
       EditorInspectorPaletteState,
       'shapeFillPalette' | 'shapeStrokePalette' | 'textColorPalette'
-    > {
-  borderPresets: BorderPreset[];
-}
+    > {}
 
 interface EditorInspectorCompactFrameOptionParams {
   browserCanvasModeOptions: CompactSelectOption<'resize' | 'keep-size'>[];

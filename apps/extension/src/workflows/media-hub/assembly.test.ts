@@ -15,7 +15,6 @@ vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (i
   ...(await importOriginal<
     typeof import('../../composition/persistence/infrastructure/indexed-db/core')
   >()),
-  EDITOR_SESSIONS_STORE: 'editor_sessions',
   SCENARIO_ASSETS_STORE: 'scenario_assets',
   SCENARIO_EXPORTS_STORE: 'scenario_exports',
   SCENARIO_PROJECTS_STORE: 'scenario_projects',

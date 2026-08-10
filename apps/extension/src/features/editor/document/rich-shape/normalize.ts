@@ -3,10 +3,6 @@ import {
   isEditorRichShapeFamily,
   resolveEditorRichShapeFamily,
 } from './catalog/families';
-import {
-  createDefaultRichShapeCalloutGeometry,
-  normalizeRichShapeCalloutGeometry,
-} from './callout';
 import { normalizeEffects } from './effects';
 import { normalizeFrame } from './frame';
 import { normalizeLayer } from './layer';
@@ -28,10 +24,6 @@ export function normalizeEditorRichShapeObject(value: unknown): EditorRichShapeD
 
   const geometry = parseEditorCustomShapeGeometry(shape['geometry']);
   const frame = normalizeFrame(shape['frame']);
-  const normalizedCallout = normalizeRichShapeCalloutGeometry(shape['callout'], frame);
-  const callout =
-    normalizedCallout ??
-    (shapeKind === 'dynamic-callout' ? createDefaultRichShapeCalloutGeometry(frame) : undefined);
   const style = normalizeStyle(shape['style']);
   const roughSource = isRecord(shape['rough']) ? shape['rough'] : {};
   const roughFillColor =
@@ -57,7 +49,6 @@ export function normalizeEditorRichShapeObject(value: unknown): EditorRichShapeD
     text: normalizeText(shape['text']),
     rough,
     ...(geometry ? { geometry } : {}),
-    ...(callout ? { callout } : {}),
     source: normalizeSource(shape['source']),
     layer: normalizeLayer(shape['layer']),
   };

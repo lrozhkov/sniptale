@@ -1,6 +1,5 @@
 import { applyEditorDocumentToCanvas } from './apply/orchestrate';
 import { applyPreparedEditorDocumentState } from './lifecycle-helpers';
-import { upgradeLegacyArrowObjects } from '../core/legacy/canvas';
 import type { ApplyEditorControllerDocumentStateOptions } from './apply-types';
 import { createPreparedEditorDocumentStateOptions } from './params';
 
@@ -21,9 +20,6 @@ export async function applyEditorControllerDocumentState(
     ...getViewportDevicePixelRatioBaselinePatch(options.viewportDevicePixelRatioBaseline),
     prepareObject: options.prepareObject,
     ...syncBackgroundLayerPatch,
-    upgradeLegacyArrowObjects: () => {
-      upgradeLegacyArrowObjects(options.canvas);
-    },
     rebuildFrameDecorations: options.rebuildFrameDecorations,
   });
 

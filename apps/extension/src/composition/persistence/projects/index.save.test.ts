@@ -4,6 +4,7 @@ import {
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
 import { createVideoProject, createVideoProjectEntry } from './index.test-support.ts';
+import { createMediaLibraryEntry } from './index.test-support.ts';
 
 const projectsDbMocks = vi.hoisted(() => ({
   buildProjectAssetMediaEntryMock: vi.fn(),
@@ -150,6 +151,25 @@ it('preserves removed project-owned assets while another project references them
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
 });
 
+it('preserves a removed project asset that was saved independently to the library', async () => {
+  const { saveVideoProject } = await import('./index');
+  const savedAsset = createProjectOwnedVideoAsset('asset-saved');
+  const existingProject = createVideoProject({ assets: [savedAsset] });
+  projectsDbMocks.txGetMock
+    .mockResolvedValueOnce(createVideoProjectEntry(existingProject))
+    .mockResolvedValueOnce(
+      createMediaLibraryEntry({
+        id: 'project-asset:asset-saved',
+        source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
+      })
+    );
+
+  await saveVideoProject({ ...existingProject, assets: [] });
+
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-saved');
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-saved');
+});
+
 it('preserves newer persisted project-owned assets for legacy unguarded saves', async () => {
   const { saveVideoProject } = await import('./index');
   const existingProject = createVideoProject({
@@ -242,6 +262,47 @@ it('falls back to the submitted project when mutation read-back is unavailable',
   projectsDbMocks.dbGetMock.mockResolvedValue(undefined);
 
   await expect(commitVideoProjectMutation(nextProject)).resolves.toEqual(nextProject);
+});
+
+it('commits a video workspace with explicit placement and returns its durable revision', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const project = createVideoProject({ name: 'Workspace commit' });
+  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+
+  await expect(
+    commitVideoProjectWorkspaceMutation(project, {
+      expectedWorkspaceRevision: null,
+      storageClass: 'library',
+    })
+  ).resolves.toEqual({
+    project: expect.objectContaining({ id: project.id, name: 'Workspace commit' }),
+    workspaceRevision: 1,
+  });
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
+      workspaceRevision: 1,
+    })
+  );
+});
+
+it('uses the configured default placement for a new video workspace', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const project = createVideoProject({ id: 'default-workspace' });
+  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+
+  await expect(
+    commitVideoProjectWorkspaceMutation(project, { expectedWorkspaceRevision: null })
+  ).resolves.toEqual({
+    project: expect.objectContaining({ id: project.id }),
+    workspaceRevision: 1,
+  });
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      lifecycle: expect.objectContaining({ storageClass: 'temporary' }),
+      workspaceRevision: 1,
+    })
+  );
 });
 
 it('uses now as createdAt fallback and ignores externally owned assets while saving', async () => {

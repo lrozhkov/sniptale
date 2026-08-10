@@ -95,6 +95,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       activeTags: [],
       folderFilter: overrides.folderFilter ?? 'all',
       search: overrides.search ?? '',
+      scope: overrides.filters?.scope ?? 'library',
       sortMode: overrides.sortMode ?? 'newest',
       ...overrides.filters,
     },

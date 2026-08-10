@@ -31,7 +31,7 @@ export function buildEditorCanvasDocument(options: {
   }
 
   return {
-    version: 1,
+    version: 2,
     sourceImageData: options.source.dataUrl,
     sourceName: options.source.name,
     sourceWidth: options.source.intrinsicWidth,

@@ -19,7 +19,6 @@ export function applyRichShapeFormattingPatch(
   return normalizeEditorRichShapeObject({
     ...shape,
     ...(patch.rotation === undefined ? {} : { rotation: patch.rotation }),
-    ...(patch.callout === undefined ? {} : { callout: patch.callout }),
     frame: patch.frame
       ? {
           ...shape.frame,

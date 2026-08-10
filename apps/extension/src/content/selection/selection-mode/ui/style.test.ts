@@ -15,6 +15,7 @@ function createSelectionVisual(
     customCss: '',
     customCssStyles: { outlineOffset: '2px' },
     fillColor: '#22c55e40',
+    fillCss: '#22c55e40',
     id: 'preset-1',
     inheritCustomCss: true,
     padding: { bottom: 4, left: 4, right: 4, top: 4 },
@@ -32,7 +33,7 @@ describe('selection-mode ui style helpers', () => {
     const cssText = getSelectionDragFrameStyle(createSelectionVisual());
 
     expect(cssText).toContain('border: 3px dashed #2563ebbf');
-    expect(cssText).toContain('background-color: #22c55e40');
+    expect(cssText).toContain('background: #22c55e40');
     expect(cssText).not.toContain('9999px');
     expect(cssText).toContain('outline-offset: 2px;');
   });

@@ -11,6 +11,7 @@ import type {
   FolderFilter,
   GalleryFolderCounts,
   GalleryGridMetrics,
+  GalleryScope,
   GalleryViewMode,
   SortMode,
 } from './types';
@@ -118,10 +119,15 @@ export function getFilteredGalleryItems(args: {
   folderFilter: FolderFilter;
   items: GalleryItem[];
   search: string;
+  scope?: GalleryScope;
   sortMode: SortMode;
 }): GalleryItem[] {
   const normalizedSearch = args.search.trim().toLowerCase();
-  const taggedItems = args.items.filter((item) => {
+  const scope = args.scope ?? 'library';
+  const scopedItems = args.items.filter(
+    (item) => (item.lifecycle?.storageClass ?? 'library') === scope
+  );
+  const taggedItems = scopedItems.filter((item) => {
     return args.activeTags.every((tag) => item.tags.includes(tag));
   });
   const result = taggedItems.filter((item) => {

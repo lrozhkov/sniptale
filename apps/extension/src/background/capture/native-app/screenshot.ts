@@ -11,7 +11,6 @@ import {
 } from './persistence/staging';
 import { saveScreenshotMediaAssetSafely } from '../../../workflows/media-hub/store';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import {
   loadOrderedNativeChunkBlobs,
@@ -79,7 +78,7 @@ async function openScreenshotEditorIfNeeded(
   }
   await runNativeBestEffort(() =>
     browserTabs.create({
-      url: buildEditorUrl({ assetId, sessionId: createEditorSessionId() }),
+      url: buildEditorUrl({ assetId }),
     })
   );
 }

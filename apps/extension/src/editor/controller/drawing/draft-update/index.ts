@@ -1,1 +1,0 @@
-export { updateEditorDrawSessionObject } from './dispatch';

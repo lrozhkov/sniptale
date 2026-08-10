@@ -29,7 +29,7 @@ const storage = vi.hoisted(() => ({
   DEFAULT_BORDER_PRESET: {
     color: '#ffff00a6',
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     inheritCustomCss: false,
     id: 'default',
     name: 'Default',
@@ -137,7 +137,7 @@ function shouldPreservePresetFillAndStrokeRatiosUnderUniformOpacity(): void {
     { height: 10, width: 12, x: 1, y: 2 },
     {
       ...storage.DEFAULT_BORDER_PRESET,
-      fillColor: '#60A5FA14',
+      fillPaint: { kind: 'solid' as const, color: '#60A5FA14' },
     }
   );
 

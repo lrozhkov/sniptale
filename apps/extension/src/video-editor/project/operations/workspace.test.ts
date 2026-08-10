@@ -140,6 +140,10 @@ function mockImportedRecordingAsset() {
 describe('loadInitialProjectFromLocation', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    saveVideoProject.mockImplementation(async (project) => ({
+      ...project,
+      updatedAt: project.updatedAt + 1,
+    }));
     window.history.replaceState({}, '', '/video-editor.html');
   });
 
@@ -170,7 +174,6 @@ async function verifyBlankProjectCreation() {
 
   vi.spyOn(Date, 'now').mockReturnValue(blankProject.createdAt);
   getVideoProject.mockResolvedValue({ status: 'notFound' });
-  saveVideoProject.mockResolvedValue(undefined);
 
   const result = await loadInitialProjectFromLocation();
 
@@ -222,7 +225,6 @@ async function verifyPersistedRecordingMigration() {
   const persistedProject = createPersistedLegacyRecordingProject();
   getVideoProject.mockResolvedValue({ project: persistedProject, status: 'ready' });
   mockImportedRecordingAsset();
-  saveVideoProject.mockResolvedValue(undefined);
 
   const project = await openPersistedProject('project-1');
 
@@ -282,7 +284,6 @@ async function verifyProjectQueryMigrationPath() {
     status: 'ready',
   });
   mockImportedRecordingAsset();
-  saveVideoProject.mockResolvedValue(undefined);
   window.history.replaceState({}, '', '/video-editor.html?project=project-1');
 
   const result = await loadInitialProjectFromLocation();

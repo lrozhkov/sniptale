@@ -94,6 +94,7 @@ export type RouteCaptureMessage =
     }
   | {
       type: 'OPEN_EDITOR_WITH_IMAGE';
+      assetId?: string;
       dataUrl: string;
       contentIntent?: ContentPrivilegedActionCapability;
     }
@@ -101,6 +102,7 @@ export type RouteCaptureMessage =
       type: 'SAVE_SCREENSHOT_TO_GALLERY';
       dataUrl: string;
       filename: string;
+      storageClass?: 'temporary' | 'library';
       contentIntent?: ContentPrivilegedActionCapability;
     }
   | ({
@@ -122,19 +124,6 @@ export type RouteCaptureMessage =
   | {
       type: 'RELEASE_WEB_SNAPSHOT_STAGED_BLOBS';
       snapshotSessionId: string;
-    }
-  | {
-      type: 'REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY';
-      assetId: string;
-      editorSessionId: string;
-    }
-  | {
-      type: 'UPDATE_GALLERY_IMAGE_ASSET';
-      assetId: string;
-      dataUrl: string;
-      editorSessionId: string;
-      updateCapabilityToken: string;
-      filename?: string;
     }
   | {
       type: 'TRIGGER_QUICK_ACTION';

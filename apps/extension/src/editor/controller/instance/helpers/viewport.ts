@@ -44,7 +44,6 @@ export function snapExternalEditorRectForController(
     strokeWidth: 0,
   });
   if (input.excludeId !== undefined) proxy.sniptaleId = input.excludeId;
-  proxy.sniptaleType = 'rectangle';
   applyEditorGridSnap(proxy, workspace);
   return {
     x: Number(proxy.left ?? snapped.x),

@@ -1,6 +1,8 @@
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingsBatchWithCompletionSafely } from '../../workflows/media-hub/store';
+import { loadSettings } from '../../composition/persistence/settings';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../composition/persistence/library-lifecycle';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { beginRecordingFinalization, finishRecordingFinalization } from './finalization-replay';
@@ -141,11 +143,15 @@ export async function finalizeRecording(
     }
 
     try {
+      const settings = await loadSettings().catch(() => null);
       await saveRecordingsBatchWithCompletionSafely(
         input.artifacts.map((artifact) => ({
           blob: artifact.file,
           filename: artifact.filename,
           id: artifact.artifactId,
+          storageClass:
+            settings?.localStoragePolicy.defaultDestination ??
+            DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
         })),
         createPostRecordResult(input.primaryRecordingId)
       );

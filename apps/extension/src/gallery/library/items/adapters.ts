@@ -9,15 +9,27 @@ import type {
   GalleryVideoProjectItem,
 } from './types';
 import { createGalleryMediaItem } from './types';
+import type { LibraryLifecycle } from '../../../contracts/settings/library-lifecycle';
+import type { AggregatePresentationEntry } from '../../../composition/persistence/aggregate-presentations';
+import { serializeAggregateRef } from '../../../composition/persistence/aggregate-presentations';
+
+function resolveLifecycle(
+  lifecycle: ScenarioProjectSummary['lifecycle'] | VideoProjectListItem['lifecycle'],
+  updatedAt: number
+): LibraryLifecycle {
+  return lifecycle ?? { savedAt: updatedAt, storageClass: 'library' as const, updatedAt };
+}
 
 export function createScenarioGalleryItem(project: ScenarioProjectSummary): GalleryScenarioItem {
   return {
     createdAt: project.createdAt,
     entityId: project.id,
+    expiresAt: null,
     filename: project.name,
     hasThumbnail: false,
     id: `scenario:${project.id}`,
     kind: 'scenario',
+    lifecycle: resolveLifecycle(project.lifecycle, project.updatedAt),
     size: 0,
     sourceFavicon: null,
     sourceTitle: null,
@@ -41,11 +53,13 @@ export function createScenarioExportGalleryItem(
     createdAt: exportEntry.createdAt,
     entityId: exportEntry.id,
     exportEntry,
+    expiresAt: null,
     filename: exportEntry.filename,
     format: exportEntry.format,
     hasThumbnail: false,
     id: `scenario-export:${exportEntry.id}`,
     kind: 'scenario-export',
+    lifecycle: resolveLifecycle(project.lifecycle, project.updatedAt),
     size: exportEntry.size,
     sourceFavicon: null,
     sourceTitle: project.name,
@@ -67,10 +81,12 @@ export function createVideoProjectGalleryItem(
   return {
     createdAt: project.createdAt,
     entityId: project.id,
+    expiresAt: null,
     filename: project.name,
     hasThumbnail: false,
     id: `video-project:${project.id}`,
     kind: 'video-project',
+    lifecycle: resolveLifecycle(project.lifecycle, project.updatedAt),
     size: 0,
     sourceFavicon: null,
     sourceTitle: null,
@@ -90,24 +106,55 @@ export function createVideoProjectGalleryItem(
 
 export function createGalleryItems(args: {
   mediaItems: MediaLibraryItem[];
+  presentations?: AggregatePresentationEntry[];
   scenarioExportsByProjectId: Map<string, ScenarioExportEntry[]>;
   scenarioProjects: ScenarioProjectSummary[];
   thumbnailIds: Set<string>;
   videoProjects: VideoProjectListItem[];
 }): GalleryItem[] {
-  const mediaItems = args.mediaItems.map(createGalleryMediaItem);
+  const presentations = new Map(
+    (args.presentations ?? []).map((entry) => [
+      serializeAggregateRef({ id: entry.aggregateId, kind: entry.aggregateKind }),
+      entry,
+    ])
+  );
+  const mediaItems = args.mediaItems
+    .filter((media) => media.source.kind !== 'project-asset')
+    .map((media) => {
+      const item = createGalleryMediaItem(media);
+      if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
+      const presentation = presentations.get(
+        serializeAggregateRef({ id: media.id, kind: 'image' })
+      );
+      return {
+        ...item,
+        hasThumbnail: Boolean(presentation),
+        presentationRevision: presentation?.presentationRevision ?? null,
+        workspaceRevision: media.workspaceRevision ?? 0,
+      };
+    });
   const videoProjectItems = args.videoProjects.map((project) => {
     const item = createVideoProjectGalleryItem(project);
+    const presentation = presentations.get(
+      serializeAggregateRef({ id: project.id, kind: 'video-project' })
+    );
     return {
       ...item,
-      hasThumbnail: args.thumbnailIds.has(item.id),
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: project.workspaceRevision ?? 0,
     };
   });
   const scenarioItems = args.scenarioProjects.map((project) => {
     const item = createScenarioGalleryItem(project);
+    const presentation = presentations.get(
+      serializeAggregateRef({ id: project.id, kind: 'scenario' })
+    );
     return {
       ...item,
-      hasThumbnail: args.thumbnailIds.has(item.id),
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: project.workspaceRevision ?? 0,
     };
   });
   const exportItems = args.scenarioProjects.flatMap((project) =>

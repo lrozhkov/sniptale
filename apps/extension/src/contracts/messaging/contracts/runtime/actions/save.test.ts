@@ -14,36 +14,9 @@ it('requires filenames for screenshot gallery save runtime messages', () => {
   expect(() => contract.parseRequest({ dataUrl: request.dataUrl, type: request.type })).toThrow(
     'runtime SAVE_SCREENSHOT_TO_GALLERY message'
   );
-});
-
-it('requires gallery update capabilities for editor asset update messages', () => {
-  const requestContract =
-    runtimeActionSaveMessageContracts[MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY];
-  const updateContract = runtimeActionSaveMessageContracts[MessageType.UPDATE_GALLERY_IMAGE_ASSET];
-  const capabilityRequest = {
-    assetId: 'asset-1',
-    editorSessionId: 'session-1',
-    type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-  };
-  const updateRequest = {
-    assetId: 'asset-1',
-    dataUrl: 'data:image/png;base64,c2NyZWVueXg=',
-    editorSessionId: 'session-1',
-    type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-    updateCapabilityToken: 'token-1',
-  };
-
-  expect(requestContract.parseRequest(capabilityRequest)).toEqual(capabilityRequest);
-  expect(
-    requestContract.parseResponse({ success: true, updateCapabilityToken: 'token-1' })
-  ).toEqual({
-    success: true,
-    updateCapabilityToken: 'token-1',
-  });
-  expect(updateContract.parseRequest(updateRequest)).toEqual(updateRequest);
-  expect(() =>
-    updateContract.parseRequest({ ...updateRequest, updateCapabilityToken: undefined })
-  ).toThrow('runtime UPDATE_GALLERY_IMAGE_ASSET message');
+  expect(() => contract.parseRequest({ ...request, storageClass: 'library' })).toThrow(
+    'runtime SAVE_SCREENSHOT_TO_GALLERY message'
+  );
 });
 
 it('parses popup archive stage requests and responses at the runtime contract', () => {

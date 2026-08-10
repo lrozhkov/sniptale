@@ -36,6 +36,7 @@ import { StepBadgePositionGrid } from './position-grid';
 import { StepBadgePresetPreview } from './thumbnail';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { getDefaultStepBadgeAlphabet } from '../../../composition/frame-annotation-controls/step-badge/helpers';
+import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
 
 type StepBadgePresetEditorProps = {
   isNew?: boolean;
@@ -273,11 +274,13 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
   const modalRootRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState('');
   const [settings, setSettings] = useState<StepBadgeSettings | null>(null);
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!props.isOpen) return;
     setName(props.isNew ? '' : getStepBadgePresetDisplayName(props.preset, locale));
     setSettings(createStepBadgeSettingsFromTemplate(props.preset.settings, props.preset.id));
+    setTagIds(props.isNew ? [] : (props.preset.tagIds ?? []));
   }, [locale, props.isNew, props.isOpen, props.preset]);
 
   usePresetEditorModalLifecycle({
@@ -300,6 +303,7 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
       ...(props.isNew ? { id: '', origin: 'user' as const } : {}),
       name: name.trim(),
       settings: template,
+      tagIds,
     });
 
   return (
@@ -322,6 +326,9 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
           onClose={props.onClose}
         />
         <PresetEditorBody name={name} onPatch={patch} settings={settings} setName={setName} />
+        <div className="px-4 pb-4">
+          <AnnotationTemplateTagAssignment onChange={setTagIds} value={tagIds} />
+        </div>
         <PresetEditorFooter
           isSaving={props.isSaving}
           name={name}

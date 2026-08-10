@@ -13,7 +13,7 @@ import {
 } from './visual-state';
 
 function isEditorRectangleTarget(object: FabricObject): object is RectangleLike {
-  return object.sniptaleRole === 'annotation' && object.sniptaleType === 'rectangle';
+  return object.sniptaleRole === 'annotation' && object.sniptaleType === 'shape';
 }
 
 export function normalizeScaledRectangleTarget(object: FabricObject): boolean {

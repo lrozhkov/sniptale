@@ -13,6 +13,7 @@ export function ToolbarPrimaryControls(props: {
     isCursorMode: toolbarProps.isCursorMode ?? true,
     aiPickMode: toolbarProps.aiPickMode ?? false,
     designReviewMode: toolbarProps.designReviewMode ?? false,
+    drawingMode: toolbarProps.drawingMode ?? false,
     compactMenus: viewModel.derivedState.compactMenus,
     displayMode: viewModel.derivedState.displayMode,
     sidebarVisible: toolbarProps.scenario?.sidebarVisible ?? false,
@@ -33,6 +34,7 @@ export function ToolbarPrimaryControls(props: {
       void viewModel.toggleMode(`page-editing:${mode}`);
     },
     onToggleDesignReview: () => toolbarProps.onToggleDesignReviewMode(!viewModel.designReviewMode),
+    onToggleDrawing: () => toolbarProps.onToggleDrawingMode?.(!(toolbarProps.drawingMode ?? false)),
     onToggleQuickEdit: () => void viewModel.toggleMode('quickedit'),
     onToggleHighlighter: () => {
       void viewModel.toggleMode('highlighter');

@@ -243,7 +243,7 @@ test('popup image editor action opens a new editor tab url', async ({ page, host
     .toBe(1);
 
   const [createdTab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
-  expect(createdTab?.url).toMatch(/\/apps\/extension\/src\/editor\/index\.html\?session=/);
+  expect(createdTab?.url).toContain('/apps/extension/src/editor/index.html');
 });
 
 test('popup video setup drives the recording lifecycle through typed runtime messages', async ({

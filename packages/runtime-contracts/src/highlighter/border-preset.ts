@@ -1,3 +1,5 @@
+import type { AnnotationTemplateTagId } from './annotation-template-tags';
+
 export const SYSTEM_BORDER_PRESET_KEYS = [
   'system-default',
   'system-soft-highlight',
@@ -53,7 +55,7 @@ export interface BorderVisualStyle {
   radius: number;
   padding: BorderPadding;
   shadow: number;
-  fillColor: string;
+  fillPaint: Paint;
   inheritCustomCss: boolean;
   customCss: string;
   effects?: BorderPresetEffects;
@@ -68,6 +70,7 @@ export interface BorderPreset extends BorderVisualStyle {
   systemPresetKey?: SystemBorderPresetKey;
   basedOnRevision?: number;
   customized?: boolean;
+  tagIds: AnnotationTemplateTagId[];
 }
 
 /** A frame-owned visual snapshot. Catalog metadata never becomes runtime state authority. */
@@ -88,7 +91,7 @@ export function cloneBorderVisualStyle(style: BorderVisualStyle): BorderVisualSt
     radius: style.radius,
     padding: { ...style.padding },
     shadow: style.shadow,
-    fillColor: style.fillColor,
+    fillPaint: clonePaint(style.fillPaint),
     inheritCustomCss: style.inheritCustomCss,
     customCss: style.customCss,
     effects: cloneBorderPresetEffects(style.effects),
@@ -121,6 +124,7 @@ export function projectBorderPresetToAppliedSettings(preset: BorderPreset): Appl
 export function cloneAppliedBorderSettings(settings: AppliedBorderSettings): AppliedBorderSettings {
   return {
     ...settings,
+    fillPaint: clonePaint(settings.fillPaint),
     padding: { ...settings.padding },
     effects: cloneBorderPresetEffects(settings.effects),
   };
@@ -138,6 +142,7 @@ export function applyManualBorderStylePatch(
   return {
     ...visual,
     ...patch,
+    fillPaint: clonePaint(patch.fillPaint ?? settings.fillPaint),
     padding: { ...settings.padding, ...patch.padding },
   };
 }
@@ -157,3 +162,4 @@ export function isSystemBorderPresetKey(value: unknown): value is SystemBorderPr
     typeof value === 'string' && (SYSTEM_BORDER_PRESET_KEYS as readonly string[]).includes(value)
   );
 }
+import { clonePaint, type Paint } from '@sniptale/foundation/paint';

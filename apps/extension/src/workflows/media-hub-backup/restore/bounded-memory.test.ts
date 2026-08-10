@@ -81,6 +81,8 @@ function createWriteHarness() {
       'project_exports',
       'thumbnails',
       'web_snapshots',
+      'image_workspaces',
+      'aggregate_presentations',
     ].map((name) => [name, { delete: vi.fn(), get: vi.fn(), put: vi.fn() }])
   );
   const tx = {

@@ -5,7 +5,7 @@ import { prepareAppliedDocument } from './';
 
 function createDocument(richShapes: NonNullable<EditorDocument['richShapes']>): EditorDocument {
   return {
-    version: 1,
+    version: 2,
     sourceImageData: 'data:image/png;base64,abc',
     sourceName: null,
     sourceWidth: 500,

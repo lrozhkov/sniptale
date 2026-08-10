@@ -1,4 +1,3 @@
-import type { EditorSessionEntry } from '../../composition/persistence/editor-sessions/contracts';
 import type {
   MediaLibraryItem,
   MediaThumbnailEntry,
@@ -14,13 +13,11 @@ import type { VideoProjectEntry } from '../../composition/persistence/projects/c
 import type { WebSnapshotRecord } from '../../composition/persistence/web-snapshots/contracts';
 import type { StorageCleanupCandidate } from '../../features/media-hub/types';
 
-const STALE_EDITOR_DRAFT_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const OLD_DIAGNOSTICS_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_PENDING_SCENARIO_ASSET_AGE_MS = 24 * 60 * 60 * 1000;
 
 export interface StorageCleanupInventory {
   diagnostics: Array<{ createdAt: string; recordingId: string; totalEvents?: number }>;
-  editorSessions: EditorSessionEntry[];
   pendingScenarioAssets: PendingScenarioAssetEntry[];
   scenarioAssets: ScenarioAssetEntry[];
   scenarioExports: ScenarioExportEntry[];
@@ -39,14 +36,12 @@ export function buildInventoryCleanupCandidates(args: {
   orphanedScenarioArtifacts: StorageCleanupCandidate[];
   orphanedScenarioPendingAssets: StorageCleanupCandidate[];
   orphanedThumbnails: StorageCleanupCandidate[];
-  staleEditorDrafts: StorageCleanupCandidate[];
 } {
   return {
     oldDiagnostics: getOldDiagnostics(args.rawInventory),
     orphanedScenarioArtifacts: getOrphanedScenarioArtifacts(args.rawInventory),
     orphanedScenarioPendingAssets: getOrphanedScenarioPendingAssets(args.rawInventory),
     orphanedThumbnails: getOrphanedThumbnails(args),
-    staleEditorDrafts: getStaleEditorDrafts(args.rawInventory),
   };
 }
 
@@ -142,26 +137,6 @@ function getOldDiagnostics(
       createdAt: Date.parse(entry.createdAt) || 0,
       kind: 'diagnostics',
       target: 'diagnostics',
-    }));
-}
-
-function getStaleEditorDrafts(
-  inventory: StorageCleanupInventory | undefined
-): StorageCleanupCandidate[] {
-  if (!inventory) {
-    return [];
-  }
-
-  const cutoff = Date.now() - STALE_EDITOR_DRAFT_AGE_MS;
-  return inventory.editorSessions
-    .filter((entry) => entry.updatedAt < cutoff)
-    .map((entry) => ({
-      id: entry.sessionId,
-      filename: entry.sourceTitle ?? entry.sessionId,
-      size: 0,
-      createdAt: entry.updatedAt,
-      kind: 'editor-session',
-      target: 'editor-session',
     }));
 }
 

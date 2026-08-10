@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { Textbox } from 'fabric';
 import { expect, it, vi } from 'vitest';
 
 import {
@@ -28,9 +31,9 @@ it('clears active selection without changing the active tool', () => {
 
 it('sets and suspends tool mode through minimal controller state', () => {
   const controller = {
-    activeTool: 'eraser',
+    activeTool: 'pencil',
     applyToolMode: vi.fn(),
-    canvas: { getActiveObjects: () => [] },
+    canvas: { getActiveObject: () => undefined, getActiveObjects: () => [] },
     syncRuntimeState: vi.fn(),
     toolModeEnabled: false,
   };
@@ -42,4 +45,21 @@ it('sets and suspends tool mode through minimal controller state', () => {
   expect(controller.toolModeEnabled).toBe(false);
   expect(controller.syncRuntimeState).toHaveBeenCalledTimes(2);
   expect(controller.applyToolMode).toHaveBeenCalledOnce();
+});
+
+it('finishes active text editing before changing to another tool', () => {
+  const text = new Textbox('Text');
+  text.isEditing = true;
+  vi.spyOn(text, 'exitEditing');
+  const controller = {
+    activeTool: 'text',
+    canvas: { getActiveObject: () => text },
+    syncRuntimeState: vi.fn(),
+    toolModeEnabled: true,
+  };
+
+  Reflect.apply(setActiveToolForController, null, [controller, 'pencil']);
+
+  expect(text.exitEditing).toHaveBeenCalledOnce();
+  expect(controller.activeTool).toBe('pencil');
 });

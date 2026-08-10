@@ -21,6 +21,7 @@ const routeAggregatorFiles = [
 ] as const;
 
 const ownerRouteDescriptorFiles = [
+  'apps/extension/src/background/application/aggregate-promotion/route-descriptors.ts',
   'apps/extension/src/background/ai/llm/route-descriptors.ts',
   'apps/extension/src/background/ai/settings/route-descriptors.ts',
   'apps/extension/src/background/annotation-fork-session/route-descriptors.ts',

@@ -9,7 +9,7 @@ export function createPreset(id: string, overrides: Record<string, unknown> = {}
     radius: 0,
     padding: { top: 3, left: 3, right: 3, bottom: 3 },
     shadow: 0,
-    fillColor: '#00000000',
+    fillPaint: createSolidPaint('#00000000'),
     inheritCustomCss: false,
     customCss: '',
     origin: 'user' as const,
@@ -51,3 +51,4 @@ export function createStoredSettings() {
     }),
   };
 }
+import { createSolidPaint } from '@sniptale/foundation/paint';

@@ -67,6 +67,7 @@ function buildGalleryFilterViewState(filters: GalleryFiltersState) {
     activeTags: filters.state.activeTags,
     folderFilter: filters.state.folderFilter,
     search: filters.state.search,
+    scope: filters.state.scope,
     sortMode: filters.state.sortMode,
   };
 }
@@ -126,6 +127,7 @@ function buildGalleryAppActions(args: {
       setActiveTags: args.filters.actions.setActiveTags,
       setFolderFilter: args.filters.actions.setFolderFilter,
       setSearch: args.filters.actions.setSearch,
+      setScope: args.filters.actions.setScope,
       setSortMode: args.filters.actions.setSortMode,
     },
     preview: {

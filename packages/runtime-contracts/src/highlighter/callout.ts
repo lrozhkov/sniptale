@@ -1,4 +1,6 @@
 import type { StepBadgeAnchor } from './step-badge';
+import type { Paint } from '@sniptale/foundation/paint';
+import type { AnnotationTemplateTagId } from './annotation-template-tags';
 
 export type CalloutAnchor = StepBadgeAnchor;
 export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
@@ -72,7 +74,7 @@ export interface CalloutPlacement {
 }
 
 export interface CalloutSurfaceStyle {
-  backgroundColor: string;
+  fillPaint: Paint;
   borderColor: string;
   borderStyle: CalloutLineStyle;
   borderWidth: number;
@@ -240,6 +242,7 @@ export interface CalloutPreset {
   placement: Pick<CalloutPlacement, 'anchor' | 'side' | 'connectorAttachments'>;
   style: CalloutVisualStyle;
   systemPresetKey?: SystemCalloutPresetKey | undefined;
+  tagIds: AnnotationTemplateTagId[];
 }
 
 export interface CalloutPresetCatalog {

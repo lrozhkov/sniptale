@@ -42,6 +42,7 @@ function createToolbarDerivedStateArgs(
   return {
     aiPickMode: props.aiPickMode ?? false,
     designReviewMode: args.designReviewMode,
+    drawingMode: props.drawingMode ?? false,
     highlighterMode: args.highlighterMode,
     isCursorMode: props.isCursorMode ?? true,
     quickEditMode: args.quickEditMode,

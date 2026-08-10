@@ -194,10 +194,13 @@ function enterActiveCalloutText(value: string) {
   });
 }
 
-function findToolbarButton(titlePattern: RegExp): HTMLButtonElement {
+function findToolbarButton(titlePattern: RegExp | string): HTMLButtonElement {
   const button = queryAllContentUiElements('button').find(
     (item): item is HTMLButtonElement =>
-      item instanceof HTMLButtonElement && titlePattern.test(item.title)
+      item instanceof HTMLButtonElement &&
+      (typeof titlePattern === 'string'
+        ? item.title.includes(titlePattern)
+        : titlePattern.test(item.title))
   );
   expect(button).toBeInstanceOf(HTMLButtonElement);
   return button as HTMLButtonElement;
@@ -406,7 +409,7 @@ describe('InteractiveFrame callout collection interactions', () => {
     );
     act(() => settingsHandles.at(-1)?.click());
     act(() => {
-      findToolbarButton(new RegExp(translate('content.callout.disableButton'))).click();
+      findToolbarButton(translate('content.callout.disableButton')).click();
     });
 
     expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(4);

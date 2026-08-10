@@ -18,11 +18,11 @@ interface LoadedLibraryThumbnailViewState {
 }
 
 function createItemKey(item: LibraryThumbnailItem): string {
-  return `${item.thumbnailId}:${item.sourceMediaId ?? ''}`;
+  return `${item.thumbnailId}:${item.sourceMediaId ?? ''}:${item.workspaceRevision ?? ''}`;
 }
 
 function createItemsKey(items: LibraryThumbnailItem[]): string {
-  return items.map((item) => `${item.thumbnailId}:${item.sourceMediaId ?? ''}`).join('|');
+  return items.map(createItemKey).join('|');
 }
 
 function revokeThumbnailUrls(thumbnails: Record<string, LoadedLibraryThumbnailViewState>) {

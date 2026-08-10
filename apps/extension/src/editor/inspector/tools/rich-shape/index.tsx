@@ -2,7 +2,6 @@ import { canUseRichShapeRoughControls, resolveRichShapeCapabilities } from './ca
 import { RichShapeEffectsSection } from './effects';
 import { RichShapeFillSection } from './fill';
 import { RichShapeLineSection } from './line';
-import { RichShapeTailSection } from './tail';
 import { RichShapeTextSection } from './text';
 import type { RichShapeControlsProps } from './types';
 
@@ -25,7 +24,6 @@ export function renderRichShapeControlsSection(
       {hasCapability(richShapeProps, 'line') ? <RichShapeLineSection {...richShapeProps} /> : null}
       {hasCapability(richShapeProps, 'fill') ? <RichShapeFillSection {...richShapeProps} /> : null}
       {hasCapability(richShapeProps, 'text') ? <RichShapeTextSection {...richShapeProps} /> : null}
-      <RichShapeTailSection {...richShapeProps} />
       {hasCapability(richShapeProps, 'effects') ? (
         <RichShapeEffectsSection {...richShapeProps} />
       ) : null}

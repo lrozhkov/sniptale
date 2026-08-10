@@ -32,7 +32,8 @@ type StepBadgeManualSettingsProps = {
   onAutoModeChange: (auto: boolean) => void;
   onCreatePreset: (
     name: string,
-    settings: StepBadgeTemplateSettings
+    settings: StepBadgeTemplateSettings,
+    tagIds?: readonly string[]
   ) => Promise<{ id?: string; outcome: string }>;
   onTemplateCreated?: (templateId: string) => void;
   onOffsetToggle: (direction: 'up' | 'down' | 'left' | 'right') => void;
@@ -49,6 +50,7 @@ type StepBadgeManualSettingsProps = {
   saveSectionRequest?: number;
   saveSectionStatus?: string;
   templateSettings: StepBadgeTemplateSettings;
+  createTagIds?: readonly string[];
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
 };
 
@@ -123,6 +125,7 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
     return (
       <StepBadgeSaveSection
         embedded
+        {...(props.createTagIds ? { createTagIds: props.createTagIds } : {})}
         onCreate={props.onCreatePreset}
         {...(props.onTemplateCreated ? { onCreated: props.onTemplateCreated } : {})}
         {...(props.onFloatingInteractionChange

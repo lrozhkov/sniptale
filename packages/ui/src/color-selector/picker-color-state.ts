@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { getPlaneColorFromHue, hexToHsv, hexToRgb, hsvToHex, resolvePickerColor } from './helpers';
 import type { HsvColor } from './math';
@@ -15,6 +15,16 @@ export function usePickerColorState(color: string) {
   );
   const stickyHueRef = useRef(draftState.hsvColor.hue);
   const alphaRef = useRef(getColorAlpha(draftState.resolvedColor) ?? 1);
+  const externalColorRef = useRef(color);
+
+  useEffect(() => {
+    if (externalColorRef.current === color) return;
+    externalColorRef.current = color;
+    const next = buildPickerDraftState(resolvePickerColor(color));
+    stickyHueRef.current = next.hsvColor.hue;
+    alphaRef.current = getColorAlpha(next.resolvedColor) ?? 1;
+    setDraftState(next);
+  }, [color]);
 
   const applyPickerDraft = useCallback(
     (nextHsvColor: HsvColor, options?: { rememberHue?: boolean; resolvedColor?: string }) => {

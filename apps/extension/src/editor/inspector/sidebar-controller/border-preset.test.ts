@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import type { EditorShapeSettings } from '../../../features/editor/document/types';
 import { createBorderPresetFromShapeSettings } from './border-preset';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -25,7 +26,7 @@ describe('createBorderPresetFromShapeSettings', () => {
         strokeOpacity: 0.7,
         strokeStyle: 'dashed',
         strokeWidth: 5.6,
-      } as never,
+      } satisfies EditorShapeSettings,
       [
         {
           ...DEFAULT_BORDER_PRESET,
@@ -42,7 +43,7 @@ describe('createBorderPresetFromShapeSettings', () => {
         color: '#445566b3',
         customCss: '',
         enabled: true,
-        fillColor: '#11223340',
+        fillPaint: { kind: 'solid', color: '#11223340' },
         inheritCustomCss: false,
         name: 'editor.tools.rectangle 1',
         order: 5,
@@ -55,22 +56,22 @@ describe('createBorderPresetFromShapeSettings', () => {
     );
   });
 
-  it('falls back to the default padding and opacity-derived stroke values', () => {
+  it('falls back to default padding and keeps explicit opacity-derived values', () => {
     const preset = createBorderPresetFromShapeSettings(
       {
         borderPresetId: null,
         customCss: '',
         fillColor: '#abcdef',
-        fillOpacity: undefined,
+        fillOpacity: 0.62,
         inheritCustomCss: false,
         opacity: 0.62,
         radius: -1,
         shadow: 0,
         strokeColor: '#123456',
-        strokeOpacity: undefined,
+        strokeOpacity: 0.62,
         strokeStyle: 'solid',
         strokeWidth: 0.4,
-      } as never,
+      } satisfies EditorShapeSettings,
       [
         {
           ...DEFAULT_BORDER_PRESET,
@@ -84,7 +85,7 @@ describe('createBorderPresetFromShapeSettings', () => {
     expect(preset).toEqual(
       expect.objectContaining({
         color: '#1234569e',
-        fillColor: '#abcdef9e',
+        fillPaint: { kind: 'solid', color: '#abcdef9e' },
         name: 'editor.tools.rectangle 2',
         padding: DEFAULT_BORDER_PRESET.padding,
         radius: 0,

@@ -24,5 +24,16 @@ it('builds content capability authority values without changing the sender princ
       requestId: 'request-1',
     })
   ).toEqual({ actionType: 'SAVE_SCREENSHOT_TO_GALLERY', requestId: 'request-1' });
+  expect(
+    createContentActionCapabilityPayload({
+      actionType: 'SAVE_SCREENSHOT_TO_GALLERY',
+      libraryDestinationAuthorized: true,
+      requestId: 'request-2',
+    })
+  ).toEqual({
+    actionType: 'SAVE_SCREENSHOT_TO_GALLERY',
+    libraryDestinationAuthorized: true,
+    requestId: 'request-2',
+  });
   expect(createContentCapabilityToken()).toEqual(expect.any(String));
 });

@@ -1,245 +1,97 @@
-import { describe, expect, it, vi } from 'vitest';
-import {
-  buildBorderPresetOptions,
-  createSelectionSettingsApplier,
-  createStaticSidebarOptions,
-  resolveToolSettingTargets,
-  shouldShowSelectionToolSettings,
-} from './actions.helpers';
-import type { SidebarToolSettingTargetArgs } from './types';
-import { createInspectorCommandParams } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';
-import type { EditorSelectionState } from '../../../features/editor/document/types';
+import { beforeEach, expect, it, vi } from 'vitest';
+import type { ImageEditorController } from '../../controller';
 
-function createSelection(
-  selectedObjectType: NonNullable<SidebarToolSettingTargetArgs['selection']['selectedObjectType']>,
-  hasSelection = true
-): EditorSelectionState {
-  const baseSelection = createInspectorCommandParams().selection as EditorSelectionState;
+const fileMocks = vi.hoisted(() => ({
+  assertReadable: vi.fn(),
+  readDataUrl: vi.fn(async () => 'data:image/png;base64,abc'),
+}));
 
-  return {
-    ...baseSelection,
-    hasSelection,
-    selectedObjectType: selectedObjectType as EditorSelectionState['selectedObjectType'],
+vi.mock('../../document/file-actions/file-reader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/file-actions/file-reader')>()),
+  readFileAsDataUrl: fileMocks.readDataUrl,
+}));
+vi.mock('../../document/file-actions/raster-intake', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/file-actions/raster-intake')>()),
+  assertEditorRasterImageFileCanBeRead: fileMocks.assertReadable,
+}));
+
+import { buildSidebarBackgroundActions } from './background';
+import { buildSidebarUtilityActions, createStaticSidebarOptions } from './actions.helpers';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+it('builds static choices and applies uniform padding through the frame draft owner', () => {
+  const setFrameDraft = vi.fn();
+  const controller: Pick<
+    ImageEditorController,
+    'exportDocument' | 'renderToDataUrl' | 'withHistoryMuted'
+  > = {
+    exportDocument: () => {
+      throw new Error('not used by this test');
+    },
+    renderToDataUrl: () => 'data:image/png;base64,abc',
+    withHistoryMuted: <T>(callback: () => T) => callback(),
   };
-}
+  const options = createStaticSidebarOptions();
+  const actions = buildSidebarUtilityActions({
+    controller,
+    confirmOpenStorageManager: vi.fn(),
+    defaultImagePresetId: null,
+    hasImage: true,
+    rememberRecentColor: vi.fn(),
+    savePresets: [],
+    setFrameDraft,
+    syncBrowserFrame: vi.fn(),
+  });
 
-function createTargetArgs(
-  overrides: Partial<SidebarToolSettingTargetArgs> = {}
-): SidebarToolSettingTargetArgs {
-  const params = createInspectorCommandParams();
-  return {
-    activeTool: 'select',
-    selection: params.selection as EditorSelectionState,
-    updateArrowSettings: vi.fn(),
-    updateBlurSettings: vi.fn(),
-    updateBrushSettings: vi.fn(),
-    updateImageSettings: vi.fn(),
-    updateSelectionArrowSettings: vi.fn(),
-    updateSelectionBlurSettings: vi.fn(),
-    updateSelectionBrushSettings: vi.fn(),
-    updateSelectionImageSettings: vi.fn(),
-    updateSelectionShapeSettings: vi.fn(),
-    updateSelectionStepSettings: vi.fn(),
-    updateSelectionTextSettings: vi.fn(),
-    updateShapeSettings: vi.fn(),
-    updateStepSettings: vi.fn(),
-    updateTextSettings: vi.fn(),
-    ...overrides,
+  actions.setUniformPadding(7.6);
+  const update = setFrameDraft.mock.calls[0]?.[0] as (state: Record<string, unknown>) => unknown;
+
+  expect(options.browserCanvasModeOptions.length).toBeGreaterThan(0);
+  expect(options.gridSizeMax).toBeGreaterThan(options.gridSizeMin);
+  expect(update({ backgroundMode: 'solid' })).toEqual({
+    backgroundMode: 'solid',
+    paddingBottom: 8,
+    paddingLeft: 8,
+    paddingRight: 8,
+    paddingTop: 8,
+  });
+});
+
+it('owns background gradient, image upload, clearing, and browser synchronization', async () => {
+  let frame = {
+    backgroundColor: '#000000',
+    backgroundGradientAngle: 0,
+    backgroundGradientColorStops: [],
+    backgroundGradientFrom: '#111111',
+    backgroundGradientStops: [],
+    backgroundGradientTo: '#222222',
+    backgroundImageData: 'old',
+    backgroundMode: 'solid',
   };
-}
-
-function registerArrowOwnerVisibilityTests() {
-  it.each([
-    ['arrow', true],
-    ['blur', false],
-    ['pencil', false],
-    ['highlighter', false],
-    ['rough-shape', false],
-    ['selection', false],
-    ['eraser', false],
-    ['fill', false],
-    ['select', true],
-    ['image', false],
-    ['callout', false],
-    ['crop', false],
-  ] as const)(
-    'shows selection settings for an arrow selection only when %s owns the same settings',
-    (activeTool, expected) => {
-      expect(
-        shouldShowSelectionToolSettings({
-          activeTool,
-          selection: createSelection('arrow'),
-        })
-      ).toBe(expected);
-    }
-  );
-}
-
-function registerSelectionOwnerTests() {
-  it.each([
-    ['pencil', true],
-    ['highlighter', true],
-    ['rectangle', true],
-    ['diamond', true],
-    ['ellipse', true],
-    ['blur', true],
-    ['arrow', true],
-    ['text', true],
-    ['meta-stamp', true],
-    ['step', true],
-    ['image', true],
-    ['source-image', true],
-    ['background', true],
-    ['browser-frame', false],
-  ] as const)(
-    'treats %s selection ownership correctly for the select tool',
-    (selectedObjectType, expected) => {
-      expect(
-        shouldShowSelectionToolSettings({
-          activeTool: 'select',
-          selection: createSelection(selectedObjectType),
-        })
-      ).toBe(expected);
-    }
-  );
-}
-
-function registerSelectionApplierTest() {
-  it('creates an applier only when the current tool can write back into selection-owned settings', () => {
-    const applyActiveSettingsToSelection = vi.fn();
-
-    expect(
-      createSelectionSettingsApplier({
-        activeTool: 'fill',
-        applyActiveSettingsToSelection,
-        selection: createSelection('arrow'),
-      })
-    ).toBeNull();
-
-    const apply = createSelectionSettingsApplier({
-      activeTool: 'select',
-      applyActiveSettingsToSelection,
-      selection: createSelection('text'),
-    });
-
-    expect(apply).not.toBeNull();
-    apply?.();
-    expect(applyActiveSettingsToSelection).toHaveBeenCalledOnce();
-    expect(
-      createSelectionSettingsApplier({
-        activeTool: 'select',
-        applyActiveSettingsToSelection,
-        selection: { ...createSelection('text'), selectedObjectLocked: true },
-      })
-    ).toBeNull();
+  const setFrameDraft = vi.fn((update: (state: typeof frame) => typeof frame) => {
+    frame = update(frame);
   });
-}
+  const syncBrowserFrame = vi.fn(async () => undefined);
+  const actions = buildSidebarBackgroundActions({ setFrameDraft, syncBrowserFrame } as never);
 
-function registerBorderPresetOptionsTest() {
-  it('filters disabled border presets out of selector options', () => {
-    expect(
-      buildBorderPresetOptions([
-        { enabled: true, id: 'preset-a', name: 'Preset A' } as never,
-        { enabled: false, id: 'preset-b', name: 'Preset B' } as never,
-      ])
-    ).toEqual([{ label: 'Preset A', value: 'preset-a' }]);
-  });
-}
+  actions.applyGradientPreset({ angle: 45, from: '#aaaaaa', to: '#bbbbbb' } as never);
+  expect(frame).toMatchObject({ backgroundGradientAngle: 45, backgroundMode: 'gradient' });
+  actions.clearBackgroundImage();
+  expect(frame.backgroundImageData).toBeNull();
+  await actions.handleBackgroundImageUpload(undefined);
+  expect(fileMocks.readDataUrl).not.toHaveBeenCalled();
 
-function registerSelectionOwnedTargetRoutingTest() {
-  it('routes shape and text updates through selection-owned handlers when selection settings are active', () => {
-    const args = createTargetArgs({
-      activeTool: 'select',
-      selection: createSelection('ellipse'),
-    });
-    const targets = resolveToolSettingTargets(args);
-
-    targets.arrow({ mode: 'straight' });
-    targets.blur({ blurType: 'pixelate' });
-    targets.brush('pencil', { color: '#111111' });
-    targets.shape({ fillColor: '#ffffff' });
-    targets.step({ type: 'number' });
-    targets.text({ textColor: '#000000' });
-    targets.image?.({ opacity: 0.5 });
-
-    expect(args.updateSelectionArrowSettings).toHaveBeenCalledWith({ mode: 'straight' });
-    expect(args.updateSelectionBlurSettings).toHaveBeenCalledWith({ blurType: 'pixelate' });
-    expect(args.updateSelectionBrushSettings).toHaveBeenCalledWith('pencil', {
-      color: '#111111',
-    });
-    expect(args.updateSelectionShapeSettings).toHaveBeenCalledWith('ellipse', {
-      fillColor: '#ffffff',
-    });
-    expect(args.updateSelectionStepSettings).toHaveBeenCalledWith({ type: 'number' });
-    expect(args.updateSelectionTextSettings).toHaveBeenCalledWith({ textColor: '#000000' });
-    expect(args.updateSelectionImageSettings).toHaveBeenCalledWith({ opacity: 0.5 });
+  const file = { name: 'background.png' } as File;
+  await actions.handleBackgroundImageUpload(file);
+  expect(fileMocks.assertReadable).toHaveBeenCalledWith(file);
+  expect(frame).toMatchObject({
+    backgroundImageData: 'data:image/png;base64,abc',
+    backgroundMode: 'image',
   });
 
-  it.each(['source-image', 'background'] as const)(
-    'routes %s image style updates through selection-owned image handlers',
-    (selectedObjectType) => {
-      const args = createTargetArgs({
-        activeTool: 'select',
-        selection: createSelection(selectedObjectType),
-      });
-      const targets = resolveToolSettingTargets(args);
-
-      targets.image?.({ opacity: 0.5 });
-
-      expect(args.updateSelectionImageSettings).toHaveBeenCalledWith({ opacity: 0.5 });
-      expect(args.updateImageSettings).not.toHaveBeenCalled();
-    }
-  );
-}
-
-function registerActiveToolTargetRoutingTest() {
-  it('routes active-tool updates through non-selection handlers and ignores shape patches for non-shape tools', () => {
-    const rectangleArgs = createTargetArgs({
-      activeTool: 'rectangle',
-      selection: createSelection('rectangle', false),
-    });
-    const rectangleTargets = resolveToolSettingTargets(rectangleArgs);
-    rectangleTargets.shape({ strokeColor: '#123456' });
-    rectangleTargets.image?.({ opacity: 0.75 });
-
-    expect(rectangleArgs.updateShapeSettings).toHaveBeenCalledWith('rectangle', {
-      strokeColor: '#123456',
-    });
-    expect(rectangleArgs.updateImageSettings).toHaveBeenCalledWith({ opacity: 0.75 });
-
-    const blurArgs = createTargetArgs({
-      activeTool: 'blur',
-      selection: createSelection('rectangle', false),
-    });
-    resolveToolSettingTargets(blurArgs).shape({ strokeColor: '#654321' });
-
-    expect(blurArgs.updateShapeSettings).not.toHaveBeenCalled();
-  });
-}
-
-function registerStaticOptionsTest() {
-  it('publishes only the surviving browser-frame static options', () => {
-    expect(createStaticSidebarOptions()).toEqual(
-      expect.objectContaining({
-        browserCanvasModeOptions: expect.any(Array),
-        browserContentModeOptions: expect.any(Array),
-        clampGridSize: expect.any(Function),
-        frameGradientPresets: expect.any(Array),
-        workspaceBackgroundPalette: expect.any(Array),
-      })
-    );
-    expect(createStaticSidebarOptions()).not.toHaveProperty('browserVariantOptions');
-    expect(createStaticSidebarOptions()).not.toHaveProperty('browserThemeOptions');
-    expect(createStaticSidebarOptions()).not.toHaveProperty('browserModeOptions');
-  });
-}
-
-describe('sidebar-controller actions helpers', () => {
-  registerArrowOwnerVisibilityTests();
-  registerSelectionOwnerTests();
-  registerSelectionApplierTest();
-  registerBorderPresetOptionsTest();
-  registerSelectionOwnedTargetRoutingTest();
-  registerActiveToolTargetRoutingTest();
-  registerStaticOptionsTest();
+  await actions.syncBrowserFrame({ enabled: true });
+  expect(syncBrowserFrame).toHaveBeenCalledWith({ enabled: true });
 });

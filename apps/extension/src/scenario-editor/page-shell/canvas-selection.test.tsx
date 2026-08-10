@@ -71,7 +71,6 @@ function useCanvasSelectionEditor(project: ScenarioProjectV3) {
     canUndo: false,
     elementActions: createElementActions(setSelectedElementId),
     elements: slide.elements,
-    getCurrentProject: () => project,
     history: {
       redo: vi.fn(),
       undo: vi.fn(),
@@ -80,6 +79,8 @@ function useCanvasSelectionEditor(project: ScenarioProjectV3) {
     project,
     projectActions: {
       applyProject: vi.fn(),
+      commitAggregateMutation: vi.fn(),
+      getCurrentProject: () => project,
     },
     selectedElement,
     selectedElementId,

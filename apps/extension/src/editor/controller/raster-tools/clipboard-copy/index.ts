@@ -1,1 +1,0 @@
-export { copyRasterSelectionToClipboard } from './controller';

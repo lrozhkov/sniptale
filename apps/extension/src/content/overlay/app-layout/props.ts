@@ -11,6 +11,7 @@ type ContentAppToolbarLayoutViewModel = Pick<
   ContentAppViewModel,
   | 'aiController'
   | 'autoBlurController'
+  | 'drawingController'
   | 'frameManager'
   | 'modeController'
   | 'modeState'
@@ -59,6 +60,7 @@ function createToolbarLayoutSection(
     autoBlurController: viewModel.autoBlurController,
     captureAction: viewModel.modeState.captureAction,
     currentViewport: viewModel.modeState.currentViewport,
+    drawingController: viewModel.drawingController,
     frameCount: viewModel.frameManager.frames.length,
     futureFrameStyle: viewModel.frameManager.getFutureFrameStyle(),
     handleTakeScreenshot: viewModel.screenshotController.handleTakeScreenshot,
@@ -67,12 +69,16 @@ function createToolbarLayoutSection(
       !viewModel.modeState.highlighterMode &&
       !viewModel.modeState.quickEditMode &&
       !viewModel.modeState.aiPickMode &&
-      !viewModel.modeState.designReviewMode,
+      !viewModel.modeState.designReviewMode &&
+      !viewModel.modeState.drawingMode,
     isToolbarVisible: viewModel.modeState.isToolbarVisible,
     modeController: viewModel.modeController,
     modes: {
       aiPickMode: viewModel.modeState.aiPickMode,
       designReviewMode: viewModel.modeState.designReviewMode,
+      ...(viewModel.modeState.drawingMode === undefined
+        ? {}
+        : { drawingMode: viewModel.modeState.drawingMode }),
       highlighterMode: viewModel.modeState.highlighterMode,
       quickEditDocumentMode: viewModel.modeState.quickEditDocumentMode,
       quickEditMode: viewModel.modeState.quickEditMode,

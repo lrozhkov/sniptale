@@ -60,7 +60,7 @@ async function verifyProjectCrudLifecycle() {
   expect(saveScenarioProjectMock).toHaveBeenCalled();
   expect(saveScenarioProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({ name: 'Scenario' }),
-    { baseUpdatedAt: null }
+    { baseUpdatedAt: null, storageClass: 'temporary' }
   );
   expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('create', [
     expect.stringMatching(/^scenario:/),

@@ -46,15 +46,19 @@ const localPreferenceKeys = [
   'sniptale_editor_export_settings',
   'sniptale_editor_workspace_defaults',
   'sniptale_editor_presets',
+  'sniptale_drawing_palette',
   'sniptale_quick_actions',
   'sniptale_quick_actions_display_mode',
 ] as const;
 
 const syncPreferenceKeys = [
   'sniptale_settings',
+  'sniptale_annotation_template_tags',
   'sniptale_highlighter_settings',
   'sniptale_callout_presets',
   'sniptale_step_badge_presets',
+  'sniptale_gradient_presets',
+  'sniptale_surface_style_presets',
   'sniptale_auto_blur_settings',
 ] as const;
 

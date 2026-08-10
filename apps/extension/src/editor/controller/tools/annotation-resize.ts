@@ -30,7 +30,7 @@ export function normalizeScaledAnnotationTarget(object: FabricObject): boolean {
     return true;
   }
 
-  if (object.sniptaleType === 'pencil' || object.sniptaleType === 'highlighter') {
+  if (object.sniptaleType === 'pencil' || object.sniptaleType === 'marker') {
     applyStrokeUniform(object);
     return true;
   }

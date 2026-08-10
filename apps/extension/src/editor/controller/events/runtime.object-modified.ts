@@ -5,10 +5,10 @@ import {
   updateBlurObject,
 } from '../../objects/annotation/blur/object';
 import { normalizeScaledRichShapeObject } from '../../objects/rich-shape';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { canonicalizeModifiedEditorDrawingSelection } from '../../drawing/object/canonicalize';
 import { syncCropGuideInteraction } from './runtime.crop-guide';
 import { syncSourceState } from './runtime.source-sync';
-import { isResizableTextCallout } from './runtime.text-callout-target';
-import { normalizeScaledTextCalloutTarget } from './text-callout';
 import type {
   EditorControllerEventCommandBindings,
   EditorControllerEventCropBindings,
@@ -22,7 +22,7 @@ type TransformOrigin = Pick<import('fabric').Transform, 'originX' | 'originY'>;
 export function createObjectModifiedHandler(
   bindings: EditorControllerEventStateBindings &
     EditorControllerEventCropBindings &
-    Pick<EditorControllerEventObjectBindings, 'ensureObjectReachable'> &
+    Pick<EditorControllerEventObjectBindings, 'ensureObjectReachable' | 'prepareObject'> &
     Pick<EditorControllerEventCommandBindings, 'commitHistory' | 'syncRuntimeState'>
 ) {
   return (event: { target?: CanvasObject; transform?: TransformOrigin }) => {
@@ -31,17 +31,30 @@ export function createObjectModifiedHandler(
         bindings.syncRuntimeState();
         return;
       }
-      if (isResizableTextCallout(event.target)) {
-        normalizeScaledTextCalloutTarget(event.target, event.transform);
-      }
       if (normalizeScaledRichShapeObject(event.target)) {
         event.target.setCoords();
       }
-      if (isBlurObject(event.target) && normalizeScaledBlurTarget(event.target)) {
+      const sharedDrawing = readEditorDrawingObject(event.target);
+      if (
+        isBlurObject(event.target) &&
+        sharedDrawing?.kind !== 'blur' &&
+        normalizeScaledBlurTarget(event.target)
+      ) {
         updateBlurObject(event.target, { settings: getBlurSettings(event.target) });
       }
-      bindings.ensureObjectReachable(event.target);
-      syncSourceState(bindings, event.target);
+      const canvas = bindings.getCanvas();
+      const canonical = canvas
+        ? canonicalizeModifiedEditorDrawingSelection({
+            canvas,
+            object: event.target,
+            prepareObject: bindings.prepareObject,
+            source: bindings.getSource(),
+          })
+        : null;
+      (canonical ?? [event.target]).forEach((object) => {
+        bindings.ensureObjectReachable(object);
+        syncSourceState(bindings, object);
+      });
     }
 
     if (bindings.getHistoryMuted() > 0) {

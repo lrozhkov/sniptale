@@ -7,7 +7,7 @@ import { normalizeScaledRectangleTarget } from './shape-style-rectangle/normaliz
 it('normalizes scaled annotation rectangle geometry while preserving visual radius intent', () => {
   const rect = new Rect({ height: 20, left: 10, scaleX: -2, scaleY: 0, top: 20, width: 40 });
   rect.sniptaleRole = 'annotation';
-  rect.sniptaleType = 'rectangle';
+  rect.sniptaleType = 'shape';
   rect.sniptaleShapeRadius = Number.NaN;
   rect.ry = 5;
 
@@ -25,7 +25,7 @@ it('ignores non-target and already-normalized rectangles', () => {
   expect(normalizeScaledRectangleTarget(rect)).toBe(false);
 
   rect.sniptaleRole = 'annotation';
-  rect.sniptaleType = 'rectangle';
+  rect.sniptaleType = 'shape';
   expect(normalizeScaledRectangleTarget(rect)).toBe(false);
 });
 

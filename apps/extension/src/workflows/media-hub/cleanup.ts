@@ -28,7 +28,6 @@ interface StorageCleanupCandidateGroups {
   heavyFiles: StorageCleanupCandidate[];
   oldScreenshots: StorageCleanupCandidate[];
   oldDiagnostics: StorageCleanupCandidate[];
-  staleEditorDrafts: StorageCleanupCandidate[];
 }
 
 export function sumBytes(items: Array<{ size: number }>): number {
@@ -74,7 +73,6 @@ export function buildCleanupCandidates(params: {
     heavyFiles: getHeavyFiles(mediaItems, topN),
     oldScreenshots: getOldScreenshots(mediaItems),
     oldDiagnostics: inventoryCandidates.oldDiagnostics,
-    staleEditorDrafts: inventoryCandidates.staleEditorDrafts,
   };
 }
 

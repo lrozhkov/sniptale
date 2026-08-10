@@ -1,8 +1,4 @@
-export {
-  handleRequestGalleryImageUpdateCapability,
-  handleSaveScreenshotToGallery,
-  handleUpdateGalleryImageAsset,
-} from './actions.gallery-update';
+export { handleSaveScreenshotToGallery } from './actions.gallery-update';
 export {
   handleFetchWebSnapshotAsset,
   handleRegisterWebSnapshotAssets,

@@ -7,7 +7,7 @@ describe('frame annotation surface styles', () => {
       getFrameAnnotationFillStyle({
         borderRadius: 12,
         decorationVisible: true,
-        fillColor: '#f97316',
+        fillCss: '#f97316',
         fillVisible: true,
       })
     ).toMatchObject({ inset: 0, width: '100%', height: '100%', borderRadius: '12px' });

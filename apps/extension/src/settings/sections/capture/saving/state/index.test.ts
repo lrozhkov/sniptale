@@ -7,6 +7,12 @@ import {
   createSavePresetsState,
   shouldConfirmDelete,
 } from '.';
+import {
+  getCaptureActionOptions,
+  getPresetCountLabel,
+  isPresetUsed,
+  reorderPresetsBefore,
+} from './helpers';
 import type { SavePresetsActions, SavePresetsDialogsState, SavePresetsSyncState } from './types';
 
 function createPreset(id: string): SavePreset {
@@ -67,6 +73,23 @@ function createActions(): SavePresetsActions {
 }
 
 describe('save-presets section state helpers', () => {
+  it('includes the explicit save-to-library after-capture action', () => {
+    expect(getCaptureActionOptions()).toContainEqual(
+      expect.objectContaining({ value: 'save_to_library' })
+    );
+  });
+  it('formats counts, detects assigned presets, and reorders valid targets', () => {
+    const presets = [createPreset('a'), createPreset('b'), createPreset('c')];
+    expect(getPresetCountLabel(2)).toBeTruthy();
+    expect(isPresetUsed('a', 'a', null, null)).toBe(true);
+    expect(isPresetUsed('b', null, 'b', null)).toBe(true);
+    expect(isPresetUsed('c', null, null, 'c')).toBe(true);
+    expect(isPresetUsed('none', 'a', 'b', 'c')).toBe(false);
+    expect(reorderPresetsBefore(presets, 'c', 'a')?.map(({ id }) => id)).toEqual(['c', 'a', 'b']);
+    expect(reorderPresetsBefore(presets, 'a', null)?.map(({ id }) => id)).toEqual(['b', 'c', 'a']);
+    expect(reorderPresetsBefore(presets, 'missing', 'a')).toBeNull();
+    expect(reorderPresetsBefore(presets, 'a', 'missing')).toBeNull();
+  });
   it('returns confirmation only for presets that are not currently assigned as defaults', () => {
     const sync = createSyncState();
 

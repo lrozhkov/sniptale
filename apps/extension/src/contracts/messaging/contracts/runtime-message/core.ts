@@ -157,6 +157,13 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
           expectedRevision: number;
           payload?: string;
         };
+    [MessageType.PROMOTE_AGGREGATE_TO_LIBRARY]: {
+      aggregate: {
+        id: string;
+        kind: 'image' | 'scenario' | 'video-project';
+      };
+      type: typeof MessageType.PROMOTE_AGGREGATE_TO_LIBRARY;
+    };
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimePopupExportProgressMessage;
     [MessageType.EXPORT_POPUP_RESULT]: RuntimePopupExportResultMessage;
     [CaptureMessageType.CAPTURE_VISIBLE]: {
@@ -213,6 +220,9 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
       payload?: string;
       result: 'read' | 'written' | 'cleared' | 'stale' | 'stale-document';
       revision: number;
+    }>;
+    [MessageType.PROMOTE_AGGREGATE_TO_LIBRARY]: RuntimeMessageResponse<{
+      result?: 'promoted';
     }>;
     [MessageType.EXPORT_POPUP_PROGRESS]: RuntimeAckResponse;
     [MessageType.EXPORT_POPUP_RESULT]: RuntimeAckResponse;

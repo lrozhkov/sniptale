@@ -35,18 +35,6 @@ export interface EditorRichShapeFrame {
   height: number;
 }
 
-export type EditorRichShapeCalloutSide = 'top' | 'right' | 'bottom' | 'left';
-
-export interface EditorRichShapeCalloutGeometry {
-  body: EditorRichShapeFrame;
-  tail: {
-    side: EditorRichShapeCalloutSide;
-    baseStartRatio: number;
-    baseEndRatio: number;
-    tip: { x: number; y: number };
-  };
-}
-
 export interface EditorRichShapeGradientFill {
   type: 'gradient';
   gradientType: 'linear' | 'radial';
@@ -168,7 +156,6 @@ export interface EditorRichShapeDocumentObject {
   text: EditorRichShapeTextState;
   rough: EditorRichShapeRoughStyle;
   geometry?: EditorBuiltInShapeGeometryDefinition;
-  callout?: EditorRichShapeCalloutGeometry;
   source?: EditorRichShapeSourceMetadata;
   layer: EditorRichShapeLayerState;
 }

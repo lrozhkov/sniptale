@@ -3,11 +3,11 @@ import { runProvenanceUrlMaintenance } from './provenance';
 
 describe('db provenance URL maintenance', () => {
   it('sanitizes persisted provenance URLs in owned readwrite transactions', async () => {
-    const { editorCursor, mediaCursor, snapshotCursor } = createProvenanceCursors();
+    const { mediaCursor, snapshotCursor, workspaceCursor } = createProvenanceCursors();
 
     await runProvenanceUrlMaintenance(
       createMaintenanceDb({
-        editor_sessions: [editorCursor],
+        image_workspaces: [workspaceCursor],
         media_library: [mediaCursor],
         web_snapshots: [snapshotCursor],
       })
@@ -19,7 +19,7 @@ describe('db provenance URL maintenance', () => {
         sourceUrl: 'https://example.com/',
       })
     );
-    expect(editorCursor.put).toHaveBeenCalledWith(
+    expect(workspaceCursor.put).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceUrl: 'https://example.com/docs/readme',
       })
@@ -103,20 +103,20 @@ describe('db media provenance current-row maintenance', () => {
   });
 });
 
-describe('db editor provenance URL maintenance', () => {
-  it('sanitizes current editor provenance instead of stale cursor provenance', async () => {
-    const editorCursor = createCursor({
-      sessionId: 'session-1',
+describe('db image workspace provenance URL maintenance', () => {
+  it('sanitizes current workspace provenance instead of stale cursor provenance', async () => {
+    const workspaceCursor = createCursor({
+      aggregateId: 'image-1',
       sourceUrl: 'https://old.example/reset?token=old#hash',
     });
-    editorCursor.currentValue = {
-      sessionId: 'session-1',
+    workspaceCursor.currentValue = {
+      aggregateId: 'image-1',
       sourceUrl: 'https://new.example/invite/abc?token=current#hash',
     };
 
-    await runProvenanceUrlMaintenance(createMaintenanceDb({ editor_sessions: [editorCursor] }));
+    await runProvenanceUrlMaintenance(createMaintenanceDb({ image_workspaces: [workspaceCursor] }));
 
-    expect(editorCursor.put).toHaveBeenCalledWith(
+    expect(workspaceCursor.put).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceUrl: 'https://new.example/',
       })
@@ -127,19 +127,19 @@ describe('db editor provenance URL maintenance', () => {
 describe('db provenance maintenance malformed records', () => {
   it('skips malformed persisted provenance records without writing repairs', async () => {
     const mediaCursor = createCursor('not a record');
-    const editorCursor = createCursor(null);
+    const workspaceCursor = createCursor(null);
     const snapshotCursor = createCursor({ id: 'snapshot-1', manifest: {} });
 
     await runProvenanceUrlMaintenance(
       createMaintenanceDb({
-        editor_sessions: [editorCursor],
+        image_workspaces: [workspaceCursor],
         media_library: [mediaCursor],
         web_snapshots: [snapshotCursor],
       })
     );
 
     expect(mediaCursor.put).not.toHaveBeenCalled();
-    expect(editorCursor.put).not.toHaveBeenCalled();
+    expect(workspaceCursor.put).not.toHaveBeenCalled();
     expect(snapshotCursor.put).not.toHaveBeenCalled();
   });
 });
@@ -150,8 +150,8 @@ function createProvenanceCursors() {
     sourceFavicon: 'https://user:pass@example.com/favicon.ico?token=secret#hash',
     sourceUrl: 'https://user:pass@example.com/reset/password?token=secret#access_token=abc',
   });
-  const editorCursor = createCursor({
-    sessionId: 'session-1',
+  const workspaceCursor = createCursor({
+    aggregateId: 'image-1',
     sourceUrl: 'https://example.com/docs/readme?session=secret#fragment',
   });
   const snapshotCursor = createCursor({
@@ -164,7 +164,7 @@ function createProvenanceCursors() {
     },
   });
 
-  return { editorCursor, mediaCursor, snapshotCursor };
+  return { mediaCursor, snapshotCursor, workspaceCursor };
 }
 
 function createSensitiveMediaRecord() {
@@ -191,7 +191,7 @@ function getRecordKey(value: unknown): IDBValidKey | undefined {
     return undefined;
   }
 
-  const candidate = value['id'] ?? value['sessionId'];
+  const candidate = value['id'] ?? value['aggregateId'];
   return isIdbValidKey(candidate) ? candidate : undefined;
 }
 

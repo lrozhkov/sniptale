@@ -11,6 +11,7 @@ import {
   parseBorderSettings,
   parseBlurSettings,
   isCalloutSettings,
+  normalizeCalloutSettings,
   isFocusSettings,
   isStepBadgeSettings,
 } from './settings-parser';
@@ -55,8 +56,10 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
   )
     return null;
 
-  const primaryCallout = value['callout'] as CalloutSettings | undefined;
-  const additionalCallouts = value['additionalCallouts'] as CalloutSettings[] | undefined;
+  const primaryCallout = normalizeCalloutSettings(value['callout']);
+  const additionalCallouts = Array.isArray(value['additionalCallouts'])
+    ? (value['additionalCallouts'].map(normalizeCalloutSettings) as CalloutSettings[])
+    : undefined;
   if (!primaryCallout && additionalCallouts?.length) return null;
   const snapshot: FrameAnnotationSnapshotV1 = {
     id: value['id'],
@@ -75,7 +78,7 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
     ...(value['stepBadge'] === undefined
       ? {}
       : { stepBadge: value['stepBadge'] as StepBadgeSettings }),
-    ...(primaryCallout === undefined ? {} : { callout: primaryCallout }),
+    ...(primaryCallout == null ? {} : { callout: primaryCallout }),
     ...(additionalCallouts === undefined
       ? {}
       : {

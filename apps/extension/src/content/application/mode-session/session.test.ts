@@ -12,6 +12,8 @@ beforeEach(() => {
   setContentModeEnabled('quick-edit', false);
   setContentModeEnabled('ai-pick', false);
   setContentModeEnabled('selection-mode', false);
+  setContentModeEnabled('design-review', false);
+  setContentModeEnabled('drawing', false);
 });
 
 describe('mode-session', () => {
@@ -30,19 +32,23 @@ describe('mode-session', () => {
     const disableHighlighter = vi.fn();
     const disableQuickEdit = vi.fn();
     const disableAiPick = vi.fn();
+    const disableDrawing = vi.fn();
 
     registerContentMode('highlighter', disableHighlighter);
     registerContentMode('quick-edit', disableQuickEdit);
     registerContentMode('ai-pick', disableAiPick);
+    registerContentMode('drawing', disableDrawing);
 
     setContentModeEnabled('highlighter', true);
     setContentModeEnabled('quick-edit', true);
     setContentModeEnabled('ai-pick', false);
+    setContentModeEnabled('drawing', true);
 
     deactivateOtherContentModes('quick-edit');
 
     expect(disableHighlighter).toHaveBeenCalledTimes(1);
     expect(disableQuickEdit).not.toHaveBeenCalled();
     expect(disableAiPick).not.toHaveBeenCalled();
+    expect(disableDrawing).toHaveBeenCalledTimes(1);
   });
 });

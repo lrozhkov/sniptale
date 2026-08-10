@@ -4,6 +4,7 @@ import {
   type VideoProjectAsset,
 } from '../video/project/public';
 import { createProjectAssetMediaId, createRecordingMediaId } from './media-id';
+import type { LibraryLifecycle } from '../../contracts/settings/library-lifecycle';
 
 export interface VideoProjectListItem extends Pick<
   VideoProject,
@@ -14,6 +15,9 @@ export interface VideoProjectListItem extends Pick<
   thumbnailSourceMediaId: string | null;
   trackCount: number;
   unavailableReason?: 'invalid' | 'unsupported-engine1';
+  lifecycle?: LibraryLifecycle;
+  retentionKind: 'ordinary' | 'video';
+  workspaceRevision?: number;
 }
 
 export function createInvalidVideoProjectListItem(id: string): VideoProjectListItem {
@@ -28,8 +32,10 @@ export function createInvalidVideoProjectListItem(id: string): VideoProjectListI
     thumbnailSourceMediaId: null,
     trackCount: 0,
     unavailableReason: 'invalid',
+    retentionKind: 'ordinary',
     updatedAt: 0,
     width: 0,
+    workspaceRevision: 0,
   };
 }
 
@@ -49,6 +55,8 @@ export function createUnsupportedVideoProjectListItem(metadata: {
     thumbnailSourceMediaId: null,
     trackCount: 0,
     unavailableReason: 'unsupported-engine1',
+    retentionKind: 'ordinary',
+    workspaceRevision: 0,
   };
 }
 
@@ -91,7 +99,11 @@ function resolveProjectThumbnailSourceMediaId(project: VideoProject): string | n
   return null;
 }
 
-export function createVideoProjectListItem(project: VideoProject): VideoProjectListItem {
+export function createVideoProjectListItem(
+  project: VideoProject,
+  lifecycle?: LibraryLifecycle,
+  workspaceRevision = 0
+): VideoProjectListItem {
   return {
     id: project.id,
     name: project.name,
@@ -104,5 +116,19 @@ export function createVideoProjectListItem(project: VideoProject): VideoProjectL
     trackCount: project.tracks.length,
     thumbnailId: createProjectThumbnailId(project.id),
     thumbnailSourceMediaId: resolveProjectThumbnailSourceMediaId(project),
+    retentionKind: resolveVideoProjectRetentionKind(project),
+    workspaceRevision,
+    ...(lifecycle ? { lifecycle } : {}),
   };
+}
+
+export function resolveVideoProjectRetentionKind(project: VideoProject): 'ordinary' | 'video' {
+  if (project.baseRecordingId || project.source?.kind === 'recording') return 'video';
+  return project.assets.some(
+    (asset) =>
+      asset.source.kind === 'recording' ||
+      (asset.source.kind === 'project-asset' && Boolean(asset.source.originRecordingId))
+  )
+    ? 'video'
+    : 'ordinary';
 }

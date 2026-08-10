@@ -106,7 +106,8 @@ it('persists gallery and scenario outputs before returning the capture payload',
   expect(ports.saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
     'data:image/png;base64,1',
     'visible.png',
-    42
+    42,
+    'library'
   );
   expect(ports.persistScenarioCaptureFromBackground).toHaveBeenCalledWith(
     expect.objectContaining({

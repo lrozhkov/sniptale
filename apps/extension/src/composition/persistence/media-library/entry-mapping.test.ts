@@ -8,6 +8,7 @@ import {
 import type { MediaLibraryEntry } from './contracts';
 import type { ProjectAssetEntry } from '../projects/contracts';
 import type { RecordingEntry } from '../recordings/contracts';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 function createRecording(type: string): RecordingEntry {
   return {
@@ -74,10 +75,18 @@ it('preserves user metadata while merging regenerated media entries', () => {
     originalFilename: 'base.webm',
     sourceTitle: 'Existing title',
     tags: ['keep'],
+    lifecycle: createLibraryLifecycle('library', 5),
   });
-  const merged = mergeMediaEntry(existing, createMediaEntry({ filename: 'fresh.webm' }));
+  const merged = mergeMediaEntry(
+    existing,
+    createMediaEntry({
+      filename: 'fresh.webm',
+      lifecycle: createLibraryLifecycle('temporary', 10),
+    })
+  );
 
   expect(merged.filename).toBe('renamed.webm');
   expect(merged.sourceTitle).toBe('Existing title');
   expect(merged.tags).toEqual(['keep']);
+  expect(merged.lifecycle).toEqual(createLibraryLifecycle('library', 5));
 });

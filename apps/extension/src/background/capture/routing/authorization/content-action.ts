@@ -3,6 +3,7 @@ export type ContentSenderBinding = {
   readonly frameId: number;
   readonly senderUrl: string;
   readonly tabId: number;
+  readonly libraryDestinationAuthorized?: true;
 };
 
 const preauthorizedContentActionRouteMessages = new WeakMap<object, ContentSenderBinding>();

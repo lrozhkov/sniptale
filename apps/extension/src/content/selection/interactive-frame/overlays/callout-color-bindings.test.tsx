@@ -35,7 +35,7 @@ it('resolves inherited comment colors from the connected frame before rendering'
   const frame = createFrameDataFixture('frame-colors', {
     borderSettings: createBorderSettingsFixture({
       color: '#112233',
-      fillColor: '#445566',
+      fillPaint: { kind: 'solid' as const, color: '#445566' },
     }),
     callout: createCalloutSettingsFixture(),
   });
@@ -70,6 +70,6 @@ it('resolves inherited comment colors from the connected frame before rendering'
   expect(renderedSettings?.style.connector.color).toBe('#112233');
   expect(renderedSettings?.style.accentEdge.color).toBe('#112233');
   expect(renderedSettings?.style.surface.borderColor).toBe('#112233');
-  expect(renderedSettings?.style.surface.backgroundColor).toBe('#445566');
+  expect(renderedSettings?.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#445566ff' });
   act(() => root.unmount());
 });

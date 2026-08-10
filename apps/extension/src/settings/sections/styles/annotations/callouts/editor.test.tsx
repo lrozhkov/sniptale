@@ -115,7 +115,8 @@ describe('CalloutPresetEditor', () => {
   it('updates visible style fields through product controls', async () => {
     await renderEditor(4);
     await openSection('content.callout.manualBackground');
-    expect(document.querySelectorAll('[data-color-field]').length).toBeGreaterThan(1);
+    expect(document.querySelector('[data-ui="shared.ui.surface-style-selector"]')).not.toBeNull();
+    expect(document.querySelectorAll('[data-color-field]').length).toBeGreaterThan(0);
     expect(
       document.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]').length
     ).toBeGreaterThan(0);

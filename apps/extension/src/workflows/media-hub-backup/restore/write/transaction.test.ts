@@ -59,6 +59,8 @@ it('returns the complete store list needed for import transactions', () => {
     'web_snapshots',
     'media_library',
     'thumbnails',
+    'image_workspaces',
+    'aggregate_presentations',
   ]);
 });
 

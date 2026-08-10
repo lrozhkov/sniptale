@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   disableHighlighterMode: vi.fn(),
   disableQuickEditDocumentMode: vi.fn(),
   disableQuickEditMode: vi.fn(),
+  disableDrawing: vi.fn(),
+  drawingController: {
+    finalizeInteraction: vi.fn(),
+    session: { dispose: vi.fn() },
+  },
   scenarioController: {
     buildManualCapturePayload: vi.fn(),
     refreshSession: vi.fn(),
@@ -23,7 +28,16 @@ const mocks = vi.hoisted(() => ({
     handleCancelCountdown: vi.fn(),
     handleTakeScreenshot: vi.fn(async () => undefined),
   },
-  useAiPickController: vi.fn(() => ({ kind: 'ai-controller' })),
+  handleAiPickContentStart: vi.fn(),
+  useAiPickController: vi.fn(() => ({
+    kind: 'ai-controller',
+    handleAiPickContentStart: mocks.handleAiPickContentStart,
+  })),
+  useContentDrawingController: vi.fn(() => mocks.drawingController),
+  useDrawingModeIntegration: vi.fn(() => ({
+    disableDrawing: mocks.disableDrawing,
+    modeController: { kind: 'drawing-mode-controller', handleToggleDrawingMode: vi.fn() },
+  })),
   useContentScreenshotAutoStart: vi.fn(),
   useScenarioController: vi.fn(() => ({
     buildManualCapturePayload: mocks.scenarioController.buildManualCapturePayload,
@@ -75,6 +89,16 @@ vi.mock('../../toolbar/mode-controller', () => ({
   useToolbarModeController: mocks.useToolbarModeController,
 }));
 
+vi.mock('../../../drawing/controller', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../drawing/controller')>()),
+  useContentDrawingController: mocks.useContentDrawingController,
+}));
+
+vi.mock('../../../drawing/mode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../drawing/mode')>()),
+  useDrawingModeIntegration: mocks.useDrawingModeIntegration,
+}));
+
 import { useContentAppControllers } from '.';
 
 let container: HTMLDivElement | null = null;
@@ -91,6 +115,7 @@ function createModeState(): ContentAppControllersModeState {
     clearPendingAutoStartCapture: vi.fn(),
     currentViewport: null,
     designReviewMode: false,
+    drawingMode: false,
     highlighterMode: false,
     isCompletelyHidden: false,
     isToolbarVisible: true,
@@ -110,6 +135,7 @@ function createModeState(): ContentAppControllersModeState {
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
     setDesignReviewMode: vi.fn(),
+    setDrawingMode: vi.fn(),
     setHighlighterMode: vi.fn(),
     setIsCompletelyHidden: vi.fn(),
     setIsToolbarVisible: vi.fn(),
@@ -234,8 +260,15 @@ function expectAutoStartArgs(modeState: ReturnType<typeof createModeState>) {
 }
 
 function expectControllerResult() {
-  expect(latestControllers?.aiController).toEqual({ kind: 'ai-controller' });
-  expect(latestControllers?.modeController).toEqual({ kind: 'mode-controller' });
+  expect(latestControllers?.aiController).toEqual({
+    kind: 'ai-controller',
+    handleAiPickContentStart: expect.any(Function),
+  });
+  expect(latestControllers?.drawingController).toBe(mocks.drawingController);
+  expect(latestControllers?.modeController).toEqual({
+    kind: 'drawing-mode-controller',
+    handleToggleDrawingMode: expect.any(Function),
+  });
   expect(latestControllers?.screenshotController).toBe(mocks.screenshotController);
 }
 
@@ -290,6 +323,26 @@ async function expectScreenshotQuickEditDisableResetsDocumentMode() {
   expect(modeState.setQuickEditDocumentMode).toHaveBeenCalledWith(false);
 }
 
+async function expectDrawingModeWiring() {
+  const modeState = await renderHarness();
+
+  expect(mocks.useContentDrawingController).toHaveBeenCalledOnce();
+  expect(mocks.useDrawingModeIntegration).toHaveBeenCalledWith({
+    baseModeController: { kind: 'mode-controller' },
+    controller: mocks.drawingController,
+    modeState,
+  });
+  expect(mocks.useScreenshotController).toHaveBeenCalledWith(
+    expect.objectContaining({
+      editingModes: expect.objectContaining({
+        drawingMode: false,
+        disableDrawingMode: expect.any(Function),
+        setDrawingMode: modeState.setDrawingMode,
+      }),
+    })
+  );
+}
+
 it(
   'groups controller ownership seams from mode-state into canonical controller hooks',
   expectControllerOwnerGrouping
@@ -302,3 +355,4 @@ it(
   'resets quick-edit document mode when screenshot capture disables quick edit',
   expectScreenshotQuickEditDisableResetsDocumentMode
 );
+it('connects Drawing to the primary content runtime controller graph', expectDrawingModeWiring);

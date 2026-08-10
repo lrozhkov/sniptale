@@ -1,4 +1,3 @@
-import { deleteScenarioAsset, saveScenarioAsset } from '../../projects';
 import type {
   ScenarioCaptureSourceKind,
   ScenarioCaptureSurface,
@@ -8,6 +7,7 @@ import type {
   ScenarioCaptureMetadata,
   ScenarioPageDescriptor,
   ScenarioPoint,
+  ScenarioProjectV3,
   ScenarioSlide,
   ScenarioTargetDescriptor,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
@@ -18,7 +18,9 @@ import {
   createDefaultCaptureMetadata,
   createScenarioCaptureSlide,
 } from '../../../../../features/scenario/stage/capture-build';
-import { getScenarioProjectRecordV3, saveScenarioProjectRecordV3 } from './project-records';
+import { getScenarioProjectRecordV3 } from './project-records';
+import { commitScenarioAggregateMutation } from '../../aggregate-mutations';
+import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub/events';
 
 export interface ScenarioCaptureSlideSaveArgs {
   body?: string;
@@ -38,7 +40,7 @@ export interface ScenarioCaptureSlideSaveArgs {
 export async function saveScenarioCaptureSlideToProject(
   args: ScenarioCaptureSlideSaveArgs
 ): Promise<{
-  project: Awaited<ReturnType<typeof saveScenarioProjectRecordV3>>;
+  project: ScenarioProjectV3;
   slide: ScenarioSlide;
   asset: ReturnType<typeof mapScenarioAssetEntry>;
 }> {
@@ -69,42 +71,15 @@ export async function saveScenarioCaptureSlideToProject(
   });
   const updatedProject = appendScenarioCaptureSlide(project, slide, now);
 
-  await saveScenarioAsset(assetEntry);
-  const savedProject = await saveCaptureProjectWithRollback(
-    updatedProject,
-    assetEntry.id,
-    project.updatedAt
-  );
+  const saved = await commitScenarioAggregateMutation(updatedProject, {
+    children: { assetPuts: [assetEntry] },
+    expectedUpdatedAt: project.updatedAt,
+  });
+  publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
 
   return {
     asset: mapScenarioAssetEntry(assetEntry),
-    project: savedProject,
+    project: saved.project,
     slide,
   };
-}
-
-async function saveCaptureProjectWithRollback(
-  project: Parameters<typeof saveScenarioProjectRecordV3>[0],
-  assetId: string,
-  baseUpdatedAt: number
-): ReturnType<typeof saveScenarioProjectRecordV3> {
-  try {
-    return await saveScenarioProjectRecordV3(project, { baseUpdatedAt });
-  } catch (error: unknown) {
-    return rollbackCaptureAsset(assetId, error);
-  }
-}
-
-async function rollbackCaptureAsset(assetId: string, cause: unknown): Promise<never> {
-  try {
-    await deleteScenarioAsset(assetId);
-  } catch (rollbackError: unknown) {
-    throw new AggregateError(
-      [cause, rollbackError],
-      'Failed to save capture project and roll back capture asset',
-      { cause: rollbackError }
-    );
-  }
-
-  throw cause;
 }

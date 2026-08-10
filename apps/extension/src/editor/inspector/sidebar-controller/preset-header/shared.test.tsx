@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../../features/editor/document/constants';
+import { createRoot } from 'react-dom/client';
+import { expect, it, vi } from 'vitest';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -12,176 +11,104 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 
 import {
   buildPresetOverwriteSavePanelState,
-  buildPresetSavePanelState,
   getPresetBaseName,
   getPresetSavePanelControls,
   pickSceneBackgroundSettings,
-  resolveActiveToolPresetOwner,
   resolvePresetOverwriteTarget,
   usePresetMatchState,
   usePresetSaveDraft,
 } from './shared';
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function createPanelControls() {
+function renderHook<T>(useValue: () => T) {
+  let value: T | undefined;
+  const root = createRoot(document.createElement('div'));
+  function Harness() {
+    value = useValue();
+    return null;
+  }
+  act(() => root.render(<Harness />));
   return {
+    get value() {
+      return value!;
+    },
+    root,
+  };
+}
+
+it('filters overwrite candidates and composes enabled and disabled save panels', () => {
+  const controls = {
     closeSavePanel: vi.fn(),
     overwriteTargetId: '',
     saveMode: 'create' as const,
-    saveName: '  ',
+    saveName: 'New preset',
     setOverwriteTargetId: vi.fn(),
     setSaveMode: vi.fn(),
     setSaveName: vi.fn(),
   };
-}
+  const presets = [
+    { id: 'system', isSystemDefault: true, name: 'System' },
+    { enabled: false, id: 'disabled', name: 'Disabled' },
+    { id: 'user', name: 'User', origin: 'user' as const },
+  ];
 
-function createSceneSettings() {
-  return {
-    backgroundColor: '#ffffff',
-    backgroundGradientAngle: 90,
-    backgroundGradientColorStops: [
-      { color: '#ffffff', offset: 0 },
-      { color: '#000000', offset: 1 },
-    ],
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientStops: ['#ffffff', '#000000'],
-    backgroundGradientTo: '#000000',
+  expect(resolvePresetOverwriteTarget(presets, 'missing')?.id).toBe('user');
+  expect(resolvePresetOverwriteTarget(presets, 'user')?.id).toBe('user');
+  const enabled = buildPresetOverwriteSavePanelState({ ...controls, onSave: vi.fn(), presets });
+  expect(enabled.canSave).toBe(true);
+  expect(enabled.overwriteOptions).toEqual([{ label: 'User', value: 'user' }]);
+  enabled.onModeChange('overwrite');
+  expect(controls.setOverwriteTargetId).toHaveBeenCalledWith('user');
+
+  const disabled = buildPresetOverwriteSavePanelState({
+    ...controls,
+    onSave: vi.fn(),
+    presets: [],
+    saveMode: 'overwrite',
+    saveName: '',
+  });
+  expect(disabled.canSave).toBe(false);
+  expect(disabled.overwriteHint).toBe('editor.compact.templateOverwriteUnavailableHint');
+});
+
+it('projects scene background fields and localized preset base names', () => {
+  const settings = pickSceneBackgroundSettings({
+    backgroundColor: '#000000',
+    backgroundGradientAngle: 45,
+    backgroundGradientColorStops: [],
+    backgroundGradientFrom: '#111111',
+    backgroundGradientStops: ['#111111', '#222222'],
+    backgroundGradientTo: '#222222',
     backgroundImageData: null,
     backgroundImageFit: 'cover',
     backgroundMode: 'gradient',
-    layoutMode: 'fit-image',
+    layoutMode: 'freeform',
     paddingBottom: 4,
     paddingLeft: 3,
     paddingRight: 2,
-    sourceImage: {
-      ...DEFAULT_EDITOR_IMAGE_SETTINGS,
-      opacity: 0.5,
-      radius: 8,
-      shadow: 20,
-      strokeColor: '#123456',
-      strokeOpacity: 0.7,
-      strokeStyle: 'dash',
-      strokeWidth: 2,
-    },
     paddingTop: 1,
-  };
-}
+  });
 
-function expectPresetOwnerNames() {
-  expect(getPresetBaseName('pencil')).toBe('editor.tools.pencil');
-  expect(getPresetBaseName('rectangle')).toBe('editor.tools.rectangle');
+  expect(settings).toMatchObject({ backgroundMode: 'gradient', paddingTop: 1 });
+  expect(getPresetBaseName('step')).toBe('editor.tools.step');
   expect(getPresetBaseName('sceneBackground')).toBe('editor.scene.sceneBackgroundTitle');
-  expect(getPresetBaseName(null)).toBe('editor.compact.shapePresetFallback');
-  expect(resolveActiveToolPresetOwner('diamond')).toBe('rectangle');
-  expect(resolveActiveToolPresetOwner('brush')).toBeNull();
-  expect(resolveActiveToolPresetOwner('crop')).toBeNull();
-}
+});
 
-function expectSceneSettingsSnapshot() {
-  expect(pickSceneBackgroundSettings(createSceneSettings() as never)).toEqual(
-    expect.objectContaining({
-      backgroundGradientColorStops: [
-        { color: '#ffffff', offset: 0 },
-        { color: '#000000', offset: 1 },
-      ],
-      backgroundGradientStops: ['#ffffff', '#000000'],
-      sourceImage: expect.objectContaining({ opacity: 0.5, radius: 8 }),
-    })
+it('owns save draft lifecycle and pending clean match state', () => {
+  const draft = renderHook(() => usePresetSaveDraft('Preset', ['Preset 1', 'Preset 2']));
+  act(() => draft.value.openSavePanel());
+  expect(draft.value.savePanelOpen).toBe(true);
+  expect(draft.value.saveName).toBe('Preset 3');
+  const controls = getPresetSavePanelControls(draft.value);
+  expect(controls.saveMode).toBe('create');
+  act(() => controls.closeSavePanel());
+  expect(draft.value.savePanelOpen).toBe(false);
+  draft.root.unmount();
+
+  const match = renderHook(() =>
+    usePresetMatchState({ currentSettings: { color: '#fff' }, matchingPresetId: undefined })
   );
-}
-
-afterEach(() => {
-  act(() => root?.unmount());
-  root = null;
-  container?.remove();
-  container = null;
-});
-
-describe('preset header shared helpers', () => {
-  it('builds create and overwrite save panel state', () => {
-    const controls = createPanelControls();
-
-    expect(
-      buildPresetSavePanelState({
-        ...controls,
-        onSave: vi.fn(),
-        overwriteDisabled: true,
-        overwriteOptions: [],
-      })
-    ).toEqual(expect.objectContaining({ canSave: false, overwriteDisabled: true }));
-
-    expect(
-      buildPresetSavePanelState({
-        ...controls,
-        overwriteTargetId: 'preset-1',
-        saveMode: 'overwrite',
-        onSave: vi.fn(),
-        overwriteDisabled: false,
-        overwriteOptions: [{ label: 'Preset', value: 'preset-1' }],
-      })
-    ).toEqual(expect.objectContaining({ canSave: true, overwriteTargetId: 'preset-1' }));
-  });
-
-  it('filters overwrite targets and initializes missing overwrite ids', () => {
-    const setOverwriteTargetId = vi.fn();
-    const presets = [
-      { id: 'system', isSystemDefault: true, name: 'System' },
-      { id: 'disabled', enabled: false, name: 'Disabled' },
-      { id: 'preset-1', name: 'Preset 1' },
-    ];
-    const state = buildPresetOverwriteSavePanelState({
-      closeSavePanel: vi.fn(),
-      onSave: vi.fn(),
-      overwriteTargetId: '',
-      presets,
-      saveMode: 'create',
-      saveName: 'Preset',
-      setOverwriteTargetId,
-      setSaveMode: vi.fn(),
-      setSaveName: vi.fn(),
-    });
-
-    expect(resolvePresetOverwriteTarget(presets, 'missing')?.id).toBe('preset-1');
-    expect(state.overwriteOptions).toEqual([{ label: 'Preset 1', value: 'preset-1' }]);
-    state.onModeChange('overwrite');
-    expect(setOverwriteTargetId).toHaveBeenCalledWith('preset-1');
-  });
-});
-
-describe('preset header shared mapping helpers', () => {
-  it('maps preset owner names, scene settings, and inactive tools', () => {
-    expectPresetOwnerNames();
-    expectSceneSettingsSnapshot();
-  });
-});
-
-describe('preset header shared hook state', () => {
-  it('tracks save draft and pending preset matches through hook state', async () => {
-    let saveDraft: ReturnType<typeof usePresetSaveDraft> | null = null;
-    let matchState: ReturnType<typeof usePresetMatchState<{ color: string }>> | null = null;
-    const Harness = (props: { color: string; match?: string }) => {
-      saveDraft = usePresetSaveDraft('Template', ['Template 1']);
-      matchState = usePresetMatchState({
-        currentSettings: { color: props.color },
-        matchingPresetId: props.match,
-      });
-      return null;
-    };
-
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-    await act(async () => root?.render(<Harness color="#111111" />));
-    act(() => saveDraft?.openSavePanel());
-    act(() => matchState?.markClean({ color: '#111111' }, 'preset-1'));
-
-    expect(getPresetSavePanelControls(saveDraft as never).saveName).toBe('Template 2');
-    expect((matchState as { selectedPresetId?: string } | null)?.selectedPresetId).toBe('preset-1');
-
-    await act(async () => root?.render(<Harness color="#222222" match="preset-2" />));
-    expect((matchState as { selectedPresetId?: string } | null)?.selectedPresetId).toBe('preset-2');
-    expect((matchState as { saveDisabled?: boolean } | null)?.saveDisabled).toBe(true);
-  });
+  act(() => match.value.markClean({ color: '#fff' }, 'preset-1'));
+  expect(match.value.selectedPresetId).toBe('preset-1');
+  expect(match.value.saveDisabled).toBe(true);
+  match.root.unmount();
 });

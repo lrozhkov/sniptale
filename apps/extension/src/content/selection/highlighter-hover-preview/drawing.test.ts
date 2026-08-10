@@ -183,7 +183,7 @@ describe('free frame drawing gesture', () => {
       radius: 8,
       padding: { top: 5, right: 5, bottom: 5, left: 5 },
       shadow: 30,
-      fillColor: '#EF444412',
+      fillPaint: { kind: 'solid' as const, color: '#EF444412' },
       inheritCustomCss: false,
       customCss: '',
     });

@@ -425,7 +425,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/styles/editor-resources/palettes/model.ts',
     reason: 'Settings palette ordering is covered by the owner-local model suite.',
     testFiles: [
-      'apps/extension/src/settings/sections/styles/editor-resources/palettes/model.test.ts',
+      'apps/extension/src/settings/sections/styles/editor-resources/palettes/view.test.tsx',
     ],
   },
   {

@@ -105,6 +105,8 @@ export interface ScenarioProjectSummary {
   createdAt: number;
   updatedAt: number;
   tags?: string[];
+  lifecycle?: import('../../../../contracts/settings/library-lifecycle').LibraryLifecycle;
+  workspaceRevision?: number;
 }
 
 export interface ScenarioRecentStep {

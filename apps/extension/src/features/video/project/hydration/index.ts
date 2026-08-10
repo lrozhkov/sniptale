@@ -191,5 +191,10 @@ export function hydrateVideoProject(
     utilityLanes: getVideoProjectUtilityLanes(project),
   } satisfies VideoProject;
 
-  return syncProjectTransitions(hydratedProject);
+  const synchronizedProject = syncProjectTransitions(hydratedProject);
+  return {
+    ...synchronizedProject,
+    // Hydration normalizes a durable snapshot; merely opening it is not a workspace mutation.
+    updatedAt: project.updatedAt,
+  };
 }

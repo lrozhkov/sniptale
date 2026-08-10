@@ -2,6 +2,8 @@ import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
 import { saveRecordingsBatchWithCompletionSafely } from '../../../workflows/media-hub/store';
+import { loadSettings } from '../../../composition/persistence/settings';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../composition/persistence/library-lifecycle';
 import { updateVideoRecordingCompletionOutbox } from '../../../composition/persistence/recordings/completion-outbox';
 import {
   createVideoProjectFromMultiSourceRecording,
@@ -18,7 +20,8 @@ const logger = createLogger({ namespace: 'OffscreenMultiSourceFinalize' });
 async function createProjectForSession(
   videos: MultiSourceRecordingProjectAssetInput[],
   microphoneAudio: MultiSourceAudioProjectAssetInput | null,
-  webcamVideo: ReturnType<typeof createWebcamProjectInput>
+  webcamVideo: ReturnType<typeof createWebcamProjectInput>,
+  storageClass: 'temporary' | 'library'
 ): Promise<string | null> {
   try {
     const project = createVideoProjectFromMultiSourceRecording({
@@ -27,7 +30,7 @@ async function createProjectForSession(
       videos,
       webcamVideo,
     });
-    await commitVideoProjectMutation(project, { baseRevision: null });
+    await commitVideoProjectMutation(project, { baseRevision: null, storageClass });
     return project.id;
   } catch (error) {
     logger.error('Failed to create a multi-source project; preserving raw recordings', error);
@@ -106,6 +109,10 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
     projectId: null,
     recordingId: session.recordingId,
   };
+  const settings = await loadSettings().catch(() => null);
+  const storageClass =
+    settings?.localStoragePolicy.defaultDestination ??
+    DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination;
   await saveRecordingsBatchWithCompletionSafely(
     sources.map((source) => {
       const artifact = source.artifact!;
@@ -113,6 +120,7 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
         blob: artifact.file,
         filename: artifact.filename,
         id: source.recordingId,
+        storageClass,
       };
     }),
     completion
@@ -127,7 +135,12 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
   const videos = buildVideoProjectInputs(session, duration);
   const microphoneAudio = buildMicrophoneProjectInput(session.audioRecorder, duration);
   const webcamVideo = createWebcamProjectInput(session.webcamRecorder, duration);
-  const projectId = await createProjectForSession(videos, microphoneAudio, webcamVideo);
+  const projectId = await createProjectForSession(
+    videos,
+    microphoneAudio,
+    webcamVideo,
+    storageClass
+  );
   const publishedCompletion = { ...completion, projectId };
   if (projectId !== null) {
     await updateVideoRecordingCompletionOutbox(publishedCompletion);

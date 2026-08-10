@@ -18,7 +18,7 @@ export function createScenarioCaptureEditorDocument(args: {
   sourceWidth: number;
 }): EditorDocument {
   return {
-    version: 1,
+    version: 2,
     sourceImageData: args.dataUrl,
     sourceName: args.sourceName ?? null,
     sourceWidth: args.sourceWidth,

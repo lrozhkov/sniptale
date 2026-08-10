@@ -126,22 +126,6 @@ export const capabilityPolicyStateDescriptors = [
     ttlMs: MINUTE_MS,
   },
   {
-    authorityFamily: 'gallery-image-update-capability',
-    failClosedOnRestart: true,
-    id: 'gallery-image-update-capabilities',
-    oneShot: true,
-    ownerModule: 'apps/extension/src/background/capture/routing/gallery-update-capabilities.ts',
-    proofModules: [
-      'apps/extension/src/background/capture/routing/gallery-update-capabilities.owner.test.ts',
-    ],
-    requiresTtl: true,
-    restartBehavior: 'Disposable editor image-update tokens fail closed after worker restart.',
-    restartClass: 'disposable-fail-closed',
-    stateClass: 'capability',
-    storageClass: 'memory-only',
-    ttlMs: MINUTE_MS,
-  },
-  {
     authorityFamily: 'project-export-runtime',
     failClosedOnRestart: false,
     id: 'project-export-capabilities',

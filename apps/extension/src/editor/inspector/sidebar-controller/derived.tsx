@@ -12,9 +12,9 @@ import {
   normalizeEditorFrameGradientStops,
 } from '../../../features/editor/document/frame-gradient';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
+import { createDefaultDrawingPaletteState } from '../../../composition/persistence/drawing-palette';
 import { getEditorToolbarDerivedState } from '../toolbar-derived-state';
 import { getAspectRatio, getFramePaddingSummary } from '../sidebar-shared';
-import { shouldShowSelectionToolSettings } from './actions.helpers';
 
 const BACKGROUND_IMAGE_PREVIEW_STYLE = {
   contain: {
@@ -75,7 +75,7 @@ function getInspectorToolSettings(args: {
   selectionToolSettings: EditorToolSettings;
   toolSettings: EditorToolSettings;
 }) {
-  return shouldShowSelectionToolSettings(args) ? args.selectionToolSettings : args.toolSettings;
+  return args.selection.hasSelection ? args.selectionToolSettings : args.toolSettings;
 }
 
 function buildDerivedMeasurements(args: {
@@ -141,6 +141,7 @@ export function useEditorInspectorSidebarDerived(args: {
     !args.selection.selectedObjectLocked;
   const measurements = buildDerivedMeasurements(args);
   const framePresentation = buildFramePresentation(args.frameDraft);
+  const drawingPalette = createDefaultDrawingPaletteState().colors;
 
   return {
     canDeleteSelection: args.selection.hasSelection,
@@ -148,12 +149,12 @@ export function useEditorInspectorSidebarDerived(args: {
     highlightedTool: toolbarState.highlightedTool,
     inspectorToolSettings: getInspectorToolSettings(args),
     isResizableLayerSelection,
-    shapeFillPalette: editorPresetState.palette.shapeFill,
-    shapeStrokePalette: editorPresetState.palette.shapeStroke,
+    shapeFillPalette: drawingPalette,
+    shapeStrokePalette: drawingPalette,
     showDocumentActions: !args.hasImage || args.inspector === 'file',
     showViewportMetrics: args.hasImage && args.inspector !== 'file',
-    textBackgroundPalette: editorPresetState.palette.textBackground,
-    textColorPalette: editorPresetState.palette.textColor,
+    textBackgroundPalette: drawingPalette,
+    textColorPalette: drawingPalette,
     ...framePresentation,
     ...measurements,
   };

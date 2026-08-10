@@ -1,8 +1,5 @@
 ﻿import { browserTabs } from '@sniptale/platform/browser/tabs';
-import {
-  saveScreenshotMediaAssetSafely,
-  updateScreenshotMediaAssetSafely,
-} from '../../workflows/media-hub/store';
+import { saveScreenshotMediaAssetSafely } from '../../workflows/media-hub/store';
 import { createMediaHubStorageHeadroomError } from '../../features/media-hub/storage-errors';
 import { dataUrlToBlob } from '../../platform/media-utils/data-url';
 import { ensureMediaHubStorageHeadroom } from '../../features/media-hub/storage-capacity';
@@ -49,7 +46,8 @@ async function ensureScreenshotStorageHeadroom(): Promise<void> {
 export async function saveScreenshotToMediaHubFromDataUrl(
   dataUrl: string,
   filename: string,
-  tabId?: number
+  tabId?: number,
+  storageClass: 'temporary' | 'library' = 'temporary'
 ): Promise<string> {
   await ensureScreenshotStorageHeadroom();
   const [blob, sourceMeta] = await Promise.all([
@@ -63,17 +61,8 @@ export async function saveScreenshotToMediaHubFromDataUrl(
     sourceUrl: sourceMeta.sourceUrl,
     sourceTitle: sourceMeta.sourceTitle,
     sourceFavicon: sourceMeta.sourceFavicon,
+    storageClass,
   });
 
-  return entry.id;
-}
-
-export async function updateGalleryImageAssetFromDataUrl(
-  assetId: string,
-  dataUrl: string,
-  filename?: string
-): Promise<string> {
-  const blob = await dataUrlToBlob(dataUrl);
-  const entry = await updateScreenshotMediaAssetSafely(assetId, blob, filename);
   return entry.id;
 }

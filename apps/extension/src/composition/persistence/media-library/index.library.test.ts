@@ -3,6 +3,7 @@ import type { MediaLibraryEntry, MediaThumbnailEntry } from './contracts';
 import type { ProjectAssetEntry, ProjectExportEntry } from '../projects/contracts';
 import type { RecordingEntry } from '../recordings/contracts';
 import { createVideoProject } from '../projects/index.test-support';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 const dbMocks = vi.hoisted(() => ({
   deleteProjectAssetMock: vi.fn(),
@@ -103,6 +104,7 @@ function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibr
     sourceTitle: overrides.sourceTitle ?? null,
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
+    ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
     ...(overrides.blob === undefined ? {} : { blob: overrides.blob }),
   };
 }
@@ -149,9 +151,15 @@ function installLegacyMediaLibrarySourceMocks() {
   const recordingB = createRecording('rec-2');
   const projectExport = createProjectExport('exp-1', 'rec-2');
   const projectAsset = createProjectAsset('asset-1', 'custom-name.png');
+  const unreferencedAsset = createProjectAsset('asset-2');
+  const missingLegacyMirror = createProjectAsset('asset-3');
   dbMocks.listRecordingsMock.mockResolvedValue([recordingA, recordingB]);
   dbMocks.listAllProjectExportsMock.mockResolvedValue([projectExport]);
-  dbMocks.listProjectAssetsMock.mockResolvedValue([projectAsset]);
+  dbMocks.listProjectAssetsMock.mockResolvedValue([
+    projectAsset,
+    unreferencedAsset,
+    missingLegacyMirror,
+  ]);
   dbMocks.getAllMock.mockResolvedValueOnce([
     createMediaEntry({
       id: 'recording:rec-1',
@@ -167,6 +175,16 @@ function installLegacyMediaLibrarySourceMocks() {
         projectId: 'project-1',
         recordingId: 'stale-recording',
       },
+    }),
+    createMediaEntry({
+      id: 'project-asset:asset-1',
+      lifecycle: createLibraryLifecycle('library', 410),
+      source: { kind: 'project-asset', projectAssetId: 'asset-1' },
+    }),
+    createMediaEntry({
+      id: 'project-asset:asset-2',
+      lifecycle: createLibraryLifecycle('library', 420),
+      source: { kind: 'project-asset', projectAssetId: 'asset-2' },
     }),
   ]);
 }
@@ -188,7 +206,23 @@ function expectLegacyMediaLibrarySyncWrites() {
     })
   );
   expect(dbMocks.txPutMock).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'project-asset:asset-1', filename: 'custom-name.png' })
+    expect.objectContaining({
+      id: 'project-asset:asset-1',
+      filename: 'custom-name.png',
+      lifecycle: createLibraryLifecycle('library', 410),
+    })
+  );
+  expect(dbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'project-asset:asset-2',
+      lifecycle: createLibraryLifecycle('library', 420),
+    })
+  );
+  expect(dbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'project-asset:asset-3',
+      lifecycle: createLibraryLifecycle('library', 400),
+    })
   );
 }
 
@@ -207,6 +241,8 @@ async function verifySyncLegacyMediaLibraryFlow() {
   expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('recording:rec-2');
   expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-1');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-2');
 }
 
 async function verifyListMediaLibraryFlow() {

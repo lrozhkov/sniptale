@@ -9,11 +9,9 @@ function createHistoryOptions(
   overrides: Partial<Parameters<typeof resolveEditorHistoryKeyboardAction>[0]>
 ) {
   return {
-    activeTool: 'select',
     altKey: false,
     code: '',
     ctrlKey: true,
-    hasRasterSelection: false,
     hasSelection: false,
     key: 'z',
     metaKey: false,
@@ -23,7 +21,7 @@ function createHistoryOptions(
 }
 
 describe('editor keyboard modifier shortcut resolvers', () => {
-  it('maps undo, redo, duplicate, and raster clipboard shortcuts', () => {
+  it('maps undo, redo, and duplicate shortcuts', () => {
     expect(resolveEditorHistoryKeyboardAction(createHistoryOptions({ key: 'z' }))).toBe('undo');
     expect(
       resolveEditorHistoryKeyboardAction(createHistoryOptions({ key: 'z', shiftKey: true }))
@@ -31,11 +29,6 @@ describe('editor keyboard modifier shortcut resolvers', () => {
     expect(
       resolveEditorHistoryKeyboardAction(createHistoryOptions({ hasSelection: true, key: 'd' }))
     ).toBe('duplicate-selection');
-    expect(
-      resolveEditorHistoryKeyboardAction(
-        createHistoryOptions({ activeTool: 'selection', hasRasterSelection: true, key: 'x' })
-      )
-    ).toBe('cut-raster-selection');
     expect(
       resolveEditorHistoryKeyboardAction(createHistoryOptions({ code: 'KeyZ', key: 'я' }))
     ).toBe('undo');

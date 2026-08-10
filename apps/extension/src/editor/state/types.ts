@@ -2,24 +2,17 @@ import type { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highli
 import type { EditorWorkspaceDefaults } from '../persistence/workspace';
 import type {
   BrowserFrameState,
-  EditorBrushSettings,
   EditorFrameSettings,
   EditorHistoryState,
   EditorLayerItem,
   EditorSelectionState,
-  EditorShapeSettings,
   EditorTool,
   EditorViewportState,
   EditorWorkspaceSettings,
 } from '../../features/editor/document/types';
 import type { EditorLayerEffectCategory } from '../../features/editor/document/effects';
-import type { EditorShapeSettingsOwner } from '../../features/editor/document/shape-settings';
 import type { EditorToolSettings } from '../../features/editor/document/tool-settings-types';
-import type {
-  EditorRasterSelectionSummary,
-  EditorRasterTargetSummary,
-  EditorRasterToolSettings,
-} from './raster-tools';
+import type { DrawingToolDefaults } from '../../features/drawing/public';
 import type { EditorCustomShapeDefinition } from '../../features/editor/document/rich-shape/custom';
 
 export type EditorInspector =
@@ -46,8 +39,6 @@ export interface EditorRuntimePatch {
   layers?: EditorLayerItem[];
   selection?: EditorSelectionState;
   cropSelection?: EditorCropSelectionState | null;
-  rasterSelection?: EditorRasterSelectionSummary;
-  rasterTarget?: EditorRasterTargetSummary;
   history?: EditorHistoryState;
   viewport?: EditorViewportState;
   frame?: EditorFrameSettings;
@@ -72,7 +63,6 @@ interface EditorUiState {
   sessionId: string | null;
   toolSettings: EditorToolSettings;
   selectionToolSettings: EditorToolSettings;
-  rasterToolSettings: EditorRasterToolSettings;
   imageData: string | null;
   pageTitle: string;
   cropReady: boolean;
@@ -83,8 +73,6 @@ interface EditorUiState {
 interface EditorDocumentState {
   layers: EditorLayerItem[];
   selection: EditorSelectionState;
-  rasterSelection: EditorRasterSelectionSummary;
-  rasterTarget: EditorRasterTargetSummary;
   history: EditorHistoryState;
   viewport: EditorViewportState;
   frame: EditorFrameSettings;
@@ -119,35 +107,19 @@ interface EditorUiActions {
 }
 
 interface EditorToolActions {
-  updateBrushSettings: (
-    tool: 'pencil' | 'highlighter',
-    patch: Partial<EditorBrushSettings>
+  replaceDrawingToolSettings: (defaults: DrawingToolDefaults) => void;
+  updateDrawingToolSettings: <Tool extends keyof DrawingToolDefaults>(
+    tool: Tool,
+    patch: Partial<DrawingToolDefaults[Tool]>
   ) => void;
-  updateSelectionBrushSettings: (
-    tool: 'pencil' | 'highlighter',
-    patch: Partial<EditorBrushSettings>
+  updateSelectionDrawingToolSettings: <Tool extends keyof DrawingToolDefaults>(
+    tool: Tool,
+    patch: Partial<DrawingToolDefaults[Tool]>
   ) => void;
-  updateShapeSettings: (
-    tool: EditorShapeSettingsOwner,
-    patch: Partial<EditorShapeSettings>
-  ) => void;
-  updateSelectionShapeSettings: (
-    tool: EditorShapeSettingsOwner,
-    patch: Partial<EditorShapeSettings>
-  ) => void;
-  updateBlurSettings: (patch: Partial<EditorToolSettings['blur']>) => void;
-  updateSelectionBlurSettings: (patch: Partial<EditorToolSettings['blur']>) => void;
-  updateArrowSettings: (patch: Partial<EditorToolSettings['arrow']>) => void;
-  updateSelectionArrowSettings: (patch: Partial<EditorToolSettings['arrow']>) => void;
-  updateLineSettings: (patch: Partial<EditorToolSettings['line']>) => void;
-  updateSelectionLineSettings: (patch: Partial<EditorToolSettings['line']>) => void;
-  updateTextSettings: (patch: Partial<EditorToolSettings['text']>) => void;
-  updateSelectionTextSettings: (patch: Partial<EditorToolSettings['text']>) => void;
   updateStepSettings: (patch: Partial<EditorToolSettings['step']>) => void;
   updateSelectionStepSettings: (patch: Partial<EditorToolSettings['step']>) => void;
   updateImageSettings: (patch: Partial<EditorToolSettings['image']>) => void;
   updateSelectionImageSettings: (patch: Partial<EditorToolSettings['image']>) => void;
-  updateRasterToolSettings: (patch: Partial<EditorRasterToolSettings>) => void;
 }
 
 interface EditorDocumentActions {

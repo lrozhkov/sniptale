@@ -12,11 +12,18 @@ function createRecordingEntry(id = 'recording-1') {
   };
 }
 
+function withLegacyLifecycle(entry: ReturnType<typeof createRecordingEntry>) {
+  return {
+    ...entry,
+    lifecycle: { savedAt: entry.createdAt, storageClass: 'library', updatedAt: entry.createdAt },
+  };
+}
+
 describe('recording entry guards', () => {
   it('accepts valid recording entries and rejects invalid payloads', () => {
     const entry = createRecordingEntry();
 
-    expect(parseRecordingEntry(entry)).toEqual(entry);
+    expect(parseRecordingEntry(entry)).toEqual(withLegacyLifecycle(entry));
     expect(parseRecordingEntry({ ...entry, size: '5' })).toBeNull();
   });
 
@@ -28,7 +35,7 @@ describe('recording entry guards', () => {
     });
 
     expect(parseRecordingEntries([createRecordingEntry(), { broken: true }])).toEqual({
-      entries: [createRecordingEntry()],
+      entries: [withLegacyLifecycle(createRecordingEntry())],
       hasInvalidRoot: false,
       invalidEntryCount: 1,
     });

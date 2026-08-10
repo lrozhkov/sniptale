@@ -123,6 +123,35 @@ describe('shared/ui/color-selector eyedropper', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('keeps the root-owned native eyedropper active while the picker rerenders', async () => {
+    let resolvePick: ((result: { sRGBHex: string }) => void) | null = null;
+    let receivedSignal: AbortSignal | undefined;
+    const open = vi.fn(
+      (options?: { signal?: AbortSignal }) =>
+        new Promise<{ sRGBHex: string }>((resolve) => {
+          receivedSignal = options?.signal;
+          resolvePick = resolve;
+        })
+    );
+    vi.stubGlobal(
+      'EyeDropper',
+      class {
+        open(options?: { signal?: AbortSignal }) {
+          return open(options);
+        }
+      }
+    );
+    const onPreviewChange = vi.fn();
+    renderSelector({ onPreviewChange });
+    await clickButton('shared.ui.colorSelectorChooseColor');
+    await clickButton('shared.ui.colorSelectorEyedropper');
+    await flushPromises();
+
+    expect(receivedSignal?.aborted).toBe(false);
+    await act(async () => resolvePick?.({ sRGBHex: '#14b8a6' }));
+    expect(onPreviewChange).toHaveBeenCalledWith('#14b8a6');
+  });
+
   it('keeps the picker open when eyedropper is canceled', async () => {
     vi.stubGlobal(
       'EyeDropper',

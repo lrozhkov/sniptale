@@ -35,7 +35,7 @@ function createCanvas() {
   });
   const object = new Rect({ left: 0, top: 0, width: 20, height: 20 });
   object.sniptaleId = 'ordinary-1';
-  object.sniptaleType = 'rectangle';
+  object.sniptaleType = 'shape';
   const objects = [object, proxy];
   const canvas = {
     getObjects: vi.fn(() => objects),

@@ -115,16 +115,14 @@ function readScenarioImageElement(project: ScenarioBackupProjectDescriptor | und
 }
 
 describe('media hub backup project privacy options', () => {
-  it('omits scenario editor draft documents when editor draft export is disabled', async () => {
+  it('always includes authoritative scenario workspace documents', async () => {
     initDBMock.mockResolvedValue(createProjectBundleDb());
 
-    const archive = await exportBackupArchive({ includeEditorDrafts: false });
-    const manifest = readArchiveJson<MediaHubBackupManifest>(archive, 'manifest.json');
+    const archive = await exportBackupArchive();
     const metadata = readArchiveJson<MediaHubBackupMetadata>(archive, 'metadata.json');
 
-    expect(manifest.dataClasses).toEqual(expect.objectContaining({ editorDrafts: false }));
-    expect(metadata.scenarioProjects?.[0]?.stepDocuments).toEqual([]);
-    expect(readScenarioImageElement(metadata.scenarioProjects?.[0])?.editDocumentId).toBeNull();
+    expect(metadata.scenarioProjects?.[0]?.stepDocuments).toHaveLength(1);
+    expect(readScenarioImageElement(metadata.scenarioProjects?.[0])?.editDocumentId).toBe('step-1');
     expect(parseBackupMetadata(metadata)).toEqual(metadata);
   });
 

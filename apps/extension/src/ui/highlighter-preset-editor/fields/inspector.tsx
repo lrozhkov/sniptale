@@ -29,6 +29,7 @@ import {
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { HighlighterFillPaintField } from './fill-paint-field';
 
 export type LinkedAnnotationTemplateOptions = {
   callouts: Array<{ label: string; value: string }>;
@@ -63,6 +64,7 @@ type BorderStyleInspectorProps = {
   cssTextareaHeight?: number;
   onChange: (patch: BorderVisualStylePatch) => void;
   onCssDraftChange: (value: string) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onCssResizeStart?: (event: MouseEvent<HTMLDivElement>) => void;
   saveSection?: ReactNode;
   saveSectionStatus?: string;
@@ -126,11 +128,16 @@ function BorderOutlineSection(props: BorderStyleInspectorProps) {
 function BorderFillSection(props: BorderStyleInspectorProps) {
   return (
     <div className="grid gap-3">
-      <BorderColorField
-        label={translate('highlighter.editor.fillColorLabel')}
-        onChange={(fillColor) => props.onChange({ fillColor })}
-        value={props.style.fillColor}
-      />
+      <PropertyField label={translate('highlighter.editor.fillColorLabel')}>
+        <HighlighterFillPaintField
+          label={translate('highlighter.editor.fillColorLabel')}
+          onChange={(fillPaint) => props.onChange({ fillPaint })}
+          {...(props.onFloatingInteractionChange
+            ? { onOpenChange: props.onFloatingInteractionChange }
+            : {})}
+          value={props.style.fillPaint}
+        />
+      </PropertyField>
     </div>
   );
 }

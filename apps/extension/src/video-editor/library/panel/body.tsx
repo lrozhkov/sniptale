@@ -39,6 +39,9 @@ function createThumbnailItems(
     mimeType: null,
     sourceMediaId: project.thumbnailSourceMediaId,
     thumbnailId: project.thumbnailId,
+    ...(project.workspaceRevision === undefined
+      ? {}
+      : { workspaceRevision: project.workspaceRevision }),
   }));
   const recordingItems = libraryState.visibleRecordings.map((recording) => ({
     createdAt: recording.createdAt,

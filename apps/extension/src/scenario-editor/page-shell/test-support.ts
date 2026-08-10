@@ -31,12 +31,13 @@ export function createScenarioV3ShellContentEditorStub(args: {
       args.selectElement ? { selectElement: args.selectElement } : {}
     ),
     elements: selectedSlide.elements,
-    getCurrentProject: () => args.project,
     history: { redo: vi.fn(), undo: vi.fn() },
     operationError: null,
     project: args.project,
     projectActions: {
       applyProject: args.applyProject ?? vi.fn(),
+      commitAggregateMutation: vi.fn(),
+      getCurrentProject: () => args.project,
     },
     selectedElement,
     selectedElementId: args.selectedElementId ?? null,

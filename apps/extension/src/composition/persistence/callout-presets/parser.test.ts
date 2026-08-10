@@ -14,7 +14,10 @@ it('parses compact catalog rows and preserves transparent colors', () => {
     userPresets: [{ id: 'user-one', name: 'Text', style }],
   });
   expect(parsed).toMatchObject({ hasInvalidRoot: false, invalidFieldCount: 0 });
-  expect(parsed.value.userPresets?.[0]?.style.surface.backgroundColor).toBe('transparent');
+  expect(parsed.value.userPresets?.[0]?.style.surface.fillPaint).toEqual({
+    kind: 'solid',
+    color: '#00000000',
+  });
 });
 
 it('accepts bounded template title content and rejects oversized titles', () => {
@@ -365,7 +368,10 @@ it('rejects unsafe colors while preserving a user-expanded wrapping width', () =
   const style = createSystemCalloutPresetCatalog()[0]!.style;
   const unsafeColor = {
     ...style,
-    surface: { ...style.surface, backgroundColor: 'url(https://example.test/tracker)' },
+    surface: {
+      ...style.surface,
+      fillPaint: { kind: 'solid', color: 'url(https://example.test/tracker)' },
+    },
   };
   const oversized = {
     ...style,

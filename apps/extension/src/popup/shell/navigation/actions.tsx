@@ -1,6 +1,5 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
@@ -28,9 +27,7 @@ export async function openScreenshotMode() {
 
 export function openImageEditor() {
   void browserTabs.create({
-    url: buildEditorUrl({
-      sessionId: createEditorSessionId(),
-    }),
+    url: buildEditorUrl(),
   });
   window.close();
 }

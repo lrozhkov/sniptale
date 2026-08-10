@@ -53,11 +53,12 @@ function createIframeElementWithTarget() {
 const testBorderSettings: BorderPreset = {
   color: '#ff671d',
   customCss: '',
-  fillColor: '#00000000',
+  fillPaint: { kind: 'solid' as const, color: '#00000000' },
   inheritCustomCss: false,
   id: 'preset-1',
   name: 'Preset',
   order: 0,
+  tagIds: [],
   padding: {
     top: 2,
     right: 5,

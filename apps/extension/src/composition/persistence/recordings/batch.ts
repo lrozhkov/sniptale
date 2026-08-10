@@ -7,6 +7,8 @@ import {
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingEntry } from './contracts';
+import type { LibraryStorageClass } from '../library-lifecycle/contracts';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { createVideoRecordingCompletionOutboxRecord } from './completion-outbox';
 
 export interface SaveRecordingBatchInput {
@@ -14,6 +16,7 @@ export interface SaveRecordingBatchInput {
   createdAt?: number;
   filename: string;
   id: string;
+  storageClass?: LibraryStorageClass;
 }
 
 function createRecordingBatchEntries(inputs: readonly SaveRecordingBatchInput[]): RecordingEntry[] {
@@ -25,11 +28,13 @@ function createRecordingBatchEntries(inputs: readonly SaveRecordingBatchInput[])
       throw new Error('Recording filename must not be empty.');
     if (ids.has(input.id)) throw new Error(`Duplicate recording ID in batch: ${input.id}.`);
     ids.add(input.id);
+    const createdAt = input.createdAt ?? defaultCreatedAt;
     return {
       id: input.id,
       blob: input.blob,
       filename: input.filename,
-      createdAt: input.createdAt ?? defaultCreatedAt,
+      createdAt,
+      lifecycle: createLibraryLifecycle(input.storageClass ?? 'library', createdAt),
       size: input.blob.size,
     };
   });

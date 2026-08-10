@@ -21,7 +21,7 @@ function createRect(options: {
   if (options.role !== undefined) {
     rect.sniptaleRole = options.role;
   }
-  rect.sniptaleType = options.type ?? 'rectangle';
+  rect.sniptaleType = options.type ?? 'shape';
   rect.isOnScreen = () => true;
   rect.setCoords();
   return rect;
@@ -78,7 +78,7 @@ function createGroupTargetFixtures() {
     height: 18,
     strokeWidth: 0,
   });
-  nestedEditable.sniptaleType = 'rectangle';
+  nestedEditable.sniptaleType = 'shape';
   const selectedGroup = new Group([selectedChild]);
   const nestedGroup = new Group([nestedEditable]);
   const siblingGroup = new Group([siblingChild, nestedGroup]);

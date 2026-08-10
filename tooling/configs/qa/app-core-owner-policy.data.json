@@ -12,8 +12,23 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/gradient-preset-resources",
+      "ownerId": "app-core.gradient-preset-resources",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/surface-style-preset-resources",
+      "ownerId": "composition.surface-style-preset-resources",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/voice-input",
       "ownerId": "app-core.voice-input",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/contracts/aggregate-promotion.ts",
+      "ownerId": "app-core.aggregate-promotion-contract",
       "ownerClass": "app-core"
     },
     {
@@ -54,6 +69,11 @@
     {
       "sourcePrefix": "apps/extension/src/features/ai",
       "ownerId": "feature.ai",
+      "ownerClass": "feature"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/features/drawing",
+      "ownerId": "feature.drawing",
       "ownerClass": "feature"
     },
     {
@@ -142,6 +162,16 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/drawing-tools",
+      "ownerId": "app-core.editor-controls.drawing",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/paint-selector",
+      "ownerId": "app-core.editor-controls.paint",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/command-palette",
       "ownerId": "app-core.command-palette-ui",
       "ownerClass": "app-core"
@@ -167,6 +197,21 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/annotation-template-query",
+      "ownerId": "app-core.annotation-template-query-ui",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/callout-background-settings",
+      "ownerId": "ui.callout-background-settings",
+      "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/ui/surface-style-selector",
+      "ownerId": "ui.surface-style-selector",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/keyboard",
       "ownerId": "app-core.keyboard-ui",
       "ownerClass": "app-core"
@@ -185,6 +230,11 @@
       "sourcePrefix": "apps/extension/src/ui/theme",
       "ownerId": "app-core.theme-ui",
       "ownerClass": "app-core"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/workflows/aggregate-editor-presence",
+      "ownerId": "workflow.aggregate-editor-presence",
+      "ownerClass": "workflow"
     },
     {
       "sourcePrefix": "apps/extension/src/workflows/ai-session",
@@ -237,6 +287,11 @@
       "ownerClass": "workflow"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/annotation-template-tags",
+      "ownerId": "persistence.annotation-template-tags",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/ai-settings",
       "ownerId": "persistence.ai-settings",
       "ownerClass": "persistence"
@@ -267,6 +322,11 @@
       "ownerClass": "persistence"
     },
     {
+      "sourcePrefix": "apps/extension/src/composition/persistence/drawing-palette",
+      "ownerId": "persistence.drawing-palette",
+      "ownerClass": "persistence"
+    },
+    {
       "sourcePrefix": "apps/extension/src/composition/persistence/editor-bootstrap",
       "ownerId": "persistence.editor-bootstrap",
       "ownerClass": "persistence"
@@ -277,13 +337,33 @@
       "ownerClass": "persistence"
     },
     {
-      "sourcePrefix": "apps/extension/src/composition/persistence/editor-sessions",
-      "ownerId": "persistence.editor-sessions",
+      "sourcePrefix": "apps/extension/src/composition/persistence/image-workspaces",
+      "ownerId": "persistence.image-workspaces",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/aggregate-presentations",
+      "ownerId": "persistence.aggregate-presentations",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/image-aggregates",
+      "ownerId": "persistence.image-aggregates",
       "ownerClass": "persistence"
     },
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/highlighter",
       "ownerId": "persistence.highlighter",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/gradient-presets",
+      "ownerId": "persistence.gradient-presets",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/surface-style-presets",
+      "ownerId": "persistence.surface-style-presets",
       "ownerClass": "persistence"
     },
     {
@@ -294,6 +374,11 @@
     {
       "sourcePrefix": "apps/extension/src/composition/persistence/infrastructure",
       "ownerId": "persistence.infrastructure",
+      "ownerClass": "persistence"
+    },
+    {
+      "sourcePrefix": "apps/extension/src/composition/persistence/library-lifecycle",
+      "ownerId": "persistence.library-lifecycle",
       "ownerClass": "persistence"
     },
     {
@@ -404,6 +489,11 @@
       "stateKind": "authoritative-adapter"
     },
     {
+      "id": "annotation-template-tags",
+      "path": "apps/extension/src/composition/persistence/annotation-template-tags",
+      "stateKind": "authoritative-durable"
+    },
+    {
       "id": "ai-settings-secrets",
       "path": "apps/extension/src/composition/persistence/ai-settings",
       "stateKind": "authoritative-sensitive"
@@ -444,13 +534,33 @@
       "stateKind": "authoritative-durable"
     },
     {
-      "id": "editor-sessions",
-      "path": "apps/extension/src/composition/persistence/editor-sessions",
-      "stateKind": "recovery-session"
+      "id": "image-workspaces",
+      "path": "apps/extension/src/composition/persistence/image-workspaces",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "aggregate-presentations",
+      "path": "apps/extension/src/composition/persistence/aggregate-presentations",
+      "stateKind": "rebuildable-cache"
+    },
+    {
+      "id": "image-aggregates",
+      "path": "apps/extension/src/composition/persistence/image-aggregates",
+      "stateKind": "authoritative-durable"
     },
     {
       "id": "highlighter",
       "path": "apps/extension/src/composition/persistence/highlighter",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "gradient-presets",
+      "path": "apps/extension/src/composition/persistence/gradient-presets",
+      "stateKind": "authoritative-durable"
+    },
+    {
+      "id": "surface-style-presets",
+      "path": "apps/extension/src/composition/persistence/surface-style-presets",
       "stateKind": "authoritative-durable"
     },
     {
@@ -630,6 +740,7 @@
   ],
   "featurePublicEntrypoints": [
     "apps/extension/src/features/ai/schemas/public.ts",
+    "apps/extension/src/features/drawing/public.ts",
     "apps/extension/src/features/editor/document/public.ts",
     "apps/extension/src/features/highlighter/contracts/index.ts",
     "apps/extension/src/features/highlighter/style/public.ts",
@@ -642,12 +753,17 @@
     ]
   ],
   "retainedAppUiRoots": [
+    "apps/extension/src/ui/annotation-template-query",
     "apps/extension/src/ui/color-selector",
+    "apps/extension/src/ui/drawing-tools",
     "apps/extension/src/ui/command-palette",
     "apps/extension/src/ui/compact-inspector-controls",
     "apps/extension/src/ui/glass-select",
     "apps/extension/src/ui/gradient-preset-grid",
     "apps/extension/src/ui/highlighter-preset-editor",
+    "apps/extension/src/ui/callout-background-settings",
+    "apps/extension/src/ui/surface-style-selector",
+    "apps/extension/src/ui/paint-selector",
     "apps/extension/src/ui/keyboard",
     "apps/extension/src/ui/page-bootstrap",
     "apps/extension/src/ui/popup-shell",

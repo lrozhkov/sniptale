@@ -7,6 +7,11 @@ import {
   commitFrameAnnotationProxy,
   readFrameAnnotationSnapshot,
 } from '../../../../frame-annotation/proxy';
+import {
+  readEditorDrawingObject,
+  translateEditorDrawingObject,
+  writeEditorDrawingObject,
+} from '../../../../drawing/object/metadata';
 
 async function cloneEditorSelectionObject(args: {
   object: FabricObject;
@@ -20,6 +25,13 @@ async function cloneEditorSelectionObject(args: {
     top: (clone.top ?? 0) + 24,
   });
   clone.sniptaleId = crypto.randomUUID();
+  const drawing = readEditorDrawingObject(clone);
+  if (drawing) {
+    writeEditorDrawingObject(
+      clone,
+      translateEditorDrawingObject(drawing, { x: 24, y: 24 }, clone.sniptaleId)
+    );
+  }
   const frameSnapshot = readFrameAnnotationSnapshot(args.object);
   if (frameSnapshot) {
     commitFrameAnnotationProxy(clone, {

@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   browserTabsCreateMock: vi.fn(),
-  createEditorSessionIdMock: vi.fn(() => 'session-1'),
   getActiveTabIdMock: vi.fn(async () => 42),
   getUrlMock: vi.fn((relativePath: string) => `chrome-extension://test/${relativePath}`),
   sendRuntimeMessageMock: vi.fn(),
@@ -25,13 +24,8 @@ vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
   },
 }));
 
-vi.mock('@sniptale/platform/security/secure-random-id', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/security/secure-random-id')>()),
-  createSecureRandomUuid: mocks.createEditorSessionIdMock,
-}));
-
 vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
-  buildEditorUrl: ({ sessionId }: { sessionId: string }) => `editor://${sessionId}`,
+  buildEditorUrl: () => 'editor://root',
 }));
 
 vi.mock('../../../platform/navigation/extension-pages/scenario-editor', () => ({
@@ -68,7 +62,6 @@ import { installPopupRuntimeMessagingMock } from '../runtime/services.test-suppo
 
 function resetPopupUtilsMocks() {
   mocks.browserTabsCreateMock.mockReset();
-  mocks.createEditorSessionIdMock.mockClear();
   mocks.getActiveTabIdMock.mockClear();
   mocks.getUrlMock.mockClear();
   mocks.sendRuntimeMessageMock.mockReset();
@@ -87,7 +80,7 @@ function verifiesExtensionPageNavigation() {
   openSettings();
   openGithubRepository();
 
-  expect(mocks.browserTabsCreateMock).toHaveBeenCalledWith({ url: 'editor://session-1' });
+  expect(mocks.browserTabsCreateMock).toHaveBeenCalledWith({ url: 'editor://root' });
   expect(mocks.browserTabsCreateMock).toHaveBeenCalledWith({
     url: 'scenario-editor://root',
   });

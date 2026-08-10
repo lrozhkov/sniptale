@@ -4,6 +4,7 @@ import { disableNavigationLock, enableNavigationLock } from '../../../selection/
 
 export function resolveToolbarNavigationLockMode(params: {
   designReviewMode: boolean;
+  drawingMode: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
   screenshotMode: boolean;
@@ -12,6 +13,10 @@ export function resolveToolbarNavigationLockMode(params: {
 }): boolean | null {
   if (params.aiPickMode) {
     return true;
+  }
+
+  if (params.drawingMode) {
+    return null;
   }
 
   if (params.designReviewMode || params.highlighterMode || params.quickEditMode) {
@@ -32,6 +37,7 @@ export function resolveToolbarNavigationLockMode(params: {
 export function useToolbarManagedNavigationEffect(params: {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   quickEditMode: boolean;
@@ -44,6 +50,7 @@ export function useToolbarManagedNavigationEffect(params: {
   const {
     aiPickMode,
     designReviewMode,
+    drawingMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -55,6 +62,7 @@ export function useToolbarManagedNavigationEffect(params: {
   } = params;
   const nextLockMode = resolveToolbarNavigationLockMode({
     designReviewMode,
+    drawingMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -71,6 +79,7 @@ export function useToolbarManagedNavigationEffect(params: {
   }, [
     aiPickMode,
     designReviewMode,
+    drawingMode,
     highlighterMode,
     isCursorMode,
     quickEditMode,
@@ -108,6 +117,7 @@ function syncToolbarManagedNavigation(params: {
 export function resolveToolbarLockPresentation(params: {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode: boolean;
   highlighterMode: boolean;
   isCursorMode: boolean;
   navigationLockEnabled: boolean;
@@ -118,6 +128,7 @@ export function resolveToolbarLockPresentation(params: {
   const lockDisabled =
     !params.screenshotMode ||
     params.isCursorMode ||
+    params.drawingMode ||
     params.designReviewMode ||
     params.highlighterMode ||
     params.quickEditMode ||

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ColorField, ToggleGrid } from '../../../chrome/ui';
-import { buildShapeColorControlProps } from '../brush-shape-sections/shared';
+import { buildShapeColorControlProps } from '../shape-color-control';
 import { TextIconOptionButtons } from '../text-option-buttons';
 import { CollapsibleSection, NumberField, RangeField, SelectField } from './fields';
 import { VerticalTextAlignIcon } from './text-icons';

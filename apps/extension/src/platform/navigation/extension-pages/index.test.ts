@@ -107,7 +107,7 @@ describe('extension page editor helpers', () => {
     await openImageEditorPage();
 
     expect(browserTabsCreateMock).toHaveBeenCalledWith({
-      url: 'chrome-extension://test/apps/extension/src/editor/index.html?session=test-session',
+      url: 'chrome-extension://test/apps/extension/src/editor/index.html',
     });
   });
 });

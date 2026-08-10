@@ -126,8 +126,8 @@ export function useStepBadgePresetPopoverController(isOpen: boolean) {
 
   return {
     catalog: {
-      create: (name: string, settings: StepBadgeTemplateSettings) =>
-        mutate('new', () => createUserStepBadgePreset({ name, settings })),
+      create: (name: string, settings: StepBadgeTemplateSettings, tagIds: readonly string[] = []) =>
+        mutate('new', () => createUserStepBadgePreset({ name, settings, tagIds })),
       error,
       pending,
       presets: catalog?.presets ?? [],

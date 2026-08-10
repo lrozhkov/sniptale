@@ -1,8 +1,6 @@
 import type { Canvas } from 'fabric';
 import { FabricImage, type FabricObject } from 'fabric';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
-import { getTextCalloutDimensions } from '../../objects/annotation/text/callout/dimensions';
-import { isTextbox } from '../core/helpers';
 import {
   createObjectLabel,
   getEditorObjectTypeLabel,
@@ -60,17 +58,6 @@ export function getSourceObject(canvas: Canvas | null): FabricObject | undefined
 }
 
 export function getObjectDimensions(object: FabricObject): { width: number; height: number } {
-  if (
-    isTextbox(object) &&
-    (object.sniptaleType === 'text' || object.sniptaleType === 'meta-stamp')
-  ) {
-    const dimensions = getTextCalloutDimensions(object);
-    return {
-      width: Math.max(1, Math.round(dimensions.width)),
-      height: Math.max(1, Math.round(dimensions.height)),
-    };
-  }
-
   return {
     width: Math.max(1, Math.round(object.getScaledWidth())),
     height: Math.max(1, Math.round(object.getScaledHeight())),

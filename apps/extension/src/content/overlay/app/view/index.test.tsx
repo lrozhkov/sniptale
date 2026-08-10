@@ -62,6 +62,7 @@ function createModeController() {
     handleEnableCursorMode: vi.fn(),
     handleHideToolbar: vi.fn(),
     handleToggleHighlighterMode: vi.fn(),
+    handleToggleDrawingMode: vi.fn(),
     handleToggleNavigationLock: vi.fn(),
     handleToggleQuickEditDocumentMode: vi.fn(),
     handleToggleQuickEditMode: vi.fn(),
@@ -75,6 +76,7 @@ function createModeState() {
     captureAction: 'download_default' as const,
     currentViewport: null,
     highlighterMode: false,
+    drawingMode: false,
     isCompletelyHidden: false,
     isToolbarVisible: true,
     pinToTab: false,
@@ -141,6 +143,7 @@ function createViewModel() {
   };
   return {
     aiController: createAiController(),
+    drawingController: { kind: 'drawing-controller' },
     frameManager: {
       frames: [{ id: 'frame-1' }, { id: 'frame-2' }],
       getFutureFrameStyle: vi.fn(() => futureFrameStyle),
@@ -200,6 +203,11 @@ async function verifiesGroupedLayoutProps() {
   );
   expect(firstCall?.[0].toolbar.setFutureFrameEffectMode).toBe(
     viewModel.frameManager.setFutureFrameEffectMode
+  );
+  expect(firstCall?.[0].toolbar.drawingController).toBe(viewModel.drawingController);
+  expect(firstCall?.[0].toolbar.modes.drawingMode).toBe(false);
+  expect(firstCall?.[0].toolbar.modeController.handleToggleDrawingMode).toBe(
+    viewModel.modeController.handleToggleDrawingMode
   );
 }
 

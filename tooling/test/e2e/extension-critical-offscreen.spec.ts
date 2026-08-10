@@ -119,6 +119,8 @@ function createFrameRasterSnapshotFixture() {
   const callout = createDefaultFrameCallout();
   callout.content.bodyHtml = 'Тест';
   callout.style.surface.textColor = '#ef4444';
+  callout.style.surface.fillPaint = { kind: 'solid', color: '#0f172acc' };
+  callout.style.customCss = '[card]\nbackdrop-filter: blur(16px) saturate(1.2) brightness(1.04);';
   callout.style.surface.shadow = 0;
   callout.style.surface.borderColor = '#f97316';
   callout.style.surface.borderWidth = 1;
@@ -186,6 +188,8 @@ function assertFrameRasterResult(result: {
   red: number;
   size: number;
   whiteBadgeOutline: number;
+  glassInteriorAdjacentDelta: number;
+  sourceAdjacentDelta: number;
 }) {
   expect(result.elapsedMs).toBeLessThan(15_000);
   expect(result.size).toBeGreaterThan(500);
@@ -204,6 +208,8 @@ function assertFrameRasterResult(result: {
   expect(result.calloutRedTop).toBeGreaterThan(result.calloutDarkTop + 8);
   expect(result.calloutRedBottom).toBeLessThan(result.calloutDarkBottom - 8);
   expect(result.whiteBadgeOutline).toBeGreaterThan(80);
+  expect(result.sourceAdjacentDelta).toBeGreaterThan(35);
+  expect(result.glassInteriorAdjacentDelta).toBeLessThan(18);
 }
 
 test('offscreen document dispatches OFFSCREEN_READY on boot', async ({ page, hostOrigin }) => {
@@ -341,6 +347,10 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
       if (!context) throw new Error('2D canvas is unavailable');
       context.fillStyle = '#f3f4f6';
       context.fillRect(0, 0, canvas.width, canvas.height);
+      for (let x = 20; x < 180; x += 2) {
+        context.fillStyle = x % 4 === 0 ? '#0066ff' : '#ffdd00';
+        context.fillRect(x, 0, 2, 105);
+      }
       const baseImage = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
@@ -484,6 +494,24 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
         await preview.decode();
         const calloutCloudTop = calloutDarkRowCounts.findIndex((count) => count >= 50);
         const calloutCloudBottom = calloutDarkRowCounts.findLastIndex((count) => count >= 50);
+        const adjacentDeltaAtRow = (row: number) => {
+          let total = 0;
+          let count = 0;
+          const start = Math.max(1, calloutOutlineLeft + 8);
+          const end = Math.min(bitmap.width - 1, calloutOutlineRight - 8);
+          for (let x = start; x <= end; x += 1) {
+            const offset = (row * bitmap.width + x) * 4;
+            const previous = offset - 4;
+            total +=
+              Math.abs(pixels[offset]! - pixels[previous]!) +
+              Math.abs(pixels[offset + 1]! - pixels[previous + 1]!) +
+              Math.abs(pixels[offset + 2]! - pixels[previous + 2]!);
+            count += 3;
+          }
+          return count > 0 ? total / count : Number.POSITIVE_INFINITY;
+        };
+        const glassInteriorAdjacentDelta = adjacentDeltaAtRow(calloutCloudTop + 8);
+        const sourceAdjacentDelta = adjacentDeltaAtRow(195);
         return {
           calloutDark,
           calloutDarkLeft,
@@ -504,6 +532,8 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
           red,
           size: output.size,
           whiteBadgeOutline,
+          glassInteriorAdjacentDelta,
+          sourceAdjacentDelta,
         };
       } finally {
         await send({ type: 'FRAME_ANNOTATION_RASTERIZE', operation: 'cancel', leaseId });

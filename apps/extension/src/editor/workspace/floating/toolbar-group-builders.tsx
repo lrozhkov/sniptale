@@ -26,7 +26,7 @@ export function isToolbarCommand(command: CompactCommand | null): command is Com
   return command !== null;
 }
 
-export function renderToolbarGroupContent(
+function renderToolbarGroupContent(
   commands: CompactCommand[],
   options: { hideValue?: boolean } = {}
 ) {

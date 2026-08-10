@@ -49,7 +49,7 @@ function applyHoverVisualDefaults(
   element.style.clipPath = 'none';
   element.style.boxShadow =
     resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
-  element.style.backgroundColor = visual.fillColor;
+  element.style.background = visual.fillCss;
 }
 
 function applyCanonicalHoverVisual(

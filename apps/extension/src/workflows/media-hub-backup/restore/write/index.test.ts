@@ -70,6 +70,8 @@ function createWriteHarness(): {
       'project_exports',
       'thumbnails',
       'web_snapshots',
+      'image_workspaces',
+      'aggregate_presentations',
     ].map((name) => [name, createHarnessStore()])
   );
 
@@ -139,6 +141,8 @@ it('returns the complete store list needed for import transactions', async () =>
     'web_snapshots',
     'media_library',
     'thumbnails',
+    'image_workspaces',
+    'aggregate_presentations',
   ]);
 });
 

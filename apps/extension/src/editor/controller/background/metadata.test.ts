@@ -74,7 +74,7 @@ it('converts duplicate backgrounds into annotations without background metadata'
   convertBackgroundDuplicateToAnnotation(duplicate);
 
   expect(duplicate.sniptaleRole).toBe('annotation');
-  expect(duplicate.sniptaleType).toBe('rectangle');
+  expect(duplicate.sniptaleType).toBe('shape');
   expect(duplicate.sniptaleBackgroundMode).toBeUndefined();
   expect(duplicate.sniptaleBackgroundColor).toBeUndefined();
 });

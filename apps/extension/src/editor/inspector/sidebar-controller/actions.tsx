@@ -1,181 +1,118 @@
-import type {
-  BrowserFrameState,
-  EditorShapeSettings,
-} from '../../../features/editor/document/types';
-import type { EditorToolSettings } from '../../../features/editor/document/tool-settings-types';
+import type { BrowserFrameState } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
-import { addBorderPreset } from '../../../composition/persistence/highlighter';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
-import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { useEditorController } from '../../application/controller-context';
 import { useEditorStore } from '../../state/useEditorStore';
-import { createBorderPresetFromShapeSettings } from './border-preset';
-import { resolveToolSettingTargets } from './actions.helpers';
-import { createSidebarActionResult } from './action-result';
+import type { EditorRenderedImageOptions } from '../../document/model/render-options';
+import { createStaticSidebarOptions, buildSidebarUtilityActions } from './actions.helpers';
 import { useBorderPresetsState, useRecentColorsState } from './actions.state';
-import { createPresetHeaderActions, useSidebarSelectionPatchActions } from './selection-actions';
+import { useSelectionSettingsHistoryPreview } from './history-preview';
+import {
+  createWorkspaceColorActionForSidebar,
+  createWorkspaceDefaultSaveActionForSidebar,
+} from './workspace-color-action';
 import type { SidebarActionArgs } from './types';
 
-type ShapePatchSelectionActions = {
-  applyPresetPatch: (patch: {
-    shape: Partial<EditorShapeSettings>;
-    step: Partial<EditorToolSettings['step']>;
-  }) => void;
-  applyShapePatch: (patch: Partial<EditorShapeSettings>) => void;
-  applyStepPatch: (patch: Partial<EditorToolSettings['step']>) => void;
-};
-
-function createBrowserFrameSyncAction(args: {
-  controller: ReturnType<typeof useEditorController>;
-  hasImage: boolean;
-  setBrowserFrame: (updates: Partial<BrowserFrameState>) => void;
-}) {
+function createBrowserFrameSyncAction(args: SidebarActionArgs) {
   return async (updates: Partial<BrowserFrameState>) => {
-    const nextBrowserFrame = { ...useEditorStore.getState().browserFrame, ...updates };
-    args.setBrowserFrame(nextBrowserFrame);
-  };
-}
-
-function createShapePresetSaveAction(args: {
-  appendBorderPreset: (preset: BorderPreset) => void;
-  borderPresets: BorderPreset[];
-  selectionPatchActions: Pick<ShapePatchSelectionActions, 'applyShapePatch'>;
-  shapeSettings: EditorShapeSettings;
-}) {
-  return async () => {
-    const preset = createBorderPresetFromShapeSettings(args.shapeSettings, args.borderPresets);
-
-    try {
-      const applied = await addBorderPreset(preset);
-      if (applied === false) {
-        toast.error(translate('editor.compact.saveShapePresetFailed'));
-        return;
-      }
-    } catch {
-      toast.error(translate('editor.compact.saveShapePresetFailed'));
-      return;
-    }
-
-    args.appendBorderPreset(preset);
-    args.selectionPatchActions.applyShapePatch({ borderPresetId: preset.id });
-    toast.success(translate('editor.compact.saveShapePresetSaved'));
-  };
-}
-
-function useSidebarBrowserFrameActions(args: {
-  controller: ReturnType<typeof useEditorController>;
-  hasImage: boolean;
-  setBrowserFrame: SidebarActionArgs['setBrowserFrame'];
-}) {
-  return {
-    insertOrUpdateBrowserFrame: async () => {
-      if (!args.hasImage) {
-        return;
-      }
-
-      await args.controller.applyBrowserFrame(useEditorStore.getState().browserFrame);
-    },
-    syncBrowserFrame: createBrowserFrameSyncAction(args),
-  };
-}
-
-function buildUtilityTargets(args: {
-  selectionPatchActions: Pick<
-    ShapePatchSelectionActions,
-    'applyPresetPatch' | 'applyShapePatch' | 'applyStepPatch'
-  >;
-  targets: ReturnType<typeof resolveToolSettingTargets>;
-}) {
-  return {
-    ...args.targets,
-    preset: args.selectionPatchActions.applyPresetPatch,
-    shape: args.selectionPatchActions.applyShapePatch,
-    step: args.selectionPatchActions.applyStepPatch,
-  };
-}
-
-function useSidebarToolActions(args: {
-  appendBorderPreset: (preset: BorderPreset) => void;
-  borderPresets: BorderPreset[];
-  controller: ReturnType<typeof useEditorController>;
-  shapeSettings: EditorShapeSettings;
-  sidebarArgs: SidebarActionArgs;
-  targets: ReturnType<typeof resolveToolSettingTargets>;
-}) {
-  const { selectionPatchActions, selectionSettingsEnabled } = useSidebarSelectionPatchActions({
-    activeTool: args.sidebarArgs.activeTool,
-    controller: args.controller,
-    shapeTool: args.sidebarArgs.shapeTool,
-    selection: args.sidebarArgs.selection,
-    targets: args.targets,
-    textSettings: args.sidebarArgs.textSettings,
-    updateShapeSettings: args.sidebarArgs.updateShapeSettings,
-    updateStepSettings: args.sidebarArgs.updateStepSettings,
-  });
-  const presetHeaderActions = createPresetHeaderActions({
-    controller: args.controller,
-    selectionSettingsEnabled,
-    updateBlurSettings: args.sidebarArgs.updateBlurSettings,
-    updateArrowSettings: args.sidebarArgs.updateArrowSettings,
-    updateBrushSettings: args.sidebarArgs.updateBrushSettings,
-    updateSelectionBlurSettings: args.sidebarArgs.updateSelectionBlurSettings,
-    updateSelectionArrowSettings: args.sidebarArgs.updateSelectionArrowSettings,
-    updateSelectionBrushSettings: args.sidebarArgs.updateSelectionBrushSettings,
-    updateSelectionShapeSettings: args.sidebarArgs.updateSelectionShapeSettings,
-    updateSelectionStepSettings: args.sidebarArgs.updateSelectionStepSettings,
-    updateSelectionTextSettings: args.sidebarArgs.updateSelectionTextSettings,
-    updateShapeSettings: args.sidebarArgs.updateShapeSettings,
-    updateStepSettings: args.sidebarArgs.updateStepSettings,
-    updateTextSettings: args.sidebarArgs.updateTextSettings,
-  });
-
-  return {
-    saveShapeAsHighlighterPreset: createShapePresetSaveAction({
-      appendBorderPreset: args.appendBorderPreset,
-      borderPresets: args.borderPresets,
-      selectionPatchActions,
-      shapeSettings: args.shapeSettings,
-    }),
-    selectionPatchActions: {
-      ...selectionPatchActions,
-      ...presetHeaderActions,
-    },
-    utilityTargets: buildUtilityTargets({ selectionPatchActions, targets: args.targets }),
+    args.setBrowserFrame({ ...useEditorStore.getState().browserFrame, ...updates });
   };
 }
 
 export function useEditorInspectorSidebarActions(args: SidebarActionArgs, hasImage: boolean) {
   const controller = useEditorController();
-  const { appendBorderPreset, borderPresets, defaultBorderPresetId } = useBorderPresetsState();
+  const { borderPresets, defaultBorderPresetId } = useBorderPresetsState();
   const { recentColors, rememberRecentColor } = useRecentColorsState();
-  const targets = resolveToolSettingTargets(args);
-  const { saveShapeAsHighlighterPreset, selectionPatchActions, utilityTargets } =
-    useSidebarToolActions({
-      appendBorderPreset,
-      borderPresets,
-      controller,
-      shapeSettings: args.shapeSettings,
-      sidebarArgs: args,
-      targets,
-    });
-  const { insertOrUpdateBrowserFrame, syncBrowserFrame } = useSidebarBrowserFrameActions({
+  const selectionSettingsEnabled =
+    args.selection.hasSelection && !args.selection.selectedObjectLocked;
+  const historyPreview = useSelectionSettingsHistoryPreview({
     controller,
+    selectionSettingsEnabled,
+  });
+  const syncBrowserFrame = createBrowserFrameSyncAction(args);
+
+  const patchStep = (patch: Parameters<typeof args.updateStepSettings>[0]) => {
+    if (args.selection.selectedObjectType === 'step') {
+      args.updateSelectionStepSettings(patch);
+      controller.applyActiveSettingsToSelection();
+    } else {
+      args.updateStepSettings(patch);
+      controller.refreshActiveToolSettingsPreview();
+    }
+  };
+  const patchImage = (patch: Parameters<typeof args.updateImageSettings>[0]) => {
+    if (
+      args.selection.selectedObjectType === 'image' ||
+      args.selection.selectedObjectType === 'source-image' ||
+      args.selection.selectedObjectType === 'background'
+    ) {
+      args.updateSelectionImageSettings(patch);
+      controller.applyActiveSettingsToSelection();
+    } else {
+      args.updateImageSettings(patch);
+    }
+  };
+  const utility = buildSidebarUtilityActions({
+    controller,
+    confirmOpenStorageManager: args.confirmOpenStorageManager,
+    defaultImagePresetId: args.defaultImagePresetId,
     hasImage,
-    setBrowserFrame: args.setBrowserFrame,
+    rememberRecentColor,
+    savePresets: args.savePresets,
+    setFrameDraft: args.setFrameDraft,
+    syncBrowserFrame,
   });
 
-  return createSidebarActionResult({
+  const selectionActions = {
+    applyImagePatch: (patch: Parameters<typeof patchImage>[0]) => {
+      patchImage(patch);
+      if (selectionSettingsEnabled) controller.commitHistory();
+    },
+    previewImagePatch: (patch: Parameters<typeof patchImage>[0]) =>
+      historyPreview.previewSelectionSettings(() => patchImage(patch)),
+    applyStepPatch: (patch: Parameters<typeof patchStep>[0]) => {
+      patchStep(patch);
+      if (selectionSettingsEnabled) controller.commitHistory();
+    },
+    previewStepPatch: (patch: Parameters<typeof patchStep>[0]) =>
+      historyPreview.previewSelectionSettings(() => patchStep(patch)),
+    commitPendingSelectionSettings: historyPreview.commitPendingSelectionSettings,
+    applyTextStyle: (command: Parameters<typeof controller.applyTextSelectionStyle>[0]) => {
+      controller.applyTextSelectionStyle(command);
+    },
+  };
+  const catalogActions = {
+    applyWorkspaceColor: createWorkspaceColorActionForSidebar(args, rememberRecentColor),
+    saveWorkspaceColorAsDefault: createWorkspaceDefaultSaveActionForSidebar(args),
+    borderPresetOptions: borderPresets
+      .filter((preset) => preset.enabled !== false)
+      .map((preset) => ({ label: preset.name, value: preset.id })),
     borderPresets,
     defaultBorderPresetId,
-    controller,
-    hasImage,
     recentColors,
-    rememberRecentColor,
-    saveShapeAsHighlighterPreset,
-    selectionPatchActions,
-    sidebarArgs: args,
-    insertOrUpdateBrowserFrame,
+  };
+  const editorActions = {
+    copyRenderedImageDisabledReason: null,
+    onApplyFrame: () => controller.applyFrameSettings(args.frameDraft),
+    onCopyRenderedImage: async (options?: EditorRenderedImageOptions) => {
+      if (!hasImage) return;
+      try {
+        await controller.copyRenderedImage(options);
+      } catch (error) {
+        toast.error(translate('editor.runtime.copyImageFailed'));
+        throw error;
+      }
+    },
+    insertOrUpdateBrowserFrame: async () => {
+      if (hasImage) await controller.applyBrowserFrame(useEditorStore.getState().browserFrame);
+    },
     syncBrowserFrame,
-    utilityTargets,
-  });
+  };
+  return {
+    catalogActions,
+    editorActions,
+    selectionActions,
+    staticOptions: createStaticSidebarOptions(),
+    utilityActions: utility,
+  };
 }

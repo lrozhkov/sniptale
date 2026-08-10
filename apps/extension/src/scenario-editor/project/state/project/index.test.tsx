@@ -25,7 +25,10 @@ const { getScenarioProjectRecordMock, listScenarioProjectSummariesMock } = vi.ho
   listScenarioProjectSummariesMock: vi.fn(),
 }));
 
-vi.mock('../../../../composition/persistence/scenario/store/public', () => ({
+vi.mock('../../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../composition/persistence/scenario/store/public')
+  >()),
   getScenarioProjectRecord: getScenarioProjectRecordMock,
   listScenarioProjectSummaries: listScenarioProjectSummariesMock,
 }));

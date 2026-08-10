@@ -69,7 +69,6 @@ function registerBlurNormalizationTests() {
 function registerAnnotationNormalizationTests() {
   it('normalizes freehand and step owners through stroke and text geometry resets', () => {
     const pencil = { ...createStrokeTarget(), sniptaleType: 'pencil' };
-    const highlighter = { ...createStrokeTarget(), sniptaleType: 'highlighter' };
     const circle = createStrokeTarget();
     const text = createStepTextTarget();
     const step = {
@@ -85,10 +84,8 @@ function registerAnnotationNormalizationTests() {
     };
 
     expect(normalizeScaledAnnotationTarget(pencil as never)).toBe(true);
-    expect(normalizeScaledAnnotationTarget(highlighter as never)).toBe(true);
     expect(normalizeScaledAnnotationTarget(step as never)).toBe(true);
     expect(pencil.strokeUniform).toBe(true);
-    expect(highlighter.strokeUniform).toBe(true);
     expect(circle.strokeUniform).toBe(true);
     expect(step.scaleX).toBe(1);
     expect(step.scaleY).toBe(1);

@@ -79,7 +79,7 @@ function createDocument(): EditorDocument {
     sourceName: 'source.png',
     sourceTop: 90,
     sourceWidth: 500,
-    version: 1 as const,
+    version: 2 as const,
   };
 }
 
@@ -98,73 +98,6 @@ function setupDocumentMocks() {
 function runSerializeCanvasEmptySuite() {
   it('serializes only user canvas objects and falls back to the empty payload', () => {
     expect(serializeCanvasObjects(null)).toBe('{"empty":true}');
-  });
-}
-
-function createSerializedTextObject() {
-  return {
-    keep: true,
-    toObject: vi.fn(() => ({
-      id: 'keep',
-      sniptaleTextBackgroundOpacity: 0.6,
-      sniptaleTextCalloutFormat: 'bubble',
-      sniptaleTextCalloutHeight: 92,
-      sniptaleTextCalloutShadow: 30,
-      sniptaleTextCalloutWidth: 340,
-      sniptaleTextVerticalAlign: 'bottom',
-      styles: { 0: { 1: { fontStyle: 'italic', underline: true } } },
-    })),
-  };
-}
-
-function expectSerializedCalloutMetadata(result: string) {
-  expect(JSON.parse(result)).toEqual({
-    objects: [
-      {
-        id: 'keep',
-        sniptaleTextBackgroundOpacity: 0.6,
-        sniptaleTextCalloutFormat: 'bubble',
-        sniptaleTextCalloutHeight: 92,
-        sniptaleTextCalloutShadow: 30,
-        sniptaleTextCalloutWidth: 340,
-        sniptaleTextVerticalAlign: 'bottom',
-        styles: { 0: { 1: { fontStyle: 'italic', underline: true } } },
-      },
-    ],
-    version: '7.2.0',
-  });
-}
-
-function runSerializeCanvasCalloutMetadataSuite() {
-  it('keeps editor text callout metadata in serialized user objects', () => {
-    const keepObject = createSerializedTextObject();
-    const skippedObject = {
-      keep: false,
-      toObject: vi.fn(() => ({ id: 'skip' })),
-    };
-
-    const result = serializeCanvasObjects({
-      getObjects: () => [keepObject, skippedObject],
-    } as never);
-
-    expectSerializedCalloutMetadata(result);
-    expect(keepObject.toObject).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        'sniptaleId',
-        'sniptaleBlurStrokeColor',
-        'sniptaleBlurStrokeWidth',
-        'sniptaleTextBackgroundOpacity',
-        'sniptaleTextCalloutFormat',
-        'sniptaleTextCalloutHeight',
-        'sniptaleTextCalloutShadow',
-        'sniptaleTextCalloutWidth',
-        'sniptaleTextVerticalAlign',
-      ])
-    );
-    expect(keepObject.toObject).toHaveBeenCalledWith(
-      expect.not.arrayContaining(['sniptaleTextVariant'])
-    );
-    expect(skippedObject.toObject).not.toHaveBeenCalled();
   });
 }
 
@@ -282,7 +215,6 @@ function runPrepareAppliedDocumentFallbackSuite() {
 describe('editor-controller-document', () => {
   beforeEach(setupDocumentMocks);
   runSerializeCanvasEmptySuite();
-  runSerializeCanvasCalloutMetadataSuite();
   runCreateBaseDocumentSuite();
   runPrepareAppliedDocumentStateSuite();
   runPrepareAppliedDocumentFallbackSuite();

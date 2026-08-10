@@ -188,7 +188,7 @@ function ScenarioV3AiPanelMount(props: {
       onSubmit={createScenarioEditorDeckAiSubmitAction({
         aiState: props.aiState,
         applyProject: props.editor.projectActions.applyProject,
-        getCurrentProject: props.editor.getCurrentProject,
+        getCurrentProject: props.editor.projectActions.getCurrentProject,
         project: props.editor.project,
         selectedSlideId: props.editor.selectedSlide.id,
         templates: props.templates,

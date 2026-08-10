@@ -54,6 +54,7 @@ function createSelectionVisual(
     customCss: '',
     customCssStyles: { outlineOffset: '2px' },
     fillColor: '#c084fc4d',
+    fillCss: '#c084fc4d',
     id: 'preset-1',
     inheritCustomCss: true,
     padding: { bottom: 4, left: 4, right: 4, top: 4 },

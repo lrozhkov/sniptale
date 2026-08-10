@@ -13,6 +13,7 @@ export type GalleryFolderCounts = Record<Exclude<FolderFilter, 'web-snapshot'>, 
 };
 
 export type SortMode = 'newest' | 'oldest' | 'size';
+export type GalleryScope = 'library' | 'temporary';
 export type GalleryViewMode = 'list' | 'compact-grid' | 'large-grid';
 
 export interface GalleryGridMetrics {

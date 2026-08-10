@@ -22,7 +22,7 @@ import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,asset',
     sourceName: null,
     sourceWidth: 320,
@@ -95,8 +95,8 @@ beforeEach(() => {
   initDBMock.mockResolvedValue({
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
-        get: txGetMock,
+      objectStore: vi.fn((storeName: string) => ({
+        get: storeName === 'scenario_projects' ? txGetMock : vi.fn(),
         put: txPutMock,
       })),
     })),
@@ -126,7 +126,13 @@ async function verifyArtifactPersistenceWithDocument() {
     id: project.id,
     project: { ...project, updatedAt: 11 },
     createdAt: project.createdAt,
+    lifecycle: {
+      savedAt: 10,
+      storageClass: 'library',
+      updatedAt: 11,
+    },
     updatedAt: 11,
+    workspaceRevision: 1,
   });
   expect(txPutMock).toHaveBeenNthCalledWith(3, {
     stepId: 'step-1',

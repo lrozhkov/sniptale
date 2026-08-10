@@ -6,7 +6,7 @@ import {
   type EditorSessionAutosaveService,
 } from '../../document/session-autosave';
 import {
-  ensureEditorPageSessionId,
+  ensureEditorPageAggregateId,
   readEditorPageLocationState,
   resolveEditorPageRestoreSource,
 } from '../../document/page-session';
@@ -52,7 +52,6 @@ async function openRestoredEditorAsset(
   services: EditorPageServices
 ) {
   services.autosaveService.updateContext({
-    assetId: restoreSource.assetId,
     sourceUrl: restoreSource.sourceUrl,
     sourceTitle: restoreSource.sourceTitle,
   });
@@ -66,11 +65,11 @@ async function openRestoredEditorAsset(
 
 export function resolveEditorPageSessionSeed() {
   const locationState = readEditorPageLocationState();
-  const sessionId = ensureEditorPageSessionId(locationState);
+  const aggregateId = ensureEditorPageAggregateId(locationState);
 
   return {
     locationState,
-    sessionId,
+    aggregateId,
   };
 }
 
@@ -92,11 +91,12 @@ export async function openEditorBootstrapPayload(
   services: EditorPageServices
 ): Promise<void> {
   const bootstrapRevision = beginEditorPageBootstrapRevision(services);
-  const { locationState, sessionId } = resolveEditorPageSessionSeed();
+  const { aggregateId } = resolveEditorPageSessionSeed();
 
   services.autosaveService.activate({
-    sessionId,
-    assetId: locationState.assetId,
+    aggregateId,
+    durableRevision: 0,
+    renderPresentation: () => services.controller.renderForExport({ format: 'png', quality: 1 }),
     sourceUrl: payload.url ?? '',
     sourceTitle: payload.title ?? '',
   });
@@ -128,18 +128,19 @@ export async function bootstrapEditorPageSession(
   services: EditorPageServices
 ): Promise<void> {
   const bootstrapRevision = beginEditorPageBootstrapRevision(services);
-  const { locationState, sessionId } = resolveEditorPageSessionSeed();
+  const { aggregateId, locationState } = resolveEditorPageSessionSeed();
 
   services.autosaveService.activate({
-    sessionId,
-    assetId: locationState.assetId,
+    aggregateId,
+    durableRevision: 0,
+    renderPresentation: () => services.controller.renderForExport({ format: 'png', quality: 1 }),
     sourceUrl: null,
     sourceTitle: null,
   });
 
   const restoreSource = await resolveEditorPageRestoreSource(
     locationState,
-    sessionId,
+    aggregateId,
     services.autosaveService
   );
   if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {

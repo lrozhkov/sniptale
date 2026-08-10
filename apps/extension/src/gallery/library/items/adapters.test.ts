@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createGalleryItems } from './adapters';
 import { isGalleryMediaItem, isGallerySelectableItem, isGalleryVideoProjectItem } from './types';
+import { createLibraryLifecycle } from '../../../composition/persistence/library-lifecycle';
 
 function createMediaLibraryItem() {
   return {
@@ -30,6 +31,7 @@ it('creates a mixed gallery list with scenario and export items sorted by freshn
     name: 'Scenario',
     createdAt: 20,
     updatedAt: 25,
+    lifecycle: createLibraryLifecycle('temporary', 25),
     tags: ['flow'],
   };
   const exportEntry = {
@@ -43,6 +45,15 @@ it('creates a mixed gallery list with scenario and export items sorted by freshn
 
   const items = createGalleryItems({
     mediaItems: [createMediaLibraryItem()],
+    presentations: [
+      {
+        aggregateId: 'project-1',
+        aggregateKind: 'scenario',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['scenario']),
+        updatedAt: 25,
+      },
+    ],
     scenarioExportsByProjectId: new Map([[scenarioProject.id, [exportEntry]]]),
     scenarioProjects: [scenarioProject],
     thumbnailIds: new Set(['scenario:project-1', 'scenario-export:export-1']),
@@ -62,6 +73,7 @@ function expectMixedGalleryItems(items: ReturnType<typeof createGalleryItems>): 
     filename: 'scenario.html',
     hasThumbnail: true,
     kind: 'scenario-export',
+    lifecycle: { storageClass: 'temporary' },
     tags: ['flow'],
     type: 'scenario-export',
   });
@@ -103,6 +115,15 @@ it('keeps scenario projects in the gallery even when exports or tags are missing
 it('creates video project gallery items with stable project thumbnails', () => {
   const items = createGalleryItems({
     mediaItems: [],
+    presentations: [
+      {
+        aggregateId: 'project-1',
+        aggregateKind: 'video-project',
+        presentationRevision: 0,
+        thumbnailBlob: new Blob(['video']),
+        updatedAt: 20,
+      },
+    ],
     scenarioExportsByProjectId: new Map(),
     scenarioProjects: [],
     thumbnailIds: new Set(['video-project:project-1']),
@@ -119,6 +140,7 @@ it('creates video project gallery items with stable project thumbnails', () => {
         trackCount: 1,
         thumbnailId: 'video-project:project-1',
         thumbnailSourceMediaId: 'recording:recording-1',
+        retentionKind: 'video',
       },
     ],
   });

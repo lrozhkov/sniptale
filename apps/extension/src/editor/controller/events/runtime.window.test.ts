@@ -133,30 +133,6 @@ it('does not try embedded rich shape editing outside select mode or without a ta
   expect(mocks.handleEditorDoubleClick).toHaveBeenCalledOnce();
 });
 
-it('passes raster clipboard command ownership into the keyboard input seam', () => {
-  const bindings = createBindings();
-  const handler = createRuntimeWindowKeyDownHandler(bindings as never);
-  const event = new KeyboardEvent('keydown', { code: 'KeyV', ctrlKey: true, key: 'v' });
-  const preventDefault = vi.spyOn(event, 'preventDefault');
-
-  handler(event);
-
-  expect(mocks.handleEditorWindowKeyDown).toHaveBeenCalledWith(
-    expect.objectContaining({
-      activeTool: 'selection',
-      copyRasterSelection: bindings.copyRasterSelection,
-      cutRasterSelection: bindings.cutRasterSelection,
-      deleteRasterSelectionPixels: bindings.deleteRasterSelectionPixels,
-      hasDrawSession: false,
-      hasRasterSelection: true,
-      pasteRasterClipboard: bindings.pasteRasterClipboard,
-      applyTextSelectionStyle: bindings.applyTextSelectionStyle,
-    })
-  );
-  expect(preventDefault).toHaveBeenCalledOnce();
-  expect(bindings.syncRuntimeState).not.toHaveBeenCalled();
-});
-
 it('omits optional text formatting ownership when the binding is unavailable', () => {
   const bindings = createBindings();
   delete (bindings as { applyTextSelectionStyle?: unknown }).applyTextSelectionStyle;

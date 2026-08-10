@@ -75,7 +75,10 @@ it('merges popover settings into the frame without changing future-callout defau
         ...baseCallout,
         style: {
           ...baseCallout.style,
-          surface: { ...baseCallout.style.surface, backgroundColor: '#f59e0b' },
+          surface: {
+            ...baseCallout.style.surface,
+            fillPaint: { kind: 'solid', color: '#f59e0bff' },
+          },
         },
       },
     }),
@@ -90,13 +93,13 @@ it('merges popover settings into the frame without changing future-callout defau
     frameId: 'frame-1',
     settings: {
       placement: { side: 'bottom' },
-      style: { surface: { backgroundColor: '#10b981' } },
+      style: { surface: { fillPaint: { kind: 'solid', color: '#10b981ff' } } },
     },
   });
 
   expect(frames.getFrames()[0]?.callout).toMatchObject({
     placement: { side: 'bottom' },
-    style: { surface: { backgroundColor: '#10b981' } },
+    style: { surface: { fillPaint: { kind: 'solid', color: '#10b981ff' } } },
   });
   expect(sessionCalloutStyleRef.current).toBe(baseCallout.style);
 });

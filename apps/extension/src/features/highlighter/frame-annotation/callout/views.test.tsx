@@ -57,7 +57,7 @@ it('renders a wide transparent hover corridor around the visible callout connect
     tailSize: 8,
   });
   const style = createDefaultCalloutSettings().style;
-  style.surface.backgroundColor = '#252830';
+  style.surface.fillPaint = { kind: 'solid', color: '#252830ff' };
   style.surface.borderColor = '#ff7a00';
   style.surface.borderStyle = 'dashed';
   style.surface.borderWidth = 3;
@@ -72,7 +72,7 @@ it('renders a wide transparent hover corridor around the visible callout connect
   expect(markup).not.toContain('pointer-events:auto');
   expect(markup).toContain('preserveAspectRatio="xMinYMin meet"');
   expect(markup).toContain('data-ui="content.callout.tail-outline"');
-  expect(markup).toContain('fill="#252830"');
+  expect(markup).toContain('fill="#252830ff"');
   expect(markup).toContain('stroke="#ff7a00"');
   expect(markup).toContain('stroke-dasharray="12 7.5"');
   expect(markup).toContain('stroke-width="3"');

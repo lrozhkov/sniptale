@@ -123,25 +123,6 @@ function registerPanSyncCallbackTest() {
   });
 }
 
-function registerRasterHoverCleanupTest() {
-  it('clears the eraser hover overlay after the pointer leaves the viewport', () => {
-    const bindings = createBindings();
-    const session = bindings.getRasterToolSession();
-    session.hoverCursor = { scenePoint: { x: 24, y: 28 }, tool: 'eraser' };
-    bindings.getActiveTool.mockReturnValue('eraser');
-    const handlers = createPanEventHandlers(bindings as never);
-
-    handlers.handleWindowMouseMove(
-      new MouseEvent('mousemove', {
-        clientX: 120,
-        clientY: 40,
-      })
-    );
-
-    expect(session.hoverCursor).toBeNull();
-  });
-}
-
 function registerWheelZoomTest() {
   it('zooms around the wheel pointer when an image is loaded', () => {
     const bindings = createBindings();
@@ -166,6 +147,5 @@ function registerWheelZoomTest() {
 describe('createPanEventHandlers', () => {
   registerPanLifecycleTest();
   registerPanSyncCallbackTest();
-  registerRasterHoverCleanupTest();
   registerWheelZoomTest();
 });

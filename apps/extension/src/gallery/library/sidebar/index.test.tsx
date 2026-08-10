@@ -22,6 +22,7 @@ vi.mock('./sections', () => ({
     sectionMocks.folderList(props);
     return <div data-ui="test.folder-list" />;
   },
+  GalleryScopePicker: () => <div data-ui="test.scope-picker" />,
   GalleryStorageCard: (props: unknown) => {
     sectionMocks.storageCard(props);
     return <div data-ui="test.storage-card" />;

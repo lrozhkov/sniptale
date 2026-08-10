@@ -1,4 +1,5 @@
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -45,6 +46,9 @@ async function restorePreparedScenarioProject(
   await restoreScenarioExports(tx, prepared);
   await restoreScenarioStepDocuments(tx, prepared);
   await restoreScenarioThumbnails(tx, restoredBlobs, prepared);
+  if (prepared.restoredPresentation) {
+    await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).put(prepared.restoredPresentation);
+  }
 }
 
 async function restoreScenarioAssets(

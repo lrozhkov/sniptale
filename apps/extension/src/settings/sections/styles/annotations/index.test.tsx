@@ -15,6 +15,7 @@ vi.mock('./numbering', async (importOriginal) => ({
   useStepBadgePresetCatalogController: () => ({}),
   StepBadgePresetCatalogSettings: () => <div>numbering-owner</div>,
 }));
+vi.mock('./tags', () => ({ AnnotationTemplateTagsSettings: () => <div>tags-owner</div> }));
 import { AnnotationsSection } from '.';
 
 it('renders only the selected annotation owner', () => {
@@ -34,5 +35,14 @@ it('defaults to borders and renders callouts independently', () => {
   act(() => root.render(<AnnotationsSection view="callouts" />));
   expect(container.textContent).toContain('callouts-owner');
   expect(container.textContent).not.toContain('numbering-owner');
+  act(() => root.unmount());
+});
+
+it('renders the shared tag manager as an independent annotation tab', () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() => root.render(<AnnotationsSection view="tags" />));
+  expect(container.textContent).toContain('tags-owner');
+  expect(container.textContent).not.toContain('borders-owner');
   act(() => root.unmount());
 });

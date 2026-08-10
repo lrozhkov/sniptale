@@ -6,13 +6,9 @@ export type EditorKeyboardAction =
   | 'space-down'
   | 'undo'
   | 'redo'
-  | 'copy-raster-selection'
-  | 'cut-raster-selection'
-  | 'paste-raster-clipboard'
   | 'duplicate-selection'
   | 'exit-text-edit'
   | 'cancel-transient'
-  | 'delete-raster-selection'
   | 'delete-selection'
   | 'apply-crop'
   | 'complete-draw'
@@ -35,5 +31,4 @@ export interface EditorKeyboardResolverOptions {
   isEditingTextboxSelection: boolean;
   hasSelectedTextTarget?: boolean;
   activeTool: string;
-  hasRasterSelection: boolean;
 }

@@ -2,7 +2,7 @@ import type { EditorDocument } from '../../../../features/editor/document/types'
 
 export function createMockDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,abc',
     sourceName: 'source.png',
     sourceWidth: 10,

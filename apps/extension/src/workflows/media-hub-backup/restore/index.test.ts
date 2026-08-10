@@ -277,6 +277,8 @@ describe('media hub backup restore replace orchestration', () => {
       expect.any(Blob),
       null,
       null,
+      null,
+      null,
       null
     );
     expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [entry.id]);

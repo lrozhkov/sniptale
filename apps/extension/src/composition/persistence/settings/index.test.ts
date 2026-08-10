@@ -70,6 +70,16 @@ const DEFAULT_VOICE_INPUT = {
   microphoneDeviceId: null,
   mode: 'local-first' as const,
 };
+const TEMPORARY_STORAGE_POLICY = {
+  cleanupEnabled: true,
+  defaultDestination: 'temporary' as const,
+  draftRetentionDays: 30,
+  videoDraftRetentionDays: 7,
+};
+const LIBRARY_STORAGE_POLICY = {
+  ...TEMPORARY_STORAGE_POLICY,
+  defaultDestination: 'library' as const,
+};
 
 function resetSettingsStorageMocks() {
   vi.clearAllMocks();
@@ -142,6 +152,7 @@ async function verifyLoadMigration() {
     defaultExportPresetId: null,
     imageFormat: 'webp',
     imageQuality: 75,
+    localStoragePolicy: LIBRARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,
@@ -190,6 +201,7 @@ async function verifyStoredSettings() {
     defaultExportPresetId: 'export-7',
     imageFormat: 'png' as const,
     imageQuality: 100,
+    localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     anonymousCrossOriginSnapshotAssetsEnabled: true,
     authenticatedSnapshotAssetsEnabled: false,
@@ -278,6 +290,7 @@ const expectedInvalidStoredSettingsResult = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  localStoragePolicy: LIBRARY_STORAGE_POLICY,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
   voiceInput: DEFAULT_VOICE_INPUT,
   ...PRIVACY_DEFAULTS,
@@ -312,6 +325,7 @@ async function verifyInvalidRootFallback() {
     defaultExportPresetId: null,
     imageFormat: 'png',
     imageQuality: 100,
+    localStoragePolicy: TEMPORARY_STORAGE_POLICY,
     fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE,
     voiceInput: DEFAULT_VOICE_INPUT,
     ...PRIVACY_DEFAULTS,

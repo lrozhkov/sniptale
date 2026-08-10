@@ -1,3 +1,5 @@
+import type { RefObject } from 'react';
+
 const COLOR_SELECTOR_FORMAT_MODES = ['hex', 'rgb', 'hsl'] as const;
 export type ColorSelectorFormatMode = (typeof COLOR_SELECTOR_FORMAT_MODES)[number];
 
@@ -14,6 +16,8 @@ export interface CompactColorSelectorProps {
   allowTransparent?: boolean;
   className?: string;
   disabled?: boolean;
+  floatingBoundaryRef?: RefObject<HTMLElement | null>;
+  floatingPlacement?: 'auto' | 'side';
   label: string;
   onChange: (value: string) => void;
   onOpenChange?: (open: boolean) => void;

@@ -1,127 +1,118 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  findObjectByIdMock: vi.fn(),
-  isEditableObjectMock: vi.fn(() => true),
-  isTextboxMock: vi.fn(() => false),
-  normalizeScaledAnnotationTargetMock: vi.fn(() => false),
-  normalizeScaledRectangleTargetMock: vi.fn(() => false),
-  resizeTextCalloutMock: vi.fn(),
+  findObjectById: vi.fn(),
+  isEditableObject: vi.fn(() => true),
+  isTextbox: vi.fn(() => false),
+  normalizeFrameAnnotationProxyGeometry: vi.fn(),
+  normalizeScaledAnnotationTarget: vi.fn(),
+  normalizeScaledRectangleTarget: vi.fn(() => false),
+  syncEditorDrawingTextObject: vi.fn(),
+  synchronizeEditorDrawingObjectFromFabric: vi.fn(),
+  synchronizeEditorDrawingTextLayout: vi.fn(),
 }));
 
 vi.mock('../../document/layers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../document/layers')>()),
-  findObjectById: mocks.findObjectByIdMock,
+  findObjectById: mocks.findObjectById,
 }));
-
-vi.mock('../../../document/model', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../document/model')>()),
-  isEditableObject: mocks.isEditableObjectMock,
-}));
-
 vi.mock('../../core/helpers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../core/helpers')>()),
-  isTextbox: mocks.isTextboxMock,
+  isTextbox: mocks.isTextbox,
 }));
-
+vi.mock('../../../document/model', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../document/model')>()),
+  isEditableObject: mocks.isEditableObject,
+}));
 vi.mock('../../../objects/shape-style', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../objects/shape-style')>()),
-  normalizeScaledRectangleTarget: mocks.normalizeScaledRectangleTargetMock,
+  normalizeScaledRectangleTarget: mocks.normalizeScaledRectangleTarget,
 }));
-
-vi.mock('../../tools/annotation-resize', () => ({
-  normalizeScaledAnnotationTarget: mocks.normalizeScaledAnnotationTargetMock,
+vi.mock('../../tools/annotation-resize', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../tools/annotation-resize')>()),
+  normalizeScaledAnnotationTarget: mocks.normalizeScaledAnnotationTarget,
 }));
-
-vi.mock('../../../objects/annotation/text/callout/resize', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../objects/annotation/text/callout/resize')>()),
-  resizeTextCallout: mocks.resizeTextCalloutMock,
+vi.mock('../../../frame-annotation/proxy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../frame-annotation/proxy')>()),
+  normalizeFrameAnnotationProxyGeometry: mocks.normalizeFrameAnnotationProxyGeometry,
+}));
+vi.mock('../../../drawing/object/metadata', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../drawing/object/metadata')>()),
+  syncEditorDrawingTextObject: mocks.syncEditorDrawingTextObject,
+  synchronizeEditorDrawingObjectFromFabric: mocks.synchronizeEditorDrawingObjectFromFabric,
+}));
+vi.mock('../../../drawing/object/vector', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../drawing/object/vector')>()),
+  synchronizeEditorDrawingTextLayout: mocks.synchronizeEditorDrawingTextLayout,
 }));
 
 import { resizeLayerObject } from './resize';
 
 function createObject(overrides: Record<string, unknown> = {}) {
   return {
-    getScaledHeight: vi.fn(() => 40),
-    getScaledWidth: vi.fn(() => 80),
-    sniptaleId: 'layer-1',
-    sniptaleLocked: false,
-    sniptaleType: 'rectangle',
+    getScaledHeight: vi.fn(() => 50),
+    getScaledWidth: vi.fn(() => 100),
     scaleX: 1,
     scaleY: 1,
-    set: vi.fn(function set(this: Record<string, unknown>, patch: Record<string, unknown>) {
-      Object.assign(this, patch);
-    }),
+    set: vi.fn(),
     setCoords: vi.fn(),
+    sniptaleLocked: false,
+    sniptaleType: 'shape',
     ...overrides,
   };
 }
 
-function registerTextResizeTest() {
-  it('routes text callout resize through the text owner', () => {
-    const object = createObject({ sniptaleType: 'text' });
+describe('layer resize', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isEditableObject.mockReturnValue(true);
+    mocks.isTextbox.mockReturnValue(false);
+    mocks.normalizeScaledRectangleTarget.mockReturnValue(false);
+  });
+
+  it('resizes vector objects by their scaled dimensions and normalizes geometry', () => {
+    const object = createObject({ scaleX: 2, scaleY: 3 });
     const canvas = { requestRenderAll: vi.fn() };
     const ensureObjectReachable = vi.fn(() => true);
-    mocks.findObjectByIdMock.mockReturnValue(object);
-    mocks.isTextboxMock.mockReturnValue(true);
+    mocks.findObjectById.mockReturnValue(object);
 
-    expect(resizeLayerObject(canvas as never, 'layer-1', 121.7, 37.2, ensureObjectReachable)).toBe(
+    expect(resizeLayerObject(canvas as never, 'shape', 200.2, 25.4, ensureObjectReachable)).toBe(
       object
     );
 
-    expect(mocks.resizeTextCalloutMock).toHaveBeenCalledWith(object, 122, 37);
+    expect(object.set).toHaveBeenCalledWith({ scaleX: 4, scaleY: 1.5 });
+    expect(mocks.normalizeScaledAnnotationTarget).toHaveBeenCalledWith(object);
+    expect(mocks.normalizeFrameAnnotationProxyGeometry).toHaveBeenCalledWith(object);
+    expect(mocks.synchronizeEditorDrawingObjectFromFabric).toHaveBeenCalledWith(object);
     expect(ensureObjectReachable).toHaveBeenCalledWith(object);
-    expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
   });
-}
 
-function registerScaledResizeTest() {
-  it('normalizes scaled objects after proportional resize', () => {
-    const object = createObject();
+  it('changes text box width without scaling the font', () => {
+    const object = createObject({ sniptaleType: 'text' });
     const canvas = { requestRenderAll: vi.fn() };
-    mocks.findObjectByIdMock.mockReturnValue(object);
+    mocks.findObjectById.mockReturnValue(object);
+    mocks.isTextbox.mockReturnValue(true);
 
-    expect(
-      resizeLayerObject(
-        canvas as never,
-        'layer-1',
-        160,
-        20,
-        vi.fn(() => true)
-      )
-    ).toBe(object);
+    resizeLayerObject(canvas as never, 'text', 180, 90, vi.fn());
 
-    expect(object.set).toHaveBeenCalledWith({ scaleX: 2, scaleY: 0.5 });
-    expect(mocks.normalizeScaledRectangleTargetMock).toHaveBeenCalledWith(object);
-    expect(mocks.normalizeScaledAnnotationTargetMock).toHaveBeenCalledWith(object);
-    expect(object.setCoords).toHaveBeenCalledOnce();
-  });
-}
-
-function registerRejectedResizeTargetTest() {
-  it('rejects locked or zero-sized targets', () => {
-    mocks.findObjectByIdMock.mockReturnValue(createObject({ sniptaleLocked: true }));
-    expect(resizeLayerObject({} as never, 'locked', 10, 10, vi.fn())).toBeNull();
-
-    mocks.findObjectByIdMock.mockReturnValue(
-      createObject({ getScaledHeight: vi.fn(() => 0), getScaledWidth: vi.fn(() => 80) })
-    );
-    expect(resizeLayerObject({} as never, 'empty', 10, 10, vi.fn())).toBeNull();
-  });
-}
-
-function runResizeStateSuite() {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.isEditableObjectMock.mockReturnValue(true);
-    mocks.isTextboxMock.mockReturnValue(false);
-    mocks.normalizeScaledAnnotationTargetMock.mockReturnValue(false);
-    mocks.normalizeScaledRectangleTargetMock.mockReturnValue(false);
+    expect(object.set).toHaveBeenCalledWith({ width: 180, scaleX: 1, scaleY: 1 });
+    expect(mocks.synchronizeEditorDrawingTextLayout).toHaveBeenCalledWith(object);
+    expect(mocks.syncEditorDrawingTextObject).toHaveBeenCalledWith(object);
+    expect(mocks.normalizeScaledAnnotationTarget).not.toHaveBeenCalled();
   });
 
-  registerTextResizeTest();
-  registerScaledResizeTest();
-  registerRejectedResizeTargetTest();
-}
+  it('rejects missing, locked, non-editable, and zero-sized objects', () => {
+    mocks.findObjectById.mockReturnValueOnce(null);
+    expect(resizeLayerObject(null, 'missing', 10, 10, vi.fn())).toBeNull();
 
-describe('layer action resize state owner', runResizeStateSuite);
+    mocks.findObjectById.mockReturnValueOnce(createObject({ sniptaleLocked: true }));
+    expect(resizeLayerObject(null, 'locked', 10, 10, vi.fn())).toBeNull();
+
+    mocks.findObjectById.mockReturnValueOnce(createObject());
+    mocks.isEditableObject.mockReturnValueOnce(false);
+    expect(resizeLayerObject(null, 'immutable', 10, 10, vi.fn())).toBeNull();
+
+    mocks.findObjectById.mockReturnValueOnce(createObject({ getScaledWidth: () => 0 }));
+    expect(resizeLayerObject(null, 'empty', 10, 10, vi.fn())).toBeNull();
+  });
+});

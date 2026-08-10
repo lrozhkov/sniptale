@@ -4,6 +4,7 @@ import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highligh
 import type { BorderPreset } from '../../../features/highlighter/contracts';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { multiplyColorAlpha } from '@sniptale/foundation/color';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 
 function clampPercentUnit(value: number | undefined, fallback: number): number {
   const unit = typeof value === 'number' ? value : fallback;
@@ -36,6 +37,7 @@ export function createBorderPresetFromShapeSettings(
     id: crypto.randomUUID(),
     name: createRectanglePresetName(borderPresets),
     order,
+    tagIds: [],
     enabled: true,
     width: Math.max(1, Math.round(shapeSettings.strokeWidth)),
     color:
@@ -44,7 +46,9 @@ export function createBorderPresetFromShapeSettings(
     radius: Math.max(0, Math.round(shapeSettings.radius)),
     padding: { ...(sourcePreset?.padding ?? DEFAULT_BORDER_PRESET.padding) },
     shadow: shapeSettings.shadow,
-    fillColor: multiplyColorAlpha(shapeSettings.fillColor, fillOpacity) ?? shapeSettings.fillColor,
+    fillPaint: createSolidPaint(
+      multiplyColorAlpha(shapeSettings.fillColor, fillOpacity) ?? shapeSettings.fillColor
+    ),
     inheritCustomCss: false,
     customCss: '',
     origin: 'user',

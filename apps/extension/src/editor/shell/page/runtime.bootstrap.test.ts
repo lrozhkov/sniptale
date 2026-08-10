@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 const {
-  ensureEditorPageSessionIdMock,
+  ensureEditorPageAggregateIdMock,
   readEditorPageLocationStateMock,
   resolveEditorPageRestoreSourceMock,
   waitForEditorControllerCanvasMock,
 } = vi.hoisted(() => ({
-  ensureEditorPageSessionIdMock: vi.fn(),
+  ensureEditorPageAggregateIdMock: vi.fn(),
   readEditorPageLocationStateMock: vi.fn(),
   resolveEditorPageRestoreSourceMock: vi.fn(),
   waitForEditorControllerCanvasMock: vi.fn(),
@@ -15,8 +15,9 @@ vi.mock('../../controller/canvas-ready', () => ({
   waitForEditorControllerCanvas: waitForEditorControllerCanvasMock,
 }));
 
-vi.mock('../../document/page-session', () => ({
-  ensureEditorPageSessionId: ensureEditorPageSessionIdMock,
+vi.mock('../../document/page-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/page-session')>()),
+  ensureEditorPageAggregateId: ensureEditorPageAggregateIdMock,
   readEditorPageLocationState: readEditorPageLocationStateMock,
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
@@ -46,8 +47,9 @@ async function verifiesBootstrapPayloadOpen() {
   );
 
   expect(autosaveService.activate).toHaveBeenCalledWith({
-    sessionId: 'session-1',
-    assetId: 'asset-1',
+    aggregateId: 'session-1',
+    durableRevision: 0,
+    renderPresentation: expect.any(Function),
     sourceUrl: 'https://example.com',
     sourceTitle: 'Example page',
   });
@@ -117,8 +119,9 @@ async function verifiesDraftRestore() {
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
 
   expect(autosaveService.activate).toHaveBeenCalledWith({
-    sessionId: 'session-1',
-    assetId: 'asset-1',
+    aggregateId: 'session-1',
+    durableRevision: 0,
+    renderPresentation: expect.any(Function),
     sourceUrl: null,
     sourceTitle: null,
   });
@@ -162,7 +165,6 @@ async function verifiesAssetRestore() {
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
 
   expect(autosaveService.updateContext).toHaveBeenCalledWith({
-    assetId: 'asset-2',
     sourceUrl: 'https://asset.example',
     sourceTitle: 'Asset title',
   });
@@ -222,7 +224,7 @@ async function verifiesNewerBootstrapPayloadWinsOverLateRestoreResolution() {
 
 describe('editor-page.runtime bootstrap flows', () => {
   setupEditorPageRuntimeBootstrapTestScope({
-    ensureEditorPageSessionIdMock,
+    ensureEditorPageAggregateIdMock,
     readEditorPageLocationStateMock,
     waitForEditorControllerCanvasMock,
   });

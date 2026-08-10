@@ -6,7 +6,6 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { isImageLayerStyleObject, readImageSettingsFromObject } from '../../objects/image-style';
 import { normalizeShadowPreset } from '../../objects/shadow';
-import { resolveShapeStrokeColor } from './shape-fill';
 
 export function syncImageSelectionSettings(object: FabricObject): void {
   if (!isImageLayerStyleObject(object)) {
@@ -32,7 +31,9 @@ export function syncImageSelectionSettings(object: FabricObject): void {
     strokeColor:
       typeof object.sniptaleImageStrokeColor === 'string'
         ? object.sniptaleImageStrokeColor
-        : resolveShapeStrokeColor(object.stroke, strokeOpacity, defaultSettings.strokeColor),
+        : typeof object.stroke === 'string'
+          ? object.stroke
+          : defaultSettings.strokeColor,
     strokeOpacity,
   };
   const settings = readImageSettingsFromObject(object, fallback);

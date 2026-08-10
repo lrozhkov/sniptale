@@ -119,20 +119,43 @@ export function runWithPersistentDataErasureBarrier<T>(
 }
 
 export type PersistenceMutationDomain =
+  | 'annotation-template-tags'
   | 'callout-presets'
+  | 'drawing-palette'
+  | 'drawing-tool-preferences'
+  | 'gradient-presets'
   | 'highlighter-settings'
   | 'step-badge-presets'
+  | 'surface-style-presets'
   | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(
   domain: PersistenceMutationDomain,
   operation: (permit: PersistenceMutationPermit) => T | Promise<T>
 ): Promise<T> {
+  return runWithPersistenceDomainMutationLocks([domain], operation);
+}
+
+export function runWithPersistenceDomainMutationLocks<T>(
+  domains: readonly PersistenceMutationDomain[],
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T> {
+  const orderedDomains = [...new Set(domains)].sort();
   return runWithPersistenceMutationPermit((permit) =>
-    getPersistenceLockManager().request(
-      `${PERSISTENCE_LOCK_NAME}:${domain}`,
-      { mode: 'exclusive' },
-      () => operation(permit)
-    )
+    acquireDomainLocks(orderedDomains, 0, () => operation(permit))
+  );
+}
+
+function acquireDomainLocks<T>(
+  domains: readonly PersistenceMutationDomain[],
+  index: number,
+  operation: () => T | Promise<T>
+): Promise<T> {
+  const domain = domains[index];
+  if (!domain) return Promise.resolve().then(operation);
+  return getPersistenceLockManager().request(
+    `${PERSISTENCE_LOCK_NAME}:${domain}`,
+    { mode: 'exclusive' },
+    () => acquireDomainLocks(domains, index + 1, operation)
   );
 }

@@ -12,6 +12,10 @@ export function getCaptureActionOptions(): { value: CaptureActionType; label: st
     { value: 'ask_system', label: translate('savePresets.section.captureActionAskSystem') },
     { value: 'edit', label: translate('savePresets.section.captureActionEdit') },
     { value: 'copy', label: translate('savePresets.section.captureActionCopy') },
+    {
+      value: 'save_to_library',
+      label: translate('savePresets.section.captureActionSaveToLibrary'),
+    },
   ];
 }
 

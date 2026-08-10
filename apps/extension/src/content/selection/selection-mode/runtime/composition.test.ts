@@ -103,6 +103,7 @@ function createScenario() {
     customCss: '',
     customCssStyles: {},
     fillColor: '#00000000',
+    fillCss: '#00000000',
     id: 'selection-frame',
     inheritCustomCss: false,
     padding: { bottom: 0, left: 0, right: 0, top: 0 },

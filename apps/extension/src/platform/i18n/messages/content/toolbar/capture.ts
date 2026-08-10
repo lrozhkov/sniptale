@@ -37,6 +37,14 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Добавить в сценарий',
     en: 'Add to scenario',
   },
+  captureSaveToLibraryLabel: {
+    ru: 'Сохранить в библиотеку',
+    en: 'Save to library',
+  },
+  captureSaveToLibraryHint: {
+    ru: 'Сохранить снимок в локальной библиотеке',
+    en: 'Save the capture to the local library',
+  },
   captureScenarioHint: {
     ru: 'Создать шаг сценария с этим снимком',
     en: 'Create a scenario step with this screenshot',
@@ -88,6 +96,10 @@ export const contentToolbarCaptureMessages = defineMessageSource({
   afterCaptureScenario: {
     ru: 'После снимка: Добавить в сценарий',
     en: 'After screenshot: Add to scenario',
+  },
+  afterCaptureSaveToLibrary: {
+    ru: 'После снимка: сохранить в библиотеку',
+    en: 'After capture: save to library',
   },
   afterCaptureEdit: {
     ru: 'После снимка: Открыть в редакторе',

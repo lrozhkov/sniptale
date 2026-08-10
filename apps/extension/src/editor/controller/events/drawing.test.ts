@@ -1,288 +1,260 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EditorControllerEventBindings } from './types';
+
 const mocks = vi.hoisted(() => ({
-  activateTextTargetMock: vi.fn(),
-  completeEditorDrawWorkflowMock: vi.fn(),
-  handleArrowDrawingMouseDownMock: vi.fn(),
-  handleBlurMouseDownMock: vi.fn(),
-  handleCalloutMouseDownMock: vi.fn(),
-  handleCropMouseDownMock: vi.fn(),
-  handleEditorDrawMouseMoveMock: vi.fn(() => ({ height: 40 })),
-  handleEditorPathCreatedMock: vi.fn(),
-  handleShapeMouseDownMock: vi.fn(),
-  handleRichShapeToolMouseDownMock: vi.fn(),
-  handleStepMouseDownMock: vi.fn(),
-  handleTextMouseDownMock: vi.fn(),
-  handleRasterToolMouseDownMock: vi.fn(async () => false),
-  handleRasterToolMouseMoveMock: vi.fn(() => false),
-  handleRasterToolMouseUpMock: vi.fn(async () => false),
-  isTextTargetMock: vi.fn(() => false),
-  resolveTextCalloutPointerZoneMock: vi.fn(() => 'outside'),
+  activateTextTarget: vi.fn(),
+  complete: vi.fn(),
+  createBlur: vi.fn(() => ({ set: vi.fn(), setCoords: vi.fn() })),
+  createBounds: vi.fn(() => ({ x: 1, y: 2, width: 30, height: 40 })),
+  createDrawing: vi.fn(),
+  createFabric: vi.fn(() => ({ sniptaleId: 'draft-1' })),
+  cropDown: vi.fn(() => false),
+  isTextTarget: vi.fn(() => false),
+  readDrawing: vi.fn(),
+  replaceFabric: vi.fn(() => ({ sniptaleId: 'replacement' })),
+  state: {
+    toolSettings: {
+      text: {
+        backgroundColor: null,
+        color: '#111111',
+        fontFamily: 'handwritten',
+        fontSize: 24,
+      },
+    },
+  },
+  stepDown: vi.fn(),
+  updateDrawing: vi.fn(),
+  updatePath: vi.fn(() => false),
+  writeDrawing: vi.fn(),
 }));
-vi.mock('../draw-workflow', () => ({
-  completeEditorDrawWorkflow: mocks.completeEditorDrawWorkflowMock,
-  handleEditorDrawMouseMove: mocks.handleEditorDrawMouseMoveMock,
-  handleEditorPathCreated: mocks.handleEditorPathCreatedMock,
+
+vi.mock('../../../features/drawing/public', () => ({
+  clampDrawingTextWidth: vi.fn(() => 80),
+  createDrawingBounds: mocks.createBounds,
+  createDrawingObject: mocks.createDrawing,
+  resolveDrawingTextHeight: vi.fn(() => 34),
+  updateCreatedDrawingObject: mocks.updateDrawing,
 }));
-vi.mock('./drawing-tool-actions/blur', () => ({
-  handleBlurMouseDown: mocks.handleBlurMouseDownMock,
+vi.mock('../../state/useEditorStore', () => ({
+  useEditorStore: { getState: () => mocks.state },
 }));
-vi.mock('./drawing-tool-actions/primitive', () => ({
-  handleArrowMouseDown: vi.fn(),
-  handleCropMouseDown: mocks.handleCropMouseDownMock,
-  handleLineMouseDown: vi.fn(),
-  handleShapeMouseDown: mocks.handleShapeMouseDownMock,
-}));
-vi.mock('./drawing-tool-actions/rich-shape', () => ({
-  handleRichShapeToolMouseDown: mocks.handleRichShapeToolMouseDownMock,
-}));
-vi.mock('./drawing-tool-actions/step', () => ({
-  handleStepMouseDown: mocks.handleStepMouseDownMock,
-}));
-vi.mock('./drawing-tool-actions/text', () => ({
-  handleTextMouseDown: mocks.handleTextMouseDownMock,
-}));
-vi.mock('./drawing-callout-actions', () => ({
-  handleCalloutMouseDown: mocks.handleCalloutMouseDownMock,
-}));
-vi.mock('./arrow-drawing', () => ({
-  handleArrowDrawingMouseDown: mocks.handleArrowDrawingMouseDownMock,
-  shouldKeepArrowDrawSessionOpen: vi.fn(() => false),
-}));
-vi.mock('../raster-tools/interactions/down', () => ({
-  handleRasterToolMouseDown: mocks.handleRasterToolMouseDownMock,
-}));
-vi.mock('../raster-tools/interactions/move', () => ({
-  handleRasterToolMouseMove: mocks.handleRasterToolMouseMoveMock,
-}));
-vi.mock('../raster-tools/interactions/up', () => ({
-  handleRasterToolMouseUp: mocks.handleRasterToolMouseUpMock,
-}));
-vi.mock('../raster-tools/interactions/tool', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../raster-tools/interactions/tool')>()),
-  isRasterEditorTool: (tool: string) =>
-    tool === 'selection' || tool === 'brush' || tool === 'eraser' || tool === 'fill',
-}));
+vi.mock('../crop-workflow/pointer', () => ({ cropDown: mocks.cropDown }));
 vi.mock('./text-target', () => ({
-  activateTextTarget: mocks.activateTextTargetMock,
-  isTextTarget: mocks.isTextTargetMock,
+  activateTextTarget: mocks.activateTextTarget,
+  isTextTarget: mocks.isTextTarget,
 }));
-vi.mock('../../objects/annotation/text/zones', () => ({
-  getTextCalloutInteractionLayout: vi.fn(),
-  resolveTextCalloutPointerZone: mocks.resolveTextCalloutPointerZoneMock,
+vi.mock('./draw-completion', () => ({ completeDrawWorkflowFromBindings: mocks.complete }));
+vi.mock('../tools/step-drawing/pointer', () => ({ handleStepMouseDown: mocks.stepDown }));
+vi.mock('../../drawing/object/metadata', () => ({
+  readEditorDrawingObject: mocks.readDrawing,
+  synchronizeEditorDrawingObjectFromFabric: vi.fn(),
+  syncEditorDrawingTextObject: vi.fn(),
+  translateEditorDrawingObject: vi.fn(),
+  writeEditorDrawingObject: mocks.writeDrawing,
 }));
-import { createDrawingEventHandlers } from './drawing';
-function createBindings(activeTool: string) {
-  const activeObject = {
-    exitEditing: vi.fn(),
-    isEditing: false,
-    sniptaleId: 'active-object',
-    type: 'rect',
-  };
-  const cropGuide = { id: 'guide' };
-  const canvas = {
+vi.mock('../../drawing/object/vector', () => ({
+  applyEditorDrawingTextVisuals: vi.fn(),
+  createEditorDrawingFabricObject: mocks.createFabric,
+  renderEditorDrawingTextBackground: vi.fn(),
+  replaceEditorDrawingFabricGeometry: mocks.replaceFabric,
+  synchronizeEditorDrawingTextLayout: vi.fn(),
+  updateEditorDrawingPathDraft: mocks.updatePath,
+}));
+vi.mock('../../drawing/object/blur', () => ({
+  clearLegacyBlurMetadata: vi.fn(),
+  createEditorDrawingBlurObject: mocks.createBlur,
+  refreshEditorDrawingBlurObject: vi.fn(),
+}));
+
+import { createEditorDrawingEventHandlers } from './drawing';
+
+function createCanvas() {
+  return {
+    add: vi.fn(),
     discardActiveObject: vi.fn(),
-    getActiveObject: vi.fn(() => activeObject),
-    getActiveObjects: vi.fn(() => [activeObject]),
-    getScenePoint: vi.fn(() => ({ x: 18, y: 24 })),
-    getViewportPoint: vi.fn(() => ({ x: 48, y: 36 })),
+    getActiveObjects: vi.fn<() => unknown[]>(() => []),
+    getScenePoint: vi.fn(
+      (event: { point?: { x: number; y: number } }) => event.point ?? { x: 10, y: 20 }
+    ),
+    remove: vi.fn(),
     requestRenderAll: vi.fn(),
     setActiveObject: vi.fn(),
   };
+}
 
-  return {
+function createBindings(tool = 'pencil') {
+  const canvas = createCanvas();
+  const bindings = {
     commitHistory: vi.fn(),
-    getActiveTool: () => activeTool,
-    getCanvas: () => canvas as never,
-    getCanvasDocumentSize: () => ({ height: 200, width: 320 }),
-    getCropGuide: vi.fn(() => cropGuide),
-    getCropSelection: vi.fn(() => ({ height: 20 })),
-    getCropSelectionMouseEnabled: vi.fn(() => true),
-    getSource: () => ({ id: 'source' }),
-    getDrawSession: vi.fn(() => ({ object: { setCoords: vi.fn() }, tool: 'rectangle' })),
-    nextLabelIndex: vi.fn(() => 7),
+    getActiveTool: vi.fn(() => tool),
+    getCanvas: vi.fn(() => canvas),
+    getDrawSession: vi.fn(() => null as null | Record<string, unknown>),
+    getSource: vi.fn(() => ({ id: 'source-1' })),
+    nextLabelIndex: vi.fn(() => 1),
     prepareObject: vi.fn(),
-    setCropState: vi.fn(),
     setDrawSession: vi.fn(),
     startDrawSession: vi.fn(),
-    switchToSelectTool: vi.fn(),
     syncRuntimeState: vi.fn(),
-    decorateShape: vi.fn(),
-    addObject: vi.fn(),
-    advanceStepValue: vi.fn(),
-  } as unknown as EditorControllerEventBindings;
-}
-function registerWorkflowRoutingTest() {
-  it('routes path, mouse move, and mouse up through workflow seams', () => {
-    const bindings = createBindings('rectangle');
-    const handlers = createDrawingEventHandlers(bindings);
-    const pointEvent = { e: { kind: 'pointer' } } as never;
-
-    handlers.handlePathCreated({ path: { id: 'path-1' } } as never);
-    expect(mocks.handleEditorPathCreatedMock).toHaveBeenCalled();
-    const pathArgs = mocks.handleEditorPathCreatedMock.mock.calls.at(0)?.[0];
-    expect(pathArgs?.switchToSelectTool).toBeUndefined();
-    expect(pathArgs?.nextLabelIndex('rectangle')).toBe(7);
-    expect(bindings.nextLabelIndex).toHaveBeenCalledWith('rectangle');
-    pathArgs?.prepareObject({ id: 'draft-shape' } as never);
-    pathArgs?.commitHistory();
-    pathArgs?.syncRuntimeState();
-    expect(bindings.prepareObject).toHaveBeenCalledWith({ id: 'draft-shape' });
-    expect(bindings.commitHistory).toHaveBeenCalledOnce();
-    expect(bindings.syncRuntimeState).toHaveBeenCalledOnce();
-
-    handlers.handleMouseMove(pointEvent);
-    expect(mocks.handleEditorDrawMouseMoveMock).toHaveBeenCalled();
-    expect(bindings.setCropState).toHaveBeenCalledWith({ id: 'guide' }, { height: 40 });
-
-    mocks.completeEditorDrawWorkflowMock.mockReturnValue({
-      cropGuide: { id: 'next-guide' },
-      cropSelection: { height: 22 },
-      drawSession: null,
-    });
-
-    handlers.handleMouseUp();
-
-    const workflowArgs = mocks.completeEditorDrawWorkflowMock.mock.calls.at(0)?.[0];
-    workflowArgs?.commitHistory();
-    workflowArgs?.syncRuntimeState();
-    expect(bindings.setDrawSession).toHaveBeenCalledWith(null);
-    expect(bindings.setCropState).toHaveBeenLastCalledWith({ id: 'next-guide' }, { height: 22 });
-    expect(bindings.commitHistory).toHaveBeenCalledTimes(2);
-    expect(bindings.syncRuntimeState).toHaveBeenCalledTimes(3);
-  });
+  };
+  return { bindings, canvas, handlers: createEditorDrawingEventHandlers(bindings as never) };
 }
 
-function registerLatestPointerTest() {
-  it('stores the latest canvas pointer on active draw sessions', () => {
-    const bindings = createBindings('line');
-    const drawSession = { object: { setCoords: vi.fn() }, tool: 'line' };
-    bindings.getDrawSession = vi.fn(() => drawSession as never);
-
-    createDrawingEventHandlers(bindings).handleMouseMove({ e: { kind: 'pointer' } } as never);
-
-    expect(drawSession).toMatchObject({ lastPoint: { x: 18, y: 24 } });
-    expect(mocks.handleEditorDrawMouseMoveMock).toHaveBeenCalledWith(
-      expect.objectContaining({ point: { x: 18, y: 24 } })
-    );
-  });
+function pointerEvent(patch: Record<string, unknown> = {}): {
+  e: Record<string, unknown>;
+  target?: Record<string, unknown>;
+} {
+  return { e: { button: 0, ctrlKey: false, shiftKey: false, timeStamp: 10, ...patch } };
 }
 
-function runWorkflowDelegationSuite() {
-  registerWorkflowRoutingTest();
-  registerLatestPointerTest();
-}
-
-function runWorkflowGuardSuite() {
-  it('guards mouse move and mouse up when workflow state is missing', () => {
-    const bindings = createBindings('rectangle');
-    bindings.getDrawSession = vi.fn(() => null);
-    const handlers = createDrawingEventHandlers(bindings);
-
-    handlers.handleMouseMove({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleEditorDrawMouseMoveMock).not.toHaveBeenCalled();
-
-    mocks.completeEditorDrawWorkflowMock.mockReturnValueOnce(null);
-    handlers.handleMouseUp();
-    expect(bindings.setDrawSession).not.toHaveBeenCalled();
-    expect(bindings.syncRuntimeState).not.toHaveBeenCalled();
-  });
-}
-function registerMouseDownBeforeSelectionOwnershipTest() {
-  it('clears annotation selection before freehand draws when the target is outside the selection', () => {
-    const bindings = createBindings('pencil');
-    const canvas = bindings.getCanvas() as unknown as {
-      discardActiveObject: ReturnType<typeof vi.fn>;
-      requestRenderAll: ReturnType<typeof vi.fn>;
-    };
-
-    createDrawingEventHandlers(bindings).handleMouseDownBefore({
-      e: { kind: 'pointer' },
-      target: { sniptaleId: 'outside-selection' },
-    } as never);
-
-    expect(canvas.discardActiveObject).toHaveBeenCalledOnce();
-    expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
-    expect(bindings.syncRuntimeState).toHaveBeenCalledOnce();
-  });
-}
-function registerToolDispatchCoverageTest() {
-  it('dispatches mouse down events to the tool-specific owner seam', () => {
-    const shapeBindings = createBindings('rectangle');
-    createDrawingEventHandlers(shapeBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleShapeMouseDownMock).toHaveBeenCalled();
-    const arrowBindings = createBindings('arrow');
-    createDrawingEventHandlers(arrowBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleArrowDrawingMouseDownMock).toHaveBeenCalled();
-    const blurBindings = createBindings('blur');
-    createDrawingEventHandlers(blurBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleBlurMouseDownMock).toHaveBeenCalled();
-    const cropBindings = createBindings('crop');
-    createDrawingEventHandlers(cropBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleCropMouseDownMock).toHaveBeenCalled();
-    const textBindings = createBindings('text');
-    createDrawingEventHandlers(textBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleTextMouseDownMock).toHaveBeenCalled();
-    const stepBindings = createBindings('step');
-    createDrawingEventHandlers(stepBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-    expect(mocks.handleStepMouseDownMock).toHaveBeenCalled();
-    const calloutBindings = createBindings('callout');
-    createDrawingEventHandlers(calloutBindings).handleMouseDown({
-      e: { kind: 'pointer' },
-    } as never);
-    expect(mocks.handleCalloutMouseDownMock).toHaveBeenCalled();
-  });
-}
-
-function registerCropGuideInteractionGuardTest() {
-  it('keeps existing crop guide pointer interactions under Fabric move and resize ownership', () => {
-    const cropBindings = createBindings('crop');
-    const cropGuide = cropBindings.getCropGuide();
-
-    createDrawingEventHandlers(cropBindings).handleMouseDown({
-      e: { kind: 'pointer' },
-      target: cropGuide,
-    } as never);
-
-    expect(mocks.handleCropMouseDownMock).not.toHaveBeenCalled();
-    const canvas = cropBindings.getCanvas() as unknown as {
-      getScenePoint: ReturnType<typeof vi.fn>;
-    };
-    expect(canvas.getScenePoint).not.toHaveBeenCalled();
-  });
-}
-
-function registerMouseDownGuardTests() {
-  it('keeps select mode, already-selected targets, and non-sticky tools out of sticky dispatch', () => {
-    const selectBindings = createBindings('select');
-    createDrawingEventHandlers(selectBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-
-    const imageBindings = createBindings('image');
-    createDrawingEventHandlers(imageBindings).handleMouseDown({ e: { kind: 'pointer' } } as never);
-
-    const textBindings = createBindings('text');
-    createDrawingEventHandlers(textBindings).handleMouseDown({
-      alreadySelected: true,
-      e: { kind: 'pointer' },
-      target: { sniptaleId: 'active-object' },
-    } as never);
-
-    expect(mocks.handleShapeMouseDownMock).not.toHaveBeenCalled();
-    expect(mocks.handleArrowDrawingMouseDownMock).not.toHaveBeenCalled();
-    expect(mocks.handleTextMouseDownMock).not.toHaveBeenCalled();
-  });
-}
-
-describe('editor-controller-events-drawing', () => {
+describe('shared drawing event orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.isTextTargetMock.mockReturnValue(false);
-    mocks.resolveTextCalloutPointerZoneMock.mockReturnValue('outside');
+    mocks.cropDown.mockReturnValue(false);
+    mocks.isTextTarget.mockReturnValue(false);
+    mocks.updatePath.mockReturnValue(false);
   });
-  runWorkflowDelegationSuite();
-  runWorkflowGuardSuite();
-  registerMouseDownBeforeSelectionOwnershipTest();
-  registerToolDispatchCoverageTest();
-  registerCropGuideInteractionGuardTest();
-  registerMouseDownGuardTests();
+
+  it('routes drawing starts and ignores non-drawing pointer paths', () => {
+    const ignored = createBindings('select');
+    ignored.handlers.handleMouseDown(pointerEvent() as never);
+    ignored.handlers.handleMouseDown(pointerEvent({ button: 2 }) as never);
+    expect(mocks.createDrawing).not.toHaveBeenCalled();
+
+    const cropped = createBindings('crop');
+    mocks.cropDown.mockReturnValueOnce(true);
+    cropped.handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.cropDown).toHaveBeenCalled();
+
+    const step = createBindings('step');
+    step.handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.stepDown).toHaveBeenCalled();
+    expect(step.bindings.commitHistory).toHaveBeenCalledOnce();
+    expect(step.bindings.syncRuntimeState).toHaveBeenCalledOnce();
+
+    const frame = createBindings('frame-annotation');
+    frame.handlers.handleMouseDown(pointerEvent() as never);
+    expect(frame.bindings.startDrawSession).not.toHaveBeenCalled();
+    expect(frame.handlers.handlePathCreated({} as never)).toBeUndefined();
+    expect(frame.handlers.handleMouseDownBefore({} as never)).toBeUndefined();
+  });
+
+  it('creates shared vector, shape, text, and blur drafts through their canonical owners', () => {
+    const pencilDrawing = {
+      id: 'pencil-1',
+      kind: 'pencil',
+      color: '#111111',
+      width: 4,
+      samples: [{ x: 10, y: 20, t: 10 }],
+    };
+    mocks.createDrawing.mockReturnValueOnce(pencilDrawing);
+    const pencil = createBindings('pencil');
+    pencil.canvas.getActiveObjects.mockReturnValueOnce([{}]);
+    pencil.handlers.handleMouseDown(pointerEvent() as never);
+    expect(pencil.canvas.discardActiveObject).toHaveBeenCalledOnce();
+    expect(mocks.createFabric).toHaveBeenCalledWith(pencilDrawing, 1);
+    expect(pencil.bindings.prepareObject).toHaveBeenCalled();
+    expect(pencil.bindings.startDrawSession).toHaveBeenCalledWith(
+      'pencil',
+      { x: 10, y: 20 },
+      expect.any(Object)
+    );
+
+    const shapeDrawing = {
+      id: 'shape-1',
+      kind: 'rectangle',
+      bounds: { x: 10, y: 20, width: 1, height: 1 },
+      color: '#111111',
+      fillColor: null,
+      width: 4,
+    };
+    mocks.createDrawing.mockReturnValueOnce(shapeDrawing);
+    const shape = createBindings('shape');
+    shape.handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.createFabric).toHaveBeenCalledWith(shapeDrawing, 1);
+
+    const text = createBindings('text');
+    text.handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.createFabric).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'text', text: '', fontFamily: 'handwritten' }),
+      1
+    );
+
+    const blur = createBindings('blur');
+    blur.handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.createBlur).toHaveBeenCalledWith(
+      expect.objectContaining({ drawing: expect.objectContaining({ kind: 'blur' }) })
+    );
+    expect(blur.bindings.startDrawSession).toHaveBeenCalledWith(
+      'blur',
+      { x: 10, y: 20 },
+      expect.any(Object)
+    );
+  });
+
+  it('updates blur bounds, live paths, and replacement geometry', () => {
+    const blurObject = { set: vi.fn(), setCoords: vi.fn() };
+    const blurDrawing = { id: 'blur-1', kind: 'blur', bounds: { x: 1, y: 2, width: 1, height: 1 } };
+    const blur = createBindings('blur');
+    blur.bindings.getDrawSession.mockReturnValue({
+      object: blurObject,
+      start: { x: 1, y: 2 },
+      tool: 'blur',
+    });
+    mocks.readDrawing.mockReturnValueOnce(blurDrawing);
+    mocks.updateDrawing.mockReturnValueOnce(blurDrawing);
+    blur.handlers.handleMouseMove(pointerEvent({ point: { x: 31, y: 42 } }) as never);
+    expect(blurObject.set).toHaveBeenCalledWith({ left: 1, top: 2, width: 30, height: 40 });
+    expect(mocks.writeDrawing).toHaveBeenCalledWith(
+      blurObject,
+      expect.objectContaining({ bounds: { x: 1, y: 2, width: 30, height: 40 } })
+    );
+
+    const path = createBindings('pencil');
+    const pathObject = { id: 'path-object' };
+    path.bindings.getDrawSession.mockReturnValue({
+      object: pathObject,
+      start: { x: 1, y: 2 },
+      tool: 'pencil',
+    });
+    const current = { id: 'pencil-1', kind: 'pencil' };
+    const next = { id: 'pencil-1', kind: 'pencil' };
+    mocks.readDrawing.mockReturnValue(current);
+    mocks.updateDrawing.mockReturnValue(next);
+    mocks.updatePath.mockReturnValueOnce(true);
+    path.handlers.handleMouseMove(pointerEvent() as never);
+    expect(mocks.updatePath).toHaveBeenCalledWith(pathObject, next, { preview: true });
+
+    mocks.updatePath.mockReturnValueOnce(false);
+    path.handlers.handleMouseMove(pointerEvent() as never);
+    expect(path.canvas.remove).toHaveBeenCalledWith(pathObject);
+    expect(path.canvas.add).toHaveBeenCalledWith(
+      expect.objectContaining({ sniptaleId: 'replacement' })
+    );
+    expect(path.bindings.setDrawSession).toHaveBeenCalled();
+  });
+
+  it('edits an existing text on click, but completes drawing after a drag or ordinary mouse-up', () => {
+    const target = { isEditing: false };
+    mocks.isTextTarget.mockReturnValue(true);
+    const text = createBindings('text');
+    text.handlers.handleMouseDown({ ...pointerEvent(), target } as never);
+    text.handlers.handleMouseUp();
+    expect(text.canvas.setActiveObject).toHaveBeenCalledWith(target, expect.any(Object));
+    expect(mocks.activateTextTarget).toHaveBeenCalledWith(
+      text.canvas,
+      target,
+      expect.any(Function),
+      { selectAll: false }
+    );
+
+    text.handlers.handleMouseDown({ ...pointerEvent(), target } as never);
+    text.handlers.handleMouseMove(pointerEvent({ point: { x: 100, y: 100 } }) as never);
+    text.handlers.handleMouseUp();
+    expect(mocks.complete).toHaveBeenCalledWith(text.bindings);
+
+    const ordinary = createBindings('arrow');
+    ordinary.handlers.handleMouseUp();
+    expect(mocks.complete).toHaveBeenCalledWith(ordinary.bindings);
+  });
 });

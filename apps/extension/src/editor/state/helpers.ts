@@ -12,38 +12,16 @@ import {
   DEFAULT_EDITOR_WORKSPACE_SETTINGS,
   normalizeEditorFrameSettings,
 } from '../../features/editor/document/constants';
-import type { EditorRasterToolSettings } from './raster-tools';
-import {
-  EMPTY_EDITOR_RASTER_SELECTION_SUMMARY,
-  EMPTY_EDITOR_RASTER_TARGET_SUMMARY,
-} from './raster-tools';
 import type { EditorRuntimePatch, EditorState } from './types';
+import type { DrawingToolDefaults } from '../../features/drawing/public';
 
 export type EditorStoreSet = Parameters<StateCreator<EditorState>>[0];
 type ToolSettingsTarget = 'toolSettings' | 'selectionToolSettings';
-type ToolSettingsKey =
-  | 'pencil'
-  | 'highlighter'
-  | 'rectangle'
-  | 'ellipse'
-  | 'blur'
-  | 'arrow'
-  | 'line'
-  | 'text'
-  | 'step'
-  | 'image';
+type ToolSettingsKey = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text' | 'step' | 'image';
 type ToolSettingsPatch = Pick<EditorState, 'toolSettings' | 'selectionToolSettings'>;
 type RuntimeStatePatch = Pick<
   EditorState,
-  | 'layers'
-  | 'selection'
-  | 'cropSelection'
-  | 'rasterSelection'
-  | 'rasterTarget'
-  | 'history'
-  | 'viewport'
-  | 'frame'
-  | 'browserFrame'
+  'layers' | 'selection' | 'cropSelection' | 'history' | 'viewport' | 'frame' | 'browserFrame'
 >;
 type ResetDocumentState = Pick<
   EditorState,
@@ -62,8 +40,6 @@ type ResetDocumentState = Pick<
   | 'richShapeToolSelection'
   | 'layers'
   | 'selection'
-  | 'rasterSelection'
-  | 'rasterTarget'
   | 'history'
   | 'viewport'
   | 'frame'
@@ -100,6 +76,23 @@ export function createToolSettingsPatch<Key extends ToolSettingsKey>(
   } as ToolSettingsPatch;
 }
 
+export function createDrawingToolSettingsPatch<Tool extends keyof DrawingToolDefaults>(
+  state: EditorState,
+  target: ToolSettingsTarget,
+  tool: Tool,
+  patch: Partial<DrawingToolDefaults[Tool]>
+): ToolSettingsPatch {
+  return {
+    [target]: {
+      ...state[target],
+      [tool]: {
+        ...state[target][tool],
+        ...patch,
+      },
+    },
+  } as ToolSettingsPatch;
+}
+
 export function createRuntimePatch(
   state: EditorState,
   patch: EditorRuntimePatch
@@ -108,8 +101,6 @@ export function createRuntimePatch(
     layers: patch.layers ?? state.layers,
     selection: patch.selection ?? state.selection,
     cropSelection: patch.cropSelection === undefined ? state.cropSelection : patch.cropSelection,
-    rasterSelection: patch.rasterSelection ?? state.rasterSelection,
-    rasterTarget: patch.rasterTarget ?? state.rasterTarget,
     history: patch.history ?? state.history,
     viewport: patch.viewport ?? state.viewport,
     frame: patch.frame ? normalizeEditorFrameSettings(patch.frame) : state.frame,
@@ -181,8 +172,6 @@ function createResetDocumentCanvasState(
   ResetDocumentState,
   | 'layers'
   | 'selection'
-  | 'rasterSelection'
-  | 'rasterTarget'
   | 'history'
   | 'viewport'
   | 'frame'
@@ -193,8 +182,6 @@ function createResetDocumentCanvasState(
   return {
     layers: [],
     selection: defaults.initialSelection,
-    rasterSelection: EMPTY_EDITOR_RASTER_SELECTION_SUMMARY,
-    rasterTarget: EMPTY_EDITOR_RASTER_TARGET_SUMMARY,
     history: defaults.initialHistory,
     viewport: defaults.initialViewport,
     frame: DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -218,12 +205,7 @@ function createWorkspaceSettingsFromDefaults(
 }
 
 export function createObjectPatch<
-  T extends
-    | BrowserFrameState
-    | EditorWorkspaceSettings
-    | EditorViewportState
-    | EditorFrameSettings
-    | EditorRasterToolSettings,
+  T extends BrowserFrameState | EditorWorkspaceSettings | EditorViewportState | EditorFrameSettings,
 >(current: T, patch: Partial<T>): T {
   return {
     ...current,

@@ -1,6 +1,5 @@
 import type {
   EditorRichShapeDocumentObject,
-  EditorRichShapeCalloutGeometry,
   EditorRichShapeEffects,
   EditorRichShapeFill,
   EditorRichShapeFrame,
@@ -10,7 +9,6 @@ import type {
 } from '../../../features/editor/document/rich-shape';
 
 export interface EditorRichShapeFormattingPatch {
-  callout?: EditorRichShapeCalloutGeometry;
   effects?: {
     reflection?: Partial<EditorRichShapeEffects['reflection']>;
     shadow?: Partial<EditorRichShapeEffects['shadow']>;

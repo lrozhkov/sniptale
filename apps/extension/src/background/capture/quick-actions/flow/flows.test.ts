@@ -48,8 +48,10 @@ vi.mock('./surface', async (importOriginal) => ({
   releaseQuickActionSurface: releaseQuickActionSurfaceMock,
 }));
 
-import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  CaptureMessageType,
+  MessageType,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { runCaptureFlow, runSelectionFlow } from './flows';
 
@@ -83,7 +85,14 @@ function createQuickAction(
   overrides: Partial<{
     id: string;
     screenshotMode: 'visible' | 'full' | 'selection';
-    afterCapture: 'download_default' | 'ask_preset' | 'ask_system' | 'scenario' | 'edit' | 'copy';
+    afterCapture:
+      | 'download_default'
+      | 'ask_preset'
+      | 'ask_system'
+      | 'scenario'
+      | 'edit'
+      | 'copy'
+      | 'save_to_library';
     exitAfterCapture: boolean;
   }> = {}
 ) {
@@ -226,11 +235,28 @@ it('starts screenshot selection and marks the tab active', async () => {
   });
   expect(ensureNativeVisibleCaptureAuthorityMock).toHaveBeenCalledWith(17);
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
-    actionTypes: [CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP],
+    actionTypes: [
+      CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+      MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+    ],
+    libraryActionTypes: [],
     tabId: 17,
   });
   expect(sendViewerPreparationCommandMock).not.toHaveBeenCalled();
   expect(args.screenshotModeState.get(17)).toBe(true);
+});
+
+it('binds library destination authority only for the explicit save-to-library action', async () => {
+  const args = { ...createSelectionArgs(), afterCapture: 'save_to_library' as const };
+  await runSelectionFlow(args);
+  expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
+    actionTypes: [
+      CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,
+      MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+    ],
+    libraryActionTypes: [MessageType.SAVE_SCREENSHOT_TO_GALLERY],
+    tabId: 17,
+  });
 });
 
 it('skips debugger setup for native selection flows and keeps viewport null', async () => {
@@ -300,6 +326,7 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
   });
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [CaptureMessageType.CAPTURE_VISIBLE],
+    libraryActionTypes: [],
     tabId: 21,
   });
   expect(sendViewerPreparationCommandMock).not.toHaveBeenCalled();

@@ -1,12 +1,16 @@
 import type { Canvas, FabricObject } from 'fabric';
 
-import { resizeTextCallout } from '../../../objects/annotation/text/callout/resize';
 import { normalizeScaledRectangleTarget } from '../../../objects/shape-style';
 import { isTextbox } from '../../core/helpers';
 import { findObjectById } from '../../document/layers';
 import { normalizeScaledAnnotationTarget } from '../../tools/annotation-resize';
 import { isEditableObject } from '../../../document/model';
 import { normalizeFrameAnnotationProxyGeometry } from '../../../frame-annotation/proxy';
+import {
+  syncEditorDrawingTextObject,
+  synchronizeEditorDrawingObjectFromFabric,
+} from '../../../drawing/object/metadata';
+import { synchronizeEditorDrawingTextLayout } from '../../../drawing/object/vector';
 
 export function resizeLayerObject(
   canvas: Canvas | null,
@@ -32,7 +36,11 @@ export function resizeLayerObject(
     isTextbox(object) &&
     (object.sniptaleType === 'text' || object.sniptaleType === 'meta-stamp')
   ) {
-    resizeTextCallout(object, nextWidth, nextHeight);
+    object.set({ width: nextWidth, scaleX: 1, scaleY: 1 });
+    if (object.sniptaleType === 'text') {
+      synchronizeEditorDrawingTextLayout(object);
+      syncEditorDrawingTextObject(object);
+    }
     object.setCoords();
     ensureObjectReachable(object);
     canvas?.requestRenderAll();
@@ -47,6 +55,7 @@ export function resizeLayerObject(
     normalizeScaledAnnotationTarget(object);
   }
   normalizeFrameAnnotationProxyGeometry(object);
+  synchronizeEditorDrawingObjectFromFabric(object);
   object.setCoords();
   ensureObjectReachable(object);
   canvas?.requestRenderAll();

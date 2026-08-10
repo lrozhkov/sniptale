@@ -1,6 +1,30 @@
 import { defineMessageSource } from '../source';
 
 export const editorDocumentActionsMessages = defineMessageSource({
+  draft: {
+    ru: 'Черновик',
+    en: 'Draft',
+  },
+  inLibrary: {
+    ru: 'В библиотеке',
+    en: 'In library',
+  },
+  saveToLibrary: {
+    ru: 'Сохранить в библиотеку',
+    en: 'Save to library',
+  },
+  saveToLibraryError: {
+    ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
+    en: 'Could not save to the library. Your draft is safe.',
+  },
+  reloadLatest: {
+    ru: 'Загрузить актуальную версию',
+    en: 'Reload latest',
+  },
+  saveCopy: {
+    ru: 'Сохранить копию',
+    en: 'Save copy',
+  },
   fileSection: {
     ru: 'Файл',
     en: 'File',

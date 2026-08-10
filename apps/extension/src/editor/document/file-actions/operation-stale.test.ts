@@ -59,7 +59,7 @@ function createDeferred<T>(): Deferred<T> {
 
 function createEditorDocument(sourceImageData: string) {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData,
     sourceName: null,
     sourceWidth: 320,

@@ -100,15 +100,6 @@ export type ContentPrivilegedActionGrantPayload = {
   contentIntentGrant?: ContentPrivilegedActionAutoStartGrant;
 };
 
-export type UpdateGalleryImageAssetMessage = {
-  type: MessageType.UPDATE_GALLERY_IMAGE_ASSET;
-  assetId: string;
-  dataUrl: string;
-  editorSessionId: string;
-  updateCapabilityToken: string;
-  filename?: string;
-};
-
 export type {
   ScenarioCreateProjectMessage,
   ScenarioDeleteStepMessage,

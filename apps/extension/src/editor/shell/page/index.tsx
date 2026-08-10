@@ -18,6 +18,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { createEditorPageEmbedProviderValue } from './embed';
 import { EditorPageLayout } from './layout';
+import { useEditorDrawingPreferencesSynchronization } from '../../drawing/preferences';
 
 function createEditorPageBootstrapLifecycle(args: {
   services: EditorPageServices;
@@ -136,6 +137,7 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   });
 
   useEditorPageBootstrapEffects(hasImageRef, setPageTitle, services);
+  useEditorDrawingPreferencesSynchronization();
   useEditorPageDefaultEffects(hydrateDefaults, hydrateWorkspaceDefaults);
   useEditorPageServiceDisposal(services);
 

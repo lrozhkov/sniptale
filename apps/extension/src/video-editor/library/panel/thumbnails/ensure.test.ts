@@ -3,11 +3,18 @@ import type { MediaThumbnailEntry } from '../../../../composition/persistence/me
 import type { LibraryThumbnailItem } from './types';
 
 const thumbnailMocks = vi.hoisted(() => ({
+  commitProjectAggregatePresentationMock: vi.fn(),
   createImageThumbnailBlobMock: vi.fn(),
   createVideoThumbnailBlobMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
   getMediaThumbnailMock: vi.fn(),
+  getAggregatePresentationMock: vi.fn(),
   saveMediaThumbnailMock: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/aggregate-presentations', () => ({
+  commitProjectAggregatePresentation: thumbnailMocks.commitProjectAggregatePresentationMock,
+  getAggregatePresentation: thumbnailMocks.getAggregatePresentationMock,
 }));
 
 vi.mock(
@@ -67,6 +74,7 @@ async function importEnsureModule() {
 beforeEach(() => {
   vi.clearAllMocks();
   thumbnailMocks.getMediaThumbnailMock.mockResolvedValue(undefined);
+  thumbnailMocks.getAggregatePresentationMock.mockResolvedValue(undefined);
   thumbnailMocks.getMediaAssetBlobMock.mockResolvedValue(
     new Blob(['video'], { type: 'video/webm' })
   );
@@ -77,6 +85,15 @@ beforeEach(() => {
     new Blob(['thumb'], { type: 'image/webp' })
   );
   thumbnailMocks.saveMediaThumbnailMock.mockResolvedValue(undefined);
+  thumbnailMocks.commitProjectAggregatePresentationMock.mockImplementation(
+    async ({ expectedWorkspaceRevision, thumbnailBlob }) => ({
+      aggregateId: 'project-1',
+      aggregateKind: 'video-project',
+      presentationRevision: expectedWorkspaceRevision,
+      thumbnailBlob,
+      updatedAt: 500,
+    })
+  );
 });
 
 it('returns cached thumbnails without reading source blobs', async () => {
@@ -109,7 +126,7 @@ it('generates and stores video thumbnails for recordings', async () => {
   );
 });
 
-it('stores project thumbnails under the project thumbnail id from a visual source asset', async () => {
+it('stores project thumbnails as revision-matched aggregate presentations', async () => {
   const imageBlob = new Blob(['image'], { type: 'image/png' });
   thumbnailMocks.getMediaAssetBlobMock.mockResolvedValueOnce(imageBlob);
   const { ensureLibraryThumbnail } = await importEnsureModule();
@@ -120,13 +137,47 @@ it('stores project thumbnails under the project thumbnail id from a visual sourc
       mimeType: null,
       sourceMediaId: 'project-asset:asset-1',
       thumbnailId: 'video-project:project-1',
+      workspaceRevision: 4,
     })
   );
 
   expect(thumbnailMocks.createImageThumbnailBlobMock).toHaveBeenCalledWith(imageBlob, 320, 180);
-  expect(thumbnailMocks.saveMediaThumbnailMock).toHaveBeenCalledWith(
-    expect.objectContaining({ assetId: 'video-project:project-1' })
+  expect(thumbnailMocks.commitProjectAggregatePresentationMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      expectedWorkspaceRevision: 4,
+      ref: { id: 'project-1', kind: 'video-project' },
+      thumbnailBlob: expect.any(Blob),
+    })
   );
+  expect(thumbnailMocks.getMediaThumbnailMock).not.toHaveBeenCalled();
+  expect(thumbnailMocks.saveMediaThumbnailMock).not.toHaveBeenCalled();
+});
+
+it('reuses a current video project aggregate presentation without reading the source', async () => {
+  const blob = new Blob(['current'], { type: 'image/webp' });
+  thumbnailMocks.getAggregatePresentationMock.mockResolvedValueOnce({
+    aggregateId: 'project-1',
+    aggregateKind: 'video-project',
+    presentationRevision: 7,
+    thumbnailBlob: blob,
+    updatedAt: 700,
+  });
+  const { ensureLibraryThumbnail } = await importEnsureModule();
+
+  await expect(
+    ensureLibraryThumbnail(
+      createItem({
+        id: 'project-1',
+        sourceMediaId: 'project-asset:asset-1',
+        thumbnailId: 'video-project:project-1',
+        workspaceRevision: 7,
+      })
+    )
+  ).resolves.toEqual(expect.objectContaining({ blob, updatedAt: 700 }));
+
+  expect(thumbnailMocks.getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(thumbnailMocks.commitProjectAggregatePresentationMock).not.toHaveBeenCalled();
+  expect(thumbnailMocks.getMediaThumbnailMock).not.toHaveBeenCalled();
 });
 
 it('fails soft when thumbnail generation cannot read or render a source', async () => {

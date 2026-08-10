@@ -11,7 +11,6 @@ import { createEditorControllerEventHandlers } from '../events';
 import type { EditorControllerInstance } from '../instance/types';
 import type { EditorSessionAutosaveService } from '../../document/session-autosave';
 import type { EditorMagnetManager } from '../magnet';
-import { createEditorRasterToolSession } from '../raster-tools/session/state';
 import { getEditorViewportDevicePixelRatioBaseline } from '../viewport';
 
 export abstract class ImageEditorControllerState {
@@ -38,7 +37,6 @@ export abstract class ImageEditorControllerState {
   viewportDevicePixelRatioBaseline = 1;
   browserFrameRenderToken = 0;
   layerMutationToken = 0;
-  rasterToolSession = createEditorRasterToolSession();
   selectionNudgeSession = null;
   lastLayerSelectionAnchorId: string | null = null;
   autosaveService: EditorSessionAutosaveService | null = null;

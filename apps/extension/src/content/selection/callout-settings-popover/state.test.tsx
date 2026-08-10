@@ -66,14 +66,16 @@ describe('useCalloutSettingsPopoverState', () => {
 
     renderHarness();
     act(() => {
-      latestState?.handleSettingChange({ style: { surface: { backgroundColor: 'transparent' } } });
+      latestState?.handleSettingChange({
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
+      });
     });
 
     expect(listener).toHaveBeenCalledWith({
       frameId: 'frame-1',
       settings: {
         sourcePresetId: undefined,
-        style: { surface: { backgroundColor: 'transparent' } },
+        style: { surface: { fillPaint: { kind: 'solid', color: '#00000000' } } },
       },
     });
 

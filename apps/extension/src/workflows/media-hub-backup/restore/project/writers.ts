@@ -1,4 +1,5 @@
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
@@ -50,6 +51,9 @@ async function restorePreparedVideoProject(
   await restoreVideoProjectAssets(tx, restoredBlobs, prepared);
   await restoreVideoProjectExports(tx, restoredBlobs, prepared);
   await restoreVideoProjectThumbnail(tx, restoredBlobs, prepared);
+  if (prepared.restoredPresentation) {
+    await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).put(prepared.restoredPresentation);
+  }
 }
 
 async function restoreVideoProjectAssets(

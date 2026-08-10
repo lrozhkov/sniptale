@@ -2,7 +2,6 @@ import {
   persistPendingEditorBootstrapPayload,
   type EditorBootstrapPayload,
 } from '../../../workflows/editor/bootstrap';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 
 export async function createScenarioEditorEmbedUrl(
@@ -13,6 +12,5 @@ export async function createScenarioEditorEmbedUrl(
   return buildEditorUrl({
     bootstrapId,
     embedMode: 'scenario',
-    sessionId: createEditorSessionId(),
   });
 }

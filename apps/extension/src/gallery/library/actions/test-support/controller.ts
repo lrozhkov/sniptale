@@ -79,6 +79,7 @@ function createControllerActions(
       setActiveTags: () => undefined,
       setFolderFilter: () => undefined,
       setSearch: () => undefined,
+      setScope: () => undefined,
       setSortMode: () => undefined,
     },
     preview: {

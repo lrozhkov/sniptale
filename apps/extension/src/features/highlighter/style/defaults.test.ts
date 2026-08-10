@@ -34,7 +34,7 @@ describe('highlighter storage defaults', () => {
         style: 'solid',
         radius: 0,
         padding: { top: 3, right: 3, bottom: 3, left: 3 },
-        fillColor: '#00000000',
+        fillPaint: { kind: 'solid' as const, color: '#00000000' },
         shadow: 0,
       }),
       expect.objectContaining({
@@ -44,7 +44,7 @@ describe('highlighter storage defaults', () => {
         style: 'solid',
         radius: 10,
         padding: { top: 6, right: 6, bottom: 6, left: 6 },
-        fillColor: '#60A5FA14',
+        fillPaint: { kind: 'solid' as const, color: '#60a5fa14' },
         shadow: 30,
       }),
       expect.objectContaining({
@@ -53,14 +53,18 @@ describe('highlighter storage defaults', () => {
         width: 2,
         radius: 4,
         padding: { top: 3, right: 3, bottom: 3, left: 3 },
-        fillColor: '#FACC152E',
+        fillPaint: { kind: 'solid' as const, color: '#facc152e' },
       }),
-      expect.objectContaining({ id: 'system-success', color: '#16A34A', fillColor: '#22C55E14' }),
+      expect.objectContaining({
+        id: 'system-success',
+        color: '#16A34A',
+        fillPaint: { kind: 'solid' as const, color: '#22c55e14' },
+      }),
       expect.objectContaining({
         id: 'system-attention',
         color: '#EF4444',
         width: 4,
-        fillColor: '#EF444412',
+        fillPaint: { kind: 'solid' as const, color: '#ef444412' },
         shadow: 30,
       }),
       expect.objectContaining({ id: 'system-review', color: '#8B5CF6', style: 'dashed' }),
@@ -76,17 +80,19 @@ describe('highlighter storage defaults', () => {
   it('keeps expanded visual fields in default and test-helper presets', () => {
     const settings = createDefaultHighlighterSettings();
     const helperPreset = createPreset('preset');
-    const helperOverridePreset = createPreset('override', { fillColor: '#ff00006b' });
+    const helperOverridePreset = createPreset('override', {
+      fillPaint: { kind: 'solid' as const, color: '#ff00006b' },
+    });
     const helperSettings = createSettings({ defaultBorderPresetId: 'override' });
     const storedSettings = createStoredSettings();
 
     expect(DEFAULT_BORDER_PRESET).toMatchObject({
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
       shadow: 0,
     });
     expect(settings.borderPresets[0]).toMatchObject({
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       shadow: 0,
     });
     expect(settings.systemPresetCatalogRevision).toBeGreaterThan(0);
@@ -99,7 +105,7 @@ describe('highlighter storage defaults', () => {
       inheritCustomCss: false,
       shadow: 0,
     });
-    expect(helperOverridePreset.fillColor).toBe('#ff00006b');
+    expect(helperOverridePreset.fillPaint).toEqual({ kind: 'solid', color: '#ff00006b' });
     expect(helperSettings.defaultBorderPresetId).toBe('override');
     expect(storedSettings.sniptale_highlighter_settings.defaultBorderPresetId).toBe('preset-2');
   });

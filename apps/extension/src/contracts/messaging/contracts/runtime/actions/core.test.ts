@@ -27,6 +27,22 @@ const offscreenFrameAnnotationRasterContract =
 const aiSettingsNavigationContract =
   runtimeActionCoreMessageContracts[MessageType.AI_SETTINGS_NAVIGATION];
 
+it('binds asset ids to editor-open messages rather than runtime wakeup', () => {
+  const openEditorContract = runtimeActionCoreMessageContracts[MessageType.OPEN_EDITOR_WITH_IMAGE];
+  const request = {
+    assetId: 'asset-1',
+    dataUrl: 'data:image/png;base64,c2NyZWVueXg=',
+    type: MessageType.OPEN_EDITOR_WITH_IMAGE,
+  };
+  expect(openEditorContract.parseRequest(request)).toEqual(request);
+  expect(() =>
+    contentRuntimeWakeupContract.parseRequest({
+      assetId: 'asset-1',
+      type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    })
+  ).toThrow('runtime CONTENT_RUNTIME_WAKEUP message');
+});
+
 it('bounds AI settings navigation to the two modal-owned destinations', () => {
   expect(
     aiSettingsNavigationContract.parseRequest({

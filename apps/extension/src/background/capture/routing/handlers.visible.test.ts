@@ -134,7 +134,8 @@ describe('capture-router-handlers.visible', () => {
     expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
       'data:image/png;base64,1',
       'visible.png',
-      42
+      42,
+      'library'
     );
     expect(persistScenarioCaptureFromBackgroundMock).toHaveBeenCalledWith(
       expect.objectContaining({

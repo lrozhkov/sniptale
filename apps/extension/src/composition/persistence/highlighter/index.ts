@@ -6,7 +6,11 @@ import type {
 } from '../../../features/highlighter/contracts';
 import { SYSTEM_BORDER_PRESET_CATALOG_REVISION } from '../../../features/highlighter/presets/catalog';
 import { browserStorage } from '../infrastructure/browser-storage';
-import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
+import {
+  runWithPersistenceDomainMutationLock,
+  runWithPersistenceDomainMutationLocks,
+} from '../infrastructure/mutation-barrier';
+import { areKnownAnnotationTemplateTagIds } from '../annotation-template-tags/known-ids';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredHighlighterSettings } from './guards';
 import { cloneHighlighterSettings, createHighlighterWriteController } from './mutation-write';
@@ -41,6 +45,10 @@ export {
 function cacheLoadedHighlighterSettings(settings: HighlighterSettings): HighlighterSettings {
   loadedHighlighterSettingsSnapshot = cloneHighlighterSettings(settings);
   return cloneHighlighterSettings(loadedHighlighterSettingsSnapshot);
+}
+
+export function cacheCoordinatedHighlighterSettings(settings: HighlighterSettings): void {
+  cacheLoadedHighlighterSettings(settings);
 }
 
 const { enqueueWrite: enqueueHighlighterWrite, writeSettings: writeHighlighterSettings } =
@@ -149,23 +157,32 @@ function isStoredHighlighterSettingsUnsafeForWrite(
 }
 
 async function runHighlighterSettingsCommand(
-  command: (settings: HighlighterSettings) => HighlighterMutationDecision
+  command: (settings: HighlighterSettings) => HighlighterMutationDecision,
+  tagIds?: readonly string[]
 ): Promise<HighlighterMutationOutcome> {
   return enqueueHighlighterWrite(() =>
-    runWithPersistenceDomainMutationLock('highlighter-settings', async (permit) => {
-      const loaded = await readResolvedHighlighterSettings();
-      const settings = cloneHighlighterSettings(loaded.settings);
-      if (isStoredHighlighterSettingsUnsafeForWrite(loaded.parsed)) {
-        cacheLoadedHighlighterSettings(settings);
-        return 'rejected';
-      }
-      const decision = command(settings);
+    runWithPersistenceDomainMutationLocks(
+      tagIds && tagIds.length > 0
+        ? ['annotation-template-tags', 'highlighter-settings']
+        : ['highlighter-settings'],
+      async (permit) => {
+        if (tagIds && tagIds.length > 0 && !(await areKnownAnnotationTemplateTagIds(tagIds))) {
+          return 'rejected';
+        }
+        const loaded = await readResolvedHighlighterSettings();
+        const settings = cloneHighlighterSettings(loaded.settings);
+        if (isStoredHighlighterSettingsUnsafeForWrite(loaded.parsed)) {
+          cacheLoadedHighlighterSettings(settings);
+          return 'rejected';
+        }
+        const decision = command(settings);
 
-      if (decision.outcome === 'applied') {
-        await writeHighlighterSettings(decision.settings, permit);
+        if (decision.outcome === 'applied') {
+          await writeHighlighterSettings(decision.settings, permit);
+        }
+        return decision.outcome;
       }
-      return decision.outcome;
-    })
+    )
   );
 }
 
@@ -217,7 +234,7 @@ export async function addBorderPresetWithOutcome(
   return runHighlighterSettingsCommand((settings) => {
     const nextSettings = addUserBorderPreset(settings, preset);
     return nextSettings ? { outcome: 'applied', settings: nextSettings } : { outcome: 'rejected' };
-  });
+  }, preset.tagIds);
 }
 
 /**
@@ -235,7 +252,7 @@ export async function updateBorderPresetWithOutcome(
     const nextSettings = updateExistingBorderPreset(settings, preset);
     if (nextSettings) return { outcome: 'applied', settings: nextSettings };
     return { outcome: exists ? 'unchanged' : 'rejected' };
-  });
+  }, preset.tagIds);
 }
 
 /**

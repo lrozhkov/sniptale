@@ -37,7 +37,7 @@ class TestSceneHelperActions extends ImageEditorControllerSceneHelperActions {
 
 it('delegates scene and document helper actions through the controller instance', async () => {
   const controller = new TestSceneHelperActions();
-  const document = { version: 1 } as EditorDocument;
+  const document = { version: 2 } as EditorDocument;
   const frame = { preset: 'frame' } as unknown as EditorFrameSettings;
   const browserFrame = { enabled: true } as BrowserFrameState;
 

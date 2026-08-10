@@ -88,3 +88,25 @@ it('exposes an editable concrete value when automatic numbering is disabled in a
   await act(async () => root.unmount());
   host.remove();
 });
+
+it('starts a new preset with empty tag metadata', async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const preset = createSystemStepBadgePresetCatalog()[0]!;
+  await act(async () =>
+    root.render(
+      <StepBadgePresetEditor
+        isOpen
+        isNew
+        isSaving={false}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        preset={preset}
+      />
+    )
+  );
+  expect(document.body.textContent).toContain('Сохранить');
+  await act(async () => root.unmount());
+  host.remove();
+});

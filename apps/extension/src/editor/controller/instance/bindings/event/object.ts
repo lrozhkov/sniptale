@@ -14,10 +14,6 @@ export function createEditorControllerEventObjectBindings(controller: EditorCont
     prepareObject: (object: FabricObject) => controller.prepareObject(object),
     startDrawSession: (tool: DrawSession['tool'], start: Point, object: FabricObject) =>
       controller.startDrawSession(tool, start, object),
-    decorateShape: (
-      object: FabricObject,
-      type: Extract<EditorObjectType, 'rectangle' | 'ellipse' | 'diamond'>
-    ) => controller.decorateShape(object, type),
     addObject: (object: FabricObject) => controller.addObject(object),
     switchToSelectTool: () => controller.switchToSelectTool(),
     advanceStepValue: () => controller.advanceStepValue(),

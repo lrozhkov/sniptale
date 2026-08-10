@@ -8,6 +8,7 @@ export interface PresetListItem {
   preview?: React.ReactNode;
   selected?: boolean;
   system?: boolean;
+  supplement?: React.ReactNode;
   onApply: () => void;
 }
 
@@ -47,13 +48,16 @@ export function PresetRow({ item }: { item: PresetListItem }) {
           {item.preview}
         </span>
       ) : null}
-      <span
-        className={[
-          'min-w-0 flex-1 truncate text-[12px] font-semibold',
-          'text-[color:var(--sniptale-color-text-primary)]',
-        ].join(' ')}
-      >
-        {item.label}
+      <span className="min-w-0 flex-1">
+        <span
+          className={[
+            'block truncate text-[12px] font-semibold',
+            'text-[color:var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+        >
+          {item.label}
+        </span>
+        {item.supplement}
       </span>
     </button>
   );

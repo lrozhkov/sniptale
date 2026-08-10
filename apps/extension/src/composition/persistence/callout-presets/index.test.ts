@@ -137,7 +137,7 @@ it('rejects an invalid style before committing it', async () => {
     placement,
     style: {
       ...source,
-      surface: { ...source.surface, backgroundColor: '#'.padEnd(8_000, 'f') },
+      surface: { ...source.surface, fillPaint: { kind: 'solid', color: '#'.padEnd(8_000, 'f') } },
     },
   });
   expect(result).toEqual({ outcome: 'rejected', reason: 'invalid-input' });

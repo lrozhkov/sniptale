@@ -1,7 +1,6 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
 import { buildEditorUrl } from './editor';
 import { buildScenarioEditorUrl } from './scenario-editor';
 import {
@@ -70,6 +69,7 @@ function buildGalleryPageUrl(options: {
   folder?: string | null;
   openStorageManager?: boolean;
   recordingId?: string | null;
+  scope?: 'library' | 'temporary';
 }) {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/gallery/index.html'));
   if (options.folder) {
@@ -82,6 +82,7 @@ function buildGalleryPageUrl(options: {
   if (options.openStorageManager) {
     url.searchParams.set('storageManager', '1');
   }
+  if (options.scope) url.searchParams.set('scope', options.scope);
 
   return url.toString();
 }
@@ -93,9 +94,7 @@ export function buildWebSnapshotViewerUrl(snapshotId: string): string {
 }
 
 function buildImageEditorPageUrl(): string {
-  return buildEditorUrl({
-    sessionId: createEditorSessionId(),
-  });
+  return buildEditorUrl();
 }
 
 function buildScenarioEditorPageUrl(projectId?: string | null, stepId?: string | null): string {
@@ -158,7 +157,11 @@ export async function openCameraRecorderPage(params: {
 }
 
 export async function openGalleryPage(
-  options: { openStorageManager?: boolean; recordingId?: string | null } = {}
+  options: {
+    openStorageManager?: boolean;
+    recordingId?: string | null;
+    scope?: 'library' | 'temporary';
+  } = {}
 ): Promise<void> {
   await browserTabs.create({ url: buildGalleryPageUrl(options) });
 }

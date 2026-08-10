@@ -1,9 +1,7 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
-  consumeGalleryImageUpdateCapability,
   markPreauthorizedContentActionRouteMessage,
-  markPreauthorizedGalleryUpdateRouteMessage,
   type RouteCaptureMessage,
 } from '../../../capture/routes';
 import {
@@ -70,29 +68,6 @@ function authorizeHarStopRoute(
   return AUTHORIZED;
 }
 
-function authorizeGalleryUpdateRoute(
-  message: Extract<RouteCaptureMessage, { type: typeof MessageType.UPDATE_GALLERY_IMAGE_ASSET }>,
-  sender: chrome.runtime.MessageSender | undefined
-): IpcAuthorizationResult {
-  const senderUrl = sender?.url;
-  const documentId = sender?.documentId;
-  if (
-    !senderUrl ||
-    !documentId ||
-    !consumeGalleryImageUpdateCapability({
-      assetId: message.assetId,
-      documentId,
-      editorSessionId: message.editorSessionId,
-      senderUrl,
-      token: message.updateCapabilityToken,
-    })
-  ) {
-    return reject('Unauthorized gallery image update');
-  }
-  markPreauthorizedGalleryUpdateRouteMessage(message);
-  return AUTHORIZED;
-}
-
 function authorizePrivilegedTabCapabilityRoute(
   message: RouteCaptureMessage | TabModeMessage,
   resolvedTabId: number,
@@ -127,9 +102,6 @@ function authorizePrivilegedTabCapabilityRoute(
   }
   if (message.type === MessageType.EXPORT_STOP_HAR) {
     return authorizeHarStopRoute(message, resolvedTabId);
-  }
-  if (message.type === MessageType.UPDATE_GALLERY_IMAGE_ASSET) {
-    return authorizeGalleryUpdateRoute(message, sender);
   }
   return AUTHORIZED;
 }

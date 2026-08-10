@@ -19,7 +19,12 @@ import type { EditorInspectorRichShapeState } from '../types';
 
 type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
 type EditorInspectorDerivedState = ReturnType<typeof useEditorInspectorSidebarDerived>;
-type EditorInspectorActions = ReturnType<typeof useEditorInspectorSidebarActions>;
+type EditorInspectorActionGroups = ReturnType<typeof useEditorInspectorSidebarActions>;
+type EditorInspectorActions = EditorInspectorActionGroups['catalogActions'] &
+  EditorInspectorActionGroups['editorActions'] &
+  EditorInspectorActionGroups['selectionActions'] &
+  EditorInspectorActionGroups['staticOptions'] &
+  EditorInspectorActionGroups['utilityActions'];
 type EditorInspectorDerivedInputSource = {
   activeTool: unknown;
   inspector: unknown;

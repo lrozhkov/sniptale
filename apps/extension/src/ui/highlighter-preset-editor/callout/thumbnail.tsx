@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 import type {
   CalloutPreset,
   CalloutConnectorMarker,
@@ -12,6 +13,7 @@ import {
   resolveCalloutCustomCss,
   type ResolvedCalloutCustomCss,
 } from '../../../features/highlighter/callout-custom-css';
+import { projectCalloutCardStyle } from '../../../features/highlighter/surface-style/card-projection';
 
 const TARGET_COLOR = 'var(--sniptale-color-text-tertiary, #94a3b8)';
 
@@ -103,7 +105,7 @@ function CalloutPreviewConnector(props: {
       <path
         d="M 50 19 L 50 28 L 29 35 Z"
         data-ui="shared.callout-preview.connector"
-        fill={style.surface.backgroundColor}
+        fill={getRepresentativeColor(style.surface.fillPaint)}
         style={props.customStyles.connector}
       />
     );
@@ -156,12 +158,6 @@ function CalloutPreviewConnector(props: {
   );
 }
 
-function resolvePreviewFill(backgroundColor: string, checkerPatternId: string): string {
-  return backgroundColor === 'transparent' || backgroundColor === '#00000000'
-    ? `url(#${checkerPatternId})`
-    : backgroundColor;
-}
-
 function getWedgeOutlinePath(radius: number) {
   return [
     'M 50 19 L 29 35 L 50 28',
@@ -209,7 +205,6 @@ function CalloutPreviewAccent(props: {
 }
 
 function CalloutPreviewCard(props: {
-  checkerPatternId: string;
   clipPathId: string;
   customStyles: ResolvedCalloutCustomCss;
   style: CalloutVisualStyle;
@@ -220,90 +215,92 @@ function CalloutPreviewCard(props: {
   const previewBorderWidth = Math.min(surface.borderWidth, 2);
   const hasWedgeOutline = style.connector.kind === 'wedge' && previewBorderWidth > 0;
   const badge = style.badge;
-  const badgeInTitle = badge.enabled && style.title.enabled && badge.placement !== 'body-start';
-  const badgeY = badgeInTitle ? 8.5 : style.title.enabled ? 19 : 13;
-  const badgeX = badge.placement === 'title-end' && badgeInTitle ? 86 : 56;
   const badgeSize = Math.min(7, Math.max(4, badge.size * 0.28));
+  const cardStyle = projectCalloutCardStyle(style);
   return (
     <>
-      <defs>
-        <pattern height="4" id={props.checkerPatternId} patternUnits="userSpaceOnUse" width="4">
-          <rect fill="var(--sniptale-color-surface-input, #e2e8f0)" height="4" width="4" />
-          <path
-            d="M 0 0 H 2 V 2 H 0 Z M 2 2 H 4 V 4 H 2 Z"
-            fill="var(--sniptale-color-surface-panel, #fff)"
-          />
-        </pattern>
-        <clipPath id={props.clipPathId}>
-          <rect height="29" rx={radius} width="43" x="50" y="4" />
-        </clipPath>
-      </defs>
-      <g
-        clipPath={`url(#${props.clipPathId})`}
-        data-ui="shared.callout-preview.surface"
-        style={props.customStyles.card}
+      <foreignObject
+        height="29"
+        width="43"
+        x="50"
+        y="4"
+        data-ui="shared.callout-preview.surface-html"
       >
-        <rect
-          fill={resolvePreviewFill(surface.backgroundColor, props.checkerPatternId)}
-          height="29"
-          rx={radius}
-          stroke={surface.borderColor}
-          strokeDasharray={getCalloutStrokeDasharray(surface.borderStyle, previewBorderWidth)}
-          strokeWidth={hasWedgeOutline ? 0 : previewBorderWidth}
-          width="43"
-          x="50"
-          y="4"
-        />
-        {style.title.enabled ? (
-          <g style={props.customStyles.title}>
-            <rect fill={style.title.backgroundColor} height="9" width="43" x="50" y="4" />
-            <path
-              d="M 56 9 H 73"
-              stroke={style.title.textColor}
-              strokeLinecap="round"
-              strokeWidth="1.6"
-            />
-            {style.title.dividerWidth > 0 ? (
-              <path
-                d="M 50 13 H 93"
-                stroke={style.title.dividerColor}
-                strokeDasharray={getCalloutStrokeDasharray(
-                  style.title.dividerStyle,
-                  Math.min(style.title.dividerWidth, 2)
-                )}
-                strokeLinecap="round"
-                strokeWidth={Math.min(style.title.dividerWidth, 2)}
-              />
-            ) : null}
-          </g>
-        ) : null}
-        {badge.enabled ? (
-          <g data-ui="shared.callout-preview.badge">
-            <rect
-              fill={badge.backgroundColor}
-              height={badgeSize}
-              rx={badge.shape === 'square' ? 0 : badge.shape === 'circle' ? badgeSize / 2 : 2}
-              stroke={badge.borderColor}
-              strokeWidth={Math.min(1.5, badge.borderWidth * 0.35)}
-              width={Math.max(badgeSize, Math.min(14, badge.text.length * 3.2 + 3))}
-              x={badgeX}
-              y={badgeY - badgeSize / 2}
-            />
-          </g>
-        ) : null}
-        <path
-          d={
-            style.title.enabled
-              ? 'M 56 20 H 86 M 56 25 H 78'
-              : 'M 56 14 H 86 M 56 20 H 82 M 56 26 H 74'
+        <div
+          style={
+            {
+              ...cardStyle,
+              borderRadius: radius,
+              borderWidth: hasWedgeOutline ? 0 : previewBorderWidth,
+              boxSizing: 'border-box',
+              height: '29px',
+              overflow: 'hidden',
+              padding: '4px 6px',
+              width: '43px',
+            } as CSSProperties
           }
-          stroke={surface.textColor}
-          strokeLinecap="round"
-          strokeOpacity="0.76"
-          strokeWidth="1.5"
-          style={props.customStyles.body}
-        />
-      </g>
+        >
+          {style.title.enabled ? (
+            <div
+              style={{
+                background: style.title.backgroundColor,
+                borderBottom: [
+                  `${Math.min(style.title.dividerWidth, 2)}px`,
+                  style.title.dividerStyle,
+                  style.title.dividerColor,
+                ].join(' '),
+                color: style.title.textColor,
+                fontSize: 4,
+                lineHeight: '7px',
+                ...props.customStyles.title,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{ background: 'currentColor', display: 'block', height: 2, width: '65%' }}
+              />
+            </div>
+          ) : null}
+          {badge.enabled ? (
+            <span
+              data-ui="shared.callout-preview.badge"
+              style={{
+                background: badge.backgroundColor,
+                border: `${Math.min(1.5, badge.borderWidth * 0.35)}px solid ${badge.borderColor}`,
+                borderRadius:
+                  badge.shape === 'square' ? 0 : badge.shape === 'circle' ? badgeSize / 2 : 2,
+                display: 'inline-block',
+                height: badgeSize,
+                width: Math.max(badgeSize, Math.min(14, badge.text.length * 3.2 + 3)),
+              }}
+            />
+          ) : null}
+          <div
+            style={{
+              color: surface.textColor,
+              fontSize: 4,
+              lineHeight: '5px',
+              opacity: 0.76,
+              ...props.customStyles.body,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{ background: 'currentColor', display: 'block', height: 1, width: '88%' }}
+            />
+            <span
+              aria-hidden="true"
+              style={{
+                background: 'currentColor',
+                display: 'block',
+                height: 1,
+                marginTop: 2,
+                width: '58%',
+              }}
+            />
+          </div>
+        </div>
+      </foreignObject>
       {hasWedgeOutline ? (
         <path
           d={getWedgeOutlinePath(radius)}
@@ -337,7 +334,6 @@ export function CalloutPresetPreview({
   style: CalloutVisualStyle;
 }) {
   const id = useId().replaceAll(':', '');
-  const checkerPatternId = `callout-checker-${id}`;
   const clipPathId = `callout-surface-${id}`;
   const normalizedStyle = cloneCalloutVisualStyle(style);
   const customStyles = resolveCalloutCustomCss(normalizedStyle.customCss).styles;
@@ -384,7 +380,6 @@ export function CalloutPresetPreview({
         ) : null}
         <CalloutPreviewConnector customStyles={customStyles} style={normalizedStyle} />
         <CalloutPreviewCard
-          checkerPatternId={checkerPatternId}
           clipPathId={clipPathId}
           customStyles={customStyles}
           style={normalizedStyle}

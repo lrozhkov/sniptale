@@ -1,8 +1,7 @@
 import {
-  deleteEditorSessionDraft,
-  getEditorSessionDraft,
-} from '../../../composition/persistence/editor-sessions/index';
-import type { EditorSessionEntry } from '../../../composition/persistence/editor-sessions/contracts';
+  getImageWorkspace,
+  type ImageWorkspaceEntry,
+} from '../../../composition/persistence/image-workspaces';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
@@ -15,13 +14,16 @@ export function activateAutosaveContext(
   state: EditorSessionAutosaveState,
   context: ActiveEditorSessionContext
 ): void {
+  clearPendingAutosaveTimer(state);
+  state.pendingDocument = null;
+  state.lastWriteError = null;
   state.activeContext = context;
-  useEditorStore.getState().setSessionId(context.sessionId);
+  useEditorStore.getState().setSessionId(context.aggregateId);
 }
 
 export function updateAutosaveContext(
   state: EditorSessionAutosaveState,
-  patch: Partial<Omit<ActiveEditorSessionContext, 'sessionId'>>
+  patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>
 ): void {
   if (!state.activeContext) {
     return;
@@ -35,16 +37,17 @@ export function updateAutosaveContext(
 
 export async function restoreAutosaveDraft(
   state: EditorSessionAutosaveState,
-  sessionId: string
-): Promise<EditorSessionEntry | undefined> {
-  const entry = await getEditorSessionDraft(sessionId);
+  aggregateId: string
+): Promise<ImageWorkspaceEntry | undefined> {
+  const entry = await getImageWorkspace(aggregateId);
   if (!entry) {
     return undefined;
   }
 
   activateAutosaveContext(state, {
-    sessionId: entry.sessionId,
-    assetId: entry.assetId,
+    aggregateId: entry.aggregateId,
+    durableRevision: entry.revision,
+    renderPresentation: state.activeContext?.renderPresentation ?? null,
     sourceUrl: entry.sourceUrl,
     sourceTitle: entry.sourceTitle,
   });
@@ -54,16 +57,10 @@ export async function restoreAutosaveDraft(
 
 export async function discardAutosaveDraft(
   state: EditorSessionAutosaveState,
-  sessionId?: string | null
+  _aggregateId?: string | null
 ): Promise<void> {
-  const resolvedSessionId = sessionId ?? state.activeContext?.sessionId ?? null;
   clearPendingAutosaveTimer(state);
   state.pendingDocument = null;
-
-  if (resolvedSessionId) {
-    await deleteEditorSessionDraft(resolvedSessionId);
-  }
-
   setEditorSaveState('idle');
 }
 

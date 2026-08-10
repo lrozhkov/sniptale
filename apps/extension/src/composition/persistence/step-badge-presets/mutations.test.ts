@@ -67,5 +67,12 @@ it('adds, updates, orders, defaults, deletes, and resets valid presets', () => {
     customized: false,
     name: 'system-classic',
   });
+  const tagged = {
+    ...catalog,
+    presets: catalog.presets.map((preset, index) =>
+      index === 0 ? { ...preset, tagIds: ['tag-one'] } : preset
+    ),
+  };
+  expect(resetSystemStepBadgePreset(tagged, 'system-classic')?.presets[0]!.tagIds).toEqual([]);
   expect(resetSystemStepBadgePreset(catalog, 'missing')).toBeNull();
 });

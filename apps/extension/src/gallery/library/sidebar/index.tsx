@@ -9,6 +9,7 @@ import {
   GalleryFolderList,
   GalleryStorageCard,
   GalleryTagsCard,
+  GalleryScopePicker,
 } from './sections';
 
 const gallerySidebarPanelClassName = [
@@ -29,6 +30,7 @@ export function GallerySidebar(props: GallerySidebarProps) {
       dataUi="gallery.sidebar.shell"
     >
       <InspectorShellPanel dataUi="gallery.sidebar.panel" className={gallerySidebarPanelClassName}>
+        <GalleryScopePicker {...props} />
         <GalleryFolderList {...props} />
         <GalleryStorageCard {...props} />
         <GalleryTagsCard {...props} />

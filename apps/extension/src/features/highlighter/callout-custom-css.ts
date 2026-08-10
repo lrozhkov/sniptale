@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { containsUnsafeCssSyntax } from '@sniptale/platform/security/css-safety';
 import { validateCssString } from './css-sanitizer/css';
 import { validateCssPolicyString } from './css-sanitizer/css';
+import { canonicalizeSurfaceCss, projectCanonicalSurfaceCss } from './surface-style/surface-css';
 
 const CALLOUT_CSS_TARGETS = ['card', 'title', 'body', 'connector', 'accent'] as const;
 
@@ -30,6 +31,7 @@ const DECORATION_PROPERTIES = [
   'backgroundPosition',
   'backgroundRepeat',
   'backgroundSize',
+  'backdropFilter',
   'boxShadow',
   'color',
   'filter',
@@ -102,13 +104,26 @@ export function validateCalloutCustomCss(
   value: string
 ): Pick<CalloutCustomCssValidation, 'blockedProperties' | 'error'> {
   if (!value.trim()) return { blockedProperties: [], error: null };
-  if (value.length > 4_000 || value.includes('@') || containsUnsafeCssSyntax(value)) {
+  if (value.length > 8_000 || value.includes('@') || containsUnsafeCssSyntax(value)) {
     return { blockedProperties: [], error: 'unsafe' };
   }
   const sections = parseSections(value);
   if (!sections) return { blockedProperties: [], error: 'syntax' };
   const blockedProperties: string[] = [];
   for (const target of CALLOUT_CSS_TARGETS) {
+    if (target === 'card') {
+      const cardDeclarations = sections.card.join('\n').trim();
+      const cardPolicy = validateCssPolicyString(cardDeclarations);
+      if (cardPolicy.rawError) return { blockedProperties: [], error: 'syntax' };
+      if (cardPolicy.blockedProps.length > 0) {
+        blockedProperties.push(...cardPolicy.blockedProps);
+        continue;
+      }
+      if (canonicalizeSurfaceCss(cardDeclarations) === null) {
+        return { blockedProperties: [], error: 'syntax' };
+      }
+      continue;
+    }
     const validation = validateCssPolicyString(sections[target].join('\n').trim());
     if (validation.rawError) return { blockedProperties: [], error: 'syntax' };
     blockedProperties.push(...validation.blockedProps);
@@ -137,6 +152,12 @@ export function resolveCalloutCustomCss(value: string): CalloutCustomCssValidati
   for (const target of CALLOUT_CSS_TARGETS) {
     const declarations = sections[target].join('\n').trim();
     if (!declarations) continue;
+    if (target === 'card') {
+      const projected = projectCanonicalSurfaceCss(declarations);
+      if (!projected) return fail('syntax');
+      styles.card = projected;
+      continue;
+    }
     const validation = validateCssString(declarations);
     if (validation.rawError) return fail('syntax');
     if (

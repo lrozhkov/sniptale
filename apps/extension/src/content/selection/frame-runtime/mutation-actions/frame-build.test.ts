@@ -35,6 +35,7 @@ function createHighlighterSettings(): HighlighterSettings {
         id: 'preset-1',
         name: 'Orange',
         order: 0,
+        tagIds: [],
         width: 3,
         color: '#ff671d',
         style: 'solid',
@@ -47,7 +48,7 @@ function createHighlighterSettings(): HighlighterSettings {
         },
         shadow: 30,
         customCss: '',
-        fillColor: '#00000000',
+        fillPaint: { kind: 'solid' as const, color: '#00000000' },
         inheritCustomCss: false,
       },
     ],
@@ -90,7 +91,7 @@ function createBuildArgs() {
     },
     shadow: 0,
     customCss: '',
-    fillColor: '#00000000',
+    fillPaint: { kind: 'solid' as const, color: '#00000000' },
     inheritCustomCss: false,
   };
 

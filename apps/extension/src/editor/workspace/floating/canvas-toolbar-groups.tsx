@@ -2,18 +2,12 @@ import type { CompactCommand } from '../../inspector/compact';
 import { translate } from '../../../platform/i18n';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { TablerIcon } from '../../inspector/compact/tabler-icon';
-import { isArrowToolbarCommandSet, sortArrowToolbarGroups } from './arrow-toolbar-groups';
-import { isBlurToolbarCommandSet, sortBlurToolbarGroups } from './blur-toolbar-groups';
-import { isBrushToolbarCommandSet, sortBrushToolbarGroups } from './brush-toolbar-groups';
-import { isLineToolbarCommandSet, sortLineToolbarGroups } from './line-toolbar-groups';
 import {
   createImageToolbarGroups,
   isImageToolbarCommandSet,
   sortImageToolbarGroups,
 } from './image-toolbar-groups';
-import { isShapeToolbarCommandSet, sortShapeToolbarGroups } from './shape-toolbar-groups';
 import { isStepToolbarCommandSet, sortStepToolbarGroups } from './step-toolbar-groups';
-import { isTextToolbarCommandSet, sortTextToolbarGroups } from './text-toolbar-groups';
 import { createCanvasToolbarImageGeometryGroup } from './canvas-toolbar-image-geometry';
 import {
   buildCanvasToolbarMoreContent,
@@ -73,25 +67,13 @@ function resolveVisibleGroups(args: {
   commandGroups: FloatingToolbarGroup[];
   documentController: EditorFloatingDocumentController;
   handlers: CanvasToolbarActionHandlers;
-  isArrowToolbar: boolean;
-  isBlurToolbar: boolean;
-  isBrushToolbar: boolean;
-  isLineToolbar: boolean;
   isImageToolbar: boolean;
-  isShapeToolbar: boolean;
   isStepToolbar: boolean;
-  isTextToolbar: boolean;
   selection: EditorToolbarSelectionState;
 }) {
   const effectsGroup =
-    args.isBrushToolbar ||
-    args.isBlurToolbar ||
-    args.isLineToolbar ||
     args.isImageToolbar ||
-    args.isArrowToolbar ||
-    args.isShapeToolbar ||
     args.isStepToolbar ||
-    args.isTextToolbar ||
     args.commandGroups.some((group) => group.kind === 'effects') ||
     !args.selection.selectedObjectId
       ? null
@@ -116,14 +98,8 @@ function resolveVisibleGroups(args: {
 
 function resolveToolbarCommandSetFlags(commands: CompactCommand[]) {
   return {
-    isArrowToolbar: isArrowToolbarCommandSet(commands),
-    isBlurToolbar: isBlurToolbarCommandSet(commands),
-    isBrushToolbar: isBrushToolbarCommandSet(commands),
     isImageToolbar: isImageToolbarCommandSet(commands),
-    isLineToolbar: isLineToolbarCommandSet(commands),
-    isShapeToolbar: isShapeToolbarCommandSet(commands),
     isStepToolbar: isStepToolbarCommandSet(commands),
-    isTextToolbar: isTextToolbarCommandSet(commands),
   };
 }
 
@@ -131,29 +107,11 @@ function sortCanvasToolbarGroups(
   groups: FloatingToolbarGroup[],
   flags: ReturnType<typeof resolveToolbarCommandSetFlags>
 ) {
-  if (flags.isBrushToolbar) {
-    return sortBrushToolbarGroups(groups);
-  }
-  if (flags.isBlurToolbar) {
-    return sortBlurToolbarGroups(groups);
-  }
-  if (flags.isLineToolbar) {
-    return sortLineToolbarGroups(groups);
-  }
   if (flags.isImageToolbar) {
     return sortImageToolbarGroups(groups);
   }
-  if (flags.isArrowToolbar) {
-    return sortArrowToolbarGroups(groups);
-  }
-  if (flags.isShapeToolbar) {
-    return sortShapeToolbarGroups(groups);
-  }
   if (flags.isStepToolbar) {
     return sortStepToolbarGroups(groups);
-  }
-  if (flags.isTextToolbar) {
-    return sortTextToolbarGroups(groups);
   }
 
   return sortLayerToolbarGroups(groups);

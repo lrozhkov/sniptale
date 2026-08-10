@@ -2,7 +2,6 @@ import { Canvas } from 'fabric';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { attachEditorControllerEventHandlers } from '../../../events';
 import { createEditorMagnetManager } from '../../../magnet';
-import { clearEditorRasterSelection } from '../../../raster-tools/session';
 import {
   applyEditorViewportZoom,
   getEditorViewportDevicePixelRatioBaseline,
@@ -74,7 +73,6 @@ export function mountEditorController(
       getWorkspace: () => useEditorStore.getState().workspace,
     });
     controller.selectionNudgeSession = null;
-    clearEditorRasterSelection(controller.rasterToolSession);
     controller.syncRuntimeState();
     canvasReadyHandoff.markReady(mountGeneration);
   } catch (error) {

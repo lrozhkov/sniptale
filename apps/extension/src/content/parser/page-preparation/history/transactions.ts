@@ -2,6 +2,7 @@ import {
   captureHistorySnapshot,
   normalizeHistoryDomBatch,
   normalizeHistoryDomEffect,
+  notifyHistoryCleared,
   notifyHistoryReachabilityChanged,
   publishHistoryState,
   pushHistoryEntry,
@@ -197,23 +198,29 @@ function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
       cancelHistoryTransaction(state, key);
     },
     clear(): void {
+      if (state.isApplying) {
+        return;
+      }
       state.past = [];
       state.future = [];
       state.deferredCommits.clear();
       state.transactions.clear();
       clearHistoryDomLocators();
-      state.bridge?.onHistoryCleared?.();
+      notifyHistoryCleared(state);
       publishHistoryState(state);
     },
-    commitEntry(args: HistoryEntryArgs): void {
+    commitEntry(args: HistoryEntryArgs): boolean {
       if (state.isApplying) {
-        return;
+        return false;
       }
 
       const entry = createEntryFromArgs(state, args);
       if (entry) {
-        if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
+        const committed = pushHistoryEntry(state, entry);
+        if (!committed) notifyHistoryReachabilityChanged(state);
+        return committed;
       }
+      return false;
     },
     commitTransaction(
       key: string,

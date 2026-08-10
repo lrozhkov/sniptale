@@ -7,6 +7,8 @@ import type {
 } from '../../../../../features/scenario/contracts/types/project';
 import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub/events';
 import { createScenarioStoreMutationQueue } from '../mutation-queue';
+import { loadSettings } from '../../../settings';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../library-lifecycle';
 
 const enqueueProjectRecordMutation = createScenarioStoreMutationQueue();
 
@@ -16,7 +18,13 @@ const enqueueProjectRecordMutation = createScenarioStoreMutationQueue();
 export async function createScenarioProjectRecord(name: string): Promise<ScenarioProject> {
   return enqueueProjectRecordMutation(async () => {
     const project = createScenarioProject(name);
-    const savedProject = await saveScenarioProject(project, { baseUpdatedAt: null });
+    const settings = await loadSettings().catch(() => null);
+    const savedProject = await saveScenarioProject(project, {
+      baseUpdatedAt: null,
+      storageClass:
+        settings?.localStoragePolicy.defaultDestination ??
+        DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+    });
     publishMediaHubLibraryChanged('create', [`scenario:${savedProject.id}`]);
     return savedProject;
   });

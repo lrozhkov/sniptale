@@ -8,8 +8,9 @@ import type { UseGalleryAppActionsResult } from '../../library/actions/useGaller
 import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
-const { layoutPropsMock } = vi.hoisted(() => ({
+const { layoutPropsMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   layoutPropsMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
 }));
 
 vi.mock('./layout', () => ({
@@ -44,6 +45,7 @@ type TestLayoutProps = {
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
+  onPreviewPromote: (item: unknown) => Promise<void>;
   onPreviewResetChanges: () => void;
   onRefresh: () => void;
   onRemoveTag: (tag: string) => void;
@@ -89,9 +91,12 @@ function createActions(): UseGalleryAppActionsResult {
       close: vi.fn(async () => undefined),
       copy: vi.fn(),
       download: vi.fn(),
+      downloadOriginal: vi.fn(),
       openInEditor: vi.fn(),
       openSnapshotScreenshotInEditor: vi.fn(),
       resetChanges: vi.fn(),
+      restoreOriginal: vi.fn(),
+      saveCopy: vi.fn(),
       saveMetadata: vi.fn(async () => undefined),
     },
     selection: {
@@ -136,6 +141,7 @@ function renderBindings() {
       <GalleryAppBindings
         actions={actions}
         controller={controllerState.controller}
+        messaging={{ sendRuntimeMessage: sendRuntimeMessageMock }}
         onRefreshAll={onRefreshAll}
         setViewMode={setViewMode}
         viewMode={viewMode}
@@ -217,4 +223,43 @@ it('deduplicates tags when the add-tag action runs repeatedly', () => {
   });
 
   expect(getState().preview.draft.tags).toEqual(['beta']);
+});
+
+it('promotes each supported gallery owner and refreshes the active scope', async () => {
+  const { controller, layoutProps } = renderBindings();
+  sendRuntimeMessageMock.mockResolvedValue({ result: 'promoted', success: true });
+  const items = [
+    createMediaItem({ id: 'media-1' }),
+    { entityId: 'scenario-1', id: 'scenario:scenario-1', type: 'scenario' },
+    { entityId: 'video-1', id: 'video-project:video-1', type: 'video-project' },
+    {
+      entityId: 'export-1',
+      id: 'scenario-export:export-1',
+      project: { id: 'scenario-2' },
+      type: 'scenario-export',
+    },
+  ];
+
+  for (const item of items) {
+    await act(async () => layoutProps.onPreviewPromote(item));
+  }
+
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(1, {
+    aggregate: { id: 'media-1', kind: 'image' },
+    type: 'PROMOTE_AGGREGATE_TO_LIBRARY',
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
+    aggregate: { id: 'scenario-1', kind: 'scenario' },
+    type: 'PROMOTE_AGGREGATE_TO_LIBRARY',
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(3, {
+    aggregate: { id: 'video-1', kind: 'video-project' },
+    type: 'PROMOTE_AGGREGATE_TO_LIBRARY',
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(4, {
+    aggregate: { id: 'scenario-2', kind: 'scenario' },
+    type: 'PROMOTE_AGGREGATE_TO_LIBRARY',
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(4);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(4);
 });

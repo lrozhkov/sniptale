@@ -3,19 +3,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { EditorTool } from '../../../features/editor/document/types';
 import type { CompactCommand } from '../../inspector/compact';
-import { useEditorStore } from '../../state/useEditorStore';
-import {
-  buildRasterBrushCompactCommands,
-  buildRasterEraserCompactCommands,
-  buildRasterFillCompactCommands,
-  buildRasterSelectionCompactCommands,
-} from '../../inspector/compact/tool-commands/raster';
-import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
-import { ToolPropertiesButton } from './tool-properties-button';
+import type { EditorToolbarSelectionState } from '../toolbar/types';
+import { resolveToolPropertiesStyle } from './tool-properties-geometry';
 
 const listeners = new Map<string, Set<() => void>>();
-const controller = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
+  drawingOptions: vi.fn((props: { selectedType?: string | null; tool: string }) => (
+    <div data-ui={`drawing-options.${props.tool}`}>{props.selectedType}</div>
+  )),
+  frameControls: vi.fn(() => <div data-ui="frame-controls" />),
+}));
+const controller = {
   canvas: {
     off: vi.fn((event: string, handler: () => void) => listeners.get(event)?.delete(handler)),
     on: vi.fn((event: string, handler: () => void) => {
@@ -24,55 +24,79 @@ const controller = vi.hoisted(() => ({
       listeners.set(event, bucket);
     }),
   },
-}));
+};
 
-vi.mock('../../application/controller-context', () => ({
-  EditorControllerProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+vi.mock('../../application/controller-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../application/controller-context')>()),
   useEditorController: () => controller,
-  useOptionalEditorController: () => null,
+}));
+vi.mock('../../drawing/options', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../drawing/options')>()),
+  EditorDrawingOptions: mocks.drawingOptions,
+}));
+vi.mock(
+  '../../../composition/frame-annotation-controls/creation-controls',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/frame-annotation-controls/creation-controls')
+    >()),
+    FrameAnnotationCreationControls: mocks.frameControls,
+  })
+);
+vi.mock('../../frame-annotation/creation-defaults', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../frame-annotation/creation-defaults')>()),
+  initializeFrameAnnotationCreationDefaults: vi.fn(),
+  setFrameAnnotationCreationDefaults: vi.fn(),
+  useFrameAnnotationCreationDefaults: () => ({}),
+}));
+vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/highlighter')>()),
+  loadHighlighterSettings: vi.fn(),
 }));
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
+import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
+
+let container: HTMLDivElement;
+let root: Root;
 
 function command(id: string): CompactCommand {
-  return { id, title: id, trigger: id, content: <div data-ui={`content.${id}`} /> };
+  return { content: <div data-ui={`content.${id}`} />, id, title: id, trigger: id };
 }
 
-function buildRasterCommands(activeTool: 'selection' | 'brush' | 'eraser' | 'fill') {
-  const controller = { clearRasterSelection: vi.fn() };
-  if (activeTool === 'selection') {
-    return buildRasterSelectionCompactCommands(controller);
-  }
-  if (activeTool === 'brush') {
-    return buildRasterBrushCompactCommands(controller);
-  }
-  if (activeTool === 'eraser') {
-    return buildRasterEraserCompactCommands(controller);
-  }
-  return buildRasterFillCompactCommands(controller);
+function selection(
+  overrides: Partial<EditorToolbarSelectionState> = {}
+): EditorToolbarSelectionState {
+  return {
+    hasSelection: false,
+    selectedObjectCount: 0,
+    selectedObjectId: null,
+    selectedObjectType: null,
+    ...overrides,
+  };
 }
 
-function renderRail(overrides: Record<string, unknown> = {}) {
-  const selection = (overrides['selection'] as never) ?? ({ hasSelection: false } as never);
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
+function renderRail(
+  overrides: {
+    activeTool?: EditorTool;
+    documentController?: { compactCommandGroups?: CompactCommand[][]; inspector?: string };
+    hasImage?: boolean;
+    leftDrawerOpen?: boolean;
+    selection?: Partial<EditorToolbarSelectionState>;
+  } = {}
+) {
+  const documentController = Object.assign(Object.create(null), {
+    compactCommandGroups: [[command('step-color'), command('step-size')]],
+    inspector: 'tool',
+    ...overrides.documentController,
+  });
   act(() => {
-    root?.render(
+    root.render(
       <EditorFloatingToolPropertiesRail
-        activeTool={(overrides['activeTool'] as never) ?? 'arrow'}
-        documentController={
-          {
-            compactCommandGroups: [[command('arrow-color'), command('arrow-width')]],
-            inspector: 'tool',
-            ...overrides,
-          } as never
-        }
-        hasImage
-        leftDrawerOpen={false}
-        selection={selection}
+        activeTool={overrides.activeTool ?? 'pencil'}
+        documentController={documentController}
+        hasImage={overrides.hasImage ?? true}
+        leftDrawerOpen={overrides.leftDrawerOpen ?? false}
+        selection={selection(overrides.selection)}
       />
     );
   });
@@ -82,226 +106,79 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   listeners.clear();
   vi.clearAllMocks();
-  useEditorStore.setState({
-    rasterToolSettings: {
-      ...useEditorStore.getState().rasterToolSettings,
-      brushColor: '#ea580c',
-      brushHardness: 0.85,
-      brushOpacity: 1,
-      brushSize: 24,
-      fillMode: 'bucket',
-      selectionMode: 'marquee',
-    },
-    rasterSelection: {
-      hasSelection: true,
-      targetLayerId: 'layer-1',
-      targetLayerName: 'Layer 1',
-    },
-  } as never);
-});
-
-afterEach(() => {
-  act(() => root?.unmount());
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
-});
-
-it('shows future-tool properties as a vertical rail and opens titleless group popovers', () => {
-  renderRail();
-
-  const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]');
-  expect(rail).not.toBeNull();
-  expect(rail?.style.getPropertyValue('--editor-tool-properties-top')).toContain('50vh');
-  const colorButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="editor.floating.tool-properties.group.line-color"]'
-  );
-  const sizeButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="editor.floating.tool-properties.group.geometry"]'
-  );
-
-  expect(colorButton).not.toBeNull();
-  expect(sizeButton).not.toBeNull();
-  expect(sizeButton?.textContent).toContain('arrow-width');
-
-  act(() => colorButton?.click());
-
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.popover.line-color"]')
-  ).not.toBeNull();
-  expect(
-    container?.querySelector<HTMLElement>(
-      '[data-ui="editor.floating.tool-properties.popover.line-color"]'
-    )?.className
-  ).toContain('top-[var(--editor-tool-properties-popover-top)]');
-  expect(
-    container
-      ?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties.popover.line-color"]')
-      ?.style.getPropertyValue('--editor-floating-popover-max-height')
-  ).toBeTruthy();
-  expect(container?.querySelector('[data-ui="content.arrow-color"]')).not.toBeNull();
-});
-
-it('uses the same popover width tokens as the canvas toolbar groups', () => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-
-  act(() => {
-    root?.render(
-      <ToolPropertiesButton
-        active
-        group={{
-          id: 'shadow',
-          kind: 'effects',
-          title: 'Shadow',
-          trigger: 'S',
-          content: <div>Shadow controls</div>,
-          width: 'rich',
-        }}
-        onToggle={vi.fn()}
-      />
-    );
-  });
-
-  expect(
-    container?.querySelector<HTMLElement>(
-      '[data-ui="editor.floating.tool-properties.popover.shadow"]'
-    )?.className
-  ).toContain('w-[min(22rem,calc(100vw-6rem))]');
 });
 
-it('keeps a group open while interacting with portaled floating child layers', () => {
-  renderRail();
-
-  const colorButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="editor.floating.tool-properties.group.line-color"]'
-  );
-  act(() => colorButton?.click());
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.popover.line-color"]')
-  ).not.toBeNull();
-
-  const floatingLayer = document.createElement('div');
-  floatingLayer.setAttribute('data-floating-ui-root', 'true');
-  document.body.append(floatingLayer);
-
-  act(() => {
-    floatingLayer.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-  });
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.popover.line-color"]')
-  ).not.toBeNull();
-
-  act(() => {
-    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-  });
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.popover.line-color"]')
-  ).toBeNull();
-
-  floatingLayer.remove();
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
 });
 
-it('hides while drawing and stays absent for non-tool inspectors', () => {
-  renderRail();
-
-  act(() => {
-    listeners.get('mouse:down')?.forEach((handler) => handler());
-  });
-
-  expect(container?.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
-
-  act(() => root?.unmount());
-  root = null;
-  container?.remove();
-  renderRail({ inspector: 'frame' });
-
-  expect(container?.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
-});
-
-it('does not show the crop compact popover while canvas and image size controls own crop UI', () => {
-  renderRail({
-    activeTool: 'crop',
-    compactCommandGroups: [[command('crop-status'), command('crop-apply')]],
-  });
-
-  expect(container?.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
-  expect(container?.textContent).not.toContain('crop-status');
-});
-
-it('shows the connected three-button creation group for frame annotations', () => {
-  renderRail({ activeTool: 'frame-annotation', compactCommandGroups: [] });
-
+it('anchors current drawing tools and renders their shared options directly', () => {
+  renderRail({ activeTool: 'pencil', documentController: { compactCommandGroups: [] } });
+  expect(container.querySelector('[data-ui="drawing-options.pencil"]')).not.toBeNull();
   expect(
-    container?.querySelector('[data-ui="editor.frame-annotation.creation-controls"]')
-  ).not.toBeNull();
-  expect(container?.querySelector('[data-ui="frame-annotation.creation.frame"]')).not.toBeNull();
-  expect(container?.querySelector('[data-ui="frame-annotation.creation.callout"]')).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="frame-annotation.creation.step-badge"]')
-  ).not.toBeNull();
-});
-
-it.each(['selection', 'brush', 'eraser', 'fill'] as const)(
-  'keeps %s tool properties visible while a layer remains selected',
-  (activeTool) => {
-    renderRail({
-      activeTool,
-      compactCommandGroups: [buildRasterCommands(activeTool)],
-      selection: { hasSelection: true, selectedObjectId: 'layer-1' },
-    });
-
-    expect(container?.querySelector('[data-ui="editor.floating.tool-properties"]')).not.toBeNull();
-  }
-);
-
-it('groups brush compact commands by geometry, fill, effects, and more', () => {
-  renderRail({
-    activeTool: 'brush',
-    compactCommandGroups: [buildRasterBrushCompactCommands({ clearRasterSelection: vi.fn() })],
-  });
-
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.group.geometry"]')
-  ).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.group.fill"]')
-  ).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.group.effects"]')
-  ).not.toBeNull();
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.group.more"]')
-  ).not.toBeNull();
-  expect(container?.textContent).not.toContain('raster-brush-clear');
-});
-
-it('keeps raster tool future settings clickable while excluding selection-clear actions', () => {
-  renderRail({
-    activeTool: 'fill',
-    compactCommandGroups: [buildRasterFillCompactCommands({ clearRasterSelection: vi.fn() })],
-  });
-
-  expect(
-    container?.querySelector('[data-ui="editor.floating.tool-properties.group.fill"]')
-  ).not.toBeNull();
-  expect(container?.textContent).not.toContain('CLR');
-
-  act(() => {
     container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.tool-properties.group.fill"]')
-      ?.click();
+      .querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]')
+      ?.style.getPropertyValue('--editor-tool-properties-top')
+  ).toContain('clamp(5rem');
+
+  renderRail({
+    activeTool: 'select',
+    documentController: { compactCommandGroups: [] },
+    selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'blur' },
   });
+  expect(container.querySelector('[data-ui="drawing-options.blur"]')).not.toBeNull();
+});
 
-  const options = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('[role="group"] button') ?? []
+it('keeps retained step command groups interactive and dismissible', () => {
+  renderRail({ activeTool: 'step' });
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.tool-properties.group.fill"]'
   );
-  const inactiveOption = options.find((option) => option.getAttribute('aria-pressed') === 'false');
-  expect(inactiveOption).toBeDefined();
+  expect(button).not.toBeNull();
+  act(() => button?.click());
+  expect(
+    container.querySelector('[data-ui="editor.floating.tool-properties.popover.fill"]')
+  ).not.toBeNull();
+  act(() => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(
+    container.querySelector('[data-ui="editor.floating.tool-properties.popover.fill"]')
+  ).toBeNull();
+});
 
-  act(() => inactiveOption?.click());
+it('renders frame annotation creation controls and hides unavailable surfaces', () => {
+  renderRail({ activeTool: 'frame-annotation', documentController: { compactCommandGroups: [] } });
+  expect(container.querySelector('[data-ui="frame-controls"]')).not.toBeNull();
 
-  expect(useEditorStore.getState().rasterToolSettings.fillMode).toBe('linear-gradient');
+  renderRail({ activeTool: 'select', documentController: { compactCommandGroups: [] } });
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+
+  renderRail({
+    activeTool: 'step',
+    documentController: { inspector: 'frame' },
+    hasImage: false,
+  });
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+});
+
+it('hides during canvas interaction and restores after completion', () => {
+  vi.useFakeTimers();
+  renderRail({ activeTool: 'pencil' });
+  act(() => listeners.get('mouse:down')?.forEach((handler) => handler()));
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+  act(() => {
+    listeners.get('mouse:up')?.forEach((handler) => handler());
+    vi.advanceTimersByTime(250);
+  });
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).not.toBeNull();
+  vi.useRealTimers();
+});
+
+it('places primary, crop, and fallback tool anchors independently', () => {
+  expect(resolveToolPropertiesStyle('pencil')).not.toEqual(resolveToolPropertiesStyle('crop'));
+  expect(resolveToolPropertiesStyle('image')).not.toEqual(resolveToolPropertiesStyle('pencil'));
 });

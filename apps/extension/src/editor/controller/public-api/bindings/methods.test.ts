@@ -27,7 +27,7 @@ describe('editor controller public api method bindings', () => {
     };
 
     const methods = createEditorControllerPublicApiMethods(controller as never);
-    expect(methods.nextLabelIndex('rectangle')).toBe(7);
+    expect(methods.nextLabelIndex('shape')).toBe(7);
     await methods.applyDocument({ id: 'document' } as never, {} as never);
     expect(controller.applyDocument).toHaveBeenCalledWith({ id: 'document' }, {});
     expect(methods.renderToDataUrl({ format: 'png' } as never)).toBe('data:image/png;base64,abc');

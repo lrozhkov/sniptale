@@ -168,7 +168,7 @@ describe('ImageEditorControllerBase', () => {
       }
 
       exportDocument(): EditorDocument {
-        return { version: 1 } as EditorDocument;
+        return { version: 2 } as EditorDocument;
       }
 
       renderToDataUrl(_options: EditorRenderToDataUrlOptions): string {
@@ -187,7 +187,7 @@ describe('ImageEditorControllerBase', () => {
     const point = { x: 1, y: 2 } as Point;
     const frame = { preset: 'frame' } as unknown as EditorFrameSettings;
     const browserFrame = { enabled: true } as BrowserFrameState;
-    const document = { version: 1 } as EditorDocument;
+    const document = { version: 2 } as EditorDocument;
     const drawSession = { tool: 'arrow' } as DrawSession;
     const cropGuide = { kind: 'crop' } as unknown as Rect;
     const cropSelection = { kind: 'selection' } as unknown as CropSelection;
@@ -210,7 +210,6 @@ describe('ImageEditorControllerBase', () => {
     controller.cancelTransientInteraction();
     controller.startDrawSession('arrow', point, object);
     controller.getActiveCropRect();
-    controller.decorateShape(object, 'rectangle');
     controller.addObject(object);
     controller.moveSelection(1);
     controller.moveSelectionToEdge('front');
@@ -231,7 +230,7 @@ describe('ImageEditorControllerBase', () => {
     controller.applyToolMode();
     controller.refreshActiveToolSettingsPreview();
     controller.switchToSelectTool();
-    controller.nextLabelIndex('rectangle');
+    controller.nextLabelIndex('shape');
     controller.advanceStepValue();
 
     expect(helperMocks.createEditorControllerEventBindings).toHaveBeenCalledOnce();
@@ -245,17 +244,12 @@ describe('ImageEditorControllerBase', () => {
       point,
       object
     );
-    expect(helperMocks.decorateShapeForController).toHaveBeenCalledWith(
-      controller,
-      object,
-      'rectangle'
-    );
     expect(helperMocks.applyDocumentForController).toHaveBeenCalledWith(controller, document, {});
     expect(helperMocks.refreshActiveToolSettingsPreviewForController).toHaveBeenCalledWith(
       controller
     );
     expect(helperMocks.withHistoryMutedForController).toHaveBeenCalled();
-    expect(helperMocks.nextLabelIndexForController).toHaveBeenCalledWith(controller, 'rectangle');
+    expect(helperMocks.nextLabelIndexForController).toHaveBeenCalledWith(controller, 'shape');
     expect(helperMocks.advanceStepValueForController).toHaveBeenCalledOnce();
   });
 });

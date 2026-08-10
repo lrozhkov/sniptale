@@ -93,15 +93,15 @@ function registerPencilResizeTest() {
   });
 }
 
-function registerHighlighterResizeTest() {
-  it('keeps highlighter strokes uniform when resizing through layer actions', () => {
+function registerMarkerResizeTest() {
+  it('keeps marker strokes uniform when resizing through layer actions', () => {
     const ensureObjectReachable = vi.fn(() => true);
-    const highlighter = expectUniformResize(
-      'highlighter-1',
-      { sniptaleType: 'highlighter' },
+    const marker = expectUniformResize(
+      'marker-1',
+      { sniptaleType: 'marker' },
       ensureObjectReachable
     );
-    expect(highlighter.strokeUniform).toBe(true);
+    expect(marker.strokeUniform).toBe(true);
   });
 }
 
@@ -130,8 +130,8 @@ function registerStepResizeTest() {
   });
 }
 
-function registerRectangleResizeTest() {
-  it('normalizes rectangle geometry after layer resize without overwriting the radius intent', () => {
+function registerShapeResizeTest() {
+  it('normalizes shape geometry after layer resize without overwriting the radius intent', () => {
     const ensureObjectReachable = vi.fn(() => true);
     const rectangle = createObject('rectangle-1', {
       getCenterPoint: () => ({ x: 60, y: 35 }),
@@ -141,7 +141,7 @@ function registerRectangleResizeTest() {
       left: 10,
       sniptaleRole: 'annotation',
       sniptaleShapeRadius: 40,
-      sniptaleType: 'rectangle',
+      sniptaleType: 'shape',
       rx: 10,
       ry: 10,
       strokeWidth: 2,
@@ -205,9 +205,9 @@ function runLayerActionsResizeSuite() {
     vi.clearAllMocks();
   });
   registerPencilResizeTest();
-  registerHighlighterResizeTest();
+  registerMarkerResizeTest();
   registerStepResizeTest();
-  registerRectangleResizeTest();
+  registerShapeResizeTest();
   registerBlurResizeTest();
 }
 

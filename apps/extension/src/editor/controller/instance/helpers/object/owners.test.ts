@@ -1,3 +1,4 @@
+import { FabricObject } from 'fabric';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -75,7 +76,7 @@ it('adapts transient and draw session state back onto the controller instance', 
   expect(cancelTransientInteractionForController(controller)).toBe(true);
   startDrawSessionForController(
     controller,
-    'rectangle',
+    'shape',
     { x: 1, y: 2 } as never,
     {
       id: 'object',
@@ -90,8 +91,14 @@ it('adapts transient and draw session state back onto the controller instance', 
 it('adapts object initialization callbacks to controller commands', () => {
   const controller = createController();
   const textbox = { sniptaleTextInitialInsertPending: true };
+  mocks.addObjectMock.mockImplementationOnce((options) => {
+    options.prepareObject(textbox);
+    options.commitHistory();
+    options.syncRuntimeState();
+  });
   mocks.prepareObjectMock.mockImplementationOnce((_object, callbacks) => {
     callbacks.onTextboxExitEmpty(textbox);
+    callbacks.onTextboxExitCommit(textbox);
   });
 
   addObjectForController(controller, { id: 'object' } as never);
@@ -102,7 +109,20 @@ it('adapts object initialization callbacks to controller commands', () => {
   );
   expect(mocks.syncRasterEffectsMock).toHaveBeenCalledWith(textbox);
   expect(controller.canvas.remove).toHaveBeenCalledWith(textbox);
-  expect(controller.switchToSelectTool).toHaveBeenCalledOnce();
+  expect(controller.commitHistory).toHaveBeenCalledTimes(2);
+  expect(controller.syncRuntimeState).toHaveBeenCalledTimes(3);
+});
+
+it('keeps textbox cleanup safe while the controller canvas is detached', () => {
+  const controller = createController();
+  controller.canvas = null;
+  const textbox = new FabricObject();
+  mocks.prepareObjectMock.mockImplementationOnce((_object, callbacks) => {
+    callbacks.onTextboxExitEmpty(textbox);
+  });
+
+  initializeObjectForController(controller, textbox);
+
   expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
 });
 

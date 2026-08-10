@@ -34,6 +34,7 @@ import {
   buildEffectProjectDescriptor,
   createBackupVideoProjectEntry,
 } from './video-effect-descriptor';
+import { appendAggregatePresentation } from '../presentation';
 
 type ExportDatabase = Awaited<ReturnType<typeof initDB>>;
 
@@ -89,9 +90,15 @@ async function buildVideoProjectDescriptor(
     signal
   );
   assertBackupExportNotCancelled(signal);
-  const thumbnail = (await db.get(THUMBNAILS_STORE, `video-project:${entry.id}`)) as
-    | MediaThumbnailEntry
-    | undefined;
+  const presentation = await appendAggregatePresentation({
+    aggregateId: entry.id,
+    aggregateKind: 'video-project',
+    budget,
+    db,
+    pathPrefix: `aggregate-presentations/video-project/${projectSegment}`,
+    signal,
+    zip,
+  });
   assertBackupExportNotCancelled(signal);
 
   return normalizeVideoProject({
@@ -99,17 +106,7 @@ async function buildVideoProjectDescriptor(
     ...(effectProject ? { effectProject } : {}),
     projectAssets,
     projectExports,
-    ...(thumbnail
-      ? {
-          thumbnail: createBackupBlobDescriptor(
-            zip,
-            budget,
-            `video-projects/${projectSegment}/thumbnail`,
-            thumbnail,
-            signal
-          ),
-        }
-      : {}),
+    ...(presentation ? { presentation } : {}),
   });
 }
 

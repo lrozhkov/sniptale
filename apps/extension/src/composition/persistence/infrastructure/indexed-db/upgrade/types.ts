@@ -1,5 +1,5 @@
 type UpgradeStoreSchema = {
-  createIndex: (name: string, keyPath: string) => unknown;
+  createIndex: (name: string, keyPath: string | string[]) => unknown;
 };
 
 export type UpgradeDatabase = {

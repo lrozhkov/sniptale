@@ -1,11 +1,12 @@
 import {
   buildScenarioEditedCaptureStep,
-  createScenarioEditedCaptureAsset,
+  prepareScenarioEditedCaptureAsset,
 } from '../../../../../workflows/scenario-capture-edit/edits';
 import {
-  cloneScenarioStepEditorDocumentRecord,
-  saveScenarioStepEditorDocumentRecord,
+  getScenarioStepEditorDocumentRecord,
+  prepareScenarioStepEditorDocumentRecord,
 } from '../../../../../composition/persistence/scenario/store/step-editor-documents';
+import { commitScenarioAggregateSnapshotMutation } from '../../../../../composition/persistence/scenario/aggregate-mutations';
 import type { EditorDocument } from '../../../../../features/editor/document/types';
 import type {
   ScenarioProject,
@@ -21,31 +22,43 @@ import type { ScenarioProjectSelectionActionArgs } from '../types';
 
 export function createApplyEditedCaptureStepAction(args: {
   applyStepReplacement: (stepId: string, replaceStep: (step: ScenarioStep) => ScenarioStep) => void;
+  getCurrentProject: () => ScenarioProject | null;
   project: ScenarioProject | null;
+  updateProject: ScenarioProjectSelectionActionArgs['updateProject'];
 }) {
   return async (stepId: string, payload: { dataUrl: string; document: EditorDocument }) => {
-    const step = args.project?.steps.find((currentStep) => currentStep.id === stepId) ?? null;
-    if (!args.project || !step || !isScenarioCaptureStep(step)) {
+    const project = args.getCurrentProject();
+    const step = project?.steps.find((currentStep) => currentStep.id === stepId) ?? null;
+    if (!project || !step || !isScenarioCaptureStep(step)) {
       return;
     }
 
-    await saveScenarioStepEditorDocumentRecord({
+    const editorDocument = prepareScenarioStepEditorDocumentRecord({
       stepId,
-      projectId: args.project.id,
+      projectId: project.id,
       document: payload.document,
     });
 
-    const asset = await createScenarioEditedCaptureAsset({
+    const prepared = await prepareScenarioEditedCaptureAsset({
       dataUrl: payload.dataUrl,
       galleryAssetId: step.galleryAssetId,
-      projectId: args.project.id,
+      projectId: project.id,
     });
-
-    args.applyStepReplacement(stepId, (currentStep) =>
-      isScenarioCaptureStep(currentStep)
-        ? buildScenarioEditedCaptureStep(currentStep, asset.id, payload.document)
-        : currentStep
-    );
+    const nextProject = {
+      ...project,
+      steps: project.steps.map((currentStep) =>
+        currentStep.id === stepId && isScenarioCaptureStep(currentStep)
+          ? buildScenarioEditedCaptureStep(currentStep, prepared.asset.id, payload.document)
+          : currentStep
+      ),
+      updatedAt: getScenarioMutationTimestamp(),
+    };
+    const result = await commitScenarioAggregateSnapshotMutation({
+      baseProject: project,
+      children: { assetPuts: [prepared.entry], editorDocumentPuts: [editorDocument] },
+      nextProject,
+    });
+    args.updateProject((current) => (Object.is(current, project) ? result.project : current));
   };
 }
 
@@ -60,13 +73,17 @@ export function createDuplicateStepAction(args: ScenarioProjectSelectionActionAr
     const clonedStep = duplicateScenarioStep(currentProject.steps[currentIndex]!);
     args.setError(null);
 
+    let clonedEditorDocument;
     if (clonedStep.kind === 'capture') {
       try {
-        await cloneScenarioStepEditorDocumentRecord({
-          sourceStepId: stepId,
-          nextProjectId: currentProject.id,
-          nextStepId: clonedStep.id,
-        });
+        const source = await getScenarioStepEditorDocumentRecord(stepId);
+        clonedEditorDocument = source
+          ? prepareScenarioStepEditorDocumentRecord({
+              document: structuredClone(source.document),
+              projectId: currentProject.id,
+              stepId: clonedStep.id,
+            })
+          : undefined;
       } catch (error) {
         args.setError(
           resolveScenarioActionErrorMessage(error, 'Failed to duplicate scenario capture step')
@@ -75,25 +92,26 @@ export function createDuplicateStepAction(args: ScenarioProjectSelectionActionAr
       }
     }
 
-    let inserted = false;
-    args.updateProject((project) => {
-      const sourceIndex = project.steps.findIndex((step) => step.id === stepId);
-      if (sourceIndex < 0) {
-        return project;
-      }
-      const nextSteps = project.steps.slice();
-      nextSteps.splice(sourceIndex + 1, 0, clonedStep);
-      inserted = true;
-
-      return {
-        ...project,
-        updatedAt: getScenarioMutationTimestamp(),
-        steps: nextSteps,
-      };
-    });
-
-    if (inserted) {
+    const nextSteps = currentProject.steps.slice();
+    nextSteps.splice(currentIndex + 1, 0, clonedStep);
+    try {
+      const result = await commitScenarioAggregateSnapshotMutation({
+        baseProject: currentProject,
+        ...(clonedEditorDocument
+          ? { children: { editorDocumentPuts: [clonedEditorDocument] } }
+          : {}),
+        nextProject: {
+          ...currentProject,
+          updatedAt: getScenarioMutationTimestamp(),
+          steps: nextSteps,
+        },
+      });
+      args.updateProject((project) =>
+        Object.is(project, currentProject) ? result.project : project
+      );
       args.setSelectedStepId(clonedStep.id);
+    } catch (error) {
+      args.setError(resolveScenarioActionErrorMessage(error, 'Failed to duplicate scenario step'));
     }
   };
 }

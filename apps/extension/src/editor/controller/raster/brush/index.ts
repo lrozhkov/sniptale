@@ -1,1 +1,0 @@
-export { paintRasterBrushBitmap } from './paint';

@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   dataUrlToBlobMock: vi.fn(),
   saveAssetMock: vi.fn(),
   translateMock: vi.fn(),
-  updateAssetMock: vi.fn(),
   tabsGetMock: vi.fn(),
 }));
 
@@ -18,7 +17,6 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/media-hub/store')>()),
   saveScreenshotMediaAssetSafely: mocks.saveAssetMock,
-  updateScreenshotMediaAssetSafely: mocks.updateAssetMock,
 }));
 
 vi.mock('../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -41,7 +39,7 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   ensureMediaHubStorageHeadroom: mocks.ensureHeadroomMock,
 }));
 
-import { saveScreenshotToMediaHubFromDataUrl, updateGalleryImageAssetFromDataUrl } from './assets';
+import { saveScreenshotToMediaHubFromDataUrl } from './assets';
 
 function setupScreenshotBridgeTest() {
   vi.clearAllMocks();
@@ -82,21 +80,16 @@ async function verifiesScreenshotSaveWithResolvedTabMetadata() {
   );
 }
 
-async function verifiesFallbackMetadataAndGalleryAssetUpdate() {
+async function verifiesFallbackMetadata() {
   mocks.dataUrlToBlobMock.mockResolvedValue('blob');
   mocks.tabsGetMock.mockRejectedValue(new Error('missing'));
   mocks.saveAssetMock.mockResolvedValue({ id: 'asset-2' });
-  mocks.updateAssetMock.mockResolvedValue({ id: 'asset-3' });
 
   await expect(saveScreenshotToMediaHubFromDataUrl('data', 'shot.png', 9)).resolves.toBe('asset-2');
-  await expect(updateGalleryImageAssetFromDataUrl('asset-3', 'data', 'next.png')).resolves.toBe(
-    'asset-3'
-  );
 
   expect(mocks.saveAssetMock).toHaveBeenLastCalledWith(
     expect.objectContaining({ sourceFavicon: null, sourceTitle: null, sourceUrl: null })
   );
-  expect(mocks.updateAssetMock).toHaveBeenCalledWith('asset-3', 'blob', 'next.png');
 }
 
 async function verifiesLocalizedLowHeadroomCopy() {
@@ -126,9 +119,6 @@ describe('media hub bridge', () => {
   beforeEach(setupScreenshotBridgeTest);
 
   it('saves screenshots with resolved tab metadata', verifiesScreenshotSaveWithResolvedTabMetadata);
-  it(
-    'falls back to null source metadata and updates gallery assets',
-    verifiesFallbackMetadataAndGalleryAssetUpdate
-  );
+  it('falls back to null source metadata', verifiesFallbackMetadata);
   it('surfaces low headroom as localized media storage copy', verifiesLocalizedLowHeadroomCopy);
 });

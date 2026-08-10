@@ -68,6 +68,10 @@ function createRecordingEntry(recordingId: string, filename: string, size: numbe
 
 beforeEach(async () => {
   vi.resetAllMocks();
+  saveVideoProject.mockImplementation(async (project) => ({
+    ...project,
+    updatedAt: project.updatedAt + 1,
+  }));
   window.history.replaceState({}, '', '/video-editor.html');
   getVideoProject.mockResolvedValue({ status: 'notFound' });
   getRecordingTelemetry.mockResolvedValue(undefined);

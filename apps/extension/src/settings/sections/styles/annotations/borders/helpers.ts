@@ -1,6 +1,7 @@
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
 import { resolveBorderShadowVisual } from '../../../../../features/highlighter/style';
 import { getSettingsCountLabel } from '../../../../section-surface/text.helpers.ts';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 
 export function getHighlighterPresetCountLabel(count: number) {
   return getSettingsCountLabel(count, {
@@ -20,7 +21,7 @@ export function getHighlighterPresetPreviewStyle(preset: BorderPreset): React.CS
     borderStyle: preset.style,
     borderColor: preset.color,
     borderRadius: `${Math.min(preset.radius, 8)}px`,
-    backgroundColor: preset.fillColor,
+    background: serializePaintToCss(preset.fillPaint),
     boxShadow: shadowVisual.settingsRowBoxShadow,
   };
 }

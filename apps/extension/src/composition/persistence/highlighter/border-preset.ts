@@ -10,6 +10,8 @@ import {
   type BorderPresetEffects,
 } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
+import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';
+import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
 const blurTypes = new Set<BorderPresetEffects['blur']['blurType']>([
@@ -101,6 +103,9 @@ function isBorderPadding(value: unknown): value is BorderPadding {
 
 function parseBorderPreset(value: unknown): BorderPreset | null {
   const effects = isPlainRecord(value) ? parseBorderPresetEffects(value['effects']) : null;
+  const tagIds = isPlainRecord(value)
+    ? parseAnnotationTemplateTagIds(value['tagIds'])
+    : { invalid: true, value: [] };
   if (
     !isPlainRecord(value) ||
     !isString(value['id']) ||
@@ -117,12 +122,14 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     !isNumber(value['radius']) ||
     (value['opacity'] !== undefined && !isNumber(value['opacity'])) ||
     (value['strokeOpacity'] !== undefined && !isNumber(value['strokeOpacity'])) ||
+    (value['fillPaint'] !== undefined && parsePaint(value['fillPaint']) === null) ||
     (value['fillColor'] !== undefined && !isString(value['fillColor'])) ||
     (value['fillOpacity'] !== undefined && !isNumber(value['fillOpacity'])) ||
     (value['inheritCustomCss'] !== undefined && !isBoolean(value['inheritCustomCss'])) ||
     !isBorderPadding(value['padding']) ||
     !borderStyles.has(value['style'] as BorderPreset['style']) ||
-    effects === null
+    effects === null ||
+    tagIds.invalid
   ) {
     return null;
   }
@@ -148,11 +155,13 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     : fillColor;
   if (!canonicalColor || !canonicalFillColor) return null;
 
+  const parsedFillPaint = parsePaint(value['fillPaint']);
+  if (value['fillPaint'] !== undefined && !parsedFillPaint) return null;
   return normalizeBorderPresetVisualFields({
     customCss: value['customCss'],
     effects,
     color: canonicalColor,
-    fillColor: canonicalFillColor,
+    fillPaint: parsedFillPaint ?? createSolidPaint(canonicalFillColor),
     id: value['id'],
     inheritCustomCss: value['inheritCustomCss'] ?? false,
     name: value['name'],
@@ -162,6 +171,7 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     shadow,
     style: value['style'] as BorderPreset['style'],
     width: value['width'],
+    tagIds: tagIds.value,
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),
     ...(value['origin'] === undefined ? {} : { origin: value['origin'] as 'system' | 'user' }),
     ...(value['systemPresetKey'] === undefined

@@ -9,6 +9,7 @@ import { isScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import { isSafeScenarioAssetImageMimeType } from './projects/guards/asset-policy';
 import { parseScenarioProject } from './projects/guards';
 import { isNumber, isRecord, isString } from '../infrastructure/indexed-db/read-primitives.ts';
+import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 
 function isNullableString(value: unknown): value is string | null {
   return value === null || isString(value);
@@ -146,6 +147,28 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
   ) {
     return null;
   }
-
-  return { createdAt: value['createdAt'], id: value['id'], project, updatedAt: value['updatedAt'] };
+  const lifecycle = parseLibraryLifecycle(value['lifecycle'], {
+    storageClass: 'library',
+    updatedAt: value['updatedAt'],
+  });
+  if (lifecycle === null) return null;
+  const workspaceRevision = value['workspaceRevision'];
+  if (
+    workspaceRevision !== undefined &&
+    !(
+      typeof workspaceRevision === 'number' &&
+      Number.isInteger(workspaceRevision) &&
+      workspaceRevision >= 0
+    )
+  ) {
+    return null;
+  }
+  return {
+    createdAt: value['createdAt'],
+    id: value['id'],
+    ...(lifecycle === undefined ? {} : { lifecycle }),
+    project,
+    updatedAt: value['updatedAt'],
+    workspaceRevision: workspaceRevision ?? 0,
+  };
 }

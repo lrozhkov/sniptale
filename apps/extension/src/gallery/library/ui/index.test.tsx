@@ -4,13 +4,26 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { formatDateTimeMock, getCurrentLocaleMock, getMediaThumbnailMock, revokeObjectURLMock } =
-  vi.hoisted(() => ({
-    formatDateTimeMock: vi.fn(() => 'Jan 01, 2024, 12:30 PM'),
-    getCurrentLocaleMock: vi.fn(() => 'en'),
-    getMediaThumbnailMock: vi.fn(),
-    revokeObjectURLMock: vi.fn(),
-  }));
+const {
+  formatDateTimeMock,
+  getAggregatePresentationMock,
+  getCurrentLocaleMock,
+  getMediaThumbnailMock,
+  revokeObjectURLMock,
+} = vi.hoisted(() => ({
+  formatDateTimeMock: vi.fn(() => 'Jan 01, 2024, 12:30 PM'),
+  getAggregatePresentationMock: vi.fn(),
+  getCurrentLocaleMock: vi.fn(() => 'en'),
+  getMediaThumbnailMock: vi.fn(),
+  revokeObjectURLMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/aggregate-presentations')
+  >()),
+  getAggregatePresentation: getAggregatePresentationMock,
+}));
 
 vi.mock(
   '../../../composition/persistence/media-library/index.library.ts',
@@ -81,6 +94,7 @@ beforeEach(() => {
     revokeObjectURL: revokeObjectURLMock,
   });
   getMediaThumbnailMock.mockReset();
+  getAggregatePresentationMock.mockReset();
   revokeObjectURLMock.mockReset();
 });
 
@@ -95,6 +109,10 @@ afterEach(() => {
 });
 
 async function verifyGalleryHelpersAndLoadedThumb() {
+  getAggregatePresentationMock.mockResolvedValue({
+    thumbnailBlob: new Blob(['thumb']),
+    updatedAt: 1,
+  });
   getMediaThumbnailMock.mockResolvedValue({
     blob: new Blob(['thumb']),
   });
@@ -169,8 +187,9 @@ async function verifySyntheticThumbRerendersDoNotReloadStableFallbacks() {
 }
 
 async function verifyStableItemThumbRerendersDoNotReload() {
-  getMediaThumbnailMock.mockResolvedValue({
-    blob: new Blob(['thumb']),
+  getAggregatePresentationMock.mockResolvedValue({
+    thumbnailBlob: new Blob(['thumb']),
+    updatedAt: 1,
   });
   const item = createMediaThumbItem('asset-stable', 1);
 
@@ -179,7 +198,8 @@ async function verifyStableItemThumbRerendersDoNotReload() {
   renderItemThumb({ ...item, updatedAt: 2 });
   await flushEffects();
 
-  expect(getMediaThumbnailMock).toHaveBeenCalledTimes(1);
+  expect(getAggregatePresentationMock).toHaveBeenCalledTimes(1);
+  expect(getMediaThumbnailMock).not.toHaveBeenCalled();
   expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   expect(revokeObjectURLMock).not.toHaveBeenCalled();
 }

@@ -210,37 +210,6 @@ describe('loadEditorSaveOptions', () => {
   });
 });
 
-describe('saveEditorRenderedImage gallery failures', () => {
-  it('throws a typed storage prompt error when gallery save fails', async () => {
-    mockSendRuntimeMessage
-      .mockResolvedValueOnce({ success: true, updateCapabilityToken: 'update-token-1' })
-      .mockResolvedValueOnce({ error: 'Disk full', success: false });
-
-    let caughtError: unknown;
-    try {
-      await editorFileActions.saveEditorRenderedImage(controller);
-    } catch (error) {
-      caughtError = error;
-    }
-
-    expect(editorFileActions.isEditorStoragePromptError(caughtError)).toBe(true);
-    expect((caughtError as Error).message).toBe('Disk full');
-    expect(mockSendRuntimeMessage).toHaveBeenNthCalledWith(1, {
-      assetId: 'asset-1',
-      editorSessionId: 'session-1',
-      type: MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-    });
-    expect(mockSendRuntimeMessage).toHaveBeenNthCalledWith(2, {
-      assetId: 'asset-1',
-      dataUrl: 'data:image/png;base64,abc',
-      editorSessionId: 'session-1',
-      filename: undefined,
-      type: MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-      updateCapabilityToken: 'update-token-1',
-    });
-  }, 20000);
-});
-
 describe('saveEditorRenderedImage save flows', () => {
   it('falls back to execute-save flow for explicit save-as actions', async () => {
     window.history.replaceState({}, '', '/editor?assetId=asset-1');

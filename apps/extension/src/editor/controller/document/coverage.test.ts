@@ -137,7 +137,6 @@ describe('editor document lifecycle coverage', () => {
       document: { id: 'document' } as never,
       prepareObject,
       rebuildFrameDecorations,
-      upgradeLegacyArrowObjects: vi.fn(),
       zoomLevel: 2,
     });
 

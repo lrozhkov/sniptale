@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 const calls = vi.hoisted(() => ({
   calloutPreset: {
@@ -34,6 +35,7 @@ const calls = vi.hoisted(() => ({
   frameSelect: vi.fn(),
   frameToggle: vi.fn(),
   stepCreate: vi.fn(),
+  stepFrameVisuals: vi.fn(),
   stepOpen: vi.fn(),
   stepRefresh: vi.fn(),
   stepReset: vi.fn(),
@@ -75,6 +77,12 @@ vi.mock('./callout/body', async (importOriginal) => ({
       <button onClick={() => props['onShowPresets']()}>refresh</button>
       <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
       <button onClick={() => props['handleDelete']()}>disable</button>
+      <button data-ui="nested-surface-open" onClick={() => props['onNestedLayerChange']?.(true)}>
+        nested-open
+      </button>
+      <button data-ui="nested-surface-close" onClick={() => props['onNestedLayerChange']?.(false)}>
+        nested-close
+      </button>
     </div>
   ),
 }));
@@ -114,23 +122,26 @@ vi.mock('../../../ui/highlighter-preset-editor/callout', () => ({
 }));
 
 vi.mock('./step-badge/body', () => ({
-  StepBadgePopoverContent: (props: Record<string, any>) => (
-    <div>
-      <button onClick={() => props['onAlphabetChange']('cyrillic')}>alphabet</button>
-      <button onClick={() => props['onAnchorChange']('bottom-right')}>anchor</button>
-      <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
-      <button onClick={() => props['onAutoModeChange'](false)}>auto</button>
-      <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
-      <button onClick={() => props['onOffsetToggle']('up')}>offset</button>
-      <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
-      <button onClick={() => props['onSettingsChange']({ sizeLevel: 5 })}>settings</button>
-      <button onClick={() => props['onShowPresets']()}>refresh</button>
-      <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
-      <button onClick={() => props['onTypeChange']('letter')}>type</button>
-      <button onClick={() => props['onValueChange']('A12')}>value</button>
-      <button onClick={() => props['onDisable']()}>disable</button>
-    </div>
-  ),
+  StepBadgePopoverContent: (props: Record<string, any>) => {
+    calls.stepFrameVisuals(props['frameVisuals']);
+    return (
+      <div>
+        <button onClick={() => props['onAlphabetChange']('cyrillic')}>alphabet</button>
+        <button onClick={() => props['onAnchorChange']('bottom-right')}>anchor</button>
+        <button onClick={() => props['onApplyPreset'](props['presets'][0])}>apply</button>
+        <button onClick={() => props['onAutoModeChange'](false)}>auto</button>
+        <button onClick={() => props['onForkPreset'](props['presets'][0])}>fork</button>
+        <button onClick={() => props['onOffsetToggle']('up')}>offset</button>
+        <button onClick={() => props['onResetPreset'](props['presets'][0])}>reset</button>
+        <button onClick={() => props['onSettingsChange']({ sizeLevel: 5 })}>settings</button>
+        <button onClick={() => props['onShowPresets']()}>refresh</button>
+        <button onClick={() => props['onTogglePreset'](props['presets'][0])}>toggle</button>
+        <button onClick={() => props['onTypeChange']('letter')}>type</button>
+        <button onClick={() => props['onValueChange']('A12')}>value</button>
+        <button onClick={() => props['onDisable']()}>disable</button>
+      </div>
+    );
+  },
 }));
 vi.mock('./step-badge/preset-controller', () => ({
   useStepBadgePresetPopoverController: () => ({
@@ -285,6 +296,62 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('keeps parent Escape dismissal disabled until the nested Surface layer closes', async () => {
+  const onClose = vi.fn();
+  await act(async () =>
+    root.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={vi.fn()}
+        onClose={onClose}
+        onDisable={vi.fn()}
+        portalTarget={portal}
+        settings={createDefaultFrameCallout()}
+      />
+    )
+  );
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-open"]')!.click()
+  );
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-close"]')!.click()
+  );
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('clears nested Surface dismissal suppression when the parent closes and reopens', async () => {
+  const onClose = vi.fn();
+  const renderPopover = (isOpen: boolean) => (
+    <FutureCalloutSettingsPopover
+      anchorEl={anchor}
+      isOpen={isOpen}
+      onChange={vi.fn()}
+      onClose={onClose}
+      onDisable={vi.fn()}
+      portalTarget={portal}
+      settings={createDefaultFrameCallout()}
+    />
+  );
+  await act(async () => root.render(renderPopover(true)));
+  await act(async () =>
+    portal.querySelector<HTMLButtonElement>('[data-ui="nested-surface-open"]')!.click()
+  );
+  await act(async () => root.render(renderPopover(false)));
+  await act(async () => root.render(renderPopover(true)));
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
 it('wires every callout and numbering mutation through the shared popover owners', async () => {
   const onCalloutChange = vi.fn();
   const onStepChange = vi.fn();
@@ -419,6 +486,11 @@ it('projects creation settings into the three shared popovers and supports an in
     document.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.click())
   );
   expect(update).toHaveBeenCalledWith({ stepBadge: null });
+  expect(calls.stepFrameVisuals).toHaveBeenLastCalledWith({
+    borderColor: settings.borderSettings.color,
+    borderWidth: settings.borderSettings.width,
+    fillColor: getRepresentativeColor(settings.borderSettings.fillPaint),
+  });
 
   act(() =>
     root.render(

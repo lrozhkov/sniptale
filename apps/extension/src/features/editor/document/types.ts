@@ -1,40 +1,17 @@
-import type { BorderPreset, CalloutFontFamily } from '../../highlighter/contracts';
+import type { BorderPreset } from '../../highlighter/contracts';
 import type { EditorRasterEffect } from './effects';
 import type { EditorRichShapeDocumentObject } from './rich-shape/types';
-import type { EditorLineStyle } from './line-types';
 import type { EditorImageSettings } from './image-types';
 import type { EditorGradientColorStop } from './gradient';
-import type {
-  EditorTextAlign,
-  EditorTextCalloutFormat,
-  EditorTextLayoutMode,
-  EditorTextVerticalAlign,
-} from './text';
-export {
-  EDITOR_BRUSH_SHAPE_CORRECTION,
-  type EditorBrushSettings,
-  type EditorBrushShapeCorrectionMode,
-} from './brush-types';
 
 export type EditorTool =
   | 'select'
-  | 'selection'
-  | 'brush'
-  | 'eraser'
-  | 'fill'
   | 'pencil'
-  | 'highlighter'
+  | 'marker'
   | 'frame-annotation'
-  | 'shapes-and-lines'
-  | 'rough-shape'
-  | 'shape-library'
-  | 'rectangle'
-  | 'ellipse'
+  | 'shape'
   | 'blur'
-  | 'diamond'
   | 'arrow'
-  | 'line'
-  | 'callout'
   | 'text'
   | 'step'
   | 'image'
@@ -45,14 +22,11 @@ export type EditorObjectType =
   | 'source-image'
   | 'background'
   | 'pencil'
-  | 'highlighter'
+  | 'marker'
   | 'frame-annotation'
-  | 'rectangle'
-  | 'ellipse'
+  | 'shape'
   | 'blur'
-  | 'diamond'
   | 'arrow'
-  | 'line'
   | 'text'
   | 'step'
   | 'image'
@@ -60,26 +34,6 @@ export type EditorObjectType =
   | 'meta-stamp'
   | 'rich-shape';
 
-export type EditorArrowMode = 'straight' | 'curve';
-export type EditorArrowType = 'sharp' | 'curved' | 'elbow';
-export const EDITOR_ARROW_VARIANT = {
-  STANDARD: 'standard',
-  TAPERED: 'tapered',
-} as const;
-export type EditorArrowVariant = (typeof EDITOR_ARROW_VARIANT)[keyof typeof EDITOR_ARROW_VARIANT];
-export type EditorArrowHead =
-  | 'none'
-  | 'arrow'
-  | 'triangle'
-  | 'triangle-outline'
-  | 'bar'
-  | 'circle'
-  | 'circle-outline'
-  | 'diamond'
-  | 'diamond-outline'
-  | 'crosshair-circle'
-  | 'open'
-  | 'block';
 type BrowserFrameCanvasMode = 'resize' | 'keep-size';
 type BrowserFrameContentMode = 'push-down' | 'fit-content';
 type EditorBackgroundMode = 'color' | 'gradient' | 'image';
@@ -142,53 +96,8 @@ export interface EditorShapeSettings {
   inheritCustomCss: boolean;
 }
 
-export interface EditorArrowSettings {
-  color: string;
-  width: number;
-  style?: EditorLineStyle;
-  opacity: number;
-  shadow: BorderPreset['shadow'];
-  shadowAngle?: number;
-  shadowBlur?: number;
-  shadowColor?: string;
-  shadowDistance?: number;
-  variant: EditorArrowVariant;
-  mode: EditorArrowMode;
-  arrowType?: EditorArrowType;
-  dynamicWidth?: boolean;
-  roughness?: number;
-  bowing?: number;
-  startHead: EditorArrowHead;
-  endHead: EditorArrowHead;
-  startHeadSize?: number;
-  endHeadSize?: number;
-}
-
-export interface EditorTextSettings {
-  calloutFormat: EditorTextCalloutFormat;
-  layoutMode: EditorTextLayoutMode;
-  textAlign: EditorTextAlign;
-  verticalAlign: EditorTextVerticalAlign;
-  fontFamily: CalloutFontFamily;
-  fontSize: number;
-  fontWeight: 'normal' | 'bold';
-  fontStyle: 'normal' | 'italic';
-  underline: boolean;
-  linethrough: boolean;
-  textColor: string;
-  textOpacity: number;
-  backgroundColor: string;
-  backgroundOpacity: number;
-  shadow: BorderPreset['shadow'];
-  shadowAngle?: number;
-  shadowBlur?: number;
-  shadowColor?: string;
-  shadowDistance?: number;
-  tailSize: number;
-}
-
-interface EditorDocumentVersion1 {
-  version: 1;
+interface EditorDocumentVersion2 {
+  version: 2;
   sourceImageData: string;
   sourceName: string | null;
   sourceWidth: number;
@@ -205,7 +114,7 @@ interface EditorDocumentVersion1 {
   richShapes?: EditorRichShapeDocumentObject[];
 }
 
-export type EditorDocument = EditorDocumentVersion1;
+export type EditorDocument = EditorDocumentVersion2;
 
 export interface EditorLayerItem {
   effectCount: number;

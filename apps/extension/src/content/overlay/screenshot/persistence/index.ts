@@ -67,13 +67,21 @@ function assertFresh(assertFreshness: FreshnessAssertion | undefined): void {
 async function sendRuntimeMessageWithFreshness<TMessage extends ContentActionRuntimeMessage>(args: {
   assertFresh?: FreshnessAssertion | undefined;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
+  libraryDestinationRequested?: boolean;
   message: TMessage;
-}): Promise<void> {
+}): Promise<unknown> {
   assertFresh(args.assertFresh);
-  const messageWithIntent = await attachContentActionIntent(args.message, args.contentIntentSource);
+  const messageWithIntent = await attachContentActionIntent(
+    args.message,
+    args.contentIntentSource,
+    undefined,
+    { libraryDestinationRequested: args.libraryDestinationRequested === true }
+  );
   assertFresh(args.assertFresh);
-  await getContentRuntimeServices().messaging.sendRuntimeMessage(messageWithIntent);
+  const response =
+    await getContentRuntimeServices().messaging.sendRuntimeMessage(messageWithIntent);
   assertFresh(args.assertFresh);
+  return response;
 }
 
 async function executePresetSave(args: {
@@ -98,6 +106,7 @@ async function executePresetSave(args: {
 
 async function persistImmediateSelectionAction(args: {
   actionType: CaptureActionType;
+  assetId?: string;
   assertFresh?: FreshnessAssertion | undefined;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   dataUrl: string;
@@ -109,6 +118,7 @@ async function persistImmediateSelectionAction(args: {
       message: {
         type: MessageType.OPEN_EDITOR_WITH_IMAGE,
         dataUrl: args.dataUrl,
+        ...(args.assetId ? { assetId: args.assetId } : {}),
       },
     });
     return { successMessage: translate('content.runtime.sentToEditor') };
@@ -170,7 +180,6 @@ async function persistDeferredSelectionAction(args: {
       ...(presetId === undefined ? {} : { presetId }),
     },
   });
-
   return { successMessage: getSavedMessage(args.mode) };
 }
 
@@ -186,21 +195,31 @@ export async function persistSelectionCapture({
   const settings = await loadSettings();
   assertFresh(assertFreshness);
   const filename = generateFilename(mode);
+  const saveResponse = await sendRuntimeMessageWithFreshness({
+    assertFresh: assertFreshness,
+    contentIntentSource,
+    libraryDestinationRequested: actionType === 'save_to_library',
+    message: {
+      type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      dataUrl,
+      filename,
+    },
+  });
+  const assetId =
+    saveResponse &&
+    typeof saveResponse === 'object' &&
+    'assetId' in saveResponse &&
+    typeof saveResponse.assetId === 'string'
+      ? saveResponse.assetId
+      : undefined;
 
-  if (settings.saveCapturesToGallery) {
-    await sendRuntimeMessageWithFreshness({
-      assertFresh: assertFreshness,
-      contentIntentSource,
-      message: {
-        type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
-        dataUrl,
-        filename,
-      },
-    });
+  if (actionType === 'save_to_library') {
+    return { successMessage: getSavedMessage(mode) };
   }
 
   const immediateResult = await persistImmediateSelectionAction({
     actionType,
+    ...(assetId ? { assetId } : {}),
     assertFresh: assertFreshness,
     contentIntentSource,
     dataUrl,

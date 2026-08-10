@@ -2,6 +2,8 @@ import type {
   MediaLibraryEntry,
   MediaThumbnailEntry,
 } from '../../../composition/persistence/media-library/contracts';
+import type { AggregatePresentationEntry } from '../../../composition/persistence/aggregate-presentations/contracts';
+import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import type {
   ProjectAssetEntry,
   ProjectExportEntry,
@@ -41,11 +43,9 @@ export interface MediaHubBackupExportOptions {
   includeTelemetry: boolean;
   includeSourceMetadata: boolean;
   includeWebSnapshots: boolean;
-  includeEditorDrafts: boolean;
 }
 
 export interface MediaHubBackupDataClassFlags {
-  editorDrafts: boolean;
   mediaAssets: boolean;
   recordings: boolean;
   scenarioProjects: boolean;
@@ -74,6 +74,14 @@ export interface MediaHubBackupAssetDescriptor {
   assetPath: string | null;
   recordingTelemetry?: RecordingTelemetryEntry;
   thumbnailPath: string | null;
+  workspace?: ImageWorkspaceEntry;
+  presentation?: AggregatePresentationBackupDescriptor;
+}
+
+export interface AggregatePresentationBackupDescriptor {
+  entry: Omit<AggregatePresentationEntry, 'previewBlob' | 'thumbnailBlob'>;
+  previewPath: string | null;
+  thumbnailPath: string;
 }
 
 export interface MediaHubBackupMetadata {
@@ -121,7 +129,7 @@ export interface EffectProjectBackupDescriptor {
 }
 
 export interface VideoBackupProjectDescriptor {
-  entry: VideoProjectEntry;
+  entry: Omit<VideoProjectEntry, 'workspaceRevision'> & { workspaceRevision?: number };
   effectProject?: EffectProjectBackupDescriptor;
   projectAssets: ProjectAssetBackupBlobDescriptor[];
   projectExports: Array<{
@@ -131,15 +139,17 @@ export interface VideoBackupProjectDescriptor {
     thumbnail?: BackupBlobDescriptor;
   }>;
   thumbnail?: BackupBlobDescriptor;
+  presentation?: AggregatePresentationBackupDescriptor;
 }
 
 export interface ScenarioBackupProjectDescriptor {
   assets: BackupBlobDescriptor[];
-  entry: ScenarioProjectEntry;
+  entry: Omit<ScenarioProjectEntry, 'workspaceRevision'> & { workspaceRevision?: number };
   exports: ScenarioExportEntry[];
   stepDocuments: ScenarioStepEditorDocumentEntry[];
   thumbnail?: BackupBlobDescriptor;
   exportThumbnails?: BackupBlobDescriptor[];
+  presentation?: AggregatePresentationBackupDescriptor;
 }
 
 export interface MediaHubBackupSummary {
@@ -153,7 +163,6 @@ export interface MediaHubLocalBackupSummary {
   approximateSizeBytes: number;
   assetCount: number;
   dataClasses: MediaHubBackupDataClassFlags;
-  editorDraftCount: number;
   recordingCount: number;
   scenarioProjectCount: number;
   selectedCount: number;

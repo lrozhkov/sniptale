@@ -3,13 +3,11 @@ import {
   SCENARIO_V3_ELEMENT_KINDS,
   type ScenarioImageElement,
 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import {
-  createScenarioEditedCaptureAsset,
-  deleteScenarioEditedCaptureAsset,
-} from '../../workflows/scenario-capture-edit/edits';
-import { saveScenarioStepEditorDocumentRecord } from '../../composition/persistence/scenario/store/step-editor-documents';
+import { prepareScenarioEditedCaptureAsset } from '../../workflows/scenario-capture-edit/edits';
+import { prepareScenarioStepEditorDocumentRecord } from '../../composition/persistence/scenario/store/step-editor-documents';
 import { ScenarioImageElementEditorHost } from '../workspace/embedded-editor-host/ScenarioImageElementEditorHost';
 import type { useScenarioV3EditorState } from './state';
+import { updateElementInSession } from './commands';
 
 type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
 
@@ -54,46 +52,26 @@ async function applyEditedImageElement(args: {
   element: ScenarioImageElement;
   payload: { dataUrl: string; document: EditorDocument };
 }) {
-  const asset = await createScenarioEditedCaptureAsset({
+  const prepared = await prepareScenarioEditedCaptureAsset({
     dataUrl: args.payload.dataUrl,
     galleryAssetId: args.element.assetRef.galleryAssetId,
     projectId: args.editor.project.id,
   });
-  await saveImageElementEditorDocument({ ...args, assetId: asset.id });
-  args.editor.elementActions.updateElement(args.element.id, {
-    assetRef: { assetId: asset.id, galleryAssetId: asset.galleryAssetId },
-    contentTransform: { scale: 1, x: 0, y: 0 },
-    editDocumentId: args.documentId,
+  const editorDocument = prepareScenarioStepEditorDocumentRecord({
+    document: args.payload.document,
+    projectId: args.editor.project.id,
+    stepId: args.documentId,
   });
-}
-
-async function saveImageElementEditorDocument(args: {
-  assetId: string;
-  documentId: string;
-  editor: ScenarioV3EditorState;
-  payload: { document: EditorDocument };
-}) {
-  try {
-    await saveScenarioStepEditorDocumentRecord({
-      document: args.payload.document,
-      projectId: args.editor.project.id,
-      stepId: args.documentId,
-    });
-  } catch (error: unknown) {
-    await rollbackEditedImageAsset(args.assetId, error);
-  }
-}
-
-async function rollbackEditedImageAsset(assetId: string, cause: unknown): Promise<never> {
-  try {
-    await deleteScenarioEditedCaptureAsset(assetId);
-  } catch (rollbackError: unknown) {
-    throw new AggregateError(
-      [cause, rollbackError],
-      'Failed to save image editor document and roll back edited asset',
-      { cause: rollbackError }
-    );
-  }
-
-  throw cause;
+  await args.editor.projectActions.commitAggregateMutation(
+    (session) =>
+      updateElementInSession(session, args.element.id, {
+        assetRef: {
+          assetId: prepared.asset.id,
+          galleryAssetId: prepared.asset.galleryAssetId,
+        },
+        contentTransform: { scale: 1, x: 0, y: 0 },
+        editDocumentId: args.documentId,
+      }),
+    { assetPuts: [prepared.entry], editorDocumentPuts: [editorDocument] }
+  );
 }

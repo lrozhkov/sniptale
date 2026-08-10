@@ -43,6 +43,7 @@ function EyedropperActionButton(props: {
   return (
     <button
       type="button"
+      disabled={props.eyedropperPressed}
       aria-label={translate('shared.ui.colorSelectorEyedropper')}
       title={translate('shared.ui.colorSelectorEyedropper')}
       data-pressed={props.eyedropperPressed ? 'true' : 'false'}

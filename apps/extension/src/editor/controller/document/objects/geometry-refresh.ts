@@ -1,21 +1,14 @@
 import type { FabricObject } from 'fabric';
-import { getArrowSettings, isArrowObject, updateArrowObject } from '../../../objects/arrow';
 import { isBlurObject, updateBlurObject } from '../../../objects/annotation/blur/object';
-import { getLineSettings, isLineObject, updateLineObject } from '../../../objects/line';
+import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { refreshEditorDrawingBlurObject } from '../../../drawing/object/blur';
 
-export function refreshPreparedObjectGeometry(
-  object: FabricObject,
-  arrowSettings: ReturnType<typeof getArrowSettings> | null
-): void {
-  if (isArrowObject(object)) {
-    updateArrowObject(object, { settings: arrowSettings ?? getArrowSettings(object) });
-  }
-
-  if (isLineObject(object)) {
-    updateLineObject(object, { settings: getLineSettings(object) });
-  }
-
+export function refreshPreparedObjectGeometry(object: FabricObject): void {
   if (isBlurObject(object)) {
-    updateBlurObject(object);
+    if (readEditorDrawingObject(object)?.kind === 'blur') {
+      refreshEditorDrawingBlurObject(object);
+    } else {
+      updateBlurObject(object);
+    }
   }
 }

@@ -10,6 +10,11 @@ import { useScenarioController } from '../../scenario/controller';
 import type { ScreenshotControllerParams } from '../../screenshot/bridge';
 import { useScreenshotController } from '../../screenshot/controller';
 import { useToolbarModeController } from '../../toolbar/mode-controller';
+import {
+  useContentDrawingController,
+  type ContentDrawingController,
+} from '../../../drawing/controller';
+import { useDrawingModeIntegration } from '../../../drawing/mode';
 
 function disableAiPickModeDeferred() {
   disableAiPickModeIfLoaded();
@@ -26,6 +31,7 @@ function useContentScenarioController(modeState: ContentAppModeStateValue) {
     autoClickBlocked:
       modeState.aiPickMode ||
       modeState.designReviewMode ||
+      modeState.drawingMode ||
       modeState.highlighterMode ||
       modeState.quickEditMode,
     captureActionRef: modeState.captureActionRef,
@@ -73,7 +79,8 @@ function useContentToolbarModeController(modeState: ContentAppModeStateValue) {
 
 function useContentScreenshotController(
   modeState: ContentAppModeStateValue,
-  scenarioController: ReturnType<typeof useScenarioController>
+  scenarioController: ReturnType<typeof useScenarioController>,
+  drawingController: ContentDrawingController
 ) {
   const captureActionRef =
     modeState.captureActionRef as ScreenshotControllerParams['captureActionRef'];
@@ -85,6 +92,11 @@ function useContentScreenshotController(
     editingModes: {
       aiPickMode: modeState.aiPickMode,
       designReviewMode: modeState.designReviewMode,
+      ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
+      disableDrawingMode: () => {
+        drawingController.finalizeInteraction();
+        modeState.setDrawingMode?.(false);
+      },
       disableAiPickMode: disableAiPickModeDeferred,
       disableDesignReviewMode,
       disableHighlighterMode,
@@ -97,6 +109,9 @@ function useContentScreenshotController(
       quickEditMode: modeState.quickEditMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
+      ...(modeState.setDrawingMode === undefined
+        ? {}
+        : { setDrawingMode: modeState.setDrawingMode }),
       setHighlighterMode: modeState.setHighlighterMode,
       setQuickEditMode: modeState.setQuickEditMode,
     },
@@ -138,14 +153,34 @@ export function useContentAppControllers(
   modeState: ContentAppModeStateValue,
   dependencies: ContentAppControllerDependencies
 ): ContentCoreControllers {
+  const drawingController = useContentDrawingController();
   const scenarioController = useContentScenarioController(modeState);
-  const aiController = useContentAiController(modeState, dependencies);
-  const modeController = useContentToolbarModeController(modeState);
-  const screenshotController = useContentScreenshotController(modeState, scenarioController);
+  const baseAiController = useContentAiController(modeState, dependencies);
+  const baseModeController = useContentToolbarModeController(modeState);
+  const { disableDrawing, modeController } = useDrawingModeIntegration({
+    baseModeController,
+    controller: drawingController,
+    modeState,
+  });
+  const aiController = {
+    ...baseAiController,
+    handleAiPickContentStart: (
+      ...args: Parameters<typeof baseAiController.handleAiPickContentStart>
+    ) => {
+      disableDrawing();
+      return baseAiController.handleAiPickContentStart(...args);
+    },
+  };
+  const screenshotController = useContentScreenshotController(
+    modeState,
+    scenarioController,
+    drawingController
+  );
   useContentScreenshotAutoStartEffect(modeState, screenshotController);
 
   return {
     aiController,
+    drawingController,
     modeController,
     scenarioController,
     screenshotController,

@@ -69,7 +69,6 @@ it('strips nested web snapshot package source metadata from archived asset blobs
     entry: createWebSnapshotEntry(manifest),
     options: {
       includeSourceMetadata: false,
-      includeEditorDrafts: true,
       includeTelemetry: true,
       includeWebSnapshots: true,
       scope: 'all',

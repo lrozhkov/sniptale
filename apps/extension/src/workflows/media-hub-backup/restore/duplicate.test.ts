@@ -218,6 +218,8 @@ it('duplicates conflicting assets without deleting the existing record', async (
     expect.any(Blob),
     expect.any(Blob),
     null,
+    null,
+    null,
     null
   );
   expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('import', [nextEntry.id]);

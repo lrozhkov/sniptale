@@ -19,9 +19,8 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
-  MEDIA_LIBRARY_STORE: 'media_library',
-  THUMBNAILS_STORE: 'thumbnails',
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: mocks.initDB,
 }));
 vi.mock('../projects/index', async (importOriginal) => ({

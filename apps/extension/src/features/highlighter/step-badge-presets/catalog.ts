@@ -54,6 +54,7 @@ function createSystemPreset(
     systemPresetKey: key,
     basedOnRevision: SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION,
     customized: false,
+    tagIds: [],
     settings: {
       ...DEFAULT_STEP_BADGE_TEMPLATE,
       ...patch,
@@ -98,7 +99,11 @@ export function cloneStepBadgeTemplate(
 }
 
 export function cloneStepBadgePreset(preset: StepBadgePreset): StepBadgePreset {
-  return { ...preset, settings: cloneStepBadgeTemplate(preset.settings) };
+  return {
+    ...preset,
+    settings: cloneStepBadgeTemplate(preset.settings),
+    tagIds: [...preset.tagIds],
+  };
 }
 
 export function createSystemStepBadgePresetCatalog(): StepBadgePreset[] {

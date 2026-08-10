@@ -509,6 +509,46 @@ describe('FrameSettingsPopover preset selection', () => {
     vi.useRealTimers();
   });
 
+  it('keeps the frame settings open while interacting with the owned paint picker portal', async () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    storageMocks.loadHighlighterSettings.mockResolvedValue(createPersistedSettings());
+    renderPopover({ onClose });
+    await flushAsyncEffects();
+    act(() => vi.advanceTimersByTime(200));
+
+    const presetRow = getPresetRow('Persisted preset');
+    clickTrusted(presetRow.querySelector<HTMLElement>('[data-frame-style-action="fork"]')!);
+    clickTrusted(
+      document.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('highlighter.editor.fillSection')}"]`
+      )!
+    );
+
+    const trigger = document.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('highlighter.editor.fillColorLabel')}"]`
+    );
+    expect(trigger).not.toBeNull();
+    act(() => trigger?.click());
+    const paintField = document.querySelector<HTMLInputElement>(
+      '[data-ui="shared.ui.paint-selector.layer"] input'
+    );
+    expect(paintField).not.toBeNull();
+    act(() => {
+      paintField?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+      paintField?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector('.sniptale-frame-settings-popover')).not.toBeNull();
+    expect(document.querySelector('[data-ui="shared.ui.paint-selector.layer"]')).not.toBeNull();
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it('keeps the frame menu open when an owned overwrite-preset option is selected', async () => {
     vi.useFakeTimers();
     const onClose = vi.fn();

@@ -6,28 +6,19 @@ import type {
 } from '../../../../../features/scenario/contracts/types/project';
 import { createScenarioEditorProjectActions } from '..';
 
-const { deleteScenarioAssetRecordMock, deleteScenarioStepEditorDocumentRecordMock } = vi.hoisted(
-  () => ({
-    deleteScenarioAssetRecordMock: vi.fn(),
-    deleteScenarioStepEditorDocumentRecordMock: vi.fn(),
-  })
-);
+const { commitScenarioAggregateSnapshotMutationMock } = vi.hoisted(() => ({
+  commitScenarioAggregateSnapshotMutationMock: vi.fn(),
+}));
 
 vi.mock(
-  '../../../../../composition/persistence/scenario/store/step-editor-documents',
+  '../../../../../composition/persistence/scenario/aggregate-mutations',
   async (importOriginal) => ({
     ...(await importOriginal<
-      typeof import('../../../../../composition/persistence/scenario/store/step-editor-documents')
+      typeof import('../../../../../composition/persistence/scenario/aggregate-mutations')
     >()),
-    cloneScenarioStepEditorDocumentRecord: vi.fn(),
-    deleteScenarioStepEditorDocumentRecord: deleteScenarioStepEditorDocumentRecordMock,
-    saveScenarioStepEditorDocumentRecord: vi.fn(),
+    commitScenarioAggregateSnapshotMutation: commitScenarioAggregateSnapshotMutationMock,
   })
 );
-
-vi.mock('../../../../../composition/persistence/scenario/store/project-records/assets', () => ({
-  deleteScenarioAssetRecord: deleteScenarioAssetRecordMock,
-}));
 
 function createNoteStep(id = 'step-note'): ScenarioNoteStep {
   return {
@@ -119,6 +110,10 @@ function createHarness(project = createProject()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  commitScenarioAggregateSnapshotMutationMock.mockImplementation(async ({ nextProject }) => ({
+    project: nextProject,
+    workspaceRevision: 2,
+  }));
 });
 
 it('clears trash entries and deletes persisted capture documents for removed steps', async () => {
@@ -127,8 +122,11 @@ it('clears trash entries and deletes persisted capture documents for removed ste
   await harness.actions.clearTrash();
 
   expect(harness.getProject().trash).toEqual([]);
-  expect(deleteScenarioAssetRecordMock).toHaveBeenCalledWith('asset-1');
-  expect(deleteScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith('trash-capture');
+  expect(commitScenarioAggregateSnapshotMutationMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      children: { assetDeletes: ['asset-1'], editorDocumentDeletes: ['trash-capture'] },
+    })
+  );
   expect(harness.setError).toHaveBeenCalledWith(null);
 });
 
@@ -140,17 +138,19 @@ it('keeps shared capture assets when an active step still references the same as
 
   await harness.actions.clearTrash();
 
-  expect(deleteScenarioAssetRecordMock).not.toHaveBeenCalled();
-  expect(deleteScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith('trash-capture');
+  expect(commitScenarioAggregateSnapshotMutationMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      children: { assetDeletes: [], editorDocumentDeletes: ['trash-capture'] },
+    })
+  );
 });
 
 it('keeps trash entries when persisted cleanup fails', async () => {
-  deleteScenarioAssetRecordMock.mockRejectedValueOnce(new Error('cleanup failed'));
+  commitScenarioAggregateSnapshotMutationMock.mockRejectedValueOnce(new Error('cleanup failed'));
   const harness = createHarness();
 
   await harness.actions.clearTrash();
 
   expect(harness.getProject().trash).toHaveLength(1);
-  expect(deleteScenarioStepEditorDocumentRecordMock).toHaveBeenCalledWith('trash-capture');
   expect(harness.setError).toHaveBeenCalledWith('cleanup failed');
 });

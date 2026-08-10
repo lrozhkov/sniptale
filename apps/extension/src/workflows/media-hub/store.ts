@@ -3,7 +3,6 @@ import {
   deleteMediaLibraryAsset,
   saveScreenshotMediaAsset,
   updateMediaLibraryEntry,
-  updateScreenshotMediaAsset,
 } from '../../composition/persistence/media-library/index';
 import {
   deleteRecording,
@@ -43,9 +42,7 @@ function assertSafeMediaFilename(filename: string): void {
 }
 
 function assertSafeOptionalMediaFilename(filename: string | undefined): void {
-  if (filename !== undefined) {
-    assertSafeMediaFilename(filename);
-  }
+  if (filename !== undefined) assertSafeMediaFilename(filename);
 }
 
 export async function saveScreenshotMediaAssetSafely(
@@ -70,20 +67,6 @@ export async function saveWebSnapshotMediaAssetSafely(
   );
   publishMediaHubLibraryChanged('create', [result.assetId]);
   return { assetId: result.assetId };
-}
-
-export async function updateScreenshotMediaAssetSafely(
-  assetId: string,
-  blob: Blob,
-  filename?: string
-): Promise<MediaLibraryEntry> {
-  assertSafeOptionalMediaFilename(filename);
-  const entry = await withMediaHubWriteGuard(
-    translate('shared.mediaHub.updateScreenshotAction'),
-    () => updateScreenshotMediaAsset(assetId, blob, filename)
-  );
-  publishMediaHubLibraryChanged('update', [entry.id]);
-  return entry;
 }
 
 export async function saveRecordingSafely(id: string, blob: Blob, filename: string): Promise<void> {

@@ -9,7 +9,7 @@ import type {
   EditorInspectorToolPatchActions,
 } from './types';
 
-export interface EditorInspectorSelectionPanelState {
+interface EditorInspectorSelectionPanelState {
   selection: EditorSelectionState;
   highlightedTool: EditorTool;
   inspectorToolSettings: EditorToolSettings;
@@ -18,14 +18,14 @@ export interface EditorInspectorSelectionPanelState {
   isResizableLayerSelection: boolean;
 }
 
-export interface EditorInspectorLayerSizePanelState {
+interface EditorInspectorLayerSizePanelState {
   layerSizeText: string;
   layerSizeDraft: EditorInspectorSizeDraft;
   layerSizeLocked: boolean;
   layerAspectRatio: number | null;
 }
 
-export interface EditorInspectorLayerSizePanelActions {
+interface EditorInspectorLayerSizePanelActions {
   setLayerSizeDraft: React.Dispatch<React.SetStateAction<EditorInspectorSizeDraft>>;
   setLayerSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
 }

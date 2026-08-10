@@ -7,15 +7,18 @@ import type { VideoProjectListItem } from '../../../features/media-hub/video-pro
 import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
+import type { LibraryLifecycle } from '../../../contracts/settings/library-lifecycle';
 
 export type GalleryItemKind = MediaAssetKind | 'scenario' | 'scenario-export' | 'video-project';
 
 interface GalleryItemBase {
   createdAt: number;
+  expiresAt?: number | null;
   filename: string;
   hasThumbnail: boolean;
   id: string;
   kind: GalleryItemKind;
+  lifecycle?: LibraryLifecycle;
   originalFilename?: string;
   size: number;
   sourceFavicon: string | null;
@@ -23,6 +26,8 @@ interface GalleryItemBase {
   sourceUrl: string | null;
   tags: string[];
   updatedAt: number;
+  presentationRevision?: number | null;
+  workspaceRevision?: number;
 }
 
 export interface GalleryMediaItem extends GalleryItemBase {
@@ -108,7 +113,13 @@ export function isGallerySelectableItem(
 export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem {
   return {
     ...item,
+    lifecycle: item.lifecycle ?? {
+      savedAt: item.updatedAt,
+      storageClass: 'library',
+      updatedAt: item.updatedAt,
+    },
     entityId: item.id,
+    expiresAt: null,
     type: 'media',
   };
 }

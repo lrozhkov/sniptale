@@ -46,7 +46,6 @@ function createExportOptions(
 ): MediaHubBackupExportOptions {
   return {
     scope: 'all',
-    includeEditorDrafts: true,
     includeSourceMetadata: true,
     includeTelemetry: true,
     includeWebSnapshots: true,
@@ -59,7 +58,6 @@ function createLocalSummary(): MediaHubLocalBackupSummary {
     approximateSizeBytes: 4096,
     assetCount: 5,
     dataClasses: {
-      editorDrafts: true,
       mediaAssets: true,
       recordings: true,
       scenarioProjects: true,
@@ -69,7 +67,6 @@ function createLocalSummary(): MediaHubLocalBackupSummary {
       videoProjects: true,
       webSnapshots: true,
     },
-    editorDraftCount: 2,
     recordingCount: 3,
     scenarioProjectCount: 1,
     selectedCount: 0,
@@ -84,7 +81,6 @@ function createSupportBundleSummary(): MediaHubLocalBackupSummary {
   return {
     ...createLocalSummary(),
     approximateSizeBytes: 1024,
-    editorDraftCount: 0,
     sourceMetadataCount: 0,
     webSnapshotCount: 0,
   };
@@ -156,7 +152,6 @@ it('renders backup disclosure counts and requires an explicit export click', asy
   );
   expect(container?.textContent).toContain('gallery.backupExportModal.classMedia');
   expect(container?.textContent).toContain('gallery.backupExportModal.classTelemetry');
-  expect(container?.textContent).toContain('gallery.backupExportModal.classEditorDrafts');
   expect(container?.textContent).toContain('5');
   expect(container?.textContent).toContain('4');
   expect(container?.textContent).toContain('3');
@@ -183,7 +178,6 @@ it('renders backup disclosure counts and requires an explicit export click', asy
 
   expect(onExport).toHaveBeenCalledWith(
     expect.objectContaining({
-      includeEditorDrafts: false,
       includeSourceMetadata: false,
       includeTelemetry: false,
       includeWebSnapshots: false,

@@ -41,7 +41,7 @@ function createFrameData(withStepBadge = true) {
       },
       shadow: 30,
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
     },
     blurSettings: createBlurSettingsFixture(),

@@ -7,6 +7,7 @@ import { translate } from '../../../platform/i18n';
 import { EditorFloatingDocumentBar } from './document-bar';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { EditorToolbarContentProps } from '../toolbar/types';
+import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
 
 const mocks = vi.hoisted(() => ({
   clearSelection: vi.fn(),
@@ -22,6 +23,37 @@ const mocks = vi.hoisted(() => ({
     imageFormat: 'png' as 'png' | 'jpeg' | 'webp',
     isClipboardCopySupported: true,
   },
+  getMediaLibraryEntry: vi.fn(),
+  commitImagePresentation: vi.fn(),
+  promoteImageAggregate: vi.fn(),
+  saveImageAggregateCopyFromDocument: vi.fn(),
+  autosaveActivate: vi.fn(),
+  autosaveLastWriteError: null as unknown,
+  connectAggregateEditorPresence: vi.fn(() => ({ dispose: vi.fn() })),
+}));
+
+vi.mock('../../../workflows/aggregate-editor-presence/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/aggregate-editor-presence/client')>()),
+  connectAggregateEditorPresence: mocks.connectAggregateEditorPresence,
+}));
+
+vi.mock('../../../composition/persistence/media-library', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/media-library')>()),
+  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
+}));
+vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
+  commitImagePresentation: mocks.commitImagePresentation,
+  promoteImageAggregate: mocks.promoteImageAggregate,
+  saveImageAggregateCopyFromDocument: mocks.saveImageAggregateCopyFromDocument,
+}));
+vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
+  dataUrlToBlob: vi.fn(async () => new Blob(['preview'], { type: 'image/png' })),
+}));
+vi.mock('../../../platform/media-utils/image-thumbnail', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/media-utils/image-thumbnail')>()),
+  createImageThumbnailBlob: vi.fn(async () => new Blob(['thumbnail'], { type: 'image/webp' })),
 }));
 
 const storeState = vi.hoisted(() => ({
@@ -29,6 +61,7 @@ const storeState = vi.hoisted(() => ({
     pageTitle: 'Captured page',
     saveErrorMessage: null as string | null,
     saveState: 'saved' as 'idle' | 'saving' | 'saved' | 'error',
+    sessionId: 'asset-1' as string | null,
   },
 }));
 
@@ -38,7 +71,17 @@ vi.mock('../../state/useEditorStore', () => ({
 }));
 vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
-  useEditorController: () => ({ clearSelection: mocks.clearSelection }),
+  useEditorController: () => ({
+    autosaveService: {
+      activate: mocks.autosaveActivate,
+      flushAutosave: vi.fn(async () => undefined),
+      getDurableRevision: vi.fn(() => 1),
+      getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
+    },
+    clearSelection: mocks.clearSelection,
+    exportDocument: vi.fn(),
+    renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
+  }),
 }));
 vi.mock('../../application/embed-context/context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/embed-context/context')>()),
@@ -116,10 +159,18 @@ beforeEach(() => {
   mocks.embed.mode = null;
   mocks.embed.onApply = null;
   mocks.embed.onClose = null;
+  mocks.autosaveLastWriteError = null;
+  mocks.getMediaLibraryEntry.mockResolvedValue({
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  });
+  mocks.promoteImageAggregate.mockResolvedValue(undefined);
+  mocks.commitImagePresentation.mockResolvedValue(undefined);
+  mocks.saveImageAggregateCopyFromDocument.mockResolvedValue('image-copy');
   storeState.value = {
     pageTitle: 'Captured page',
     saveErrorMessage: null,
     saveState: 'saved',
+    sessionId: 'asset-1',
   };
 });
 
@@ -161,6 +212,48 @@ it('renders document title, status, and document quick actions next to the title
   ).toBe('saved');
 });
 
+it('shows storage state separately and promotes a linked draft without changing its id', async () => {
+  window.history.replaceState(null, '', '?assetId=asset-1');
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+
+  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  const promote = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (candidate) =>
+      candidate.textContent?.includes(translate('editor.documentActions.saveToLibrary'))
+  );
+  await act(async () => promote?.click());
+
+  expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
+  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  window.history.replaceState(null, '', '/');
+});
+
+it('offers reload and an atomic copy when another tab made the workspace stale', async () => {
+  mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
+  storeState.value = {
+    pageTitle: 'Captured page',
+    saveErrorMessage: 'Workspace changed',
+    saveState: 'error',
+    sessionId: 'asset-1',
+  };
+  renderDocumentBar();
+
+  expect(container?.textContent).toContain(translate('editor.documentActions.reloadLatest'));
+  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
+  );
+  await act(async () => saveCopy?.click());
+
+  expect(mocks.saveImageAggregateCopyFromDocument).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceTitle: 'Captured page', targetAggregateId: expect.any(String) })
+  );
+  expect(mocks.autosaveActivate).toHaveBeenCalledWith(
+    expect.objectContaining({ durableRevision: 1, sourceTitle: 'Captured page' })
+  );
+  expect(window.location.search).toContain('assetId=');
+});
+
 it('opens the existing full document actions menu from the file button', () => {
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
@@ -188,6 +281,7 @@ it('keeps document-required quick actions disabled for an empty editor', () => {
     pageTitle: '',
     saveErrorMessage: null,
     saveState: 'idle',
+    sessionId: null,
   };
 
   renderDocumentBar(createProps({ hasImage: false }));
@@ -268,19 +362,34 @@ it('renders saving, error, and draft status labels from the current store state'
   };
 
   renderStatus(
-    { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'saved' },
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: null,
+      saveState: 'saved',
+      sessionId: 'asset-1',
+    },
     translate('common.states.saved')
   );
   renderStatus(
-    { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'saving' },
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: null,
+      saveState: 'saving',
+      sessionId: 'asset-1',
+    },
     translate('common.states.saving')
   );
   renderStatus(
-    { pageTitle: 'Captured page', saveErrorMessage: 'Disk error', saveState: 'error' },
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: 'Disk error',
+      saveState: 'error',
+      sessionId: 'asset-1',
+    },
     'Disk error'
   );
   renderStatus(
-    { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle' },
+    { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle', sessionId: 'asset-1' },
     translate('common.states.draft')
   );
 });

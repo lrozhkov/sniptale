@@ -90,7 +90,7 @@ function createEditorDocument() {
     sourceName: null,
     sourceTop: 0,
     sourceWidth: 320,
-    version: 1 as const,
+    version: 2 as const,
   };
 }
 

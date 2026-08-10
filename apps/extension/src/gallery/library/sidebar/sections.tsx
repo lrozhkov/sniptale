@@ -1,4 +1,4 @@
-import { Download, FolderArchive, HardDrive, Upload } from 'lucide-react';
+import { BookOpen, Download, FileClock, FolderArchive, HardDrive, Upload } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { SIDEBAR_FOLDERS } from '../constants';
@@ -7,6 +7,38 @@ import type { GallerySidebarProps } from './types';
 
 function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
+}
+
+export function GalleryScopePicker({
+  onScopeChange,
+  scope,
+}: Pick<GallerySidebarProps, 'onScopeChange' | 'scope'>) {
+  return (
+    <div className="grid grid-cols-2 gap-2" aria-label={translate('gallery.app.storageClasses')}>
+      {(
+        [
+          ['library', BookOpen, translate('gallery.app.library')],
+          ['temporary', FileClock, translate('gallery.app.drafts')],
+        ] as const
+      ).map(([value, Icon, label]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={scope === value}
+          onClick={() => onScopeChange?.(value)}
+          className={cx(
+            'flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition',
+            scope === value
+              ? 'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-panel)]'
+              : 'border-transparent text-[var(--sniptale-color-text-secondary)]'
+          )}
+        >
+          <Icon className="h-4 w-4" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function GalleryFolderList({

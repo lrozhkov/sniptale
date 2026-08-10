@@ -1,8 +1,4 @@
-export {
-  addObjectForController,
-  decorateShapeForController,
-  initializeObjectForController,
-} from './canvas-object';
+export { addObjectForController, initializeObjectForController } from './canvas-object';
 export {
   cancelTransientInteractionForController,
   getActiveCropRectForController,

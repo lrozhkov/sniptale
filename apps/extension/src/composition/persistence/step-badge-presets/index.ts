@@ -6,7 +6,11 @@ import type {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION } from '../../../features/highlighter/step-badge-presets/catalog';
 import { browserStorage } from '../infrastructure/browser-storage';
-import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
+import { areKnownAnnotationTemplateTagIds } from '../annotation-template-tags/known-ids';
+import {
+  runWithPersistenceDomainMutationLock,
+  runWithPersistenceDomainMutationLocks,
+} from '../infrastructure/mutation-barrier';
 import {
   cloneStepBadgePresetCatalog,
   resolveStoredStepBadgePresetCatalog,
@@ -56,6 +60,10 @@ function cache(catalog: StepBadgePresetCatalog) {
   snapshotRevision += 1;
   snapshot = cloneStepBadgePresetCatalog(catalog);
   return cloneStepBadgePresetCatalog(snapshot);
+}
+
+export function cacheCoordinatedStepBadgePresetCatalog(catalog: StepBadgePresetCatalog): void {
+  cache(catalog);
 }
 
 const writer = createStepBadgePresetWriteController({
@@ -120,23 +128,32 @@ type Decision =
   | { outcome: 'unchanged' };
 
 async function command(
-  mutate: (catalog: StepBadgePresetCatalog) => Decision
+  mutate: (catalog: StepBadgePresetCatalog) => Decision,
+  tagIds?: readonly string[]
 ): Promise<StepBadgePresetMutationResult> {
   return writer.enqueueWrite(() =>
-    runWithPersistenceDomainMutationLock('step-badge-presets', async (permit) => {
-      const loaded = await readCatalog();
-      if (unsafe(loaded.parsed)) return { outcome: 'rejected', reason: 'unsafe-storage' };
-      const decision = mutate(cloneStepBadgePresetCatalog(loaded.catalog));
-      if (decision.outcome !== 'applied') return decision;
-      try {
-        await writer.writeCatalog(decision.catalog, permit);
-      } catch (error) {
-        if (error instanceof StepBadgePresetQuotaError)
-          return { outcome: 'rejected', reason: 'quota' };
-        throw error;
+    runWithPersistenceDomainMutationLocks(
+      tagIds && tagIds.length > 0
+        ? ['annotation-template-tags', 'step-badge-presets']
+        : ['step-badge-presets'],
+      async (permit) => {
+        if (tagIds && tagIds.length > 0 && !(await areKnownAnnotationTemplateTagIds(tagIds))) {
+          return { outcome: 'rejected', reason: 'invalid-input' };
+        }
+        const loaded = await readCatalog();
+        if (unsafe(loaded.parsed)) return { outcome: 'rejected', reason: 'unsafe-storage' };
+        const decision = mutate(cloneStepBadgePresetCatalog(loaded.catalog));
+        if (decision.outcome !== 'applied') return decision;
+        try {
+          await writer.writeCatalog(decision.catalog, permit);
+        } catch (error) {
+          if (error instanceof StepBadgePresetQuotaError)
+            return { outcome: 'rejected', reason: 'quota' };
+          throw error;
+        }
+        return { outcome: 'applied', ...(decision.id ? { id: decision.id } : {}) };
       }
-      return { outcome: 'applied', ...(decision.id ? { id: decision.id } : {}) };
-    })
+    )
   );
 }
 
@@ -151,6 +168,7 @@ function valid(name: string, settings: unknown): settings is StepBadgeTemplateSe
 export function createUserStepBadgePreset(input: {
   name: string;
   settings: StepBadgeTemplateSettings;
+  tagIds?: readonly string[];
 }) {
   if (!valid(input.name, input.settings))
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' } as const);
@@ -168,15 +186,16 @@ export function createUserStepBadgePreset(input: {
       order: catalog.presets.length,
       enabled: true,
       origin: 'user',
+      tagIds: [...(input.tagIds ?? [])],
     });
     return next
       ? { outcome: 'applied', catalog: next, id }
       : { outcome: 'rejected', reason: 'duplicate-id' };
-  });
+  }, input.tagIds);
 }
 
 export function updateStoredStepBadgePreset(
-  input: Pick<StepBadgePreset, 'id' | 'name' | 'settings'>
+  input: Pick<StepBadgePreset, 'id' | 'name' | 'settings'> & { tagIds?: readonly string[] }
 ) {
   if (!valid(input.name, input.settings))
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' } as const);
@@ -185,7 +204,7 @@ export function updateStoredStepBadgePreset(
     return next
       ? { outcome: 'applied', catalog: next }
       : { outcome: 'rejected', reason: 'not-found' };
-  });
+  }, input.tagIds);
 }
 
 export function deleteStoredStepBadgePreset(id: string) {
@@ -234,7 +253,7 @@ export function resetStoredSystemStepBadgePreset(id: string) {
   return command((catalog): Decision => {
     const current = catalog.presets.find((preset) => preset.id === id);
     if (!current) return { outcome: 'rejected', reason: 'not-found' };
-    if (current.origin === 'system' && current.customized !== true) {
+    if (current.origin === 'system' && current.customized !== true && current.tagIds.length === 0) {
       return { outcome: 'unchanged' };
     }
     const next = resetSystemStepBadgePreset(catalog, id);

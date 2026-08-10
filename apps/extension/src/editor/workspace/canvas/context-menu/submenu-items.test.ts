@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { expect, it, vi } from 'vitest';
 import {
   buildArrangeItems,
@@ -6,6 +8,7 @@ import {
   withMenuClose,
 } from './submenu-items';
 import type { CanvasContextMenuController } from './types';
+import { resolveCanvasContextMenuRequest, resolveCanvasContextMenuState } from './helpers';
 
 function createController(): CanvasContextMenuController {
   const withHistoryMuted = vi.fn(<T>(callback: () => T) => callback());
@@ -101,4 +104,106 @@ it('builds transform actions through the async layer transformation seam', async
   );
   expect(controller.applyLayerTransformation).toHaveBeenNthCalledWith(3, 'layer-7', 'rotate-left');
   expect(controller.applyLayerTransformation).toHaveBeenNthCalledWith(4, 'layer-7', 'rotate-right');
+});
+
+const layer = {
+  effectCount: 0,
+  effects: [],
+  id: 'layer-1',
+  immutable: false,
+  locked: false,
+  name: 'Layer',
+  previewColor: null,
+  previewDataUrl: null,
+  previewTransparent: true,
+  raster: false,
+  selected: true,
+  selectedCount: 1,
+  type: 'shape' as const,
+  typeLabel: 'Shape',
+  visible: true,
+};
+const selection = {
+  hasSelection: true,
+  selectedObjectCount: 1,
+  selectedObjectHeight: 40,
+  selectedObjectId: 'layer-1',
+  selectedObjectIds: ['layer-1'],
+  selectedObjectType: 'shape' as const,
+  selectedObjectWidth: 80,
+};
+
+it('resolves empty, selected, and directly targeted canvas context requests', () => {
+  const controller = createController();
+  const target = {
+    sniptaleId: 'layer-1',
+    sniptaleRole: 'annotation',
+    sniptaleType: 'shape',
+  };
+  const canvas = Object.assign(Object.create(null), {
+    findTarget: vi.fn<() => unknown>(() => target),
+    getActiveObject: vi.fn(() => null),
+    getActiveObjects: vi.fn(() => [target]),
+  });
+  controller.canvas = canvas;
+
+  expect(
+    resolveCanvasContextMenuRequest({
+      controller,
+      event: new MouseEvent('contextmenu'),
+      hasImage: false,
+      layers: [layer],
+      selection,
+    })
+  ).toEqual({ kind: 'no-image', layer: null });
+  expect(
+    resolveCanvasContextMenuRequest({
+      controller,
+      event: new MouseEvent('contextmenu'),
+      hasImage: true,
+      layers: [layer],
+      selection,
+    })
+  ).toEqual(expect.objectContaining({ kind: 'single' }));
+
+  canvas.findTarget.mockReturnValue(null);
+  expect(
+    resolveCanvasContextMenuRequest({
+      controller,
+      event: new MouseEvent('contextmenu'),
+      hasImage: true,
+      layers: [layer],
+      selection,
+    })
+  ).toEqual({ kind: 'blank', layer: null });
+  expect(controller.clearSelection).toHaveBeenCalledOnce();
+});
+
+it('clamps menu placement and chooses a submenu side from available space', () => {
+  const wrapperElement = document.createElement('div');
+  vi.spyOn(wrapperElement, 'getBoundingClientRect').mockReturnValue({
+    bottom: 400,
+    height: 400,
+    left: 0,
+    right: 800,
+    toJSON: () => ({}),
+    top: 0,
+    width: 800,
+    x: 0,
+    y: 0,
+  });
+  expect(
+    resolveCanvasContextMenuState({
+      anchor: { x: 20, y: 390 },
+      request: { kind: 'single', layer },
+      wrapperElement,
+    })
+  ).toEqual(expect.objectContaining({ style: { left: 20, top: 140 }, submenuSide: 'right' }));
+  expect(
+    resolveCanvasContextMenuState({
+      anchor: { x: 790, y: 10 },
+      request: { kind: 'multi', layer: null },
+      wrapperElement,
+    }).submenuSide
+  ).toBe('left');
 });

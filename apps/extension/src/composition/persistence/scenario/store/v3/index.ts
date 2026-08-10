@@ -7,4 +7,4 @@ export {
   updateScenarioProjectRecordMetadataV3,
 } from './project-records';
 export { saveScenarioCaptureSlideToProject } from './capture';
-export { createScenarioV3ImageAsset } from './image-assets';
+export { prepareScenarioV3ImageAsset } from './image-assets';

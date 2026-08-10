@@ -139,10 +139,6 @@ export interface EditorControllerInstanceObjectCapabilities {
   cancelTransientInteraction(): boolean;
   startDrawSession(tool: DrawSession['tool'], start: Point, object: FabricObject): void;
   getActiveCropRect(): Rect | null;
-  decorateShape(
-    object: FabricObject,
-    type: Extract<EditorObjectType, 'rectangle' | 'ellipse' | 'diamond'>
-  ): void;
   addObject(object: FabricObject): void;
   logBrowserFrame(stage: string, payload?: Record<string, unknown>): void;
   ensureBrowserFrameOnTop(): void;

@@ -18,7 +18,7 @@ export function addStepBadgePreset(catalog: StepBadgePresetCatalog, preset: Step
 
 export function updateStepBadgePreset(
   catalog: StepBadgePresetCatalog,
-  input: Pick<StepBadgePreset, 'id' | 'name' | 'settings'>
+  input: Pick<StepBadgePreset, 'id' | 'name' | 'settings'> & { tagIds?: readonly string[] }
 ) {
   const current = catalog.presets.find((preset) => preset.id === input.id);
   if (!current) return null;
@@ -31,6 +31,7 @@ export function updateStepBadgePreset(
             ...preset,
             name: input.name,
             settings: cloneStepBadgeTemplate(input.settings),
+            tagIds: [...(input.tagIds ?? preset.tagIds)],
             ...(preset.origin === 'system' ? { customized: true } : {}),
           }
         : preset

@@ -51,6 +51,7 @@ function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibr
     sourceTitle: overrides.sourceTitle ?? null,
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
+    ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
     blob: overrides.blob ?? new Blob(['image']),
   };
 }
@@ -64,7 +65,10 @@ beforeEach(() => {
 });
 
 it('merges added tags with the current media record tags', async () => {
-  const existing = createMediaEntry({ tags: ['remote'] });
+  const existing = createMediaEntry({
+    tags: ['remote'],
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
+  });
   dbMocks.getMock.mockResolvedValue(existing);
   vi.spyOn(Date, 'now').mockReturnValue(999);
 
@@ -75,7 +79,11 @@ it('merges added tags with the current media record tags', async () => {
   );
   expect(dbMocks.putMock).toHaveBeenCalledWith(
     'media_library',
-    expect.objectContaining({ tags: ['remote', 'demo'], updatedAt: 999 })
+    expect.objectContaining({
+      tags: ['remote', 'demo'],
+      updatedAt: 999,
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
+    })
   );
 });
 
@@ -85,6 +93,11 @@ it('skips writes when every added tag already exists on the current record', asy
 
   const { addMediaLibraryEntryTags } = await import('./index.library.ts');
 
-  await expect(addMediaLibraryEntryTags('asset-1', ['demo'])).resolves.toStrictEqual(existing);
+  await expect(addMediaLibraryEntryTags('asset-1', ['demo'])).resolves.toEqual(
+    expect.objectContaining({
+      tags: existing.tags,
+      lifecycle: { savedAt: 100, storageClass: 'library', updatedAt: 100 },
+    })
+  );
   expect(dbMocks.putMock).not.toHaveBeenCalled();
 });

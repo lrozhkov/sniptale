@@ -21,9 +21,12 @@ export interface UseGalleryAppActionsResult {
     close: () => Promise<void>;
     copy: () => void;
     download: () => void;
+    downloadOriginal: () => void;
     openInEditor: (item: GalleryItem) => void;
     openSnapshotScreenshotInEditor: () => void;
     resetChanges: () => void;
+    restoreOriginal: () => void;
+    saveCopy: () => void;
     saveMetadata: () => Promise<void>;
   };
   selection: {

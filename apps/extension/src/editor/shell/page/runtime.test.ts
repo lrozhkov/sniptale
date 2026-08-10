@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   createEditorSessionAutosaveServiceMock,
   createImageEditorControllerMock,
-  ensureEditorPageSessionIdMock,
+  ensureEditorPageAggregateIdMock,
   loadEditorPresetStateMock,
   loadEditorWorkspaceDefaultsMock,
   loadHighlighterSettingsMock,
@@ -13,7 +13,7 @@ const {
 } = vi.hoisted(() => ({
   createEditorSessionAutosaveServiceMock: vi.fn(),
   createImageEditorControllerMock: vi.fn(),
-  ensureEditorPageSessionIdMock: vi.fn(),
+  ensureEditorPageAggregateIdMock: vi.fn(),
   loadEditorPresetStateMock: vi.fn(),
   loadEditorWorkspaceDefaultsMock: vi.fn(),
   loadHighlighterSettingsMock: vi.fn(),
@@ -36,8 +36,9 @@ vi.mock('../../document/session-autosave', async (importOriginal) => ({
   createEditorSessionAutosaveService: createEditorSessionAutosaveServiceMock,
 }));
 
-vi.mock('../../document/page-session', () => ({
-  ensureEditorPageSessionId: ensureEditorPageSessionIdMock,
+vi.mock('../../document/page-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/page-session')>()),
+  ensureEditorPageAggregateId: ensureEditorPageAggregateIdMock,
   readEditorPageLocationState: readEditorPageLocationStateMock,
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
@@ -69,6 +70,7 @@ import {
   loadEditorPageDefaults,
   resolveEditorPageSessionSeed,
 } from './runtime';
+import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highlighter';
 
 async function flushRuntimeDefaultsWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -99,7 +101,7 @@ function useEditorPageRuntimeTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
     readEditorPageLocationStateMock.mockReturnValue({ assetId: 'asset-1' });
-    ensureEditorPageSessionIdMock.mockReturnValue('session-1');
+    ensureEditorPageAggregateIdMock.mockReturnValue('session-1');
     loadEditorPresetStateMock.mockResolvedValue({
       arrow: { defaultPresetId: 'arrow-default', presets: [] },
       ellipse: { defaultPresetId: 'ellipse-default', presets: [] },
@@ -154,8 +156,8 @@ function verifiesSessionSeed() {
   const seed = resolveEditorPageSessionSeed();
 
   expect(seed).toEqual({
+    aggregateId: 'session-1',
     locationState: { assetId: 'asset-1' },
-    sessionId: 'session-1',
   });
 }
 
@@ -163,7 +165,10 @@ async function verifiesDefaultPresetLoading() {
   const hydrateDefaults = vi.fn();
   const hydrateWorkspaceDefaults = vi.fn();
   loadHighlighterSettingsMock.mockResolvedValueOnce({
-    borderPresets: [{ id: 'preset-1' }, { id: 'preset-2' }],
+    borderPresets: [
+      { ...DEFAULT_BORDER_PRESET, id: 'preset-1' },
+      { ...DEFAULT_BORDER_PRESET, id: 'preset-2' },
+    ],
     defaultBorderPresetId: 'preset-2',
   });
   loadEditorPresetStateMock.mockResolvedValueOnce({
@@ -192,8 +197,8 @@ async function verifiesDefaultPresetLoading() {
   await flushRuntimeDefaultsWork();
 
   expect(hydrateDefaults).toHaveBeenCalledWith({
-    borderPreset: { id: 'preset-2' },
-    toolSettings: { ellipse: { strokeColor: '#00ff00' } },
+    borderPreset: expect.objectContaining({ id: 'preset-2' }),
+    toolSettings: {},
   });
   expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({ backgroundColor: '#123456' });
 

@@ -1,109 +1,102 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-import { createRichShapeToolDraft } from './draft';
-import { clearRichShapeToolOrigin, markRichShapeToolOrigin } from './origin';
-import { updateRichShapeDraft } from './resize';
-import { resolveActiveRichShapeToolSelection } from './selection';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  createCustomRichShapeInsertionObject: vi.fn(),
-  createRichShapeCatalogObject: vi.fn(),
+  createRichShapeToolDraft: vi.fn(),
+  markRichShapeToolOrigin: vi.fn(),
   resizeRichShapeObjectToBounds: vi.fn(),
+  state: { richShapeToolSelection: null as unknown },
 }));
 
+vi.mock('../../../state/useEditorStore', () => ({
+  useEditorStore: { getState: () => mocks.state },
+}));
+vi.mock('./index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./index')>()),
+  createRichShapeToolDraft: mocks.createRichShapeToolDraft,
+  markRichShapeToolOrigin: mocks.markRichShapeToolOrigin,
+}));
 vi.mock('../../../objects/rich-shape', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../objects/rich-shape')>()),
-  createRichShapeCatalogObject: mocks.createRichShapeCatalogObject,
   resizeRichShapeObjectToBounds: mocks.resizeRichShapeObjectToBounds,
 }));
 
-vi.mock('../custom-rich-shape-insertion', () => ({
-  createCustomRichShapeInsertionObject: mocks.createCustomRichShapeInsertionObject,
-}));
+import { handleRichShapeToolMouseDown } from './pointer';
+import { updateRichShapeDraft } from './resize';
+import { resolveActiveRichShapeToolSelection } from './selection';
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'uuid-1') });
-  mocks.createRichShapeCatalogObject.mockReturnValue({ sniptaleRichShape: {} });
-  mocks.createCustomRichShapeInsertionObject.mockReturnValue({ sniptaleRichShape: {} });
-});
-
-it('owns rich shape origin metadata and active selection defaults', () => {
-  const object = {};
-
-  markRichShapeToolOrigin(object as never, 'shape-library');
-  expect(object).toHaveProperty('sniptaleRichShapeToolOrigin', 'shape-library');
-  clearRichShapeToolOrigin(object as never);
-
-  expect(object).not.toHaveProperty('sniptaleRichShapeToolOrigin');
-  expect(resolveActiveRichShapeToolSelection('shape-library', null)).toBeNull();
-  expect(resolveActiveRichShapeToolSelection('shapes-and-lines', null)).toEqual({
-    rough: false,
-    shapeId: 'rectangle',
+describe('rich shape drawing owners', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.createRichShapeToolDraft.mockReturnValue(undefined);
+    mocks.state.richShapeToolSelection = null;
   });
-  expect(
-    resolveActiveRichShapeToolSelection('rough-shape', { rough: false, shapeId: 'ellipse' })
-  ).toEqual({ rough: true, shapeId: 'ellipse' });
-});
 
-it('routes catalog, missing catalog, and custom draft creation through draft owners', () => {
-  const prepareObject = vi.fn();
-  const nextLabelIndex = vi.fn(() => 7);
+  it('starts a catalog draft when both source and selection are available', () => {
+    const selection = { itemId: 'shape-rectangle', source: 'built-in' };
+    const object = { id: 'draft' };
+    const bindings = {
+      getSource: vi.fn(() => ({ id: 'source' })),
+      nextLabelIndex: vi.fn(() => 2),
+      prepareObject: vi.fn(),
+      startDrawSession: vi.fn(),
+    };
+    mocks.state.richShapeToolSelection = selection;
+    mocks.createRichShapeToolDraft.mockReturnValue({ object, tool: 'rich-shape' });
+    const point = { x: 10, y: 20 };
 
-  expect(
-    createRichShapeToolDraft({
-      nextLabelIndex,
-      point: { x: 10, y: 20 } as never,
-      prepareObject,
-      selection: { rough: true, shapeId: 'rectangle' },
-      source: {} as never,
-    })
-  ).toEqual({ object: { sniptaleRichShape: {} }, tool: 'rich-shape' });
-  expect(mocks.createRichShapeCatalogObject).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'uuid-1', labelIndex: 7, left: 10, rough: true, top: 20 })
-  );
+    handleRichShapeToolMouseDown(bindings as never, point as never);
 
-  expect(
-    createRichShapeToolDraft({
-      nextLabelIndex,
-      point: { x: 1, y: 2 } as never,
-      prepareObject,
-      selection: { customDefinition: { id: 'custom' }, rough: false, shapeId: 'custom' } as never,
-      source: { left: 0, top: 0 } as never,
-    })
-  ).toEqual({ object: { sniptaleRichShape: {} }, tool: 'rich-shape' });
-  expect(mocks.createCustomRichShapeInsertionObject).toHaveBeenCalledWith(
-    expect.objectContaining({ left: 1, shapeId: 'custom', top: 2 })
-  );
-  expect(
-    createRichShapeToolDraft({
-      nextLabelIndex,
-      point: { x: 0, y: 0 } as never,
-      prepareObject,
-      selection: { rough: false, shapeId: 'missing-shape-id' },
-      source: {} as never,
-    })
-  ).toBeNull();
-});
+    expect(mocks.markRichShapeToolOrigin).toHaveBeenCalledWith(object, 'shape');
+    expect(bindings.startDrawSession).toHaveBeenCalledWith('rich-shape', point, object);
+  });
 
-it('owns rich shape draft resizing and aspect-ratio fallback', () => {
-  const object = {
-    sniptaleRichShape: {
-      geometry: { viewBox: { height: 0, width: 20 } },
-    },
-  };
+  it('does not start without a source, selection, or successfully created draft', () => {
+    const bindings = {
+      getSource: vi.fn<() => unknown>(() => null),
+      nextLabelIndex: vi.fn(),
+      prepareObject: vi.fn(),
+      startDrawSession: vi.fn(),
+    };
+    handleRichShapeToolMouseDown(bindings as never, { x: 0, y: 0 } as never);
+    bindings.getSource.mockReturnValue({ id: 'source' });
+    handleRichShapeToolMouseDown(bindings as never, { x: 0, y: 0 } as never);
+    mocks.state.richShapeToolSelection = { itemId: 'shape', source: 'built-in' };
+    handleRichShapeToolMouseDown(bindings as never, { x: 0, y: 0 } as never);
 
-  expect(
-    updateRichShapeDraft({ object: null, tool: 'line' } as never, { x: 2, y: 3 } as never)
-  ).toBeNull();
-  expect(
-    updateRichShapeDraft(
-      { object, start: { x: 0, y: 0 }, tool: 'rich-shape' } as never,
-      { x: 40, y: 10 } as never,
-      true
-    )
-  ).toBeNull();
-  expect(mocks.resizeRichShapeObjectToBounds).toHaveBeenCalledWith(
-    object,
-    expect.objectContaining({ height: 40, width: 40 })
-  );
+    expect(bindings.startDrawSession).not.toHaveBeenCalled();
+  });
+
+  it('resizes rich-shape drafts in free and constrained directions', () => {
+    const object = {
+      sniptaleRichShape: { geometry: { viewBox: { height: 50, width: 100 } } },
+    };
+    const session = {
+      object,
+      start: { x: 100, y: 100 },
+      tool: 'rich-shape',
+    };
+
+    updateRichShapeDraft(session as never, { x: 60, y: 70 } as never);
+    expect(mocks.resizeRichShapeObjectToBounds).toHaveBeenLastCalledWith(object, {
+      height: 30,
+      left: 60,
+      top: 70,
+      width: 40,
+    });
+
+    updateRichShapeDraft(session as never, { x: 40, y: 60 } as never, true);
+    expect(mocks.resizeRichShapeObjectToBounds).toHaveBeenLastCalledWith(object, {
+      height: 30,
+      left: 40,
+      top: 70,
+      width: 60,
+    });
+    expect(updateRichShapeDraft({ tool: 'pencil' } as never, {} as never)).toBeNull();
+  });
+
+  it('returns the active rich-shape selection unchanged', () => {
+    const selection = { itemId: 'shape', source: 'built-in' } as never;
+    expect(resolveActiveRichShapeToolSelection(selection)).toBe(selection);
+    expect(resolveActiveRichShapeToolSelection(null)).toBeNull();
+  });
 });

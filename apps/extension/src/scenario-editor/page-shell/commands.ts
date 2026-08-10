@@ -23,6 +23,7 @@ import {
 import { keepReachableSelection } from './selection';
 import { insertSlideElementIntoSession } from './session-element-insert';
 import type { ScenarioV3EditorSession } from './types';
+import type { CommitScenarioV3AggregateMutation } from './types';
 
 type SetSession = Dispatch<SetStateAction<ScenarioV3EditorSession>>;
 type GetSession = () => ScenarioV3EditorSession;
@@ -70,7 +71,8 @@ export function createElementCommands(
   setSession: SetSession,
   projectId: string | null = null,
   getSession: GetSession | null = null,
-  reportOperationError: OperationErrorReporter | null = null
+  reportOperationError: OperationErrorReporter | null = null,
+  commitAggregateMutation: CommitScenarioV3AggregateMutation | null = null
 ) {
   return {
     deleteElement: (elementId: string) =>
@@ -86,14 +88,30 @@ export function createElementCommands(
         projectId,
         reportOperationError,
         setSession,
+        commitAggregateMutation,
       }),
     selectElement: (elementId: string) =>
       setSession((session) => ({ ...session, selectedElementId: elementId })),
     selectSlideSurface: () => setSession((session) => ({ ...session, selectedElementId: null })),
     updateElement: (elementId: string, patch: ScenarioV3ElementPatch) =>
-      commitSelectedSlideMutation(setSession, (project, slideId) =>
-        updateSlideElement(project, slideId, elementId, patch)
-      ),
+      setSession((session) => updateElementInSession(session, elementId, patch)),
+  };
+}
+
+export function updateElementInSession(
+  session: ScenarioV3EditorSession,
+  elementId: string,
+  patch: ScenarioV3ElementPatch
+): ScenarioV3EditorSession {
+  const slideId = session.selectedSlideId ?? session.project.slides[0]?.id;
+  if (!slideId) return session;
+  const nextProject = updateSlideElement(session.project, slideId, elementId, patch);
+  if (Object.is(nextProject, session.project)) return session;
+  return {
+    ...session,
+    ...keepReachableSelection(session, nextProject),
+    history: pushProjectHistory(session.history, session.project, nextProject),
+    project: nextProject,
   };
 }
 
@@ -103,6 +121,7 @@ async function insertImageFileWithErrorHandling(args: {
   projectId: string | null;
   reportOperationError: OperationErrorReporter | null;
   setSession: SetSession;
+  commitAggregateMutation: CommitScenarioV3AggregateMutation | null;
 }): Promise<void> {
   if (!args.file) {
     return;

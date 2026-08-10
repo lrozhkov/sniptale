@@ -1,5 +1,6 @@
 import { ensurePersistentStorage } from '../../../../composition/persistence/infrastructure/indexed-db/core';
-import { cleanupOldRecordings } from '../../../../composition/persistence/recordings/index';
+import { cleanupDrafts } from '../../../../composition/persistence/library-lifecycle';
+import { loadSettings } from '../../../../composition/persistence/settings';
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
 import { migrateCalloutSystemPresetCatalog } from '../../../../composition/persistence/callout-presets';
@@ -16,11 +17,7 @@ import {
   recoverVideoCaptureSurfaceOnStartup,
   resetVideoRecordingRuntimeState,
 } from '../../../media/lifecycle';
-import {
-  STARTUP_RECORDINGS_RETENTION_DAYS,
-  type BackgroundModeState,
-  type RuntimeWiringLogger,
-} from './shared';
+import { type BackgroundModeState, type RuntimeWiringLogger } from './shared';
 import { ensureActivePageAccessRuntime } from '../../page-access/service';
 
 export function runStartupMaintenance(
@@ -33,9 +30,15 @@ export function runStartupMaintenance(
     logger.warn('Failed to request persistent storage', error);
   });
 
-  cleanupOldRecordings(STARTUP_RECORDINGS_RETENTION_DAYS).catch((error) => {
-    logger.warn('IDB cleanup failed (non-critical)', error);
-  });
+  loadSettings()
+    .then((settings) =>
+      settings.localStoragePolicy.cleanupEnabled
+        ? cleanupDrafts({ policy: settings.localStoragePolicy })
+        : undefined
+    )
+    .catch((error) => {
+      logger.warn('Draft cleanup failed (non-critical)', error);
+    });
 
   cleanupExpiredProjectExportInputs().catch((error) => {
     logger.warn('Project export input cleanup failed (non-critical)', error);

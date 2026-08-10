@@ -82,6 +82,7 @@ describe('quick-actions-presets after-capture catalog', () => {
       'ask_system',
       'ask_preset',
       'scenario',
+      'save_to_library',
     ]);
     expect(descriptors[0]).toEqual({
       value: 'download_default',

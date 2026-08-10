@@ -6,6 +6,7 @@ import type {
   LegacyCalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { getCanonicalSystemCalloutPreset } from '../../callout-presets/catalog';
+import { clonePaint, createSolidPaint } from '@sniptale/foundation/paint';
 
 export type { CalloutSettingsPatch } from '@sniptale/runtime-contracts/highlighter/callout';
 
@@ -61,7 +62,11 @@ export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle
       spacing: { ...DEFAULT_STYLE.connector.spacing, ...style.connector?.spacing },
     },
     customCss: style.customCss ?? DEFAULT_STYLE.customCss,
-    surface: { ...DEFAULT_STYLE.surface, ...style.surface },
+    surface: {
+      ...DEFAULT_STYLE.surface,
+      ...style.surface,
+      fillPaint: clonePaint(style.surface?.fillPaint ?? DEFAULT_STYLE.surface.fillPaint),
+    },
     title: { ...DEFAULT_STYLE.title, ...style.title },
     typography: { ...DEFAULT_STYLE.typography, ...style.typography },
   };
@@ -160,7 +165,11 @@ export function applyCalloutSettingsPatch(
         },
       },
       customCss: patch.style?.customCss ?? settings.style.customCss,
-      surface: { ...settings.style.surface, ...patch.style?.surface },
+      surface: {
+        ...settings.style.surface,
+        ...patch.style?.surface,
+        fillPaint: clonePaint(patch.style?.surface?.fillPaint ?? settings.style.surface.fillPaint),
+      },
       title: { ...settings.style.title, ...patch.style?.title },
       typography: { ...settings.style.typography, ...patch.style?.typography },
     },
@@ -209,7 +218,7 @@ function normalizeLegacyCallout(settings: LegacyCalloutSettings): CalloutSetting
       },
       surface: {
         ...DEFAULT_STYLE.surface,
-        backgroundColor,
+        fillPaint: createSolidPaint(backgroundColor),
         radius: settings.variant === 'bubble' ? 12 : settings.variant === 'rect' ? 4 : 0,
         shadow: settings.variant === 'text-only' ? 0 : DEFAULT_STYLE.surface.shadow,
         textColor: settings.textColor,

@@ -8,7 +8,7 @@ export type CaptureModeLabel = 'visible' | 'full';
 
 export type CapturePersistenceSettings = Pick<
   Settings,
-  'defaultImagePresetId' | 'saveCapturesToGallery'
+  'defaultImagePresetId' | 'localStoragePolicy' | 'saveCapturesToGallery'
 >;
 
 export type StartCapturePorts = {
@@ -24,7 +24,8 @@ export type StartCapturePorts = {
   saveScreenshotToMediaHubFromDataUrl(
     dataUrl: string,
     filename: string,
-    tabId: number
+    tabId: number,
+    storageClass?: 'temporary' | 'library'
   ): Promise<string | null>;
   transitionCaptureJob(
     jobId: string,

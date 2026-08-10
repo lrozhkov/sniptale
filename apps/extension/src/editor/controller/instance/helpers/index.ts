@@ -21,7 +21,6 @@ export {
   addObjectForController,
   advanceStepValueForController,
   cancelTransientInteractionForController,
-  decorateShapeForController,
   getActiveCropRectForController,
   moveSelectionForController,
   moveSelectionToEdgeForController,

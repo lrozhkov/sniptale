@@ -9,6 +9,7 @@ const {
   createImageThumbnailBlobMock,
   createVideoThumbnailBlobMock,
   dataUrlToBlobMock,
+  getAggregatePresentationMock,
   getMediaAssetBlobMock,
   getMediaThumbnailMock,
   listRecentScenarioStepsMock,
@@ -17,10 +18,15 @@ const {
   createImageThumbnailBlobMock: vi.fn(),
   createVideoThumbnailBlobMock: vi.fn(),
   dataUrlToBlobMock: vi.fn(),
+  getAggregatePresentationMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
   getMediaThumbnailMock: vi.fn(),
   listRecentScenarioStepsMock: vi.fn(),
   saveMediaThumbnailMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/aggregate-presentations', () => ({
+  getAggregatePresentation: getAggregatePresentationMock,
 }));
 
 vi.mock(
@@ -64,6 +70,7 @@ import { ensureGalleryItemThumbnail } from './thumbnails';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getAggregatePresentationMock.mockResolvedValue(undefined);
 });
 
 it('returns existing thumbnails without rebuilding them', async () => {
@@ -77,9 +84,11 @@ it('returns existing thumbnails without rebuilding them', async () => {
   };
   getMediaThumbnailMock.mockResolvedValue(existingThumbnail);
 
-  await expect(ensureGalleryItemThumbnail(createMediaItem({ id: 'asset-1' }))).resolves.toEqual(
-    existingThumbnail
-  );
+  await expect(
+    ensureGalleryItemThumbnail(
+      createMediaItem({ id: 'asset-1', kind: 'recording', mimeType: 'video/webm' })
+    )
+  ).resolves.toEqual(existingThumbnail);
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
 });
@@ -112,20 +121,13 @@ it('deduplicates media thumbnail generation and persists the generated entry', a
   });
 });
 
-it('builds scenario thumbnails from recent step previews', async () => {
-  const previewBlob = new Blob(['preview'], { type: 'image/png' });
+it('reads scenario thumbnails only from aggregate presentations', async () => {
   const thumbnailBlob = new Blob(['thumb'], { type: 'image/png' });
-  getMediaThumbnailMock.mockResolvedValue(undefined);
-  listRecentScenarioStepsMock.mockResolvedValue([
-    {
-      id: 'step-1',
-      position: 0,
-      previewDataUrl: 'data:image/png;base64,AAAA',
-      title: 'Step 1',
-    },
-  ]);
-  dataUrlToBlobMock.mockResolvedValue(previewBlob);
-  createImageThumbnailBlobMock.mockResolvedValue(thumbnailBlob);
+  getAggregatePresentationMock.mockResolvedValueOnce({
+    presentationRevision: 3,
+    thumbnailBlob,
+    updatedAt: 4,
+  });
 
   const result = await ensureGalleryItemThumbnail(
     createScenarioItem({
@@ -134,18 +136,22 @@ it('builds scenario thumbnails from recent step previews', async () => {
     })
   );
 
-  expect(listRecentScenarioStepsMock).toHaveBeenCalledWith('project-1');
-  expect(dataUrlToBlobMock).toHaveBeenCalledWith('data:image/png;base64,AAAA');
-  expect(createImageThumbnailBlobMock).toHaveBeenCalledWith(previewBlob, 320, 180);
+  expect(getAggregatePresentationMock).toHaveBeenCalledWith({
+    id: 'project-1',
+    kind: 'scenario',
+  });
+  expect(listRecentScenarioStepsMock).not.toHaveBeenCalled();
+  expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
   expect(result).toMatchObject({ assetId: 'scenario:project-1' });
 });
 
-it('builds video project thumbnails from the project thumbnail source media id', async () => {
-  const projectBlob = new Blob(['project-asset'], { type: 'video/webm' });
+it('reads video project thumbnails only from aggregate presentations', async () => {
   const thumbnailBlob = new Blob(['thumb'], { type: 'image/png' });
-  getMediaThumbnailMock.mockResolvedValue(undefined);
-  getMediaAssetBlobMock.mockResolvedValue(projectBlob);
-  createVideoThumbnailBlobMock.mockResolvedValue(thumbnailBlob);
+  getAggregatePresentationMock.mockResolvedValueOnce({
+    presentationRevision: 2,
+    thumbnailBlob,
+    updatedAt: 4,
+  });
 
   const result = await ensureGalleryItemThumbnail(
     createVideoProjectItem({
@@ -154,7 +160,11 @@ it('builds video project thumbnails from the project thumbnail source media id',
     })
   );
 
-  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('project-asset:asset-1');
-  expect(createVideoThumbnailBlobMock).toHaveBeenCalledWith(projectBlob, 320, 180);
+  expect(getAggregatePresentationMock).toHaveBeenCalledWith({
+    id: 'video-project-1',
+    kind: 'video-project',
+  });
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
   expect(result).toMatchObject({ assetId: 'video-project:project-1' });
 });

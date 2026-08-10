@@ -10,6 +10,7 @@ type CreateInput = {
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutSettings['style'];
+  tagIds?: readonly string[];
 };
 
 type OverwriteInput = CreateInput & { id: string };
@@ -34,12 +35,13 @@ export function createCalloutSaveSection(args: {
   return {
     error: args.error,
     isSaving: args.isSaving,
-    onCreate: async (name) => {
+    onCreate: async (name, tagIds) => {
       const result = await args.create({
         content: { titleText: args.settings.content.titleText },
         name,
         placement,
         style: args.settings.style,
+        ...(tagIds ? { tagIds } : {}),
       });
       const saved =
         result === true || (typeof result === 'object' && result?.outcome === 'applied');

@@ -25,3 +25,12 @@ it('updates untouched systems and preserves customized system snapshots', () => 
     catalog
   );
 });
+
+it('migrates absent tag metadata and compactly round-trips assigned tags', () => {
+  const legacy = resolveStoredStepBadgePresetCatalog({});
+  expect(legacy.presets.every((preset) => preset.tagIds.length === 0)).toBe(true);
+  legacy.presets[0]!.tagIds = ['tag-one'];
+  expect(resolveStoredStepBadgePresetCatalog(serializeStepBadgePresetCatalog(legacy))).toEqual(
+    legacy
+  );
+});

@@ -29,13 +29,14 @@ const PRESET: BorderPreset = {
   id: 'preset-1',
   name: 'Preset',
   order: 1,
+  tagIds: [],
   padding: { bottom: 8, left: 8, right: 8, top: 8 },
   radius: 4,
   shadow: BORDER_SHADOW_SOFT_INTENSITY,
   style: 'solid',
   width: 2,
   customCss: '',
-  fillColor: '#00000000',
+  fillPaint: { kind: 'solid' as const, color: '#00000000' },
   inheritCustomCss: false,
 };
 

@@ -1,4 +1,4 @@
-import type { EditorSessionEntry } from '../../../composition/persistence/editor-sessions/contracts';
+import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
   activateAutosaveContext,
@@ -16,12 +16,14 @@ import {
 
 export interface EditorSessionAutosaveService {
   activate: (context: ActiveEditorSessionContext) => void;
-  updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'sessionId'>>) => void;
-  restoreDraft: (sessionId: string) => Promise<EditorSessionEntry | undefined>;
+  updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
+  restoreDraft: (aggregateId: string) => Promise<ImageWorkspaceEntry | undefined>;
   scheduleAutosave: (document: EditorDocument) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
-  discardDraft: (sessionId?: string | null) => Promise<void>;
+  discardDraft: (aggregateId?: string | null) => Promise<void>;
+  getDurableRevision: () => number | null;
+  getLastWriteError: () => unknown | null;
   dispose: () => void;
 }
 
@@ -33,11 +35,13 @@ function createEditorSessionAutosaveActions(
   return {
     activate: (context) => activateAutosaveContext(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
-    restoreDraft: (sessionId) => restoreAutosaveDraft(state, sessionId),
+    restoreDraft: (aggregateId) => restoreAutosaveDraft(state, aggregateId),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),
-    discardDraft: (sessionId) => discardAutosaveDraft(state, sessionId),
+    discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),
+    getDurableRevision: () => state.activeContext?.durableRevision ?? null,
+    getLastWriteError: () => state.lastWriteError,
     dispose: () => disposeAutosaveState(state),
   };
 }

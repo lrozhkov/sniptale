@@ -34,7 +34,7 @@ export function convertBackgroundDuplicateToAnnotation(object: FabricObject): vo
   }
 
   object.sniptaleRole = 'annotation';
-  object.sniptaleType = object instanceof FabricImage ? 'image' : 'rectangle';
+  object.sniptaleType = object instanceof FabricImage ? 'image' : 'shape';
   Reflect.deleteProperty(object, 'sniptaleBackgroundMode');
   Reflect.deleteProperty(object, 'sniptaleBackgroundFit');
   Reflect.deleteProperty(object, 'sniptaleBackgroundImageData');

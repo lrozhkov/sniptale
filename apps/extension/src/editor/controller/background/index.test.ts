@@ -93,7 +93,7 @@ it('resets frame draft fields and converts duplicate backgrounds to annotations'
     backgroundMode: 'gradient',
   });
   expect(duplicate.sniptaleRole).toBe('annotation');
-  expect(duplicate.sniptaleType).toBe('rectangle');
+  expect(duplicate.sniptaleType).toBe('shape');
   expect(duplicate.sniptaleBackgroundMode).toBeUndefined();
 });
 

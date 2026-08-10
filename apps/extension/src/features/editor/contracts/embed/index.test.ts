@@ -13,7 +13,7 @@ import {
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,abc',
     sourceName: null,
     sourceWidth: 120,

@@ -4,7 +4,6 @@ const {
   browserDebugger,
   browserTabs,
   cleanupCapture,
-  cleanupOldRecordings,
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
   cleanupScreenshotModeAfterTabClose,
@@ -48,7 +47,6 @@ const {
     subscribeToUpdated: vi.fn(),
   },
   cleanupCapture: vi.fn(),
-  cleanupOldRecordings: vi.fn(),
   cleanupExpiredProjectExportInputs: vi.fn(),
   cleanupScreenshotModeAfterNavigation: vi.fn(),
   cleanupScreenshotModeAfterTabClose: vi.fn(),
@@ -93,15 +91,6 @@ vi.mock(
       typeof import('../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core')
     >()),
     ensurePersistentStorage,
-  })
-);
-vi.mock(
-  '../../../apps/extension/src/composition/persistence/recordings/index',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../apps/extension/src/composition/persistence/recordings/index')
-    >()),
-    cleanupOldRecordings,
   })
 );
 vi.mock('../../../apps/extension/src/composition/persistence/ai-settings/init', () => ({
@@ -163,7 +152,6 @@ import type { WebSnapshotViewerPorts } from '../../../apps/extension/src/backgro
 
 export {
   cleanupCapture,
-  cleanupOldRecordings,
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
   cleanupScreenshotModeAfterTabClose,
@@ -269,7 +257,6 @@ function resetListenerRefs() {
 function resetMockDefaults() {
   ensurePersistentStorage.mockResolvedValue(undefined);
   ensureActiveVideoRecordingLeaseHydrated.mockResolvedValue(null);
-  cleanupOldRecordings.mockResolvedValue(undefined);
   cleanupExpiredProjectExportInputs.mockResolvedValue(undefined);
   cleanupScreenshotModeAfterNavigation.mockResolvedValue(undefined);
   cleanupScreenshotModeAfterTabClose.mockResolvedValue(undefined);

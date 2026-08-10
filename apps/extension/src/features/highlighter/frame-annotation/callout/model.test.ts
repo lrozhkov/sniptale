@@ -47,7 +47,7 @@ describe('callout model', () => {
     });
     expect(patched.sourcePresetId).toBeUndefined();
     expect(patched.style.surface.radius).toBe(24);
-    expect(patched.style.surface.backgroundColor).toBe('#222222');
+    expect(patched.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#222222ff' });
     expect(patched.style.connector.kind).toBe('wedge');
   });
 

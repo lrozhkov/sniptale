@@ -5,7 +5,7 @@ import { createToolPresetActions } from './actions';
 
 export function useToolPresetsController() {
   const state = useEditorPresetStorageState();
-  const [owner, setOwner] = useState<EditorPresetFamily>('pencil');
+  const [owner, setOwner] = useState<EditorPresetFamily>('step');
   const collection = state[owner];
   const actions = createToolPresetActions({
     currentPresets: collection.presets,

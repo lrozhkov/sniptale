@@ -73,7 +73,7 @@ function createEditorDocument(): EditorDocument {
     sourceName: 'source.png',
     sourceTop: 0,
     sourceWidth: 320,
-    version: 1,
+    version: 2,
   };
 }
 

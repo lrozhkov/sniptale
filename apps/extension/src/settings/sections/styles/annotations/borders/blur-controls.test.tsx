@@ -73,6 +73,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     id: overrides.id ?? 'preset-1',
     name: overrides.name ?? 'Preset',
     order: overrides.order ?? 0,
+    tagIds: overrides.tagIds ?? [],
     width: overrides.width ?? 4,
     color: overrides.color ?? '#ff6600',
     style: overrides.style ?? 'solid',
@@ -80,7 +81,7 @@ function createPreset(overrides: Partial<BorderPreset> = {}): BorderPreset {
     padding: overrides.padding ?? { top: 1, right: 1, bottom: 1, left: 1 },
     shadow: overrides.shadow ?? 30,
     customCss: overrides.customCss ?? '',
-    fillColor: overrides.fillColor ?? '#00000000',
+    fillPaint: overrides.fillPaint ?? { kind: 'solid', color: '#00000000' },
     inheritCustomCss: overrides.inheritCustomCss ?? false,
   };
 }

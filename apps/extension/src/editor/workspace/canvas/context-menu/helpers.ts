@@ -87,7 +87,7 @@ function isEditingTextTarget(target: EditableTarget | null) {
   return Boolean(target?.isEditing && isTextTarget(target));
 }
 
-export function shouldUseNativeCanvasContextMenu(controller: CanvasContextMenuController): boolean {
+function shouldUseNativeCanvasContextMenu(controller: CanvasContextMenuController): boolean {
   const activeObject = (controller.canvas?.getActiveObject?.() as EditableTarget | null) ?? null;
   return isEditingTextTarget(activeObject);
 }

@@ -1,4 +1,5 @@
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
+import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 
 type RecordValue = Record<string, unknown>;
@@ -182,7 +183,11 @@ function parseConnector(value: unknown): CalloutVisualStyle['connector'] | null 
 
 function parseSurface(value: unknown): CalloutVisualStyle['surface'] | null {
   if (!isPlainRecord(value)) return null;
-  const backgroundColor = readColor(value['backgroundColor']);
+  const fillPaint =
+    parsePaint(value['fillPaint']) ??
+    (readColor(value['backgroundColor'])
+      ? createSolidPaint(readColor(value['backgroundColor'])!)
+      : null);
   const borderColor = readColor(value['borderColor']);
   const borderStyle = readEnum(value['borderStyle'], 'solid', ['solid', 'dashed', 'dotted']);
   const borderWidth = readNumber(value, 'borderWidth', undefined, 0, 12);
@@ -192,7 +197,7 @@ function parseSurface(value: unknown): CalloutVisualStyle['surface'] | null {
   const shadow = readNumber(value, 'shadow', undefined, 0, 100);
   const shadowColor = readColor(value['shadowColor'], '#000000');
   const textColor = readColor(value['textColor']);
-  return backgroundColor &&
+  return fillPaint &&
     borderColor &&
     borderStyle &&
     borderWidth !== null &&
@@ -203,7 +208,7 @@ function parseSurface(value: unknown): CalloutVisualStyle['surface'] | null {
     shadowColor &&
     textColor
     ? {
-        backgroundColor,
+        fillPaint,
         borderColor,
         borderStyle,
         borderWidth,

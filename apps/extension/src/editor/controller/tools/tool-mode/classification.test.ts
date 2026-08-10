@@ -1,22 +1,51 @@
-import { expect, it } from 'vitest';
+// @vitest-environment jsdom
 
-import {
-  isFreeDrawingTool,
-  isRasterInteractionTool,
-  isStickyAnnotationTool,
-} from './classification';
+import { Canvas, Rect } from 'fabric';
+import { expect, it, vi } from 'vitest';
 
-it('classifies annotation, raster, and free-drawing tool roles', () => {
-  expect(isStickyAnnotationTool('shape-library')).toBe(true);
-  expect(isStickyAnnotationTool('frame-annotation')).toBe(true);
-  expect(isStickyAnnotationTool('select')).toBe(false);
-  expect(isStickyAnnotationTool('crop')).toBe(false);
+vi.mock('../../../document/model', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../document/model')>()),
+  isEditableObject: vi.fn(() => true),
+}));
 
-  expect(isRasterInteractionTool('selection')).toBe(true);
-  expect(isRasterInteractionTool('fill')).toBe(true);
-  expect(isRasterInteractionTool('text')).toBe(false);
+import { isStickyAnnotationTool } from './classification';
+import { setCanvasObjectInteractivity } from './interactivity';
 
-  expect(isFreeDrawingTool('pencil')).toBe(true);
-  expect(isFreeDrawingTool('highlighter')).toBe(true);
-  expect(isFreeDrawingTool('brush')).toBe(false);
+it('classifies current drawing tools as sticky and retained utility tools as non-sticky', () => {
+  expect(
+    (['pencil', 'marker', 'shape', 'blur', 'arrow', 'text', 'step'] as const).every((tool) =>
+      isStickyAnnotationTool(tool)
+    )
+  ).toBe(true);
+  expect(
+    (['select', 'image', 'crop'] as const).every((tool) => !isStickyAnnotationTool(tool))
+  ).toBe(true);
+});
+
+it('applies all, selection, text, and disabled interactivity modes', () => {
+  const selected = new Rect();
+  selected.sniptaleId = 'selected';
+  selected.sniptaleType = 'shape';
+  const text = new Rect();
+  text.sniptaleId = 'text';
+  text.sniptaleType = 'text';
+  const canvas = new Canvas(document.createElement('canvas'));
+  canvas.add(selected, text);
+  vi.spyOn(canvas, 'getActiveObjects').mockReturnValue([selected]);
+
+  setCanvasObjectInteractivity(canvas, 'selection');
+  expect(selected.selectable).toBe(true);
+  expect(text.selectable).toBe(false);
+
+  setCanvasObjectInteractivity(canvas, 'text');
+  expect(selected.selectable).toBe(false);
+  expect(text.selectable).toBe(true);
+
+  setCanvasObjectInteractivity(canvas, 'all');
+  expect(selected.evented).toBe(true);
+  expect(text.evented).toBe(true);
+
+  setCanvasObjectInteractivity(canvas, 'none');
+  expect(selected.evented).toBe(false);
+  expect(text.evented).toBe(false);
 });

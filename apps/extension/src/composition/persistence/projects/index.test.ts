@@ -28,6 +28,7 @@ const projectsDbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../infrastructure/indexed-db/core', () => ({
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
   PROJECT_EXPORTS_STORE: 'project_exports',
@@ -134,8 +135,14 @@ async function verifyProjectSaveRefreshesUpdatedAt() {
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith({
     createdAt: 55,
     id: 'project-1',
+    lifecycle: {
+      savedAt: 100,
+      storageClass: 'library',
+      updatedAt: 999,
+    },
     project: expect.objectContaining({ id: 'project-1', updatedAt: 999 }),
     updatedAt: 999,
+    workspaceRevision: 1,
   });
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
@@ -180,6 +187,48 @@ describe('projects-db video project flows', () => {
     'saves projects with preserved createdAt and refreshed updatedAt',
     verifyProjectSaveRefreshesUpdatedAt
   );
+  it('aligns project-asset mirrors with a new temporary project lifecycle', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const project = createVideoProjectEntryWithMediaClip().project;
+    const media = createMediaLibraryEntry({
+      id: 'project-asset:project-asset-1',
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+      source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
+    });
+    projectsDbMocks.txGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(media);
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await saveVideoProject(project, { storageClass: 'temporary' });
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: media.id,
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 999 },
+      })
+    );
+  });
+  it('does not downgrade an independently promoted project asset on draft autosave', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const project = createVideoProjectEntryWithMediaClip().project;
+    const media = createMediaLibraryEntry({
+      id: 'project-asset:project-asset-1',
+      lifecycle: { savedAt: 800, storageClass: 'library', updatedAt: 800 },
+      source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
+    });
+    projectsDbMocks.txGetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(media);
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await saveVideoProject(project, { storageClass: 'temporary' });
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: media.id,
+        lifecycle: { savedAt: 800, storageClass: 'library', updatedAt: 800 },
+      })
+    );
+  });
   it('reads, lists and deletes video projects', verifyProjectReadListAndDelete);
 });
 

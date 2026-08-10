@@ -263,7 +263,7 @@ it('starts all prepared source recorders and finalizes video plus separate micro
         }),
       ]),
     }),
-    { baseRevision: null }
+    { baseRevision: null, storageClass: 'temporary' }
   );
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({

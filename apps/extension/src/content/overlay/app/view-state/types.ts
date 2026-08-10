@@ -5,9 +5,11 @@ import type { ContentAppModeState } from '../mode';
 import type { useScenarioController } from '../../scenario/controller';
 import type { useScreenshotController } from '../../screenshot/controller';
 import type { useToolbarModeController } from '../../toolbar/mode-controller';
+import type { ContentDrawingController } from '../../../drawing/controller';
 
 export interface ContentCoreControllers {
   aiController: ReturnType<typeof useAiPickController>;
+  drawingController: ContentDrawingController;
   modeController: ReturnType<typeof useToolbarModeController>;
   scenarioController: ReturnType<typeof useScenarioController>;
   screenshotController: ReturnType<typeof useScreenshotController>;

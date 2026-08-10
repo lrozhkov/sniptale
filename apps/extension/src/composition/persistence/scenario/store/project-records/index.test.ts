@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   blobToDataUrlMock,
-  deleteScenarioStepEditorDocumentRecordMock,
-  deleteScenarioAssetMock,
   deleteScenarioExportMock,
   deleteScenarioProjectMock,
   getScenarioAssetMock,
@@ -15,8 +13,6 @@ const {
   saveScenarioProjectMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
-  deleteScenarioStepEditorDocumentRecordMock: vi.fn(),
-  deleteScenarioAssetMock: vi.fn(),
   deleteScenarioExportMock: vi.fn(),
   deleteScenarioProjectMock: vi.fn(),
   getScenarioAssetMock: vi.fn(),
@@ -37,7 +33,6 @@ vi.mock('../../projects', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../projects')>();
   return {
     ...actual,
-    deleteScenarioAsset: deleteScenarioAssetMock,
     deleteScenarioExport: deleteScenarioExportMock,
     deleteScenarioProject: deleteScenarioProjectMock,
     getScenarioAsset: getScenarioAssetMock,
@@ -53,11 +48,10 @@ vi.mock('../step-editor-documents/index', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../step-editor-documents/index')>();
   return {
     ...actual,
-    deleteScenarioStepEditorDocumentRecord: deleteScenarioStepEditorDocumentRecordMock,
     listScenarioStepEditorDocumentRecords: listScenarioStepEditorDocumentRecordsMock,
   };
 });
-import { deleteScenarioAssetRecord, getScenarioAssetBlob, getScenarioAssetEntry } from './assets';
+import { getScenarioAssetBlob, getScenarioAssetEntry } from './assets';
 import {
   deleteScenarioStepFromProject,
   moveScenarioStepInProject,
@@ -75,7 +69,6 @@ beforeEach(() => {
   listScenarioProjectsMock.mockResolvedValue([]);
   saveScenarioProjectMock.mockImplementation(async (project) => project);
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,preview');
-  deleteScenarioAssetMock.mockResolvedValue(undefined);
   deleteScenarioExportMock.mockResolvedValue(undefined);
   deleteScenarioProjectMock.mockResolvedValue(undefined);
   getScenarioAssetMock.mockResolvedValue(undefined);
@@ -83,7 +76,6 @@ beforeEach(() => {
   listScenarioAssetsMock.mockResolvedValue([]);
   listScenarioExportsMock.mockResolvedValue([]);
   listScenarioStepEditorDocumentRecordsMock.mockResolvedValue([]);
-  deleteScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
 });
 
 async function verifyAssetReadFacadeLifecycle() {
@@ -113,9 +105,9 @@ async function verifyAssetReadFacadeLifecycle() {
     createdAt: 30,
     size: assetBlob.size,
   });
-  await deleteScenarioAssetRecord('asset-1');
-
-  expect(deleteScenarioAssetMock).toHaveBeenCalledWith('asset-1');
+  getScenarioAssetMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+  await expect(getScenarioAssetBlob('missing')).resolves.toBeUndefined();
+  await expect(getScenarioAssetEntry('missing')).resolves.toBeUndefined();
 }
 
 async function verifyProjectStepMutationLifecycle() {
@@ -137,7 +129,6 @@ async function verifyProjectStepMutationLifecycle() {
   expect(trimmedProject?.trash.map((entry) => entry.step.id)).toEqual([firstStep.id]);
   expect(restoredProject?.steps.map((step) => step.id)).toEqual([firstStep.id, secondStep.id]);
   expect(restoredProject?.trash).toEqual([]);
-  expect(deleteScenarioAssetMock).not.toHaveBeenCalledWith(firstStep.assetId);
 }
 
 function createRecorderSidebarFixture() {

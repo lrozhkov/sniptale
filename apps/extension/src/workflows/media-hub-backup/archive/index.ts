@@ -9,6 +9,8 @@ import type {
   RecordingEntry,
 } from '../../../composition/persistence/recordings/contracts';
 import type { WebSnapshotRecord } from '../../../composition/persistence/web-snapshots/contracts';
+import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
+import { parseImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/parser';
 import { translate } from '../../../platform/i18n';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../features/web-snapshot/provenance';
@@ -17,6 +19,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
+  IMAGE_WORKSPACES_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../storage/constants';
 import {
@@ -30,6 +33,7 @@ import type {
   MediaHubBackupAssetDescriptor,
   MediaHubBackupExportOptions,
 } from '../contracts/types';
+import { appendAggregatePresentation } from '../export/presentation';
 
 type BackupDatabase = Pick<Awaited<ReturnType<typeof initDB>>, 'get'>;
 
@@ -64,21 +68,50 @@ export async function appendBackupAssetDescriptor(args: {
     zip: args.zip,
   });
 
-  const thumbnailPath = await appendBackupThumbnailDescriptor(args);
+  const isImageAggregate =
+    args.entry.source.kind === 'screenshot' &&
+    (args.entry.kind === 'screenshot' || args.entry.kind === 'image');
+  const thumbnailPath = isImageAggregate ? null : await appendBackupThumbnailDescriptor(args);
 
   const sanitizedEntry = createBackupMediaEntry(args.entry, blob.size);
   const recordingTelemetry =
     options.includeTelemetry && args.entry.source.kind === 'recording'
       ? await resolveRecordingTelemetry(args.db, args.entry)
       : undefined;
+  const workspace = isImageAggregate
+    ? (parseImageWorkspaceEntry(await args.db.get(IMAGE_WORKSPACES_STORE, args.entry.id)) ??
+      undefined)
+    : undefined;
+  const presentation = isImageAggregate
+    ? await appendAggregatePresentation({
+        aggregateId: args.entry.id,
+        aggregateKind: 'image',
+        budget: args.budget,
+        db: args.db,
+        pathPrefix: `aggregate-presentations/image/${args.encodePathSegment(args.entry.id)}`,
+        signal: args.signal,
+        zip: args.zip,
+      })
+    : undefined;
   args.assets.push({
     assetPath,
     entry: buildBackupAssetEntry(sanitizedEntry, options),
     ...(recordingTelemetry === undefined ? {} : { recordingTelemetry }),
     thumbnailPath,
+    ...(workspace ? { workspace: sanitizeWorkspace(workspace, options) } : {}),
+    ...(presentation ? { presentation } : {}),
   });
 
-  return args.thumbnailCount;
+  return args.thumbnailCount + (presentation ? 1 : 0);
+}
+
+function sanitizeWorkspace(
+  workspace: ImageWorkspaceEntry,
+  options: MediaHubBackupExportOptions
+): ImageWorkspaceEntry {
+  return options.includeSourceMetadata
+    ? { ...workspace, sourceUrl: sanitizeProvenanceUrl(workspace.sourceUrl) }
+    : { ...workspace, sourceTitle: null, sourceUrl: null };
 }
 
 function buildBackupAssetEntry(

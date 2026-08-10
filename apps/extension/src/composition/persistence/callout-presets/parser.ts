@@ -10,6 +10,7 @@ import {
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseCalloutVisualStyle } from './visual-style-parser';
+import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
 
 export { parseCalloutVisualStyle } from './visual-style-parser';
 
@@ -24,6 +25,7 @@ interface StoredCalloutPresetPlacement {
   enabled: boolean;
   id: string;
   order: number;
+  tagIds?: string[];
 }
 
 interface StoredSystemCalloutPresetOverride {
@@ -144,16 +146,25 @@ function isNumberInRange(value: unknown, minimum: number, maximum: number): valu
 }
 
 function parsePlacement(value: unknown): StoredCalloutPresetPlacement | null {
+  const tagIds = isPlainRecord(value)
+    ? parseAnnotationTemplateTagIds(value['tagIds'])
+    : { invalid: true, value: [] };
   if (
     !isPlainRecord(value) ||
     !isString(value['id']) ||
     value['id'].length === 0 ||
     !isBoolean(value['enabled']) ||
-    !isNonNegativeInteger(value['order'])
+    !isNonNegativeInteger(value['order']) ||
+    tagIds.invalid
   ) {
     return null;
   }
-  return { enabled: value['enabled'], id: value['id'], order: value['order'] };
+  return {
+    enabled: value['enabled'],
+    id: value['id'],
+    order: value['order'],
+    ...(value['tagIds'] === undefined ? {} : { tagIds: tagIds.value }),
+  };
 }
 
 function isValidPresetName(value: unknown): value is string {

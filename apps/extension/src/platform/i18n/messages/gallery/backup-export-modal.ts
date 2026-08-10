@@ -57,10 +57,6 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     ru: 'Recording telemetry, если опция включена',
     en: 'Recording telemetry when enabled',
   },
-  classEditorDrafts: {
-    ru: 'Step editor documents и черновики, если опция включена',
-    en: 'Step editor documents and drafts when enabled',
-  },
   classWebSnapshots: {
     ru: 'Web snapshot packages, если опция включена',
     en: 'Web snapshot packages when enabled',
@@ -88,14 +84,6 @@ export const galleryBackupExportModalMessages = defineMessageSource({
   includeWebSnapshotsDescription: {
     ru: 'Web snapshots содержат сохранённые HTML/CSS package assets.',
     en: 'Web snapshots include saved HTML/CSS package assets.',
-  },
-  includeEditorDrafts: {
-    ru: 'Включить editor drafts',
-    en: 'Include editor drafts',
-  },
-  includeEditorDraftsDescription: {
-    ru: 'Добавляет документы пошагового редактора сценариев.',
-    en: 'Adds scenario step editor documents.',
   },
   supportBundle: {
     ru: 'Support bundle',

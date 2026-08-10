@@ -1,3 +1,5 @@
+import type { AnnotationTemplateTagId } from './annotation-template-tags';
+
 export type StepBadgeType = 'number' | 'letter' | 'manual';
 export type StepBadgeAlphabet = 'cyrillic' | 'latin';
 export type StepBadgeSize = 'standard' | 'large' | 'extra-large';
@@ -112,6 +114,7 @@ export interface StepBadgePreset {
   systemPresetKey?: SystemStepBadgePresetKey;
   basedOnRevision?: number;
   customized?: boolean;
+  tagIds: AnnotationTemplateTagId[];
 }
 
 export interface StepBadgePresetCatalog {

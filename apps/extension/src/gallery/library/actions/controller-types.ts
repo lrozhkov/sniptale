@@ -87,6 +87,9 @@ interface GalleryPreviewControllerActions {
   storage: {
     refresh: () => Promise<void>;
   };
+  surface: {
+    setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
+  };
 }
 
 interface GalleryImportControllerActions {

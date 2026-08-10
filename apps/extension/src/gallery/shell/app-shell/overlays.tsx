@@ -86,9 +86,13 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onPreviewCopy'
   | 'onPreviewDelete'
   | 'onPreviewDownload'
+  | 'onPreviewDownloadOriginal'
   | 'onPreviewEdit'
   | 'onPreviewOpenSnapshotScreenshot'
+  | 'onPreviewPromote'
   | 'onPreviewResetChanges'
+  | 'onPreviewRestoreOriginal'
+  | 'onPreviewSaveCopy'
   | 'onRemoveTag'
   | 'onTagDraftChange'
   | 'state'
@@ -126,10 +130,16 @@ function renderPreviewOverlayPanel(
       onAddTag={props.onAddTag}
       {...buildPreviewResetProps(props)}
       onDownload={async () => props.onPreviewDownload()}
+      onDownloadOriginal={async () => props.onPreviewDownloadOriginal()}
       onCopy={async () => props.onPreviewCopy()}
       onEdit={() => props.onPreviewEdit(previewItem)}
       onOpenSnapshotScreenshot={async () => props.onPreviewOpenSnapshotScreenshot()}
       onDelete={async () => props.onPreviewDelete(previewItem)}
+      onRestoreOriginal={props.onPreviewRestoreOriginal}
+      onSaveCopy={async () => props.onPreviewSaveCopy()}
+      {...(props.onPreviewPromote
+        ? { onPromote: async () => props.onPreviewPromote?.(previewItem) }
+        : {})}
     />
   );
 }

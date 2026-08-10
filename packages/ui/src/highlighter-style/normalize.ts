@@ -1,5 +1,6 @@
 import type { BorderVisualStyle } from './types';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { clonePaint } from '@sniptale/foundation/paint';
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
@@ -35,7 +36,7 @@ export function normalizeBorderPresetVisualFields<T extends BorderVisualStyle>(p
   return {
     ...preset,
     shadow: normalizeBorderShadowIntensity(preset.shadow),
-    fillColor: preset.fillColor ?? '#00000000',
+    fillPaint: clonePaint(preset.fillPaint),
     inheritCustomCss: preset.inheritCustomCss ?? false,
     effects: cloneBorderPresetEffects(preset.effects),
   };

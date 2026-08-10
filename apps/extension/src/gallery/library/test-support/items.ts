@@ -27,6 +27,13 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
     hasThumbnail: overrides.hasThumbnail ?? false,
+    ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
+    ...(overrides.presentationRevision !== undefined
+      ? { presentationRevision: overrides.presentationRevision }
+      : {}),
+    ...(overrides.workspaceRevision !== undefined
+      ? { workspaceRevision: overrides.workspaceRevision }
+      : {}),
     type: overrides.type ?? 'media',
   };
 }
@@ -129,6 +136,7 @@ export function createVideoProjectItem(
     thumbnailId:
       overrides.project?.thumbnailId ?? `video-project:${overrides.entityId ?? 'video-project-1'}`,
     thumbnailSourceMediaId: overrides.thumbnailSourceMediaId ?? 'project-asset:asset-1',
+    retentionKind: overrides.project?.retentionKind ?? 'ordinary',
     trackCount: overrides.project?.trackCount ?? 1,
     updatedAt: overrides.updatedAt ?? 2,
     width: overrides.width ?? 1280,

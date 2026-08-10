@@ -1,4 +1,8 @@
 import { expect, expectTypeOf, it } from 'vitest';
+import {
+  ANNOTATION_TEMPLATE_TAG_LIMITS,
+  cloneAnnotationTemplateTagState,
+} from './annotation-template-tags';
 
 import type {
   CalloutAnchor,
@@ -34,9 +38,22 @@ const BORDER_PRESET: BorderPreset = {
   radius: 4,
   padding: { top: 1, right: 2, bottom: 3, left: 4 },
   shadow: 10,
-  fillColor: '#000000',
+  fillPaint: {
+    kind: 'gradient',
+    gradient: {
+      type: 'linear',
+      angle: 90,
+      interpolation: 'srgb',
+      repeat: { enabled: false, span: 1 },
+      stops: [
+        { id: 'left', color: '#000000ff', position: 0, midpoint: 0.5 },
+        { id: 'right', color: '#ffffffff', position: 1, midpoint: 0.5 },
+      ],
+    },
+  },
   inheritCustomCss: false,
   customCss: '',
+  tagIds: ['tag-one'],
 };
 
 it('keeps highlighter alphabets and shared anchors canonical', () => {
@@ -68,6 +85,25 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
   }>();
 });
 
+it('clones annotation template tag state without sharing mutable arrays', () => {
+  const source = {
+    activeFilterTagIds: ['tag-one'],
+    schemaVersion: 1,
+    tags: [{ id: 'tag-one', label: 'Review' }],
+  };
+  const clone = cloneAnnotationTemplateTagState(source);
+
+  expect(ANNOTATION_TEMPLATE_TAG_LIMITS).toEqual({
+    maximumLabelLength: 32,
+    maximumTags: 32,
+    maximumTagsPerTemplate: 8,
+  });
+  expect(clone).toEqual(source);
+  expect(clone.activeFilterTagIds).not.toBe(source.activeFilterTagIds);
+  expect(clone.tags).not.toBe(source.tags);
+  expect(clone.tags[0]).not.toBe(source.tags[0]);
+});
+
 it('recognizes only canonical system step badge preset keys', () => {
   for (const key of SYSTEM_STEP_BADGE_PRESET_KEYS) {
     expect(isSystemStepBadgePresetKey(key)).toBe(true);
@@ -92,7 +128,9 @@ it('projects catalog presets into independent applied border snapshots', () => {
   });
   expect(applied).not.toHaveProperty('id');
   expect(applied).not.toHaveProperty('name');
+  expect(applied).not.toHaveProperty('tagIds');
   expect(applied.padding).not.toBe(BORDER_PRESET.padding);
+  expect(applied.fillPaint).not.toBe(BORDER_PRESET.fillPaint);
 });
 
 it('clears preset attribution on manual patches and clones nested padding', () => {
@@ -108,6 +146,12 @@ it('clears preset attribution on manual patches and clones nested padding', () =
   expect(manual).not.toHaveProperty('sourcePresetName');
   expect(clone).toEqual(manual);
   expect(clone.padding).not.toBe(manual.padding);
+  expect(manual.fillPaint).not.toBe(applied.fillPaint);
+  expect(clone.fillPaint).not.toBe(manual.fillPaint);
+  if (manual.fillPaint.kind === 'gradient' && applied.fillPaint.kind === 'gradient') {
+    manual.fillPaint.gradient.stops[0]!.color = '#ff0000ff';
+    expect(applied.fillPaint.gradient.stops[0]!.color).toBe('#000000ff');
+  }
 });
 
 it('normalizes legacy catalog snapshots while preserving applied snapshots', () => {

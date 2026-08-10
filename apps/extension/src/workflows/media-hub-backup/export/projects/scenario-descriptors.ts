@@ -31,6 +31,7 @@ import type {
   MediaHubBackupExportOptions,
   ScenarioBackupProjectDescriptor,
 } from '../../contracts/types';
+import { appendAggregatePresentation } from '../presentation';
 
 type ExportDatabase = Awaited<ReturnType<typeof initDB>>;
 
@@ -67,12 +68,17 @@ async function buildScenarioProjectDescriptor(
 ): Promise<ScenarioBackupProjectDescriptor> {
   assertSupportedScenarioBackupProjectEntry(entry);
   const projectSegment = safeBackupPathSegment(entry.id, 'scenario project id');
-  const [assets, exports, stepDocuments, thumbnail] = await loadScenarioProjectBundle(
-    db,
-    entry.id,
-    signal
-  );
+  const [assets, exports, stepDocuments] = await loadScenarioProjectBundle(db, entry.id, signal);
   const exportThumbnails = await buildScenarioThumbs(db, zip, budget, entry.id, exports, signal);
+  const presentation = await appendAggregatePresentation({
+    aggregateId: entry.id,
+    aggregateKind: 'scenario',
+    budget,
+    db,
+    pathPrefix: `aggregate-presentations/scenario/${projectSegment}`,
+    signal,
+    zip,
+  });
   assertBackupExportNotCancelled(signal);
 
   return normalizeScenarioProject({
@@ -88,17 +94,7 @@ async function buildScenarioProjectDescriptor(
     entry: applyScenarioProjectPrivacyOptions(entry, options),
     exports,
     stepDocuments: buildScenarioStepDocuments(stepDocuments, options),
-    ...(thumbnail
-      ? {
-          thumbnail: createBackupBlobDescriptor(
-            zip,
-            budget,
-            `scenario-projects/${projectSegment}/thumbnail`,
-            thumbnail,
-            signal
-          ),
-        }
-      : {}),
+    ...(presentation ? { presentation } : {}),
     exportThumbnails,
   });
 }
@@ -107,9 +103,9 @@ function buildScenarioStepDocuments(
   stepDocuments: ScenarioStepEditorDocumentEntry[],
   options: MediaHubBackupExportOptions
 ): ScenarioStepEditorDocumentEntry[] {
-  return options.includeEditorDrafts
-    ? stepDocuments.map((document) => applyScenarioStepDocumentPrivacyOptions(document, options))
-    : [];
+  return stepDocuments.map((document) =>
+    applyScenarioStepDocumentPrivacyOptions(document, options)
+  );
 }
 
 async function loadScenarioProjectBundle(
@@ -136,12 +132,7 @@ async function loadScenarioProjectBundle(
     projectId
   )) as ScenarioStepEditorDocumentEntry[];
   assertBackupExportNotCancelled(signal);
-  const thumbnail = (await db.get(THUMBNAILS_STORE, `scenario:${projectId}`)) as
-    | MediaThumbnailEntry
-    | undefined;
-  assertBackupExportNotCancelled(signal);
-
-  return [assets, exports, stepDocuments, thumbnail] as const;
+  return [assets, exports, stepDocuments] as const;
 }
 
 async function buildScenarioThumbs(

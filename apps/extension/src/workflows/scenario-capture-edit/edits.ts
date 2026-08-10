@@ -1,12 +1,9 @@
-import {
-  deleteScenarioAsset,
-  saveScenarioAsset,
-} from '../../composition/persistence/scenario/projects';
 import type { EditorDocument } from '../../features/editor/document/types';
 import { dataUrlToBlob } from '../../platform/media-utils/data-url';
 import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
 import { getDefaultScenarioImageTransform } from '../../features/scenario/project/defaults';
 import type { ScenarioAssetEntry } from '@sniptale/runtime-contracts/scenario/types/session';
+import type { ScenarioAssetEntry as DbScenarioAssetEntry } from '../../composition/persistence/scenario/contracts';
 import type { ScenarioCaptureStep } from '../../features/scenario/contracts/types/project';
 import { createDefaultScenarioViewportTransform } from '../../features/scenario/stage/layout';
 import {
@@ -15,17 +12,17 @@ import {
 } from '../../composition/persistence/scenario/store/project-records/helpers';
 import { projectCompatOverlaysFromEditorDocument } from '../../features/scenario/capture-step/editor-document';
 
-export async function createScenarioEditedCaptureAsset(args: {
+export async function prepareScenarioEditedCaptureAsset(args: {
   dataUrl: string;
   galleryAssetId?: string | null;
   projectId: string;
-}): Promise<ScenarioAssetEntry> {
+}): Promise<{ asset: ScenarioAssetEntry; entry: DbScenarioAssetEntry }> {
   const now = Date.now();
   const assetId = createScenarioAssetId();
   const blob = await dataUrlToBlob(args.dataUrl);
   const dimensions = await measureImageBlob(blob);
 
-  await saveScenarioAsset({
+  const entry = {
     id: assetId,
     projectId: args.projectId,
     galleryAssetId: args.galleryAssetId ?? null,
@@ -35,23 +32,9 @@ export async function createScenarioEditedCaptureAsset(args: {
     height: dimensions.height,
     createdAt: now,
     size: blob.size,
-  });
+  } satisfies DbScenarioAssetEntry;
 
-  return mapScenarioAssetEntry({
-    id: assetId,
-    projectId: args.projectId,
-    galleryAssetId: args.galleryAssetId ?? null,
-    blob,
-    mimeType: blob.type || 'image/png',
-    width: dimensions.width,
-    height: dimensions.height,
-    createdAt: now,
-    size: blob.size,
-  });
-}
-
-export function deleteScenarioEditedCaptureAsset(assetId: string): Promise<void> {
-  return deleteScenarioAsset(assetId);
+  return { asset: mapScenarioAssetEntry(entry), entry };
 }
 
 export function buildScenarioEditedCaptureStep(

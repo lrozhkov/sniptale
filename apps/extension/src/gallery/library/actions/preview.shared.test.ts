@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { copyPreviewItem, downloadPreviewItem, openInEditor } from './preview';
+import {
+  copyPreviewItem,
+  createRestoreOriginalAction,
+  createSaveImageCopyAction,
+  downloadOriginalPreviewItem,
+  downloadPreviewItem,
+  openInEditor,
+} from './preview';
 import { createBusyActionRunner } from './shared';
 import {
   createController,
@@ -12,6 +19,9 @@ import {
 
 const {
   getMediaAssetBlobMock,
+  getAggregatePreviewBlobMock,
+  copyImageAggregateMock,
+  restoreImageAggregateOriginalMock,
   browserTabsCreateMock,
   writeBrowserClipboardItemsMock,
   buildEditorUrlMock,
@@ -19,6 +29,9 @@ const {
   openVideoEditorPageMock,
 } = vi.hoisted(() => ({
   getMediaAssetBlobMock: vi.fn(),
+  getAggregatePreviewBlobMock: vi.fn(),
+  copyImageAggregateMock: vi.fn(),
+  restoreImageAggregateOriginalMock: vi.fn(),
   browserTabsCreateMock: vi.fn(),
   writeBrowserClipboardItemsMock: vi.fn(),
   buildEditorUrlMock: vi.fn((options: { assetId?: string | null; sessionId?: string | null }) => {
@@ -42,6 +55,16 @@ vi.mock(
     getMediaAssetBlob: getMediaAssetBlobMock,
   })
 );
+
+vi.mock('../../../composition/persistence/aggregate-presentations', () => ({
+  getAggregatePreviewBlob: getAggregatePreviewBlobMock,
+}));
+
+vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
+  copyImageAggregate: copyImageAggregateMock,
+  restoreImageAggregateOriginal: restoreImageAggregateOriginalMock,
+}));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { create: browserTabsCreateMock },
@@ -124,7 +147,7 @@ async function verifyPreviewDownloadAndCopyFlows() {
   });
   const setIsBusy = vi.fn();
   const runBusy = createRunBusy(vi.fn(), setIsBusy);
-  getMediaAssetBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
 
   await downloadPreviewItem(controller, runBusy);
   await flushMicrotasks();
@@ -142,7 +165,9 @@ async function verifyPreviewErrorBannerFlow() {
     previewItem: createMediaItem({ id: 'asset-2', filename: 'broken.png' }),
   });
   const setBanner = vi.fn();
-  getMediaAssetBlobMock.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('copy failed'));
+  getAggregatePreviewBlobMock
+    .mockResolvedValueOnce(null)
+    .mockRejectedValueOnce(new Error('copy failed'));
 
   await downloadPreviewItem(controller, createRunBusy(setBanner));
   await flushMicrotasks();
@@ -151,6 +176,37 @@ async function verifyPreviewErrorBannerFlow() {
 
   expect(setBanner).toHaveBeenNthCalledWith(1, expect.stringContaining('broken.png'));
   expect(setBanner).toHaveBeenNthCalledWith(2, 'copy failed');
+}
+
+async function verifyOriginalAndCopyActions() {
+  const { controller, getState } = createController({
+    previewItem: createMediaItem({
+      id: 'image-1',
+      filename: 'edited.png',
+      originalFilename: 'original.png',
+      workspaceRevision: 4,
+    }),
+  });
+  const runBusy = createRunBusy();
+  getMediaAssetBlobMock.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+  restoreImageAggregateOriginalMock.mockResolvedValue({ revision: 5, updatedAt: 10 });
+  copyImageAggregateMock.mockResolvedValue('session-1');
+
+  await downloadOriginalPreviewItem(controller, runBusy);
+  createRestoreOriginalAction(controller, runBusy)();
+  await getState().storage.confirmDialog?.onConfirm();
+  await createSaveImageCopyAction(controller, runBusy)();
+
+  expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4);
+  expect(copyImageAggregateMock).toHaveBeenCalledWith({
+    aggregateId: 'image-1',
+    expectedWorkspaceRevision: 5,
+    targetAggregateId: 'session-1',
+  });
+  expect(getState().preview.session.item).toEqual(
+    expect.objectContaining({ presentationRevision: 5, workspaceRevision: 5 })
+  );
 }
 
 function verifyOpenInEditorFlow() {
@@ -197,6 +253,10 @@ describe('gallery preview shared actions', () => {
     verifyPreviewErrorBannerFlow
   );
   it('opens only image assets in the editor flow', verifyOpenInEditorFlow);
+  it(
+    'downloads the immutable original, restores it in place, and saves copies with a new id',
+    verifyOriginalAndCopyActions
+  );
   it(
     'surfaces busy-action failures without leaving the busy flag enabled',
     verifyBusyActionRunnerFlow

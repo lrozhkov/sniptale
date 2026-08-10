@@ -7,15 +7,14 @@ import {
   type EditorBootstrapPayload,
 } from '../../../workflows/editor/bootstrap';
 import { EDITOR_BOOTSTRAP_QUERY_PARAM } from '../../../features/editor/contracts/bootstrap';
-import { readEditorAssetId, readEditorSessionId } from '@sniptale/runtime-contracts/editor/session';
-import { createSecureRandomUuid as createEditorSessionId } from '@sniptale/platform/security/secure-random-id';
+import { readEditorAssetId } from '@sniptale/runtime-contracts/editor/session';
+import { createSecureRandomUuid as createAggregateId } from '@sniptale/platform/security/secure-random-id';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { type EditorSessionAutosaveService } from '../session-autosave';
 
 interface EditorPageLocationState {
   assetId: string | null;
   bootstrapId: string | null;
-  sessionId: string | null;
 }
 
 interface EditorPageAssetRestoreSource {
@@ -52,10 +51,16 @@ function readEditorBootstrapId(search: string): string | null {
   return new URLSearchParams(search).get(EDITOR_BOOTSTRAP_QUERY_PARAM);
 }
 
-function buildCurrentEditorSessionUrl(sessionId: string): string {
+function buildCurrentEditorAggregateUrl(aggregateId: string): string {
   const url = new URL(window.location.href);
-  url.searchParams.set('session', sessionId);
+  url.searchParams.set('assetId', aggregateId);
+  url.searchParams.delete('session');
   return `${url.pathname}${url.search}`;
+}
+
+/** Rebinds the current editor tab to a newly created aggregate without reloading the document. */
+export function replaceEditorPageAggregateId(aggregateId: string): void {
+  window.history.replaceState({}, '', buildCurrentEditorAggregateUrl(aggregateId));
 }
 
 /**
@@ -67,21 +72,20 @@ export function readEditorPageLocationState(
   return {
     assetId: readEditorAssetId(search),
     bootstrapId: readEditorBootstrapId(search),
-    sessionId: readEditorSessionId(search),
   };
 }
 
 /**
  * Ensures the current editor tab has a stable logical session id in its URL.
  */
-export function ensureEditorPageSessionId(locationState: EditorPageLocationState): string {
-  if (locationState.sessionId) {
-    return locationState.sessionId;
+export function ensureEditorPageAggregateId(locationState: EditorPageLocationState): string {
+  if (locationState.assetId) {
+    return locationState.assetId;
   }
 
-  const sessionId = createEditorSessionId();
-  window.history.replaceState({}, '', buildCurrentEditorSessionUrl(sessionId));
-  return sessionId;
+  const aggregateId = createAggregateId();
+  replaceEditorPageAggregateId(aggregateId);
+  return aggregateId;
 }
 
 async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRestoreSource> {
@@ -110,10 +114,10 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
  */
 export async function resolveEditorPageRestoreSource(
   locationState: EditorPageLocationState,
-  sessionId: string,
+  aggregateId: string,
   autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>
 ): Promise<EditorPageRestoreSource> {
-  const draftEntry = await autosaveService.restoreDraft(sessionId);
+  const draftEntry = await autosaveService.restoreDraft(aggregateId);
   if (draftEntry) {
     return {
       kind: 'draft',

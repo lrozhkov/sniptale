@@ -196,6 +196,47 @@
   display: none !important;
 }
 
+/* Drawing owns page interaction while active; prepared annotations remain visual-only. */
+.sniptale-drawing-canvas {
+  outline: none;
+}
+
+.sniptale-drawing-canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--sniptale-color-border-accent-strong);
+}
+
+:host(.sniptale-drawing-mode-active) .sniptale-frame-container,
+:host(.sniptale-drawing-mode-active) .sniptale-interactive-frame {
+  pointer-events: none !important;
+}
+
+:host(.sniptale-drawing-mode-active) .sniptale-action-toolbar,
+:host(.sniptale-drawing-mode-active) .sniptale-toolbar-portal-wrapper,
+:host(.sniptale-drawing-mode-active) .sniptale-frame-toolbar-trigger,
+:host(.sniptale-drawing-mode-active) .sniptale-frame-toolbar-bridge,
+:host(.sniptale-drawing-mode-active) .sniptale-frame-settings-popover,
+:host(.sniptale-drawing-mode-active) .sniptale-frame-style-editor-layer,
+:host(.sniptale-drawing-mode-active) .sniptale-step-badge-popover,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-settings-popover,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-format-toolbar,
+:host(.sniptale-drawing-mode-active) .sniptale-highlight-hover,
+:host(.sniptale-drawing-mode-active) .sniptale-blocking-overlay,
+:host(.sniptale-drawing-mode-active) .sniptale-editing-blocking-overlay,
+:host(.sniptale-drawing-mode-active) .sniptale-resize-handle,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-drag-handle,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-adjacent-controls,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-tail-handle,
+:host(.sniptale-drawing-mode-active) .sniptale-callout-settings-handle,
+:host(.sniptale-drawing-mode-active) .sniptale-step-badge-controls,
+:host(.sniptale-drawing-mode-active) .sniptale-free-frame-draft-portal,
+:host(.sniptale-drawing-mode-active) .sniptale-quick-edit-hover,
+:host(.sniptale-drawing-mode-active) .sniptale-design-review-frame,
+:host(.sniptale-drawing-mode-active) .sniptale-annotation-marker-layer,
+:host(.sniptale-drawing-mode-active) [data-ui='content.design-review.popover'],
+:host(.sniptale-drawing-mode-active) [data-ui='content.design-review.feedback-panel'] {
+  display: none !important;
+}
+
 .sniptale-frame-toolbar-trigger:hover,
 .sniptale-frame-toolbar-trigger:focus-visible,
 .sniptale-frame-quick-action:hover,

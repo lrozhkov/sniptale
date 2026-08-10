@@ -44,7 +44,20 @@ export function respondWithCaptureAction(
   if (context.captureAction === 'scenario') {
     return respondWithScenario(capturePromise, context, state).catch(fail);
   }
+  if (context.captureAction === 'save_to_library') {
+    return respondWithStoredCapture(capturePromise, context, state).catch(fail);
+  }
   return respondWithDownload(capturePromise, context, state).catch(fail);
+}
+
+async function respondWithStoredCapture(
+  capturePromise: Promise<CaptureDeliveryPayload>,
+  context: { sendResponse: (response?: unknown) => void },
+  state: { jobId?: string | undefined }
+): Promise<void> {
+  state.jobId = readCaptureDeliveryPayload(await capturePromise).jobId;
+  await markCaptureJobTerminal(state.jobId, 'completed');
+  context.sendResponse({ success: true, action: 'save_to_library' });
 }
 
 async function respondWithEditor(
@@ -52,9 +65,12 @@ async function respondWithEditor(
   context: { resolvedTabId: number; sendResponse: (response?: unknown) => void },
   state: { jobId?: string | undefined }
 ): Promise<void> {
-  const { dataUrl, jobId } = readCaptureDeliveryPayload(await capturePromise);
+  const { assetId, dataUrl, jobId } = readCaptureDeliveryPayload(await capturePromise);
   state.jobId = jobId;
-  await openEditorWithImage(dataUrl, { tabId: context.resolvedTabId });
+  await openEditorWithImage(dataUrl, {
+    ...(assetId ? { assetId } : {}),
+    tabId: context.resolvedTabId,
+  });
   await markCaptureJobTerminal(jobId, 'completed');
   context.sendResponse({ success: true, result: 'accepted' });
 }

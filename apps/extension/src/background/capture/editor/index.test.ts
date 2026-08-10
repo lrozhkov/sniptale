@@ -114,7 +114,6 @@ async function verifySourceTabBootstrapRouting(): Promise<void> {
   });
   expect(buildEditorUrlMock).toHaveBeenCalledWith({
     bootstrapId: 'bootstrap-1',
-    sessionId: 'session-1',
   });
   expect(browserTabsCreateMock).toHaveBeenCalledWith({
     url: 'chrome-extension://editor',
@@ -190,7 +189,6 @@ describe('capture-editor bootstrap fallback', () => {
 
     expect(buildEditorUrlMock).toHaveBeenCalledWith({
       bootstrapId: null,
-      sessionId: 'session-1',
     });
     expect(browserTabsCreateMock).toHaveBeenCalledWith({
       url: 'chrome-extension://editor',

@@ -2,7 +2,7 @@ import type { EditorTool } from '../../../features/editor/document/types';
 import type { EditorInspector } from '../../state/types';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 
-export type EditorFloatingLeftDrawerMode = 'shapes-and-lines' | 'rough-shape' | 'shape-library';
+export type EditorFloatingLeftDrawerMode = 'shape';
 
 export type EditorFloatingRightUtilityMode =
   | 'frame'
@@ -20,7 +20,9 @@ interface EditorFloatingSurfaceRoute {
   rightUtility: EditorFloatingRightUtilityMode | null;
 }
 
-const LEFT_DRAWER_TOOLS = new Set<EditorTool>(['shapes-and-lines', 'rough-shape', 'shape-library']);
+// The catalog/import implementation is intentionally retained but suspended until the
+// dedicated rich-shape integration wave. The shared shape tool never opens this drawer.
+const LEFT_DRAWER_TOOLS = new Set<EditorTool>();
 
 const RIGHT_UTILITY_INSPECTORS = new Set<EditorInspector>([
   'frame',
@@ -33,25 +35,19 @@ const RIGHT_UTILITY_INSPECTORS = new Set<EditorInspector>([
   'layer-effects',
 ]);
 
-const SELECTION_TOOLBAR_BLOCKED_TOOLS = new Set<EditorTool>([
-  'crop',
-  'selection',
-  'brush',
-  'eraser',
-  'fill',
-]);
+const SELECTION_TOOLBAR_BLOCKED_TOOLS = new Set<EditorTool>(['crop']);
 
-export function isLeftDrawerMode(tool: EditorTool): tool is EditorFloatingLeftDrawerMode {
+function isLeftDrawerMode(tool: EditorTool): tool is EditorFloatingLeftDrawerMode {
   return LEFT_DRAWER_TOOLS.has(tool);
 }
 
-export function isRightUtilityMode(
+function isRightUtilityMode(
   inspector: EditorInspector
 ): inspector is EditorFloatingRightUtilityMode {
   return RIGHT_UTILITY_INSPECTORS.has(inspector);
 }
 
-export function isCanvasSelectionToolbarEligible(args: {
+function isCanvasSelectionToolbarEligible(args: {
   activeTool: EditorTool;
   hasImage: boolean;
   inspector: EditorInspector;

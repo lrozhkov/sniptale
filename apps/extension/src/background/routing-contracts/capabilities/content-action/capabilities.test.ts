@@ -4,6 +4,7 @@ import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/captur
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   consumeContentPrivilegedActionCapability,
+  consumeContentPrivilegedActionCapabilityBinding,
   issueContentPrivilegedActionAutoStartGrant,
   resetContentPrivilegedActionCapabilitiesForTests,
   routeContentPrivilegedActionProofRequest,
@@ -110,11 +111,13 @@ function requestTrustedEventProof(
 }
 
 function issueTrustedContentIntent(
-  actionType: CaptureMessageType | MessageType = CaptureMessageType.CAPTURE_VISIBLE
+  actionType: CaptureMessageType | MessageType = CaptureMessageType.CAPTURE_VISIBLE,
+  libraryDestinationRequested = false
 ) {
   const proof = requestTrustedEventProof({ actionType, requestId: 'request-1' });
   const message = {
     actionType,
+    ...(libraryDestinationRequested ? { libraryDestinationRequested: true as const } : {}),
     requestId: 'request-1',
     source: { kind: 'trusted-content-event-proof' as const, proofToken: proof.proofToken },
     type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY,
@@ -184,6 +187,76 @@ it('issues and consumes a sender-bound one-shot content action capability', () =
       sender: contentSender(),
     })
   ).toBe(false);
+});
+
+it('carries an explicit library destination only through its scoped one-shot capability', () => {
+  const grant = issueContentPrivilegedActionAutoStartGrant({
+    actionTypes: [MessageType.SAVE_SCREENSHOT_TO_GALLERY],
+    libraryActionTypes: [MessageType.SAVE_SCREENSHOT_TO_GALLERY],
+    tabId: 7,
+  });
+  const contentIntent = requestAutoStartContentIntent({
+    actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+    grantToken: grant.grantToken,
+    requestId: 'library-save',
+  });
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual(expect.objectContaining({ libraryDestinationAuthorized: true, tabId: 7 }));
+});
+
+it('authorizes a manual trusted library save without upgrading an ordinary trusted save', () => {
+  const libraryIntent = issueTrustedContentIntent(MessageType.SAVE_SCREENSHOT_TO_GALLERY, true);
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent: libraryIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual(expect.objectContaining({ libraryDestinationAuthorized: true }));
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent: libraryIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toBeNull();
+
+  const defaultIntent = issueTrustedContentIntent(MessageType.SAVE_SCREENSHOT_TO_GALLERY);
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent: defaultIntent,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toEqual(expect.not.objectContaining({ libraryDestinationAuthorized: true }));
+});
+
+it('rejects malformed capabilities and senders before consulting authority state', () => {
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent: null,
+      resolvedTabId: 7,
+      sender: contentSender(),
+    })
+  ).toBeNull();
+  expect(
+    consumeContentPrivilegedActionCapabilityBinding({
+      actionType: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      contentIntent: { requestId: 'request-1', token: 'token-1' },
+      resolvedTabId: 7,
+      sender: undefined,
+    })
+  ).toBeNull();
 });
 
 it('binds AI settings navigation to one trusted activation, sender, and action', () => {

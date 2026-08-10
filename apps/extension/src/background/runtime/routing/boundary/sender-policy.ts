@@ -39,11 +39,7 @@ const unauthorizedRouteErrors = {
   'video-control': 'Unauthorized video-control route sender',
 } satisfies Record<PrivilegedTabRouteFamily, string>;
 
-const editorCaptureRoutes = new Set<string>([
-  MessageType.REQUEST_GALLERY_IMAGE_UPDATE_CAPABILITY,
-  MessageType.EXECUTE_SAVE,
-  MessageType.UPDATE_GALLERY_IMAGE_ASSET,
-]);
+const editorCaptureRoutes = new Set<string>([MessageType.EXECUTE_SAVE]);
 const popupCaptureRoutes = new Set<string>([MessageType.TRIGGER_QUICK_ACTION]);
 const viewerCaptureRoutes = new Set<string>([
   MessageType.FETCH_WEB_SNAPSHOT_ASSET,

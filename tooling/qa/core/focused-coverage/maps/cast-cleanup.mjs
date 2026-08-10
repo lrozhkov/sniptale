@@ -4,18 +4,6 @@ import { CAST_CLEANUP_SHARED_OWNER_MAPPINGS } from './cast-cleanup-shared.mjs';
 
 const CAST_CLEANUP_LOCAL_OWNER_MAPPING_ENTRIES = [
   {
-    owner: 'editor-freehand-committed-brush-boundary',
-    productionFile: 'apps/extension/src/editor/controller/freehand/brush-committed.ts',
-    reason: 'Committed brush prototype method detection is covered by focused brush suites.',
-    testFiles: ['apps/extension/src/editor/controller/freehand/brush-committed.test.ts'],
-  },
-  {
-    owner: 'editor-freehand-points-boundary',
-    productionFile: 'apps/extension/src/editor/controller/freehand/points.ts',
-    reason: 'Freehand point parsing is covered by the focused points suite.',
-    testFiles: ['apps/extension/src/editor/controller/freehand/points.test.ts'],
-  },
-  {
     owner: 'editor-magnet-vendor-adapter',
     productionFile: 'apps/extension/src/editor/controller/magnet/aligning-guidelines.ts',
     reason: 'Fabric aligning guideline adapter behavior is covered by magnet manager tests.',

@@ -5,6 +5,7 @@ import {
   Highlighter,
   MousePointer2,
   MousePointerClick,
+  Pencil,
   TextCursor,
   TextCursorInput,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import type { ToolbarModeButtonsProps } from './mode-types';
 import {
   resolveToolbarMenuPlacement,
   resolveToolbarFloatingMenuStyle,
+  TOOLBAR_PRIMARY_MENU_Z_INDEX,
   useToolbarFloatingMenuDismissal,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
@@ -33,9 +35,10 @@ import type { ToolbarPageEditingMode } from '../types';
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
-type ToolbarInteractionMode = 'cursor' | 'design-review' | 'highlighter' | 'quick-edit';
+type ToolbarInteractionMode = 'cursor' | 'design-review' | 'drawing' | 'highlighter' | 'quick-edit';
 const TOOLBAR_INTERACTION_MODES: readonly ToolbarInteractionMode[] = [
   'cursor',
+  'drawing',
   'highlighter',
   'quick-edit',
   'design-review',
@@ -48,6 +51,10 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
 
   if (props.designReviewMode) {
     return 'design-review';
+  }
+
+  if (props.drawingMode) {
+    return 'drawing';
   }
 
   if (props.quickEditMode || props.aiPickMode) {
@@ -67,6 +74,8 @@ function getModeIcon(mode: ToolbarInteractionMode) {
       return <TextCursorInput size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'design-review':
       return <DesignReviewModeIcon size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+    case 'drawing':
+      return <Pencil size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
       return <Highlighter size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
@@ -86,6 +95,11 @@ function getModeCopy(mode: ToolbarInteractionMode) {
       return {
         hint: translate('content.toolbar.designReviewEnable'),
         label: translate('content.toolbar.designReviewLabel'),
+      };
+    case 'drawing':
+      return {
+        hint: translate('content.toolbar.drawingEnable'),
+        label: translate('content.toolbar.drawingLabel'),
       };
     case 'highlighter':
       return {
@@ -125,6 +139,9 @@ function createModeSelectionHandler(
         break;
       case 'design-review':
         props.onToggleDesignReview();
+        break;
+      case 'drawing':
+        props.onToggleDrawing?.();
         break;
       case 'highlighter':
         props.onToggleHighlighter();
@@ -196,7 +213,7 @@ function ToolbarModeMenu(props: {
         title={translate('content.toolbar.modeMenuTitle')}
         variant="capture"
         placement={menuPlacement}
-        style={menuStyle}
+        style={{ ...menuStyle, zIndex: TOOLBAR_PRIMARY_MENU_Z_INDEX }}
       >
         {TOOLBAR_INTERACTION_MODES.map((mode) => {
           const selected = selectedMode === mode;

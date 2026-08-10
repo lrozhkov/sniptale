@@ -23,27 +23,6 @@ function buildParsedEditorPresetState(
 ): Partial<EditorPresetStorageState> {
   const value: Partial<EditorPresetStorageState> = {};
 
-  if (parsed.pencil.collection) {
-    value.pencil = parsed.pencil.collection;
-  }
-  if (parsed.highlighter.collection) {
-    value.highlighter = parsed.highlighter.collection;
-  }
-  if (parsed.ellipse.collection) {
-    value.ellipse = parsed.ellipse.collection;
-  }
-  if (parsed.blur.collection) {
-    value.blur = parsed.blur.collection;
-  }
-  if (parsed.arrow.collection) {
-    value.arrow = parsed.arrow.collection;
-  }
-  if (parsed.line.collection) {
-    value.line = parsed.line.collection;
-  }
-  if (parsed.text.collection) {
-    value.text = parsed.text.collection;
-  }
   if (parsed.step.collection) {
     value.step = parsed.step.collection;
   }
@@ -70,16 +49,7 @@ export function parseStoredEditorPresetState(value: unknown): ParsedRoot {
 
   return {
     hasInvalidRoot: false,
-    invalidFieldCount:
-      parsed.pencil.invalidFieldCount +
-      parsed.highlighter.invalidFieldCount +
-      parsed.ellipse.invalidFieldCount +
-      parsed.blur.invalidFieldCount +
-      parsed.arrow.invalidFieldCount +
-      parsed.line.invalidFieldCount +
-      parsed.text.invalidFieldCount +
-      parsed.step.invalidFieldCount +
-      parsed.sceneBackground.invalidFieldCount,
+    invalidFieldCount: parsed.step.invalidFieldCount + parsed.sceneBackground.invalidFieldCount,
     value: buildParsedEditorPresetState(parsed),
   };
 }
@@ -118,13 +88,6 @@ export function resolveStoredEditorPresetState(
   const defaults = createDefaultEditorPresetStorageState();
 
   return {
-    pencil: normalizePresetCollection(value.pencil, defaults.pencil),
-    highlighter: normalizePresetCollection(value.highlighter, defaults.highlighter),
-    ellipse: normalizePresetCollection(value.ellipse, defaults.ellipse),
-    blur: normalizePresetCollection(value.blur, defaults.blur),
-    arrow: normalizePresetCollection(value.arrow, defaults.arrow),
-    line: normalizePresetCollection(value.line, defaults.line),
-    text: normalizePresetCollection(value.text, defaults.text),
     step: normalizePresetCollection(value.step, defaults.step),
     sceneBackground: normalizePresetCollection(value.sceneBackground, defaults.sceneBackground),
     palette: value.palette

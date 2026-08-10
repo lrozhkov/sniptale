@@ -5,11 +5,17 @@ const {
   createRenderedCaptureJobMock,
   openEditorWithImageMock,
   transitionCaptureJobMock,
+  consumeRecentCaptureAssetBindingMock,
 } = vi.hoisted(() => ({
   executeDownloadMock: vi.fn(),
   createRenderedCaptureJobMock: vi.fn(),
   openEditorWithImageMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
+  consumeRecentCaptureAssetBindingMock: vi.fn(),
+}));
+
+vi.mock('./actions.gallery-update', () => ({
+  consumeRecentCaptureAssetBinding: consumeRecentCaptureAssetBindingMock,
 }));
 
 vi.mock('../download/download-router/index', () => ({
@@ -42,6 +48,7 @@ beforeEach(() => {
   openEditorWithImageMock.mockResolvedValue(undefined);
   createRenderedCaptureJobMock.mockResolvedValue('capture-job-route');
   transitionCaptureJobMock.mockResolvedValue(undefined);
+  consumeRecentCaptureAssetBindingMock.mockReturnValue(true);
 });
 
 async function flushPromises(): Promise<void> {
@@ -89,6 +96,30 @@ it('routes editor requests through async success responses', async () => {
     tabId: 42,
   });
   expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+});
+
+it('links editor requests to an existing draft asset when provided', async () => {
+  const sendResponse = vi.fn();
+
+  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, sendResponse, 'asset-1')).toBe(
+    true
+  );
+  await flushPromises();
+
+  expect(openEditorWithImageMock).toHaveBeenCalledWith('data:image/png;base64,2', {
+    assetId: 'asset-1',
+    tabId: 42,
+  });
+});
+
+it('rejects arbitrary editor asset ids that are not bound to the latest capture', () => {
+  consumeRecentCaptureAssetBindingMock.mockReturnValue(false);
+  const sendResponse = vi.fn();
+  expect(handleOpenEditorWithImage('data:image/png;base64,2', 42, sendResponse, 'asset-x')).toBe(
+    true
+  );
+  expect(openEditorWithImageMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
 });
 
 it('reports execute-save and editor failures through route errors', async () => {

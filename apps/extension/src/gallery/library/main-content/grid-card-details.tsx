@@ -1,6 +1,34 @@
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import type { GalleryItem } from '../items';
 import { formatDate } from '../ui';
+import { translate } from '../../../platform/i18n';
+
+function GalleryLifecycleLabel({ item }: Pick<GalleryCardDetailsProps, 'item'>) {
+  if (item.lifecycle?.storageClass !== 'temporary') return null;
+  const expiration = item.expiresAt
+    ? `${translate('gallery.app.draftExpires')} ${formatDate(item.expiresAt)}`
+    : translate('gallery.app.draftNoExpiration');
+  return (
+    <span className="text-[var(--sniptale-color-warning)]">
+      {translate('gallery.app.draftUpdated')} {formatDate(item.lifecycle.updatedAt)} · {expiration}
+    </span>
+  );
+}
+
+function GalleryPresentationLabel({ item }: Pick<GalleryCardDetailsProps, 'item'>) {
+  if (
+    item.workspaceRevision === undefined ||
+    item.presentationRevision === undefined ||
+    item.presentationRevision === item.workspaceRevision
+  ) {
+    return null;
+  }
+  return (
+    <span className="text-[var(--sniptale-color-info)]">
+      {translate('gallery.app.updatingPreview')}
+    </span>
+  );
+}
 
 interface GalleryCardDetailsProps {
   item: GalleryItem;
@@ -35,6 +63,8 @@ export function GalleryListDetails(props: GalleryCardDetailsProps) {
       </div>
       <div className="truncate text-xs text-[var(--sniptale-color-text-muted)]" title={dateLabel}>
         {dateLabel}
+        <GalleryLifecycleLabel item={props.item} />
+        <GalleryPresentationLabel item={props.item} />
       </div>
       <div className="text-right text-xs text-[var(--sniptale-color-text-muted)]">
         {props.item.size > 0 ? formatBytes(props.item.size) : '—'}
@@ -63,6 +93,8 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
         <span>{dateLabel}</span>
         <span>{props.item.size > 0 ? formatBytes(props.item.size) : '—'}</span>
       </div>
+      <GalleryLifecycleLabel item={props.item} />
+      <GalleryPresentationLabel item={props.item} />
       {props.item.tags.length > 0 ? (
         <div className="mt-2 truncate text-xs text-[var(--sniptale-color-info)]" title={tagsLabel}>
           {tagsLabel}

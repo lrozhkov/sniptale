@@ -44,6 +44,7 @@ export function resolveStoredStepBadgePresetCatalog(
           SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION)
         : SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION,
       customized,
+      tagIds: [...(placement?.tagIds ?? [])],
     };
   });
   const users: StepBadgePreset[] = (stored.userPresets ?? []).map((preset, index) => {
@@ -53,6 +54,7 @@ export function resolveStoredStepBadgePresetCatalog(
       origin: 'user' as const,
       enabled: placement?.enabled ?? true,
       order: placement?.order ?? systems.length + index,
+      tagIds: [...(placement?.tagIds ?? [])],
     };
   });
   const presets = [...systems, ...users]
@@ -85,6 +87,7 @@ export function serializeStepBadgePresetCatalog(
       id: preset.id,
       order: preset.order,
       enabled: preset.enabled !== false,
+      tagIds: [...preset.tagIds],
     })),
     systemOverrides: catalog.presets
       .filter((preset) => preset.origin === 'system' && preset.customized === true)

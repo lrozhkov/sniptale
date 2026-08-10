@@ -15,9 +15,10 @@ it('returns current project entries unchanged when backup ids do not need remapp
   const scenarioEntry = createV3ScenarioMetadataWithImageAsset().scenarioProjects![0]!.entry;
 
   expect(remapVideoProjectEntry(createPreparedVideoProject(videoEntry))).toBe(videoEntry);
-  expect(remapScenarioProjectEntry(createPreparedScenarioProject(scenarioEntry))).toBe(
-    scenarioEntry
-  );
+  expect(remapScenarioProjectEntry(createPreparedScenarioProject(scenarioEntry))).toEqual({
+    ...scenarioEntry,
+    workspaceRevision: 0,
+  });
 });
 
 it('rejects legacy scenario descriptors at remap entrypoints', () => {

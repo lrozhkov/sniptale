@@ -47,7 +47,7 @@ describe('highlighter hover session', () => {
       color: restoredPreset.color,
       customCss: restoredPreset.customCss,
       effects: restoredPreset.effects,
-      fillColor: restoredPreset.fillColor,
+      fillPaint: restoredPreset.fillPaint,
       inheritCustomCss: restoredPreset.inheritCustomCss,
       padding: restoredPreset.padding,
       radius: restoredPreset.radius,

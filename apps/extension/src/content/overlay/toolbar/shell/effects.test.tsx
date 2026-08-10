@@ -156,6 +156,7 @@ async function renderNavigationHarness(
     <NavigationHarness
       aiPickMode={false}
       designReviewMode={false}
+      drawingMode={false}
       highlighterMode={false}
       isCursorMode={false}
       quickEditMode={false}
@@ -202,6 +203,15 @@ function registerManagedNavigationLockTests() {
     expect(getNavigationState().navigationLockEnabled).toBe(true);
     expect(getNavigationState().lockDisabled).toBe(true);
     expect(getNavigationState().lockTitle).toBe('content.toolbar.navigationLockManaged');
+  });
+
+  it('removes the navigation overlay while Drawing owns pointer input', async () => {
+    await renderNavigationHarness({ drawingMode: true });
+
+    expect(shellMocks.disableNavigationLock).toHaveBeenCalledTimes(1);
+    expect(shellMocks.enableNavigationLock).not.toHaveBeenCalled();
+    expect(getNavigationState().navigationLockEnabled).toBe(false);
+    expect(getNavigationState().lockDisabled).toBe(true);
   });
 }
 

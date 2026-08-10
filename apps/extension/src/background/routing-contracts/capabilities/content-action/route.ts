@@ -44,14 +44,19 @@ export function resetContentPrivilegedActionCapabilitiesForTests(): void {
 function canIssueCapabilityForRequest(args: {
   request: ContentPrivilegedActionCapabilityRequest;
   senderBinding: ContentSenderBinding;
-}): boolean {
+}): { authorized: boolean; libraryDestinationAuthorized: boolean } {
   if (args.request.source.kind === 'trusted-content-event-proof') {
-    return consumeTrustedEventProofForCapabilityRequest({
-      actionType: args.request.actionType,
-      requestId: args.request.requestId,
-      senderBinding: args.senderBinding,
-      source: args.request.source,
-    });
+    return {
+      authorized: consumeTrustedEventProofForCapabilityRequest({
+        actionType: args.request.actionType,
+        requestId: args.request.requestId,
+        senderBinding: args.senderBinding,
+        source: args.request.source,
+      }),
+      libraryDestinationAuthorized:
+        args.request.actionType === 'SAVE_SCREENSHOT_TO_GALLERY' &&
+        args.request.libraryDestinationRequested === true,
+    };
   }
 
   return consumeAutoStartGrantForCapabilityRequest({
@@ -185,7 +190,11 @@ export function routeContentPrivilegedActionCapabilityRequest(
     return true;
   }
 
-  if (!canIssueCapabilityForRequest({ request, senderBinding: preauthorizedSenderBinding })) {
+  const decision = canIssueCapabilityForRequest({
+    request,
+    senderBinding: preauthorizedSenderBinding,
+  });
+  if (!decision.authorized) {
     sendResponse(createRouteErrorResponse('Unauthorized content action capability request'));
     return true;
   }
@@ -194,6 +203,7 @@ export function routeContentPrivilegedActionCapabilityRequest(
     success: true,
     contentIntent: issueContentPrivilegedActionCapability({
       actionType: request.actionType,
+      libraryDestinationAuthorized: decision.libraryDestinationAuthorized,
       requestId: request.requestId,
       senderBinding: preauthorizedSenderBinding,
     }),
@@ -240,10 +250,17 @@ export function consumeContentPrivilegedActionCapabilityBinding(args: {
     return null;
   }
 
-  const authorized = consumeIssuedContentPrivilegedActionCapability({
+  const capability = consumeIssuedContentPrivilegedActionCapability({
     actionType: args.actionType,
     contentIntent: args.contentIntent,
     senderBinding: senderDecision.principal,
   });
-  return authorized ? senderDecision.principal : null;
+  return capability
+    ? {
+        ...senderDecision.principal,
+        ...(capability.libraryDestinationAuthorized
+          ? { libraryDestinationAuthorized: true as const }
+          : {}),
+      }
+    : null;
 }

@@ -1,15 +1,7 @@
 import type { EditorPresetFamily } from '../../../../../features/editor/document/presets';
 import { translate } from '../../../../../platform/i18n';
 
-export const TOOL_PRESET_OWNERS: readonly EditorPresetFamily[] = [
-  'pencil',
-  'highlighter',
-  'ellipse',
-  'arrow',
-  'text',
-  'step',
-  'sceneBackground',
-];
+export const TOOL_PRESET_OWNERS: readonly EditorPresetFamily[] = ['step', 'sceneBackground'];
 
 export function getToolPresetOwnerLabel(owner: EditorPresetFamily): string {
   return owner === 'sceneBackground'

@@ -16,14 +16,18 @@ describe('callout color bindings', () => {
           surfaceBorder: 'frame-border',
         },
       },
-      { borderColor: '#ff0000', fillColor: '#00ff00' }
+      {
+        borderColor: '#ff0000',
+        fillColor: '#00ff00',
+        fillPaint: { kind: 'solid', color: '#00ff00ff' },
+      }
     );
 
     expect(resolved.connector.color).toBe('#ff0000');
     expect(resolved.accentEdge.color).toBe('#ff0000');
     expect(resolved.surface.borderColor).toBe('#ff0000');
-    expect(resolved.surface.backgroundColor).toBe('#00ff00');
-    expect(resolved.surface.shadowColor).toBe('#00ff00');
+    expect(resolved.surface.fillPaint).toEqual({ kind: 'solid', color: '#00ff00ff' });
+    expect(resolved.surface.shadowColor).toBe('#00ff00ff');
   });
 
   it('falls back to the stored custom color when a frame source is unavailable', () => {
@@ -36,7 +40,7 @@ describe('callout color bindings', () => {
       {}
     );
 
-    expect(resolved.surface.backgroundColor).toBe(style.surface.backgroundColor);
+    expect(resolved.surface.fillPaint).toEqual(style.surface.fillPaint);
   });
 
   it('resolves badge colors from the accent and frame sources', () => {

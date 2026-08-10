@@ -5,6 +5,7 @@ import { createRenderedCaptureJob } from '../jobs/rendered-job';
 import { transitionCaptureJob } from '../jobs/state-machine';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
+import { consumeRecentCaptureAssetBinding } from './actions.gallery-update';
 
 function isDownloadAction(actionType: CaptureActionType): boolean {
   return actionType !== 'copy' && actionType !== 'edit' && actionType !== 'scenario';
@@ -67,9 +68,17 @@ export function handleExecuteSave(
 export function handleOpenEditorWithImage(
   dataUrl: string,
   resolvedTabId: number,
-  sendResponse: SendResponse
+  sendResponse: SendResponse,
+  assetId?: string
 ): boolean {
-  openEditorWithImage(dataUrl, { tabId: resolvedTabId })
+  if (assetId && !consumeRecentCaptureAssetBinding(resolvedTabId, assetId)) {
+    sendResponse(createRouteErrorResponse('Editor asset is not bound to the latest capture'));
+    return true;
+  }
+  openEditorWithImage(dataUrl, {
+    ...(assetId ? { assetId } : {}),
+    tabId: resolvedTabId,
+  })
     .then(() => sendResponse({ success: true, result: 'accepted' }))
     .catch((error) => sendResponse(createRouteErrorResponse(error)));
   return true;

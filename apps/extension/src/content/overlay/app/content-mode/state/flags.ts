@@ -8,10 +8,12 @@ export function useContentModeFlags() {
   const [quickEditDocumentMode, setQuickEditDocumentMode] = useState(false);
   const [aiPickMode, setAiPickMode] = useState(false);
   const [designReviewMode, setDesignReviewMode] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
 
   const flags: ContentAppModeFlags = {
     aiPickMode,
     designReviewMode,
+    drawingMode,
     highlighterMode,
     quickEditDocumentMode,
     quickEditMode,
@@ -20,6 +22,7 @@ export function useContentModeFlags() {
   const controls: ContentAppModeControls = {
     setAiPickMode,
     setDesignReviewMode,
+    setDrawingMode,
     setHighlighterMode,
     setQuickEditDocumentMode,
     setQuickEditMode,

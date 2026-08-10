@@ -81,21 +81,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('routes primary, raster, and inspector actions from the floating rail', () => {
+it('routes primary drawing and retained inspector actions from the floating rail', () => {
   const props = createProps();
   renderToolRail(props);
 
   expect(queryUi('editor.floating.tool-rail.text')).not.toBeNull();
-  expect(queryUi('editor.floating.tool-rail.eraser')).not.toBeNull();
+  expect(queryUi('editor.floating.tool-rail.eraser')).toBeNull();
   act(() => {
     getButton(translate('editor.tools.text')).click();
-    getButton(translate('editor.tools.eraser')).click();
     getButton(translate('editor.toolbar.resize')).click();
     getButton(translate('editor.toolbar.frame')).click();
   });
 
   expect(props.onActivateTool).toHaveBeenCalledWith('text');
-  expect(props.onActivateTool).toHaveBeenCalledWith('eraser');
   expect(props.onActivateTool).not.toHaveBeenCalledWith('crop');
   expect(props.onToggleInspector).toHaveBeenCalledWith('canvas-size');
   expect(props.onToggleInspector).toHaveBeenCalledWith('frame');

@@ -94,6 +94,14 @@ describe('highlighter preset mutation guards', () => {
     expect(resetSystemBorderPresetToCanonical(settings, 'missing')).toBeNull();
     expect(resetSystemBorderPresetToCanonical(userSettings, user.id)).toBeNull();
     expect(resetSystemBorderPresetToCanonical(settings, system.id)).toBeNull();
+    const tagged = updateExistingBorderPreset(settings, {
+      ...system,
+      name: getBorderPresetDisplayName(system),
+      tagIds: ['tag-one'],
+    })!;
+    expect(resetSystemBorderPresetToCanonical(tagged, system.id)?.borderPresets[0]!.tagIds).toEqual(
+      []
+    );
   });
 
   it('freezes the localized system name when a visual edit supplies a blank name', () => {

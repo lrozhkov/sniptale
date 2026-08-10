@@ -11,6 +11,7 @@ import type {
   FolderFilter,
   GalleryFolderCounts,
   GalleryGridMetrics,
+  GalleryScope,
   GalleryPreviewSessionState,
   SortMode,
 } from '../library/types';
@@ -21,6 +22,7 @@ export type {
   GalleryGridMetrics,
   GalleryPreviewSessionState,
   GalleryViewMode,
+  GalleryScope,
   SortMode,
 } from '../library/types';
 
@@ -53,6 +55,7 @@ interface GalleryAppFilterState {
   folderFilter: FolderFilter;
   sortMode: SortMode;
   search: string;
+  scope: GalleryScope;
   activeTags: string[];
 }
 
@@ -111,6 +114,7 @@ interface GalleryAppFilterActions {
   setFolderFilter: Dispatch<SetStateAction<FolderFilter>>;
   setSortMode: Dispatch<SetStateAction<SortMode>>;
   setSearch: Dispatch<SetStateAction<string>>;
+  setScope: Dispatch<SetStateAction<GalleryScope>>;
   setActiveTags: Dispatch<SetStateAction<string[]>>;
 }
 

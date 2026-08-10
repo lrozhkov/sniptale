@@ -46,7 +46,7 @@ function createFrame(id: string) {
     borderSettings: {
       color: '#000',
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       fillOpacity: 0,
       inheritCustomCss: false,
       strokeOpacity: 100,

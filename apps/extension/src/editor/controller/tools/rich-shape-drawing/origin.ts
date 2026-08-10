@@ -1,6 +1,6 @@
 import type { FabricObject } from 'fabric';
 
-type RichShapeToolOrigin = 'shapes-and-lines' | 'rough-shape' | 'shape-library';
+type RichShapeToolOrigin = 'shape';
 
 type RichShapeToolOriginObject = FabricObject & {
   sniptaleRichShapeToolOrigin?: RichShapeToolOrigin;

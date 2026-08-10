@@ -27,6 +27,24 @@ vi.mock('../../../color-selector', async (importOriginal) => ({
   ),
 }));
 
+vi.mock('../fill-paint-field', () => ({
+  HighlighterFillPaintField: ({
+    label,
+    onChange,
+  }: {
+    label: string;
+    onChange: (value: unknown) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="compact-paint-selector"
+      onClick={() => onChange({ kind: 'solid', color: '#123456ff' })}
+    >
+      {label}
+    </button>
+  ),
+}));
+
 import { EditorBasicSettings } from './basic-settings';
 import { EditorCustomCssField } from './custom-css-field';
 import { EditorPaddingFields } from './padding-fields';
@@ -109,19 +127,19 @@ it('renders the text-backed preview state and error feedback', async () => {
 });
 
 it('wires compact color selectors, numeric inspectors, and style controls', async () => {
-  const state = createState({ fillColor: 'transparent' });
+  const state = createState({ fillPaint: { kind: 'solid' as const, color: '#00000000' } });
 
   await renderUi(<EditorBasicSettings state={state} />);
 
   const colorSelectors = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('[data-testid="compact-color-selector"]') ?? []
   );
-  expect(colorSelectors).toHaveLength(2);
+  expect(colorSelectors).toHaveLength(1);
   expect(container?.textContent).not.toContain('highlighter.editor.opacityLabel');
 
   await act(async () => {
     colorSelectors[0]?.click();
-    colorSelectors[1]?.click();
+    container?.querySelector<HTMLButtonElement>('[data-testid="compact-paint-selector"]')?.click();
     const widthInput = getNumericInput('highlighter.editor.widthLabel');
     const radiusInput = getNumericInput('highlighter.editor.radiusLabel');
     setNumericInputValue(widthInput, '7');
@@ -132,7 +150,7 @@ it('wires compact color selectors, numeric inspectors, and style controls', asyn
   });
 
   expect(state.setColor).toHaveBeenCalledWith('#123456');
-  expect(state.setFillColor).toHaveBeenCalledWith('#123456');
+  expect(state.setFillPaint).toHaveBeenCalledWith({ kind: 'solid', color: '#123456ff' });
   expect(state.setWidth).toHaveBeenCalledWith(7);
   expect(state.setRadius).toHaveBeenCalledWith(8);
   expect(state.setStyle).toHaveBeenCalledWith('solid');

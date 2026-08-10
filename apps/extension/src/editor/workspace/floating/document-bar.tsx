@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -14,6 +14,20 @@ import { EditorInspectorDocumentActions } from '../../inspector/document-actions
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
+import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
+import {
+  commitImagePresentation,
+  promoteImageAggregate,
+  saveImageAggregateCopyFromDocument,
+  StaleImageWorkspaceError,
+} from '../../../composition/persistence/image-aggregates';
+import type { LibraryStorageClass } from '../../../contracts/settings/library-lifecycle';
+import { useEditorController } from '../../application/controller-context';
+import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
+import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
+import { replaceEditorPageAggregateId } from '../../document/page-session';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
@@ -43,8 +57,100 @@ function useDocumentBarState() {
       pageTitle: state.pageTitle,
       saveErrorMessage: state.saveErrorMessage,
       saveState: state.saveState,
+      sessionId: state.sessionId,
     }))
   );
+}
+
+function useDocumentStorageClass(aggregateId: string | null, pageTitle: string) {
+  const editorController = useEditorController();
+  const [storageClass, setStorageClass] = useState<LibraryStorageClass>('temporary');
+  const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
+
+  useEffect(() => {
+    void (aggregateId ? getMediaLibraryEntry(aggregateId) : null)?.then((entry) =>
+      setStorageClass(entry?.lifecycle?.storageClass ?? 'temporary')
+    );
+  }, [aggregateId]);
+
+  const promote = useCallback(async () => {
+    if (!aggregateId || !editorController.autosaveService) return;
+    setPromotionState('saving');
+    try {
+      await editorController.autosaveService.flushAutosave(() => editorController.exportDocument());
+      const revision = editorController.autosaveService.getDurableRevision();
+      if (revision === null) throw new Error('Image workspace revision is unavailable.');
+      const previewBlob = await dataUrlToBlob(
+        await editorController.renderForExport({ format: 'png', quality: 1 })
+      );
+      await commitImagePresentation({
+        aggregateId,
+        expectedWorkspaceRevision: revision,
+        previewBlob,
+        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
+      });
+      await promoteImageAggregate(aggregateId, revision);
+      setStorageClass('library');
+      setPromotionState('idle');
+    } catch (error) {
+      setPromotionState('error');
+      throw error;
+    }
+  }, [aggregateId, editorController]);
+
+  const saveConflictCopy = useCallback(async () => {
+    if (!editorController.autosaveService) return;
+    setPromotionState('saving');
+    try {
+      const document = editorController.exportDocument();
+      const previewBlob = await dataUrlToBlob(
+        await editorController.renderForExport({ format: 'png', quality: 1 })
+      );
+      const targetAggregateId = createSecureRandomUuid(
+        'Secure random image copy IDs are unavailable.'
+      );
+      await saveImageAggregateCopyFromDocument({
+        document,
+        previewBlob,
+        sourceTitle: pageTitle,
+        targetAggregateId,
+        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
+      });
+      replaceEditorPageAggregateId(targetAggregateId);
+      editorController.autosaveService.activate({
+        aggregateId: targetAggregateId,
+        durableRevision: 1,
+        renderPresentation: () => editorController.renderForExport({ format: 'png', quality: 1 }),
+        sourceTitle: pageTitle,
+        sourceUrl: null,
+      });
+      useEditorStore.getState().setSaveErrorMessage(null);
+      useEditorStore.getState().setSaveState('saved');
+      setStorageClass('library');
+      setPromotionState('idle');
+    } catch (error) {
+      setPromotionState('error');
+      throw error;
+    }
+  }, [editorController, pageTitle]);
+
+  useEffect(() => {
+    if (!aggregateId) return;
+    const presence = connectAggregateEditorPresence({
+      aggregate: { id: aggregateId, kind: 'image' },
+      promote,
+    });
+    return () => presence.dispose();
+  }, [aggregateId, promote]);
+
+  return {
+    hasStaleConflict:
+      editorController.autosaveService?.getLastWriteError() instanceof StaleImageWorkspaceError,
+    promote,
+    promotionState,
+    saveConflictCopy,
+    storageClass,
+  };
 }
 
 function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
@@ -68,7 +174,7 @@ function resolveDocumentStatus(state: ReturnType<typeof useDocumentBarState>) {
     return state.saveErrorMessage ?? translate('common.states.error');
   }
 
-  return translate('common.states.draft');
+  return translate('common.states.saved');
 }
 
 function useDismissableMenu(open: boolean, onClose: () => void) {
@@ -109,6 +215,10 @@ function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
 }) {
+  const storage = useDocumentStorageClass(
+    props.documentState.sessionId,
+    props.documentState.pageTitle
+  );
   return (
     <div className={DOCUMENT_TITLE_CLASS_NAME}>
       <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
@@ -118,6 +228,47 @@ function EditorFloatingDocumentSummary(props: {
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
         <span className="truncate">{resolveDocumentStatus(props.documentState)}</span>
       </div>
+      <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--sniptale-color-text-muted)]">
+        <span>
+          {translate(
+            storage.storageClass === 'library'
+              ? 'editor.documentActions.inLibrary'
+              : 'editor.documentActions.draft'
+          )}
+        </span>
+        {storage.storageClass === 'temporary' ? (
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            disabled={storage.promotionState === 'saving'}
+            onClick={() => void storage.promote().catch(() => undefined)}
+          >
+            {translate('editor.documentActions.saveToLibrary')}
+          </button>
+        ) : null}
+        {storage.promotionState === 'error' ? (
+          <span role="alert">{translate('editor.documentActions.saveToLibraryError')}</span>
+        ) : null}
+      </div>
+      {storage.hasStaleConflict ? (
+        <div className="mt-1 flex items-center gap-2 text-[11px]">
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            onClick={() => window.location.reload()}
+          >
+            {translate('editor.documentActions.reloadLatest')}
+          </button>
+          <button
+            type="button"
+            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+            disabled={storage.promotionState === 'saving'}
+            onClick={() => void storage.saveConflictCopy().catch(() => undefined)}
+          >
+            {translate('editor.documentActions.saveCopy')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -18,8 +18,12 @@ export interface PreviewPanelProps {
   onResetChanges?: () => void;
   onSave?: () => Promise<void>;
   onDownload: () => Promise<void>;
+  onDownloadOriginal?: () => Promise<void>;
   onCopy: () => Promise<void>;
   onEdit: () => void;
   onOpenSnapshotScreenshot?: () => Promise<void>;
   onDelete: () => Promise<void>;
+  onPromote?: () => Promise<void>;
+  onRestoreOriginal?: () => void;
+  onSaveCopy?: () => Promise<void>;
 }

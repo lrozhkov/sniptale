@@ -20,7 +20,7 @@ export function resolveFrameAnnotationVisualScene(params: {
   const surface = resolveFrameSurface(frame);
   const borderColor = borderVisual?.strokeColor ?? 'var(--sniptale-color-accent)';
   const borderCssColor = borderVisual?.strokeColor ?? borderColor;
-  const fillCssColor = borderVisual?.fillColor ?? 'transparent';
+  const fillCss = borderVisual?.fillCss ?? 'transparent';
   const shadowVisual = borderVisual
     ? resolveBorderShadowVisual(borderVisual.shadow, borderColor)
     : null;
@@ -32,7 +32,7 @@ export function resolveFrameAnnotationVisualScene(params: {
     fillStyle: getFrameAnnotationFillStyle({
       decorationVisible: surface.decorationVisible,
       fillVisible: surface.fillVisible,
-      fillColor: fillCssColor,
+      fillCss,
       borderRadius: surface.geometry.radius * visualScale,
       ...(borderVisual ? { customCssStyles: borderVisual.customCssStyles } : {}),
     }),

@@ -75,7 +75,6 @@ it('restores rich shape document objects after Fabric JSON load', async () => {
     document: { id: 'document' } as never,
     prepareObject,
     rebuildFrameDecorations: vi.fn(async () => undefined),
-    upgradeLegacyArrowObjects: vi.fn(),
     zoomLevel: 1,
   });
 
@@ -104,7 +103,6 @@ it('skips rich shape document objects when their geometry cannot be restored', a
     document: { id: 'document' } as never,
     prepareObject: vi.fn(),
     rebuildFrameDecorations: vi.fn(async () => undefined),
-    upgradeLegacyArrowObjects: vi.fn(),
     zoomLevel: 1,
   });
 
@@ -136,7 +134,6 @@ it('leaves applied documents without rich shape objects unchanged', async () => 
     document: { id: 'document' } as never,
     prepareObject: vi.fn(),
     rebuildFrameDecorations: vi.fn(async () => undefined),
-    upgradeLegacyArrowObjects: vi.fn(),
     zoomLevel: 1,
   });
 

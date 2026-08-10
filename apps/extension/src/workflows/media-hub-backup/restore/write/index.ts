@@ -2,6 +2,8 @@ import type { MediaLibraryEntry } from '../../../../composition/persistence/medi
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { WebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -10,6 +12,8 @@ import {
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../../storage/constants';
+import type { ImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
+import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import {
   createProjectAssetStoreEntry,
   createProjectExportStoreEntry,
@@ -34,6 +38,8 @@ export interface BackupImportAssetRecordSnapshot {
   recordingTelemetryEntry: unknown;
   thumbnailEntry: unknown;
   webSnapshotEntry: unknown;
+  imageWorkspaceEntry: unknown;
+  aggregatePresentationEntry: unknown;
 }
 
 export async function deleteExistingAssetRecord(
@@ -55,6 +61,10 @@ export async function deleteExistingAssetRecord(
 
   await getStore(tx, MEDIA_LIBRARY_STORE).delete(entry.id);
   await getStore(tx, THUMBNAILS_STORE).delete(entry.id);
+  if (entry.source.kind === 'screenshot') {
+    await getStore(tx, IMAGE_WORKSPACES_STORE).delete(entry.id);
+    await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['image', entry.id]);
+  }
 }
 
 export async function snapshotExistingAssetRecord(
@@ -69,6 +79,14 @@ export async function snapshotExistingAssetRecord(
     recordingTelemetryEntry: undefined,
     thumbnailEntry: await getStore(tx, THUMBNAILS_STORE).get(entry.id),
     webSnapshotEntry: undefined,
+    imageWorkspaceEntry:
+      entry.source.kind === 'screenshot'
+        ? await getStore(tx, IMAGE_WORKSPACES_STORE).get(entry.id)
+        : undefined,
+    aggregatePresentationEntry:
+      entry.source.kind === 'screenshot'
+        ? await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).get(['image', entry.id])
+        : undefined,
   };
 
   if (entry.source.kind === 'recording') {
@@ -120,6 +138,12 @@ export async function restoreAssetRecordSnapshot(
   await restoreSnapshotEntry(tx, WEB_SNAPSHOTS_STORE, snapshot.webSnapshotEntry);
   await restoreSnapshotEntry(tx, MEDIA_LIBRARY_STORE, snapshot.mediaLibraryEntry);
   await restoreSnapshotEntry(tx, THUMBNAILS_STORE, snapshot.thumbnailEntry);
+  await restoreSnapshotEntry(tx, IMAGE_WORKSPACES_STORE, snapshot.imageWorkspaceEntry);
+  await restoreSnapshotEntry(
+    tx,
+    AGGREGATE_PRESENTATIONS_STORE,
+    snapshot.aggregatePresentationEntry
+  );
 }
 
 export async function writeMainAssetRecord(
@@ -187,8 +211,12 @@ export async function restoreAssetRecord(
   blob: Blob,
   thumbnail: Blob | null,
   recordingTelemetry: RecordingTelemetryEntry | null = null,
-  webSnapshotRecord: WebSnapshotRecord | null = null
+  webSnapshotRecord: WebSnapshotRecord | null = null,
+  workspace: ImageWorkspaceEntry | null = null,
+  presentation: AggregatePresentationEntry | null = null
 ): Promise<void> {
   await writeMainAssetRecord(tx, entry, blob, recordingTelemetry, webSnapshotRecord);
   await writeThumbnailRecord(tx, entry, thumbnail);
+  if (workspace) await getStore(tx, IMAGE_WORKSPACES_STORE).put(workspace);
+  if (presentation) await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).put(presentation);
 }

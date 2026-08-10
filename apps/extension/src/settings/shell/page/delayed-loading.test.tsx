@@ -69,6 +69,10 @@ vi.mock('../../sections/capture/saving', () => {
   settingsPageDelayMocks.loadedSectionModules.push('saving');
   return { SavePresetsSection: markerComponent('saves-section') };
 });
+vi.mock('../../sections/capture/storage-drafts', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('storage-drafts');
+  return { StorageDraftsSection: markerComponent('storage-drafts-section') };
+});
 vi.mock('../../sections/styles/annotations', () => {
   settingsPageDelayMocks.loadedSectionModules.push('annotations');
   return { AnnotationsSection: markerComponent('highlighter-section') };
@@ -194,6 +198,7 @@ describe('SettingsPage delayed loading', () => {
         'ai-connections',
         'screen-sizes',
         'saving',
+        'storage-drafts',
         'annotations',
         'editor-resources',
         'media-quality',

@@ -131,10 +131,6 @@ function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summa
           label={translate('gallery.backupExportModal.classTelemetry')}
         />
         <DataClassRow
-          count={summary.editorDraftCount}
-          label={translate('gallery.backupExportModal.classEditorDrafts')}
-        />
-        <DataClassRow
           count={summary.webSnapshotCount}
           label={translate('gallery.backupExportModal.classWebSnapshots')}
         />
@@ -166,12 +162,6 @@ function BackupPrivacyOptionsGrid(props: {
         label={translate('gallery.backupExportModal.includeWebSnapshots')}
         description={translate('gallery.backupExportModal.includeWebSnapshotsDescription')}
         onChange={(includeWebSnapshots) => props.onChange({ includeWebSnapshots })}
-      />
-      <PrivacyToggle
-        checked={props.options.includeEditorDrafts}
-        label={translate('gallery.backupExportModal.includeEditorDrafts')}
-        description={translate('gallery.backupExportModal.includeEditorDraftsDescription')}
-        onChange={(includeEditorDrafts) => props.onChange({ includeEditorDrafts })}
       />
     </div>
   );

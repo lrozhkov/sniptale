@@ -223,7 +223,7 @@ function registerQuickEditDocumentTransitionTests() {
     const params = { ...createParams(), quickEditMode: true };
     const handlers = createToolbarEditingHandlers(params);
 
-    handlers.handleEnableCursorMode();
+    expect(handlers.handleEnableCursorMode()).toBe(true);
 
     expect(toolbarEditingMocks.disableQuickEditDocumentModeMock).toHaveBeenCalledOnce();
     expect(toolbarEditingMocks.disableQuickEditModeMock).toHaveBeenCalledOnce();
@@ -239,7 +239,7 @@ function registerQuickEditDocumentTransitionTests() {
     });
     toolbarEditingMocks.isQuickEditDocumentModeEnabledMock.mockReturnValueOnce(true);
 
-    handlers.handleEnableCursorMode();
+    expect(handlers.handleEnableCursorMode()).toBe(false);
 
     expect(toolbarEditingMocks.disableQuickEditModeMock).not.toHaveBeenCalled();
     expect(params.setQuickEditDocumentMode).toHaveBeenCalledWith(true);

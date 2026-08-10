@@ -33,7 +33,7 @@ function createSetters() {
   return {
     setColor: vi.fn(),
     setCustomCss: vi.fn(),
-    setFillColor: vi.fn(),
+    setFillPaint: vi.fn(),
     setEffects: vi.fn(),
     setInheritCustomCss: vi.fn(),
     setIsResizing: vi.fn(),
@@ -54,13 +54,14 @@ describe('border-preset-editor-state draft setters', () => {
       id: 'preset',
       name: 'Preset',
       order: 1,
+      tagIds: [],
       width: 5,
       color: '#ff660080',
       style: 'dashed',
       radius: 9,
       padding: { top: 1, right: 2, bottom: 3, left: 4 },
       shadow: 30,
-      fillColor: '#00ff0040',
+      fillPaint: { kind: 'solid' as const, color: '#00ff0040' },
       inheritCustomCss: false,
       customCss: 'color: red;',
     };
@@ -84,7 +85,7 @@ describe('border-preset-editor-state preview style', () => {
     const style = buildBorderPresetPreviewStyle({
       color: '#ff660080',
       customCss: 'outline: 1px solid red;',
-      fillColor: '#00ff0040',
+      fillPaint: { kind: 'solid' as const, color: '#00ff0040' },
       inheritCustomCss: true,
       radius: 12,
       shadow: 100,
@@ -93,7 +94,7 @@ describe('border-preset-editor-state preview style', () => {
     });
 
     expect(style).toMatchObject({
-      backgroundColor: '#00ff0040',
+      background: '#00ff0040',
       borderColor: '#ff660080',
       borderRadius: '12px',
       borderStyle: 'solid',
@@ -110,7 +111,7 @@ describe('border-preset-editor-state preview style', () => {
     const style = buildBorderPresetPreviewStyle({
       color: '#ff6600',
       customCss: 'geometry-escape',
-      fillColor: '#00ff00',
+      fillPaint: { kind: 'solid' as const, color: '#00ff00' },
       inheritCustomCss: true,
       radius: 12,
       shadow: 0,

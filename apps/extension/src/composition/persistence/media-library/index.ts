@@ -9,4 +9,4 @@ export {
   syncLegacyMediaLibrary,
   updateMediaLibraryEntry,
 } from './index.library.ts';
-export { saveScreenshotMediaAsset, updateScreenshotMediaAsset } from './index.screenshots.ts';
+export { saveScreenshotMediaAsset } from './index.screenshots.ts';

@@ -25,10 +25,11 @@ it('folds legacy frame paint opacity into existing color alpha at the read bound
     },
     0
   );
+  const { fillPaint: _canonicalFillPaint, ...legacyBorderSettings } = snapshot.borderSettings!;
   const parsed = parseFrameAnnotationSnapshot({
     ...snapshot,
     borderSettings: {
-      ...snapshot.borderSettings,
+      ...legacyBorderSettings,
       color: '#33669980',
       fillColor: '#abcdef80',
       opacity: 0.5,
@@ -38,7 +39,7 @@ it('folds legacy frame paint opacity into existing color alpha at the read bound
   });
 
   expect(parsed?.borderSettings?.color).toBe('#33669940');
-  expect(parsed?.borderSettings?.fillColor).toBe('#abcdef40');
+  expect(parsed?.borderSettings?.fillPaint).toEqual({ kind: 'solid', color: '#abcdef40' });
   expect(parsed?.blurSettings?.strokeColor).toBe('#11223340');
   expect(parsed?.borderSettings).not.toHaveProperty('opacity');
   expect(parsed?.borderSettings).not.toHaveProperty('fillOpacity');

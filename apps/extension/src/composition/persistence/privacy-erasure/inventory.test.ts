@@ -16,6 +16,9 @@ import {
 
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('image_workspaces');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });
 
 it('preserves preferences and AI provider secrets for the default delete-data mode', () => {
@@ -30,6 +33,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).not.toContain('sniptale_popup_export_preferences');
   expect(plan.local).not.toContain('sniptale_video_editor_preview_preferences');
   expect(plan.local).not.toContain('sniptale_video_settings');
+  expect(plan.local).not.toContain('sniptale_drawing_palette');
   expect(plan.local).not.toContain(AI_PROVIDERS_KEY);
   expect(plan.local).not.toContain(AI_PROVIDER_SECRETS_KEY);
   expect(plan.local).not.toContain(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
@@ -66,6 +70,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.local).toContain('sniptale_video_editor_preview_preferences');
   expect(plan.local).toContain('sniptale_scenario_editor_navigator_collapsed');
   expect(plan.local).toContain('sniptale_video_settings');
+  expect(plan.local).toContain('sniptale_drawing_palette');
   expect(plan.local).toContain('sniptale.editor.command-palette');
   expect(plan.local).toContain('sniptale.gallery.command-palette');
   expect(plan.local).toContain('sniptale.popup.command-palette');
@@ -76,8 +81,10 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.local).toContain(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
   expect(plan.localPrefixes).toContain('sniptale_video_editor_track_panel_prefs:');
   expect(plan.sync).toContain('sniptale_settings');
+  expect(plan.sync).toContain('sniptale_annotation_template_tags');
   expect(plan.sync).toContain('sniptale_auto_blur_settings');
   expect(plan.sync).toContain('sniptale_callout_presets');
+  expect(plan.sync).toContain('sniptale_gradient_presets');
 });
 
 it('includes extension-page trace localStorage in the page-local erasure inventory', () => {

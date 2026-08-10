@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import type { BorderPresetDraftSetters, BorderPresetDraftState } from './types';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 
 export function useBorderPresetDraftState() {
   const [name, setName] = useState('');
@@ -11,7 +12,7 @@ export function useBorderPresetDraftState() {
   const [radius, setRadius] = useState(0);
   const [padding, setPadding] = useState({ top: 3, left: 3, right: 3, bottom: 3 });
   const [shadow, setShadow] = useState(0);
-  const [fillColor, setFillColor] = useState('#00000000');
+  const [fillPaint, setFillPaint] = useState(() => createSolidPaint('#00000000'));
   const [effects, setEffects] = useState(() => cloneBorderPresetEffects(undefined));
   const [inheritCustomCss, setInheritCustomCss] = useState(false);
   const [customCss, setCustomCss] = useState('');
@@ -21,7 +22,7 @@ export function useBorderPresetDraftState() {
     () => ({
       setColor,
       setCustomCss,
-      setFillColor,
+      setFillPaint,
       setEffects,
       setInheritCustomCss,
       setIsResizing,
@@ -38,7 +39,7 @@ export function useBorderPresetDraftState() {
   const draft: BorderPresetDraftState = {
     color,
     customCss,
-    fillColor,
+    fillPaint,
     effects,
     inheritCustomCss,
     isResizing,

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { resolveColorSelectorDisplayValue } from './helpers';
 import { useColorSelectorOptions } from './state-options';
 import {
@@ -7,6 +7,7 @@ import {
   type CompactColorSelectorProps,
 } from './types';
 import { useColorSelectorLifecycle } from './lifecycle';
+import { useEyedropper } from './popover-state';
 import { usePickerInteractionState, usePickerRollback } from './picker-actions';
 
 type UseColorSelectorStateArgs = {
@@ -27,6 +28,9 @@ function useColorSelectorBaseState(value: string) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const committedColor = useMemo(() => resolveColorSelectorDisplayValue(value), [value]);
   const [draftColor, setDraftColor] = useState(committedColor);
+  const setEyedropperActive = useCallback((active: boolean) => {
+    eyedropperActiveRef.current = active;
+  }, []);
   return {
     committedColor,
     draftColor,
@@ -39,9 +43,7 @@ function useColorSelectorBaseState(value: string) {
     setFormatMode,
     setDraftColor,
     setExpanded,
-    setEyedropperActive: (active: boolean) => {
-      eyedropperActiveRef.current = active;
-    },
+    setEyedropperActive,
     setPickerOpen,
   };
 }
@@ -64,6 +66,10 @@ export function useColorSelectorState(args: UseColorSelectorStateArgs) {
     setDraftColor: state.setDraftColor,
     setExpanded: state.setExpanded,
   });
+  const eyedropper = useEyedropper(
+    pickerInteractions.handleDraftColorChange,
+    state.setEyedropperActive
+  );
   useColorSelectorLifecycle({
     committedColor: state.committedColor,
     expanded: state.expanded,
@@ -79,12 +85,12 @@ export function useColorSelectorState(args: UseColorSelectorStateArgs) {
   return {
     committedColor: state.committedColor,
     draftColor: state.draftColor,
+    eyedropper,
     expanded: state.expanded,
     formatMode: state.formatMode,
     layerRef: state.layerRef,
     pickerOpen: state.pickerOpen,
     rootRef: state.rootRef,
-    setEyedropperActive: state.setEyedropperActive,
     cycleFormatMode: () => {
       state.setFormatMode((currentMode) => getNextColorSelectorFormatMode(currentMode));
     },

@@ -13,7 +13,10 @@ const { getScenarioAssetBlob } = vi.hoisted(() => ({
   getScenarioAssetBlob: vi.fn<(assetId: string) => Promise<Blob | null>>(),
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/public', () => ({
+vi.mock('../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/public')
+  >()),
   getScenarioAssetBlob,
 }));
 

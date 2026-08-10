@@ -12,6 +12,7 @@ const {
   notifyStoppedMock,
   saveBatchMock,
   updateOutboxMock,
+  loadSettingsMock,
 } = vi.hoisted(() => ({
   commitProjectMock: vi.fn(),
   createProjectMock: vi.fn(() => ({ id: 'project-1' })),
@@ -19,6 +20,12 @@ const {
   notifyStoppedMock: vi.fn(),
   saveBatchMock: vi.fn(),
   updateOutboxMock: vi.fn(),
+  loadSettingsMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
 }));
 
 vi.mock('../../../composition/persistence/projects/index-mutations', async (importOriginal) => ({
@@ -114,19 +121,31 @@ beforeEach(() => {
   notifySavedMock.mockResolvedValue(undefined);
   notifyStoppedMock.mockResolvedValue(undefined);
   updateOutboxMock.mockResolvedValue(undefined);
+  loadSettingsMock.mockRejectedValue(new Error('settings unavailable'));
 });
 
 describe('multi-source finalization', () => {
   it('commits every required artifact in one batch before project creation and staging deletion', async () => {
     const session = createSession('multi-batch');
+    loadSettingsMock.mockResolvedValueOnce({
+      localStoragePolicy: { defaultDestination: 'temporary' },
+    });
     await finalizeSession(session);
 
     expect(saveBatchMock).toHaveBeenCalledOnce();
     expect(saveBatchMock.mock.calls[0]?.[0]).toHaveLength(2);
+    expect(saveBatchMock.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ storageClass: 'temporary' }),
+      expect.objectContaining({ storageClass: 'temporary' }),
+    ]);
     expect(saveBatchMock.mock.calls[0]?.[1]).toEqual({
       primaryRecordingId: 'multi-batch-window-1',
       projectId: null,
       recordingId: 'multi-batch',
+    });
+    expect(commitProjectMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }), {
+      baseRevision: null,
+      storageClass: 'temporary',
     });
     expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
       commitProjectMock.mock.invocationCallOrder[0]!

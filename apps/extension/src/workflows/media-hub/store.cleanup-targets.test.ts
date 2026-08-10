@@ -3,15 +3,13 @@ import type { StorageCleanupCandidate } from '../../features/media-hub/types';
 
 const storeMocks = vi.hoisted(() => ({
   deleteDiagnosticsMock: vi.fn(),
-  deleteEditorSessionDraftMock: vi.fn(),
   deleteMediaLibraryAssetMock: vi.fn(),
   deleteMediaThumbnailMock: vi.fn(),
   deletePendingScenarioAssetMock: vi.fn(),
   deleteProjectAssetMock: vi.fn(),
   deleteRecordingMock: vi.fn(),
-  deleteScenarioAssetMock: vi.fn(),
+  deleteOrphanedScenarioAggregateChildMock: vi.fn(),
   deleteScenarioExportMock: vi.fn(),
-  deleteScenarioStepEditorDocumentMock: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
 }));
@@ -35,13 +33,7 @@ vi.mock('../../composition/persistence/projects/index', async (importOriginal) =
 vi.mock('../../composition/persistence/scenario/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/scenario/projects')>()),
   deletePendingScenarioAsset: storeMocks.deletePendingScenarioAssetMock,
-  deleteScenarioAsset: storeMocks.deleteScenarioAssetMock,
   deleteScenarioExport: storeMocks.deleteScenarioExportMock,
-}));
-
-vi.mock('../../composition/persistence/editor-sessions/index', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/editor-sessions/index')>()),
-  deleteEditorSessionDraft: storeMocks.deleteEditorSessionDraftMock,
 }));
 
 vi.mock('../../composition/persistence/diagnostics/index', async (importOriginal) => ({
@@ -49,15 +41,15 @@ vi.mock('../../composition/persistence/diagnostics/index', async (importOriginal
   deleteDiagnostics: storeMocks.deleteDiagnosticsMock,
 }));
 
-vi.mock(
-  '../../composition/persistence/scenario/editor-documents/index',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../composition/persistence/scenario/editor-documents/index')
-    >()),
-    deleteScenarioStepEditorDocument: storeMocks.deleteScenarioStepEditorDocumentMock,
-  })
-);
+vi.mock('../../composition/persistence/scenario/aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/scenario/aggregate-mutations')
+  >()),
+  commitScenarioAggregateMutation: vi.fn(),
+  commitScenarioAggregateSnapshotMutation: vi.fn(),
+  deleteScenarioAggregate: vi.fn(),
+  deleteOrphanedScenarioAggregateChild: storeMocks.deleteOrphanedScenarioAggregateChildMock,
+}));
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -98,7 +90,6 @@ function createCleanupCandidates() {
     createCleanupCandidate('recording-1', 'recording'),
     createCleanupCandidate('project-asset-1', 'project-asset'),
     createCleanupCandidate('thumbnail-1', 'thumbnail'),
-    createCleanupCandidate('session-1', 'editor-session'),
     createCleanupCandidate('pending-asset-1', 'scenario-pending-asset'),
     createCleanupCandidate('scenario-asset-1', 'scenario-asset'),
     createCleanupCandidate('scenario-export-1', 'scenario-export'),
@@ -112,11 +103,16 @@ function expectCleanupDeletes() {
   expect(storeMocks.deleteRecordingMock).toHaveBeenCalledWith('recording-1');
   expect(storeMocks.deleteProjectAssetMock).toHaveBeenCalledWith('project-asset-1');
   expect(storeMocks.deleteMediaThumbnailMock).toHaveBeenCalledWith('thumbnail-1');
-  expect(storeMocks.deleteEditorSessionDraftMock).toHaveBeenCalledWith('session-1');
   expect(storeMocks.deletePendingScenarioAssetMock).toHaveBeenCalledWith('pending-asset-1');
-  expect(storeMocks.deleteScenarioAssetMock).toHaveBeenCalledWith('scenario-asset-1');
+  expect(storeMocks.deleteOrphanedScenarioAggregateChildMock).toHaveBeenCalledWith({
+    id: 'scenario-asset-1',
+    kind: 'asset',
+  });
   expect(storeMocks.deleteScenarioExportMock).toHaveBeenCalledWith('scenario-export-1');
-  expect(storeMocks.deleteScenarioStepEditorDocumentMock).toHaveBeenCalledWith('step-1');
+  expect(storeMocks.deleteOrphanedScenarioAggregateChildMock).toHaveBeenCalledWith({
+    id: 'step-1',
+    kind: 'editor-document',
+  });
   expect(storeMocks.deleteDiagnosticsMock).toHaveBeenCalledWith('diagnostics-1');
 }
 
@@ -143,7 +139,6 @@ describe('media-hub typed storage cleanup deletion', () => {
       'recording-1',
       'project-asset-1',
       'thumbnail-1',
-      'session-1',
       'pending-asset-1',
       'scenario-asset-1',
       'scenario-export-1',

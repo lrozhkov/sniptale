@@ -74,10 +74,7 @@ async function inspectScenarioProjectEntry(
   project: ScenarioProjectEntry,
   inventory: ScenarioProjectBackupInspection
 ): Promise<void> {
-  const thumbnail = await getThumbnail(db, `scenario:${project.id}`);
-  if (thumbnail) {
-    inventory.thumbnails.push(thumbnail);
-  }
+  inventory.sizeBytes += getJsonSizeBytes(project);
 
   const assets = (await db.getAllFromIndex(
     SCENARIO_ASSETS_STORE,

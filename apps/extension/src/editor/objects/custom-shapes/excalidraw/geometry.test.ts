@@ -160,5 +160,5 @@ it('handles empty imports and export item shape-kind replacements', () => {
     label: 'Cloud',
     mappedElements: [mapped],
   });
-  expect(definition?.richShapeDefaults?.shapeKind).toBe('cloud-callout');
+  expect(definition?.richShapeDefaults?.shapeKind).toBe('excalidraw-export-item');
 });

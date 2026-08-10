@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../persistence/workspace';
 import { useEditorStore } from './useEditorStore';
+import { createDefaultDrawingToolDefaults } from '../../features/drawing/public';
 
 afterEach(() => {
   useEditorStore.setState({ viewportPreviewAutomationBlockedInSession: false });
@@ -46,6 +47,31 @@ function registerDocumentDefaultsTests() {
 
     expect(useEditorStore.getState().workspace.backgroundColor).toBe('#333333');
     expect(useEditorStore.getState().workspaceBackgroundEdited).toBe(false);
+  });
+
+  it('keeps synchronized drawing defaults during later page-default hydration', () => {
+    const drawing = createDefaultDrawingToolDefaults();
+    useEditorStore.getState().replaceDrawingToolSettings({
+      ...drawing,
+      pencil: { ...drawing.pencil, width: 16 },
+    });
+
+    useEditorStore.getState().hydrateDefaults({
+      toolSettings: {
+        step: {
+          ...useEditorStore.getState().toolSettings.step,
+          color: '#123456',
+          type: 'number',
+          value: '4',
+        },
+      },
+    });
+
+    expect(useEditorStore.getState().toolSettings.pencil.width).toBe(16);
+    expect(useEditorStore.getState().toolSettings.step).toMatchObject({
+      color: '#123456',
+      value: '4',
+    });
   });
 }
 

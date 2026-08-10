@@ -26,6 +26,24 @@ vi.mock('../../color-selector', async (importOriginal) => ({
   ),
 }));
 
+vi.mock('./fill-paint-field', () => ({
+  HighlighterFillPaintField: ({
+    label,
+    onChange,
+  }: {
+    label: string;
+    onChange: (value: unknown) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="compact-paint-selector"
+      onClick={() => onChange({ kind: 'solid', color: '#123456ff' })}
+    >
+      {label}
+    </button>
+  ),
+}));
+
 import { BorderPresetEditorFields } from '.';
 import { BorderStyleInspector } from './inspector';
 import { createBaseState, type BorderPresetEditorTestState } from '../content.test-support';
@@ -122,7 +140,7 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   selectCategory('highlighter.editor.fillSection');
   expect(container?.textContent).not.toContain('highlighter.editor.noFill');
   await act(async () => {
-    queryFieldElements().colorSelectors[0]?.click();
+    container?.querySelector<HTMLButtonElement>('[data-testid="compact-paint-selector"]')?.click();
   });
 
   selectCategory('highlighter.editor.geometrySection');
@@ -173,7 +191,7 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
 
   expect(state.setName).toHaveBeenCalledWith('Updated preset');
   expect(state.setColor).toHaveBeenCalledWith('#123456');
-  expect(state.setFillColor).toHaveBeenCalledWith('#123456');
+  expect(state.setFillPaint).toHaveBeenCalledWith({ kind: 'solid', color: '#123456ff' });
   expect(state.setCustomCss).toHaveBeenCalledWith('border-color: blue;');
   const paddingUpdates = vi
     .mocked(state.setPadding)

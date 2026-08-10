@@ -12,7 +12,10 @@ const dbMocks = vi.hoisted(() => ({
   txDoneMock: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
+  IMAGE_WORKSPACES_STORE: 'image_workspaces',
   MEDIA_LIBRARY_STORE: 'media_library',
   THUMBNAILS_STORE: 'thumbnails',
   initDB: dbMocks.initDBMock,
@@ -61,6 +64,7 @@ function createMediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibr
     sourceTitle: overrides.sourceTitle ?? null,
     sourceFavicon: overrides.sourceFavicon ?? null,
     tags: overrides.tags ?? [],
+    ...(overrides.lifecycle ? { lifecycle: overrides.lifecycle } : {}),
     ...(overrides.blob === undefined ? {} : { blob: overrides.blob }),
   };
 }
@@ -124,7 +128,11 @@ beforeEach(() => {
 
 function registerUpdateMediaLibraryEntryTests() {
   it('updates media metadata while preserving existing tags and refresh timestamps', async () => {
-    const existingEntry = createMediaEntry({ tags: ['old'], sourceTitle: 'Before' });
+    const existingEntry = createMediaEntry({
+      tags: ['old'],
+      sourceTitle: 'Before',
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
+    });
     dbMocks.getMock.mockResolvedValue(existingEntry);
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(999);
 
@@ -144,6 +152,7 @@ function registerUpdateMediaLibraryEntryTests() {
         sourceTitle: 'After',
         tags: ['old'],
         updatedAt: 999,
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
       })
     );
   });

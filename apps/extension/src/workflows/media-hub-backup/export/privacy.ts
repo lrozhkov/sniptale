@@ -170,7 +170,7 @@ function scrubScenarioElementV3(
 
   const nextElement: ScenarioImageElement = {
     ...element,
-    editDocumentId: options.includeEditorDrafts ? element.editDocumentId : null,
+    editDocumentId: element.editDocumentId,
   };
 
   if (!nextElement.captureContext) {

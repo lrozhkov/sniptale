@@ -10,6 +10,8 @@ import {
 import { registerToolbarMenuEscapeOwner } from '../state/menu';
 
 const TOOLBAR_MENU_GAP_PX = 10;
+export const TOOLBAR_PRIMARY_MENU_Z_INDEX = 2147483647;
+export const TOOLBAR_SECONDARY_MENU_Z_INDEX = 2147483646;
 export const TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX = 250;
 const TOOLBAR_MENU_VIEWPORT_MARGIN_PX = 8;
 

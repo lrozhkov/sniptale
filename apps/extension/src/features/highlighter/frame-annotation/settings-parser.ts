@@ -73,7 +73,9 @@ function isBorderSettings(value: unknown): boolean {
   return (
     ['width', 'radius', 'shadow'].every((key) => isFiniteNumber(value[key])) &&
     ['opacity', 'strokeOpacity', 'fillOpacity'].every((key) => isOptionalFinite(value[key])) &&
-    hasSafeColorFields(value, ['color', 'fillColor']) &&
+    hasSafeColorFields(value, ['color']) &&
+    (value['fillPaint'] === undefined || parsePaint(value['fillPaint']) !== null) &&
+    (value['fillColor'] === undefined || isSafeCssColor(value['fillColor'])) &&
     isOneOf(value['style'], ['solid', 'dashed', 'dotted']) &&
     isRecord(padding) &&
     ['top', 'right', 'bottom', 'left'].every((key) => isFiniteNumber(padding[key])) &&
@@ -102,7 +104,9 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
   if (value === undefined) return undefined;
   if (!isBorderSettings(value) || !isRecord(value)) return null;
   const color = normalizeColor(value['color'] as string);
-  const fillColor = normalizeColor(value['fillColor'] as string);
+  const fillColor = normalizeColor(
+    typeof value['fillColor'] === 'string' ? value['fillColor'] : '#00000000'
+  );
   if (!color || !fillColor) return null;
   const strokeMultiplier = isFiniteNumber(value['strokeOpacity'])
     ? value['strokeOpacity'] / 100
@@ -116,6 +120,8 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
     ? multiplyColorAlpha(fillColor, value['fillOpacity'] / 100)
     : fillColor;
   if (!canonicalColor || !canonicalFillColor) return null;
+  const parsedFillPaint = parsePaint(value['fillPaint']);
+  if (value['fillPaint'] !== undefined && !parsedFillPaint) return null;
   return {
     width: value['width'] as number,
     color: canonicalColor,
@@ -123,7 +129,7 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
     radius: value['radius'] as number,
     padding: { ...(value['padding'] as AppliedBorderSettings['padding']) },
     shadow: value['shadow'] as number,
-    fillColor: canonicalFillColor,
+    fillPaint: parsedFillPaint ?? createSolidPaint(canonicalFillColor),
     inheritCustomCss: value['inheritCustomCss'] as boolean,
     customCss: value['customCss'] as string,
     ...(isRecord(value['effects'])
@@ -329,9 +335,10 @@ function isCalloutSurface(value: unknown): boolean {
     hasFields(
       value,
       ['borderWidth', 'paddingX', 'paddingY', 'radius', 'shadow'],
-      ['backgroundColor', 'borderColor', 'borderStyle', 'shadowColor', 'textColor']
+      ['borderColor', 'borderStyle', 'shadowColor', 'textColor']
     ) &&
-    hasSafeColorFields(value, ['backgroundColor', 'borderColor', 'shadowColor', 'textColor']) &&
+    hasSafeColorFields(value, ['borderColor', 'shadowColor', 'textColor']) &&
+    (parsePaint(value['fillPaint']) !== null || isSafeCssColor(value['backgroundColor'])) &&
     isOneOf(value['borderStyle'], ['solid', 'dashed', 'dotted'])
   );
 }
@@ -510,6 +517,23 @@ export function isCalloutSettings(value: unknown): boolean {
     isCalloutConnector(style['connector'])
   );
 }
+
+export function normalizeCalloutSettings(value: unknown) {
+  if (value === undefined) return undefined;
+  if (!isCalloutSettings(value) || !isRecord(value)) return null;
+  const style = value['style'] as Record<string, unknown>;
+  const surface = style['surface'] as Record<string, unknown>;
+  const fillPaint =
+    parsePaint(surface['fillPaint']) ?? createSolidPaint(surface['backgroundColor'] as string);
+  const { backgroundColor: _legacyBackgroundColor, ...surfaceWithoutLegacy } = surface;
+  return {
+    ...structuredClone(value),
+    style: {
+      ...structuredClone(style),
+      surface: { ...structuredClone(surfaceWithoutLegacy), fillPaint },
+    },
+  } as unknown as import('@sniptale/runtime-contracts/highlighter/callout').CalloutSettings;
+}
 import { containsUnsafeCssSyntax } from '@sniptale/platform/security/css-safety';
 import { validateCalloutCustomCss } from '../callout-custom-css';
 import { validateCssPolicyString } from '../css-sanitizer/css';
@@ -517,3 +541,4 @@ import { validateStepBadgeCustomCss } from '../step-badge-custom-css';
 import { isReservedFrameCssProperty } from '../style/decoration';
 import type { AppliedBorderSettings, BlurSettings } from '@sniptale/ui/highlighter-style/types';
 import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
+import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';

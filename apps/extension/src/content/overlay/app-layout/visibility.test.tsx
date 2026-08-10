@@ -275,3 +275,22 @@ it('removes the marker surface when the screenshot session exits', async () => {
 
   expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
 });
+
+it('removes annotation and Design Review chrome while Drawing owns interaction', async () => {
+  const props = createControllerProps();
+
+  await renderLayout({
+    ...props,
+    toolbar: {
+      ...props.toolbar,
+      isCompletelyHidden: false,
+      modes: {
+        ...props.toolbar.modes,
+        drawingMode: true,
+      },
+    },
+  });
+
+  expect(designReviewSurfaceMock).not.toHaveBeenCalled();
+  expect(container?.querySelector('[data-ui="content.annotation-markers"]')).toBeNull();
+});

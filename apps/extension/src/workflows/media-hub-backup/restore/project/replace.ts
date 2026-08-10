@@ -3,6 +3,7 @@ import type {
   VideoProjectEntry,
 } from '../../../../composition/persistence/projects/contracts';
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -46,6 +47,7 @@ export async function deleteExistingVideoProjectBundle(
     await deleteProjectExportMirror(tx, entry);
   }
   await getStore(tx, THUMBNAILS_STORE).delete(`video-project:${projectId}`);
+  await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['video-project', projectId]);
 }
 
 async function deleteProjectAssetMirror(tx: BackupTransaction, assetId: string): Promise<void> {
@@ -95,6 +97,7 @@ export async function deleteExistingScenarioProjectBundle(
     }
   }
   await getStore(tx, THUMBNAILS_STORE).delete(`scenario:${projectId}`);
+  await getStore(tx, AGGREGATE_PRESENTATIONS_STORE).delete(['scenario', projectId]);
 }
 
 function readStringField(value: unknown, field: string): string | null {

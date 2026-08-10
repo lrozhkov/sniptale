@@ -2,7 +2,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 
 export function createEditorDocumentFixture(): EditorDocument {
   return {
-    version: 1,
+    version: 2,
     sourceImageData: 'data:image/png;base64,source',
     sourceName: 'capture.png',
     sourceWidth: 100,

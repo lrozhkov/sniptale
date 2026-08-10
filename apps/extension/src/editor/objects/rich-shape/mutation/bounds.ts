@@ -1,7 +1,4 @@
-import {
-  resizeRichShapeCalloutGeometry,
-  type EditorRichShapeDocumentObject,
-} from '../../../../features/editor/document/rich-shape';
+import type { EditorRichShapeDocumentObject } from '../../../../features/editor/document/rich-shape';
 import { exportRichShapeDocumentObjectFromGroup } from '../document-export';
 import type { RichShapeGroup } from '../types';
 
@@ -21,15 +18,6 @@ export function withNormalizedRichShapeBounds(
     frame: nextFrame,
     scaleX: 1,
     scaleY: 1,
-    ...(exportedShape.callout
-      ? {
-          callout: resizeRichShapeCalloutGeometry(
-            exportedShape.callout,
-            exportedShape.frame,
-            nextFrame
-          ),
-        }
-      : {}),
   };
 }
 

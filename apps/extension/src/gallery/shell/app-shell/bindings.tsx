@@ -4,10 +4,31 @@ import type { GalleryAppStateController, GalleryViewMode } from '../../state/typ
 import type { GalleryItem } from '../../library/items';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import { GalleryAppLayout } from './layout';
+import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  isGalleryMediaItem,
+  isGalleryScenarioExportItem,
+  isGalleryScenarioItem,
+  isGalleryVideoProjectItem,
+} from '../../library/items';
+
+function resolvePromotionTarget(item: GalleryItem) {
+  if (isGalleryMediaItem(item)) return { kind: 'image' as const, id: item.entityId ?? item.id };
+  if (isGalleryScenarioExportItem(item)) {
+    return { kind: 'scenario' as const, id: item.project.id };
+  }
+  if (isGalleryScenarioItem(item)) return { kind: 'scenario' as const, id: item.entityId };
+  if (isGalleryVideoProjectItem(item)) {
+    return { kind: 'video-project' as const, id: item.entityId };
+  }
+  return null;
+}
 
 interface GalleryAppBindingsProps {
   actions: UseGalleryAppActionsResult;
   controller: GalleryAppStateController;
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>;
   filteredScenarioProjects?: ScenarioProjectSummary[];
   onRefreshAll: () => void;
   scenarioPreviewProject?: ScenarioProjectSummary | null;
@@ -45,7 +66,8 @@ function openPreview(
 
 function buildGalleryPreviewHandlers(
   actions: UseGalleryAppActionsResult,
-  controller: GalleryAppStateController
+  controller: GalleryAppStateController,
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
 ) {
   return {
     onPreviewClose: () => void actions.preview.close(),
@@ -56,12 +78,26 @@ function buildGalleryPreviewHandlers(
       })),
     onPreviewResetChanges: () => actions.preview.resetChanges(),
     onPreviewDownload: actions.preview.download,
+    onPreviewDownloadOriginal: actions.preview.downloadOriginal,
     onPreviewCopy: actions.preview.copy,
     onPreviewEdit: actions.preview.openInEditor,
     onPreviewOpenSnapshotScreenshot: actions.preview.openSnapshotScreenshotInEditor,
+    onPreviewRestoreOriginal: actions.preview.restoreOriginal,
+    onPreviewSaveCopy: actions.preview.saveCopy,
     onPreviewDelete: (
       item: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0][number]
     ) => void actions.selection.deleteMany([item]),
+    onPreviewPromote: async (item: GalleryItem) => {
+      const target = resolvePromotionTarget(item);
+      if (!target) return;
+      const response = await messaging.sendRuntimeMessage({
+        aggregate: target,
+        type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+      });
+      if (!response.success) throw new Error(response.error ?? 'Could not save to the library.');
+      controller.actions.preview.setPreview((previous) => ({ ...previous, item: null, url: null }));
+      await controller.actions.storage.refresh();
+    },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>
       openPreview(controller, item, options),
   };
@@ -115,11 +151,12 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onRemoveTag: (tag: string) => removeTag(controller, tag),
     onAddTag: () => addTag(controller),
     onFolderFilterChange: controller.actions.filters.setFolderFilter,
+    onScopeChange: controller.actions.filters.setScope,
     onActiveTagsChange: controller.actions.filters.setActiveTags,
     onSearchChange: controller.actions.filters.setSearch,
     onSortModeChange: controller.actions.filters.setSortMode,
     onViewModeChange: props.setViewMode,
-    ...buildGalleryPreviewHandlers(actions, controller),
+    ...buildGalleryPreviewHandlers(actions, controller, props.messaging),
     ...buildGallerySelectionHandlers(actions, controller),
   };
 }

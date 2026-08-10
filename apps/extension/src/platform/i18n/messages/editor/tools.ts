@@ -11,6 +11,10 @@ export const editorToolsMessages = defineMessageSource({
     ru: 'Фигуры и линии',
     en: 'Shapes and lines',
   },
+  shape: {
+    ru: 'Фигуры',
+    en: 'Shapes',
+  },
   roughShape: {
     ru: 'Карандаш и фигуры',
     en: 'Sketch shapes',

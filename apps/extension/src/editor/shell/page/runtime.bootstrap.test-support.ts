@@ -8,7 +8,7 @@ export function createEditorPageController() {
   return {
     autosaveService: null,
     dispose: vi.fn(),
-    exportDocument: vi.fn(() => ({ version: 1 })),
+    exportDocument: vi.fn(() => ({ version: 2 })),
     loadDocument: vi.fn(async () => undefined),
     openImage: vi.fn(async () => undefined),
   };
@@ -27,7 +27,7 @@ export function createEditorPageAutosaveService() {
 
 export function createEditorPageDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,doc',
     sourceName: null,
     sourceWidth: 320,
@@ -54,14 +54,14 @@ export function createEditorPageRuntime(
 }
 
 export function setupEditorPageRuntimeBootstrapTestScope(args: {
-  ensureEditorPageSessionIdMock: ReturnType<typeof vi.fn>;
+  ensureEditorPageAggregateIdMock: ReturnType<typeof vi.fn>;
   readEditorPageLocationStateMock: ReturnType<typeof vi.fn>;
   waitForEditorControllerCanvasMock: ReturnType<typeof vi.fn>;
 }) {
   beforeEach(() => {
     vi.clearAllMocks();
     args.readEditorPageLocationStateMock.mockReturnValue({ assetId: 'asset-1' });
-    args.ensureEditorPageSessionIdMock.mockReturnValue('session-1');
+    args.ensureEditorPageAggregateIdMock.mockReturnValue('session-1');
     args.waitForEditorControllerCanvasMock.mockResolvedValue(undefined);
   });
 }

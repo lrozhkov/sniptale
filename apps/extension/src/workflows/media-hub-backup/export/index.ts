@@ -32,6 +32,7 @@ async function appendBackupMediaAssets(args: {
   db: Awaited<ReturnType<typeof initDB>>;
   items: Awaited<ReturnType<typeof listMediaLibrary>>;
   options: MediaHubBackupExportOptions;
+  projectAssetIdsExportedWithProjects: ReadonlySet<string>;
   signal?: AbortSignal | undefined;
   zip: JSZip;
 }): Promise<{ assets: MediaHubBackupAssetDescriptor[]; thumbnailCount: number }> {
@@ -42,7 +43,10 @@ async function appendBackupMediaAssets(args: {
     assertBackupExportNotCancelled(args.signal);
     const entry = parseMediaLibraryEntry(await args.db.get('media_library', item.id));
     assertBackupExportNotCancelled(args.signal);
-    if (!entry || !shouldExportMediaEntry(entry, args.options)) {
+    if (
+      !entry ||
+      !shouldExportMediaEntry(entry, args.options, args.projectAssetIdsExportedWithProjects)
+    ) {
       continue;
     }
 
@@ -137,15 +141,21 @@ async function collectBackupPayload(args: {
 }) {
   const items = await listMediaLibrary();
   assertBackupExportNotCancelled(args.signal);
+  const projects = await buildBackupProjectDescriptorSet(args);
+  const projectAssetIdsExportedWithProjects = new Set(
+    projects.videoProjects.flatMap((project) =>
+      project.projectAssets.map((asset) => asset.entry.id)
+    )
+  );
   const { assets, thumbnailCount } = await appendBackupMediaAssets({
     budget: args.budget,
     db: args.db,
     items,
     options: args.options,
+    projectAssetIdsExportedWithProjects,
     signal: args.signal,
     zip: args.zip,
   });
-  const projects = await buildBackupProjectDescriptorSet(args);
   return {
     assets,
     thumbnailCount,

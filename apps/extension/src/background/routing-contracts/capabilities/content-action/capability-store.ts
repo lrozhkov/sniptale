@@ -27,6 +27,7 @@ const CONTENT_ACTION_AUTO_START_GRANTS_POLICY_ID = 'content-action-auto-start-gr
 
 type ContentPrivilegedActionAutoStartGrantRecord = {
   allowedActionTypes: ContentPrivilegedActionType[];
+  libraryActionTypes: ContentPrivilegedActionType[];
   expiresAtEpochMs: number;
   tabId: number;
 };
@@ -64,18 +65,19 @@ export function consumeAutoStartGrantForCapabilityRequest(args: {
   actionType: ContentPrivilegedActionType;
   senderBinding: ContentSenderBinding;
   source: Extract<ContentPrivilegedActionRequestSource, { kind: 'background-auto-start' }>;
-}): boolean {
+}): { authorized: boolean; libraryDestinationAuthorized: boolean } {
   pruneExpiredAutoStartGrants();
   const record = contentPrivilegedActionAutoStartGrants.get(args.source.grantToken);
   if (!record || record.tabId !== args.senderBinding.tabId) {
     contentPrivilegedActionAutoStartGrants.delete(args.source.grantToken);
-    return false;
+    return { authorized: false, libraryDestinationAuthorized: false };
   }
 
   const actionIndex = record.allowedActionTypes.indexOf(args.actionType);
   if (actionIndex < 0) {
-    return false;
+    return { authorized: false, libraryDestinationAuthorized: false };
   }
+  const libraryDestinationAuthorized = record.libraryActionTypes.includes(args.actionType);
 
   record.allowedActionTypes.splice(actionIndex, 1);
   if (record.allowedActionTypes.length === 0) {
@@ -83,11 +85,12 @@ export function consumeAutoStartGrantForCapabilityRequest(args: {
   } else {
     contentPrivilegedActionAutoStartGrants.set(args.source.grantToken, record);
   }
-  return true;
+  return { authorized: true, libraryDestinationAuthorized };
 }
 
 export function issueContentPrivilegedActionCapability(args: {
   actionType: ContentPrivilegedActionType;
+  libraryDestinationAuthorized?: boolean;
   requestId: string;
   senderBinding: ContentSenderBinding;
 }): ContentPrivilegedActionCapability {
@@ -106,12 +109,14 @@ export function issueContentPrivilegedActionCapability(args: {
 
 export function issueContentPrivilegedActionAutoStartGrant(args: {
   actionTypes: readonly ContentPrivilegedActionType[];
+  libraryActionTypes?: readonly ContentPrivilegedActionType[];
   tabId: number;
 }): ContentPrivilegedActionAutoStartGrant {
   pruneExpiredAutoStartGrants();
   const grantToken = createContentCapabilityToken();
   contentPrivilegedActionAutoStartGrants.set(grantToken, {
     allowedActionTypes: [...args.actionTypes],
+    libraryActionTypes: [...(args.libraryActionTypes ?? [])],
     expiresAtEpochMs:
       Date.now() + requirePolicyStateTtlMs(CONTENT_ACTION_AUTO_START_GRANTS_POLICY_ID),
     tabId: args.tabId,
@@ -123,7 +128,7 @@ export function consumeIssuedContentPrivilegedActionCapability(args: {
   actionType: ContentPrivilegedActionType;
   contentIntent: ContentPrivilegedActionCapability;
   senderBinding: ContentSenderBinding;
-}): boolean {
+}): ContentActionCapabilityPayload | null {
   pruneExpiredContentActionCapabilities();
   const result = consumeOneShotPolicyCapability({
     policyStateId: CONTENT_ACTION_CAPABILITIES_POLICY_ID,
@@ -135,7 +140,7 @@ export function consumeIssuedContentPrivilegedActionCapability(args: {
     validateRecord: ({ payload }) =>
       payload.actionType === args.actionType && payload.requestId === args.contentIntent.requestId,
   });
-  return result.consumed;
+  return result.consumed ? result.payload : null;
 }
 
 export function resetContentPrivilegedActionCapabilityStoreForTests(): void {

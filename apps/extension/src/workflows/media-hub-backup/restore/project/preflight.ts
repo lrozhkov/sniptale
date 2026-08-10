@@ -14,6 +14,7 @@ import type { BackupBlobDescriptor, ProjectAssetBackupBlobDescriptor } from '../
 import type { PreparedProjectDomains } from './prepare';
 import { loadRequiredArchiveBlob } from '../prepare';
 import { readRestoredBlob } from './helpers';
+import { materializeAggregatePresentation } from '../presentation';
 
 function collectProjectBlobDescriptors(
   prepared: PreparedProjectDomains
@@ -54,7 +55,40 @@ export async function assertPreparedProjectBlobsAvailable(
   await assertPreparedProjectAssetBlobsSafe(prepared, restoredBlobs);
   await prepareEffectProjectSnapshots(prepared, restoredBlobs);
   await prepareEffectBundles(prepared, restoredBlobs);
+  await prepareAggregatePresentations(prepared, zip);
   prepared.restoredBlobs = restoredBlobs;
+}
+
+async function prepareAggregatePresentations(
+  prepared: PreparedProjectDomains,
+  zip: JSZip
+): Promise<void> {
+  for (const project of prepared.videoProjects) {
+    const descriptor = project.descriptor.presentation;
+    if (descriptor?.entry.aggregateId !== project.descriptor.entry.id) continue;
+    const presentation = await materializeAggregatePresentation({
+      descriptor: {
+        ...descriptor,
+        entry: { ...descriptor.entry, aggregateId: project.projectId },
+      },
+      ref: { id: project.projectId, kind: 'video-project' },
+      zip,
+    });
+    if (presentation) project.restoredPresentation = presentation;
+  }
+  for (const project of prepared.scenarioProjects) {
+    const descriptor = project.descriptor.presentation;
+    if (descriptor?.entry.aggregateId !== project.descriptor.entry.id) continue;
+    const presentation = await materializeAggregatePresentation({
+      descriptor: {
+        ...descriptor,
+        entry: { ...descriptor.entry, aggregateId: project.projectId },
+      },
+      ref: { id: project.projectId, kind: 'scenario' },
+      zip,
+    });
+    if (presentation) project.restoredPresentation = presentation;
+  }
 }
 
 async function materializeProjectBlobs(

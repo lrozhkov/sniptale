@@ -18,10 +18,9 @@ describe('extension page editor urls', () => {
         assetId: 'asset-1',
         bootstrapId: 'bootstrap-1',
         embedMode: 'scenario',
-        sessionId: 'session-1',
       })
     ).toBe(
-      'chrome-extension://test/apps/extension/src/editor/index.html?embed=scenario&session=session-1' +
+      'chrome-extension://test/apps/extension/src/editor/index.html?embed=scenario' +
         '&bootstrap=bootstrap-1&assetId=asset-1'
     );
 
@@ -29,7 +28,7 @@ describe('extension page editor urls', () => {
       'chrome-extension://test/apps/extension/src/editor/index.html'
     );
     expect(buildEditorUrl()).toBe('chrome-extension://test/apps/extension/src/editor/index.html');
-    expect(buildEditorUrl({ embedMode: null, sessionId: null })).toBe(
+    expect(buildEditorUrl({ embedMode: null })).toBe(
       'chrome-extension://test/apps/extension/src/editor/index.html'
     );
     expect(getURLMock).toHaveBeenCalledWith('apps/extension/src/editor/index.html');

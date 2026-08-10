@@ -1,19 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
+  commitScenarioAggregateMutationMock,
   dataUrlToBlobMock,
-  deleteScenarioAssetMock,
   getScenarioProjectRecordV3Mock,
   measureImageBlobMock,
-  saveScenarioAssetMock,
-  saveScenarioProjectRecordV3Mock,
 } = vi.hoisted(() => ({
+  commitScenarioAggregateMutationMock: vi.fn(),
   dataUrlToBlobMock: vi.fn(),
-  deleteScenarioAssetMock: vi.fn(),
   getScenarioProjectRecordV3Mock: vi.fn(),
   measureImageBlobMock: vi.fn(),
-  saveScenarioAssetMock: vi.fn(),
-  saveScenarioProjectRecordV3Mock: vi.fn(),
 }));
 
 vi.mock('../../../../../platform/media-utils/data-url', async (importOriginal) => ({
@@ -26,21 +22,16 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
   measureImageBlob: measureImageBlobMock,
 }));
 
-vi.mock('../../projects', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../projects')>();
-  return {
-    ...actual,
-    deleteScenarioAsset: deleteScenarioAssetMock,
-    saveScenarioAsset: saveScenarioAssetMock,
-  };
-});
+vi.mock('../../aggregate-mutations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../aggregate-mutations')>()),
+  commitScenarioAggregateMutation: commitScenarioAggregateMutationMock,
+}));
 
 vi.mock('./project-records', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./project-records')>();
   return {
     ...actual,
     getScenarioProjectRecordV3: getScenarioProjectRecordV3Mock,
-    saveScenarioProjectRecordV3: saveScenarioProjectRecordV3Mock,
   };
 });
 
@@ -51,10 +42,11 @@ import type { ScenarioCaptureSlideSaveArgs } from './capture';
 beforeEach(() => {
   vi.clearAllMocks();
   dataUrlToBlobMock.mockResolvedValue(new Blob(['pixel'], { type: 'image/png' }));
-  deleteScenarioAssetMock.mockResolvedValue(undefined);
   measureImageBlobMock.mockResolvedValue({ height: 900, width: 1440 });
-  saveScenarioAssetMock.mockResolvedValue(undefined);
-  saveScenarioProjectRecordV3Mock.mockImplementation(async (project) => project);
+  commitScenarioAggregateMutationMock.mockImplementation(async (project) => ({
+    project,
+    workspaceRevision: 1,
+  }));
 });
 
 it('turns recorder capture metadata into a v3 presentation slide', async () => {
@@ -91,12 +83,15 @@ it('turns recorder capture metadata into a v3 presentation slide', async () => {
       expect.objectContaining({ kind: 'callout', role: 'step-note' }),
     ])
   );
-  expect(saveScenarioProjectRecordV3Mock).toHaveBeenCalledWith(
+  expect(commitScenarioAggregateMutationMock).toHaveBeenCalledWith(
     expect.objectContaining({
       id: project.id,
       slides: [expect.objectContaining({ id: result.slide.id })],
     }),
-    { baseUpdatedAt: project.updatedAt }
+    expect.objectContaining({
+      children: { assetPuts: [expect.objectContaining({ projectId: project.id })] },
+      expectedUpdatedAt: project.updatedAt,
+    })
   );
 });
 
@@ -136,19 +131,19 @@ it('fails explicitly when the capture project no longer exists', async () => {
   await expect(saveScenarioCaptureSlideToProject(createCaptureSaveArgs('missing'))).rejects.toThrow(
     'Scenario project not found: missing'
   );
-  expect(saveScenarioAssetMock).not.toHaveBeenCalled();
+  expect(commitScenarioAggregateMutationMock).not.toHaveBeenCalled();
 });
 
-it('rolls back the capture asset when the project write fails', async () => {
+it('does not require compensating child cleanup when the aggregate transaction fails', async () => {
   const project = createScenarioProjectV3('Recorded deck');
   const writeError = new Error('project write failed');
   getScenarioProjectRecordV3Mock.mockResolvedValue(project);
-  saveScenarioProjectRecordV3Mock.mockRejectedValueOnce(writeError);
+  commitScenarioAggregateMutationMock.mockRejectedValueOnce(writeError);
 
   await expect(
     saveScenarioCaptureSlideToProject(createCaptureSaveArgs(project.id))
   ).rejects.toThrow('project write failed');
-  expect(deleteScenarioAssetMock).toHaveBeenCalledWith(expect.any(String));
+  expect(commitScenarioAggregateMutationMock).toHaveBeenCalledTimes(1);
 });
 
 function createCaptureSaveArgs(projectId: string): ScenarioCaptureSlideSaveArgs {

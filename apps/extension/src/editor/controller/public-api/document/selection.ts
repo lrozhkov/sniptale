@@ -5,7 +5,10 @@ import { previewEditorSelectionSettings } from '../../public-actions/selection/o
 
 type EditorSelectionCanvasSource = {
   canvas: Canvas | null;
+  prepareObject: EditorSelectionApplyControllerPrepare;
 };
+
+type EditorSelectionApplyControllerPrepare = (object: import('fabric').FabricObject) => void;
 
 type EditorSelectionHistoryScope = {
   withHistoryMuted: <T>(callback: () => T) => T;
@@ -19,12 +22,12 @@ type EditorSelectionRuntimeSync = {
   syncRuntimeState: () => void;
 };
 
-export type EditorSelectionApplyController = EditorSelectionCanvasSource &
+type EditorSelectionApplyController = EditorSelectionCanvasSource &
   EditorSelectionHistoryScope &
   EditorSelectionHistoryCommit &
   EditorSelectionRuntimeSync;
 
-export type EditorSelectionPreviewController = EditorSelectionCanvasSource &
+type EditorSelectionPreviewController = EditorSelectionCanvasSource &
   EditorSelectionHistoryScope &
   EditorSelectionRuntimeSync;
 
@@ -33,6 +36,7 @@ export function applyEditorSelectionSettingsViaController(
 ): void {
   applyEditorSelectionSettings({
     canvas: controller.canvas,
+    prepareObject: (object) => controller.prepareObject(object),
     withHistoryMuted: (callback) => controller.withHistoryMuted(callback),
     commitHistory: () => controller.commitHistory(),
     syncRuntimeState: () => controller.syncRuntimeState(),
@@ -44,6 +48,7 @@ export function previewEditorSelectionSettingsViaController(
 ): void {
   previewEditorSelectionSettings({
     canvas: controller.canvas,
+    prepareObject: (object) => controller.prepareObject(object),
     withHistoryMuted: (callback) => controller.withHistoryMuted(callback),
     syncRuntimeState: () => controller.syncRuntimeState(),
   });

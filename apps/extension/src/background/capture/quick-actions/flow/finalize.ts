@@ -126,6 +126,9 @@ async function executeAfterCaptureAction({
       };
     case 'ask_preset':
       return showQuickActionSaveDialog(tabId, captureResult);
+    case 'save_to_library':
+      await markQuickActionCaptureJobTerminal(captureResult.jobId, 'completed');
+      return { successToastMessage: null };
     case 'download_default':
     case 'ask_system':
     case 'scenario':

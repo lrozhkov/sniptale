@@ -7,7 +7,6 @@ import {
   createEventDocumentStateBindings,
   createEventInteractionStateBindings,
 } from './state';
-import type { RasterCommandController } from './types';
 
 export function createEditorControllerEventBindings(controller: EditorControllerInstance) {
   return {
@@ -16,6 +15,6 @@ export function createEditorControllerEventBindings(controller: EditorController
     ...createEventDocumentStateBindings(controller),
     ...createEventInteractionStateBindings(controller),
     ...createEditorControllerEventObjectBindings(controller),
-    ...createEditorControllerEventCommandBindings(controller as RasterCommandController),
+    ...createEditorControllerEventCommandBindings(controller),
   };
 }

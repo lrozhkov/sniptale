@@ -85,13 +85,14 @@ describe('border preset editor state initialization', () => {
       id: 'preset-1',
       name: 'Orange border',
       order: 4,
+      tagIds: [],
       width: 6,
       color: '#ff6600',
       style: 'dashed',
       radius: 12,
       padding: { top: 4, right: 5, bottom: 6, left: 7 },
       shadow: 30,
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: true,
       customCss: 'background: red;',
     };
@@ -213,6 +214,7 @@ describe('border preset editor save edit flow', () => {
       systemPresetKey: 'system-default',
       customized: false,
       order: 2,
+      tagIds: [],
       width: 4,
       color: '#111111',
       style: 'solid',
@@ -220,7 +222,7 @@ describe('border preset editor save edit flow', () => {
       padding: { top: 1, right: 1, bottom: 1, left: 1 },
       shadow: 100,
       customCss: '',
-      fillColor: '#00000000',
+      fillPaint: { kind: 'solid' as const, color: '#00000000' },
       inheritCustomCss: false,
     };
     const onUpdate = vi.fn();

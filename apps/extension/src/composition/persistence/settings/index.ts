@@ -2,7 +2,9 @@ import type {
   CaptureActionType,
   ContentToolbarPreferences,
   ContextMenuSettings,
+  LocalStoragePolicy,
   Settings,
+  NormalizedSettings,
   SettingsPatch,
   ViewportPreset,
 } from '../../../contracts/settings';
@@ -16,10 +18,11 @@ import {
   cloneViewportPreset,
   createSystemViewportPresetCatalog,
 } from '../../../features/viewport-presets/catalog';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
 
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
-let settingsMutationQueue = Promise.resolve<Settings | null>(null);
+let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
 
 const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = createSystemViewportPresetCatalog();
 
@@ -47,10 +50,11 @@ const DEFAULT_VOICE_INPUT_SETTINGS: VoiceInputPreferences = {
   mode: 'local-first',
 };
 
-export const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: NormalizedSettings = {
   captureAction: 'download_default',
   contentToolbar: DEFAULT_CONTENT_TOOLBAR_SETTINGS,
   contextMenu: DEFAULT_CONTEXT_MENU_SETTINGS,
+  localStoragePolicy: DEFAULT_LOCAL_STORAGE_POLICY,
   saveCapturesToGallery: false,
   viewportPresets: DEFAULT_VIEWPORT_PRESETS,
   defaultViewportPresetId: null,
@@ -91,11 +95,12 @@ function cloneFullPageCapturePreferences(
   return { ...settings };
 }
 
-export function createDefaultSettings(): Settings {
+export function createDefaultSettings(): NormalizedSettings {
   return {
     ...DEFAULT_SETTINGS,
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
+    localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
     fullPageCapture: cloneFullPageCapturePreferences(DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES),
     voiceInput: { ...DEFAULT_VOICE_INPUT_SETTINGS },
     presets: [],
@@ -122,16 +127,19 @@ export async function saveSettings(settings: Settings): Promise<void> {
   logger.debug('Saved settings payload');
 }
 
-function normalizeLoadedSettings(parsedValue: Partial<Settings>): Settings {
+function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSettings {
   const defaultSettings = createDefaultSettings();
   const captureAction = resolveCaptureAction(
     parsedValue.captureAction ?? defaultSettings.captureAction
   );
+  const localStoragePolicy = normalizeLocalStoragePolicy(parsedValue);
 
   return {
     ...defaultSettings,
     ...parsedValue,
     captureAction,
+    localStoragePolicy,
+    saveCapturesToGallery: localStoragePolicy.defaultDestination === 'library',
     contentToolbar: {
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...parsedValue.contentToolbar,
@@ -165,11 +173,27 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): Settings {
   };
 }
 
+function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStoragePolicy {
+  const legacyDestination = parsedValue.saveCapturesToGallery ? 'library' : 'temporary';
+  return {
+    ...DEFAULT_LOCAL_STORAGE_POLICY,
+    defaultDestination: parsedValue.localStoragePolicy?.defaultDestination ?? legacyDestination,
+    cleanupEnabled:
+      parsedValue.localStoragePolicy?.cleanupEnabled ?? DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,
+    draftRetentionDays:
+      parsedValue.localStoragePolicy?.draftRetentionDays ??
+      DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    videoDraftRetentionDays:
+      parsedValue.localStoragePolicy?.videoDraftRetentionDays ??
+      DEFAULT_LOCAL_STORAGE_POLICY.videoDraftRetentionDays,
+  };
+}
+
 /**
  * Read path only: invalid stored fields are dropped from the returned value, but this function
  * never repairs or migrates storage. Explicit mutations and maintenance flows own writes.
  */
-export async function loadSettings(): Promise<Settings> {
+export async function loadSettings(): Promise<NormalizedSettings> {
   const getSyncStorageValue = browserStorage.sync.get.bind(browserStorage.sync);
   const result = await getSyncStorageValue([STORAGE_KEY]);
   const parsedSettings = parseStoredSettings(result[STORAGE_KEY]);
@@ -192,13 +216,24 @@ export async function clearSettings(): Promise<void> {
   logger.debug('Cleared settings payload');
 }
 
-function queueSettingsMutation(run: () => Promise<Settings>): Promise<Settings> {
+function queueSettingsMutation(
+  run: () => Promise<NormalizedSettings>
+): Promise<NormalizedSettings> {
   const nextMutation = settingsMutationQueue.catch(() => null).then(run);
   settingsMutationQueue = nextMutation;
   return nextMutation;
 }
 
-function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPatch): Settings {
+function applySettingsPatch(
+  currentSettings: NormalizedSettings,
+  settingsPatch: SettingsPatch
+): NormalizedSettings {
+  const legacyDestination =
+    settingsPatch.saveCapturesToGallery === undefined
+      ? undefined
+      : settingsPatch.saveCapturesToGallery
+        ? 'library'
+        : 'temporary';
   return normalizeLoadedSettings({
     ...currentSettings,
     ...settingsPatch,
@@ -216,6 +251,11 @@ function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPa
       ...currentSettings.fullPageCapture,
       ...settingsPatch.fullPageCapture,
     },
+    localStoragePolicy: {
+      ...currentSettings.localStoragePolicy,
+      ...settingsPatch.localStoragePolicy,
+      ...(legacyDestination === undefined ? {} : { defaultDestination: legacyDestination }),
+    },
     voiceInput: {
       ...DEFAULT_VOICE_INPUT_SETTINGS,
       ...currentSettings.voiceInput,
@@ -228,7 +268,7 @@ function applySettingsPatch(currentSettings: Settings, settingsPatch: SettingsPa
  * Serializes settings mutations in-process and reloads storage for each queued patch.
  * Failed writes reject to the caller and the queue remains usable for later mutations.
  */
-export async function patchSettings(settingsPatch: SettingsPatch): Promise<Settings> {
+export async function patchSettings(settingsPatch: SettingsPatch): Promise<NormalizedSettings> {
   return queueSettingsMutation(async () => {
     const currentSettings = await loadSettings();
     const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
@@ -238,7 +278,7 @@ export async function patchSettings(settingsPatch: SettingsPatch): Promise<Setti
   });
 }
 
-export async function resetSettingsToDefaults(): Promise<Settings> {
+export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
   return queueSettingsMutation(async () => {
     const nextSettings = createDefaultSettings();
     await saveSettings(nextSettings);

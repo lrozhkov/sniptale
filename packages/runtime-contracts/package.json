@@ -15,7 +15,9 @@
     "./editor/session": "./src/editor/session/index.ts",
     "./effect-v1": "./src/effect-v1/index.ts",
     "./export": "./src/export/index.ts",
+    "./highlighter/annotation-template-tags": "./src/highlighter/annotation-template-tags.ts",
     "./highlighter/callout": "./src/highlighter/callout.ts",
+    "./highlighter/surface-style": "./src/highlighter/surface-style.ts",
     "./highlighter/border-preset": "./src/highlighter/border-preset.ts",
     "./highlighter/step-badge": "./src/highlighter/step-badge.ts",
     "./messaging/capture-messages": "./src/messaging/capture-messages.ts",
@@ -67,6 +69,7 @@
     "./web-snapshot": "./src/web-snapshot/index.ts"
   },
   "dependencies": {
+    "@sniptale/foundation": "0.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -6,6 +6,7 @@ describe('resolveToolbarNavigationLockMode', () => {
     expect(
       resolveToolbarNavigationLockMode({
         designReviewMode: false,
+        drawingMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: false,
@@ -19,6 +20,7 @@ describe('resolveToolbarNavigationLockMode', () => {
     expect(
       resolveToolbarNavigationLockMode({
         designReviewMode: false,
+        drawingMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: false,
@@ -32,6 +34,7 @@ describe('resolveToolbarNavigationLockMode', () => {
     expect(
       resolveToolbarNavigationLockMode({
         designReviewMode: false,
+        drawingMode: false,
         highlighterMode: false,
         isCursorMode: true,
         quickEditMode: false,
@@ -46,6 +49,7 @@ describe('resolveToolbarNavigationLockMode', () => {
       resolveToolbarNavigationLockMode({
         aiPickMode: false,
         designReviewMode: true,
+        drawingMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: false,
@@ -59,6 +63,7 @@ describe('resolveToolbarNavigationLockMode', () => {
       resolveToolbarNavigationLockMode({
         aiPickMode: false,
         designReviewMode: false,
+        drawingMode: false,
         highlighterMode: true,
         isCursorMode: false,
         quickEditMode: false,
@@ -72,11 +77,26 @@ describe('resolveToolbarNavigationLockMode', () => {
       resolveToolbarNavigationLockMode({
         aiPickMode: false,
         designReviewMode: false,
+        drawingMode: false,
         highlighterMode: false,
         isCursorMode: false,
         quickEditMode: true,
         screenshotMode: true,
       })
     ).toBe(false);
+  });
+
+  it('removes the generic navigation overlay while Drawing owns pointer input', () => {
+    expect(
+      resolveToolbarNavigationLockMode({
+        aiPickMode: false,
+        designReviewMode: false,
+        drawingMode: true,
+        highlighterMode: false,
+        isCursorMode: false,
+        quickEditMode: false,
+        screenshotMode: true,
+      })
+    ).toBeNull();
   });
 });

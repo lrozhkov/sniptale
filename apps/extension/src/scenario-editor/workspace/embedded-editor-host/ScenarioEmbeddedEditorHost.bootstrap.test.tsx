@@ -179,9 +179,8 @@ beforeEach(() => {
   getScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,abc');
   persistPendingEditorBootstrapPayloadMock.mockResolvedValue('bootstrap-1');
-  getEmbeddedEditorUrlMocks().createEditorSessionIdMock.mockReturnValue('session-1');
   getEmbeddedEditorUrlMocks().buildEditorUrlMock.mockReturnValue(
-    '/editor/index.html?sessionId=session-1&embed=scenario'
+    '/editor/index.html?bootstrap=bootstrap-1&embed=scenario'
   );
 });
 
@@ -215,10 +214,9 @@ it('resolves the iframe bootstrap payload inside the scenario modal host', async
   expect(getEmbeddedEditorUrlMocks().buildEditorUrlMock).toHaveBeenCalledWith({
     bootstrapId: 'bootstrap-1',
     embedMode: 'scenario',
-    sessionId: 'session-1',
   });
   expect(container?.querySelector('iframe')?.getAttribute('src')).toBe(
-    '/editor/index.html?sessionId=session-1&embed=scenario'
+    '/editor/index.html?bootstrap=bootstrap-1&embed=scenario'
   );
 });
 

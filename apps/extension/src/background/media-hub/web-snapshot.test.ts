@@ -26,7 +26,6 @@ vi.mock('../../workflows/media-hub/store', async (importOriginal) => ({
   saveScreenshotMediaAssetSafely: vi.fn(),
   saveWebSnapshotMediaAssetSafely: mocks.saveWebSnapshot,
   updateMediaLibraryEntrySafely: vi.fn(),
-  updateScreenshotMediaAssetSafely: vi.fn(),
 }));
 
 vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => ({

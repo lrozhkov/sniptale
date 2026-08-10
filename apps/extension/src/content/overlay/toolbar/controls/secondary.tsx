@@ -3,6 +3,7 @@ import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
 import { ToolbarDesignReviewControls } from './design-review';
+import { ToolbarDrawingControls } from './drawing';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -150,6 +151,12 @@ export function ToolbarSecondaryControls(props: {
           panelOpen={toolbarProps.designReviewPanelOpen ?? false}
           toolbarMenuState={viewModel.toolbarMenuState}
           onTogglePanel={toolbarProps.onToggleDesignReviewPanel ?? (() => undefined)}
+        />
+      ) : null}
+      {toolbarProps.drawingMode && toolbarProps.drawingController ? (
+        <ToolbarDrawingControls
+          controller={toolbarProps.drawingController}
+          displayMode={viewModel.derivedState.displayMode}
         />
       ) : null}
       <ToolbarUtilityButtons

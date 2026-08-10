@@ -11,7 +11,8 @@ import { parseBackupManifestPrivacyFields } from './privacy-options';
 import { readManifestNumber, readManifestRecord, readManifestString } from './readers';
 
 export const BACKUP_FORMAT = 'sniptale-media-hub-backup';
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 5;
+export const MIN_SUPPORTED_BACKUP_VERSION = 4;
 export const MAX_BACKUP_ARCHIVE_BYTES = 500 * 1024 * 1024;
 export const MAX_BACKUP_FILE_COUNT = 2000;
 export const MAX_BACKUP_JSON_BYTES = 10 * 1024 * 1024;
@@ -115,7 +116,7 @@ function assertBackupManifest(manifest: MediaHubBackupManifest): void {
     throw new Error(translate('shared.mediaHub.backupInvalidArchive'));
   }
 
-  if (manifest.version !== BACKUP_VERSION) {
+  if (manifest.version < MIN_SUPPORTED_BACKUP_VERSION || manifest.version > BACKUP_VERSION) {
     throw new Error(
       `${translate('shared.mediaHub.backupUnsupportedVersionPrefix')} ${manifest.version}.`
     );

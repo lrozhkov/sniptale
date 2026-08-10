@@ -60,11 +60,14 @@ function createCallbackProps() {
     onPreviewCopy: vi.fn(),
     onPreviewDelete: vi.fn(),
     onPreviewDownload: vi.fn(),
+    onPreviewDownloadOriginal: vi.fn(),
     onPreviewEdit: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewOpen: vi.fn(),
     onPreviewOpenSnapshotScreenshot: vi.fn(),
     onPreviewResetChanges: vi.fn(),
+    onPreviewRestoreOriginal: vi.fn(),
+    onPreviewSaveCopy: vi.fn(),
     onRefresh: vi.fn(),
     onRemoveTag: vi.fn(),
     onSearchChange: vi.fn(),
@@ -84,7 +87,6 @@ function createPendingExportState() {
   return {
     options: {
       scope: 'all' as const,
-      includeEditorDrafts: true,
       includeSourceMetadata: true,
       includeTelemetry: true,
       includeWebSnapshots: true,
@@ -93,7 +95,6 @@ function createPendingExportState() {
       approximateSizeBytes: 4096,
       assetCount: 2,
       dataClasses: {
-        editorDrafts: true,
         mediaAssets: true,
         recordings: true,
         scenarioProjects: true,
@@ -103,7 +104,6 @@ function createPendingExportState() {
         videoProjects: true,
         webSnapshots: true,
       },
-      editorDraftCount: 1,
       recordingCount: 1,
       scenarioProjectCount: 0,
       selectedCount: 0,

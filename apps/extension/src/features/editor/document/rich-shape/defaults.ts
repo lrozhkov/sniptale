@@ -113,7 +113,6 @@ export function createDefaultRichShapeObject(
     text: overrides.text ?? DEFAULT_RICH_SHAPE_TEXT,
     rough: overrides.rough ?? DEFAULT_RICH_SHAPE_ROUGH,
     ...(overrides.geometry === undefined ? {} : { geometry: overrides.geometry }),
-    ...(overrides.callout === undefined ? {} : { callout: overrides.callout }),
     source: overrides.source ?? DEFAULT_RICH_SHAPE_SOURCE,
     layer: overrides.layer ?? DEFAULT_RICH_SHAPE_LAYER,
   };

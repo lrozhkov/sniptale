@@ -11,6 +11,7 @@ import { BorderPresetEditorFields } from './fields';
 import type { BorderPresetEditorProps } from './useBorderPresetEditorState';
 import type { useBorderPresetEditorState } from './useBorderPresetEditorState';
 import { usePresetEditorModalLifecycle } from './modal-lifecycle';
+import { AnnotationTemplateTagAssignment } from '../annotation-template-query';
 
 type EditorState = ReturnType<typeof useBorderPresetEditorState>;
 
@@ -54,8 +55,12 @@ export function BorderPresetEditorContent({
   preset,
   state,
   linkedTemplateOptions,
+  tagIds = preset?.tagIds ?? [],
+  onTagIdsChange = () => undefined,
 }: Pick<BorderPresetEditorProps, 'isSaving' | 'linkedTemplateOptions' | 'onClose' | 'preset'> & {
   state: EditorState;
+  tagIds?: string[];
+  onTagIdsChange?: (tagIds: string[]) => void;
 }) {
   const modalRootRef = useRef<HTMLDivElement>(null);
   usePresetEditorModalLifecycle({ modalRootRef, onClose });
@@ -81,6 +86,7 @@ export function BorderPresetEditorContent({
             {...(linkedTemplateOptions ? { linkedTemplateOptions } : {})}
             state={state}
           />
+          <AnnotationTemplateTagAssignment onChange={onTagIdsChange} value={tagIds} />
         </ProductModalBody>
         <EditorFooter
           disabled={!state.name.trim() || state.hasBlockedProps || Boolean(state.cssError)}

@@ -26,6 +26,7 @@ import {
   type FrameAnnotationToolbarBounds,
 } from './toolbar-placement';
 import { EditorFrameAnnotationLayerControls } from './toolbar-layer-controls';
+import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export function FrameProjection(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
@@ -273,8 +274,8 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       settingsAnchorRef={anchorRef}
       showSettingsHandle={!props.selected || props.settingsMenu === 'step'}
       surfacePortalTarget={props.sceneRoot}
-      {...(props.snapshot.borderSettings?.fillColor
-        ? { fillColor: props.snapshot.borderSettings.fillColor }
+      {...(props.snapshot.borderSettings?.fillPaint
+        ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
         : {})}
       {...(props.snapshot.borderSettings?.shadow === undefined
         ? {}

@@ -19,7 +19,7 @@ function createControllerScenario() {
   return {
     browserFrame: { enabled: true } as BrowserFrameState,
     controller: createImageEditorController(),
-    editorDocument: { version: 1 } as EditorDocument,
+    editorDocument: { version: 2 } as EditorDocument,
     frame: { preset: 'frame' } as unknown as EditorFrameSettings,
   };
 }

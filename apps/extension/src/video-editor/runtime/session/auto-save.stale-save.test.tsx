@@ -13,6 +13,7 @@ vi.mock('../../../composition/persistence/projects/index-mutations', async (impo
     typeof import('../../../composition/persistence/projects/index-mutations')
   >()),
   commitVideoProjectMutation: saveVideoProject,
+  commitVideoProjectWorkspaceMutation: saveVideoProject,
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -59,55 +60,28 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('retries stale autosaves against the latest persisted project revision', async () => {
+it('rejects a stale autosave without rebasing it onto the latest persisted project', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave stale retry');
-  const persistedOnlyAsset = createPersistedOnlyAsset();
-  const latestProject = { ...project, assets: [persistedOnlyAsset], updatedAt: 200 };
   const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
 
-  saveVideoProject.mockRejectedValueOnce(createStaleSaveError()).mockResolvedValueOnce({
-    ...project,
-    updatedAt: 300,
+  saveVideoProject.mockRejectedValueOnce(createStaleSaveError());
+  getVideoProject.mockResolvedValue({
+    project,
+    status: 'ready',
+    workspaceRevision: 4,
   });
-  getVideoProject.mockResolvedValue({ project: latestProject, status: 'ready' });
   renderAutosaveHarness(project, setSaveState, useVideoEditorAutoSave);
 
   await flushAutoSaveTimers();
 
   expect(getVideoProject).toHaveBeenCalledWith(project.id);
-  expect(saveVideoProject).toHaveBeenNthCalledWith(1, project, {
-    baseRevision: project.updatedAt,
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(saveVideoProject).toHaveBeenCalledWith(project, {
+    expectedWorkspaceRevision: 4,
   });
-  expect(saveVideoProject).toHaveBeenNthCalledWith(
-    2,
-    expect.objectContaining({
-      assets: [persistedOnlyAsset],
-      id: project.id,
-      updatedAt: latestProject.updatedAt,
-    }),
-    { baseRevision: latestProject.updatedAt }
-  );
-  expect(setSaveState).toHaveBeenCalledWith('saved');
+  expect(setSaveState).toHaveBeenCalledWith('error');
 });
-
-function createPersistedOnlyAsset() {
-  return {
-    createdAt: 100,
-    id: 'persisted-asset',
-    metadata: {
-      duration: 1,
-      hasAudio: false,
-      height: 1,
-      mimeType: 'video/mp4',
-      size: 1,
-      width: 1,
-    },
-    name: 'persisted.mp4',
-    source: { kind: 'project-asset' as const, projectAssetId: 'persisted-asset' },
-    type: 'VIDEO' as const,
-  };
-}
 
 function createStaleSaveError(): Error {
   return Object.assign(new Error('stale project'), {

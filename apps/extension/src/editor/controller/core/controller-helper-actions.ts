@@ -1,3 +1,3 @@
-import { ImageEditorControllerRasterHelperActions } from './controller-raster-helper-actions';
+import { ImageEditorControllerInteractionHelperActions } from './controller-interaction-helper-actions';
 
-export abstract class ImageEditorControllerHelperActions extends ImageEditorControllerRasterHelperActions {}
+export abstract class ImageEditorControllerHelperActions extends ImageEditorControllerInteractionHelperActions {}

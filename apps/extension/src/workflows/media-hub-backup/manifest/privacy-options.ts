@@ -31,7 +31,6 @@ function parseBackupDataClassFlags(value: unknown): MediaHubBackupManifest['data
 
   const record = readManifestRecord(value);
   return {
-    editorDrafts: readManifestBoolean(record['editorDrafts']),
     mediaAssets: readManifestBoolean(record['mediaAssets']),
     recordings: readManifestBoolean(record['recordings']),
     scenarioProjects: readManifestBoolean(record['scenarioProjects']),
@@ -58,7 +57,6 @@ function parseBackupPrivacyOptions(value: unknown): MediaHubBackupManifest['priv
   return createMediaHubBackupExportOptions({
     scope,
     ...(selected === undefined ? {} : { selected }),
-    includeEditorDrafts: readManifestBoolean(record['includeEditorDrafts']),
     includeSourceMetadata: readManifestBoolean(record['includeSourceMetadata']),
     includeTelemetry: readManifestBoolean(record['includeTelemetry']),
     includeWebSnapshots: readManifestBoolean(record['includeWebSnapshots']),

@@ -4,6 +4,7 @@ export const SETTINGS_SECTION_IDS = [
   'screen-sizes',
   'media-quality',
   'saving',
+  'storage-drafts',
   'annotations',
   'editor-resources',
   'ai-connections',
@@ -21,6 +22,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
   saving: [],
+  'storage-drafts': [],
   annotations: ['borders', 'callouts', 'numbering'],
   'editor-resources': ['tools', 'palettes'],
   'ai-connections': [],
@@ -36,6 +38,7 @@ type SettingsRouteWithoutView = {
     | 'quick-actions'
     | 'screen-sizes'
     | 'saving'
+    | 'storage-drafts'
     | 'ai-connections'
     | 'ai-prompts'
     | 'voice-input';

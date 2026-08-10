@@ -6,6 +6,9 @@ import { useGalleryAppActions } from '../../library/actions/useGalleryAppActions
 import type { GalleryViewMode } from '../../state/types';
 import { GalleryAppBindings } from './bindings';
 import { useGalleryAppState } from '../../state';
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
+
+const galleryRuntimeMessaging = createRuntimeMessagingTransport();
 
 export function GalleryApp() {
   usePageLocaleMetadata('gallery.app.documentTitle');
@@ -28,6 +31,7 @@ export function GalleryApp() {
       <GalleryAppBindings
         controller={controller}
         actions={actions}
+        messaging={galleryRuntimeMessaging}
         onRefreshAll={handleRefreshAll}
         setViewMode={setViewMode}
         viewMode={viewMode}

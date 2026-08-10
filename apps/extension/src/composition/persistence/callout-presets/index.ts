@@ -6,7 +6,11 @@ import type {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/catalog';
 import { browserStorage } from '../infrastructure/browser-storage';
-import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
+import { areKnownAnnotationTemplateTagIds } from '../annotation-template-tags/known-ids';
+import {
+  runWithPersistenceDomainMutationLock,
+  runWithPersistenceDomainMutationLocks,
+} from '../infrastructure/mutation-barrier';
 import {
   cloneCalloutPresetCatalog,
   resolveStoredCalloutPresetCatalog,
@@ -60,6 +64,10 @@ function cacheCatalog(catalog: CalloutPresetCatalog): CalloutPresetCatalog {
   snapshotRevision += 1;
   loadedSnapshot = cloneCalloutPresetCatalog(catalog);
   return cloneCalloutPresetCatalog(loadedSnapshot);
+}
+
+export function cacheCoordinatedCalloutPresetCatalog(catalog: CalloutPresetCatalog): void {
+  cacheCatalog(catalog);
 }
 
 const { enqueueWrite, writeCatalog } = createCalloutPresetWriteController({
@@ -135,26 +143,35 @@ type MutationDecision =
   | { outcome: 'rejected' | 'unchanged'; reason?: CalloutPresetMutationReason };
 
 async function runCommand(
-  command: (catalog: CalloutPresetCatalog) => MutationDecision
+  command: (catalog: CalloutPresetCatalog) => MutationDecision,
+  tagIds?: readonly string[]
 ): Promise<CalloutPresetMutationResult> {
   return enqueueWrite(() =>
-    runWithPersistenceDomainMutationLock('callout-presets', async (permit) => {
-      const loaded = await readCatalog();
-      if (isUnsafeForWrite(loaded.parsed)) {
-        return { outcome: 'rejected', reason: 'unsafe-storage' };
-      }
-      const decision = command(cloneCalloutPresetCatalog(loaded.catalog));
-      if (decision.outcome !== 'applied') return decision;
-      try {
-        await writeCatalog(decision.catalog, permit);
-      } catch (error) {
-        if (error instanceof CalloutPresetQuotaError) {
-          return { outcome: 'rejected', reason: 'quota' };
+    runWithPersistenceDomainMutationLocks(
+      tagIds && tagIds.length > 0
+        ? ['annotation-template-tags', 'callout-presets']
+        : ['callout-presets'],
+      async (permit) => {
+        if (tagIds && tagIds.length > 0 && !(await areKnownAnnotationTemplateTagIds(tagIds))) {
+          return { outcome: 'rejected', reason: 'invalid-input' };
         }
-        throw error;
+        const loaded = await readCatalog();
+        if (isUnsafeForWrite(loaded.parsed)) {
+          return { outcome: 'rejected', reason: 'unsafe-storage' };
+        }
+        const decision = command(cloneCalloutPresetCatalog(loaded.catalog));
+        if (decision.outcome !== 'applied') return decision;
+        try {
+          await writeCatalog(decision.catalog, permit);
+        } catch (error) {
+          if (error instanceof CalloutPresetQuotaError) {
+            return { outcome: 'rejected', reason: 'quota' };
+          }
+          throw error;
+        }
+        return { outcome: 'applied', ...(decision.id ? { id: decision.id } : {}) };
       }
-      return { outcome: 'applied', ...(decision.id ? { id: decision.id } : {}) };
-    })
+    )
   );
 }
 
@@ -192,6 +209,7 @@ export function createUserCalloutPreset(input: {
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
+  tagIds?: readonly string[];
 }): Promise<CalloutPresetMutationResult> {
   if (
     !isValidName(input.name) ||
@@ -215,11 +233,12 @@ export function createUserCalloutPreset(input: {
       name: input.name.trim(),
       placement: input.placement,
       style: input.style,
+      tagIds: input.tagIds ?? [],
     });
     return next
       ? { catalog: next, id, outcome: 'applied' }
       : { outcome: 'rejected', reason: 'duplicate-id' };
-  });
+  }, input.tagIds);
 }
 
 export function updateCalloutPreset(input: {
@@ -228,6 +247,7 @@ export function updateCalloutPreset(input: {
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
+  tagIds?: readonly string[];
 }): Promise<CalloutPresetMutationResult> {
   if (
     !isValidName(input.name) ||
@@ -247,7 +267,7 @@ export function updateCalloutPreset(input: {
       content: input.content ?? current.content,
     });
     return next ? { catalog: next, outcome: 'applied' } : { outcome: 'unchanged' };
-  });
+  }, input.tagIds);
 }
 
 export function deleteCalloutPreset(id: string): Promise<CalloutPresetMutationResult> {

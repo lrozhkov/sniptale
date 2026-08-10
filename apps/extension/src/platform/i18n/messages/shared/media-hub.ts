@@ -130,18 +130,6 @@ export const sharedMediaHubMessages = defineMessageSource({
     ru: 'Удаление thumbnail cache без удаления исходных данных',
     en: 'Delete thumbnail cache without deleting source data',
   },
-  staleEditorDraftsTitle: {
-    ru: 'Старые черновики редактора',
-    en: 'Stale Editor Drafts',
-  },
-  staleEditorDraftsDescription: {
-    ru: 'Черновики editor_sessions старше срока восстановления.',
-    en: 'editor_sessions drafts older than the recovery window.',
-  },
-  staleEditorDraftsIrreversible: {
-    ru: 'Удаление только восстановительного черновика',
-    en: 'Delete only the recovery draft',
-  },
   orphanedScenarioPendingAssetsTitle: {
     ru: 'Зависшие временные ассеты сценариев',
     en: 'Stale Scenario Pending Assets',

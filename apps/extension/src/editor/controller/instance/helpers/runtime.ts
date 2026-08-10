@@ -8,7 +8,6 @@ import {
   syncEditorControllerRuntimeState,
   withEditorHistoryMuted,
 } from '../../runtime/actions';
-import { syncEditorRasterSelectionSession } from '../../raster-tools/session';
 import { refreshEditorToolSettingsPreview } from '../../tools/settings-preview';
 
 export function withHistoryMutedForController<T>(
@@ -46,10 +45,6 @@ export function commitHistoryForController(controller: EditorControllerInstance)
 }
 
 export function syncRuntimeStateForController(controller: EditorControllerInstance): void {
-  syncEditorRasterSelectionSession({
-    canvas: controller.canvas,
-    session: controller.rasterToolSession,
-  });
   const topMostSelectedId =
     controller.canvas
       ?.getObjects()

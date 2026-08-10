@@ -5,6 +5,26 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'aggregate-promotion-authority',
+    failClosedOnRestart: false,
+    id: 'aggregate-editor-presence',
+    oneShot: false,
+    ownerModule:
+      'apps/extension/src/background/application/aggregate-promotion/presence-registry.ts',
+    proofModules: [
+      'apps/extension/src/background/application/aggregate-promotion/coordinator.test.ts',
+      'apps/extension/src/background/application/aggregate-promotion/ports.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Worker restart disconnects editor ports and reconstructs presence from reconnecting documents;',
+      'until then promotion uses durable revision checks and therefore fails closed on stale presentation.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'annotation-fork-session',
     failClosedOnRestart: false,
     id: 'annotation-fork-sessions',
@@ -54,6 +74,46 @@ export const runtimePolicyStateDescriptors = [
     restartClass: 'durable-lease',
     stateClass: 'job-state',
     storageClass: 'state-manager',
+  },
+  {
+    authorityFamily: 'gradient-preset-persistence',
+    failClosedOnRestart: false,
+    id: 'gradient-preset-mutation-queue',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/composition/persistence/gradient-presets/index.ts',
+    proofModules: [
+      'apps/extension/src/composition/persistence/gradient-presets/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Durable sync storage remains authoritative across runtime restart;',
+      'the new runtime recreates an empty local ordering queue and re-reads validated storage',
+      'under the cross-context mutation barrier before every write.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
+    authorityFamily: 'surface-style-preset-persistence',
+    failClosedOnRestart: false,
+    id: 'surface-style-preset-mutation-queue',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/composition/persistence/surface-style-presets/index.ts',
+    proofModules: [
+      'apps/extension/src/composition/persistence/surface-style-presets/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Durable sync storage remains authoritative across runtime restart;',
+      'the new runtime recreates an empty local ordering queue and re-reads validated storage',
+      'under the cross-context mutation barrier before every revisioned write.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
   },
   {
     authorityFamily: 'capture-surface',

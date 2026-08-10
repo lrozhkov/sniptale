@@ -19,7 +19,7 @@ function createFrame(overrides: Partial<FrameData> = {}): FrameData {
       radius: 60,
       padding: { top: 2, right: 3, bottom: 4, left: 5 },
       shadow: 0,
-      fillColor: '#facc15',
+      fillPaint: { kind: 'solid' as const, color: '#facc15' },
       inheritCustomCss: false,
       customCss: '',
     },

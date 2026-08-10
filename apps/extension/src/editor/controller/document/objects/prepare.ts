@@ -1,16 +1,12 @@
 import { type FabricObject, type Textbox } from 'fabric';
 import { isGroup, isTextbox } from '../../core/helpers';
-import {
-  getArrowInteractionAppearance,
-  getArrowSettings,
-  isArrowObject,
-} from '../../../objects/arrow';
-import { applyTextCalloutRendering } from '../../../objects/annotation/text/callout/lifecycle';
 import { applyEditorObjectInteractionControls } from '../interaction-controls/apply';
 import { refreshPreparedObjectGeometry } from './geometry-refresh';
 import { applyBaseInteractionPatch } from './interaction-patches';
 import { applyLineLikeRichShapeControls } from './rich-shape-controls';
 import { attachEditorTextboxLifecycle } from './textbox-lifecycle';
+import { applyEditorDrawingInteractionControls } from '../../../drawing/object/controls';
+import { applyEditorDrawingTextVisuals } from '../../../drawing/object/vector';
 
 export function prepareEditorObject(
   object: FabricObject,
@@ -20,11 +16,7 @@ export function prepareEditorObject(
   }
 ): void {
   const locked = Boolean(object.sniptaleLocked);
-  const arrowObject = isArrowObject(object);
-  const arrowSettings = arrowObject ? getArrowSettings(object) : null;
-  const arrowInteraction = arrowSettings ? getArrowInteractionAppearance(arrowSettings) : null;
-
-  applyBaseInteractionPatch(object, { arrowInteraction, arrowObject, locked });
+  applyBaseInteractionPatch(object, { arrowInteraction: null, arrowObject: false, locked });
   applyEditorObjectInteractionControls(object);
 
   if (isGroup(object)) {
@@ -33,15 +25,14 @@ export function prepareEditorObject(
   applyLineLikeRichShapeControls(object);
 
   if (isTextbox(object)) {
-    if (object.sniptaleType === 'text' || object.sniptaleType === 'meta-stamp') {
-      applyTextCalloutRendering(object);
-    }
+    if (object.sniptaleType === 'text') applyEditorDrawingTextVisuals(object);
     attachEditorTextboxLifecycle(object, {
       onEmpty: () => options.onTextboxExitEmpty(object),
       onCommit: options.onTextboxExitCommit,
     });
   }
 
-  refreshPreparedObjectGeometry(object, arrowSettings);
+  refreshPreparedObjectGeometry(object);
   applyEditorObjectInteractionControls(object);
+  applyEditorDrawingInteractionControls(object);
 }
