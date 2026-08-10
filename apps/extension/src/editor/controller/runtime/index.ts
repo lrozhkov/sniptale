@@ -6,6 +6,7 @@ import { collectLayers, getObjectDimensions } from '../document/layers';
 import { isRichShapeObject } from '../../objects/rich-shape';
 import { syncSelectionToolSettingsFromObject } from '../selection';
 import { getSingleSelectionType, isUserObject } from '../../document/model';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
 
 function getSelectedObjectLabel(object: FabricObject | null): string | null {
   if (!object || !isRichShapeObject(object)) {
@@ -46,6 +47,8 @@ export function syncEditorRuntimeState(
     .filter((id): id is string => Boolean(id));
   const singleType = getSingleSelectionType(activeObjects);
   const selectedObject = getSelectedObject(activeObjects);
+  const selectedObjectsAreDrawing =
+    activeObjects.length > 0 && activeObjects.every((object) => readEditorDrawingObject(object));
   const selectedDimensions = selectedObject ? getObjectDimensions(selectedObject) : null;
 
   if (selectedObject && singleType) {
@@ -58,6 +61,7 @@ export function syncEditorRuntimeState(
     layers,
     selection: {
       hasSelection: activeObjects.length > 0,
+      selectedObjectsAreDrawing,
       selectedObjectCount: activeObjects.length,
       selectedObjectType: singleType,
       selectedObjectId: selectedObject

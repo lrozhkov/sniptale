@@ -27,7 +27,7 @@ import { translate } from '../../platform/i18n';
 import { useEditorStore } from '../state/useEditorStore';
 
 type ConfigurableTool = keyof DrawingToolDefaults;
-type DrawingOptionsTool = ConfigurableTool | 'blur';
+type DrawingOptionsTool = ConfigurableTool | 'blur' | 'selection';
 type DrawingSettingsUpdate = <Tool extends ConfigurableTool>(
   tool: Tool,
   patch: Partial<DrawingToolDefaults[Tool]>
@@ -218,6 +218,7 @@ function ToolOptions(props: {
         />
       );
     case 'blur':
+    case 'selection':
       return null;
   }
 }
@@ -234,7 +235,9 @@ export function EditorDrawingOptions(props: {
   const toolSettings = useEditorStore((state) => state.toolSettings);
   const selectionToolSettings = useEditorStore((state) => state.selectionToolSettings);
   const selected =
-    props.selectedType === props.tool || (props.tool === 'shape' && props.selectedType === 'shape');
+    props.tool === 'selection' ||
+    props.selectedType === props.tool ||
+    (props.tool === 'shape' && props.selectedType === 'shape');
   const values = selected ? selectionToolSettings : toolSettings;
 
   const update = <Tool extends ConfigurableTool>(
@@ -265,7 +268,9 @@ export function EditorDrawingOptions(props: {
       <ToolOptions common={common} settings={values} tool={props.tool} update={update} />
       {selected ? (
         <>
-          {props.tool === 'blur' ? null : <DrawingOptionsDivider vertical />}
+          {props.tool === 'blur' || props.tool === 'selection' ? null : (
+            <DrawingOptionsDivider vertical />
+          )}
           <DrawingDeselectOption onClick={props.onClearSelection} />
           <DrawingDeleteOption onClick={props.onDeleteSelection} />
         </>

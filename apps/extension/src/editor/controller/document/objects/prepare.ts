@@ -5,7 +5,7 @@ import { refreshPreparedObjectGeometry } from './geometry-refresh';
 import { applyBaseInteractionPatch } from './interaction-patches';
 import { applyLineLikeRichShapeControls } from './rich-shape-controls';
 import { attachEditorTextboxLifecycle } from './textbox-lifecycle';
-import { applyEditorDrawingInteractionControls } from '../../../drawing/object/controls';
+import { applyEditorDrawingInteractionControls } from '../../../drawing/object/controls/apply';
 import { applyEditorDrawingTextVisuals } from '../../../drawing/object/vector';
 
 export function prepareEditorObject(

@@ -1,4 +1,4 @@
-import type { Canvas, FabricObject, Point, Rect, TPointerEvent } from 'fabric';
+import type { Canvas, FabricObject, Point, Rect, TPointerEvent, Transform } from 'fabric';
 import type { CropSelection, DrawSession, PanSession } from '../core/types';
 import type { SourceState } from '../../document/model/source-state';
 import type { EditorObjectType, EditorTool } from '../../../features/editor/document/types';
@@ -20,7 +20,11 @@ export interface EditorControllerEventHandlers {
   handleObjectModified: (event: { target?: FabricObject; transform?: TransformOrigin }) => void;
   handlePathCreated: (event: { path: FabricObject }) => void;
   handleMouseDownBefore: (event: { e: TPointerEvent; target?: FabricObject }) => void;
-  handleMouseDown: (event: { e: TPointerEvent; target?: FabricObject }) => void;
+  handleMouseDown: (event: {
+    e: TPointerEvent;
+    target?: FabricObject;
+    transform?: Pick<Transform, 'target'> | null;
+  }) => void;
   handleMouseMoveBefore: (event: { e: TPointerEvent; target?: FabricObject }) => void;
   handleMouseMove: (event: { e: TPointerEvent }) => void;
   handleMouseUp: () => void;

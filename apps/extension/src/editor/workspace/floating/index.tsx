@@ -30,22 +30,27 @@ function useDismissedLeftDrawer(activeTool: EditorTool) {
 
 function useFloatingRailProps(
   toolbarProps: ReturnType<typeof useEditorToolbarController>,
-  setDismissedLeftDrawerTool: (tool: EditorTool | null) => void
+  setDismissedLeftDrawerTool: (tool: EditorTool | null) => void,
+  setCollapsedDrawingOptionsTool: React.Dispatch<React.SetStateAction<EditorTool | null>>
 ) {
   return useMemo(
     () => ({
       ...toolbarProps,
       onActivateTool: (tool: EditorTool) => {
         setDismissedLeftDrawerTool(null);
+        setCollapsedDrawingOptionsTool(null);
         toolbarProps.onActivateTool(tool);
       },
+      onToggleActiveToolOptions: (tool: EditorTool) =>
+        setCollapsedDrawingOptionsTool((current) => (current === tool ? null : tool)),
     }),
-    [setDismissedLeftDrawerTool, toolbarProps]
+    [setCollapsedDrawingOptionsTool, setDismissedLeftDrawerTool, toolbarProps]
   );
 }
 
 type FloatingLoadedSurfacesProps = {
   documentController: ReturnType<typeof useEditorInspectorSidebarController>;
+  collapsedDrawingOptionsTool: EditorTool | null;
   hasImage: boolean;
   layersCollapsed: boolean;
   layersHeightRatio: number | null;
@@ -60,6 +65,7 @@ type FloatingLoadedSurfacesProps = {
 
 function EditorFloatingLoadedSurfaces({
   documentController,
+  collapsedDrawingOptionsTool,
   hasImage,
   layersCollapsed,
   layersHeightRatio,
@@ -93,6 +99,7 @@ function EditorFloatingLoadedSurfaces({
         onLayersHeightRatioChange={onLayersHeightRatioChange}
       />
       <EditorFloatingSelectionSurfaces
+        collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
         documentController={documentController}
         hasImage={hasImage}
         surfaceRoute={surfaceRoute}
@@ -141,18 +148,24 @@ function EditorFloatingDockedPanels({
 }
 
 function EditorFloatingSelectionSurfaces({
+  collapsedDrawingOptionsTool,
   documentController,
   hasImage,
   surfaceRoute,
   toolbarProps,
 }: Pick<
   Parameters<typeof EditorFloatingLoadedSurfaces>[0],
-  'documentController' | 'hasImage' | 'surfaceRoute' | 'toolbarProps'
+  | 'collapsedDrawingOptionsTool'
+  | 'documentController'
+  | 'hasImage'
+  | 'surfaceRoute'
+  | 'toolbarProps'
 >) {
   return (
     <>
       <EditorFloatingToolPropertiesRail
         activeTool={toolbarProps.activeTool}
+        collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
         documentController={documentController}
         hasImage={hasImage}
         leftDrawerOpen={surfaceRoute.leftDrawer !== null}
@@ -216,6 +229,17 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
   const { dismissedLeftDrawerTool, setDismissedLeftDrawerTool } = useDismissedLeftDrawer(
     toolbarProps.activeTool
   );
+  const [collapsedDrawingOptionsTool, setCollapsedDrawingOptionsTool] = useState<EditorTool | null>(
+    null
+  );
+  useEffect(() => {
+    if (
+      collapsedDrawingOptionsTool !== null &&
+      collapsedDrawingOptionsTool !== toolbarProps.activeTool
+    ) {
+      setCollapsedDrawingOptionsTool(null);
+    }
+  }, [collapsedDrawingOptionsTool, toolbarProps.activeTool]);
   const surfaceRoute = resolveFloatingSurfaceRoute({
     activeTool: toolbarProps.activeTool,
     dismissedLeftDrawerTool,
@@ -223,7 +247,11 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
     inspector: documentController.inspector,
     selection: documentController.selection,
   });
-  const railProps = useFloatingRailProps(toolbarProps, setDismissedLeftDrawerTool);
+  const railProps = useFloatingRailProps(
+    toolbarProps,
+    setDismissedLeftDrawerTool,
+    setCollapsedDrawingOptionsTool
+  );
 
   return (
     <FloatingChromeRoot
@@ -235,6 +263,7 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
       <EditorFloatingWorkspaceOverlays documentController={documentController} />
       {hasImage ? (
         <EditorFloatingLoadedSurfaces
+          collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
           documentController={documentController}
           hasImage={hasImage}
           layersCollapsed={layersCollapsed}

@@ -78,6 +78,7 @@ function selection(
 function renderRail(
   overrides: {
     activeTool?: EditorTool;
+    collapsedDrawingOptionsTool?: EditorTool | null;
     documentController?: { compactCommandGroups?: CompactCommand[][]; inspector?: string };
     hasImage?: boolean;
     leftDrawerOpen?: boolean;
@@ -93,6 +94,7 @@ function renderRail(
     root.render(
       <EditorFloatingToolPropertiesRail
         activeTool={overrides.activeTool ?? 'pencil'}
+        collapsedDrawingOptionsTool={overrides.collapsedDrawingOptionsTool ?? null}
         documentController={documentController}
         hasImage={overrides.hasImage ?? true}
         leftDrawerOpen={overrides.leftDrawerOpen ?? false}
@@ -165,17 +167,39 @@ it('renders frame annotation creation controls and hides unavailable surfaces', 
   expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
 });
 
-it('hides during canvas interaction and restores after completion', () => {
-  vi.useFakeTimers();
+it('keeps drawing options stable during canvas interaction and only honors an explicit toggle', () => {
   renderRail({ activeTool: 'pencil' });
   act(() => listeners.get('mouse:down')?.forEach((handler) => handler()));
-  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
-  act(() => {
-    listeners.get('mouse:up')?.forEach((handler) => handler());
-    vi.advanceTimersByTime(250);
-  });
   expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).not.toBeNull();
-  vi.useRealTimers();
+  expect(controller.canvas.on).not.toHaveBeenCalled();
+
+  renderRail({ activeTool: 'pencil', collapsedDrawingOptionsTool: 'pencil' });
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+
+  renderRail({
+    activeTool: 'shape',
+    collapsedDrawingOptionsTool: 'shape',
+    selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'shape' },
+  });
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+
+  renderRail({
+    activeTool: 'select',
+    collapsedDrawingOptionsTool: 'pencil',
+    selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'pencil' },
+  });
+  expect(container.querySelector('[data-ui="drawing-options.pencil"]')).not.toBeNull();
+
+  renderRail({
+    activeTool: 'select',
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 2,
+      selectedObjectType: null,
+      selectedObjectsAreDrawing: true,
+    },
+  });
+  expect(container.querySelector('[data-ui="drawing-options.selection"]')).not.toBeNull();
 });
 
 it('places primary, crop, and fallback tool anchors independently', () => {

@@ -52,12 +52,18 @@ function isCanvasSelectionToolbarEligible(args: {
   hasImage: boolean;
   inspector: EditorInspector;
   selection: Pick<EditorToolbarSelectionState, 'hasSelection'> &
-    Partial<Pick<EditorToolbarSelectionState, 'selectedObjectCount' | 'selectedObjectType'>>;
+    Partial<
+      Pick<
+        EditorToolbarSelectionState,
+        'selectedObjectCount' | 'selectedObjectType' | 'selectedObjectsAreDrawing'
+      >
+    >;
 }) {
   return (
     args.hasImage &&
     args.inspector === 'tool' &&
     args.selection.hasSelection &&
+    args.selection.selectedObjectsAreDrawing !== true &&
     !(
       args.selection.selectedObjectCount === 1 &&
       args.selection.selectedObjectType === 'frame-annotation'
@@ -72,7 +78,12 @@ export function resolveFloatingSurfaceRoute(args: {
   hasImage: boolean;
   inspector: EditorInspector;
   selection: Pick<EditorToolbarSelectionState, 'hasSelection'> &
-    Partial<Pick<EditorToolbarSelectionState, 'selectedObjectCount' | 'selectedObjectType'>>;
+    Partial<
+      Pick<
+        EditorToolbarSelectionState,
+        'selectedObjectCount' | 'selectedObjectType' | 'selectedObjectsAreDrawing'
+      >
+    >;
 }): EditorFloatingSurfaceRoute {
   const leftDrawer =
     args.hasImage &&

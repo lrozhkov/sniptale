@@ -8,9 +8,13 @@ import {
   type PathProps,
   type SerializedPathProps,
 } from 'fabric';
-import { updateCreatedDrawingObject, type DrawingObject } from '../../../features/drawing/public';
-import { readEditorDrawingObject, writeEditorDrawingObject } from './metadata';
-import { createEditorDrawingFabricObject } from './vector';
+import {
+  updateCreatedDrawingObject,
+  type DrawingObject,
+} from '../../../../features/drawing/public';
+import { readEditorDrawingObject, writeEditorDrawingObject } from '../metadata';
+import { createEditorDrawingFabricObject } from '../vector';
+import { DRAWING_SELECTION_ACCENT } from './chrome';
 
 type DrawingArrow = Extract<DrawingObject, { kind: 'arrow' }>;
 type ArrowEndpoint = 'start' | 'end';
@@ -55,8 +59,7 @@ function updateArrowPathInPlace<
   next: DrawingArrow,
   anchor: ArrowEndpoint
 ): void {
-  const anchorPoint = current[anchor];
-  const anchorBefore = toParentPoint(object, anchorPoint);
+  const anchorBefore = toParentPoint(object, current[anchor]);
   const geometry = createEditorDrawingFabricObject(next, 1);
   if (!(geometry instanceof Path)) return;
   object.set({
@@ -117,7 +120,7 @@ function renderEndpoint(
   ctx.beginPath();
   ctx.arc(left, top, object.__corner ? 7 : 5.5, 0, Math.PI * 2);
   ctx.fillStyle = '#f8fafc';
-  ctx.strokeStyle = object.cornerStrokeColor || object.borderColor || '#f97316';
+  ctx.strokeStyle = object.cornerStrokeColor || object.borderColor || DRAWING_SELECTION_ACCENT;
   ctx.lineWidth = 1.6;
   ctx.fill();
   ctx.stroke();
@@ -155,12 +158,9 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
   });
 }
 
-export function applyEditorDrawingInteractionControls(object: FabricObject): void {
-  const drawing = readEditorDrawingObject(object);
-  if (drawing?.kind !== 'arrow' || !(object instanceof Path)) return;
-  object.controls = {
+export function createDrawingArrowControls(): Record<string, Control> {
+  return {
     start: createArrowEndpointControl('start'),
     end: createArrowEndpointControl('end'),
   };
-  object.set({ hasBorders: false, lockRotation: true });
 }

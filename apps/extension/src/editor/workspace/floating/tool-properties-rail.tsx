@@ -4,7 +4,6 @@ import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/fl
 import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
-import type { EditorControllerInstance } from '../../controller/instance/types';
 import { EditorDrawingOptions } from '../../drawing/options';
 import { resolveToolPropertiesStyle } from './tool-properties-geometry';
 import { createToolPropertiesGroups } from './tool-properties-groups';
@@ -34,15 +33,7 @@ const TOOL_PROPERTIES_SHIFTED_CLASS_NAME = floatingChromeClassNames(
   'min-[721px]:left-[25.25rem]'
 );
 
-const TOOLS_WITH_PROPERTIES = new Set<EditorTool>([
-  'pencil',
-  'marker',
-  'shape',
-  'arrow',
-  'text',
-  'step',
-  'frame-annotation',
-]);
+const TOOLS_WITH_PROPERTIES = new Set<EditorTool>(['step']);
 
 const TOOL_PROPERTIES_EXCLUDED_ACTIONS = new Set(['meta-technical-data']);
 
@@ -50,50 +41,6 @@ function flattenCommands(commandGroups: CompactCommand[][]): CompactCommand[] {
   return commandGroups
     .flat()
     .filter((command) => !TOOL_PROPERTIES_EXCLUDED_ACTIONS.has(command.id));
-}
-
-function useToolPropertiesVisibility(enabled: boolean) {
-  const controller = useEditorController();
-  const [hidden, setHidden] = useState(false);
-
-  useEffect(() => {
-    if (!enabled) {
-      setHidden(false);
-      return;
-    }
-
-    const canvas = controller.canvas as EditorControllerInstance['canvas'];
-    let returnTimer = 0;
-    const clearReturnTimer = () => {
-      if (returnTimer !== 0) {
-        window.clearTimeout(returnTimer);
-        returnTimer = 0;
-      }
-    };
-    const hide = () => {
-      clearReturnTimer();
-      setHidden(true);
-    };
-    const showAfterAction = () => {
-      clearReturnTimer();
-      returnTimer = window.setTimeout(() => {
-        returnTimer = 0;
-        setHidden(false);
-      }, 250);
-    };
-
-    canvas?.on('mouse:down', hide);
-    canvas?.on('path:created', showAfterAction);
-    canvas?.on('mouse:up', showAfterAction);
-    return () => {
-      clearReturnTimer();
-      canvas?.off('mouse:down', hide);
-      canvas?.off('path:created', showAfterAction);
-      canvas?.off('mouse:up', showAfterAction);
-    };
-  }, [controller, enabled]);
-
-  return hidden;
 }
 
 function useDismissToolProperties(close: () => void) {
@@ -173,6 +120,7 @@ function ToolPropertiesButtons(props: {
 
 interface EditorFloatingToolPropertiesRailProps {
   activeTool: EditorTool;
+  collapsedDrawingOptionsTool: EditorTool | null;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
   leftDrawerOpen: boolean;
@@ -181,6 +129,7 @@ interface EditorFloatingToolPropertiesRailProps {
 
 export function EditorFloatingToolPropertiesRail({
   activeTool,
+  collapsedDrawingOptionsTool,
   documentController,
   hasImage,
   leftDrawerOpen,
@@ -224,11 +173,23 @@ export function EditorFloatingToolPropertiesRail({
     activeTool === 'text'
       ? activeTool
       : null;
-  const drawingOptionsTool = selectedDrawingTool ?? activeDrawingTool;
-  const drawingPropertiesEnabled = hasImage && Boolean(drawingOptionsTool);
+  const drawingOptionsTool =
+    selectedDrawingTool ??
+    (selection.selectedObjectsAreDrawing && selection.hasSelection ? 'selection' : null) ??
+    activeDrawingTool;
+  const matchingActiveDrawingOptionsCollapsed =
+    collapsedDrawingOptionsTool === activeDrawingTool && drawingOptionsTool === activeDrawingTool;
+  const drawingPropertiesEnabled =
+    hasImage &&
+    Boolean(drawingOptionsTool) &&
+    !matchingActiveDrawingOptionsCollapsed &&
+    Boolean(
+      selectedDrawingTool ||
+      selection.selectedObjectsAreDrawing ||
+      collapsedDrawingOptionsTool !== activeDrawingTool
+    );
   const enabled =
     standardPropertiesEnabled || frameAnnotationPropertiesEnabled || drawingPropertiesEnabled;
-  const hidden = useToolPropertiesVisibility(enabled);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
   const className = leftDrawerOpen
     ? TOOL_PROPERTIES_SHIFTED_CLASS_NAME
@@ -240,7 +201,7 @@ export function EditorFloatingToolPropertiesRail({
     }
   }, [enabled]);
 
-  if (!enabled || hidden) {
+  if (!enabled) {
     return null;
   }
 

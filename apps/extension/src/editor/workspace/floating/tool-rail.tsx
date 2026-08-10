@@ -52,9 +52,12 @@ const EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL = {
   text: 'text',
 } satisfies Record<EditorTool, CanvasToolDescriptorKind>;
 
-export function EditorFloatingToolRail(
-  props: EditorToolbarContentProps & { leftDrawerOpen?: boolean }
-) {
+type EditorFloatingToolRailProps = EditorToolbarContentProps & {
+  leftDrawerOpen?: boolean;
+  onToggleActiveToolOptions?: (tool: EditorTool) => void;
+};
+
+export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   const stackClassName = props.leftDrawerOpen
     ? TOOL_RAIL_STACK_SHIFTED_CLASS_NAME
     : TOOL_RAIL_STACK_CLASS_NAME;
@@ -78,13 +81,17 @@ export function EditorFloatingToolRail(
   );
 }
 
-function buildEditorToolRailActions(props: EditorToolbarContentProps): CanvasToolAction[] {
+function buildEditorToolRailActions(props: EditorFloatingToolRailProps): CanvasToolAction[] {
+  const toggleOptionsProps = props.onToggleActiveToolOptions
+    ? { onToggleActiveToolOptions: props.onToggleActiveToolOptions }
+    : {};
   return [
     ...buildEditorToolActions({
       group: 'primary',
       hasImage: props.hasImage,
       isToolButtonActive: props.isToolButtonActive,
       onActivateTool: props.onActivateTool,
+      ...toggleOptionsProps,
       tools: TOOL_ORDER,
     }),
     ...buildEditorToolActions({
@@ -107,6 +114,7 @@ function buildEditorToolActions(props: {
   hasImage: boolean;
   isToolButtonActive: (tool: EditorTool) => boolean;
   onActivateTool: (tool: EditorTool) => void;
+  onToggleActiveToolOptions?: (tool: EditorTool) => void;
   tools: readonly EditorTool[];
 }): CanvasToolAction[] {
   return props.tools.map((tool) =>
@@ -116,10 +124,43 @@ function buildEditorToolActions(props: {
       group: props.group,
       id: tool,
       kind: EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL[tool],
-      label: getDocumentRequiredTitle(getToolLabel(tool), props.hasImage),
-      onSelect: () => props.onActivateTool(tool),
+      label: getDocumentRequiredTitle(getEditorToolTitle(tool), props.hasImage),
+      onSelect: () => {
+        if (props.isToolButtonActive(tool) && isDrawingOptionsTool(tool)) {
+          props.onToggleActiveToolOptions?.(tool);
+          return;
+        }
+        props.onActivateTool(tool);
+      },
     })
   );
+}
+
+function isDrawingOptionsTool(tool: EditorTool): boolean {
+  return (
+    tool === 'pencil' ||
+    tool === 'marker' ||
+    tool === 'shape' ||
+    tool === 'arrow' ||
+    tool === 'text'
+  );
+}
+
+function getEditorToolTitle(tool: EditorTool): string {
+  const label = getToolLabel(tool);
+  const modifierKey =
+    tool === 'pencil' || tool === 'marker'
+      ? 'content.toolbar.drawingStrokeModifierHint'
+      : tool === 'shape'
+        ? 'content.toolbar.drawingShapeModifierHint'
+        : tool === 'arrow'
+          ? 'content.toolbar.drawingArrowModifierHint'
+          : tool === 'text'
+            ? 'content.toolbar.drawingTextModifierHint'
+            : tool === 'select'
+              ? 'content.toolbar.drawingSelectModifierHint'
+              : null;
+  return modifierKey ? `${label}\n${translate(modifierKey)}` : label;
 }
 
 function buildEditorInspectorActions(props: {

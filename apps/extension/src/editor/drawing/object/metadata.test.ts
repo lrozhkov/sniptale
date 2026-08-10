@@ -10,6 +10,7 @@ import {
 } from './canonicalize';
 import {
   readEditorDrawingObject,
+  isEditorDrawingSelection,
   syncEditorDrawingTextObject,
   synchronizeEditorDrawingObjectFromFabric,
   translateEditorDrawingObject,
@@ -27,6 +28,21 @@ const shape: DrawingObject = {
 };
 
 describe('editor drawing metadata authority', () => {
+  it('recognizes both drawing objects and all-drawing ActiveSelections', () => {
+    const canvas = new Canvas(document.createElement('canvas'));
+    const first = createEditorDrawingFabricObject(shape, 1);
+    const second = createEditorDrawingFabricObject({ ...shape, id: 'shape-2' }, 2);
+    const ordinary = new Rect({ height: 20, width: 20 });
+    canvas.add(first, second, ordinary);
+
+    expect(isEditorDrawingSelection(first)).toBe(true);
+    expect(isEditorDrawingSelection(new ActiveSelection([first, second], { canvas }))).toBe(true);
+    expect(isEditorDrawingSelection(new ActiveSelection([first, ordinary], { canvas }))).toBe(
+      false
+    );
+    canvas.dispose();
+  });
+
   it('normalizes a committed Fabric transform into the shared drawing object', () => {
     const object = createEditorDrawingFabricObject(shape, 1);
     object.set({ angle: 30, left: 70, scaleX: 2, scaleY: 3, top: 80 });

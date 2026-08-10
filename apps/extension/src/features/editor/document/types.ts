@@ -136,6 +136,7 @@ export interface EditorLayerItem {
 
 export interface EditorSelectionState {
   hasSelection: boolean;
+  selectedObjectsAreDrawing?: boolean;
   selectedObjectCount: number;
   selectedObjectType: EditorObjectType | null;
   selectedObjectId: string | null;

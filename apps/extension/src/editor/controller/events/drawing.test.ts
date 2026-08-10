@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { FabricObject } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   createFabric: vi.fn(() => ({ sniptaleId: 'draft-1' })),
   cropDown: vi.fn(() => false),
   isTextTarget: vi.fn(() => false),
+  isDrawingSelection: vi.fn(() => false),
   readDrawing: vi.fn(),
   replaceFabric: vi.fn(() => ({ sniptaleId: 'replacement' })),
   state: {
@@ -47,6 +49,7 @@ vi.mock('./text-target', () => ({
 vi.mock('./draw-completion', () => ({ completeDrawWorkflowFromBindings: mocks.complete }));
 vi.mock('../tools/step-drawing/pointer', () => ({ handleStepMouseDown: mocks.stepDown }));
 vi.mock('../../drawing/object/metadata', () => ({
+  isEditorDrawingSelection: mocks.isDrawingSelection,
   readEditorDrawingObject: mocks.readDrawing,
   synchronizeEditorDrawingObjectFromFabric: vi.fn(),
   syncEditorDrawingTextObject: vi.fn(),
@@ -112,6 +115,7 @@ describe('shared drawing event orchestration', () => {
     vi.clearAllMocks();
     mocks.cropDown.mockReturnValue(false);
     mocks.isTextTarget.mockReturnValue(false);
+    mocks.isDrawingSelection.mockReturnValue(false);
     mocks.updatePath.mockReturnValue(false);
   });
 
@@ -256,5 +260,39 @@ describe('shared drawing event orchestration', () => {
     const ordinary = createBindings('arrow');
     ordinary.handlers.handleMouseUp();
     expect(mocks.complete).toHaveBeenCalledWith(ordinary.bindings);
+  });
+
+  it('lets Fabric transform a selected drawing instead of starting another drawing', () => {
+    const selected = new FabricObject();
+    selected.__corner = 'br';
+    selected.sniptaleId = 'shape-1';
+    mocks.isDrawingSelection.mockReturnValueOnce(true);
+    mocks.createDrawing.mockReturnValue({ id: 'shape-2', kind: 'rectangle' });
+    const shape = createBindings('shape');
+
+    shape.handlers.handleMouseDown({
+      e: new MouseEvent('mousedown', { button: 0 }),
+      target: selected,
+      transform: { target: selected },
+    });
+
+    expect(mocks.createDrawing).not.toHaveBeenCalled();
+    expect(shape.bindings.startDrawSession).not.toHaveBeenCalled();
+  });
+
+  it('lets Fabric move an all-drawing ActiveSelection without starting another drawing', () => {
+    const selected = new FabricObject();
+    mocks.isDrawingSelection.mockReturnValueOnce(true);
+    const shape = createBindings('shape');
+
+    shape.handlers.handleMouseDown({
+      e: new MouseEvent('mousedown', { button: 0 }),
+      target: selected,
+      transform: { target: selected },
+    });
+
+    expect(mocks.isDrawingSelection).toHaveBeenCalledWith(selected);
+    expect(mocks.createDrawing).not.toHaveBeenCalled();
+    expect(shape.bindings.startDrawSession).not.toHaveBeenCalled();
   });
 });

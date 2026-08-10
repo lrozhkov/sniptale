@@ -88,7 +88,7 @@ it('resets hover cursor and syncs selection changes', () => {
   expect(canvas.defaultCursor).toBe('default');
 
   const syncRuntimeState = vi.fn();
-  createSelectionChangeHandler({ syncRuntimeState })();
+  createSelectionChangeHandler({ getCanvas: () => null, syncRuntimeState })();
   expect(syncRuntimeState).toHaveBeenCalledOnce();
 });
 

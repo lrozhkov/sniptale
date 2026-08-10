@@ -240,16 +240,16 @@ export function createEditorDrawingFabricObject(
   const normalizedDrawing =
     drawing.kind === 'text'
       ? (() => {
-          const previousCenter = getDrawingBoundsCenter(drawing.bounds);
           const height = Math.max(1, object.height);
           const width = Math.max(40, object.width);
+          const center = getDrawingBoundsCenter(drawing.bounds);
           return {
             ...drawing,
             bounds: {
+              ...drawing.bounds,
               height,
               width,
-              x: previousCenter.x - width / 2,
-              y: previousCenter.y - height / 2,
+              ...(drawing.rotation ? { x: center.x - width / 2, y: center.y - height / 2 } : {}),
             },
           };
         })()
