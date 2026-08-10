@@ -67,10 +67,12 @@ it('does not enable drawing when sibling-mode cleanup fails', () => {
 
 it('owns activation and sibling-mode cleanup without discarding shared-history state', () => {
   const harness = createHarness(true);
+  harness.session.setActiveTool('marker');
   harness.mode.handleToggleDrawingMode?.(true);
   expect(harness.base.handleEnableCursorMode).toHaveBeenCalledTimes(1);
   expect(harness.setDrawingMode).toHaveBeenCalledWith(true);
   expect(harness.setNavigationLockEnabled).toHaveBeenCalledWith(false);
+  expect(harness.session.getSnapshot().activeTool).toBe('pencil');
 
   harness.mode.handleToggleHighlighterMode(true);
   expect(harness.disableDrawing).toHaveBeenCalledTimes(1);

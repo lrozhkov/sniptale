@@ -9,6 +9,7 @@ import {
 export interface DrawingSessionSnapshot {
   readonly document: DrawingDocumentV1;
   readonly activeTool: DrawingTool;
+  readonly selectedObjectIds: readonly string[];
   readonly selectedObjectId: string | null;
   readonly defaults: DrawingToolDefaults;
   readonly revision: number;
@@ -26,8 +27,11 @@ export interface DrawingSession {
   setActiveTool(tool: DrawingTool): void;
   setDefaults(defaults: DrawingToolDefaults): void;
   select(objectId: string | null): void;
+  setSelection(objectIds: readonly string[]): void;
+  toggleSelection(objectId: string): void;
   commitObject(object: DrawingObject, options?: { select?: boolean }): void;
   replaceObject(object: DrawingObject): void;
+  replaceObjects(objects: readonly DrawingObject[]): void;
   deleteSelected(): void;
   clear(): void;
   dispose(): void;
@@ -35,127 +39,183 @@ export interface DrawingSession {
 
 const EMPTY_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
 
-export function createDrawingSession(options: {
+type DrawingSessionOptions = {
   initialDocument?: DrawingDocumentV1;
   defaults?: DrawingToolDefaults;
   onDocumentCommit: (commit: DrawingDocumentCommit) => boolean;
   onDispose?: () => void;
-}): DrawingSession {
-  let document = options.initialDocument ?? EMPTY_DOCUMENT;
-  let activeTool: DrawingTool = 'pencil';
-  let selectedObjectId: string | null = null;
-  let defaults = options.defaults ?? createDefaultDrawingToolDefaults();
-  let revision = 0;
-  let disposed = false;
-  let commitInProgress = false;
-  const listeners = new Set<() => void>();
+};
 
-  const emit = () => {
-    revision += 1;
-    listeners.forEach((listener) => listener());
-  };
-  const snapshot = (): DrawingSessionSnapshot => ({
-    document,
-    activeTool,
-    selectedObjectId,
-    defaults,
-    revision,
-  });
-  const applyDocument = (next: DrawingDocumentV1, nextSelectedId: string | null) => {
-    document = next;
-    selectedObjectId = nextSelectedId;
-    emit();
-  };
-  const replayDocument = (next: DrawingDocumentV1) => {
-    if (disposed) return false;
-    if (next !== document) applyDocument(next, null);
+class DrawingSessionOwner implements DrawingSession {
+  private document: DrawingDocumentV1;
+  private activeTool: DrawingTool = 'pencil';
+  private selectedObjectIds: readonly string[] = [];
+  private defaults: DrawingToolDefaults;
+  private revision = 0;
+  private disposed = false;
+  private commitInProgress = false;
+  private readonly listeners = new Set<() => void>();
+
+  constructor(private readonly options: DrawingSessionOptions) {
+    this.document = options.initialDocument ?? EMPTY_DOCUMENT;
+    this.defaults = options.defaults ?? createDefaultDrawingToolDefaults();
+  }
+
+  private emit() {
+    this.revision += 1;
+    this.listeners.forEach((listener) => listener());
+  }
+
+  private normalizeSelection(ids: readonly string[], source = this.document) {
+    const available = new Set(source.objects.map((object) => object.id));
+    return [...new Set(ids)].filter((id) => available.has(id));
+  }
+
+  private applyDocument(next: DrawingDocumentV1, nextSelectedIds: readonly string[]) {
+    this.document = next;
+    this.selectedObjectIds = this.normalizeSelection(nextSelectedIds, next);
+    this.emit();
+  }
+
+  private replayDocument = (next: DrawingDocumentV1) => {
+    if (this.disposed) return false;
+    if (next !== this.document) this.applyDocument(next, []);
     return true;
   };
-  const commitDocument = (next: DrawingDocumentV1, nextSelectedId = selectedObjectId) => {
-    if (next === document || disposed || commitInProgress) return;
-    const before = document;
-    const beforeSelectedId = selectedObjectId;
-    const revisionBeforeCommit = revision;
-    const selectedId = next.objects.some((object) => object.id === nextSelectedId)
-      ? nextSelectedId
-      : null;
-    document = next;
-    selectedObjectId = selectedId;
-    commitInProgress = true;
+
+  private commitDocument(next: DrawingDocumentV1, nextSelectedIds = this.selectedObjectIds) {
+    if (next === this.document || this.disposed || this.commitInProgress) return;
+    const before = this.document;
+    const beforeSelectedIds = this.selectedObjectIds;
+    const revisionBeforeCommit = this.revision;
+    this.document = next;
+    this.selectedObjectIds = this.normalizeSelection(nextSelectedIds, next);
+    this.commitInProgress = true;
     let accepted: boolean | undefined;
     try {
-      accepted = options.onDocumentCommit({
+      accepted = this.options.onDocumentCommit({
         after: next,
         before,
-        replay: replayDocument,
+        replay: this.replayDocument,
       });
     } catch (error) {
-      document = before;
-      selectedObjectId = beforeSelectedId;
+      this.document = before;
+      this.selectedObjectIds = beforeSelectedIds;
       throw error;
     } finally {
-      commitInProgress = false;
+      this.commitInProgress = false;
     }
     if (accepted !== true) {
-      document = before;
-      selectedObjectId = beforeSelectedId;
+      this.document = before;
+      this.selectedObjectIds = beforeSelectedIds;
       return;
     }
-    if (revision === revisionBeforeCommit) emit();
-  };
+    if (this.revision === revisionBeforeCommit) this.emit();
+  }
 
-  return {
-    getSnapshot: snapshot,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    setActiveTool(tool) {
-      if (activeTool === tool) return;
-      activeTool = tool;
-      if (tool !== 'select') selectedObjectId = null;
-      emit();
-    },
-    setDefaults(next) {
-      if (next === defaults) return;
-      defaults = next;
-      emit();
-    },
-    select(id) {
-      if (selectedObjectId === id) return;
-      selectedObjectId = id;
-      emit();
-    },
-    commitObject(object, commitOptions) {
-      commitDocument(
-        { version: 1, objects: [...document.objects, object] },
-        commitOptions?.select === false ? null : object.id
-      );
-    },
-    replaceObject(object) {
-      const index = document.objects.findIndex((candidate) => candidate.id === object.id);
-      if (index < 0 || document.objects[index] === object) return;
-      const objects = [...document.objects];
-      objects[index] = object;
-      commitDocument({ version: 1, objects });
-    },
-    deleteSelected() {
-      if (!selectedObjectId) return;
-      const objects = document.objects.filter((object) => object.id !== selectedObjectId);
-      if (objects.length === document.objects.length) return;
-      commitDocument({ version: 1, objects }, null);
-    },
-    clear() {
-      if (document.objects.length === 0) return;
-      commitDocument(EMPTY_DOCUMENT, null);
-    },
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      options.onDispose?.();
-      listeners.clear();
-      document = EMPTY_DOCUMENT;
-      selectedObjectId = null;
-    },
-  };
+  getSnapshot(): DrawingSessionSnapshot {
+    return {
+      document: this.document,
+      activeTool: this.activeTool,
+      selectedObjectIds: this.selectedObjectIds,
+      selectedObjectId: this.selectedObjectIds.at(-1) ?? null,
+      defaults: this.defaults,
+      revision: this.revision,
+    };
+  }
+
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  setActiveTool(tool: DrawingTool) {
+    if (this.activeTool === tool) return;
+    this.activeTool = tool;
+    if (tool !== 'select') this.selectedObjectIds = [];
+    this.emit();
+  }
+
+  setDefaults(next: DrawingToolDefaults) {
+    if (next === this.defaults) return;
+    this.defaults = next;
+    this.emit();
+  }
+
+  select(id: string | null) {
+    this.setSelection(id ? [id] : []);
+  }
+
+  setSelection(ids: readonly string[]) {
+    const next = this.normalizeSelection(ids);
+    if (
+      this.selectedObjectIds.length === next.length &&
+      this.selectedObjectIds.every((selectedId, index) => selectedId === next[index])
+    )
+      return;
+    this.selectedObjectIds = next;
+    this.emit();
+  }
+
+  toggleSelection(id: string) {
+    if (!this.document.objects.some((object) => object.id === id)) return;
+    this.setSelection(
+      this.selectedObjectIds.includes(id)
+        ? this.selectedObjectIds.filter((selectedId) => selectedId !== id)
+        : [...this.selectedObjectIds, id]
+    );
+  }
+
+  commitObject(object: DrawingObject, commitOptions?: { select?: boolean }) {
+    this.commitDocument(
+      { version: 1, objects: [...this.document.objects, object] },
+      commitOptions?.select === false ? [] : [object.id]
+    );
+  }
+
+  replaceObject(object: DrawingObject) {
+    const index = this.document.objects.findIndex((candidate) => candidate.id === object.id);
+    if (index < 0 || this.document.objects[index] === object) return;
+    const objects = [...this.document.objects];
+    objects[index] = object;
+    this.commitDocument({ version: 1, objects });
+  }
+
+  replaceObjects(replacements: readonly DrawingObject[]) {
+    if (replacements.length === 0) return;
+    const byId = new Map(replacements.map((object) => [object.id, object]));
+    let changed = false;
+    const objects = this.document.objects.map((object) => {
+      const replacement = byId.get(object.id);
+      if (!replacement || replacement === object) return object;
+      changed = true;
+      return replacement;
+    });
+    if (changed) this.commitDocument({ version: 1, objects });
+  }
+
+  deleteSelected() {
+    if (this.selectedObjectIds.length === 0) return;
+    const selected = new Set(this.selectedObjectIds);
+    const objects = this.document.objects.filter((object) => !selected.has(object.id));
+    if (objects.length !== this.document.objects.length)
+      this.commitDocument({ version: 1, objects }, []);
+  }
+
+  clear() {
+    if (this.document.objects.length > 0) this.commitDocument(EMPTY_DOCUMENT, []);
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.options.onDispose?.();
+    this.listeners.clear();
+    this.document = EMPTY_DOCUMENT;
+    this.selectedObjectIds = [];
+  }
+}
+
+export function createDrawingSession(options: DrawingSessionOptions): DrawingSession {
+  return new DrawingSessionOwner(options);
 }

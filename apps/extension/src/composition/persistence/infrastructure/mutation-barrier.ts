@@ -122,6 +122,7 @@ export type PersistenceMutationDomain =
   | 'annotation-template-tags'
   | 'callout-presets'
   | 'drawing-palette'
+  | 'drawing-tool-preferences'
   | 'gradient-presets'
   | 'highlighter-settings'
   | 'step-badge-presets'

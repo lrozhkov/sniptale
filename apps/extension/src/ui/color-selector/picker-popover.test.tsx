@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ColorSelectorPickerPopover } from './picker-popover';
 import { getNextColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
+import { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 
 vi.mock('../../platform/i18n', () => ({
   translate: (key: string) => key,
@@ -14,9 +15,11 @@ vi.mock('../../platform/i18n', () => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderPopover(
-  props: Partial<React.ComponentProps<typeof ColorSelectorPickerPopover>> = {}
-) {
+type PopoverHarnessProps = Partial<React.ComponentProps<typeof ColorSelectorPickerPopover>> & {
+  onEyedropperStateChange?: (active: boolean) => void;
+};
+
+function renderPopover(props: PopoverHarnessProps = {}) {
   if (!container) {
     throw new Error('missing container');
   }
@@ -26,23 +29,31 @@ function renderPopover(
   });
 }
 
-function PopoverHarness(props: Partial<React.ComponentProps<typeof ColorSelectorPickerPopover>>) {
+function PopoverHarness(props: PopoverHarnessProps) {
   const [formatMode, setFormatMode] = React.useState(props.formatMode ?? 'hex');
+  const onColorChange = props.onColorChange ?? (() => undefined);
+  const eyedropper = useEyedropper(
+    onColorChange,
+    props.onEyedropperStateChange ?? (() => undefined)
+  );
 
   return (
     <ColorSelectorPickerPopover
       color="#123456"
+      eyedropper={props.eyedropper ?? eyedropper}
       formatMode={formatMode}
-      onApply={() => undefined}
-      onCancel={() => undefined}
-      onColorChange={() => undefined}
+      onApply={props.onApply ?? (() => undefined)}
+      onCancel={props.onCancel ?? (() => undefined)}
+      onColorChange={onColorChange}
       onCycleFormatMode={() => {
         setFormatMode((currentMode) => getNextColorSelectorFormatMode(currentMode));
         props.onCycleFormatMode?.();
       }}
-      onEyedropperStateChange={() => undefined}
-      onSelectTransparent={() => undefined}
-      {...props}
+      onSelectTransparent={props.onSelectTransparent ?? (() => undefined)}
+      {...(props.allowAlpha === undefined ? {} : { allowAlpha: props.allowAlpha })}
+      {...(props.allowTransparent === undefined
+        ? {}
+        : { allowTransparent: props.allowTransparent })}
     />
   );
 }

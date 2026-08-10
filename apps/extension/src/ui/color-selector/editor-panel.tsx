@@ -4,22 +4,22 @@ import { getColorFromPlanePoint } from '@sniptale/ui/color-selector/helpers';
 import { PickerControls } from './picker-layout';
 import { ColorPlane } from './picker-sections';
 import {
-  useEyedropper,
   useHslInputs,
   useManualColorInput,
   usePickerColorState,
   useRgbInputs,
 } from '@sniptale/ui/color-selector/popover-state';
+import type { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 
 type ColorEditorPanelProps = {
   allowAlpha?: boolean;
   allowTransparent?: boolean;
   color: string;
+  eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ColorSelectorFormatMode;
   onColorChange: (color: string) => void;
   onCycleFormatMode: () => void;
-  onEyedropperStateChange: (active: boolean) => void;
   onSelectTransparent: () => void;
 };
 
@@ -35,7 +35,6 @@ export function ColorEditorPanel(props: ColorEditorPanelProps) {
   const handleAlphaChange = (nextAlpha: string) => emit(color.handleAlphaChange(nextAlpha));
   const rgbInputs = useRgbInputs(color.resolvedColor, handleChannelColorChange);
   const hslInputs = useHslInputs(color.resolvedColor, handleChannelColorChange);
-  const eyedropper = useEyedropper(handleChannelColorChange, props.onEyedropperStateChange);
   return (
     <div className="space-y-3" data-ui="shared.ui.color-selector.editor-panel">
       <ColorPlane
@@ -53,7 +52,7 @@ export function ColorEditorPanel(props: ColorEditorPanelProps) {
         allowAlpha={props.allowAlpha !== false}
         allowTransparent={props.allowTransparent !== false}
         color={color}
-        eyedropper={eyedropper}
+        eyedropper={props.eyedropper}
         formatMode={props.formatMode}
         hslInputs={hslInputs}
         manualColorInput={manualColorInput}

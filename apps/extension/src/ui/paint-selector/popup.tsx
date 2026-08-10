@@ -9,6 +9,7 @@ import {
   type PaintStopIdFactory,
 } from '@sniptale/foundation/paint';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
+import { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 import {
   ColorSelectorFloatingLayer,
   useColorSelectorLayerStyle,
@@ -97,6 +98,7 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
         gradient: updateGradientStop(props.draft.gradient, selected.id, { color }),
       });
   };
+  const eyedropper = useEyedropper(changeColor, props.onEyedropperStateChange);
   const presetActions = props.presetActions
     ? {
         ...props.presetActions,
@@ -164,8 +166,8 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
             selected?.color ?? (props.draft.kind === 'solid' ? props.draft.color : '#000000ff')
           }
           formatMode={props.formatMode}
+          eyedropper={eyedropper}
           onCycleFormatMode={props.onCycleFormatMode}
-          onEyedropperStateChange={props.onEyedropperStateChange}
           onSelectTransparent={() => changeColor('#00000000')}
           onColorChange={changeColor}
         />

@@ -193,6 +193,36 @@ it('exposes eyedropper pressed state, resolves picked colors, and clears on unmo
   expect(onEyedropperStateChange).toHaveBeenLastCalledWith(false);
 });
 
+it('starts the native eyedropper before publishing React state and aborts only with its root', async () => {
+  const calls: string[] = [];
+  let resolvePick: ((result: { sRGBHex: string }) => void) | null = null;
+  const onEyedropperStateChange = vi.fn((active: boolean) => calls.push(`state:${active}`));
+  vi.stubGlobal(
+    'EyeDropper',
+    class {
+      open(...args: unknown[]) {
+        calls.push(`open:${args.length}`);
+        return new Promise<{ sRGBHex: string }>((resolve) => {
+          resolvePick = resolve;
+        });
+      }
+    }
+  );
+
+  renderHarness(() => ({
+    eyedropper: useEyedropper(vi.fn(), onEyedropperStateChange),
+  }));
+  await act(async () => {
+    void (hookState['eyedropper'] as ReturnType<typeof useEyedropper>).handleEyedropperPick();
+    await Promise.resolve();
+  });
+
+  expect(calls.slice(0, 2)).toEqual(['open:1', 'state:true']);
+  act(() => root?.unmount());
+  expect(calls).toContain('state:false');
+  await act(async () => resolvePick?.({ sRGBHex: '#abcdef' }));
+});
+
 it('returns early when the EyeDropper constructor is unavailable', async () => {
   const onColorChange = vi.fn();
   const onEyedropperStateChange = vi.fn();

@@ -93,6 +93,7 @@ export function createDrawingModeController(args: {
         return;
       }
       if (!baseModeController.handleEnableCursorMode()) return;
+      controller.session.setActiveTool('pencil');
       args.setDrawingMode?.(true);
       // The drawing canvas is the interaction shield. The generic navigation-lock
       // overlay would sit above it and consume every drawing pointer event.

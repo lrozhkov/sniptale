@@ -25,6 +25,7 @@ import type { ToolbarModeButtonsProps } from './mode-types';
 import {
   resolveToolbarMenuPlacement,
   resolveToolbarFloatingMenuStyle,
+  TOOLBAR_PRIMARY_MENU_Z_INDEX,
   useToolbarFloatingMenuDismissal,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
@@ -212,7 +213,7 @@ function ToolbarModeMenu(props: {
         title={translate('content.toolbar.modeMenuTitle')}
         variant="capture"
         placement={menuPlacement}
-        style={menuStyle}
+        style={{ ...menuStyle, zIndex: TOOLBAR_PRIMARY_MENU_Z_INDEX }}
       >
         {TOOLBAR_INTERACTION_MODES.map((mode) => {
           const selected = selectedMode === mode;

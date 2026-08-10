@@ -43,6 +43,40 @@ describe('drawing session', () => {
     expect(onDocumentCommit).toHaveBeenCalledTimes(2);
   });
 
+  it('owns multiple selected ids and commits a batch replacement or deletion once', () => {
+    const onDocumentCommit = vi.fn<(commit: DrawingDocumentCommit) => boolean>(() => true);
+    const session = createDrawingSession({ onDocumentCommit });
+    session.commitObject({
+      bounds: { x: 0, y: 0, width: 10, height: 10 },
+      id: 'one',
+      kind: 'blur',
+    });
+    session.commitObject({
+      bounds: { x: 20, y: 0, width: 10, height: 10 },
+      id: 'two',
+      kind: 'blur',
+    });
+    session.setActiveTool('select');
+    session.setSelection(['one', 'two', 'missing', 'one']);
+    expect(session.getSnapshot()).toMatchObject({
+      selectedObjectId: 'two',
+      selectedObjectIds: ['one', 'two'],
+    });
+
+    onDocumentCommit.mockClear();
+    session.replaceObjects([
+      { id: 'one', kind: 'blur', bounds: { x: 5, y: 0, width: 10, height: 10 } },
+      { id: 'two', kind: 'blur', bounds: { x: 25, y: 0, width: 10, height: 10 } },
+    ]);
+    expect(onDocumentCommit).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['one', 'two']);
+
+    session.deleteSelected();
+    expect(onDocumentCommit).toHaveBeenCalledTimes(2);
+    expect(session.getSnapshot().document.objects).toEqual([]);
+    expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  });
+
   it('leaves the document unchanged when the external history owner rejects a commit', () => {
     const session = createDrawingSession({ onDocumentCommit: () => false });
     session.commitObject({

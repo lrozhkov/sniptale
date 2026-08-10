@@ -11,9 +11,13 @@ it('is body-only and resynchronizes when the selected stop changes', () => {
   const root = createRoot(host);
   const props = {
     formatMode: 'hex' as const,
+    eyedropper: {
+      eyedropperAvailable: false,
+      eyedropperPressed: false,
+      handleEyedropperPick: vi.fn(async () => undefined),
+    },
     onColorChange: vi.fn(),
     onCycleFormatMode: vi.fn(),
-    onEyedropperStateChange: vi.fn(),
     onSelectTransparent: vi.fn(),
   };
   act(() => root.render(<ColorEditorPanel {...props} color="#111111ff" />));

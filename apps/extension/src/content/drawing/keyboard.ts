@@ -1,3 +1,4 @@
+import { useEffect, type RefObject } from 'react';
 import {
   translateDrawingObject,
   type DrawingSession,
@@ -24,10 +25,10 @@ export function handleDrawingKeyDown(args: {
     session.deleteSelected();
     return;
   }
-  const selected = snapshot.document.objects.find(
-    (object) => object.id === snapshot.selectedObjectId
+  const selected = snapshot.document.objects.filter((object) =>
+    snapshot.selectedObjectIds.includes(object.id)
   );
-  if (event.key.startsWith('Arrow') && selected) {
+  if (event.key.startsWith('Arrow') && selected.length > 0) {
     event.preventDefault();
     const amount = event.shiftKey ? 10 : 1;
     const delta =
@@ -38,17 +39,69 @@ export function handleDrawingKeyDown(args: {
           : event.key === 'ArrowUp'
             ? { x: 0, y: -amount }
             : { x: 0, y: amount };
-    session.replaceObject(translateDrawingObject(selected, delta));
+    session.replaceObjects(selected.map((object) => translateDrawingObject(object, delta)));
     return;
   }
-  if (event.key === 'Enter' && selected?.kind === 'text') {
+  const editableText = selected.length === 1 && selected[0]?.kind === 'text' ? selected[0] : null;
+  if (event.key === 'Enter' && editableText) {
     event.preventDefault();
-    args.onEditText(selected);
+    args.onEditText(editableText);
     return;
   }
   if (event.key !== 'Escape') return;
   event.preventDefault();
   if (args.hasDraft) args.onCancelDraft();
-  else if (snapshot.selectedObjectId) session.select(null);
+  else if (snapshot.selectedObjectIds.length > 0) session.select(null);
+  else if (snapshot.activeTool !== 'select') session.setActiveTool('select');
   else args.onExit?.();
+}
+
+function isDrawingEditableKeyboardTarget(event: KeyboardEvent): boolean {
+  return event
+    .composedPath()
+    .some(
+      (target) =>
+        target instanceof Element &&
+        target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+    );
+}
+
+export function useDrawingEscapeOwnership(args: {
+  active: boolean;
+  cancelDraft: () => void;
+  cancelText: () => void;
+  editText: (object: DrawingTextObject) => void;
+  hasTextDraft: boolean;
+  onExit?: () => void;
+  pointerDraftRef: RefObject<unknown | null>;
+  session: DrawingSession;
+}) {
+  useEffect(() => {
+    if (!args.active) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        isDrawingEditableKeyboardTarget(event)
+      ) {
+        return;
+      }
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      handleDrawingKeyDown({
+        event,
+        hasDraft: Boolean(args.pointerDraftRef.current || args.hasTextDraft),
+        onCancelDraft: () => {
+          args.cancelDraft();
+          args.cancelText();
+        },
+        onEditText: args.editText,
+        ...(args.onExit === undefined ? {} : { onExit: args.onExit }),
+        session: args.session,
+        snapshot: args.session.getSnapshot(),
+      });
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [args]);
 }

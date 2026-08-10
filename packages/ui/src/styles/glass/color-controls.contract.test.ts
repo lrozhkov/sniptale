@@ -18,4 +18,12 @@ describe('glass.color-controls contract', () => {
     expect(glassColorControlsStylesheet).toContain('.sniptale-glass-color-trigger--disabled,');
     expect(glassColorControlsStylesheet).toContain('.sniptale-glass-hidden-color {');
   });
+
+  it('uses the accent border instead of a theme text border for an active color', () => {
+    const activeRule = glassColorControlsStylesheet
+      .split('.sniptale-glass-color-option--active {')[1]
+      ?.split('}')[0];
+    expect(activeRule).toContain('var(--sniptale-color-accent) 82%');
+    expect(activeRule).not.toContain('var(--sniptale-color-text-primary-strong)');
+  });
 });

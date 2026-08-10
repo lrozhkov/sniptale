@@ -1,21 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import {
-  appendDrawingSamples,
-  translateDrawingObject,
-  type DrawingPoint,
-} from '../../features/drawing/public';
+import type { DrawingPoint } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import {
   beginDrawingPointer,
   commitDrawingPointerDraft,
-  resizeDrawingObject,
   toDrawingScenePoint,
-  updateCreatedDrawingObject,
   type PointerDraft,
 } from './interaction';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { DrawingTextDraft } from './text-editor';
+import { updateDrawingPointerDraft } from './pointer-update';
+
+export const TEXT_DRAG_THRESHOLD = 4;
 
 export function useDrawingPointerRuntime(args: {
   active: boolean;
@@ -31,17 +28,19 @@ export function useDrawingPointerRuntime(args: {
   const [draftRevision, setDraftRevision] = useState(0);
   const changed = useCallback(() => setDraftRevision((value) => value + 1), []);
   const cancelDraft = useCallback(() => {
+    const draft = draftRef.current;
+    if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
     onCancelText();
     changed();
-  }, [changed, onCancelText]);
+  }, [changed, controller, onCancelText]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
       if (!active || event.button !== 0) return;
       const point = toDrawingScenePoint(event, root);
       if (event.pointerType === 'touch') {
-        touchPointsRef.current.set(event.pointerId, point);
+        touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (touchPointsRef.current.size >= 2) {
           const points = [...touchPointsRef.current.values()];
           touchCentroidRef.current = averagePoints(points);
@@ -51,12 +50,13 @@ export function useDrawingPointerRuntime(args: {
         }
       }
       const start = beginDrawingPointer({
+        modifiers: { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
         point,
         snapshot: controller.session.getSnapshot(),
         timestamp: event.timeStamp,
       });
       draftRef.current = start.draft;
-      if ('selection' in start) controller.session.select(start.selection ?? null);
+      if (start.selection) controller.session.setSelection(start.selection);
       if (start.text) onText(start.text);
       event.currentTarget.setPointerCapture(event.pointerId);
       changed();
@@ -66,51 +66,25 @@ export function useDrawingPointerRuntime(args: {
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (moveTouchViewport({ controller, event, root, touchCentroidRef, touchPointsRef })) return;
+      if (moveTouchViewport({ controller, event, touchCentroidRef, touchPointsRef })) return;
       const draft = draftRef.current;
       if (!draft) return;
       const point = toDrawingScenePoint(event, root);
-      if (draft.kind === 'create') {
-        const samples =
-          typeof event.nativeEvent.getCoalescedEvents === 'function'
-            ? event.nativeEvent.getCoalescedEvents()
-            : [event.nativeEvent];
-        let object = draft.object;
-        if (object.kind === 'pencil' || object.kind === 'marker') {
-          object = {
-            ...object,
-            samples: appendDrawingSamples(
-              object.samples,
-              samples.map((sample) => ({
-                ...toDrawingScenePoint(sample, root),
-                t: sample.timeStamp,
-              })),
-              object.kind === 'pencil'
-            ),
-          };
-        } else {
-          samples.forEach((sample) => {
-            object = updateCreatedDrawingObject({
-              object,
-              start: draft.start,
-              point: toDrawingScenePoint(sample, root),
-              timestamp: sample.timeStamp,
-              square: event.shiftKey,
-            });
-          });
-        }
-        draftRef.current = { ...draft, object };
-      } else if (draft.kind === 'move') {
-        draftRef.current = {
-          ...draft,
-          object: translateDrawingObject(draft.original, {
-            x: point.x - draft.start.x,
-            y: point.y - draft.start.y,
-          }),
-        };
-      } else {
-        draftRef.current = { ...draft, object: resizeDrawingObject(draft, point) };
+      const isTextTransform =
+        (draft.kind === 'move' || draft.kind === 'resize') && draft.original.kind === 'text';
+      if (isTextTransform) {
+        const distance = Math.hypot(point.x - draft.start.x, point.y - draft.start.y);
+        if (distance < TEXT_DRAG_THRESHOLD) return;
       }
+      const update = updateDrawingPointerDraft({
+        documentObjects: controller.session.getSnapshot().document.objects,
+        draft,
+        event,
+        point,
+        root,
+      });
+      draftRef.current = update.draft;
+      if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
     [changed, controller, root]
@@ -167,13 +141,12 @@ function averagePoints(points: DrawingPoint[]): DrawingPoint {
 function moveTouchViewport(args: {
   controller: ContentDrawingController;
   event: ReactPointerEvent<HTMLCanvasElement>;
-  root: PageScrollRoot;
   touchCentroidRef: { current: DrawingPoint | null };
   touchPointsRef: { current: Map<number, DrawingPoint> };
 }): boolean {
-  const { controller, event, root, touchCentroidRef, touchPointsRef } = args;
+  const { controller, event, touchCentroidRef, touchPointsRef } = args;
   if (event.pointerType !== 'touch' || !touchPointsRef.current.has(event.pointerId)) return false;
-  touchPointsRef.current.set(event.pointerId, toDrawingScenePoint(event, root));
+  touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (touchPointsRef.current.size < 2) return false;
   const centroid = averagePoints([...touchPointsRef.current.values()]);
   const previous = touchCentroidRef.current;

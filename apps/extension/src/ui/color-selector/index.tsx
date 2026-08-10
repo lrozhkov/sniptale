@@ -52,12 +52,13 @@ type ColorSelectorPanelsProps = {
   cycleFormatMode: () => void;
   draftColor: string;
   expanded: boolean;
+  floatingBoundaryRef: CompactColorSelectorProps['floatingBoundaryRef'];
   floatingOwnerId: string;
+  floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   normalizedPalette: readonly string[];
   normalizedRecentColors: readonly string[];
   pickerOpen: boolean;
-  setEyedropperActive: (active: boolean) => void;
   title: string;
   value: string;
   onApply: () => void;
@@ -123,11 +124,11 @@ function ColorSelectorPickerLayer(
         allowTransparent={props.allowTransparent}
         color={props.draftColor}
         formatMode={props.formatMode}
+        eyedropper={props.state.eyedropper}
         onApply={props.onApply}
         onCancel={props.onCancel}
         onColorChange={props.onColorChange}
         onCycleFormatMode={props.cycleFormatMode}
-        onEyedropperStateChange={props.setEyedropperActive}
         onSelectTransparent={props.onSelectTransparent}
       />
     </ColorSelectorFloatingLayer>
@@ -139,7 +140,12 @@ function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
   const portalTarget =
     typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(props.rootNode);
   const portalTheme = useResolvedPortalTheme(props.rootNode);
-  const layerStyle = useColorSelectorLayerStyle(props.rootNode, open);
+  const layerStyle = useColorSelectorLayerStyle(
+    props.rootNode,
+    open,
+    props.floatingPlacement,
+    props.floatingBoundaryRef?.current ?? null
+  );
 
   if (!open || !portalTarget) {
     return null;
@@ -159,7 +165,9 @@ function ColorSelectorBody(props: {
   allowTransparent: boolean;
   className: string | undefined;
   disabled: boolean;
+  floatingBoundaryRef: CompactColorSelectorProps['floatingBoundaryRef'];
   floatingOwnerId: string;
+  floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
   label: string;
   pickerOnly: boolean;
   state: ReturnType<typeof useColorSelectorState>;
@@ -195,12 +203,13 @@ function ColorSelectorBody(props: {
         cycleFormatMode={props.state.cycleFormatMode}
         draftColor={props.state.draftColor}
         expanded={props.state.expanded}
+        floatingBoundaryRef={props.floatingBoundaryRef}
         floatingOwnerId={props.floatingOwnerId}
+        floatingPlacement={props.floatingPlacement}
         formatMode={props.state.formatMode}
         normalizedPalette={props.state.normalizedPalette}
         normalizedRecentColors={props.state.normalizedRecentColors}
         pickerOpen={props.state.pickerOpen}
-        setEyedropperActive={props.state.setEyedropperActive}
         title={props.title}
         value={props.state.draftColor}
         onApply={props.state.handlePickerApply}
@@ -221,6 +230,8 @@ export function CompactColorSelector({
   allowTransparent = true,
   className,
   disabled = false,
+  floatingBoundaryRef,
+  floatingPlacement = 'auto',
   label,
   onChange,
   onOpenChange,
@@ -263,7 +274,9 @@ export function CompactColorSelector({
       allowTransparent={allowTransparent}
       className={className}
       disabled={disabled}
+      floatingBoundaryRef={floatingBoundaryRef}
       floatingOwnerId={floatingOwnerId}
+      floatingPlacement={floatingPlacement}
       label={label}
       pickerOnly={pickerOnly}
       state={state}

@@ -1,6 +1,7 @@
 import { PickerFooter } from './picker-sections';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { ColorEditorPanel } from './editor-panel';
+import type { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 
 const PANEL_CLASS_NAME = [
   'rounded-[14px] border p-3',
@@ -14,12 +15,12 @@ type ColorSelectorPickerPopoverProps = {
   allowAlpha?: boolean;
   allowTransparent?: boolean;
   color: string;
+  eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ColorSelectorFormatMode;
   onApply: () => void;
   onCancel: () => void;
   onColorChange: (color: string) => void;
   onCycleFormatMode: () => void;
-  onEyedropperStateChange: (active: boolean) => void;
   onSelectTransparent: () => void;
 };
 

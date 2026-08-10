@@ -2,26 +2,34 @@ import type { DrawingObject } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { PointerDraft } from './interaction';
 import { getDrawingViewportProjection } from './interaction';
-import { renderDrawingObject, renderDrawingSelection } from './render';
+import {
+  renderDrawingMarquee,
+  renderDrawingMultiSelection,
+  renderDrawingObject,
+  renderDrawingSelection,
+} from './render';
 import { resolveDrawingFrameRenderables } from './frame-renderables';
 
 export function drawDrawingFrame(args: {
   canvas: HTMLCanvasElement;
   objects: readonly DrawingObject[];
   draft: PointerDraft | null;
-  selectedId: string | null;
+  selectedIds: readonly string[];
   root: PageScrollRoot;
   showChrome: boolean;
+  suppressText?: boolean;
 }): void {
-  const { canvas, objects, draft, selectedId, root, showChrome } = args;
+  const { canvas, objects, draft, selectedIds, root, showChrome, suppressText = false } = args;
   const ratio = Math.max(1, window.devicePixelRatio || 1);
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const cssWidth = `${width}px`;
+  const cssHeight = `${height}px`;
+  if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
+  if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight;
   if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
   }
   const context = canvas.getContext('2d');
   if (!context) return;
@@ -35,15 +43,19 @@ export function drawDrawingFrame(args: {
     context.rect(rect.left, rect.top, rect.width, rect.height);
     context.clip();
   }
-  resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) =>
-    renderDrawingObject(context, object, projection, preview ? { preview: true } : {})
-  );
-  if (showChrome && selectedId) {
-    const selected =
-      draft && draft.kind !== 'create' && draft.object.id === selectedId
-        ? draft.object
-        : objects.find((object) => object.id === selectedId);
-    if (selected) renderDrawingSelection(context, selected, projection);
+  resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) => {
+    if (!suppressText || object.kind !== 'text')
+      renderDrawingObject(context, object, projection, preview ? { preview: true } : {});
+  });
+  if (showChrome && draft?.kind === 'marquee') {
+    renderDrawingMarquee(context, draft.start, draft.current, projection);
+  }
+  if (showChrome && selectedIds.length > 0) {
+    const selected = resolveDrawingFrameRenderables(objects, draft)
+      .map(({ object }) => object)
+      .filter((object) => selectedIds.includes(object.id));
+    if (selected.length === 1) renderDrawingSelection(context, selected[0]!, projection);
+    else renderDrawingMultiSelection(context, selected, projection);
   }
   context.restore();
 }

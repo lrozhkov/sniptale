@@ -91,6 +91,35 @@ it('builds and hit-tests triangle and parallelogram geometry inside their bounds
   expect(hitTestDrawingObject(parallelogram, { x: 2, y: 2 })).toBe(false);
 });
 
+it('hit-tests rotatable objects in their local geometry', () => {
+  const rectangle = {
+    id: 'rotated',
+    kind: 'rectangle' as const,
+    bounds: { x: 0, y: 0, width: 100, height: 20 },
+    color: '#000000',
+    rotation: 90,
+    width: 4,
+  };
+
+  expect(hitTestDrawingObject(rectangle, { x: 50, y: 50 })).toBe(true);
+  expect(hitTestDrawingObject(rectangle, { x: 90, y: 10 })).toBe(false);
+});
+
+it('hit-tests a sheared rectangle as a parallelogram while preserving rectangle ownership', () => {
+  const rectangle = {
+    id: 'sheared',
+    kind: 'rectangle' as const,
+    bounds: { x: 0, y: 0, width: 125, height: 50 },
+    color: '#000000',
+    skewX: Math.atan(0.5) * (180 / Math.PI),
+    width: 4,
+  };
+
+  expect(hitTestDrawingObject(rectangle, { x: 30, y: 0 })).toBe(true);
+  expect(hitTestDrawingObject(rectangle, { x: -5, y: 0 })).toBe(false);
+  expect(hitTestDrawingObject(rectangle, { x: 80, y: 49 })).toBe(true);
+});
+
 it('translates and resizes arrows, text, and bounded objects', () => {
   const arrow = {
     id: 'arrow',
@@ -115,7 +144,8 @@ it('translates and resizes arrows, text, and bounded objects', () => {
     fontSize: 20,
   };
   expect(replaceDrawingObjectBounds(text, { x: 0, y: 0, width: 10, height: 2 })).toMatchObject({
-    fontSize: 8,
+    bounds: { x: 0, y: 0, width: 10, height: 2 },
+    fontSize: 20,
   });
   const blur = { id: 'blur', kind: 'blur' as const, bounds: { x: 0, y: 0, width: 0, height: 0 } };
   expect(translateDrawingObject(blur, { x: 4, y: 5 })).toMatchObject({ bounds: { x: 4, y: 5 } });

@@ -85,6 +85,29 @@ it('replays page and Drawing operations through one chronological history', () =
   expect(session.getSnapshot().document.objects.map(({ id }) => id)).toEqual(['first', 'second']);
 });
 
+it('records a multi-object Drawing update as one shared-history event', () => {
+  const history = createPagePreparationHistoryStore();
+  registerSnapshotBridge(history);
+  const session = createPagePreparationDrawingSession(history);
+  session.commitObject(createBlur('first'));
+  session.commitObject(createBlur('second'));
+  session.setActiveTool('select');
+  session.setSelection(['first', 'second']);
+  session.replaceObjects([
+    { ...createBlur('first'), bounds: { x: 10, y: 0, width: 10, height: 10 } },
+    { ...createBlur('second'), bounds: { x: 30, y: 0, width: 10, height: 10 } },
+  ]);
+
+  history.undo();
+  expect(
+    session
+      .getSnapshot()
+      .document.objects.map((object) => ('bounds' in object ? object.bounds.x : null))
+  ).toEqual([0, 0]);
+  history.undo();
+  expect(session.getSnapshot().document.objects.map((object) => object.id)).toEqual(['first']);
+});
+
 it('rejects a Drawing mutation when shared history has no active preparation bridge', () => {
   const session = createPagePreparationDrawingSession(createPagePreparationHistoryStore());
   session.commitObject(createBlur('untracked'));

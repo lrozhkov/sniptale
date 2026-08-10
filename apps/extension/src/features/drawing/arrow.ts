@@ -63,3 +63,23 @@ export function buildDrawingArrowOutline(object: DrawingArrowObject): DrawingPoi
     offsetPoint(object.start, tangent, normal, 0, -tailHalf),
   ];
 }
+
+/** Builds the ideal open-arrow geometry used for bounds, hit testing, and sketch rendering. */
+export function buildDrawingFreehandArrowLines(object: DrawingArrowObject): DrawingPoint[][] {
+  const dx = object.end.x - object.start.x;
+  const dy = object.end.y - object.start.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return [[object.start, object.end]];
+
+  const tangent = { x: dx / length, y: dy / length };
+  const normal = { x: -tangent.y, y: tangent.x };
+  const headLength = Math.min(length * 0.38, Math.max(14, object.width * 2.2));
+  const headHalf = headLength * 0.52;
+  const leftWing = offsetPoint(object.end, tangent, normal, -headLength, headHalf);
+  const rightWing = offsetPoint(object.end, tangent, normal, -headLength, -headHalf);
+  return [
+    [object.start, object.end],
+    [leftWing, object.end],
+    [object.end, rightWing],
+  ];
+}

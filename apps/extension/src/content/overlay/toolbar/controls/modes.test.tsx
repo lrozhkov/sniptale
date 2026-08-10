@@ -147,6 +147,7 @@ it('opens the vertical mode menu away from the reserved sidebar work area', () =
 
   expect(menuSurface?.style.left).toBe('auto');
   expect(menuSurface?.style.right).toBe('calc(100% + 10px)');
+  expect(menuSurface?.style.zIndex).toBe('2147483647');
 });
 
 it('selects a mode option from the menu mousedown action', () => {

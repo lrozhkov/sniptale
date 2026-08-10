@@ -1,5 +1,5 @@
 import { buildDrawingStrokeOutline } from './freehand';
-import { buildDrawingArrowOutline } from './arrow';
+import { buildDrawingArrowOutline, buildDrawingFreehandArrowLines } from './arrow';
 import type { DrawingBounds, DrawingObject, DrawingPoint, DrawingShapeObject } from './model';
 
 export type DrawingResizeHandle =
@@ -13,6 +13,8 @@ export type DrawingResizeHandle =
   | 'w'
   | 'start'
   | 'end';
+
+export type DrawingRotationHandle = 'rotate-nw' | 'rotate-ne' | 'rotate-se' | 'rotate-sw';
 
 const normalizeBounds = (bounds: DrawingBounds): DrawingBounds => ({
   x: bounds.width < 0 ? bounds.x + bounds.width : bounds.x,
@@ -34,7 +36,9 @@ export function getDrawingObjectBounds(object: DrawingObject): DrawingBounds {
   if ('bounds' in object) return normalizeBounds(object.bounds);
   const outline =
     object.kind === 'arrow'
-      ? buildDrawingArrowOutline(object)
+      ? object.design === 'freehand'
+        ? buildDrawingFreehandArrowLines(object).flat()
+        : buildDrawingArrowOutline(object)
       : buildDrawingStrokeOutline(object.samples, object.width, {
           dynamicWidth: object.kind === 'pencil',
         });
@@ -46,38 +50,162 @@ export function getDrawingObjectBounds(object: DrawingObject): DrawingBounds {
   return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
 }
 
+export function getDrawingObjectRotation(object: DrawingObject): number {
+  return object.kind === 'arrow' ? 0 : (object.rotation ?? 0);
+}
+
+export function getDrawingObjectSkewX(object: DrawingObject): number {
+  return object.kind === 'rectangle' ||
+    object.kind === 'ellipse' ||
+    object.kind === 'triangle' ||
+    object.kind === 'parallelogram'
+    ? (object.skewX ?? 0)
+    : 0;
+}
+
+export function getDrawingBoundsCenter(bounds: DrawingBounds): DrawingPoint {
+  return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+}
+
+export function rotateDrawingPoint(
+  point: DrawingPoint,
+  center: DrawingPoint,
+  rotation: number
+): DrawingPoint {
+  if (rotation === 0) return point;
+  const radians = (rotation * Math.PI) / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const x = point.x - center.x;
+  const y = point.y - center.y;
+  return {
+    x: center.x + x * cosine - y * sine,
+    y: center.y + x * sine + y * cosine,
+  };
+}
+
+export function transformDrawingObjectVector(
+  object: DrawingObject,
+  vector: DrawingPoint
+): DrawingPoint {
+  return rotateDrawingPoint(vector, { x: 0, y: 0 }, getDrawingObjectRotation(object));
+}
+
+export function untransformDrawingObjectVector(
+  object: DrawingObject,
+  vector: DrawingPoint
+): DrawingPoint {
+  const unrotated = rotateDrawingPoint(vector, { x: 0, y: 0 }, -getDrawingObjectRotation(object));
+  return unrotated;
+}
+
+export function transformDrawingObjectPoint(
+  object: DrawingObject,
+  point: DrawingPoint
+): DrawingPoint {
+  const center = getDrawingBoundsCenter(getDrawingObjectBounds(object));
+  const vector = transformDrawingObjectVector(object, {
+    x: point.x - center.x,
+    y: point.y - center.y,
+  });
+  return { x: center.x + vector.x, y: center.y + vector.y };
+}
+
+export function untransformDrawingObjectPoint(
+  object: DrawingObject,
+  point: DrawingPoint
+): DrawingPoint {
+  const center = getDrawingBoundsCenter(getDrawingObjectBounds(object));
+  const vector = untransformDrawingObjectVector(object, {
+    x: point.x - center.x,
+    y: point.y - center.y,
+  });
+  return { x: center.x + vector.x, y: center.y + vector.y };
+}
+
 const containsBounds = (bounds: DrawingBounds, point: DrawingPoint, tolerance: number) =>
   point.x >= bounds.x - tolerance &&
   point.x <= bounds.x + bounds.width + tolerance &&
   point.y >= bounds.y - tolerance &&
   point.y <= bounds.y + bounds.height + tolerance;
 
+export function getDrawingShapeShearOffset(object: DrawingShapeObject): number {
+  const bounds = getDrawingObjectBounds(object);
+  const requested = Math.tan((getDrawingObjectSkewX(object) * Math.PI) / 180) * bounds.height;
+  const maximum = Math.max(0, bounds.width - Math.max(8, object.width * 2));
+  return Math.max(-maximum, Math.min(maximum, requested));
+}
+
+function getDrawingShapeBaseBounds(object: DrawingShapeObject) {
+  const bounds = getDrawingObjectBounds(object);
+  const shear = getDrawingShapeShearOffset(object);
+  return {
+    bounds: {
+      x: bounds.x - Math.min(0, shear),
+      y: bounds.y,
+      width: bounds.width - Math.abs(shear),
+      height: bounds.height,
+    },
+    shear,
+  };
+}
+
+function shearDrawingShapePoint(point: DrawingPoint, bounds: DrawingBounds, shear: number) {
+  const progress = bounds.height === 0 ? 0 : (point.y - bounds.y) / bounds.height;
+  return { x: point.x + shear * (1 - progress), y: point.y };
+}
+
 export function getDrawingShapePoints(object: Exclude<DrawingShapeObject, { kind: 'ellipse' }>) {
-  const { x, y, width, height } = getDrawingObjectBounds(object);
+  const geometry = getDrawingShapeBaseBounds(object);
+  const { x, y, width, height } = geometry.bounds;
+  let points: DrawingPoint[];
   switch (object.kind) {
     case 'triangle':
-      return [
+      points = [
         { x: x + width / 2, y },
         { x: x + width, y: y + height },
         { x, y: y + height },
       ];
+      break;
     case 'parallelogram': {
       const offset = width * 0.22;
-      return [
+      points = [
         { x: x + offset, y },
         { x: x + width, y },
         { x: x + width - offset, y: y + height },
         { x, y: y + height },
       ];
+      break;
     }
     case 'rectangle':
-      return [
+      points = [
         { x, y },
         { x: x + width, y },
         { x: x + width, y: y + height },
         { x, y: y + height },
       ];
+      break;
   }
+  return points.map((point) => shearDrawingShapePoint(point, geometry.bounds, geometry.shear));
+}
+
+export function getDrawingEllipsePoints(
+  object: Extract<DrawingShapeObject, { kind: 'ellipse' }>,
+  segments = 64
+): DrawingPoint[] {
+  const geometry = getDrawingShapeBaseBounds(object);
+  const center = getDrawingBoundsCenter(geometry.bounds);
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2;
+    return shearDrawingShapePoint(
+      {
+        x: center.x + Math.cos(angle) * (geometry.bounds.width / 2),
+        y: center.y + Math.sin(angle) * (geometry.bounds.height / 2),
+      },
+      geometry.bounds,
+      geometry.shear
+    );
+  });
 }
 
 function pointInPolygon(point: DrawingPoint, vertices: readonly DrawingPoint[]): boolean {
@@ -123,25 +251,37 @@ export function hitTestDrawingObject(
   tolerance = 6
 ): boolean {
   const bounds = getDrawingObjectBounds(object);
-  if (!containsBounds(bounds, point, tolerance)) return false;
+  const localPoint = untransformDrawingObjectPoint(object, point);
+  if (!containsBounds(bounds, localPoint, tolerance)) return false;
   if (object.kind === 'arrow') {
+    if (object.design === 'freehand') {
+      const toleranceWithStroke = Math.max(tolerance, object.width * 0.25);
+      return buildDrawingFreehandArrowLines(object).some((line) =>
+        line
+          .slice(1)
+          .some((end, index) => distanceToSegment(point, line[index]!, end) <= toleranceWithStroke)
+      );
+    }
     return (
       pointInPolygon(point, buildDrawingArrowOutline(object)) ||
       distanceToSegment(point, object.start, object.end) <= tolerance
     );
   }
   if (object.kind === 'ellipse') {
-    if (bounds.width === 0 || bounds.height === 0) return false;
-    const dx = (point.x - (bounds.x + bounds.width / 2)) / (bounds.width / 2);
-    const dy = (point.y - (bounds.y + bounds.height / 2)) / (bounds.height / 2);
-    return dx * dx + dy * dy <= 1.25;
+    if (getDrawingObjectSkewX(object) === 0) {
+      if (bounds.width === 0 || bounds.height === 0) return false;
+      const dx = (localPoint.x - (bounds.x + bounds.width / 2)) / (bounds.width / 2);
+      const dy = (localPoint.y - (bounds.y + bounds.height / 2)) / (bounds.height / 2);
+      return dx * dx + dy * dy <= 1.25;
+    }
+    return pointInPolygon(localPoint, getDrawingEllipsePoints(object));
   }
   if (
     object.kind === 'rectangle' ||
     object.kind === 'triangle' ||
     object.kind === 'parallelogram'
   ) {
-    return pointInPolygon(point, getDrawingShapePoints(object));
+    return pointInPolygon(localPoint, getDrawingShapePoints(object));
   }
   return true;
 }
@@ -199,12 +339,7 @@ export function replaceDrawingObjectBounds(
     };
   }
   if (object.kind === 'text') {
-    const scale = Math.max(0.25, Math.min(scaleX, scaleY));
-    return {
-      ...object,
-      bounds: target,
-      fontSize: Math.max(8, Math.round(object.fontSize * scale)),
-    };
+    return { ...object, bounds: target };
   }
   return { ...object, bounds: target };
 }

@@ -12,7 +12,14 @@ export function resolveDrawingFrameRenderables(
 ): DrawingFrameRenderable[] {
   const committed = objects.map((object) => ({
     object:
-      draft && draft.kind !== 'create' && draft.object.id === object.id ? draft.object : object,
+      draft?.kind === 'move-selection'
+        ? (draft.objects.find((candidate) => candidate.id === object.id) ?? object)
+        : draft &&
+            draft.kind !== 'create' &&
+            draft.kind !== 'marquee' &&
+            draft.object.id === object.id
+          ? draft.object
+          : object,
     preview: false,
   }));
   return draft?.kind === 'create'

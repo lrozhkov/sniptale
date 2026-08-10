@@ -55,7 +55,11 @@ export const glassPopoverToolbarFormColorStyles = `
 .sniptale-glass-color-option:disabled { cursor: not-allowed; }
 
 .sniptale-glass-color-option--active {
-  border-color: color-mix(in srgb, var(--sniptale-color-text-inverse) 92%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 82%,
+    var(--sniptale-color-border-soft) 18%
+  );
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--sniptale-color-accent) 18%, transparent);
 }
 

@@ -17,64 +17,60 @@ type EyeDropperCtor = new () => {
 };
 
 function getEyeDropperCtor(): EyeDropperCtor | null {
-  return 'EyeDropper' in window ? (window['EyeDropper'] as EyeDropperCtor) : null;
+  if (typeof window === 'undefined') return null;
+  const candidate: unknown = Reflect.get(window, 'EyeDropper');
+  return typeof candidate === 'function' ? (candidate as EyeDropperCtor) : null;
 }
 
 function clearEyedropperSession(args: {
   abortControllerRef: MutableRefObject<AbortController | null>;
   eyedropperActiveRef: MutableRefObject<boolean>;
-  onEyedropperStateChange: (active: boolean) => void;
+  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
   setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
 }) {
   args.eyedropperActiveRef.current = false;
   args.setEyedropperPressed(false);
-  args.onEyedropperStateChange(false);
+  args.onEyedropperStateChangeRef.current(false);
   args.abortControllerRef.current = null;
 }
 
 function startEyedropperSession(args: {
-  abortControllerRef: MutableRefObject<AbortController | null>;
   eyedropperActiveRef: MutableRefObject<boolean>;
   eyedropperTokenRef: MutableRefObject<number>;
-  onEyedropperStateChange: (active: boolean) => void;
+  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
   setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
 }) {
   const nextToken = args.eyedropperTokenRef.current + 1;
-  const abortController = new AbortController();
   args.eyedropperTokenRef.current = nextToken;
-  args.abortControllerRef.current?.abort();
-  args.abortControllerRef.current = abortController;
   args.eyedropperActiveRef.current = true;
   args.setEyedropperPressed(true);
-  args.onEyedropperStateChange(true);
-  return {
-    abortController,
-    nextToken,
-  };
+  args.onEyedropperStateChangeRef.current(true);
+  return nextToken;
 }
 
 function useEyedropperCleanup(args: {
   abortControllerRef: MutableRefObject<AbortController | null>;
   eyedropperActiveRef: MutableRefObject<boolean>;
-  onEyedropperStateChange: (active: boolean) => void;
-  setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
+  eyedropperTokenRef: MutableRefObject<number>;
+  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
 }) {
-  const { abortControllerRef, eyedropperActiveRef, onEyedropperStateChange, setEyedropperPressed } =
-    args;
+  const {
+    abortControllerRef,
+    eyedropperActiveRef,
+    eyedropperTokenRef,
+    onEyedropperStateChangeRef,
+  } = args;
 
   useEffect(
     () => () => {
+      eyedropperTokenRef.current += 1;
       abortControllerRef.current?.abort();
       if (eyedropperActiveRef.current) {
-        clearEyedropperSession({
-          abortControllerRef,
-          eyedropperActiveRef,
-          onEyedropperStateChange,
-          setEyedropperPressed,
-        });
+        eyedropperActiveRef.current = false;
+        onEyedropperStateChangeRef.current(false);
       }
     },
-    [abortControllerRef, eyedropperActiveRef, onEyedropperStateChange, setEyedropperPressed]
+    [abortControllerRef, eyedropperActiveRef, eyedropperTokenRef, onEyedropperStateChangeRef]
   );
 }
 
@@ -82,21 +78,30 @@ async function runEyedropperPick(args: {
   abortControllerRef: MutableRefObject<AbortController | null>;
   eyedropperActiveRef: MutableRefObject<boolean>;
   eyedropperTokenRef: MutableRefObject<number>;
-  onColorChange: (color: string) => void;
-  onEyedropperStateChange: (active: boolean) => void;
+  onColorChangeRef: MutableRefObject<(color: string) => void>;
+  onEyedropperStateChangeRef: MutableRefObject<(active: boolean) => void>;
   setEyedropperPressed: Dispatch<SetStateAction<boolean>>;
 }) {
   const EyeDropperClass = getEyeDropperCtor();
   if (!EyeDropperClass) {
     return;
   }
+  if (args.eyedropperActiveRef.current) return;
 
-  const { abortController, nextToken } = startEyedropperSession(args);
+  let pick: Promise<EyeDropperResult>;
+  const abortController = new AbortController();
+  try {
+    pick = new EyeDropperClass().open({ signal: abortController.signal });
+  } catch {
+    return;
+  }
+  args.abortControllerRef.current = abortController;
+  const nextToken = startEyedropperSession(args);
 
   try {
-    const result = await new EyeDropperClass().open({ signal: abortController.signal });
+    const result = await pick;
     if (args.eyedropperTokenRef.current === nextToken) {
-      args.onColorChange(resolvePickerColor(result.sRGBHex));
+      args.onColorChangeRef.current(resolvePickerColor(result.sRGBHex));
     }
   } catch {
     // User cancel keeps the picker state intact.
@@ -257,13 +262,17 @@ export function useEyedropper(
   const abortControllerRef = useRef<AbortController | null>(null);
   const eyedropperActiveRef = useRef(false);
   const eyedropperTokenRef = useRef(0);
+  const onColorChangeRef = useRef(onColorChange);
+  const onEyedropperStateChangeRef = useRef(onEyedropperStateChange);
+  onColorChangeRef.current = onColorChange;
+  onEyedropperStateChangeRef.current = onEyedropperStateChange;
   const eyedropperAvailable = useMemo(() => getEyeDropperCtor() !== null, []);
   const [eyedropperPressed, setEyedropperPressed] = useState(false);
   useEyedropperCleanup({
     abortControllerRef,
     eyedropperActiveRef,
-    onEyedropperStateChange,
-    setEyedropperPressed,
+    eyedropperTokenRef,
+    onEyedropperStateChangeRef,
   });
 
   const handleEyedropperPick = useCallback(async () => {
@@ -271,11 +280,11 @@ export function useEyedropper(
       abortControllerRef,
       eyedropperActiveRef,
       eyedropperTokenRef,
-      onColorChange,
-      onEyedropperStateChange,
+      onColorChangeRef,
+      onEyedropperStateChangeRef,
       setEyedropperPressed,
     });
-  }, [onColorChange, onEyedropperStateChange]);
+  }, []);
 
   return {
     eyedropperAvailable,
