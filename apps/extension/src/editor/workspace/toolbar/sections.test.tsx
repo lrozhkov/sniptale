@@ -116,9 +116,6 @@ function registerSurfaceRoutingTest() {
     render(renderToolbarSectionSurface(actions, true, onActivateTool));
     expectWorkspaceButtonOrder();
 
-    clickButton('[title="editor.tools.selection"]');
-    clickButton('[title="editor.tools.eraser"]');
-    clickButton('[title="editor.tools.fill"]');
     clickButton('[title="editor.toolbar.crop"]');
     clickButton('[title="editor.toolbar.workspace"]');
     clickButton('[title="editor.toolbar.gridMode"]');
@@ -129,9 +126,7 @@ function registerSurfaceRoutingTest() {
     clickButton('[aria-label*="editor.toolbar.fitToWindow"]');
 
     expect(actions.onActivateCrop).toHaveBeenCalledOnce();
-    expect(onActivateTool).toHaveBeenNthCalledWith(1, 'selection');
-    expect(onActivateTool).toHaveBeenNthCalledWith(2, 'eraser');
-    expect(onActivateTool).toHaveBeenNthCalledWith(3, 'fill');
+    expect(onActivateTool).not.toHaveBeenCalled();
     expect(actions.onToggleInspector).not.toHaveBeenCalledWith('canvas-size');
     expect(actions.onToggleWorkspace).toHaveBeenCalledOnce();
     expect(actions.onToggleGrid).toHaveBeenCalledOnce();

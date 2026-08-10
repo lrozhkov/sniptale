@@ -52,7 +52,7 @@ beforeEach(() => {
 it('keeps raster layer type detection in the layer-type owner', () => {
   expect(isEditorRasterLayerType('image')).toBe(true);
   expect(isEditorRasterLayerType('source-image')).toBe(true);
-  expect(isEditorRasterLayerType('rectangle')).toBe(false);
+  expect(isEditorRasterLayerType('shape')).toBe(false);
 });
 
 it('keeps object and selection render data in the render-data owner', () => {

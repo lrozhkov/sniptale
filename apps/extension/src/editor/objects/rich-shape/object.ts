@@ -4,10 +4,8 @@ import type {
   EditorRichShapeDocumentObject,
 } from '../../../features/editor/document/rich-shape';
 import { createObjectLabel } from '../../document/model';
-import { createRichShapeCalloutControls } from './callout-controls/factory';
 import { exportRichShapeDocumentObjectFromGroup } from './document-export';
 import { createRichShapeGeometryObjects } from './geometry';
-import { applyRichShapeDocumentObjectToObject } from './mutation/apply';
 import { resolveRichShapeGeometry } from './geometry-resolution';
 import type { RichShapeGroup } from './types';
 
@@ -50,7 +48,6 @@ export function createRichShapeObject(
     group.sniptaleRichShapeCatalogId = documentShape.source.itemId;
   }
   group.set({ height: documentShape.frame.height, width: documentShape.frame.width });
-  group.controls = createRichShapeCalloutControls(group, applyRichShapeDocumentObjectToObject);
   return group;
 }
 

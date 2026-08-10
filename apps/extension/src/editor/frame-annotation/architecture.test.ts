@@ -47,9 +47,9 @@ it('keeps SnapDOM isolated to the offscreen raster adapter', () => {
   expect(consumers).toEqual(['offscreen/frame-annotation-rasterizer/index.tsx']);
 });
 
-it('keeps frame annotations distinct from existing badge, frame, text, comment, and freehand types', () => {
+it('keeps frame annotations distinct from the shared drawing and step types', () => {
   const types = readFileSync(join(extensionRoot, 'features/editor/document/types.ts'), 'utf8');
-  for (const existing of ["'highlighter'", "'rectangle'", "'text'", "'callout'", "'step'"]) {
+  for (const existing of ["'pencil'", "'marker'", "'shape'", "'text'", "'step'"]) {
     expect(types).toContain(existing);
   }
   expect(types).toContain("'frame-annotation'");
@@ -58,7 +58,7 @@ it('keeps frame annotations distinct from existing badge, frame, text, comment, 
     .map((path) => readFileSync(path, 'utf8'))
     .join('\n');
   expect(frameOwnerSource).not.toMatch(
-    /sniptaleType\s*=\s*['"](?:highlighter|rectangle|text|callout|step)['"]/
+    /sniptaleType\s*=\s*['"](?:pencil|marker|shape|text|step)['"]/
   );
 
   const authoritativeTypeWriters = sourceFiles(join(extensionRoot, 'editor'))
@@ -67,7 +67,5 @@ it('keeps frame annotations distinct from existing badge, frame, text, comment, 
     )
     .map((path) => relative(extensionRoot, path));
   expect(authoritativeTypeWriters).toEqual(['editor/frame-annotation/proxy.ts']);
-  expect(frameOwnerSource).not.toMatch(
-    /(?:badge|step|callout|comment|text|rectangle).*frame-annotation\s*:/i
-  );
+  expect(frameOwnerSource).not.toMatch(/(?:step|pencil|marker|shape|text).*frame-annotation\s*:/i);
 });

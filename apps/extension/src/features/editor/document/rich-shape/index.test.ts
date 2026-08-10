@@ -11,6 +11,7 @@ import {
   createEnabledRichShapeRoughStyle,
   createStableRichShapeRoughSeed,
   isEditorKnownRichShapeKind,
+  isEditorRichShapeDocumentObject,
   normalizeEditorDocumentRichShapes,
   normalizeEditorRichShapeObject,
   resolveEditorRichShapeFamily,
@@ -86,13 +87,24 @@ function registerRichShapeSerializationTests() {
   it('round-trips rich shape documents through JSON serialization', () => {
     const shape = createDefaultRichShapeObject({
       id: 'shape-1',
-      shapeFamily: EDITOR_RICH_SHAPE_FAMILY.CALLOUT,
-      shapeKind: 'cloud-callout',
+      shapeFamily: EDITOR_RICH_SHAPE_FAMILY.OFFICE,
+      shapeKind: 'ellipse',
       source: { ...DEFAULT_RICH_SHAPE_SOURCE, type: 'custom', itemId: 'item-1' },
     });
     const [roundTrip] = normalizeEditorDocumentRichShapes(JSON.parse(JSON.stringify([shape])));
 
     expect(roundTrip).toEqual(shape);
+  });
+
+  it('rejects the retired rich-shape callout family', () => {
+    const shape = createDefaultRichShapeObject({ id: 'legacy-callout' });
+    expect(
+      isEditorRichShapeDocumentObject({
+        ...shape,
+        shapeFamily: 'callout',
+        shapeKind: 'cloud-callout',
+      })
+    ).toBe(false);
   });
 }
 

@@ -35,7 +35,7 @@ function createEditorDocument(sourceName: string): EditorDocument {
     sourceName,
     sourceTop: 0,
     sourceWidth: 320,
-    version: 1,
+    version: 2,
   };
 }
 

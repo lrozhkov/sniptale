@@ -15,7 +15,6 @@ import type {
   EditorInspectorPaletteState,
   EditorInspectorPresetHeaderBag,
   EditorInspectorRecentColorState,
-  EditorInspectorShapePresetActions,
   EditorInspectorSizeDraft,
 } from '../types';
 import type { EditorInspectorLayerEffectsState } from '../layer-effects/shared';
@@ -24,7 +23,6 @@ import type {
   EditorInspectorLayerEffectSizeControls,
 } from '../layer-effects/types';
 import type { EditorInspectorInteractiveToolPanelProps } from '../panel-types';
-import type { CompactSelectOption } from '../../chrome/ui';
 
 export interface EditorInspectorConfirmDialogState {
   title: string;
@@ -36,7 +34,6 @@ export interface EditorInspectorConfirmDialogState {
 export interface EditorInspectorContentProps
   extends
     EditorInspectorInteractiveToolPanelProps,
-    EditorInspectorShapePresetActions,
     EditorInspectorFrameMutationActions,
     EditorInspectorPaletteState,
     EditorInspectorPresetHeaderBag,
@@ -69,7 +66,6 @@ export interface EditorInspectorContentProps
   workspaceColorError: string | null;
   workspaceColorMatchesDefault: boolean;
   workspaceDefaultSavePending: boolean;
-  borderPresetOptions: CompactSelectOption<string>[];
   savePresets: SavePreset[];
   defaultImagePresetId: string | null;
   layers: EditorLayerItem[];

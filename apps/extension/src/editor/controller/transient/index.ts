@@ -6,9 +6,6 @@ import {
   type SerializedRectProps,
   type TOptions,
 } from 'fabric';
-import { applyTextLayout } from '../../objects/annotation/text/layout';
-import { isCompletedDrawSessionTooSmall } from '../drawing';
-import { isEditorDrawSessionLifecycleClick } from '../drawing/tool-lifecycle';
 import {
   configureCropGuideForEditing,
   createCropSelectionFromRect,
@@ -43,17 +40,8 @@ type EditorDrawSessionCompletion =
 
 function completeTextDrawSession(
   drawSession: DrawSession,
-  minDrawSize: number,
   object: FabricObject
 ): EditorDrawSessionCompletion {
-  const isLifecycleClick =
-    isEditorDrawSessionLifecycleClick(drawSession, minDrawSize) ??
-    isCompletedDrawSessionTooSmall(drawSession, minDrawSize);
-
-  applyTextLayout(object as import('fabric').Textbox, {
-    layoutMode: isLifecycleClick ? 'auto' : 'fixed-width',
-  });
-
   return {
     kind: 'complete',
     drawSession: null,
@@ -94,10 +82,13 @@ export function completeEditorDrawSession(options: {
   }
 
   if (options.drawSession.tool === 'text' && object.type === 'textbox') {
-    return completeTextDrawSession(options.drawSession, options.minDrawSize, object);
+    return completeTextDrawSession(options.drawSession, object);
   }
 
-  if (isCompletedDrawSessionTooSmall(options.drawSession, options.minDrawSize)) {
+  if (
+    options.drawSession.tool !== 'crop' &&
+    Math.max(object.getScaledWidth(), object.getScaledHeight()) < options.minDrawSize
+  ) {
     return {
       kind: 'discard',
       drawSession: null,

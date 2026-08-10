@@ -1,17 +1,10 @@
 import type { EditorKeyboardAction, EditorKeyboardResolverOptions } from './keyboard-types';
 
 export function resolveEditorDeleteKeyboardAction(
-  options: Pick<
-    EditorKeyboardResolverOptions,
-    'activeTool' | 'hasRasterSelection' | 'hasSelection' | 'key'
-  >
-): Extract<EditorKeyboardAction, 'delete-raster-selection' | 'delete-selection'> | null {
+  options: Pick<EditorKeyboardResolverOptions, 'hasSelection' | 'key'>
+): Extract<EditorKeyboardAction, 'delete-selection'> | null {
   if (options.key !== 'Delete' && options.key !== 'Backspace') {
     return null;
-  }
-
-  if (options.activeTool === 'selection' && options.hasRasterSelection) {
-    return 'delete-raster-selection';
   }
 
   return options.hasSelection ? 'delete-selection' : null;
@@ -20,15 +13,27 @@ export function resolveEditorDeleteKeyboardAction(
 export function resolveEditorEnterKeyboardAction(
   options: Pick<
     EditorKeyboardResolverOptions,
-    'hasCropGuide' | 'hasDrawSession' | 'hasSelectedTextTarget' | 'key'
+    | 'hasCropGuide'
+    | 'hasDrawSession'
+    | 'hasSelectedTextTarget'
+    | 'isEditingTextboxSelection'
+    | 'key'
+    | 'shiftKey'
   >
-): Extract<EditorKeyboardAction, 'apply-crop' | 'complete-draw' | 'enter-text-edit'> | null {
+): Extract<
+  EditorKeyboardAction,
+  'apply-crop' | 'complete-draw' | 'enter-text-edit' | 'exit-text-edit'
+> | null {
   if (options.key !== 'Enter') {
     return null;
   }
 
   if (options.hasDrawSession) {
     return 'complete-draw';
+  }
+
+  if (options.isEditingTextboxSelection) {
+    return options.shiftKey ? null : 'exit-text-edit';
   }
 
   if (options.hasSelectedTextTarget) {
@@ -41,12 +46,7 @@ export function resolveEditorEnterKeyboardAction(
 export function resolveEditorFallbackKeyboardAction(
   options: Pick<
     EditorKeyboardResolverOptions,
-    | 'activeTool'
-    | 'code'
-    | 'hasRasterSelection'
-    | 'hasSelection'
-    | 'isEditingTextboxSelection'
-    | 'key'
+    'code' | 'hasSelection' | 'isEditingTextboxSelection' | 'key'
   >
 ): EditorKeyboardAction {
   if (options.code === 'Space') {

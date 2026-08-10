@@ -10,7 +10,7 @@ it('detects managed background objects by role or type', () => {
   byType.sniptaleType = 'background';
   const annotation = new Rect({});
   annotation.sniptaleRole = 'annotation';
-  annotation.sniptaleType = 'rectangle';
+  annotation.sniptaleType = 'shape';
 
   expect(isManagedBackgroundObject(byRole)).toBe(true);
   expect(isManagedBackgroundObject(byType)).toBe(true);

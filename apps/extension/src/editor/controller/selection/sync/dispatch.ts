@@ -1,13 +1,49 @@
 import type { FabricObject } from 'fabric';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
+import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { useEditorStore } from '../../../state/useEditorStore';
 import { syncRichShapeSelectionSettings } from '../rich-shape-sync';
 import { syncImageSelectionSettings } from '../sync-image';
-import { syncArrowSelectionSettings, syncLineSelectionSettings } from '../sync-linear';
 import { syncStepSelectionSettings } from '../sync-step';
-import { syncTextSelectionSettings } from '../sync-text/dispatch';
-import { syncBlurSelectionSettings } from './blur';
-import { syncBrushSelectionSettings } from './brush';
-import { syncShapeSelectionSettings } from './shape';
+
+function syncDrawingSelection(object: FabricObject): void {
+  const drawing = readEditorDrawingObject(object);
+  if (!drawing || drawing.kind === 'blur') return;
+  const store = useEditorStore.getState();
+  if (drawing.kind === 'pencil') {
+    store.updateSelectionDrawingToolSettings('pencil', {
+      color: drawing.color,
+      width: drawing.width,
+    });
+  } else if (drawing.kind === 'marker') {
+    store.updateSelectionDrawingToolSettings('marker', {
+      color: drawing.color,
+      opacity: drawing.opacity,
+      width: drawing.width,
+    });
+  } else if (drawing.kind === 'arrow') {
+    store.updateSelectionDrawingToolSettings('arrow', {
+      color: drawing.color,
+      design: drawing.design ?? 'standard',
+      dynamicWidth: drawing.dynamicWidth,
+      width: drawing.width,
+    });
+  } else if (drawing.kind === 'text') {
+    store.updateSelectionDrawingToolSettings('text', {
+      backgroundColor: drawing.backgroundColor,
+      color: drawing.color,
+      fontFamily: drawing.fontFamily ?? 'handwritten',
+      fontSize: drawing.fontSize,
+    });
+  } else {
+    store.updateSelectionDrawingToolSettings('shape', {
+      color: drawing.color,
+      fillColor: drawing.fillColor ?? null,
+      kind: drawing.kind === 'parallelogram' ? 'rectangle' : drawing.kind,
+      width: drawing.width,
+    });
+  }
+}
 
 export function syncSelectionToolSettingsFromObject(
   object: FabricObject,
@@ -24,29 +60,17 @@ export function syncSelectionToolSettingsFromObject(
       syncImageSelectionSettings(object);
       break;
     case 'pencil':
-    case 'highlighter':
-      syncBrushSelectionSettings(object, type);
-      break;
-    case 'rectangle':
-    case 'ellipse':
-    case 'diamond':
-      syncShapeSelectionSettings(object, type);
-      break;
+    case 'marker':
+    case 'shape':
     case 'blur':
-      syncBlurSelectionSettings(object);
-      break;
     case 'text':
+    case 'arrow':
+      syncDrawingSelection(object);
+      break;
     case 'meta-stamp':
-      syncTextSelectionSettings(object);
       break;
     case 'step':
       syncStepSelectionSettings(object);
-      break;
-    case 'arrow':
-      syncArrowSelectionSettings(object);
-      break;
-    case 'line':
-      syncLineSelectionSettings(object);
       break;
     case 'rich-shape':
       syncRichShapeSelectionSettings(object);

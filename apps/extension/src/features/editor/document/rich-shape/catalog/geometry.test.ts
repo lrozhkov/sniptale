@@ -87,8 +87,6 @@ describe('built-in rich shape catalog geometry', () => {
     expect(getTextFrame('pie')).toEqual({ height: 34, left: 30, top: 46, width: 48 });
     expect(getTextFrame('chord')).toEqual({ height: 30, left: 18, top: 62, width: 64 });
     expect(getTextFrame('flowchart-delay')).toEqual({ height: 64, left: 10, top: 18, width: 64 });
-    expect(getTextFrame('rect-callout')).toEqual({ height: 46, left: 16, top: 18, width: 68 });
-    expect(getTextFrame('cloud-callout')).toEqual({ height: 38, left: 24, top: 38, width: 56 });
   });
 });
 

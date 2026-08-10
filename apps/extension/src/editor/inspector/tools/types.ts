@@ -5,13 +5,11 @@ import type {
   EditorInspectorPresetHeaderBag,
   EditorInspectorRecentColorState,
   EditorInspectorSelectionActionIcons,
-  EditorInspectorShapePresetActions,
 } from '../types';
 
 export interface EditorInspectorToolsPanelProps
   extends
     EditorInspectorConfigurableToolPanelProps,
-    EditorInspectorShapePresetActions,
     EditorInspectorRecentColorState,
     EditorInspectorPaletteState,
     Pick<EditorInspectorPresetHeaderBag, 'toolPresetHeader'>,

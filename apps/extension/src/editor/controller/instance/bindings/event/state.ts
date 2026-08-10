@@ -52,6 +52,5 @@ export function createEventInteractionStateBindings(controller: EditorController
     setPanSession: (session: PanSession | null) => {
       controller.panSession = session;
     },
-    getRasterToolSession: () => controller.rasterToolSession,
   };
 }

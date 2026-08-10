@@ -1,1 +1,0 @@
-export { createDrawingEventHandlers } from './handlers';

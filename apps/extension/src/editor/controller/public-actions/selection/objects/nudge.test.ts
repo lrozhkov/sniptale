@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { expect, it, vi } from 'vitest';
 
 import { nudgeEditorSelection } from './nudge';
@@ -6,6 +8,8 @@ import {
   readFrameAnnotationSnapshot,
 } from '../../../../frame-annotation/proxy';
 import { createFabricCanvasFixture } from '../../../../testing/fabric-canvas.test-support';
+import { readEditorDrawingObject } from '../../../../drawing/object/metadata';
+import { createEditorDrawingFabricObject } from '../../../../drawing/object/vector';
 
 it('moves selected objects, refreshes coordinates, and syncs runtime state', () => {
   const object = {
@@ -66,6 +70,43 @@ it('normalizes a nudged frame-annotation proxy back into canonical metadata', ()
     })
   ).toBe(true);
   expect(readFrameAnnotationSnapshot(object)).toMatchObject({ x: 15, y: 26 });
+});
+
+it('persists a nudged shared drawing through authoritative reconstruction', () => {
+  const object = createEditorDrawingFabricObject(
+    {
+      bounds: { height: 20, width: 40, x: 10, y: 15 },
+      color: '#f00',
+      fillColor: null,
+      id: 'shape-1',
+      kind: 'rectangle',
+      width: 4,
+    },
+    1
+  );
+  const canvas = createFabricCanvasFixture({
+    getActiveObject: () => object,
+    getActiveObjects: () => [object],
+    requestRenderAll: vi.fn(),
+  });
+
+  expect(
+    nudgeEditorSelection({
+      canvas,
+      deltaX: 5,
+      deltaY: -3,
+      ensureObjectReachable: vi.fn(() => true),
+      setSource: vi.fn(),
+      source: null,
+      syncRuntimeState: vi.fn(),
+    })
+  ).toBe(true);
+
+  const drawing = readEditorDrawingObject(object);
+  expect(drawing).toMatchObject({ bounds: { x: 15, y: 12 } });
+  const reconstructed =
+    drawing && drawing.kind !== 'blur' ? createEditorDrawingFabricObject(drawing, 1) : object;
+  expect(reconstructed.getCenterPoint()).toMatchObject(object.getCenterPoint());
 });
 
 it('does not nudge without a canvas or mutable active selection', () => {

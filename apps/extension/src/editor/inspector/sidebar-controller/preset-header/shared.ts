@@ -1,23 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import type { EditorSceneBackgroundSettings } from '../../../../features/editor/document/presets';
-import type { EditorTool } from '../../../../features/editor/document/types';
 import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
 import { translate } from '../../../../platform/i18n';
 import { getPresetSettingsSignature } from './matching';
 
 type SaveMode = 'create' | 'overwrite';
-export type ActiveToolPresetOwner =
-  | 'arrow'
-  | 'blur'
-  | 'ellipse'
-  | 'highlighter'
-  | 'line'
-  | 'pencil'
-  | 'rectangle'
-  | 'step'
-  | 'text'
-  | null;
+export type ActiveToolPresetOwner = 'step';
 
 export type PresetSavePanelControls = {
   closeSavePanel: () => void;
@@ -77,7 +66,7 @@ export function resolvePresetOverwriteTarget<TPreset extends PresetOverwriteCand
   return overwritePresets.find((preset) => preset.id === overwriteTargetId) ?? overwritePresets[0];
 }
 
-export function buildPresetSavePanelState(
+function buildPresetSavePanelState(
   args: PresetSavePanelControls & {
     onSave: () => void;
     overwriteOptions: Array<{ label: string; value: string }>;
@@ -146,21 +135,10 @@ function createPresetName(baseName: string, names: readonly string[]): string {
 
 export function getPresetBaseName(owner: ActiveToolPresetOwner | 'sceneBackground'): string {
   switch (owner) {
-    case 'pencil':
-    case 'highlighter':
-    case 'ellipse':
-    case 'blur':
-    case 'arrow':
-    case 'line':
-    case 'text':
     case 'step':
       return translate(`editor.tools.${owner}`);
-    case 'rectangle':
-      return translate('editor.tools.rectangle');
     case 'sceneBackground':
       return translate('editor.scene.sceneBackgroundTitle');
-    case null:
-      return translate('editor.compact.shapePresetFallback');
   }
 }
 
@@ -173,12 +151,14 @@ export function pickSceneBackgroundSettings(frameDraft: {
   backgroundColor: string;
   backgroundGradientFrom: string;
   backgroundGradientTo: string;
-  backgroundGradientStops?: string[];
-  backgroundGradientColorStops?: EditorSceneBackgroundSettings['backgroundGradientColorStops'];
+  backgroundGradientStops?: string[] | undefined;
+  backgroundGradientColorStops?:
+    | EditorSceneBackgroundSettings['backgroundGradientColorStops']
+    | undefined;
   backgroundGradientAngle: number;
   backgroundImageData: string | null;
   backgroundImageFit: string;
-  sourceImage?: EditorSceneBackgroundSettings['sourceImage'];
+  sourceImage?: EditorSceneBackgroundSettings['sourceImage'] | undefined;
   layoutMode: string;
 }): EditorSceneBackgroundSettings {
   return {
@@ -199,36 +179,6 @@ export function pickSceneBackgroundSettings(frameDraft: {
     sourceImage: normalizeEditorImageSettings(frameDraft.sourceImage),
     layoutMode: frameDraft.layoutMode as EditorSceneBackgroundSettings['layoutMode'],
   };
-}
-
-export function resolveActiveToolPresetOwner(tool: EditorTool): ActiveToolPresetOwner {
-  switch (tool) {
-    case 'pencil':
-    case 'highlighter':
-    case 'ellipse':
-    case 'blur':
-    case 'arrow':
-    case 'line':
-    case 'text':
-    case 'step':
-      return tool;
-    case 'rectangle':
-    case 'diamond':
-      return 'rectangle';
-    case 'shapes-and-lines':
-    case 'rough-shape':
-    case 'callout':
-    case 'frame-annotation':
-    case 'selection':
-    case 'brush':
-    case 'eraser':
-    case 'fill':
-    case 'select':
-    case 'shape-library':
-    case 'image':
-    case 'crop':
-      return null;
-  }
 }
 
 export function usePresetMatchState<TSettings>(args: {

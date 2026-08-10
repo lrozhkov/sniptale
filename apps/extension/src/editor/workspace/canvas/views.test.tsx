@@ -27,7 +27,7 @@ it('renders the pannable image viewport with checkerboard surface and grid overl
   expect(markup).toContain('overflow-auto');
   expect(markup).toContain('max(48rem, 130vw)');
   expect(markup).toContain('background-size:10px 10px');
-  expect(markup).toContain('mock.raster-overlay');
+  expect(markup).not.toContain('mock.raster-overlay');
 });
 
 it('keeps the viewport inert and hides image-only styling before an image is loaded', () => {

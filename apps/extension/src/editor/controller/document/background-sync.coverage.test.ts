@@ -70,7 +70,6 @@ it('syncs legacy frame background against the prepared canvas size during docume
     prepareObject: vi.fn(),
     rebuildFrameDecorations: vi.fn(async () => undefined),
     syncBackgroundLayer,
-    upgradeLegacyArrowObjects: vi.fn(),
     viewportDevicePixelRatioBaseline: 1,
     zoomLevel: 2,
   });

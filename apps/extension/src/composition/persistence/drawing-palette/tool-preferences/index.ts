@@ -35,7 +35,7 @@ export function subscribeToDrawingToolPreferences(
 type DrawingToolPreferencesMutationResult = 'applied' | 'rejected';
 
 export type DrawingToolPreferencesPatch = {
-  [Tool in keyof DrawingToolDefaults]?: DrawingToolDefaults[Tool];
+  [Tool in keyof DrawingToolDefaults]?: Partial<DrawingToolDefaults[Tool]>;
 };
 
 function mergeDrawingToolPreferences(
@@ -43,11 +43,11 @@ function mergeDrawingToolPreferences(
   patch: DrawingToolPreferencesPatch
 ): DrawingToolDefaults {
   return {
-    pencil: patch.pencil ?? current.pencil,
-    marker: patch.marker ?? current.marker,
-    shape: patch.shape ?? current.shape,
-    arrow: patch.arrow ?? current.arrow,
-    text: patch.text ?? current.text,
+    pencil: { ...current.pencil, ...patch.pencil },
+    marker: { ...current.marker, ...patch.marker },
+    shape: { ...current.shape, ...patch.shape },
+    arrow: { ...current.arrow, ...patch.arrow },
+    text: { ...current.text, ...patch.text },
   };
 }
 

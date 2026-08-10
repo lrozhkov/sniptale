@@ -1,5 +1,6 @@
 import type { EditorTool } from '../../../../../features/editor/document/types';
 import type { EditorControllerInstance } from '../../types';
+import { isTextbox } from '../../../core/helpers';
 
 function discardActiveCanvasSelection(controller: EditorControllerInstance): boolean {
   const activeObjects =
@@ -24,6 +25,15 @@ export function setActiveToolForController(
   controller: EditorControllerInstance,
   tool: EditorTool
 ): void {
+  const activeObject = controller.canvas?.getActiveObject();
+  if (
+    controller.activeTool !== tool &&
+    activeObject &&
+    isTextbox(activeObject) &&
+    activeObject.isEditing
+  ) {
+    activeObject.exitEditing();
+  }
   controller.toolModeEnabled = true;
   controller.activeTool = tool;
   controller.syncRuntimeState();

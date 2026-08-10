@@ -1,12 +1,7 @@
 import type {
   BrowserFrameState,
-  EditorSelectionState,
-  EditorShapeSettings,
-  EditorTool,
   EditorWorkspaceSettings,
 } from '../../../features/editor/document/types';
-import type { EditorRichShapeDocumentObject } from '../../../features/editor/document/rich-shape';
-import type { EditorToolSettings } from '../../../features/editor/document/tool-settings-types';
 
 import { EditorInspectorBrowserFramePanel } from '../environment';
 import type { CompactSelectOption } from '../../chrome/ui';
@@ -17,49 +12,18 @@ import { renderEditorInspectorContentToolsSections } from './tools';
 import { renderEditorInspectorContentWorkspaceSections } from './workspace';
 import type { EditorInspectorContentProps } from '../content/types';
 import type { EditorInspectorPresetHeaderState } from '../presets';
+import type { EditorInspectorToolsPanelProps } from '../tools/types';
 
-export interface EditorInspectorContentSurfaceSectionsProps {
+export interface EditorInspectorContentSurfaceSectionsProps extends Omit<
+  EditorInspectorToolsPanelProps,
+  'selectionDuplicateIcon' | 'selectionDeleteIcon'
+> {
   inspector: string;
+  scenePresetHeader: EditorInspectorPresetHeaderState | null;
   browserFrame: BrowserFrameState;
   workspace: EditorWorkspaceSettings;
-  selection: EditorSelectionState;
-  cropReady: boolean;
-  highlightedTool: EditorTool;
-  scenePresetHeader: EditorInspectorPresetHeaderState | null;
-  inspectorToolSettings: EditorToolSettings;
-  richShapeSelection: EditorRichShapeDocumentObject | null;
-  toolPresetHeader: EditorInspectorPresetHeaderState | null;
-  recentColors: string[];
-  borderPresetOptions: CompactSelectOption<string>[];
-  frameBackgroundPalette: readonly string[];
-  canDeleteSelection: boolean;
-  isResizableLayerSelection: boolean;
-  layerSizeText: string;
-  layerSizeDraft: { width: number; height: number };
-  layerSizeLocked: boolean;
-  layerAspectRatio: number | null;
-  arrowVariantOptions: CompactSelectOption<EditorToolSettings['arrow']['variant']>[];
-  arrowTypeOptions: CompactSelectOption<NonNullable<EditorToolSettings['arrow']['arrowType']>>[];
-  arrowModeOptions: CompactSelectOption<EditorToolSettings['arrow']['mode']>[];
-  arrowHeadOptions: CompactSelectOption<EditorToolSettings['arrow']['startHead']>[];
-  lineStyleOptions: CompactSelectOption<EditorToolSettings['line']['style']>[];
-  lineCornerOptions: CompactSelectOption<EditorToolSettings['line']['corners']>[];
-  lineFillModeOptions: CompactSelectOption<EditorToolSettings['line']['fillMode']>[];
-  lineRoughFillStyleOptions: CompactSelectOption<EditorToolSettings['line']['roughFillStyle']>[];
-  blurTypeOptions: CompactSelectOption<EditorToolSettings['blur']['blurType']>[];
   browserCanvasModeOptions: CompactSelectOption<BrowserFrameState['canvasMode']>[];
   browserContentModeOptions: CompactSelectOption<BrowserFrameState['contentMode']>[];
-  fontOptions: CompactSelectOption<EditorToolSettings['text']['fontFamily']>[];
-  shapeFillPalette: readonly string[];
-  shapeStrokePalette: readonly string[];
-  stepAlphabetOptions: CompactSelectOption<EditorToolSettings['step']['alphabet']>[];
-  stepTypeOptions: CompactSelectOption<EditorToolSettings['step']['type']>[];
-  textAlignOptions?: CompactSelectOption<EditorToolSettings['text']['textAlign']>[];
-  textVerticalAlignOptions?: CompactSelectOption<EditorToolSettings['text']['verticalAlign']>[];
-  textBackgroundPalette: readonly string[];
-  textCalloutFormatOptions: CompactSelectOption<EditorToolSettings['text']['calloutFormat']>[];
-  textColorPalette: readonly string[];
-  textLayoutModeOptions?: CompactSelectOption<EditorToolSettings['text']['layoutMode']>[];
   workspaceColorError: string | null;
   workspaceColorMatchesDefault: boolean;
   workspaceDefaultSavePending: boolean;
@@ -76,43 +40,8 @@ export interface EditorInspectorContentSurfaceSectionsProps {
     locked: boolean,
     aspectRatio: number | null
   ) => { width: number; height: number };
-  setLayerSizeDraft: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
-  setLayerSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
-  previewColor: (setter: (value: string) => void, color: string) => void;
-  updateColor: (setter: (value: string) => void, color: string) => void;
   applyWorkspaceColor: (color: string) => Promise<void> | void;
   saveWorkspaceColorAsDefault: () => Promise<void> | void;
-  applyPreset: (presetId: string) => void;
-  setPencilShapeCorrection: (
-    shapeCorrection: EditorToolSettings['pencil']['shapeCorrection']
-  ) => void;
-  saveShapeAsHighlighterPreset: () => Promise<void> | void;
-  applyBrushPatch: (
-    tool: 'pencil' | 'highlighter',
-    patch: Partial<EditorToolSettings['pencil']>
-  ) => void;
-  applyShapePatch: (patch: Partial<EditorShapeSettings>) => void;
-  applyBlurPatch: (patch: Partial<EditorToolSettings['blur']>) => void;
-  applyArrowPatch: (patch: Partial<EditorToolSettings['arrow']>) => void;
-  applyLinePatch?: (patch: Partial<EditorToolSettings['line']>) => void;
-  applyTextPatch: (patch: Partial<EditorToolSettings['text']>) => void;
-  applyTextStyle: EditorInspectorContentProps['applyTextStyle'];
-  applyStepPatch: (patch: Partial<EditorToolSettings['step']>) => void;
-  applyImagePatch?: ((patch: Partial<EditorToolSettings['image']>) => void) | undefined;
-  applyRichShapePatch: EditorInspectorContentProps['applyRichShapePatch'];
-  arrangeSelection: EditorInspectorContentProps['arrangeSelection'];
-  previewBrushPatch: (
-    tool: 'pencil' | 'highlighter',
-    patch: Partial<EditorToolSettings['pencil']>
-  ) => void;
-  previewShapePatch: (patch: Partial<EditorShapeSettings>) => void;
-  previewBlurPatch: (patch: Partial<EditorToolSettings['blur']>) => void;
-  previewArrowPatch: (patch: Partial<EditorToolSettings['arrow']>) => void;
-  previewLinePatch?: (patch: Partial<EditorToolSettings['line']>) => void;
-  previewTextPatch: (patch: Partial<EditorToolSettings['text']>) => void;
-  previewStepPatch: (patch: Partial<EditorToolSettings['step']>) => void;
-  previewImagePatch?: ((patch: Partial<EditorToolSettings['image']>) => void) | undefined;
-  commitPendingSelectionSettings: () => void;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   updateWorkspace: (patch: Partial<EditorWorkspaceSettings>) => void;

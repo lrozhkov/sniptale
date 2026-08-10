@@ -64,7 +64,6 @@ it('masks the canvas element with the workspace color while the document is load
     document: { id: 'document' } as never,
     prepareObject: vi.fn(),
     rebuildFrameDecorations: vi.fn(async () => undefined),
-    upgradeLegacyArrowObjects: vi.fn(),
     zoomLevel: 2,
   });
 

@@ -162,6 +162,11 @@
       "ownerClass": "app-core"
     },
     {
+      "sourcePrefix": "apps/extension/src/ui/drawing-tools",
+      "ownerId": "app-core.editor-controls.drawing",
+      "ownerClass": "app-core"
+    },
+    {
       "sourcePrefix": "apps/extension/src/ui/paint-selector",
       "ownerId": "app-core.editor-controls.paint",
       "ownerClass": "app-core"
@@ -750,6 +755,7 @@
   "retainedAppUiRoots": [
     "apps/extension/src/ui/annotation-template-query",
     "apps/extension/src/ui/color-selector",
+    "apps/extension/src/ui/drawing-tools",
     "apps/extension/src/ui/command-palette",
     "apps/extension/src/ui/compact-inspector-controls",
     "apps/extension/src/ui/glass-select",

@@ -99,7 +99,6 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       strokeWidth: 0,
     });
     if (input.excludeId !== undefined) target.sniptaleId = input.excludeId;
-    target.sniptaleType = 'rectangle';
     target.canvas = this.canvas;
     this.moving({ target } as unknown as EditorMagnetTransformEvent);
     this.canvas.requestRenderAll();
@@ -127,7 +126,6 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       strokeWidth: 0,
     });
     if (input.excludeId !== undefined) target.sniptaleId = input.excludeId;
-    target.sniptaleType = 'rectangle';
     target.canvas = this.canvas;
     const corner = RESIZE_CORNER_BY_DIRECTION[input.direction];
     const uniformKey = this.canvas.uniScaleKey ?? 'shiftKey';

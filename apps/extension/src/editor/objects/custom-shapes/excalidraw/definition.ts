@@ -1,7 +1,6 @@
 import {
   DEFAULT_RICH_SHAPE_TEXT,
   EDITOR_RICH_SHAPE_FAMILY,
-  getEditorBuiltInShapeEntry,
   type EditorCustomShapeDefinition,
 } from '../../../../features/editor/document/rich-shape';
 import { createStableCustomShapeId } from '../ids';
@@ -38,8 +37,7 @@ export function createExcalidrawDefinition(args: {
   mappedElements: readonly ExcalidrawMappedElement[];
   label: string;
 }): EditorCustomShapeDefinition | null {
-  const nativeEntry = resolveNativeLibraryReplacement(args.item, args.label);
-  const geometry = nativeEntry?.geometry ?? combineExcalidrawElementGeometries(args.mappedElements);
+  const geometry = combineExcalidrawElementGeometries(args.mappedElements);
   const first = args.mappedElements[0];
   if (!geometry || !first) {
     return null;
@@ -54,7 +52,6 @@ export function createExcalidrawDefinition(args: {
   const richShapeDefaults = createExcalidrawRichShapeDefaults({
     first,
     mappedCount: args.mappedElements.length,
-    nativeEntry,
     shapeKind,
     source,
     textContent: metadata.textContent,
@@ -65,7 +62,6 @@ export function createExcalidrawDefinition(args: {
     first,
     geometry,
     metadata,
-    nativeEntry,
     richShapeDefaults,
     source,
   });
@@ -98,7 +94,6 @@ function createExcalidrawDefinitionResult(params: {
   first: ExcalidrawMappedElement;
   geometry: NonNullable<EditorCustomShapeDefinition['geometry']>;
   metadata: ReturnType<typeof createExcalidrawImportMetadata>;
-  nativeEntry: ReturnType<typeof resolveNativeLibraryReplacement>;
   richShapeDefaults: NonNullable<EditorCustomShapeDefinition['richShapeDefaults']>;
   source: NonNullable<EditorCustomShapeDefinition['source']>;
 }): EditorCustomShapeDefinition {
@@ -123,10 +118,9 @@ function createExcalidrawDefinitionResult(params: {
     ],
     geometry: params.geometry,
     capabilities:
-      params.nativeEntry?.capabilities ??
-      (params.first.element.type === 'line' || params.first.element.type === 'arrow'
+      params.first.element.type === 'line' || params.first.element.type === 'arrow'
         ? ['line', 'connectors']
-        : ['fill', 'line', 'text', 'effects']),
+        : ['fill', 'line', 'text', 'effects'],
     richShapeDefaults: params.richShapeDefaults,
     source: params.source,
     importMetadata: params.metadata,
@@ -151,7 +145,6 @@ function createExcalidrawImportMetadata(args: {
 function createExcalidrawRichShapeDefaults(args: {
   first: ExcalidrawMappedElement;
   mappedCount: number;
-  nativeEntry: ReturnType<typeof resolveNativeLibraryReplacement>;
   shapeKind: ExcalidrawMappedElement['shapeKind'] | 'excalidraw-export-item';
   source: {
     type: 'manual-excalidraw-import';
@@ -165,10 +158,8 @@ function createExcalidrawRichShapeDefaults(args: {
 }) {
   const rough = createExcalidrawRoughDefaults(args.first);
   return {
-    shapeFamily:
-      args.nativeEntry?.insertDefaults.shapeFamily ??
-      (args.mappedCount === 1 ? args.first.shapeFamily : EDITOR_RICH_SHAPE_FAMILY.LIBRARY),
-    shapeKind: args.nativeEntry?.insertDefaults.shapeKind ?? args.shapeKind,
+    shapeFamily: args.mappedCount === 1 ? args.first.shapeFamily : EDITOR_RICH_SHAPE_FAMILY.LIBRARY,
+    shapeKind: args.shapeKind,
     style: args.first.style,
     ...createExcalidrawTextDefaults(args.first, args.textContent),
     ...(rough ? { rough } : {}),
@@ -203,12 +194,4 @@ function createExcalidrawRoughDefaults(
     fillTransparency: first.style.fillTransparency,
     preserveVertices: true,
   };
-}
-
-function resolveNativeLibraryReplacement(item: ExcalidrawImportItemModel, label: string) {
-  const searchText = [label, item.name, ...item.tags].filter(Boolean).join(' ').toLowerCase();
-  if (searchText.includes('cloud') || searchText.includes('облак')) {
-    return getEditorBuiltInShapeEntry('cloud-callout');
-  }
-  return undefined;
 }

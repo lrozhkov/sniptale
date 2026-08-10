@@ -103,7 +103,7 @@ function createDocument(projectId: string, stepId = 'step-1') {
       sourceName: null,
       sourceTop: 0,
       sourceWidth: 10,
-      version: 1 as const,
+      version: 2 as const,
     },
     projectId,
     stepId,

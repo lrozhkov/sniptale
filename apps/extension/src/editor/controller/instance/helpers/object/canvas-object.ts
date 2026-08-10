@@ -1,24 +1,9 @@
 import type { FabricObject } from 'fabric';
-import type { EditorObjectType } from '../../../../../features/editor/document/types';
 import { prepareEditorObject } from '../../../document/objects/prepare';
 import { addEditorCanvasObject } from '../../../input/canvas-actions/object-add';
-import { decorateEditorShape } from '../../../input/canvas-actions/shape-decoration';
 import { syncEditorRasterEffects } from '../../../layer-effects/filters';
 import type { EditorControllerInstance } from '../../types';
-
-function consumeInitialTextInsertFlag(textbox: import('fabric').Textbox): boolean {
-  const shouldResetTool = Boolean(textbox.sniptaleTextInitialInsertPending);
-  textbox.sniptaleTextInitialInsertPending = false;
-  return shouldResetTool;
-}
-
-export function decorateShapeForController(
-  controller: EditorControllerInstance,
-  object: FabricObject,
-  type: Extract<EditorObjectType, 'rectangle' | 'ellipse' | 'diamond'>
-): void {
-  decorateEditorShape(object, type, (itemType) => controller.nextLabelIndex(itemType));
-}
+import { syncEditorDrawingTextObject } from '../../../../drawing/object/metadata';
 
 export function addObjectForController(
   controller: EditorControllerInstance,
@@ -40,18 +25,12 @@ export function initializeObjectForController(
   syncEditorRasterEffects(object);
   prepareEditorObject(object, {
     onTextboxExitEmpty: (textbox) => {
-      const shouldResetTool = consumeInitialTextInsertFlag(textbox);
       controller.canvas?.remove(textbox);
       controller.canvas?.requestRenderAll();
-      if (shouldResetTool) {
-        controller.switchToSelectTool();
-      }
       controller.syncRuntimeState();
     },
     onTextboxExitCommit: (textbox) => {
-      if (consumeInitialTextInsertFlag(textbox)) {
-        controller.switchToSelectTool();
-      }
+      syncEditorDrawingTextObject(textbox);
       controller.commitHistory();
       controller.syncRuntimeState();
     },

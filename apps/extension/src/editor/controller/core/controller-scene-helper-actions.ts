@@ -3,13 +3,11 @@ import type {
   BrowserFrameState,
   EditorDocument,
   EditorFrameSettings,
-  EditorObjectType,
 } from '../../../features/editor/document/types';
 
 import type { ApplyDocumentOptions } from './types';
 import {
   applyDocumentForController,
-  decorateShapeForController,
   ensureBrowserFrameOnTopForController,
   initializeObjectForController,
   logBrowserFrameForController,
@@ -55,12 +53,5 @@ export abstract class ImageEditorControllerSceneHelperActions extends ImageEdito
 
   sendFrameObjectsToBack(): void {
     sendFrameObjectsToBackForController(this.instance);
-  }
-
-  decorateShape(
-    object: FabricObject,
-    type: Extract<EditorObjectType, 'rectangle' | 'ellipse' | 'diamond'>
-  ): void {
-    decorateShapeForController(this.instance, object, type);
   }
 }

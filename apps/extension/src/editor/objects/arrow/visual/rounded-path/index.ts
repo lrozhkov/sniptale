@@ -1,1 +1,0 @@
-export { buildRoundedClosedPath } from './build';

@@ -1,11 +1,6 @@
 import { useEditorController } from '../../application/controller-context';
 import { getSelectedRichShapeDocumentObject } from '../../controller/public-actions/selection/rich-shape';
-import {
-  getEditorShapeSettings,
-  type EditorShapeTool,
-} from '../../../features/editor/document/shape-settings';
 import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
-import { type EditorTool } from '../../../features/editor/document/types';
 import { useEditorStore } from '../../state/useEditorStore';
 import type { EditorInspectorPresetHeaderBag } from '../types';
 import {
@@ -31,6 +26,12 @@ import { useEditorPresetStorageState } from './presets';
 import { useEditorInspectorPresetHeaders } from './preset-headers';
 
 type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
+type EditorInspectorActionGroups = ReturnType<typeof useEditorInspectorSidebarActions>;
+type EditorInspectorActions = EditorInspectorActionGroups['catalogActions'] &
+  EditorInspectorActionGroups['editorActions'] &
+  EditorInspectorActionGroups['selectionActions'] &
+  EditorInspectorActionGroups['staticOptions'] &
+  EditorInspectorActionGroups['utilityActions'];
 
 function createSidebarControllerLocalState(localState: EditorInspectorLocalState) {
   const { workspaceColor, ...rest } = localState;
@@ -93,10 +94,9 @@ function useSidebarDerivedState(
 function useSidebarActions(
   hasImage: boolean,
   store: EditorInspectorStoreSlice,
-  derived: ReturnType<typeof useSidebarDerivedState>['derived'],
   localState: EditorInspectorLocalState
-) {
-  return useEditorInspectorSidebarActions(
+): EditorInspectorActions {
+  const groups = useEditorInspectorSidebarActions(
     {
       activeTool: store.activeTool,
       browserFrame: store.browserFrame,
@@ -107,29 +107,11 @@ function useSidebarActions(
       selection: store.selection,
       setFrameDraft: localState.setFrameDraft,
       setBrowserFrame: store.setBrowserFrame,
-      shapeSettings: getEditorShapeSettings(
-        derived.inspectorToolSettings,
-        resolveSidebarShapeTool(derived.highlightedTool)
-      ),
-      shapeTool: resolveSidebarShapeTool(derived.highlightedTool),
-      textSettings: derived.inspectorToolSettings.text,
       setWorkspaceColorError: localState.workspaceColor.setError,
       setWorkspaceDefaultSavePending: localState.workspaceColor.setPending,
-      updateBlurSettings: store.updateBlurSettings,
-      updateArrowSettings: store.updateArrowSettings,
-      updateLineSettings: store.updateLineSettings,
-      updateBrushSettings: store.updateBrushSettings,
-      updateSelectionBlurSettings: store.updateSelectionBlurSettings,
-      updateSelectionArrowSettings: store.updateSelectionArrowSettings,
-      updateSelectionLineSettings: store.updateSelectionLineSettings,
-      updateSelectionBrushSettings: store.updateSelectionBrushSettings,
-      updateSelectionShapeSettings: store.updateSelectionShapeSettings,
       updateSelectionStepSettings: store.updateSelectionStepSettings,
-      updateSelectionTextSettings: store.updateSelectionTextSettings,
       updateSelectionImageSettings: store.updateSelectionImageSettings,
-      updateShapeSettings: store.updateShapeSettings,
       updateStepSettings: store.updateStepSettings,
-      updateTextSettings: store.updateTextSettings,
       updateImageSettings: store.updateImageSettings,
       updateWorkspace: store.updateWorkspace,
       updateWorkspaceDefaults: store.updateWorkspaceDefaults,
@@ -138,18 +120,13 @@ function useSidebarActions(
     },
     hasImage
   );
-}
-
-export function resolveSidebarShapeTool(tool: EditorTool): EditorShapeTool {
-  if (tool === 'ellipse') {
-    return 'ellipse';
-  }
-
-  if (tool === 'diamond') {
-    return 'diamond';
-  }
-
-  return 'rectangle';
+  return {
+    ...groups.staticOptions,
+    ...groups.utilityActions,
+    ...groups.selectionActions,
+    ...groups.catalogActions,
+    ...groups.editorActions,
+  };
 }
 
 function buildSidebarControllerState(args: {
@@ -227,7 +204,7 @@ export function useEditorInspectorSidebarController(hasImage: boolean) {
     store,
     editorController
   );
-  const actions = useSidebarActions(hasImage, store, derived, localState);
+  const actions = useSidebarActions(hasImage, store, localState);
   const presetHeaders = useEditorInspectorPresetHeaders(
     createPresetHeaderArgs(derived, actions, editorPresetState, localState)
   );
@@ -269,16 +246,7 @@ function createPresetHeaderArgs(
 ): Parameters<typeof useEditorInspectorPresetHeaders>[0] {
   return {
     activeTool: derived.highlightedTool,
-    applyBlurPresetSettings: (settings) => actions.applyBlurPresetSettings(settings),
-    applyArrowPresetSettings: (settings) => actions.applyArrowPresetSettings(settings),
-    applyLinePresetSettings: (settings) => actions.applyLinePresetSettings(settings),
-    applyBrushPresetSettings: (tool, settings) => actions.applyBrushPresetSettings(tool, settings),
-    applyShapePresetSettings: (owner, settings) =>
-      actions.applyShapePresetSettings(owner, settings),
-    applyStepPresetSettings: (settings) => actions.applyStepPresetSettings(settings),
-    applyTextPresetSettings: (settings) => actions.applyTextPresetSettings(settings),
-    borderPresets: actions.borderPresets,
-    defaultBorderPresetId: actions.defaultBorderPresetId,
+    applyStepPresetSettings: (settings) => actions.applyStepPatch(settings),
     editorPresetState,
     frameDraft: localState.frameDraft,
     setFrameSettings: (settings) => {

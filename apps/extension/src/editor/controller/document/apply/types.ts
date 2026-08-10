@@ -4,7 +4,6 @@ import type { PreparedAppliedDocument } from '..';
 
 export type AppliedDocumentCanvasLoadCallbacks = {
   prepareObject: (object: FabricObject) => void;
-  upgradeLegacyArrowObjects: () => void;
   syncBackgroundLayer?: (
     frame: EditorDocument['frame'],
     canvasSize: { width: number; height: number }

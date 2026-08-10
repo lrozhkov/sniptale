@@ -1,7 +1,5 @@
 import type { FabricObject } from 'fabric';
 
-import { DEFAULT_EDITOR_TEXTBOX_WIDTH } from '../../../objects/annotation/text';
-
 import type { SourceState } from '../../../document/model/source-state';
 
 function getObjectDimension(
@@ -24,7 +22,7 @@ function getObjectDimension(
 
 export function clampTechnicalDataTextPosition(text: FabricObject, source: SourceState): void {
   const inset = 20;
-  const textWidth = getObjectDimension(text, 'width', DEFAULT_EDITOR_TEXTBOX_WIDTH);
+  const textWidth = getObjectDimension(text, 'width', 360);
   const textHeight = getObjectDimension(text, 'height', 120);
   const minLeft = source.left + inset;
   const maxLeft = Math.max(minLeft, source.left + source.displayWidth - textWidth - inset);

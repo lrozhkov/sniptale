@@ -54,8 +54,8 @@ export const AUDIT_STORAGE_OWNER_MAPPINGS = [
     exclusive: true,
     reason: 'Editor preset storage parser changes are covered by focused guard suites.',
     testFiles: [
-      'apps/extension/src/composition/persistence/editor-presets/guards.test.ts',
-      'apps/extension/src/composition/persistence/editor-presets/index.test.ts',
+      'apps/extension/src/composition/persistence/editor-presets/scene-background-source-image.test.ts',
+      'apps/extension/src/composition/persistence/editor-presets/state.test.ts',
     ],
   },
 ];

@@ -279,7 +279,7 @@ async function createOriginalImageDocument(
   const height = media.height;
   if (!width || !height) throw new ImageAggregateNotFoundError(media.id);
   return {
-    version: 1,
+    version: 2,
     sourceImageData: await blobToDataUrl(media.blob),
     sourceName: media.originalFilename,
     sourceWidth: width,

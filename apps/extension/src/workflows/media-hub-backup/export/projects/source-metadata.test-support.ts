@@ -93,7 +93,7 @@ function createScenarioStepDocumentRecordWithSourceMetadata() {
   return {
     createdAt: 5,
     document: {
-      version: 1,
+      version: 2,
       sourceImageData: EDITOR_SOURCE_IMAGE_DATA_URL,
       sourceName: null,
       sourceWidth: 100,

@@ -11,9 +11,6 @@ export function applyEditorEditingKeyboardAction(
       return { preventDefault: true };
     case 'cancel-transient':
       return { preventDefault: options.cancelTransientInteraction() };
-    case 'delete-raster-selection':
-      options.deleteRasterSelectionPixels();
-      return { preventDefault: true };
     case 'delete-selection':
       options.deleteSelection();
       return { preventDefault: true };
@@ -30,9 +27,6 @@ export function applyEditorEditingKeyboardAction(
     case 'undo':
     case 'redo':
     case 'space-down':
-    case 'copy-raster-selection':
-    case 'cut-raster-selection':
-    case 'paste-raster-clipboard':
     case 'duplicate-selection':
       return { preventDefault: false };
   }

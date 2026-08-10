@@ -3,14 +3,7 @@ import { translate } from '../../../platform/i18n';
 import { CompactCommandToken, type CompactCommand } from '../../inspector/compact';
 import { resolveCompactCommandTrigger } from '../../inspector/compact/shared';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
-import { createArrowToolbarGroups } from './arrow-toolbar-groups';
-import { createBlurToolbarGroups } from './blur-toolbar-groups';
-import { createBrushToolbarGroups } from './brush-toolbar-groups';
-import { createLineToolbarGroups } from './line-toolbar-groups';
-import { createRasterToolbarGroups } from './raster-toolbar-groups';
-import { createShapeToolbarGroups } from './shape-toolbar-groups';
 import { createStepToolbarGroups } from './step-toolbar-groups';
-import { createTextToolbarGroups } from './text-toolbar-groups';
 import { createToolbarGroup } from './toolbar-group-builders';
 
 function isTemplateCommand(command: CompactCommand): boolean {
@@ -123,15 +116,5 @@ function createGenericToolPropertiesGroups(commands: CompactCommand[]): Floating
 }
 
 export function createToolPropertiesGroups(commands: CompactCommand[]): FloatingToolbarGroup[] {
-  return (
-    createBrushToolbarGroups(commands) ??
-    createBlurToolbarGroups(commands) ??
-    createLineToolbarGroups(commands) ??
-    createArrowToolbarGroups(commands) ??
-    createShapeToolbarGroups(commands) ??
-    createStepToolbarGroups(commands) ??
-    createRasterToolbarGroups(commands) ??
-    createTextToolbarGroups(commands, { fontTrigger: 'icon' }) ??
-    createGenericToolPropertiesGroups(commands)
-  );
+  return createStepToolbarGroups(commands) ?? createGenericToolPropertiesGroups(commands);
 }

@@ -1,41 +1,11 @@
-import type { Canvas, FabricObject } from 'fabric';
-import { isArrowObject, updateArrowObject } from '../../objects/arrow';
-import { isLineObject, updateLineObject } from '../../objects/line';
+import type { Canvas } from 'fabric';
 import { isTextbox } from '../core/helpers';
 import { applyEditorObjectInteractionControls } from '../document/interaction-controls/apply';
 import { clearRichShapeToolOrigin } from '../tools/rich-shape-drawing/origin';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
 import type { completeEditorDrawSession } from '../transient';
 import type { DrawWorkflowState } from './completion-types';
-
-function reapplyInteractionControls(object: FabricObject): void {
-  if (typeof object.set !== 'function') {
-    return;
-  }
-
-  applyEditorObjectInteractionControls(object);
-}
-
-function completeArrowDrawObject(object: FabricObject): void {
-  delete object.sniptaleArrowClickMode;
-  delete object.sniptaleArrowDrawing;
-  delete object.sniptaleArrowPointerMoved;
-  delete object.sniptaleArrowDraftPoints;
-  if (isArrowObject(object)) {
-    updateArrowObject(object, {});
-    reapplyInteractionControls(object);
-  }
-}
-
-function completeLineDrawObject(canvas: Canvas, object: FabricObject): void {
-  delete object.sniptaleLineClickMode;
-  delete object.sniptaleLineDrawing;
-  delete object.sniptaleLinePointerMoved;
-  if (isLineObject(object)) {
-    updateLineObject(object, {});
-    reapplyInteractionControls(object);
-  }
-  canvas.discardActiveObject?.();
-}
 
 export function createCompletedDrawWorkflowState(
   canvas: Canvas,
@@ -43,14 +13,16 @@ export function createCompletedDrawWorkflowState(
   commitHistory: () => void,
   syncRuntimeState: () => void
 ): DrawWorkflowState {
-  if (completion.completedTool === 'arrow') {
-    completeArrowDrawObject(completion.object);
+  const drawing = readEditorDrawingObject(completion.object);
+  if (drawing?.kind === 'pencil' || drawing?.kind === 'marker' || drawing?.kind === 'arrow') {
+    updateEditorDrawingPathDraft(completion.object, drawing, { preview: false });
   }
   if (completion.completedTool === 'rich-shape') {
     clearRichShapeToolOrigin(completion.object);
   }
-  if (completion.completedTool === 'line') {
-    completeLineDrawObject(canvas, completion.object);
+  applyEditorObjectInteractionControls(completion.object);
+  if (completion.completedTool === 'pencil' || completion.completedTool === 'marker') {
+    canvas.discardActiveObject();
   } else {
     canvas.setActiveObject(completion.object);
   }
@@ -59,7 +31,9 @@ export function createCompletedDrawWorkflowState(
     completion.object.selectAll();
   }
   canvas.requestRenderAll();
-  commitHistory();
+  if (completion.completedTool !== 'text') {
+    commitHistory();
+  }
   syncRuntimeState();
 
   return {

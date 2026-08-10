@@ -11,6 +11,7 @@ import {
   type DrawingShapeKind,
   type DrawingShapeObject,
 } from '../../../../features/drawing/public';
+import { measureContentDrawingText } from '../../../drawing/text-measurement';
 import { translate } from '../../../../platform/i18n';
 import {
   ArrowWidthModeOptions,
@@ -23,12 +24,12 @@ import {
   DrawingTextOptions,
   DrawingWidthOptions,
   MarkerOpacityOptions,
-} from './drawing-option-controls';
+} from '../../../../ui/drawing-tools/options';
 import {
   resolveUpdatedQuickObject,
   type DrawingQuickToolUpdate as QuickToolUpdate,
   type SelectedQuickDrawingObject,
-} from './drawing-option-update';
+} from '../../../../features/drawing/updates';
 import {
   resolveToolbarFloatingMenuStyle,
   resolveToolbarMenuPlacement,
@@ -156,7 +157,9 @@ function replaceSelectedQuickObject(
   selected: Exclude<SelectedQuickDrawingObject, null>,
   update: QuickToolUpdate
 ) {
-  controller.session.replaceObject(resolveUpdatedQuickObject(selected, update));
+  controller.session.replaceObject(
+    resolveUpdatedQuickObject(selected, update, { measureText: measureContentDrawingText })
+  );
 }
 
 function updateQuickToolOption(args: {
@@ -277,7 +280,9 @@ function ToolbarDrawingSelectionOptions(props: {
     : [];
   const update = (next: QuickToolUpdate) => {
     props.controller.session.replaceObjects(
-      selectedQuick.map((object) => resolveUpdatedQuickObject(object, next))
+      selectedQuick.map((object) =>
+        resolveUpdatedQuickObject(object, next, { measureText: measureContentDrawingText })
+      )
     );
   };
   const vertical = props.displayMode === 'vertical';

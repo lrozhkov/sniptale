@@ -17,7 +17,6 @@ type EditorWindowKeyDownOptions = EditorKeyboardCommandCallbacks & {
   altKey: boolean;
   shiftKey: boolean;
   activeTool: string;
-  hasRasterSelection: boolean;
   hasCropGuide: boolean;
   hasDrawSession?: boolean;
 };
@@ -44,7 +43,6 @@ export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): 
     hasCropGuide: options.hasCropGuide,
     ...(options.hasDrawSession === undefined ? {} : { hasDrawSession: options.hasDrawSession }),
     activeTool: options.activeTool,
-    hasRasterSelection: options.hasRasterSelection,
     isEditingTextboxSelection: Boolean(
       activeObject && isTextbox(activeObject) && activeObject.isEditing
     ),
@@ -58,11 +56,7 @@ export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): 
     undo: options.undo,
     redo: options.redo,
     duplicateSelection: options.duplicateSelection,
-    copyRasterSelection: options.copyRasterSelection,
-    cutRasterSelection: options.cutRasterSelection,
-    pasteRasterClipboard: options.pasteRasterClipboard,
     ...(options.nudgeSelection ? { nudgeSelection: options.nudgeSelection } : {}),
-    deleteRasterSelectionPixels: options.deleteRasterSelectionPixels,
     deleteSelection: options.deleteSelection,
     applyCropSelection: options.applyCropSelection,
     ...(options.applyTextSelectionStyle

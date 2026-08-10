@@ -7,16 +7,7 @@ import type {
 } from '../../../features/editor/document/presets';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 import { cloneEditorPreset } from './defaults';
-import {
-  parseArrowSettings,
-  parseBlurSettings,
-  parseBrushSettings,
-  parseLineSettings,
-  parseSceneBackgroundSettings,
-  parseShapeSettings,
-  parseStepSettings,
-  parseTextSettings,
-} from './setting-parsers';
+import { parseSceneBackgroundSettings, parseStepSettings } from './setting-parsers';
 
 type ParsedCollection<TKey extends EditorPresetFamily> = {
   collection?: EditorPresetCollection<EditorPresetSettingsMap[TKey]>;
@@ -105,38 +96,19 @@ function parsePaletteSettings(value: unknown): EditorPaletteSettings | undefined
     return undefined;
   }
 
-  const shapeStroke = parsePaletteList(value['shapeStroke']);
-  const shapeFill = parsePaletteList(value['shapeFill']);
-  const textColor = parsePaletteList(value['textColor']);
-  const textBackground = parsePaletteList(value['textBackground']);
   const sceneBackground = parsePaletteList(value['sceneBackground']);
 
-  if (!shapeStroke || !shapeFill || !textColor || !textBackground || !sceneBackground) {
+  if (!sceneBackground) {
     return undefined;
   }
 
   return {
-    shapeStroke,
-    shapeFill,
-    textColor,
-    textBackground,
     sceneBackground,
   };
 }
 
 export function parseRootCollections(value: Record<string, unknown>) {
   return {
-    pencil: parsePresetCollection<'pencil'>(value['pencil'], (settings) =>
-      parseBrushSettings(settings, 'subtle')
-    ),
-    highlighter: parsePresetCollection<'highlighter'>(value['highlighter'], (settings) =>
-      parseBrushSettings(settings, 'off')
-    ),
-    ellipse: parsePresetCollection<'ellipse'>(value['ellipse'], parseShapeSettings),
-    blur: parsePresetCollection<'blur'>(value['blur'], parseBlurSettings),
-    arrow: parsePresetCollection<'arrow'>(value['arrow'], parseArrowSettings),
-    line: parsePresetCollection<'line'>(value['line'], parseLineSettings),
-    text: parsePresetCollection<'text'>(value['text'], parseTextSettings),
     step: parsePresetCollection<'step'>(value['step'], parseStepSettings),
     sceneBackground: parsePresetCollection<'sceneBackground'>(
       value['sceneBackground'],

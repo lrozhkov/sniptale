@@ -8,7 +8,6 @@ import {
   EDITOR_CANVAS_EMPTY_DROPZONE_DATA_UI,
   EDITOR_CANVAS_VIEWPORT_DATA_UI,
 } from './context-menu/types';
-import { EditorRasterOverlay } from './raster-overlay';
 import { EditorFrameAnnotationPlane } from '../../frame-annotation/plane';
 import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
 import type { EditorLayerItem, EditorTool } from '../../../features/editor/document/types';
@@ -126,10 +125,6 @@ function CanvasStage(
           {...(props.surfaceStyle === undefined ? {} : { style: props.surfaceStyle })}
         >
           <canvas ref={props.canvasRef} className="relative z-10 block" />
-          <EditorRasterOverlay
-            canvasRef={props.canvasRef as React.RefObject<HTMLCanvasElement | null>}
-            hasImage={props.hasImage}
-          />
           {props.hasImage && props.controller ? (
             <EditorFrameAnnotationPlane
               activeTool={props.activeTool ?? 'select'}

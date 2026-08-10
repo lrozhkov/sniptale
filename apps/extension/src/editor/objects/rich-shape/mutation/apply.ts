@@ -1,6 +1,5 @@
 import type { FabricObject } from 'fabric';
 import type { EditorRichShapeDocumentObject } from '../../../../features/editor/document/rich-shape';
-import { createRichShapeCalloutControls } from '../callout-controls/factory';
 import { replaceRichShapeGroupObjects } from '../group-objects';
 import { isRichShapeObject } from '../guards';
 import { resolveRichShapeGeometry } from '../geometry-resolution';
@@ -22,7 +21,6 @@ export function applyRichShapeDocumentObjectToObject(
   const nextShape = cloneRichShape(shape);
   object.sniptaleRichShape = nextShape;
   replaceRichShapeGroupObjects(object, nextShape, geometry);
-  object.controls = createRichShapeCalloutControls(object, applyRichShapeDocumentObjectToObject);
   object.set({
     angle: nextShape.rotation,
     height: nextShape.frame.height,

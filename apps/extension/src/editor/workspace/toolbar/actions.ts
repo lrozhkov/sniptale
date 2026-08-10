@@ -24,10 +24,6 @@ type ToolbarActionArgs = {
   setInspector: (inspector: ToolbarInspector | 'tool') => void;
 };
 
-function isRasterToolbarTool(tool: EditorTool): tool is 'selection' | 'brush' | 'eraser' | 'fill' {
-  return tool === 'selection' || tool === 'brush' || tool === 'eraser' || tool === 'fill';
-}
-
 function prepareToolAction(args: ToolbarActionArgs, options?: { preserveSelection?: boolean }) {
   if (!args.hasImage) {
     return false;
@@ -78,11 +74,7 @@ function toggleFileInspector(args: ToolbarActionArgs) {
 export function createEditorToolbarActions(args: ToolbarActionArgs) {
   return {
     activateTool(tool: EditorTool) {
-      if (
-        !prepareToolAction(args, {
-          preserveSelection: isRasterToolbarTool(tool),
-        })
-      ) {
+      if (!prepareToolAction(args)) {
         return;
       }
 

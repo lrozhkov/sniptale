@@ -3,6 +3,7 @@ import {
   appendDrawingSamples,
   resolveDrawingMarqueeSelection,
   translateDrawingObject,
+  updateCreatedDrawingObject,
   type DrawingObject,
   type DrawingPoint,
 } from '../../features/drawing/public';
@@ -11,7 +12,6 @@ import {
   resizeDrawingObject,
   rotateDrawingObject,
   toDrawingScenePoint,
-  updateCreatedDrawingObject,
   type PointerDraft,
 } from './interaction';
 

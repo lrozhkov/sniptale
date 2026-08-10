@@ -40,7 +40,7 @@ function createFlattenedResizeDocument(options: {
   width: number;
 }): EditorDocument {
   return {
-    version: 1,
+    version: 2,
     sourceImageData: options.dataUrl,
     sourceName: options.name,
     sourceWidth: options.width,

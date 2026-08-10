@@ -70,6 +70,7 @@ import {
   loadEditorPageDefaults,
   resolveEditorPageSessionSeed,
 } from './runtime';
+import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highlighter';
 
 async function flushRuntimeDefaultsWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -164,7 +165,10 @@ async function verifiesDefaultPresetLoading() {
   const hydrateDefaults = vi.fn();
   const hydrateWorkspaceDefaults = vi.fn();
   loadHighlighterSettingsMock.mockResolvedValueOnce({
-    borderPresets: [{ id: 'preset-1' }, { id: 'preset-2' }],
+    borderPresets: [
+      { ...DEFAULT_BORDER_PRESET, id: 'preset-1' },
+      { ...DEFAULT_BORDER_PRESET, id: 'preset-2' },
+    ],
     defaultBorderPresetId: 'preset-2',
   });
   loadEditorPresetStateMock.mockResolvedValueOnce({
@@ -193,8 +197,8 @@ async function verifiesDefaultPresetLoading() {
   await flushRuntimeDefaultsWork();
 
   expect(hydrateDefaults).toHaveBeenCalledWith({
-    borderPreset: { id: 'preset-2' },
-    toolSettings: { ellipse: { strokeColor: '#00ff00' } },
+    borderPreset: expect.objectContaining({ id: 'preset-2' }),
+    toolSettings: {},
   });
   expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({ backgroundColor: '#123456' });
 

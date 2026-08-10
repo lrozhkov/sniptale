@@ -59,7 +59,7 @@ describe('editor-controller layer-effects rasterize', () => {
 
     expect(isEditorRasterLayerType('image')).toBe(true);
     expect(isEditorRasterLayerType('source-image')).toBe(true);
-    expect(isEditorRasterLayerType('rectangle')).toBe(false);
+    expect(isEditorRasterLayerType('shape')).toBe(false);
     expect(rasterizeEditorObjects({} as never, [])).toBeNull();
     expect(rasterizeEditorObjects({} as never, [object as never])).toEqual({
       bounds: { height: 10, left: 1, top: 2, width: 20 },
@@ -144,7 +144,7 @@ describe('editor-controller layer-effects rasterize', () => {
     expect(
       buildRasterizedSourceState(
         { id: 'source' } as never,
-        { sniptaleRole: 'annotation', sniptaleType: 'rectangle' } as never
+        { sniptaleRole: 'annotation', sniptaleType: 'shape' } as never
       )
     ).toEqual({ id: 'source' });
   });

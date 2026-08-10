@@ -60,7 +60,7 @@ const RICH_SHAPE_GEOMETRY_FILES = [
   'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/arrows.ts',
   'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/basic.ts',
   'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/decorative.ts',
-  'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/flow-callout.ts',
+  'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/flowchart.ts',
   'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/index.ts',
   'apps/extension/src/features/editor/document/rich-shape/catalog/geometry/primitives.ts',
 ];
@@ -70,12 +70,6 @@ const EDITOR_DOCUMENT_LOAD_FILES = [
   'apps/extension/src/editor/controller/document/lifecycle/open/load/run.ts',
   'apps/extension/src/editor/controller/document/lifecycle/open/load/trace.ts',
   'apps/extension/src/editor/controller/document/lifecycle/open/store.ts',
-];
-const EDITOR_LINE_SECTION_FILES = [
-  'apps/extension/src/editor/inspector/tools/line-sections/fill.tsx',
-  'apps/extension/src/editor/inspector/tools/line-sections/index.tsx',
-  'apps/extension/src/editor/inspector/tools/line-sections/rough-fill.tsx',
-  'apps/extension/src/editor/inspector/tools/line-sections/types.ts',
 ];
 const EDITOR_WORKSPACE_COLOR_FILES = [
   'apps/extension/src/editor/inspector/workspace-color/compact-workspace-content.tsx',
@@ -243,23 +237,11 @@ export const COVERAGE_ROLLOUT_OWNER_MAPPINGS = [
       'apps/extension/src/editor/controller/document/lifecycle/split.test.ts',
     ],
   })),
-  ...EDITOR_LINE_SECTION_FILES.map((productionFile) => ({
-    owner: 'editor-inspector-line-sections',
-    productionFile,
-    reason: 'Line, fill, rough-fill, and patch contracts are exercised by inspector suites.',
-    testFiles: [
-      'apps/extension/src/editor/inspector/tools/line.test.tsx',
-      'apps/extension/src/editor/inspector/tools/line-rough-fill.test.tsx',
-    ],
-  })),
   ...EDITOR_WORKSPACE_COLOR_FILES.map((productionFile) => ({
     owner: 'editor-inspector-workspace-color',
     productionFile,
     reason: 'Workspace color rendering and commands are exercised by compact and floating suites.',
-    testFiles: [
-      'apps/extension/src/editor/inspector/compact/inspector/details.test.tsx',
-      'apps/extension/src/editor/workspace/floating/ui-migration-coverage.surfaces.test.tsx',
-    ],
+    testFiles: ['apps/extension/src/editor/inspector/compact/inspector/details.test.tsx'],
   })),
   ...SCENARIO_STEP_FACTORY_FILES.map((productionFile) => ({
     owner: 'scenario-step-factories',

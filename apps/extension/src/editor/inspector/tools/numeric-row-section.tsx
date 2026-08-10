@@ -1,6 +1,6 @@
 import { NumericRow, type NumericRowProps } from '../../chrome/ui';
 
-export function resolveInspectorNumericUnit(
+function resolveInspectorNumericUnit(
   valueText: string,
   options: { degree?: boolean } = {}
 ): NumericRowProps['unit'] {

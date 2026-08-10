@@ -1,7 +1,5 @@
 import {
-  appendDrawingSample,
   clampDrawingTextWidth,
-  createDrawingBounds,
   getDrawingBoundsCenter,
   getDrawingObjectBounds,
   getDrawingObjectRotation,
@@ -10,6 +8,7 @@ import {
   hitTestDrawingDocument,
   replaceDrawingObjectBounds,
   resolveDrawingTextFontFamily,
+  resolveDrawingLinearPoint,
   transformDrawingObjectPoint,
   transformDrawingObjectVector,
   untransformDrawingObjectVector,
@@ -18,12 +17,10 @@ import {
   type DrawingPoint,
   type DrawingResizeHandle,
   type DrawingRotationHandle,
-  type DrawingSample,
-  type DrawingTool,
-  type DrawingToolDefaults,
   type DrawingSessionSnapshot,
   type DrawingSession,
   type DrawingSelectionMode,
+  createDrawingObject,
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
 import { resizeDrawingBox } from './box-resize';
@@ -67,9 +64,9 @@ type DrawingPointerModifiers = {
   shiftKey: boolean;
 };
 
-const STRICT_LINEAR_ANGLE_STEP = 15;
-const MAGNETIC_LINEAR_ANGLE_STEP = 45;
-const MAGNETIC_LINEAR_ANGLE_TOLERANCE = 5;
+const STRICT_ANGLE_STEP = 15;
+const MAGNETIC_ANGLE_STEP = 45;
+const MAGNETIC_ANGLE_TOLERANCE = 5;
 const ROTATION_HANDLE_OFFSET = 18;
 const ROTATION_HANDLE_RADIUS = 9;
 let drawingTextMeasurementContext: CanvasRenderingContext2D | null | undefined;
@@ -80,8 +77,6 @@ function getDrawingTextMeasurementContext(): CanvasRenderingContext2D | null {
     typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
   return drawingTextMeasurementContext;
 }
-
-export const createDrawingId = () => `drawing-${crypto.randomUUID()}`;
 
 export function getDrawingViewportProjection(root: PageScrollRoot): DrawingViewportProjection {
   const scroll = readPageScroll(root);
@@ -98,111 +93,16 @@ export function toDrawingScenePoint(
   return { x: event.clientX + projection.x, y: event.clientY + projection.y };
 }
 
-function angularDistance(left: number, right: number): number {
-  return Math.abs(((left - right + 540) % 360) - 180);
-}
-
 function normalizeAngle(angle: number): number {
   return ((((angle + 180) % 360) + 360) % 360) - 180;
 }
 
 function resolveDrawingSnappedAngle(angle: number, modifiers: DrawingPointerModifiers): number {
-  if (modifiers.shiftKey)
-    return Math.round(angle / STRICT_LINEAR_ANGLE_STEP) * STRICT_LINEAR_ANGLE_STEP;
+  if (modifiers.shiftKey) return Math.round(angle / STRICT_ANGLE_STEP) * STRICT_ANGLE_STEP;
   if (modifiers.ctrlKey) return angle;
-  const magneticAngle = Math.round(angle / MAGNETIC_LINEAR_ANGLE_STEP) * MAGNETIC_LINEAR_ANGLE_STEP;
-  return angularDistance(angle, magneticAngle) <= MAGNETIC_LINEAR_ANGLE_TOLERANCE
-    ? magneticAngle
-    : angle;
-}
-
-export function resolveDrawingLinearPoint(args: {
-  modifiers: DrawingPointerModifiers;
-  point: DrawingPoint;
-  start: DrawingPoint;
-}): DrawingPoint {
-  const deltaX = args.point.x - args.start.x;
-  const deltaY = args.point.y - args.start.y;
-  const distance = Math.hypot(deltaX, deltaY);
-  if (distance < 0.001) return args.point;
-
-  const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
-  const snappedAngle = resolveDrawingSnappedAngle(angle, args.modifiers);
-  if (snappedAngle === angle) return args.point;
-
-  const radians = (snappedAngle * Math.PI) / 180;
-  return {
-    x: args.start.x + Math.cos(radians) * distance,
-    y: args.start.y + Math.sin(radians) * distance,
-  };
-}
-
-function createDrawingObject(
-  tool: DrawingTool,
-  point: DrawingPoint,
-  timestamp: number,
-  defaults: DrawingToolDefaults
-): DrawingObject | null {
-  const id = createDrawingId();
-  const bounds = { x: point.x, y: point.y, width: 0, height: 0 };
-  switch (tool) {
-    case 'pencil':
-      return { id, kind: 'pencil', samples: [{ ...point, t: timestamp }], ...defaults.pencil };
-    case 'marker':
-      return { id, kind: 'marker', samples: [{ ...point, t: timestamp }], ...defaults.marker };
-    case 'shape':
-      return { id, bounds, ...defaults.shape };
-    case 'arrow':
-      return { id, kind: 'arrow', start: point, end: point, ...defaults.arrow };
-    case 'blur':
-      return { id, kind: 'blur', bounds };
-    case 'select':
-    case 'text':
-      return null;
-  }
-}
-
-export function updateCreatedDrawingObject(args: {
-  modifiers: DrawingPointerModifiers;
-  object: DrawingObject;
-  point: DrawingPoint;
-  start: DrawingPoint;
-  timestamp: number;
-}): DrawingObject {
-  const { modifiers, object, point, start, timestamp } = args;
-  if (object.kind === 'pencil' || object.kind === 'marker') {
-    if (modifiers.ctrlKey || modifiers.shiftKey) {
-      const end = resolveDrawingLinearPoint({ modifiers, point, start });
-      const first = object.samples[0] ?? { ...start, t: timestamp };
-      return { ...object, samples: [first, { ...end, t: timestamp }] };
-    }
-    const sample: DrawingSample = { ...point, t: timestamp };
-    return {
-      ...object,
-      samples: appendDrawingSample(object.samples, sample, object.kind === 'pencil'),
-    };
-  }
-  if (object.kind === 'arrow') {
-    return { ...object, end: resolveDrawingLinearPoint({ modifiers, point, start }) };
-  }
-  if ('bounds' in object) {
-    let end = point;
-    if (
-      modifiers.shiftKey &&
-      (object.kind === 'rectangle' ||
-        object.kind === 'ellipse' ||
-        object.kind === 'triangle' ||
-        object.kind === 'parallelogram')
-    ) {
-      const size = Math.max(Math.abs(point.x - start.x), Math.abs(point.y - start.y));
-      end = {
-        x: start.x + Math.sign(point.x - start.x || 1) * size,
-        y: start.y + Math.sign(point.y - start.y || 1) * size,
-      };
-    }
-    return { ...object, bounds: createDrawingBounds(start, end) };
-  }
-  return object;
+  const magneticAngle = Math.round(angle / MAGNETIC_ANGLE_STEP) * MAGNETIC_ANGLE_STEP;
+  const distance = Math.abs(((angle - magneticAngle + 540) % 360) - 180);
+  return distance <= MAGNETIC_ANGLE_TOLERANCE ? magneticAngle : angle;
 }
 
 export function resolveDrawingResizeHandle(

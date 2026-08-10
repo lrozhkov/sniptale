@@ -79,6 +79,11 @@ vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: useEditorStoreMock,
 }));
 
+vi.mock('../../drawing/preferences', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../drawing/preferences')>()),
+  useEditorDrawingPreferencesSynchronization: vi.fn(),
+}));
+
 import { EDITOR_BOOTSTRAP_EVENT } from '@sniptale/ui/branding';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { EditorPage } from './';

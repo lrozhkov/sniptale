@@ -176,30 +176,25 @@ it('keeps document bar and tool rail mounted for an empty editor', () => {
   expect(mocks.useInspectorController).toHaveBeenCalledWith(false);
 });
 
-it('opens the left drawer and shifts the rail for routed tools', () => {
+it('keeps the retained shape catalog drawer suspended for the shared shape tool', () => {
   mocks.useToolbarController.mockReturnValue({
     ...createToolbarProps(),
-    activeTool: 'shapes-and-lines',
+    activeTool: 'shape',
   });
   const markup = renderToStaticMarkup(<EditorFloatingWorkspace hasImage />);
 
-  expect(markup).toContain('mock.left-drawer');
-  const drawerProps = mocks.leftDrawer.mock.lastCall?.[0];
-  assertDefined(drawerProps);
-  drawerProps.onClose();
-  expect(mocks.useInspectorController.mock.results.at(-1)?.value.setInspector).toHaveBeenCalledWith(
-    'tool'
-  );
+  expect(markup).not.toContain('mock.left-drawer');
+  expect(mocks.leftDrawer).not.toHaveBeenCalled();
   expect(mocks.toolRail).toHaveBeenCalledWith(
-    expect.objectContaining({ leftDrawerOpen: true }),
+    expect.objectContaining({ leftDrawerOpen: false }),
     undefined
   );
 });
 
-it('keeps the shape library drawer open while showing selected layer canvas toolbar', () => {
+it('shows the selected layer toolbar without activating the suspended shape drawer', () => {
   mocks.useToolbarController.mockReturnValue({
     ...createToolbarProps(),
-    activeTool: 'shape-library',
+    activeTool: 'shape',
   });
   mocks.useInspectorController.mockReturnValue({
     id: 'document-controller',
@@ -210,12 +205,9 @@ it('keeps the shape library drawer open while showing selected layer canvas tool
 
   const markup = renderToStaticMarkup(<EditorFloatingWorkspace hasImage />);
 
-  expect(markup).toContain('mock.left-drawer');
+  expect(markup).not.toContain('mock.left-drawer');
   expect(markup).toContain('mock.canvas-toolbar');
-  expect(mocks.leftDrawer).toHaveBeenCalledWith(
-    expect.objectContaining({ mode: 'shape-library' }),
-    undefined
-  );
+  expect(mocks.leftDrawer).not.toHaveBeenCalled();
   expect(mocks.canvasToolbar).toHaveBeenCalledWith(
     expect.objectContaining({ enabled: true }),
     undefined

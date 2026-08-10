@@ -49,39 +49,51 @@ it('keeps object event commands in the object bindings owner', () => {
   const bindings = createEditorControllerEventObjectBindings(controller as never);
 
   bindings.addObject(object as never);
-  bindings.startDrawSession('rectangle', { x: 1, y: 2 } as never, object as never);
-  expect(bindings.beginRichShapeTextEditing({ sniptaleType: 'rectangle' } as never)).toBe(false);
+  bindings.startDrawSession('shape', { x: 1, y: 2 } as never, object as never);
+  expect(bindings.beginRichShapeTextEditing({ sniptaleType: 'shape' } as never)).toBe(false);
 
   expect(controller.addObject).toHaveBeenCalledWith(object);
-  expect(controller.startDrawSession).toHaveBeenCalledWith('rectangle', { x: 1, y: 2 }, object);
+  expect(controller.startDrawSession).toHaveBeenCalledWith('shape', { x: 1, y: 2 }, object);
 });
 
 it('keeps command event forwarding in the command bindings owner', async () => {
   const controller = {
-    applyRasterBitmap: vi.fn(async () => undefined),
+    applyCropSelection: vi.fn(async () => undefined),
+    applyTextSelectionStyle: vi.fn(() => true),
     cancelTransientInteraction: vi.fn(() => true),
-    clearRasterSelection: vi.fn(),
     commitHistory: vi.fn(),
     deleteSelection: vi.fn(),
+    duplicateSelection: vi.fn(async () => undefined),
     finalizeSelectionNudge: vi.fn(),
     nudgeSelection: vi.fn(() => true),
     syncRuntimeState: vi.fn(),
     syncViewportState: vi.fn(),
     zoomLevel: 2,
     setZoomAtViewportPoint: vi.fn(),
+    undo: vi.fn(async () => undefined),
+    redo: vi.fn(async () => undefined),
   };
   const bindings = createEditorControllerEventCommandBindings(controller as never);
 
   expect(bindings.cancelTransientInteraction()).toBe(true);
+  expect(bindings.applyTextSelectionStyle('bold')).toBe(true);
+  bindings.commitHistory();
+  bindings.syncRuntimeState();
+  bindings.syncViewportState();
+  bindings.nudgeSelection({ code: 'ArrowRight', deltaX: 1, deltaY: 0, step: 1 });
+  bindings.finalizeSelectionNudge('ArrowRight');
+  bindings.deleteSelection();
+  bindings.undo();
+  bindings.redo();
+  bindings.duplicateSelection();
+  bindings.applyCropSelection();
   bindings.zoomViewportAtPoint(1.5, { clientX: 10, clientY: 20 });
-  await bindings.applyRasterBitmap({ kind: 'object', objectId: 'layer-1', objectName: 'Layer 1' }, {
-    width: 1,
-    height: 1,
-  } as HTMLCanvasElement);
-
   expect(controller.setZoomAtViewportPoint).toHaveBeenCalledWith(3, {
     clientX: 10,
     clientY: 20,
   });
-  expect(controller.applyRasterBitmap).toHaveBeenCalledOnce();
+  expect(controller.commitHistory).toHaveBeenCalledOnce();
+  expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
+  expect(controller.syncViewportState).toHaveBeenCalledOnce();
+  expect(controller.deleteSelection).toHaveBeenCalledOnce();
 });

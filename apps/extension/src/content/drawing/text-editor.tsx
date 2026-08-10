@@ -9,7 +9,7 @@ import {
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
 import type { ContentDrawingController } from './controller';
-import { createDrawingId } from './interaction';
+import { createDrawingId } from '../../features/drawing/public';
 import {
   DrawingTextBackgrounds,
   resolveDrawingTextDomValue,

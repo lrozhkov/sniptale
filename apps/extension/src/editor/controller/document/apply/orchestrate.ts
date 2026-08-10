@@ -42,7 +42,6 @@ export async function applyEditorDocumentToCanvas(
       prepared,
       zoomLevel: options.zoomLevel,
       prepareObject: options.prepareObject,
-      upgradeLegacyArrowObjects: options.upgradeLegacyArrowObjects,
       rebuildFrameDecorations: options.rebuildFrameDecorations,
     };
     if (options.syncBackgroundLayer) {

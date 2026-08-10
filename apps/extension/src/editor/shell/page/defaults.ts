@@ -29,36 +29,7 @@ function resolveDefaultToolSettings(
   state: Awaited<ReturnType<typeof loadEditorPresetState>>
 ): Partial<EditorToolSettings> {
   const toolSettings: Partial<EditorToolSettings> = {};
-  const pencil = state.pencil.presets.find((preset) => preset.id === state.pencil.defaultPresetId);
-  const highlighter = state.highlighter.presets.find(
-    (preset) => preset.id === state.highlighter.defaultPresetId
-  );
-  const ellipse = state.ellipse.presets.find(
-    (preset) => preset.id === state.ellipse.defaultPresetId
-  );
-  const blur = state.blur.presets.find((preset) => preset.id === state.blur.defaultPresetId);
-  const arrow = state.arrow.presets.find((preset) => preset.id === state.arrow.defaultPresetId);
-  const text = state.text.presets.find((preset) => preset.id === state.text.defaultPresetId);
   const step = state.step.presets.find((preset) => preset.id === state.step.defaultPresetId);
-
-  if (pencil) {
-    toolSettings.pencil = pencil.settings;
-  }
-  if (highlighter) {
-    toolSettings.highlighter = highlighter.settings;
-  }
-  if (ellipse) {
-    toolSettings.ellipse = ellipse.settings;
-  }
-  if (blur) {
-    toolSettings.blur = blur.settings;
-  }
-  if (arrow) {
-    toolSettings.arrow = arrow.settings;
-  }
-  if (text) {
-    toolSettings.text = text.settings;
-  }
   if (step) {
     toolSettings.step = step.settings;
   }
@@ -67,10 +38,12 @@ function resolveDefaultToolSettings(
 }
 
 function loadEditorPageToolDefaults(hydrateDefaults: (options?: EditorPageDefaults) => void): void {
-  Promise.all([loadHighlighterSettings(), loadEditorPresetState()])
-    .then(([highlighterSettings, editorPresetState]) => {
+  loadHighlighterSettings()
+    .then(async (highlighterSettings) => {
+      const borderPreset = resolveDefaultBorderPreset(highlighterSettings);
+      const editorPresetState = await loadEditorPresetState();
       const nextDefaults: Required<Pick<EditorPageDefaults, 'borderPreset' | 'toolSettings'>> = {
-        borderPreset: resolveDefaultBorderPreset(highlighterSettings),
+        borderPreset,
         toolSettings: resolveDefaultToolSettings(editorPresetState),
       };
 

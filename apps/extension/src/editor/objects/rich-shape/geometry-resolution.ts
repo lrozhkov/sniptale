@@ -1,5 +1,4 @@
 import {
-  createRichShapeCalloutGeometry,
   getEditorBuiltInShapeEntry,
   type EditorBuiltInShapeCatalogEntry,
   type EditorBuiltInShapeGeometryDefinition,
@@ -21,11 +20,5 @@ export function resolveRichShapeGeometry(
   shape: EditorRichShapeDocumentObject,
   fallback?: EditorBuiltInShapeGeometryDefinition
 ): EditorBuiltInShapeGeometryDefinition | null {
-  return (
-    createRichShapeCalloutGeometry(shape) ??
-    fallback ??
-    shape.geometry ??
-    resolveRichShapeCatalogEntry(shape)?.geometry ??
-    null
-  );
+  return fallback ?? shape.geometry ?? resolveRichShapeCatalogEntry(shape)?.geometry ?? null;
 }

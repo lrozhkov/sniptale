@@ -7,7 +7,7 @@ import { type EditorRichShapeGradientFill } from '../../../../features/editor/do
 import { translate } from '../../../../platform/i18n';
 import { ColorField } from '../../../chrome/ui';
 import { EditorGradientControls } from '../../gradient';
-import { buildShapeColorControlProps } from '../brush-shape-sections/shared';
+import { buildShapeColorControlProps } from '../shape-color-control';
 import { CollapsibleSection, PercentRangeField } from './fields';
 import { RichShapeFillModeSelector } from './fill-mode-selector';
 import { createFillModeOptions, getFillMode, syncFillMode, type FillMode } from './fill-mode';

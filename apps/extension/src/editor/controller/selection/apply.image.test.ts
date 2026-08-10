@@ -1,5 +1,13 @@
+// @vitest-environment jsdom
+
 import { beforeEach, expect, it, vi } from 'vitest';
-import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../features/editor/document/constants';
+import { Canvas, Rect, type FabricObject } from 'fabric';
+import {
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
+  DEFAULT_EDITOR_TOOL_SETTINGS,
+} from '../../../features/editor/document/constants';
+import type { EditorObjectType } from '../../../features/editor/document/types';
+import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/public';
 import { applySelectionToolSettingsToObjects } from './apply/dispatch';
 import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
@@ -39,15 +47,18 @@ beforeEach(() => {
   updateSelectionImageSettingsMock.mockClear();
 });
 
-function createImageStyleObject(sniptaleType: string, sniptaleBackgroundMode?: string) {
-  return {
-    height: 120,
-    sniptaleBackgroundMode,
-    sniptaleType,
-    set: vi.fn(),
-    setCoords: vi.fn(),
-    width: 160,
-  };
+function createImageStyleObject(
+  sniptaleType: EditorObjectType,
+  sniptaleBackgroundMode?: NonNullable<FabricObject['sniptaleBackgroundMode']>
+) {
+  const object = new Rect({ height: 120, width: 160 });
+  if (sniptaleBackgroundMode !== undefined) {
+    object.sniptaleBackgroundMode = sniptaleBackgroundMode;
+  }
+  object.sniptaleType = sniptaleType;
+  vi.spyOn(object, 'set');
+  vi.spyOn(object, 'setCoords');
+  return object;
 }
 
 it('applies image settings only to image-style raster objects', () => {
@@ -55,21 +66,25 @@ it('applies image settings only to image-style raster objects', () => {
   const sourceImage = createImageStyleObject('source-image');
   const backgroundImage = createImageStyleObject('background', 'image');
   const colorBackground = createImageStyleObject('background', 'color');
-  const rectangle = { sniptaleType: 'rectangle', set: vi.fn(), setCoords: vi.fn() };
+  const rectangle = createImageStyleObject('shape');
+  const canvas = new Canvas(document.createElement('canvas'));
+  const settings = DEFAULT_EDITOR_TOOL_SETTINGS(DEFAULT_BORDER_PRESET);
 
   applySelectionToolSettingsToObjects(
-    [image, sourceImage, backgroundImage, colorBackground, rectangle] as never,
+    canvas,
+    [image, sourceImage, backgroundImage, colorBackground, rectangle],
     'image',
     {
+      ...settings,
       image: {
-        ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+        ...settings.image,
         opacity: 0.6,
         radius: 12,
         strokeColor: '#123456',
         strokeOpacity: 0.8,
         strokeWidth: 3,
       },
-    } as never
+    }
   );
 
   expect(image.set).toHaveBeenCalledWith(expect.objectContaining({ opacity: 0.6 }));
@@ -90,9 +105,9 @@ it.each(['background', 'source-image'] as const)(
       setCoords: vi.fn(),
       width: 160,
     };
-    const rectangle = { sniptaleType: 'rectangle', set: vi.fn(), setCoords: vi.fn() };
+    const rectangle = { sniptaleType: 'shape', set: vi.fn(), setCoords: vi.fn() };
 
-    applySelectionToolSettingsToObjects([image, rectangle] as never, selectedType, {
+    applySelectionToolSettingsToObjects({} as never, [image, rectangle] as never, selectedType, {
       image: {
         ...DEFAULT_EDITOR_IMAGE_SETTINGS,
         opacity: 0.35,
@@ -112,7 +127,7 @@ it('keeps non-image backgrounds as no-op selection targets', () => {
     setCoords: vi.fn(),
   };
 
-  applySelectionToolSettingsToObjects([background] as never, 'background', {
+  applySelectionToolSettingsToObjects({} as never, [background] as never, 'background', {
     image: {
       ...DEFAULT_EDITOR_IMAGE_SETTINGS,
       opacity: 0.35,

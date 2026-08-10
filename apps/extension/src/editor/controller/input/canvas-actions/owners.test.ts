@@ -11,7 +11,7 @@ it('keeps no-canvas draw-session starts inside the draw-session owner', () => {
       object: {} as never,
       prepareObject: vi.fn(),
       start: { x: 0, y: 0 } as never,
-      tool: 'rectangle',
+      tool: 'shape',
     })
   ).toBeNull();
 });

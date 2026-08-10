@@ -4,11 +4,10 @@ import {
   isRecord,
   isString,
 } from '@sniptale/runtime-contracts/validation/primitives';
-import { normalizeRichShapeCalloutGeometry } from './callout';
 import { isEditorRichShapeFamily } from './catalog/families';
 import { parseEditorCustomShapeGeometry } from './custom';
 import { EDITOR_RICH_SHAPE_OBJECT_TYPE } from './types';
-import type { EditorRichShapeDocumentObject, EditorRichShapeFrame } from './types';
+import type { EditorRichShapeDocumentObject } from './types';
 
 function isFrame(value: unknown): boolean {
   return (
@@ -109,14 +108,6 @@ function isGeometry(value: unknown): boolean {
   return value === undefined || parseEditorCustomShapeGeometry(value) !== null;
 }
 
-function isCallout(value: unknown, frame: unknown): boolean {
-  return (
-    value === undefined ||
-    (isFrame(frame) &&
-      normalizeRichShapeCalloutGeometry(value, frame as EditorRichShapeFrame) !== undefined)
-  );
-}
-
 export function isEditorRichShapeDocumentObject(
   value: unknown
 ): value is EditorRichShapeDocumentObject {
@@ -135,7 +126,7 @@ export function isEditorRichShapeDocumentObject(
     isText(value['text']) &&
     isRough(value['rough']) &&
     isGeometry(value['geometry']) &&
-    isCallout(value['callout'], value['frame']) &&
+    value['callout'] === undefined &&
     isSource(value['source']) &&
     isLayer(value['layer'])
   );

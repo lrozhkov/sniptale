@@ -1,116 +1,76 @@
 import { expect, it } from 'vitest';
-import type { EditorTool } from '../../../features/editor/document/types';
-import type { EditorInspector } from '../../state/types';
-import {
-  isCanvasSelectionToolbarEligible,
-  isLeftDrawerMode,
-  isRightUtilityMode,
-  resolveFloatingSurfaceRoute,
-} from './routes';
+import { resolveFloatingSurfaceRoute } from './routes';
 
-const rightUtilities: EditorInspector[] = [
-  'frame',
-  'browser-frame',
-  'meta',
-  'workspace',
-  'grid',
-  'canvas-size',
-  'image-size',
-  'layer-effects',
-];
+const emptySelection = {
+  hasSelection: false,
+  selectedObjectCount: 0,
+  selectedObjectType: null,
+};
 
-it('routes library and independent tool modes into the left drawer', () => {
-  const leftTools: EditorTool[] = ['shapes-and-lines', 'rough-shape', 'shape-library'];
-
-  expect(leftTools.every(isLeftDrawerMode)).toBe(true);
-  expect(isLeftDrawerMode('pencil')).toBe(false);
-  expect(isLeftDrawerMode('step')).toBe(false);
-
-  for (const activeTool of leftTools) {
-    expect(
-      resolveFloatingSurfaceRoute({
-        activeTool,
-        hasImage: true,
-        inspector: 'tool',
-        selection: { hasSelection: false },
-      }).leftDrawer
-    ).toBe(activeTool);
-  }
-});
-
-it('routes document and scene utilities into a compact right panel', () => {
-  for (const inspector of rightUtilities) {
-    expect(isRightUtilityMode(inspector)).toBe(true);
-    expect(
-      resolveFloatingSurfaceRoute({
-        activeTool: 'select',
-        hasImage: true,
-        inspector,
-        selection: { hasSelection: false },
-      }).rightUtility
-    ).toBe(inspector);
-  }
-
-  expect(isRightUtilityMode('file')).toBe(false);
-  expect(isRightUtilityMode('tool')).toBe(false);
-});
-
-it('keeps the selection toolbar on canvas only for editable selection states', () => {
+it('keeps the suspended shape catalog closed while routing utility inspectors and selections', () => {
   expect(
-    isCanvasSelectionToolbarEligible({
+    resolveFloatingSurfaceRoute({
+      activeTool: 'shape',
+      hasImage: true,
+      inspector: 'tool',
+      selection: emptySelection,
+    })
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: null });
+  expect(
+    resolveFloatingSurfaceRoute({
+      activeTool: 'select',
+      hasImage: true,
+      inspector: 'workspace',
+      selection: emptySelection,
+    })
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: 'workspace' });
+  expect(
+    resolveFloatingSurfaceRoute({
       activeTool: 'select',
       hasImage: true,
       inspector: 'tool',
-      selection: { hasSelection: true },
+      selection: { ...emptySelection, hasSelection: true, selectedObjectCount: 2 },
     })
-  ).toBe(true);
+  ).toEqual({ canvasSelectionToolbar: true, leftDrawer: null, rightUtility: null });
+});
+
+it('suppresses drawers and selection toolbar for dismissed, empty, crop, and frame annotation states', () => {
   expect(
-    isCanvasSelectionToolbarEligible({
-      activeTool: 'brush',
+    resolveFloatingSurfaceRoute({
+      activeTool: 'shape',
+      dismissedLeftDrawerTool: 'shape',
       hasImage: true,
       inspector: 'tool',
-      selection: { hasSelection: true },
-    })
-  ).toBe(false);
+      selection: emptySelection,
+    }).leftDrawer
+  ).toBeNull();
   expect(
-    isCanvasSelectionToolbarEligible({
+    resolveFloatingSurfaceRoute({
       activeTool: 'crop',
       hasImage: true,
       inspector: 'tool',
-      selection: { hasSelection: true },
-    })
+      selection: { ...emptySelection, hasSelection: true },
+    }).canvasSelectionToolbar
   ).toBe(false);
   expect(
     resolveFloatingSurfaceRoute({
-      activeTool: 'step',
-      hasImage: true,
-      inspector: 'tool',
-      selection: { hasSelection: true },
-    }).canvasSelectionToolbar
-  ).toBe(true);
-  expect(
-    resolveFloatingSurfaceRoute({
-      activeTool: 'shape-library',
-      hasImage: true,
-      inspector: 'tool',
-      selection: { hasSelection: true },
-    })
-  ).toEqual({
-    canvasSelectionToolbar: true,
-    leftDrawer: 'shape-library',
-    rightUtility: null,
-  });
-
-  expect(
-    isCanvasSelectionToolbarEligible({
       activeTool: 'select',
       hasImage: true,
       inspector: 'tool',
       selection: {
+        ...emptySelection,
         hasSelection: true,
         selectedObjectCount: 1,
         selectedObjectType: 'frame-annotation',
       },
-    })
+    }).canvasSelectionToolbar
   ).toBe(false);
+  expect(
+    resolveFloatingSurfaceRoute({
+      activeTool: 'shape',
+      hasImage: false,
+      inspector: 'tool',
+      selection: emptySelection,
+    })
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: null });
 });

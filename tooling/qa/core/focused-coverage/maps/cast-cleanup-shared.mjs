@@ -98,7 +98,9 @@ export const CAST_CLEANUP_SHARED_OWNER_MAPPINGS = [
     productionFile:
       'apps/extension/src/composition/persistence/editor-presets/scene-background-setting-parser.ts',
     reason: 'Scene background storage parsing is covered by editor preset parser tests.',
-    testFiles: ['apps/extension/src/composition/persistence/editor-presets/guards.test.ts'],
+    testFiles: [
+      'apps/extension/src/composition/persistence/editor-presets/scene-background-source-image.test.ts',
+    ],
   },
   {
     owner: 'shared-design-system-preview-copy',

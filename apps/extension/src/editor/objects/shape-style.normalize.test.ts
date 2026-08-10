@@ -26,7 +26,7 @@ describe('shape-style rectangle normalization', () => {
   it('normalizes scaled annotation rectangles and preserves canonical shadow metadata', () => {
     const rect = new Rect({ height: 20, left: 10, scaleX: -2, scaleY: 0, top: 20, width: 40 });
     rect.sniptaleRole = 'annotation';
-    rect.sniptaleType = 'rectangle';
+    rect.sniptaleType = 'shape';
     rect.sniptaleShapeRadius = Number.NaN;
     rect.ry = 5;
 
@@ -45,7 +45,7 @@ describe('shape-style rectangle normalization', () => {
     const rect = new Rect({ height: 20, scaleX: 1, scaleY: 1, width: 40 });
     expect(normalizeScaledRectangleTarget(rect)).toBe(false);
     rect.sniptaleRole = 'annotation';
-    rect.sniptaleType = 'rectangle';
+    rect.sniptaleType = 'shape';
     expect(normalizeScaledRectangleTarget(rect)).toBe(false);
   });
 });

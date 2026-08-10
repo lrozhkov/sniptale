@@ -1,5 +1,4 @@
 import type { EditorTool } from '../../../../../features/editor/document/types';
-import { createEditorRasterToolSession } from '../../../raster-tools/session/state';
 import type { EditorControllerInstance } from '../../types';
 import { createMockHistory } from '../test-fixtures-history';
 
@@ -54,7 +53,6 @@ function createMockControllerInteractionState() {
 
 function createMockControllerRuntimeState() {
   return {
-    rasterToolSession: createEditorRasterToolSession(),
     eventHandlers: {} as EditorControllerInstance['eventHandlers'],
   };
 }

@@ -68,7 +68,7 @@ export function createEditorOwnershipSelection(): EditorStoreState['selection'] 
     selectedObjectCount: 1,
     selectedObjectId: 'layer-1',
     selectedObjectIds: ['layer-1'],
-    selectedObjectType: 'rectangle',
+    selectedObjectType: 'shape',
     selectedObjectWidth: 160,
   };
 }

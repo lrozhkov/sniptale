@@ -8,11 +8,15 @@ import { prepareCanvasForDocumentLoad, renderCanvasAfterDocumentLoad } from './c
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
 import { restoreFrameAnnotationProxyFromMetadata } from '../../../frame-annotation/proxy';
 import { assertValidFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
+import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
+import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
+import { readEditorDrawingObject } from '../../../drawing/object/metadata';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
 ): Promise<SourceState | null> {
   assertValidFrameAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson);
+  assertValidEditorDrawingCanvasJson(options.prepared.normalizedDocument.canvasJson);
   await options.canvas.loadFromJSON(options.prepared.normalizedDocument.canvasJson);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,
@@ -24,9 +28,8 @@ export async function loadPreparedDocumentOnCanvas(
       options.viewportDevicePixelRatioBaseline;
   }
   prepareCanvasForDocumentLoad(canvasPrepareOptions);
-  options.upgradeLegacyArrowObjects();
   options.canvas.getObjects().forEach((object) => {
-    options.prepareObject(object);
+    if (!readEditorDrawingObject(object)) options.prepareObject(object);
     if (
       object.sniptaleType === 'frame-annotation' &&
       !restoreFrameAnnotationProxyFromMetadata(object)
@@ -45,6 +48,11 @@ export async function loadPreparedDocumentOnCanvas(
     canvas: options.canvas,
     source: options.prepared.source,
     prepareObject: options.prepareObject,
+  });
+  restoreCanonicalEditorDrawingObjects({
+    canvas: options.canvas,
+    prepareObject: options.prepareObject,
+    source,
   });
   logEditorSourceTrace('canvas:source-ready', {
     objectCount: options.canvas.getObjects().length,

@@ -7,9 +7,13 @@ import { getMutableEditorSelection } from './active-selection';
 
 function runSelectionSettingsMutation(options: {
   canvas: Canvas | null;
+  prepareObject: (object: import('fabric').FabricObject) => void;
   withHistoryMuted: <T>(callback: () => T) => T;
 }): boolean {
   const { canvas, withHistoryMuted } = options;
+  if (!canvas) {
+    return false;
+  }
   const activeObjects = getMutableEditorSelection(canvas);
   if (!activeObjects) {
     return false;
@@ -22,9 +26,11 @@ function runSelectionSettingsMutation(options: {
 
   withHistoryMuted(() => {
     applySelectionToolSettingsToObjects(
+      canvas,
       activeObjects,
       selectedType,
-      useEditorStore.getState().selectionToolSettings
+      useEditorStore.getState().selectionToolSettings,
+      options.prepareObject
     );
     canvas?.requestRenderAll();
   });
@@ -34,6 +40,7 @@ function runSelectionSettingsMutation(options: {
 
 export function applyEditorSelectionSettings(options: {
   canvas: Canvas | null;
+  prepareObject: (object: import('fabric').FabricObject) => void;
   withHistoryMuted: <T>(callback: () => T) => T;
   commitHistory: () => void;
   syncRuntimeState: () => void;
@@ -46,6 +53,7 @@ export function applyEditorSelectionSettings(options: {
 
 export function previewEditorSelectionSettings(options: {
   canvas: Canvas | null;
+  prepareObject: (object: import('fabric').FabricObject) => void;
   withHistoryMuted: <T>(callback: () => T) => T;
   syncRuntimeState: () => void;
 }): void {

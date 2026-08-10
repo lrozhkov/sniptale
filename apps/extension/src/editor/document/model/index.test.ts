@@ -52,47 +52,12 @@ describe('utils color parsing', () => {
     expect(hexToRgba('transparent', 0.2)).toBe('transparent');
   });
 
-  it('keeps annotation shadow and arrow metadata in custom Fabric JSON props', () => {
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextCalloutFormat');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextLayoutMode');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextVerticalAlign');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextBackgroundOpacity');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextCalloutShadow');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextCalloutWidth');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleTextCalloutHeight');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushShadow');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushShadowAngle');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushShadowColor');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushSmoothing');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushDynamicWidth');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushWidth');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushPointsJson');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBrushSamplesJson');
-    expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleTextVariant');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowWidth');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowVariant');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowType');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowDynamicWidth');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowStartHeadSize');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowEndHeadSize');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowShadow');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowShadowAngle');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleArrowShadowColor');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLinePointsJson');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineStyle');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineShadow');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineShadowAngle');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineShadowColor');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineFillMode');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleLineGradientStops');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleShapeStrokeOpacity');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleShapeFillOpacity');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleShapeCustomCss');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleShapeInheritCustomCss');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBlurAmount');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBlurType');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBlurShowBorder');
-    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBlurStrokeStyle');
+  it('keeps shared drawing metadata and excludes removed legacy tool metadata', () => {
+    expect(CUSTOM_JSON_PROPS).toContain('sniptaleDrawingJson');
+    expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleTextCalloutFormat');
+    expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleBrushPointsJson');
+    expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleArrowVariant');
+    expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleLinePointsJson');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundMode');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundGradientColorStops');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundFit');
@@ -148,19 +113,15 @@ describe('utils object helpers', () => {
     expect(getEditorObjectTypeLabel('source-image')).toBeTruthy();
     expect(getEditorObjectTypeLabel('background')).toBeTruthy();
     expect(getEditorObjectTypeLabel('blur')).toBeTruthy();
-    expect(getEditorObjectTypeLabel('line')).toBeTruthy();
-    expect(getEditorObjectTypeLabel('rectangle')).toBeTruthy();
+    expect(getEditorObjectTypeLabel('shape')).toBeTruthy();
     expect(getEditorObjectTypeLabel('image')).toBeTruthy();
     expect(getEditorObjectTypeLabel('browser-frame')).toBeTruthy();
     expect(getEditorObjectTypeLabel('meta-stamp')).toBeTruthy();
     expect(
-      getSingleSelectionType([
-        { sniptaleType: 'rectangle' },
-        { sniptaleType: 'rectangle' },
-      ] as never)
-    ).toBe('rectangle');
+      getSingleSelectionType([{ sniptaleType: 'shape' }, { sniptaleType: 'shape' }] as never)
+    ).toBe('shape');
     expect(
-      getSingleSelectionType([{ sniptaleType: 'rectangle' }, { sniptaleType: 'ellipse' }] as never)
+      getSingleSelectionType([{ sniptaleType: 'shape' }, { sniptaleType: 'ellipse' }] as never)
     ).toBeNull();
     expect(getSingleSelectionType([{ sniptaleType: null }] as never)).toBeNull();
   });

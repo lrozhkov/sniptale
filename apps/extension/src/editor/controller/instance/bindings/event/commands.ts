@@ -1,15 +1,8 @@
 import { fireAndReportEditorAction } from '../../../../runtime/async-actions';
 import type { EditorSelectionNudge } from '../../../tools/nudge';
-import type { EditorRasterTargetReference } from '../../../raster/types';
-import {
-  copyRasterSelectionForController,
-  cutRasterSelectionForController,
-  deleteRasterSelectionForController,
-  pasteRasterClipboardForController,
-} from '../../../raster-tools/controller';
-import type { RasterCommandController } from './types';
+import type { EditorControllerInstance } from '../../types';
 
-export function createEditorControllerEventCommandBindings(controller: RasterCommandController) {
+export function createEditorControllerEventCommandBindings(controller: EditorControllerInstance) {
   return {
     cancelTransientInteraction: () => controller.cancelTransientInteraction(),
     undo: () => fireAndReportEditorAction('keyboard-undo', () => controller.undo()),
@@ -32,24 +25,5 @@ export function createEditorControllerEventCommandBindings(controller: RasterCom
     syncViewportState: () => controller.syncViewportState(),
     zoomViewportAtPoint: (delta: number, point: { clientX: number; clientY: number }) =>
       controller.setZoomAtViewportPoint(controller.zoomLevel * delta, point),
-    clearRasterSelection: () => controller.clearRasterSelection(),
-    applyRasterBitmap: (reference: EditorRasterTargetReference, bitmap: HTMLCanvasElement) =>
-      controller.applyRasterBitmap(reference, bitmap),
-    copyRasterSelection: () =>
-      fireAndReportEditorAction('keyboard-copy-raster-selection', async () => {
-        await copyRasterSelectionForController(controller);
-      }),
-    cutRasterSelection: () =>
-      fireAndReportEditorAction('keyboard-cut-raster-selection', async () => {
-        await cutRasterSelectionForController(controller);
-      }),
-    deleteRasterSelectionPixels: () =>
-      fireAndReportEditorAction('keyboard-delete-raster-selection', async () => {
-        await deleteRasterSelectionForController(controller);
-      }),
-    pasteRasterClipboard: () =>
-      fireAndReportEditorAction('keyboard-paste-raster-clipboard', async () => {
-        await pasteRasterClipboardForController(controller);
-      }),
   };
 }

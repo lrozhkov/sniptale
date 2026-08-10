@@ -24,7 +24,6 @@ export function createCropGuideRect(point: Point): Rect {
     originY: 'top',
   });
   crop.sniptaleRole = 'crop-guide';
-  crop.sniptaleType = 'rectangle';
   crop.sniptaleCropGuideMode = 'selection';
   return crop;
 }

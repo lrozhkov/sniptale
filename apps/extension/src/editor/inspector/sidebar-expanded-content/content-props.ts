@@ -39,13 +39,11 @@ function selectEditorInspectorCanvasState(controller: SidebarExpandedController)
     browserFrame: controller.browserFrame,
     workspace: controller.workspace,
     recentColors: controller.recentColors,
-    borderPresetOptions: controller.borderPresetOptions,
     savePresets: controller.savePresets,
     defaultImagePresetId: controller.defaultImagePresetId,
     frameBackgroundPalette: controller.frameBackgroundPalette,
     shapeFillPalette: controller.shapeFillPalette,
     shapeStrokePalette: controller.shapeStrokePalette,
-    textBackgroundPalette: controller.textBackgroundPalette,
     textColorPalette: controller.textColorPalette,
     savePresetPickerOpen: controller.savePresetPickerOpen,
     setSavePresetPickerOpen: controller.setSavePresetPickerOpen,
@@ -121,18 +119,6 @@ function selectEditorInspectorStyleDraft(controller: SidebarExpandedController) 
     workspaceColorError: controller.workspaceColorError,
     workspaceColorMatchesDefault: controller.workspaceColorMatchesDefault,
     workspaceDefaultSavePending: controller.workspaceDefaultSavePending,
-    applyPreset: controller.applyPreset,
-    setPencilShapeCorrection: controller.setPencilShapeCorrection,
-    saveShapeAsHighlighterPreset: controller.saveShapeAsHighlighterPreset,
-    applyBrushPatch: controller.applyBrushPatch,
-    applyShapePatch: controller.applyShapePatch,
-    applyBlurPatch: controller.applyBlurPatch,
-    applyArrowPatch: controller.applyArrowPatch,
-    ...(controller.applyLinePatch === undefined
-      ? {}
-      : { applyLinePatch: controller.applyLinePatch }),
-    applyTextPatch: controller.applyTextPatch,
-    applyTextStyle: controller.applyTextStyle,
     applyStepPatch: controller.applyStepPatch,
     ...(controller.applyImagePatch === undefined
       ? {}
@@ -144,14 +130,6 @@ function selectEditorInspectorStyleDraft(controller: SidebarExpandedController) 
 
 function selectEditorInspectorPreviewDraft(controller: SidebarExpandedController) {
   return {
-    previewBrushPatch: controller.previewBrushPatch,
-    previewShapePatch: controller.previewShapePatch,
-    previewBlurPatch: controller.previewBlurPatch,
-    previewArrowPatch: controller.previewArrowPatch,
-    ...(controller.previewLinePatch === undefined
-      ? {}
-      : { previewLinePatch: controller.previewLinePatch }),
-    previewTextPatch: controller.previewTextPatch,
     previewStepPatch: controller.previewStepPatch,
     ...(controller.previewImagePatch === undefined
       ? {}

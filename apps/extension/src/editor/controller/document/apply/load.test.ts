@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   ensureEditorSourceLayer: vi.fn(async () => ({ id: 'source' })),
   prepareCanvasForDocumentLoad: vi.fn(),
   renderCanvasAfterDocumentLoad: vi.fn(),
+  restoreCanonicalEditorDrawingObjects: vi.fn(),
 }));
 
 vi.mock('../../../objects/rich-shape', async (importOriginal) => ({
@@ -26,6 +27,10 @@ vi.mock('./canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./canvas')>()),
   prepareCanvasForDocumentLoad: mocks.prepareCanvasForDocumentLoad,
   renderCanvasAfterDocumentLoad: mocks.renderCanvasAfterDocumentLoad,
+}));
+vi.mock('../../../drawing/object/canonicalize', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../drawing/object/canonicalize')>()),
+  restoreCanonicalEditorDrawingObjects: mocks.restoreCanonicalEditorDrawingObjects,
 }));
 
 import { loadPreparedDocumentOnCanvas, restoreRichShapeObjects } from './load';
@@ -71,7 +76,6 @@ describe('document apply load owner', () => {
         prepareObject,
         rebuildFrameDecorations: vi.fn(async () => undefined),
         syncBackgroundLayer,
-        upgradeLegacyArrowObjects: vi.fn(),
         viewportDevicePixelRatioBaseline: 2,
         zoomLevel: 1,
       })
@@ -80,6 +84,11 @@ describe('document apply load owner', () => {
     expect(canvas.loadFromJSON).toHaveBeenCalledWith('{"objects":[]}');
     expect(prepareObject).toHaveBeenCalledWith({ sniptaleId: 'json-object' });
     expect(canvas.add).toHaveBeenCalledWith({ sniptaleId: 'rich-object' });
+    expect(mocks.restoreCanonicalEditorDrawingObjects).toHaveBeenCalledWith({
+      canvas,
+      prepareObject,
+      source: { id: 'source' },
+    });
     expect(syncBackgroundLayer).toHaveBeenCalledWith(
       { backgroundMode: 'color' },
       { height: 20, width: 30 }
@@ -112,7 +121,6 @@ describe('document apply load owner', () => {
         prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
         prepareObject: vi.fn(),
         rebuildFrameDecorations: vi.fn(async () => undefined),
-        upgradeLegacyArrowObjects: vi.fn(),
         zoomLevel: 1,
       })
     ).resolves.toEqual({ id: 'source' });
@@ -147,7 +155,6 @@ describe('document apply load owner', () => {
         prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
         prepareObject: vi.fn(),
         rebuildFrameDecorations: vi.fn(async () => undefined),
-        upgradeLegacyArrowObjects: vi.fn(),
         zoomLevel: 1,
       })
     ).rejects.toThrow('Invalid frame annotation proxy');

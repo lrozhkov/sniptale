@@ -75,7 +75,7 @@ function isBrowserFrameState(value: unknown): boolean {
 export function isEditorDocument(value: unknown): value is EditorDocument {
   return (
     isRecord(value) &&
-    value['version'] === 1 &&
+    value['version'] === 2 &&
     isImageDataUrl(value['sourceImageData']) &&
     isNullableString(value['sourceName']) &&
     isNumber(value['sourceWidth']) &&

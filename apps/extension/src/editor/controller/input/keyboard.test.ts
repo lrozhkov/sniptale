@@ -132,73 +132,6 @@ function registerSelectionShortcutTest() {
   });
 }
 
-function createRasterSelectionOptions() {
-  return {
-    activeTool: 'selection',
-    hasRasterSelection: true,
-  };
-}
-
-function registerRasterClipboardShortcutTest() {
-  it('routes clipboard shortcuts to raster selection ownership', () => {
-    expect(
-      resolveEditorKeyboardAction(
-        createKeyboardOptions({
-          ...createRasterSelectionOptions(),
-          code: 'KeyC',
-          ctrlKey: true,
-          key: 'c',
-        })
-      )
-    ).toBe('copy-raster-selection');
-    expect(
-      resolveEditorKeyboardAction(
-        createKeyboardOptions({
-          ...createRasterSelectionOptions(),
-          code: 'KeyX',
-          ctrlKey: true,
-          key: 'x',
-        })
-      )
-    ).toBe('cut-raster-selection');
-    expect(
-      resolveEditorKeyboardAction(
-        createKeyboardOptions({
-          activeTool: 'selection',
-          code: 'KeyV',
-          ctrlKey: true,
-          key: 'v',
-        })
-      )
-    ).toBe('paste-raster-clipboard');
-  });
-}
-
-function registerRasterDeleteShortcutTest() {
-  it('keeps object delete ownership outside active raster selection mode', () => {
-    expect(
-      resolveEditorKeyboardAction(
-        createKeyboardOptions({
-          ...createRasterSelectionOptions(),
-          code: 'Delete',
-          key: 'Delete',
-        })
-      )
-    ).toBe('delete-raster-selection');
-    expect(
-      resolveEditorKeyboardAction(
-        createKeyboardOptions({
-          activeTool: 'select',
-          code: 'Delete',
-          hasRasterSelection: true,
-          hasSelection: true,
-          key: 'Delete',
-        })
-      )
-    ).toBe('delete-selection');
-  });
-}
-
 function registerArrowNudgeResolutionTest() {
   it('resolves arrow-key nudges', () => {
     expect(
@@ -277,8 +210,6 @@ function registerEnterTextTargetTest() {
 
 function runEditorControllerKeyboardSelectionSuite() {
   registerSelectionShortcutTest();
-  registerRasterClipboardShortcutTest();
-  registerRasterDeleteShortcutTest();
   registerArrowNudgeResolutionTest();
   registerArrowNudgeGuardTest();
   registerEnterTextTargetTest();

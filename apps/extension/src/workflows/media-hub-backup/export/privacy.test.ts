@@ -260,7 +260,7 @@ it('sanitizes editor document browser URLs when source metadata is included', ()
   const entry = {
     createdAt: 1,
     document: {
-      version: 1 as const,
+      version: 2 as const,
       sourceImageData: '',
       sourceName: null,
       sourceWidth: 100,

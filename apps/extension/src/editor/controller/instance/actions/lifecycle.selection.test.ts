@@ -124,6 +124,7 @@ function registerToolSwitchTest() {
       ...createLifecycleController(),
       canvas: {
         discardActiveObject,
+        getActiveObject: () => null,
         getActiveObjects: () => [{ sniptaleId: 'layer-1' }],
         requestRenderAll,
       },
@@ -145,9 +146,10 @@ function registerClearSelectionTest() {
     const requestRenderAll = vi.fn();
     const controller = {
       ...createLifecycleController(),
-      activeTool: 'rectangle',
+      activeTool: 'shape',
       canvas: {
         discardActiveObject,
+        getActiveObject: () => null,
         getActiveObjects: () => [{ sniptaleId: 'layer-1' }],
         requestRenderAll,
       },
@@ -158,7 +160,7 @@ function registerClearSelectionTest() {
     expect(discardActiveObject).toHaveBeenCalledOnce();
     expect(requestRenderAll).toHaveBeenCalledOnce();
     expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
-    expect(controller.activeTool).toBe('rectangle');
+    expect(controller.activeTool).toBe('shape');
     expect(controller.toolModeEnabled).toBe(true);
     expect(controller.applyToolMode).not.toHaveBeenCalled();
   });

@@ -58,7 +58,6 @@ it('keeps browser page zoom compensation advisory when applying a document', asy
     document: { id: 'document' } as never,
     prepareObject: vi.fn(),
     rebuildFrameDecorations: vi.fn(async () => undefined),
-    upgradeLegacyArrowObjects: vi.fn(),
     viewportDevicePixelRatioBaseline: 1,
     zoomLevel: 2,
   });

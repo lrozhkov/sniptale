@@ -8,7 +8,7 @@ export function createEditorPageController() {
   return {
     autosaveService: null,
     dispose: vi.fn(),
-    exportDocument: vi.fn(() => ({ version: 1 })),
+    exportDocument: vi.fn(() => ({ version: 2 })),
     loadDocument: vi.fn(async () => undefined),
     openImage: vi.fn(async () => undefined),
   };
@@ -27,7 +27,7 @@ export function createEditorPageAutosaveService() {
 
 export function createEditorPageDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,doc',
     sourceName: null,
     sourceWidth: 320,

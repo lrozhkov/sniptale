@@ -1,10 +1,13 @@
 import type { Textbox } from 'fabric';
-import type { EditorTextSettings } from '../../../features/editor/document/types';
 import type { EditorTextInlineStyleCommand } from './commands';
 
-type TextStylePatch = Partial<
-  Pick<EditorTextSettings, 'fontStyle' | 'fontWeight' | 'linethrough' | 'underline'>
->;
+type TextStyleSettings = {
+  fontStyle: 'normal' | 'italic';
+  fontWeight: 'normal' | 'bold';
+  linethrough: boolean;
+  underline: boolean;
+};
+type TextStylePatch = Partial<TextStyleSettings>;
 
 type TextSelectionStyle = TextStylePatch & {
   [key: string]: unknown;
@@ -47,7 +50,7 @@ export function getObjectStylePatch(
 }
 
 export function getTextSettingsStylePatch(
-  settings: EditorTextSettings,
+  settings: TextStyleSettings,
   command: EditorTextInlineStyleCommand
 ): TextStylePatch {
   switch (command) {

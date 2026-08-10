@@ -2,10 +2,6 @@ import type { FabricObject, Point } from 'fabric';
 import { getEditorBuiltInShapeEntry } from '../../../../features/editor/document/rich-shape';
 import { resizeRichShapeObjectToBounds } from '../../../objects/rich-shape';
 import type { DrawSession } from '../../core/types';
-import {
-  createProportionalRectDraftBounds,
-  createRectDraftBounds,
-} from '../../drawing/shape-updates/bounds';
 
 type RichShapeDraftObject = FabricObject & {
   sniptaleRichShape?: {
@@ -32,13 +28,19 @@ export function updateRichShapeDraft(
     return null;
   }
 
-  const bounds = constrainProportions
-    ? createProportionalRectDraftBounds(
-        drawSession.start,
-        point,
-        resolveRichShapeDraftAspectRatio(drawSession.object)
-      )
-    : createRectDraftBounds(drawSession.start, point);
+  const deltaX = point.x - drawSession.start.x;
+  const deltaY = point.y - drawSession.start.y;
+  const ratio = resolveRichShapeDraftAspectRatio(drawSession.object);
+  const width = constrainProportions
+    ? Math.min(Math.abs(deltaX), Math.abs(deltaY) * ratio)
+    : Math.abs(deltaX);
+  const height = constrainProportions ? width / ratio : Math.abs(deltaY);
+  const bounds = {
+    left: deltaX < 0 ? drawSession.start.x - width : drawSession.start.x,
+    top: deltaY < 0 ? drawSession.start.y - height : drawSession.start.y,
+    width,
+    height,
+  };
   resizeRichShapeObjectToBounds(drawSession.object, bounds);
   return null;
 }

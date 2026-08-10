@@ -4,7 +4,6 @@ import {
   scheduleEditorViewportStateSyncFrame,
   startEditorViewportPan,
 } from '../viewport/interactions';
-import { clearEditorRasterHoverCursor } from '../raster-tools/session';
 import type {
   EditorControllerEventHandlers,
   EditorControllerEventStateBindings,
@@ -13,8 +12,6 @@ import type {
 
 type PanEventBindings = Pick<
   EditorControllerEventStateBindings,
-  | 'getActiveTool'
-  | 'getRasterToolSession'
   | 'getIsSpacePressed'
   | 'getPanSession'
   | 'getSource'
@@ -24,28 +21,6 @@ type PanEventBindings = Pick<
   | 'setViewportSyncFrame'
 > &
   Pick<EditorControllerEventCommandBindings, 'syncViewportState' | 'zoomViewportAtPoint'>;
-
-function syncRasterHoverCursor(bindings: PanEventBindings, event?: MouseEvent): void {
-  if (bindings.getActiveTool() !== 'eraser') {
-    clearEditorRasterHoverCursor(bindings.getRasterToolSession());
-    return;
-  }
-
-  const viewportElement = bindings.getViewportElement();
-  if (!viewportElement || !event) {
-    return;
-  }
-
-  const rect = viewportElement.getBoundingClientRect();
-  const insideViewport =
-    event.clientX >= rect.left &&
-    event.clientX <= rect.right &&
-    event.clientY >= rect.top &&
-    event.clientY <= rect.bottom;
-  if (!insideViewport) {
-    clearEditorRasterHoverCursor(bindings.getRasterToolSession());
-  }
-}
 
 function handleViewportMouseDown(bindings: PanEventBindings, event: MouseEvent): void {
   bindings.setPanSession(
@@ -79,7 +54,6 @@ function handleViewportScroll(bindings: PanEventBindings): void {
 }
 
 function handleWindowMouseMove(bindings: PanEventBindings, event: MouseEvent): void {
-  syncRasterHoverCursor(bindings, event);
   moveEditorViewportPan({
     viewportElement: bindings.getViewportElement(),
     panSession: bindings.getPanSession(),

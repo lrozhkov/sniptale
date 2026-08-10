@@ -26,19 +26,9 @@ export function applyEditorKeyboardAction(
     case 'duplicate-selection':
       options.duplicateSelection();
       return { preventDefault: true };
-    case 'copy-raster-selection':
-      options.copyRasterSelection();
-      return { preventDefault: true };
-    case 'cut-raster-selection':
-      options.cutRasterSelection();
-      return { preventDefault: true };
-    case 'paste-raster-clipboard':
-      options.pasteRasterClipboard();
-      return { preventDefault: true };
     case 'ignore':
     case 'exit-text-edit':
     case 'cancel-transient':
-    case 'delete-raster-selection':
     case 'delete-selection':
     case 'apply-crop':
     case 'complete-draw':

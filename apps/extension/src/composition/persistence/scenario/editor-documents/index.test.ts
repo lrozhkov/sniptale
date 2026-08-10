@@ -29,7 +29,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,doc',
     sourceName: null,
     sourceWidth: 320,

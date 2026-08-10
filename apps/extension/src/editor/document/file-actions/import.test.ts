@@ -30,7 +30,7 @@ const controller: ImportEditorSessionController = {
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,doc',
     sourceName: null,
     sourceWidth: 320,
@@ -156,6 +156,40 @@ it('imports an exported editor document with default rich shape values', async (
     expect.objectContaining({ richShapes: [richShape] })
   );
   expect(setImageData).toHaveBeenCalledWith('data:image/png;base64,doc');
+});
+
+it('retains benign callout wording in rich-shape content and source metadata', async () => {
+  const setImageData = vi.fn();
+  const base = createDefaultRichShapeObject({ id: 'rich-callout-word' });
+  const richShape = {
+    ...base,
+    text: { ...base.text, content: 'Callout the important result' },
+    source: { ...base.source, name: 'My Callout Icon' },
+  };
+
+  await editorFileActions.importEditorSessionFromFile(
+    controller,
+    createSessionFile({ ...createEditorDocument(), richShapes: [richShape] }),
+    setImageData
+  );
+
+  expect(controller.loadDocument).toHaveBeenCalledWith(
+    expect.objectContaining({ richShapes: [richShape] })
+  );
+});
+
+it('rejects the retired structural rich-shape callout member', async () => {
+  const base = createDefaultRichShapeObject({ id: 'legacy-callout' });
+  const legacyShape = { ...base, callout: { side: 'right' } };
+
+  await expect(
+    editorFileActions.importEditorSessionFromFile(
+      controller,
+      createSessionFile({ ...createEditorDocument(), richShapes: [legacyShape] }),
+      vi.fn()
+    )
+  ).rejects.toThrow(translate('editor.runtime.sessionImportInvalid'));
+  expect(controller.loadDocument).not.toHaveBeenCalled();
 });
 
 it('rejects oversized editor sessions before reading file contents', async () => {

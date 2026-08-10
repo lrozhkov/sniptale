@@ -186,15 +186,12 @@ function runGenericResizeSuite() {
 }
 
 function runTextResizeSuite() {
-  it('resizes editor text layers through callout dimensions instead of object scaling', () => {
+  it('resizes shared text layers by their wrapping width instead of scaling the font', () => {
     const target = createObject('text-1', {
       getScaledHeight: () => 120,
       getScaledWidth: () => 420,
       height: 40,
       initDimensions: vi.fn(),
-      sniptaleTextCalloutFormat: 'bubble',
-      sniptaleTextCalloutHeight: 120,
-      sniptaleTextCalloutWidth: 420,
       sniptaleType: 'text',
       padding: 10,
       scaleX: 2,
@@ -209,9 +206,7 @@ function runTextResizeSuite() {
     expect(resizeLayerObject(canvas, 'text-1', 280, 48, ensureObjectReachable)).toBe(target);
     expect(target.scaleX).toBe(1);
     expect(target.scaleY).toBe(1);
-    expect(target['sniptaleTextCalloutWidth']).toBe(280);
-    expect(target['sniptaleTextCalloutHeight']).toBe(76);
-    expect(target['width']).toBe(244);
+    expect(target['width']).toBe(280);
     expect(target.setCoords).toHaveBeenCalledOnce();
     expect(ensureObjectReachable).toHaveBeenCalledWith(target);
   });

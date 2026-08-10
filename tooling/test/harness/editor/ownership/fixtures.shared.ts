@@ -14,7 +14,7 @@ export function createFixtureLayer(): EditorLayerItem {
     raster: false,
     selected: true,
     selectedCount: 1,
-    type: 'rectangle',
+    type: 'shape',
     typeLabel: 'Rectangle',
     visible: true,
   };

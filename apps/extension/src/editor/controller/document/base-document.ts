@@ -34,7 +34,7 @@ export async function createBaseDocument(
   });
 
   return {
-    version: 1,
+    version: 2,
     sourceImageData: dataUrl,
     sourceName,
     sourceWidth,

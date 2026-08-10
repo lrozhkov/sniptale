@@ -1,115 +1,118 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const selectionToolSettings = {
-  step: { alphabet: 'latin', color: '#123123', sizeLevel: 'md', type: 'number', value: '1' },
-  text: {
-    backgroundColor: '#ffffff',
-    backgroundOpacity: 1,
-    calloutFormat: 'panel',
-    fontFamily: 'serif',
-    fontSize: 18,
-    fontStyle: 'normal',
-    fontWeight: 'bold',
-    layoutMode: 'fixed-width',
-    linethrough: false,
-    shadow: 0,
-    textAlign: 'left',
-    textColor: '#222222',
-    underline: false,
-    verticalAlign: 'top',
-  },
-};
-
 const mocks = vi.hoisted(() => ({
-  getBlurSettingsMock: vi.fn(() => ({ amount: 8 })),
-  isArrowObjectMock: vi.fn(() => false),
-  isBlurObjectMock: vi.fn(() => false),
-  isGroupMock: vi.fn(() => false),
-  isTextboxMock: vi.fn(() => false),
-  parseColorForStoreMock: vi.fn((value: unknown, fallback: string) => {
-    return value == null || value === '' ? fallback : `parsed:${String(value)}`;
-  }),
-  syncRichShapeSelectionSettingsMock: vi.fn(),
-  updateSelectionBlurSettingsMock: vi.fn(),
-  updateSelectionStepSettingsMock: vi.fn(),
-  updateSelectionTextSettingsMock: vi.fn(),
+  readEditorDrawingObject: vi.fn(),
+  syncRichShapeSelectionSettings: vi.fn(),
+  syncStepSelectionSettings: vi.fn(),
+  updateSelectionDrawingToolSettings: vi.fn(),
 }));
 
+vi.mock('../../drawing/object/metadata', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../drawing/object/metadata')>()),
+  readEditorDrawingObject: mocks.readEditorDrawingObject,
+}));
 vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: {
     getState: () => ({
-      selectionToolSettings,
-      updateSelectionBlurSettings: mocks.updateSelectionBlurSettingsMock,
-      updateSelectionStepSettings: mocks.updateSelectionStepSettingsMock,
-      updateSelectionTextSettings: mocks.updateSelectionTextSettingsMock,
+      updateSelectionDrawingToolSettings: mocks.updateSelectionDrawingToolSettings,
     }),
   },
 }));
-vi.mock('../core/helpers', async () => ({
-  ...(await vi.importActual<typeof import('../core/helpers')>('../core/helpers')),
-  isGroup: mocks.isGroupMock,
-  isTextbox: mocks.isTextboxMock,
-  parseColorForStore: mocks.parseColorForStoreMock,
-}));
-vi.mock('../../objects', async () => ({
-  ...(await vi.importActual<typeof import('../../objects')>('../../objects')),
-  isArrowObject: mocks.isArrowObjectMock,
-}));
-vi.mock('../../objects/annotation/blur/object', async () => ({
-  ...(await vi.importActual<typeof import('../../objects/annotation/blur/object')>(
-    '../../objects/annotation/blur/object'
-  )),
-  getBlurSettings: mocks.getBlurSettingsMock,
-  isBlurObject: mocks.isBlurObjectMock,
-}));
 vi.mock('./rich-shape-sync', () => ({
-  syncRichShapeSelectionSettings: mocks.syncRichShapeSelectionSettingsMock,
+  syncRichShapeSelectionSettings: mocks.syncRichShapeSelectionSettings,
+}));
+vi.mock('./sync-step', () => ({
+  syncStepSelectionSettings: mocks.syncStepSelectionSettings,
 }));
 
 import { syncSelectionToolSettingsFromObject } from './sync/dispatch';
 
-describe('editor-controller selection sync remaining branch coverage', () => {
+describe('editor-controller selection sync drawing dispatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('keeps early exits explicit for unsupported selected object shapes', () => {
-    syncSelectionToolSettingsFromObject({} as never, 'text');
-    syncSelectionToolSettingsFromObject({} as never, 'step');
-    syncSelectionToolSettingsFromObject({} as never, 'arrow');
+  it.each([
+    [
+      'pencil',
+      { color: '#111111', kind: 'pencil', points: [], width: 4 },
+      { color: '#111111', width: 4 },
+    ],
+    [
+      'marker',
+      { color: '#222222', kind: 'marker', opacity: 0.4, points: [], width: 16 },
+      { color: '#222222', opacity: 0.4, width: 16 },
+    ],
+    [
+      'arrow',
+      {
+        color: '#333333',
+        dynamicWidth: true,
+        end: { x: 20, y: 20 },
+        kind: 'arrow',
+        start: { x: 0, y: 0 },
+        width: 6,
+      },
+      { color: '#333333', design: 'standard', dynamicWidth: true, width: 6 },
+    ],
+    [
+      'text',
+      {
+        backgroundColor: null,
+        color: '#444444',
+        fontSize: 24,
+        height: 30,
+        kind: 'text',
+        text: 'Text',
+        width: 100,
+        x: 0,
+        y: 0,
+      },
+      {
+        backgroundColor: null,
+        color: '#444444',
+        fontFamily: 'handwritten',
+        fontSize: 24,
+      },
+    ],
+    [
+      'shape',
+      {
+        color: '#555555',
+        fillColor: null,
+        height: 20,
+        kind: 'rectangle',
+        width: 3,
+        x: 0,
+        y: 0,
+      },
+      { color: '#555555', fillColor: null, kind: 'rectangle', width: 3 },
+    ],
+  ] as const)('syncs %s drawing settings', (type, drawing, expected) => {
+    mocks.readEditorDrawingObject.mockReturnValueOnce(drawing);
+
+    syncSelectionToolSettingsFromObject({} as never, type);
+
+    expect(mocks.updateSelectionDrawingToolSettings).toHaveBeenCalledWith(type, expected);
+  });
+
+  it('ignores blur and objects without shared drawing metadata', () => {
+    mocks.readEditorDrawingObject.mockReturnValueOnce({ kind: 'blur' }).mockReturnValueOnce(null);
+
     syncSelectionToolSettingsFromObject({} as never, 'blur');
+    syncSelectionToolSettingsFromObject({} as never, 'pencil');
 
-    expect(mocks.updateSelectionTextSettingsMock).not.toHaveBeenCalled();
-    expect(mocks.updateSelectionStepSettingsMock).toHaveBeenCalledOnce();
-    expect(mocks.updateSelectionBlurSettingsMock).not.toHaveBeenCalled();
+    expect(mocks.updateSelectionDrawingToolSettings).not.toHaveBeenCalled();
   });
 
-  it('covers text font fallbacks and plain sans font inference', () => {
-    mocks.isTextboxMock.mockReturnValue(true);
+  it('keeps retained step and rich-shape owners', () => {
+    const step = { id: 'step' };
+    const richShape = { id: 'rich-shape' };
 
-    syncSelectionToolSettingsFromObject({ fill: '#111111', fontFamily: 42 } as never, 'text');
-    syncSelectionToolSettingsFromObject({ fill: '#222222', fontFamily: 'Arial' } as never, 'text');
+    syncSelectionToolSettingsFromObject(step as never, 'step');
+    syncSelectionToolSettingsFromObject(richShape as never, 'rich-shape');
 
-    expect(mocks.updateSelectionTextSettingsMock).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ fontFamily: 'serif' })
-    );
-    expect(mocks.updateSelectionTextSettingsMock).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ fontFamily: 'sans' })
-    );
-  });
-
-  it('covers grouped step, blur, and rich-shape sync branches', () => {
-    mocks.isGroupMock.mockReturnValueOnce(true);
-    syncSelectionToolSettingsFromObject({ getObjects: () => [] } as never, 'step');
-
-    mocks.isBlurObjectMock.mockReturnValueOnce(true);
-    syncSelectionToolSettingsFromObject({ kind: 'blur' } as never, 'blur');
-
-    syncSelectionToolSettingsFromObject({ kind: 'rich' } as never, 'rich-shape');
-
-    expect(mocks.updateSelectionBlurSettingsMock).toHaveBeenCalledWith({ amount: 8 });
-    expect(mocks.syncRichShapeSelectionSettingsMock).toHaveBeenCalledWith({ kind: 'rich' });
+    expect(mocks.syncStepSelectionSettings).toHaveBeenCalledWith(step);
+    expect(mocks.syncRichShapeSelectionSettings).toHaveBeenCalledWith(richShape);
   });
 });

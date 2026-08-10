@@ -36,10 +36,10 @@ it('delegates interaction and tool helper actions through the controller instanc
   const controller = new TestInteractionHelperActions();
 
   controller.moveSelection(1);
-  expect(controller.nextLabelIndex('rectangle')).toBe(4);
+  expect(controller.nextLabelIndex('shape')).toBe(4);
   controller.advanceStepValue();
 
   expect(helperMocks.moveSelectionForController).toHaveBeenCalledWith(controller, 1);
-  expect(helperMocks.nextLabelIndexForController).toHaveBeenCalledWith(controller, 'rectangle');
+  expect(helperMocks.nextLabelIndexForController).toHaveBeenCalledWith(controller, 'shape');
   expect(helperMocks.advanceStepValueForController).toHaveBeenCalledOnce();
 });

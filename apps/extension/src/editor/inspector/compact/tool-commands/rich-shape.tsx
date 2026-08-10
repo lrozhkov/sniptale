@@ -9,7 +9,6 @@ import {
 import { RichShapeEffectsSection } from '../../tools/rich-shape/effects';
 import { RichShapeFillSection } from '../../tools/rich-shape/fill';
 import { RichShapeLineSection } from '../../tools/rich-shape/line';
-import { RichShapeTailSection } from '../../tools/rich-shape/tail';
 import { RichShapeTextSection } from '../../tools/rich-shape/text';
 import type { RichShapeControlsProps } from '../../tools/rich-shape/types';
 import type { ToolCommandParams } from './types';
@@ -163,24 +162,6 @@ function buildRichShapeEffectsCommand(props: RichShapeControlsProps): CompactCom
   };
 }
 
-function buildRichShapeTailCommand(props: RichShapeControlsProps): CompactCommand | null {
-  if (!props.shape.callout) {
-    return null;
-  }
-
-  return {
-    id: 'rich-shape-tail',
-    icon: 'preset',
-    title: translate('editor.compact.richShapeTail'),
-    trigger: <TablerIcon icon="tabler:route" />,
-    content: (
-      <CompactCommandField label={translate('editor.compact.richShapeTail')}>
-        <RichShapeTailSection {...props} compact />
-      </CompactCommandField>
-    ),
-  };
-}
-
 export function buildRichShapeCompactCommands(params: ToolCommandParams): CompactCommand[] {
   const props = createRichShapeControlsProps(params);
 
@@ -192,7 +173,6 @@ export function buildRichShapeCompactCommands(params: ToolCommandParams): Compac
     buildRichShapeLineCommand(props),
     buildRichShapeFillCommand(props),
     buildRichShapeTextCommand(props),
-    buildRichShapeTailCommand(props),
     buildRichShapeEffectsCommand(props),
   ];
 

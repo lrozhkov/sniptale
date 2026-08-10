@@ -114,7 +114,7 @@ export function resetEditorStore(overrides: Partial<EditorStoreState> = {}) {
         raster: false,
         selectedCount: 1,
         selected: true,
-        type: 'rectangle',
+        type: 'shape',
         typeLabel: 'Rectangle',
         visible: true,
       },

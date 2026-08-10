@@ -1,8 +1,5 @@
 import type { Canvas, FabricObject, TPointerEvent } from 'fabric';
 import { isTextbox } from '../core/helpers';
-import { updateEditorArrowOnDoubleClick } from './interactions';
-import { isArrowObject } from '../../objects/arrow';
-import { isLineObject, updateLinePointOnDoubleClick } from '../../objects/line';
 
 export function handleEditorDoubleClick(options: {
   canvas: Canvas | null;
@@ -19,26 +16,8 @@ export function handleEditorDoubleClick(options: {
     return;
   }
 
-  if (!canvas || !target || activeTool !== 'select') {
-    return;
-  }
-
-  if (isLineObject(target)) {
-    updateLinePointOnDoubleClick(target);
-    canvas.setActiveObject(target);
-    canvas.requestRenderAll();
-    syncRuntimeState();
-    return;
-  }
-
-  if (!isArrowObject(target)) {
-    return;
-  }
-
-  const point = canvas.getScenePoint(event);
-  updateEditorArrowOnDoubleClick(target, point);
-  canvas.setActiveObject(target);
-  canvas.requestRenderAll();
-  commitHistory();
-  syncRuntimeState();
+  void canvas;
+  void event;
+  void commitHistory;
+  void syncRuntimeState;
 }

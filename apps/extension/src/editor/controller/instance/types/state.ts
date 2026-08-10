@@ -5,7 +5,6 @@ import type { EditorControllerEventHandlers } from '../../events';
 import type { EditorSelectionNudgeSession } from '../../tools/nudge';
 import type { EditorSessionAutosaveService } from '../../../document/session-autosave';
 import type { EditorMagnetManager } from '../../magnet';
-import type { EditorRasterToolSessionState } from '../../raster-tools/types';
 import type { CropSelection, DrawSession, PanSession } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 import type { EditorControllerDocumentSize } from './shared';
@@ -33,7 +32,6 @@ export interface EditorControllerInteractionState {
   cropSelectionMouseEnabled: boolean;
   isSpacePressed: boolean;
   panSession: PanSession | null;
-  rasterToolSession: EditorRasterToolSessionState;
   selectionNudgeSession: EditorSelectionNudgeSession | null;
   lastLayerSelectionAnchorId: string | null;
 }

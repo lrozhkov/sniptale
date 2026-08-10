@@ -1,8 +1,4 @@
 import { detachEditorControllerEventHandlers } from '../../../events';
-import {
-  clearEditorRasterSelection,
-  clearEditorRasterTransientState,
-} from '../../../raster-tools/session';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 
@@ -36,6 +32,4 @@ export function disposeEditorController(controller: EditorControllerInstance): v
   controller.panSession = null;
   controller.isSpacePressed = false;
   controller.selectionNudgeSession = null;
-  clearEditorRasterTransientState(controller.rasterToolSession);
-  clearEditorRasterSelection(controller.rasterToolSession);
 }

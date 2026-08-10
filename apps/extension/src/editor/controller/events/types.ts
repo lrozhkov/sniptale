@@ -4,8 +4,6 @@ import type { SourceState } from '../../document/model/source-state';
 import type { EditorObjectType, EditorTool } from '../../../features/editor/document/types';
 import type { EditorSelectionNudge } from '../tools/nudge';
 import type { EditorTextInlineStyleCommand } from '../text-formatting';
-import type { EditorRasterToolSessionState } from '../raster-tools/types';
-import type { EditorRasterTargetReference } from '../raster/types';
 
 type TransformOrigin = Pick<import('fabric').Transform, 'originX' | 'originY'>;
 
@@ -53,7 +51,6 @@ export interface EditorControllerEventStateBindings {
   setPanSession: (session: PanSession | null) => void;
   getViewportSyncFrame: () => number;
   setViewportSyncFrame: (frame: number) => void;
-  getRasterToolSession: () => EditorRasterToolSessionState;
 }
 
 export interface EditorControllerEventCropBindings {
@@ -70,10 +67,6 @@ export interface EditorControllerEventObjectBindings {
   nextLabelIndex: (type: EditorObjectType) => number;
   prepareObject: (object: FabricObject) => void;
   startDrawSession: (tool: DrawSession['tool'], start: Point, object: FabricObject) => void;
-  decorateShape: (
-    object: FabricObject,
-    type: Extract<EditorObjectType, 'rectangle' | 'ellipse' | 'diamond'>
-  ) => void;
   addObject: (object: FabricObject) => void;
   switchToSelectTool: () => void;
   advanceStepValue: () => void;
@@ -94,15 +87,6 @@ export interface EditorControllerEventCommandBindings {
   syncRuntimeState: () => void;
   syncViewportState: () => void;
   zoomViewportAtPoint: (delta: number, point: { clientX: number; clientY: number }) => void;
-  clearRasterSelection: () => void;
-  applyRasterBitmap: (
-    reference: EditorRasterTargetReference,
-    bitmap: HTMLCanvasElement
-  ) => Promise<void>;
-  copyRasterSelection: () => void;
-  cutRasterSelection: () => void;
-  deleteRasterSelectionPixels: () => void;
-  pasteRasterClipboard: () => void;
 }
 
 export type EditorControllerEventBindings = EditorControllerEventStateBindings &

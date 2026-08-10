@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type React from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
 import type { EditorControllerInstance } from '../../controller/instance/types';
-import { RASTER_TOOL_ORDER, TOOL_ORDER } from '../../chrome/tool-icons';
+import { EditorDrawingOptions } from '../../drawing/options';
+import { resolveToolPropertiesStyle } from './tool-properties-geometry';
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
@@ -35,85 +35,16 @@ const TOOL_PROPERTIES_SHIFTED_CLASS_NAME = floatingChromeClassNames(
 );
 
 const TOOLS_WITH_PROPERTIES = new Set<EditorTool>([
-  ...RASTER_TOOL_ORDER,
   'pencil',
-  'highlighter',
-  'rectangle',
-  'ellipse',
-  'diamond',
-  'blur',
+  'marker',
+  'shape',
   'arrow',
-  'line',
   'text',
   'step',
   'frame-annotation',
 ]);
 
-const TOOL_RAIL_BUTTON_SIZE_PX = 36;
-const TOOL_RAIL_ITEM_GAP_PX = 6;
-const TOOL_RAIL_CHILD_GAP_PX = 6;
-const TOOL_RAIL_DIVIDER_SIZE_PX = 1;
-const TOOL_RAIL_PADDING_PX = 6;
-
-const TOOL_RAIL_PRIMARY_TOOLS = TOOL_ORDER;
-const TOOL_RAIL_RASTER_TOOLS: EditorTool[] = [...RASTER_TOOL_ORDER, 'crop'];
 const TOOL_PROPERTIES_EXCLUDED_ACTIONS = new Set(['meta-technical-data']);
-
-function getToolRailGroupHeight(toolCount: number) {
-  return toolCount * TOOL_RAIL_BUTTON_SIZE_PX + Math.max(0, toolCount - 1) * TOOL_RAIL_ITEM_GAP_PX;
-}
-
-const TOOL_RAIL_PRIMARY_HEIGHT_PX = getToolRailGroupHeight(TOOL_RAIL_PRIMARY_TOOLS.length);
-const TOOL_RAIL_RASTER_HEIGHT_PX = getToolRailGroupHeight(TOOL_RAIL_RASTER_TOOLS.length);
-const TOOL_RAIL_INSPECTOR_HEIGHT_PX = getToolRailGroupHeight(4);
-const TOOL_RAIL_HEIGHT_ESTIMATE_PX =
-  TOOL_RAIL_PADDING_PX * 2 +
-  TOOL_RAIL_PRIMARY_HEIGHT_PX +
-  TOOL_RAIL_RASTER_HEIGHT_PX +
-  TOOL_RAIL_INSPECTOR_HEIGHT_PX +
-  TOOL_RAIL_DIVIDER_SIZE_PX * 2 +
-  TOOL_RAIL_CHILD_GAP_PX * 4;
-
-function resolveToolPropertiesAnchorOffset(activeTool: EditorTool) {
-  const primaryIndex = TOOL_RAIL_PRIMARY_TOOLS.indexOf(activeTool);
-  if (primaryIndex >= 0) {
-    return (
-      TOOL_RAIL_PADDING_PX +
-      primaryIndex * (TOOL_RAIL_BUTTON_SIZE_PX + TOOL_RAIL_ITEM_GAP_PX) +
-      TOOL_RAIL_BUTTON_SIZE_PX / 2
-    );
-  }
-
-  const rasterIndex = TOOL_RAIL_RASTER_TOOLS.indexOf(activeTool);
-  if (rasterIndex >= 0) {
-    const rasterStart =
-      TOOL_RAIL_PADDING_PX +
-      TOOL_RAIL_PRIMARY_HEIGHT_PX +
-      TOOL_RAIL_CHILD_GAP_PX +
-      TOOL_RAIL_DIVIDER_SIZE_PX +
-      TOOL_RAIL_CHILD_GAP_PX;
-
-    return (
-      rasterStart +
-      rasterIndex * (TOOL_RAIL_BUTTON_SIZE_PX + TOOL_RAIL_ITEM_GAP_PX) +
-      TOOL_RAIL_BUTTON_SIZE_PX / 2
-    );
-  }
-
-  return TOOL_RAIL_HEIGHT_ESTIMATE_PX / 2;
-}
-
-function resolveToolPropertiesStyle(activeTool: EditorTool) {
-  const anchorOffset = resolveToolPropertiesAnchorOffset(activeTool);
-
-  return {
-    '--editor-tool-properties-top': [
-      'clamp(5rem,',
-      `calc(50vh - ${TOOL_RAIL_HEIGHT_ESTIMATE_PX / 2}px + ${anchorOffset}px),`,
-      'calc(100vh - 5rem))',
-    ].join(' '),
-  } as React.CSSProperties;
-}
 
 function flattenCommands(commandGroups: CompactCommand[][]): CompactCommand[] {
   return commandGroups
@@ -215,11 +146,7 @@ function isToolPropertiesEnabled(args: {
   return (
     args.hasImage &&
     args.inspector === 'tool' &&
-    (!args.selection.hasSelection ||
-      args.activeTool === 'selection' ||
-      args.activeTool === 'brush' ||
-      args.activeTool === 'eraser' ||
-      args.activeTool === 'fill') &&
+    (!args.selection.hasSelection || args.activeTool === 'select') &&
     TOOLS_WITH_PROPERTIES.has(args.activeTool) &&
     args.groups.length > 0
   );
@@ -259,6 +186,7 @@ export function EditorFloatingToolPropertiesRail({
   leftDrawerOpen,
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
+  const controller = useEditorController();
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const frameAnnotationDefaults = useFrameAnnotationCreationDefaults();
   useEffect(() => {
@@ -279,7 +207,27 @@ export function EditorFloatingToolPropertiesRail({
     documentController.inspector === 'tool' &&
     !selection.hasSelection &&
     activeTool === 'frame-annotation';
-  const enabled = standardPropertiesEnabled || frameAnnotationPropertiesEnabled;
+  const selectedDrawingTool =
+    selection.selectedObjectType === 'pencil' ||
+    selection.selectedObjectType === 'marker' ||
+    selection.selectedObjectType === 'shape' ||
+    selection.selectedObjectType === 'arrow' ||
+    selection.selectedObjectType === 'blur' ||
+    selection.selectedObjectType === 'text'
+      ? selection.selectedObjectType
+      : null;
+  const activeDrawingTool =
+    activeTool === 'pencil' ||
+    activeTool === 'marker' ||
+    activeTool === 'shape' ||
+    activeTool === 'arrow' ||
+    activeTool === 'text'
+      ? activeTool
+      : null;
+  const drawingOptionsTool = selectedDrawingTool ?? activeDrawingTool;
+  const drawingPropertiesEnabled = hasImage && Boolean(drawingOptionsTool);
+  const enabled =
+    standardPropertiesEnabled || frameAnnotationPropertiesEnabled || drawingPropertiesEnabled;
   const hidden = useToolPropertiesVisibility(enabled);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
   const className = leftDrawerOpen
@@ -303,7 +251,15 @@ export function EditorFloatingToolPropertiesRail({
         className={className}
         style={resolveToolPropertiesStyle(activeTool)}
       >
-        {frameAnnotationPropertiesEnabled ? (
+        {drawingOptionsTool ? (
+          <EditorDrawingOptions
+            onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
+            onClearSelection={() => controller.clearSelection()}
+            onDeleteSelection={() => controller.deleteSelection()}
+            selectedType={selection.selectedObjectType}
+            tool={drawingOptionsTool}
+          />
+        ) : frameAnnotationPropertiesEnabled ? (
           <FrameAnnotationCreationControls
             dataUi="editor.frame-annotation.creation-controls"
             onChange={setFrameAnnotationCreationDefaults}

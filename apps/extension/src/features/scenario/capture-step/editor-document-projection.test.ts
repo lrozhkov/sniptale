@@ -21,7 +21,7 @@ function createDocument(objects: Record<string, unknown>[] | string) {
     sourceName: null,
     sourceTop: 0,
     sourceWidth: 320,
-    version: 1,
+    version: 2,
   } as const;
 }
 

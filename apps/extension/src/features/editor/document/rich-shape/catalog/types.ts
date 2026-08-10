@@ -8,7 +8,6 @@ export const EDITOR_BUILT_IN_SHAPE_CATEGORY = {
   BLOCK_ARROWS: 'block-arrows',
   EQUATION: 'equation-shapes',
   FLOWCHART: 'flowchart',
-  CALLOUTS: 'callouts',
   STARS_BANNERS: 'stars-banners',
   ACTION_BUTTONS: 'action-buttons',
 } as const;

@@ -196,6 +196,6 @@ function createEditorDocument(): EditorDocument {
     sourceName: null,
     sourceTop: 0,
     sourceWidth: 1,
-    version: 1,
+    version: 2,
   };
 }

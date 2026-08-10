@@ -118,8 +118,6 @@ function registerCatalogSearchTests() {
     expect(findIds('connector')).toContain('straight-connector');
     expect(findIds('база данных')).toContain('flowchart-database');
     expect(findIds('database')).toContain('flowchart-database');
-    expect(findIds('выноска')).toContain('dynamic-callout');
-    expect(findIds('callout')).toContain('dynamic-callout');
   });
 }
 

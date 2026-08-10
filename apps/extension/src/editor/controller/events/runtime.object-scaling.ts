@@ -1,11 +1,7 @@
 import { isBlurObject } from '../../objects/annotation/blur/object';
-import { isArrowObject, normalizeScaledArrowObject } from '../../objects/arrow';
-import { isLineObject, normalizeScaledLineObject } from '../../objects/line';
 import { normalizeScaledRectangleTarget } from '../../objects/shape-style';
 import { syncCropGuideInteraction } from './runtime.crop-guide';
 import { syncSourceState } from './runtime.source-sync';
-import { isResizableTextCallout } from './runtime.text-callout-target';
-import { normalizeScaledTextCalloutTarget } from './text-callout';
 import { normalizeScaledAnnotationTarget } from '../tools/annotation-resize';
 import type {
   EditorControllerEventCommandBindings,
@@ -46,17 +42,10 @@ export function createObjectScalingHandler(
 function normalizeRuntimeScaledTarget(
   bindings: EditorControllerEventStateBindings,
   target: CanvasObject,
-  transform?: TransformOrigin
+  _transform?: TransformOrigin
 ) {
-  if (isResizableTextCallout(target)) {
+  if (isBlurObject(target)) {
     target.dirty = true;
-    normalizeScaledTextCalloutTarget(target, transform);
-  } else if (isBlurObject(target)) {
-    target.dirty = true;
-  } else if (isArrowObject(target)) {
-    return normalizeScaledArrowObject(target);
-  } else if (isLineObject(target)) {
-    return normalizeScaledLineObject(target);
   } else if (normalizeScaledRectangleTarget(target)) {
     target.setCoords();
   } else if (target.sniptaleType === 'rich-shape') {

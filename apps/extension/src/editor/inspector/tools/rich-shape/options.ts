@@ -7,7 +7,6 @@ import type {
   EditorRichShapeRoughFillStyle,
 } from '../../../../features/editor/document/rich-shape';
 import type { CompactSelectOption } from '../../../chrome/ui';
-import { createRoughFillStyleOptions } from '../rough-fill-options';
 
 export const RICH_SHAPE_DASH_OPTIONS = [
   { value: 'solid', label: translate('highlighter.editor.styleSolid') },
@@ -38,5 +37,12 @@ export const RICH_SHAPE_ARROWHEAD_OPTIONS = [
   { value: 'oval', label: translate('editor.compact.richShapeArrowHeadOval') },
 ] satisfies CompactSelectOption<EditorRichShapeArrowhead>[];
 
-export const RICH_SHAPE_ROUGH_FILL_OPTIONS =
-  createRoughFillStyleOptions<EditorRichShapeRoughFillStyle>();
+export const RICH_SHAPE_ROUGH_FILL_OPTIONS = [
+  { value: 'hachure', label: translate('editor.compact.richShapeRoughFillHachure') },
+  { value: 'solid', label: translate('editor.compact.richShapeRoughFillSolid') },
+  { value: 'zigzag', label: translate('editor.compact.richShapeRoughFillZigzag') },
+  { value: 'cross-hatch', label: translate('editor.compact.richShapeRoughFillCrossHatch') },
+  { value: 'dots', label: translate('editor.compact.richShapeRoughFillDots') },
+  { value: 'dashed', label: translate('editor.compact.richShapeRoughFillDashed') },
+  { value: 'zigzag-line', label: translate('editor.compact.richShapeRoughFillZigzagLine') },
+] satisfies CompactSelectOption<EditorRichShapeRoughFillStyle>[];

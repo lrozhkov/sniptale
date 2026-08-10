@@ -81,7 +81,6 @@ describe('editor shape browser', () => {
       'block-arrows',
       'equation-shapes',
       'flowchart',
-      'callouts',
       'stars-banners',
       'action-buttons',
     ]);

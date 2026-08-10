@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { isEditorDocument } from './guards';
-import { EDITOR_ARROW_VARIANT, EDITOR_BRUSH_SHAPE_CORRECTION } from './types';
 import { createDefaultRichShapeObject } from './rich-shape';
 
 const TEST_IMAGE_DATA_URL =
@@ -10,7 +9,7 @@ const TEST_IMAGE_DATA_URL =
 
 function createEditorDocumentFixture() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: TEST_IMAGE_DATA_URL,
     sourceName: 'capture.png',
     sourceWidth: 1280,
@@ -91,21 +90,13 @@ function registerBasicAcceptedDocumentTests() {
     });
   });
 
-  it('keeps the editor-document runtime constants on their canonical union values', () => {
-    expect(EDITOR_ARROW_VARIANT).toEqual({
-      STANDARD: 'standard',
-      TAPERED: 'tapered',
-    });
-    expect(EDITOR_BRUSH_SHAPE_CORRECTION).toEqual({
-      OFF: 'off',
-      SUBTLE: 'subtle',
-      STRONG: 'strong',
-    });
+  it('rejects the unsupported alpha document version explicitly', () => {
+    expect(isEditorDocument({ ...createEditorDocumentFixture(), version: 1 })).toBe(false);
   });
 }
 
 function registerRichShapeAcceptedDocumentTests() {
-  it('accepts additive rich shape document objects while keeping legacy documents loadable', () => {
+  it('accepts additive rich shape document objects in the current document version', () => {
     expect(isEditorDocument(createEditorDocumentFixture())).toBe(true);
     expect(
       isEditorDocument({

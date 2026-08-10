@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { FabricImage, Textbox } from 'fabric';
+import { FabricImage } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import {
   collectLayers,
@@ -140,21 +140,6 @@ it('uses scaled dimensions and fallback layer names when object metadata is inco
 
   expect(layer).toEqual(expect.objectContaining({ type: 'rectangle' }));
   expect(layer?.name.length).toBeGreaterThan(0);
-});
-
-it('uses stored callout dimensions for editor text layers', () => {
-  const textLayer = Object.assign(Object.create(Textbox.prototype), {
-    height: 40,
-    sniptaleTextLayoutMode: 'fixed-width',
-    sniptaleRole: 'annotation',
-    sniptaleTextCalloutHeight: 120,
-    sniptaleTextCalloutWidth: 420,
-    sniptaleType: 'text',
-    padding: 10,
-    width: 120,
-  });
-
-  expect(getObjectDimensions(textLayer as never)).toEqual({ width: 420, height: 120 });
 });
 
 it('collects only user-visible canvas layers without the synthetic transparent base entry', () => {

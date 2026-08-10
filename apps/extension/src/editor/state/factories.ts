@@ -11,11 +11,7 @@ import {
   type EditorStoreSet,
 } from './helpers';
 import type { EditorState } from './types';
-import {
-  createHydrateDefaultsAction,
-  createRasterToolSettingsUpdater,
-  createToolSettingsUpdaters,
-} from './tool-settings';
+import { createHydrateDefaultsAction, createToolSettingsUpdaters } from './tool-settings';
 
 export type EditorStoreSetters = Pick<
   EditorState,
@@ -39,23 +35,13 @@ export type EditorStoreToolActions = Pick<
   | 'hydrateDefaults'
   | 'hydrateWorkspaceDefaults'
   | 'updateWorkspaceDefaults'
-  | 'updateBrushSettings'
-  | 'updateSelectionBrushSettings'
-  | 'updateShapeSettings'
-  | 'updateSelectionShapeSettings'
-  | 'updateBlurSettings'
-  | 'updateSelectionBlurSettings'
-  | 'updateArrowSettings'
-  | 'updateSelectionArrowSettings'
-  | 'updateLineSettings'
-  | 'updateSelectionLineSettings'
-  | 'updateTextSettings'
-  | 'updateSelectionTextSettings'
+  | 'replaceDrawingToolSettings'
+  | 'updateDrawingToolSettings'
+  | 'updateSelectionDrawingToolSettings'
   | 'updateStepSettings'
   | 'updateSelectionStepSettings'
   | 'updateImageSettings'
   | 'updateSelectionImageSettings'
-  | 'updateRasterToolSettings'
 >;
 export type EditorStoreLayoutActions = Pick<
   EditorState,
@@ -89,7 +75,6 @@ export function createEditorStoreToolActions(set: EditorStoreSet): EditorStoreTo
     hydrateWorkspaceDefaults: createWorkspaceDefaultsHydrator(set),
     updateWorkspaceDefaults: createWorkspaceDefaultsUpdater(set),
     ...createToolSettingsUpdaters(set),
-    updateRasterToolSettings: createRasterToolSettingsUpdater(set),
   };
 }
 

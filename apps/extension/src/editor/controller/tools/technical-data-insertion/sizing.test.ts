@@ -1,63 +1,42 @@
 // @vitest-environment jsdom
-import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  resizeTextCalloutMock: vi.fn(),
-}));
-
-vi.mock('../../../objects/annotation/text/callout/resize', () => ({
-  resizeTextCallout: mocks.resizeTextCalloutMock,
-}));
-
-import { DEFAULT_EDITOR_TEXTBOX_WIDTH } from '../../../objects/annotation/text';
+import { Textbox } from 'fabric';
+import { afterEach, expect, it, vi } from 'vitest';
 import { resizeTechnicalDataTextObject } from './sizing';
 
-beforeEach(() => {
-  mocks.resizeTextCalloutMock.mockClear();
+const settings = {
+  backgroundColor: null,
+  color: '#111111',
+  fontFamily: 'handwritten' as const,
+  fontSize: 20,
+};
+
+afterEach(() => vi.restoreAllMocks());
+
+it('uses a stable column width and expands row layouts to measured text', () => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => ({ font: '', measureText: () => ({ width: 498 }) })),
+  });
+  const text = new Textbox('Technical data');
+  vi.spyOn(text, 'set');
+
+  resizeTechnicalDataTextObject(text, 'Technical data', 'column', settings);
+  expect(text.set).toHaveBeenLastCalledWith({ width: 360 });
+
+  resizeTechnicalDataTextObject(text, 'Technical data', 'row', settings);
+  expect(text.set).toHaveBeenLastCalledWith({ width: 500 });
 });
 
-function createTextSettings() {
-  return {
-    fontFamily: 'inter',
-    fontSize: 16,
-    fontStyle: 'normal',
-    fontWeight: '400',
-  } as never;
-}
+it('uses deterministic text length fallback when measurement is unavailable', () => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => null),
+  });
+  const text = new Textbox('A'.repeat(40));
+  vi.spyOn(text, 'set');
 
-it('uses the default textbox width for column technical data', () => {
-  const text = { set: vi.fn() };
+  resizeTechnicalDataTextObject(text, 'A'.repeat(40), 'row', settings);
 
-  resizeTechnicalDataTextObject(text as never, 'content', 'column', createTextSettings());
-
-  expect(text.set).toHaveBeenCalledWith({ width: DEFAULT_EDITOR_TEXTBOX_WIDTH });
-});
-
-it('resizes row technical data through callout geometry', () => {
-  const text = { set: vi.fn() };
-
-  resizeTechnicalDataTextObject(text as never, 'wide row content', 'row', createTextSettings());
-
-  expect(mocks.resizeTextCalloutMock).toHaveBeenCalledWith(text, expect.any(Number), 1);
-  expect(mocks.resizeTextCalloutMock.mock.calls[0]?.[1]).toBeGreaterThanOrEqual(
-    DEFAULT_EDITOR_TEXTBOX_WIDTH
-  );
-});
-
-it('uses canvas measurement when a row text context is available', () => {
-  const createElement = vi.spyOn(document, 'createElement').mockReturnValue({
-    getContext: () => ({
-      measureText: () => ({ width: 400 }),
-    }),
-  } as never);
-
-  resizeTechnicalDataTextObject(
-    { set: vi.fn() } as never,
-    'measured row content',
-    'row',
-    createTextSettings()
-  );
-
-  expect(mocks.resizeTextCalloutMock).toHaveBeenCalledWith(expect.anything(), 402, 1);
-  createElement.mockRestore();
+  expect(text.set).toHaveBeenCalledWith({ width: 576 });
 });

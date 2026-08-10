@@ -13,11 +13,6 @@ import {
 import { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highlighter';
 import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../persistence/workspace';
 import { createEditorStoreActions } from './actions';
-import {
-  DEFAULT_EDITOR_RASTER_TOOL_SETTINGS,
-  EMPTY_EDITOR_RASTER_SELECTION_SUMMARY,
-  EMPTY_EDITOR_RASTER_TARGET_SUMMARY,
-} from './raster-tools';
 import type { EditorState } from './types';
 
 const initialToolSettings = DEFAULT_EDITOR_TOOL_SETTINGS(DEFAULT_BORDER_PRESET);
@@ -69,7 +64,6 @@ export const useEditorStore = create<EditorState>()((set) => ({
   sessionId: null,
   toolSettings: initialToolSettings,
   selectionToolSettings: initialToolSettings,
-  rasterToolSettings: DEFAULT_EDITOR_RASTER_TOOL_SETTINGS,
   imageData: null,
   pageTitle: '',
   cropReady: false,
@@ -77,8 +71,6 @@ export const useEditorStore = create<EditorState>()((set) => ({
   richShapeToolSelection: null,
   layers: [],
   selection: initialSelection,
-  rasterSelection: EMPTY_EDITOR_RASTER_SELECTION_SUMMARY,
-  rasterTarget: EMPTY_EDITOR_RASTER_TARGET_SUMMARY,
   history: initialHistory,
   viewport: initialViewport,
   frame: DEFAULT_EDITOR_FRAME_SETTINGS,

@@ -118,24 +118,18 @@ export function getEditorObjectTypeLabel(type: EditorObjectType): string {
       return translate('editor.runtime.background');
     case 'pencil':
       return translate('editor.runtime.pencil');
-    case 'highlighter':
+    case 'marker':
       return translate('editor.runtime.highlighter');
     case 'frame-annotation':
       return translate('editor.tools.frameAnnotation');
-    case 'rectangle':
+    case 'shape':
       return translate('editor.runtime.rectangle');
-    case 'ellipse':
-      return translate('editor.runtime.ellipse');
     case 'rich-shape':
       return translate('editor.runtime.richShape');
     case 'blur':
       return translate('editor.runtime.blur');
-    case 'diamond':
-      return translate('editor.runtime.diamond');
     case 'arrow':
       return translate('editor.runtime.arrow');
-    case 'line':
-      return translate('editor.runtime.line');
     case 'text':
       return translate('editor.runtime.text');
     case 'step':

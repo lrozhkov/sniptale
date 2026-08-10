@@ -1,5 +1,5 @@
 import type { Canvas } from 'fabric';
-import { createDrawingEventHandlers } from './drawing';
+import { createEditorDrawingEventHandlers } from './drawing';
 import { createPanEventHandlers } from './pan';
 import { createRuntimeEventHandlers } from './runtime';
 import type { EditorControllerEventBindings, EditorControllerEventHandlers } from './types';
@@ -11,7 +11,7 @@ export function createEditorControllerEventHandlers(
 ): EditorControllerEventHandlers {
   return {
     ...createRuntimeEventHandlers(bindings),
-    ...createDrawingEventHandlers(bindings),
+    ...createEditorDrawingEventHandlers(bindings),
     ...createPanEventHandlers(bindings),
   };
 }

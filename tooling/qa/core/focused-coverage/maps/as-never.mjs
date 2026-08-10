@@ -35,12 +35,6 @@ export const AS_NEVER_REMOVAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/offscreen-document/service.creation.test.ts'],
   },
   {
-    owner: 'editor-raster-metadata',
-    productionFile: 'apps/extension/src/editor/controller/raster/object/metadata.ts',
-    reason: 'Raster replacement metadata copy behavior is covered by raster object owner tests.',
-    testFiles: ['apps/extension/src/editor/controller/raster/object/owners.test.ts'],
-  },
-  {
     owner: 'project-export-renderer-clip-compatibility',
     productionFile: 'apps/extension/src/offscreen/project-export/renderer/clip.ts',
     reason: 'Project export clip compatibility layers are covered by renderer clip tests.',

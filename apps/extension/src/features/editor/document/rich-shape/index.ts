@@ -35,17 +35,6 @@ export type {
   EditorCustomShapeStoredDefinition,
 } from './custom';
 export {
-  createDefaultRichShapeCalloutGeometry,
-  isDynamicRichShapeCallout,
-  isEditorRichShapeCalloutSide,
-  normalizeRichShapeCalloutGeometry,
-  resetRichShapeCalloutTail,
-  switchRichShapeCalloutSide,
-} from './callout';
-export { getRichShapeCalloutSidePoint } from './callout-side-point';
-export { createRichShapeCalloutGeometry } from './callout-geometry';
-export { resizeRichShapeCalloutGeometry } from './callout-resize';
-export {
   DEFAULT_RICH_SHAPE_EFFECTS,
   DEFAULT_RICH_SHAPE_FRAME,
   DEFAULT_RICH_SHAPE_LAYER,
@@ -67,8 +56,6 @@ export { EDITOR_RICH_SHAPE_OBJECT_TYPE } from './types';
 export type {
   EditorRichShapeArrowhead,
   EditorRichShapeAutofitMode,
-  EditorRichShapeCalloutGeometry,
-  EditorRichShapeCalloutSide,
   EditorRichShapeDashStyle,
   EditorRichShapeDocumentObject,
   EditorRichShapeEffects,

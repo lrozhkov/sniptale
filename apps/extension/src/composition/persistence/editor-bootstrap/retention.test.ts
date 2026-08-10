@@ -52,7 +52,7 @@ function createDbEntries() {
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,QUJDRA==',
     sourceName: null,
     sourceWidth: 320,
@@ -210,7 +210,7 @@ describe('editor-bootstrap retention invalid consume flow', () => {
       persistedEntry: {
         blob: new Blob(['editor'], { type: 'image/png' }),
         createdAt: 4_000_000,
-        document: { version: 1, sourceImageData: 'not-a-data-url' },
+        document: { version: 2, sourceImageData: 'not-a-data-url' },
         id: 'bootstrap-id',
         sourceFaviconUrl: null,
         title: 'Persisted title',

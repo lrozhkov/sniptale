@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import {
   resolveEditorDeleteKeyboardAction,
   resolveEditorEnterKeyboardAction,
@@ -7,62 +6,40 @@ import {
 } from './keyboard-editing';
 
 describe('editor keyboard editing resolvers', () => {
-  it('routes active raster selection deletion before object selection deletion', () => {
-    expect(
-      resolveEditorDeleteKeyboardAction({
-        activeTool: 'selection',
-        hasRasterSelection: true,
-        hasSelection: true,
-        key: 'Delete',
-      })
-    ).toBe('delete-raster-selection');
-    expect(
-      resolveEditorDeleteKeyboardAction({
-        activeTool: 'select',
-        hasRasterSelection: true,
-        hasSelection: true,
-        key: 'Backspace',
-      })
-    ).toBe('delete-selection');
+  it('deletes only an existing object selection', () => {
+    expect(resolveEditorDeleteKeyboardAction({ hasSelection: true, key: 'Delete' })).toBe(
+      'delete-selection'
+    );
+    expect(resolveEditorDeleteKeyboardAction({ hasSelection: false, key: 'Backspace' })).toBeNull();
   });
 
-  it('prioritizes draw completion, text editing, then crop apply for Enter', () => {
+  it('finishes drawing and text editing while preserving Shift+Enter', () => {
+    const base = {
+      hasCropGuide: false,
+      hasDrawSession: false,
+      hasSelectedTextTarget: false,
+      isEditingTextboxSelection: false,
+      key: 'Enter',
+      shiftKey: false,
+    };
+    expect(resolveEditorEnterKeyboardAction({ ...base, hasDrawSession: true })).toBe(
+      'complete-draw'
+    );
+    expect(resolveEditorEnterKeyboardAction({ ...base, isEditingTextboxSelection: true })).toBe(
+      'exit-text-edit'
+    );
     expect(
-      resolveEditorEnterKeyboardAction({
-        hasCropGuide: true,
-        hasDrawSession: true,
-        hasSelectedTextTarget: true,
-        key: 'Enter',
-      })
-    ).toBe('complete-draw');
-    expect(
-      resolveEditorEnterKeyboardAction({
-        hasCropGuide: true,
-        hasSelectedTextTarget: true,
-        key: 'Enter',
-      })
-    ).toBe('enter-text-edit');
-    expect(resolveEditorEnterKeyboardAction({ hasCropGuide: true, key: 'Enter' })).toBe(
-      'apply-crop'
+      resolveEditorEnterKeyboardAction({ ...base, isEditingTextboxSelection: true, shiftKey: true })
+    ).toBeNull();
+    expect(resolveEditorEnterKeyboardAction({ ...base, hasSelectedTextTarget: true })).toBe(
+      'enter-text-edit'
     );
   });
 
-  it('maps space, escape, and delete fallback actions', () => {
+  it('exits text editing before falling back to transient cancellation', () => {
     expect(
       resolveEditorFallbackKeyboardAction({
-        activeTool: 'select',
-        code: 'Space',
-        hasRasterSelection: false,
-        hasSelection: false,
-        isEditingTextboxSelection: false,
-        key: ' ',
-      })
-    ).toBe('space-down');
-    expect(
-      resolveEditorFallbackKeyboardAction({
-        activeTool: 'select',
         code: 'Escape',
-        hasRasterSelection: false,
         hasSelection: false,
         isEditingTextboxSelection: true,
         key: 'Escape',
@@ -70,13 +47,11 @@ describe('editor keyboard editing resolvers', () => {
     ).toBe('exit-text-edit');
     expect(
       resolveEditorFallbackKeyboardAction({
-        activeTool: 'select',
-        code: 'Delete',
-        hasRasterSelection: false,
-        hasSelection: true,
+        code: 'Escape',
+        hasSelection: false,
         isEditingTextboxSelection: false,
-        key: 'Delete',
+        key: 'Escape',
       })
-    ).toBe('delete-selection');
+    ).toBe('cancel-transient');
   });
 });

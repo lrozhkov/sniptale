@@ -1,6 +1,6 @@
 import { translate } from '../../../../platform/i18n';
 import { ColorField } from '../../../chrome/ui';
-import { buildShapeColorControlProps } from '../brush-shape-sections/shared';
+import { buildShapeColorControlProps } from '../shape-color-control';
 import { CollapsibleSection, RangeField, PercentRangeField } from './fields';
 import { RichShapeMetricField } from './metric-field';
 import type { RichShapeControlsProps } from './types';

@@ -1,5 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import {
+  resolveDrawingLinearPoint,
+  updateCreatedDrawingObject,
+} from '../../features/drawing/public';
+import {
   createDefaultDrawingToolDefaults,
   createDrawingSession,
   type DrawingCreatableShapeKind,
@@ -9,11 +13,9 @@ import {
   commitDrawingPointerDraft,
   getDrawingRotationHandlePoint,
   resolveDrawingRotationHandle,
-  resolveDrawingLinearPoint,
   resolveDrawingResizeHandle,
   resizeDrawingObject,
   rotateDrawingObject,
-  updateCreatedDrawingObject,
 } from './interaction';
 
 afterEach(() => vi.restoreAllMocks());

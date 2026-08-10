@@ -148,7 +148,6 @@ it('renders empty import states and hides optional browser chrome', () => {
           'action-buttons',
           'basic-shapes',
           'block-arrows',
-          'callouts',
           'custom',
           'equation-shapes',
           'flowchart',

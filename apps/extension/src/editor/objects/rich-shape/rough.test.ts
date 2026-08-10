@@ -21,7 +21,6 @@ const REPRESENTATIVE_BY_CATEGORY = {
   [EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC]: 'oval',
   [EDITOR_BUILT_IN_SHAPE_CATEGORY.BLOCK_ARROWS]: 'block-arrow',
   [EDITOR_BUILT_IN_SHAPE_CATEGORY.FLOWCHART]: 'flowchart-decision',
-  [EDITOR_BUILT_IN_SHAPE_CATEGORY.CALLOUTS]: 'rect-callout',
 } satisfies Partial<Record<EditorBuiltInShapeCategory, string>>;
 
 function getEntry(id: string) {

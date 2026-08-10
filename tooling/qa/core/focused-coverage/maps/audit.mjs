@@ -86,7 +86,6 @@ export const AUDIT_OWNER_MAPPINGS = [
     exclusive: true,
     reason: 'Editor export disclosure changes are covered by focused document action suites.',
     testFiles: [
-      'apps/extension/src/editor/inspector/document-actions/compact.test.tsx',
       'apps/extension/src/editor/inspector/document-actions/disclosure-shared.test.tsx',
       'apps/extension/src/editor/inspector/document-actions/export-image-size.test.tsx',
       'apps/extension/src/editor/inspector/document-actions/export-settings.test.tsx',

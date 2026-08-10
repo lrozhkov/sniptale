@@ -43,7 +43,7 @@ function createRect(options: {
     strokeWidth: 0,
   });
   if (options.role !== undefined) rect.sniptaleRole = options.role;
-  rect.sniptaleType = options.type ?? 'rectangle';
+  rect.sniptaleType = options.type ?? 'shape';
   rect.isOnScreen = () => true;
   rect.setCoords();
   return rect;
@@ -283,7 +283,7 @@ function verifySessionGatingAndGuideState() {
   const movingTarget = createRect({ left: 43, top: 38, width: 20, height: 20 });
   const sibling = createRect({ left: 60, top: 40, width: 20, height: 20 });
   const harness = createManagerHarness({
-    activeTool: 'rectangle',
+    activeTool: 'shape',
     objects: [movingTarget, sibling],
   });
 
