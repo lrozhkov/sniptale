@@ -2,37 +2,24 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { bodyPropsSpy, listPropsSpy } = vi.hoisted(() => ({
-  bodyPropsSpy: vi.fn(),
+const { rowsPropsSpy, listPropsSpy } = vi.hoisted(() => ({
+  rowsPropsSpy: vi.fn(),
   listPropsSpy: vi.fn(),
 }));
 
 vi.mock('./cards', () => ({
-  CaptureActionCard: (props: unknown) => {
-    bodyPropsSpy({ type: 'capture', props });
-    return <div data-testid="capture-card" />;
+  SaveSettingsRows: (props: unknown) => {
+    rowsPropsSpy(props);
+    return <div data-testid="settings-rows" />;
   },
-  DefaultPresetsCard: (props: unknown) => {
-    bodyPropsSpy({ type: 'defaults', props });
-    return <div data-testid="default-card" />;
-  },
-  GalleryToggleCard: (props: unknown) => {
-    bodyPropsSpy({ type: 'gallery', props });
-    return <div data-testid="gallery-card" />;
-  },
-  SavePresetsHeader: () => <div data-testid="header">header</div>,
 }));
 
 vi.mock('./list/root', () => ({
-  PresetsList: (props: { onEdit: () => void }) => {
+  PresetsList: (props: unknown) => {
     listPropsSpy(props);
-    return (
-      <button data-testid="presets-list" onClick={() => props.onEdit()}>
-        add
-      </button>
-    );
+    return <div data-testid="presets-list" />;
   },
 }));
 
@@ -46,7 +33,7 @@ function createProps(
 ): Parameters<typeof SavePresetsSectionContent>[0] {
   return {
     captureAction: 'download_default',
-    captureActionOptions: [{ value: 'download_default', label: 'Download default' }],
+    captureActionOptions: [{ value: 'download_default', label: 'Download' }],
     closeDeleteDialog: vi.fn(),
     closeEditor: vi.fn(),
     confirmDelete: null,
@@ -59,116 +46,59 @@ function createProps(
     handleDefaultImageChange: vi.fn(async () => undefined),
     handleDefaultVideoChange: vi.fn(async () => undefined),
     handleDeletePreset: vi.fn(),
-    handleTogglePresetEnabled: vi.fn(async () => undefined),
-    handleToggleSaveToGallery: vi.fn(async () => undefined),
     handleSavePreset: vi.fn(async () => undefined),
-    onMoveBefore: vi.fn(async () => undefined),
+    handleTogglePresetEnabled: vi.fn(async () => undefined),
     isEditorOpen: false,
     isLoading: false,
+    onMoveBefore: vi.fn(async () => undefined),
     openEditor: vi.fn(),
-    presetCountLabel: 'presets',
     presetOptions: [],
     presets: [],
-    saveCapturesToGallery: false,
+    view: 'settings',
     ...overrides,
   };
 }
 
-function renderSection(overrides: Partial<Parameters<typeof SavePresetsSectionContent>[0]> = {}) {
-  const props = createProps(overrides);
-
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  act(() => {
-    root?.render(<SavePresetsSectionContent {...props} />);
-  });
-
-  return props;
+function renderSection(props: Parameters<typeof SavePresetsSectionContent>[0]) {
+  act(() => root?.render(<SavePresetsSectionContent {...props} />));
 }
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  bodyPropsSpy.mockReset();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  rowsPropsSpy.mockReset();
   listPropsSpy.mockReset();
 });
 
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
+  act(() => root?.unmount());
   root = null;
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
 });
 
-function verifySavePresetsSectionComposition() {
-  const props = renderSection({ saveCapturesToGallery: true });
+it('shows only compact settings on the settings subpage', () => {
+  renderSection(createProps());
 
-  act(() => {
-    container?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
-      if (button.textContent) {
-        button.click();
-      }
-    });
-  });
+  expect(container?.querySelector('[data-testid="settings-rows"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="presets-list"]')).toBeNull();
+  expect(container?.firstElementChild?.className).toContain('max-w-[720px]');
+});
 
-  expect(container?.querySelector('[data-testid="header"]')).toBeTruthy();
+it('shows only folder templates and forwards their controller actions', () => {
+  const props = createProps({ view: 'templates' });
+  renderSection(props);
+
+  expect(container?.querySelector('[data-testid="settings-rows"]')).toBeNull();
   expect(container?.querySelector('[data-testid="presets-list"]')).toBeTruthy();
-  expect(bodyPropsSpy).toHaveBeenCalledWith(
+  expect(listPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
-      type: 'capture',
-      props: expect.objectContaining({ captureAction: props.captureAction }),
-    })
-  );
-  expect(bodyPropsSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: 'gallery',
-      props: expect.objectContaining({ enabled: true }),
-    })
-  );
-  expect(listPropsSpy).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      onCloseDeleteDialog: props.closeDeleteDialog,
-      onCloseEditor: props.closeEditor,
-      onDelete: props.handleDeletePreset,
       onEdit: props.openEditor,
+      onMoveBefore: props.onMoveBefore,
       onSavePreset: props.handleSavePreset,
-      onToggleEnabled: props.handleTogglePresetEnabled,
-      presetCountLabel: 'presets',
     })
   );
-  expect(props.openEditor).toHaveBeenCalledWith();
-}
-
-describe('SavePresetsSectionContent', () => {
-  it(
-    'renders the save presets cards/list composition and opens the add flow',
-    verifySavePresetsSectionComposition
-  );
-
-  it('forwards an editing preset only when the editor flow targets an existing preset', () => {
-    const editingPreset = {
-      id: 'preset-1',
-      name: 'Downloads',
-      path: '/tmp',
-      enabled: true,
-      isDefault: false,
-      format: 'png',
-    };
-
-    renderSection({
-      editingPreset: editingPreset as never,
-    });
-
-    expect(listPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        editingPreset,
-      })
-    );
-  });
 });

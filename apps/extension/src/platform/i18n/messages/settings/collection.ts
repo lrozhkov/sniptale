@@ -12,6 +12,7 @@ export const settingsCollectionMessages = defineMessageSource({
     moveUp: { en: 'Move up', ru: 'Переместить вверх' },
     moveDown: { en: 'Move down', ru: 'Переместить вниз' },
   },
+  builtInBadge: { en: 'Built-in', ru: 'Предустановленный' },
   defaultBadge: { en: 'Default', ru: 'По умолчанию' },
   dragHandle: { en: 'Change position', ru: 'Изменить позицию' },
   dragInstructions: {

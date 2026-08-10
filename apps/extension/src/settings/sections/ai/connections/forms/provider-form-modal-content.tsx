@@ -3,7 +3,7 @@ import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import { AiProvidersFormModalLayout } from './layout';
-import { AiProvidersFormFieldSurface, AiProvidersFormModalBody } from './shared';
+import { AiProvidersFormModalBody } from './shared';
 
 export type ProviderFormModalContentProps = {
   apiKeyInputRef: React.Ref<HTMLInputElement>;
@@ -73,22 +73,6 @@ function ProviderNameField(props: ProviderFormModalContentProps) {
   );
 }
 
-function ProviderConnectionTypeField() {
-  return (
-    <ProductField
-      label={translate('settings.aiProviders.providerConnectionTypeLabel')}
-      hint={translate('settings.aiProviders.providerConnectionTypeHint')}
-    >
-      <ProductInput
-        value={translate('settings.aiProviders.providerConnectionTypeValue')}
-        disabled
-        readOnly
-        aria-readonly
-      />
-    </ProductField>
-  );
-}
-
 function ProviderApiUrlField(props: ProviderFormModalContentProps) {
   return (
     <ProductField
@@ -114,21 +98,9 @@ function ProviderFormModalBody(props: ProviderFormModalContentProps) {
       onSubmit={props.onSubmit}
       {...(props.errors['submit'] === undefined ? {} : { submitError: props.errors['submit'] })}
     >
-      <AiProvidersFormFieldSurface>
-        <ProviderNameField {...props} />
-      </AiProvidersFormFieldSurface>
-
-      <AiProvidersFormFieldSurface>
-        <ProviderConnectionTypeField />
-      </AiProvidersFormFieldSurface>
-
-      <AiProvidersFormFieldSurface>
-        <ProviderApiUrlField {...props} />
-      </AiProvidersFormFieldSurface>
-
-      <AiProvidersFormFieldSurface>
-        <ProviderApiKeyField {...props} />
-      </AiProvidersFormFieldSurface>
+      <ProviderNameField {...props} />
+      <ProviderApiUrlField {...props} />
+      <ProviderApiKeyField {...props} />
     </AiProvidersFormModalBody>
   );
 }

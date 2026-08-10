@@ -6,7 +6,7 @@ export const editorCompactPresetMessages = defineMessageSource({
     en: 'Apply',
   },
   presetSaveMode: {
-    ru: 'Сохранение пресета',
+    ru: 'Сохранение шаблона',
     en: 'Preset save mode',
   },
   presetSaveModeCreate: {
@@ -18,11 +18,11 @@ export const editorCompactPresetMessages = defineMessageSource({
     en: 'Overwrite',
   },
   presetName: {
-    ru: 'Название пресета',
+    ru: 'Название шаблона',
     en: 'Preset name',
   },
   presetNamePlaceholder: {
-    ru: 'Новый пресет',
+    ru: 'Новый шаблон',
     en: 'New preset',
   },
   templateParameters: {
@@ -90,7 +90,7 @@ export const editorCompactPresetMessages = defineMessageSource({
     en: 'User',
   },
   systemPresetOverwriteHint: {
-    ru: 'Системный пресет нельзя перезаписать. Сохраните настройки как новый пресет.',
+    ru: 'Системный шаблон нельзя перезаписать. Сохраните настройки как новый шаблон.',
     en: 'System presets cannot be overwritten. Save the current settings as a new preset.',
   },
   cancel: {

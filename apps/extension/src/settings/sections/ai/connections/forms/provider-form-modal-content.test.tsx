@@ -149,7 +149,8 @@ it('renders create mode with a required API key label and default placeholder', 
       mode: 'provider',
     })
   );
-  expect(container?.querySelectorAll('label')).toHaveLength(4);
+  expect(container?.querySelectorAll('label')).toHaveLength(3);
+  expect(container?.querySelector('input[disabled]')).toBeNull();
 });
 
 it('renders edit mode with the stored-secret hint and edit placeholder', async () => {
@@ -187,9 +188,7 @@ it('renders re-entry guidance and validation errors when the stored secret is mi
   expect(getTextContent()).toContain('Missing key');
   expect(getTextContent()).toContain('Invalid URL');
   expect(getTextContent()).toContain('Missing name');
-  expect(container?.querySelector('input[disabled]')?.getAttribute('value')).toBe(
-    translate('settings.aiProviders.providerConnectionTypeValue')
-  );
+  expect(container?.querySelector('input[disabled]')).toBeNull();
 });
 
 it('renders a recoverable submit error above the provider fields', async () => {

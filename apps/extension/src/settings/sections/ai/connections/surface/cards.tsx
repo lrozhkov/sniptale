@@ -1,5 +1,3 @@
-import { Server } from 'lucide-react';
-
 import { translate } from '../../../../../platform/i18n';
 import {
   SettingsCollection,
@@ -13,7 +11,6 @@ export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState
     id: provider.id,
     title: provider.name,
     meta: `${provider.connectionType} · ${provider.baseUrl}`,
-    preview: <Server size={16} />,
     badges: [
       {
         id: 'api-key',
@@ -33,7 +30,7 @@ export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState
     const provider = byId.get(action.itemId);
     if (!provider) return;
     if (action.type === 'edit') props.state.modals.openProviderModal(provider);
-    if (action.type === 'reset') void props.state.handleClearProviderSecret(provider.id);
+    if (action.type === 'reset') void props.state.catalogActions.clearProviderSecret(provider.id);
     if (action.type === 'delete')
       props.state.modals.setConfirmDelete({ type: 'provider', item: provider });
   };

@@ -87,7 +87,7 @@ async function verifyModelSaveErrorPath() {
     })
   );
   expect(loggerErrorMock).toHaveBeenCalledTimes(1);
-  expect(toastErrorMock).toHaveBeenCalledTimes(1);
+  expect(toastErrorMock).not.toHaveBeenCalled();
   expect(setIsSaving).toHaveBeenNthCalledWith(1, true);
   expect(setIsSaving).toHaveBeenLastCalledWith(false);
   expect(setErrors).toHaveBeenCalledWith({
@@ -131,7 +131,7 @@ async function verifyModelCreateOmitsEmptyPrompt() {
 describe('ai-providers-section-form-save.model', () => {
   beforeEach(resetModelFormSaveMocks);
 
-  it('shows a toast and logs when model persistence fails', verifyModelSaveErrorPath);
+  it('keeps model persistence failures in the form and logs them', verifyModelSaveErrorPath);
   it(
     'omits empty system prompts from create payloads before model persistence starts',
     verifyModelCreateOmitsEmptyPrompt

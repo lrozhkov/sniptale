@@ -5,11 +5,7 @@ import type {
   PageAccessStatus,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 import {
   type GalleryStatus,
   PopupHomeActionRow,
@@ -22,7 +18,6 @@ import { PageAccessControls } from './page-access-controls';
 interface PopupHomePageProps {
   quickActions: QuickAction[];
   quickActionsReady: boolean;
-  displayMode: QuickActionsDisplayMode;
   viewportPresets: ViewportPreset[];
   activeTabCapabilities: ActiveTabCapabilities;
   galleryStatus: GalleryStatus | null;
@@ -45,13 +40,11 @@ function isPageAccessChoiceActive(status: PageAccessStatus | null): boolean {
 
 function getPopupHomeCapabilityState(
   activeTabCapabilities: ActiveTabCapabilities,
-  displayMode: QuickActionsDisplayMode,
   quickActionsCount: number,
   pageAccessDisabledReason: string | null,
   pageAccessStatus: PageAccessStatus | null
 ) {
-  const shouldShowQuickActions =
-    displayMode !== 'hidden' && !isPageAccessChoiceActive(pageAccessStatus);
+  const shouldShowQuickActions = !isPageAccessChoiceActive(pageAccessStatus);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
@@ -74,7 +67,6 @@ type PopupHomeCapabilityState = ReturnType<typeof getPopupHomeCapabilityState>;
 
 interface PopupHomePageContentProps {
   capabilityState: PopupHomeCapabilityState;
-  displayMode: QuickActionsDisplayMode;
   galleryStatus: GalleryStatus | null;
   onOpenScreenshotMode(): void;
   onPageAccessRequest(operation: PageAccessOperation): void;
@@ -91,7 +83,6 @@ interface PopupHomePageContentProps {
 
 function PopupHomePageContent({
   capabilityState,
-  displayMode,
   galleryStatus,
   onOpenScreenshotMode,
   onPageAccessRequest,
@@ -112,7 +103,6 @@ function PopupHomePageContent({
         quickActionsReady={quickActionsReady}
         hasQuickActions={capabilityState.hasQuickActions}
         quickActions={quickActions}
-        displayMode={displayMode}
         viewportPresets={viewportPresets}
         quickActionsDisabledTitle={capabilityState.quickActionsDisabledTitle}
         restrictionIndicatorTitle={capabilityState.restrictedPageFeaturesTitle}
@@ -141,7 +131,6 @@ function PopupHomePageContent({
 export function PopupHomePage({
   quickActions,
   quickActionsReady,
-  displayMode,
   viewportPresets,
   activeTabCapabilities,
   galleryStatus,
@@ -150,7 +139,6 @@ export function PopupHomePage({
 }: PopupHomePageProps) {
   const capabilityState = getPopupHomeCapabilityState(
     activeTabCapabilities,
-    displayMode,
     quickActions.length,
     pageAccess.disabledReason,
     pageAccess.status
@@ -164,7 +152,6 @@ export function PopupHomePage({
   return (
     <PopupHomePageContent
       capabilityState={capabilityState}
-      displayMode={displayMode}
       galleryStatus={galleryStatus}
       onOpenScreenshotMode={() => {
         void handleOpenScreenshotMode();

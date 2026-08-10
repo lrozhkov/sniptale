@@ -196,3 +196,16 @@ it('reports loader failures through the shared error handler', async () => {
   expect(setters.setIsLoading).toHaveBeenNthCalledWith(1, true);
   expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
 });
+
+it('rejects an explicit reload after reporting its failure', async () => {
+  const setters = createLoaderSetters();
+  await renderLoaderHarness(setters);
+  await flushEffects();
+  const reloadError = new Error('refresh failed');
+  loaderMocks.loadAiProvidersRuntimeDataMock.mockRejectedValueOnce(reloadError);
+
+  await expect(latestReloadData?.reloadData()).rejects.toBe(reloadError);
+
+  expect(loaderMocks.reportAiProvidersLoaderErrorMock).toHaveBeenLastCalledWith(reloadError);
+  expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
+});

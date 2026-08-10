@@ -5,6 +5,7 @@ import {
   getKeyboardPreviewIntent,
   isKeyboardPreviewCurrent,
   moveKeyboardPreview,
+  moveReorderPreviewToTarget,
   resolveKeyboardPreviewGroups,
 } from './keyboard-reorder';
 import type { SettingsCollectionResolvedGroup } from './types';
@@ -35,6 +36,23 @@ describe('keyboard reorder preview', () => {
       source: 'keyboard',
     });
     expect(isKeyboardPreviewCurrent(groups, moved)).toBe(true);
+  });
+
+  it('repositions a live pointer preview and emits the drag source', () => {
+    const preview = createKeyboardPreview(groups, 'first')!;
+    const moved = moveReorderPreviewToTarget(preview, 'second', 'after');
+    expect(moved.itemIds).toEqual(['second', 'first']);
+    expect(getKeyboardPreviewIntent(groups, moved, 'drag')).toEqual({
+      itemId: 'first',
+      groupId: 'group',
+      beforeItemId: null,
+      source: 'drag',
+    });
+    expect(moveReorderPreviewToTarget(moved, 'second', 'before').itemIds).toEqual([
+      'first',
+      'second',
+    ]);
+    expect(moveReorderPreviewToTarget(preview, 'missing', 'after')).toBe(preview);
   });
 
   it('treats missing, unchanged, boundary, and stale previews as no-ops', () => {

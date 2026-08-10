@@ -5,6 +5,7 @@ import type { ViewportPresetDraft } from '../helpers';
 import { resolveViewportPresetEditorTitle } from './helpers';
 import { useViewportPresetEditorState } from './state';
 import { ViewportPresetEditorContent, ViewportPresetEditorFooter } from './views';
+import { settingsModalClassName } from '../../../../section-surface';
 
 interface ViewportPresetEditorProps {
   isLoading?: boolean;
@@ -63,6 +64,7 @@ function renderViewportPresetEditorBody(args: {
       scrollable
       onClose={args.onClose}
       onKeyDown={args.state.handlers.handleKeyDown}
+      dialogClassName={settingsModalClassName}
     >
       <ProductModalHeader
         compact

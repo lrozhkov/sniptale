@@ -4,7 +4,6 @@ export const SETTINGS_SECTION_IDS = [
   'screen-sizes',
   'media-quality',
   'saving',
-  'storage-drafts',
   'annotations',
   'editor-resources',
   'ai-connections',
@@ -21,35 +20,29 @@ export const SETTINGS_SECTION_VIEWS = {
   'quick-actions': [],
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
-  saving: [],
-  'storage-drafts': [],
-  annotations: ['borders', 'callouts', 'numbering'],
+  saving: ['settings', 'storage', 'templates'],
+  annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes'],
-  'ai-connections': [],
-  'ai-prompts': [],
+  'ai-connections': ['integrations', 'chrome-ai', 'security'],
+  'ai-prompts': ['templates', 'prompts'],
   'voice-input': [],
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
   'access-data': ['permissions', 'privacy'],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
 type SettingsRouteWithoutView = {
-  section:
-    | 'interface-browser'
-    | 'quick-actions'
-    | 'screen-sizes'
-    | 'saving'
-    | 'storage-drafts'
-    | 'ai-connections'
-    | 'ai-prompts'
-    | 'voice-input';
+  section: 'interface-browser' | 'quick-actions' | 'screen-sizes' | 'voice-input';
   view?: never;
 };
 
 export type SettingsRoute =
   | SettingsRouteWithoutView
   | { section: 'media-quality'; view?: 'image' | 'video' }
-  | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' }
+  | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' }
+  | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | { section: 'editor-resources'; view?: 'tools' | 'palettes' }
+  | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
+  | { section: 'ai-prompts'; view?: 'templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }
   | { section: 'access-data'; view?: 'permissions' | 'privacy' };
 
@@ -66,6 +59,7 @@ export type LegacySettingsSection =
   | 'ai'
   | 'presets'
   | 'saves'
+  | 'storage-drafts'
   | 'highlighter'
   | 'editor'
   | 'image'
@@ -83,9 +77,10 @@ export type LegacySettingsSection =
 
 const LEGACY_ROUTES: Readonly<Record<LegacySettingsSection, SettingsRoute>> = {
   appearance: { section: 'interface-browser' },
-  ai: { section: 'ai-connections' },
+  ai: { section: 'ai-connections', view: 'integrations' },
   presets: { section: 'screen-sizes' },
-  saves: { section: 'saving' },
+  saves: { section: 'saving', view: 'settings' },
+  'storage-drafts': { section: 'saving', view: 'storage' },
   highlighter: { section: 'annotations', view: 'borders' },
   editor: { section: 'editor-resources', view: 'tools' },
   image: { section: 'media-quality', view: 'image' },
@@ -97,7 +92,7 @@ const LEGACY_ROUTES: Readonly<Record<LegacySettingsSection, SettingsRoute>> = {
   'native-screenshots': { section: 'native-app', view: 'capture' },
   'native-video': { section: 'native-app', view: 'capture' },
   'native-telemetry': { section: 'native-app', view: 'telemetry' },
-  templates: { section: 'ai-prompts' },
+  templates: { section: 'ai-prompts', view: 'templates' },
   permissions: { section: 'access-data', view: 'permissions' },
   privacy: { section: 'access-data', view: 'privacy' },
 };

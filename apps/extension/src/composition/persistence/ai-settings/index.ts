@@ -6,6 +6,8 @@ export {
   loadDefaultModelId,
   loadGlobalSystemPrompt,
   loadScenarioEditorSystemPrompt,
+  resetGlobalSystemPrompt,
+  resetScenarioEditorSystemPrompt,
   type AISecretProtectionStatus,
   type AIProviderUpsertInput,
 } from './core';

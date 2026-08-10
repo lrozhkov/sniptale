@@ -64,6 +64,11 @@ const customProfile: VideoRecordingProfile = {
     quality: VideoQuality.MEDIUM,
   },
 };
+const secondCustomProfile: VideoRecordingProfile = {
+  ...customProfile,
+  id: 'custom:compact',
+  name: 'Compact',
+};
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -72,6 +77,7 @@ function createProps(overrides: Partial<ReturnTypeUseProfiles> = {}): ReturnType
   return {
     actions: {
       confirmDelete: vi.fn(async () => undefined),
+      reorderProfile: vi.fn(async () => undefined),
       saveProfile: vi.fn(async () => undefined),
       selectProfile: vi.fn(async () => undefined),
     },
@@ -83,7 +89,7 @@ function createProps(overrides: Partial<ReturnTypeUseProfiles> = {}): ReturnType
     },
     profiles: {
       builtIn: BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES,
-      custom: [customProfile],
+      custom: [customProfile, secondCustomProfile],
       isAtLimit: false,
       selectedId: customProfile.id,
     },
@@ -129,6 +135,18 @@ it('renders profile groups and forwards profile, editor, and delete actions', ()
   expect(container?.textContent).toContain('save error');
   expect(container?.textContent).toContain('settings.collection.defaultBadge');
 
+  const builtInRow = container?.querySelector(
+    `[data-settings-collection-item="${props.profiles.builtIn[0]?.id}"]`
+  );
+  expect(builtInRow?.querySelector('[aria-label="settings.collection.actions.menu"]')).toBeNull();
+  expect(builtInRow?.querySelector('[data-collection-direct-action="set-default"]')).not.toBeNull();
+  expect(builtInRow?.querySelector('[aria-label="settings.collection.dragHandle"]')).toBeNull();
+
+  const customHandle = container?.querySelector<HTMLElement>(
+    `[data-settings-collection-item="${customProfile.id}"] [aria-label="settings.collection.dragHandle"]`
+  );
+  expect(customHandle).not.toBeNull();
+
   const addButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
     button.textContent?.includes('settings.videoQuality.addProfile')
   );
@@ -138,6 +156,11 @@ it('renders profile groups and forwards profile, editor, and delete actions', ()
       .find((button) => button.textContent === 'settings.collection.actions.setDefault')
       ?.click()
   );
+  act(() => customHandle?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+  act(() =>
+    customHandle?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  );
+  act(() => customHandle?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
   clickByLabel('settings.collection.actions.edit');
   act(() =>
     Array.from(container?.querySelectorAll('button') ?? [])
@@ -168,6 +191,7 @@ it('renders profile groups and forwards profile, editor, and delete actions', ()
   expect(props.dialogs.setEditor).toHaveBeenCalled();
   expect(props.dialogs.setDeleteProfile).toHaveBeenCalled();
   expect(props.actions.selectProfile).toHaveBeenCalled();
+  expect(props.actions.reorderProfile).toHaveBeenCalledWith(customProfile.id, null);
   expect(props.actions.saveProfile).toHaveBeenCalledWith(customProfile);
   expect(props.actions.confirmDelete).toHaveBeenCalled();
 });

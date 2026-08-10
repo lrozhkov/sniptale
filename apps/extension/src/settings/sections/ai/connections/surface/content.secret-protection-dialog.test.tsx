@@ -32,6 +32,13 @@ let root: Root | null = null;
 
 function createState(): AiProvidersSectionState {
   return {
+    catalogActions: {
+      clearProviderSecret: vi.fn().mockResolvedValue(undefined),
+      deleteModel: vi.fn().mockResolvedValue(undefined),
+      deleteProvider: vi.fn().mockResolvedValue(undefined),
+      moveModel: vi.fn().mockResolvedValue(undefined),
+      setDefaultModel: vi.fn().mockResolvedValue(undefined),
+    },
     chromeAi: createMockChromeAiState(),
     secretProtection: {
       ...createMockSecretProtectionState(),
@@ -53,10 +60,6 @@ function createState(): AiProvidersSectionState {
       closeModelModal: vi.fn(),
       setConfirmDelete: vi.fn(),
     },
-    handleDefaultModelChange: vi.fn().mockResolvedValue(undefined),
-    handleClearProviderSecret: vi.fn().mockResolvedValue(undefined),
-    handleDeleteProvider: vi.fn().mockResolvedValue(undefined),
-    handleDeleteModel: vi.fn().mockResolvedValue(undefined),
     reloadData: vi.fn().mockResolvedValue(undefined),
     getProviderName: vi.fn(() => 'OpenAI'),
   };

@@ -198,7 +198,7 @@ export const popupVideoMediaMessages = defineMessageSource({
     en: 'Camera settings',
   },
   webcamQualityBrowserNotice: {
-    ru: 'Браузер отдаёт диапазоны возможностей камеры, поэтому пресеты применяются как предпочтительные значения.',
+    ru: 'Браузер отдаёт диапазоны возможностей камеры, поэтому шаблоны применяются как предпочтительные значения.',
     en: 'The browser exposes camera capability ranges, so presets are applied as preferred values.',
   },
   webcamQualityPreviewLoading: {

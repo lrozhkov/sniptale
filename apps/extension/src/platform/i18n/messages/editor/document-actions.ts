@@ -34,7 +34,7 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'More actions',
   },
   moreActionsDescription: {
-    ru: 'Пресеты, JSON-сессия и сброс документа',
+    ru: 'Шаблоны, JSON-сессия и сброс документа',
     en: 'Presets, JSON session, and document reset',
   },
   showMoreActions: {
@@ -90,7 +90,7 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'Save to folder',
   },
   saveToFolderDescription: {
-    ru: 'Быстрые пресеты сохранения в Downloads без системного диалога.',
+    ru: 'Быстрые шаблоны сохранения в Downloads без системного диалога.',
     en: 'Quick Downloads presets without opening the system dialog.',
   },
   expandSection: {
@@ -106,7 +106,7 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'Session',
   },
   presetTag: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   exportSession: {
@@ -122,11 +122,11 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'JSON',
   },
   noDefaultPreset: {
-    ru: 'Без пресета',
+    ru: 'Без шаблона',
     en: 'No preset',
   },
   noSavePresets: {
-    ru: 'Нет активных пресетов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
+    ru: 'Нет активных шаблонов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
     en: 'No active presets. Add a path in settings to save quickly without the system dialog.',
   },
   downloadsPrefix: {
@@ -138,7 +138,7 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: '...',
   },
   noPresetsDescription: {
-    ru: 'Нет активных пресетов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
+    ru: 'Нет активных шаблонов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
     en: 'No active presets. Add a path in settings to save quickly without the system dialog.',
   },
 });

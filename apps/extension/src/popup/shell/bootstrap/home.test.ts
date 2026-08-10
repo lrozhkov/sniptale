@@ -1,19 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getQuickActionsBootstrapDataMock: vi.fn(),
+  getQuickActionsMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   trackPopupPerfAsyncMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
-  getQuickActionsBootstrapData: mocks.getQuickActionsBootstrapDataMock,
-}));
-
-vi.mock('../../../features/quick-actions-presets/display-mode', () => ({
-  DEFAULT_QUICK_ACTIONS_DISPLAY_MODE: 'list',
-  sanitizeQuickActionsDisplayMode: vi.fn(),
+  getQuickActions: mocks.getQuickActionsMock,
 }));
 
 vi.mock('../../../platform/i18n', () => ({
@@ -59,36 +54,31 @@ beforeEach(() => {
   mocks.trackPopupPerfAsyncMock.mockImplementation(
     async (_label: string, task: () => Promise<unknown>) => task()
   );
-  mocks.getQuickActionsBootstrapDataMock.mockResolvedValue({
-    actions: [{ id: 'action-1', status: true }],
-    displayMode: 'grid',
-  });
+  mocks.getQuickActionsMock.mockResolvedValue([{ id: 'action-1', status: true }]);
 });
 
 describe('popup home bootstrap owner', () => {
-  it('loads quick-actions data and display mode through one home workflow owner', async () => {
+  it('loads quick-actions data through the home workflow owner', async () => {
     const result = await loadPopupHomeBootstrapData(createPopupHomeBootstrapPromises());
 
     expect(result).toEqual({
       actions: [{ id: 'action-1', status: true }],
       homeError: null,
-      quickActionsMode: 'grid',
     });
     expect(mocks.trackPopupPerfAsyncMock).toHaveBeenCalledWith(
       'popup.bootstrap.quick-actions',
-      mocks.getQuickActionsBootstrapDataMock
+      mocks.getQuickActionsMock
     );
   });
 
   it('returns advisory fallbacks when quick-actions sources fail', async () => {
-    mocks.getQuickActionsBootstrapDataMock.mockRejectedValueOnce(new Error('actions failed'));
+    mocks.getQuickActionsMock.mockRejectedValueOnce(new Error('actions failed'));
 
     const result = await loadPopupHomeBootstrapData(createPopupHomeBootstrapPromises());
 
     expect(result).toEqual({
       actions: [],
       homeError: 'popup.home.quickActionsLoadError',
-      quickActionsMode: 'list',
     });
     expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
       'Failed to bootstrap quick actions',

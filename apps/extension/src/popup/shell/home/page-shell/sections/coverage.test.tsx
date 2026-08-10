@@ -63,7 +63,6 @@ it('hides the quick-actions section entirely when it should not be shown', async
       quickActionsReady
       hasQuickActions
       quickActions={[{ id: 'action-1' } as never]}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />
@@ -81,7 +80,6 @@ it('omits the disabled title when quick actions stay interactive', async () => {
       quickActionsReady
       hasQuickActions
       quickActions={[action] as never}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />
@@ -89,7 +87,6 @@ it('omits the disabled title when quick actions stay interactive', async () => {
 
   expect(quickActionsBlockSpy).toHaveBeenCalledWith({
     actions: [action],
-    displayMode: 'list',
     onTriggerAction: expect.any(Function),
     presets: [],
   });

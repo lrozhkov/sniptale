@@ -113,7 +113,7 @@ function verifyProviderCreateLayout() {
     2,
     expect.objectContaining({ tone: 'primary', type: 'submit' })
   );
-  expect(actionButtonPropsSpy.mock.calls[1]?.[0]).not.toHaveProperty('compact');
+  expect(actionButtonPropsSpy.mock.calls[1]?.[0]).toHaveProperty('compact', true);
 }
 
 function verifyModelEditSavingLayout() {

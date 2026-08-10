@@ -17,8 +17,7 @@ describe('settings contracts', () => {
     expectTypeOf<QuickActionScreenshotMode>().toEqualTypeOf<'visible' | 'full' | 'selection'>();
     expectTypeOf<SettingsPatch['contextMenu']>().not.toEqualTypeOf<unknown>();
     expectTypeOf<SettingsPatch['fullPageCapture']>().not.toEqualTypeOf<unknown>();
-    expectTypeOf<SettingsPatch['defaultViewportPresetId']>().toEqualTypeOf<
-      string | null | undefined
-    >();
+    expectTypeOf<SettingsPatch>().not.toHaveProperty('defaultViewportPresetId');
+    expectTypeOf<SettingsPatch>().not.toHaveProperty('saveCapturesToGallery');
   });
 });

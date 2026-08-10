@@ -2,10 +2,10 @@ import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dial
 import { translate } from '../../../../../platform/i18n';
 import {
   SettingsCollection,
-  SettingsSectionHeader,
   settingsSectionClassName,
   type SettingsCollectionAction,
   type SettingsCollectionItem,
+  type SettingsCollectionMoveIntent,
 } from '../../../../section-surface';
 import type { VideoRecordingProfile } from '@sniptale/runtime-contracts/video/types/types';
 import { getProfileName, getProfileSummary } from './profile-copy';
@@ -28,6 +28,7 @@ function createProfileItems(
       edit: editable,
       setDefault: profile.id !== selectedId,
       delete: editable,
+      reorder: editable,
     },
   }));
 }
@@ -48,6 +49,9 @@ function ProfileCollection(props: {
     if (action.type === 'edit') props.root.dialogs.setEditor({ profile });
     if (action.type === 'delete') props.root.dialogs.setDeleteProfile(profile);
   };
+  const onMove = (intent: SettingsCollectionMoveIntent) => {
+    void props.root.actions.reorderProfile(intent.itemId, intent.beforeItemId);
+  };
   return (
     <SettingsCollection
       ariaLabel={props.title}
@@ -61,6 +65,7 @@ function ProfileCollection(props: {
       {...(props.addAction ? { addAction: props.addAction } : {})}
       {...(props.emptyState ? { emptyState: props.emptyState } : {})}
       onAction={onAction}
+      {...(props.editable ? { onMove } : {})}
     />
   );
 }
@@ -68,12 +73,7 @@ function ProfileCollection(props: {
 export function VideoQualityProfilesContent(props: ReturnTypeUseProfiles) {
   const { actions, dialogs, profiles, state } = props;
   return (
-    <div className={settingsSectionClassName}>
-      <SettingsSectionHeader
-        kicker={translate('settings.videoQuality.kicker')}
-        title={translate('settings.videoQuality.title')}
-        description={translate('settings.videoQuality.description')}
-      />
+    <div className={`${settingsSectionClassName} max-w-[760px]`}>
       {state.error ? (
         <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
           {state.error}

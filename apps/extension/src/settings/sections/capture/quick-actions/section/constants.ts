@@ -26,11 +26,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-import type {
-  CaptureActionType,
-  QuickActionDelay,
-  QuickActionsDisplayMode,
-} from '../../../../../contracts/settings';
+import type { CaptureActionType, QuickActionDelay } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
 
 export const allowedQuickActionIcons = [
@@ -116,21 +112,4 @@ export const qualityOptions = [
   { value: 80, label: '80%' },
   { value: 70, label: '70%' },
   { value: 60, label: '60%' },
-];
-
-export const displayModeOptions: {
-  value: QuickActionsDisplayMode;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: 'list',
-    label: translate('settings.quickActions.displayModeList'),
-    description: translate('settings.quickActions.displayModeListDescription'),
-  },
-  {
-    value: 'hidden',
-    label: translate('settings.quickActions.displayModeHidden'),
-    description: translate('settings.quickActions.displayModeHiddenDescription'),
-  },
 ];

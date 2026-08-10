@@ -67,7 +67,7 @@ async function verifyProviderDeleteFlow() {
   expect(deleteAIProviderMock).toHaveBeenCalledWith('provider-1');
   expect(deleteAIModelMock).not.toHaveBeenCalled();
   expect(reloadData).toHaveBeenCalledTimes(1);
-  expect(toastSuccessMock).toHaveBeenCalledWith(translate('settings.aiProviders.providerDeleted'));
+  expect(toastSuccessMock).not.toHaveBeenCalled();
   expect(setConfirmDelete).toHaveBeenLastCalledWith(null);
 }
 
@@ -85,7 +85,7 @@ async function verifyModelDeleteFlow() {
   expect(deleteAIModelMock).toHaveBeenCalledWith('model-1');
   expect(deleteAIProviderMock).not.toHaveBeenCalled();
   expect(reloadData).toHaveBeenCalledTimes(1);
-  expect(toastSuccessMock).toHaveBeenCalledWith(translate('settings.aiProviders.modelDeleted'));
+  expect(toastSuccessMock).not.toHaveBeenCalled();
   expect(setConfirmDelete).toHaveBeenLastCalledWith(null);
 }
 

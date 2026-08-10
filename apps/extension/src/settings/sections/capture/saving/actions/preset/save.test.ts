@@ -43,7 +43,6 @@ function createSyncState(presets: SavePreset[]): SavePresetsSyncState {
     defaultVideoPresetId: null,
     isLoading: false,
     presets,
-    saveCapturesToGallery: false,
     settings: createSettings(),
     setCaptureAction: vi.fn(),
     setDefaultExportPresetId: vi.fn(),
@@ -52,7 +51,6 @@ function createSyncState(presets: SavePreset[]): SavePresetsSyncState {
     setPresets: vi.fn((value: SavePreset[]) => {
       sync.presets = value;
     }),
-    setSaveCapturesToGallery: vi.fn(),
     updateSettings: vi.fn(async () => undefined),
   };
   return sync;
@@ -89,7 +87,7 @@ it('creates a new preset with sanitized path and closes the editor', async () =>
   });
   expect(persistSettings).toHaveBeenCalledWith({ presets: sync.presets });
   expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetCreated');
+  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
 });
 
 it('updates an existing preset and keeps its previous path when sanitized input is empty', async () => {
@@ -112,7 +110,7 @@ it('updates an existing preset and keeps its previous path when sanitized input 
     path: 'Existing',
   });
   expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetUpdated');
+  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
 });
 
 it('rejects blank names before persisting settings', async () => {

@@ -98,16 +98,12 @@ async function verifyDelayedLoadingBranch() {
     createSectionState({
       actions: [],
       confirmDelete: null,
-      confirmationMessage: null,
       editingId: null,
       editForm: null,
       isLoading: true,
     })
   );
   expect(container?.querySelector('[data-testid="settings-card-loading"]')).not.toBeNull();
-  expect(container?.textContent).toContain('settings.navigation.quickactions');
-  expect(container?.textContent).toContain('settings.quickActions.subtitle');
-  expect(container?.textContent).not.toContain('Quick action saved');
 }
 
 async function verifyEmptyState() {
@@ -115,13 +111,13 @@ async function verifyEmptyState() {
     createSectionState({
       actions: [],
       confirmDelete: null,
-      confirmationMessage: null,
       editingId: null,
       editForm: null,
     })
   );
   expect(container?.textContent).toContain('settings.quickActions.emptyTitle');
   expect(container?.textContent).toContain('settings.quickActions.emptyDescriptionPrefix');
+  expect(container?.textContent).not.toContain('settings.quickActions.savedActionsLabel');
   expect(container?.querySelector('[data-testid="product-modal"]')).toBeNull();
   expect(container?.querySelector('[role="status"]')).toBeNull();
 }
@@ -131,7 +127,6 @@ async function verifyDraftState() {
     createSectionState({
       actions: [],
       confirmDelete: null,
-      confirmationMessage: null,
       editingId: 'draft-action',
     })
   );

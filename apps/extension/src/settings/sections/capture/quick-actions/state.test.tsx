@@ -74,12 +74,11 @@ it('creates editor state with null defaults and a reset helper', async () => {
   expect(editorState?.editForm).toBeNull();
 });
 
-it('creates ui state with stable defaults for display and loading', async () => {
+it('creates ui state with stable loading defaults', async () => {
   await renderNode(<UiHarness />);
 
   expect(uiState).toMatchObject({
     confirmDelete: null,
-    displayMode: 'list',
     isLoading: true,
   });
 });

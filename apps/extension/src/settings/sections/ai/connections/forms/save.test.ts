@@ -119,7 +119,7 @@ async function verifyProviderCreateFlow() {
     setIsSaving.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
   );
   expect(onSave).toHaveBeenCalledTimes(1);
-  expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  expect(toastSuccessMock).not.toHaveBeenCalled();
   expect(setIsSaving).toHaveBeenNthCalledWith(1, true);
   expect(setIsSaving).toHaveBeenLastCalledWith(false);
 }

@@ -85,7 +85,10 @@ async function renderHarness() {
     isLoading: false,
     isMutating: false,
     refreshTemplates: vi.fn(async () => undefined),
-    removeTemplate: removeTemplateMock,
+    templateLifecycle: {
+      remove: removeTemplateMock,
+      restoreSystem: vi.fn(async () => undefined),
+    },
     selectTemplate: selectTemplateMock,
     templates: [{ content: 'Template content', id: 'template-1', name: 'Template 1' }],
     updateTemplate: updateTemplateMock,

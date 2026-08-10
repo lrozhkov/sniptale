@@ -11,7 +11,6 @@ export function usePopupLifecycleSync(state: PopupRuntimeStateSlice) {
       setViewportPresets: state.presets.setViewportPresets,
       setQuickActions: state.presets.setQuickActions,
       setQuickActionsReady: state.presets.setQuickActionsReady,
-      setDisplayMode: state.presets.setDisplayMode,
       setVideoSettings: state.recording.setVideoSettings,
       setSelectedPresetId: state.presets.setSelectedPresetId,
       setVideoCaptureMode: state.presets.setVideoCaptureMode,

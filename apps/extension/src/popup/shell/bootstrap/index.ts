@@ -1,8 +1,4 @@
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   type VideoRecordingRuntimeState,
@@ -26,7 +22,6 @@ const logger = createLogger({ namespace: 'PopupBootstrap' });
 export type PopupBootstrapResult = {
   viewportPresets: ViewportPreset[];
   quickActions: QuickAction[];
-  quickActionsMode: QuickActionsDisplayMode;
   videoSettings: VideoRecordingSettings;
   recordingControlCapability: { controlToken: string; recordingId: string } | null;
   recordingState: VideoRecordingRuntimeState;
@@ -43,7 +38,6 @@ type PopupBootstrapData = {
   homeError: string | null;
   microphones: MicrophoneOption[];
   webcams: WebcamOption[];
-  quickActionsMode: QuickActionsDisplayMode;
   recordingResponse: RecordingStateResponse;
   selectedPresetId: string | null;
   captureMode: CaptureMode;
@@ -115,7 +109,6 @@ async function loadPopupBootstrapData(
     actions: homeData.actions,
     microphones: videoData.microphones,
     webcams: videoData.webcams,
-    quickActionsMode: homeData.quickActionsMode,
     recordingResponse,
     selectedPresetId: videoData.selectedPresetId,
     videoSettings: videoData.videoSettings,
@@ -133,7 +126,6 @@ function buildPopupBootstrapResult(data: PopupBootstrapData): PopupBootstrapResu
     microphones: data.microphones,
     webcams: data.webcams,
     quickActions: data.actions.filter((action) => action.status),
-    quickActionsMode: data.quickActionsMode,
     recordingControlCapability:
       typeof data.recordingResponse.controlToken === 'string' &&
       typeof data.recordingResponse.recordingId === 'string'

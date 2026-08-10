@@ -1,13 +1,11 @@
 import type { CaptureActionType } from '../../../../../contracts/settings';
-import { settingsSectionClassName } from '../../../../section-surface';
 import {
-  CaptureActionCard,
-  DefaultPresetsCard,
-  GalleryToggleCard,
-  SavePresetsHeader,
-} from './cards';
-import { PresetsList } from './list/root';
+  settingsCompactWorkbenchClassName,
+  settingsSectionClassName,
+} from '../../../../section-surface';
 import type { SavePresetsListProps, SavePresetsRowHandlers } from '../state/types';
+import { SaveSettingsRows } from './cards';
+import { PresetsList } from './list/root';
 
 type SavePresetsSectionContentProps = {
   captureAction: CaptureActionType;
@@ -24,11 +22,10 @@ type SavePresetsSectionContentProps = {
   handleDeletePreset: SavePresetsRowHandlers['onDelete'];
   handleSavePreset: SavePresetsListProps['onSavePreset'];
   handleTogglePresetEnabled: SavePresetsRowHandlers['onToggleEnabled'];
-  handleToggleSaveToGallery: () => Promise<void>;
   isLoading: boolean;
   openEditor: SavePresetsRowHandlers['onEdit'];
   presetOptions: { value: string; label: string }[];
-  saveCapturesToGallery: boolean;
+  view: 'settings' | 'templates';
 } & Pick<
   SavePresetsListProps,
   | 'confirmDelete'
@@ -36,7 +33,6 @@ type SavePresetsSectionContentProps = {
   | 'editingPreset'
   | 'isEditorOpen'
   | 'onMoveBefore'
-  | 'presetCountLabel'
   | 'presets'
 >;
 
@@ -52,47 +48,35 @@ function buildPresetsListProps(props: SavePresetsSectionContentProps): SavePrese
     onEdit: props.openEditor,
     onSavePreset: props.handleSavePreset,
     onToggleEnabled: props.handleTogglePresetEnabled,
-    presetCountLabel: props.presetCountLabel,
     presets: props.presets,
     ...(props.editingPreset === undefined ? {} : { editingPreset: props.editingPreset }),
   };
 }
 
-function SavePresetsSectionBody(props: SavePresetsSectionContentProps) {
-  const listProps = buildPresetsListProps(props);
+export function SavePresetsSectionContent(props: SavePresetsSectionContentProps) {
+  if (props.view === 'templates') {
+    return (
+      <div className={settingsSectionClassName}>
+        <PresetsList {...buildPresetsListProps(props)} />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <CaptureActionCard
+    <div className={`${settingsSectionClassName} ${settingsCompactWorkbenchClassName} !space-y-0`}>
+      <SaveSettingsRows
         captureAction={props.captureAction}
         captureActionOptions={props.captureActionOptions}
-        isLoading={props.isLoading}
-        onChange={props.handleCaptureActionChange}
-      />
-      <GalleryToggleCard
-        enabled={props.saveCapturesToGallery}
-        onToggle={props.handleToggleSaveToGallery}
-      />
-      <DefaultPresetsCard
         defaultExportPresetId={props.defaultExportPresetId}
         defaultImagePresetId={props.defaultImagePresetId}
         defaultVideoPresetId={props.defaultVideoPresetId}
         isLoading={props.isLoading}
+        onCaptureActionChange={props.handleCaptureActionChange}
         onDefaultExportChange={props.handleDefaultExportChange}
         onDefaultImageChange={props.handleDefaultImageChange}
         onDefaultVideoChange={props.handleDefaultVideoChange}
         presetOptions={props.presetOptions}
       />
-      <PresetsList {...listProps} />
-    </>
-  );
-}
-
-export function SavePresetsSectionContent(props: SavePresetsSectionContentProps) {
-  return (
-    <div className={settingsSectionClassName}>
-      <SavePresetsHeader />
-      <SavePresetsSectionBody {...props} />
     </div>
   );
 }

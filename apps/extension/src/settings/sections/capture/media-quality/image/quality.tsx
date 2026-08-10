@@ -1,64 +1,32 @@
 import { translate } from '../../../../../platform/i18n';
-import { settingsCardClassName } from '../../../../section-surface/panel-controls';
-import { SettingsRangeField } from '../../../../section-surface';
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { SettingsControlRow } from '../../../../section-surface';
 import type { useImageSettingsSection } from './controller';
-
-const imageSettingsCardClassName = settingsCardClassName;
-
-const imageSettingsQualityUnavailableClassName = [
-  'rounded bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_52%,transparent)]',
-  'px-2 py-1 text-xs text-[var(--sniptale-color-text-dim)]',
-].join(' ');
-
-function ImageSettingsQualityDescription({
-  state,
-}: {
-  state: ReturnType<typeof useImageSettingsSection>;
-}) {
-  return (
-    <span>
-      {state.isQualityDisabled
-        ? translate('imageSettings.section.qualityLosslessDescription')
-        : state.imageQuality >= 90
-          ? translate('imageSettings.section.qualityHighDescription')
-          : state.imageQuality >= 70
-            ? translate('imageSettings.section.qualityBalancedDescription')
-            : state.imageQuality >= 50
-              ? translate('imageSettings.section.qualityMediumDescription')
-              : translate('imageSettings.section.qualityLowDescription')}
-    </span>
-  );
-}
 
 export function ImageSettingsSectionQuality({
   state,
 }: {
   state: ReturnType<typeof useImageSettingsSection>;
 }) {
-  const qualityWrapperClassName = state.isQualityDisabled ? 'pointer-events-none opacity-40' : '';
   const qualityValue = state.isQualityDisabled ? 100 : state.imageQuality;
 
   return (
-    <div className={imageSettingsCardClassName}>
-      <SettingsRangeField
-        min="1"
-        max="100"
-        value={qualityValue}
-        onChange={(event) => state.handleQualityChange(Number(event.target.value))}
-        disabled={state.isQualityDisabled}
-        className={qualityWrapperClassName}
+    <SettingsControlRow label={translate('imageSettings.section.qualityLabel')}>
+      <NumericRow
+        appearance="plain"
+        className="min-h-10 w-full !grid-cols-1 py-1.5 [&>div]:!col-start-1"
         label={translate('imageSettings.section.qualityLabel')}
-        displayValue={qualityValue}
-        displaySuffix="%"
-        aside={
-          state.isQualityDisabled ? (
-            <span className={imageSettingsQualityUnavailableClassName}>
-              {translate('imageSettings.section.qualityUnavailable')}
-            </span>
-          ) : undefined
-        }
-        hint={<ImageSettingsQualityDescription state={state} />}
+        labelVisible={false}
+        min={1}
+        max={100}
+        step={1}
+        unit="%"
+        value={qualityValue}
+        scrub={{ min: 1, max: 100, step: 1 }}
+        disabled={state.isQualityDisabled}
+        onPreviewValue={state.handleQualityPreview}
+        onCommitValue={(quality) => void state.handleQualityCommit(quality)}
       />
-    </div>
+    </SettingsControlRow>
   );
 }

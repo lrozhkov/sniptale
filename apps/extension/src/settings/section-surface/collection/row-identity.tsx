@@ -27,23 +27,39 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
         {item.meta === undefined ? null : (
           <div className="truncate text-xs text-[var(--sniptale-color-text-dim)]">{item.meta}</div>
         )}
-        {item.supplement === undefined ? null : <div className="mt-1">{item.supplement}</div>}
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {item.badges?.map((badge) => (
-            <span
-              key={badge.id}
-              className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames[badge.tone]}`}
-            >
-              {badge.label}
-            </span>
-          ))}
-          {item.isDefault ? (
-            <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames.success}`}>
-              {translate('settings.collection.defaultBadge')}
-            </span>
-          ) : null}
-        </div>
       </div>
     </>
+  );
+}
+
+export function SettingsCollectionRowMarkers({ item }: { item: SettingsCollectionItem }) {
+  const hasBadges =
+    item.isBuiltIn === true || item.isDefault === true || (item.badges?.length ?? 0) > 0;
+  if (!hasBadges && item.supplement === undefined) return null;
+  return (
+    <div
+      data-settings-collection-markers
+      className="flex max-w-[42%] flex-none flex-wrap items-center justify-end gap-1.5"
+    >
+      {item.supplement}
+      {item.isBuiltIn ? (
+        <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames.neutral}`}>
+          {translate('settings.collection.builtInBadge')}
+        </span>
+      ) : null}
+      {item.badges?.map((badge) => (
+        <span
+          key={badge.id}
+          className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames[badge.tone]}`}
+        >
+          {badge.label}
+        </span>
+      ))}
+      {item.isDefault ? (
+        <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClassNames.success}`}>
+          {translate('settings.collection.defaultBadge')}
+        </span>
+      ) : null}
+    </div>
   );
 }

@@ -119,4 +119,13 @@ describe('resolveQuickActionRuntimeContext', () => {
       imageQuality: 90,
     });
   });
+
+  it('does not inherit the retired global viewport default', () => {
+    expect(
+      resolveQuickActionRuntimeContext(
+        createQuickAction(),
+        createSettings({ defaultViewportPresetId: 'legacy-default' })
+      ).viewportPresetId
+    ).toBeNull();
+  });
 });

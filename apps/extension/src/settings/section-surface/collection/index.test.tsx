@@ -16,6 +16,7 @@ const items: readonly SettingsCollectionItem[] = [
     title: 'First item',
     meta: 'Metadata',
     enabled: true,
+    isBuiltIn: true,
     isDefault: true,
     capabilities: {
       edit: true,
@@ -31,8 +32,24 @@ const items: readonly SettingsCollectionItem[] = [
 
 function getMenuTrigger(itemId: string): HTMLButtonElement | null {
   return container.querySelector(
-    `[data-settings-collection-item="${itemId}"] [aria-haspopup="menu"]`
+    `[data-settings-collection-item="${itemId}"] [aria-label="Действия"][aria-expanded]`
   );
+}
+
+function dispatchPointer(
+  target: Element | null,
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+  options: { clientX?: number; clientY?: number; pointerId?: number } = {}
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    button: 0,
+    cancelable: true,
+    clientX: options.clientX ?? 0,
+    clientY: options.clientY ?? 0,
+  });
+  Object.defineProperty(event, 'pointerId', { value: options.pointerId ?? 1 });
+  target?.dispatchEvent(event);
 }
 
 beforeEach(() => {
@@ -61,7 +78,13 @@ describe('SettingsCollection', () => {
     expect(container.querySelector('section')?.getAttribute('aria-label')).toBe('Presets');
     expect(container.textContent).toContain('First item');
     expect(container.textContent).toContain('Metadata');
+    expect(container.querySelector('[data-settings-collection-markers]')?.textContent).toContain(
+      'Предустановленный'
+    );
     expect(container.textContent).toContain('По умолчанию');
+    for (const control of container.querySelectorAll<HTMLButtonElement>('button[aria-label]')) {
+      expect(control.title).not.toBe('');
+    }
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="Редактировать"]')?.click());
     expect(onAction).toHaveBeenCalledWith({ type: 'edit', itemId: 'first' });
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="Выключить"]')?.click());
@@ -88,6 +111,68 @@ describe('SettingsCollection', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not load');
     renderState('ready', []);
     expect(container.textContent).toContain('Nothing here');
+  });
+
+  it('renders the canonical plus icon for add actions', () => {
+    const onInvoke = vi.fn();
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Add action"
+          items={[]}
+          addAction={{ label: 'Добавить', onInvoke }}
+          onAction={vi.fn()}
+        />
+      )
+    );
+
+    const addButton = container.querySelector<HTMLButtonElement>('button');
+    expect(addButton?.querySelector('.lucide-plus')).not.toBeNull();
+    act(() => addButton?.click());
+    expect(onInvoke).toHaveBeenCalledOnce();
+  });
+
+  it('shows a single secondary action directly without the three-dot trigger', () => {
+    const onAction = vi.fn();
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Profiles"
+          items={[{ id: 'profile', title: 'Profile', capabilities: { setDefault: true } }]}
+          onAction={onAction}
+        />
+      )
+    );
+
+    expect(container.querySelector('[aria-label="Действия"]')).toBeNull();
+    const directAction = container.querySelector<HTMLButtonElement>(
+      '[data-collection-direct-action="set-default"]'
+    );
+    expect(directAction?.title).toBe('Сделать по умолчанию');
+    expect(directAction?.className).toContain('opacity-0');
+    expect(directAction?.className).toContain('group-hover:opacity-100');
+    expect(directAction?.className).toContain('group-focus-within:opacity-100');
+    expect(directAction?.tabIndex).toBe(0);
+    act(() => directAction?.click());
+    expect(onAction).toHaveBeenCalledWith({ type: 'set-default', itemId: 'profile' });
+  });
+
+  it('keeps a sole non-default action persistently visible', () => {
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Profiles"
+          items={[{ id: 'profile', title: 'Profile', capabilities: { delete: true } }]}
+          onAction={vi.fn()}
+        />
+      )
+    );
+
+    const directAction = container.querySelector<HTMLButtonElement>(
+      '[data-collection-direct-action="delete"]'
+    );
+    expect(directAction).not.toBeNull();
+    expect(directAction?.className).not.toContain('opacity-0');
   });
 
   it('emits keyboard move intents only after the handle is picked up', () => {
@@ -161,9 +246,9 @@ describe('SettingsCollection', () => {
     act(() => getMenuTrigger('first')?.click());
     const labels = [
       ...container.querySelectorAll<HTMLButtonElement>(
-        '[data-settings-collection-item="first"] [role="menuitem"]'
+        '[data-settings-collection-item="first"] [data-collection-inline-action]'
       ),
-    ].map((button) => button.textContent?.trim());
+    ].map((button) => button.getAttribute('aria-label'));
     expect(labels).toEqual([
       'Сделать по умолчанию',
       'Переместить вверх',
@@ -180,18 +265,31 @@ describe('SettingsCollection', () => {
         <SettingsCollection ariaLabel="Drag" items={items} onAction={vi.fn()} onMove={onMove} />
       )
     );
-    const handles = container.querySelectorAll<HTMLElement>('[draggable="true"]');
+    const handles = container.querySelectorAll<HTMLElement>('[aria-label="Изменить позицию"]');
     const target = container.querySelector<HTMLElement>('[data-settings-collection-item="second"]');
     if (target) {
       target.getBoundingClientRect = () =>
         ({ top: 0, height: 100 }) as ReturnType<HTMLElement['getBoundingClientRect']>;
     }
-    act(() => handles[0]?.dispatchEvent(new Event('dragstart', { bubbles: true })));
-    act(() =>
-      target?.dispatchEvent(
-        new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 90 })
+    act(() => dispatchPointer(handles[0] ?? null, 'pointerdown'));
+    act(() => dispatchPointer(handles[0] ?? null, 'pointermove', { clientY: 90 }));
+    expect(
+      [...container.querySelectorAll('[data-settings-collection-item]')].map((row) =>
+        row.getAttribute('data-settings-collection-item')
       )
-    );
+    ).toEqual(['first', 'second']);
+    expect(
+      container
+        .querySelector('[data-settings-collection-dragging="true"]')
+        ?.getAttribute('data-settings-collection-item')
+    ).toBe('first');
+    expect(
+      container
+        .querySelector('[data-settings-collection-item="second"]')
+        ?.getAttribute('data-settings-collection-drop-after')
+    ).toBe('true');
+    expect(container.querySelector('[draggable]')).toBeNull();
+    act(() => dispatchPointer(handles[0] ?? null, 'pointerup', { clientY: 90 }));
     expect(onMove).toHaveBeenCalledWith({
       itemId: 'first',
       groupId: null,
@@ -207,9 +305,10 @@ describe('SettingsCollection', () => {
         <SettingsCollection ariaLabel="Cancel" items={items} onAction={vi.fn()} onMove={vi.fn()} />
       )
     );
-    const handle = container.querySelector<HTMLElement>('[draggable="true"]');
-    act(() => handle?.dispatchEvent(new Event('dragstart', { bubbles: true })));
-    act(() => handle?.dispatchEvent(new Event('dragend', { bubbles: true })));
+    const handle = container.querySelector<HTMLElement>('[aria-label="Изменить позицию"]');
+    act(() => dispatchPointer(handle, 'pointerdown'));
+    act(() => dispatchPointer(handle, 'pointermove', { clientY: 10 }));
+    act(() => dispatchPointer(handle, 'pointercancel', { clientY: 10 }));
     expect(container.textContent).toContain('Перемещение отменено');
   });
 });

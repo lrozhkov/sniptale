@@ -51,22 +51,30 @@ it('renders preset capabilities and forwards catalog actions', () => {
   const root = createRoot(node);
   act(() => root.render(<ToolPresetsSettings />));
   expect(node.textContent).toContain('settings.editor.createInEditorHint');
-  expect(node.textContent).toContain('highlighter.section.systemBadge');
-  const handles = node.querySelectorAll('[draggable="true"]');
+  expect(node.textContent).toContain('settings.collection.builtInBadge');
+  const handles = node.querySelectorAll<HTMLButtonElement>(
+    '[aria-label="settings.collection.dragHandle"]'
+  );
   const rows = node.querySelectorAll('[data-settings-collection-item]');
   act(() => {
     (node.querySelector('section > div button') as HTMLElement | null)?.click();
-    handles[1]?.dispatchEvent(new Event('dragstart', { bubbles: true }));
+    handles[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
   });
   act(() => {
-    rows[0]?.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
-    rows[0]?.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
-    handles[1]?.dispatchEvent(new Event('dragend', { bubbles: true }));
+    handles[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+  });
+  act(() => {
+    handles[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+  });
+  act(() => {
     rows[1]
       ?.querySelector('button[aria-label="settings.collection.actions.enable"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    [...(rows[1]?.querySelectorAll('button') ?? [])]
-      .find((button) => button.textContent?.includes('settings.collection.actions.delete'))
+    rows[1]
+      ?.querySelector<HTMLButtonElement>('button[aria-label="settings.collection.actions.menu"]')
+      ?.click();
+    rows[1]
+      ?.querySelector<HTMLButtonElement>('button[aria-label="settings.collection.actions.delete"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   expect(state.value.actions.movePreset).toHaveBeenCalledWith('custom', 'system');

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-import type { QuickAction, QuickActionsDisplayMode } from '../../../../contracts/settings';
-import { DEFAULT_QUICK_ACTIONS_DISPLAY_MODE } from '../../../../features/quick-actions-presets/display-mode';
+import type { QuickAction } from '../../../../contracts/settings';
 
 export function useQuickActionsEditorState() {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -21,17 +20,12 @@ export function useQuickActionsEditorState() {
 
 export function useQuickActionsUiState() {
   const [confirmDelete, setConfirmDelete] = useState<QuickAction | null>(null);
-  const [displayMode, setDisplayModeState] = useState<QuickActionsDisplayMode>(
-    DEFAULT_QUICK_ACTIONS_DISPLAY_MODE
-  );
   const [isLoading, setIsLoading] = useState(true);
 
   return {
     confirmDelete,
-    displayMode,
     isLoading,
     setConfirmDelete,
-    setDisplayModeState,
     setIsLoading,
   };
 }

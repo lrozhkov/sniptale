@@ -14,7 +14,7 @@ import {
   type SettingsCollectionMoveIntent,
 } from '../../../section-surface';
 import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from './section/constants';
-import { getDelayLabel, getQuickActionCountLabel, getViewportPresetLabel } from './section/helpers';
+import { getDelayLabel, getViewportPresetLabel } from './section/helpers';
 import type { QuickActionsSectionState } from './controller';
 
 export function QuickActionsList(props: {
@@ -42,15 +42,7 @@ export function QuickActionsList(props: {
       preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-accent)]" />,
       enabled: action.status,
       busy: props.state.isLoading,
-      badges: isBundledQuickAction(action)
-        ? [
-            {
-              id: 'bundled',
-              label: translate('settings.quickActions.bundledBadge'),
-              tone: 'neutral',
-            },
-          ]
-        : [],
+      isBuiltIn: isBundledQuickAction(action),
       capabilities: {
         edit: !isBundledQuickAction(action),
         toggle: true,
@@ -70,9 +62,7 @@ export function QuickActionsList(props: {
   return (
     <SettingsCollection
       ariaLabel={translate('settings.quickActions.savedActionsLabel')}
-      title={translate('settings.quickActions.savedActionsLabel')}
       items={items}
-      countLabel={`${items.length} ${getQuickActionCountLabel(items.length)}`}
       state={props.state.isLoading ? 'loading' : 'ready'}
       emptyState={
         props.state.editingId ? null : (

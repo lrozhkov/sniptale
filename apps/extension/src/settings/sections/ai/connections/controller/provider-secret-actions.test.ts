@@ -28,7 +28,7 @@ describe('provider-secret-actions', () => {
     clearAIProviderSecretMock.mockResolvedValue(undefined);
   });
 
-  it('clears a provider secret, reloads provider data, and shows success', async () => {
+  it('clears a provider secret and reloads provider data without redundant success feedback', async () => {
     const { handleAiProviderSecretClear } = await import('./provider-secret-actions');
     const reloadData = vi.fn().mockResolvedValue(undefined);
 
@@ -36,9 +36,7 @@ describe('provider-secret-actions', () => {
 
     expect(clearAIProviderSecretMock).toHaveBeenCalledWith('provider-1');
     expect(reloadData).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith(
-      translate('settings.aiProviders.providerSecretCleared')
-    );
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 
   it('surfaces clear failures without reloading provider data', async () => {

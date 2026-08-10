@@ -99,7 +99,6 @@ it('renders the quick-actions empty state when the owner is visible without acti
       quickActionsReady
       hasQuickActions={false}
       quickActions={[]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle={null}
       restrictionIndicatorTitle="Restricted"
@@ -128,7 +127,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle="Blocked reason"
       restrictionIndicatorTitle={null}
@@ -140,7 +138,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
     expect.objectContaining({
       actions: [action],
       disabledTitle: 'Blocked reason',
-      displayMode: 'list',
       onTriggerAction,
       presets: [],
     })
@@ -152,7 +149,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle={null}
       restrictionIndicatorTitle={null}

@@ -81,12 +81,11 @@ function expectRestrictedHomeSections(quickAction: ReturnType<typeof createQuick
   });
   expect(popupHomeQuickActionsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
-      displayMode: 'hidden',
-      hasQuickActions: false,
+      hasQuickActions: true,
       quickActions: [quickAction],
       quickActionsReady: true,
       quickActionsDisabledTitle: 'popup.common.restrictedPageFeatures',
-      shouldShowQuickActions: false,
+      shouldShowQuickActions: true,
     })
   );
   expect(popupHomeActionRowSpy).toHaveBeenCalledWith(
@@ -104,7 +103,6 @@ async function renderRestrictedHomePage(quickAction: ReturnType<typeof createQui
     <PopupHomePage
       quickActions={[quickAction]}
       quickActionsReady
-      displayMode="hidden"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities({
         isRestrictedPage: true,
@@ -183,7 +181,6 @@ it('renders the home error surface on unrestricted pages', async () => {
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
       galleryStatus={null}
@@ -201,7 +198,6 @@ it('renders bootstrap home errors even when no action handler error is present',
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
       galleryStatus={null}
@@ -220,7 +216,6 @@ it('forwards the quick-actions readiness state to the section owner', async () =
     <PopupHomePage
       quickActions={[]}
       quickActionsReady={false}
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
       galleryStatus={null}

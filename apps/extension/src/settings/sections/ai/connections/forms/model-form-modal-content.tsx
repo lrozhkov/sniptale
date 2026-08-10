@@ -1,5 +1,4 @@
 import type React from 'react';
-import { AlertTriangle } from 'lucide-react';
 import type { AIProvider } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -9,9 +8,10 @@ import {
   ProductSelect,
   ProductTextarea,
 } from '@sniptale/ui/product-form-controls';
-import { ProductModal } from '@sniptale/ui/product-modal';
+import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { AiProvidersFormModalLayout } from './layout';
-import { AiProvidersFormFieldSurface, AiProvidersFormModalBody } from './shared';
+import { AiProvidersFormModalBody } from './shared';
+import { settingsModalClassName } from '../../../../section-surface';
 
 type ModelFormModalContentProps = {
   errors: Record<string, string>;
@@ -36,19 +36,25 @@ type ModelFormModalContentProps = {
 
 function MissingProvidersState(props: Pick<ModelFormModalContentProps, 'onClose'>) {
   return (
-    <ProductModal width="400px" onClose={props.onClose}>
-      <div className="p-6 text-center">
-        <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-[var(--sniptale-color-warning)]" />
-        <h3 className="mb-2 text-lg font-semibold text-[var(--sniptale-color-text-primary-strong)]">
-          {translate('settings.aiProviders.modelModalMissingProvidersTitle')}
-        </h3>
-        <p className="mb-4 text-sm text-[var(--sniptale-color-text-muted)]">
+    <ProductModal
+      width="400px"
+      maxWidth="calc(100vw - 32px)"
+      dialogClassName={settingsModalClassName}
+      onClose={props.onClose}
+    >
+      <ProductModalHeader
+        compact
+        title={translate('settings.aiProviders.modelModalMissingProvidersTitle')}
+        onClose={props.onClose}
+      />
+      <ProductModalBody compact className="space-y-4">
+        <p className="text-sm leading-5 text-[var(--sniptale-color-text-muted)]">
           {translate('settings.aiProviders.modelModalMissingProvidersDescription')}
         </p>
-        <ProductActionButton onClick={props.onClose} tone="secondary">
+        <ProductActionButton compact onClick={props.onClose} tone="secondary">
           {translate('common.actions.close')}
         </ProductActionButton>
-      </div>
+      </ProductModalBody>
     </ProductModal>
   );
 }
@@ -137,15 +143,9 @@ function ModelFormModalBody(props: ModelFormModalContentProps) {
       onSubmit={props.onSubmit}
       {...(props.errors['submit'] === undefined ? {} : { submitError: props.errors['submit'] })}
     >
-      <AiProvidersFormFieldSurface>
-        <ModelProviderField {...props} />
-      </AiProvidersFormFieldSurface>
-      <AiProvidersFormFieldSurface>
-        <ModelIdentityFields {...props} />
-      </AiProvidersFormFieldSurface>
-      <AiProvidersFormFieldSurface>
-        <ModelPromptField {...props} />
-      </AiProvidersFormFieldSurface>
+      <ModelProviderField {...props} />
+      <ModelIdentityFields {...props} />
+      <ModelPromptField {...props} />
     </AiProvidersFormModalBody>
   );
 }

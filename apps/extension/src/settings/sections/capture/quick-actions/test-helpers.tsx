@@ -24,6 +24,7 @@ function createSettingsPanelControlMocks() {
     settingsAddButtonClassName: 'settings-add-button',
     settingsCardClassName: 'settings-card',
     settingsEmptyStateClassName: 'settings-empty-state',
+    settingsModalClassName: 'settings-modal',
     settingsModalFieldSurfaceClassName: 'settings-modal-field-surface',
     SettingsDragHandle: () => <span data-testid="settings-drag-handle">drag</span>,
     SettingsSwitch: (props: {

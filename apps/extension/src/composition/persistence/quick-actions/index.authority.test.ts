@@ -12,13 +12,11 @@ const {
   isBundledQuickActionMock,
   mergeStoredQuickActionsMock,
   normalizeQuickActionMock,
-  sanitizeQuickActionsDisplayModeMock,
 } = vi.hoisted(() => ({
   getBundledQuickActionsMock: vi.fn(),
   isBundledQuickActionMock: vi.fn(),
   mergeStoredQuickActionsMock: vi.fn(),
   normalizeQuickActionMock: vi.fn(),
-  sanitizeQuickActionsDisplayModeMock: vi.fn(),
 }));
 
 vi.mock('../infrastructure/browser-storage', () => ({
@@ -43,11 +41,6 @@ vi.mock('../../../features/quick-actions-presets/catalog', () => ({
   getBundledQuickActions: getBundledQuickActionsMock,
   getQuickActionDisplayName: vi.fn(),
   isBundledQuickAction: isBundledQuickActionMock,
-}));
-
-vi.mock('../../../features/quick-actions-presets/display-mode', () => ({
-  DEFAULT_QUICK_ACTIONS_DISPLAY_MODE: 'list',
-  sanitizeQuickActionsDisplayMode: sanitizeQuickActionsDisplayModeMock,
 }));
 
 vi.mock('../../../features/quick-actions-presets/normalization', () => ({
@@ -86,9 +79,6 @@ function resetQuickActionsAuthorityMocks() {
     changed: false,
   }));
   isBundledQuickActionMock.mockReturnValue(false);
-  sanitizeQuickActionsDisplayModeMock.mockImplementation((mode: unknown) =>
-    mode === 'hidden' ? 'hidden' : 'list'
-  );
   browserStorageLocalGetMock.mockResolvedValue({});
   browserStorageLocalSetMock.mockResolvedValue(undefined);
 }

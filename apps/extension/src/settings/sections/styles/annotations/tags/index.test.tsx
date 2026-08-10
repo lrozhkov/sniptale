@@ -23,26 +23,33 @@ const controller = vi.hoisted(() => ({
 vi.mock('./controller', () => ({ useAnnotationTemplateTagsController: () => controller }));
 import { AnnotationTemplateTagsSettings } from '.';
 
-it('creates and renames tags while showing cross-catalog usage', async () => {
+it('uses the standard collection and creates and renames tags through its editor', async () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
   await act(async () => root.render(<AnnotationTemplateTagsSettings />));
   expect(host.textContent).toContain('Используется: 3');
-  const inputs = host.querySelectorAll<HTMLInputElement>('input');
+  expect(host.querySelector('[data-settings-collection-item="review"]')).not.toBeNull();
+  expect(host.querySelector('h2')).toBeNull();
   const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  await act(async () => {
-    setValue?.call(inputs[0], 'Training');
-    inputs[0]?.dispatchEvent(new Event('input', { bubbles: true }));
-  });
   const create = Array.from(host.querySelectorAll('button')).find((button) =>
     button.textContent?.includes('Создать тег')
   );
   await act(async () => create?.click());
-  expect(controller.actions.create).toHaveBeenCalledWith('Training');
+  let input = host.querySelector<HTMLInputElement>('#annotation-template-tag-name');
   await act(async () => {
-    setValue?.call(inputs[1], 'Review 2');
-    inputs[1]?.dispatchEvent(new Event('input', { bubbles: true }));
+    setValue?.call(input, 'Training');
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const submitCreate = host.querySelector<HTMLButtonElement>('button[type="submit"]');
+  await act(async () => submitCreate?.click());
+  expect(controller.actions.create).toHaveBeenCalledWith('Training');
+  const edit = host.querySelector<HTMLButtonElement>('[aria-label="Редактировать"]');
+  await act(async () => edit?.click());
+  input = host.querySelector<HTMLInputElement>('#annotation-template-tag-name');
+  await act(async () => {
+    setValue?.call(input, 'Review 2');
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const rename = Array.from(host.querySelectorAll('button')).find((button) =>
     button.textContent?.includes('Переименовать')
@@ -63,6 +70,8 @@ it('supports merge and confirmed deletion and renders loading, error, and empty 
   const root = createRoot(host);
   await act(async () => root.render(<AnnotationTemplateTagsSettings />));
 
+  const edit = host.querySelector<HTMLButtonElement>('[aria-label="Редактировать"]');
+  await act(async () => edit?.click());
   const select = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]');
   await act(async () => select?.click());
   const target = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
@@ -75,9 +84,7 @@ it('supports merge and confirmed deletion and renders loading, error, and empty 
   await act(async () => merge?.click());
   expect(controller.actions.merge).toHaveBeenCalledWith('review', 'training');
 
-  const remove = Array.from(host.querySelectorAll('button')).find((button) =>
-    button.textContent?.includes('Удалить')
-  );
+  const remove = host.querySelector<HTMLButtonElement>('[aria-label="Удалить"]');
   await act(async () => remove?.click());
   const confirm = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')

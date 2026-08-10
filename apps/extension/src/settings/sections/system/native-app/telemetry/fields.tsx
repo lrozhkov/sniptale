@@ -1,6 +1,5 @@
 import type { NativeCaptureSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../../platform/i18n';
-import { settingsMetaLabelClassName } from '../../../../section-surface';
 import { ToggleRow } from '../components/toggle-row';
 
 export function NativeTelemetryFields(props: {
@@ -10,7 +9,6 @@ export function NativeTelemetryFields(props: {
 }) {
   return (
     <div className="space-y-1">
-      <p className={settingsMetaLabelClassName}>{translate('settings.nativeApp.telemetryTitle')}</p>
       <ToggleRow
         checked={props.settings.video.telemetry.collectCursor}
         disabled={props.disabled}

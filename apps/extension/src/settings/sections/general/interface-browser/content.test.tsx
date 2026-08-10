@@ -95,21 +95,19 @@ async function verifyContextMenuControls(): Promise<void> {
 
   await renderWithState(state);
 
-  expect(container?.textContent).toContain(translate('settings.navigation.appearance', 'ru'));
+  expect(container?.firstElementChild?.className).toContain('max-w-[720px]');
   expect(container?.textContent).toContain(translate('settings.appearance.themeModeLabel', 'ru'));
   expect(container?.textContent).toContain(
     translate('settings.appearance.languagePreferenceLabel', 'ru')
   );
-  expect(container?.textContent).toContain('Встраивание в контекстное меню');
+  expect(container?.textContent).toContain('Контекстное меню браузера');
   expect(container?.textContent).toContain('Копировать название и ссылку');
   expect(container?.textContent).toContain('Настройки');
   expectContextMenuButtons();
 }
 
 function expectContextMenuButtons(): void {
-  expect(
-    container?.querySelector('button[aria-label="Встраивание в контекстное меню"]')
-  ).toBeTruthy();
+  expect(container?.querySelector('button[aria-label="Показывать меню Sniptale"]')).toBeTruthy();
   expect(container?.querySelector('button[aria-label="Снимки"]')).toBeTruthy();
   expect(
     container?.querySelector('button[aria-label="Копировать название и ссылку"]')

@@ -1,5 +1,6 @@
 import { translate } from '../../../platform/i18n';
 import { settingsEmptyStateClassName } from '../classes';
+import { useSettingsCollectionLayoutAnimation } from './layout-animation';
 import { SettingsCollectionRow } from './row';
 import type { SettingsCollectionReorderInteraction } from './reorder-interaction';
 import type { SettingsCollectionProps, SettingsCollectionResolvedGroup } from './types';
@@ -9,9 +10,11 @@ export function SettingsCollectionContent(props: {
   groups: readonly SettingsCollectionResolvedGroup[];
   reorder: SettingsCollectionReorderInteraction;
   openMenuItemId: string | null;
-  onOpenMenuItemChange(itemId: string | null): void;
+  onMenuOpenChange(itemId: string, open: boolean): void;
 }) {
   const { collection, groups, reorder } = props;
+  const collectionRootRef = useSettingsCollectionLayoutAnimation(groups);
+  const pointerDragging = reorder.draggingItemId !== null;
   if (collection.state === 'loading') {
     return (
       <div
@@ -35,8 +38,14 @@ export function SettingsCollectionContent(props: {
   }
   return (
     <div
+      ref={collectionRootRef}
+      data-settings-collection-root
+      data-settings-collection-pointer-dragging={pointerDragging || undefined}
       className={[
-        'overflow-visible rounded-xl border',
+        pointerDragging
+          ? 'overflow-visible cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
+          : 'overflow-hidden',
+        'rounded-xl border',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface)]',
       ].join(' ')}
@@ -55,20 +64,32 @@ export function SettingsCollectionContent(props: {
               )}
             </div>
           )}
-          {group.items.map((item) => (
-            <SettingsCollectionRow
-              key={item.id}
-              item={item}
-              reorderingEnabled={collection.onMove !== undefined}
-              dragInstructionsId={reorder.a11y.dragInstructionsId}
-              groups={groups}
-              activeKeyboardItemId={reorder.a11y.keyboardItemId}
-              menuOpen={props.openMenuItemId === item.id}
-              onMenuOpenChange={(open) => props.onOpenMenuItemChange(open ? item.id : null)}
-              onAction={collection.onAction}
-              {...reorder.row}
-            />
-          ))}
+          {group.items.map((item, index) => {
+            const dropTarget = reorder.pointerDropTarget;
+            const isTargetGroup = dropTarget?.groupId === group.id;
+            const dropBefore = isTargetGroup && dropTarget.beforeItemId === item.id;
+            const dropAfter =
+              isTargetGroup && dropTarget.beforeItemId === null && index === group.items.length - 1;
+            return (
+              <SettingsCollectionRow
+                key={item.id}
+                item={item}
+                dragging={reorder.draggingItemId === item.id}
+                dragOffsetY={reorder.dragOffsetY}
+                dropAfter={dropAfter}
+                dropBefore={dropBefore}
+                pointerDragging={pointerDragging}
+                reorderingEnabled={collection.onMove !== undefined}
+                dragInstructionsId={reorder.a11y.dragInstructionsId}
+                groups={groups}
+                activeKeyboardItemId={reorder.a11y.keyboardItemId}
+                menuOpen={props.openMenuItemId === item.id}
+                onMenuOpenChange={(open) => props.onMenuOpenChange(item.id, open)}
+                onAction={collection.onAction}
+                {...reorder.row}
+              />
+            );
+          })}
         </div>
       ))}
     </div>

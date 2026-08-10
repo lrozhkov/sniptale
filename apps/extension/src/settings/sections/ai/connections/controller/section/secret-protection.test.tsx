@@ -75,7 +75,7 @@ it('owns dialog validation, unlock cancellation, and successful lifecycle action
   expect(mutations.disable).toHaveBeenCalledWith('secret');
   expect(mutations.reset).toHaveBeenCalledOnce();
   expect(mutations.lock).toHaveBeenCalledOnce();
-  expect(toast.success).toHaveBeenCalled();
+  expect(toast.success).not.toHaveBeenCalled();
 
   let cancelled: Error | undefined;
   act(() => {

@@ -26,7 +26,6 @@ type PendingUnlock = {
 type CompleteDialogAction = (params: {
   action: () => Promise<void>;
   onSuccess?: () => void;
-  successMessage: string;
 }) => Promise<void>;
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -96,14 +95,12 @@ function buildDialogActionRunner(args: {
       await args.reloadData();
       params.onSuccess?.();
       args.setDialog(null);
-      toast.success(params.successMessage);
     } catch (error) {
       const message = getErrorMessage(
         error,
         translate('settings.aiProviders.secretProtectionActionError')
       );
       args.setError(message);
-      toast.error(message);
     } finally {
       args.setBusy(false);
     }
@@ -127,7 +124,6 @@ function buildUnlockEnableHandlers(args: {
           args.pendingUnlockRef.current?.resolve();
           args.pendingUnlockRef.current = null;
         },
-        successMessage: translate('settings.aiProviders.secretProtectionUnlocked'),
       });
     },
     async handleEnableSubmit(params: { passphrase: string; confirmPassphrase: string }) {
@@ -143,7 +139,6 @@ function buildUnlockEnableHandlers(args: {
       }
       await args.completeDialogAction({
         action: () => enableAISecretPassphraseProtection(params.passphrase),
-        successMessage: translate('settings.aiProviders.secretProtectionEnabled'),
       });
     },
   };
@@ -162,7 +157,6 @@ function buildLifecycleHandlers(args: {
       }
       await args.completeDialogAction({
         action: () => disableAISecretPassphraseProtection(passphrase || undefined),
-        successMessage: translate('settings.aiProviders.secretProtectionDisabled'),
       });
     },
     async handleChangeSubmit(params: {
@@ -180,13 +174,11 @@ function buildLifecycleHandlers(args: {
       }
       await args.completeDialogAction({
         action: () => changeAISecretPassphraseProtection(params),
-        successMessage: translate('settings.aiProviders.secretProtectionChanged'),
       });
     },
     handleResetConfirm() {
       return args.completeDialogAction({
         action: resetAISecretPassphraseProtection,
-        successMessage: translate('settings.aiProviders.secretProtectionReset'),
       });
     },
   };
@@ -198,7 +190,6 @@ function buildLockNowHandler(args: { reloadData: () => Promise<void>; setBusy: S
     try {
       await lockAISecretPassphraseProtection();
       await args.reloadData();
-      toast.success(translate('settings.aiProviders.secretProtectionLocked'));
     } catch (error) {
       toast.error(
         getErrorMessage(error, translate('settings.aiProviders.secretProtectionActionError'))

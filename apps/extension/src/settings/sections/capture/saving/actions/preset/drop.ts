@@ -1,10 +1,10 @@
-import type { Settings } from '../../../../../../contracts/settings';
+import type { SettingsPatch } from '../../../../../../contracts/settings';
 import { reorderPresetsBefore } from '../../state/helpers';
 import type { SavePresetsSyncState } from '../../state/types';
 
 export function createMovePresetBeforeAction(
   sync: SavePresetsSyncState,
-  persistSettings: (partialSettings: Partial<Settings>) => Promise<void>
+  persistSettings: (partialSettings: SettingsPatch) => Promise<void>
 ) {
   return async (presetId: string, beforePresetId: string | null) => {
     const nextPresets = reorderPresetsBefore(sync.presets, presetId, beforePresetId);

@@ -4,6 +4,31 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { productSelectSpy } = vi.hoisted(() => ({ productSelectSpy: vi.fn() }));
+
+vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/product-form-controls')>()),
+  ProductSelect: (props: {
+    'aria-label': string;
+    options: { label: string; value: string }[];
+    value: string;
+    onChange(value: string): void;
+  }) => {
+    productSelectSpy(props);
+    return (
+      <button
+        type="button"
+        role="combobox"
+        aria-controls="voice-input-options"
+        aria-expanded="false"
+        aria-label={props['aria-label']}
+      >
+        {props.options.find((option) => option.value === props.value)?.label}
+      </button>
+    );
+  },
+}));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -95,6 +120,7 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  productSelectSpy.mockReset();
 });
 
 afterEach(() => {
@@ -115,7 +141,8 @@ describe('voice input Settings content', () => {
     expect(container.textContent).toContain('settings.voiceInput.localDisclosure');
     expect(container.textContent).toContain('settings.voiceInput.browserDisclosure');
     expect(container.textContent).not.toContain('settings.voiceInput.clear');
-    expect(container.querySelectorAll('select')).toHaveLength(3);
+    expect(container.querySelectorAll('select')).toHaveLength(0);
+    expect(container.querySelectorAll('[role="combobox"]')).toHaveLength(3);
 
     render(createController({ status: { microphoneAccess: 'granted' } }));
     expect(button('settings.voiceInput.install')).toBeTruthy();
@@ -203,14 +230,18 @@ describe('voice input Settings content', () => {
       },
     });
     render(controller);
-    const microphoneSelect = container.querySelector('select');
-    expect(microphoneSelect?.textContent).toContain('Desk microphone');
-    expect(microphoneSelect?.textContent).not.toContain('private-device-id');
-    act(() => {
-      if (!microphoneSelect) return;
-      microphoneSelect.value = 'private-device-id';
-      microphoneSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    const microphoneSelect = [...container.querySelectorAll('[role="combobox"]')].find(
+      (element) => element.getAttribute('aria-label') === 'settings.voiceInput.microphoneLabel'
+    );
+    const microphoneProps = productSelectSpy.mock.calls.find(
+      ([props]) => props['aria-label'] === 'settings.voiceInput.microphoneLabel'
+    )?.[0];
+    expect(microphoneProps?.options).toContainEqual({
+      label: 'Desk microphone',
+      value: 'private-device-id',
     });
+    expect(microphoneSelect?.textContent).not.toContain('private-device-id');
+    act(() => microphoneProps?.onChange('private-device-id'));
     expect(controller.preferences.setMicrophoneDeviceId).toHaveBeenCalledWith('private-device-id');
   });
 

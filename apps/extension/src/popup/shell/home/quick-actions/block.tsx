@@ -1,8 +1,4 @@
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 import { QuickActionListItem, type QuickActionListDensity } from './block-items/item';
 
 const MAX_STRETCHED_QUICK_ACTIONS = 10;
@@ -65,18 +61,16 @@ function shouldStretchQuickActionList(actionsCount: number) {
 
 export function QuickActionsBlock({
   actions,
-  displayMode,
   presets,
   disabledTitle,
   onTriggerAction,
 }: {
   actions: QuickAction[];
-  displayMode: QuickActionsDisplayMode;
   presets: ViewportPreset[];
   disabledTitle?: string | null;
   onTriggerAction: (actionId: string) => void;
 }) {
-  if (displayMode === 'hidden' || actions.length === 0) {
+  if (actions.length === 0) {
     return null;
   }
 

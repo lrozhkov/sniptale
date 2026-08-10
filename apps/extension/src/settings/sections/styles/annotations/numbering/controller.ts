@@ -47,10 +47,7 @@ export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogCon
     };
   }, [refresh]);
   const mutate = useCallback(
-    async (
-      operation: () => Promise<{ outcome: string }>,
-      success?: Parameters<typeof translate>[0]
-    ) => {
+    async (operation: () => Promise<{ outcome: string }>) => {
       let accepted = false;
       const run = async () => {
         setIsSaving(true);
@@ -62,7 +59,6 @@ export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogCon
             accepted = true;
             if (result.outcome === 'applied') {
               await refresh();
-              if (success) toast.success(translate(success));
             }
           }
         } catch {

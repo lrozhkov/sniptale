@@ -1,6 +1,11 @@
 export { SettingsSectionHeader } from './section-header';
+export {
+  SettingsSectionHeaderActions,
+  SettingsSectionHeaderActionsProvider,
+} from './section-header-actions';
 export { SettingsSubpageTabs } from './subpage-tabs';
 export { SettingsRangeField } from './range-field';
+export { SettingsControlRow } from './panel-controls';
 export { SettingsCollection } from './collection';
 export type {
   SettingsCollectionAction,
@@ -11,9 +16,11 @@ export type {
 } from './collection';
 export {
   settingsAddButtonClassName,
+  settingsCompactWorkbenchClassName,
   settingsDividerClassName,
   settingsEmptyStateClassName,
   settingsMetaLabelClassName,
+  settingsModalClassName,
   settingsModalFieldSurfaceClassName,
   settingsNeutralBadgeClassName,
   settingsPageContentClassName,

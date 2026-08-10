@@ -1,10 +1,12 @@
-import { Bot } from 'lucide-react';
-
 import { translate } from '../../../../../platform/i18n';
 import type { AiProvidersSectionState } from '../controller/types';
-import { aiProvidersSectionCardClassName } from './constants';
 import { SettingsSwitch } from '../../../../section-surface/panel-controls';
-import { settingsToggleRowClassName } from '../../../../section-surface';
+import {
+  settingsCompactWorkbenchClassName,
+  settingsPanelClassName,
+  settingsToggleRowClassName,
+} from '../../../../section-surface';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 function getChromeAiStatusCopy(state: AiProvidersSectionState['chromeAi']): string {
   if (state.isChecking) {
@@ -40,11 +42,10 @@ export function AIProvidersChromeAiCard(props: { state: AiProvidersSectionState 
       (chromeAi.availability === 'unsupported' || chromeAi.availability === 'unavailable'));
 
   return (
-    <section className={aiProvidersSectionCardClassName}>
+    <section className={`${settingsCompactWorkbenchClassName} ${settingsPanelClassName}`}>
       <div className={settingsToggleRowClassName}>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-            <Bot size={16} className="text-[var(--sniptale-color-success)]" />
+          <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('settings.aiProviders.chromeAiTitle')}
           </div>
           <div className="mt-1 text-xs text-[var(--sniptale-color-text-dim)]">
@@ -60,6 +61,28 @@ export function AIProvidersChromeAiCard(props: { state: AiProvidersSectionState 
           disabled={disabled}
           onClick={() => void chromeAi.handleToggle()}
         />
+      </div>
+      <div className="flex flex-wrap items-center gap-3 pt-3">
+        <ProductActionButton
+          compact
+          tone="secondary"
+          disabled={
+            !chromeAi.enabled ||
+            chromeAi.isChecking ||
+            chromeAi.isSettingUp ||
+            chromeAi.testStatus === 'running'
+          }
+          onClick={() => void chromeAi.handleTest()}
+        >
+          {chromeAi.testStatus === 'running'
+            ? translate('settings.aiProviders.chromeAiTestRunning')
+            : translate('settings.aiProviders.chromeAiTestAction')}
+        </ProductActionButton>
+        {chromeAi.testStatus === 'success' ? (
+          <span className="text-xs text-[var(--sniptale-color-success)]">
+            {translate('settings.aiProviders.chromeAiTestSuccess')}
+          </span>
+        ) : null}
       </div>
     </section>
   );

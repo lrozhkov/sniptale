@@ -35,7 +35,12 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   },
 }));
 
-import { SettingsDragHandle, SettingsRange, SettingsSwitch } from './panel-controls';
+import {
+  SettingsControlRow,
+  SettingsDragHandle,
+  SettingsRange,
+  SettingsSwitch,
+} from './panel-controls';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -113,6 +118,21 @@ function runSettingsPanelControlsSuite() {
     verifySettingsSwitchAndRange
   );
   it('renders the drag handle with caller-provided classes', verifyDragHandleRendering);
+  it('keeps labels, descriptions, and controls in one shared compact row contract', () => {
+    renderElement(
+      <SettingsControlRow label="Language" description="Used throughout the application">
+        <button type="button">Choose</button>
+      </SettingsControlRow>
+    );
+
+    const row = container?.querySelector('[data-ui="settings.control-row"]');
+    expect(row?.textContent).toContain('Language');
+    expect(row?.textContent).toContain('Used throughout the application');
+    expect(row?.className).toContain('max-w-[720px]');
+    expect(row?.querySelector('[data-ui="settings.control-row.value"]')?.className).toContain(
+      'max-w-[280px]'
+    );
+  });
 }
 
 describe('settings-panel-controls', runSettingsPanelControlsSuite);

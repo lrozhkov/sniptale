@@ -1,7 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
-import type { Settings } from '../../../../../contracts/settings';
-import { getCaptureActionOptions, getPresetCountLabel } from './helpers';
+import type { SettingsPatch } from '../../../../../contracts/settings';
+import { getCaptureActionOptions } from './helpers';
 import type { SavePresetsSyncState } from './types';
 
 function buildPresetOptions(sync: SavePresetsSyncState) {
@@ -14,13 +14,12 @@ function buildPresetOptions(sync: SavePresetsSyncState) {
 export function buildSavePresetsViewModel(sync: SavePresetsSyncState) {
   return {
     captureActionOptions: getCaptureActionOptions(),
-    presetCountLabel: getPresetCountLabel(sync.presets.length),
     presetOptions: buildPresetOptions(sync),
   };
 }
 
 export function createSettingsPersister(sync: SavePresetsSyncState) {
-  return async (partialSettings: Partial<Settings>) => {
+  return async (partialSettings: SettingsPatch) => {
     try {
       await sync.updateSettings(partialSettings);
     } catch (error) {

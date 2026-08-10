@@ -1,6 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
 import type { CaptureActionType, SavePreset } from '../../../../../contracts/settings';
-import { getSettingsCountLabel } from '../../../../section-surface/text.helpers.ts';
 
 export function getCaptureActionOptions(): { value: CaptureActionType; label: string }[] {
   return [
@@ -17,14 +16,6 @@ export function getCaptureActionOptions(): { value: CaptureActionType; label: st
       label: translate('savePresets.section.captureActionSaveToLibrary'),
     },
   ];
-}
-
-export function getPresetCountLabel(count: number): string {
-  return getSettingsCountLabel(count, {
-    one: 'savePresets.section.countOne',
-    few: 'savePresets.section.countFew',
-    many: 'savePresets.section.countMany',
-  });
 }
 
 export function isPresetUsed(

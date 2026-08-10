@@ -81,10 +81,7 @@ it('surfaces provider persistence failures back into the form state', async () =
       `${translate('common.states.error')}` +
       `${translate('settings.aiProviders.providerSaveErrorSuffix')}: save failed`,
   });
-  expect(toastErrorMock).toHaveBeenCalledWith(
-    `${translate('common.states.error')}` +
-      `${translate('settings.aiProviders.providerSaveErrorSuffix')}: save failed`
-  );
+  expect(toastErrorMock).not.toHaveBeenCalled();
   expect(setIsSaving).toHaveBeenNthCalledWith(1, true);
   expect(setIsSaving).toHaveBeenLastCalledWith(false);
 });
@@ -114,7 +111,5 @@ it('preserves structured locked-secret mutation reasons in the provider submit e
   expect(setErrors).toHaveBeenCalledWith({
     submit: translate('settings.aiProviders.providerSaveSecretLocked'),
   });
-  expect(toastErrorMock).toHaveBeenCalledWith(
-    translate('settings.aiProviders.providerSaveSecretLocked')
-  );
+  expect(toastErrorMock).not.toHaveBeenCalled();
 });

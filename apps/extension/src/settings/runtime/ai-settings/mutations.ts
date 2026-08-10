@@ -74,6 +74,12 @@ export function deleteAIModel(modelId: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'delete-model', modelId }).then(() => undefined);
 }
 
+export function moveAIModel(modelId: string, beforeModelId: string | null): Promise<void> {
+  return sendAiSettingsMutation({ beforeModelId, modelId, operation: 'move-model' }).then(
+    () => undefined
+  );
+}
+
 export function saveDefaultModelId(defaultModelId: string | null): Promise<void> {
   return sendAiSettingsMutation({
     defaultModelId,
@@ -87,6 +93,16 @@ export function saveGlobalSystemPrompt(prompt: string): Promise<void> {
 
 export function saveScenarioEditorSystemPrompt(prompt: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'save-scenario-editor-prompt', prompt }).then(
+    () => undefined
+  );
+}
+
+export function resetGlobalSystemPrompt(): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'reset-global-prompt' }).then(() => undefined);
+}
+
+export function resetScenarioEditorSystemPrompt(): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'reset-scenario-editor-prompt' }).then(
     () => undefined
   );
 }

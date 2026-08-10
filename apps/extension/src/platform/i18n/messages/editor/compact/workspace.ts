@@ -14,7 +14,7 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     en: 'Backing',
   },
   neutralPresets: {
-    ru: 'Нейтральные пресеты',
+    ru: 'Нейтральные шаблоны',
     en: 'Neutral presets',
   },
   workspaceDefaultHint: {

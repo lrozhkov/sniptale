@@ -88,8 +88,6 @@ it('wires the scenario editor prompt state locally', async () => {
 
   expect(setScenarioEditorPromptState).toHaveBeenCalledWith('Updated scenario');
   expect(promptMocks.saveScenarioPromptMock).toHaveBeenCalledWith('Scenario prompt');
-  expect(promptMocks.toastSuccessMock).toHaveBeenCalledWith(
-    'settings.aiProviders.scenarioEditorPromptSavedMessage'
-  );
+  expect(promptMocks.toastSuccessMock).not.toHaveBeenCalled();
   expect(scenarioEditorPromptRef.current?.style.height).toBe('160px');
 });

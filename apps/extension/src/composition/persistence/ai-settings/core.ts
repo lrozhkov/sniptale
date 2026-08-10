@@ -209,6 +209,12 @@ export async function saveGlobalSystemPrompt(prompt: string): Promise<void> {
   return saveLocalValue(AI_GLOBAL_PROMPT_KEY, prompt, 'Global system prompt saved');
 }
 
+export async function resetGlobalSystemPrompt(): Promise<void> {
+  await initializeAiStorageAccess();
+  await browserStorage.local.remove(AI_GLOBAL_PROMPT_KEY);
+  logger.info('Global system prompt reset');
+}
+
 export async function loadScenarioEditorSystemPrompt(): Promise<string> {
   const result = await browserStorage.local.get([AI_SCENARIO_EDITOR_PROMPT_KEY]);
   return parseStoredSystemPrompt(
@@ -224,4 +230,10 @@ export async function saveScenarioEditorSystemPrompt(prompt: string): Promise<vo
     prompt,
     'Scenario editor system prompt saved'
   );
+}
+
+export async function resetScenarioEditorSystemPrompt(): Promise<void> {
+  await initializeAiStorageAccess();
+  await browserStorage.local.remove(AI_SCENARIO_EDITOR_PROMPT_KEY);
+  logger.info('Scenario editor system prompt reset');
 }

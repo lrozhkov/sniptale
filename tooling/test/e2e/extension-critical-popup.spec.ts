@@ -18,7 +18,6 @@ import {
   POPUP_VIDEO_RESUME_LABEL,
   POPUP_VIDEO_STOP_LABEL,
   POPUP_VIDEO_TAB_LABEL,
-  QUICK_ACTIONS_DISPLAY_MODE_KEY,
   QUICK_ACTIONS_KEY,
   applyHarnessBootstrap,
   VideoMessageType,
@@ -175,7 +174,6 @@ test('popup quick action dispatches a typed runtime message', async ({ page, hos
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
     storage: {
       [QUICK_ACTIONS_KEY]: [createQuickAction(actionName)],
-      [QUICK_ACTIONS_DISPLAY_MODE_KEY]: 'list',
     },
   });
   await openPopupHarness(page, hostOrigin);
@@ -212,7 +210,6 @@ test('popup page access choice hides page actions and unlocks after activation',
     },
     storage: {
       [QUICK_ACTIONS_KEY]: [createQuickAction(actionName)],
-      [QUICK_ACTIONS_DISPLAY_MODE_KEY]: 'list',
     },
   });
   await openPopupHarness(page, hostOrigin);

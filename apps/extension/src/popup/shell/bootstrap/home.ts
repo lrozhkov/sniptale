@@ -1,6 +1,5 @@
-import { getQuickActionsBootstrapData } from '../../../composition/persistence/quick-actions';
-import { DEFAULT_QUICK_ACTIONS_DISPLAY_MODE } from '../../../features/quick-actions-presets/display-mode';
-import type { QuickAction, QuickActionsDisplayMode } from '../../../contracts/settings';
+import { getQuickActions } from '../../../composition/persistence/quick-actions';
+import type { QuickAction } from '../../../contracts/settings';
 import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { trackPopupPerfAsync } from '../../diagnostics/performance';
@@ -22,22 +21,15 @@ type AdvisoryBootstrapLoadResult<TValue> = {
 type PopupHomeBootstrapData = {
   actions: QuickAction[];
   homeError: string | null;
-  quickActionsMode: QuickActionsDisplayMode;
 };
 
 type PopupHomeBootstrapPromises = {
-  quickActionsPromise: Promise<{
-    actions: QuickAction[];
-    displayMode: QuickActionsDisplayMode;
-  }>;
+  quickActionsPromise: Promise<QuickAction[]>;
 };
 
 export function createPopupHomeBootstrapPromises(): PopupHomeBootstrapPromises {
   return {
-    quickActionsPromise: trackPopupPerfAsync(
-      'popup.bootstrap.quick-actions',
-      getQuickActionsBootstrapData
-    ),
+    quickActionsPromise: trackPopupPerfAsync('popup.bootstrap.quick-actions', getQuickActions),
   };
 }
 
@@ -45,10 +37,7 @@ export async function loadPopupHomeBootstrapData(
   promises: PopupHomeBootstrapPromises
 ): Promise<PopupHomeBootstrapData> {
   const advisoryQuickActions = await loadAdvisoryBootstrapValue({
-    fallback: {
-      actions: [],
-      displayMode: DEFAULT_QUICK_ACTIONS_DISPLAY_MODE,
-    },
+    fallback: [],
     failureMessage: 'Failed to bootstrap quick actions',
     warningMessage: translate('popup.home.quickActionsLoadError'),
     task: promises.quickActionsPromise,
@@ -56,8 +45,7 @@ export async function loadPopupHomeBootstrapData(
 
   return {
     homeError: advisoryQuickActions.warning,
-    actions: advisoryQuickActions.value.actions,
-    quickActionsMode: advisoryQuickActions.value.displayMode,
+    actions: advisoryQuickActions.value,
   };
 }
 

@@ -11,7 +11,9 @@ import {
   loadAIProviders,
   loadDefaultModelId,
   lockAISecretProtection,
+  resetGlobalSystemPrompt,
   resetAISecretPassphraseProtection,
+  resetScenarioEditorSystemPrompt,
   saveAIModels,
   saveAIModelGraph,
   saveChromeAiEnabled,
@@ -100,6 +102,29 @@ async function deleteModel(modelId: string): Promise<void> {
   );
 }
 
+async function moveModel(modelId: string, beforeModelId: string | null): Promise<void> {
+  const models = await loadAIModels();
+  const sourceIndex = models.findIndex((model) => model.id === modelId);
+  if (sourceIndex < 0) {
+    throw new Error(`Model ${modelId} not found`);
+  }
+  if (beforeModelId === modelId) return;
+  if (beforeModelId !== null && !models.some((model) => model.id === beforeModelId)) {
+    throw new Error(`Model ${beforeModelId} not found`);
+  }
+
+  const source = models[sourceIndex];
+  if (!source) return;
+  const nextModels = models.filter((model) => model.id !== modelId);
+  const targetIndex =
+    beforeModelId === null
+      ? nextModels.length
+      : nextModels.findIndex((model) => model.id === beforeModelId);
+  nextModels.splice(targetIndex, 0, source);
+  if (nextModels.every((model, index) => model.id === models[index]?.id)) return;
+  await saveAIModels(nextModels);
+}
+
 async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
   if (defaultModelId) {
     const models = await loadAIModels();
@@ -126,12 +151,18 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
       return updateModel(command.model);
     case 'delete-model':
       return deleteModel(command.modelId);
+    case 'move-model':
+      return moveModel(command.modelId, command.beforeModelId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
     case 'save-global-prompt':
       return saveGlobalSystemPrompt(command.prompt);
     case 'save-scenario-editor-prompt':
       return saveScenarioEditorSystemPrompt(command.prompt);
+    case 'reset-global-prompt':
+      return resetGlobalSystemPrompt();
+    case 'reset-scenario-editor-prompt':
+      return resetScenarioEditorSystemPrompt();
     case 'save-chrome-ai-enabled':
       return saveChromeAiEnabled(command.enabled);
     case 'enable-secret-passphrase-protection':

@@ -6,24 +6,16 @@ export const viewportPresetsMessages = defineMessageSource({
       ru: 'Размеры области страницы и окна браузера для снимков и записи',
       en: 'Page viewport and browser window sizes for captures and recordings',
     },
-    defaultLabel: {
-      ru: 'Размер по умолчанию',
-      en: 'Default size',
-    },
     nativeOption: {
       ru: 'Текущий размер',
       en: 'Current size',
     },
-    defaultHint: {
-      ru: 'Используется в селекторах снимка и записи, если помещается на текущем экране',
-      en: 'Used by capture and recording selectors when it fits the current display',
-    },
     savedLabel: {
-      ru: 'Пресеты размеров',
+      ru: 'Шаблоны размеров',
       en: 'Size presets',
     },
     emptyTitle: {
-      ru: 'Нет доступных пресетов',
+      ru: 'Нет доступных шаблонов',
       en: 'No presets available',
     },
     emptyDescription: {
@@ -31,41 +23,29 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'Add a custom page viewport or browser window size',
     },
     addButton: {
-      ru: 'Добавить пресет',
+      ru: 'Добавить шаблон',
       en: 'Add preset',
     },
     deleteTitle: {
-      ru: 'Удалить пресет?',
+      ru: 'Удалить шаблон?',
       en: 'Delete preset?',
     },
     deleteMessagePrefix: {
-      ru: 'Вы уверены, что хотите удалить пресет',
+      ru: 'Вы уверены, что хотите удалить шаблон',
       en: 'Are you sure you want to delete the preset',
     },
     deleteMessageSuffix: {
       ru: '?',
       en: '?',
     },
-    countOne: {
-      ru: 'пресет',
-      en: 'preset',
-    },
-    countFew: {
-      ru: 'пресета',
-      en: 'presets',
-    },
-    countMany: {
-      ru: 'пресетов',
-      en: 'presets',
-    },
   },
   editor: {
     editTitle: {
-      ru: 'Редактировать пресет',
+      ru: 'Редактировать шаблон',
       en: 'Edit preset',
     },
     newTitle: {
-      ru: 'Новый пресет',
+      ru: 'Новый шаблон',
       en: 'New preset',
     },
     nameLabel: {
@@ -118,40 +98,28 @@ export const viewportPresetsMessages = defineMessageSource({
     },
   },
   messages: {
-    defaultUnavailable: {
-      ru: 'Размер по умолчанию сейчас недоступен. Используется текущий размер.',
-      en: 'The default size is unavailable right now. Current size is used instead.',
-    },
-    viewerWindowDisabled: {
-      ru: 'В сохранённом снимке можно изменить только область страницы. Используется текущий размер.',
-      en: 'Only the page viewport can be resized in a saved snapshot. Current size is used instead.',
-    },
-    defaultUpdated: {
-      ru: 'Размер по умолчанию обновлён',
-      en: 'Default size updated',
-    },
     presetUpdated: {
-      ru: 'Пресет обновлён',
+      ru: 'Шаблон обновлён',
       en: 'Preset updated',
     },
     presetCreated: {
-      ru: 'Пресет создан',
+      ru: 'Шаблон создан',
       en: 'Preset created',
     },
     presetDeleted: {
-      ru: 'Пресет удалён',
+      ru: 'Шаблон удалён',
       en: 'Preset deleted',
     },
     presetReset: {
-      ru: 'Системный пресет восстановлен',
+      ru: 'Системный шаблон восстановлен',
       en: 'System preset reset',
     },
     presetEnabled: {
-      ru: 'Пресет включён',
+      ru: 'Шаблон включён',
       en: 'Preset enabled',
     },
     presetDisabled: {
-      ru: 'Пресет выключен',
+      ru: 'Шаблон выключен',
       en: 'Preset disabled',
     },
     updateFailed: {
@@ -179,21 +147,21 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'Outer Chrome size; capture and video dimensions may differ.',
     },
     systemPreset: {
-      ru: 'Системный пресет можно изменить, выключить или восстановить.',
+      ru: 'Системный шаблон можно изменить, выключить или восстановить.',
       en: 'A system preset can be edited, disabled, or reset.',
     },
   },
   actions: {
     enable: {
-      ru: 'Включить пресет',
+      ru: 'Включить шаблон',
       en: 'Enable preset',
     },
     disable: {
-      ru: 'Выключить пресет',
+      ru: 'Выключить шаблон',
       en: 'Disable preset',
     },
     reset: {
-      ru: 'Восстановить системный пресет',
+      ru: 'Восстановить системный шаблон',
       en: 'Reset system preset',
     },
     moveUp: {
@@ -219,7 +187,7 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'The exact video size is checked at start.',
     },
     screenUnsupported: {
-      ru: 'Для записи экрана пресеты недоступны: источник выбирается в системном окне.',
+      ru: 'Для записи экрана шаблоны недоступны: источник выбирается в системном окне.',
       en: 'Presets are unavailable for screen recording because the source is selected by the system picker.',
     },
     cropViewportUnsupported: {
@@ -251,15 +219,15 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'Another operation is already controlling this window size.',
     },
     disabled: {
-      ru: 'Пресет выключен в настройках.',
+      ru: 'Шаблон выключен в настройках.',
       en: 'This preset is disabled in settings.',
     },
     missing: {
-      ru: 'Пресет больше не существует.',
+      ru: 'Шаблон больше не существует.',
       en: 'This preset no longer exists.',
     },
     unsupported: {
-      ru: 'Пресет недоступен в этом режиме.',
+      ru: 'Шаблон недоступен в этом режиме.',
       en: 'This preset is unavailable in this mode.',
     },
     permissionDenied: {
@@ -295,7 +263,7 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'Chrome could not restore the previous size.',
     },
     unavailable: {
-      ru: 'Пресет сейчас недоступен.',
+      ru: 'Шаблон сейчас недоступен.',
       en: 'This preset is currently unavailable.',
     },
   },

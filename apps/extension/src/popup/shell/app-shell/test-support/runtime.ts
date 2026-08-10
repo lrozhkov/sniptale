@@ -70,7 +70,6 @@ function createRuntimeNavigation(overrides: PopupRuntimeStateOverrides) {
 
 function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
   return {
-    displayMode: overrides.displayMode ?? 'list',
     homeError: overrides.homeError ?? null,
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,

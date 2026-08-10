@@ -39,9 +39,11 @@ vi.mock('../../../section-surface/panel-controls', () => ({
   settingsEmptyStateClassName: 'empty-state',
   settingsInfoIconButtonClassName: 'info-button',
   settingsModalFieldSurfaceClassName: 'field-surface',
+  settingsModalClassName: 'settings-modal',
   settingsNeutralBadgeClassName: 'neutral-badge',
   settingsSuccessBadgeClassName: 'success-badge',
   SettingsDragHandle: () => <div data-testid="drag-handle">drag</div>,
+  SettingsControlRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SettingsRange: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="range" {...props} />
   ),

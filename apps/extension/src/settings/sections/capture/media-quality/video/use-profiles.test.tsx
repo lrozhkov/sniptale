@@ -166,6 +166,35 @@ it('deletes a custom profile and clears its selected-profile marker', async () =
   );
 });
 
+it('persists custom profile order and ignores invalid or unchanged moves', async () => {
+  const secondProfile: VideoRecordingProfile = {
+    ...existingProfile,
+    id: 'custom:compact',
+    name: 'Compact',
+  };
+  const settings = {
+    ...DEFAULT_VIDEO_SETTINGS,
+    qualityProfileId: existingProfile.id,
+    qualityProfiles: [existingProfile, secondProfile],
+  };
+  loadVideoSettingsMock.mockResolvedValueOnce(settings);
+  mutateVideoSettingsMock.mockImplementationOnce(async (mutation) => mutation(settings));
+  await renderHarness();
+
+  await act(async () =>
+    requireState().actions.reorderProfile(secondProfile.id, existingProfile.id)
+  );
+  const mutation = mutateVideoSettingsMock.mock.calls[0]?.[0];
+  expect(mutation?.(settings).qualityProfiles).toEqual([secondProfile, existingProfile]);
+
+  mutateVideoSettingsMock.mockClear();
+  await act(async () => requireState().actions.reorderProfile('missing', null));
+  await act(async () =>
+    requireState().actions.reorderProfile(secondProfile.id, existingProfile.id)
+  );
+  expect(mutateVideoSettingsMock).not.toHaveBeenCalled();
+});
+
 it('surfaces load and save failures without replacing the current settings', async () => {
   loadVideoSettingsMock.mockRejectedValueOnce(new Error('load failed'));
   await renderHarness();

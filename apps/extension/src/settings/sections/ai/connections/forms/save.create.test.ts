@@ -57,5 +57,5 @@ it('treats provider create saves without an optional provider object as a normal
   expect(addAIProviderMock).toHaveBeenCalledTimes(1);
   expect(onSave).toHaveBeenCalledTimes(1);
   expect(setErrors).not.toHaveBeenCalled();
-  expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  expect(toastSuccessMock).not.toHaveBeenCalled();
 });

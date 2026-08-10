@@ -49,6 +49,10 @@ it('renders catalog, loading, error, reset, and user delete states', () => {
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
     'settings.collection.defaultBadge'
   );
+  expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).not.toContain('<h2');
+  expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).not.toContain(
+    'highlighter.stepBadgePresets.description'
+  );
   expect(
     renderToStaticMarkup(<StepBadgePresetsPanel controller={{ ...base, isLoading: true }} />)
   ).toContain('common.states.loading');

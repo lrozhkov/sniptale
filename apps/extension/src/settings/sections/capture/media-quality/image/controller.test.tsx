@@ -85,7 +85,7 @@ describe('useImageSettingsSection', () => {
     expect(latestState?.isQualityDisabled).toBe(false);
   });
 
-  it('updates local state and persists format and quality changes', async () => {
+  it('updates local state and persists format changes', async () => {
     const updateSettings = vi.fn().mockResolvedValue(undefined);
     useSettingsStoreMock.mockReturnValue(
       createStoreState({
@@ -103,12 +103,47 @@ describe('useImageSettingsSection', () => {
     expect(latestState?.imageFormat).toBe('webp');
     expect(latestState?.isQualityDisabled).toBe(false);
     expect(updateSettings).toHaveBeenCalledWith({ imageFormat: 'webp' });
+  });
+
+  it('previews quality locally and persists it only on commit', async () => {
+    const updateSettings = vi.fn().mockResolvedValue(undefined);
+    useSettingsStoreMock.mockReturnValue(
+      createStoreState({
+        settings: { imageFormat: 'webp', imageQuality: 85 },
+        updateSettings,
+      })
+    );
+
+    await renderHarness();
+
+    act(() => latestState?.handleQualityPreview(61));
+    expect(latestState?.imageQuality).toBe(61);
+    expect(updateSettings).not.toHaveBeenCalled();
 
     await act(async () => {
-      await latestState?.handleQualityChange(61);
+      await latestState?.handleQualityCommit(61);
     });
 
-    expect(latestState?.imageQuality).toBe(61);
+    expect(updateSettings).toHaveBeenCalledOnce();
     expect(updateSettings).toHaveBeenCalledWith({ imageQuality: 61 });
+  });
+
+  it('restores the persisted quality when a commit fails', async () => {
+    const updateSettings = vi.fn().mockRejectedValue(new Error('save failed'));
+    useSettingsStoreMock.mockReturnValue(
+      createStoreState({
+        settings: { imageFormat: 'jpeg', imageQuality: 85 },
+        updateSettings,
+      })
+    );
+
+    await renderHarness();
+    act(() => latestState?.handleQualityPreview(42));
+
+    await act(async () => {
+      await latestState?.handleQualityCommit(42);
+    });
+
+    expect(latestState?.imageQuality).toBe(85);
   });
 });

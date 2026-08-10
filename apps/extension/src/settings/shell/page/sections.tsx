@@ -4,8 +4,11 @@ import type {
   SettingsSectionId,
 } from '../../../platform/navigation/extension-pages/settings-route/codec';
 import { AppearanceSection } from '../../sections/general/interface-browser';
+import { translate } from '../../../platform/i18n';
+import { SettingsSectionHeader } from '../../section-surface';
 import {
   DEFERRED_SETTINGS_SECTION_LOADERS,
+  SETTINGS_NAV_ITEMS_BY_ID,
   type SettingsSectionModule,
 } from '../navigation/registry';
 
@@ -65,6 +68,16 @@ export function renderSettingsRouteContent(
     <Section
       onViewChange={onViewChange}
       {...(route.view === undefined ? {} : { view: route.view })}
+    />
+  );
+}
+
+export function renderSettingsRouteHeader(section: SettingsSectionId): ReactNode {
+  const item = SETTINGS_NAV_ITEMS_BY_ID[section];
+  return (
+    <SettingsSectionHeader
+      kicker={translate(item.label)}
+      description={translate(item.description)}
     />
   );
 }

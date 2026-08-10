@@ -44,11 +44,7 @@ function getListNode() {
   return listNode;
 }
 
-async function renderQuickActionsBlock(
-  actions: QuickAction[],
-  displayMode: 'hidden' | 'list' = 'list',
-  disabledTitle?: string
-) {
+async function renderQuickActionsBlock(actions: QuickAction[], disabledTitle?: string) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -59,7 +55,6 @@ async function renderQuickActionsBlock(
     root?.render(
       <QuickActionsBlock
         actions={actions}
-        displayMode={displayMode}
         presets={[]}
         {...(disabledTitle === undefined ? {} : { disabledTitle })}
         onTriggerAction={() => undefined}
@@ -148,16 +143,9 @@ function runOverflowBoundarySuite() {
 }
 
 function runVisibilityAndDisabledSuite() {
-  it('renders nothing when quick actions are hidden', async () => {
-    await renderQuickActionsBlock([createQuickAction('action-1')], 'hidden');
-
-    expect(container?.innerHTML).toBe('');
-  });
-
   it('keeps short quick action lists in the stacked layout and forwards the disabled title', async () => {
     await renderQuickActionsBlock(
       [createQuickAction('action-1'), createQuickAction('action-2')],
-      'list',
       'Blocked'
     );
 

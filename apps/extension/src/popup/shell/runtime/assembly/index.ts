@@ -63,7 +63,6 @@ function assemblePopupViewState(
     home: {
       quickActions: state.presets.quickActions,
       quickActionsReady: state.presets.quickActionsReady,
-      displayMode: state.presets.displayMode,
       viewportPresets: state.presets.viewportPresets,
       homeError: state.session.homeError,
     },

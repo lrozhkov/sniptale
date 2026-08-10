@@ -25,7 +25,6 @@ function applyBootstrapSuccess(params: PopupLifecycleBootstrapParams, state: Pop
   params.setViewportPresets(state.viewportPresets);
   params.setQuickActions(state.quickActions);
   params.setQuickActionsReady(true);
-  params.setDisplayMode(state.quickActionsMode);
   params.setVideoSettings(state.videoSettings);
   params.setSelectedPresetId(state.selectedPresetId);
   params.setVideoCaptureMode(state.captureMode);

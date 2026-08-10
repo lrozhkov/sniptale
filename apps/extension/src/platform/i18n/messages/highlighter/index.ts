@@ -25,6 +25,8 @@ export const highlighterMessages = defineMessageSource({
     assignmentLabel: { ru: 'Теги', en: 'Tags' },
     assignmentEmpty: { ru: 'Теги ещё не созданы', en: 'No tags created yet' },
     add: { ru: 'Создать тег', en: 'Create tag' },
+    createTitle: { ru: 'Новый тег', en: 'New tag' },
+    editTitle: { ru: 'Изменить тег', en: 'Edit tag' },
     name: { ru: 'Название тега', en: 'Tag name' },
     usage: { ru: 'Используется: {count}', en: 'Used: {count}' },
     rename: { ru: 'Переименовать', en: 'Rename' },
@@ -304,18 +306,6 @@ export const highlighterMessages = defineMessageSource({
     presetsLabel: {
       ru: 'Шаблоны рамок',
       en: 'Border templates',
-    },
-    countOne: {
-      ru: 'шаблон',
-      en: 'template',
-    },
-    countFew: {
-      ru: 'шаблона',
-      en: 'templates',
-    },
-    countMany: {
-      ru: 'шаблонов',
-      en: 'templates',
     },
     defaultBadge: {
       ru: 'По умолчанию',

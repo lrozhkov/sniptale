@@ -15,7 +15,6 @@ export async function handleAiProviderSecretClear(props: {
 }): Promise<void> {
   try {
     await clearAIProviderSecret(props.providerId);
-    toast.success(translate('settings.aiProviders.providerSecretCleared'));
     await props.reloadData();
   } catch (error) {
     logger.error('Clear provider secret failed', error);

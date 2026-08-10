@@ -40,8 +40,8 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Images and video',
   },
   saving: {
-    ru: 'Сохранение',
-    en: 'Saving',
+    ru: 'Файлы и хранилище',
+    en: 'Files and storage',
   },
   storageDrafts: {
     ru: 'Хранилище и черновики',
@@ -67,12 +67,72 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Доступ и данные',
     en: 'Access and data',
   },
+  descriptions: {
+    interfaceBrowser: {
+      ru: 'Настройте тему, язык и поведение браузерных функций.',
+      en: 'Configure the theme, language, and browser behavior.',
+    },
+    quickActions: {
+      ru: 'Настройте команды захвата и действия, доступные без открытия редактора.',
+      en: 'Configure capture commands and actions available without opening the editor.',
+    },
+    screenSizes: {
+      ru: 'Управляйте готовыми размерами области захвата и значением по умолчанию.',
+      en: 'Manage capture-area sizes and choose the default.',
+    },
+    mediaQuality: {
+      ru: 'Настройте параметры изображений и профили качества видео.',
+      en: 'Configure image settings and video quality profiles.',
+    },
+    saving: {
+      ru: 'Настройте скачивание, рабочие материалы, библиотеку и черновики.',
+      en: 'Configure downloads, working materials, the library, and drafts.',
+    },
+    storageDrafts: {
+      ru: 'Управляйте локальным хранилищем, сроками хранения и черновиками.',
+      en: 'Manage local storage, retention periods, and drafts.',
+    },
+    annotations: {
+      ru: 'Настройте рамки, выноски, нумерацию и теги для аннотаций.',
+      en: 'Configure frames, callouts, numbering, and annotation tags.',
+    },
+    editorResources: {
+      ru: 'Управляйте наборами инструментов и цветовыми палитрами редактора.',
+      en: 'Manage editor tool presets and color palettes.',
+    },
+    aiConnections: {
+      ru: 'Подключите AI-провайдеров и выберите доступные модели.',
+      en: 'Connect AI providers and choose the available models.',
+    },
+    aiPrompts: {
+      ru: 'Настройте системные промпты и шаблоны для повторного использования.',
+      en: 'Configure system prompts and reusable templates.',
+    },
+    voiceInput: {
+      ru: 'Проверьте и настройте голосовой ввод для аннотаций и редакторов.',
+      en: 'Test and configure voice input for annotations and editors.',
+    },
+    nativeApp: {
+      ru: 'Настройте подключение, захват и команды приложения Sniptale.',
+      en: 'Configure connection, capture, and commands for the Sniptale app.',
+    },
+    accessData: {
+      ru: 'Управляйте разрешениями, конфиденциальностью и локальными данными.',
+      en: 'Manage permissions, privacy, and local data.',
+    },
+  },
   views: {
+    settings: { ru: 'Настройки', en: 'Settings' },
+    storage: { ru: 'Хранилище', en: 'Storage' },
+    folderTemplates: { ru: 'Шаблоны папок', en: 'Folder templates' },
+    templates: { ru: 'Шаблоны', en: 'Templates' },
+    prompts: { ru: 'Промпты', en: 'Prompts' },
     image: { ru: 'Изображения', en: 'Images' },
     video: { ru: 'Видео', en: 'Video' },
     borders: { ru: 'Рамки', en: 'Frames' },
     callouts: { ru: 'Выноски', en: 'Callouts' },
     numbering: { ru: 'Нумерация', en: 'Numbering' },
+    tags: { ru: 'Теги', en: 'Tags' },
     tools: { ru: 'Инструменты', en: 'Tools' },
     palettes: { ru: 'Палитры', en: 'Palettes' },
     connection: { ru: 'Подключение', en: 'Connection' },
@@ -95,7 +155,7 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'AI settings',
   },
   presets: {
-    ru: 'Пресеты размеров',
+    ru: 'Шаблоны размеров',
     en: 'Size presets',
   },
   saves: {

@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
 
-import { DEFAULT_QUICK_ACTIONS_DISPLAY_MODE } from '../../../../features/quick-actions-presets/display-mode';
 import type {
   ActiveTabCapabilities,
   CapabilityState,
@@ -117,12 +116,10 @@ function createRuntimePresets(
   overrides: PopupRuntimeStateSliceOverrides
 ): PopupRuntimeStateSlice['presets'] {
   return {
-    displayMode: overrides.displayMode ?? DEFAULT_QUICK_ACTIONS_DISPLAY_MODE,
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,
     selectedPreset: overrides.selectedPreset ?? null,
     selectedPresetId: overrides.selectedPresetId ?? null,
-    setDisplayMode: overrides.setDisplayMode ?? vi.fn(),
     setQuickActions: overrides.setQuickActions ?? vi.fn(),
     setQuickActionsReady: overrides.setQuickActionsReady ?? vi.fn(),
     setSelectedPresetId: overrides.setSelectedPresetId ?? vi.fn(),

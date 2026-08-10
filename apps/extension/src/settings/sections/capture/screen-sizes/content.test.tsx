@@ -59,7 +59,6 @@ let root: Root | null = null;
 
 function createProps() {
   return {
-    defaultField: { onChange: vi.fn().mockResolvedValue(undefined), selectedPresetId: null },
     deletion: {
       close: vi.fn(),
       confirm: vi.fn().mockResolvedValue(undefined),
@@ -74,15 +73,17 @@ function createProps() {
       onSave: vi.fn().mockResolvedValue(undefined),
     },
     list: {
-      countLabel: 'viewportPresets.section.countFew',
       onDelete: vi.fn(),
       onEdit: vi.fn(),
       onMoveBefore: vi.fn().mockResolvedValue(undefined),
       onReset: vi.fn().mockResolvedValue(undefined),
       onToggle: vi.fn().mockResolvedValue(undefined),
-      onSetDefault: vi.fn().mockResolvedValue(undefined),
     },
-    model: { isLoading: false, presets: [viewportOne, viewportTwo, systemWindow] },
+    model: {
+      isLoading: false,
+      isMutating: false,
+      presets: [viewportOne, viewportTwo, systemWindow],
+    },
   };
 }
 
@@ -117,6 +118,8 @@ it('groups viewport/window rows and renders type, size, disabled state, and frie
   expect(container?.textContent).toContain('Tablet');
   expect(container?.textContent).toContain('viewportPresets.messages.presetDisabled');
   expect(container?.textContent).toContain('Custom HD window');
+  expect(container?.textContent).not.toContain('viewportPresets.section.savedLabel');
+  expect(container?.querySelector('[data-collection-direct-action="set-default"]')).toBeNull();
   expect(mocks.dialogs).toHaveBeenCalledWith(
     expect.objectContaining({ editingViewport: viewportOne, viewportConfirmOpen: true })
   );
@@ -177,4 +180,15 @@ it('routes toggle, movement, edit, reset, delete, and add collection intents', (
     )
   );
   expect(container?.textContent).not.toContain('viewportPresets.groups.window');
+});
+
+it('keeps preset rows mounted while a mutation is being persisted', () => {
+  const props = createProps();
+  act(() =>
+    root?.render(<PresetsSectionContent {...props} model={{ ...props.model, isMutating: true }} />)
+  );
+
+  expect(container?.textContent).toContain('Phone');
+  expect(container?.textContent).toContain('Tablet');
+  expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeNull();
 });

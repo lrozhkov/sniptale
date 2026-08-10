@@ -135,6 +135,43 @@ it('adds and updates models only when their provider and model records exist', a
   expect(models).toEqual([{ ...createModel('model-1'), displayName: 'Updated' }]);
 });
 
+it('moves a model before another model or to the end without changing model records', async () => {
+  models = [createModel('model-1'), createModel('model-2'), createModel('model-3')];
+
+  await mutateStoredAISettings({
+    beforeModelId: 'model-1',
+    modelId: 'model-3',
+    operation: 'move-model',
+  });
+  expect(models.map(({ id }) => id)).toEqual(['model-3', 'model-1', 'model-2']);
+
+  await mutateStoredAISettings({
+    beforeModelId: null,
+    modelId: 'model-1',
+    operation: 'move-model',
+  });
+  expect(models.map(({ id }) => id)).toEqual(['model-3', 'model-2', 'model-1']);
+});
+
+it('rejects unknown model reorder targets and skips no-op writes', async () => {
+  models = [createModel('model-1'), createModel('model-2')];
+
+  await expect(
+    mutateStoredAISettings({
+      beforeModelId: 'missing-model',
+      modelId: 'model-1',
+      operation: 'move-model',
+    })
+  ).rejects.toThrow('Model missing-model not found');
+  await mutateStoredAISettings({
+    beforeModelId: 'model-1',
+    modelId: 'model-1',
+    operation: 'move-model',
+  });
+
+  expect(coreMocks.saveAIModels).not.toHaveBeenCalled();
+});
+
 it('rejects an update when the provider exists but the model does not', async () => {
   await expect(
     mutateStoredAISettings({ model: createModel('missing-model'), operation: 'update-model' })

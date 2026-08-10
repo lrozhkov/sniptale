@@ -4,56 +4,31 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const settingsRangePropsMock = vi.hoisted(() => vi.fn());
+const numericRowPropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
   translate: (key: string) => key,
 }));
 
-vi.mock('../../../../section-surface/panel-controls', async (importOriginal) => ({
-  ...(await importOriginal()),
-  settingsCardClassName: 'settings-card',
-}));
-
 vi.mock('../../../../section-surface', async (importOriginal) => ({
   ...(await importOriginal()),
   settingsSectionClassName: 'settings-section',
+  settingsCompactWorkbenchClassName: 'settings-compact-workbench',
   settingsMetaLabelClassName: 'meta-label',
-  SettingsSectionHeader: (props: { description?: string; kicker?: string; title?: string }) => (
-    <div>
-      <span>{props.kicker}</span>
-      {props.title ? <span>{props.title}</span> : null}
-      <span>{props.description}</span>
-    </div>
-  ),
-  SettingsRangeField: ({
-    aside,
-    displaySuffix,
-    displayValue,
-    hint,
-    label,
-    rangeClassName: _rangeClassName,
-    ...props
-  }: React.InputHTMLAttributes<HTMLInputElement> & {
-    aside?: React.ReactNode;
-    displaySuffix?: React.ReactNode;
-    displayValue?: React.ReactNode;
-    hint?: React.ReactNode;
-    label?: React.ReactNode;
-    rangeClassName?: string;
+}));
+
+vi.mock('../../../../../ui/compact-inspector-controls', async (importOriginal) => ({
+  ...(await importOriginal()),
+  NumericRow: (props: {
+    disabled?: boolean;
+    label: string;
+    onCommitValue(value: number): void;
+    onPreviewValue(value: number): void;
+    value: number;
   }) => {
-    settingsRangePropsMock(props);
-    return (
-      <div>
-        <span>{label}</span>
-        <span>{displayValue}</span>
-        <span>{displaySuffix}</span>
-        {aside ? <span>{aside}</span> : null}
-        {hint ? <span>{hint}</span> : null}
-        <input type="range" {...props} />
-      </div>
-    );
+    numericRowPropsMock(props);
+    return <div data-testid="numeric-row">{props.label}</div>;
   },
 }));
 
@@ -83,7 +58,8 @@ function createState(overrides: Partial<ImageSettingsState> = {}): ImageSettings
     isLoading: false,
     isQualityDisabled: false,
     handleFormatChange: vi.fn(),
-    handleQualityChange: vi.fn(),
+    handleQualityCommit: vi.fn(),
+    handleQualityPreview: vi.fn(),
     ...overrides,
   } as ImageSettingsState;
 }
@@ -98,16 +74,16 @@ afterEach(async () => {
 });
 
 describe('ImageSettingsSectionContent', () => {
-  it('renders format cards, tips, and forwards user actions', async () => {
+  it('renders compact format and quality controls and forwards user actions', async () => {
     const state = createState({ isLoading: true });
 
     await renderWithState(state);
 
-    expect(container?.textContent).toContain('settings.navigation.image');
-    expect(container?.textContent).toContain('imageSettings.section.subtitle');
-    expect(container?.textContent).toContain('imageSettings.section.saving');
+    expect(container?.textContent).not.toContain('imageSettings.section.saving');
+    expect(container?.firstElementChild?.className).toContain('settings-compact-workbench');
+    expect(container?.firstElementChild?.className).not.toContain('!max-w-[560px]');
     expect(container?.textContent).toContain('imageSettings.section.formatWebpLabel');
-    expect(container?.textContent).toContain('imageSettings.section.tipQuality');
+    expect(container?.querySelector('ul')).toBeNull();
 
     const buttons = Array.from(container?.querySelectorAll('button') ?? []);
     await act(async () => {
@@ -115,16 +91,19 @@ describe('ImageSettingsSectionContent', () => {
     });
 
     await act(async () => {
-      const lastRangeProps = settingsRangePropsMock.mock.lastCall?.[0] as
-        | React.InputHTMLAttributes<HTMLInputElement>
+      const lastNumericProps = numericRowPropsMock.mock.lastCall?.[0] as
+        | {
+            onCommitValue(value: number): void;
+            onPreviewValue(value: number): void;
+          }
         | undefined;
-      lastRangeProps?.onChange?.({
-        target: { value: '91' },
-      } as React.ChangeEvent<HTMLInputElement>);
+      lastNumericProps?.onPreviewValue(91);
+      lastNumericProps?.onCommitValue(91);
     });
 
     expect(state.handleFormatChange).toHaveBeenCalledWith('png');
-    expect(state.handleQualityChange).toHaveBeenCalledWith(91);
+    expect(state.handleQualityPreview).toHaveBeenCalledWith(91);
+    expect(state.handleQualityCommit).toHaveBeenCalledWith(91);
   });
 });
 
@@ -138,18 +117,15 @@ describe('ImageSettingsSectionContent quality states', () => {
       })
     );
 
-    expect(container?.textContent).toContain('imageSettings.section.qualityUnavailable');
-    expect(container?.textContent).toContain('imageSettings.section.qualityLosslessDescription');
-    expect(container?.textContent).toContain('100%');
+    expect(numericRowPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: true, value: 100 })
+    );
   });
 
-  it.each([
-    [95, 'imageSettings.section.qualityHighDescription'],
-    [75, 'imageSettings.section.qualityBalancedDescription'],
-    [55, 'imageSettings.section.qualityMediumDescription'],
-    [25, 'imageSettings.section.qualityLowDescription'],
-  ])('renders the correct quality description for %s', async (imageQuality, expectedKey) => {
-    await renderWithState(createState({ imageQuality }));
-    expect(container?.textContent).toContain(expectedKey);
+  it('passes the current lossy quality to the numeric scrubber', async () => {
+    await renderWithState(createState({ imageQuality: 73 }));
+    expect(numericRowPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: false, value: 73, unit: '%' })
+    );
   });
 });

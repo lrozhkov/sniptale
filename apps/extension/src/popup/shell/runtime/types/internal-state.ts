@@ -1,10 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../../features/media-hub/storage-capacity';
 import type {
@@ -31,14 +27,12 @@ interface PopupRuntimeSessionState {
 interface PopupRuntimePresetState {
   quickActions: QuickAction[];
   quickActionsReady: boolean;
-  displayMode: QuickActionsDisplayMode;
   viewportPresets: ViewportPreset[];
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
-  setDisplayMode: Dispatch<SetStateAction<QuickActionsDisplayMode>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;

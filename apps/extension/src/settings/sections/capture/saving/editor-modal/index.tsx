@@ -4,6 +4,7 @@ import { resolveSavePresetEditorTitle } from './copy';
 import { SavePresetEditorFields } from './fields';
 import { useSavePresetEditorState } from './state';
 import type { SavePresetEditorModalProps } from './types';
+import { settingsModalClassName } from '../../../../section-surface';
 
 /**
  * Modal editor for a single save preset.
@@ -18,7 +19,14 @@ export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
   };
 
   return (
-    <ProductModal isOpen onClose={props.onClose} width="420px" maxHeight="85vh" scrollable>
+    <ProductModal
+      isOpen
+      onClose={props.onClose}
+      width="400px"
+      maxHeight="85vh"
+      scrollable
+      dialogClassName={settingsModalClassName}
+    >
       <ProductModalHeader
         compact
         title={resolveSavePresetEditorTitle(props.preset)}

@@ -1,10 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
 import type { StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
 import type {
   CaptureMode,
@@ -23,7 +19,6 @@ export type PopupLifecycleBootstrapParams = {
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
-  setDisplayMode: Dispatch<SetStateAction<QuickActionsDisplayMode>>;
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;

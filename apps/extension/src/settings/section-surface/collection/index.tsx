@@ -42,7 +42,9 @@ export function SettingsCollection(props: SettingsCollectionProps) {
         groups={reorder.groups}
         reorder={reorder}
         openMenuItemId={openMenuItemId}
-        onOpenMenuItemChange={setOpenMenuItemId}
+        onMenuOpenChange={(itemId, open) =>
+          setOpenMenuItemId((current) => (open ? itemId : current === itemId ? null : current))
+        }
       />
     </section>
   );

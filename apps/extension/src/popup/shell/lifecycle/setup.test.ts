@@ -64,7 +64,6 @@ function createBootstrapState() {
     microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
     webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
-    quickActionsMode: 'grid' as const,
     recordingControlCapability: null,
     recordingState: { status: 'idle' } as const,
     selectedPresetId: 'preset-1',
@@ -94,7 +93,6 @@ function createParams(): PopupLifecycleParams {
     bootstrap: {
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
-      setDisplayMode: vi.fn(),
       setHomeError: vi.fn(),
       setPage: vi.fn(),
       setIsReady: vi.fn(),
@@ -149,7 +147,6 @@ function expectBootstrappedStateApplied(
   expect(params.bootstrap.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
   expect(params.bootstrap.setQuickActions).toHaveBeenCalledWith(state.quickActions);
   expect(params.bootstrap.setQuickActionsReady).toHaveBeenCalledWith(true);
-  expect(params.bootstrap.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
   expect(params.bootstrap.setHomeError).toHaveBeenCalledWith(null);
   expect(params.bootstrap.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
   expect(params.bootstrap.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);

@@ -4,12 +4,12 @@ import { translate } from '../../../../../platform/i18n';
 import type { HotkeyConfig } from '../../../../../contracts/settings';
 import { formatHotkey } from '../../../../../features/keyboard-shortcuts/hotkey-format';
 import {
+  getQuickActionHotkeyValidationFailure,
   hotkeyEventToConfig,
-  isHotkeyReserved,
-  hotkeyToKeyString,
+  type QuickActionHotkeyValidationFailure,
 } from '../../../../../features/keyboard-shortcuts/hotkeys';
 
-// policyStateIds: [] - reserved shortcut keys are immutable UI validation policy,
+// policyStateIds: [] - shortcut assignment rules are immutable UI validation policy,
 // not mutable capability or authorization state.
 
 export interface HotkeyKeyboardEvent {
@@ -28,46 +28,6 @@ export interface HotkeyMouseEvent {
   stopPropagation: () => void;
 }
 
-const RESERVED_KEYS = new Set([
-  'F5',
-  'F11',
-  'F12',
-  'Escape',
-  'Tab',
-  'Enter',
-  'Ctrl+T',
-  'Ctrl+W',
-  'Ctrl+N',
-  'Ctrl+R',
-  'Ctrl+Tab',
-  'Ctrl+Shift+T',
-  'Ctrl+Shift+Tab',
-  'Ctrl+Shift+N',
-  'Ctrl+L',
-  'Ctrl+O',
-  'Ctrl+P',
-  'Ctrl+S',
-  'Ctrl+F',
-  'Ctrl+G',
-  'Ctrl+H',
-  'Ctrl+J',
-  'Ctrl+K',
-  'Ctrl+D',
-  'Alt+F4',
-  'Alt+Tab',
-  'Alt+F4',
-  'Cmd+T',
-  'Cmd+W',
-  'Cmd+N',
-  'Cmd+R',
-  'Cmd+Shift+T',
-  'Cmd+Shift+N',
-  'Cmd+L',
-  'Cmd+P',
-  'Cmd+S',
-  'Cmd+F',
-]);
-
 function buildHotkeyFromEvent(event: HotkeyKeyboardEvent): HotkeyConfig {
   return hotkeyEventToConfig(event);
 }
@@ -82,13 +42,13 @@ function useHotkeyDisplayValue(value?: HotkeyConfig | null) {
   return { displayValue, setDisplayValue };
 }
 
-function useReservedHotkeyDisplayReset(
+function useHotkeyFeedbackDisplayReset(
   setDisplayValue: React.Dispatch<React.SetStateAction<string>>,
   value?: HotkeyConfig | null
 ) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearReservedDisplayReset = useCallback(() => {
+  const clearFeedbackDisplayReset = useCallback(() => {
     if (timeoutRef.current === null) {
       return;
     }
@@ -97,20 +57,33 @@ function useReservedHotkeyDisplayReset(
     timeoutRef.current = null;
   }, []);
 
-  const scheduleReservedDisplayReset = useCallback(() => {
-    clearReservedDisplayReset();
+  const scheduleFeedbackDisplayReset = useCallback(() => {
+    clearFeedbackDisplayReset();
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
       setDisplayValue(value ? formatHotkey(value) : '');
     }, 1500);
-  }, [clearReservedDisplayReset, setDisplayValue, value]);
+  }, [clearFeedbackDisplayReset, setDisplayValue, value]);
 
-  useEffect(() => clearReservedDisplayReset, [clearReservedDisplayReset]);
+  useEffect(() => clearFeedbackDisplayReset, [clearFeedbackDisplayReset]);
 
   return {
-    clearReservedDisplayReset,
-    scheduleReservedDisplayReset,
+    clearFeedbackDisplayReset,
+    scheduleFeedbackDisplayReset,
   };
+}
+
+function getHotkeyValidationMessage(failure: QuickActionHotkeyValidationFailure): string {
+  if (failure === 'modifier-required') {
+    return translate('settings.hotkeyInput.modifierRequired');
+  }
+  if (failure === 'altgr-conflict') {
+    return translate('settings.hotkeyInput.altGrConflict');
+  }
+  if (failure === 'unsupported-key') {
+    return translate('settings.hotkeyInput.unsupportedKey');
+  }
+  return translate('settings.hotkeyInput.reservedCombination');
 }
 
 interface UseHotkeyInputControllerArgs {
@@ -120,52 +93,44 @@ interface UseHotkeyInputControllerArgs {
 }
 
 function useHotkeyKeyDownHandler({
-  clearReservedDisplayReset,
+  clearFeedbackDisplayReset,
   onChange,
   onError,
-  scheduleReservedDisplayReset,
+  scheduleFeedbackDisplayReset,
   setDisplayValue,
 }: UseHotkeyInputControllerArgs & {
-  clearReservedDisplayReset: () => void;
-  scheduleReservedDisplayReset: () => void;
+  clearFeedbackDisplayReset: () => void;
+  scheduleFeedbackDisplayReset: () => void;
   setDisplayValue: React.Dispatch<React.SetStateAction<string>>;
 }) {
   return useCallback(
     (event: HotkeyKeyboardEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      clearReservedDisplayReset();
+      clearFeedbackDisplayReset();
 
       if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) {
         return false;
       }
 
       if (event.key === 'Escape') {
-        onChange(null);
         return true;
       }
 
       const hotkey = buildHotkeyFromEvent(event);
-      const isFunctionKey = /^F\d+$/.test(event.key);
-      const hasModifier = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
-
-      if (!hasModifier && !isFunctionKey) {
-        onError?.(translate('settings.hotkeyInput.modifierRequired'));
-        return false;
-      }
-
-      const keyString = hotkeyToKeyString(hotkey);
-      if (RESERVED_KEYS.has(keyString) || isHotkeyReserved(hotkey)) {
-        onError?.(translate('settings.hotkeyInput.reservedCombination'));
-        setDisplayValue(translate('settings.hotkeyInput.reservedDisplay'));
-        scheduleReservedDisplayReset();
+      const validationFailure = getQuickActionHotkeyValidationFailure(hotkey);
+      if (validationFailure) {
+        const message = getHotkeyValidationMessage(validationFailure);
+        onError?.(message);
+        setDisplayValue(message);
+        scheduleFeedbackDisplayReset();
         return false;
       }
 
       onChange(hotkey);
       return true;
     },
-    [clearReservedDisplayReset, onChange, onError, scheduleReservedDisplayReset, setDisplayValue]
+    [clearFeedbackDisplayReset, onChange, onError, scheduleFeedbackDisplayReset, setDisplayValue]
   );
 }
 
@@ -186,16 +151,16 @@ export function useHotkeyInputController({
   value,
 }: UseHotkeyInputControllerArgs) {
   const focusState = useHotkeyFocusState();
-  const inputRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLButtonElement>(null);
   const { displayValue, setDisplayValue } = useHotkeyDisplayValue(value);
-  const { clearReservedDisplayReset, scheduleReservedDisplayReset } = useReservedHotkeyDisplayReset(
+  const { clearFeedbackDisplayReset, scheduleFeedbackDisplayReset } = useHotkeyFeedbackDisplayReset(
     setDisplayValue,
     value
   );
   const baseHandleKeyDown = useHotkeyKeyDownHandler({
-    clearReservedDisplayReset,
+    clearFeedbackDisplayReset,
     onChange,
-    scheduleReservedDisplayReset,
+    scheduleFeedbackDisplayReset,
     setDisplayValue,
     ...(onError === undefined ? {} : { onError }),
   });
@@ -214,10 +179,10 @@ export function useHotkeyInputController({
     (event: HotkeyMouseEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      clearReservedDisplayReset();
+      clearFeedbackDisplayReset();
       onChange(null);
     },
-    [clearReservedDisplayReset, onChange]
+    [clearFeedbackDisplayReset, onChange]
   );
 
   return {

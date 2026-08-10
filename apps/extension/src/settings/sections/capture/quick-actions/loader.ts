@@ -1,38 +1,23 @@
 import { useEffect } from 'react';
 
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { QuickAction, QuickActionsDisplayMode } from '../../../../contracts/settings';
-import {
-  getQuickActions,
-  getQuickActionsDisplayMode,
-} from '../../../../composition/persistence/quick-actions';
+import type { QuickAction } from '../../../../contracts/settings';
+import { getQuickActions } from '../../../../composition/persistence/quick-actions';
 
 const logger = createLogger({ namespace: 'SettingsQuickActions' });
 
-async function loadQuickActionsState() {
-  const [loadedActions, loadedDisplayMode] = await Promise.all([
-    getQuickActions(),
-    getQuickActionsDisplayMode(),
-  ]);
-
-  return { loadedActions, loadedDisplayMode };
-}
-
 export function useQuickActionsLoader(props: {
   setActions: (actions: QuickAction[]) => void;
-  setDisplayModeState: (value: QuickActionsDisplayMode) => void;
   setIsLoading: (value: boolean) => void;
 }) {
-  const { setActions, setDisplayModeState, setIsLoading } = props;
+  const { setActions, setIsLoading } = props;
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
 
       try {
-        const { loadedActions, loadedDisplayMode } = await loadQuickActionsState();
-        setActions(loadedActions);
-        setDisplayModeState(loadedDisplayMode);
+        setActions(await getQuickActions());
       } catch (error) {
         logger.error('Failed to load quick actions', error);
       } finally {
@@ -41,5 +26,5 @@ export function useQuickActionsLoader(props: {
     };
 
     void loadData();
-  }, [setActions, setDisplayModeState, setIsLoading]);
+  }, [setActions, setIsLoading]);
 }

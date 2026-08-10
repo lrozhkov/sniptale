@@ -8,11 +8,7 @@ import {
   getFormActionRowClassName,
 } from '@sniptale/ui/control-language';
 import { requestLocalExtensionDataErasure } from '../../../../runtime/privacy-erasure-client';
-import {
-  SettingsSectionHeader,
-  settingsPanelClassName,
-  settingsSectionClassName,
-} from '../../../../section-surface';
+import { settingsPanelClassName, settingsSectionClassName } from '../../../../section-surface';
 
 type PrivacyAction = 'delete-local-data' | 'factory-reset';
 type PrivacyStatus = { kind: 'error' | 'success'; message: string } | null;
@@ -150,12 +146,6 @@ export function PrivacySection() {
 
   return (
     <section className={settingsSectionClassName}>
-      <SettingsSectionHeader
-        kicker={translate('settings.privacy.kicker')}
-        title={translate('settings.privacy.title')}
-        description={translate('settings.privacy.description')}
-      />
-
       <div className={[settingsPanelClassName, 'space-y-5'].join(' ')}>
         <PrivacyDataClasses />
         <PrivacyActionRow

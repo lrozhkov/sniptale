@@ -44,7 +44,6 @@ export async function saveEditedQuickAction(props: {
   editForm: QuickAction | null;
   onPersist: (actions: QuickAction[]) => Promise<boolean>;
   onResetEditor: () => void;
-  onConfirm: (message: string) => void;
 }) {
   if (!props.editForm) {
     return;
@@ -71,21 +70,13 @@ export async function saveEditedQuickAction(props: {
     return;
   }
 
-  props.onConfirm(
-    translate(
-      existingIndex >= 0
-        ? 'settings.quickActions.messageUpdated'
-        : 'settings.quickActions.messageCreated'
-    )
-  );
   props.onResetEditor();
 }
 
 export async function deleteQuickAction(
   actions: QuickAction[],
   id: string,
-  onPersist: (actions: QuickAction[]) => Promise<boolean>,
-  onConfirm: (message: string) => void
+  onPersist: (actions: QuickAction[]) => Promise<boolean>
 ) {
   const action = actions.find((candidate) => candidate.id === id);
 
@@ -93,9 +84,5 @@ export async function deleteQuickAction(
     return;
   }
 
-  const wasPersisted = await onPersist(actions.filter((action) => action.id !== id));
-  if (!wasPersisted) {
-    return;
-  }
-  onConfirm(translate('settings.quickActions.messageDeleted'));
+  await onPersist(actions.filter((action) => action.id !== id));
 }

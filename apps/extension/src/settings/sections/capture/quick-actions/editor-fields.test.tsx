@@ -172,6 +172,23 @@ function verifyQuickActionEditorFieldInteractions() {
   expect(state.updateFormField).toHaveBeenCalledWith('viewportPresetId', null);
   expect(state.updateFormField).toHaveBeenCalledWith('delay', 5);
   expect(state.updateFormField).toHaveBeenCalledWith('delay', null);
+
+  const selectProps = productSelectPropsSpy.mock.calls.map(([props]) => props);
+  expect(selectProps).toEqual(
+    expect.arrayContaining([expect.objectContaining({ controlSize: 'sm' })])
+  );
+  expect(
+    selectProps.find((props) =>
+      props.options.some((option: { value: string }) => option.value === 'preset-1')
+    )
+  ).toEqual(
+    expect.objectContaining({
+      controlSize: 'sm',
+      menuClassName: '!max-h-52',
+      menuPlacement: 'auto',
+      menuScrollable: true,
+    })
+  );
 }
 
 describe('quick-actions-editor-fields', () => {

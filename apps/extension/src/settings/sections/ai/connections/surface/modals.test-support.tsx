@@ -72,7 +72,10 @@ export function createSubmittingState<
   };
 }
 
-export type AiProvidersSectionStateOverrides = Partial<Omit<AiProvidersSectionState, 'modals'>> & {
+export type AiProvidersSectionStateOverrides = Partial<
+  Omit<AiProvidersSectionState, 'catalogActions' | 'modals'>
+> & {
+  catalogActions?: Partial<AiProvidersSectionState['catalogActions']>;
   modals?: Partial<AiProvidersSectionState['modals']>;
 };
 
@@ -90,6 +93,13 @@ export function createBaseSectionState(
     setConfirmDelete: vi.fn(),
   };
   const baseState: AiProvidersSectionState = {
+    catalogActions: {
+      clearProviderSecret: vi.fn().mockResolvedValue(undefined),
+      deleteModel: vi.fn().mockResolvedValue(undefined),
+      deleteProvider: vi.fn().mockResolvedValue(undefined),
+      moveModel: vi.fn().mockResolvedValue(undefined),
+      setDefaultModel: vi.fn().mockResolvedValue(undefined),
+    },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
@@ -98,10 +108,6 @@ export function createBaseSectionState(
     isLoading: false,
     modelOptions: [],
     modals: baseModals,
-    handleDefaultModelChange: vi.fn().mockResolvedValue(undefined),
-    handleClearProviderSecret: vi.fn().mockResolvedValue(undefined),
-    handleDeleteProvider: vi.fn().mockResolvedValue(undefined),
-    handleDeleteModel: vi.fn().mockResolvedValue(undefined),
     reloadData: vi.fn().mockResolvedValue(undefined),
     getProviderName: vi.fn(() => PROVIDER.name),
   };
@@ -109,6 +115,7 @@ export function createBaseSectionState(
   return {
     ...baseState,
     ...overrides,
+    catalogActions: { ...baseState.catalogActions, ...(overrides.catalogActions ?? {}) },
     modals: { ...baseModals, ...(overrides.modals ?? {}) },
   };
 }

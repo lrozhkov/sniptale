@@ -84,8 +84,6 @@ it('wires the global prompt state locally', async () => {
 
   expect(setGlobalPromptState).toHaveBeenCalledWith('Updated global');
   expect(promptMocks.saveGlobalPromptMock).toHaveBeenCalledWith('Global prompt');
-  expect(promptMocks.toastSuccessMock).toHaveBeenCalledWith(
-    'settings.aiProviders.globalPromptSavedMessage'
-  );
+  expect(promptMocks.toastSuccessMock).not.toHaveBeenCalled();
   expect(globalPromptRef.current?.style.height).toBe('160px');
 });

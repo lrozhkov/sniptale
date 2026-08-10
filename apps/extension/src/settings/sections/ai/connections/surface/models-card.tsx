@@ -1,4 +1,4 @@
-import { Cpu } from 'lucide-react';
+import { useState } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -10,23 +10,25 @@ import type { AiProvidersSectionState } from '../controller/types';
 import { getAiModelPromptLabel } from './helpers';
 
 export function AIProvidersModelsCard(props: { state: AiProvidersSectionState }) {
+  const [movingModelId, setMovingModelId] = useState<string | null>(null);
   const items: readonly SettingsCollectionItem[] = props.state.models.map((model) => ({
     id: model.id,
     title: model.displayName,
     meta: `${props.state.getProviderName(model.providerId)} · ${model.modelCode} · ${getAiModelPromptLabel(model)}`,
-    preview: <Cpu size={16} />,
     isDefault: props.state.defaultModelId === model.id,
+    busy: movingModelId === model.id,
     capabilities: {
       edit: true,
       setDefault: props.state.defaultModelId !== model.id,
       delete: true,
+      reorder: movingModelId === null,
     },
   }));
   const byId = new Map(props.state.models.map((model) => [model.id, model]));
   const onAction = (action: SettingsCollectionAction) => {
     const model = byId.get(action.itemId);
     if (!model) return;
-    if (action.type === 'set-default') void props.state.handleDefaultModelChange(model.id);
+    if (action.type === 'set-default') void props.state.catalogActions.setDefaultModel(model.id);
     if (action.type === 'edit') props.state.modals.openModelModal(model);
     if (action.type === 'delete')
       props.state.modals.setConfirmDelete({ type: 'model', item: model });
@@ -55,6 +57,13 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
         onInvoke: () => props.state.modals.openModelModal(),
       }}
       onAction={onAction}
+      onMove={(intent) => {
+        if (movingModelId !== null) return;
+        setMovingModelId(intent.itemId);
+        void props.state.catalogActions
+          .moveModel(intent.itemId, intent.beforeItemId)
+          .finally(() => setMovingModelId(null));
+      }}
     />
   );
 }

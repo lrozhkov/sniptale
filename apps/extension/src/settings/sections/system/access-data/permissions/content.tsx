@@ -1,7 +1,7 @@
 import { AlertCircle } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
-import { settingsSectionClassName, SettingsSectionHeader } from '../../../../section-surface';
+import { settingsSectionClassName } from '../../../../section-surface';
 import { getPermissionContent, type PermissionInfo, type PermissionState } from './permissions-lib';
 import { RequiredManifestPermissionDisclosureList } from './required-disclosure-list';
 import { DISABLED_PERMISSION_BORDER_CLASS_NAME } from './content.constants.ts';
@@ -19,18 +19,12 @@ const requestButtonClassName = [
 ].join(' ');
 
 const permissionCardClassName = [
-  'flex items-center justify-between rounded-[18px] border p-5 transition-colors',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,var(--sniptale-color-surface-canvas)_18%)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-subtle)_34%,transparent)]',
-  'hover:border-[var(--sniptale-color-border-strong)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_54%,transparent)]',
+  'flex items-center justify-between border-b px-4 py-3 transition-colors last:border-b-0',
+  'border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
 const permissionIconClassName = [
-  'flex-shrink-0 rounded-full border p-3 shadow-inner',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-muted)_78%,transparent)]',
+  'flex h-8 w-8 flex-shrink-0 items-center justify-center',
   'text-[var(--sniptale-color-success)]',
 ].join(' ');
 
@@ -169,14 +163,16 @@ function PermissionStatusChecks(props: {
           {translate('settings.permissions.statusChecksDescription')}
         </p>
       </div>
-      {props.permissions.map((permission) => (
-        <PermissionCard
-          key={permission.id}
-          permission={permission}
-          onRequestPermission={props.onRequestPermission}
-          onRevokePermission={props.onRevokePermission}
-        />
-      ))}
+      <div className="overflow-hidden rounded-[12px] border border-[var(--sniptale-color-border-soft)]">
+        {props.permissions.map((permission) => (
+          <PermissionCard
+            key={permission.id}
+            permission={permission}
+            onRequestPermission={props.onRequestPermission}
+            onRevokePermission={props.onRevokePermission}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -205,11 +201,6 @@ export function PermissionsSectionContent(props: {
 }) {
   return (
     <div className={settingsSectionClassName}>
-      <SettingsSectionHeader
-        description={translate('settings.permissions.subtitle')}
-        kicker={translate('settings.navigation.permissions')}
-      />
-
       <PermissionStatusChecks
         permissions={props.permissions}
         onRequestPermission={props.onRequestPermission}

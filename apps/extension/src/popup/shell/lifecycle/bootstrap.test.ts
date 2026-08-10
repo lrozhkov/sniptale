@@ -37,7 +37,6 @@ function createParams() {
   return {
     refreshActiveTabCapabilities: vi.fn(async () => undefined),
     refreshGalleryStatus: vi.fn(async () => undefined),
-    setDisplayMode: vi.fn(),
     setHomeError: vi.fn(),
     setPage: vi.fn(),
     setIsReady: vi.fn(),
@@ -73,7 +72,6 @@ function createBootstrapState() {
     microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
     webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
-    quickActionsMode: 'grid' as const,
     recordingControlCapability: null,
     recordingStatusError: 'recording state unavailable',
     recordingState: { status: 'idle' } as const,
@@ -106,7 +104,6 @@ function expectBootstrappedStateApplied(
   expect(params.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
   expect(params.setQuickActions).toHaveBeenCalledWith(state.quickActions);
   expect(params.setQuickActionsReady).toHaveBeenCalledWith(true);
-  expect(params.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
   expect(params.setHomeError).toHaveBeenCalledWith(null);
   expect(params.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
   expect(params.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);

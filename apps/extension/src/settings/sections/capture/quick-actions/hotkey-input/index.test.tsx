@@ -68,14 +68,22 @@ async function verifyExistingShortcutRendering() {
 
   const onChange = vi.fn();
   const onError = vi.fn();
-  await renderInput(<HotkeyInput value={null} onChange={onChange} onError={onError} />);
+  await renderInput(
+    <HotkeyInput
+      value={{ altKey: false, ctrlKey: true, key: 'K', metaKey: false, shiftKey: true }}
+      onChange={onChange}
+      onError={onError}
+    />
+  );
 
-  const field = container?.querySelector('[tabindex="0"]') as HTMLDivElement;
+  const field = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="settings.quick-actions.hotkey-recorder"]'
+  );
 
   act(() => {
-    field.focus();
-    field.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    field.blur();
+    field?.focus();
+    field?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    field?.blur();
     container
       ?.querySelector<HTMLButtonElement>('button[title="settings.hotkeyInput.clearTitle"]')
       ?.click();
@@ -86,7 +94,11 @@ async function verifyExistingShortcutRendering() {
   expect(handleKeyDown).toHaveBeenCalled();
   expect(handleBlur).toHaveBeenCalled();
   expect(handleClear).toHaveBeenCalled();
-  expect(useHotkeyInputControllerSpy).toHaveBeenCalledWith({ onChange, onError, value: null });
+  expect(useHotkeyInputControllerSpy).toHaveBeenCalledWith({
+    onChange,
+    onError,
+    value: { altKey: false, ctrlKey: true, key: 'K', metaKey: false, shiftKey: true },
+  });
 }
 
 async function verifyRecordingStateRendering() {
@@ -104,6 +116,10 @@ async function verifyRecordingStateRendering() {
 
   expect(container?.textContent).toContain('settings.hotkeyInput.recordingPlaceholder');
   expect(container?.textContent).toContain('settings.hotkeyInput.recordingHint');
+  expect(container?.querySelector('[role="status"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[data-ui="settings.quick-actions.hotkey-recorder"]')?.tagName
+  ).toBe('BUTTON');
   expect(container?.querySelector('button[title="settings.hotkeyInput.clearTitle"]')).toBeNull();
 }
 

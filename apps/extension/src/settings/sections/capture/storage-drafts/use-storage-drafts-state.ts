@@ -47,7 +47,6 @@ export function useStorageDraftsState() {
     try {
       const next = await patchSettings({ localStoragePolicy: patch });
       setPolicy(next.localStoragePolicy);
-      showToast(translate('settings.storageDrafts.saved'), 'success');
     } catch {
       showToast(translate('settings.storageDrafts.error'), 'error');
     } finally {

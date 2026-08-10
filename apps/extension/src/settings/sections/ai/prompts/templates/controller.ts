@@ -7,18 +7,26 @@ import { usePromptTemplates } from '../../../../../features/prompt-templates/hoo
  * Owns settings prompt template CRUD and modal flows.
  */
 export function useTemplatesSection() {
-  const { templates, isLoading, isMutating, error, addTemplate, updateTemplate, removeTemplate } =
-    usePromptTemplates();
+  const {
+    templates,
+    isLoading,
+    isMutating,
+    error,
+    addTemplate,
+    updateTemplate,
+    templateLifecycle,
+  } = usePromptTemplates();
   const editorState = useTemplateEditorState();
   const deleteState = useTemplateDeleteState();
-  const { confirmDelete, handleSaveTemplate } = useTemplateActions(
+  const { confirmDelete, handleResetTemplate, handleSaveTemplate } = useTemplateActions(
     editorState.editingTemplate === undefined
       ? {
           addTemplate,
           closeDeleteDialog: deleteState.closeDeleteDialog,
           closeTemplateEditor: editorState.closeTemplateEditor,
           confirmState: deleteState.confirmState,
-          removeTemplate,
+          removeTemplate: templateLifecycle.remove,
+          resetTemplate: templateLifecycle.restoreSystem,
           updateTemplate,
         }
       : {
@@ -27,7 +35,8 @@ export function useTemplatesSection() {
           closeTemplateEditor: editorState.closeTemplateEditor,
           confirmState: deleteState.confirmState,
           editingTemplate: editorState.editingTemplate,
-          removeTemplate,
+          removeTemplate: templateLifecycle.remove,
+          resetTemplate: templateLifecycle.restoreSystem,
           updateTemplate,
         }
   );
@@ -36,12 +45,16 @@ export function useTemplatesSection() {
     confirmDelete,
     confirmState: deleteState.confirmState,
     editingTemplate: editorState.editingTemplate,
-    handleDeleteTemplate: deleteState.openDeleteDialog,
     handleEditTemplate: editorState.openTemplateEditor,
     handleSaveTemplate,
+    templateLifecycle: {
+      move: templateLifecycle.move,
+      requestDelete: deleteState.openDeleteDialog,
+      restore: handleResetTemplate,
+      setEnabled: templateLifecycle.setEnabled,
+    },
     isEditorOpen: editorState.isEditorOpen,
-    isLoading: isLoading || isMutating,
-    submitError: error,
+    status: { isLoading, isMutating, submitError: error },
     templates,
     closeDeleteDialog: deleteState.closeDeleteDialog,
     closeTemplateEditor: editorState.closeTemplateEditor,

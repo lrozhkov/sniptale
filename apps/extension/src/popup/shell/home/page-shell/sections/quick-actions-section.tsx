@@ -1,9 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { Skeleton } from '@sniptale/ui/skeleton';
@@ -15,7 +11,6 @@ interface PopupHomeQuickActionsProps {
   quickActionsReady: boolean;
   hasQuickActions: boolean;
   quickActions: QuickAction[];
-  displayMode: QuickActionsDisplayMode;
   viewportPresets: ViewportPreset[];
   quickActionsDisabledTitle?: string | null;
   restrictionIndicatorTitle?: string | null;
@@ -67,7 +62,6 @@ export function PopupHomeQuickActions({
   quickActionsReady,
   hasQuickActions,
   quickActions,
-  displayMode,
   viewportPresets,
   quickActionsDisabledTitle,
   restrictionIndicatorTitle,
@@ -95,7 +89,6 @@ export function PopupHomeQuickActions({
         ) : hasQuickActions ? (
           <QuickActionsBlock
             actions={quickActions}
-            displayMode={displayMode}
             presets={viewportPresets}
             onTriggerAction={onTriggerAction}
             {...(quickActionsDisabledTitle === undefined

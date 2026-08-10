@@ -12,7 +12,6 @@ import { translate } from '../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveChromeAiEnabled } from '../../../../runtime/ai-settings/mutations';
 import type { AIModel } from '../../../../../contracts/settings';
-import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { saveAiProvidersDefaultModel } from './save';
 
 const logger = createLogger({ namespace: 'SettingsAiProvidersChromeAi' });
@@ -117,12 +116,10 @@ async function enableChromeAi(args: {
     args.toggleArgs.setChromeAiEnabled(true);
     await args.toggleArgs.reloadData();
     await args.refreshAvailability();
-    toast.success(translate('settings.aiProviders.chromeAiEnabledMessage'));
   } catch (toggleError) {
     const message = normalizeChromeAiToggleError(toggleError);
     logger.error('Failed to enable Chrome AI', toggleError);
     args.setError(message);
-    toast.error(message);
   } finally {
     args.setIsSettingUp(false);
   }
@@ -132,6 +129,7 @@ export function useAiProvidersChromeAiState(args: ChromeAiToggleArgs) {
   const [error, setError] = useState<string | null>(null);
   const [isSettingUp, setIsSettingUp] = useState(false);
   const [setupProgress, setSetupProgress] = useState<number | null>(null);
+  const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const { availability, isChecking, refreshAvailability } = useChromeAiAvailabilityState();
 
   const handleToggle = useCallback(async () => {
@@ -140,6 +138,7 @@ export function useAiProvidersChromeAiState(args: ChromeAiToggleArgs) {
     }
 
     setError(null);
+    setTestStatus('idle');
 
     if (args.chromeAiEnabled) {
       await disableChromeAi(args);
@@ -156,13 +155,30 @@ export function useAiProvidersChromeAiState(args: ChromeAiToggleArgs) {
     });
   }, [args, availability, isChecking, isSettingUp, refreshAvailability]);
 
+  const handleTest = useCallback(async () => {
+    if (!args.chromeAiEnabled || isChecking || isSettingUp || testStatus === 'running') return;
+    setError(null);
+    setTestStatus('running');
+    try {
+      await prepareChromeAiSession({});
+      setTestStatus('success');
+      await refreshAvailability();
+    } catch (testError) {
+      logger.error('Failed to test Chrome AI', testError);
+      setError(normalizeChromeAiToggleError(testError));
+      setTestStatus('error');
+    }
+  }, [args.chromeAiEnabled, isChecking, isSettingUp, refreshAvailability, testStatus]);
+
   return {
     availability,
     enabled: args.chromeAiEnabled,
     error,
+    handleTest,
     handleToggle,
     isChecking,
     isSettingUp,
     setupProgress,
+    testStatus,
   };
 }

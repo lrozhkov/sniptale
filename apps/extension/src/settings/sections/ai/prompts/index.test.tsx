@@ -7,24 +7,34 @@ vi.mock('./controller', () => ({ useAiPromptsController: () => controller.state 
 vi.mock('./surface/content', () => ({ AiPromptsContent: () => <div>prompt-settings</div> }));
 vi.mock('./templates', () => ({ TemplatesSection: () => <div>prompt-templates</div> }));
 import { AIPromptsSection } from '.';
-it('provides one entry point for prompts and templates', () => {
+it('opens templates first and switches to prompts through the route callback', () => {
   const node = document.createElement('div');
   const root = createRoot(node);
-  act(() => root.render(<AIPromptsSection />));
-  expect(node.textContent).toContain('prompt-settings');
+  const onViewChange = vi.fn();
+  act(() => root.render(<AIPromptsSection onViewChange={onViewChange} />));
   expect(node.textContent).toContain('prompt-templates');
+  expect(node.textContent).not.toContain('prompt-settings');
+  const promptsTab = Array.from(node.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes('Промпты')
+  );
+  act(() => promptsTab?.click());
+  expect(onViewChange).toHaveBeenCalledWith('prompts');
+
+  act(() => root.render(<AIPromptsSection view="prompts" onViewChange={onViewChange} />));
+  expect(node.textContent).toContain('prompt-settings');
+  expect(node.textContent).not.toContain('prompt-templates');
   act(() => root.unmount());
 });
 
-it('renders loading and error states while preserving the templates entry point', () => {
+it('keeps prompt loading and error states inside the prompts subpage', () => {
   const node = document.createElement('div');
   const root = createRoot(node);
   controller.state = { isLoading: true, error: false, prompts: {} };
-  act(() => root.render(<AIPromptsSection />));
+  act(() => root.render(<AIPromptsSection view="prompts" />));
   expect(node.textContent).not.toContain('prompt-templates');
   controller.state = { isLoading: false, error: true, prompts: {} };
-  act(() => root.render(<AIPromptsSection />));
+  act(() => root.render(<AIPromptsSection view="prompts" />));
   expect(node.querySelector('[role="alert"]')).not.toBeNull();
-  expect(node.textContent).toContain('prompt-templates');
+  expect(node.textContent).not.toContain('prompt-templates');
   act(() => root.unmount());
 });

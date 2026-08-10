@@ -1,54 +1,8 @@
 import { Monitor, MoonStar, SunMedium } from 'lucide-react';
-import type { ReactNode } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
-import { getControlSegmentedOptionClassName } from '@sniptale/ui/control-language';
 
 import type { AppearanceSectionState } from './types';
-import {
-  ACTIVE_THEME_BACKGROUND_CLASS_NAME,
-  IDLE_THEME_BACKGROUND_CLASS_NAME,
-} from './styles.constants.ts';
-
-function ThemeModeButton(props: {
-  active: boolean;
-  description: string;
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      className={[
-        'flex flex-col items-start gap-3 text-left transition-colors',
-        getControlSegmentedOptionClassName({
-          active: props.active,
-          density: 'default',
-          layout: 'tile',
-        }),
-        props.active
-          ? [
-              'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_10%,transparent)]',
-              ACTIVE_THEME_BACKGROUND_CLASS_NAME,
-            ].join(' ')
-          : [
-              IDLE_THEME_BACKGROUND_CLASS_NAME,
-              'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_78%,transparent)]',
-            ].join(' '),
-      ].join(' ')}
-    >
-      <span className="flex items-center gap-2 text-sm font-medium">
-        {props.icon}
-        {props.label}
-      </span>
-      <span className="text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-        {props.description}
-      </span>
-    </button>
-  );
-}
 
 export function ThemeChips({ state }: { state: AppearanceSectionState }) {
   const themeIcons = {
@@ -61,7 +15,10 @@ export function ThemeChips({ state }: { state: AppearanceSectionState }) {
     <div
       role="group"
       aria-label={translate('settings.appearance.themeModeLabel', state.locale)}
-      className="grid gap-3 md:grid-cols-3"
+      className={[
+        'inline-flex w-full min-w-0 gap-1 rounded-lg p-1 sm:w-auto',
+        'bg-[var(--sniptale-color-surface-hover)]',
+      ].join(' ')}
     >
       {state.themeOptions.map((option) => {
         const active =
@@ -70,14 +27,28 @@ export function ThemeChips({ state }: { state: AppearanceSectionState }) {
             : state.preference === option.value && state.resolvedTheme === option.value;
 
         return (
-          <ThemeModeButton
+          <button
             key={option.value}
-            active={active}
-            description={option.description}
-            icon={themeIcons[option.value]}
-            label={option.label}
+            type="button"
+            aria-pressed={active}
+            title={option.label}
             onClick={() => state.setPreference(option.value)}
-          />
+            className={[
+              'inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-3',
+              'text-xs transition-colors sm:flex-none',
+              'focus-visible:outline-none focus-visible:ring-2',
+              'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+              active
+                ? 'bg-[var(--sniptale-color-surface-panel)] font-semibold text-[var(--sniptale-color-text-primary)]'
+                : [
+                    'font-medium text-[var(--sniptale-color-text-muted)]',
+                    'hover:text-[var(--sniptale-color-text-primary)]',
+                  ].join(' '),
+            ].join(' ')}
+          >
+            {themeIcons[option.value]}
+            <span className="truncate">{option.label}</span>
+          </button>
         );
       })}
     </div>

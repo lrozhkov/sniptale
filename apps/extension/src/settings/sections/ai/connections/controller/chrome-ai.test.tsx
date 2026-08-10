@@ -166,9 +166,7 @@ it('enables chrome-ai through setup/download flow and refreshes runtime data', a
   expect(chromeAiControllerMocks.saveChromeAiEnabledMock).toHaveBeenCalledWith(true);
   expect(args.setChromeAiEnabled).toHaveBeenCalledWith(true);
   expect(args.reloadData).toHaveBeenCalledTimes(1);
-  expect(chromeAiControllerMocks.toastSuccessMock).toHaveBeenCalledWith(
-    translate('settings.aiProviders.chromeAiEnabledMessage')
-  );
+  expect(chromeAiControllerMocks.toastSuccessMock).not.toHaveBeenCalled();
 });
 
 it('surfaces unsupported availability without starting setup', async () => {
@@ -205,7 +203,7 @@ it('disables chrome-ai and reconciles a chrome default model back to stored prov
   expect(args.reloadData).toHaveBeenCalledTimes(1);
 });
 
-it('reports setup failures through error state, logger, and toast', async () => {
+it('reports setup failures inline without a duplicate toast', async () => {
   chromeAiControllerMocks.loadChromeAiAvailabilityMock.mockResolvedValue('downloadable');
   chromeAiControllerMocks.prepareChromeAiSessionMock.mockRejectedValue(new Error('setup failed'));
 
@@ -215,7 +213,7 @@ it('reports setup failures through error state, logger, and toast', async () => 
     await latestState?.handleToggle();
   });
 
-  expect(chromeAiControllerMocks.toastErrorMock).toHaveBeenCalledWith('setup failed');
+  expect(chromeAiControllerMocks.toastErrorMock).not.toHaveBeenCalled();
   expect(chromeAiControllerMocks.loggerErrorMock).toHaveBeenCalledWith(
     'Failed to enable Chrome AI',
     expect.any(Error)
@@ -238,6 +236,19 @@ it.each([
     await latestState?.handleToggle();
   });
 
-  expect(chromeAiControllerMocks.toastErrorMock).toHaveBeenCalledWith(translate(messageKey));
+  expect(chromeAiControllerMocks.toastErrorMock).not.toHaveBeenCalled();
   expect(latestState?.error).toBe(translate(messageKey));
+});
+
+it('tests the enabled Chrome AI runtime and exposes an inline result', async () => {
+  await renderHarness(createArgs({ chromeAiEnabled: true }));
+  await flushEffects();
+
+  await act(async () => {
+    await latestState?.handleTest();
+  });
+
+  expect(chromeAiControllerMocks.prepareChromeAiSessionMock).toHaveBeenCalledOnce();
+  expect(latestState?.testStatus).toBe('success');
+  expect(chromeAiControllerMocks.toastSuccessMock).not.toHaveBeenCalled();
 });

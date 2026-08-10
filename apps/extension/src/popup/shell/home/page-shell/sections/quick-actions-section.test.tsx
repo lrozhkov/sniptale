@@ -46,7 +46,6 @@ it('renders the quick-actions section empty state when no actions are available'
       quickActionsReady
       hasQuickActions={false}
       quickActions={[]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle={null}
       restrictionIndicatorTitle="Restricted"
@@ -70,7 +69,6 @@ it('forwards quick-actions section props to the list block when actions exist', 
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle="Blocked reason"
       restrictionIndicatorTitle={null}
@@ -82,7 +80,6 @@ it('forwards quick-actions section props to the list block when actions exist', 
     expect.objectContaining({
       actions: [action],
       disabledTitle: 'Blocked reason',
-      displayMode: 'list',
       onTriggerAction,
       presets: [],
     })
@@ -98,7 +95,6 @@ it('omits the disabled title when quick actions are available without restrictio
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />
@@ -106,7 +102,6 @@ it('omits the disabled title when quick actions are available without restrictio
 
   expect(quickActionsBlockSpy).toHaveBeenCalledWith({
     actions: [action],
-    displayMode: 'list',
     onTriggerAction: expect.any(Function),
     presets: [],
   });
@@ -119,7 +114,6 @@ it('delays the loading placeholder while quick-actions bootstrap is pending', as
       quickActionsReady={false}
       hasQuickActions={false}
       quickActions={[]}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />
@@ -147,7 +141,6 @@ it('keeps the delayed loading placeholder hidden when quick-actions become ready
       quickActionsReady={false}
       hasQuickActions={false}
       quickActions={[]}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />
@@ -158,7 +151,6 @@ it('keeps the delayed loading placeholder hidden when quick-actions become ready
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       onTriggerAction={vi.fn()}
     />

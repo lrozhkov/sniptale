@@ -137,10 +137,12 @@ function mockChromeAiState() {
     availability: 'available',
     enabled: false,
     error: null,
+    handleTest: vi.fn(),
     handleToggle: vi.fn(),
     isChecking: false,
     isSettingUp: false,
     setupProgress: null,
+    testStatus: 'idle',
   });
 }
 
@@ -241,7 +243,7 @@ it('builds the controller dependencies from owner-local hooks', () => {
 it('normalizes an empty default-model value to null before saving', async () => {
   const deps = useAiProvidersSectionControllerDependencies();
 
-  await deps.handleDefaultModelChange('');
+  await deps.catalogActions.setDefaultModel('');
 
   expect(dependencyMocks.saveAiProvidersDefaultModelMock).toHaveBeenCalledWith(
     null,

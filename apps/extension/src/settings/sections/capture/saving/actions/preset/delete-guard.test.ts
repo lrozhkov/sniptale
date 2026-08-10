@@ -40,14 +40,12 @@ function createSyncState(): SavePresetsSyncState {
     defaultVideoPresetId: 'b',
     isLoading: false,
     presets: [],
-    saveCapturesToGallery: false,
     settings: createSettings(),
     setCaptureAction: vi.fn(),
     setDefaultExportPresetId: vi.fn(),
     setDefaultImagePresetId: vi.fn(),
     setDefaultVideoPresetId: vi.fn(),
     setPresets: vi.fn(),
-    setSaveCapturesToGallery: vi.fn(),
     updateSettings: vi.fn(async () => undefined),
   };
 }

@@ -12,6 +12,9 @@ const service = vi.hoisted(() => ({
   remove: vi.fn(),
   list: vi.fn(),
   patch: vi.fn(),
+  reset: vi.fn(),
+  saveOrder: vi.fn(),
+  setEnabled: vi.fn(),
   touch: vi.fn(),
 }));
 const localeState = vi.hoisted(() => ({ current: 'en' as 'en' | 'ru' }));
@@ -27,6 +30,9 @@ vi.mock('../service', async (importOriginal) => ({
   deletePromptTemplateRecord: service.remove,
   loadPromptTemplateList: service.list,
   savePromptTemplatePatch: service.patch,
+  resetPromptTemplateRecord: service.reset,
+  savePromptTemplateOrder: service.saveOrder,
+  setPromptTemplateEnabledRecord: service.setEnabled,
   touchPromptTemplateRecord: service.touch,
 }));
 
@@ -40,6 +46,8 @@ function template(overrides: Partial<PromptTemplate> = {}): PromptTemplate {
     name: overrides.name ?? 'Template',
     isDefault: overrides.isDefault ?? false,
     ...(overrides.lastUsedAt === undefined ? {} : { lastUsedAt: overrides.lastUsedAt }),
+    ...(overrides.enabled === undefined ? {} : { enabled: overrides.enabled }),
+    ...(overrides.customized === undefined ? {} : { customized: overrides.customized }),
   };
 }
 
@@ -80,9 +88,15 @@ beforeEach(() => {
   service.remove.mockReset();
   service.list.mockReset();
   service.patch.mockReset();
+  service.reset.mockReset();
+  service.saveOrder.mockReset();
+  service.setEnabled.mockReset();
   service.touch.mockReset();
   localeState.current = 'en';
   service.list.mockResolvedValue([template()]);
+  service.reset.mockResolvedValue(template({ id: 'default-translate', isDefault: true }));
+  service.saveOrder.mockResolvedValue(undefined);
+  service.setEnabled.mockImplementation(async (id, enabled) => template({ id, enabled }));
 });
 
 afterEach(() => {
@@ -110,6 +124,12 @@ it('loads, refreshes, mutates, selects, and removes prompt templates', async () 
   await act(async () => currentState().updateTemplate('created', { name: 'Renamed' }));
   expect(currentState().templates[0]?.name).toBe('Renamed');
 
+  const restored = template({ id: 'template-2', name: 'Factory', isDefault: true });
+  service.reset.mockResolvedValueOnce(restored);
+  await act(async () => currentState().templateLifecycle.restoreSystem('template-2'));
+  expect(service.reset).toHaveBeenCalledWith('template-2', 'en');
+  expect(currentState().templates[1]).toEqual(restored);
+
   service.touch.mockResolvedValueOnce({ content: 'Selected body', lastUsedAt: 321 });
   await expect(
     act(async () => currentState().selectTemplate(template({ id: 'created' })))
@@ -117,8 +137,8 @@ it('loads, refreshes, mutates, selects, and removes prompt templates', async () 
   expect(currentState().templates[0]?.lastUsedAt).toBe(321);
 
   service.remove.mockResolvedValueOnce(undefined);
-  await act(async () => currentState().removeTemplate('created'));
-  expect(currentState().templates).toEqual([template({ id: 'template-2', name: 'Updated' })]);
+  await act(async () => currentState().templateLifecycle.remove('created'));
+  expect(currentState().templates).toEqual([restored]);
 });
 
 it('stores a readable error when loading fails', async () => {
@@ -130,18 +150,87 @@ it('stores a readable error when loading fails', async () => {
   expect(currentState().error).toBe('load failed');
 });
 
-it('keeps system templates available while toggling their visibility', async () => {
+it('keeps system templates available while explicitly toggling their visibility', async () => {
   const systemTemplate = template({ id: 'system', isDefault: true });
   service.list.mockResolvedValueOnce([systemTemplate]);
-  service.remove.mockResolvedValue(undefined);
+  service.setEnabled.mockImplementation(async (_id, enabled) => ({ ...systemTemplate, enabled }));
 
   await mountProbe();
 
-  await act(async () => currentState().removeTemplate(systemTemplate.id));
+  await act(async () => currentState().templateLifecycle.setEnabled(systemTemplate.id, false));
   expect(currentState().templates).toEqual([{ ...systemTemplate, enabled: false }]);
 
-  await act(async () => currentState().removeTemplate(systemTemplate.id));
+  await act(async () => currentState().templateLifecycle.setEnabled(systemTemplate.id, true));
   expect(currentState().templates).toEqual([{ ...systemTemplate, enabled: true }]);
+  expect(service.remove).not.toHaveBeenCalled();
+});
+
+it('reorders templates and persists the resulting visible order', async () => {
+  service.list.mockResolvedValueOnce([
+    template({ id: 'first' }),
+    template({ id: 'second' }),
+    template({ id: 'third' }),
+  ]);
+  await mountProbe();
+
+  await act(async () => currentState().templateLifecycle.move('first', null));
+
+  expect(currentState().templates.map((item) => item.id)).toEqual(['second', 'third', 'first']);
+  expect(service.saveOrder).toHaveBeenCalledWith(currentState().templates);
+});
+
+it('keeps the previous order and surfaces a persistence failure', async () => {
+  service.list.mockResolvedValueOnce([template({ id: 'first' }), template({ id: 'second' })]);
+  service.saveOrder.mockRejectedValueOnce(new Error('order failed'));
+  await mountProbe();
+
+  let failure: unknown;
+  await act(async () => {
+    try {
+      await currentState().templateLifecycle.move('first', null);
+    } catch (error) {
+      failure = error;
+    }
+  });
+
+  expect(failure).toEqual(new Error('order failed'));
+  expect(currentState().templates.map((item) => item.id)).toEqual(['first', 'second']);
+  expect(currentState().error).toBe('order failed');
+});
+
+it('surfaces reset and availability failures and ignores a no-op move', async () => {
+  const systemTemplate = template({ id: 'default-translate', isDefault: true });
+  service.list.mockResolvedValueOnce([systemTemplate]);
+  service.reset.mockRejectedValueOnce(new Error('reset failed'));
+  service.setEnabled.mockRejectedValueOnce(new Error('toggle failed'));
+  await mountProbe();
+
+  let resetFailure: unknown;
+  await act(async () => {
+    try {
+      await currentState().templateLifecycle.restoreSystem(systemTemplate.id);
+    } catch (error) {
+      resetFailure = error;
+    }
+  });
+  expect(resetFailure).toEqual(new Error('reset failed'));
+  expect(currentState().error).toBe('reset failed');
+
+  let toggleFailure: unknown;
+  await act(async () => {
+    try {
+      await currentState().templateLifecycle.setEnabled(systemTemplate.id, false);
+    } catch (error) {
+      toggleFailure = error;
+    }
+  });
+  expect(toggleFailure).toEqual(new Error('toggle failed'));
+  expect(currentState().error).toBe('toggle failed');
+
+  await act(async () =>
+    currentState().templateLifecycle.move(systemTemplate.id, systemTemplate.id)
+  );
+  expect(service.saveOrder).not.toHaveBeenCalled();
 });
 
 it('ignores an older locale load that resolves after the current catalog', async () => {

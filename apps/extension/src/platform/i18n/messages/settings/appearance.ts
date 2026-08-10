@@ -142,24 +142,24 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: RAW_DIAGNOSTICS_DESCRIPTION_EN,
   },
   contextMenuTitle: {
-    ru: 'Встраивание в контекстное меню',
-    en: 'Browser context menu integration',
+    ru: 'Контекстное меню браузера',
+    en: 'Browser context menu',
   },
   contextMenuDescription: {
     ru: 'Управляет тем, какие разделы и страницы Sniptale доступны из контекстного меню браузера.',
     en: 'Controls which Sniptale sections and pages are available from the browser context menu.',
   },
   contextMenuEnabledLabel: {
-    ru: 'Встраивание в контекстное меню',
-    en: 'Enable context menu integration',
+    ru: 'Показывать меню Sniptale',
+    en: 'Show the Sniptale menu',
   },
   contextMenuEnabledDescription: {
     ru: 'Добавить корневое меню Sniptale в контекстное меню браузера.',
     en: 'Add the Sniptale root item to the browser context menu.',
   },
   contextMenuVisibleItemsLabel: {
-    ru: 'Показывать пункты',
-    en: 'Visible items',
+    ru: 'Команды в меню',
+    en: 'Menu commands',
   },
   contextMenuScreenshotsLabel: {
     ru: 'Снимки',
@@ -174,7 +174,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Video',
   },
   contextMenuVideoDescription: {
-    ru: 'Запись вкладки, области, пресета и окна.',
+    ru: 'Запись вкладки, области, шаблона и окна.',
     en: 'Tab, area, preset, and window recording.',
   },
   contextMenuExportLabel: {

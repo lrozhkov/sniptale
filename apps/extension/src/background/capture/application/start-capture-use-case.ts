@@ -72,10 +72,7 @@ export async function runStartCaptureUseCase(
 }
 
 export async function maybePersistScreenshotInMediaHub(
-  settings: {
-    localStoragePolicy?: Settings['localStoragePolicy'];
-    saveCapturesToGallery?: boolean;
-  },
+  settings: Pick<Settings, 'localStoragePolicy'>,
   dataUrl: string,
   filename: string,
   tabId: number,
@@ -85,8 +82,7 @@ export async function maybePersistScreenshotInMediaHub(
   const storageClass =
     captureAction === 'save_to_library'
       ? 'library'
-      : (settings.localStoragePolicy?.defaultDestination ??
-        (settings.saveCapturesToGallery ? 'library' : 'temporary'));
+      : (settings.localStoragePolicy?.defaultDestination ?? 'temporary');
   return ports.saveScreenshotToMediaHubFromDataUrl(dataUrl, filename, tabId, storageClass);
 }
 
@@ -139,7 +135,7 @@ async function persistCaptureDeliveryPayload(args: {
   captureAction: CaptureActionType;
   scenarioCapture: ScenarioRuntimeCapturePayload | undefined;
   scenarioSessionService: ScenarioSessionService;
-  settings: Pick<Settings, 'defaultImagePresetId' | 'localStoragePolicy' | 'saveCapturesToGallery'>;
+  settings: Pick<Settings, 'defaultImagePresetId' | 'localStoragePolicy'>;
 }): Promise<string | null> {
   try {
     const galleryAssetId = await maybePersistScreenshotInMediaHub(

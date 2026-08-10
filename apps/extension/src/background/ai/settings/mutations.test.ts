@@ -31,6 +31,19 @@ it('delegates the complete mutation command to the persistence authority', async
   expect(storageMocks.mutateStoredAISettings).toHaveBeenCalledWith(message);
 });
 
+it('delegates model reorder commands without changing their insertion target', async () => {
+  const message = {
+    beforeModelId: null,
+    modelId: 'model-1',
+    operation: 'move-model',
+    type: 'AI_SETTINGS_MUTATION',
+  } as const;
+
+  await mutateAiSettings(message);
+
+  expect(storageMocks.mutateStoredAISettings).toHaveBeenCalledWith(message);
+});
+
 it('delegates queue reset to the persistence authority', () => {
   resetAiSettingsMutationQueueForTests();
 

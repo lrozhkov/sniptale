@@ -46,7 +46,7 @@ import {
   saveAiProvidersScenarioEditorPrompt,
 } from '../../prompts/save';
 
-it('persists default model and prompt values with translated success toasts', async () => {
+it('persists default model and prompt values without redundant success toasts', async () => {
   const setDefaultModelId = vi.fn();
 
   saveDefaultModelIdMock.mockResolvedValue(undefined);
@@ -63,15 +63,7 @@ it('persists default model and prompt values with translated success toasts', as
   expect(saveScenarioEditorSystemPromptMock).toHaveBeenCalledWith(
     'Use scenario summary guardrails'
   );
-  expect(toastSuccessMock).toHaveBeenCalledWith(
-    translate('settings.aiProviders.defaultModelUpdated')
-  );
-  expect(toastSuccessMock).toHaveBeenCalledWith(
-    translate('settings.aiProviders.globalPromptSavedMessage')
-  );
-  expect(toastSuccessMock).toHaveBeenCalledWith(
-    translate('settings.aiProviders.scenarioEditorPromptSavedMessage')
-  );
+  expect(toastSuccessMock).not.toHaveBeenCalled();
 });
 
 it('keeps local state unchanged and returns prompt errors when persistence fails', async () => {

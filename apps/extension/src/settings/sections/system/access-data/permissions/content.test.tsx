@@ -71,8 +71,6 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const { onRefresh, onRequestPermission } = await renderContent();
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
-  expect(container?.textContent).toContain('settings.navigation.permissions');
-  expect(container?.textContent).toContain('settings.permissions.subtitle');
   expect(container?.textContent).toContain('settings.permissions.requiredGrantsTitle');
   expect(container?.textContent).toContain('settings.permissions.requiredDebuggerName');
   expect(container?.textContent).toContain('settings.permissions.requiredTabCaptureName');

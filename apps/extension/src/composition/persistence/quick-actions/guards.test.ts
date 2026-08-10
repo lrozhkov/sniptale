@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseStoredQuickActions, parseStoredQuickActionsDisplayMode } from './guards';
+import { parseStoredQuickActions } from './guards';
 
 describe('quick-action storage guards', () => {
   it('normalizes legacy after-capture values and counts invalid entries', () => {
@@ -27,11 +27,6 @@ describe('quick-action storage guards', () => {
       hasInvalidRoot: false,
       invalidEntryCount: 1,
     });
-  });
-
-  it('accepts only supported display modes', () => {
-    expect(parseStoredQuickActionsDisplayMode('row')).toBe('row');
-    expect(parseStoredQuickActionsDisplayMode('broken')).toBeNull();
   });
 
   it('accepts the current viewport preset reference', () => {

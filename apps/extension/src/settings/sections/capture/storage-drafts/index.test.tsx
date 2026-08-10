@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  confirmDialog: vi.fn(),
   cleanupDrafts: vi.fn(),
   getLibraryStorageUsage: vi.fn(),
   getStorageEstimateInfo: vi.fn(),
@@ -14,6 +15,27 @@ const mocks = vi.hoisted(() => ({
   patchSettings: vi.fn(),
   showToast: vi.fn(),
   state: vi.fn(),
+}));
+
+vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
+  ProductConfirmDialog: (props: {
+    onCancel(): void;
+    onConfirm(): void | Promise<void>;
+    title: ReactNode;
+  }) => {
+    mocks.confirmDialog(props);
+    return (
+      <div data-testid="confirm-dialog">
+        <span>{props.title}</span>
+        <button data-testid="confirm" onClick={() => void props.onConfirm()}>
+          confirm
+        </button>
+        <button data-testid="cancel" onClick={props.onCancel}>
+          cancel
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('./use-storage-drafts-state', async (importOriginal) => ({
@@ -45,6 +67,19 @@ vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks
 
 import { StorageDraftsSection } from '.';
 import { translate } from '../../../../platform/i18n';
+import {
+  SettingsSectionHeader,
+  SettingsSectionHeaderActionsProvider,
+} from '../../../section-surface';
+
+function SectionHarness(props: { view?: 'settings' | 'storage' }) {
+  return (
+    <SettingsSectionHeaderActionsProvider>
+      <SettingsSectionHeader kicker="Хранилище" description="Описание" />
+      <StorageDraftsSection {...(props.view === undefined ? {} : { view: props.view })} />
+    </SettingsSectionHeaderActionsProvider>
+  );
+}
 
 it('connects the storage policy state owner to all storage controls', async () => {
   const state = {
@@ -63,9 +98,10 @@ it('connects the storage policy state owner to all storage controls', async () =
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(<StorageDraftsSection />));
+  act(() => root.render(<SectionHarness />));
   expect(container.textContent).toContain(translate('settings.storageDrafts.newItemsTitle'));
-  expect(container.textContent).toContain(translate('settings.storageDrafts.loading'));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.newItemsDescription'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.loading'));
 
   const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
   const click = (label: string) => {
@@ -73,17 +109,15 @@ it('connects the storage policy state owner to all storage controls', async () =
     expect(button).toBeDefined();
     act(() => button?.click());
   };
-  click(translate('settings.storageDrafts.openDrafts'));
-  click(translate('settings.storageDrafts.deleteExpired'));
-  click(translate('settings.storageDrafts.privacyLink'));
   click(translate('settings.storageDrafts.resetDefaults'));
 
-  expect(mocks.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
-  expect(state.runCleanup).toHaveBeenCalledWith(false);
-  expect(mocks.openSettingsPage).toHaveBeenCalledWith({
-    route: { section: 'access-data', view: 'privacy' },
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
   });
-  expect(state.updatePolicy).toHaveBeenCalled();
+
+  expect(state.updatePolicy).toHaveBeenCalledWith(
+    expect.objectContaining({ cleanupEnabled: expect.any(Boolean) })
+  );
   act(() => root.unmount());
   container.remove();
 });
@@ -102,11 +136,11 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
     usage: { available: 70, drafts: 10, library: 20, total: 30 },
   };
   mocks.state.mockReturnValue(state);
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const nativeConfirm = vi.spyOn(window, 'confirm');
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(<StorageDraftsSection />));
+  act(() => root.render(<SectionHarness />));
 
   expect(container.textContent).toContain('30');
   const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]');
@@ -123,17 +157,41 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
   act(() => libraryOption?.click());
   expect(state.updatePolicy).toHaveBeenCalledWith({ defaultDestination: 'library' });
 
+  act(() => root.render(<SectionHarness view="storage" />));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.newItemsTitle'));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.usageTitle'));
+
+  const storageButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+  const clickStorageAction = (label: string) => {
+    const button = storageButtons.find((candidate) => candidate.textContent?.includes(label));
+    expect(button).toBeDefined();
+    act(() => button?.click());
+  };
+  clickStorageAction(translate('settings.storageDrafts.openDrafts'));
+  clickStorageAction(translate('settings.storageDrafts.deleteExpired'));
+  clickStorageAction(translate('settings.storageDrafts.privacyLink'));
+
+  expect(mocks.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
+  expect(state.runCleanup).toHaveBeenCalledWith(false);
+  expect(mocks.openSettingsPage).toHaveBeenCalledWith({
+    route: { section: 'access-data', view: 'privacy' },
+  });
+
   const deleteAll = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('settings.storageDrafts.deleteAll'))
   );
   act(() => deleteAll?.click());
+  expect(nativeConfirm).not.toHaveBeenCalled();
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
+  });
   expect(state.runCleanup).toHaveBeenCalledWith(true);
 
   mocks.state.mockReturnValue({
     ...state,
     policy: { ...state.policy, cleanupEnabled: false },
   });
-  act(() => root.render(<StorageDraftsSection />));
+  act(() => root.render(<SectionHarness />));
   expect(container.textContent).toContain(
     translate('settings.storageDrafts.cleanupDisabledWarning')
   );

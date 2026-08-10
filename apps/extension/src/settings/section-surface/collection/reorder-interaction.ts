@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { translate } from '../../../platform/i18n';
 import {
@@ -9,87 +9,68 @@ import {
   resolveKeyboardPreviewGroups,
   type SettingsCollectionKeyboardPreview,
 } from './keyboard-reorder';
-import { getSettingsCollectionMoveIntent } from './model';
+import { useSettingsCollectionPointerReorder } from './pointer-reorder-interaction';
 import type { SettingsCollectionMoveIntent, SettingsCollectionResolvedGroup } from './types';
 
 export function useSettingsCollectionReorder(
   groups: readonly SettingsCollectionResolvedGroup[],
   onMove: ((intent: SettingsCollectionMoveIntent) => void) | undefined
 ) {
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragBaseline, setDragBaseline] = useState<SettingsCollectionKeyboardPreview | null>(null);
   const [keyboardPreview, setKeyboardPreview] = useState<SettingsCollectionKeyboardPreview | null>(
     null
   );
   const [announcement, setAnnouncement] = useState({ message: '', sequence: 0 });
   const dragInstructionsId = useId();
-  const draggedItemRef = useRef<string | null>(null);
   const announce = useCallback((message: string) => {
     setAnnouncement((current) => ({ message, sequence: current.sequence + 1 }));
   }, []);
   const canMove = onMove !== undefined;
+
   useEffect(() => {
     if (keyboardPreview === null) return;
     if (canMove && isKeyboardPreviewCurrent(groups, keyboardPreview)) return;
     setKeyboardPreview(null);
     announce(translate('settings.collection.announcements.cancelled'));
   }, [announce, canMove, groups, keyboardPreview]);
-  useEffect(() => {
-    if (dragBaseline === null) return;
-    if (canMove && isKeyboardPreviewCurrent(groups, dragBaseline)) return;
-    draggedItemRef.current = null;
-    setDraggedItemId(null);
-    setDragBaseline(null);
-    announce(translate('settings.collection.announcements.cancelled'));
-  }, [announce, canMove, dragBaseline, groups]);
-  const emitMove = (intent: SettingsCollectionMoveIntent | null) => {
-    if (!intent || !onMove) return false;
-    onMove(intent);
-    setKeyboardPreview(null);
-    announce(translate('settings.collection.announcements.moved'));
-    return true;
-  };
+
+  const emitMove = useCallback(
+    (intent: SettingsCollectionMoveIntent | null) => {
+      if (!intent || !onMove) return false;
+      onMove(intent);
+      setKeyboardPreview(null);
+      announce(translate('settings.collection.announcements.moved'));
+      return true;
+    },
+    [announce, onMove]
+  );
+
+  const pointer = useSettingsCollectionPointerReorder({
+    announce,
+    groups,
+    onMove,
+    resetKeyboardPreview: () => setKeyboardPreview(null),
+  });
+  const pointerIntent = pointer.preview
+    ? getKeyboardPreviewIntent(groups, pointer.preview, 'drag')
+    : null;
 
   return {
     a11y: { announcement, dragInstructionsId, keyboardItemId: keyboardPreview?.itemId ?? null },
+    dragOffsetY: pointer.dragOffsetY,
+    draggingItemId: pointer.preview?.itemId ?? null,
     groups: resolveKeyboardPreviewGroups(groups, keyboardPreview),
+    pointerDropTarget: pointerIntent
+      ? { beforeItemId: pointerIntent.beforeItemId, groupId: pointerIntent.groupId }
+      : null,
     row: {
-      onDragStart(itemId: string) {
-        const baseline = createKeyboardPreview(groups, itemId);
-        if (!baseline || !canMove || !isKeyboardPreviewCurrent(groups, baseline)) return;
-        setKeyboardPreview(null);
-        draggedItemRef.current = itemId;
-        setDraggedItemId(itemId);
-        setDragBaseline(baseline);
-        announce(translate('settings.collection.announcements.pickedUp'));
-      },
-      onDragEnd() {
-        if (draggedItemRef.current === null) return;
-        draggedItemRef.current = null;
-        setDraggedItemId(null);
-        setDragBaseline(null);
-        announce(translate('settings.collection.announcements.cancelled'));
-      },
-      onDrop(targetItemId: string, placement: 'before' | 'after') {
-        const activeDragIsCurrent =
-          dragBaseline !== null &&
-          draggedItemId === dragBaseline.itemId &&
-          canMove &&
-          isKeyboardPreviewCurrent(groups, dragBaseline);
-        const intent = !activeDragIsCurrent
-          ? null
-          : getSettingsCollectionMoveIntent({
-              groups,
-              itemId: dragBaseline.itemId,
-              targetItemId,
-              placement,
-              source: 'drag',
-            });
-        if (!emitMove(intent) && draggedItemId !== null)
-          announce(translate('settings.collection.announcements.cancelled'));
-        draggedItemRef.current = null;
-        setDraggedItemId(null);
-        setDragBaseline(null);
+      onPointerStart(
+        itemId: string,
+        pointerId: number,
+        clientX: number,
+        clientY: number,
+        root: HTMLElement | null
+      ) {
+        pointer.start(itemId, pointerId, clientX, clientY, root);
       },
       onKeyboardToggle(itemId: string) {
         if (keyboardPreview?.itemId === itemId) {
@@ -100,6 +81,7 @@ export function useSettingsCollectionReorder(
         }
         const preview = createKeyboardPreview(groups, itemId);
         if (!preview) return;
+        pointer.clear();
         setKeyboardPreview(preview);
         announce(translate('settings.collection.announcements.pickedUp'));
       },

@@ -14,10 +14,12 @@ interface AiProvidersChromeAiState {
   availability: ChromeAiAvailability;
   enabled: boolean;
   error: string | null;
+  handleTest: () => Promise<void>;
   handleToggle: () => Promise<void>;
   isChecking: boolean;
   isSettingUp: boolean;
   setupProgress: number | null;
+  testStatus: 'idle' | 'running' | 'success' | 'error';
 }
 
 export type AiSecretProtectionDialogMode = 'enable' | 'unlock' | 'disable' | 'change' | 'reset';
@@ -63,6 +65,13 @@ interface AiProvidersModalsState {
 }
 
 export interface AiProvidersSectionState {
+  catalogActions: {
+    clearProviderSecret: (providerId: string) => Promise<void>;
+    deleteModel: () => Promise<void>;
+    deleteProvider: () => Promise<void>;
+    moveModel: (modelId: string, beforeModelId: string | null) => Promise<boolean>;
+    setDefaultModel: (value: string) => Promise<void>;
+  };
   chromeAi: AiProvidersChromeAiState;
   secretProtection: AiSecretProtectionState;
   providers: AIProvider[];
@@ -71,10 +80,6 @@ export interface AiProvidersSectionState {
   isLoading: boolean;
   modelOptions: { value: string; label: string }[];
   modals: AiProvidersModalsState;
-  handleDefaultModelChange: (value: string) => Promise<void>;
-  handleClearProviderSecret: (providerId: string) => Promise<void>;
-  handleDeleteProvider: () => Promise<void>;
-  handleDeleteModel: () => Promise<void>;
   reloadData: () => Promise<void>;
   getProviderName: (providerId: string) => string;
 }

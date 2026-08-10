@@ -1,13 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { DEFAULT_QUICK_ACTIONS_DISPLAY_MODE } from '../../../features/quick-actions-presets/display-mode';
 import { type StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -164,19 +159,14 @@ function usePopupSessionState() {
 function usePopupCapturePresetState() {
   const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
   const [quickActionsReady, setQuickActionsReady] = useState(false);
-  const [displayMode, setDisplayMode] = useState<QuickActionsDisplayMode>(
-    DEFAULT_QUICK_ACTIONS_DISPLAY_MODE
-  );
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState<CaptureMode>(CaptureMode.TAB);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
   return {
-    displayMode,
     quickActions,
     quickActionsReady,
     selectedPresetId,
-    setDisplayMode,
     setQuickActions,
     setQuickActionsReady,
     setSelectedPresetId,

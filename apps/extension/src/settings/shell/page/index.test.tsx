@@ -148,15 +148,22 @@ function expectSettingsPageShell() {
   expect(container?.querySelector('[data-ui="settings.page.layout"]')?.className).toContain(
     'min-h-0'
   );
-  expect(container?.querySelector('[data-ui="settings.page.content"]')?.className).toContain(
-    'overflow-hidden'
-  );
+  const contentClassName = container?.querySelector('[data-ui="settings.page.content"]')?.className;
+  expect(contentClassName).toContain('overflow-hidden');
+  expect(contentClassName).toContain('rounded-[28px]');
+  expect(contentClassName).toContain('border-[var(--sniptale-color-border-soft)]');
+  expect(contentClassName).toContain('var(--sniptale-color-surface-panel)');
   expect(container?.querySelector('[data-ui="settings.page.content-scroll"]')?.className).toContain(
     'overflow-y-auto'
   );
   expect(container?.querySelector('[data-ui="settings.page.content-scroll"]')?.className).toContain(
     '[scrollbar-gutter:stable]'
   );
+  expect(container?.querySelector('[data-ui="settings.page.header"]')?.className).toContain(
+    'shrink-0'
+  );
+  expect(container?.querySelector('[data-ui="settings.page.header"] h1')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="settings.page.content-scroll"] h1')).toBeNull();
 }
 
 async function openPaletteFromHotkey() {
@@ -248,6 +255,7 @@ describe('SettingsPage navigation', () => {
       expect(container?.querySelector('[data-ui="settings.loading.skeleton"]')).toBeNull();
       await flushLazySettingsSection();
       expect(container?.textContent).toContain(marker);
+      expect(container?.querySelectorAll('[data-ui="settings.page.header"] h1')).toHaveLength(1);
     }
 
     const hotkeyArgs = settingsPageMocks.useCommandPaletteHotkeyMock.mock.calls[0]?.[0] as {

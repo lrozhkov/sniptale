@@ -122,8 +122,8 @@ function renderMockSectionModals(props: { state: AiProvidersSectionState }) {
           message={translate('settings.aiProviders.deleteProviderTitle')}
           onConfirm={
             modals.confirmDelete.type === 'provider'
-              ? props.state.handleDeleteProvider
-              : props.state.handleDeleteModel
+              ? props.state.catalogActions.deleteProvider
+              : props.state.catalogActions.deleteModel
           }
           onCancel={() => modals.setConfirmDelete(null)}
         />
@@ -192,6 +192,13 @@ function createModalState() {
 
 function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvidersSectionState {
   const baseState: AiProvidersSectionState = {
+    catalogActions: {
+      clearProviderSecret: vi.fn().mockResolvedValue(undefined),
+      deleteModel: vi.fn().mockResolvedValue(undefined),
+      deleteProvider: vi.fn().mockResolvedValue(undefined),
+      moveModel: vi.fn().mockResolvedValue(undefined),
+      setDefaultModel: vi.fn().mockResolvedValue(undefined),
+    },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
@@ -200,10 +207,6 @@ function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvid
     isLoading: false,
     modelOptions: [],
     modals: createModalState(),
-    handleDefaultModelChange: vi.fn().mockResolvedValue(undefined),
-    handleClearProviderSecret: vi.fn().mockResolvedValue(undefined),
-    handleDeleteProvider: vi.fn().mockResolvedValue(undefined),
-    handleDeleteModel: vi.fn().mockResolvedValue(undefined),
     reloadData: vi.fn().mockResolvedValue(undefined),
     getProviderName: vi.fn(() => 'OpenAI'),
   };
@@ -273,6 +276,6 @@ it('renders modal branches and confirm dialog actions through the state-owned ha
   expect(state.modals.closeProviderModal).toHaveBeenCalledTimes(2);
   expect(state.modals.closeModelModal).toHaveBeenCalledTimes(2);
   expect(state.reloadData).toHaveBeenCalledTimes(2);
-  expect(state.handleDeleteProvider).toHaveBeenCalledTimes(1);
+  expect(state.catalogActions.deleteProvider).toHaveBeenCalledTimes(1);
   expect(state.modals.setConfirmDelete).toHaveBeenCalledWith(null);
 });

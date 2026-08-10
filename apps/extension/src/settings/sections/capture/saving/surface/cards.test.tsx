@@ -16,6 +16,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-form-controls')>()),
   ProductSelect: (props: {
+    'aria-label'?: string;
     disabled?: boolean;
     onChange: (value: string) => void | Promise<void>;
     options: Array<{ label: string; value: string }>;
@@ -24,6 +25,7 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     productSelectPropsSpy(props);
     return (
       <select
+        aria-label={props['aria-label']}
         data-testid="product-select"
         disabled={props.disabled}
         value={props.value}
@@ -39,61 +41,21 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   },
 }));
 
-vi.mock('../../../../section-surface/panel-controls', () => ({
-  settingsAddButtonClassName: 'settings-add-button',
-  settingsCardClassName: 'settings-card',
-  settingsDangerIconButtonClassName: 'danger-button',
-  settingsEmptyStateClassName: 'empty-state',
-  settingsInfoIconButtonClassName: 'info-button',
-  settingsModalFieldSurfaceClassName: 'field-surface',
-  settingsNeutralBadgeClassName: 'neutral-badge',
-  settingsSuccessBadgeClassName: 'success-badge',
-  SettingsDragHandle: () => <div data-testid="drag-handle">drag</div>,
-  SettingsRange: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input type="range" {...props} />
-  ),
-  SettingsSwitch: (props: {
-    checked: boolean;
-    onClick: () => void | Promise<void>;
-    title?: string;
-  }) => (
-    <button
-      data-checked={String(props.checked)}
-      data-testid="settings-switch"
-      title={props.title}
-      onClick={() => void props.onClick()}
-    >
-      {String(props.checked)}
-    </button>
-  ),
-}));
-
-import { CaptureActionCard, DefaultPresetsCard, GalleryToggleCard } from './cards';
+import { SaveSettingsRows } from './cards';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function renderNode(node: React.ReactNode) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  await act(async () => {
-    root?.render(node);
-  });
-}
-
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
   productSelectPropsSpy.mockReset();
 });
 
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
+  act(() => root?.unmount());
   root = null;
   container?.remove();
   container = null;
@@ -101,82 +63,70 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('renders the capture action card and forwards disabled select changes', async () => {
-  const onChange = vi.fn(async () => undefined);
-
-  await renderNode(
-    <CaptureActionCard
-      captureAction="download_default"
-      captureActionOptions={[{ value: 'download_default', label: 'Download default' }]}
-      isLoading
-      onChange={onChange}
-    />
-  );
-
-  const select = container?.querySelector<HTMLSelectElement>('[data-testid="product-select"]');
-
-  expect(select?.disabled).toBe(true);
-  expect(container?.textContent).toContain('savePresets.section.captureActionLabel');
-  expect(productSelectPropsSpy).toHaveBeenCalledWith(
-    expect.objectContaining({ disabled: true, value: 'download_default' })
-  );
-});
-
-it('renders gallery toggle titles for both enabled states', async () => {
-  const onToggle = vi.fn(async () => undefined);
-
-  await renderNode(<GalleryToggleCard enabled onToggle={onToggle} />);
-  expect(container?.querySelector('[data-testid="settings-switch"]')?.getAttribute('title')).toBe(
-    'savePresets.section.galleryToggleOnTitle'
-  );
-
-  await renderNode(<GalleryToggleCard enabled={false} onToggle={onToggle} />);
-
-  const toggle = container?.querySelector<HTMLButtonElement>('[data-testid="settings-switch"]');
-
-  expect(toggle?.title).toBe('savePresets.section.galleryToggleOffTitle');
-  act(() => {
-    toggle?.click();
-  });
-
-  expect(onToggle).toHaveBeenCalled();
-});
-
-it('renders default preset selects and forwards each change handler', async () => {
+it('renders the save controls as compact label-and-select rows', async () => {
+  const onCaptureActionChange = vi.fn(async () => undefined);
   const onDefaultImageChange = vi.fn(async () => undefined);
   const onDefaultVideoChange = vi.fn(async () => undefined);
   const onDefaultExportChange = vi.fn(async () => undefined);
 
-  await renderNode(
-    <DefaultPresetsCard
-      defaultExportPresetId="export-preset"
-      defaultImagePresetId="image-preset"
-      defaultVideoPresetId="video-preset"
-      isLoading={false}
-      onDefaultExportChange={onDefaultExportChange}
-      onDefaultImageChange={onDefaultImageChange}
-      onDefaultVideoChange={onDefaultVideoChange}
-      presetOptions={[
-        { value: 'image-preset', label: 'Image preset' },
-        { value: 'video-preset', label: 'Video preset' },
-        { value: 'export-preset', label: 'Export preset' },
-      ]}
-    />
-  );
+  await act(async () => {
+    root?.render(
+      <SaveSettingsRows
+        captureAction="download_default"
+        captureActionOptions={[{ value: 'download_default', label: 'Download' }]}
+        defaultExportPresetId="export"
+        defaultImagePresetId="image"
+        defaultVideoPresetId="video"
+        isLoading={false}
+        onCaptureActionChange={onCaptureActionChange}
+        onDefaultExportChange={onDefaultExportChange}
+        onDefaultImageChange={onDefaultImageChange}
+        onDefaultVideoChange={onDefaultVideoChange}
+        presetOptions={[
+          { value: 'image', label: 'Image' },
+          { value: 'video', label: 'Video' },
+          { value: 'export', label: 'Export' },
+        ]}
+      />
+    );
+  });
 
   const selects = Array.from(
     container?.querySelectorAll<HTMLSelectElement>('[data-testid="product-select"]') ?? []
   );
+  expect(selects).toHaveLength(4);
+  expect(selects.map((select) => select.getAttribute('aria-label'))).toEqual([
+    'savePresets.section.captureActionLabel',
+    'savePresets.section.imagePresetLabel',
+    'savePresets.section.videoPresetLabel',
+    'savePresets.section.exportPresetLabel',
+  ]);
+  expect(container?.textContent).toContain('savePresets.section.captureActionLabel');
+  expect(container?.textContent).toContain('savePresets.section.imagePresetLabel');
+  expect(container?.textContent).not.toContain('savePresets.section.saveToGalleryLabel');
+  expect(container?.firstElementChild?.className).not.toContain('divide-y');
+  expect(container?.textContent).toContain('savePresets.section.captureActionDescription');
+  expect(container?.textContent).toContain('savePresets.section.downloadsDescription');
 
-  act(() => {
-    selects[0]?.dispatchEvent(new Event('change', { bubbles: true }));
-    selects[1]?.dispatchEvent(new Event('change', { bubbles: true }));
-    selects[2]?.dispatchEvent(new Event('change', { bubbles: true }));
+  await act(async () => {
+    root?.render(
+      <SaveSettingsRows
+        captureAction="download_default"
+        captureActionOptions={[{ value: 'download_default', label: 'Download' }]}
+        defaultExportPresetId={null}
+        defaultImagePresetId={null}
+        defaultVideoPresetId={null}
+        isLoading
+        onCaptureActionChange={onCaptureActionChange}
+        onDefaultExportChange={onDefaultExportChange}
+        onDefaultImageChange={onDefaultImageChange}
+        onDefaultVideoChange={onDefaultVideoChange}
+        presetOptions={[{ value: '', label: 'Not set' }]}
+      />
+    );
   });
 
-  expect(selects).toHaveLength(3);
-  expect(container?.textContent).toContain('savePresets.section.defaultPresetsLabel');
-  expect(onDefaultImageChange).toHaveBeenCalledWith('image-preset');
-  expect(onDefaultVideoChange).toHaveBeenCalledWith('video-preset');
-  expect(onDefaultExportChange).toHaveBeenCalledWith('export-preset');
+  expect(productSelectPropsSpy).toHaveBeenLastCalledWith(
+    expect.objectContaining({ disabled: true, value: '' })
+  );
 });

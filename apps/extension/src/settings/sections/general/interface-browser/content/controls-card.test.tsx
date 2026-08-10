@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   contextMenu: vi.fn(() => <div data-ui="context-menu" />),
-  switchRow: vi.fn(),
   themeChips: vi.fn(() => <div data-ui="theme-chips" />),
 }));
 
@@ -40,20 +39,6 @@ vi.mock('./context-menu-controls', () => ({
 vi.mock('./theme-chips', () => ({
   ThemeChips: mocks.themeChips,
 }));
-vi.mock('./switch-row', () => ({
-  AppearanceSwitchRow: (props: { checked: boolean; label: string; onToggle: () => void }) => {
-    mocks.switchRow(props);
-    return (
-      <button
-        type="button"
-        aria-label={props.label}
-        aria-pressed={props.checked}
-        onClick={props.onToggle}
-      />
-    );
-  },
-}));
-
 import { AppearanceControlsCard } from './controls-card';
 import {
   buildAppearanceContextMenuOptions,
@@ -118,6 +103,8 @@ it('renders appearance owners and routes locale controls', () => {
 
   expect(container?.querySelector('[data-ui="theme-chips"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="context-menu"]')).not.toBeNull();
+  expect(container?.firstElementChild?.className).not.toContain('divide-y');
+  expect(container?.firstElementChild?.className).not.toContain('rounded');
 
   const select = container?.querySelector<HTMLSelectElement>(
     '[aria-label="settings.appearance.languageSelectAriaLabel"]'

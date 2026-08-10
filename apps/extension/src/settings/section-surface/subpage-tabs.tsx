@@ -7,9 +7,10 @@ export function SettingsSubpageTabs(props: {
   return (
     <nav
       aria-label={props.ariaLabel}
+      data-ui="settings.subpage-tabs"
       className={[
-        'inline-flex max-w-full flex-wrap gap-1 rounded-[12px] border p-1',
-        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]',
+        'sticky top-0 z-20 flex w-full max-w-full flex-wrap gap-x-6 gap-y-1',
+        'bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
     >
       {props.items.map((item) => {
@@ -21,12 +22,21 @@ export function SettingsSubpageTabs(props: {
             aria-current={active ? 'page' : undefined}
             onClick={() => props.onChange?.(item.id)}
             className={[
-              'min-h-8 rounded-[8px] px-3 text-xs font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2',
-              'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+              'relative min-h-11 min-w-28 px-2 py-3 text-sm font-medium',
+              'transition-colors',
+              'focus-visible:outline-none focus-visible:text-[var(--sniptale-color-text-primary)]',
+              'focus-visible:after:absolute focus-visible:after:inset-x-0 focus-visible:after:bottom-0',
+              'focus-visible:after:h-0.5 focus-visible:after:bg-[var(--sniptale-color-focus-ring)]',
               active
-                ? 'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)] shadow-sm'
-                : 'text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]',
+                ? [
+                    'font-semibold text-[var(--sniptale-color-text-primary)]',
+                    'after:absolute after:inset-x-0 after:bottom-0 after:h-0.5',
+                    'after:bg-[var(--sniptale-color-accent)]',
+                  ].join(' ')
+                : [
+                    'text-[var(--sniptale-color-text-secondary)]',
+                    'hover:text-[var(--sniptale-color-text-primary)]',
+                  ].join(' '),
             ].join(' ')}
           >
             {item.label}

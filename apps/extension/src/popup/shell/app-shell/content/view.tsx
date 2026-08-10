@@ -30,7 +30,6 @@ export function PopupAppContent({ runtime }: { runtime: PopupRuntimeState }) {
     <PopupHomePage
       quickActions={runtime.home.quickActions}
       quickActionsReady={runtime.home.quickActionsReady}
-      displayMode={runtime.home.displayMode}
       viewportPresets={runtime.home.viewportPresets}
       activeTabCapabilities={runtime.environment.activeTabCapabilities}
       galleryStatus={runtime.environment.galleryStatus}

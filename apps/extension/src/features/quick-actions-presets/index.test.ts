@@ -7,7 +7,6 @@ import {
   getQuickActionDisplayName,
   isBundledQuickAction,
 } from './catalog';
-import { sanitizeQuickActionsDisplayMode } from './display-mode';
 import { mergeStoredQuickActions, normalizeQuickAction } from './normalization';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -238,16 +237,11 @@ describe('quick-actions-presets merge and display mode', () => {
     );
   });
 
-  it('keeps already normalized bundled sets unchanged and sanitizes display modes', () => {
+  it('keeps already normalized bundled sets unchanged', () => {
     const bundledActions = getBundledQuickActions();
     const result = mergeStoredQuickActions(bundledActions);
 
     expect(result.changed).toBe(false);
     expect(result.actions).toEqual(bundledActions);
-
-    expect(sanitizeQuickActionsDisplayMode('hidden')).toBe('hidden');
-    expect(sanitizeQuickActionsDisplayMode('list')).toBe('list');
-    expect(sanitizeQuickActionsDisplayMode('row')).toBe('list');
-    expect(sanitizeQuickActionsDisplayMode(null)).toBe('list');
   });
 });

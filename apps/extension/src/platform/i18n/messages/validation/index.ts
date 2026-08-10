@@ -43,7 +43,7 @@ export const validationMessages = defineMessageSource({
       en: 'Maximum 50000 characters',
     },
     presetIdRequired: {
-      ru: 'ID пресета не может быть пустым',
+      ru: 'ID шаблона не может быть пустым',
       en: 'Preset ID cannot be empty',
     },
     minWidth320: {

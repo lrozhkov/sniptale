@@ -53,22 +53,27 @@ it('renders prompt save failures inline and disables the save button while a pro
   await renderUi(
     <AIProvidersPromptCard
       prompt={{
-        isSaving: true,
-        saveError: 'Prompt save failed',
+        status: {
+          canReset: true,
+          isDirty: false,
+          isSaving: true,
+          saveError: 'Prompt save failed',
+        },
         value: 'Global prompt',
         textareaRef: { current: null },
         setValue: vi.fn(),
+        handleReset: vi.fn().mockResolvedValue(undefined),
         handleSave: vi.fn().mockResolvedValue(undefined),
         handleResizeStart: vi.fn(),
       }}
       descriptionKey="settings.aiProviders.globalPromptDescription"
-      saveButtonKey="settings.aiProviders.globalPromptSaveButton"
+      titleKey="settings.aiProviders.globalPromptTitle"
     />
   );
 
   expect(container?.textContent).toContain('Prompt save failed');
   const saveButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-    button.textContent?.includes(translate('settings.aiProviders.globalPromptSaveButton'))
+    button.textContent?.includes(translate('common.actions.save'))
   );
   expect(saveButton?.disabled).toBe(true);
 });
@@ -77,19 +82,20 @@ it('forwards prompt edits, resize starts, and save requests', async () => {
   const setValue = vi.fn();
   const handleResizeStart = vi.fn();
   const handleSave = vi.fn().mockResolvedValue(undefined);
+  const handleReset = vi.fn().mockResolvedValue(undefined);
   await renderUi(
     <AIProvidersPromptCard
       prompt={{
-        isSaving: false,
-        saveError: null,
+        status: { canReset: true, isDirty: true, isSaving: false, saveError: null },
         value: 'Initial',
         textareaRef: { current: null },
         setValue,
+        handleReset,
         handleSave,
         handleResizeStart,
       }}
       descriptionKey="settings.aiProviders.globalPromptDescription"
-      saveButtonKey="settings.aiProviders.globalPromptSaveButton"
+      titleKey="settings.aiProviders.globalPromptTitle"
     />
   );
   const textarea = container?.querySelector('textarea');
@@ -100,8 +106,11 @@ it('forwards prompt edits, resize starts, and save requests', async () => {
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     }
     resizeHandle?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    container?.querySelector('button')?.click();
+    const buttons = container?.querySelectorAll('button');
+    buttons?.[0]?.click();
+    buttons?.[1]?.click();
   });
   expect(handleResizeStart).toHaveBeenCalledOnce();
+  expect(handleReset).toHaveBeenCalledOnce();
   expect(handleSave).toHaveBeenCalledOnce();
 });

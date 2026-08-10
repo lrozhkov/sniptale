@@ -8,15 +8,25 @@ import { NativeTelemetryView } from '.';
 it('renders telemetry controls', () => {
   const node = document.createElement('div');
   const root = createRoot(node);
+  const onChange = vi.fn();
   act(() =>
     root.render(
       <NativeTelemetryView
         disabled={false}
         settings={DEFAULT_VIDEO_SETTINGS.native as NativeCaptureSettings}
-        onChange={vi.fn()}
+        onChange={onChange}
       />
     )
   );
+  expect(node.firstElementChild?.className).toContain('max-w-[720px]');
   expect(node.querySelectorAll('button[role="switch"]').length).toBe(5);
+  act(() => node.querySelector<HTMLButtonElement>('button[role="switch"]')?.click());
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      video: expect.objectContaining({
+        telemetry: expect.objectContaining({ collectCursor: false }),
+      }),
+    })
+  );
   act(() => root.unmount());
 });

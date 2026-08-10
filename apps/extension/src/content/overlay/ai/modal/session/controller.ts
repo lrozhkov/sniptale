@@ -18,7 +18,7 @@ function createAIModalActions(core: AIModalCoreState, stopVoiceInput: () => void
       setEditingTemplate: core.editor.setEditingTemplate,
       setIsEditorOpen: core.editor.setIsEditorOpen,
     }),
-    handleDeleteTemplate: createTemplateDeleteHandler(core.templatesState.removeTemplate),
+    handleDeleteTemplate: createTemplateDeleteHandler(core.templatesState.templateLifecycle.remove),
     handleEditTemplate: createTemplateEditHandler({
       setEditingTemplate: core.editor.setEditingTemplate,
       setIsEditorOpen: core.editor.setIsEditorOpen,

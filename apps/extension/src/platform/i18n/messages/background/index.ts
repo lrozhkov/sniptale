@@ -103,7 +103,7 @@ export const backgroundMessages = defineMessageSource({
       en: 'Recording remains paused because separate cursor capture could not reconnect after navigation.',
     },
     viewportPresetRequired: {
-      ru: 'Выберите пресет размера для записи вкладки',
+      ru: 'Выберите шаблон размера для записи вкладки',
       en: 'Select a size preset for tab recording',
     },
     sourceSelectionCancelled: {

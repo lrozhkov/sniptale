@@ -12,16 +12,14 @@ import {
 import { PresetsListEmptyState } from './empty-state';
 
 type PresetsListProps = {
-  defaultPresetId: string | null;
+  isBusy: boolean;
   isLoading: boolean;
   onDelete: (preset: ViewportPreset) => void;
   onEdit: (preset: ViewportPreset) => void;
   onMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
   onReset: (preset: ViewportPreset) => Promise<void>;
-  onSetDefault: (presetId: string | null) => Promise<void>;
   onToggle: (preset: ViewportPreset) => Promise<void>;
   onAdd: () => void;
-  presetsCountLabel: string;
   viewportPresets: ViewportPreset[];
 };
 
@@ -39,16 +37,11 @@ function createCollectionItems(
       </>
     ),
     enabled: preset.enabled,
-    isDefault: preset.id === props.defaultPresetId,
-    busy: props.isLoading,
-    badges:
-      preset.kind === 'system'
-        ? [{ id: 'system', label: translate('highlighter.section.systemBadge'), tone: 'neutral' }]
-        : [],
+    busy: props.isBusy,
+    isBuiltIn: preset.kind === 'system',
     capabilities: {
       edit: true,
       toggle: true,
-      setDefault: preset.enabled && preset.id !== props.defaultPresetId,
       reset: preset.kind === 'system' && preset.customized,
       delete: preset.kind === 'user',
       reorder: true,
@@ -80,7 +73,6 @@ export function PresetsList(props: PresetsListProps) {
     if (!preset) return;
     if (action.type === 'edit') props.onEdit(preset);
     if (action.type === 'toggle') void props.onToggle(preset);
-    if (action.type === 'set-default') void props.onSetDefault(preset.id);
     if (action.type === 'reset') void props.onReset(preset);
     if (action.type === 'delete') props.onDelete(preset);
   };
@@ -92,13 +84,11 @@ export function PresetsList(props: PresetsListProps) {
     <div className="mb-6">
       <SettingsCollection
         ariaLabel={translate('viewportPresets.section.savedLabel')}
-        title={translate('viewportPresets.section.savedLabel')}
         items={createCollectionItems(props, locale)}
         groups={createGroups(props.viewportPresets)}
-        countLabel={`${props.viewportPresets.length} ${props.presetsCountLabel}`}
         addAction={{
           label: translate('viewportPresets.section.addButton'),
-          disabled: props.isLoading,
+          disabled: props.isLoading || props.isBusy,
           onInvoke: props.onAdd,
         }}
         state={props.isLoading ? 'loading' : 'ready'}

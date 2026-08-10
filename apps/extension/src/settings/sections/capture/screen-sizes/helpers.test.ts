@@ -1,7 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type { SystemViewportPreset, UserViewportPreset } from '../../../../contracts/settings';
-import { createViewportPreset, getDeleteMessage, updateViewportPreset } from './helpers';
+import {
+  createViewportPreset,
+  getDeleteMessage,
+  moveViewportPresetBefore,
+  updateViewportPreset,
+} from './helpers';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -83,6 +88,21 @@ it('creates presets in the next group position', () => {
   expect(
     createViewportPreset({ height: 844, name: 'Phone', target: 'viewport', width: 390 }, presets)
   ).toMatchObject({ id: 'created-preset', name: 'Phone', order: 2 });
+});
+
+it('moves a preset before another item without restoring the stale stored order', () => {
+  const moved = moveViewportPresetBefore(
+    [viewportPreset, secondViewportPreset, systemWindowPreset],
+    secondViewportPreset.id,
+    viewportPreset.id
+  );
+
+  expect(moved.map((preset) => preset.id)).toEqual([
+    secondViewportPreset.id,
+    viewportPreset.id,
+    systemWindowPreset.id,
+  ]);
+  expect(moved.map((preset) => preset.order)).toEqual([0, 1, 0]);
 });
 
 it('accepts an 80-character name and rejects 81 characters at the mutation boundary', () => {

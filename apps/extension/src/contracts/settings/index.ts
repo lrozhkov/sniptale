@@ -70,6 +70,7 @@ export interface Settings {
   /** @deprecated Read compatibility for settings written before localStoragePolicy. */
   saveCapturesToGallery: boolean;
   viewportPresets: ViewportPreset[];
+  /** @deprecated Read compatibility only; capture flows require an explicit viewport selection. */
   defaultViewportPresetId: string | null;
   presets?: SavePreset[];
   defaultImagePresetId?: string | null;
@@ -89,7 +90,13 @@ export type NormalizedSettings = Settings & { localStoragePolicy: LocalStoragePo
 
 export type SettingsPatch = Omit<
   Partial<Settings>,
-  'contentToolbar' | 'contextMenu' | 'fullPageCapture' | 'localStoragePolicy' | 'voiceInput'
+  | 'contentToolbar'
+  | 'contextMenu'
+  | 'defaultViewportPresetId'
+  | 'fullPageCapture'
+  | 'localStoragePolicy'
+  | 'saveCapturesToGallery'
+  | 'voiceInput'
 > & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
@@ -171,8 +178,6 @@ export type BundledQuickActionId =
   | 'default-delayed-visible'
   | 'default-copy-visible'
   | 'default-copy-selection';
-
-export type QuickActionsDisplayMode = 'hidden' | 'list';
 
 export const SCREENSHOT_MODE_COLORS: Record<QuickActionScreenshotMode, string> = {
   visible: DEFAULT_COLOR_ACCENT,

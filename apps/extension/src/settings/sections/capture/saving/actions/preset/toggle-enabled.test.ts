@@ -40,7 +40,6 @@ function createSyncState(presets: SavePreset[]): SavePresetsSyncState {
     defaultVideoPresetId: null,
     isLoading: false,
     presets,
-    saveCapturesToGallery: false,
     settings: createSettings(),
     setCaptureAction: vi.fn(),
     setDefaultExportPresetId: vi.fn(),
@@ -49,7 +48,6 @@ function createSyncState(presets: SavePreset[]): SavePresetsSyncState {
     setPresets: vi.fn((value: SavePreset[]) => {
       sync.presets = value;
     }),
-    setSaveCapturesToGallery: vi.fn(),
     updateSettings: vi.fn(async () => undefined),
   };
   return sync;
@@ -60,7 +58,7 @@ beforeEach(() => {
   mocks.translateMock.mockClear();
 });
 
-it('toggles preset enabled state and emits the matching toast copy', async () => {
+it('toggles preset enabled state without redundant success feedback', async () => {
   const enabledPreset = createPreset('a', true);
   const disabledPreset = createPreset('b', false);
   const sync = createSyncState([enabledPreset, disabledPreset]);
@@ -71,6 +69,5 @@ it('toggles preset enabled state and emits the matching toast copy', async () =>
 
   expect(sync.presets[0]?.enabled).toBe(false);
   expect(sync.presets[1]?.enabled).toBe(true);
-  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetHidden');
-  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetShown');
+  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
 });

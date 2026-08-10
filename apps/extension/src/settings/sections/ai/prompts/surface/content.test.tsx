@@ -14,11 +14,11 @@ vi.mock('./prompt-card', () => ({
 import { AiPromptsContent } from './content';
 it('renders both prompt mutation surfaces', () => {
   const prompt = {
-    isSaving: false,
-    saveError: null,
+    status: { canReset: false, isDirty: false, isSaving: false, saveError: null },
     value: '',
     textareaRef: { current: null },
     setValue: vi.fn(),
+    handleReset: vi.fn(),
     handleSave: vi.fn(),
     handleResizeStart: vi.fn(),
   };

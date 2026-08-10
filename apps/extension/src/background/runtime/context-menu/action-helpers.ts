@@ -79,18 +79,12 @@ export async function showContextMenuToast(
 export function resolveContextMenuVideoPreset(settings: Settings): Promise<string | null> {
   return loadVideoUiState().then((videoUiState) => {
     const presets = settings.viewportPresets ?? [];
-    const defaultPresetId = settings.defaultViewportPresetId;
-    const preferredPresetId = videoUiState.viewportPresetId ?? defaultPresetId;
-    const fallbackPresetId = presets.some(
-      (preset) => preset.id === defaultPresetId && preset.enabled
-    )
-      ? defaultPresetId
-      : null;
+    const preferredPresetId = videoUiState.viewportPresetId;
     const resolvedPresetId = presets.some(
       (preset) => preset.id === preferredPresetId && preset.enabled
     )
       ? preferredPresetId
-      : fallbackPresetId;
+      : null;
     return presets.find((entry) => entry.id === resolvedPresetId)?.id ?? null;
   });
 }

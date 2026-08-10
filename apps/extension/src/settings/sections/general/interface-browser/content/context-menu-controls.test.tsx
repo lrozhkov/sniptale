@@ -61,9 +61,16 @@ describe('ContextMenuControls', () => {
 
     await renderWithState(state);
 
-    expect(container?.textContent).toContain('Встраивание в контекстное меню');
+    expect(container?.textContent).toContain('Контекстное меню браузера');
+    expect(container?.textContent).toContain('Команды в меню');
     expect(container?.textContent).toContain('Копировать название и ссылку');
     expect(container?.querySelector('button[aria-label="Настройки"]')).toBeTruthy();
+    expect(
+      [...(container?.querySelectorAll<HTMLElement>('*') ?? [])].some(
+        (element) =>
+          typeof element.className === 'string' && element.className.includes('rounded-[18px]')
+      )
+    ).toBe(false);
 
     const pageLinkToggle = container?.querySelector(
       'button[aria-label="Копировать название и ссылку"]'

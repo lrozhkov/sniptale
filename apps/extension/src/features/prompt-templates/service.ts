@@ -4,10 +4,15 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   deletePromptTemplate,
   getPromptTemplates,
+  loadTemplateOrder,
+  resetPromptTemplate,
   savePromptTemplate,
+  saveTemplateOrder,
+  setPromptTemplateEnabled,
   updateTemplateLastUsed,
 } from '../../composition/persistence/prompt-templates';
 import {
+  applyPromptTemplateOrder,
   createPromptTemplateDraft,
   requirePromptTemplateUpdate,
   sortPromptTemplates,
@@ -27,12 +32,19 @@ function getDefaultPromptTemplateCreationDeps(): PromptTemplateCreationDeps {
 
 export async function loadPromptTemplateList(locale?: AppLocale): Promise<PromptTemplate[]> {
   try {
-    const loadedTemplates = await getPromptTemplates(locale);
-    return sortPromptTemplates(loadedTemplates);
+    const [loadedTemplates, orderedIds] = await Promise.all([
+      getPromptTemplates(locale),
+      loadTemplateOrder(),
+    ]);
+    return applyPromptTemplateOrder(sortPromptTemplates(loadedTemplates), orderedIds);
   } catch (error) {
     logger.error('Failed to load prompt templates', error);
     throw error;
   }
+}
+
+export async function savePromptTemplateOrder(templates: readonly PromptTemplate[]): Promise<void> {
+  await saveTemplateOrder(templates.map((template) => template.id));
 }
 
 export async function createPromptTemplateRecord(
@@ -63,8 +75,7 @@ export async function savePromptTemplatePatch(
   try {
     const updatedTemplate = requirePromptTemplateUpdate(templates, id, patch);
 
-    await savePromptTemplate(updatedTemplate);
-    return updatedTemplate;
+    return await savePromptTemplate(updatedTemplate);
   } catch (error) {
     logger.error('Failed to update prompt template', error);
     throw error;
@@ -76,6 +87,30 @@ export async function deletePromptTemplateRecord(id: string): Promise<void> {
     await deletePromptTemplate(id);
   } catch (error) {
     logger.error('Failed to delete prompt template', error);
+    throw error;
+  }
+}
+
+export async function setPromptTemplateEnabledRecord(
+  id: string,
+  enabled: boolean
+): Promise<PromptTemplate> {
+  try {
+    return await setPromptTemplateEnabled(id, enabled);
+  } catch (error) {
+    logger.error('Failed to update prompt template availability', error);
+    throw error;
+  }
+}
+
+export async function resetPromptTemplateRecord(
+  id: string,
+  locale?: AppLocale
+): Promise<PromptTemplate> {
+  try {
+    return await resetPromptTemplate(id, locale);
+  } catch (error) {
+    logger.error('Failed to reset prompt template', error);
     throw error;
   }
 }

@@ -1,12 +1,10 @@
-import { translate } from '../../../../../../platform/i18n';
-import type { Settings } from '../../../../../../contracts/settings';
-import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import type { SettingsPatch } from '../../../../../../contracts/settings';
 import type { SavePresetsDialogState, SavePresetsSyncState } from '../../state/types';
 
 export function createConfirmDeletePresetAction(
   sync: SavePresetsSyncState,
   dialogState: SavePresetsDialogState,
-  persistSettings: (partialSettings: Partial<Settings>) => Promise<void>
+  persistSettings: (partialSettings: SettingsPatch) => Promise<void>
 ) {
   return async () => {
     if (!dialogState.confirmDelete) {
@@ -49,7 +47,6 @@ export function createConfirmDeletePresetAction(
       throw error;
     }
 
-    toast.success(translate('savePresets.messages.presetDeleted'));
     dialogState.closeDeleteDialog();
   };
 }

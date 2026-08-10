@@ -6,7 +6,6 @@ import {
   createDefaultQuickAction,
   getDelayLabel,
   getViewportPresetLabel,
-  getQuickActionCountLabel,
   reorderQuickActionsBefore,
 } from './helpers';
 
@@ -39,9 +38,7 @@ function verifyEmulationAndDelayLabels() {
   expect(getDelayLabel(5)).toBe(`5 ${translate('settings.quickActions.delayShortSuffix')}`);
 }
 
-function verifyQuickActionCountAndDefaultAction() {
-  expect(getQuickActionCountLabel(1)).toBeTruthy();
-
+function verifyDefaultAction() {
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'quick-action-id') });
 
   expect(createDefaultQuickAction()).toEqual(
@@ -79,10 +76,7 @@ function runQuickActionsSectionHelpersSuite() {
     'builds emulation and delay labels for native, preset, and fallback values',
     verifyEmulationAndDelayLabels
   );
-  it(
-    'builds quick-action count copy and a default quick-action payload',
-    verifyQuickActionCountAndDefaultAction
-  );
+  it('builds quick-action count copy and a default quick-action payload', verifyDefaultAction);
   it('reorders quick actions only when the moved and anchor ids exist', verifyQuickActionReorder);
 }
 

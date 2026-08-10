@@ -7,28 +7,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { QuickAction } from '../../../../contracts/settings';
 import { useQuickActionsController } from './controller';
 
-const {
-  getQuickActionsDisplayModeMock,
-  getQuickActionsMock,
-  loggerErrorMock,
-  saveQuickActionsDisplayModeMock,
-  saveQuickActionsMock,
-  toastErrorMock,
-} = vi.hoisted(() => ({
-  saveQuickActionsMock: vi.fn(),
-  saveQuickActionsDisplayModeMock: vi.fn(),
-  getQuickActionsMock: vi.fn(),
-  getQuickActionsDisplayModeMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  toastErrorMock: vi.fn(),
-}));
+const { getQuickActionsMock, loggerErrorMock, saveQuickActionsMock, toastErrorMock } = vi.hoisted(
+  () => ({
+    saveQuickActionsMock: vi.fn(),
+    getQuickActionsMock: vi.fn(),
+    loggerErrorMock: vi.fn(),
+    toastErrorMock: vi.fn(),
+  })
+);
 
 vi.mock('../../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal()),
   getQuickActions: getQuickActionsMock,
-  getQuickActionsDisplayMode: getQuickActionsDisplayModeMock,
   saveQuickActions: saveQuickActionsMock,
-  saveQuickActionsDisplayMode: saveQuickActionsDisplayModeMock,
 }));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
@@ -103,10 +94,7 @@ beforeEach(() => {
   vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   saveQuickActionsMock.mockReset();
   saveQuickActionsMock.mockResolvedValue(undefined);
-  saveQuickActionsDisplayModeMock.mockReset();
-  saveQuickActionsDisplayModeMock.mockResolvedValue(undefined);
   getQuickActionsMock.mockReset();
-  getQuickActionsDisplayModeMock.mockReset();
   loggerErrorMock.mockReset();
   toastErrorMock.mockReset();
 });
@@ -125,14 +113,12 @@ afterEach(() => {
 
 async function loadController(actions: QuickAction[]) {
   getQuickActionsMock.mockResolvedValue(actions);
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
   await renderHarness();
   await flushEffects();
 }
 
 it('keeps the controller stable when the initial quick-actions load fails', async () => {
   getQuickActionsMock.mockRejectedValue(new Error('load failed'));
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
 
   await renderHarness();
   await flushEffects();
@@ -142,16 +128,8 @@ it('keeps the controller stable when the initial quick-actions load fails', asyn
   expect(loggerErrorMock).toHaveBeenCalledWith('Failed to load quick actions', expect.any(Error));
 });
 
-it('persists display-mode and status changes', async () => {
+it('persists status changes', async () => {
   await loadController([createQuickAction({ id: 'action-1', status: true })]);
-
-  await act(async () => {
-    await latestState?.setDisplayMode('hidden');
-  });
-
-  expect(saveQuickActionsDisplayModeMock).toHaveBeenCalledWith('hidden');
-  expect(latestState?.displayMode).toBe('hidden');
-  expect(latestState?.confirmationMessage).toBe('Настройка сохранена');
 
   await act(async () => {
     await latestState?.handleToggleStatus('action-1');

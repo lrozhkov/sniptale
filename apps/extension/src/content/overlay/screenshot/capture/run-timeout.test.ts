@@ -106,7 +106,9 @@ beforeEach(() => {
     return 0;
   };
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameMock);
-  loadSettingsMock.mockResolvedValue({ saveCapturesToGallery: false });
+  loadSettingsMock.mockResolvedValue({
+    localStoragePolicy: { defaultDestination: 'temporary' },
+  });
   persistBackgroundCaptureMock.mockResolvedValue({ successMessage: null });
   persistSelectionCaptureMock.mockResolvedValue({ successMessage: null });
   sendRuntimeMessageMock.mockResolvedValue({

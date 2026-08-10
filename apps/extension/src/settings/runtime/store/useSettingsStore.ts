@@ -39,7 +39,7 @@ function syncSettingsWriteQueue(state: SettingsWriteState, settings: Settings) {
 function beginSettingsWrite(state: SettingsWriteState, set: SettingsStoreSet) {
   state.writeVersion += 1;
   state.pendingWriteCount += 1;
-  set({ isLoading: true, error: null });
+  set({ error: null });
 }
 
 function finishSettingsWrite(
@@ -48,10 +48,7 @@ function finishSettingsWrite(
   patch: Partial<Pick<SettingsStore, 'settings' | 'error'>> = {}
 ) {
   state.pendingWriteCount = Math.max(0, state.pendingWriteCount - 1);
-  set({
-    ...patch,
-    isLoading: state.pendingWriteCount > 0,
-  });
+  set(patch);
 }
 
 function isStaleLoadResult(state: SettingsWriteState, loadVersion: number) {
@@ -69,6 +66,7 @@ async function loadSettingsIntoStore(
     const settings = await loadSettingsRuntimeState();
 
     if (isStaleLoadResult(state, loadVersion)) {
+      set({ isLoading: false });
       return;
     }
 
@@ -76,6 +74,7 @@ async function loadSettingsIntoStore(
     set({ settings, isLoading: false });
   } catch (error) {
     if (isStaleLoadResult(state, loadVersion)) {
+      set({ isLoading: false });
       return;
     }
 

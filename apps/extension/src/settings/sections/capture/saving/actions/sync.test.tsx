@@ -116,7 +116,6 @@ describe('useSavePresetsSync', () => {
     expect(getState().defaultExportPresetId).toBe('preset-export');
     expect(getState().defaultImagePresetId).toBe('preset-image');
     expect(getState().defaultVideoPresetId).toBe('preset-video');
-    expect(getState().saveCapturesToGallery).toBe(true);
     expect(getState().presets).toHaveLength(1);
   });
 
@@ -127,7 +126,6 @@ describe('useSavePresetsSync', () => {
     delete (settings as Partial<Settings>).defaultImagePresetId;
     delete (settings as Partial<Settings>).defaultVideoPresetId;
     delete (settings as Partial<Settings>).presets;
-    delete (settings as Partial<Settings>).saveCapturesToGallery;
 
     await renderHarness(settings);
 
@@ -135,7 +133,6 @@ describe('useSavePresetsSync', () => {
     expect(getState().defaultExportPresetId).toBeNull();
     expect(getState().defaultImagePresetId).toBeNull();
     expect(getState().defaultVideoPresetId).toBeNull();
-    expect(getState().saveCapturesToGallery).toBe(false);
     expect(getState().presets).toEqual([]);
   });
 });

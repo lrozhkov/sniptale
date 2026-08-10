@@ -9,6 +9,22 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     ru: 'Управление провайдерами и моделями для обработки данных',
     en: 'Manage providers and models used for data processing',
   },
+  tabsLabel: {
+    ru: 'Разделы настроек AI',
+    en: 'AI settings sections',
+  },
+  integrationsTab: {
+    ru: 'Интеграции',
+    en: 'Integrations',
+  },
+  chromeAiTab: {
+    ru: 'Chrome AI',
+    en: 'Chrome AI',
+  },
+  securityTab: {
+    ru: 'Безопасность',
+    en: 'Security',
+  },
   chromeAiTitle: {
     ru: 'Включить Chrome AI',
     en: 'Enable Chrome AI',
@@ -41,17 +57,25 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     ru: 'Chrome AI включён. Модель появляется только в селекторах и не хранится как обычный CRUD-провайдер.',
     en: 'Chrome AI is enabled. The model appears only in selectors and is not stored as a normal CRUD provider.',
   },
-  chromeAiEnabledMessage: {
-    ru: 'Chrome AI включён',
-    en: 'Chrome AI enabled',
+  chromeAiTestAction: {
+    ru: 'Проверить Chrome AI',
+    en: 'Test Chrome AI',
+  },
+  chromeAiTestRunning: {
+    ru: 'Проверяем…',
+    en: 'Testing…',
+  },
+  chromeAiTestSuccess: {
+    ru: 'Chrome AI готов к работе',
+    en: 'Chrome AI is ready',
   },
   loadErrorSuffix: {
     ru: ' загрузки настроек AI',
     en: ' loading AI settings',
   },
   globalPromptTitle: {
-    ru: 'Промпт по умолчанию',
-    en: 'Default prompt',
+    ru: 'Системный промпт для редактора контента',
+    en: 'System prompt for the content editor',
   },
   globalPromptDescription: {
     ru: 'Используется для всех моделей, у которых не задан собственный промпт',
@@ -64,6 +88,18 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
   globalPromptSavedMessage: {
     ru: 'Глобальный промпт сохранён',
     en: 'Global prompt saved',
+  },
+  globalPromptResetButton: {
+    ru: 'Сбросить',
+    en: 'Reset',
+  },
+  globalPromptResetMessage: {
+    ru: 'Глобальный промпт восстановлен',
+    en: 'Global prompt restored',
+  },
+  globalPromptResetErrorSuffix: {
+    ru: ' восстановления глобального промпта',
+    en: ' restoring the global prompt',
   },
   globalPromptSaveErrorSuffix: {
     ru: ' сохранения глобального промпта',
@@ -85,6 +121,18 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     ru: 'Промпт AI-редактора сценариев сохранён',
     en: 'Scenario AI editor prompt saved',
   },
+  scenarioEditorPromptResetButton: {
+    ru: 'Сбросить',
+    en: 'Reset',
+  },
+  scenarioEditorPromptResetMessage: {
+    ru: 'Промпт AI-редактора восстановлен',
+    en: 'Scenario AI editor prompt restored',
+  },
+  scenarioEditorPromptResetErrorSuffix: {
+    ru: ' восстановления промпта AI-редактора сценариев',
+    en: ' restoring the scenario AI editor prompt',
+  },
   scenarioEditorPromptSaveErrorSuffix: {
     ru: ' сохранения промпта AI-редактора сценариев',
     en: ' saving the scenario AI editor prompt',
@@ -96,6 +144,10 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
   modelsTitle: {
     ru: 'Модели',
     en: 'Models',
+  },
+  modelOrderSaveError: {
+    ru: 'Не удалось изменить порядок моделей',
+    en: 'Could not reorder models',
   },
   defaultModelTitle: {
     ru: 'Модель по умолчанию',

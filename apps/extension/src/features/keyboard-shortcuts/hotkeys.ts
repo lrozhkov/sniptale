@@ -25,6 +25,7 @@ const RESERVED_HOTKEYS: string[] = [
   'Ctrl+K',
   'Ctrl+D',
   'Alt+F4',
+  'Alt+Tab',
   'F5',
   'F11',
   'F12',
@@ -38,7 +39,30 @@ const RESERVED_HOTKEYS: string[] = [
   'Cmd+P',
   'Cmd+S',
   'Cmd+F',
+  'Cmd+Tab',
 ];
+
+const QUICK_ACTION_SHORTCUT_KEYS = new Set([
+  ',',
+  '.',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'Delete',
+  'End',
+  'Home',
+  'Insert',
+  'PageDown',
+  'PageUp',
+  'Space',
+]);
+
+export type QuickActionHotkeyValidationFailure =
+  | 'altgr-conflict'
+  | 'modifier-required'
+  | 'reserved'
+  | 'unsupported-key';
 
 export interface HotkeyEventLike {
   altKey: boolean;
@@ -148,4 +172,29 @@ export function matchesHotkeyEvent(event: HotkeyEventLike, hotkey: HotkeyConfig)
 
 export function isHotkeyReserved(hotkey: HotkeyConfig): boolean {
   return RESERVED_HOTKEYS.includes(hotkeyToKeyString(hotkey));
+}
+
+/** Validates shortcuts newly assigned through quick-action settings. */
+export function getQuickActionHotkeyValidationFailure(
+  hotkey: HotkeyConfig
+): QuickActionHotkeyValidationFailure | null {
+  const normalizedHotkey = normalizeHotkeyConfig(hotkey);
+  const hasPrimaryModifier =
+    normalizedHotkey.ctrlKey || normalizedHotkey.altKey || normalizedHotkey.metaKey;
+
+  if (!hasPrimaryModifier) {
+    return 'modifier-required';
+  }
+  if (normalizedHotkey.ctrlKey && normalizedHotkey.altKey) {
+    return 'altgr-conflict';
+  }
+  if (isHotkeyReserved(normalizedHotkey)) {
+    return 'reserved';
+  }
+
+  const isLetterOrNumber = /^[A-Z0-9]$/.test(normalizedHotkey.key);
+  if (!isLetterOrNumber && !QUICK_ACTION_SHORTCUT_KEYS.has(normalizedHotkey.key)) {
+    return 'unsupported-key';
+  }
+  return null;
 }

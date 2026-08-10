@@ -1,121 +1,88 @@
-import { translate } from '../../../../../platform/i18n';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { CaptureActionType } from '../../../../../contracts/settings';
-import { settingsCardClassName, SettingsSwitch } from '../../../../section-surface/panel-controls';
-import { settingsMetaLabelClassName, SettingsSectionHeader } from '../../../../section-surface';
+import { translate } from '../../../../../platform/i18n';
+import { SettingsControlRow, settingsMetaLabelClassName } from '../../../../section-surface';
 
-export function SavePresetsHeader() {
-  return (
-    <SettingsSectionHeader
-      description={translate('savePresets.section.subtitle')}
-      kicker={translate('settings.navigation.saves')}
-    />
-  );
-}
-
-export function CaptureActionCard(props: {
-  captureAction: CaptureActionType;
-  captureActionOptions: { value: CaptureActionType; label: string }[];
-  isLoading: boolean;
-  onChange: (value: CaptureActionType) => Promise<void>;
-}) {
-  return (
-    <div className={settingsCardClassName}>
-      <label className="mb-2 block text-sm font-medium text-[var(--sniptale-color-text-secondary)]">
-        {translate('savePresets.section.captureActionLabel')}
-      </label>
-      <ProductSelect<CaptureActionType>
-        value={props.captureAction}
-        onChange={props.onChange}
-        options={props.captureActionOptions}
-        disabled={props.isLoading}
-      />
-    </div>
-  );
-}
-
-export function GalleryToggleCard(props: { enabled: boolean; onToggle: () => Promise<void> }) {
-  return (
-    <div className={settingsCardClassName}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <label className="block text-sm font-medium text-[var(--sniptale-color-text-secondary)]">
-            {translate('savePresets.section.saveToGalleryLabel')}
-          </label>
-          <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
-            {translate('savePresets.section.saveToGalleryDescription')}
-          </p>
-        </div>
-        <SettingsSwitch
-          checked={props.enabled}
-          onClick={props.onToggle}
-          title={
-            props.enabled
-              ? translate('savePresets.section.galleryToggleOnTitle')
-              : translate('savePresets.section.galleryToggleOffTitle')
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
-function DefaultPresetSelect(props: {
-  label: string;
-  value: string | null;
-  onChange: (value: string) => Promise<void>;
-  options: { value: string; label: string }[];
+function SettingsSelectRow<T extends string>(props: {
   disabled: boolean;
+  description?: string;
+  label: string;
+  onChange: (value: T) => Promise<void>;
+  options: { value: T; label: string }[];
+  value: T;
 }) {
   return (
-    <div>
-      <span className={`mb-1 block ${settingsMetaLabelClassName}`}>{props.label}</span>
-      <ProductSelect
-        value={props.value ?? ''}
+    <SettingsControlRow label={props.label} description={props.description}>
+      <ProductSelect<T>
+        aria-label={props.label}
+        value={props.value}
         onChange={props.onChange}
         options={props.options}
         disabled={props.disabled}
       />
-    </div>
+    </SettingsControlRow>
   );
 }
 
-export function DefaultPresetsCard(props: {
+export function SaveSettingsRows(props: {
+  captureAction: CaptureActionType;
+  captureActionOptions: { value: CaptureActionType; label: string }[];
   defaultExportPresetId: string | null;
   defaultImagePresetId: string | null;
   defaultVideoPresetId: string | null;
   isLoading: boolean;
+  onCaptureActionChange: (value: CaptureActionType) => Promise<void>;
   onDefaultExportChange: (value: string) => Promise<void>;
   onDefaultImageChange: (value: string) => Promise<void>;
   onDefaultVideoChange: (value: string) => Promise<void>;
   presetOptions: { value: string; label: string }[];
 }) {
   return (
-    <div className={`${settingsCardClassName} space-y-3`}>
-      <label className="block text-sm font-medium text-[var(--sniptale-color-text-secondary)]">
-        {translate('savePresets.section.defaultPresetsLabel')}
-      </label>
-      <DefaultPresetSelect
-        label={translate('savePresets.section.imagePresetLabel')}
-        value={props.defaultImagePresetId}
-        onChange={props.onDefaultImageChange}
-        options={props.presetOptions}
-        disabled={props.isLoading}
-      />
-      <DefaultPresetSelect
-        label={translate('savePresets.section.videoPresetLabel')}
-        value={props.defaultVideoPresetId}
-        onChange={props.onDefaultVideoChange}
-        options={props.presetOptions}
-        disabled={props.isLoading}
-      />
-      <DefaultPresetSelect
-        label={translate('savePresets.section.exportPresetLabel')}
-        value={props.defaultExportPresetId}
-        onChange={props.onDefaultExportChange}
-        options={props.presetOptions}
-        disabled={props.isLoading}
-      />
+    <div className="space-y-6">
+      <section className="space-y-1">
+        <h2 className={settingsMetaLabelClassName}>
+          {translate('savePresets.section.afterCaptureTitle')}
+        </h2>
+        <SettingsSelectRow
+          disabled={props.isLoading}
+          description={translate('savePresets.section.captureActionDescription')}
+          label={translate('savePresets.section.captureActionLabel')}
+          onChange={props.onCaptureActionChange}
+          options={props.captureActionOptions}
+          value={props.captureAction}
+        />
+      </section>
+      <section className="space-y-1">
+        <div>
+          <h2 className={settingsMetaLabelClassName}>
+            {translate('savePresets.section.downloadsTitle')}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+            {translate('savePresets.section.downloadsDescription')}
+          </p>
+        </div>
+        <SettingsSelectRow
+          disabled={props.isLoading}
+          label={translate('savePresets.section.imagePresetLabel')}
+          onChange={props.onDefaultImageChange}
+          options={props.presetOptions}
+          value={props.defaultImagePresetId ?? ''}
+        />
+        <SettingsSelectRow
+          disabled={props.isLoading}
+          label={translate('savePresets.section.videoPresetLabel')}
+          onChange={props.onDefaultVideoChange}
+          options={props.presetOptions}
+          value={props.defaultVideoPresetId ?? ''}
+        />
+        <SettingsSelectRow
+          disabled={props.isLoading}
+          label={translate('savePresets.section.exportPresetLabel')}
+          onChange={props.onDefaultExportChange}
+          options={props.presetOptions}
+          value={props.defaultExportPresetId ?? ''}
+        />
+      </section>
     </div>
   );
 }

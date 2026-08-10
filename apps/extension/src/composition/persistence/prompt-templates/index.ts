@@ -90,8 +90,8 @@ export async function getPromptTemplates(locale?: AppLocale): Promise<PromptTemp
 /**
  * Сохранение шаблона (создание или обновление)
  */
-export async function savePromptTemplate(template: PromptTemplate): Promise<void> {
-  await queuePromptTemplateMutation(async () => {
+export async function savePromptTemplate(template: PromptTemplate): Promise<PromptTemplate> {
+  return queuePromptTemplateMutation(async () => {
     const templates = await materializePromptTemplatesForMutation();
     const index = templates.findIndex((current) => current.id === template.id);
     const nextTemplates = [...templates];
@@ -115,26 +115,76 @@ export async function savePromptTemplate(template: PromptTemplate): Promise<void
     logger.debug('Saved prompt template', {
       templateId: template.id,
     });
+    return persistedTemplate;
   });
 }
 
-/**
- * Удаляет пользовательский шаблон или переключает видимость системного.
- */
+/** Restores a system template from the current localized catalog. */
+export async function resetPromptTemplate(id: string, locale?: AppLocale): Promise<PromptTemplate> {
+  return queuePromptTemplateMutation(async () => {
+    if (!isSystemPromptTemplateId(id)) {
+      throw new Error(`Prompt template ${id} is not a system template`);
+    }
+
+    const canonical = createSystemPromptTemplateCatalog(locale).find(
+      (template) => template.id === id
+    );
+    if (!canonical) {
+      throw new Error(`System prompt template ${id} is missing from the catalog`);
+    }
+
+    const templates = mergePromptTemplateCatalog(await loadStoredPromptTemplates(), locale);
+    const index = templates.findIndex((template) => template.id === id);
+    const current = templates[index];
+    if (!current || index < 0) {
+      throw new Error(`System prompt template ${id} is missing from the materialized catalog`);
+    }
+
+    const restored: PromptTemplate = {
+      ...canonical,
+      enabled: current.enabled !== false,
+      ...(current.lastUsedAt === undefined ? {} : { lastUsedAt: current.lastUsedAt }),
+    };
+    const nextTemplates = [...templates];
+    nextTemplates[index] = restored;
+    await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: nextTemplates });
+    logger.debug('Reset system prompt template', { templateId: id });
+    return restored;
+  });
+}
+
+/** Deletes user-owned templates. System catalog entries are immutable. */
 export async function deletePromptTemplate(id: string): Promise<void> {
   await queuePromptTemplateMutation(async () => {
+    if (isSystemPromptTemplateId(id)) {
+      throw new Error(`System prompt template ${id} cannot be deleted`);
+    }
     const templates = await materializePromptTemplatesForMutation();
-    const filtered = isSystemPromptTemplateId(id)
-      ? templates.map((template) =>
-          template.id === id ? { ...template, enabled: template.enabled === false } : template
-        )
-      : templates.filter((template) => template.id !== id);
+    const filtered = templates.filter((template) => template.id !== id);
 
     await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: filtered });
-    logger.debug('Updated prompt template availability', {
-      isSystemTemplate: isSystemPromptTemplateId(id),
-      templateId: id,
-    });
+    logger.debug('Deleted user prompt template', { templateId: id });
+  });
+}
+
+/** Enables or disables a template without changing its customized state. */
+export async function setPromptTemplateEnabled(
+  id: string,
+  enabled: boolean
+): Promise<PromptTemplate> {
+  return queuePromptTemplateMutation(async () => {
+    const templates = await materializePromptTemplatesForMutation();
+    const index = templates.findIndex((template) => template.id === id);
+    const current = templates[index];
+    if (!current || index < 0) {
+      throw new Error(`Prompt template ${id} is missing from the materialized catalog`);
+    }
+    const updated = { ...current, enabled };
+    const nextTemplates = [...templates];
+    nextTemplates[index] = updated;
+    await browserStorage.local.set({ [PROMPT_TEMPLATES_KEY]: nextTemplates });
+    logger.debug('Updated prompt template availability', { enabled, templateId: id });
+    return updated;
   });
 }
 

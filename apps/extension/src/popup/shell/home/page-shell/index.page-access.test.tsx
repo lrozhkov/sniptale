@@ -87,7 +87,6 @@ function renderPopupHomePage(
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
       galleryStatus={null}
@@ -209,7 +208,6 @@ it('does not read page-access status for restricted tabs', async () => {
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities({ isRestrictedPage: true })}
       galleryStatus={null}

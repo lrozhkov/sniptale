@@ -1,7 +1,6 @@
-import type { QuickAction, QuickActionsDisplayMode } from '../../../contracts/settings';
+import type { QuickAction } from '../../../contracts/settings';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 
-type StoredQuickActionsDisplayMode = QuickActionsDisplayMode | 'row';
 type LegacyQuickActionAfterCapture = NonNullable<QuickAction['afterCapture']> | 'download';
 type StoredQuickAction = Omit<QuickAction, 'afterCapture'> & {
   afterCapture?: LegacyQuickActionAfterCapture | null;
@@ -174,10 +173,4 @@ export function parseStoredQuickActions(value: unknown): ParsedQuickActionsStora
     hasInvalidRoot: false,
     invalidEntryCount: value.length - actions.length,
   };
-}
-
-export function parseStoredQuickActionsDisplayMode(
-  value: unknown
-): StoredQuickActionsDisplayMode | null {
-  return value === 'hidden' || value === 'list' || value === 'row' ? value : null;
 }

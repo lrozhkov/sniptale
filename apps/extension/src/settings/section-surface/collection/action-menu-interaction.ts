@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
-type FocusDirection = 1 | -1 | 'first' | 'last';
+const POINTER_LEAVE_CLOSE_DELAY = 900;
 
 export function useSettingsCollectionActionMenuInteraction(props: {
   open: boolean;
@@ -8,23 +8,32 @@ export function useSettingsCollectionActionMenuInteraction(props: {
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { onOpenChange, open } = props;
+
+  const cancelScheduledClose = useCallback(() => {
+    if (closeTimerRef.current === null) return;
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
+  const closeAndRestoreFocus = useCallback(() => {
+    cancelScheduledClose();
+    onOpenChange(false);
+    triggerRef.current?.focus();
+  }, [cancelScheduledClose, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
-    const menu = rootRef.current?.querySelector<HTMLElement>('[role="menu"]');
-    menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    rootRef.current?.querySelector<HTMLButtonElement>('[data-collection-inline-action]')?.focus();
 
     const handlePointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
-      onOpenChange(false);
-      triggerRef.current?.focus();
+      closeAndRestoreFocus();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      onOpenChange(false);
-      triggerRef.current?.focus();
+      closeAndRestoreFocus();
     };
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
@@ -32,27 +41,28 @@ export function useSettingsCollectionActionMenuInteraction(props: {
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onOpenChange, open]);
+  }, [closeAndRestoreFocus, open]);
 
-  const closeAndRestoreFocus = () => {
-    onOpenChange(false);
-    triggerRef.current?.focus();
-  };
-  const focusMenuItem = (direction: FocusDirection) => {
-    const buttons = [
-      ...(rootRef.current?.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"]:not(:disabled)'
-      ) ?? []),
-    ];
-    if (buttons.length === 0) return;
-    if (direction === 'first' || direction === 'last') {
-      buttons[direction === 'first' ? 0 : buttons.length - 1]?.focus();
-      return;
-    }
-    const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const nextIndex = (currentIndex + direction + buttons.length) % buttons.length;
-    buttons[nextIndex]?.focus();
-  };
+  useEffect(() => () => cancelScheduledClose(), [cancelScheduledClose]);
 
-  return { closeAndRestoreFocus, focusMenuItem, rootRef, triggerRef };
+  return {
+    closeAndRestoreFocus,
+    rootRef,
+    triggerRef,
+    onBlur(event: React.FocusEvent<HTMLDivElement>) {
+      if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
+        return;
+      onOpenChange(false);
+    },
+    onPointerEnter: cancelScheduledClose,
+    onPointerLeave() {
+      if (!open) return;
+      cancelScheduledClose();
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null;
+        if (rootRef.current?.contains(document.activeElement)) return;
+        onOpenChange(false);
+      }, POINTER_LEAVE_CLOSE_DELAY);
+    },
+  };
 }

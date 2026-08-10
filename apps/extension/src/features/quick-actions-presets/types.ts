@@ -1,8 +1,4 @@
-import type {
-  BundledQuickActionId,
-  QuickAction,
-  QuickActionsDisplayMode,
-} from '../../contracts/settings';
+import type { BundledQuickActionId, QuickAction } from '../../contracts/settings';
 
 export type BundledQuickActionConfig = {
   id: BundledQuickActionId;
@@ -18,5 +14,3 @@ export type BundledQuickActionConfig = {
   afterCapture: NonNullable<QuickAction['afterCapture']>;
   delay: Exclude<QuickAction['delay'], undefined>;
 };
-
-export type QuickActionDisplayModeInput = QuickActionsDisplayMode | 'row' | null | undefined;

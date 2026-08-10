@@ -147,6 +147,28 @@ it('rejects content senders for provider/model mutations', () => {
   expect(loggerWarnMock).toHaveBeenCalled();
 });
 
+it('rejects prompt resets from content senders', () => {
+  const sendResponse = vi.fn();
+  hasPreauthorizedAiSettingsMutationMessageMock.mockReturnValue(false);
+
+  expect(
+    routeAiSettingsMutationMessage(
+      {
+        operation: 'reset-global-prompt',
+        type: MessageType.AI_SETTINGS_MUTATION,
+      },
+      { tab: { id: 7 } as chrome.tabs.Tab, url: 'https://example.test/page' },
+      sendResponse
+    )
+  ).toBe(true);
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: 'Unauthorized AI settings mutation sender',
+  });
+  expect(mutateAiSettingsMock).not.toHaveBeenCalled();
+});
+
 it('returns background-owned AI secret protection status to settings pages', async () => {
   const sendResponse = vi.fn();
 

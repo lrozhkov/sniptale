@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   browserTabsGetZoom: vi.fn(),
   getApplied: vi.fn(),
   getAvailability: vi.fn(),
-  loadSettings: vi.fn(),
   release: vi.fn(),
   releaseTabOwners: vi.fn(),
   sendTabMessage: vi.fn(),
@@ -15,11 +14,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: mocks.browserTabsGet, getZoom: mocks.browserTabsGetZoom },
-}));
-
-vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
-  loadSettings: mocks.loadSettings,
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -89,10 +83,6 @@ beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: mocks.sendTabMessage });
   mocks.browserTabsGet.mockResolvedValue({ id: 5, windowId: 3, url: 'https://example.com' });
   mocks.browserTabsGetZoom.mockResolvedValue(1);
-  mocks.loadSettings.mockResolvedValue({
-    defaultViewportPresetId: preset.id,
-    viewportPresets: [preset],
-  });
   mocks.getAvailability.mockResolvedValue({
     status: 'available',
     presetId: preset.id,
@@ -106,26 +96,9 @@ beforeEach(() => {
   mocks.sendTabMessage.mockResolvedValue(undefined);
 });
 
-describe('screenshot mode default surface setup', () => {
-  it('binds a trusted content document before querying or mutating the default surface', async () => {
+describe('screenshot mode initial surface setup', () => {
+  it('binds the trusted content document and keeps the current page size', async () => {
     const current = state();
-    mocks.getAvailability.mockImplementationOnce(async () => {
-      expect(getScreenshotSurfaceSession(5)).toMatchObject({
-        documentId: 'content-document-5',
-      });
-      return {
-        status: 'available',
-        presetId: preset.id,
-        target: preset.target,
-        required: { width: preset.width, height: preset.height },
-      };
-    });
-    mocks.apply.mockImplementationOnce(async () => {
-      expect(getScreenshotSurfaceSession(5)).toMatchObject({
-        documentId: 'content-document-5',
-      });
-      return applied;
-    });
 
     await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner, new Map(), {
       surfaceDocumentId: 'content-document-5',
@@ -134,103 +107,14 @@ describe('screenshot mode default surface setup', () => {
     expect(getScreenshotSurfaceSession(5)).toMatchObject({
       documentId: 'content-document-5',
     });
-  });
-
-  it('applies an available default preset and exposes its typed surface to content', async () => {
-    const current = state();
-
-    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner, new Map(), {
-      toolbarVisible: false,
-    });
-
-    expect(mocks.apply).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: 'screenshot',
-        owner: 'screenshot',
-        presetId: preset.id,
-        tabId: 5,
-      })
-    );
-    expect(mocks.sendTabMessage).toHaveBeenCalledWith(5, {
-      toolbarVisible: false,
-      type: 'ENABLE_SCREENSHOT_MODE',
-      pageZoom: 1,
-      surfaceCapabilityToken: expect.any(String),
-      surfaceLeaseGeneration: 1,
-      surfaceOperationGeneration: 1,
-      viewport: {
-        presetId: preset.id,
-        target: 'viewport',
-        width: 1440,
-        height: 900,
-      },
-    });
-    expect(current.viewport.get(5)).toEqual({
-      presetId: preset.id,
-      target: 'viewport',
-      width: 1440,
-      height: 900,
-    });
-    expect(current.owner.get(5)).toBe('capture-surface');
-  });
-
-  it('falls back to current size with a warning when the configured default is unavailable', async () => {
-    mocks.getAvailability.mockResolvedValue({
-      status: 'unavailable',
-      presetId: preset.id,
-      target: 'viewport',
-      reason: 'viewport-too-large',
-    });
-    const current = state();
-
-    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
-
+    expect(mocks.getAvailability).not.toHaveBeenCalled();
     expect(mocks.apply).not.toHaveBeenCalled();
     expect(mocks.sendTabMessage).toHaveBeenCalledWith(
       5,
-      expect.objectContaining({
-        type: 'ENABLE_SCREENSHOT_MODE',
-        surfaceWarning: expect.any(String),
-        viewport: null,
-      })
+      expect.objectContaining({ viewport: null })
     );
     expect(current.viewport.get(5)).toBeNull();
-  });
-
-  it('uses current size without warning when the default is null', async () => {
-    mocks.loadSettings.mockResolvedValue({
-      defaultViewportPresetId: null,
-      viewportPresets: [preset],
-    });
-    const current = state();
-
-    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
-
-    expect(mocks.getAvailability).not.toHaveBeenCalled();
-    expect(mocks.sendTabMessage).toHaveBeenCalledWith(5, {
-      type: 'ENABLE_SCREENSHOT_MODE',
-      pageZoom: 1,
-      surfaceCapabilityToken: expect.any(String),
-      surfaceOperationGeneration: 0,
-      viewport: null,
-    });
-  });
-
-  it('uses current size with a warning when the configured default is disabled or missing', async () => {
-    for (const viewportPresets of [[{ ...preset, enabled: false }], []]) {
-      mocks.loadSettings.mockResolvedValueOnce({
-        defaultViewportPresetId: preset.id,
-        viewportPresets,
-      });
-      const current = state();
-
-      await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
-
-      expect(mocks.sendTabMessage).toHaveBeenLastCalledWith(
-        5,
-        expect.objectContaining({ surfaceWarning: expect.any(String), viewport: null })
-      );
-    }
+    expect(current.owner.has(5)).toBe(false);
   });
 });
 
@@ -296,7 +180,7 @@ describe('screenshot mode session reconciliation', () => {
     expect(current.screenshot.get(5)).toBe(true);
   });
 
-  it('disables preparation and releases the surface when a new-session post-effect guard throws', async () => {
+  it('disables preparation when a new-session post-effect guard throws', async () => {
     const current = state();
     const commitGuard = vi
       .fn()
@@ -317,13 +201,36 @@ describe('screenshot mode session reconciliation', () => {
     expect(mocks.sendTabMessage).toHaveBeenLastCalledWith(5, {
       type: 'DISABLE_SCREENSHOT_MODE',
     });
-    expect(mocks.releaseTabOwners).toHaveBeenCalledWith(5, ['screenshot']);
+    expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
+    expect(current.screenshot.has(5)).toBe(false);
+  });
+
+  it('rolls back a prepared new session when the post-effect guard declines the commit', async () => {
+    const current = state();
+    const commitGuard = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    await expect(
+      enableScreenshotModeGuarded(
+        5,
+        current.screenshot,
+        current.viewport,
+        current.owner,
+        new Map(),
+        { commitGuard }
+      )
+    ).resolves.toBe(false);
+
+    expect(mocks.sendTabMessage).toHaveBeenLastCalledWith(5, {
+      type: 'DISABLE_SCREENSHOT_MODE',
+    });
+    expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
+    expect(getScreenshotSurfaceSession(5)).toBeNull();
     expect(current.screenshot.has(5)).toBe(false);
   });
 });
 
 describe('screenshot mode rollback and disable', () => {
-  it('releases an applied default when content preparation fails', async () => {
+  it('tears down preparation without releasing a nonexistent initial surface', async () => {
     mocks.sendTabMessage.mockRejectedValueOnce(new Error('content unavailable'));
     const current = state();
 
@@ -331,11 +238,11 @@ describe('screenshot mode rollback and disable', () => {
       enableScreenshotMode(5, current.screenshot, current.viewport, current.owner)
     ).rejects.toThrow('content unavailable');
 
-    expect(mocks.releaseTabOwners).toHaveBeenCalledWith(5, ['screenshot']);
+    expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
     expect(current.screenshot.has(5)).toBe(false);
   });
 
-  it('aggregates preparation enable and disable failures after releasing the surface', async () => {
+  it('aggregates preparation enable and disable failures', async () => {
     const enableError = new Error('content enable failed');
     const disableError = new Error('content disable failed');
     mocks.sendTabMessage.mockRejectedValueOnce(enableError).mockRejectedValueOnce(disableError);
@@ -350,16 +257,14 @@ describe('screenshot mode rollback and disable', () => {
 
     expect(failure).toBeInstanceOf(AggregateError);
     expect((failure as AggregateError).errors).toEqual([enableError, disableError]);
-    expect(mocks.releaseTabOwners).toHaveBeenCalledWith(5, ['screenshot']);
+    expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
     expect(getScreenshotSurfaceSession(5)).toBeNull();
   });
 
-  it('retains screenshot authority when preparation and physical surface rollback fail', async () => {
+  it('ends the surface session when preparation rollback fails without a physical surface', async () => {
     const enableError = new Error('content enable failed');
     const disableError = new Error('content disable failed');
-    const releaseError = new Error('surface release failed');
     mocks.sendTabMessage.mockRejectedValueOnce(enableError).mockRejectedValueOnce(disableError);
-    mocks.releaseTabOwners.mockRejectedValueOnce(releaseError);
     const current = state();
 
     const failure = await enableScreenshotMode(
@@ -370,8 +275,8 @@ describe('screenshot mode rollback and disable', () => {
     ).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(AggregateError);
-    expect((failure as AggregateError).errors).toEqual([enableError, disableError, releaseError]);
-    expect(getScreenshotSurfaceSession(5)).not.toBeNull();
+    expect((failure as AggregateError).errors).toEqual([enableError, disableError]);
+    expect(getScreenshotSurfaceSession(5)).toBeNull();
   });
 
   it('releases through the capture-surface owner and clears state on disable', async () => {
@@ -431,6 +336,13 @@ describe('screenshot mode rollback and disable', () => {
   it('preserves content mode and session state when surface release fails before teardown', async () => {
     const current = state();
     await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
+    current.viewport.set(5, {
+      presetId: preset.id,
+      target: preset.target,
+      width: preset.width,
+      height: preset.height,
+    });
+    current.owner.set(5, 'capture-surface');
     const session = getScreenshotSurfaceSession(5)!;
     mocks.sendTabMessage.mockClear();
     mocks.releaseTabOwners.mockRejectedValueOnce(new Error('surface release failed'));
@@ -453,12 +365,19 @@ describe('screenshot mode rollback and disable', () => {
     expect(getScreenshotSurfaceSession(5)).not.toBeNull();
     expect(current.screenshot.get(5)).toBe(true);
     expect(current.owner.get(5)).toBe('capture-surface');
-    expect(mocks.apply).toHaveBeenCalledOnce();
+    expect(mocks.apply).not.toHaveBeenCalled();
   });
 
   it('preserves background session state when content rejects final teardown', async () => {
     const current = state();
     await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner);
+    current.viewport.set(5, {
+      presetId: preset.id,
+      target: preset.target,
+      width: preset.width,
+      height: preset.height,
+    });
+    current.owner.set(5, 'capture-surface');
     const session = getScreenshotSurfaceSession(5)!;
     mocks.sendTabMessage.mockClear();
     mocks.sendTabMessage.mockResolvedValueOnce({
@@ -483,7 +402,7 @@ describe('screenshot mode rollback and disable', () => {
     expect(getScreenshotSurfaceSession(5)).not.toBeNull();
     expect(current.screenshot.get(5)).toBe(true);
     expect(current.owner.get(5)).toBe('capture-surface');
-    expect(mocks.apply).toHaveBeenCalledTimes(2);
+    expect(mocks.apply).toHaveBeenCalledOnce();
   });
 
   it('rejects a stale document A disable without tearing down replacement session B', async () => {
@@ -530,7 +449,7 @@ describe('screenshot mode rollback and disable', () => {
 
     expect(getScreenshotSurfaceSession(5)).toBe(sessionB);
     expect(current.screenshot.get(5)).toBe(true);
-    expect(current.owner.get(5)).toBe('capture-surface');
+    expect(current.owner.has(5)).toBe(false);
     expect(mocks.sendTabMessage).not.toHaveBeenCalled();
     expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
   });
