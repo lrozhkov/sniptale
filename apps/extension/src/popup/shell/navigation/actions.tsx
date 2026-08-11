@@ -6,6 +6,7 @@ import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-p
 import { getPopupResponseErrorMessage } from '../../diagnostics/runtime-errors';
 import { getActiveTabId } from '../tab-access';
 import { getPopupRuntimeServices } from '../../runtime-services';
+import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 
 export type PopupPage = 'home' | 'video' | 'export';
 
@@ -78,5 +79,18 @@ export async function triggerQuickAction(actionId: string) {
     throw new Error(getPopupResponseErrorMessage(response, 'popup.home.triggerQuickActionError'));
   }
 
+  window.close();
+}
+
+export async function triggerScreenshotCapture(config: ScreenshotCaptureConfig) {
+  const tabId = await getActiveTabId();
+  const response = await getPopupRuntimeServices().messaging.sendRuntimeMessage({
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    config,
+    tabId,
+  });
+  if (response?.success === false) {
+    throw new Error(getPopupResponseErrorMessage(response, 'popup.home.captureError'));
+  }
   window.close();
 }

@@ -189,6 +189,25 @@ function verifyGenericBoundaryParserFacades() {
   });
 
   expect(runtimeMessage.type).toBe(MessageType.TRIGGER_QUICK_ACTION);
+  const screenshotMessage = parseRuntimeRequestMessage({
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    config: {
+      screenshotMode: 'desktop',
+      viewportPresetId: null,
+      delay: null,
+      afterCapture: 'download_default',
+      imageFormat: null,
+      imageQuality: null,
+      exitAfterCapture: false,
+    },
+  });
+  expect(screenshotMessage.type).toBe(MessageType.TRIGGER_SCREENSHOT_CAPTURE);
+  expect(() =>
+    parseRuntimeRequestMessage({
+      type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+      config: { screenshotMode: 'desktop', afterCapture: 'scenario' },
+    })
+  ).toThrow();
   expect(parseRuntimeResponseForRequest(runtimeMessage, { success: true })).toEqual({
     success: true,
   });

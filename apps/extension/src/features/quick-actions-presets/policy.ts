@@ -1,4 +1,8 @@
 import type { CaptureActionType, QuickAction } from '../../contracts/settings';
+import {
+  normalizeScreenshotCaptureConfig,
+  type ScreenshotCaptureConfig,
+} from '@sniptale/runtime-contracts/capture/action';
 
 // policyStateId: quick-action-capability-policy - canonical field and sink constraints shared by
 // Settings canonicalization, popup availability, storage normalization, and runtime validation.
@@ -39,6 +43,12 @@ export function normalizeQuickActionPolicy(action: QuickAction): QuickAction {
       : {}),
     ...(copyToClipboard ? { imageFormat: 'png', imageQuality: null } : {}),
   };
+}
+
+export function normalizeScreenshotCaptureConfigPolicy(
+  config: ScreenshotCaptureConfig
+): ScreenshotCaptureConfig {
+  return normalizeScreenshotCaptureConfig(config);
 }
 
 export function normalizeQuickActionEditorPolicy(action: QuickAction): QuickAction {

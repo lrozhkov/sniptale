@@ -2,6 +2,8 @@ import { getQuickActions } from '../../../../composition/persistence/quick-actio
 import { loadSettings } from '../../../../composition/persistence/settings';
 import type { QuickActionRuntimeContext } from './shared';
 import { assertQuickActionPolicy } from '../../../../features/quick-actions-presets/policy';
+import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
+import { normalizeScreenshotCaptureConfigPolicy } from '../../../../features/quick-actions-presets/policy';
 
 export async function loadQuickActionRuntimeContext(
   actionId: string
@@ -13,6 +15,23 @@ export async function loadQuickActionRuntimeContext(
   }
 
   return resolveQuickActionRuntimeContext(action, settings);
+}
+
+export async function loadScreenshotCaptureRuntimeContext(
+  config: ScreenshotCaptureConfig
+): Promise<QuickActionRuntimeContext> {
+  const settings = await loadSettings();
+  const normalizedConfig = normalizeScreenshotCaptureConfigPolicy(config);
+  return resolveQuickActionRuntimeContext(
+    {
+      id: 'popup-screenshot-setup',
+      status: true,
+      name: 'Popup screenshot setup',
+      icon: 'Camera',
+      ...normalizedConfig,
+    },
+    settings
+  );
 }
 
 export function resolveQuickActionRuntimeContext(

@@ -26,6 +26,54 @@ const offscreenFrameAnnotationRasterContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE];
 const aiSettingsNavigationContract =
   runtimeActionCoreMessageContracts[MessageType.AI_SETTINGS_NAVIGATION];
+const screenshotCaptureContract =
+  runtimeActionCoreMessageContracts[MessageType.TRIGGER_SCREENSHOT_CAPTURE];
+
+const validScreenshotConfig = {
+  screenshotMode: 'desktop',
+  viewportPresetId: null,
+  delay: null,
+  afterCapture: 'download_default',
+  imageFormat: null,
+  imageQuality: null,
+  exitAfterCapture: false,
+} as const;
+
+it('parses strict popup screenshot capture requests and typed responses', () => {
+  const request = {
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    tabId: 7,
+    config: validScreenshotConfig,
+  };
+  expect(screenshotCaptureContract.parseRequest(request)).toEqual(request);
+  expect(screenshotCaptureContract.parseResponse({ success: true, result: 'accepted' })).toEqual({
+    success: true,
+    result: 'accepted',
+  });
+  expect(screenshotCaptureContract.parseResponse({ success: false, error: 'blocked' })).toEqual({
+    success: false,
+    error: 'blocked',
+  });
+});
+
+it.each([
+  { screenshotMode: 'camera' },
+  { viewportPresetId: 4 },
+  { delay: 2 },
+  { afterCapture: 'publish' },
+  { imageFormat: 'gif' },
+  { imageQuality: 0 },
+  { imageQuality: 101 },
+  { exitAfterCapture: 'yes' },
+  { extra: true },
+])('rejects malformed popup screenshot config %o', (patch) => {
+  expect(() =>
+    screenshotCaptureContract.parseRequest({
+      type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+      config: { ...validScreenshotConfig, ...patch },
+    })
+  ).toThrow();
+});
 
 it('binds asset ids to editor-open messages rather than runtime wakeup', () => {
   const openEditorContract = runtimeActionCoreMessageContracts[MessageType.OPEN_EDITOR_WITH_IMAGE];

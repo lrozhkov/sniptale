@@ -83,6 +83,7 @@ export const backgroundRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.CONTENT_RUNTIME_WAKEUP,
   MessageType.OPEN_EDITOR_WITH_IMAGE,
   MessageType.TRIGGER_QUICK_ACTION,
+  MessageType.TRIGGER_SCREENSHOT_CAPTURE,
   CaptureMessageType.CAPTURE_VISIBLE,
   CaptureMessageType.CAPTURE_FULL,
   CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP,

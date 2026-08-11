@@ -53,9 +53,8 @@ it('renders the quick-actions section empty state when no actions are available'
     />
   );
 
-  expect(
-    getContainer()?.querySelector('[data-ui="popup.home.quick-actions-restriction-indicator"]')
-  ).not.toBeNull();
+  expect(getContainer()?.textContent).toContain('popup.home.quickActionsEmpty');
+  expect(getContainer()?.textContent).not.toContain('popup.home.quickActionsTitle');
   expect(quickActionsBlockSpy).not.toHaveBeenCalled();
 });
 

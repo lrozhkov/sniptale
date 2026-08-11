@@ -32,7 +32,6 @@ export function PopupAppContent({ runtime }: { runtime: PopupRuntimeState }) {
       quickActionsReady={runtime.home.quickActionsReady}
       viewportPresets={runtime.home.viewportPresets}
       activeTabCapabilities={runtime.environment.activeTabCapabilities}
-      galleryStatus={runtime.environment.galleryStatus}
       homeError={runtime.home.homeError}
       {...(runtime.environment.pageAccess ? { pageAccess: runtime.environment.pageAccess } : {})}
     />

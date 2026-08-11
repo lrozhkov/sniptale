@@ -1,5 +1,6 @@
 import type { MessageType } from '../../message-types';
 import type { RuntimeMessageResponse } from '../response';
+import type { ScreenshotCaptureConfig } from '../../../capture/action';
 import type {
   ContentPrivilegedActionCapability,
   ContentPrivilegedActionActivationKey,
@@ -57,6 +58,11 @@ export type RuntimeContentActionRequestByType = {
     contentIntent?: ContentPrivilegedActionCapability;
     tabId?: number;
   };
+  [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: {
+    type: typeof MessageType.TRIGGER_SCREENSHOT_CAPTURE;
+    config: ScreenshotCaptureConfig;
+    tabId?: number;
+  };
 };
 
 export type RuntimeContentActionResponseByType = {
@@ -78,4 +84,5 @@ export type RuntimeContentActionResponseByType = {
   }>;
   [MessageType.OPEN_EXPORT_MODAL]: RuntimeEmptyResponse;
   [MessageType.TRIGGER_QUICK_ACTION]: RuntimeMessageResponse<{ result?: string }>;
+  [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: RuntimeMessageResponse<{ result?: string }>;
 };

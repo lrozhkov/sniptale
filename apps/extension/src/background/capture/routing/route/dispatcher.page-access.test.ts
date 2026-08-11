@@ -9,6 +9,7 @@ const {
   ensureNativeVisibleCaptureAuthorityMock,
   isOwnedSnapshotViewerPageMock,
   loadQuickActionRuntimeContextMock,
+  loadScreenshotCaptureRuntimeContextMock,
 } = vi.hoisted(() => ({
   browserTabsGetMock: vi.fn(),
   handleFullCaptureMock: vi.fn(),
@@ -18,11 +19,13 @@ const {
   ensureNativeVisibleCaptureAuthorityMock: vi.fn(),
   isOwnedSnapshotViewerPageMock: vi.fn(),
   loadQuickActionRuntimeContextMock: vi.fn(),
+  loadScreenshotCaptureRuntimeContextMock: vi.fn(),
 }));
 
 vi.mock('../../quick-actions/flow/load', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../quick-actions/flow/load')>()),
   loadQuickActionRuntimeContext: loadQuickActionRuntimeContextMock,
+  loadScreenshotCaptureRuntimeContext: loadScreenshotCaptureRuntimeContextMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
@@ -86,7 +89,18 @@ beforeEach(() => {
   ensureNativeVisibleCaptureAuthorityMock.mockResolvedValue(undefined);
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
   loadQuickActionRuntimeContextMock.mockResolvedValue({ captureMode: 'visible' });
+  loadScreenshotCaptureRuntimeContextMock.mockResolvedValue({ captureMode: 'visible' });
 });
+
+const desktopConfig = {
+  screenshotMode: 'desktop' as const,
+  viewportPresetId: null,
+  delay: null,
+  afterCapture: 'download_default' as const,
+  imageFormat: null,
+  imageQuality: null,
+  exitAfterCapture: false,
+};
 
 it('rejects screenshot capture without page access before handler side effects', async () => {
   const args = createRouteArgs();
@@ -167,6 +181,48 @@ it('runs desktop quick actions without page access or active-page authorization'
     expect.any(Object),
     runtimeContext
   );
+});
+
+it('runs popup desktop capture without page access and uses the validated runtime context', async () => {
+  const { pageAccessPort: _pageAccessPort, ...args } = createRouteArgs();
+  const runtimeContext = { captureMode: 'desktop' };
+  loadScreenshotCaptureRuntimeContextMock.mockResolvedValueOnce(runtimeContext);
+
+  expect(
+    routeCaptureMessage({
+      ...args,
+      message: { type: 'TRIGGER_SCREENSHOT_CAPTURE', config: desktopConfig },
+    })
+  ).toBe(true);
+  await flushRouteAsync();
+
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+  expect(handleTriggerQuickActionMock).toHaveBeenCalledWith(
+    { actionId: 'popup-screenshot-setup' },
+    expect.any(Object),
+    runtimeContext
+  );
+});
+
+it('requires page access for popup tab capture before handler effects', async () => {
+  const args = createRouteArgs();
+  ensureActivePageAccessRuntimeMock.mockRejectedValue(new Error('Page access is required.'));
+  loadScreenshotCaptureRuntimeContextMock.mockResolvedValueOnce({ captureMode: 'visible' });
+  expect(
+    routeCaptureMessage({
+      ...args,
+      message: {
+        type: 'TRIGGER_SCREENSHOT_CAPTURE',
+        config: { ...desktopConfig, screenshotMode: 'visible' },
+      },
+    })
+  ).toBe(true);
+  await flushRouteAsync();
+  expect(handleTriggerQuickActionMock).not.toHaveBeenCalled();
+  expect(args.sendResponse).toHaveBeenCalledWith({
+    error: 'Page access is required.',
+    success: false,
+  });
 });
 
 it('rejects native visible capture without native capture authority before handler side effects', async () => {

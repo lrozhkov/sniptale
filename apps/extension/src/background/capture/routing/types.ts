@@ -130,4 +130,9 @@ export type RouteCaptureMessage =
       actionId: string;
       contentIntent?: ContentPrivilegedActionCapability;
       tabId?: number;
+    }
+  | {
+      type: 'TRIGGER_SCREENSHOT_CAPTURE';
+      config: import('@sniptale/runtime-contracts/capture/action').ScreenshotCaptureConfig;
+      tabId?: number;
     };

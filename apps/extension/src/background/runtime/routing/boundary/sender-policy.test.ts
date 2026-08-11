@@ -180,6 +180,42 @@ it('allows only popup quick-action targeted capture routes without a sender tab'
   ).toBe(true);
   expect(
     canRoute(
+      {
+        type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+        tabId: 7,
+        config: {
+          screenshotMode: 'desktop',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture: 'download_default',
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        },
+      },
+      createSender({ url: POPUP_URL })
+    )
+  ).toBe(true);
+  expect(
+    canRoute(
+      {
+        type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+        tabId: 7,
+        config: {
+          screenshotMode: 'visible',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture: 'download_default',
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        },
+      },
+      createTopLevelContentSender()
+    )
+  ).toBe(false);
+  expect(
+    canRoute(
       { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
       createSender({ url: POPUP_URL })
     )

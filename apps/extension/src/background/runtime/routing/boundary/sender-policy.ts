@@ -40,7 +40,10 @@ const unauthorizedRouteErrors = {
 } satisfies Record<PrivilegedTabRouteFamily, string>;
 
 const editorCaptureRoutes = new Set<string>([MessageType.EXECUTE_SAVE]);
-const popupCaptureRoutes = new Set<string>([MessageType.TRIGGER_QUICK_ACTION]);
+const popupCaptureRoutes = new Set<string>([
+  MessageType.TRIGGER_QUICK_ACTION,
+  MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+]);
 const viewerCaptureRoutes = new Set<string>([
   MessageType.FETCH_WEB_SNAPSHOT_ASSET,
   MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
@@ -91,6 +94,9 @@ function isAuthorizedViewerCaptureRoute(
 }
 
 export function canRouteCaptureMessageFromSender(args: CaptureRouteSenderPolicyArgs): boolean {
+  if (args.message.type === MessageType.TRIGGER_SCREENSHOT_CAPTURE) {
+    return isAuthorizedPopupCaptureRoute(args.message, args.sender);
+  }
   return (
     authorizeContentSender(args.sender, args.resolvedTabId).allowed ||
     isAuthorizedEditorCaptureRoute(args.message, args.sender) ||

@@ -43,6 +43,7 @@ const localPreferenceKeys = [
   'sniptale_scenario_editor_navigator_collapsed',
   'sniptale_video_settings',
   'sniptale_video_ui_state',
+  'sniptale_screenshot_setup',
   'sniptale_editor_export_settings',
   'sniptale_editor_workspace_defaults',
   'sniptale_editor_presets',

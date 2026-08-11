@@ -5,6 +5,23 @@ export const popupHomeMessages = defineMessageSource({
     ru: 'Быстрые действия',
     en: 'Quick actions',
   },
+  quickActionsModeHint: {
+    ru: 'Запустить сохранённое действие',
+    en: 'Run a saved action',
+  },
+  captureTabLabel: { ru: 'Вкладка', en: 'Tab' },
+  captureTabHint: { ru: 'Снимок текущей вкладки', en: 'Capture the current tab' },
+  captureWindowLabel: { ru: 'Окно', en: 'Window' },
+  captureWindowHint: { ru: 'Снимок окна или экрана', en: 'Capture a window or screen' },
+  toolsLabel: { ru: 'Инструменты', en: 'Tools' },
+  toolsTitle: {
+    ru: 'Открыть инструменты подготовки страницы',
+    en: 'Open page preparation tools',
+  },
+  captureButtonLabel: { ru: 'Сделать снимок', en: 'Take screenshot' },
+  capturePendingLabel: { ru: 'Создание снимка…', en: 'Capturing…' },
+  captureButtonTitle: { ru: 'Сделать снимок', en: 'Take screenshot' },
+  captureError: { ru: 'Не удалось сделать снимок', en: 'Failed to capture screenshot' },
   quickActionsEmpty: {
     ru: 'Быстрые действия пока не настроены.',
     en: 'Quick actions are not configured yet.',

@@ -6,22 +6,20 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
 import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
-import {
-  type GalleryStatus,
-  PopupHomeActionRow,
-  PopupHomeErrorMessage,
-  PopupHomeQuickActions,
-} from './sections';
+import { PopupHomeErrorMessage, PopupHomeQuickActions } from './sections';
 import { usePopupHomeActions } from './actions';
 import { PageAccessControls } from './page-access-controls';
 import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
+import { normalizeScreenshotCaptureConfigPolicy } from '../../../../features/quick-actions-presets/policy';
+import { ScreenshotModeSelector } from './mode-selector';
+import { ScreenshotSetupPanel } from './setup-panel';
+import { useScreenshotSetupState } from './use-screenshot-setup';
 
 interface PopupHomePageProps {
   quickActions: QuickAction[];
   quickActionsReady: boolean;
   viewportPresets: ViewportPreset[];
   activeTabCapabilities: ActiveTabCapabilities;
-  galleryStatus: GalleryStatus | null;
   homeError?: string | null;
   pageAccess?: PopupPageAccessRuntime;
 }
@@ -69,7 +67,6 @@ type PopupHomeCapabilityState = ReturnType<typeof getPopupHomeCapabilityState>;
 
 interface PopupHomePageContentProps {
   capabilityState: PopupHomeCapabilityState;
-  galleryStatus: GalleryStatus | null;
   onOpenScreenshotMode(): void;
   onPageAccessRequest(operation: PageAccessOperation): void;
   onQuickAction(actionId: string): void;
@@ -79,13 +76,15 @@ interface PopupHomePageContentProps {
   quickActions: QuickAction[];
   quickActionsReady: boolean;
   resolvedHomeError: string | null;
+  setup: ReturnType<typeof useScreenshotSetupState>;
+  capturePending: boolean;
+  onCapture(): void;
   showHomeError: boolean;
   viewportPresets: ViewportPreset[];
 }
 
 function PopupHomePageContent({
   capabilityState,
-  galleryStatus,
   onOpenScreenshotMode,
   onPageAccessRequest,
   onQuickAction,
@@ -95,34 +94,57 @@ function PopupHomePageContent({
   quickActions,
   quickActionsReady,
   resolvedHomeError,
+  setup,
+  capturePending,
+  onCapture,
   showHomeError,
   viewportPresets,
 }: PopupHomePageContentProps) {
+  const mode = setup.state.selectedMode;
+  const activeConfig = mode === 'desktop' ? setup.state.desktop : setup.state.tab;
+  const tabDisabledReason = capabilityState.screenshotDisabledReason;
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <PopupHomeQuickActions
-        shouldShowQuickActions={capabilityState.shouldShowQuickActions}
-        quickActionsReady={quickActionsReady}
-        hasQuickActions={capabilityState.hasQuickActions}
-        quickActions={quickActions}
-        viewportPresets={viewportPresets}
-        quickActionsDisabledTitle={capabilityState.quickActionsDisabledTitle}
-        restrictionIndicatorTitle={capabilityState.restrictedPageFeaturesTitle}
-        onTriggerAction={onQuickAction}
+      <ScreenshotModeSelector
+        mode={mode}
+        tabDisabledReason={tabDisabledReason}
+        toolsDisabledReason={tabDisabledReason}
+        onModeChange={(selectedMode) => setup.update({ selectedMode })}
+        onOpenTools={onOpenScreenshotMode}
       />
-      <PageAccessControls
-        disabled={pageAccessPendingOperation !== null}
-        error={pageAccessError}
-        onRequest={onPageAccessRequest}
-        pendingOperation={pageAccessPendingOperation}
-        status={pageAccessStatus}
-      />
-      <PopupHomeActionRow
-        screenshotDisabled={Boolean(capabilityState.screenshotDisabledReason)}
-        screenshotDisabledTitle={capabilityState.screenshotDisabledTitle}
-        galleryStatus={galleryStatus}
-        onOpenScreenshotMode={onOpenScreenshotMode}
-      />
+      {mode === 'quick-actions' ? (
+        <PopupHomeQuickActions
+          shouldShowQuickActions={capabilityState.shouldShowQuickActions}
+          quickActionsReady={quickActionsReady}
+          hasQuickActions={capabilityState.hasQuickActions}
+          quickActions={quickActions}
+          viewportPresets={viewportPresets}
+          quickActionsDisabledTitle={capabilityState.quickActionsDisabledTitle}
+          onTriggerAction={onQuickAction}
+        />
+      ) : (
+        <ScreenshotSetupPanel
+          config={activeConfig}
+          viewportPresets={viewportPresets}
+          pending={!setup.ready || setup.savePending || capturePending}
+          disabledReason={mode === 'tab' ? tabDisabledReason : null}
+          onChange={(config) =>
+            setup.update({
+              [mode]: normalizeScreenshotCaptureConfigPolicy(config),
+            })
+          }
+          onCapture={onCapture}
+        />
+      )}
+      {mode !== 'desktop' ? (
+        <PageAccessControls
+          disabled={pageAccessPendingOperation !== null}
+          error={pageAccessError}
+          onRequest={onPageAccessRequest}
+          pendingOperation={pageAccessPendingOperation}
+          status={pageAccessStatus}
+        />
+      ) : null}
       {showHomeError && resolvedHomeError ? (
         <PopupHomeErrorMessage message={resolvedHomeError} />
       ) : null}
@@ -135,7 +157,6 @@ export function PopupHomePage({
   quickActionsReady,
   viewportPresets,
   activeTabCapabilities,
-  galleryStatus,
   homeError,
   pageAccess = defaultPageAccessRuntime,
 }: PopupHomePageProps) {
@@ -145,7 +166,14 @@ export function PopupHomePage({
     pageAccess.disabledReason,
     pageAccess.status
   );
-  const { actionError, handleOpenScreenshotMode, handleQuickAction } = usePopupHomeActions({
+  const setup = useScreenshotSetupState();
+  const {
+    actionError,
+    capturePending,
+    handleOpenScreenshotMode,
+    handleQuickAction,
+    handleScreenshotCapture,
+  } = usePopupHomeActions({
     screenshotDisabledReason: capabilityState.screenshotDisabledReason,
     quickActionsDisabledReason: capabilityState.quickActionsDisabledReason,
     quickActions,
@@ -155,7 +183,6 @@ export function PopupHomePage({
   return (
     <PopupHomePageContent
       capabilityState={capabilityState}
-      galleryStatus={galleryStatus}
       onOpenScreenshotMode={() => {
         void handleOpenScreenshotMode();
       }}
@@ -171,7 +198,24 @@ export function PopupHomePage({
       quickActions={quickActions}
       quickActionsReady={quickActionsReady}
       resolvedHomeError={resolvedHomeError}
-      showHomeError={!activeTabCapabilities.isRestrictedPage || homeError != null}
+      setup={setup}
+      capturePending={capturePending}
+      onCapture={() => {
+        void setup
+          .flush()
+          .then((committed) => {
+            const mode = committed.selectedMode;
+            if (mode === 'quick-actions') return;
+            void handleScreenshotCapture(
+              mode === 'desktop' ? committed.desktop : committed.tab,
+              mode === 'tab' ? capabilityState.screenshotDisabledReason : null
+            );
+          })
+          .catch(() => undefined);
+      }}
+      showHomeError={
+        actionError != null || !activeTabCapabilities.isRestrictedPage || homeError != null
+      }
       viewportPresets={viewportPresets}
     />
   );

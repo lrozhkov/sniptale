@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { translate } from '../../../../platform/i18n';
-import { openScreenshotMode, triggerQuickAction } from '../../navigation/actions';
+import {
+  openScreenshotMode,
+  triggerQuickAction,
+  triggerScreenshotCapture,
+} from '../../navigation/actions';
+import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { QuickAction } from '../../../../contracts/settings';
 import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
 
@@ -14,6 +19,7 @@ export function usePopupHomeActions({
   quickActions: QuickAction[];
 }) {
   const [actionError, setActionError] = useState<string | null>(null);
+  const [capturePending, setCapturePending] = useState(false);
 
   const handleOpenScreenshotMode = async () => {
     if (screenshotDisabledReason) {
@@ -50,9 +56,29 @@ export function usePopupHomeActions({
     }
   };
 
+  const handleScreenshotCapture = async (
+    config: ScreenshotCaptureConfig,
+    disabledReason: string | null
+  ) => {
+    if (disabledReason || capturePending) {
+      if (disabledReason) setActionError(disabledReason);
+      return;
+    }
+    setActionError(null);
+    setCapturePending(true);
+    try {
+      await triggerScreenshotCapture(config);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : translate('popup.home.captureError'));
+      setCapturePending(false);
+    }
+  };
+
   return {
     actionError,
+    capturePending,
     handleOpenScreenshotMode,
     handleQuickAction,
+    handleScreenshotCapture,
   };
 }

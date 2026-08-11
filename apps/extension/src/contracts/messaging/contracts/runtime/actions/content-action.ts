@@ -18,8 +18,23 @@ import {
   isContentPrivilegedActionType,
 } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
+import { isScreenshotCaptureConfigValue } from '@sniptale/runtime-contracts/capture/action';
 
 export const contentActionRuntimeContracts = {
+  [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: {
+    parseRequest: createGuardParser(
+      'runtime TRIGGER_SCREENSHOT_CAPTURE message',
+      createMessageGuard({
+        type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+        required: { config: isScreenshotCaptureConfigValue },
+        optional: { tabId: isNumber },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime TRIGGER_SCREENSHOT_CAPTURE response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
   [MessageType.DOWNLOAD_BROWSER_ANNOTATIONS]: {
     parseRequest: createGuardParser(
       'runtime DOWNLOAD_BROWSER_ANNOTATIONS message',

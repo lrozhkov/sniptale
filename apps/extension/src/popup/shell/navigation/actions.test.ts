@@ -56,6 +56,7 @@ import {
   openSettings,
   openVideoEditor,
   triggerQuickAction,
+  triggerScreenshotCapture,
 } from './actions';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { installPopupRuntimeMessagingMock } from '../runtime/services.test-support';
@@ -105,9 +106,20 @@ function verifiesExtensionPageNavigation() {
 async function verifiesRuntimeMessaging() {
   mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true });
   mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true });
+  mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true });
 
   await openScreenshotMode();
   await triggerQuickAction('action-1');
+  const config = {
+    screenshotMode: 'desktop' as const,
+    viewportPresetId: null,
+    delay: null,
+    afterCapture: 'download_default' as const,
+    imageFormat: null,
+    imageQuality: null,
+    exitAfterCapture: false,
+  };
+  await triggerScreenshotCapture(config);
 
   expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(1, {
     type: MessageType.ENABLE_SCREENSHOT_MODE,
@@ -118,7 +130,12 @@ async function verifiesRuntimeMessaging() {
     actionId: 'action-1',
     tabId: 42,
   });
-  expect(window.close).toHaveBeenCalledTimes(2);
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(3, {
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    config,
+    tabId: 42,
+  });
+  expect(window.close).toHaveBeenCalledTimes(3);
 }
 
 async function verifiesRuntimeErrors() {

@@ -16,7 +16,11 @@ vi.mock('../../../../composition/persistence/settings', async (importOriginal) =
   loadSettings: loadSettingsMock,
 }));
 
-import { loadQuickActionRuntimeContext, resolveQuickActionRuntimeContext } from './load';
+import {
+  loadQuickActionRuntimeContext,
+  loadScreenshotCaptureRuntimeContext,
+  resolveQuickActionRuntimeContext,
+} from './load';
 
 function createSettings(overrides: Partial<Settings> = {}): Settings {
   return {
@@ -96,6 +100,42 @@ describe('loadQuickActionRuntimeContext', () => {
     await expect(loadQuickActionRuntimeContext('missing-action')).rejects.toThrow(
       'Quick action not found'
     );
+  });
+});
+
+describe('loadScreenshotCaptureRuntimeContext', () => {
+  it('normalizes popup desktop config before creating the runtime context', async () => {
+    const context = await loadScreenshotCaptureRuntimeContext({
+      screenshotMode: 'desktop',
+      viewportPresetId: 'wide',
+      delay: 10,
+      afterCapture: 'copy',
+      imageFormat: 'webp',
+      imageQuality: 70,
+      exitAfterCapture: true,
+    });
+    expect(context).toMatchObject({
+      captureMode: 'desktop',
+      viewportPresetId: null,
+      delaySeconds: 0,
+      afterCapture: 'copy',
+      imageFormat: 'png',
+      action: { exitAfterCapture: false, imageQuality: null },
+    });
+  });
+
+  it('rejects unsupported desktop delivery at the runtime boundary', async () => {
+    await expect(
+      loadScreenshotCaptureRuntimeContext({
+        screenshotMode: 'desktop',
+        viewportPresetId: null,
+        delay: null,
+        afterCapture: 'scenario',
+        imageFormat: null,
+        imageQuality: null,
+        exitAfterCapture: false,
+      })
+    ).rejects.toThrow('unavailable for window or screen capture');
   });
 });
 

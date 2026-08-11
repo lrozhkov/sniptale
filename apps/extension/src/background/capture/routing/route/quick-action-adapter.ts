@@ -3,17 +3,31 @@ import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import { handleTriggerQuickAction } from '../actions.quick-action';
 import type { CaptureRouteAdapterContext } from './types';
-import { loadQuickActionRuntimeContext } from '../../quick-actions/flow/load';
+import {
+  loadQuickActionRuntimeContext,
+  loadScreenshotCaptureRuntimeContext,
+} from '../../quick-actions/flow/load';
 
 export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {
-  if (args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION') {
+  if (
+    args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION' &&
+    args.routeArgs.message.type !== 'TRIGGER_SCREENSHOT_CAPTURE'
+  ) {
     return false;
   }
   const message = args.routeArgs.message;
-  void loadQuickActionRuntimeContext(message.actionId)
+  const runtimeContextPromise =
+    message.type === 'TRIGGER_QUICK_ACTION'
+      ? loadQuickActionRuntimeContext(message.actionId)
+      : loadScreenshotCaptureRuntimeContext(message.config);
+  void runtimeContextPromise
     .then(async (runtimeContext) => {
       await authorizePageAccess(args, runtimeContext.captureMode);
-      handleTriggerQuickAction(message, args.context, runtimeContext);
+      handleTriggerQuickAction(
+        message.type === 'TRIGGER_QUICK_ACTION' ? message : { actionId: 'popup-screenshot-setup' },
+        args.context,
+        runtimeContext
+      );
     })
     .catch((error: unknown) => {
       args.context.sendResponse(createRouteErrorResponse(error));

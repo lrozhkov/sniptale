@@ -4,10 +4,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openScreenshotModeSpy, triggerQuickActionSpy } = vi.hoisted(() => ({
-  openScreenshotModeSpy: vi.fn(),
-  triggerQuickActionSpy: vi.fn(),
-}));
+const { openScreenshotModeSpy, triggerQuickActionSpy, triggerScreenshotCaptureSpy } = vi.hoisted(
+  () => ({
+    openScreenshotModeSpy: vi.fn(),
+    triggerQuickActionSpy: vi.fn(),
+    triggerScreenshotCaptureSpy: vi.fn(),
+  })
+);
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -18,6 +21,7 @@ vi.mock('../../navigation/actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../navigation/actions')>()),
   openScreenshotMode: openScreenshotModeSpy,
   triggerQuickAction: triggerQuickActionSpy,
+  triggerScreenshotCapture: triggerScreenshotCaptureSpy,
 }));
 
 import { usePopupHomeActions } from './actions';
@@ -57,6 +61,7 @@ beforeEach(() => {
   latestHookState = null;
   openScreenshotModeSpy.mockReset();
   triggerQuickActionSpy.mockReset();
+  triggerScreenshotCaptureSpy.mockReset();
 });
 
 afterEach(() => {
@@ -103,6 +108,69 @@ describe('use-popup-home-actions', () => {
 
     expect(openScreenshotModeSpy).toHaveBeenCalled();
     expect(container?.textContent ?? '').not.toContain('Screenshots are disabled');
+  });
+
+  it('surfaces explicit and fallback errors while opening tools', async () => {
+    await renderHarness({});
+    openScreenshotModeSpy.mockRejectedValueOnce(new Error('Tools failed'));
+    await act(async () => {
+      await latestHookState?.handleOpenScreenshotMode();
+    });
+    expect(container?.textContent).toContain('Tools failed');
+    openScreenshotModeSpy.mockRejectedValueOnce('unknown');
+    await act(async () => {
+      await latestHookState?.handleOpenScreenshotMode();
+    });
+    expect(container?.textContent).toContain('t:popup.home.openPrepError');
+  });
+});
+
+describe('use-popup-home-actions direct capture', () => {
+  const config = {
+    screenshotMode: 'desktop' as const,
+    viewportPresetId: null,
+    delay: null,
+    afterCapture: 'download_default' as const,
+    imageFormat: null,
+    imageQuality: null,
+    exitAfterCapture: false,
+  };
+
+  it('blocks unavailable capture before transport', async () => {
+    await renderHarness({});
+    await act(async () => {
+      await latestHookState?.handleScreenshotCapture(config, 'Capture blocked');
+    });
+    expect(container?.textContent).toContain('Capture blocked');
+    expect(triggerScreenshotCaptureSpy).not.toHaveBeenCalled();
+  });
+
+  it('marks accepted capture pending and ignores duplicate starts', async () => {
+    triggerScreenshotCaptureSpy.mockResolvedValue(undefined);
+    await renderHarness({});
+    await act(async () => {
+      await latestHookState?.handleScreenshotCapture(config, null);
+    });
+    expect(latestHookState?.capturePending).toBe(true);
+    await act(async () => {
+      await latestHookState?.handleScreenshotCapture(config, null);
+    });
+    expect(triggerScreenshotCaptureSpy).toHaveBeenCalledOnce();
+  });
+
+  it('surfaces explicit and fallback failures and releases pending state', async () => {
+    triggerScreenshotCaptureSpy.mockRejectedValueOnce(new Error('Capture failed'));
+    await renderHarness({});
+    await act(async () => {
+      await latestHookState?.handleScreenshotCapture(config, null);
+    });
+    expect(container?.textContent).toContain('Capture failed');
+    expect(latestHookState?.capturePending).toBe(false);
+    triggerScreenshotCaptureSpy.mockRejectedValueOnce('unknown');
+    await act(async () => {
+      await latestHookState?.handleScreenshotCapture(config, null);
+    });
+    expect(container?.textContent).toContain('t:popup.home.captureError');
   });
 });
 

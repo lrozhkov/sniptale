@@ -106,6 +106,7 @@ declare module './' {
     type EXECUTE_SAVE = typeof import('./').MessageType.EXECUTE_SAVE;
     type SHOW_SAVE_DIALOG = typeof import('./').MessageType.SHOW_SAVE_DIALOG;
     type TRIGGER_QUICK_ACTION = typeof import('./').MessageType.TRIGGER_QUICK_ACTION;
+    type TRIGGER_SCREENSHOT_CAPTURE = typeof import('./').MessageType.TRIGGER_SCREENSHOT_CAPTURE;
     type SHOW_TOAST = typeof import('./').MessageType.SHOW_TOAST;
     type SHOW_QUICK_ACTION_COUNTDOWN = typeof import('./').MessageType.SHOW_QUICK_ACTION_COUNTDOWN;
     type COPY_IMAGE_TO_CLIPBOARD = typeof import('./').MessageType.COPY_IMAGE_TO_CLIPBOARD;
