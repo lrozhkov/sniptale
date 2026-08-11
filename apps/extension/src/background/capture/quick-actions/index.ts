@@ -8,7 +8,7 @@ import { classifyTabRuntimeCapability } from '../../../features/tab-capabilities
 const logger = createLogger({ namespace: 'BackgroundQuickActions' });
 
 type QuickActionResult =
-  | { result: 'accepted' | 'blocked' | 'duplicate' }
+  | { result: 'accepted' | 'blocked' | 'cancelled' | 'duplicate' }
   | { error: string; result: 'failed' };
 
 export async function handleQuickAction({
@@ -20,6 +20,7 @@ export async function handleQuickAction({
   captureGuardState,
   pageAccessPort,
   webSnapshotViewerPorts,
+  runtimeContext,
 }: HandleQuickActionArgs): Promise<QuickActionResult> {
   logger.log('Handling quick action', { actionId, tabId });
 
@@ -29,17 +30,19 @@ export async function handleQuickAction({
     return { result: 'duplicate' };
   }
 
-  try {
-    assertQuickActionSupported(actionId, tabId, tab);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error), result: 'failed' };
+  if (runtimeContext?.captureMode !== 'desktop') {
+    try {
+      assertQuickActionSupported(actionId, tabId, tab);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error), result: 'failed' };
+    }
   }
   const pageCapability = classifyTabRuntimeCapability(tab);
 
   captureGuardState.isCapturing = true;
 
   try {
-    return await processQuickAction({
+    const processArgs = {
       actionId,
       tabId,
       viewportState,
@@ -47,7 +50,9 @@ export async function handleQuickAction({
       pageCapability,
       pageAccessPort,
       webSnapshotViewerPorts,
-    });
+      ...(runtimeContext ? { runtimeContext } : {}),
+    };
+    return await processQuickAction(processArgs);
   } catch (error) {
     logger.error('Quick action failed', error);
     notifyQuickActionError(tabId, error);

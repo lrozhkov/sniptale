@@ -5,6 +5,7 @@ import { afterCaptureLabels, qualityOptions } from './section/constants';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
 import { settingsMetaLabelClassName, settingsToggleRowClassName } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
+import { getAllowedQuickActionAfterCaptureActions } from '../../../../features/quick-actions-presets/policy';
 
 type QuickActionsEditorOutputState = Pick<QuickActionsSectionState, 'editForm' | 'updateFormField'>;
 
@@ -21,6 +22,10 @@ export function QuickActionsEditorPrimaryOutputField(props: {
 export function QuickActionsEditorAdvancedOutputFields(props: {
   state: QuickActionsEditorOutputState;
 }) {
+  if (props.state.editForm?.afterCapture === 'copy') {
+    return null;
+  }
+
   return (
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <QuickActionsFormatField state={props.state} />
@@ -108,6 +113,9 @@ function QuickActionsQualityField(props: { state: QuickActionsEditorOutputState 
 }
 
 function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputState }) {
+  const allowedActions = props.state.editForm
+    ? getAllowedQuickActionAfterCaptureActions(props.state.editForm)
+    : null;
   return (
     <div>
       <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
@@ -119,9 +127,9 @@ function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputS
         onChange={(value) =>
           props.state.updateFormField('afterCapture', value as CaptureActionType)
         }
-        options={(Object.entries(afterCaptureLabels) as [CaptureActionType, string][]).map(
-          ([value, label]) => ({ value, label })
-        )}
+        options={(Object.entries(afterCaptureLabels) as [CaptureActionType, string][])
+          .filter(([value]) => !allowedActions || allowedActions.has(value))
+          .map(([value, label]) => ({ value, label }))}
       />
     </div>
   );

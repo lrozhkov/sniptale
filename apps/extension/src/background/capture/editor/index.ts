@@ -58,7 +58,7 @@ async function resolveEditorSourceMetadata(sourceContext?: {
     return { sourceFaviconUrl, sourceUrl, sourceTitle };
   }
 
-  if (!sourceUrl && !sourceTitle) {
+  if (sourceContext === undefined && !sourceUrl && !sourceTitle) {
     const [activeTab] = await browserTabs.query({ active: true, currentWindow: true });
     sourceUrl = activeTab?.url ?? '';
     sourceTitle = activeTab?.title ?? '';

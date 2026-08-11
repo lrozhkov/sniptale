@@ -65,6 +65,29 @@ it('starts editing and skips bundled actions', () => {
   expect(setEditForm).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Updated' }));
 });
 
+it('selects a valid desktop sink and clears fields that desktop capture cannot use', () => {
+  const setEditForm = vi.fn();
+  const scenarioAction = createQuickAction({
+    afterCapture: 'scenario',
+    delay: 5,
+    exitAfterCapture: true,
+    screenshotMode: 'visible',
+    viewportPresetId: 'native',
+  });
+
+  updateQuickActionField(scenarioAction, 'screenshotMode', 'desktop', setEditForm);
+
+  expect(setEditForm).toHaveBeenCalledWith(
+    expect.objectContaining({
+      afterCapture: 'download_default',
+      delay: null,
+      exitAfterCapture: false,
+      screenshotMode: 'desktop',
+      viewportPresetId: null,
+    })
+  );
+});
+
 it('saves created and edited actions and rejects invalid input', async () => {
   const onPersist = vi.fn().mockResolvedValue(true);
   const onResetEditor = vi.fn();

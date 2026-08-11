@@ -4,6 +4,8 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 export const handledOffscreenRuntimeMessageTypes = [
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
   MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+  MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,

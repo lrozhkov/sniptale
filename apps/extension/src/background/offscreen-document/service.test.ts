@@ -174,7 +174,7 @@ async function verifyRecreateAfterRuntimeStartupFailure() {
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Retry startup',
   });
 }
@@ -191,7 +191,7 @@ async function verifyRecreateAfterReadyTimeout() {
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Retry after timeout',
   });
 }

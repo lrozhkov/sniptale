@@ -7,7 +7,7 @@ import {
 import { translate } from '../../../platform/i18n';
 import { CaptureMode, type CaptureSource } from '@sniptale/runtime-contracts/video/types/types';
 
-type DesktopCapturePolicyName = 'screen' | 'window';
+type DesktopCapturePolicyName = 'screen' | 'window' | 'desktop-screenshot';
 
 type DesktopCapturePolicy = {
   sources: readonly BrowserDesktopCaptureSource[];
@@ -36,6 +36,10 @@ const desktopCapturePolicies = {
   window: {
     sources: ['window'],
     fallbackLabel: () => '',
+  },
+  'desktop-screenshot': {
+    sources: ['window', 'screen'],
+    fallbackLabel: () => translate('shared.runtime.screenFallbackName'),
   },
 } satisfies Record<DesktopCapturePolicyName, DesktopCapturePolicy>;
 
@@ -110,4 +114,13 @@ export async function getScreenCaptureSource(
     screenName: result.selection.label,
     streamId: result.selection.streamId,
   };
+}
+
+export function chooseDesktopScreenshotSource(
+  deps?: DesktopCaptureSourcePickerDeps
+): Promise<DesktopMediaSourceChooserResult> {
+  return chooseDesktopCaptureSource({
+    ...(deps === undefined ? {} : { deps }),
+    policyName: 'desktop-screenshot',
+  });
 }

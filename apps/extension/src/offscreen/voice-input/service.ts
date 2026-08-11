@@ -4,6 +4,7 @@ import {
   VOICE_INPUT_LOCAL_QUALITY,
   VoiceInputPortMessageType,
   type VoiceInputErrorCode,
+  type VoiceInputBusyOwner,
   type VoiceInputPreferences,
   type VoiceInputServerEvent,
   type VoiceInputSnapshot,
@@ -20,13 +21,18 @@ import {
 
 const logger = createLogger({ namespace: 'OffscreenSpeechRecognition' });
 
+function inspectVoiceInputBusyOwner(): VoiceInputBusyOwner | null {
+  const owner = inspectOffscreenMediaActivityOwner();
+  return owner === 'desktop-screenshot' ? 'video-recording' : owner;
+}
+
 function createSnapshot(
   preferences: VoiceInputPreferences,
   api = resolveSpeechRecognitionApi()
 ): VoiceInputSnapshot {
   return {
     apiFlavor: api.flavor,
-    busyOwner: inspectOffscreenMediaActivityOwner(),
+    busyOwner: inspectVoiceInputBusyOwner(),
     effectiveMode: null,
     errorCode: null,
     fallbackReason: null,
@@ -64,7 +70,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
   }): VoiceInputSnapshot {
     const failedSnapshot: VoiceInputSnapshot = {
       ...createSnapshot(args.preferences, deps.resolveApi()),
-      busyOwner: inspectOffscreenMediaActivityOwner(),
+      busyOwner: inspectVoiceInputBusyOwner(),
       errorCode: args.errorCode,
       phase: 'error',
       sessionId: args.sessionId,
@@ -93,9 +99,11 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
       const errorCode: VoiceInputErrorCode =
         acquisition.busyOwner === 'video-recording'
           ? 'busy-video'
-          : acquisition.busyOwner === 'privacy-erasure'
-            ? 'privacy-erasure-in-progress'
-            : 'busy-speech';
+          : acquisition.busyOwner === 'desktop-screenshot'
+            ? 'busy-video'
+            : acquisition.busyOwner === 'privacy-erasure'
+              ? 'privacy-erasure-in-progress'
+              : 'busy-speech';
       return emitBusyFailure({ ...args, errorCode });
     }
     snapshot = {

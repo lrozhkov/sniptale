@@ -23,7 +23,12 @@ import { applyQuickActionSurface, releaseQuickActionSurfaceAfterFailure } from '
 
 type QuickActionStartMessage =
   | { autoStartSelection: true }
-  | { autoStartCaptureType: Exclude<QuickActionRuntimeContext['captureMode'], 'selection'> };
+  | {
+      autoStartCaptureType: Exclude<
+        QuickActionRuntimeContext['captureMode'],
+        'desktop' | 'selection'
+      >;
+    };
 
 type QuickActionFlowResult = { result: 'accepted' | 'blocked' };
 
@@ -180,7 +185,7 @@ export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<Quick
 
 export async function runCaptureFlow(
   args: QuickActionFlowArgs & {
-    captureMode: Exclude<QuickActionRuntimeContext['captureMode'], 'selection'>;
+    captureMode: Exclude<QuickActionRuntimeContext['captureMode'], 'desktop' | 'selection'>;
   }
 ): Promise<QuickActionFlowResult> {
   try {

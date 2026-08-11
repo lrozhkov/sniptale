@@ -19,6 +19,7 @@ const bundledQuickActionIds = new Set<NonNullable<QuickAction['bundledId']>>([
   'default-delayed-visible',
   'default-copy-visible',
   'default-copy-selection',
+  'default-desktop-download',
 ]);
 
 const quickActionOrigins = new Set<NonNullable<QuickAction['origin']>>(['bundled', 'user']);
@@ -26,6 +27,7 @@ const quickActionScreenshotModes = new Set<QuickAction['screenshotMode']>([
   'visible',
   'full',
   'selection',
+  'desktop',
 ]);
 const quickActionDelays = new Set<Exclude<NonNullable<QuickAction['delay']>, undefined>>([
   0, 3, 5, 10,
@@ -37,6 +39,7 @@ const quickActionAfterCaptureValues = new Set<LegacyQuickActionAfterCapture>([
   'scenario',
   'edit',
   'copy',
+  'save_to_library',
   'download',
 ]);
 const quickActionImageFormats = new Set<

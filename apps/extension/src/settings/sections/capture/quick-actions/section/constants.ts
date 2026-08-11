@@ -87,6 +87,7 @@ export const screenshotModeLabels: Record<string, string> = {
   visible: translate('settings.quickActions.screenshotModeVisible'),
   full: translate('settings.quickActions.screenshotModeFull'),
   selection: translate('settings.quickActions.screenshotModeSelection'),
+  desktop: translate('settings.quickActions.screenshotModeDesktop'),
 };
 
 export const afterCaptureLabels: Record<CaptureActionType, string> = {

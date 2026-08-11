@@ -100,6 +100,18 @@ describe('loadQuickActionRuntimeContext', () => {
 });
 
 describe('resolveQuickActionRuntimeContext', () => {
+  it.each(['scenario', 'ask_preset'] as const)(
+    'rejects the unsupported desktop sink %s at the runtime boundary',
+    (afterCapture) => {
+      expect(() =>
+        resolveQuickActionRuntimeContext(
+          createQuickAction({ screenshotMode: 'desktop', afterCapture }),
+          createSettings()
+        )
+      ).toThrow('unavailable for window or screen capture');
+    }
+  );
+
   it('fills the runtime defaults from the action and settings', () => {
     expect(
       resolveQuickActionRuntimeContext(

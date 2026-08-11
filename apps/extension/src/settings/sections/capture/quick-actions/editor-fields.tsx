@@ -124,6 +124,10 @@ export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActi
               value: 'selection',
               label: translate('settings.quickActions.screenshotModeSelection'),
             },
+            {
+              value: 'desktop',
+              label: translate('settings.quickActions.screenshotModeDesktop'),
+            },
           ]}
         />
       </div>
@@ -135,6 +139,10 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
   state: QuickActionsSectionState;
   viewportPresets: ViewportPreset[] | undefined;
 }) {
+  if (props.state.editForm?.screenshotMode === 'desktop') {
+    return null;
+  }
+
   const viewportPresetOptions = buildViewportPresetOptions(props.viewportPresets);
 
   return (

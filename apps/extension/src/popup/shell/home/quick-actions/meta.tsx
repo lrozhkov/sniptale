@@ -78,6 +78,7 @@ function getScreenshotModeLabels(): Record<string, string> {
     visible: translate('settings.quickActions.screenshotModeVisible'),
     full: translate('settings.quickActions.screenshotModeFull'),
     selection: translate('settings.quickActions.screenshotModeSelection'),
+    desktop: translate('settings.quickActions.screenshotModeDesktop'),
   };
 }
 
@@ -88,6 +89,7 @@ function getAfterCaptureLabels(): Record<string, string> {
     ask_system: translate('settings.quickActions.afterCaptureAskSystem'),
     edit: translate('settings.quickActions.afterCaptureEdit'),
     copy: translate('settings.quickActions.afterCaptureCopy'),
+    save_to_library: translate('settings.quickActions.afterCaptureSaveToLibrary'),
   };
 }
 

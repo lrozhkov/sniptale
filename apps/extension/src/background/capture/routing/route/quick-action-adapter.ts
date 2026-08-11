@@ -3,15 +3,17 @@ import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import { handleTriggerQuickAction } from '../actions.quick-action';
 import type { CaptureRouteAdapterContext } from './types';
+import { loadQuickActionRuntimeContext } from '../../quick-actions/flow/load';
 
 export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {
   if (args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION') {
     return false;
   }
   const message = args.routeArgs.message;
-  void authorizePageAccess(args)
-    .then(() => {
-      handleTriggerQuickAction(message, args.context);
+  void loadQuickActionRuntimeContext(message.actionId)
+    .then(async (runtimeContext) => {
+      await authorizePageAccess(args, runtimeContext.captureMode);
+      handleTriggerQuickAction(message, args.context, runtimeContext);
     })
     .catch((error: unknown) => {
       args.context.sendResponse(createRouteErrorResponse(error));
@@ -19,7 +21,13 @@ export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boole
   return true;
 }
 
-async function authorizePageAccess(args: CaptureRouteAdapterContext): Promise<void> {
+async function authorizePageAccess(
+  args: CaptureRouteAdapterContext,
+  captureMode: string
+): Promise<void> {
+  if (captureMode === 'desktop') {
+    return;
+  }
   const tabId = args.context.resolvedTabId;
   const tab = await browserTabs.get(tabId);
   if (isOwnedSnapshotViewerPage(tab.url)) {

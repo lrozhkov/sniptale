@@ -3,7 +3,7 @@ import type { VoiceInputBusyOwner } from '@sniptale/runtime-contracts/voice-inpu
 // policyStateId: offscreen-media-activity-lease - this document-local lease is the single
 // authority excluding concurrent speech recognition, video capture, and privacy erasure.
 
-type OffscreenMediaActivityOwner = VoiceInputBusyOwner;
+type OffscreenMediaActivityOwner = VoiceInputBusyOwner | 'desktop-screenshot';
 
 type ActiveLease = {
   owner: OffscreenMediaActivityOwner;

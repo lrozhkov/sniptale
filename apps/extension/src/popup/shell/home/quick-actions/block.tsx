@@ -63,11 +63,13 @@ export function QuickActionsBlock({
   actions,
   presets,
   disabledTitle,
+  isActionPageIndependent,
   onTriggerAction,
 }: {
   actions: QuickAction[];
   presets: ViewportPreset[];
   disabledTitle?: string | null;
+  isActionPageIndependent?: (action: QuickAction) => boolean;
   onTriggerAction: (actionId: string) => void;
 }) {
   if (actions.length === 0) {
@@ -95,7 +97,9 @@ export function QuickActionsBlock({
             presets={presets}
             density={density}
             onTriggerAction={onTriggerAction}
-            {...(disabledTitle === undefined ? {} : { disabledTitle })}
+            {...(disabledTitle === undefined || isActionPageIndependent?.(action)
+              ? {}
+              : { disabledTitle })}
           />
         ))}
       </div>

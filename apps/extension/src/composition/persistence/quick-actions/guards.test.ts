@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { parseStoredQuickActions } from './guards';
 
 describe('quick-action storage guards', () => {
+  it('distinguishes missing storage from an invalid root', () => {
+    expect(parseStoredQuickActions(undefined)).toEqual({
+      actions: [],
+      hasInvalidRoot: false,
+      invalidEntryCount: 0,
+    });
+    expect(parseStoredQuickActions({})).toEqual({
+      actions: [],
+      hasInvalidRoot: true,
+      invalidEntryCount: 0,
+    });
+  });
+
   it('normalizes legacy after-capture values and counts invalid entries', () => {
     expect(
       parseStoredQuickActions([
@@ -44,6 +57,44 @@ describe('quick-action storage guards', () => {
 
     expect(result).toEqual({
       actions: [expect.objectContaining({ viewportPresetId: 'system:viewport-hd' })],
+      hasInvalidRoot: false,
+      invalidEntryCount: 0,
+    });
+  });
+
+  it('accepts a complete desktop action including library delivery and optional fields', () => {
+    const result = parseStoredQuickActions([
+      {
+        afterCapture: 'save_to_library',
+        bundledId: 'default-desktop-download',
+        delay: null,
+        exitAfterCapture: false,
+        hotkey: {
+          altKey: false,
+          ctrlKey: true,
+          key: 'D',
+          metaKey: false,
+          shiftKey: true,
+        },
+        icon: 'Monitor',
+        id: 'default-desktop-download',
+        imageFormat: 'webp',
+        imageQuality: 80,
+        name: 'Desktop capture',
+        origin: 'bundled',
+        screenshotMode: 'desktop',
+        status: true,
+        viewportPresetId: null,
+      },
+    ]);
+
+    expect(result).toEqual({
+      actions: [
+        expect.objectContaining({
+          afterCapture: 'save_to_library',
+          screenshotMode: 'desktop',
+        }),
+      ],
       hasInvalidRoot: false,
       invalidEntryCount: 0,
     });

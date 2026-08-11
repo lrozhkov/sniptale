@@ -135,7 +135,7 @@ it('creates a new offscreen document when none exists yet', async () => {
 
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Custom recording reason',
   });
   expect(loggerLogMock).toHaveBeenCalledWith('Created offscreen document');
@@ -184,7 +184,7 @@ it('creates a document after logging a failed runtime-context lookup', async () 
   );
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Run extension-owned offscreen media work',
   });
 });
@@ -227,7 +227,7 @@ it('closes a timed-out startup before creating a replacement offscreen document'
   });
   expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Retry recording',
   });
 });

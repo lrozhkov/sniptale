@@ -46,15 +46,21 @@ function QuickActionsEditorBody(props: {
       <div className={editorSectionClassName}>
         <QuickActionsEditorPrimaryOutputField state={props.state} />
       </div>
+      {props.state.editForm?.screenshotMode !== 'desktop' ||
+      props.state.editForm?.afterCapture !== 'copy' ? (
+        <div className={editorSectionClassName}>
+          <QuickActionsEditorSecondaryCaptureFields
+            state={props.state}
+            viewportPresets={props.viewportPresets}
+          />
+          <QuickActionsEditorAdvancedOutputFields state={props.state} />
+        </div>
+      ) : null}
       <div className={editorSectionClassName}>
-        <QuickActionsEditorSecondaryCaptureFields
+        <QuickActionsEditorToggleRow
           state={props.state}
-          viewportPresets={props.viewportPresets}
+          includeExitAfterCapture={props.state.editForm?.screenshotMode !== 'desktop'}
         />
-        <QuickActionsEditorAdvancedOutputFields state={props.state} />
-      </div>
-      <div className={editorSectionClassName}>
-        <QuickActionsEditorToggleRow state={props.state} includeExitAfterCapture />
       </div>
     </ProductModalBody>
   );

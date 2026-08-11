@@ -25,6 +25,10 @@ export const sharedDefaultsMessages = defineMessageSource({
     ru: 'Выделить и скопировать',
     en: 'Select and copy',
   },
+  quickActionDesktopDownload: {
+    ru: 'Снимок окна или экрана',
+    en: 'Capture window or screen',
+  },
   templateReplaceNamesName: {
     ru: 'Замена имён',
     en: 'Replace names',

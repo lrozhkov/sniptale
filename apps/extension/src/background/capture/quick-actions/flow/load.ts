@@ -1,6 +1,7 @@
 import { getQuickActions } from '../../../../composition/persistence/quick-actions';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import type { QuickActionRuntimeContext } from './shared';
+import { assertQuickActionPolicy } from '../../../../features/quick-actions-presets/policy';
 
 export async function loadQuickActionRuntimeContext(
   actionId: string
@@ -18,13 +19,16 @@ export function resolveQuickActionRuntimeContext(
   action: QuickActionRuntimeContext['action'],
   settings: QuickActionRuntimeContext['settings']
 ): QuickActionRuntimeContext {
+  assertQuickActionPolicy(action);
+  const afterCapture = action.afterCapture ?? 'download_default';
   return {
     action,
-    afterCapture: action.afterCapture ?? 'download_default',
+    afterCapture,
     captureMode: action.screenshotMode || 'visible',
     delaySeconds: action.delay ?? 0,
     viewportPresetId: action.viewportPresetId ?? null,
-    imageFormat: action.imageFormat || settings.imageFormat || 'png',
+    imageFormat:
+      afterCapture === 'copy' ? 'png' : action.imageFormat || settings.imageFormat || 'png',
     imageQuality: action.imageQuality || settings.imageQuality || 90,
     settings,
   };

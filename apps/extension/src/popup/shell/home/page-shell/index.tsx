@@ -14,6 +14,7 @@ import {
 } from './sections';
 import { usePopupHomeActions } from './actions';
 import { PageAccessControls } from './page-access-controls';
+import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
 
 interface PopupHomePageProps {
   quickActions: QuickAction[];
@@ -40,11 +41,12 @@ function isPageAccessChoiceActive(status: PageAccessStatus | null): boolean {
 
 function getPopupHomeCapabilityState(
   activeTabCapabilities: ActiveTabCapabilities,
-  quickActionsCount: number,
+  quickActions: QuickAction[],
   pageAccessDisabledReason: string | null,
   pageAccessStatus: PageAccessStatus | null
 ) {
-  const shouldShowQuickActions = !isPageAccessChoiceActive(pageAccessStatus);
+  const shouldShowQuickActions =
+    !isPageAccessChoiceActive(pageAccessStatus) || quickActions.some(isDesktopQuickAction);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
@@ -54,7 +56,7 @@ function getPopupHomeCapabilityState(
     activeTabCapabilities.quickActions.reason ?? pageAccessDisabledReason;
   return {
     shouldShowQuickActions,
-    hasQuickActions: shouldShowQuickActions && quickActionsCount > 0,
+    hasQuickActions: shouldShowQuickActions && quickActions.length > 0,
     screenshotDisabledReason,
     quickActionsDisabledReason,
     restrictedPageFeaturesTitle,
@@ -139,13 +141,14 @@ export function PopupHomePage({
 }: PopupHomePageProps) {
   const capabilityState = getPopupHomeCapabilityState(
     activeTabCapabilities,
-    quickActions.length,
+    quickActions,
     pageAccess.disabledReason,
     pageAccess.status
   );
   const { actionError, handleOpenScreenshotMode, handleQuickAction } = usePopupHomeActions({
     screenshotDisabledReason: capabilityState.screenshotDisabledReason,
     quickActionsDisabledReason: capabilityState.quickActionsDisabledReason,
+    quickActions,
   });
   const resolvedHomeError = actionError ?? homeError ?? null;
 

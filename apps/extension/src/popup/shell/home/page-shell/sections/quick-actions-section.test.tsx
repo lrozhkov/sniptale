@@ -102,6 +102,7 @@ it('omits the disabled title when quick actions are available without restrictio
 
   expect(quickActionsBlockSpy).toHaveBeenCalledWith({
     actions: [action],
+    isActionPageIndependent: expect.any(Function),
     onTriggerAction: expect.any(Function),
     presets: [],
   });

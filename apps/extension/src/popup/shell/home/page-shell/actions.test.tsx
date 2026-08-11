@@ -21,12 +21,14 @@ vi.mock('../../navigation/actions', async (importOriginal) => ({
 }));
 
 import { usePopupHomeActions } from './actions';
+import type { QuickAction } from '../../../../contracts/settings';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestHookState: ReturnType<typeof usePopupHomeActions> | null = null;
 
 function HookHarness(props: {
+  quickActions: QuickAction[];
   quickActionsDisabledReason?: string | null;
   screenshotDisabledReason?: string | null;
 }) {
@@ -35,6 +37,7 @@ function HookHarness(props: {
 }
 
 async function renderHarness(props: {
+  quickActions?: QuickAction[];
   quickActionsDisabledReason?: string | null;
   screenshotDisabledReason?: string | null;
 }) {
@@ -45,7 +48,7 @@ async function renderHarness(props: {
   }
 
   await act(async () => {
-    root?.render(<HookHarness {...props} />);
+    root?.render(<HookHarness quickActions={props.quickActions ?? []} {...props} />);
   });
 }
 

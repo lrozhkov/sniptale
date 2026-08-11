@@ -139,6 +139,8 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
   MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+  MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
   MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
   MessageType.OFFSCREEN_VOICE_INPUT_START,
   MessageType.OFFSCREEN_VOICE_INPUT_STOP,

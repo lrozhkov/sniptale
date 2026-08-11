@@ -101,6 +101,16 @@ const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
     afterCapture: 'copy',
     delay: null,
   },
+  {
+    id: 'default-desktop-download',
+    icon: 'Monitor',
+    nameKey: 'shared.defaults.quickActionDesktopDownload',
+    screenshotMode: 'desktop',
+    afterCapture: 'download_default',
+    delay: null,
+    imageFormat: null,
+    exitAfterCapture: false,
+  },
 ] as const;
 
 const bundledQuickActionIdSet = new Set<BundledQuickActionId>(
@@ -147,9 +157,9 @@ export function createBundledQuickAction(config: BundledQuickActionConfig): Quic
     viewportPresetId: null,
     delay: config.delay,
     afterCapture: config.afterCapture,
-    imageFormat: 'png',
+    imageFormat: config.imageFormat === undefined ? 'png' : config.imageFormat,
     imageQuality: null,
-    exitAfterCapture: true,
+    exitAfterCapture: config.exitAfterCapture ?? true,
   };
 }
 

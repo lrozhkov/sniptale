@@ -1,6 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { createDesktopMediaSourceChooser, getScreenCaptureSource } from './source-picker';
+import {
+  chooseDesktopScreenshotSource,
+  createDesktopMediaSourceChooser,
+  getScreenCaptureSource,
+} from './source-picker';
 
 const translateMock = vi.hoisted(() => vi.fn());
 
@@ -53,6 +57,17 @@ it('routes screen source selection through the screen policy with a target tab',
   expect(desktopCapture.chooseDesktopMedia).toHaveBeenCalledWith({
     sources: ['screen'],
     targetTab: tab,
+  });
+});
+
+it('offers only windows and screens for a desktop screenshot', async () => {
+  const desktopCapture = createDesktopCaptureMock({ status: 'cancelled' });
+
+  await expect(chooseDesktopScreenshotSource({ desktopCapture })).resolves.toEqual({
+    status: 'cancelled',
+  });
+  expect(desktopCapture.chooseDesktopMedia).toHaveBeenCalledWith({
+    sources: ['window', 'screen'],
   });
 });
 

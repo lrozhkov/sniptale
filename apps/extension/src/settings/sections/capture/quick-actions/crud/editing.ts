@@ -3,6 +3,7 @@ import { translate } from '../../../../../platform/i18n';
 import { isBundledQuickAction } from '../../../../../features/quick-actions-presets/catalog';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { createDefaultQuickAction } from '../section/helpers';
+import { normalizeQuickActionEditorPolicy } from '../../../../../features/quick-actions-presets/policy';
 
 export function beginNewQuickAction(
   setEditingId: (value: string) => void,
@@ -36,7 +37,7 @@ export function updateQuickActionField<K extends keyof QuickAction>(
     return;
   }
 
-  setEditForm({ ...editForm, [field]: value });
+  setEditForm(normalizeQuickActionEditorPolicy({ ...editForm, [field]: value }));
 }
 
 export async function saveEditedQuickAction(props: {
@@ -59,11 +60,14 @@ export async function saveEditedQuickAction(props: {
     return;
   }
 
-  const existingIndex = props.actions.findIndex((action) => action.id === props.editForm?.id);
+  const normalizedEditForm = normalizeQuickActionEditorPolicy(props.editForm);
+  const existingIndex = props.actions.findIndex((action) => action.id === normalizedEditForm.id);
   const updatedActions =
     existingIndex >= 0
-      ? props.actions.map((action, index) => (index === existingIndex ? props.editForm! : action))
-      : [...props.actions, props.editForm];
+      ? props.actions.map((action, index) =>
+          index === existingIndex ? normalizedEditForm : action
+        )
+      : [...props.actions, normalizedEditForm];
 
   const wasPersisted = await props.onPersist(updatedActions);
   if (!wasPersisted) {

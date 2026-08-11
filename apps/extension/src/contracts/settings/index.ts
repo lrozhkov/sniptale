@@ -144,12 +144,13 @@ export interface PromptTemplate {
   lastUsedAt?: number;
 }
 
-export type QuickActionScreenshotMode = 'visible' | 'full' | 'selection';
+export type QuickActionScreenshotMode = 'visible' | 'full' | 'selection' | 'desktop';
 
 import {
   DEFAULT_COLOR_ACCENT,
   DEFAULT_COLOR_INFO,
   DEFAULT_COLOR_SELECTION,
+  DEFAULT_COLOR_SUCCESS,
 } from '@sniptale/ui/default-colors/constants';
 
 export type QuickActionDelay = 0 | 3 | 5 | 10;
@@ -177,12 +178,14 @@ export type BundledQuickActionId =
   | 'default-selection'
   | 'default-delayed-visible'
   | 'default-copy-visible'
-  | 'default-copy-selection';
+  | 'default-copy-selection'
+  | 'default-desktop-download';
 
 export const SCREENSHOT_MODE_COLORS: Record<QuickActionScreenshotMode, string> = {
   visible: DEFAULT_COLOR_ACCENT,
   full: DEFAULT_COLOR_INFO,
   selection: DEFAULT_COLOR_SELECTION,
+  desktop: DEFAULT_COLOR_SUCCESS,
 };
 
 export interface QuickAction {

@@ -192,7 +192,7 @@ async function verifyFailedStartupIgnoresLateReady() {
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD'],
     justification: 'Retry startup',
   });
 }

@@ -5,6 +5,7 @@ import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { Skeleton } from '@sniptale/ui/skeleton';
 import { QuickActionsBlock } from '../../quick-actions/block';
 import { PopupHomeQuickActionsEmptyState } from './empty-state';
+import { isDesktopQuickAction } from '../../../../../features/quick-actions-presets/policy';
 
 interface PopupHomeQuickActionsProps {
   shouldShowQuickActions: boolean;
@@ -91,6 +92,7 @@ export function PopupHomeQuickActions({
             actions={quickActions}
             presets={viewportPresets}
             onTriggerAction={onTriggerAction}
+            isActionPageIndependent={isDesktopQuickAction}
             {...(quickActionsDisabledTitle === undefined
               ? {}
               : { disabledTitle: quickActionsDisabledTitle })}

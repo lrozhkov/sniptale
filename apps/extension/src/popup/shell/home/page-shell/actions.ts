@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { translate } from '../../../../platform/i18n';
 import { openScreenshotMode, triggerQuickAction } from '../../navigation/actions';
+import type { QuickAction } from '../../../../contracts/settings';
+import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
 
 export function usePopupHomeActions({
   screenshotDisabledReason,
   quickActionsDisabledReason,
+  quickActions,
 }: {
   screenshotDisabledReason?: string | null;
   quickActionsDisabledReason?: string | null;
+  quickActions: QuickAction[];
 }) {
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -29,7 +33,8 @@ export function usePopupHomeActions({
   };
 
   const handleQuickAction = async (actionId: string) => {
-    if (quickActionsDisabledReason) {
+    const action = quickActions.find((candidate) => candidate.id === actionId);
+    if (quickActionsDisabledReason && (!action || !isDesktopQuickAction(action))) {
       setActionError(quickActionsDisabledReason);
       return;
     }

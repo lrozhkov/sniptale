@@ -137,6 +137,10 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Выделенная область',
     en: 'Selected area',
   },
+  screenshotModeDesktop: {
+    ru: 'Окно или экран',
+    en: 'Window or screen',
+  },
   afterCaptureDownloadDefault: {
     ru: 'Скачать в папку по умолчанию',
     en: 'Download to the default folder',

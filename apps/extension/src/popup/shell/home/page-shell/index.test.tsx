@@ -76,6 +76,7 @@ function getActionRowProxyProps() {
 
 function expectRestrictedHomeSections(quickAction: ReturnType<typeof createQuickAction>) {
   expect(usePopupHomeActionsSpy).toHaveBeenCalledWith({
+    quickActions: [quickAction],
     quickActionsDisabledReason: 'Quick actions blocked',
     screenshotDisabledReason: 'Screenshots blocked',
   });

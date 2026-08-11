@@ -8,6 +8,7 @@ const {
   ensureActivePageAccessRuntimeMock,
   ensureNativeVisibleCaptureAuthorityMock,
   isOwnedSnapshotViewerPageMock,
+  loadQuickActionRuntimeContextMock,
 } = vi.hoisted(() => ({
   browserTabsGetMock: vi.fn(),
   handleFullCaptureMock: vi.fn(),
@@ -16,6 +17,12 @@ const {
   ensureActivePageAccessRuntimeMock: vi.fn(),
   ensureNativeVisibleCaptureAuthorityMock: vi.fn(),
   isOwnedSnapshotViewerPageMock: vi.fn(),
+  loadQuickActionRuntimeContextMock: vi.fn(),
+}));
+
+vi.mock('../../quick-actions/flow/load', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../quick-actions/flow/load')>()),
+  loadQuickActionRuntimeContext: loadQuickActionRuntimeContextMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', async (importOriginal) => ({
@@ -78,6 +85,7 @@ beforeEach(() => {
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   ensureNativeVisibleCaptureAuthorityMock.mockResolvedValue(undefined);
   isOwnedSnapshotViewerPageMock.mockReturnValue(false);
+  loadQuickActionRuntimeContextMock.mockResolvedValue({ captureMode: 'visible' });
 });
 
 it('rejects screenshot capture without page access before handler side effects', async () => {
@@ -137,6 +145,28 @@ it('fails quick actions closed when page access port is missing', async () => {
     error: 'Page access port unavailable.',
     success: false,
   });
+});
+
+it('runs desktop quick actions without page access or active-page authorization', async () => {
+  const { pageAccessPort: _pageAccessPort, ...args } = createRouteArgs();
+  const runtimeContext = { captureMode: 'desktop' };
+  loadQuickActionRuntimeContextMock.mockResolvedValueOnce(runtimeContext);
+
+  expect(
+    routeCaptureMessage({
+      ...args,
+      message: { type: 'TRIGGER_QUICK_ACTION', actionId: 'desktop-action' },
+    })
+  ).toBe(true);
+  await flushRouteAsync();
+
+  expect(browserTabsGetMock).not.toHaveBeenCalled();
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+  expect(handleTriggerQuickActionMock).toHaveBeenCalledWith(
+    { type: 'TRIGGER_QUICK_ACTION', actionId: 'desktop-action' },
+    expect.any(Object),
+    runtimeContext
+  );
 });
 
 it('rejects native visible capture without native capture authority before handler side effects', async () => {

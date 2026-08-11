@@ -54,6 +54,10 @@ import type {
   RuntimeFrameAnnotationRasterRequestByType,
   RuntimeFrameAnnotationRasterResponseByType,
 } from './frame-annotation-raster.types';
+import type {
+  RuntimeDesktopFrameRequestByType,
+  RuntimeDesktopFrameResponseByType,
+} from './desktop-frame.types';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
@@ -61,7 +65,8 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimeHarRequestByType &
   RuntimePrivacyErasureRequestByType &
-  RuntimeFrameAnnotationRasterRequestByType & {
+  RuntimeFrameAnnotationRasterRequestByType &
+  RuntimeDesktopFrameRequestByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       pageZoom?: number;
@@ -192,7 +197,8 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimeHarResponseByType &
   RuntimePrivacyErasureResponseByType &
-  RuntimeFrameAnnotationRasterResponseByType & {
+  RuntimeFrameAnnotationRasterResponseByType &
+  RuntimeDesktopFrameResponseByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.SCREENSHOT_MODE_STATUS]: ScreenshotModeStatusResponse;
