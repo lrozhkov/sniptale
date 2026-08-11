@@ -17,9 +17,11 @@ let root: Root | null = null;
 
 function ModeButtonsHarness(params: {
   aiPickMode?: boolean;
+  canClearPagePreparation?: boolean;
   designReviewMode?: boolean;
   drawingMode?: boolean;
   onDisableAiPickMode?: () => void;
+  onClearPagePreparation?: () => void;
   onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
   onToggleDesignReview?: () => void;
   onToggleDrawing?: () => void;
@@ -32,6 +34,7 @@ function ModeButtonsHarness(params: {
   const props: ToolbarModeButtonsProps = {
     isCursorMode: true,
     aiPickMode: params.aiPickMode ?? false,
+    canClearPagePreparation: params.canClearPagePreparation ?? false,
     designReviewMode: params.designReviewMode ?? false,
     drawingMode: params.drawingMode ?? false,
     compactMenus: true,
@@ -44,6 +47,7 @@ function ModeButtonsHarness(params: {
     toolbarMenuState,
     onEnableCursorMode: vi.fn(),
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
+    onClearPagePreparation: params.onClearPagePreparation ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
@@ -57,9 +61,11 @@ function ModeButtonsHarness(params: {
 function renderModeButtons(
   params: {
     aiPickMode?: boolean;
+    canClearPagePreparation?: boolean;
     designReviewMode?: boolean;
     drawingMode?: boolean;
     onDisableAiPickMode?: () => void;
+    onClearPagePreparation?: () => void;
     onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
     onToggleDesignReview?: () => void;
     onToggleDrawing?: () => void;
@@ -104,6 +110,29 @@ it('activates Drawing through its distinct Working Mode option', () => {
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
   expect(onToggleDrawing).toHaveBeenCalledTimes(1);
+});
+
+it('shows the clear-all action in Navigation and routes it to the reset owner', () => {
+  const onClearPagePreparation = vi.fn();
+  renderModeButtons({ canClearPagePreparation: true, onClearPagePreparation });
+
+  const clearButton = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
+  );
+  expect(clearButton?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
+  expect(clearButton?.querySelector('svg')?.classList.contains('lucide-brush-cleaning')).toBe(true);
+
+  act(() => clearButton?.click());
+  expect(onClearPagePreparation).toHaveBeenCalledOnce();
+});
+
+it('disables the clear-all action while page preparation history is empty', () => {
+  renderModeButtons();
+  expect(
+    document.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
+    )?.disabled
+  ).toBe(true);
 });
 
 afterEach(() => {
@@ -233,12 +262,12 @@ it('offers Design Review as a standalone mode and no longer adds a Quick Edit in
   expect(onToggleDesignReview).toHaveBeenCalledOnce();
 });
 
-it('uses a highlighter glyph for annotations instead of the border glyph', () => {
+it('uses the annotation glyph instead of the border glyph', () => {
   renderModeButtons();
   act(() => queryModeSelectorButton()?.click());
 
   const icon = document.querySelector('[data-ui="content.toolbar.mode-option.highlighter"] svg');
-  expect(icon?.getAttribute('class')).toContain('lucide-highlighter');
+  expect(icon?.getAttribute('class')).toContain('lucide-message-square-plus');
   expect(icon?.getAttribute('class')).not.toContain('lucide-square');
 });
 

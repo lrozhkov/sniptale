@@ -22,7 +22,12 @@ it('toggles tag filters and gives Escape to the nested filter before restoring f
   );
   const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
   await act(async () => trigger.click());
-  const option = host.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
+  const menu = document.body.querySelector<HTMLElement>(
+    '[data-ui="shared.annotation-template-query.filter-menu"]'
+  )!;
+  expect(host.contains(menu)).toBe(false);
+  expect(menu.className).toContain('overflow-y-auto');
+  const option = menu.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
   expect(document.activeElement).toBe(option);
   act(() => option.click());
   expect(onChange).toHaveBeenCalledWith(['review']);

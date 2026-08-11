@@ -14,13 +14,28 @@ import type { PopupPage } from '../navigation/actions';
 import { usePopupRuntimeEffects } from './effects';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-const { loggerErrorMock, persistVideoSettingsMock, persistVideoUiStateMock, toastErrorMock } =
-  vi.hoisted(() => ({
-    loggerErrorMock: vi.fn(),
-    persistVideoSettingsMock: vi.fn(),
-    persistVideoUiStateMock: vi.fn(),
-    toastErrorMock: vi.fn(),
-  }));
+const {
+  loggerErrorMock,
+  persistVideoSettingsMock,
+  persistVideoUiStateMock,
+  savePopupLastPageMock,
+  toastErrorMock,
+} = vi.hoisted(() => ({
+  loggerErrorMock: vi.fn(),
+  persistVideoSettingsMock: vi.fn(),
+  persistVideoUiStateMock: vi.fn(),
+  savePopupLastPageMock: vi.fn(),
+  toastErrorMock: vi.fn(),
+}));
+vi.mock(
+  '../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    savePopupLastPage: savePopupLastPageMock,
+  })
+);
 vi.mock('@sniptale/platform/observability/logger', (_importOriginal) => ({
   createLogger: ({ namespace }: { namespace: string }) => ({
     child: () => {
@@ -158,12 +173,14 @@ beforeEach(() => {
   loggerErrorMock.mockReset();
   persistVideoSettingsMock.mockReset();
   persistVideoUiStateMock.mockReset();
+  savePopupLastPageMock.mockReset();
   toastErrorMock.mockReset();
   persistVideoSettingsMock.mockImplementation(async (patch) => ({
     ...createEffectsState().videoSettings,
     ...patch,
   }));
   persistVideoUiStateMock.mockResolvedValue(undefined);
+  savePopupLastPageMock.mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
     value: {
@@ -377,6 +394,36 @@ async function verifyQueuedSettingsPreserveExternalFields() {
   expect(setVideoSettingsMock).toHaveBeenCalledWith(secondAuthoritative);
 }
 
+async function verifyLastPopupPagePersistence() {
+  const initial = createEffectsState({ page: 'home' });
+  await renderHarness(<EffectsHarness state={initial} />);
+  await renderHarness(<EffectsHarness state={{ ...initial, page: 'video' }} />);
+  await flushMicrotasks();
+
+  expect(savePopupLastPageMock).toHaveBeenCalledWith('video');
+}
+
+async function verifyLatestPopupPageFailureRollsBackToLastSuccessfulPage() {
+  const first = Promise.withResolvers<void>();
+  const second = Promise.withResolvers<void>();
+  savePopupLastPageMock.mockReset();
+  savePopupLastPageMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const initial = createEffectsState({ page: 'home' });
+  await renderHarness(<EffectsHarness state={initial} />);
+  await renderHarness(<EffectsHarness state={{ ...initial, page: 'video' }} />);
+  await renderHarness(<EffectsHarness state={{ ...initial, page: 'export' }} />);
+  await flushMicrotasks();
+
+  await act(async () => first.resolve());
+  await flushMicrotasks();
+  await act(async () => second.reject(new Error('latest page write failed')));
+  await flushMicrotasks();
+
+  expect(savePopupLastPageMock).toHaveBeenNthCalledWith(1, 'video');
+  expect(savePopupLastPageMock).toHaveBeenNthCalledWith(2, 'export');
+  expect(setPageMock).toHaveBeenCalledWith('video');
+}
+
 function runPopupRuntimeEffectsSuite() {
   it('logs persistence failures for video settings and UI state', verifyPersistenceFailures);
   it(
@@ -406,6 +453,11 @@ function runPopupRuntimeEffectsSuite() {
   it(
     'preserves authoritative cross-context fields across queued local edits',
     verifyQueuedSettingsPreserveExternalFields
+  );
+  it('persists the last selected popup page', verifyLastPopupPagePersistence);
+  it(
+    'rolls a failed latest popup page write back to the last successful queued page',
+    verifyLatestPopupPageFailureRollsBackToLastSuccessfulPage
   );
 }
 

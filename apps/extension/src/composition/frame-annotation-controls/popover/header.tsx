@@ -7,7 +7,6 @@ export type SettingsPopoverContext = 'element' | 'toolbar';
 
 export function SettingsPopoverHeader(props: {
   action?: { label: string; onClick: () => void };
-  applyToFutureAction?: { label: string; onClick: () => void };
   closeLabel: string;
   context: SettingsPopoverContext;
   destructiveAction?: { label: string; onClick: () => void };
@@ -56,17 +55,6 @@ export function SettingsPopoverHeader(props: {
             type="button"
           >
             {props.destructiveAction.label}
-          </button>
-        ) : null}
-        {props.applyToFutureAction ? (
-          <button
-            className="sniptale-settings-popover-mode-action"
-            data-settings-action="apply-to-future"
-            onClick={props.applyToFutureAction.onClick}
-            title={props.applyToFutureAction.label}
-            type="button"
-          >
-            {props.applyToFutureAction.label}
           </button>
         ) : null}
         {props.action ? (

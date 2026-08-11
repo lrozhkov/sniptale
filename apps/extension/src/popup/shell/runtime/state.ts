@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { type StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
 import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
+import type { ScreenshotSetupMode } from '../../../composition/persistence/capture-settings';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -162,14 +163,31 @@ function usePopupCapturePresetState() {
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState<CaptureMode>(CaptureMode.TAB);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [screenshotStartupMode, setScreenshotStartupMode] = useState<ScreenshotSetupMode | null>(
+    null
+  );
+  const screenshotStartupSupersededRef = useRef(false);
+  const publishScreenshotStartupMode = useCallback<
+    Dispatch<SetStateAction<ScreenshotSetupMode | null>>
+  >((nextMode) => {
+    if (screenshotStartupSupersededRef.current) return;
+    setScreenshotStartupMode(nextMode);
+  }, []);
+  const clearScreenshotStartupMode = useCallback(() => {
+    screenshotStartupSupersededRef.current = true;
+    setScreenshotStartupMode(null);
+  }, []);
 
   return {
     quickActions,
     quickActionsReady,
     selectedPresetId,
+    screenshotStartupMode,
+    clearScreenshotStartupMode,
     setQuickActions,
     setQuickActionsReady,
     setSelectedPresetId,
+    setScreenshotStartupMode: publishScreenshotStartupMode,
     setVideoCaptureMode,
     setViewportPresets,
     videoCaptureMode,

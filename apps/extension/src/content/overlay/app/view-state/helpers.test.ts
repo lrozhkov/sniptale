@@ -64,6 +64,18 @@ function buildRuntimeBridgeResult(modeState: ContentAppModeState) {
       handleTakeScreenshot: vi.fn(async () => undefined),
       invalidateScreenshotRuns: vi.fn(),
       modeControls: buildContentModeControls(modeState),
+      modeController: {
+        handleClearHighlights: vi.fn(),
+        handleEnableCursorMode: vi.fn(() => true),
+        handleHideToolbar: vi.fn(),
+        handleToggleHighlighterMode: vi.fn(),
+        handleToggleDesignReviewMode: vi.fn(),
+        handleToggleDrawingMode: vi.fn(),
+        handleToggleNavigationLock: vi.fn(),
+        handleToggleQuickEditDocumentMode: vi.fn(),
+        handleToggleQuickEditMode: vi.fn(),
+        handleToggleScreenshotMode: vi.fn(),
+      },
       modeFlags: {
         aiPickMode: modeState.aiPickMode,
         designReviewMode: modeState.designReviewMode,

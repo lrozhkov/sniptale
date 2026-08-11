@@ -5,12 +5,12 @@ export type BundledQuickActionConfig = {
   icon: string;
   nameKey:
     | 'shared.defaults.quickActionVisibleDownload'
+    | 'shared.defaults.quickActionFullPageDownload'
+    | 'shared.defaults.quickActionVisibleCopy'
     | 'shared.defaults.quickActionVisibleEdit'
     | 'shared.defaults.quickActionSelectionDownload'
-    | 'shared.defaults.quickActionVisibleDelayed'
-    | 'shared.defaults.quickActionVisibleCopy'
-    | 'shared.defaults.quickActionSelectionCopy'
-    | 'shared.defaults.quickActionDesktopDownload';
+    | 'shared.defaults.quickActionDesktopDownload'
+    | 'shared.defaults.quickActionVisibleLibrary';
   screenshotMode: QuickAction['screenshotMode'];
   afterCapture: NonNullable<QuickAction['afterCapture']>;
   delay: Exclude<QuickAction['delay'], undefined>;

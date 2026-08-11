@@ -1,5 +1,5 @@
 import { ChevronRight, X } from 'lucide-react';
-import { type MouseEvent, type ReactNode } from 'react';
+import { type MouseEvent, type ReactNode, type RefObject } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -64,6 +64,7 @@ export function InlineCurtainTrigger({
   onClick,
   onSecondaryClick,
   secondaryAction,
+  triggerRef,
   valueLabel,
 }: {
   ariaControls: string;
@@ -73,6 +74,7 @@ export function InlineCurtainTrigger({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onSecondaryClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   secondaryAction?: InlineCurtainSecondaryAction;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   valueLabel: string;
 }) {
   return (
@@ -83,6 +85,7 @@ export function InlineCurtainTrigger({
         ariaLabel={ariaLabel}
         label={label}
         onClick={onClick}
+        {...(triggerRef === undefined ? {} : { triggerRef })}
         valueLabel={valueLabel}
       />
       {secondaryAction ? (
@@ -104,6 +107,7 @@ function InlineCurtainPrimaryButton({
   label,
   onClick,
   valueLabel,
+  triggerRef,
 }: {
   ariaControls: string;
   ariaExpanded: boolean;
@@ -111,9 +115,11 @@ function InlineCurtainPrimaryButton({
   label: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   valueLabel: string;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <button
+      ref={triggerRef}
       type="button"
       aria-controls={ariaControls}
       aria-expanded={ariaExpanded}
@@ -121,7 +127,10 @@ function InlineCurtainPrimaryButton({
       className="flex min-w-0 flex-1 items-center gap-2 text-left"
       onClick={onClick}
     >
-      <span className="min-w-[60px] shrink-0 text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
+      <span
+        className="w-[88px] shrink-0 truncate text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]"
+        title={label}
+      >
         {label}
       </span>
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={valueLabel}>

@@ -121,6 +121,7 @@ function createArgs(overrides: Partial<ActionArgs> = {}): ActionArgs {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  closeQuickActionCaptureMock.mockResolvedValue(undefined);
   runSelectionScreenshotMock.mockResolvedValue(undefined);
   runViewportScreenshotMock.mockResolvedValue(undefined);
   shouldExitAfterQuickActionCaptureMock.mockReturnValue(false);
@@ -165,6 +166,28 @@ async function expectStaleImmediateFailureDoesNotShowError() {
   expect(showScreenshotErrorMock).not.toHaveBeenCalled();
 }
 
+async function expectQuickActionWaitsForSurfaceCleanup() {
+  let resolveCleanup: (() => void) | undefined;
+  closeQuickActionCaptureMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveCleanup = resolve;
+    })
+  );
+  shouldExitAfterQuickActionCaptureMock.mockReturnValueOnce(true);
+  const args = createArgs();
+  let completed = false;
+
+  const capture = runImmediateScreenshot('visible', args, 1).then(() => {
+    completed = true;
+  });
+  await vi.waitFor(() => expect(closeQuickActionCaptureMock).toHaveBeenCalledOnce());
+
+  expect(completed).toBe(false);
+  resolveCleanup?.();
+  await capture;
+  expect(completed).toBe(true);
+}
+
 describe('screenshot-controller-action-immediate', () => {
   it(
     'runs viewport capture and restores the visible runtime state',
@@ -177,5 +200,9 @@ describe('screenshot-controller-action-immediate', () => {
   it(
     'suppresses stale capture aborts without showing an error',
     expectStaleImmediateFailureDoesNotShowError
+  );
+  it(
+    'does not complete an auto-start quick action before its surface lease is released',
+    expectQuickActionWaitsForSurfaceCleanup
   );
 });

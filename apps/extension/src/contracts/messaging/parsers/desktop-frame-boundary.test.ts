@@ -1,80 +1,35 @@
 import { expect, it } from 'vitest';
-import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { parseOffscreenRuntimeMessage, parseRuntimeResponseForMessage } from './boundary';
 
-const capabilityToken = 'capability-token';
+const pngDataUrl =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=';
 
-it('parses the strict desktop frame command and supported formats', () => {
-  for (const imageFormat of ['png', 'jpeg', 'webp'] as const) {
-    expect(
-      parseOffscreenRuntimeMessage({
-        type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
-        capabilityToken,
-        requestId: `request-${imageFormat}`,
-        streamId: 'one-shot-stream',
-        imageFormat,
-        imageQuality: 85,
-      })
-    ).toEqual(expect.objectContaining({ imageFormat }));
-  }
-});
-
-it('rejects malformed formats, quality, correlation ids, and extra fields', () => {
-  const valid = {
-    type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
-    capabilityToken,
-    requestId: 'request-1',
-    streamId: 'one-shot-stream',
-    imageFormat: 'png',
-    imageQuality: 85,
+it('parses the bounded offscreen PNG clipboard command', () => {
+  const message = {
+    type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
+    capabilityToken: 'capability',
+    requestId: 'desktop-capture:clipboard',
+    dataUrl: pngDataUrl,
   };
+  expect(parseOffscreenRuntimeMessage(message)).toEqual(message);
+  expect(
+    parseRuntimeResponseForMessage(MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD, {
+      success: true,
+      result: 'copied',
+    })
+  ).toEqual({ success: true, result: 'copied' });
+});
 
-  for (const message of [
-    { ...valid, imageFormat: 'gif' },
-    { ...valid, imageQuality: 0 },
-    { ...valid, requestId: '' },
-    { ...valid, extra: true },
-  ]) {
-    expect(() => parseOffscreenRuntimeMessage(message)).toThrow(MessageContractError);
+it('rejects non-PNG and malformed clipboard commands', () => {
+  for (const dataUrl of ['data:image/webp;base64,AA==', 'data:text/plain;base64,QQ==']) {
+    expect(() =>
+      parseOffscreenRuntimeMessage({
+        type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
+        capabilityToken: 'capability',
+        requestId: 'desktop-capture:clipboard',
+        dataUrl,
+      })
+    ).toThrow();
   }
-});
-
-it('requires complete successful desktop-frame responses', () => {
-  expect(
-    parseRuntimeResponseForMessage(MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME, {
-      success: true,
-      result: 'captured',
-      dataUrl: 'data:image/png;base64,AA==',
-      width: 1280,
-      height: 720,
-    })
-  ).toEqual(expect.objectContaining({ result: 'captured' }));
-
-  expect(() =>
-    parseRuntimeResponseForMessage(MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME, {
-      success: true,
-      result: 'captured',
-    })
-  ).toThrow(MessageContractError);
-});
-
-it('accepts only PNG artifacts at the clipboard boundary', () => {
-  expect(
-    parseOffscreenRuntimeMessage({
-      type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
-      capabilityToken,
-      requestId: 'request-1:clipboard',
-      dataUrl: 'data:image/png;base64,AA==',
-    })
-  ).toEqual(expect.objectContaining({ type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD }));
-
-  expect(() =>
-    parseOffscreenRuntimeMessage({
-      type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
-      capabilityToken,
-      requestId: 'request-1:clipboard',
-      dataUrl: 'data:image/webp;base64,AA==',
-    })
-  ).toThrow(MessageContractError);
 });

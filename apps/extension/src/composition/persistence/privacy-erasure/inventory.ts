@@ -39,6 +39,7 @@ const localPreferenceKeys = [
   'sniptale_export_md_spoiler_open',
   'sniptale_editor_file_menu_save_to_folder_open',
   'sniptale_popup_export_preferences',
+  'sniptale_popup_startup',
   'sniptale_video_editor_preview_preferences',
   'sniptale_scenario_editor_navigator_collapsed',
   'sniptale_video_settings',

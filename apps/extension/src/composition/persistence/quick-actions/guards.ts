@@ -13,13 +13,13 @@ interface ParsedQuickActionsStorageValue {
 }
 
 const bundledQuickActionIds = new Set<NonNullable<QuickAction['bundledId']>>([
-  'default-fullscreen',
-  'default-edit-visible',
-  'default-selection',
-  'default-delayed-visible',
-  'default-copy-visible',
-  'default-copy-selection',
-  'default-desktop-download',
+  'default-visible-download',
+  'default-full-page-download',
+  'default-selection-download',
+  'default-visible-copy',
+  'default-visible-edit',
+  'default-desktop-capture',
+  'default-visible-library',
 ]);
 
 const quickActionOrigins = new Set<NonNullable<QuickAction['origin']>>(['bundled', 'user']);
@@ -111,6 +111,7 @@ function isStoredQuickAction(value: unknown): value is StoredQuickAction {
     quickActionScreenshotModes.has(value['screenshotMode'] as QuickAction['screenshotMode']) &&
     isBoolean(value['exitAfterCapture']) &&
     hasOptionalField(value, 'origin', isQuickActionOrigin) &&
+    hasOptionalField(value, 'customized', isBoolean) &&
     hasOptionalField(
       value,
       'bundledId',

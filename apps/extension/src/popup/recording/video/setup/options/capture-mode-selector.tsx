@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { Crop, Monitor, ScreenShare, Video } from 'lucide-react';
+import { Crop, PanelTop, PanelsTopLeft, Video } from 'lucide-react';
 import { translate, type TranslationKey } from '../../../../../platform/i18n';
 import type {
   ActiveTabCapabilities,
@@ -42,7 +42,7 @@ const CAPTURE_MODE_OPTIONS: Array<{
   labelKey: TranslationKey;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  { mode: CaptureMode.TAB, labelKey: 'popup.video.modeTabLabel', icon: Monitor },
+  { mode: CaptureMode.TAB, labelKey: 'popup.video.modeTabLabel', icon: PanelTop },
   {
     mode: CaptureMode.TAB_CROP,
     labelKey: 'popup.video.modeAreaLabel',
@@ -56,7 +56,7 @@ const CAPTURE_MODE_OPTIONS: Array<{
   {
     mode: CaptureMode.SCREEN,
     labelKey: 'popup.video.modeScreenLabel',
-    icon: ScreenShare,
+    icon: PanelsTopLeft,
   },
 ];
 

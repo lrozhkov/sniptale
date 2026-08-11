@@ -129,10 +129,18 @@ export type RouteCaptureMessage =
       type: 'TRIGGER_QUICK_ACTION';
       actionId: string;
       contentIntent?: ContentPrivilegedActionCapability;
+      desktopSelection?: import('@sniptale/runtime-contracts/capture/action').DesktopScreenshotSelection;
+      tabId?: number;
+    }
+  | {
+      type: 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE';
+      actionId?: string;
+      config?: import('@sniptale/runtime-contracts/capture/action').ScreenshotCaptureConfig;
       tabId?: number;
     }
   | {
       type: 'TRIGGER_SCREENSHOT_CAPTURE';
       config: import('@sniptale/runtime-contracts/capture/action').ScreenshotCaptureConfig;
+      desktopSelection?: import('@sniptale/runtime-contracts/capture/action').DesktopScreenshotSelection;
       tabId?: number;
     };

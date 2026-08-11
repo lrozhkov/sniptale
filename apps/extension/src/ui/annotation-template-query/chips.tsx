@@ -1,4 +1,5 @@
 import type { AnnotationTemplateTag } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
+import type { ReactNode } from 'react';
 
 export function AnnotationTemplateTagChips(props: {
   className?: string;
@@ -11,7 +12,10 @@ export function AnnotationTemplateTagChips(props: {
   return (
     <span
       aria-label={fullLabel}
-      className={['flex min-w-0 flex-wrap gap-1', props.className ?? ''].join(' ')}
+      className={[
+        'inline-flex min-w-0 shrink flex-nowrap gap-1 overflow-hidden',
+        props.className ?? '',
+      ].join(' ')}
       data-ui="shared.annotation-template-tags.chips"
       title={fullLabel}
     >
@@ -19,7 +23,7 @@ export function AnnotationTemplateTagChips(props: {
         <span
           aria-hidden="true"
           className={[
-            'max-w-24 truncate rounded-full px-2 py-0.5 text-[10px]',
+            'min-w-0 max-w-24 shrink truncate rounded-full px-2 py-0.5 text-[10px]',
             'bg-[var(--sniptale-color-surface-muted)]',
             'text-[var(--sniptale-color-text-muted)]',
           ].join(' ')}
@@ -32,7 +36,7 @@ export function AnnotationTemplateTagChips(props: {
         <span
           aria-hidden="true"
           className={[
-            'rounded-full px-2 py-0.5 text-[10px]',
+            'shrink-0 rounded-full px-2 py-0.5 text-[10px]',
             'bg-[var(--sniptale-color-surface-muted)]',
             'text-[var(--sniptale-color-text-muted)]',
           ].join(' ')}
@@ -40,6 +44,21 @@ export function AnnotationTemplateTagChips(props: {
           +{hiddenCount}
         </span>
       ) : null}
+    </span>
+  );
+}
+
+export function AnnotationTemplatePresetMetaLine(props: {
+  name: ReactNode;
+  tags: readonly AnnotationTemplateTag[];
+}) {
+  return (
+    <span
+      className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+      data-ui="shared.annotation-template-tags.preset-meta-line"
+    >
+      <span className="min-w-0 flex-1">{props.name}</span>
+      <AnnotationTemplateTagChips className="max-w-[55%]" tags={props.tags} />
     </span>
   );
 }

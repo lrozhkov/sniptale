@@ -16,7 +16,8 @@ import { useOpeningPresetSelection } from '../popover/preset-order';
 import {
   AnnotationTemplateQueryControls,
   AnnotationTemplateQueryEmpty,
-  AnnotationTemplateTagChips,
+  AnnotationTemplatePresetMetaLine,
+  AnnotationTemplateQueryResults,
   queryAnnotationTemplateValues,
   resolveAnnotationTemplateTags,
   useAnnotationTemplateTagState,
@@ -58,80 +59,84 @@ export function StepBadgePresetSection(props: {
         query={query}
         tags={tagState.state.tags}
       />
-      {orderedPresets.length === 0 ? (
-        <AnnotationTemplateQueryEmpty
-          hasFilter={tagState.state.activeFilterTagIds.length > 0}
-          onClearFilter={() => void tagState.setActiveFilterTagIds([])}
-          onClearQuery={() => setQuery('')}
-          query={query}
-        />
-      ) : (
-        <ProductGlassPresetList scrollable variant="menu">
-          {orderedPresets.map((preset) => {
-            const disabled = preset.enabled === false;
-            const pending = props.pending.has(preset.id);
-            return (
-              <div
-                className="sniptale-callout-preset-row"
-                data-disabled={disabled ? 'true' : undefined}
-                key={preset.id}
-              >
-                <ProductGlassPresetItem
-                  active={props.activePresetId === preset.id}
-                  disabled={disabled}
-                  onClick={() => props.onApply(preset)}
-                  showActiveIndicator
+      <AnnotationTemplateQueryResults loading={tagState.isLoading}>
+        {orderedPresets.length === 0 ? (
+          <AnnotationTemplateQueryEmpty
+            hasFilter={tagState.state.activeFilterTagIds.length > 0}
+            onClearFilter={() => void tagState.setActiveFilterTagIds([])}
+            onClearQuery={() => setQuery('')}
+            query={query}
+          />
+        ) : (
+          <ProductGlassPresetList scrollable variant="menu">
+            {orderedPresets.map((preset) => {
+              const disabled = preset.enabled === false;
+              const pending = props.pending.has(preset.id);
+              return (
+                <div
+                  className="sniptale-callout-preset-row"
+                  data-disabled={disabled ? 'true' : undefined}
+                  key={preset.id}
                 >
-                  <StepBadgePresetPreview compact settings={preset.settings} />
-                  <ProductGlassPresetMeta>
-                    <PresetNameWithOverflowHint
-                      name={getStepBadgePresetDisplayName(preset, locale)}
-                    />
-                    <AnnotationTemplateTagChips
-                      tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
-                    />
-                  </ProductGlassPresetMeta>
-                </ProductGlassPresetItem>
-                <span className="sniptale-callout-preset-actions">
-                  <button
-                    aria-label={translate('content.templateFork.fork')}
-                    className="sniptale-callout-preset-action"
-                    data-template-fork-source={preset.id}
-                    disabled={pending}
-                    onClick={() => props.onFork(preset)}
-                    title={translate('content.templateFork.fork')}
-                    type="button"
+                  <ProductGlassPresetItem
+                    active={props.activePresetId === preset.id}
+                    disabled={disabled}
+                    onClick={() => props.onApply(preset)}
+                    showActiveIndicator
                   >
-                    <CopyPlus size={15} />
-                  </button>
-                  {preset.origin === 'system' && preset.customized === true ? (
+                    <StepBadgePresetPreview compact settings={preset.settings} />
+                    <ProductGlassPresetMeta>
+                      <AnnotationTemplatePresetMetaLine
+                        name={
+                          <PresetNameWithOverflowHint
+                            name={getStepBadgePresetDisplayName(preset, locale)}
+                          />
+                        }
+                        tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
+                      />
+                    </ProductGlassPresetMeta>
+                  </ProductGlassPresetItem>
+                  <span className="sniptale-callout-preset-actions">
                     <button
+                      aria-label={translate('content.templateFork.fork')}
                       className="sniptale-callout-preset-action"
+                      data-template-fork-source={preset.id}
                       disabled={pending}
-                      onClick={() => props.onReset(preset)}
-                      title={translate('highlighter.stepBadgePresets.reset')}
+                      onClick={() => props.onFork(preset)}
+                      title={translate('content.templateFork.fork')}
                       type="button"
                     >
-                      <RotateCcw size={15} />
+                      <CopyPlus size={15} />
                     </button>
-                  ) : null}
-                  <button
-                    className="sniptale-callout-preset-action"
-                    disabled={pending || (!disabled && enabledCount <= 1)}
-                    onClick={() => props.onToggle(preset)}
-                    title={translate(
-                      disabled ? 'content.stepBadge.showPreset' : 'content.stepBadge.hidePreset'
-                    )}
-                    type="button"
-                  >
-                    {disabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
-                </span>
-              </div>
-            );
-          })}
-        </ProductGlassPresetList>
-      )}
+                    {preset.origin === 'system' && preset.customized === true ? (
+                      <button
+                        className="sniptale-callout-preset-action"
+                        disabled={pending}
+                        onClick={() => props.onReset(preset)}
+                        title={translate('highlighter.stepBadgePresets.reset')}
+                        type="button"
+                      >
+                        <RotateCcw size={15} />
+                      </button>
+                    ) : null}
+                    <button
+                      className="sniptale-callout-preset-action"
+                      disabled={pending || (!disabled && enabledCount <= 1)}
+                      onClick={() => props.onToggle(preset)}
+                      title={translate(
+                        disabled ? 'content.stepBadge.showPreset' : 'content.stepBadge.hidePreset'
+                      )}
+                      type="button"
+                    >
+                      {disabled ? <Eye size={15} /> : <EyeOff size={15} />}
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
+          </ProductGlassPresetList>
+        )}
+      </AnnotationTemplateQueryResults>
       {props.error ? <div role="alert">{props.error}</div> : null}
     </ContentPopoverSection>
   );

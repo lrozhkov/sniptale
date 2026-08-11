@@ -8,6 +8,7 @@ import type {
 } from './contracts';
 import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
 import { stagePopupExportLaunchSelection } from '../export/selection/launch-selection';
+import { applyPopupStartupSelection, loadPopupStartupSelection } from './startup-routing';
 
 const logger = createLogger({ namespace: 'PopupLifecycle' });
 
@@ -77,9 +78,10 @@ export async function bootstrapPopupLifecycle({
     getParams();
 
   try {
-    const [bootstrapState, launchPage] = await Promise.all([
+    const [bootstrapState, launchPage, startupState] = await Promise.all([
       bootstrapPopupState(),
       consumePopupExportLaunchIntent(),
+      loadPopupStartupSelection(),
     ]);
 
     if (cancelledRef()) {
@@ -90,6 +92,8 @@ export async function bootstrapPopupLifecycle({
     if (launchPage) {
       stagePopupExportLaunchSelection({ includeAnnotations: true });
       getParams().setPage(launchPage);
+    } else {
+      await applyPopupStartupSelection(getParams(), startupState.selection, startupState.lastPage);
     }
     await refreshPopupSecondaryState({
       cancelledRef,

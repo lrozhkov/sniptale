@@ -56,7 +56,8 @@ describe('getCalloutLayoutState', () => {
       zIndex: 20,
     });
 
-    expect(layout.cloudStyle.boxShadow).toContain('#ff0000');
+    expect(layout.wrapperStyle.filter).toContain('#ff0000');
+    expect(layout.cloudStyle.boxShadow).toBe('none');
   });
 
   it('leaves the HTML cloud transparent for the flush combined bubble and wedge contour', () => {

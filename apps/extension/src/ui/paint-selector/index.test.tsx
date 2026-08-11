@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { createGradientPaint, createSolidPaint } from '@sniptale/foundation/paint';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '.';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -11,10 +11,8 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-function changeSelect(select: HTMLSelectElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-  setter?.call(select, value);
-  select.dispatchEvent(new Event('change', { bubbles: true }));
+function selectPaintMode(popup: Element, mode: 'solid' | 'linear' | 'radial' | 'conic') {
+  popup.querySelector<HTMLButtonElement>(`[aria-label="highlighter.paintPicker.${mode}"]`)!.click();
 }
 
 function changeInput(input: HTMLInputElement, value: string) {
@@ -50,7 +48,7 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
     1
   );
   expect(popup.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
-  act(() => changeSelect(popup.querySelector('select')!, 'linear'));
+  act(() => selectPaintMode(popup, 'linear'));
   expect(
     popup.querySelectorAll('[aria-label^="highlighter.paintPicker.gradientStop"]')
   ).toHaveLength(2);
@@ -62,6 +60,39 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
     kind: 'gradient',
     gradient: { type: 'linear' },
   });
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('uses a compact solid-color layout and shows the palette in the same dialog', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        palette={['#123456', '#abcdef']}
+        value={createSolidPaint('#ffffff')}
+        onChange={onChange}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const layer = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.layer"]')!;
+  const popup = layer.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  expect(layer.style.width).toBe('328px');
+  expect(popup.querySelector('[data-ui="shared.ui.paint-selector.presets"]')).toBeNull();
+  const paletteColor = popup.querySelector<HTMLButtonElement>('[aria-label="Fill: #123456"]')!;
+  act(() => paletteColor.click());
+  act(() =>
+    Array.from(popup.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent === 'shared.ui.colorSelectorApply')!
+      .click()
+  );
+  expect(onChange).toHaveBeenCalledWith(createSolidPaint('#123456'));
   act(() => root.unmount());
   host.remove();
 });
@@ -116,10 +147,12 @@ it('keeps dismissal and focus traversal inside a Shadow DOM paint popup', async 
   const popup = shadowRoot.querySelector<HTMLElement>(
     '[data-ui="shared.ui.paint-selector.popup"]'
   )!;
-  const mode = popup.querySelector<HTMLSelectElement>('select')!;
+  const mode = popup.querySelector<HTMLButtonElement>(
+    '[aria-label="highlighter.paintPicker.linear"]'
+  )!;
   act(() => {
     mode.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
-    changeSelect(mode, 'linear');
+    mode.click();
   });
   expect(shadowRoot.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBe(popup);
   const colorField = popup.querySelector<HTMLInputElement>('input')!;
@@ -198,52 +231,41 @@ it('traps focus in the dialog and restores it to the trigger on close', async ()
   host.remove();
 });
 
-it('retains preset input on failure and blocks duplicate saves while pending', async () => {
+it('changes a newly created gradient without selecting a template', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  let resolveSave!: (committed: boolean) => void;
-  const onSave = vi.fn(() => new Promise<boolean>((resolve) => (resolveSave = resolve)));
-  const value = createGradientPaint(
-    '#f00',
-    (() => {
-      let id = 0;
-      return () => `stop-${++id}`;
-    })()
-  );
+  const onChange = vi.fn();
   act(() =>
     root.render(
       <CompactPaintSelector
         label="Fill"
         title="Fill"
-        value={value}
-        onChange={vi.fn()}
-        presetActions={{ onSave }}
+        value={createSolidPaint('#ffffff')}
+        onChange={onChange}
       />
     )
   );
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() => selectPaintMode(popup, 'linear'));
+  const color = popup.querySelector<HTMLInputElement>(
+    'input[aria-label="shared.ui.colorSelectorHex"]'
+  )!;
+  act(() => changeInput(color, '#123456'));
   act(() =>
     Array.from(popup.querySelectorAll<HTMLButtonElement>('button'))
-      .find((button) => button.textContent === 'highlighter.paintPicker.saveAs')!
+      .find((button) => button.textContent === 'shared.ui.colorSelectorApply')!
       .click()
   );
-  const input = popup.querySelector<HTMLInputElement>('input[aria-label$="presetName"]')!;
-  act(() => changeInput(input, 'Reusable gradient'));
-  const save = Array.from(popup.querySelectorAll<HTMLButtonElement>('button')).find(
-    (button) => button.textContent === 'highlighter.paintPicker.save'
-  )!;
-  act(() => {
-    save.click();
-    save.click();
-  });
-  expect(onSave).toHaveBeenCalledOnce();
-  await act(async () => resolveSave(false));
-  expect(input.value).toBe('Reusable gradient');
-  onSave.mockResolvedValueOnce(true);
-  await act(async () => save.click());
-  expect(popup.querySelector('input[aria-label$="presetName"]')).toBeNull();
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'gradient',
+      gradient: expect.objectContaining({
+        stops: expect.arrayContaining([expect.objectContaining({ color: '#123456ff' })]),
+      }),
+    })
+  );
   act(() => root.unmount());
   host.remove();
 });

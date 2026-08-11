@@ -17,6 +17,7 @@ import {
   beginEditQuickAction,
   beginNewQuickAction,
   deleteQuickAction,
+  resetQuickAction,
   saveEditedQuickAction,
   updateQuickActionField,
 } from './editing';
@@ -44,11 +45,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('starts editing and skips bundled actions', () => {
+it('starts editing both bundled and user actions', () => {
   const setEditingId = vi.fn();
   const setEditForm = vi.fn();
   const bundled = createQuickAction({
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
   });
   const existing = createQuickAction({ id: 'action-2', name: 'Existing' });
@@ -59,8 +60,9 @@ it('starts editing and skips bundled actions', () => {
   updateQuickActionField(existing, 'name', 'Updated', setEditForm);
   updateQuickActionField(null, 'name', 'Ignored', setEditForm);
 
-  expect(setEditingId).toHaveBeenCalledTimes(2);
+  expect(setEditingId).toHaveBeenCalledTimes(3);
   expect(setEditForm).toHaveBeenCalledWith(expect.objectContaining({ name: '' }));
+  expect(setEditForm).toHaveBeenCalledWith(bundled);
   expect(setEditForm).toHaveBeenCalledWith(existing);
   expect(setEditForm).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Updated' }));
 });
@@ -108,7 +110,7 @@ it('saves created and edited actions and rejects invalid input', async () => {
     actions: [],
     editForm: createQuickAction({
       id: 'bundled',
-      bundledId: 'default-selection',
+      bundledId: 'default-selection-download',
       origin: 'bundled',
     }),
     onPersist,
@@ -127,7 +129,38 @@ it('saves created and edited actions and rejects invalid input', async () => {
   expect(onPersist).toHaveBeenCalledWith([
     expect.objectContaining({ id: 'created', name: 'Created' }),
   ]);
+  expect(onPersist).toHaveBeenCalledWith([
+    expect.objectContaining({
+      bundledId: 'default-selection-download',
+      customized: true,
+    }),
+  ]);
   expect(onResetEditor).toHaveBeenCalledTimes(3);
+});
+
+it('resets only the selected customized bundled action', async () => {
+  const onPersist = vi.fn().mockResolvedValue(true);
+  const bundled = createQuickAction({
+    bundledId: 'default-visible-copy',
+    customized: true,
+    id: 'default-visible-copy',
+    name: 'Customized copy',
+    origin: 'bundled',
+    screenshotMode: 'full',
+  });
+  const user = createQuickAction({ id: 'user-1', name: 'User action' });
+
+  await resetQuickAction([bundled, user], bundled.id, onPersist);
+
+  expect(onPersist).toHaveBeenCalledWith([
+    expect.objectContaining({
+      bundledId: 'default-visible-copy',
+      customized: false,
+      name: 'shared.defaults.quickActionVisibleCopy',
+      screenshotMode: 'visible',
+    }),
+    user,
+  ]);
 });
 
 it('deletes user actions only', async () => {
@@ -135,7 +168,7 @@ it('deletes user actions only', async () => {
   const user = createQuickAction({ id: 'user-1' });
   const bundled = createQuickAction({
     id: 'bundled-1',
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
   });
 

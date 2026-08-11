@@ -1,4 +1,4 @@
-import { normalizeScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
+import { normalizeScreenshotCaptureConfigPolicy } from '../../../features/quick-actions-presets/policy';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 import { parseStoredScreenshotSetupState } from './screenshot-guards';
@@ -38,8 +38,8 @@ export async function loadScreenshotSetupState(): Promise<ScreenshotSetupState> 
   };
   return {
     ...parsed,
-    tab: normalizeScreenshotCaptureConfig(parsed.tab),
-    desktop: normalizeScreenshotCaptureConfig(parsed.desktop),
+    tab: normalizeScreenshotCaptureConfigPolicy(parsed.tab),
+    desktop: normalizeScreenshotCaptureConfigPolicy(parsed.desktop),
   };
 }
 

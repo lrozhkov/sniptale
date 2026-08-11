@@ -35,7 +35,7 @@ export async function runImmediateScreenshot(
     }
 
     if (shouldExitAfterQuickActionCapture(args.params.quickActionOverlayRef)) {
-      closeQuickActionCapture(args.params, args.runtime, runToken);
+      await closeQuickActionCapture(args.params, args.runtime, runToken);
       return;
     }
 

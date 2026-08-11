@@ -91,6 +91,7 @@ export function CalloutBackgroundSettings(props: ManualContentProps) {
   return (
     <SettingsStack>
       <SharedCalloutBackgroundSettings
+        manageStyles={props.manageSurfaceStyles === true}
         style={props.settings.style}
         onChange={(style) => props.onChange({ style })}
         {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}

@@ -68,6 +68,12 @@ export function StepBadgePopoverContent(props: {
     templates: props.presets,
   });
   const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
+  const onUseForNewFrames =
+    workflow.session.mode === 'temporary' &&
+    props.headerContext === 'element' &&
+    props.onApplyToFuture
+      ? applyToFuture.request
+      : undefined;
 
   return (
     <>
@@ -77,16 +83,6 @@ export function StepBadgePopoverContent(props: {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
                 onClick: workflow.requestTemplates,
-              },
-            }
-          : {})}
-        {...(workflow.session.mode === 'temporary' &&
-        props.headerContext === 'element' &&
-        props.onApplyToFuture
-          ? {
-              applyToFutureAction: {
-                label: translate('content.templateFork.applyToFuture'),
-                onClick: applyToFuture.request,
               },
             }
           : {})}
@@ -155,6 +151,7 @@ export function StepBadgePopoverContent(props: {
             ? { createTagIds: workflow.session.sourceTemplate.tagIds }
             : {})}
           {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
+          {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
           settings={props.localStepBadgeSettings}
         />
       )}

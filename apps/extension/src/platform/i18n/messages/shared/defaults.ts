@@ -2,32 +2,32 @@ import { defineMessageSource } from '../source';
 
 export const sharedDefaultsMessages = defineMessageSource({
   quickActionVisibleDownload: {
-    ru: 'Сохранить вкладку',
-    en: 'Save tab capture',
+    ru: 'Скачать видимую область',
+    en: 'Download visible area',
+  },
+  quickActionFullPageDownload: {
+    ru: 'Скачать всю страницу',
+    en: 'Download full page',
   },
   quickActionVisibleEdit: {
-    ru: 'Редактировать вкладку',
-    en: 'Edit tab capture',
+    ru: 'Открыть снимок в редакторе',
+    en: 'Open screenshot in editor',
   },
   quickActionSelectionDownload: {
-    ru: 'Выделить и сохранить',
-    en: 'Select and save',
-  },
-  quickActionVisibleDelayed: {
-    ru: 'Снимок через 5 секунд',
-    en: 'Capture in 5 seconds',
+    ru: 'Выделить и скачать область',
+    en: 'Select and download area',
   },
   quickActionVisibleCopy: {
-    ru: 'Скопировать вкладку',
-    en: 'Copy tab capture',
-  },
-  quickActionSelectionCopy: {
-    ru: 'Выделить и скопировать',
-    en: 'Select and copy',
+    ru: 'Скопировать видимую область',
+    en: 'Copy visible area',
   },
   quickActionDesktopDownload: {
-    ru: 'Снимок окна или экрана',
-    en: 'Capture window or screen',
+    ru: 'Скачать снимок окна или экрана',
+    en: 'Download window or screen capture',
+  },
+  quickActionVisibleLibrary: {
+    ru: 'Сохранить снимок в библиотеку',
+    en: 'Save screenshot to library',
   },
   templateReplaceNamesName: {
     ru: 'Замена имён',

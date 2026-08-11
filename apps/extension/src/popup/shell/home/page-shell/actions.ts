@@ -6,6 +6,7 @@ import {
   triggerScreenshotCapture,
 } from '../../navigation/actions';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { QuickAction } from '../../../../contracts/settings';
 import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
 
@@ -21,7 +22,7 @@ export function usePopupHomeActions({
   const [actionError, setActionError] = useState<string | null>(null);
   const [capturePending, setCapturePending] = useState(false);
 
-  const handleOpenScreenshotMode = async () => {
+  const handleOpenScreenshotMode = async (workingMode?: ToolbarWorkingMode) => {
     if (screenshotDisabledReason) {
       setActionError(screenshotDisabledReason);
       return;
@@ -30,7 +31,7 @@ export function usePopupHomeActions({
     setActionError(null);
 
     try {
-      await openScreenshotMode();
+      await openScreenshotMode(workingMode);
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : translate('popup.home.openPrepError')
@@ -48,7 +49,7 @@ export function usePopupHomeActions({
     setActionError(null);
 
     try {
-      await triggerQuickAction(actionId);
+      await triggerQuickAction(actionId, Boolean(action && isDesktopQuickAction(action)));
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : translate('popup.home.triggerQuickActionError')

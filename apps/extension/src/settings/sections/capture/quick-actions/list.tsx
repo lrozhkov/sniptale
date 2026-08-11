@@ -44,10 +44,14 @@ export function QuickActionsList(props: {
       busy: props.state.isLoading,
       isBuiltIn: isBundledQuickAction(action),
       capabilities: {
-        edit: !isBundledQuickAction(action),
+        edit: true,
         toggle: true,
         delete: !isBundledQuickAction(action),
+        reset: isBundledQuickAction(action) && action.customized === true,
         reorder: true,
+      },
+      actionLabels: {
+        reset: translate('settings.quickActions.resetAction'),
       },
     };
   });
@@ -57,6 +61,7 @@ export function QuickActionsList(props: {
     if (!action) return;
     if (intent.type === 'toggle') void props.state.handleToggleStatus(action.id);
     if (intent.type === 'edit') props.state.handleEdit(action);
+    if (intent.type === 'reset') void props.state.handleReset(action.id);
     if (intent.type === 'delete') props.state.setConfirmDelete(action);
   };
   return (

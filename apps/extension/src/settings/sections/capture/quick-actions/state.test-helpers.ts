@@ -70,7 +70,7 @@ function createDefaultUserAction() {
 function createDefaultBundledAction() {
   return createQuickAction({
     id: 'bundled-action',
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
     name: 'Selection',
     afterCapture: 'download_default',
@@ -112,6 +112,7 @@ export function createSectionState(
     handleCancelEdit: overrides.handleCancelEdit ?? vi.fn(),
     handleDelete: overrides.handleDelete ?? vi.fn().mockResolvedValue(undefined),
     handleMoveBefore: overrides.handleMoveBefore ?? vi.fn().mockResolvedValue(undefined),
+    handleReset: overrides.handleReset ?? vi.fn().mockResolvedValue(undefined),
     handleEdit: overrides.handleEdit ?? vi.fn(),
     handleHotkeyError: overrides.handleHotkeyError ?? vi.fn(),
     handleSaveEdit: overrides.handleSaveEdit ?? vi.fn().mockResolvedValue(undefined),

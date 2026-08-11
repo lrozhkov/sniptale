@@ -1,11 +1,14 @@
 import {
   distributeGradientStops,
+  removeGradientStop,
   reverseGradient,
   updateGradientStop,
   type Gradient,
   type PaintInterpolationSpace,
   type PaintStopIdFactory,
 } from '@sniptale/foundation/paint';
+import { AlignHorizontalDistributeCenter, ArrowLeftRight, Trash2 } from 'lucide-react';
+import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import { GradientRail } from './gradient-rail';
 import { translate } from '../../platform/i18n';
 
@@ -35,10 +38,20 @@ function GradientPrimaryControls({
   gradient,
   selected,
   onChange,
-}: GradientControlsProps & { selected: Gradient['stops'][number] }) {
+  onSelectStop,
+}: GradientControlsProps & {
+  selected: Gradient['stops'][number];
+  onSelectStop: (id: string) => void;
+}) {
+  const removeSelected = () => {
+    const next = removeGradientStop(gradient, selected.id);
+    onChange(next);
+    const nextSelected = next.stops[0];
+    if (nextSelected) onSelectStop(nextSelected.id);
+  };
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <label className="text-[11px]">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+      <label className="min-w-0 text-[11px]">
         {translate('highlighter.paintPicker.position')}
         <input
           className={`${FIELD_CLASS_NAME} mt-1 w-full`}
@@ -55,20 +68,30 @@ function GradientPrimaryControls({
           }
         />
       </label>
-      <button
-        type="button"
-        className={`${FIELD_CLASS_NAME} mt-4`}
-        onClick={() => onChange(reverseGradient(gradient))}
-      >
-        {translate('highlighter.paintPicker.reverse')}
-      </button>
-      <button
-        type="button"
-        className={`${FIELD_CLASS_NAME} mt-4`}
-        onClick={() => onChange(distributeGradientStops(gradient))}
-      >
-        {translate('highlighter.paintPicker.distribute')}
-      </button>
+      <div className="flex items-center gap-1">
+        <ProductGlassIconButton
+          aria-label={translate('highlighter.paintPicker.reverse')}
+          onClick={() => onChange(reverseGradient(gradient))}
+          title={translate('highlighter.paintPicker.reverse')}
+        >
+          <ArrowLeftRight aria-hidden="true" size={14} />
+        </ProductGlassIconButton>
+        <ProductGlassIconButton
+          aria-label={translate('highlighter.paintPicker.distribute')}
+          onClick={() => onChange(distributeGradientStops(gradient))}
+          title={translate('highlighter.paintPicker.distribute')}
+        >
+          <AlignHorizontalDistributeCenter aria-hidden="true" size={14} />
+        </ProductGlassIconButton>
+        <ProductGlassIconButton
+          aria-label={translate('highlighter.paintPicker.removeStop')}
+          disabled={gradient.stops.length <= 2}
+          onClick={removeSelected}
+          title={translate('highlighter.paintPicker.removeStop')}
+        >
+          <Trash2 aria-hidden="true" size={14} />
+        </ProductGlassIconButton>
+      </div>
     </div>
   );
 }
@@ -76,20 +99,27 @@ function GradientPrimaryControls({
 function GradientGeometryControls({ gradient, onChange }: GradientControlsProps) {
   if (gradient.type === 'linear') {
     return (
-      <label className="block text-[11px]">
-        {translate('highlighter.paintPicker.angle')}
-        <input
-          className={`${FIELD_CLASS_NAME} ml-2 w-20`}
-          type="number"
-          value={gradient.angle}
-          onChange={(event) => onChange(withAngle(gradient, number(event.target.value, 0)))}
-        />
-      </label>
+      <div className="rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-2.5">
+        <label className="flex items-center justify-between gap-3 text-[11px]">
+          {translate('highlighter.paintPicker.angle')}
+          <input
+            className={`${FIELD_CLASS_NAME} w-20`}
+            type="number"
+            value={gradient.angle}
+            onChange={(event) => onChange(withAngle(gradient, number(event.target.value, 0)))}
+          />
+        </label>
+      </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2 text-[11px]">
+    <div
+      className={[
+        'grid grid-cols-2 gap-2 rounded-[9px] border p-2.5 text-[11px]',
+        'border-[var(--sniptale-color-border-soft)]',
+      ].join(' ')}
+    >
       {(['x', 'y'] as const).map((axis) => (
         <label key={axis}>
           {translate(
@@ -107,44 +137,36 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
           />
         </label>
       ))}
+      {gradient.type === 'radial'
+        ? (['x', 'y'] as const).map((axis) => (
+            <label key={`radius-${axis}`}>
+              {translate(
+                axis === 'x' ? 'highlighter.paintPicker.radiusX' : 'highlighter.paintPicker.radiusY'
+              )}
+              <input
+                className={`${FIELD_CLASS_NAME} mt-1 w-full`}
+                type="number"
+                value={Math.round(gradient.radius[axis] * 100)}
+                onChange={(event) =>
+                  onChange(withRadius(gradient, axis, number(event.target.value, 50) / 100))
+                }
+              />
+            </label>
+          ))
+        : null}
+      {gradient.type === 'conic' ? (
+        <label className="col-span-2">
+          {translate('highlighter.paintPicker.startAngle')}
+          <input
+            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
+            type="number"
+            value={gradient.startAngle}
+            onChange={(event) => onChange(withStartAngle(gradient, number(event.target.value, 0)))}
+          />
+        </label>
+      ) : null}
     </div>
   );
-}
-
-function GradientTypeAdvancedFields({ gradient, onChange }: GradientControlsProps) {
-  if (gradient.type === 'radial') {
-    return (
-      <>
-        {(['x', 'y'] as const).map((axis) => (
-          <label key={axis}>
-            {translate(
-              axis === 'x' ? 'highlighter.paintPicker.radiusX' : 'highlighter.paintPicker.radiusY'
-            )}
-            <input
-              className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-              type="number"
-              value={Math.round(gradient.radius[axis] * 100)}
-              onChange={(event) =>
-                onChange(withRadius(gradient, axis, number(event.target.value, 50) / 100))
-              }
-            />
-          </label>
-        ))}
-      </>
-    );
-  }
-
-  return gradient.type === 'conic' ? (
-    <label>
-      {translate('highlighter.paintPicker.startAngle')}
-      <input
-        className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-        type="number"
-        value={gradient.startAngle}
-        onChange={(event) => onChange(withStartAngle(gradient, number(event.target.value, 0)))}
-      />
-    </label>
-  ) : null;
 }
 
 function GradientAdvancedControls({
@@ -224,7 +246,6 @@ function GradientAdvancedControls({
             }
           />
         </label>
-        <GradientTypeAdvancedFields gradient={gradient} onChange={onChange} />
       </div>
     </details>
   );
@@ -242,11 +263,22 @@ export function GradientEditor(props: {
     props.gradient.stops[0]!;
   return (
     <div className="min-w-0 space-y-3">
-      <GradientRail {...props} onSelect={props.onSelectStop} />
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="font-semibold">
+            {translate('highlighter.paintPicker.gradientStops')}
+          </span>
+          <span className="text-[var(--sniptale-color-text-muted)]">
+            {translate('highlighter.paintPicker.addStopHint')}
+          </span>
+        </div>
+        <GradientRail {...props} onSelect={props.onSelectStop} />
+      </div>
       <GradientPrimaryControls
         gradient={props.gradient}
         selected={selected}
         onChange={props.onChange}
+        onSelectStop={props.onSelectStop}
       />
       <GradientGeometryControls gradient={props.gradient} onChange={props.onChange} />
       <GradientAdvancedControls

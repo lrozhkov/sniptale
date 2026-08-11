@@ -21,14 +21,19 @@ export async function loadScreenshotCaptureRuntimeContext(
   config: ScreenshotCaptureConfig
 ): Promise<QuickActionRuntimeContext> {
   const settings = await loadSettings();
+  assertQuickActionPolicy(config);
   const normalizedConfig = normalizeScreenshotCaptureConfigPolicy(config);
+  const operationalConfig = {
+    ...normalizedConfig,
+    exitAfterCapture: normalizedConfig.screenshotMode !== 'desktop',
+  };
   return resolveQuickActionRuntimeContext(
     {
       id: 'popup-screenshot-setup',
       status: true,
       name: 'Popup screenshot setup',
       icon: 'Camera',
-      ...normalizedConfig,
+      ...operationalConfig,
     },
     settings
   );

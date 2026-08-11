@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../platform/i18n';
-import { buildAppearanceContextMenuOptions } from './copy';
+import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from './copy';
 import { AppearanceSectionContent } from './content';
 
 type AppearanceSectionContentState = Parameters<typeof AppearanceSectionContent>[0]['state'];
@@ -17,7 +17,6 @@ function createState(
   overrides: Partial<AppearanceSectionContentState> = {}
 ): AppearanceSectionContentState {
   return {
-    rawDiagnosticsEnabled: false,
     contextMenu: {
       enabled: true,
       showExport: true,
@@ -34,6 +33,12 @@ function createState(
     locale: 'ru',
     localeOptions: [{ label: 'Русский', value: 'ru' }],
     preference: 'system',
+    popupStartup: {
+      loading: false,
+      options: buildPopupStartupOptions('ru'),
+      selection: 'remember-last',
+      updateSelection: vi.fn().mockResolvedValue(undefined),
+    },
     resolvedTheme: 'light',
     setLanguagePreference: vi.fn(),
     setPreference: vi.fn(),
@@ -42,7 +47,6 @@ function createState(
       { description: 'desc', label: 'Light', value: 'light' },
       { description: 'desc', label: 'Dark', value: 'dark' },
     ],
-    updateRawDiagnosticsEnabled: vi.fn().mockResolvedValue(undefined),
     updateContextMenu: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -138,5 +142,4 @@ async function verifyRawDiagnosticsHidden(): Promise<void> {
   await renderWithState(state);
 
   expect(container?.textContent).not.toContain('Сохранять расширенную диагностику');
-  expect(state.updateRawDiagnosticsEnabled).not.toHaveBeenCalled();
 }

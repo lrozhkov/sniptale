@@ -97,6 +97,29 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Предпочтение языка',
     en: 'Language preference',
   },
+  popupStartupLabel: {
+    ru: 'Стартовый экран',
+    en: 'Start screen',
+  },
+  popupStartupAriaLabel: {
+    ru: 'Что показывать при открытии основного меню',
+    en: 'What to show when opening the main menu',
+  },
+  popupStartupOptions: {
+    'remember-last': {
+      ru: 'Продолжить с последнего места',
+      en: 'Continue where I left off',
+    },
+    'screenshots:quick-actions': { ru: 'Снимки — Действия', en: 'Screenshots — Shortcuts' },
+    'screenshots:tab': { ru: 'Снимки — Вкладка', en: 'Screenshots — Tab' },
+    'screenshots:desktop': { ru: 'Снимки — Окно', en: 'Screenshots — Window' },
+    'screenshots:tools': { ru: 'Снимки — Инструменты', en: 'Screenshots — Tools' },
+    'video:tab': { ru: 'Видео — Вкладка', en: 'Video — Tab' },
+    'video:area': { ru: 'Видео — Область', en: 'Video — Area' },
+    'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
+    'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
+    export: { ru: 'Экспорт', en: 'Export' },
+  },
   themeModeLabel: {
     ru: 'Режим темы',
     en: 'Theme mode',

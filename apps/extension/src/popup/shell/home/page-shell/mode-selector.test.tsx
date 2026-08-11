@@ -10,16 +10,14 @@ import { ScreenshotModeSelector } from './mode-selector';
 
 afterEach(cleanupRenderedNode);
 
-it('selects capture modes while tools remain a non-persisted command', async () => {
+it('selects all four persisted popup modes', async () => {
   const onModeChange = vi.fn();
-  const onOpenTools = vi.fn();
   await renderNode(
     <ScreenshotModeSelector
       mode="quick-actions"
       tabDisabledReason={null}
       toolsDisabledReason={null}
       onModeChange={onModeChange}
-      onOpenTools={onOpenTools}
     />
   );
   (
@@ -31,7 +29,8 @@ it('selects capture modes while tools remain a non-persisted command', async () 
     getContainer()?.querySelector('[aria-label="popup.home.toolsLabel"]') as HTMLButtonElement
   ).click();
   expect(onModeChange).toHaveBeenCalledWith('desktop');
-  expect(onOpenTools).toHaveBeenCalledOnce();
+  expect(onModeChange).toHaveBeenCalledWith('tools');
+  expect(getContainer()?.textContent).toContain('popup.home.shortcutsModeLabel');
 });
 
 it('disables tab and tools independently from desktop capture', async () => {
@@ -41,7 +40,6 @@ it('disables tab and tools independently from desktop capture', async () => {
       tabDisabledReason="blocked"
       toolsDisabledReason="blocked"
       onModeChange={vi.fn()}
-      onOpenTools={vi.fn()}
     />
   );
   expect(

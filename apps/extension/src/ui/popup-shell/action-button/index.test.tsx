@@ -56,6 +56,21 @@ describe('PopupActionButton', () => {
     expect(markup).toContain('justify-center');
   });
 
+  it('centers the icon and label together when requested', () => {
+    const markup = renderToStaticMarkup(
+      <PopupActionButton
+        centered
+        icon={TestIcon}
+        label="Take screenshot"
+        iconClassName="text-brand"
+        onClick={() => {}}
+      />
+    );
+
+    expect(markup).toContain('justify-center');
+    expect(markup).toContain('flex-none items-center');
+  });
+
   it('omits optional trailing and accessible-label wrappers when the label is not textual', () => {
     const markup = renderToStaticMarkup(
       <PopupActionButton

@@ -4,7 +4,7 @@ import {
   type BrowserDesktopCaptureResult,
   type BrowserDesktopCaptureSource,
 } from '@sniptale/platform/browser/desktop-capture';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../i18n';
 import { CaptureMode, type CaptureSource } from '@sniptale/runtime-contracts/video/types/types';
 
 type DesktopCapturePolicyName = 'screen' | 'window' | 'desktop-screenshot';
@@ -117,10 +117,12 @@ export async function getScreenCaptureSource(
 }
 
 export function chooseDesktopScreenshotSource(
+  targetTab?: chrome.tabs.Tab,
   deps?: DesktopCaptureSourcePickerDeps
 ): Promise<DesktopMediaSourceChooserResult> {
   return chooseDesktopCaptureSource({
     ...(deps === undefined ? {} : { deps }),
     policyName: 'desktop-screenshot',
+    ...(targetTab === undefined ? {} : { targetTab }),
   });
 }

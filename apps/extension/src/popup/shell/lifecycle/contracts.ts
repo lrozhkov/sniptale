@@ -10,6 +10,7 @@ import type {
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
 import type { PopupPage } from '../navigation/actions';
+import type { ScreenshotSetupMode } from '../../../composition/persistence/capture-settings';
 
 export type PopupLifecycleBootstrapParams = {
   refreshActiveTabCapabilities: () => Promise<void>;
@@ -22,6 +23,7 @@ export type PopupLifecycleBootstrapParams = {
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
+  setScreenshotStartupMode: Dispatch<SetStateAction<ScreenshotSetupMode | null>>;
   setRecordingControlCapability: Dispatch<
     SetStateAction<{ controlToken: string; recordingId: string } | null>
   >;

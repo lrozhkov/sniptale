@@ -26,6 +26,7 @@ function EmptyState() {
 export function TemplatesList(props: {
   isBusy: boolean;
   isLoading: boolean;
+  mutatingTemplateId: string | null;
   onDelete: (template: PromptTemplate) => void;
   onEdit: (template: PromptTemplate) => void;
   onMove: (itemId: string, beforeItemId: string | null) => Promise<void>;
@@ -39,7 +40,7 @@ export function TemplatesList(props: {
     title: template.name,
     meta: template.content,
     enabled: template.enabled !== false,
-    busy: props.isBusy,
+    busy: props.mutatingTemplateId === template.id,
     capabilities: {
       edit: true,
       delete: template.isDefault !== true,

@@ -23,7 +23,8 @@ vi.mock('./flows', () => ({
   runSelectionFlow: runSelectionFlowMock,
 }));
 
-vi.mock('../desktop/workflow', () => ({
+vi.mock('../desktop/workflow', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../desktop/workflow')>()),
   runDesktopQuickAction: runDesktopQuickActionMock,
 }));
 

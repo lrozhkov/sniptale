@@ -3,22 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { PopupFooter, type PopupFooterProps } from './index';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 let mediaQueryMatches = false;
-
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  runtimeInfo: {
-    getManifest: () => ({
-      name: 'Sniptale',
-      version: '0.0.0-test',
-    }),
-  },
-}));
 
 function installMatchMedia() {
   Object.defineProperty(window, 'matchMedia', {
@@ -73,9 +62,12 @@ async function renderFooter() {
   act(() => {
     root?.render(
       <PopupFooter
-        onOpenDesignSystem={() => undefined}
+        onOpenGallery={() => undefined}
         onOpenGithub={() => undefined}
+        onOpenImageEditor={() => undefined}
+        onOpenScenarioEditor={() => undefined}
         onOpenSettings={() => undefined}
+        onOpenVideoEditor={() => undefined}
       />
     );
   });
@@ -89,9 +81,12 @@ async function renderFooterWithProps(props: Partial<PopupFooterProps>) {
   act(() => {
     root?.render(
       <PopupFooter
-        onOpenDesignSystem={() => undefined}
+        onOpenGallery={() => undefined}
         onOpenGithub={() => undefined}
+        onOpenImageEditor={() => undefined}
+        onOpenScenarioEditor={() => undefined}
         onOpenSettings={() => undefined}
+        onOpenVideoEditor={() => undefined}
         {...props}
       />
     );
@@ -157,25 +152,55 @@ it('cycles the popup footer theme preference through light, dark, and system', a
   expect(button.getAttribute('data-theme-preference')).toBe('system');
 });
 
-it('renders only the extension version in the footer label', async () => {
+it('replaces the version with application launchers and a separator', async () => {
   await renderFooter();
 
   const footer = container?.querySelector('footer');
-  const versionBlock = footer?.firstElementChild;
+  const applicationActions = footer?.querySelector('[data-ui="popup.footer.application-actions"]');
 
   expect(footer?.className).toContain('rounded-[16px]');
-  expect(versionBlock?.textContent).toBe(`v${runtimeInfo.getManifest().version}`);
-  expect(versionBlock?.textContent).not.toContain(runtimeInfo.getManifest().name);
+  expect(applicationActions?.querySelectorAll('button')).toHaveLength(4);
+  expect(footer?.textContent).not.toContain('v0.0.0');
+  expect(footer?.querySelector('[data-ui="popup.footer.application-separator"]')).not.toBeNull();
+});
+
+it('wires the four application launchers in product order', async () => {
+  const onOpenImageEditor = vi.fn();
+  const onOpenVideoEditor = vi.fn();
+  const onOpenScenarioEditor = vi.fn();
+  const onOpenGallery = vi.fn();
+  await renderFooterWithProps({
+    onOpenGallery,
+    onOpenImageEditor,
+    onOpenScenarioEditor,
+    onOpenVideoEditor,
+  });
+
+  const buttons = [
+    'popup.footer.image-editor-button',
+    'popup.footer.video-editor-button',
+    'popup.footer.scenario-editor-button',
+    'popup.footer.gallery-button',
+  ];
+  act(() => buttons.forEach(clickFooterAction));
+
+  expect(onOpenImageEditor).toHaveBeenCalledOnce();
+  expect(onOpenVideoEditor).toHaveBeenCalledOnce();
+  expect(onOpenScenarioEditor).toHaveBeenCalledOnce();
+  expect(onOpenGallery).toHaveBeenCalledOnce();
+  expect(
+    Array.from(
+      container?.querySelectorAll('[data-ui="popup.footer.application-actions"] button') ?? []
+    ).map((button) => button.getAttribute('data-ui'))
+  ).toEqual(buttons);
 });
 
 it('wires footer actions and shows the restriction indicator when requested', async () => {
-  const onOpenDesignSystem = vi.fn();
   const onOpenGithub = vi.fn();
   const onOpenSettings = vi.fn();
   const restrictionIndicatorTitle = 'Недоступно на этой странице';
 
   await renderFooterWithProps({
-    onOpenDesignSystem,
     onOpenGithub,
     onOpenSettings,
     showRestrictionIndicator: true,
@@ -184,7 +209,6 @@ it('wires footer actions and shows the restriction indicator when requested', as
 
   act(() => {
     clickFooterAction('popup.footer.github-button');
-    clickFooterAction('popup.footer.design-system-button');
     clickFooterAction('popup.footer.settings-button');
   });
 
@@ -192,7 +216,6 @@ it('wires footer actions and shows the restriction indicator when requested', as
   expect(onOpenGithub).toHaveBeenCalledTimes(1);
   expect(githubButton?.getAttribute('title')).toBe('GitHub');
   expect(githubButton?.querySelector('svg')?.classList.contains('lucide-github')).toBe(true);
-  expect(onOpenDesignSystem).toHaveBeenCalledTimes(1);
   expect(onOpenSettings).toHaveBeenCalledTimes(1);
   expect(
     container
@@ -204,11 +227,8 @@ it('wires footer actions and shows the restriction indicator when requested', as
   ).toContain('var(--sniptale-color-danger)');
 });
 
-it('hides the design system action when the build flag disables it', async () => {
-  setDesignSystemFlag(false);
-
+it('does not expose the design system action in the footer', async () => {
   await renderFooter();
-
   expect(container?.querySelector('[data-ui="popup.footer.design-system-button"]')).toBeNull();
 });
 

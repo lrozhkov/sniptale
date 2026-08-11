@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { isScreenshotCaptureConfigValue, normalizeScreenshotCaptureConfig } from './action';
+import {
+  isDesktopScreenshotSelectionValue,
+  isScreenshotCaptureConfigValue,
+  normalizeScreenshotCaptureConfig,
+} from './action';
 
 const config = {
   screenshotMode: 'visible',
@@ -48,4 +52,16 @@ it('normalizes desktop and clipboard-only fields', () => {
     afterCapture: 'copy',
     imageFormat: 'png',
   });
+});
+
+it('accepts only exact correlated desktop selections', () => {
+  const selected = {
+    requestId: 'request-1',
+    reservationToken: 'reservation-1',
+    status: 'selected',
+    streamId: 'one-shot-stream',
+  };
+  expect(isDesktopScreenshotSelectionValue(selected)).toBe(true);
+  expect(isDesktopScreenshotSelectionValue({ ...selected, extra: true })).toBe(false);
+  expect(isDesktopScreenshotSelectionValue({ ...selected, streamId: 42 })).toBe(false);
 });

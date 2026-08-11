@@ -114,13 +114,15 @@ describe('product-form-controls contract', () => {
     expectProductRangeThumbContract();
   });
 
-  it('keeps a darker checked toggle thumb contract for light-theme contrast', () => {
+  it('uses the canonical navigation accent for checked toggles', () => {
+    expect(productFormControlsStylesheet).toContain(
+      '.sniptale-product-toggle-checked {\n  border-color: var(--sniptale-color-accent);\n  background: var(--sniptale-color-accent);\n}'
+    );
     expect(productFormControlsStylesheet).toContain(
       '.sniptale-product-toggle-checked .sniptale-product-toggle-thumb {'
     );
-    expect(productFormControlsStylesheet).toContain('var(--sniptale-color-accent-soft-strong) 38%');
-    expect(productFormControlsStylesheet).not.toContain(
-      'background: color-mix(in srgb, var(--sniptale-color-surface-panel) 74%, white 26%);'
+    expect(productFormControlsStylesheet).toContain(
+      'background: var(--sniptale-color-text-inverse);'
     );
   });
 

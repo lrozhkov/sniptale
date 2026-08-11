@@ -89,7 +89,7 @@ function createProps(overrides: Partial<Parameters<typeof TemplatesSectionConten
       setEnabled: vi.fn(async () => undefined),
     },
     isEditorOpen: false,
-    status: { isLoading: false, isMutating: false, submitError: null },
+    status: { isLoading: false, isMutating: false, mutatingTemplateId: null, submitError: null },
     openNewTemplateEditor: vi.fn(),
     templates: [],
     ...(overrides.editingTemplate === undefined
@@ -231,18 +231,51 @@ function verifyTemplateRowActionsAndDialogs() {
 }
 
 function verifyTemplatesLoadingStateDelay() {
-  renderSection({ status: { isLoading: true, isMutating: false, submitError: null } });
+  renderSection({
+    status: { isLoading: true, isMutating: false, mutatingTemplateId: null, submitError: null },
+  });
   expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeTruthy();
   expect(container?.textContent).not.toContain(translate('templates.section.emptyTitle'));
 }
 
 function verifyTemplatesStayVisibleWhileMutating() {
   renderSection({
-    status: { isLoading: false, isMutating: true, submitError: null },
+    status: {
+      isLoading: false,
+      isMutating: true,
+      mutatingTemplateId: 'template-1',
+      submitError: null,
+    },
     templates: [createTemplate()],
   });
   expect(container?.textContent).toContain('Template 1');
   expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeFalsy();
+}
+
+function verifyOnlyMutatingTemplateRowIsBusy() {
+  renderSection({
+    status: {
+      isLoading: false,
+      isMutating: true,
+      mutatingTemplateId: 'template-1',
+      submitError: null,
+    },
+    templates: [
+      createTemplate({ id: 'template-1', name: 'Template 1' }),
+      createTemplate({ id: 'template-2', name: 'Template 2' }),
+    ],
+  });
+  expect(
+    container?.querySelector('[data-settings-collection-item="template-1"]')?.className
+  ).toContain('cursor-wait');
+  expect(
+    container?.querySelector('[data-settings-collection-item="template-2"]')?.className
+  ).not.toContain('cursor-wait');
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-settings-collection-item="template-2"] button[role="switch"]'
+    )?.disabled
+  ).toBe(false);
 }
 
 function runTemplatesSectionContentSuite() {
@@ -252,6 +285,7 @@ function runTemplatesSectionContentSuite() {
     'keeps template rows mounted while a mutation is saving',
     verifyTemplatesStayVisibleWhileMutating
   );
+  it('marks only the template being updated as busy', verifyOnlyMutatingTemplateRowIsBusy);
   it(
     'routes row actions, hover updates, editor props, and delete dialog events',
     verifyTemplateRowActionsAndDialogs

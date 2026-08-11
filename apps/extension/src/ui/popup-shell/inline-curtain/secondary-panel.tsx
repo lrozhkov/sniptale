@@ -1,9 +1,9 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../platform/i18n';
 import {
   InlineCurtainCustomPanel,
   InlineCurtainPanelCloseButton,
   type InlineCurtainSecondaryAction,
-} from './curtain-trigger';
+} from './trigger';
 
 export function renderSecondaryCurtainPanel({
   openPanel,

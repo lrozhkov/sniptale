@@ -28,6 +28,20 @@ const aiSettingsNavigationContract =
   runtimeActionCoreMessageContracts[MessageType.AI_SETTINGS_NAVIGATION];
 const screenshotCaptureContract =
   runtimeActionCoreMessageContracts[MessageType.TRIGGER_SCREENSHOT_CAPTURE];
+const quickActionContract = runtimeActionCoreMessageContracts[MessageType.TRIGGER_QUICK_ACTION];
+const prepareDesktopContract =
+  runtimeActionCoreMessageContracts[MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE];
+const offscreenDesktopPrepareContract =
+  runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME];
+const offscreenDesktopCaptureContract =
+  runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME];
+
+const desktopSelection = {
+  requestId: 'request-1',
+  reservationToken: 'reservation-1',
+  status: 'selected' as const,
+  streamId: 'one-shot-stream',
+};
 
 const validScreenshotConfig = {
   screenshotMode: 'desktop',
@@ -43,6 +57,7 @@ it('parses strict popup screenshot capture requests and typed responses', () => 
   const request = {
     type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
     tabId: 7,
+    desktopSelection,
     config: validScreenshotConfig,
   };
   expect(screenshotCaptureContract.parseRequest(request)).toEqual(request);
@@ -54,6 +69,118 @@ it('parses strict popup screenshot capture requests and typed responses', () => 
     success: false,
     error: 'blocked',
   });
+});
+
+it('parses popup desktop selections and rejects malformed selections', () => {
+  const request = {
+    type: MessageType.TRIGGER_QUICK_ACTION,
+    actionId: 'desktop-action',
+    desktopSelection,
+    tabId: 7,
+  };
+  expect(quickActionContract.parseRequest(request)).toEqual(request);
+  expect(() => quickActionContract.parseRequest({ ...request, desktopSelection: 42 })).toThrow();
+  expect(() =>
+    screenshotCaptureContract.parseRequest({
+      type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+      config: validScreenshotConfig,
+      desktopSelection: { ...desktopSelection, streamId: 42 },
+    })
+  ).toThrow();
+});
+
+it('resolves desktop encoding policy before the popup opens the picker', () => {
+  expect(
+    prepareDesktopContract.parseRequest({
+      type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+      actionId: 'desktop-action',
+      tabId: 7,
+    })
+  ).toMatchObject({ actionId: 'desktop-action' });
+  expect(
+    prepareDesktopContract.parseRequest({
+      type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+      config: validScreenshotConfig,
+      tabId: 7,
+    })
+  ).toMatchObject({ config: validScreenshotConfig });
+  expect(() =>
+    prepareDesktopContract.parseRequest({
+      type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+      actionId: 'desktop-action',
+      config: validScreenshotConfig,
+    })
+  ).toThrow();
+
+  expect(
+    prepareDesktopContract.parseResponse({
+      success: true,
+      result: 'ready',
+      imageFormat: 'webp',
+      imageQuality: 72,
+      requestId: 'request-1',
+      reservationToken: 'reservation-1',
+    })
+  ).toMatchObject({ imageFormat: 'webp', imageQuality: 72 });
+  expect(prepareDesktopContract.parseResponse({ success: false, error: 'blocked' })).toEqual({
+    success: false,
+    error: 'blocked',
+  });
+  for (const invalidRequest of [
+    null,
+    [],
+    { type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE },
+    { type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE, actionId: 4 },
+    { type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE, config: { screenshotMode: 'desktop' } },
+  ]) {
+    expect(() => prepareDesktopContract.parseRequest(invalidRequest)).toThrow();
+  }
+  for (const invalidResponse of [
+    { success: true },
+    { success: true, result: 'pending', imageFormat: 'webp', imageQuality: 72 },
+    { success: true, result: 'ready', imageFormat: 'gif', imageQuality: 72 },
+    { success: true, result: 'ready', imageFormat: 'png', imageQuality: 0 },
+    { success: true, result: 'ready', imageFormat: 'png', imageQuality: 101 },
+  ]) {
+    expect(() => prepareDesktopContract.parseResponse(invalidResponse)).toThrow();
+  }
+});
+
+it('parses exact offscreen desktop frame responses and rejects malformed dimensions', () => {
+  expect(
+    offscreenDesktopPrepareContract.parseResponse({ success: true, result: 'accepted' })
+  ).toEqual({ success: true, result: 'accepted' });
+  expect(offscreenDesktopPrepareContract.parseResponse({ success: false, error: 'busy' })).toEqual({
+    success: false,
+    error: 'busy',
+  });
+  expect(() =>
+    offscreenDesktopPrepareContract.parseResponse({ success: true, result: 'pending' })
+  ).toThrow();
+
+  const captured = {
+    success: true,
+    result: 'captured',
+    dataUrl: 'data:image/png;base64,AA==',
+    width: 1280,
+    height: 720,
+  } as const;
+  expect(offscreenDesktopCaptureContract.parseResponse(captured)).toEqual(captured);
+  expect(offscreenDesktopCaptureContract.parseResponse({ success: false, error: 'ended' })).toEqual(
+    {
+      success: false,
+      error: 'ended',
+    }
+  );
+  for (const invalid of [
+    { ...captured, result: 'pending' },
+    { ...captured, dataUrl: 'data:text/plain;base64,AA==' },
+    { ...captured, width: 0 },
+    { ...captured, width: 1.5 },
+    { ...captured, height: -1 },
+  ]) {
+    expect(() => offscreenDesktopCaptureContract.parseResponse(invalid)).toThrow();
+  }
 });
 
 it.each([

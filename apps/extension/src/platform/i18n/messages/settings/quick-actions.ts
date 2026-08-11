@@ -102,8 +102,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Enabled',
   },
   exitAfterCaptureLabel: {
-    ru: 'Выйти после захвата',
-    en: 'Exit after capture',
+    ru: 'Закрыть инструменты после захвата',
+    en: 'Close tools after capture',
   },
   savedActionsLabel: {
     ru: 'Сохранённые действия',
@@ -124,6 +124,10 @@ export const settingsQuickActionsMessages = defineMessageSource({
   addButton: {
     ru: 'Добавить действие',
     en: 'Add action',
+  },
+  resetAction: {
+    ru: 'Восстановить заводские настройки',
+    en: 'Restore factory settings',
   },
   screenshotModeVisible: {
     ru: 'Видимая область',

@@ -20,6 +20,7 @@ const {
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
   loadQuickActionRuntimeContextMock,
+  waitForContentToolbarReadyMock,
 } = vi.hoisted(() => ({
   handleFullCaptureMock: vi.fn(),
   handleVisibleCaptureMock: vi.fn(),
@@ -40,6 +41,12 @@ const {
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
   loadQuickActionRuntimeContextMock: vi.fn(),
+  waitForContentToolbarReadyMock: vi.fn(),
+}));
+
+vi.mock('../../../runtime/page-access/readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/page-access/readiness')>()),
+  waitForContentToolbarReady: waitForContentToolbarReadyMock,
 }));
 
 vi.mock('../../quick-actions/flow/load', async (importOriginal) => ({
@@ -142,6 +149,7 @@ beforeEach(() => {
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  waitForContentToolbarReadyMock.mockResolvedValue({ screenshotMode: false, visible: false });
 });
 
 it('renews a screenshot surface only for its preauthorized content document', async () => {

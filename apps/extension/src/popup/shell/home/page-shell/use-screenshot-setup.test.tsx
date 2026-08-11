@@ -2,7 +2,10 @@
 import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
-import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
+import {
+  DEFAULT_SCREENSHOT_SETUP_STATE,
+  type ScreenshotSetupMode,
+} from '../../../../composition/persistence/capture-settings';
 
 const { loadMock, patchMock, toastErrorMock } = vi.hoisted(() => ({
   loadMock: vi.fn(),
@@ -27,8 +30,14 @@ import { useScreenshotSetupState } from './use-screenshot-setup';
 
 let latestSetup: ReturnType<typeof useScreenshotSetupState> | null = null;
 
-function Harness() {
-  const setup = useScreenshotSetupState();
+function Harness({
+  startupMode = null,
+  onStartupModeCleared,
+}: {
+  startupMode?: ScreenshotSetupMode | null;
+  onStartupModeCleared?: () => void;
+}) {
+  const setup = useScreenshotSetupState(startupMode, onStartupModeCleared);
   latestSetup = setup;
   return (
     <div>
@@ -41,11 +50,17 @@ function Harness() {
         data-testid="full"
         onClick={() => setup.update({ tab: { ...setup.state.tab, screenshotMode: 'full' } })}
       />
+      <button
+        data-testid="desktop-save-as"
+        onClick={() =>
+          setup.update({ desktop: { ...setup.state.desktop, afterCapture: 'ask_system' } })
+        }
+      />
     </div>
   );
 }
 
-function setupButton(id: 'desktop' | 'tab' | 'full'): HTMLButtonElement {
+function setupButton(id: 'desktop' | 'desktop-save-as' | 'tab' | 'full'): HTMLButtonElement {
   return getContainer()?.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement;
 }
 
@@ -68,6 +83,80 @@ it('restores stored setup and persists an explicit mode change', async () => {
   });
   expect(getContainer()?.textContent).toBe('desktop:visible');
   expect(patchMock).toHaveBeenCalledWith({ selectedMode: 'desktop' });
+});
+
+it('applies a fixed startup mode operationally without overwriting remembered setup', async () => {
+  await renderNode(<Harness />);
+  await act(async () => Promise.resolve());
+  await renderNode(<Harness startupMode="desktop" />);
+  expect(getContainer()?.textContent).toBe('desktop:visible');
+  expect(patchMock).not.toHaveBeenCalled();
+  await expect(latestSetup?.flush()).resolves.toMatchObject({ selectedMode: 'desktop' });
+  expect(patchMock).not.toHaveBeenCalled();
+});
+
+it('keeps a fixed startup mode while editing its draft without overwriting remembered mode', async () => {
+  const desktop = {
+    ...DEFAULT_SCREENSHOT_SETUP_STATE.desktop,
+    afterCapture: 'ask_system' as const,
+  };
+  patchMock.mockResolvedValueOnce({ ...DEFAULT_SCREENSHOT_SETUP_STATE, desktop });
+  await renderNode(<Harness />);
+  await act(async () => Promise.resolve());
+  await renderNode(<Harness startupMode="desktop" />);
+  await act(async () => {
+    setupButton('desktop-save-as').click();
+    await Promise.resolve();
+  });
+
+  expect(latestSetup?.state).toMatchObject({ selectedMode: 'desktop', desktop });
+  await expect(latestSetup?.flush()).resolves.toMatchObject({
+    selectedMode: 'desktop',
+    desktop,
+  });
+  expect(patchMock).toHaveBeenCalledWith({ desktop });
+});
+
+it('clears a fixed runtime override so an explicit mode survives a home remount', async () => {
+  const storedTab = { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'tab' as const };
+  const clearStartupMode = vi.fn();
+  patchMock.mockResolvedValueOnce(storedTab);
+  await renderNode(<Harness />);
+  await act(async () => Promise.resolve());
+  await renderNode(<Harness startupMode="desktop" onStartupModeCleared={clearStartupMode} />);
+  await act(async () => {
+    setupButton('tab').click();
+    await Promise.resolve();
+  });
+
+  expect(clearStartupMode).toHaveBeenCalledOnce();
+  expect(patchMock).toHaveBeenCalledWith({ selectedMode: 'tab' });
+  expect(getContainer()?.textContent).toBe('tab:visible');
+
+  await renderNode(<div data-testid="other-page" />);
+  loadMock.mockResolvedValueOnce(storedTab);
+  await renderNode(<Harness startupMode={null} onStartupModeCleared={clearStartupMode} />);
+  await act(async () => Promise.resolve());
+
+  expect(getContainer()?.textContent).toBe('tab:visible');
+});
+
+it('does not let a late fixed startup mode overwrite an earlier explicit selection', async () => {
+  const storedTab = { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'tab' as const };
+  const clearStartupMode = vi.fn();
+  patchMock.mockResolvedValueOnce(storedTab);
+  await renderNode(<Harness onStartupModeCleared={clearStartupMode} />);
+  await act(async () => Promise.resolve());
+  await act(async () => {
+    setupButton('tab').click();
+    await Promise.resolve();
+  });
+
+  await renderNode(<Harness startupMode="desktop" onStartupModeCleared={clearStartupMode} />);
+
+  expect(clearStartupMode).toHaveBeenCalledOnce();
+  expect(getContainer()?.textContent).toBe('tab:visible');
+  await expect(latestSetup?.flush()).resolves.toMatchObject({ selectedMode: 'tab' });
 });
 
 it('rolls back the latest optimistic update when persistence fails', async () => {

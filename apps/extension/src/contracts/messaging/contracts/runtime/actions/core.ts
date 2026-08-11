@@ -53,6 +53,7 @@ import { isContentPrivilegedActionCapability } from '@sniptale/runtime-contracts
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import { contentActionRuntimeContracts } from './content-action';
 import { pageAccessRuntimeContracts } from './page-access';
+import { isScreenshotImageFormat } from '@sniptale/runtime-contracts/capture/action';
 
 function isAiSettingsNavigationSection(value: unknown): value is 'ai-connections' | 'ai-prompts' {
   return value === 'ai-connections' || value === 'ai-prompts';
@@ -156,48 +157,8 @@ function isDesktopCaptureCorrelationId(value: unknown): value is string {
   return isString(value) && value.length > 0 && value.length <= 128;
 }
 
-function isDesktopCaptureStreamId(value: unknown): value is string {
-  return isString(value) && value.length > 0 && value.length <= 4_096;
-}
-
 function isPngImageDataUrl(value: unknown): value is string {
   return isImageDataUrl(value) && value.startsWith('data:image/png');
-}
-
-const isDesktopFrameResponseEnvelope = createRuntimeResponseGuard<
-  RuntimeMessageResponse<{
-    result: 'captured';
-    dataUrl: string;
-    width: number;
-    height: number;
-  }>
->({
-  optional: {
-    result: (value) => value === 'captured',
-    dataUrl: isImageDataUrl,
-    width: isNumber,
-    height: isNumber,
-  },
-});
-
-function isDesktopFrameResponse(value: unknown): value is RuntimeMessageResponse<{
-  result: 'captured';
-  dataUrl: string;
-  width: number;
-  height: number;
-}> {
-  if (!isDesktopFrameResponseEnvelope(value) || !isRecord(value)) return false;
-  if (value['success'] !== true) return true;
-  return (
-    value['result'] === 'captured' &&
-    isImageDataUrl(value['dataUrl']) &&
-    isNumber(value['width']) &&
-    Number.isSafeInteger(value['width']) &&
-    value['width'] > 0 &&
-    isNumber(value['height']) &&
-    Number.isSafeInteger(value['height']) &&
-    value['height'] > 0
-  );
 }
 
 const isDesktopClipboardResponseEnvelope = createRuntimeResponseGuard<
@@ -211,6 +172,53 @@ function isDesktopClipboardResponse(
     isDesktopClipboardResponseEnvelope(value) &&
     isRecord(value) &&
     (value['success'] !== true || value['result'] === 'copied')
+  );
+}
+
+const isDesktopFrameAckResponseEnvelope = createRuntimeResponseGuard<
+  RuntimeMessageResponse<{ result: 'accepted' }>
+>({
+  optional: { result: (value) => value === 'accepted' },
+});
+function isDesktopFrameAckResponse(
+  value: unknown
+): value is RuntimeMessageResponse<{ result: 'accepted' }> {
+  return (
+    isDesktopFrameAckResponseEnvelope(value) &&
+    isRecord(value) &&
+    (value['success'] !== true || value['result'] === 'accepted')
+  );
+}
+
+const isDesktopFrameCaptureResponseEnvelope = createRuntimeResponseGuard<
+  RuntimeMessageResponse<{
+    result: 'captured';
+    dataUrl: string;
+    width: number;
+    height: number;
+  }>
+>({
+  optional: {
+    result: (value) => value === 'captured',
+    dataUrl: isImageDataUrl,
+    width: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
+    height: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
+  },
+});
+function isDesktopFrameCaptureResponse(value: unknown): value is RuntimeMessageResponse<{
+  result: 'captured';
+  dataUrl: string;
+  width: number;
+  height: number;
+}> {
+  return (
+    isDesktopFrameCaptureResponseEnvelope(value) &&
+    isRecord(value) &&
+    (value['success'] !== true ||
+      (value['result'] === 'captured' &&
+        isImageDataUrl(value['dataUrl']) &&
+        isNumber(value['width']) &&
+        isNumber(value['height'])))
   );
 }
 
@@ -289,26 +297,6 @@ export const runtimeActionCoreMessageContracts = {
       isFrameAnnotationRasterResponse
     ),
   },
-  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: {
-    parseRequest: createGuardParser(
-      'runtime OFFSCREEN_CAPTURE_DESKTOP_FRAME message',
-      createMessageGuard({
-        type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
-        required: {
-          capabilityToken: isString,
-          requestId: isDesktopCaptureCorrelationId,
-          streamId: isDesktopCaptureStreamId,
-          imageFormat: (value) => value === 'png' || value === 'jpeg' || value === 'webp',
-          imageQuality: (value) =>
-            isNumber(value) && Number.isFinite(value) && value >= 1 && value <= 100,
-        },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime OFFSCREEN_CAPTURE_DESKTOP_FRAME response',
-      isDesktopFrameResponse
-    ),
-  },
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_WRITE_IMAGE_CLIPBOARD message',
@@ -324,6 +312,52 @@ export const runtimeActionCoreMessageContracts = {
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_WRITE_IMAGE_CLIPBOARD response',
       isDesktopClipboardResponse
+    ),
+  },
+  [MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_PREPARE_DESKTOP_FRAME message',
+      createMessageGuard({
+        type: MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
+        required: { capabilityToken: isString, requestId: isDesktopCaptureCorrelationId },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_PREPARE_DESKTOP_FRAME response',
+      isDesktopFrameAckResponse
+    ),
+  },
+  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_CAPTURE_DESKTOP_FRAME message',
+      createMessageGuard({
+        type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+        required: {
+          capabilityToken: isString,
+          requestId: isDesktopCaptureCorrelationId,
+          streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
+          imageFormat: isScreenshotImageFormat,
+          imageQuality: (value) =>
+            isNumber(value) && Number.isFinite(value) && value >= 1 && value <= 100,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_CAPTURE_DESKTOP_FRAME response',
+      isDesktopFrameCaptureResponse
+    ),
+  },
+  [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_CANCEL_DESKTOP_FRAME message',
+      createMessageGuard({
+        type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+        required: { capabilityToken: isString, requestId: isDesktopCaptureCorrelationId },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_CANCEL_DESKTOP_FRAME response',
+      isDesktopFrameAckResponse
     ),
   },
   [MessageType.REQUEST_LLM_SESSION]: {
@@ -525,20 +559,6 @@ export const runtimeActionCoreMessageContracts = {
     parseResponse: createGuardParser(
       'runtime OPEN_EDITOR_WITH_IMAGE response',
       createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
-    ),
-  },
-  [MessageType.TRIGGER_QUICK_ACTION]: {
-    parseRequest: createGuardParser(
-      'runtime TRIGGER_QUICK_ACTION message',
-      createMessageGuard({
-        type: MessageType.TRIGGER_QUICK_ACTION,
-        required: { actionId: isString },
-        optional: { contentIntent: isContentPrivilegedActionCapability, tabId: isNumber },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime TRIGGER_QUICK_ACTION response',
-      createRuntimeResponseGuard({ optional: { result: isString } })
     ),
   },
 } satisfies PartialRuntimeRegistry;

@@ -9,12 +9,14 @@ const {
   executeDownload,
   openEditorWithImage,
   releaseQuickActionSurface,
+  shouldCloseQuickActionTools,
   transitionCaptureJob,
 } = vi.hoisted(() => ({
   createRenderedCaptureJob: vi.fn(),
   executeDownload: vi.fn(),
   openEditorWithImage: vi.fn(),
   releaseQuickActionSurface: vi.fn(),
+  shouldCloseQuickActionTools: vi.fn(),
   transitionCaptureJob: vi.fn(),
 }));
 
@@ -44,6 +46,7 @@ vi.mock('../../jobs/rendered-job', () => ({
 vi.mock('./surface', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./surface')>()),
   releaseQuickActionSurface,
+  shouldCloseQuickActionTools,
 }));
 
 vi.mock('../../jobs/state-machine', async (importOriginal) => ({
@@ -63,6 +66,7 @@ beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendMessage });
   transitionCaptureJob.mockResolvedValue(undefined);
   releaseQuickActionSurface.mockResolvedValue(undefined);
+  shouldCloseQuickActionTools.mockReturnValue(true);
 });
 
 describe('capture quick action finalize copy flow', () => {
@@ -187,6 +191,28 @@ describe('capture quick action finalize edit flow', () => {
         ([tabId, message]) => tabId === 12 && message.type === MessageType.DESTROY_UI_TOOLBAR
       )
     ).toBe(false);
+  });
+
+  it('preserves tools that were already open before the capture', async () => {
+    shouldCloseQuickActionTools.mockReturnValueOnce(false);
+
+    await finalizeQuickActionCapture({
+      action: createAction('existing-tools-action', 'Existing tools', 'edit'),
+      captureResult: {
+        dataUrl: 'data:image/png;base64,edit',
+        filename: 'capture.png',
+        needsDebugger: false,
+      },
+      settings: createSettings(),
+      tabId: 16,
+    });
+
+    expect(
+      sendMessage.mock.calls.some(
+        ([tabId, message]) => tabId === 16 && message.type === MessageType.DESTROY_UI_TOOLBAR
+      )
+    ).toBe(false);
+    expect(releaseQuickActionSurface).toHaveBeenCalledWith(16);
   });
 });
 

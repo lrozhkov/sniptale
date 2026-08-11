@@ -35,6 +35,18 @@ const availabilityReasons = new Set([
   'platform-rejected',
   'verification-failed',
 ]);
+// policyStateIds: [] - toolbar working modes are an immutable boundary allowlist.
+const toolbarWorkingModes = new Set([
+  'cursor',
+  'drawing',
+  'highlighter',
+  'quick-edit',
+  'design-review',
+]);
+
+function isToolbarWorkingMode(value: unknown): boolean {
+  return isString(value) && toolbarWorkingModes.has(value);
+}
 
 function hasOnlyFields(value: Record<string, unknown>, fields: readonly string[]): boolean {
   const allowed = new Set(fields);
@@ -93,6 +105,7 @@ export const runtimeModeMessageContracts = {
           autoStartSelection: isBoolean,
           autoStartCaptureType: isString,
           toolbarVisible: isBoolean,
+          workingMode: isToolbarWorkingMode,
           contentIntent: ContentActionContract.isContentPrivilegedActionCapability,
           surfaceCapabilityToken: isString,
           surfaceLeaseGeneration: isNumber,

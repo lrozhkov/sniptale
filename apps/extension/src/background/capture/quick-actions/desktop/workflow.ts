@@ -1,12 +1,7 @@
 import { generateFilename } from '@sniptale/foundation/utils/filename';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { chooseDesktopScreenshotSource } from '../../../media/desktop-capture/source-picker';
-import {
-  ensureOffscreenDocument,
-  waitForOffscreenReady,
-} from '../../../offscreen-document/service';
-import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
+import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
 import { saveScreenshotToMediaHubFromDataUrl } from '../../../media-hub/assets';
 import { executeDownload } from '../../download/download-router';
 import { openEditorWithImage } from '../../editor';
@@ -14,44 +9,148 @@ import { createRenderedCaptureJob } from '../../jobs/rendered-job';
 import { transitionCaptureJob } from '../../jobs/state-machine';
 import type { QuickActionRuntimeContext } from '../flow/shared';
 import { acquireMediaMutationPermit } from '../../../mutation-exclusion/media-activity';
+import { assertQuickActionPolicy } from '../../../../features/quick-actions-presets/policy';
+import {
+  ensureOffscreenDocument,
+  waitForOffscreenReady,
+} from '../../../offscreen-document/service';
+import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 
 type DesktopQuickActionResult = { result: 'accepted' | 'cancelled' };
-
-async function captureDesktopDataUrl(args: {
-  context: QuickActionRuntimeContext;
+type ReleasePermit = () => void;
+type PendingPreparation = {
+  contextKey: string;
+  releasePermit: ReleasePermit;
   requestId: string;
-  streamId: string;
-}) {
-  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-    attachOffscreenCommandCapability({
-      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
-      requestId: args.requestId,
-      streamId: args.streamId,
-      imageFormat: args.context.imageFormat,
-      imageQuality: args.context.imageQuality,
-    })
-  );
-  if (
-    response?.success !== true ||
-    response.result !== 'captured' ||
-    typeof response.dataUrl !== 'string'
-  ) {
-    throw new Error(response?.error ?? 'Offscreen desktop frame capture failed');
-  }
-  return response.dataUrl;
+  reservationToken: string;
+  tabId: number;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
+const PREPARATION_TIMEOUT_MS = 30_000;
+const pendingPreparations = new Map<string, PendingPreparation>();
+const preparingTabIds = new Set<number>();
+
+function contextKey(context: QuickActionRuntimeContext): string {
+  return JSON.stringify([
+    context.action.id,
+    context.captureMode,
+    context.afterCapture,
+    context.imageFormat,
+    context.imageQuality,
+  ]);
 }
 
-async function copyDesktopDataUrl(dataUrl: string, requestId: string): Promise<void> {
-  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+function prepareOffscreenFrame(requestId: string) {
+  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
-      type: MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD,
+      type: MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
       requestId,
-      dataUrl,
     })
   );
-  if (response?.success !== true || response.result !== 'copied') {
-    throw new Error(response?.error ?? 'Offscreen clipboard write failed');
+}
+
+function cancelOffscreenFrame(requestId: string) {
+  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
+      requestId,
+    })
+  );
+}
+
+function captureOffscreenFrame(args: {
+  requestId: string;
+  streamId: string;
+  imageFormat: QuickActionRuntimeContext['imageFormat'];
+  imageQuality: number;
+}) {
+  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+      ...args,
+    })
+  );
+}
+
+async function cancelPreparation(preparation: PendingPreparation): Promise<void> {
+  if (pendingPreparations.get(preparation.reservationToken) === preparation) {
+    pendingPreparations.delete(preparation.reservationToken);
   }
+  clearTimeout(preparation.timeout);
+  try {
+    await cancelOffscreenFrame(preparation.requestId);
+  } finally {
+    preparation.releasePermit();
+  }
+}
+
+export async function reserveDesktopQuickAction(args: {
+  context: QuickActionRuntimeContext;
+  tabId: number;
+}): Promise<{ requestId: string; reservationToken: string }> {
+  assertQuickActionPolicy(args.context.action);
+  if (args.context.captureMode !== 'desktop') throw new Error('Desktop capture is required');
+  if (
+    preparingTabIds.has(args.tabId) ||
+    [...pendingPreparations.values()].some((pending) => pending.tabId === args.tabId)
+  ) {
+    throw new Error('A desktop screenshot picker is already open');
+  }
+  preparingTabIds.add(args.tabId);
+  const releasePermit = acquireMediaMutationPermit();
+  if (!releasePermit) {
+    preparingTabIds.delete(args.tabId);
+    throw new Error('Local data erasure is in progress');
+  }
+  const requestId = crypto.randomUUID();
+  const reservationToken = crypto.randomUUID();
+  try {
+    await ensureOffscreenDocument('Capture a window or screen screenshot');
+    await waitForOffscreenReady();
+    const response = await prepareOffscreenFrame(requestId);
+    if (!response || response.success !== true || response.result !== 'accepted') {
+      throw new Error(response?.error || 'Desktop screenshot preparation failed');
+    }
+    const preparation: PendingPreparation = {
+      contextKey: contextKey(args.context),
+      releasePermit,
+      requestId,
+      reservationToken,
+      tabId: args.tabId,
+      timeout: setTimeout(() => {
+        const current = pendingPreparations.get(reservationToken);
+        if (current) void cancelPreparation(current);
+      }, PREPARATION_TIMEOUT_MS),
+    };
+    pendingPreparations.set(reservationToken, preparation);
+    return { requestId, reservationToken };
+  } catch (error) {
+    releasePermit();
+    throw error;
+  } finally {
+    preparingTabIds.delete(args.tabId);
+  }
+}
+
+function takePreparation(args: {
+  context: QuickActionRuntimeContext;
+  selection: DesktopScreenshotSelection;
+  tabId: number;
+}): PendingPreparation {
+  const preparation = pendingPreparations.get(args.selection.reservationToken);
+  if (!preparation) throw new Error('Desktop screenshot preparation is missing or expired');
+  pendingPreparations.delete(args.selection.reservationToken);
+  clearTimeout(preparation.timeout);
+  if (
+    preparation.requestId !== args.selection.requestId ||
+    preparation.tabId !== args.tabId ||
+    preparation.contextKey !== contextKey(args.context)
+  ) {
+    void cancelPreparation(preparation);
+    throw new Error('Desktop screenshot preparation does not match this capture request');
+  }
+  return preparation;
 }
 
 async function deliverDesktopCapture(args: {
@@ -60,15 +159,10 @@ async function deliverDesktopCapture(args: {
   dataUrl: string;
   filename: string;
   jobId: string;
-  requestId: string;
 }): Promise<void> {
   switch (args.context.afterCapture) {
     case 'edit':
       await openEditorWithImage(args.dataUrl, { assetId: args.assetId, url: null, title: null });
-      await transitionCaptureJob(args.jobId, 'completed');
-      return;
-    case 'copy':
-      await copyDesktopDataUrl(args.dataUrl, `${args.requestId}:clipboard`);
       await transitionCaptureJob(args.jobId, 'completed');
       return;
     case 'save_to_library':
@@ -87,6 +181,7 @@ async function deliverDesktopCapture(args: {
       );
       return;
     case 'ask_preset':
+    case 'copy':
     case 'scenario':
       throw new Error('Selected action is unavailable for window or screen capture');
   }
@@ -94,35 +189,36 @@ async function deliverDesktopCapture(args: {
 
 export async function runDesktopQuickAction(args: {
   context: QuickActionRuntimeContext;
+  desktopSelection?: DesktopScreenshotSelection;
   tabId: number;
 }): Promise<DesktopQuickActionResult> {
-  const releaseMutationPermit = acquireMediaMutationPermit();
-  if (!releaseMutationPermit) throw new Error('Local data erasure is in progress');
-
+  assertQuickActionPolicy(args.context.action);
+  if (!args.desktopSelection) throw new Error('Desktop screenshot selection is required');
+  const preparation = takePreparation({
+    context: args.context,
+    selection: args.desktopSelection,
+    tabId: args.tabId,
+  });
   let jobId: string | null = null;
   try {
-    await ensureOffscreenDocument('Capture one user-selected window or screen frame');
-    await waitForOffscreenReady();
-    const selection = await chooseDesktopScreenshotSource();
-    if (selection.status === 'cancelled') return { result: 'cancelled' };
-    if (selection.status === 'failed') throw new Error(selection.error);
-
-    const requestId = crypto.randomUUID();
-    const capturePromise = captureDesktopDataUrl({
-      context: args.context,
-      requestId,
-      streamId: selection.selection.streamId,
+    if (args.desktopSelection.status === 'cancelled') {
+      await cancelOffscreenFrame(preparation.requestId);
+      return { result: 'cancelled' };
+    }
+    const response = await captureOffscreenFrame({
+      requestId: preparation.requestId,
+      streamId: args.desktopSelection.streamId,
+      imageFormat: args.context.imageFormat,
+      imageQuality: args.context.imageQuality,
     });
-    const jobPromise = createRenderedCaptureJob(args.tabId);
-    const [captureResult, jobResult] = await Promise.allSettled([capturePromise, jobPromise]);
-    if (jobResult.status === 'fulfilled') jobId = jobResult.value;
-    if (captureResult.status === 'rejected') throw captureResult.reason;
-    if (jobResult.status === 'rejected') throw jobResult.reason;
-    const dataUrl = captureResult.value;
-    const createdJobId = jobResult.value;
+    if (!response || response.success !== true || response.result !== 'captured') {
+      throw new Error(response?.error || 'Desktop screenshot capture failed');
+    }
+    const createdJobId = await createRenderedCaptureJob(args.tabId);
+    jobId = createdJobId;
     const filename = generateFilename('desktop', args.context.imageFormat);
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
-      dataUrl,
+      response.dataUrl,
       filename,
       undefined,
       args.context.afterCapture === 'save_to_library' ? 'library' : 'temporary'
@@ -130,10 +226,9 @@ export async function runDesktopQuickAction(args: {
     await deliverDesktopCapture({
       assetId,
       context: args.context,
-      dataUrl,
+      dataUrl: response.dataUrl,
       filename,
       jobId: createdJobId,
-      requestId,
     });
     return { result: 'accepted' };
   } catch (error) {
@@ -144,6 +239,6 @@ export async function runDesktopQuickAction(args: {
     }
     throw error;
   } finally {
-    releaseMutationPermit();
+    preparation.releasePermit();
   }
 }

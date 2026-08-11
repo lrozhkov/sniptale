@@ -1,6 +1,10 @@
-export { AnnotationTemplateTagChips } from './chips';
+export { AnnotationTemplatePresetMetaLine, AnnotationTemplateTagChips } from './chips';
 export { AnnotationTemplateTagAssignment } from './assignment';
-export { AnnotationTemplateQueryControls, AnnotationTemplateQueryEmpty } from './filter';
+export {
+  AnnotationTemplateQueryControls,
+  AnnotationTemplateQueryEmpty,
+  AnnotationTemplateQueryResults,
+} from './filter';
 export {
   normalizeAnnotationTemplateQuery,
   queryAnnotationTemplateValues,

@@ -125,6 +125,30 @@ it('routes screenshot mode messages through async success and delegated status h
   );
 });
 
+it('forwards a requested working mode and synchronizes persisted mode flags', async () => {
+  const context = createContext();
+  context.quickEditModeState.set(7, true);
+
+  expect(
+    routeScreenshotModeMessage(
+      { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'highlighter' },
+      context
+    )
+  ).toBe(true);
+  await flushPromises();
+
+  expect(enableScreenshotModeMock).toHaveBeenCalledWith(
+    7,
+    context.screenshotModeState,
+    context.viewportState,
+    context.viewportOwnerState,
+    context.webSnapshotViewerPorts,
+    { workingMode: 'highlighter' }
+  );
+  expect(context.highlighterModeState.get(7)).toBe(true);
+  expect(context.quickEditModeState.has(7)).toBe(false);
+});
+
 it('binds content-originated screenshot enable to its preauthorized document', async () => {
   const context = createContext();
   const message = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;

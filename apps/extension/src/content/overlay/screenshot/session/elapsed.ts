@@ -42,12 +42,16 @@ async function runCountdownCapture(
   });
 }
 
-function closeQuickActionCountdownCapture(args: {
+async function closeQuickActionCountdownCapture(args: {
   controllerArgs: CreateScreenshotControllerActionsArgs;
   quickActionAfterCapture: CaptureActionType | null;
   runToken: number;
-}): void {
-  closeQuickActionCapture(args.controllerArgs.params, args.controllerArgs.runtime, args.runToken);
+}): Promise<void> {
+  await closeQuickActionCapture(
+    args.controllerArgs.params,
+    args.controllerArgs.runtime,
+    args.runToken
+  );
   const quickActionSuccessMessage = args.quickActionAfterCapture
     ? getQuickActionSuccessMessage(args.quickActionAfterCapture)
     : null;
@@ -108,7 +112,7 @@ export async function executeCountdownScreenshot(
     }
 
     if (shouldCloseQuickAction) {
-      closeQuickActionCountdownCapture({
+      await closeQuickActionCountdownCapture({
         controllerArgs: args,
         quickActionAfterCapture,
         runToken,

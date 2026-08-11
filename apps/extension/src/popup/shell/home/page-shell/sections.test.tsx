@@ -50,7 +50,7 @@ it('renders the quick-actions empty state when the owner is visible without acti
     />
   );
 
-  const section = getContainer()?.querySelector('section');
+  const content = getContainer()?.firstElementChild;
 
   expect(getContainer()?.textContent).not.toContain('popup.home.quickActionsTitle');
   expect(getContainer()?.textContent).toContain('popup.home.quickActionsEmpty');
@@ -58,7 +58,8 @@ it('renders the quick-actions empty state when the owner is visible without acti
   expect(
     getContainer()?.querySelector('[data-ui="popup.home.quick-actions-restriction-indicator"]')
   ).toBeNull();
-  expect(section?.className).toContain('rounded-[16px]');
+  expect(content?.className).toContain('overflow-y-auto');
+  expect(getContainer()?.querySelector('section')).toBeNull();
 });
 
 it('forwards the quick-actions owner props to the list block and hides the section when disabled', async () => {

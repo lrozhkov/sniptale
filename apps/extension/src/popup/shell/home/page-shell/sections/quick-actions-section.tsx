@@ -45,30 +45,22 @@ export function PopupHomeQuickActions({
   }
 
   return (
-    <section
-      className={[
-        'flex min-h-0 flex-1 flex-col rounded-[16px] border',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_88%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_98%,transparent)] p-3',
-      ].join(' ')}
-    >
-      <div className="min-h-0 flex-1">
-        {!quickActionsReady ? (
-          <DelayedLoadingFallback fallback={<QuickActionsLoadingState />} />
-        ) : hasQuickActions ? (
-          <QuickActionsBlock
-            actions={quickActions}
-            presets={viewportPresets}
-            onTriggerAction={onTriggerAction}
-            isActionPageIndependent={isDesktopQuickAction}
-            {...(quickActionsDisabledTitle === undefined
-              ? {}
-              : { disabledTitle: quickActionsDisabledTitle })}
-          />
-        ) : (
-          <PopupHomeQuickActionsEmptyState />
-        )}
-      </div>
-    </section>
+    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      {!quickActionsReady ? (
+        <DelayedLoadingFallback fallback={<QuickActionsLoadingState />} />
+      ) : hasQuickActions ? (
+        <QuickActionsBlock
+          actions={quickActions}
+          presets={viewportPresets}
+          onTriggerAction={onTriggerAction}
+          isActionPageIndependent={isDesktopQuickAction}
+          {...(quickActionsDisabledTitle === undefined
+            ? {}
+            : { disabledTitle: quickActionsDisabledTitle })}
+        />
+      ) : (
+        <PopupHomeQuickActionsEmptyState />
+      )}
+    </div>
   );
 }

@@ -24,6 +24,17 @@ function handleScreenshotModeStatus(context: TabModeContext): boolean {
   );
 }
 
+function syncWorkingModeState(
+  context: TabModeContext,
+  workingMode: Extract<TabModeMessage, { type: 'ENABLE_SCREENSHOT_MODE' }>['workingMode']
+): void {
+  if (workingMode === undefined) return;
+  if (workingMode === 'highlighter') context.highlighterModeState.set(context.resolvedTabId, true);
+  else context.highlighterModeState.delete(context.resolvedTabId);
+  if (workingMode === 'quick-edit') context.quickEditModeState.set(context.resolvedTabId, true);
+  else context.quickEditModeState.delete(context.resolvedTabId);
+}
+
 export function routeScreenshotModeMessage(
   message: TabModeMessage,
   context: TabModeContext
@@ -42,8 +53,11 @@ export function routeScreenshotModeMessage(
           context.viewportState,
           context.viewportOwnerState,
           context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
-          senderBinding ? { surfaceDocumentId: senderBinding.documentId } : {}
-        ),
+          {
+            ...(senderBinding ? { surfaceDocumentId: senderBinding.documentId } : {}),
+            ...(message.workingMode === undefined ? {} : { workingMode: message.workingMode }),
+          }
+        ).then(() => syncWorkingModeState(context, message.workingMode)),
         context.sendResponse
       );
       return true;

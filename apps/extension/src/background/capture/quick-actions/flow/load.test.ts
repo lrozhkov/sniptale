@@ -104,12 +104,12 @@ describe('loadQuickActionRuntimeContext', () => {
 });
 
 describe('loadScreenshotCaptureRuntimeContext', () => {
-  it('normalizes popup desktop config before creating the runtime context', async () => {
+  it('normalizes an allowed popup desktop config before creating the runtime context', async () => {
     const context = await loadScreenshotCaptureRuntimeContext({
       screenshotMode: 'desktop',
       viewportPresetId: 'wide',
       delay: 10,
-      afterCapture: 'copy',
+      afterCapture: 'edit',
       imageFormat: 'webp',
       imageQuality: 70,
       exitAfterCapture: true,
@@ -118,24 +118,41 @@ describe('loadScreenshotCaptureRuntimeContext', () => {
       captureMode: 'desktop',
       viewportPresetId: null,
       delaySeconds: 0,
-      afterCapture: 'copy',
-      imageFormat: 'png',
-      action: { exitAfterCapture: false, imageQuality: null },
+      afterCapture: 'edit',
+      imageFormat: 'webp',
+      action: { exitAfterCapture: false, imageQuality: 70 },
     });
   });
 
-  it('rejects unsupported desktop delivery at the runtime boundary', async () => {
-    await expect(
-      loadScreenshotCaptureRuntimeContext({
-        screenshotMode: 'desktop',
-        viewportPresetId: null,
-        delay: null,
-        afterCapture: 'scenario',
-        imageFormat: null,
-        imageQuality: null,
-        exitAfterCapture: false,
-      })
-    ).rejects.toThrow('unavailable for window or screen capture');
+  it.each(['scenario', 'copy'] as const)(
+    'rejects unsupported desktop delivery %s at the runtime boundary',
+    async (afterCapture) => {
+      await expect(
+        loadScreenshotCaptureRuntimeContext({
+          screenshotMode: 'desktop',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture,
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        })
+      ).rejects.toThrow('unavailable for window or screen capture');
+    }
+  );
+
+  it('closes only tools opened by a direct popup tab capture', async () => {
+    const context = await loadScreenshotCaptureRuntimeContext({
+      screenshotMode: 'visible',
+      viewportPresetId: null,
+      delay: null,
+      afterCapture: 'download_default',
+      imageFormat: null,
+      imageQuality: null,
+      exitAfterCapture: false,
+    });
+
+    expect(context.action.exitAfterCapture).toBe(true);
   });
 });
 

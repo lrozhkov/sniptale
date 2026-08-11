@@ -70,7 +70,7 @@ it('forwards template section state into the templates content shell', async () 
       setEnabled: vi.fn(async () => undefined),
     },
     isEditorOpen: false,
-    status: { isLoading: false, isMutating: false, submitError: null },
+    status: { isLoading: false, isMutating: false, mutatingTemplateId: null, submitError: null },
     openNewTemplateEditor: vi.fn(),
     templates: [],
   };
@@ -99,7 +99,7 @@ it('forwards the editing template only when the controller exposes one', async (
       setEnabled: vi.fn(async () => undefined),
     },
     isEditorOpen: true,
-    status: { isLoading: false, isMutating: false, submitError: null },
+    status: { isLoading: false, isMutating: false, mutatingTemplateId: null, submitError: null },
     openNewTemplateEditor: vi.fn(),
     templates: [],
   });

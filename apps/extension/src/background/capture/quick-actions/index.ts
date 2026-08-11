@@ -18,6 +18,7 @@ export async function handleQuickAction({
   viewportState,
   screenshotModeState,
   captureGuardState,
+  desktopSelection,
   pageAccessPort,
   webSnapshotViewerPorts,
   runtimeContext,
@@ -51,11 +52,14 @@ export async function handleQuickAction({
       pageAccessPort,
       webSnapshotViewerPorts,
       ...(runtimeContext ? { runtimeContext } : {}),
+      ...(desktopSelection === undefined ? {} : { desktopSelection }),
     };
     return await processQuickAction(processArgs);
   } catch (error) {
     logger.error('Quick action failed', error);
-    notifyQuickActionError(tabId, error);
+    if (runtimeContext?.captureMode !== 'desktop') {
+      notifyQuickActionError(tabId, error);
+    }
     return { error: error instanceof Error ? error.message : String(error), result: 'failed' };
   } finally {
     captureGuardState.isCapturing = false;

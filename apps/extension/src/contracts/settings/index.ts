@@ -173,13 +173,13 @@ export interface QuickActionOverlay {
 export type QuickActionOrigin = 'bundled' | 'user';
 
 export type BundledQuickActionId =
-  | 'default-fullscreen'
-  | 'default-edit-visible'
-  | 'default-selection'
-  | 'default-delayed-visible'
-  | 'default-copy-visible'
-  | 'default-copy-selection'
-  | 'default-desktop-download';
+  | 'default-visible-download'
+  | 'default-full-page-download'
+  | 'default-selection-download'
+  | 'default-visible-copy'
+  | 'default-visible-edit'
+  | 'default-desktop-capture'
+  | 'default-visible-library';
 
 export const SCREENSHOT_MODE_COLORS: Record<QuickActionScreenshotMode, string> = {
   visible: DEFAULT_COLOR_ACCENT,
@@ -195,6 +195,7 @@ export interface QuickAction {
   icon: string;
   origin?: QuickActionOrigin;
   bundledId?: BundledQuickActionId | null;
+  customized?: boolean;
   hotkey?: HotkeyConfig | null;
   screenshotMode: QuickActionScreenshotMode;
   viewportPresetId?: string | null;

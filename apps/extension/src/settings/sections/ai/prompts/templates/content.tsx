@@ -11,6 +11,7 @@ export function TemplatesSectionContent(props: TemplatesSectionContentProps) {
       <TemplatesList
         isBusy={props.status.isMutating}
         isLoading={props.status.isLoading}
+        mutatingTemplateId={props.status.mutatingTemplateId}
         onDelete={props.templateLifecycle.requestDelete}
         onEdit={props.handleEditTemplate}
         onMove={props.templateLifecycle.move}

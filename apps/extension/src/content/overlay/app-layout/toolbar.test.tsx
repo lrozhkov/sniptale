@@ -7,12 +7,29 @@ import type { AutoBlurController } from '../auto-blur/controller';
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutScenarioProps, ContentAppLayoutToolbarProps } from './types';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { createDrawingSession } from '../../../features/drawing/public';
+import { createContentDrawingController } from '../../drawing/controller';
 
-const { preloadContentScenarioRecorderSidebarMock, toolbarMock } = vi.hoisted(() => ({
+const {
+  clearAllPagePreparationChangesMock,
+  preloadContentScenarioRecorderSidebarMock,
+  showToastMock,
+  toolbarMock,
+} = vi.hoisted(() => ({
+  clearAllPagePreparationChangesMock: vi.fn(() => true),
   preloadContentScenarioRecorderSidebarMock: vi.fn(async () => undefined),
+  showToastMock: vi.fn(),
   toolbarMock: vi.fn((props: { scenario?: unknown }) => (
     <div data-ui="content.toolbar.mock">{JSON.stringify(props.scenario ?? null)}</div>
   )),
+}));
+
+vi.mock('../../application/page-preparation-reset', () => ({
+  clearAllPagePreparationChanges: clearAllPagePreparationChangesMock,
+}));
+
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  showToast: showToastMock,
 }));
 
 vi.mock('../toolbar/view', () => ({
@@ -284,6 +301,25 @@ async function verifiesToolbarForwardsFutureFrameStyleSession() {
   );
 }
 
+async function verifiesNavigationClearUsesSharedResetOwner() {
+  const props = createProps();
+  const drawingController = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  const finalizeInteraction = vi.spyOn(drawingController, 'finalizeInteraction');
+  props.toolbar.drawingController = drawingController;
+  await renderShell(props);
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onClearPagePreparation: () => void;
+  };
+  lastToolbarProps.onClearPagePreparation();
+
+  expect(finalizeInteraction).toHaveBeenCalledOnce();
+  expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
+  expect(showToastMock).toHaveBeenCalledWith('Все изменения очищены', 'info');
+}
+
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
   await renderShell(props);
@@ -361,5 +397,9 @@ describe('ContentToolbarShell', () => {
   it(
     'forwards the future-frame session style and mode action into the toolbar',
     verifiesToolbarForwardsFutureFrameStyleSession
+  );
+  it(
+    'routes Navigation clear through the shared page-preparation reset owner',
+    verifiesNavigationClearUsesSharedResetOwner
   );
 });

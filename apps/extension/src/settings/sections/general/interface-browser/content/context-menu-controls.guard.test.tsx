@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { buildAppearanceContextMenuOptions } from '../copy';
+import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from '../copy';
 import { ContextMenuControls } from './context-menu-controls';
 import type { AppearanceSectionState } from './types';
 
@@ -43,7 +43,12 @@ function createAppearanceState(
     locale: 'ru',
     localeOptions: [{ label: 'Русский', value: 'ru' }],
     preference: 'system',
-    rawDiagnosticsEnabled: false,
+    popupStartup: {
+      loading: false,
+      options: buildPopupStartupOptions('ru'),
+      selection: 'remember-last',
+      updateSelection: vi.fn().mockResolvedValue(undefined),
+    },
     resolvedTheme: 'light',
     setLanguagePreference: vi.fn(),
     setPreference: vi.fn(),
@@ -53,7 +58,6 @@ function createAppearanceState(
       { description: 'Тёмная', label: 'Тёмная', value: 'dark' },
     ],
     updateContextMenu,
-    updateRawDiagnosticsEnabled: vi.fn().mockResolvedValue(undefined),
   };
 }
 

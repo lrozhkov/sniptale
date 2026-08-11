@@ -331,20 +331,18 @@ it('keeps compact font sliders while accepting a larger manual title size', asyn
   expect(latestSettings.style.title.fontSize).toBe(120);
 });
 
-it('stores a semantic frame color source and disables the custom picker', async () => {
+it('offers a compact color-or-surface selector without frame color source cycling', async () => {
   await openSection('content.callout.manualBackground');
-  const sourceToggle = document.querySelector<HTMLButtonElement>('[data-color-source="custom"]');
-  await act(async () => sourceToggle?.click());
-  await act(async () =>
-    document.querySelector<HTMLButtonElement>('[data-color-source="frame-border"]')?.click()
-  );
-
-  expect(latestSettings.style.colorBindings.surfaceBackground).toBe('frame-fill');
   const backgroundPicker = document.querySelector<HTMLButtonElement>(
     '[data-ui="shared.ui.surface-style-selector"] > button'
   );
-  expect(backgroundPicker?.disabled).toBe(true);
-  expect(latestSettings.style.surface.fillPaint).not.toEqual({ kind: 'solid', color: '#fedcbaff' });
+  expect(backgroundPicker?.disabled).toBe(false);
+  expect(document.querySelector('[data-color-source]')).toBeNull();
+  await act(async () => backgroundPicker?.click());
+  expect(
+    document.querySelector('[aria-label="content.callout.surfaceStyle.backgroundType"]')
+  ).not.toBeNull();
+  expect(document.body.textContent).not.toContain('content.callout.surfaceStyle.advancedCss');
 });
 
 it('inherits the shadow color from the resolved comment background and border', async () => {

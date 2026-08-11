@@ -1,15 +1,21 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
-  InlineCurtainNotice,
-  InlineCurtainOptionList,
-  type InlineCurtainOption,
-} from './curtain-options';
-import { renderSecondaryCurtainPanel } from './curtain-secondary-panel';
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
+import { translate } from '../../../platform/i18n';
+import { InlineCurtainNotice, InlineCurtainOptionList, type InlineCurtainOption } from './options';
+import { renderSecondaryCurtainPanel } from './secondary-panel';
 import {
   INLINE_CURTAIN_PANEL_CLASS_NAME,
+  InlineCurtainPanelCloseButton,
   InlineCurtainTrigger,
   type InlineCurtainSecondaryAction,
-} from './curtain-trigger';
+} from './trigger';
 
 const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[14px]';
 type InlineCurtainSelectProps = {
@@ -20,6 +26,7 @@ type InlineCurtainSelectProps = {
   onChange: (value: string) => void;
   onOpenChange?: (open: boolean) => void;
   options: InlineCurtainOption[];
+  optionsPanel?: ReactNode;
   optionsFooter?: ReactNode;
   secondaryAction?: InlineCurtainSecondaryAction;
   selectedLabel?: string;
@@ -34,6 +41,7 @@ export function InlineCurtainSelect({
   onChange,
   onOpenChange,
   options,
+  optionsPanel,
   optionsFooter,
   secondaryAction,
   selectedLabel,
@@ -41,6 +49,7 @@ export function InlineCurtainSelect({
 }: InlineCurtainSelectProps) {
   const [openPanel, setOpenPanel] = useState<'options' | 'secondary' | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelId = useId();
   const valueLabel =
     selectedLabel ?? options.find((option) => option.value === value)?.label ?? emptyText ?? '';
@@ -49,7 +58,8 @@ export function InlineCurtainSelect({
     rootRef,
     setOpen: (open) => setOpenPanel(open ? openPanel : null),
   });
-  useEffect(() => onOpenChange?.(openPanel === 'options'), [onOpenChange, openPanel]);
+  useInlineCurtainLifecycle({ openPanel, panelId, rootRef, setOpenPanel, triggerRef });
+  useLayoutEffect(() => onOpenChange?.(openPanel === 'options'), [onOpenChange, openPanel]);
   return (
     <div ref={rootRef} className={INLINE_CURTAIN_ROW_CLASS_NAME} data-open={openPanel !== null}>
       <InlineCurtainSelectTrigger
@@ -59,6 +69,7 @@ export function InlineCurtainSelect({
         panelId={panelId}
         {...(secondaryAction === undefined ? {} : { secondaryAction })}
         setOpenPanel={setOpenPanel}
+        triggerRef={triggerRef}
         valueLabel={valueLabel}
       />
       <InlineCurtainSelectPanels
@@ -66,6 +77,7 @@ export function InlineCurtainSelect({
         onChange={onChange}
         openPanel={openPanel}
         options={options}
+        {...(optionsPanel === undefined ? {} : { optionsPanel })}
         {...(optionsFooter === undefined ? {} : { optionsFooter })}
         panelId={panelId}
         setOpenPanel={setOpenPanel}
@@ -84,6 +96,7 @@ function InlineCurtainSelectPanels({
   onChange,
   openPanel,
   options,
+  optionsPanel,
   optionsFooter,
   panelId,
   secondaryAction,
@@ -95,6 +108,7 @@ function InlineCurtainSelectPanels({
   onChange: (value: string) => void;
   openPanel: 'options' | 'secondary' | null;
   options: InlineCurtainOption[];
+  optionsPanel?: ReactNode;
   optionsFooter?: ReactNode;
   panelId: string;
   secondaryAction?: InlineCurtainSecondaryAction;
@@ -107,6 +121,14 @@ function InlineCurtainSelectPanels({
       setOpenPanel,
       ...(secondaryAction === undefined ? {} : { secondaryAction }),
     });
+  }
+
+  if (optionsPanel !== undefined) {
+    return (
+      <InlineCurtainCustomOptionsPanel id={panelId} onClose={() => setOpenPanel(null)}>
+        {optionsPanel}
+      </InlineCurtainCustomOptionsPanel>
+    );
   }
 
   return (
@@ -125,6 +147,26 @@ function InlineCurtainSelectPanels({
   );
 }
 
+function InlineCurtainCustomOptionsPanel({
+  children,
+  id,
+  onClose,
+}: {
+  children: ReactNode;
+  id: string;
+  onClose(): void;
+}) {
+  return (
+    <div id={id} role="dialog" aria-modal="false" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
+      <InlineCurtainPanelCloseButton
+        ariaLabel={translate('common.actions.close')}
+        onClick={onClose}
+      />
+      <div className="pt-1">{children}</div>
+    </div>
+  );
+}
+
 function InlineCurtainSelectTrigger({
   ariaLabel,
   label,
@@ -132,6 +174,7 @@ function InlineCurtainSelectTrigger({
   panelId,
   secondaryAction,
   setOpenPanel,
+  triggerRef,
   valueLabel,
 }: {
   ariaLabel: string;
@@ -142,6 +185,7 @@ function InlineCurtainSelectTrigger({
   setOpenPanel: (
     updater: (current: 'options' | 'secondary' | null) => 'options' | 'secondary' | null
   ) => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
   valueLabel: string;
 }) {
   return (
@@ -153,6 +197,7 @@ function InlineCurtainSelectTrigger({
       onClick={() => toggleCurtainPanel('options', setOpenPanel)}
       {...(secondaryAction === undefined ? {} : { secondaryAction })}
       {...createSecondaryClickProps(secondaryAction, setOpenPanel)}
+      triggerRef={triggerRef}
       valueLabel={valueLabel}
     />
   );
@@ -171,6 +216,42 @@ function createSecondaryClickProps(
   return {
     onSecondaryClick: () => toggleCurtainPanel('secondary', setOpenPanel),
   };
+}
+
+function useInlineCurtainLifecycle({
+  openPanel,
+  panelId,
+  rootRef,
+  setOpenPanel,
+  triggerRef,
+}: {
+  openPanel: 'options' | 'secondary' | null;
+  panelId: string;
+  rootRef: RefObject<HTMLDivElement | null>;
+  setOpenPanel: (panel: 'options' | 'secondary' | null) => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (!openPanel) {
+      if (wasOpenRef.current) triggerRef.current?.focus();
+      wasOpenRef.current = false;
+      return;
+    }
+    wasOpenRef.current = true;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpenPanel(null);
+    };
+    document.addEventListener('keydown', handleKeyDown, true);
+    queueMicrotask(() => {
+      const panel = rootRef.current?.querySelector<HTMLElement>(`[id="${panelId}"]`);
+      panel?.querySelector<HTMLElement>('button:not([disabled]), [tabindex="0"]')?.focus();
+    });
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [openPanel, panelId, rootRef, setOpenPanel, triggerRef]);
 }
 
 function toggleCurtainPanel(
@@ -225,7 +306,7 @@ function InlineCurtainPanel({
   optionsFooter?: ReactNode;
 }) {
   return (
-    <div id={id} className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
+    <div id={id} role="listbox" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
       <InlineCurtainNotice {...(notice === undefined ? {} : { notice })} />
       <InlineCurtainOptionList
         activeValue={activeValue}

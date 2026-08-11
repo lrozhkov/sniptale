@@ -38,6 +38,15 @@ export function normalizeQuickAction(action: QuickAction): QuickAction {
   }
 
   const bundledAction = createBundledQuickAction(bundledConfig);
+  if (action.customized === true) {
+    return normalizeQuickActionPolicy({
+      ...normalizeAfterCapture(action),
+      id: bundledConfig.id,
+      origin: 'bundled',
+      bundledId: bundledConfig.id,
+      customized: true,
+    });
+  }
   return normalizeQuickActionPolicy({
     ...bundledAction,
     ...(typeof action.status === 'undefined' ? {} : { status: action.status }),

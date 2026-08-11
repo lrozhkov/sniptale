@@ -18,16 +18,101 @@ import {
   isContentPrivilegedActionType,
 } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
-import { isScreenshotCaptureConfigValue } from '@sniptale/runtime-contracts/capture/action';
+import {
+  isDesktopScreenshotSelectionValue,
+  isScreenshotCaptureConfigValue,
+  isScreenshotImageFormat,
+} from '@sniptale/runtime-contracts/capture/action';
+import type {
+  ScreenshotCaptureConfig,
+  ScreenshotImageFormat,
+} from '@sniptale/runtime-contracts/capture/action';
+import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
+
+function isDesktopScreenshotPreparationRequest(value: unknown): value is {
+  type: typeof MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
+  actionId?: string;
+  config?: ScreenshotCaptureConfig;
+  tabId?: number;
+} {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const request = value as Record<string, unknown>;
+  const hasActionId = typeof request['actionId'] === 'string';
+  const hasConfig = isScreenshotCaptureConfigValue(request['config']);
+  return hasActionId !== hasConfig;
+}
+
+function isDesktopScreenshotPreparationResponse(value: unknown): value is RuntimeMessageResponse<{
+  result: 'ready';
+  imageFormat: ScreenshotImageFormat;
+  imageQuality: number;
+  requestId: string;
+  reservationToken: string;
+}> {
+  const isEnvelope = createRuntimeResponseGuard({
+    optional: {
+      result: isString,
+      imageFormat: isString,
+      imageQuality: isNumber,
+      requestId: isString,
+      reservationToken: isString,
+    },
+  });
+  if (!isEnvelope(value) || typeof value !== 'object' || value === null) return false;
+  const response = value as Record<string, unknown>;
+  if (response['success'] !== true) return true;
+  return (
+    response['result'] === 'ready' &&
+    isScreenshotImageFormat(response['imageFormat']) &&
+    isNumber(response['imageQuality']) &&
+    Number.isFinite(response['imageQuality']) &&
+    response['imageQuality'] >= 1 &&
+    response['imageQuality'] <= 100 &&
+    isString(response['requestId']) &&
+    isString(response['reservationToken'])
+  );
+}
 
 export const contentActionRuntimeContracts = {
+  [MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE]: {
+    parseRequest: createGuardParser(
+      'runtime PREPARE_DESKTOP_SCREENSHOT_CAPTURE message',
+      (value: unknown) =>
+        createMessageGuard({
+          type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+          optional: { actionId: isString, config: isScreenshotCaptureConfigValue, tabId: isNumber },
+        })(value) && isDesktopScreenshotPreparationRequest(value)
+    ),
+    parseResponse: createGuardParser(
+      'runtime PREPARE_DESKTOP_SCREENSHOT_CAPTURE response',
+      isDesktopScreenshotPreparationResponse
+    ),
+  },
+  [MessageType.TRIGGER_QUICK_ACTION]: {
+    parseRequest: createGuardParser(
+      'runtime TRIGGER_QUICK_ACTION message',
+      createMessageGuard({
+        type: MessageType.TRIGGER_QUICK_ACTION,
+        required: { actionId: isString },
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+          desktopSelection: isDesktopScreenshotSelectionValue,
+          tabId: isNumber,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime TRIGGER_QUICK_ACTION response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
   [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: {
     parseRequest: createGuardParser(
       'runtime TRIGGER_SCREENSHOT_CAPTURE message',
       createMessageGuard({
         type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
         required: { config: isScreenshotCaptureConfigValue },
-        optional: { tabId: isNumber },
+        optional: { desktopSelection: isDesktopScreenshotSelectionValue, tabId: isNumber },
       })
     ),
     parseResponse: createGuardParser(

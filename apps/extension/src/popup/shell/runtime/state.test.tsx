@@ -202,4 +202,20 @@ describe('usePopupRuntimeState', () => {
 
     expect(latestState?.recording.startError).toBeNull();
   });
+
+  it('publishes startup mode until an explicit selection supersedes startup routing', async () => {
+    await renderHarness();
+
+    act(() => {
+      latestState?.presets.setScreenshotStartupMode('desktop');
+    });
+    expect(latestState?.presets.screenshotStartupMode).toBe('desktop');
+
+    act(() => {
+      latestState?.presets.clearScreenshotStartupMode();
+      latestState?.presets.setScreenshotStartupMode('tab');
+    });
+
+    expect(latestState?.presets.screenshotStartupMode).toBeNull();
+  });
 });

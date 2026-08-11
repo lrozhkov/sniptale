@@ -46,7 +46,7 @@ describe('quick-actions-presets bundled defaults', () => {
     expect(bundledActions[0]).toEqual(
       expect.objectContaining({
         afterCapture: 'download_default',
-        bundledId: 'default-fullscreen',
+        bundledId: 'default-visible-download',
         icon: 'MonitorDown',
         imageFormat: 'png',
         name: 'translated:shared.defaults.quickActionVisibleDownload',
@@ -54,28 +54,35 @@ describe('quick-actions-presets bundled defaults', () => {
         screenshotMode: 'visible',
       })
     );
+    expect(bundledActions[1]).toEqual(
+      expect.objectContaining({
+        bundledId: 'default-full-page-download',
+        screenshotMode: 'full',
+      })
+    );
     expect(bundledActions[3]).toEqual(
       expect.objectContaining({
-        bundledId: 'default-delayed-visible',
-        delay: 5,
+        afterCapture: 'copy',
+        bundledId: 'default-visible-copy',
+        screenshotMode: 'visible',
       })
     );
     expect(bundledActions[5]).toEqual(
       expect.objectContaining({
-        afterCapture: 'copy',
-        bundledId: 'default-copy-selection',
-        screenshotMode: 'selection',
-      })
-    );
-    expect(bundledActions[6]).toEqual(
-      expect.objectContaining({
         afterCapture: 'download_default',
-        bundledId: 'default-desktop-download',
+        bundledId: 'default-desktop-capture',
         exitAfterCapture: false,
         icon: 'Monitor',
         imageFormat: null,
         name: 'translated:shared.defaults.quickActionDesktopDownload',
         screenshotMode: 'desktop',
+      })
+    );
+    expect(bundledActions[6]).toEqual(
+      expect.objectContaining({
+        afterCapture: 'save_to_library',
+        bundledId: 'default-visible-library',
+        screenshotMode: 'visible',
       })
     );
   });
@@ -107,7 +114,7 @@ describe('quick-actions-presets display names', () => {
     expect(
       getQuickActionDisplayName(
         createUserAction({
-          bundledId: 'default-edit-visible',
+          bundledId: 'default-visible-edit',
           id: 'renamed-action',
           name: 'Local override',
         })
@@ -132,7 +139,7 @@ describe('quick-actions-presets bundled detection', () => {
     expect(
       isBundledQuickAction(
         createUserAction({
-          bundledId: 'default-selection',
+          bundledId: 'default-selection-download',
           id: 'custom-user-id',
         })
       )
@@ -141,7 +148,7 @@ describe('quick-actions-presets bundled detection', () => {
       isBundledQuickAction(
         createUserAction({
           bundledId: null,
-          id: 'default-copy-visible',
+          id: 'default-visible-copy',
           origin: 'bundled',
         })
       )
@@ -158,11 +165,11 @@ describe('quick-actions-presets bundled detection', () => {
 });
 
 describe('quick-actions-presets bundled normalization', () => {
-  it('normalizes bundled actions to canonical defaults and preserves explicit status', () => {
+  it('normalizes untouched bundled actions to canonical defaults and preserves status', () => {
     const normalized = normalizeQuickAction(
       createUserAction({
         afterCapture: 'edit',
-        bundledId: 'default-copy-visible',
+        bundledId: 'default-visible-copy',
         delay: 10,
         icon: 'UnexpectedIcon',
         id: 'renamed-id',
@@ -176,14 +183,37 @@ describe('quick-actions-presets bundled normalization', () => {
     expect(normalized).toEqual(
       expect.objectContaining({
         afterCapture: 'copy',
-        bundledId: 'default-copy-visible',
+        bundledId: 'default-visible-copy',
         delay: null,
         icon: 'ClipboardCopy',
-        id: 'default-copy-visible',
+        id: 'default-visible-copy',
         name: 'translated:shared.defaults.quickActionVisibleCopy',
         origin: 'bundled',
         screenshotMode: 'visible',
         status: false,
+      })
+    );
+  });
+
+  it('preserves explicitly customized bundled actions', () => {
+    const normalized = normalizeQuickAction(
+      createUserAction({
+        bundledId: 'default-visible-copy',
+        customized: true,
+        id: 'default-visible-copy',
+        name: 'My clipboard action',
+        origin: 'bundled',
+        screenshotMode: 'full',
+      })
+    );
+
+    expect(normalized).toEqual(
+      expect.objectContaining({
+        bundledId: 'default-visible-copy',
+        customized: true,
+        id: 'default-visible-copy',
+        name: 'My clipboard action',
+        screenshotMode: 'full',
       })
     );
   });
@@ -210,7 +240,7 @@ describe('quick-actions-presets user normalization', () => {
     );
   });
 
-  it('clears desktop-only unsupported fields without hiding an invalid persisted sink', () => {
+  it('clears desktop-only fields and replaces an unavailable persisted sink', () => {
     expect(
       normalizeQuickAction(
         createUserAction({
@@ -224,7 +254,7 @@ describe('quick-actions-presets user normalization', () => {
       )
     ).toEqual(
       expect.objectContaining({
-        afterCapture: 'scenario',
+        afterCapture: 'download_default',
         delay: null,
         exitAfterCapture: false,
         imageFormat: 'webp',
@@ -250,7 +280,7 @@ describe('quick-actions-presets merge and display mode', () => {
     });
     const storedActions = [
       createUserAction({
-        bundledId: 'default-selection',
+        bundledId: 'default-selection-download',
         id: 'custom-selection-id',
         origin: 'bundled',
         status: false,
@@ -264,8 +294,8 @@ describe('quick-actions-presets merge and display mode', () => {
     expect(result.actions).toHaveLength(8);
     expect(result.actions[0]).toEqual(
       expect.objectContaining({
-        bundledId: 'default-selection',
-        id: 'default-selection',
+        bundledId: 'default-selection-download',
+        id: 'default-selection-download',
         origin: 'bundled',
         status: false,
       })

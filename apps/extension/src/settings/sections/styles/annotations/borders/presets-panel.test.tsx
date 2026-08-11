@@ -215,7 +215,7 @@ describe('HighlighterPresetsPanel', () => {
 
     expect(container?.querySelector('h2')).toBeNull();
     const toolbar = container?.querySelector('[data-ui="settings.collection.toolbar"]');
-    expect(toolbar?.querySelector('[type="search"]')).not.toBeNull();
+    expect(toolbar?.querySelector('[type="text"]')).not.toBeNull();
     expect(toolbar?.textContent).toContain('highlighter.section.addButton');
     expect(container?.textContent).toContain('settings.collection.defaultBadge');
     expect(container?.textContent).toContain('settings.collection.builtInBadge');

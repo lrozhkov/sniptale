@@ -1,4 +1,5 @@
 import type { CalloutPreset } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { ReactNode } from 'react';
 import { getCalloutPresetDisplayName } from '../../../features/highlighter/callout-presets/display-name';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { TemplateSaveSettings } from '../template-save-settings';
@@ -6,6 +7,7 @@ import { TemplateSaveSettings } from '../template-save-settings';
 export type CalloutSaveSectionProps = {
   error: string | null;
   isSaving: boolean;
+  leadingContent?: ReactNode;
   onCreate: (name: string, tagIds?: readonly string[]) => Promise<boolean>;
   onCreated?: () => void;
   onOverwrite: (presetId: string) => Promise<boolean>;
@@ -27,6 +29,7 @@ export function CalloutSaveSettings(props: CalloutSaveSectionProps) {
       duplicateNameErrorLabel={translate('content.callout.presetNameExists')}
       error={props.error}
       isSaving={props.isSaving}
+      {...(props.leadingContent ? { leadingContent: props.leadingContent } : {})}
       nameLabel={translate('content.callout.newPresetName')}
       onCreate={props.onCreate}
       {...(props.onCreated ? { onCreated: props.onCreated } : {})}

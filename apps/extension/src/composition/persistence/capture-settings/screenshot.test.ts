@@ -23,7 +23,7 @@ it('loads defaults without repairing missing or malformed storage', async () => 
   expect(setMock).not.toHaveBeenCalled();
 });
 
-it('normalizes desktop and clipboard fields on read without writing', async () => {
+it('replaces a persisted desktop clipboard action on read without writing', async () => {
   getMock.mockResolvedValue({
     sniptale_screenshot_setup: {
       selectedMode: 'desktop',
@@ -41,8 +41,8 @@ it('normalizes desktop and clipboard fields on read without writing', async () =
   const state = await loadScreenshotSetupState();
   expect(state.desktop).toEqual({
     ...DEFAULT_SCREENSHOT_SETUP_STATE.desktop,
-    afterCapture: 'copy',
-    imageFormat: 'png',
+    imageFormat: 'webp',
+    imageQuality: 80,
   });
   expect(setMock).not.toHaveBeenCalled();
 });
@@ -73,4 +73,13 @@ it('serializes a top-level patch through the persistence mutation owner', async 
     { sniptale_screenshot_setup: { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'tab' } },
     expect.any(Object)
   );
+});
+
+it('restores the tools tab as a persisted popup mode', async () => {
+  getMock.mockResolvedValue({
+    sniptale_screenshot_setup: { selectedMode: 'tools' },
+  });
+
+  await expect(loadScreenshotSetupState()).resolves.toMatchObject({ selectedMode: 'tools' });
+  expect(setMock).not.toHaveBeenCalled();
 });

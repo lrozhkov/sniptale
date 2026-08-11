@@ -9,6 +9,7 @@ import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import type { ScreenshotStartContext } from '../../../content/overlay/screenshot/types';
 import { createModeState } from './mode-state.test-support';
 import { usePreparationSurfacePortSync } from './port-sync';
+import type { UseToolbarModeControllerResult } from '../../../content/overlay/toolbar/mode-controller/types';
 
 type PortCommand = { type: string; viewport?: { width: number; height: number } };
 type PortListener = (command: PortCommand) => void | Promise<void>;
@@ -137,6 +138,7 @@ function renderHarness(
   function Harness() {
     usePreparationSurfacePortSync(
       modeState,
+      createModeController(),
       handleTakeScreenshot,
       mocks.invalidateScreenshotRuns,
       mocks.connectPort
@@ -147,4 +149,19 @@ function renderHarness(
   act(() => {
     root?.render(<Harness />);
   });
+}
+
+function createModeController(): UseToolbarModeControllerResult {
+  return {
+    handleClearHighlights: vi.fn(),
+    handleEnableCursorMode: vi.fn(() => true),
+    handleHideToolbar: vi.fn(),
+    handleToggleDesignReviewMode: vi.fn(),
+    handleToggleDrawingMode: vi.fn(),
+    handleToggleHighlighterMode: vi.fn(),
+    handleToggleNavigationLock: vi.fn(),
+    handleToggleQuickEditDocumentMode: vi.fn(),
+    handleToggleQuickEditMode: vi.fn(),
+    handleToggleScreenshotMode: vi.fn(),
+  };
 }

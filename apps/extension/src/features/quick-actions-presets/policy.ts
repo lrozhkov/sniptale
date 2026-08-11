@@ -10,7 +10,6 @@ const DESKTOP_AFTER_CAPTURE_ACTIONS = new Set<CaptureActionType>([
   'download_default',
   'ask_system',
   'edit',
-  'copy',
   'save_to_library',
 ]);
 
@@ -32,7 +31,11 @@ function isQuickActionAfterCaptureAllowed(
 }
 
 export function normalizeQuickActionPolicy(action: QuickAction): QuickAction {
-  const afterCapture = action.afterCapture ?? 'download_default';
+  const requestedAfterCapture = action.afterCapture ?? 'download_default';
+  const afterCapture =
+    isDesktopQuickAction(action) && !DESKTOP_AFTER_CAPTURE_ACTIONS.has(requestedAfterCapture)
+      ? 'download_default'
+      : requestedAfterCapture;
   const copyToClipboard = afterCapture === 'copy';
 
   return {
@@ -48,7 +51,12 @@ export function normalizeQuickActionPolicy(action: QuickAction): QuickAction {
 export function normalizeScreenshotCaptureConfigPolicy(
   config: ScreenshotCaptureConfig
 ): ScreenshotCaptureConfig {
-  return normalizeScreenshotCaptureConfig(config);
+  return normalizeScreenshotCaptureConfig({
+    ...config,
+    ...(config.screenshotMode === 'desktop' && !isQuickActionAfterCaptureAllowed(config)
+      ? { afterCapture: 'download_default' }
+      : {}),
+  });
 }
 
 export function normalizeQuickActionEditorPolicy(action: QuickAction): QuickAction {
@@ -62,7 +70,9 @@ export function normalizeQuickActionEditorPolicy(action: QuickAction): QuickActi
   });
 }
 
-export function assertQuickActionPolicy(action: QuickAction): void {
+export function assertQuickActionPolicy(
+  action: Pick<QuickAction, 'afterCapture' | 'screenshotMode'>
+): void {
   if (!isQuickActionAfterCaptureAllowed(action)) {
     throw new Error('Selected action is unavailable for window or screen capture');
   }

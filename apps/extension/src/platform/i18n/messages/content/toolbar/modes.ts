@@ -44,12 +44,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Navigation lock',
   },
   cursorDefault: {
-    ru: 'Обычная работа со страницей без инструментов редактирования',
-    en: 'Use the page normally without editing tools',
+    ru: 'Обычная работа со страницей',
+    en: 'Interact with the page normally',
   },
   cursorLabel: {
-    ru: 'Курсор',
-    en: 'Cursor',
+    ru: 'Навигация',
+    en: 'Navigate',
+  },
+  cursorDescription: {
+    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
+    en: 'Interact with the page normally',
   },
   cursorEnable: {
     ru: 'Вернуться к обычной работе со страницей',
@@ -192,6 +196,10 @@ export const contentToolbarModesMessages = defineMessageSource({
   clearFrames: {
     ru: 'Очистить все рамки',
     en: 'Clear all frames',
+  },
+  clearPagePreparation: {
+    ru: 'Очистить все изменения',
+    en: 'Clear all changes',
   },
   autoBlur: {
     ru: 'Размытие данных',

@@ -33,6 +33,8 @@ export function PopupAppContent({ runtime }: { runtime: PopupRuntimeState }) {
       viewportPresets={runtime.home.viewportPresets}
       activeTabCapabilities={runtime.environment.activeTabCapabilities}
       homeError={runtime.home.homeError}
+      startupMode={runtime.home.screenshotStartupMode}
+      onStartupModeCleared={runtime.home.clearScreenshotStartupMode}
       {...(runtime.environment.pageAccess ? { pageAccess: runtime.environment.pageAccess } : {})}
     />
   );

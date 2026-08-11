@@ -65,6 +65,8 @@ function assemblePopupViewState(
       quickActionsReady: state.presets.quickActionsReady,
       viewportPresets: state.presets.viewportPresets,
       homeError: state.session.homeError,
+      screenshotStartupMode: state.presets.screenshotStartupMode,
+      clearScreenshotStartupMode: state.presets.clearScreenshotStartupMode,
     },
     environment: {
       activeTabCapabilities: state.environment.activeTabCapabilities,

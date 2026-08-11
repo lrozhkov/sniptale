@@ -51,13 +51,21 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'frame annotation rasterization is correlated by the staged immutable job reference',
   },
-  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: {
-    idempotent: true,
-    reason: 'one-shot desktop frame capture is correlated by requestId',
-  },
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {
     idempotent: true,
     reason: 'clipboard write is correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME]: {
+    idempotent: true,
+    reason: 'desktop screenshot reservation is correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: {
+    idempotent: true,
+    reason: 'desktop frame consumption is one-shot and correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME]: {
+    idempotent: false,
+    reason: 'desktop reservation cleanup is deliberately repeatable',
   },
   [VideoMessageType.GET_DESKTOP_MEDIA]: {
     idempotent: true,

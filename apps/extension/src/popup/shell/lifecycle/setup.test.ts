@@ -7,6 +7,7 @@ import type { PopupLifecycleParams } from './contracts';
 const mocks = vi.hoisted(() => ({
   activatedListener: undefined as (() => void) | undefined,
   bootstrapPopupStateMock: vi.fn(),
+  loadPopupStartupStateMock: vi.fn(),
   mediaHubListener: undefined as ((event: { type: string }) => void) | undefined,
   recordingHandlers: undefined as
     | {
@@ -47,6 +48,16 @@ vi.mock('../../../features/media-hub/events', (_importOriginal) => ({
 vi.mock('../bootstrap', (_importOriginal) => ({
   bootstrapPopupState: mocks.bootstrapPopupStateMock,
 }));
+
+vi.mock(
+  '../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    loadPopupStartupState: mocks.loadPopupStartupStateMock,
+  })
+);
 
 vi.mock('../message-sync', (_importOriginal) => ({
   subscribeToRecordingMessages: mocks.subscribeToRecordingMessagesMock,
@@ -104,6 +115,7 @@ function createParams(): PopupLifecycleParams {
       setSelectedPresetId: vi.fn(),
       setStartError,
       setVideoCaptureMode: vi.fn(),
+      setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
       setWebcamDevices: vi.fn(),
@@ -197,6 +209,11 @@ beforeEach(() => {
   mocks.subscribeToMediaHubEventsMock.mockReset();
   mocks.subscribeToRecordingMessagesMock.mockReset();
   mocks.bootstrapPopupStateMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockResolvedValue({
+    selection: 'remember-last',
+    lastPage: 'home',
+  });
 
   mocks.subscribeToActivatedMock.mockImplementation((listener: () => void) => {
     mocks.activatedListener = listener;
@@ -238,8 +255,9 @@ describe('setupPopupLifecycle', () => {
     mocks.bootstrapPopupStateMock.mockResolvedValue(state);
 
     const cleanup = setupPopupLifecycle(() => params);
-    await flushAsyncWork();
-    await flushAsyncWork();
+    await vi.waitFor(() => {
+      expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
+    });
 
     expectBootstrappedStateApplied(params, state);
 
@@ -313,10 +331,10 @@ describe('setupPopupLifecycle error handling', () => {
     );
 
     setupPopupLifecycle(() => params);
-    await flushAsyncWork();
-    await flushAsyncWork();
+    await vi.waitFor(() => {
+      expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
+    });
 
-    expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
     expect(errorSpy).toHaveBeenCalledWith(
       '[PopupLifecycle]',
       'Failed to refresh popup secondary state',

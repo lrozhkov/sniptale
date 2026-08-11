@@ -73,6 +73,8 @@ function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
     homeError: overrides.homeError ?? null,
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,
+    screenshotStartupMode: overrides.screenshotStartupMode ?? null,
+    clearScreenshotStartupMode: overrides.clearScreenshotStartupMode ?? vi.fn(),
     viewportPresets: overrides.viewportPresets ?? [
       {
         kind: 'user',

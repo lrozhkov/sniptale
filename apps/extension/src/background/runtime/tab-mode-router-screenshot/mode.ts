@@ -1,6 +1,7 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getScreenshotModeCapability } from '../../../features/tab-capabilities/capabilities';
 import { classifyTabRuntimeCapability } from '../../../features/tab-capabilities/runtime';
 import { translate } from '../../../platform/i18n';
@@ -39,6 +40,7 @@ type EnableScreenshotModeArgs = {
     readPreparationState?: () => Promise<ScreenshotModePreparationState>;
     surfaceDocumentId?: string;
     toolbarVisible?: boolean;
+    workingMode?: ToolbarWorkingMode;
   };
   screenshotModeState: ModeState;
   tabId: number;
@@ -113,6 +115,7 @@ async function reenableScreenshotMode(
       ports: args.webSnapshotViewerPorts,
       tabId: args.tabId,
       toolbarVisible,
+      ...(args.options.workingMode === undefined ? {} : { workingMode: args.options.workingMode }),
       viewport: args.viewportState.get(args.tabId) ?? null,
       ...surfaceBinding,
     });
@@ -193,6 +196,7 @@ async function enableNewScreenshotMode(
       ...(args.options.toolbarVisible === undefined
         ? {}
         : { toolbarVisible: args.options.toolbarVisible }),
+      ...(args.options.workingMode === undefined ? {} : { workingMode: args.options.workingMode }),
       viewport: null,
       ...surfaceBinding,
     });
@@ -238,7 +242,11 @@ export async function enableScreenshotMode(
   viewportState: ViewportState,
   viewportOwnerState: ViewportOwnerState,
   webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map(),
-  options: { surfaceDocumentId?: string; toolbarVisible?: boolean } = {}
+  options: {
+    surfaceDocumentId?: string;
+    toolbarVisible?: boolean;
+    workingMode?: ToolbarWorkingMode;
+  } = {}
 ): Promise<void> {
   await runScreenshotModeOperation(tabId, () =>
     enableScreenshotModeOperation({

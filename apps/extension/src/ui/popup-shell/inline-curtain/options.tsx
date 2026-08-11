@@ -54,7 +54,7 @@ export function InlineCurtainOptionList({
   options: InlineCurtainOption[];
 }) {
   const detailId = useId();
-  const [highlightedDetail, setHighlightedDetail] = useState<string | null | undefined>(undefined);
+  const [highlightedDetail, setHighlightedDetail] = useState<string | null>(null);
   if (options.length === 0) {
     return (
       <div className="px-2 py-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
@@ -64,9 +64,7 @@ export function InlineCurtainOptionList({
   }
 
   const visibleDetail =
-    highlightedDetail === undefined
-      ? (options.find((option) => option.disabled && option.detail)?.detail ?? null)
-      : highlightedDetail;
+    highlightedDetail ?? options.find((option) => option.disabled && option.detail)?.detail ?? null;
 
   return (
     <div>
@@ -118,6 +116,8 @@ function InlineCurtainOptionButton({
   return (
     <button
       type="button"
+      role="option"
+      aria-selected={active}
       aria-describedby={option.detail ? detailId : undefined}
       aria-disabled={option.disabled || undefined}
       className={cx(

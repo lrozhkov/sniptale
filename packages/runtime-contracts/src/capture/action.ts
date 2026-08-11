@@ -26,6 +26,11 @@ export type ScreenshotCaptureConfig = {
   exitAfterCapture: boolean;
 };
 
+export type DesktopScreenshotSelection = {
+  requestId: string;
+  reservationToken: string;
+} & ({ status: 'cancelled' } | { status: 'selected'; streamId: string });
+
 const captureActionTypeValues = new Set<string>(CAPTURE_ACTION_TYPES);
 
 export function isCaptureActionTypeValue(value: unknown): value is CaptureActionType {
@@ -58,6 +63,22 @@ export function normalizeScreenshotCaptureConfig(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isDesktopScreenshotSelectionValue(
+  value: unknown
+): value is DesktopScreenshotSelection {
+  if (
+    !isRecord(value) ||
+    typeof value['requestId'] !== 'string' ||
+    typeof value['reservationToken'] !== 'string'
+  )
+    return false;
+  return value['status'] === 'cancelled'
+    ? Object.keys(value).length === 3
+    : value['status'] === 'selected' &&
+        typeof value['streamId'] === 'string' &&
+        Object.keys(value).length === 4;
 }
 
 function hasScreenshotSourceFields(value: Record<string, unknown>): boolean {

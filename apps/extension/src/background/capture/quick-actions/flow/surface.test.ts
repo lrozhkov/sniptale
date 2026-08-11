@@ -43,6 +43,7 @@ import {
   releaseQuickActionSurface,
   releaseQuickActionSurfaceAfterFailure,
   resetQuickActionSurfaceTransactionsForTests,
+  shouldCloseQuickActionTools,
 } from './surface';
 
 function createSettings(viewportPresets: ViewportPreset[]): Settings {
@@ -148,6 +149,7 @@ it('keeps Current size native without resolving or applying a preset and returns
 
   expect(mocks.beginSession).toHaveBeenCalledWith(7);
   expect(args.viewportState.get(7)).toBeNull();
+  expect(shouldCloseQuickActionTools(7)).toBe(true);
   expect(mocks.loadSettings).not.toHaveBeenCalled();
 });
 
@@ -247,6 +249,7 @@ it('uses the already-current physical size for a native quick action without a s
     sessionId: 'session-1',
   });
   await applyQuickActionSurface(args);
+  expect(shouldCloseQuickActionTools(7)).toBe(false);
   expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
   expect(args.viewportState.get(7)).toEqual(priorViewport);
 

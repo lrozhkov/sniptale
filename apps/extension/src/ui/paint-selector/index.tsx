@@ -8,9 +8,6 @@ import { translate, useAppLocale } from '../../platform/i18n';
 import { usePaintSelectorLifecycle } from './lifecycle';
 import { usePaintModeState } from './mode-state';
 import { PaintSelectorPortal } from './popup';
-import type { GradientPresetActions, GradientPresetOption } from './preset-controls';
-
-export type { GradientPresetActions, GradientPresetOption } from './preset-controls';
 
 const createId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -63,12 +60,7 @@ function PaintSelectorTrigger(props: {
   );
 }
 
-export function CompactPaintSelector(
-  props: CompactPaintSelectorProps & {
-    presetActions?: Omit<GradientPresetActions, 'onApply'>;
-    presets?: readonly GradientPresetOption[];
-  }
-) {
+export function CompactPaintSelector(props: CompactPaintSelectorProps) {
   useAppLocale();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -123,13 +115,13 @@ export function CompactPaintSelector(
         onModeChange={setMode}
         open={state.open}
         ownerId={ownerId}
+        palette={props.palette ?? []}
         preview={state.preview}
+        recentColors={props.recentColors ?? []}
         rootRef={rootRef}
         selectedStopId={state.selectedStopId}
         selectStop={state.setSelectedStopId}
         title={props.title}
-        {...(props.presetActions ? { presetActions: props.presetActions } : {})}
-        {...(props.presets ? { presets: props.presets } : {})}
       />
     </div>
   );

@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { InlineCurtainSelect } from './curtain-select';
+import { InlineCurtainSelect } from './select';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -51,6 +51,26 @@ function renderSelectWithSecondaryAction() {
           panel: <div>Camera settings panel</div>,
         }}
         value="camera-1"
+      />
+    );
+  });
+}
+
+function renderSelectWithCustomOptionsPanel(onFormatChange = vi.fn()) {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(
+      <InlineCurtainSelect
+        ariaLabel="Quality"
+        label="Quality"
+        onChange={vi.fn()}
+        options={[]}
+        optionsPanel={<button onClick={() => onFormatChange('webp')}>WebP</button>}
+        selectedLabel="JPEG · 90%"
+        value="jpeg"
       />
     );
   });
@@ -121,4 +141,35 @@ it('opens the secondary curtain panel and closes it from the panel close button'
   });
 
   expect(container?.textContent).not.toContain('Camera settings panel');
+});
+
+it('keeps a custom options curtain open while its controls are changed', () => {
+  const onFormatChange = vi.fn();
+  renderSelectWithCustomOptionsPanel(onFormatChange);
+
+  act(() => {
+    container?.querySelector<HTMLButtonElement>('[aria-label="Quality"]')?.click();
+  });
+  act(() => {
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent === 'WebP')
+      ?.click();
+  });
+
+  expect(onFormatChange).toHaveBeenCalledWith('webp');
+  expect(container?.textContent).toContain('WebP');
+  expect(container?.querySelector<HTMLElement>('[id]')).not.toBeNull();
+});
+
+it('closes on Escape and restores focus to the trigger', async () => {
+  renderSelect();
+  const trigger = container?.querySelector<HTMLButtonElement>('[aria-label="Device"]');
+  act(() => trigger?.click());
+  await act(async () => Promise.resolve());
+  expect(container?.querySelector('[role="listbox"]')).not.toBeNull();
+  expect(document.activeElement?.getAttribute('role')).toBe('option');
+
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(container?.querySelector('[role="listbox"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
 });

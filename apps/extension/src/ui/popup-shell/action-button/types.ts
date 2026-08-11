@@ -14,5 +14,6 @@ export interface PopupActionButtonProps {
   onClick: () => void;
   trailing?: ReactNode;
   compact?: boolean;
+  centered?: boolean;
   dataUi?: string;
 }

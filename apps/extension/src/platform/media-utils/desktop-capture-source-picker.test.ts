@@ -4,12 +4,12 @@ import {
   chooseDesktopScreenshotSource,
   createDesktopMediaSourceChooser,
   getScreenCaptureSource,
-} from './source-picker';
+} from './desktop-capture-source-picker';
 
 const translateMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+vi.mock('../i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../i18n')>()),
   translate: translateMock,
 }));
 
@@ -62,8 +62,21 @@ it('routes screen source selection through the screen policy with a target tab',
 
 it('offers only windows and screens for a desktop screenshot', async () => {
   const desktopCapture = createDesktopCaptureMock({ status: 'cancelled' });
+  const tab = createTab();
 
-  await expect(chooseDesktopScreenshotSource({ desktopCapture })).resolves.toEqual({
+  await expect(chooseDesktopScreenshotSource(tab, { desktopCapture })).resolves.toEqual({
+    status: 'cancelled',
+  });
+  expect(desktopCapture.chooseDesktopMedia).toHaveBeenCalledWith({
+    sources: ['window', 'screen'],
+    targetTab: tab,
+  });
+});
+
+it('creates popup-owned desktop screenshot streams without a target tab', async () => {
+  const desktopCapture = createDesktopCaptureMock({ status: 'cancelled' });
+
+  await expect(chooseDesktopScreenshotSource(undefined, { desktopCapture })).resolves.toEqual({
     status: 'cancelled',
   });
   expect(desktopCapture.chooseDesktopMedia).toHaveBeenCalledWith({

@@ -10,6 +10,9 @@ import {
 import type { HandledOffscreenRuntimeMessageType } from './routing';
 
 const handledCommandTypes = [
+  MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,

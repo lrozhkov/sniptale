@@ -266,6 +266,14 @@ function verifyWebSnapshotTabAuthorityFieldParsing() {
   ).toThrow(MessageContractError);
 }
 
+function verifyScreenshotEnableAsyncAckParsing() {
+  const message = parseTabRequestMessage({ type: MessageType.ENABLE_SCREENSHOT_MODE });
+  expect(parseTabResponseForRequest(message, { success: true, result: 'accepted' })).toEqual({
+    success: true,
+    result: 'accepted',
+  });
+}
+
 describe('message boundary parsers', () => {
   it('accepts valid background runtime messages', verifyBackgroundRuntimeMessageParsing);
   it(
@@ -295,6 +303,10 @@ describe('message boundary parsers', () => {
     verifyRemovedNavigationLockMessagesRejected
   );
   it('parses generic runtime and tab boundary facades', verifyGenericBoundaryParserFacades);
+  it(
+    'accepts the routed screenshot enable async acknowledgement',
+    verifyScreenshotEnableAsyncAckParsing
+  );
   it(
     'accepts screenshot mode status capability fields',
     verifyScreenshotModeStatusCapabilityResponseParsing

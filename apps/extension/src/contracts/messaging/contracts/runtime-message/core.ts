@@ -58,6 +58,7 @@ import type {
   RuntimeDesktopFrameRequestByType,
   RuntimeDesktopFrameResponseByType,
 } from './desktop-frame.types';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
@@ -77,6 +78,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       autoStartSelection?: boolean;
       autoStartCaptureType?: 'visible' | 'full';
       toolbarVisible?: boolean;
+      workingMode?: ToolbarWorkingMode;
       surfaceCapabilityToken?: string;
       surfaceLeaseGeneration?: number;
       surfaceOperationGeneration?: number;

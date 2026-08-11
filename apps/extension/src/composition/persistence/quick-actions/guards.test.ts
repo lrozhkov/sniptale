@@ -66,7 +66,7 @@ describe('quick-action storage guards', () => {
     const result = parseStoredQuickActions([
       {
         afterCapture: 'save_to_library',
-        bundledId: 'default-desktop-download',
+        bundledId: 'default-desktop-capture',
         delay: null,
         exitAfterCapture: false,
         hotkey: {
@@ -77,7 +77,7 @@ describe('quick-action storage guards', () => {
           shiftKey: true,
         },
         icon: 'Monitor',
-        id: 'default-desktop-download',
+        id: 'default-desktop-capture',
         imageFormat: 'webp',
         imageQuality: 80,
         name: 'Desktop capture',
@@ -97,6 +97,28 @@ describe('quick-action storage guards', () => {
       ],
       hasInvalidRoot: false,
       invalidEntryCount: 0,
+    });
+  });
+
+  it('drops retired bundled actions so the current factory catalog can replace them', () => {
+    const result = parseStoredQuickActions([
+      {
+        afterCapture: 'download_default',
+        bundledId: 'default-fullscreen',
+        exitAfterCapture: true,
+        icon: 'MonitorDown',
+        id: 'default-fullscreen',
+        name: 'Legacy visible capture',
+        origin: 'bundled',
+        screenshotMode: 'visible',
+        status: true,
+      },
+    ]);
+
+    expect(result).toEqual({
+      actions: [],
+      hasInvalidRoot: false,
+      invalidEntryCount: 1,
     });
   });
 

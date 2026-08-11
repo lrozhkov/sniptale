@@ -12,6 +12,8 @@ const {
   setLocalePreferenceMock,
   useAppLocaleMock,
   useSettingsStoreMock,
+  loadPopupStartupStateMock,
+  savePopupStartupSelectionMock,
 } = vi.hoisted(() => ({
   getCurrentLocaleMock: vi.fn(() => 'ru'),
   getStoredLocalePreferenceMock: vi.fn<() => 'ru' | 'en' | null>(() => 'ru'),
@@ -20,7 +22,20 @@ const {
   setLocalePreferenceMock: vi.fn().mockResolvedValue(undefined),
   useAppLocaleMock: vi.fn(() => 'ru'),
   useSettingsStoreMock: vi.fn(),
+  loadPopupStartupStateMock: vi.fn(),
+  savePopupStartupSelectionMock: vi.fn(),
 }));
+
+vi.mock(
+  '../../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    loadPopupStartupState: loadPopupStartupStateMock,
+    savePopupStartupSelection: savePopupStartupSelectionMock,
+  })
+);
 
 vi.mock('../../../../platform/i18n', async () => {
   const actual = await vi.importActual('../../../../platform/i18n');
@@ -98,6 +113,11 @@ beforeEach(resetAppearanceSectionMocks);
 beforeEach(() => {
   setAppThemePreferenceMock.mockResolvedValue('dark');
   setLocalePreferenceMock.mockResolvedValue(undefined);
+  loadPopupStartupStateMock.mockResolvedValue({ selection: 'remember-last', lastPage: 'home' });
+  savePopupStartupSelectionMock.mockResolvedValue({
+    selection: 'remember-last',
+    lastPage: 'home',
+  });
 });
 
 afterEach(() => {
@@ -132,24 +152,80 @@ it('builds all context menu item options and persists context menu updates', asy
   expect(updateSettings).toHaveBeenCalledWith({ contextMenu: { showSettings: false } });
 });
 
-it('persists the raw diagnostics preference', async () => {
+it('loads and persists the popup startup destination', async () => {
+  loadPopupStartupStateMock.mockResolvedValueOnce({
+    selection: 'video:screen',
+    lastPage: 'video',
+  });
   await renderHarness();
 
+  expect(latestState?.popupStartup.selection).toBe('video:screen');
+  expect(latestState?.popupStartup.options).toHaveLength(10);
+
   await act(async () => {
-    await latestState?.updateRawDiagnosticsEnabled(true);
+    await latestState?.popupStartup.updateSelection('screenshots:tools');
   });
 
-  const storeResult = useSettingsStoreMock.mock.results[0];
-  if (!storeResult) {
-    throw new Error('Expected the settings store mock to be called');
-  }
+  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('screenshots:tools');
+  expect(latestState?.popupStartup.selection).toBe('screenshots:tools');
+});
 
-  const { updateSettings } = storeResult.value as {
-    updateSettings: ReturnType<typeof vi.fn>;
-  };
-  expect(updateSettings).toHaveBeenCalledWith({
-    rawDiagnosticsEnabled: true,
+it('keeps the default startup destination when preference loading fails', async () => {
+  loadPopupStartupStateMock.mockRejectedValueOnce(new Error('storage unavailable'));
+  await renderHarness();
+
+  expect(latestState?.popupStartup.loading).toBe(false);
+  expect(latestState?.popupStartup.selection).toBe('remember-last');
+});
+
+it('rolls back the startup destination when persistence fails', async () => {
+  await renderHarness();
+  savePopupStartupSelectionMock.mockRejectedValueOnce(new Error('write failed'));
+
+  await act(async () => {
+    await latestState?.popupStartup.updateSelection('export');
   });
+
+  expect(latestState?.popupStartup.selection).toBe('remember-last');
+});
+
+it('rolls a failed latest startup write back to the last successful queued choice', async () => {
+  await renderHarness();
+  const first = Promise.withResolvers<unknown>();
+  const second = Promise.withResolvers<unknown>();
+  savePopupStartupSelectionMock.mockReset();
+  savePopupStartupSelectionMock
+    .mockReturnValueOnce(first.promise)
+    .mockReturnValueOnce(second.promise);
+
+  let firstUpdate: Promise<void> | undefined;
+  let secondUpdate: Promise<void> | undefined;
+  act(() => {
+    firstUpdate = latestState?.popupStartup.updateSelection('video:screen');
+    secondUpdate = latestState?.popupStartup.updateSelection('export');
+  });
+  await act(async () => first.resolve(undefined));
+  await act(async () => second.reject(new Error('latest write failed')));
+  await act(async () => Promise.all([firstUpdate, secondUpdate]));
+
+  expect(savePopupStartupSelectionMock).toHaveBeenNthCalledWith(1, 'video:screen');
+  expect(savePopupStartupSelectionMock).toHaveBeenNthCalledWith(2, 'export');
+  expect(latestState?.popupStartup.selection).toBe('video:screen');
+});
+
+it('ignores startup preference hydration after the settings section unmounts', async () => {
+  const deferred = Promise.withResolvers<{
+    selection: 'video:tab';
+    lastPage: 'video';
+  }>();
+  loadPopupStartupStateMock.mockReturnValueOnce(deferred.promise);
+  await renderHarness();
+
+  act(() => root?.unmount());
+  root = null;
+  await act(async () => deferred.resolve({ selection: 'video:tab', lastPage: 'video' }));
+
+  expect(savePopupStartupSelectionMock).not.toHaveBeenCalled();
 });
 
 it('falls back to the current locale, persists theme and locale changes, and reacts to storage events', async () => {

@@ -203,4 +203,39 @@ describe('QuickActionsSection compose tree', () => {
 
     expectComposeHandlers(state);
   });
+
+  it('offers per-row restore for customized factory actions without deletion', async () => {
+    const baseState = createSectionState();
+    const bundledAction = {
+      ...baseState.actions[1]!,
+      bundledId: 'default-selection-download' as const,
+      customized: true,
+      id: 'default-selection-download',
+    };
+    const state = createSectionState({
+      actions: [bundledAction],
+      confirmDelete: null,
+      editForm: null,
+      editingId: null,
+    });
+    useQuickActionsControllerSpy.mockReturnValue(state);
+    await renderQuickActionsSection();
+    const container = getQuickActionsContainer()!;
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="settings.collection.actions.menu"]')
+        ?.click();
+    });
+    const reset = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="settings.quickActions.resetAction"]'
+    );
+    expect(reset).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="settings.collection.actions.delete"]')
+    ).toBeNull();
+
+    act(() => reset?.click());
+    expect(state.handleReset).toHaveBeenCalledWith('default-selection-download');
+  });
 });

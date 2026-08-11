@@ -12,6 +12,39 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+vi.mock(
+  '../../../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import('../../../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog')
+      >();
+    const { getSystemSurfaceStylePresets } =
+      await import('../../../../../features/highlighter/surface-style/system-presets');
+    return {
+      ...original,
+      useSurfaceStylePresetCatalog: () => ({
+        actions: {
+          onCreate: vi.fn(),
+          onDelete: vi.fn(),
+          onDuplicate: vi.fn(),
+          onRename: vi.fn(),
+          onReorder: vi.fn(),
+          onReset: vi.fn(),
+          onToggleFavorite: vi.fn(),
+          onUpdate: vi.fn(),
+        },
+        catalog: { catalogRevision: 1, unsafeForWrite: false },
+        presets: getSystemSurfaceStylePresets().map((preset, order) => ({
+          ...preset,
+          favorite: false,
+          order,
+        })),
+      }),
+    };
+  }
+);
+
 vi.mock('../../../../../ui/color-selector', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../ui/color-selector')>()),
   CompactColorSelector: ({
@@ -115,7 +148,12 @@ describe('CalloutPresetEditor', () => {
   it('updates visible style fields through product controls', async () => {
     await renderEditor(4);
     await openSection('content.callout.manualBackground');
-    expect(document.querySelector('[data-ui="shared.ui.surface-style-selector"]')).not.toBeNull();
+    const surfaceSelector = document.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.surface-style-selector"] > button'
+    );
+    expect(surfaceSelector).not.toBeNull();
+    await act(async () => surfaceSelector?.click());
+    expect(document.body.textContent).toContain('content.callout.surfaceStyle.advancedCss');
     expect(document.querySelectorAll('[data-color-field]').length).toBeGreaterThan(0);
     expect(
       document.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]').length

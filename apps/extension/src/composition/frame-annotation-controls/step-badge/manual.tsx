@@ -14,6 +14,7 @@ import {
 } from '../../../ui/highlighter-preset-editor/step-badge/inspector';
 import { StepBadgeCssSection } from '../../../ui/highlighter-preset-editor/step-badge/inspector-css';
 import { HighlighterManualInspectorSurface } from '../../../ui/highlighter-preset-editor/manual-inspector-surface';
+import { ApplyToFutureFramesSetting } from '../popover/apply-future';
 import { StepBadgeSaveSection } from './save-section';
 import { StepBadgeAutoSection, StepBadgePositionSection, StepBadgeValueSection } from './views';
 
@@ -37,6 +38,7 @@ type StepBadgeManualSettingsProps = {
   ) => Promise<{ id?: string; outcome: string }>;
   onTemplateCreated?: (templateId: string) => void;
   onOffsetToggle: (direction: 'up' | 'down' | 'left' | 'right') => void;
+  onUseForNewFrames?: () => void;
   onFloatingInteractionChange?: (open: boolean) => void;
   onSettingsChange: (patch: Partial<StepBadgeSettings>) => void;
   onTypeChange: (type: 'number' | 'letter') => void;
@@ -125,6 +127,11 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
     return (
       <StepBadgeSaveSection
         embedded
+        {...(props.onUseForNewFrames
+          ? {
+              leadingContent: <ApplyToFutureFramesSetting onClick={props.onUseForNewFrames} />,
+            }
+          : {})}
         {...(props.createTagIds ? { createTagIds: props.createTagIds } : {})}
         onCreate={props.onCreatePreset}
         {...(props.onTemplateCreated ? { onCreated: props.onTemplateCreated } : {})}

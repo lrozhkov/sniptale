@@ -57,6 +57,18 @@ function createRuntimeBridgeParams(): ContentRuntimeBridgeParams {
       setQuickEditMode: vi.fn(),
       setScreenshotMode: vi.fn(),
     },
+    modeController: {
+      handleClearHighlights: vi.fn(),
+      handleEnableCursorMode: vi.fn(() => true),
+      handleHideToolbar: vi.fn(),
+      handleToggleHighlighterMode: vi.fn(),
+      handleToggleDesignReviewMode: vi.fn(),
+      handleToggleDrawingMode: vi.fn(),
+      handleToggleNavigationLock: vi.fn(),
+      handleToggleQuickEditDocumentMode: vi.fn(),
+      handleToggleQuickEditMode: vi.fn(),
+      handleToggleScreenshotMode: vi.fn(),
+    },
     modeFlags: {
       aiPickMode: false,
       designReviewMode: false,

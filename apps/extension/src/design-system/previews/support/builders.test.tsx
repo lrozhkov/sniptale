@@ -175,11 +175,18 @@ function verifiesPopupFooterPreviews() {
   expectElementAt(footerActions, 0, 'default footer primary action').props.onClick();
   expectElementAt(footerActions, 1, 'default footer secondary action').props.onClick();
   toElement(expectElementAt(previews, 1, 'compact footer preview').preview).props.onClick();
+  toElement(expectElementAt(previews, 2, 'default footer preview').preview).props.onOpenGallery();
+  toElement(expectElementAt(previews, 2, 'default footer preview').preview).props.onOpenGithub();
   toElement(
     expectElementAt(previews, 2, 'default footer preview').preview
-  ).props.onOpenDesignSystem();
-  toElement(expectElementAt(previews, 2, 'default footer preview').preview).props.onOpenGithub();
+  ).props.onOpenImageEditor();
+  toElement(
+    expectElementAt(previews, 2, 'default footer preview').preview
+  ).props.onOpenScenarioEditor();
   toElement(expectElementAt(previews, 2, 'default footer preview').preview).props.onOpenSettings();
+  toElement(
+    expectElementAt(previews, 2, 'default footer preview').preview
+  ).props.onOpenVideoEditor();
 }
 
 function verifiesPopupSelectPreviews() {

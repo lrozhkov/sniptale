@@ -78,6 +78,7 @@ function createParams(): PopupLifecycleParams {
       setSelectedPresetId: vi.fn(),
       setStartError,
       setVideoCaptureMode: vi.fn(),
+      setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
       setWebcamDevices: vi.fn(),

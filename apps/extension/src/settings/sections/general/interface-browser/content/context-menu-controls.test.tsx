@@ -66,6 +66,11 @@ describe('ContextMenuControls', () => {
     expect(container?.textContent).toContain('Копировать название и ссылку');
     expect(container?.querySelector('button[aria-label="Настройки"]')).toBeTruthy();
     expect(
+      container
+        ?.querySelector('button[aria-label="Настройки"] > span')
+        ?.className.includes('bg-[var(--sniptale-color-accent)]')
+    ).toBe(true);
+    expect(
       [...(container?.querySelectorAll<HTMLElement>('*') ?? [])].some(
         (element) =>
           typeof element.className === 'string' && element.className.includes('rounded-[18px]')

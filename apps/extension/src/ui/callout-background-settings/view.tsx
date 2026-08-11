@@ -7,6 +7,7 @@ import { SurfaceStyleSelector, type SurfaceStyleSelectorProps } from '../surface
 export function CalloutBackgroundSettingsView(props: {
   actions: SurfaceStyleSelectorProps['actions'] & { onReset: () => Promise<boolean> };
   disabled?: boolean;
+  manageStyles: boolean;
   onChange: (style: CalloutVisualStyle) => void;
   onOpenChange?: (open: boolean) => void;
   presets: SurfaceStyleSelectorProps['presets'];
@@ -14,36 +15,28 @@ export function CalloutBackgroundSettingsView(props: {
   unsafeForWrite: boolean;
   value: SurfaceStyleSelectorProps['value'];
 }) {
-  const source = props.style.colorBindings.surfaceBackground;
-  const sources = ['custom', 'frame-border', 'frame-fill'] as const;
-  const nextSource = sources[(sources.indexOf(source) + 1) % sources.length] ?? 'custom';
   return (
     <div className="grid gap-2" data-ui="shared.ui.callout-background-settings">
       <label className="text-xs">{translate('content.callout.surfaceStyle.title')}</label>
-      <button
-        type="button"
-        data-color-source={source}
-        onClick={() =>
-          props.onChange({
-            ...props.style,
-            colorBindings: { ...props.style.colorBindings, surfaceBackground: nextSource },
-          })
-        }
-      >
-        {translate(`content.callout.colorSource.${source}`)}
-      </button>
       <SurfaceStyleSelector
         actions={props.actions}
-        disabled={props.disabled || source !== 'custom' || props.unsafeForWrite}
+        disabled={props.disabled || props.unsafeForWrite}
+        presentation={props.manageStyles ? 'management' : 'selection'}
         presets={props.presets}
         value={props.value}
-        onChange={(surface) => props.onChange(applySurfaceStyleToCallout(props.style, surface))}
+        onChange={(surface) => {
+          const next = applySurfaceStyleToCallout(props.style, surface);
+          props.onChange({
+            ...next,
+            colorBindings: { ...next.colorBindings, surfaceBackground: 'custom' },
+          });
+        }}
         {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
       />
-      {surfaceCssOverridesPaint(props.value.surfaceCss) ? (
+      {props.manageStyles && surfaceCssOverridesPaint(props.value.surfaceCss) ? (
         <div role="status">{translate('content.callout.surfaceStyle.cssOverrideWarning')}</div>
       ) : null}
-      {props.unsafeForWrite ? (
+      {props.manageStyles && props.unsafeForWrite ? (
         <button type="button" onClick={() => void props.actions.onReset()}>
           {translate('content.callout.surfaceStyle.reset')}
         </button>

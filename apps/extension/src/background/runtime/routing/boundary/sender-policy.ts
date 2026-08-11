@@ -5,7 +5,7 @@ import { authorizeContentSender } from '../../../routing-contracts/capabilities/
 import { isPopupTabRouteSenderUrl } from '../capabilities/popup-tab/route-capabilities';
 
 type CaptureRouteSenderPolicyArgs = {
-  message: { type: string };
+  message: { type: string; desktopSelection?: unknown };
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
@@ -42,6 +42,7 @@ const unauthorizedRouteErrors = {
 const editorCaptureRoutes = new Set<string>([MessageType.EXECUTE_SAVE]);
 const popupCaptureRoutes = new Set<string>([
   MessageType.TRIGGER_QUICK_ACTION,
+  MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
   MessageType.TRIGGER_SCREENSHOT_CAPTURE,
 ]);
 const viewerCaptureRoutes = new Set<string>([
@@ -94,7 +95,13 @@ function isAuthorizedViewerCaptureRoute(
 }
 
 export function canRouteCaptureMessageFromSender(args: CaptureRouteSenderPolicyArgs): boolean {
-  if (args.message.type === MessageType.TRIGGER_SCREENSHOT_CAPTURE) {
+  if (args.message.desktopSelection !== undefined) {
+    return isAuthorizedPopupCaptureRoute(args.message, args.sender);
+  }
+  if (
+    args.message.type === MessageType.TRIGGER_SCREENSHOT_CAPTURE ||
+    args.message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
+  ) {
     return isAuthorizedPopupCaptureRoute(args.message, args.sender);
   }
   return (

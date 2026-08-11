@@ -28,7 +28,9 @@ export const MessageType = {
   OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE: 'OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE',
   FRAME_ANNOTATION_RASTERIZE: 'FRAME_ANNOTATION_RASTERIZE',
   OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: 'OFFSCREEN_FRAME_ANNOTATION_RASTERIZE',
+  OFFSCREEN_PREPARE_DESKTOP_FRAME: 'OFFSCREEN_PREPARE_DESKTOP_FRAME',
   OFFSCREEN_CAPTURE_DESKTOP_FRAME: 'OFFSCREEN_CAPTURE_DESKTOP_FRAME',
+  OFFSCREEN_CANCEL_DESKTOP_FRAME: 'OFFSCREEN_CANCEL_DESKTOP_FRAME',
   OFFSCREEN_WRITE_IMAGE_CLIPBOARD: 'OFFSCREEN_WRITE_IMAGE_CLIPBOARD',
   OFFSCREEN_VOICE_INPUT_STATUS: 'OFFSCREEN_VOICE_INPUT_STATUS',
   OFFSCREEN_VOICE_INPUT_START: 'OFFSCREEN_VOICE_INPUT_START',
@@ -100,6 +102,7 @@ export const MessageType = {
   EXECUTE_SAVE: 'EXECUTE_SAVE',
   SHOW_SAVE_DIALOG: 'SHOW_SAVE_DIALOG',
   TRIGGER_QUICK_ACTION: 'TRIGGER_QUICK_ACTION',
+  PREPARE_DESKTOP_SCREENSHOT_CAPTURE: 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE',
   TRIGGER_SCREENSHOT_CAPTURE: 'TRIGGER_SCREENSHOT_CAPTURE',
   SHOW_TOAST: 'SHOW_TOAST',
   SHOW_QUICK_ACTION_COUNTDOWN: 'SHOW_QUICK_ACTION_COUNTDOWN',
@@ -109,6 +112,13 @@ export const MessageType = {
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
+
+export type ToolbarWorkingMode =
+  | 'cursor'
+  | 'drawing'
+  | 'highlighter'
+  | 'quick-edit'
+  | 'design-review';
 
 export { CaptureMessageType, CaptureType } from '../capture-messages';
 export type { CaptureArea } from '../capture-messages';
@@ -195,6 +205,7 @@ export type TabModeMessage =
       tabId?: number;
       viewport?: AppliedViewportPresetPayload | null;
       contentIntent?: ContentPrivilegedActionCapability;
+      workingMode?: ToolbarWorkingMode;
       surfaceCapabilityToken?: string;
       surfaceWarning?: string;
     }

@@ -1,5 +1,8 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
+import type {
+  AppliedViewportPresetPayload,
+  ToolbarWorkingMode,
+} from '@sniptale/runtime-contracts/messaging/message-types';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
@@ -12,7 +15,8 @@ async function enablePreparationForRegularPage(
   surfaceOperationGeneration: number,
   surfaceLeaseGeneration?: number,
   surfaceWarning?: string,
-  toolbarVisible?: boolean
+  toolbarVisible?: boolean,
+  workingMode?: ToolbarWorkingMode
 ): Promise<void> {
   const pageZoom = await browserTabs.getZoom(tabId).catch(() => undefined);
   await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
@@ -24,6 +28,7 @@ async function enablePreparationForRegularPage(
     ...(surfaceWarning === undefined ? {} : { surfaceWarning }),
     viewport,
     ...(toolbarVisible === undefined ? {} : { toolbarVisible }),
+    ...(workingMode === undefined ? {} : { workingMode }),
   });
 }
 
@@ -32,6 +37,7 @@ export async function enablePreparationByCapability(args: {
   ports: WebSnapshotViewerPorts;
   tabId: number;
   toolbarVisible?: boolean;
+  workingMode?: ToolbarWorkingMode;
   viewport: AppliedViewportPresetPayload | null;
   surfaceCapabilityToken: string;
   surfaceLeaseGeneration?: number;
@@ -47,7 +53,8 @@ export async function enablePreparationByCapability(args: {
         args.surfaceOperationGeneration,
         args.surfaceLeaseGeneration,
         args.surfaceWarning,
-        args.toolbarVisible
+        args.toolbarVisible,
+        args.workingMode
       );
       return;
     case TabRuntimeCapability.OwnedSnapshotViewer:
@@ -57,6 +64,7 @@ export async function enablePreparationByCapability(args: {
         ...(args.surfaceWarning === undefined ? {} : { surfaceWarning: args.surfaceWarning }),
         viewport: args.viewport,
         ...(args.toolbarVisible === undefined ? {} : { toolbarVisible: args.toolbarVisible }),
+        ...(args.workingMode === undefined ? {} : { workingMode: args.workingMode }),
       });
       return;
     case TabRuntimeCapability.Restricted:

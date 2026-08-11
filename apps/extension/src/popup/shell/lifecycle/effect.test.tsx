@@ -28,6 +28,7 @@ function createLifecycleParams() {
       setVideoSettings: vi.fn(),
       setSelectedPresetId: vi.fn(),
       setVideoCaptureMode: vi.fn(),
+      setScreenshotStartupMode: vi.fn(),
       setRecordingState: vi.fn(),
       setMicrophoneDevices: vi.fn(),
       setWebcamDevices: vi.fn(),

@@ -4,10 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   browserTabsCreateMock: vi.fn(),
+  chooseDesktopScreenshotSourceMock: vi.fn(),
   getActiveTabIdMock: vi.fn(async () => 42),
   getUrlMock: vi.fn((relativePath: string) => `chrome-extension://test/${relativePath}`),
   sendRuntimeMessageMock: vi.fn(),
   translateMock: vi.fn((key: string) => `t:${key}`),
+}));
+
+vi.mock('../../../platform/media-utils/desktop-capture-source-picker', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../platform/media-utils/desktop-capture-source-picker')
+  >()),
+  chooseDesktopScreenshotSource: mocks.chooseDesktopScreenshotSourceMock,
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -63,6 +71,7 @@ import { installPopupRuntimeMessagingMock } from '../runtime/services.test-suppo
 
 function resetPopupUtilsMocks() {
   mocks.browserTabsCreateMock.mockReset();
+  mocks.chooseDesktopScreenshotSourceMock.mockReset();
   mocks.getActiveTabIdMock.mockClear();
   mocks.getUrlMock.mockClear();
   mocks.sendRuntimeMessageMock.mockReset();
@@ -70,6 +79,107 @@ function resetPopupUtilsMocks() {
   installPopupRuntimeMessagingMock(mocks.sendRuntimeMessageMock);
   vi.restoreAllMocks();
   vi.stubGlobal('close', vi.fn());
+}
+
+async function verifiesPopupOwnedDesktopSelection() {
+  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValue({
+    status: 'selected',
+    selection: { label: 'Window', streamId: 'popup-desktop-stream' },
+  });
+  mocks.sendRuntimeMessageMock.mockImplementation(async (message: { type: string }) =>
+    message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
+      ? {
+          success: true,
+          result: 'ready',
+          imageFormat: 'webp',
+          imageQuality: 72,
+          requestId: 'desktop-request',
+          reservationToken: 'desktop-reservation',
+        }
+      : { success: true }
+  );
+  const config = {
+    screenshotMode: 'desktop' as const,
+    viewportPresetId: null,
+    delay: null,
+    afterCapture: 'download_default' as const,
+    imageFormat: null,
+    imageQuality: null,
+    exitAfterCapture: false,
+  };
+
+  await triggerQuickAction('desktop-action', true);
+  await triggerScreenshotCapture(config);
+
+  expect(mocks.chooseDesktopScreenshotSourceMock).toHaveBeenCalledTimes(2);
+  expect(mocks.chooseDesktopScreenshotSourceMock).toHaveBeenCalledWith();
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(1, {
+    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+    actionId: 'desktop-action',
+    tabId: 42,
+  });
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
+    type: MessageType.TRIGGER_QUICK_ACTION,
+    actionId: 'desktop-action',
+    desktopSelection: {
+      requestId: 'desktop-request',
+      reservationToken: 'desktop-reservation',
+      status: 'selected',
+      streamId: 'popup-desktop-stream',
+    },
+    tabId: 42,
+  });
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(3, {
+    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+    config,
+    tabId: 42,
+  });
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(4, {
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    config,
+    desktopSelection: {
+      requestId: 'desktop-request',
+      reservationToken: 'desktop-reservation',
+      status: 'selected',
+      streamId: 'popup-desktop-stream',
+    },
+    tabId: 42,
+  });
+  expect(mocks.sendRuntimeMessageMock).not.toHaveBeenCalledWith(
+    expect.objectContaining({ desktopStreamId: expect.any(String) })
+  );
+}
+
+async function verifiesDesktopSelectionCancellationAndFailure() {
+  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValueOnce({ status: 'cancelled' });
+  mocks.sendRuntimeMessageMock.mockResolvedValue({
+    success: true,
+    result: 'ready',
+    imageFormat: 'png',
+    imageQuality: 90,
+    requestId: 'cancel-request',
+    reservationToken: 'cancel-reservation',
+  });
+  await triggerQuickAction('desktop-action', true);
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+    actionId: 'desktop-action',
+    tabId: 42,
+  });
+  expect(window.close).not.toHaveBeenCalled();
+
+  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValueOnce({
+    status: 'failed',
+    error: 'picker failed',
+  });
+  await expect(triggerQuickAction('desktop-action', true)).rejects.toThrow('picker failed');
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledTimes(4);
+  expect(
+    mocks.sendRuntimeMessageMock.mock.calls.some(
+      ([message]) => message.type === MessageType.TRIGGER_QUICK_ACTION
+    )
+  ).toBe(true);
+  expect(window.close).not.toHaveBeenCalled();
 }
 
 function verifiesExtensionPageNavigation() {
@@ -111,7 +221,7 @@ async function verifiesRuntimeMessaging() {
   await openScreenshotMode();
   await triggerQuickAction('action-1');
   const config = {
-    screenshotMode: 'desktop' as const,
+    screenshotMode: 'visible' as const,
     viewportPresetId: null,
     delay: null,
     afterCapture: 'download_default' as const,
@@ -155,6 +265,19 @@ async function verifiesRuntimeErrors() {
   expect(closeSpy).not.toHaveBeenCalled();
 }
 
+async function verifiesToolbarWorkingModeSelection() {
+  mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true });
+
+  await openScreenshotMode('drawing');
+
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: MessageType.ENABLE_SCREENSHOT_MODE,
+    tabId: 42,
+    workingMode: 'drawing',
+  });
+  expect(window.close).toHaveBeenCalledOnce();
+}
+
 async function verifiesStaleRuntimeErrors() {
   mocks.sendRuntimeMessageMock.mockResolvedValueOnce({
     success: false,
@@ -180,6 +303,15 @@ function runPopupUtilsSuite() {
     verifiesRuntimeMessaging
   );
   it('surfaces explicit and translated popup runtime errors', verifiesRuntimeErrors);
+  it(
+    'selects desktop media in the popup before runtime delivery',
+    verifiesPopupOwnedDesktopSelection
+  );
+  it(
+    'keeps the popup open when desktop selection is cancelled or fails',
+    verifiesDesktopSelectionCancellationAndFailure
+  );
+  it('opens tools with an explicit working mode', verifiesToolbarWorkingModeSelection);
   it('normalizes stale popup runtime errors into a refresh hint', verifiesStaleRuntimeErrors);
 }
 

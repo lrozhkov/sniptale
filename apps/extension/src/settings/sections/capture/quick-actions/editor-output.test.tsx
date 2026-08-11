@@ -173,4 +173,13 @@ describe('quick actions editor output', () => {
     expect(selects[2]?.disabled).toBe(true);
     expect(buttons).toHaveLength(1);
   });
+
+  it('does not offer clipboard delivery for window or screen capture', async () => {
+    const state = createState({ editForm: { screenshotMode: 'desktop' } });
+    await renderOutput(state, false);
+
+    expect(
+      Array.from(container?.querySelectorAll('option') ?? []).map((option) => option.value)
+    ).not.toContain('copy');
+  });
 });

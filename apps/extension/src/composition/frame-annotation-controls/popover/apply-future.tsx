@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Settings2 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 
@@ -40,6 +41,30 @@ export function ApplyToFutureFramesGuard(props: { onCancel: () => void; onConfir
           {translate('content.templateFork.applyToFutureConfirm')}
         </ProductActionButton>
       </div>
+    </div>
+  );
+}
+
+export function ApplyToFutureFramesSetting(props: { onClick: () => void }) {
+  return (
+    <div className="grid gap-2" data-ui="content.template-fork.apply-to-future-setting">
+      <div className="grid gap-1">
+        <div className="text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]">
+          {translate('content.templateFork.futureSettingsTitle')}
+        </div>
+        <div className="text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+          {translate('content.templateFork.futureSettingsDescription')}
+        </div>
+      </div>
+      <ProductActionButton
+        compact
+        data-settings-action="apply-to-future"
+        onClick={props.onClick}
+        tone="secondary"
+      >
+        <Settings2 aria-hidden="true" size={14} />
+        {translate('content.templateFork.futureSettingsAction')}
+      </ProductActionButton>
     </div>
   );
 }

@@ -18,6 +18,7 @@ export interface TemplatesSectionContentProps {
   status: {
     isLoading: boolean;
     isMutating: boolean;
+    mutatingTemplateId: string | null;
     submitError: string | null;
   };
   openNewTemplateEditor: () => void;

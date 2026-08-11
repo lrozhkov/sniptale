@@ -25,6 +25,17 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
         />
       </SettingsControlRow>
 
+      <SettingsControlRow label={translate('settings.appearance.popupStartupLabel', state.locale)}>
+        <ProductSelect
+          id="settings-popup-startup"
+          value={state.popupStartup.selection}
+          onChange={state.popupStartup.updateSelection}
+          options={state.popupStartup.options}
+          disabled={state.popupStartup.loading}
+          aria-label={translate('settings.appearance.popupStartupAriaLabel', state.locale)}
+        />
+      </SettingsControlRow>
+
       <div className="pt-1">
         <ContextMenuControls state={state} />
       </div>

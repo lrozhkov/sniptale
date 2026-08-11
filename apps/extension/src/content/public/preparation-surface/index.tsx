@@ -296,6 +296,7 @@ function usePreparationControllers(
 
 function usePreparationCaptureSync(
   modeState: ContentAppModeState,
+  modeController: PreparationSurfaceControllers['modeController'],
   screenshotController: PreparationSurfaceControllers['screenshotController'],
   ports: PreparationHostPorts
 ): void {
@@ -307,6 +308,7 @@ function usePreparationCaptureSync(
   });
   usePreparationSurfacePortSync(
     modeState,
+    modeController,
     screenshotController.handleTakeScreenshot,
     screenshotController.invalidateScreenshotRuns,
     ports.connectPort,
@@ -340,7 +342,12 @@ export function PreparationSurface(props: PreparationSurfaceProps) {
     ports: props.ports,
   });
 
-  usePreparationCaptureSync(modeState, controllers.screenshotController, props.ports);
+  usePreparationCaptureSync(
+    modeState,
+    controllers.modeController,
+    controllers.screenshotController,
+    props.ports
+  );
   usePreparationFrameCallbacks(props.ports.acceptsElement, frameManager);
   usePreparationViewportSync(modeState.currentViewport, props.onViewportChange);
 

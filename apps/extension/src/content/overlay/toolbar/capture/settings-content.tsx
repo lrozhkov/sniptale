@@ -1,5 +1,5 @@
 import React from 'react';
-import { Columns2, EyeOff, Pin, PinOff, Rows3, X } from 'lucide-react';
+import { Columns2, PanelTopClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import {
@@ -159,7 +159,7 @@ function renderToolbarSettingsUtilityItems(props: {
       {renderPinToTabItem(props)}
       <ProductToolbarMenuDivider />
       {renderActionItem({
-        icon: <EyeOff className="sniptale-popover-icon" />,
+        icon: <PanelTopClose className="sniptale-popover-icon" />,
         label: translate('content.toolbar.hideToolbar'),
         onAction: () => props.onHide(),
         onClose: props.onClose,

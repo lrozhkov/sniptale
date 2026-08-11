@@ -11,7 +11,11 @@ export async function processQuickAction(
   const context = args.runtimeContext ?? (await loadQuickActionRuntimeContext(args.actionId));
 
   if (context.captureMode === 'desktop') {
-    return runDesktopQuickAction({ context, tabId: args.tabId });
+    return runDesktopQuickAction({
+      context,
+      ...(args.desktopSelection === undefined ? {} : { desktopSelection: args.desktopSelection }),
+      tabId: args.tabId,
+    });
   }
 
   if (context.captureMode === 'selection') {

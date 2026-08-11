@@ -58,6 +58,12 @@ declare module './' {
     type REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY =
       typeof import('./').MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY;
     type CONTENT_RUNTIME_WAKEUP = typeof import('./').MessageType.CONTENT_RUNTIME_WAKEUP;
+    type OFFSCREEN_PREPARE_DESKTOP_FRAME =
+      typeof import('./').MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME;
+    type OFFSCREEN_CAPTURE_DESKTOP_FRAME =
+      typeof import('./').MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME;
+    type OFFSCREEN_CANCEL_DESKTOP_FRAME =
+      typeof import('./').MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME;
     type EXPORT_POPUP_PROGRESS = typeof import('./').MessageType.EXPORT_POPUP_PROGRESS;
     type EXPORT_POPUP_RESULT = typeof import('./').MessageType.EXPORT_POPUP_RESULT;
     type REQUEST_EXPORT_HAR_START_CAPABILITY =
@@ -106,6 +112,8 @@ declare module './' {
     type EXECUTE_SAVE = typeof import('./').MessageType.EXECUTE_SAVE;
     type SHOW_SAVE_DIALOG = typeof import('./').MessageType.SHOW_SAVE_DIALOG;
     type TRIGGER_QUICK_ACTION = typeof import('./').MessageType.TRIGGER_QUICK_ACTION;
+    type PREPARE_DESKTOP_SCREENSHOT_CAPTURE =
+      typeof import('./').MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
     type TRIGGER_SCREENSHOT_CAPTURE = typeof import('./').MessageType.TRIGGER_SCREENSHOT_CAPTURE;
     type SHOW_TOAST = typeof import('./').MessageType.SHOW_TOAST;
     type SHOW_QUICK_ACTION_COUNTDOWN = typeof import('./').MessageType.SHOW_QUICK_ACTION_COUNTDOWN;

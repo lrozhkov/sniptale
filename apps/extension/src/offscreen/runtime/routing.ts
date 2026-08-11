@@ -47,7 +47,13 @@ import {
   deleteFrameAnnotationRasterJob,
 } from '../../composition/persistence/frame-annotation-raster-jobs';
 import { FrameAnnotationRasterizer } from '../frame-annotation-rasterizer';
-import { captureDesktopFrame, writeDesktopFrameClipboard } from '../media/desktop-frame';
+import {
+  cancelDesktopFrame,
+  captureDesktopFrame,
+  reserveDesktopFrame,
+  writeDesktopFrameClipboard,
+} from '../media/desktop-frame';
+import type { DesktopFrameResult } from '../media/desktop-frame';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
@@ -101,8 +107,10 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
-    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
@@ -132,8 +140,10 @@ export function resolveOffscreenRuntimeResponseMode(
       return 'immediate-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
-    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
@@ -170,12 +180,7 @@ export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
 ): Promise<
-  | void
-  | RecordingStopOutcome
-  | 'applied'
-  | 'copied'
-  | 'stale'
-  | Awaited<ReturnType<typeof captureDesktopFrame>>
+  void | RecordingStopOutcome | DesktopFrameResult | 'accepted' | 'applied' | 'copied' | 'stale'
 > {
   switch (message.type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
@@ -193,15 +198,15 @@ export async function handleOffscreenRuntimeMessage(
         throw error;
       }
     }
-    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
-      return captureDesktopFrame({
-        streamId: message.streamId,
-        imageFormat: message.imageFormat,
-        imageQuality: message.imageQuality,
-      });
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
       await writeDesktopFrameClipboard(message.dataUrl);
       return 'copied';
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+      return reserveDesktopFrame(message.requestId);
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+      return captureDesktopFrame(message);
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+      return cancelDesktopFrame(message.requestId);
     case VideoMessageType.GET_DESKTOP_MEDIA:
       await requestDesktopMedia(
         message.captureMode,

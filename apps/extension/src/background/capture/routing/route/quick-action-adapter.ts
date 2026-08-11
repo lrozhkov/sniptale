@@ -7,15 +7,35 @@ import {
   loadQuickActionRuntimeContext,
   loadScreenshotCaptureRuntimeContext,
 } from '../../quick-actions/flow/load';
+import { reserveDesktopQuickAction } from '../../quick-actions/desktop/workflow';
 
 export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {
   if (
     args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION' &&
+    args.routeArgs.message.type !== 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' &&
     args.routeArgs.message.type !== 'TRIGGER_SCREENSHOT_CAPTURE'
   ) {
     return false;
   }
   const message = args.routeArgs.message;
+  if (message.type === 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE') {
+    void loadDesktopScreenshotPreparationContext(message)
+      .then(async (runtimeContext) => {
+        const preparation = await reserveDesktopQuickAction({
+          context: runtimeContext,
+          tabId: args.context.resolvedTabId,
+        });
+        args.context.sendResponse({
+          success: true,
+          result: 'ready',
+          imageFormat: runtimeContext.imageFormat,
+          imageQuality: runtimeContext.imageQuality,
+          ...preparation,
+        });
+      })
+      .catch((error: unknown) => args.context.sendResponse(createRouteErrorResponse(error)));
+    return true;
+  }
   const runtimeContextPromise =
     message.type === 'TRIGGER_QUICK_ACTION'
       ? loadQuickActionRuntimeContext(message.actionId)
@@ -24,7 +44,14 @@ export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boole
     .then(async (runtimeContext) => {
       await authorizePageAccess(args, runtimeContext.captureMode);
       handleTriggerQuickAction(
-        message.type === 'TRIGGER_QUICK_ACTION' ? message : { actionId: 'popup-screenshot-setup' },
+        message.type === 'TRIGGER_QUICK_ACTION'
+          ? message
+          : {
+              actionId: 'popup-screenshot-setup',
+              ...(message.desktopSelection === undefined
+                ? {}
+                : { desktopSelection: message.desktopSelection }),
+            },
         args.context,
         runtimeContext
       );
@@ -33,6 +60,24 @@ export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boole
       args.context.sendResponse(createRouteErrorResponse(error));
     });
   return true;
+}
+
+async function loadDesktopScreenshotPreparationContext(
+  message: Extract<
+    CaptureRouteAdapterContext['routeArgs']['message'],
+    { type: 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' }
+  >
+) {
+  const runtimeContext =
+    message.actionId !== undefined
+      ? await loadQuickActionRuntimeContext(message.actionId)
+      : message.config !== undefined
+        ? await loadScreenshotCaptureRuntimeContext(message.config)
+        : null;
+  if (!runtimeContext || runtimeContext.captureMode !== 'desktop') {
+    throw new Error('Desktop screenshot preparation requires a desktop capture configuration');
+  }
+  return runtimeContext;
 }
 
 async function authorizePageAccess(
@@ -54,4 +99,5 @@ async function authorizePageAccess(
   }
 
   await pageAccessPort.ensureActivePageAccessRuntime(tabId);
+  await pageAccessPort.waitForContentToolbarReady?.(tabId);
 }

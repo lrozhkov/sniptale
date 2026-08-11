@@ -21,7 +21,7 @@ function action(overrides: Partial<QuickAction> = {}): QuickAction {
   };
 }
 
-it('normalizes desktop-only and clipboard constraints for popup capture configs', () => {
+it('replaces unavailable desktop clipboard delivery for popup capture configs', () => {
   expect(
     normalizeScreenshotCaptureConfigPolicy({
       screenshotMode: 'desktop',
@@ -36,9 +36,9 @@ it('normalizes desktop-only and clipboard constraints for popup capture configs'
     screenshotMode: 'desktop',
     viewportPresetId: null,
     delay: null,
-    afterCapture: 'copy',
-    imageFormat: 'png',
-    imageQuality: null,
+    afterCapture: 'download_default',
+    imageFormat: 'webp',
+    imageQuality: 80,
     exitAfterCapture: false,
   });
 });
@@ -56,12 +56,13 @@ it('applies quick-action field and sink policy for tab and desktop modes', () =>
     exitAfterCapture: true,
   });
   expect(isDesktopQuickAction(desktop)).toBe(true);
-  expect(getAllowedQuickActionAfterCaptureActions(desktop)?.has('copy')).toBe(true);
+  expect(getAllowedQuickActionAfterCaptureActions(desktop)?.has('copy')).toBe(false);
   expect(normalizeQuickActionPolicy(desktop)).toMatchObject({
+    afterCapture: 'download_default',
     viewportPresetId: null,
     delay: null,
-    imageFormat: 'png',
-    imageQuality: null,
+    imageFormat: 'webp',
+    imageQuality: 80,
     exitAfterCapture: false,
   });
   expect(normalizeQuickActionPolicy(action()).afterCapture).toBe('download_default');
@@ -71,6 +72,9 @@ it('normalizes editor fallback and rejects only invalid desktop sinks at runtime
   const invalid = action({ screenshotMode: 'desktop', afterCapture: 'scenario' });
   expect(normalizeQuickActionEditorPolicy(invalid).afterCapture).toBe('download_default');
   expect(() => assertQuickActionPolicy(invalid)).toThrow('unavailable');
+  expect(() =>
+    assertQuickActionPolicy(action({ screenshotMode: 'desktop', afterCapture: 'copy' }))
+  ).toThrow('unavailable');
   expect(() => assertQuickActionPolicy(action({ afterCapture: 'scenario' }))).not.toThrow();
   expect(normalizeQuickActionEditorPolicy(action({ afterCapture: 'edit' })).afterCapture).toBe(
     'edit'

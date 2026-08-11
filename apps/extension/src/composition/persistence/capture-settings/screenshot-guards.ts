@@ -57,7 +57,7 @@ function parseConfig(value: unknown, expected: 'tab' | 'desktop'): ScreenshotCap
 }
 
 function isSetupMode(value: unknown): value is ScreenshotSetupMode {
-  return value === 'quick-actions' || value === 'tab' || value === 'desktop';
+  return value === 'quick-actions' || value === 'tab' || value === 'desktop' || value === 'tools';
 }
 
 export function parseStoredScreenshotSetupState(value: unknown): Partial<ScreenshotSetupState> {

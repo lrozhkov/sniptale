@@ -8,6 +8,7 @@ const MODE_HINT_KEYS = {
   'quick-actions': 'popup.home.quickActionsModeHint',
   tab: 'popup.home.captureTabHint',
   desktop: 'popup.home.captureWindowHint',
+  tools: 'popup.home.toolsTitle',
 } as const;
 
 export function ScreenshotModeSelector(props: {
@@ -15,21 +16,30 @@ export function ScreenshotModeSelector(props: {
   tabDisabledReason: string | null;
   toolsDisabledReason: string | null;
   onModeChange(mode: ScreenshotSetupMode): void;
-  onOpenTools(): void;
 }) {
   const options = [
-    { mode: 'quick-actions' as const, icon: Zap, label: translate('popup.home.quickActionsTitle') },
+    {
+      mode: 'quick-actions' as const,
+      icon: Zap,
+      label: translate('popup.home.shortcutsModeLabel'),
+    },
     { mode: 'tab' as const, icon: PanelTop, label: translate('popup.home.captureTabLabel') },
     {
       mode: 'desktop' as const,
       icon: PanelsTopLeft,
       label: translate('popup.home.captureWindowLabel'),
     },
+    { mode: 'tools' as const, icon: PanelTopOpen, label: translate('popup.home.toolsLabel') },
   ];
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {options.map((option) => {
-        const disabledReason = option.mode === 'tab' ? props.tabDisabledReason : null;
+        const disabledReason =
+          option.mode === 'tab'
+            ? props.tabDisabledReason
+            : option.mode === 'tools'
+              ? props.toolsDisabledReason
+              : null;
         return (
           <PopupIconStateButton
             key={option.mode}
@@ -44,16 +54,6 @@ export function ScreenshotModeSelector(props: {
           />
         );
       })}
-      <PopupIconStateButton
-        icon={PanelTopOpen}
-        label={translate('popup.home.toolsLabel')}
-        description={props.toolsDisabledReason ?? translate('popup.home.toolsTitle')}
-        active={false}
-        disabled={Boolean(props.toolsDisabledReason)}
-        accentClassName={ACCENT}
-        layout="stacked"
-        onClick={props.onOpenTools}
-      />
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import type { QuickAction } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
-import { isBundledQuickAction } from '../../../../../features/quick-actions-presets/catalog';
+import {
+  isBundledQuickAction,
+  resetBundledQuickAction,
+} from '../../../../../features/quick-actions-presets/catalog';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { createDefaultQuickAction } from '../section/helpers';
 import { normalizeQuickActionEditorPolicy } from '../../../../../features/quick-actions-presets/policy';
@@ -19,10 +22,6 @@ export function beginEditQuickAction(
   setEditingId: (value: string) => void,
   setEditForm: (value: QuickAction) => void
 ) {
-  if (isBundledQuickAction(action)) {
-    return;
-  }
-
   setEditingId(action.id);
   setEditForm({ ...action });
 }
@@ -50,17 +49,15 @@ export async function saveEditedQuickAction(props: {
     return;
   }
 
-  if (isBundledQuickAction(props.editForm)) {
-    props.onResetEditor();
-    return;
-  }
-
   if (!props.editForm.name.trim()) {
     toast.error(translate('settings.quickActions.validationNameRequired'));
     return;
   }
 
-  const normalizedEditForm = normalizeQuickActionEditorPolicy(props.editForm);
+  const normalizedEditForm = normalizeQuickActionEditorPolicy({
+    ...props.editForm,
+    ...(isBundledQuickAction(props.editForm) ? { customized: true } : {}),
+  });
   const existingIndex = props.actions.findIndex((action) => action.id === normalizedEditForm.id);
   const updatedActions =
     existingIndex >= 0
@@ -75,6 +72,22 @@ export async function saveEditedQuickAction(props: {
   }
 
   props.onResetEditor();
+}
+
+export async function resetQuickAction(
+  actions: QuickAction[],
+  id: string,
+  onPersist: (actions: QuickAction[]) => Promise<boolean>
+) {
+  const index = actions.findIndex((action) => action.id === id);
+  if (index < 0) return;
+
+  const resetAction = resetBundledQuickAction(actions[index]!);
+  if (!resetAction) return;
+
+  await onPersist(
+    actions.map((action, actionIndex) => (actionIndex === index ? resetAction : action))
+  );
 }
 
 export async function deleteQuickAction(

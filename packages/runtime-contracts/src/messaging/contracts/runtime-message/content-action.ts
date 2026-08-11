@@ -1,6 +1,10 @@
 import type { MessageType } from '../../message-types';
 import type { RuntimeMessageResponse } from '../response';
-import type { ScreenshotCaptureConfig } from '../../../capture/action';
+import type {
+  DesktopScreenshotSelection,
+  ScreenshotCaptureConfig,
+  ScreenshotImageFormat,
+} from '../../../capture/action';
 import type {
   ContentPrivilegedActionCapability,
   ContentPrivilegedActionActivationKey,
@@ -56,11 +60,19 @@ export type RuntimeContentActionRequestByType = {
     type: typeof MessageType.TRIGGER_QUICK_ACTION;
     actionId: string;
     contentIntent?: ContentPrivilegedActionCapability;
+    desktopSelection?: DesktopScreenshotSelection;
+    tabId?: number;
+  };
+  [MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE]: {
+    type: typeof MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
+    actionId?: string;
+    config?: ScreenshotCaptureConfig;
     tabId?: number;
   };
   [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: {
     type: typeof MessageType.TRIGGER_SCREENSHOT_CAPTURE;
     config: ScreenshotCaptureConfig;
+    desktopSelection?: DesktopScreenshotSelection;
     tabId?: number;
   };
 };
@@ -84,5 +96,12 @@ export type RuntimeContentActionResponseByType = {
   }>;
   [MessageType.OPEN_EXPORT_MODAL]: RuntimeEmptyResponse;
   [MessageType.TRIGGER_QUICK_ACTION]: RuntimeMessageResponse<{ result?: string }>;
+  [MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE]: RuntimeMessageResponse<{
+    result: 'ready';
+    imageFormat: ScreenshotImageFormat;
+    imageQuality: number;
+    requestId: string;
+    reservationToken: string;
+  }>;
   [MessageType.TRIGGER_SCREENSHOT_CAPTURE]: RuntimeMessageResponse<{ result?: string }>;
 };

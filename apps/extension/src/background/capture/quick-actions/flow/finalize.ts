@@ -7,7 +7,7 @@ import type {
   QuickAction,
   Settings as UserSettings,
 } from '../../../../contracts/settings';
-import { releaseQuickActionSurface } from './surface';
+import { releaseQuickActionSurface, shouldCloseQuickActionTools } from './surface';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { executeDownload } from '../../download/download-router/index';
 import { openEditorWithImage } from '../../editor/index';
@@ -60,6 +60,9 @@ export async function finalizeQuickActionCapture({
 
   if (action.exitAfterCapture) {
     showQuickActionSuccessToast(tabId, afterCaptureResult.successToastMessage);
+  }
+
+  if (action.exitAfterCapture && shouldCloseQuickActionTools(tabId)) {
     runBestEffort(
       getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
         type: MessageType.DESTROY_UI_TOOLBAR,

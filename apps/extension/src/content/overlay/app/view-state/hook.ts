@@ -34,6 +34,7 @@ export function useContentAppViewModel(params: {
     handleTakeScreenshot: controllers.screenshotController.handleTakeScreenshot,
     invalidateScreenshotRuns: controllers.screenshotController.invalidateScreenshotRuns,
     modeControls,
+    modeController: controllers.modeController,
     modeFlags,
     quickActionState: buildContentQuickActionState(modeState),
     visibilityState,

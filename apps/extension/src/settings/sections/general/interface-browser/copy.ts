@@ -1,5 +1,28 @@
 import { SUPPORTED_LOCALES, translate, type AppLocale } from '../../../../platform/i18n';
 import type { ContextMenuSettings } from '../../../../contracts/settings';
+import type { PopupStartupSelection } from '../../../../composition/persistence/capture-settings/popup-startup';
+
+export function buildPopupStartupOptions(locale: AppLocale): Array<{
+  value: PopupStartupSelection;
+  label: string;
+}> {
+  const values: PopupStartupSelection[] = [
+    'remember-last',
+    'screenshots:quick-actions',
+    'screenshots:tab',
+    'screenshots:desktop',
+    'screenshots:tools',
+    'video:tab',
+    'video:area',
+    'video:camera',
+    'video:screen',
+    'export',
+  ];
+  return values.map((value) => ({
+    value,
+    label: translate(`settings.appearance.popupStartupOptions.${value}` as const, locale),
+  }));
+}
 
 export function buildAppearanceThemeOptions(locale: AppLocale) {
   return [

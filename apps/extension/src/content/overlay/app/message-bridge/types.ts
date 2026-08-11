@@ -2,6 +2,7 @@ import type { QuickActionOverlay } from '../../../../contracts/settings';
 import type * as ContentActionContract from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { ScreenshotStartContext } from '../../screenshot/types';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
   ContentAppQuickActionState,
   ContentAppRuntimeModeControls,
@@ -25,6 +26,7 @@ export type RuntimeMessageRequest = {
   autoStartSelection?: boolean;
   autoStartCaptureType?: 'visible' | 'full';
   toolbarVisible?: boolean;
+  workingMode?: ToolbarWorkingMode;
   contentIntentGrant?: ContentActionContract.ContentPrivilegedActionAutoStartGrant;
   payload?: {
     type?: 'info' | 'success' | 'warning' | 'error';
@@ -57,6 +59,7 @@ type ScreenshotHandlerRef = {
 export interface RuntimeMessageBridgeModeState {
   aiPickMode: boolean;
   designReviewMode: boolean;
+  drawingMode?: boolean;
   highlighterMode: boolean;
   isToolbarVisible: boolean;
   quickEditMode: boolean;
@@ -105,4 +108,7 @@ export interface RuntimeMessageBridgeParams {
   modeState: RuntimeMessageBridgeModeState;
   quickAction: RuntimeMessageBridgeQuickActionControls;
   viewport: RuntimeMessageBridgeViewportControls;
+  workingModes: {
+    select: (mode: ToolbarWorkingMode) => void;
+  };
 }

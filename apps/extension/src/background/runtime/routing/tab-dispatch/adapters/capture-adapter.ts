@@ -5,6 +5,7 @@ import {
   ensureActivePageAccessRuntime,
   ensureNativeVisibleCaptureAuthority,
 } from '../../../page-access/service';
+import { waitForContentToolbarReady } from '../../../page-access/readiness';
 import { routeWithVerifiedPageAccess } from './page-access-guard';
 import { rejectUnauthorizedRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';
@@ -23,7 +24,11 @@ export function routeResolvedCaptureMessage(args: ResolvedTabRouteArgs): boolean
       viewportState: args.deps.viewportState,
       screenshotModeState: args.deps.screenshotModeState,
       captureGuardState: args.deps.captureGuardState,
-      pageAccessPort: { ensureActivePageAccessRuntime, ensureNativeVisibleCaptureAuthority },
+      pageAccessPort: {
+        ensureActivePageAccessRuntime,
+        ensureNativeVisibleCaptureAuthority,
+        waitForContentToolbarReady,
+      },
       scenarioSessionService: args.deps.scenarioSessionService,
       sender: args.sender,
       webSnapshotViewerPorts: args.deps.webSnapshotViewerPorts,

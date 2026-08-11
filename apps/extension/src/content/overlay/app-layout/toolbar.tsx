@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
 import {
@@ -15,6 +15,11 @@ import type {
   ContentAppScenarioState,
 } from './types';
 import type { CaptureActionType } from '../../../contracts/settings';
+import { clearAllPagePreparationChanges } from '../../application/page-preparation-reset';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../platform/i18n';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -140,6 +145,7 @@ function createToolbarAutoBlurProps(
 }
 
 function renderToolbarShell(args: {
+  canClearPagePreparation: boolean;
   designReview: ContentToolbarShellProps['designReview'];
   handleToggleScreenshotMode: (enabled: boolean) => void;
   scenarioToolbarProps: ReturnType<typeof buildScenarioToolbarProps>;
@@ -149,6 +155,22 @@ function renderToolbarShell(args: {
   const autoBlur = createToolbarAutoBlurProps(args.toolbar.autoBlurController);
   const handleHideToolbar = () => {
     args.toolbar.setPinnedToolbarVisible(false);
+  };
+  const handleClearPagePreparation = () => {
+    args.toolbar.drawingController?.finalizeInteraction();
+    const fullyCleared = clearAllPagePreparationChanges({
+      clearHighlights: modeController.handleClearHighlights,
+      history: pagePreparationHistory,
+      resetAnnotations: browserAnnotationSession.resetForDocument,
+    });
+    showToast(
+      translate(
+        fullyCleared
+          ? 'content.toolbar.allChangesCleared'
+          : 'content.toolbar.someChangesCouldNotBeCleared'
+      ),
+      fullyCleared ? 'info' : 'error'
+    );
   };
 
   return (
@@ -185,6 +207,8 @@ function renderToolbarShell(args: {
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
+        onClearPagePreparation={handleClearPagePreparation}
+        canClearPagePreparation={args.canClearPagePreparation}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
         timerDelay={args.toolbar.timerDelay}
@@ -212,6 +236,11 @@ function renderToolbarShell(args: {
 }
 
 export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
+  const canClearPagePreparation = useSyncExternalStore(
+    pagePreparationHistory.subscribe,
+    () => pagePreparationHistory.getState().canUndo,
+    () => false
+  );
   const byClickBlocked = isScenarioByClickBlocked(toolbar.modes);
   const handleDisableScreenshotMode = () =>
     exitScreenshotModeFromUserAction({
@@ -246,6 +275,7 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
   });
 
   return renderToolbarShell({
+    canClearPagePreparation,
     designReview,
     handleToggleScreenshotMode,
     scenarioToolbarProps,

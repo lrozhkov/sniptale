@@ -15,6 +15,8 @@ import type { ContentPrivilegedActionIntentSource } from '../../../content/appli
 import type { RuntimeMessageBridgeParams } from '../../../content/overlay/app/message-bridge/types';
 import type { ScreenshotStartContext } from '../../../content/overlay/screenshot/types';
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
+import type { UseToolbarModeControllerResult } from '../../../content/overlay/toolbar/mode-controller/types';
+import { selectToolbarWorkingMode } from '../../../content/overlay/app/message-bridge/working-modes';
 import {
   PREPARATION_SURFACE_RESIZE,
   type ViewerPreparationCommand,
@@ -49,6 +51,7 @@ function handlePreparationPortCommand(
 
 function createPreparationBridgeParams(
   modeState: ContentAppModeState,
+  modeController: UseToolbarModeControllerResult,
   handleTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource,
@@ -76,6 +79,9 @@ function createPreparationBridgeParams(
       isToolbarVisible: modeState.isToolbarVisible,
     },
     quickAction: buildContentQuickActionState(modeState),
+    workingModes: {
+      select: (mode) => selectToolbarWorkingMode(modeController, mode),
+    },
     viewport: {
       ...buildContentViewportState(modeState),
       clearPendingAutoStartCapture: modeState.clearPendingAutoStartCapture,
@@ -88,6 +94,7 @@ function createPreparationBridgeParams(
 
 export function usePreparationSurfacePortSync(
   modeState: ContentAppModeState,
+  modeController: UseToolbarModeControllerResult,
   handleTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource,
@@ -98,10 +105,16 @@ export function usePreparationSurfacePortSync(
   onPopupExportRequest?: Parameters<PreparationPortConnector>[1]
 ): void {
   const bridgeParamsRef = useRef<RuntimeMessageBridgeParams>(
-    createPreparationBridgeParams(modeState, handleTakeScreenshot, invalidateScreenshotRuns)
+    createPreparationBridgeParams(
+      modeState,
+      modeController,
+      handleTakeScreenshot,
+      invalidateScreenshotRuns
+    )
   );
   bridgeParamsRef.current = createPreparationBridgeParams(
     modeState,
+    modeController,
     handleTakeScreenshot,
     invalidateScreenshotRuns
   );

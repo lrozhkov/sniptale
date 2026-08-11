@@ -14,6 +14,7 @@ export function usePopupLifecycleSync(state: PopupRuntimeStateSlice) {
       setVideoSettings: state.recording.setVideoSettings,
       setSelectedPresetId: state.presets.setSelectedPresetId,
       setVideoCaptureMode: state.presets.setVideoCaptureMode,
+      setScreenshotStartupMode: state.presets.setScreenshotStartupMode,
       setRecordingControlCapability: state.recording.setRecordingControlCapability,
       setRecordingState: state.recording.setRecordingState,
       setMicrophoneDevices: state.devices.setMicrophoneDevices,

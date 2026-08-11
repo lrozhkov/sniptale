@@ -23,6 +23,7 @@ vi.mock('../../../../features/quick-actions-presets/catalog', () => ({
   isBundledQuickAction: vi.fn(),
   mergeStoredQuickActions: vi.fn(),
   normalizeQuickAction: vi.fn(),
+  resetBundledQuickAction: vi.fn(),
 }));
 
 vi.mock('./meta', () => ({

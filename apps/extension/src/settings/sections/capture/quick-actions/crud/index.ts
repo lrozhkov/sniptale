@@ -3,6 +3,7 @@ import {
   beginEditQuickAction,
   beginNewQuickAction,
   deleteQuickAction,
+  resetQuickAction,
   saveEditedQuickAction,
   updateQuickActionField,
 } from './editing';
@@ -14,6 +15,7 @@ export {
   beginNewQuickAction,
   deleteQuickAction,
   persistQuickActions,
+  resetQuickAction,
   saveEditedQuickAction,
   toggleQuickActionStatus,
   updateQuickActionField,
@@ -36,6 +38,7 @@ export function createQuickActionsCrud(props: {
     handleDelete: async (id: string) => deleteQuickAction(props.actions, id, handlePersistActions),
     handleEdit: (action: QuickAction) =>
       beginEditQuickAction(action, props.setEditingId, props.setEditForm),
+    handleReset: async (id: string) => resetQuickAction(props.actions, id, handlePersistActions),
     handleSaveEdit: async () =>
       saveEditedQuickAction({
         actions: props.actions,

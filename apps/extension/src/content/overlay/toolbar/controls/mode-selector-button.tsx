@@ -5,6 +5,7 @@ export function ModeSelectorButton(props: {
   children: React.ReactNode;
   disabled?: boolean;
   label: string;
+  title?: string;
   menuIndicator?: boolean;
   onToggle: () => void;
   open: boolean;
@@ -19,7 +20,7 @@ export function ModeSelectorButton(props: {
       dataUi="content.toolbar.mode-selector-button"
       disabled={props.disabled ?? false}
       menuIndicator={props.menuIndicator ?? false}
-      title={props.label}
+      title={props.title ?? props.label}
       data-menu-open={props.open ? 'true' : 'false'}
       onClick={(event) => {
         event.stopPropagation();

@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { useTemplateActions } from './actions';
 import { useTemplateDeleteState } from './delete-state';
 import { useTemplateEditorState } from './editor-state';
@@ -7,6 +8,7 @@ import { usePromptTemplates } from '../../../../../features/prompt-templates/hoo
  * Owns settings prompt template CRUD and modal flows.
  */
 export function useTemplatesSection() {
+  const [mutatingTemplateId, setMutatingTemplateId] = useState<string | null>(null);
   const {
     templates,
     isLoading,
@@ -41,6 +43,15 @@ export function useTemplatesSection() {
         }
   );
 
+  const runRowMutation = useCallback(async (templateId: string, mutation: () => Promise<void>) => {
+    setMutatingTemplateId(templateId);
+    try {
+      await mutation();
+    } finally {
+      setMutatingTemplateId((current) => (current === templateId ? null : current));
+    }
+  }, []);
+
   return {
     confirmDelete,
     confirmState: deleteState.confirmState,
@@ -48,13 +59,16 @@ export function useTemplatesSection() {
     handleEditTemplate: editorState.openTemplateEditor,
     handleSaveTemplate,
     templateLifecycle: {
-      move: templateLifecycle.move,
+      move: (itemId: string, beforeItemId: string | null) =>
+        runRowMutation(itemId, () => templateLifecycle.move(itemId, beforeItemId)),
       requestDelete: deleteState.openDeleteDialog,
-      restore: handleResetTemplate,
-      setEnabled: templateLifecycle.setEnabled,
+      restore: (templateId: string) =>
+        runRowMutation(templateId, () => handleResetTemplate(templateId)),
+      setEnabled: (templateId: string, enabled: boolean) =>
+        runRowMutation(templateId, () => templateLifecycle.setEnabled(templateId, enabled)),
     },
     isEditorOpen: editorState.isEditorOpen,
-    status: { isLoading, isMutating, submitError: error },
+    status: { isLoading, isMutating, mutatingTemplateId, submitError: error },
     templates,
     closeDeleteDialog: deleteState.closeDeleteDialog,
     closeTemplateEditor: editorState.closeTemplateEditor,

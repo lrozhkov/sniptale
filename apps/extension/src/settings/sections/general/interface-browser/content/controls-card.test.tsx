@@ -44,6 +44,7 @@ import {
   buildAppearanceContextMenuOptions,
   buildAppearanceLocaleOptions,
   buildAppearanceThemeOptions,
+  buildPopupStartupOptions,
 } from '../copy';
 import type { AppearanceSectionState } from './types';
 
@@ -68,13 +69,17 @@ function createState(overrides: Partial<AppearanceSectionState> = {}): Appearanc
     locale: 'en',
     localeOptions: buildAppearanceLocaleOptions('en'),
     preference: 'system',
-    rawDiagnosticsEnabled: false,
+    popupStartup: {
+      loading: false,
+      options: buildPopupStartupOptions('en'),
+      selection: 'remember-last',
+      updateSelection: vi.fn().mockResolvedValue(undefined),
+    },
     resolvedTheme: 'light',
     setLanguagePreference: vi.fn(),
     setPreference: vi.fn(),
     themeOptions: buildAppearanceThemeOptions('en'),
     updateContextMenu: vi.fn().mockResolvedValue(undefined),
-    updateRawDiagnosticsEnabled: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -116,6 +121,17 @@ it('renders appearance owners and routes locale controls', () => {
     }
   });
   expect(state.setLanguagePreference).toHaveBeenCalledWith('en');
+
+  const startupSelect = container?.querySelector<HTMLSelectElement>(
+    '[aria-label="settings.appearance.popupStartupAriaLabel"]'
+  );
+  act(() => {
+    if (startupSelect) {
+      startupSelect.value = 'video:screen';
+      startupSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  expect(state.popupStartup.updateSelection).toHaveBeenCalledWith('video:screen');
   expect(mocks.themeChips).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
   expect(mocks.contextMenu).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
 });

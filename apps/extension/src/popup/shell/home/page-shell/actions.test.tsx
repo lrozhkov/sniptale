@@ -175,6 +175,21 @@ describe('use-popup-home-actions direct capture', () => {
 });
 
 describe('use-popup-home-actions quick actions', () => {
+  it('marks desktop actions for popup-owned source selection', async () => {
+    triggerQuickActionSpy.mockResolvedValue(undefined);
+    const desktopAction = {
+      id: 'desktop-action',
+      screenshotMode: 'desktop',
+    } as QuickAction;
+    await renderHarness({ quickActions: [desktopAction] });
+
+    await act(async () => {
+      await latestHookState?.handleQuickAction('desktop-action');
+    });
+
+    expect(triggerQuickActionSpy).toHaveBeenCalledWith('desktop-action', true);
+  });
+
   it('uses explicit and fallback quick-action errors', async () => {
     await renderHarness({
       quickActionsDisabledReason: 'Quick actions are disabled',
@@ -199,8 +214,8 @@ describe('use-popup-home-actions quick actions', () => {
       await latestHookState?.handleQuickAction('action-3');
     });
 
-    expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(1, 'action-2');
-    expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(2, 'action-3');
+    expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(1, 'action-2', false);
+    expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(2, 'action-3', false);
     expect(container?.textContent).toContain('t:popup.home.triggerQuickActionError');
   });
 });

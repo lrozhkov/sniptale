@@ -3,9 +3,10 @@ import { handleQuickAction } from '../quick-actions/index';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { CaptureRouteContext } from './types';
 import type { QuickActionRuntimeContext } from '../quick-actions/flow/shared';
+import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
 
 export function handleTriggerQuickAction(
-  message: { actionId: string },
+  message: { actionId: string; desktopSelection?: DesktopScreenshotSelection },
   context: CaptureRouteContext,
   runtimeContext?: QuickActionRuntimeContext
 ): boolean {
@@ -21,6 +22,9 @@ export function handleTriggerQuickAction(
         captureGuardState: context.captureGuardState,
         pageAccessPort: context.pageAccessPort,
         webSnapshotViewerPorts: context.webSnapshotViewerPorts,
+        ...(message.desktopSelection === undefined
+          ? {}
+          : { desktopSelection: message.desktopSelection }),
         ...(runtimeContext === undefined ? {} : { runtimeContext }),
       })
     )

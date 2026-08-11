@@ -116,6 +116,8 @@ export interface ToolbarProps {
   ) => void;
   onHide: () => void;
   onClearHighlights: () => void;
+  onClearPagePreparation?: () => void;
+  canClearPagePreparation?: boolean;
   autoBlur?: ToolbarAutoBlurProps;
   onToggleNavigationLock?: (enabled: boolean) => void;
   timerDelay: number;

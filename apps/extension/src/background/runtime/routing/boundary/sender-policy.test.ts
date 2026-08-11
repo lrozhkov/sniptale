@@ -222,6 +222,27 @@ it('allows only popup quick-action targeted capture routes without a sender tab'
   ).toBe(false);
 });
 
+it('accepts popup desktop selections only from the popup document', () => {
+  runtimeInfoGetUrlMock.mockReturnValue(
+    'chrome-extension://test/apps/extension/src/popup/index.html'
+  );
+  const message = {
+    actionId: 'desktop-action',
+    desktopSelection: {
+      requestId: 'request-1',
+      reservationToken: 'reservation-1',
+      status: 'selected' as const,
+      streamId: 'one-shot-stream',
+    },
+    tabId: 7,
+    type: MessageType.TRIGGER_QUICK_ACTION,
+  };
+
+  expect(canRoute(message, createSender({ url: POPUP_URL }))).toBe(true);
+  expect(canRoute(message, createTopLevelContentSender())).toBe(false);
+  expect(canRoute(message, createSender({ url: VIEWER_URL }))).toBe(false);
+});
+
 it('allows owned snapshot viewer routes and rejects unrelated extension pages', () => {
   runtimeInfoGetUrlMock.mockImplementation((path: string) => `chrome-extension://test/${path}`);
 

@@ -65,6 +65,27 @@ it('routes quick actions through browser tab lookup and async responses', async 
   });
 });
 
+it('forwards popup desktop selections into the delivery workflow', async () => {
+  const sendResponse = vi.fn();
+  const desktopSelection = {
+    requestId: 'request-1',
+    reservationToken: 'reservation-1',
+    status: 'selected' as const,
+    streamId: 'one-shot-stream',
+  };
+
+  handleTriggerQuickAction(
+    { actionId: 'desktop-action', desktopSelection },
+    createContext(sendResponse)
+  );
+
+  await vi.waitFor(() =>
+    expect(handleQuickActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ desktopSelection })
+    )
+  );
+});
+
 it('reports tab lookup failures through route errors', async () => {
   const tabFailureResponse = vi.fn();
 

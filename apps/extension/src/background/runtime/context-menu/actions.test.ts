@@ -296,14 +296,14 @@ async function verifySettingsPageRouting() {
 
 async function verifyQuickActionRouting() {
   await handleBackgroundContextMenuQuickAction({
-    actionId: 'default-edit-visible',
+    actionId: 'default-visible-edit',
     deps: createDeps(),
     tab: createTab(),
   });
 
   expect(handleQuickActionMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      actionId: 'default-edit-visible',
+      actionId: 'default-visible-edit',
       tabId: 11,
     })
   );

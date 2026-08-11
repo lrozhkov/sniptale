@@ -18,6 +18,7 @@ import {
   persistVideoUiState,
 } from '../../recording/persistence';
 import type { PopupPage } from '../navigation/actions';
+import { savePopupLastPage } from '../../../composition/persistence/capture-settings/popup-startup';
 import { usePopupMediaDeviceEffects } from './media-device-effects';
 import type { RecordingControlCapability } from './recording-control-capability';
 import { usePopupRecordingNavigationEffect } from './recording-navigation-effect';
@@ -55,15 +56,80 @@ export function usePopupRuntimeEffects(state: {
 
 function usePopupPersistenceEffects(state: {
   isReady: boolean;
+  page: PopupPage;
   videoSettings: VideoRecordingSettings;
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
+  setPage: Dispatch<SetStateAction<PopupPage>>;
 }) {
+  usePopupPagePersistenceEffect(state);
   useVideoSettingsPersistenceEffect(state);
   useVideoUiStatePersistenceEffect(state);
+}
+
+function usePopupPagePersistenceEffect(state: {
+  isReady: boolean;
+  page: PopupPage;
+  setPage: Dispatch<SetStateAction<PopupPage>>;
+}) {
+  const { isReady, page, setPage } = state;
+  const committedPageRef = useRef(state.page);
+  const enqueuedPageRef = useRef(state.page);
+  const pageRevisionRef = useRef(0);
+  const pageQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const mountedRef = useRef(true);
+  const restoringPageRef = useRef(false);
+  const wasReadyRef = useRef(state.isReady);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) {
+      committedPageRef.current = page;
+      enqueuedPageRef.current = page;
+      wasReadyRef.current = false;
+      return;
+    }
+    if (!wasReadyRef.current) {
+      committedPageRef.current = page;
+      enqueuedPageRef.current = page;
+      wasReadyRef.current = true;
+      return;
+    }
+    if (restoringPageRef.current) {
+      restoringPageRef.current = false;
+      enqueuedPageRef.current = page;
+      return;
+    }
+    if (enqueuedPageRef.current === page) return;
+
+    const desiredPage = page;
+    const revision = ++pageRevisionRef.current;
+    enqueuedPageRef.current = desiredPage;
+    const operation = pageQueueRef.current.then(async () => {
+      try {
+        await savePopupLastPage(desiredPage);
+        committedPageRef.current = desiredPage;
+      } catch (error) {
+        logger.error('Failed to persist popup page', error);
+        if (mountedRef.current && pageRevisionRef.current === revision) {
+          restoringPageRef.current = true;
+          enqueuedPageRef.current = committedPageRef.current;
+          setPage(committedPageRef.current);
+        }
+        toast.error(translate('common.states.error'));
+      }
+    });
+    pageQueueRef.current = operation;
+    void operation;
+  }, [isReady, page, setPage]);
 }
 
 function useVideoSettingsPersistenceEffect(state: {

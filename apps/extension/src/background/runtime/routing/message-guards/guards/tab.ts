@@ -24,6 +24,7 @@ const backgroundInternalSignalTypes = [
 
 const captureMessageTypes = [
   'TRIGGER_QUICK_ACTION',
+  'PREPARE_DESKTOP_SCREENSHOT_CAPTURE',
   'TRIGGER_SCREENSHOT_CAPTURE',
   MessageType.DOWNLOAD_BROWSER_ANNOTATIONS,
   MessageType.OPEN_EXPORT_MODAL,
