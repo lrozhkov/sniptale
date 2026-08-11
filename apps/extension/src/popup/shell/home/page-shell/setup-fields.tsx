@@ -16,13 +16,12 @@ const captureActions: CaptureActionType[] = [
   'ask_system',
   'edit',
   'copy',
-  'scenario',
   'save_to_library',
 ];
 
 const actionKeys: Record<CaptureActionType, Parameters<typeof translate>[0]> = {
   download_default: 'settings.quickActions.afterCaptureDownloadDefault',
-  ask_preset: 'settings.quickActions.afterCaptureAskPreset',
+  ask_preset: 'popup.home.captureChooseFolderLabel',
   ask_system: 'settings.quickActions.afterCaptureAskSystem',
   edit: 'settings.quickActions.afterCaptureEdit',
   copy: 'settings.quickActions.afterCaptureCopy',
@@ -34,11 +33,35 @@ function settingOptions(values: ReadonlyArray<InlineCurtainOption>): InlineCurta
   return values.map((option) => ({ ...option }));
 }
 
-export function TabCaptureFields(props: {
+type CaptureFieldProps = {
   config: ScreenshotCaptureConfig;
-  viewportPresets: ViewportPreset[];
   patch(value: Partial<ScreenshotCaptureConfig>): void;
-}) {
+};
+
+export function TabCaptureAreaField(props: CaptureFieldProps) {
+  return (
+    <InlineCurtainSelect
+      value={props.config.screenshotMode}
+      label={translate('popup.home.captureAreaLabel')}
+      ariaLabel={translate('popup.home.captureAreaLabel')}
+      options={settingOptions([
+        { value: 'visible', label: translate('settings.quickActions.screenshotModeVisible') },
+        { value: 'full', label: translate('settings.quickActions.screenshotModeFull') },
+        {
+          value: 'selection',
+          label: translate('settings.quickActions.screenshotModeSelection'),
+        },
+      ])}
+      onChange={(value) =>
+        props.patch({ screenshotMode: value as ScreenshotCaptureConfig['screenshotMode'] })
+      }
+    />
+  );
+}
+
+export function TabCaptureSizeField(
+  props: CaptureFieldProps & { viewportPresets: ViewportPreset[] }
+) {
   const viewportOptions = settingOptions([
     { value: '', label: translate('viewportPresets.section.nativeOption') },
     ...orderViewportPresetsForSelector(props.viewportPresets)
@@ -56,82 +79,67 @@ export function TabCaptureFields(props: {
   ]);
 
   return (
-    <>
-      <InlineCurtainSelect
-        value={props.config.screenshotMode}
-        label={translate('popup.home.captureAreaLabel')}
-        ariaLabel={translate('popup.home.captureAreaLabel')}
-        options={settingOptions([
-          { value: 'visible', label: translate('settings.quickActions.screenshotModeVisible') },
-          { value: 'full', label: translate('settings.quickActions.screenshotModeFull') },
-          {
-            value: 'selection',
-            label: translate('settings.quickActions.screenshotModeSelection'),
-          },
-        ])}
-        onChange={(value) =>
-          props.patch({ screenshotMode: value as ScreenshotCaptureConfig['screenshotMode'] })
-        }
-      />
-      <InlineCurtainSelect
-        value={props.config.viewportPresetId ?? ''}
-        label={translate('popup.home.captureSizeLabel')}
-        ariaLabel={translate('popup.home.captureSizeLabel')}
-        options={viewportOptions}
-        onChange={(value) => props.patch({ viewportPresetId: value || null })}
-        optionsFooter={<ManageSizePresetsButton />}
-      />
-      <InlineCurtainSelect
-        value={props.config.delay === null ? '' : String(props.config.delay)}
-        label={translate('popup.home.captureCountdownLabel')}
-        ariaLabel={translate('popup.home.captureCountdownLabel')}
-        options={settingOptions([
-          { value: '', label: translate('popup.home.captureCountdownOff') },
-          ...([3, 5, 10] as const).map((value) => ({
-            value: String(value),
-            label: `${value} ${translate('settings.quickActions.delayShortSuffix')}`,
-          })),
-        ])}
-        onChange={(value) =>
-          props.patch({
-            delay: value === '' ? null : (Number(value) as ScreenshotCaptureConfig['delay']),
-          })
-        }
-      />
-    </>
+    <InlineCurtainSelect
+      value={props.config.viewportPresetId ?? ''}
+      label={translate('popup.home.captureSizeLabel')}
+      ariaLabel={translate('popup.home.captureSizeLabel')}
+      options={viewportOptions}
+      onChange={(value) => props.patch({ viewportPresetId: value || null })}
+      optionsFooter={<ManageSizePresetsButton />}
+    />
   );
 }
 
-export function OutputFields(props: {
-  config: ScreenshotCaptureConfig;
-  patch(value: Partial<ScreenshotCaptureConfig>): void;
-}) {
+export function TabCaptureCountdownField(props: CaptureFieldProps) {
+  return (
+    <InlineCurtainSelect
+      value={props.config.delay === null ? '' : String(props.config.delay)}
+      label={translate('popup.home.captureCountdownLabel')}
+      ariaLabel={translate('popup.home.captureCountdownLabel')}
+      options={settingOptions([
+        { value: '', label: translate('popup.home.captureCountdownOff') },
+        ...([3, 5, 10] as const).map((value) => ({
+          value: String(value),
+          label: `${value} ${translate('settings.quickActions.delayShortSuffix')}`,
+        })),
+      ])}
+      onChange={(value) =>
+        props.patch({
+          delay: value === '' ? null : (Number(value) as ScreenshotCaptureConfig['delay']),
+        })
+      }
+    />
+  );
+}
+
+export function AfterCaptureField(props: CaptureFieldProps) {
   const allowed = getAllowedQuickActionAfterCaptureActions(props.config);
-  const showEncoding = props.config.afterCapture !== 'copy';
 
   return (
-    <>
-      <InlineCurtainSelect
-        value={props.config.afterCapture}
-        label={translate('settings.quickActions.afterCaptureLabel')}
-        ariaLabel={translate('settings.quickActions.afterCaptureLabel')}
-        options={captureActions
-          .filter((value) => !allowed || allowed.has(value))
-          .map((value) => ({ value, label: translate(actionKeys[value]) }))}
-        onChange={(value) => props.patch({ afterCapture: value as CaptureActionType })}
-      />
-      {showEncoding ? (
-        <InlineCurtainSelect
-          value={props.config.imageFormat ?? ''}
-          selectedLabel={getImageQualitySummary(props.config)}
-          label={translate('popup.home.captureQualityLabel')}
-          ariaLabel={translate('popup.home.captureQualityAria')}
-          options={[]}
-          optionsPanel={<ImageQualityPanel config={props.config} patch={props.patch} />}
-          onChange={() => undefined}
-        />
-      ) : null}
-    </>
+    <InlineCurtainSelect
+      value={props.config.afterCapture}
+      label={translate('settings.quickActions.afterCaptureLabel')}
+      ariaLabel={translate('settings.quickActions.afterCaptureLabel')}
+      options={captureActions
+        .filter((value) => !allowed || allowed.has(value))
+        .map((value) => ({ value, label: translate(actionKeys[value]) }))}
+      onChange={(value) => props.patch({ afterCapture: value as CaptureActionType })}
+    />
+  );
+}
+
+export function ImageQualityField(props: CaptureFieldProps) {
+  if (props.config.afterCapture === 'copy') return null;
+  return (
+    <InlineCurtainSelect
+      value={props.config.imageFormat ?? ''}
+      selectedLabel={getImageQualitySummary(props.config)}
+      label={translate('popup.home.captureQualityLabel')}
+      ariaLabel={translate('popup.home.captureQualityAria')}
+      options={[]}
+      optionsPanel={<ImageQualityPanel config={props.config} patch={props.patch} />}
+      onChange={() => undefined}
+    />
   );
 }
 

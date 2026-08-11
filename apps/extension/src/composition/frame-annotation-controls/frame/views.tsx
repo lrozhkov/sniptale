@@ -272,6 +272,9 @@ function FrameBorderSection(props: {
           handleTogglePresetEnabled={props.handleTogglePresetEnabled}
           locale={locale}
           onClose={props.onClose}
+          {...(props.onFloatingInteractionChange
+            ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+            : {})}
           pendingPresetIds={props.pendingPresetIds}
           {...(props.selectedPresetId === undefined
             ? {}
@@ -292,6 +295,7 @@ function FramePresetMode(props: {
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
   onClose: () => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
 }) {
@@ -314,6 +318,9 @@ function FramePresetMode(props: {
         compact
         disabled={tagState.isLoading || tagState.error}
         onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
         onQueryChange={setQuery}
         query={query}
         tags={tagState.state.tags}

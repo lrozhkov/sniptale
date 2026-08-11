@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   browserTabsCreateMock: vi.fn(),
+  captureDesktopScreenshotFrameMock: vi.fn(),
   chooseDesktopScreenshotSourceMock: vi.fn(),
   getActiveTabIdMock: vi.fn(async () => 42),
   getUrlMock: vi.fn((relativePath: string) => `chrome-extension://test/${relativePath}`),
   sendRuntimeMessageMock: vi.fn(),
   translateMock: vi.fn((key: string) => `t:${key}`),
+}));
+
+vi.mock('../../../platform/media-utils/desktop-screenshot-frame', () => ({
+  captureDesktopScreenshotFrame: mocks.captureDesktopScreenshotFrameMock,
 }));
 
 vi.mock('../../../platform/media-utils/desktop-capture-source-picker', async (importOriginal) => ({
@@ -72,6 +77,7 @@ import { installPopupRuntimeMessagingMock } from '../runtime/services.test-suppo
 function resetPopupUtilsMocks() {
   mocks.browserTabsCreateMock.mockReset();
   mocks.chooseDesktopScreenshotSourceMock.mockReset();
+  mocks.captureDesktopScreenshotFrameMock.mockReset();
   mocks.getActiveTabIdMock.mockClear();
   mocks.getUrlMock.mockClear();
   mocks.sendRuntimeMessageMock.mockReset();
@@ -82,6 +88,11 @@ function resetPopupUtilsMocks() {
 }
 
 async function verifiesPopupOwnedDesktopSelection() {
+  mocks.captureDesktopScreenshotFrameMock.mockResolvedValue({
+    dataUrl: 'data:image/webp;base64,AA==',
+    width: 1200,
+    height: 800,
+  });
   mocks.chooseDesktopScreenshotSourceMock.mockResolvedValue({
     status: 'selected',
     selection: { label: 'Window', streamId: 'popup-desktop-stream' },
@@ -125,7 +136,9 @@ async function verifiesPopupOwnedDesktopSelection() {
       requestId: 'desktop-request',
       reservationToken: 'desktop-reservation',
       status: 'selected',
-      streamId: 'popup-desktop-stream',
+      dataUrl: 'data:image/webp;base64,AA==',
+      width: 1200,
+      height: 800,
     },
     tabId: 42,
   });
@@ -141,13 +154,21 @@ async function verifiesPopupOwnedDesktopSelection() {
       requestId: 'desktop-request',
       reservationToken: 'desktop-reservation',
       status: 'selected',
-      streamId: 'popup-desktop-stream',
+      dataUrl: 'data:image/webp;base64,AA==',
+      width: 1200,
+      height: 800,
     },
     tabId: 42,
   });
   expect(mocks.sendRuntimeMessageMock).not.toHaveBeenCalledWith(
     expect.objectContaining({ desktopStreamId: expect.any(String) })
   );
+  expect(mocks.captureDesktopScreenshotFrameMock).toHaveBeenCalledTimes(2);
+  expect(mocks.captureDesktopScreenshotFrameMock).toHaveBeenCalledWith({
+    streamId: 'popup-desktop-stream',
+    imageFormat: 'webp',
+    imageQuality: 72,
+  });
 }
 
 async function verifiesDesktopSelectionCancellationAndFailure() {
@@ -179,6 +200,41 @@ async function verifiesDesktopSelectionCancellationAndFailure() {
       ([message]) => message.type === MessageType.TRIGGER_QUICK_ACTION
     )
   ).toBe(true);
+  expect(window.close).not.toHaveBeenCalled();
+}
+
+async function verifiesDesktopFrameFailureCancelsPreparation() {
+  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValue({
+    status: 'selected',
+    selection: { label: 'Window', streamId: 'popup-desktop-stream' },
+  });
+  mocks.captureDesktopScreenshotFrameMock.mockRejectedValue(new Error('frame acquisition failed'));
+  mocks.sendRuntimeMessageMock.mockImplementation(async (message: { type: string }) =>
+    message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
+      ? {
+          success: true,
+          result: 'ready',
+          imageFormat: 'png',
+          imageQuality: 90,
+          requestId: 'failed-frame-request',
+          reservationToken: 'failed-frame-reservation',
+        }
+      : { success: true, result: 'cancelled' }
+  );
+
+  await expect(triggerQuickAction('desktop-action', true)).rejects.toThrow(
+    'frame acquisition failed'
+  );
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
+    type: MessageType.TRIGGER_QUICK_ACTION,
+    actionId: 'desktop-action',
+    desktopSelection: {
+      status: 'cancelled',
+      requestId: 'failed-frame-request',
+      reservationToken: 'failed-frame-reservation',
+    },
+    tabId: 42,
+  });
   expect(window.close).not.toHaveBeenCalled();
 }
 
@@ -310,6 +366,10 @@ function runPopupUtilsSuite() {
   it(
     'keeps the popup open when desktop selection is cancelled or fails',
     verifiesDesktopSelectionCancellationAndFailure
+  );
+  it(
+    'cancels the prepared desktop reservation when frame acquisition fails',
+    verifiesDesktopFrameFailureCancelsPreparation
   );
   it('opens tools with an explicit working mode', verifiesToolbarWorkingModeSelection);
   it('normalizes stale popup runtime errors into a refresh hint', verifiesStaleRuntimeErrors);

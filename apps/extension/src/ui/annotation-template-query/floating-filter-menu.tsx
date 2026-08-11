@@ -65,24 +65,27 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
     queueMicrotask(() =>
       menuRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus()
     );
-    const onPointerDown = (event: PointerEvent) => {
+    const portalRoot = menuRef.current?.getRootNode();
+    const localEventTarget =
+      portalRoot instanceof ShadowRoot || portalRoot instanceof Document ? portalRoot : document;
+    const onPointerDown = (event: Event) => {
       const root = rootRef.current;
       const menu = menuRef.current;
       const path = event.composedPath();
       if (root && !path.includes(root) && (!menu || !path.includes(menu))) setOpen(false);
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+    const onKeyDown = (event: Event) => {
+      if (!(event instanceof KeyboardEvent) || event.key !== 'Escape') return;
       event.preventDefault();
       event.stopImmediatePropagation();
       setOpen(false);
       queueMicrotask(() => triggerRef.current?.focus());
     };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
+    localEventTarget.addEventListener('pointerdown', onPointerDown, true);
+    localEventTarget.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
+      localEventTarget.removeEventListener('pointerdown', onPointerDown, true);
+      localEventTarget.removeEventListener('keydown', onKeyDown, true);
     };
   }, [open, setOpen]);
 
@@ -112,24 +115,31 @@ export function FloatingFilterMenu(props: {
   return createPortal(
     <div
       className={[
-        'fixed z-[2147483647] overflow-y-auto overscroll-contain rounded-xl border p-1.5',
+        'pointer-events-auto fixed z-[2147483647] overflow-y-auto overscroll-contain',
+        'cursor-default rounded-xl border p-1.5',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] shadow-xl',
       ].join(' ')}
       data-ui="shared.annotation-template-query.filter-menu"
       data-floating-ui-owned-by={props.ownerId}
+      data-floating-ui-root="true"
       role="menu"
       ref={props.menuRef}
       style={props.style}
+      onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
     >
       {props.tags.map((tag) => (
         <button
           aria-checked={props.activeFilterTagIds.includes(tag.id)}
           className={[
-            'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs',
-            'hover:bg-[var(--sniptale-color-surface-input)]',
+            'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+            props.activeFilterTagIds.includes(tag.id)
+              ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent-emphasis)]'
+              : 'hover:bg-[var(--sniptale-color-surface-hover)]',
           ].join(' ')}
+          data-active={props.activeFilterTagIds.includes(tag.id) ? 'true' : 'false'}
           key={tag.id}
           onClick={() => toggle(tag.id)}
           role="menuitemcheckbox"
@@ -144,9 +154,9 @@ export function FloatingFilterMenu(props: {
       {props.activeFilterTagIds.length > 0 ? (
         <button
           className={[
-            'mt-1 w-full rounded-lg px-2 py-1.5 text-left text-xs',
+            'mt-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
             'text-[var(--sniptale-color-accent)]',
-            'hover:bg-[var(--sniptale-color-surface-input)]',
+            'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-accent-emphasis)]',
           ].join(' ')}
           onClick={() => props.onActiveFilterTagIdsChange([])}
           type="button"

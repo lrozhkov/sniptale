@@ -25,7 +25,6 @@ type UiRuntimeBridgeMessageType =
   | VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
 
 const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
-  MessageType.ENABLE_SCREENSHOT_MODE,
   MessageType.DISABLE_SCREENSHOT_MODE,
   MessageType.ENABLE_HIGHLIGHTER_MODE,
   MessageType.DISABLE_HIGHLIGHTER_MODE,

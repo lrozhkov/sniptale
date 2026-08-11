@@ -1,6 +1,6 @@
 import { Funnel, Search, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   AnnotationTemplateTag,
   AnnotationTemplateTagId,
@@ -8,11 +8,27 @@ import type {
 import { translate } from '../../platform/i18n';
 import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-menu';
 
+const FILTER_TRIGGER_BASE_CLASS_NAME = [
+  'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg',
+  'border px-2 text-xs transition-colors',
+].join(' ');
+const FILTER_TRIGGER_ACTIVE_CLASS_NAME = [
+  'border-[var(--sniptale-color-border-accent-strong)]',
+  'bg-[var(--sniptale-color-accent-soft)]',
+  'text-[var(--sniptale-color-accent-emphasis)]',
+].join(' ');
+const FILTER_TRIGGER_IDLE_CLASS_NAME = [
+  'border-[var(--sniptale-color-border-soft)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+  'hover:text-[var(--sniptale-color-text-primary)]',
+].join(' ');
+
 export function AnnotationTemplateQueryControls(props: {
   activeFilterTagIds: readonly AnnotationTemplateTagId[];
   compact?: boolean;
   disabled?: boolean;
   onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onQueryChange: (query: string) => void;
   query: string;
   tags: readonly AnnotationTemplateTag[];
@@ -20,6 +36,14 @@ export function AnnotationTemplateQueryControls(props: {
   const [open, setOpen] = useState(false);
   const floating = useFloatingFilterMenu(open, setOpen);
   const activeCount = props.activeFilterTagIds.length;
+  const onFloatingInteractionChange = props.onFloatingInteractionChange;
+
+  useEffect(() => {
+    if (!open) return;
+    onFloatingInteractionChange?.(true);
+    return () => onFloatingInteractionChange?.(false);
+  }, [onFloatingInteractionChange, open]);
+
   return (
     <div className="flex items-center gap-2" data-ui="shared.annotation-template-query.controls">
       <label
@@ -54,10 +78,12 @@ export function AnnotationTemplateQueryControls(props: {
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={translate('highlighter.templateTags.filterLabel')}
+          aria-pressed={activeCount > 0}
           className={[
-            'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-2',
-            'border-[var(--sniptale-color-border-soft)] text-xs',
+            FILTER_TRIGGER_BASE_CLASS_NAME,
+            activeCount > 0 ? FILTER_TRIGGER_ACTIVE_CLASS_NAME : FILTER_TRIGGER_IDLE_CLASS_NAME,
           ].join(' ')}
+          data-active={activeCount > 0 ? 'true' : 'false'}
           disabled={props.disabled || props.tags.length === 0}
           onClick={() => {
             if (!open) floating.position();

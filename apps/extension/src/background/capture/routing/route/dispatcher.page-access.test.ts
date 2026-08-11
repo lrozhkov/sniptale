@@ -225,10 +225,13 @@ it('runs desktop quick actions without page access or active-page authorization'
   const { pageAccessPort: _pageAccessPort, ...args } = createRouteArgs();
   const runtimeContext = { captureMode: 'desktop' };
   const desktopSelection = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+    height: 1,
     requestId: 'request-1',
     reservationToken: 'reservation-1',
     status: 'selected' as const,
-    streamId: 'stream-1',
+    width: 1,
   };
   loadQuickActionRuntimeContextMock.mockResolvedValueOnce(runtimeContext);
 
@@ -261,10 +264,13 @@ it('runs popup desktop capture without page access and uses the validated runtim
   const { pageAccessPort: _pageAccessPort, ...args } = createRouteArgs();
   const runtimeContext = { captureMode: 'desktop' };
   const desktopSelection = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+    height: 1,
     requestId: 'request-2',
     reservationToken: 'reservation-2',
     status: 'selected' as const,
-    streamId: 'stream-2',
+    width: 1,
   };
   loadScreenshotCaptureRuntimeContextMock.mockResolvedValueOnce(runtimeContext);
 

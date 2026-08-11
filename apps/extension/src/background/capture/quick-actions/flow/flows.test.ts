@@ -11,6 +11,8 @@ const {
   releaseQuickActionSurfaceMock,
   sendTabMessageMock,
   sendViewerPreparationCommandMock,
+  waitForContentToolbarReadyMock,
+  waitForContentScreenshotModeMock,
 } = vi.hoisted(() => ({
   issueContentPrivilegedActionAutoStartGrantMock: vi.fn(),
   ensureNativeVisibleCaptureAuthorityMock: vi.fn(),
@@ -20,7 +22,20 @@ const {
   releaseQuickActionSurfaceMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   sendViewerPreparationCommandMock: vi.fn(),
+  waitForContentToolbarReadyMock: vi.fn(),
+  waitForContentScreenshotModeMock: vi.fn(),
 }));
+
+vi.mock(
+  '../../../routing-contracts/runtime-messaging/content-toolbar-readiness',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../routing-contracts/runtime-messaging/content-toolbar-readiness')
+    >()),
+    waitForContentToolbarReady: waitForContentToolbarReadyMock,
+    waitForContentScreenshotMode: waitForContentScreenshotModeMock,
+  })
+);
 
 vi.mock('../../../../platform/runtime-messaging/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/runtime-messaging/index')>()),
@@ -179,9 +194,11 @@ beforeEach(() => {
     surfaceOperationGeneration: tabId === 17 ? 0 : 1,
     ...(tabId === 17 ? {} : { surfaceLeaseGeneration: 1 }),
   }));
-  sendTabMessageMock.mockResolvedValue(undefined);
+  sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   sendViewerPreparationCommandMock.mockResolvedValue(undefined);
+  waitForContentToolbarReadyMock.mockResolvedValue({ screenshotMode: false, visible: false });
+  waitForContentScreenshotModeMock.mockResolvedValue({ screenshotMode: true, visible: false });
   prepareQuickActionSurfaceMock.mockImplementation(
     async (args: ReturnType<typeof createCaptureArgs>) => {
       if (args.viewportPresetId) {
@@ -218,21 +235,25 @@ it('starts screenshot selection and marks the tab active', async () => {
 
   await runSelectionFlow(args);
 
-  expect(sendTabMessageMock).toHaveBeenCalledWith(17, {
-    type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: null,
-    contentIntentGrant: { grantToken: 'grant-token-1' },
-    quickActionOverlay: {
-      afterCapture: 'copy',
-      delaySeconds: 2,
-      exitAfterCapture: true,
-      imageFormat: 'jpeg',
-      imageQuality: 75,
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    17,
+    {
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+      viewport: null,
+      contentIntentGrant: { grantToken: 'grant-token-1' },
+      quickActionOverlay: {
+        afterCapture: 'copy',
+        delaySeconds: 2,
+        exitAfterCapture: true,
+        imageFormat: 'jpeg',
+        imageQuality: 75,
+      },
+      autoStartSelection: true,
+      surfaceCapabilityToken: 'surface-token-1',
+      surfaceOperationGeneration: 0,
     },
-    autoStartSelection: true,
-    surfaceCapabilityToken: 'surface-token-1',
-    surfaceOperationGeneration: 0,
-  });
+    { frameId: 0 }
+  );
   expect(ensureNativeVisibleCaptureAuthorityMock).toHaveBeenCalledWith(17);
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [
@@ -270,7 +291,8 @@ it('skips debugger setup for native selection flows and keeps viewport null', as
     expect.objectContaining({
       autoStartSelection: true,
       viewport: null,
-    })
+    }),
+    { frameId: 0 }
   );
 });
 
@@ -303,27 +325,31 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
 
   await runCaptureFlow(args);
 
-  expect(sendTabMessageMock).toHaveBeenCalledWith(21, {
-    type: MessageType.ENABLE_SCREENSHOT_MODE,
-    viewport: {
-      presetId: 'preset-1',
-      target: 'viewport' as const,
-      width: 1440,
-      height: 900,
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    21,
+    {
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+      viewport: {
+        presetId: 'preset-1',
+        target: 'viewport' as const,
+        width: 1440,
+        height: 900,
+      },
+      contentIntentGrant: { grantToken: 'grant-token-1' },
+      quickActionOverlay: {
+        afterCapture: 'download_default',
+        delaySeconds: 0,
+        exitAfterCapture: false,
+        imageFormat: 'png',
+        imageQuality: 88,
+      },
+      autoStartCaptureType: 'visible',
+      surfaceCapabilityToken: 'surface-token-1',
+      surfaceLeaseGeneration: 1,
+      surfaceOperationGeneration: 1,
     },
-    contentIntentGrant: { grantToken: 'grant-token-1' },
-    quickActionOverlay: {
-      afterCapture: 'download_default',
-      delaySeconds: 0,
-      exitAfterCapture: false,
-      imageFormat: 'png',
-      imageQuality: 88,
-    },
-    autoStartCaptureType: 'visible',
-    surfaceCapabilityToken: 'surface-token-1',
-    surfaceLeaseGeneration: 1,
-    surfaceOperationGeneration: 1,
-  });
+    { frameId: 0 }
+  );
   expect(issueContentPrivilegedActionAutoStartGrantMock).toHaveBeenCalledWith({
     actionTypes: [CaptureMessageType.CAPTURE_VISIBLE],
     libraryActionTypes: [],
@@ -381,6 +407,37 @@ it('surfaces both content delivery and privileged rollback failures', async () =
     expect.objectContaining({ message: 'content delivery failed' }),
     expect.objectContaining({ message: 'restore failed' }),
   ]);
+});
+
+it('rolls the surface back when the UI listener rejects capture startup', async () => {
+  const args = createCaptureArgs();
+  sendTabMessageMock.mockResolvedValueOnce({ success: false, error: 'startup rejected' });
+
+  await expect(runCaptureFlow(args)).rejects.toThrow('startup rejected');
+
+  expect(args.screenshotModeState.has(21)).toBe(false);
+  expect(releaseQuickActionSurfaceMock).toHaveBeenCalledWith(21, args.viewportState);
+});
+
+it('accepts an empty delivery response only after toolbar state confirms startup', async () => {
+  const args = createCaptureArgs();
+  sendTabMessageMock.mockResolvedValueOnce(undefined);
+
+  await expect(runCaptureFlow(args)).resolves.toEqual({ result: 'accepted' });
+
+  expect(waitForContentScreenshotModeMock).toHaveBeenCalledWith(21, true);
+  expect(args.screenshotModeState.get(21)).toBe(true);
+});
+
+it('rolls the surface back when toolbar state does not confirm startup', async () => {
+  const args = createCaptureArgs();
+  sendTabMessageMock.mockResolvedValueOnce(undefined);
+  waitForContentScreenshotModeMock.mockRejectedValueOnce(new Error('mode was not enabled'));
+
+  await expect(runCaptureFlow(args)).rejects.toThrow('mode was not enabled');
+
+  expect(args.screenshotModeState.has(21)).toBe(false);
+  expect(releaseQuickActionSurfaceMock).toHaveBeenCalledWith(21, args.viewportState);
 });
 
 it('routes owned viewer capture flows through the viewer port with preset viewport', async () => {

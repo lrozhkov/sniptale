@@ -20,6 +20,10 @@ import {
   type QuickActionRuntimeContext,
 } from './shared';
 import { applyQuickActionSurface, releaseQuickActionSurfaceAfterFailure } from './surface';
+import {
+  waitForContentScreenshotMode,
+  waitForContentToolbarReady,
+} from '../../../routing-contracts/runtime-messaging/content-toolbar-readiness';
 
 type QuickActionStartMessage =
   | { autoStartSelection: true }
@@ -39,19 +43,27 @@ async function sendQuickActionMessage(
 ) {
   const viewport = args.viewportState.get(args.tabId) ?? null;
 
-  await getBackgroundRuntimeMessaging().sendTabMessage(args.tabId, {
-    type: MessageType.ENABLE_SCREENSHOT_MODE,
-    contentIntentGrant: contentCaps.issueContentPrivilegedActionAutoStartGrant({
-      actionTypes: resolveContentIntentGrantActionTypes(args, message),
-      libraryActionTypes:
-        args.afterCapture === 'save_to_library' ? [MessageType.SAVE_SCREENSHOT_TO_GALLERY] : [],
-      tabId: args.tabId,
-    }),
-    quickActionOverlay: buildQuickActionOverlay(args),
-    ...surfaceBinding,
-    ...message,
-    viewport,
-  });
+  const response = await getBackgroundRuntimeMessaging().sendTabMessage(
+    args.tabId,
+    {
+      type: MessageType.ENABLE_SCREENSHOT_MODE,
+      contentIntentGrant: contentCaps.issueContentPrivilegedActionAutoStartGrant({
+        actionTypes: resolveContentIntentGrantActionTypes(args, message),
+        libraryActionTypes:
+          args.afterCapture === 'save_to_library' ? [MessageType.SAVE_SCREENSHOT_TO_GALLERY] : [],
+        tabId: args.tabId,
+      }),
+      quickActionOverlay: buildQuickActionOverlay(args),
+      ...surfaceBinding,
+      ...message,
+      viewport,
+    },
+    { frameId: 0 }
+  );
+  if (response && !response.success) {
+    throw new Error(response.error || 'Screenshot mode did not acknowledge capture startup');
+  }
+  await waitForContentScreenshotMode(args.tabId, true);
 }
 
 function requireQuickActionSurfaceBinding(
@@ -171,6 +183,7 @@ export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<Quick
       return { result: 'accepted' };
     }
     await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
+    await waitForContentToolbarReady(args.tabId);
     await sendQuickActionMessage(
       args,
       message,
@@ -197,6 +210,7 @@ export async function runCaptureFlow(
       return { result: 'accepted' };
     }
     await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
+    await waitForContentToolbarReady(args.tabId);
     await sendQuickActionMessage(
       args,
       message,

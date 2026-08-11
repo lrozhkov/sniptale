@@ -94,6 +94,28 @@ it('hides format and quality whenever clipboard delivery is selected', async () 
   expect(getContainer()?.textContent).not.toContain('popup.home.captureQualityLabel');
 });
 
+it('uses popup folder wording and omits scenario recording from post-capture actions', async () => {
+  await renderNode(
+    <ScreenshotSetupPanel
+      config={DEFAULT_SCREENSHOT_SETUP_STATE.tab}
+      viewportPresets={[]}
+      pending={false}
+      disabledReason={null}
+      onChange={vi.fn()}
+      onCapture={vi.fn()}
+    />
+  );
+  const values = [...(getContainer()?.querySelectorAll('option') ?? [])].map((option) => ({
+    label: option.textContent,
+    value: option.value,
+  }));
+  expect(values).toContainEqual({
+    label: 'popup.home.captureChooseFolderLabel',
+    value: 'ask_preset',
+  });
+  expect(values.some((option) => option.value === 'scenario')).toBe(false);
+});
+
 it('renders tab settings, applies field changes, and disables a pending capture', async () => {
   const onChange = vi.fn();
   await renderNode(
@@ -118,19 +140,28 @@ it('renders tab settings, applies field changes, and disables a pending capture'
     />
   );
   const selects = getContainer()?.querySelectorAll('select');
+  expect(
+    [...(selects ?? [])].map((select) => select.parentElement?.firstChild?.textContent)
+  ).toEqual([
+    'popup.home.captureAreaLabel',
+    'settings.quickActions.afterCaptureLabel',
+    'popup.home.captureSizeLabel',
+    'popup.home.captureQualityLabel',
+    'popup.home.captureCountdownLabel',
+  ]);
   await act(async () => {
     const mode = selects?.[0] as HTMLSelectElement;
     mode.value = 'full';
     mode.dispatchEvent(new Event('change', { bubbles: true }));
-    const viewport = selects?.[1] as HTMLSelectElement;
-    viewport.value = 'wide';
-    viewport.dispatchEvent(new Event('change', { bubbles: true }));
-    const delay = selects?.[2] as HTMLSelectElement;
-    delay.value = '5';
-    delay.dispatchEvent(new Event('change', { bubbles: true }));
-    const afterCapture = selects?.[3] as HTMLSelectElement;
+    const afterCapture = selects?.[1] as HTMLSelectElement;
     afterCapture.value = 'edit';
     afterCapture.dispatchEvent(new Event('change', { bubbles: true }));
+    const viewport = selects?.[2] as HTMLSelectElement;
+    viewport.value = 'wide';
+    viewport.dispatchEvent(new Event('change', { bubbles: true }));
+    const delay = selects?.[4] as HTMLSelectElement;
+    delay.value = '5';
+    delay.dispatchEvent(new Event('change', { bubbles: true }));
     const webp = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
       (button) => button.textContent === 'imageSettings.section.formatWebpLabel'
     );

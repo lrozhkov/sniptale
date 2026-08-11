@@ -7,12 +7,27 @@ const {
   issueContentPrivilegedActionAutoStartGrantMock,
   prepareQuickActionSurfaceMock,
   sendTabMessageMock,
+  waitForContentToolbarReadyMock,
+  waitForContentScreenshotModeMock,
 } = vi.hoisted(() => ({
   getScreenshotSurfaceBindingMock: vi.fn(),
   issueContentPrivilegedActionAutoStartGrantMock: vi.fn(),
   prepareQuickActionSurfaceMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
+  waitForContentToolbarReadyMock: vi.fn(),
+  waitForContentScreenshotModeMock: vi.fn(),
 }));
+
+vi.mock(
+  '../../../routing-contracts/runtime-messaging/content-toolbar-readiness',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../routing-contracts/runtime-messaging/content-toolbar-readiness')
+    >()),
+    waitForContentToolbarReady: waitForContentToolbarReadyMock,
+    waitForContentScreenshotMode: waitForContentScreenshotModeMock,
+  })
+);
 
 vi.mock('../../../../platform/runtime-messaging/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/runtime-messaging/index')>()),
@@ -113,7 +128,9 @@ beforeEach(() => {
     surfaceLeaseGeneration: 1,
     surfaceOperationGeneration: 1,
   });
-  sendTabMessageMock.mockResolvedValue(undefined);
+  sendTabMessageMock.mockResolvedValue({ success: true });
+  waitForContentToolbarReadyMock.mockResolvedValue({ screenshotMode: false, visible: false });
+  waitForContentScreenshotModeMock.mockResolvedValue({ screenshotMode: true, visible: false });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   prepareQuickActionSurfaceMock.mockImplementation(
     async (args: ReturnType<typeof createCaptureArgs>) => {
@@ -141,7 +158,8 @@ it('grants visible auto-start access to content-owned preset-session saves', asy
     expect.objectContaining({
       autoStartCaptureType: 'visible',
       contentIntentGrant: { grantToken: 'grant-token-1' },
-    })
+    }),
+    { frameId: 0 }
   );
 });
 
@@ -158,6 +176,7 @@ it('grants full auto-start access to content-owned preset-session saves', async 
     expect.objectContaining({
       autoStartCaptureType: 'full',
       contentIntentGrant: { grantToken: 'grant-token-1' },
-    })
+    }),
+    { frameId: 0 }
   );
 });

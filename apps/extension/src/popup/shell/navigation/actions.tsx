@@ -12,10 +12,39 @@ import { getPopupRuntimeServices } from '../../runtime-services';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import { chooseDesktopScreenshotSource } from '../../../platform/media-utils/desktop-capture-source-picker';
 import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
+import { captureDesktopScreenshotFrame } from '../../../platform/media-utils/desktop-screenshot-frame';
 
 export type PopupPage = 'home' | 'video' | 'export';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/lrozhkov/sniptale';
+
+async function cancelPreparedDesktopCapture(args: {
+  preparation: { actionId: string } | { config: ScreenshotCaptureConfig };
+  requestId: string;
+  reservationToken: string;
+  tabId: number;
+}): Promise<void> {
+  const desktopSelection: DesktopScreenshotSelection = {
+    status: 'cancelled',
+    requestId: args.requestId,
+    reservationToken: args.reservationToken,
+  };
+  await getPopupRuntimeServices().messaging.sendRuntimeMessage(
+    'actionId' in args.preparation
+      ? {
+          type: MessageType.TRIGGER_QUICK_ACTION,
+          actionId: args.preparation.actionId,
+          desktopSelection,
+          tabId: args.tabId,
+        }
+      : {
+          type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+          config: args.preparation.config,
+          desktopSelection,
+          tabId: args.tabId,
+        }
+  );
+}
 
 export async function openScreenshotMode(workingMode?: ToolbarWorkingMode) {
   const tabId = await getActiveTabId();
@@ -104,33 +133,35 @@ async function choosePopupDesktopSource(
     };
   }
   if (selection.status === 'failed') {
-    const desktopSelection: DesktopScreenshotSelection = {
-      status: 'cancelled',
+    await cancelPreparedDesktopCapture({
+      preparation,
       requestId: prepareResponse.requestId,
       reservationToken: prepareResponse.reservationToken,
-    };
-    await getPopupRuntimeServices().messaging.sendRuntimeMessage(
-      'actionId' in preparation
-        ? {
-            type: MessageType.TRIGGER_QUICK_ACTION,
-            actionId: preparation.actionId,
-            desktopSelection,
-            tabId,
-          }
-        : {
-            type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
-            config: preparation.config,
-            desktopSelection,
-            tabId,
-          }
-    );
+      tabId,
+    });
     throw new Error(selection.error);
+  }
+  let frame: Awaited<ReturnType<typeof captureDesktopScreenshotFrame>>;
+  try {
+    frame = await captureDesktopScreenshotFrame({
+      streamId: selection.selection.streamId,
+      imageFormat: prepareResponse.imageFormat,
+      imageQuality: prepareResponse.imageQuality,
+    });
+  } catch (error) {
+    await cancelPreparedDesktopCapture({
+      preparation,
+      requestId: prepareResponse.requestId,
+      reservationToken: prepareResponse.reservationToken,
+      tabId,
+    });
+    throw error;
   }
   return {
     status: 'selected',
     requestId: prepareResponse.requestId,
     reservationToken: prepareResponse.reservationToken,
-    streamId: selection.selection.streamId,
+    ...frame,
   };
 }
 

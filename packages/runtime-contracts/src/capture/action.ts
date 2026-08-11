@@ -1,3 +1,5 @@
+import { isImageDataUrl } from '../validation/data-url';
+
 const CAPTURE_ACTION_TYPES = [
   'download_default',
   'ask_preset',
@@ -29,7 +31,10 @@ export type ScreenshotCaptureConfig = {
 export type DesktopScreenshotSelection = {
   requestId: string;
   reservationToken: string;
-} & ({ status: 'cancelled' } | { status: 'selected'; streamId: string });
+} & (
+  | { status: 'cancelled' }
+  | { status: 'selected'; dataUrl: string; width: number; height: number }
+);
 
 const captureActionTypeValues = new Set<string>(CAPTURE_ACTION_TYPES);
 
@@ -77,8 +82,15 @@ export function isDesktopScreenshotSelectionValue(
   return value['status'] === 'cancelled'
     ? Object.keys(value).length === 3
     : value['status'] === 'selected' &&
-        typeof value['streamId'] === 'string' &&
-        Object.keys(value).length === 4;
+        isImageDataUrl(value['dataUrl']) &&
+        Number.isSafeInteger(value['width']) &&
+        Number.isSafeInteger(value['height']) &&
+        (value['width'] as number) > 0 &&
+        (value['height'] as number) > 0 &&
+        (value['width'] as number) <= 32_768 &&
+        (value['height'] as number) <= 32_768 &&
+        (value['width'] as number) * (value['height'] as number) <= 100_000_000 &&
+        Object.keys(value).length === 6;
 }
 
 function hasScreenshotSourceFields(value: Record<string, unknown>): boolean {

@@ -22,6 +22,8 @@ import {
   useApplyToFutureFrames,
 } from '../popover/apply-future';
 
+const ignoreFloatingInteractionChange = () => undefined;
+
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
 ): Pick<CalloutPlacement, 'anchor' | 'side'> {
@@ -122,6 +124,7 @@ export function CalloutSettingsPopoverContent(props: {
             });
           }}
           onForkPreset={workflow.fork}
+          onFloatingInteractionChange={props.onNestedLayerChange ?? ignoreFloatingInteractionChange}
           {...(props.onResetPreset ? { onResetPreset: props.onResetPreset } : {})}
           onTogglePreset={props.onTogglePreset}
           pendingPresetIds={props.pendingPresetIds}

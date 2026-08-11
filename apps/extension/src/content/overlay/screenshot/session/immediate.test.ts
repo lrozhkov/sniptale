@@ -188,6 +188,19 @@ async function expectQuickActionWaitsForSurfaceCleanup() {
   expect(completed).toBe(true);
 }
 
+async function expectFailedQuickActionReleasesItsSurface() {
+  const error = new Error('library persistence failed');
+  runViewportScreenshotMock.mockRejectedValueOnce(error);
+  shouldExitAfterQuickActionCaptureMock.mockReturnValue(true);
+  const args = createArgs();
+
+  await runImmediateScreenshot('visible', args, 1);
+
+  expect(closeQuickActionCaptureMock).toHaveBeenCalledWith(args.params, args.runtime, 1);
+  expect(restoreVisibleUiStateMock).not.toHaveBeenCalled();
+  expect(showScreenshotErrorMock).toHaveBeenCalledWith(error);
+}
+
 describe('screenshot-controller-action-immediate', () => {
   it(
     'runs viewport capture and restores the visible runtime state',
@@ -204,5 +217,9 @@ describe('screenshot-controller-action-immediate', () => {
   it(
     'does not complete an auto-start quick action before its surface lease is released',
     expectQuickActionWaitsForSurfaceCleanup
+  );
+  it(
+    'releases an auto-start quick-action surface after capture or library persistence fails',
+    expectFailedQuickActionReleasesItsSurface
   );
 });

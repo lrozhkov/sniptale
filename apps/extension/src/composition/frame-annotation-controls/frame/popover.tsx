@@ -10,6 +10,7 @@ import { getBorderPresetCssValidation } from '../../../ui/highlighter-preset-edi
 import { useFrameCreationPopoverState } from './popover-state';
 import type { FrameAnnotationStyleSettings } from '../contracts';
 import { useLinkedAnnotationTemplateOptions } from './linked-template-options';
+import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 
 export type { FrameAnnotationStyleSettings } from '../contracts';
 
@@ -25,6 +26,7 @@ export function FrameAnnotationCreationFramePopover(props: {
 }) {
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const state = useFrameCreationPopoverState(props);
+  const dismissal = usePopoverInteractionDismissal({ blocked: false, isOpen: props.isOpen });
   const linkedTemplateOptions = useLinkedAnnotationTemplateOptions();
   const headerContext = props.headerContext ?? 'toolbar';
   const presentation = useFrameAnnotationPopoverPresentation({
@@ -38,13 +40,13 @@ export function FrameAnnotationCreationFramePopover(props: {
   });
 
   usePopoverDistanceClose({
-    isOpen: props.isOpen,
+    isOpen: dismissal.isDismissalEnabled,
     onClose: props.onClose,
     popoverRef,
   });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
-    isOpen: props.isOpen,
+    isOpen: dismissal.isDismissalEnabled,
     onClose: props.onClose,
   });
   const handleFocusBlurChange = (blurAmount: number) => {
@@ -112,6 +114,7 @@ export function FrameAnnotationCreationFramePopover(props: {
             save: state.presetSaving.save,
           }}
           onClose={props.onClose}
+          onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
           onEffectModeChange={(effectMode) => state.border.apply({ effectMode })}
           onShowPresets={state.catalog.refresh}
           pendingPresetIds={state.catalog.pendingPresetIds}

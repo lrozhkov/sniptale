@@ -37,10 +37,13 @@ const offscreenDesktopCaptureContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME];
 
 const desktopSelection = {
+  dataUrl:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+  height: 1,
   requestId: 'request-1',
   reservationToken: 'reservation-1',
   status: 'selected' as const,
-  streamId: 'one-shot-stream',
+  width: 1,
 };
 
 const validScreenshotConfig = {
@@ -84,7 +87,7 @@ it('parses popup desktop selections and rejects malformed selections', () => {
     screenshotCaptureContract.parseRequest({
       type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
       config: validScreenshotConfig,
-      desktopSelection: { ...desktopSelection, streamId: 42 },
+      desktopSelection: { ...desktopSelection, dataUrl: 42 },
     })
   ).toThrow();
 });

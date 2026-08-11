@@ -5,10 +5,10 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { isTopLevelContentRuntimeMessage, isUiRuntimeBridgeMessage } from './ownership';
 
 describe('runtime-message-listener shared ownership routing', () => {
-  it('routes screenshot mode through both listeners by design', () => {
+  it('routes screenshot enable only through the UI listener that acknowledges startup', () => {
     const message = { type: MessageType.ENABLE_SCREENSHOT_MODE };
 
-    expect(isTopLevelContentRuntimeMessage(message)).toBe(true);
+    expect(isTopLevelContentRuntimeMessage(message)).toBe(false);
     expect(isUiRuntimeBridgeMessage(message)).toBe(true);
   });
 

@@ -59,20 +59,6 @@ function cancelOffscreenFrame(requestId: string) {
   );
 }
 
-function captureOffscreenFrame(args: {
-  requestId: string;
-  streamId: string;
-  imageFormat: QuickActionRuntimeContext['imageFormat'];
-  imageQuality: number;
-}) {
-  return getBackgroundRuntimeMessaging().sendRuntimeMessage(
-    attachOffscreenCommandCapability({
-      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
-      ...args,
-    })
-  );
-}
-
 async function cancelPreparation(preparation: PendingPreparation): Promise<void> {
   if (pendingPreparations.get(preparation.reservationToken) === preparation) {
     pendingPreparations.delete(preparation.reservationToken);
@@ -205,20 +191,12 @@ export async function runDesktopQuickAction(args: {
       await cancelOffscreenFrame(preparation.requestId);
       return { result: 'cancelled' };
     }
-    const response = await captureOffscreenFrame({
-      requestId: preparation.requestId,
-      streamId: args.desktopSelection.streamId,
-      imageFormat: args.context.imageFormat,
-      imageQuality: args.context.imageQuality,
-    });
-    if (!response || response.success !== true || response.result !== 'captured') {
-      throw new Error(response?.error || 'Desktop screenshot capture failed');
-    }
+    await cancelOffscreenFrame(preparation.requestId);
     const createdJobId = await createRenderedCaptureJob(args.tabId);
     jobId = createdJobId;
     const filename = generateFilename('desktop', args.context.imageFormat);
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
-      response.dataUrl,
+      args.desktopSelection.dataUrl,
       filename,
       undefined,
       args.context.afterCapture === 'save_to_library' ? 'library' : 'temporary'
@@ -226,7 +204,7 @@ export async function runDesktopQuickAction(args: {
     await deliverDesktopCapture({
       assetId,
       context: args.context,
-      dataUrl: response.dataUrl,
+      dataUrl: args.desktopSelection.dataUrl,
       filename,
       jobId: createdJobId,
     });

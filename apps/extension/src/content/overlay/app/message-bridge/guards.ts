@@ -9,6 +9,7 @@ const CAPTURE_ACTION_TYPES = new Set<CaptureActionType>([
   'scenario',
   'edit',
   'copy',
+  'save_to_library',
 ]);
 
 const IMAGE_FORMATS = new Set(['png', 'jpeg', 'webp']);

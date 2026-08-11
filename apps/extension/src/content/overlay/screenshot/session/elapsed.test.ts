@@ -180,6 +180,19 @@ async function expectCountdownSelectionFailureRestoresUiAndReportsSelectionError
   expect(args.session.pendingType).toBeNull();
 }
 
+async function expectCountdownQuickActionFailureReleasesItsSurface() {
+  const error = new Error('library persistence failed');
+  runViewportScreenshotMock.mockRejectedValueOnce(error);
+  shouldExitAfterQuickActionCaptureMock.mockReturnValue(true);
+  const args = createArgs();
+
+  await executeCountdownScreenshot('visible', args, 1);
+
+  expect(closeQuickActionCaptureMock).toHaveBeenCalledWith(args.params, args.runtime, 1);
+  expect(restoreVisibleUiStateMock).not.toHaveBeenCalled();
+  expect(showScreenshotErrorMock).toHaveBeenCalledWith(error);
+}
+
 async function expectStaleCountdownRunDoesNotCaptureOrRestore() {
   const session = createScreenshotControllerSession(true);
   session.runGeneration = 2;
@@ -262,6 +275,10 @@ describe('screenshot-controller-action-elapsed', () => {
   it(
     'restores visible UI and routes selection failures through the selection error surface',
     expectCountdownSelectionFailureRestoresUiAndReportsSelectionError
+  );
+  it(
+    'releases a delayed auto-start surface after capture or library persistence fails',
+    expectCountdownQuickActionFailureReleasesItsSurface
   );
   it(
     'aborts stale delayed quick-action captures before capture or restore side effects',

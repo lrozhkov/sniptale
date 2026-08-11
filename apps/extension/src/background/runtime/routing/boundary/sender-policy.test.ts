@@ -229,10 +229,13 @@ it('accepts popup desktop selections only from the popup document', () => {
   const message = {
     actionId: 'desktop-action',
     desktopSelection: {
+      dataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+      height: 1,
       requestId: 'request-1',
       reservationToken: 'reservation-1',
       status: 'selected' as const,
-      streamId: 'one-shot-stream',
+      width: 1,
     },
     tabId: 7,
     type: MessageType.TRIGGER_QUICK_ACTION,

@@ -3,7 +3,13 @@ import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/captur
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
-import { OutputFields, TabCaptureFields } from './setup-fields';
+import {
+  AfterCaptureField,
+  ImageQualityField,
+  TabCaptureAreaField,
+  TabCaptureCountdownField,
+  TabCaptureSizeField,
+} from './setup-fields';
 
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;
@@ -21,14 +27,17 @@ export function ScreenshotSetupPanel(props: {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="flex flex-col">
+          {desktop ? null : <TabCaptureAreaField config={props.config} patch={patch} />}
+          <AfterCaptureField config={props.config} patch={patch} />
           {desktop ? null : (
-            <TabCaptureFields
+            <TabCaptureSizeField
               config={props.config}
               viewportPresets={props.viewportPresets}
               patch={patch}
             />
           )}
-          <OutputFields config={props.config} patch={patch} />
+          <ImageQualityField config={props.config} patch={patch} />
+          {desktop ? null : <TabCaptureCountdownField config={props.config} patch={patch} />}
         </div>
       </div>
       <div className="mt-3 grid w-full grid-cols-1">

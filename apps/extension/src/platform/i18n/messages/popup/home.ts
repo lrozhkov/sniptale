@@ -28,6 +28,7 @@ export const popupHomeMessages = defineMessageSource({
   capturePendingLabel: { ru: 'Создание снимка…', en: 'Capturing…' },
   captureButtonTitle: { ru: 'Сделать снимок', en: 'Take screenshot' },
   captureAreaLabel: { ru: 'Область снимка', en: 'Capture area' },
+  captureChooseFolderLabel: { ru: 'Выбрать папку', en: 'Choose folder' },
   captureSizeLabel: { ru: 'Размер', en: 'Size' },
   captureCountdownLabel: { ru: 'Отсчёт', en: 'Countdown' },
   captureCountdownOff: { ru: 'Выключено', en: 'Off' },

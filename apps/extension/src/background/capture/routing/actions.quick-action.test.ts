@@ -68,10 +68,13 @@ it('routes quick actions through browser tab lookup and async responses', async 
 it('forwards popup desktop selections into the delivery workflow', async () => {
   const sendResponse = vi.fn();
   const desktopSelection = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+    height: 1,
     requestId: 'request-1',
     reservationToken: 'reservation-1',
     status: 'selected' as const,
-    streamId: 'one-shot-stream',
+    width: 1,
   };
 
   handleTriggerQuickAction(

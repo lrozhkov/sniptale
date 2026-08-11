@@ -93,7 +93,9 @@ async function runPrepared(context: QuickActionRuntimeContext, tabId: number) {
     desktopSelection: {
       ...preparation,
       status: 'selected',
-      streamId: 'one-shot-stream',
+      dataUrl: createDataUrl(context.afterCapture),
+      width: 1200,
+      height: 800,
     },
     tabId,
   });
@@ -204,6 +206,9 @@ it.each([
     expect.any(String),
     undefined,
     assetClass
+  );
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME })
   );
   if (afterCapture === 'edit') {
     expect(mocks.openEditor).toHaveBeenCalledWith(expect.any(String), {

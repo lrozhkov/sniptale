@@ -27,7 +27,7 @@ export const tabUiMessageContracts = {
     parseRequest: runtimeMessageContracts[MessageType.ENABLE_SCREENSHOT_MODE].parseRequest,
     parseResponse: createGuardParser(
       'tab ENABLE_SCREENSHOT_MODE response',
-      createRuntimeResponseGuard({ optional: { result: isString } })
+      createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
     ),
   },
   [MessageType.DISABLE_SCREENSHOT_MODE]: {

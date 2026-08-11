@@ -38,6 +38,7 @@ export function CalloutPresetSection(props: {
   presets: CalloutPreset[];
   error: string | null;
   frameColors?: CalloutFrameColors;
+  onFloatingInteractionChange?: (open: boolean) => void;
 }) {
   const locale = useAppLocale();
   const [query, setQuery] = useState('');
@@ -60,6 +61,9 @@ export function CalloutPresetSection(props: {
         compact
         disabled={tagState.isLoading || tagState.error}
         onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
         onQueryChange={setQuery}
         query={query}
         tags={tagState.state.tags}

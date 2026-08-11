@@ -18,6 +18,7 @@ import type { CreateScreenshotControllerActionsArgs } from './action-types';
 import type { ScreenshotType } from '../types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { CaptureActionType } from '../../../../contracts/settings';
+import { closeFailedQuickActionCapture } from './quick-action-cleanup';
 
 async function runCountdownCapture(
   type: ScreenshotType,
@@ -121,6 +122,9 @@ export async function executeCountdownScreenshot(
       return;
     }
   } catch (error) {
+    if (shouldCloseQuickAction && isCurrentScreenshotRun(args.runtime, runToken)) {
+      didCloseQuickAction = await closeFailedQuickActionCapture(args, runToken);
+    }
     reportCountdownCaptureError(error, type);
   } finally {
     if (!didCloseQuickAction) {

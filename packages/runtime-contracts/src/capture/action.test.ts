@@ -56,12 +56,15 @@ it('normalizes desktop and clipboard-only fields', () => {
 
 it('accepts only exact correlated desktop selections', () => {
   const selected = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+    height: 1,
     requestId: 'request-1',
     reservationToken: 'reservation-1',
     status: 'selected',
-    streamId: 'one-shot-stream',
+    width: 1,
   };
   expect(isDesktopScreenshotSelectionValue(selected)).toBe(true);
   expect(isDesktopScreenshotSelectionValue({ ...selected, extra: true })).toBe(false);
-  expect(isDesktopScreenshotSelectionValue({ ...selected, streamId: 42 })).toBe(false);
+  expect(isDesktopScreenshotSelectionValue({ ...selected, dataUrl: 42 })).toBe(false);
 });

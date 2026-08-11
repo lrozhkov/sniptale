@@ -132,6 +132,9 @@ export function StepBadgePopoverContent(props: {
             });
           }}
           onFork={workflow.fork}
+          {...(props.onFloatingInteractionChange
+            ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+            : {})}
           onReset={props.onResetPreset}
           onToggle={props.onTogglePreset}
           pending={props.pendingPresetIds}

@@ -28,6 +28,7 @@ export function StepBadgePresetSection(props: {
   error: string | null;
   onApply: (preset: StepBadgePreset) => void;
   onFork: (preset: StepBadgePreset) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onReset: (preset: StepBadgePreset) => void;
   onToggle: (preset: StepBadgePreset) => void;
   pending: ReadonlySet<string>;
@@ -55,6 +56,9 @@ export function StepBadgePresetSection(props: {
         compact
         disabled={tagState.isLoading || tagState.error}
         onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
         onQueryChange={setQuery}
         query={query}
         tags={tagState.state.tags}
