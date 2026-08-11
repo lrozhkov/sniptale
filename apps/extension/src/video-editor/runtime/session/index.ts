@@ -97,6 +97,7 @@ export function useVideoEditorRuntime(
       currentTime: params.playback.currentTime,
       isPlaying: params.playback.isPlaying,
       playbackRange: params.playback.playbackRange,
+      projectHistoryTransactionActive: params.playback.projectHistoryTransactionActive,
       selection: params.playback.selection,
       placementMode: params.playback.placementMode,
       selectedClipId: params.playback.selectedClipId,

@@ -58,6 +58,10 @@ function handlePlaybackShortcutKeyDown(
     return;
   }
 
+  if (latestState.projectHistoryTransactionActive) {
+    return;
+  }
+
   if (event.code === 'KeyS' && latestState.selectedClipId) {
     event.preventDefault();
     handlersRef.current.splitClipAt(latestState.selectedClipId, latestState.currentTime);

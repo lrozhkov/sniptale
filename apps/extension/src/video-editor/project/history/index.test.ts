@@ -58,6 +58,51 @@ describe('video editor project history', () => {
     expect(store.getState().project?.name).toBe('Branched');
   });
 
+  it('records a continuous edit transaction as one undoable action', () => {
+    const store = useVideoEditorStore;
+    store.getState().setProject(createEmptyVideoProject('Initial'));
+
+    const lease = store.getState().beginProjectHistoryTransaction();
+    store.getState().renameProject('Drag frame 1');
+    store.getState().renameProject('Drag frame 2');
+    store.getState().renameProject('Drag frame 3');
+    store.getState().endProjectHistoryTransaction(lease!);
+
+    expect(store.getState().projectHistory.past).toHaveLength(1);
+    store.getState().undoProject();
+    expect(store.getState().project?.name).toBe('Initial');
+  });
+
+  it('does not create a history entry or invalidate redo for a net-unchanged transaction', () => {
+    const store = useVideoEditorStore;
+    store.getState().setProject(createEmptyVideoProject('Initial'));
+    store.getState().renameProject('Edited');
+    store.getState().undoProject();
+
+    const lease = store.getState().beginProjectHistoryTransaction();
+    store.getState().renameProject('Temporary drag value');
+    store.getState().renameProject('Initial');
+    store.getState().endProjectHistoryTransaction(lease!);
+
+    expect(store.getState().projectHistory.past).toHaveLength(0);
+    expect(store.getState().projectHistory.future).toHaveLength(1);
+  });
+
+  it('invalidates redo once when a transaction commits a branched edit', () => {
+    const store = useVideoEditorStore;
+    store.getState().setProject(createEmptyVideoProject('Initial'));
+    store.getState().renameProject('Edited');
+    store.getState().undoProject();
+
+    const lease = store.getState().beginProjectHistoryTransaction();
+    store.getState().renameProject('Branch frame 1');
+    store.getState().renameProject('Branch frame 2');
+    store.getState().endProjectHistoryTransaction(lease!);
+
+    expect(store.getState().projectHistory.past).toHaveLength(1);
+    expect(store.getState().projectHistory.future).toEqual([]);
+  });
+
   it('preserves redo and revision state when a stale updater returns the current project', () => {
     useVideoEditorStore.getState().setProject(createEmptyVideoProject('Initial'));
     useVideoEditorStore.getState().renameProject('Edited');
@@ -94,6 +139,27 @@ describe('video editor project history', () => {
     expect(useVideoEditorStore.getState().project?.name).toBe('Persisted reload');
   });
 
+  it('discards an active transaction when the accepted project is replaced', () => {
+    const store = useVideoEditorStore;
+    const first = createEmptyVideoProject('First');
+    const second = createEmptyVideoProject('Second');
+    store.getState().setProject(first);
+    const lease = store.getState().beginProjectHistoryTransaction();
+    store.getState().renameProject('First drag frame');
+
+    store.getState().setProject(second);
+    store.getState().endProjectHistoryTransaction(lease!);
+    store.getState().undoProject();
+
+    expect(store.getState().project?.id).toBe(second.id);
+    expect(store.getState().projectHistory).toMatchObject({
+      projectId: second.id,
+      past: [],
+      future: [],
+      transaction: null,
+    });
+  });
+
   it('rejects stale cross-project history instead of replacing the active project', () => {
     const active = createEmptyVideoProject('Active');
     const stale = createEmptyVideoProject('Stale');
@@ -104,6 +170,7 @@ describe('video editor project history', () => {
         past: [stale],
         future: [],
         error: null,
+        transaction: null,
       },
     });
 

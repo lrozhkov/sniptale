@@ -16,6 +16,8 @@ import {
 } from '../../../../features/video/project/types';
 import { useProjectTimelineDrag } from './drag';
 
+const TEST_HISTORY_LEASE = Symbol('test-history-transaction');
+
 let beginClipInteraction: ReturnType<typeof useProjectTimelineDrag>['beginClipInteraction'] | null =
   null;
 let container: HTMLDivElement | null = null;
@@ -131,6 +133,11 @@ function renderStatefulDragHarness(project: VideoProject, onMove: MoveClipCallba
   function StatefulHarness() {
     const [currentProject, setCurrentProject] = useState(project);
     const timelineDrag = useProjectTimelineDrag({
+      historyTransaction: {
+        beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
+        endProjectHistoryTransaction: () => undefined,
+        isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
+      },
       pixelsPerSecond: 10,
       project: currentProject,
       onMoveClip: (clipId, startTime, trackId, timelineLaneId) => {
@@ -158,6 +165,11 @@ function createTimelineHarness(props: {
 }) {
   return function TimelineHarness() {
     const timelineDrag = useProjectTimelineDrag({
+      historyTransaction: {
+        beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
+        endProjectHistoryTransaction: () => undefined,
+        isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
+      },
       pixelsPerSecond: 10,
       project: props.project,
       onMoveClip: props.onMoveClip,

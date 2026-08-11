@@ -14,8 +14,14 @@ import type {
   TimelineEffectDragTarget,
   TimelineEffectSelection,
 } from '../types';
+import type {
+  VideoEditorProjectHistoryTransactionActions,
+  VideoEditorProjectHistoryTransactionLease,
+} from '../../../contracts/commands/history';
 
 interface UseProjectTimelineEffectInteractionsOptions {
+  historyTransaction: VideoEditorProjectHistoryTransactionActions;
+  pointerSessionCleanupRef?: React.MutableRefObject<(() => void) | null>;
   magnetEnabled: boolean;
   pixelsPerSecond: number;
   project: VideoProject;
@@ -42,6 +48,7 @@ interface EffectInteractionSessionRefs {
 }
 
 interface EffectInteractionMovementOptions extends EffectInteractionSessionRefs {
+  historyTransaction: VideoEditorProjectHistoryTransactionActions;
   magnetEnabled: boolean;
   moveCallbacks: EffectMoveCallbacks;
   pixelsPerSecond: number;
@@ -55,6 +62,10 @@ interface EffectInteractionSelectionOptions extends EffectSelectionCallbacks {
 
 type BeginEffectInteractionOptions = EffectInteractionMovementOptions &
   EffectInteractionSelectionOptions;
+type EffectPointerStartEvent = Pick<
+  React.PointerEvent,
+  'clientX' | 'preventDefault' | 'stopPropagation'
+>;
 
 function useEffectInteractionCleanup(
   cleanupRef: React.MutableRefObject<(() => void) | null>,
@@ -76,16 +87,41 @@ function startEffectInteractionSession(
     target: TimelineEffectDragTarget;
   }
 ) {
+  options.cleanupRef.current?.();
   options.interactionRef.current = {
     startClientX: options.startClientX,
     target: options.target,
   };
 
-  options.cleanupRef.current?.();
-  options.cleanupRef.current = startWindowPointerSession({
+  let historyTransactionLease: VideoEditorProjectHistoryTransactionLease | null = null;
+  let finished = false;
+  const endHistoryTransaction = () => {
+    if (!historyTransactionLease) return;
+    const lease = historyTransactionLease;
+    historyTransactionLease = null;
+    options.historyTransaction.endProjectHistoryTransaction(lease);
+  };
+  const finishInteraction = () => {
+    if (finished) return;
+    finished = true;
+    endHistoryTransaction();
+    options.interactionRef.current = null;
+  };
+  const cleanupPointerSession = startWindowPointerSession({
     onMove: (moveEvent) => {
       const interaction = options.interactionRef.current;
       if (!interaction) {
+        return;
+      }
+
+      if (!historyTransactionLease) {
+        historyTransactionLease = options.historyTransaction.beginProjectHistoryTransaction();
+      }
+      if (
+        !historyTransactionLease ||
+        !options.historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
+      ) {
+        finishInteraction();
         return;
       }
 
@@ -99,14 +135,16 @@ function startEffectInteractionSession(
         options.moveCallbacks
       );
     },
-    onEnd: () => {
-      options.interactionRef.current = null;
-    },
+    onEnd: finishInteraction,
   });
+  options.cleanupRef.current = () => {
+    cleanupPointerSession();
+    finishInteraction();
+  };
 }
 
 function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
-  return (event: React.PointerEvent, target: TimelineEffectDragTarget) => {
+  return (event: EffectPointerStartEvent, target: TimelineEffectDragTarget) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -123,6 +161,7 @@ function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
 
     startEffectInteractionSession({
       cleanupRef: options.cleanupRef,
+      historyTransaction: options.historyTransaction,
       interactionRef: options.interactionRef,
       magnetEnabled: options.magnetEnabled,
       moveCallbacks: options.moveCallbacks,
@@ -137,7 +176,7 @@ function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
 
 function useBeginEffectInteractionCallback(options: BeginEffectInteractionOptions) {
   return useCallback(
-    (event: React.PointerEvent<Element>, target: TimelineEffectDragTarget) => {
+    (event: EffectPointerStartEvent, target: TimelineEffectDragTarget) => {
       createBeginEffectInteraction(options)(event, target);
     },
     [options]
@@ -175,6 +214,7 @@ function createBeginEffectInteractionOptions(args: {
   return {
     cleanupRef: args.refs.cleanupRef,
     interactionRef: args.refs.interactionRef,
+    historyTransaction: args.options.historyTransaction,
     magnetEnabled: args.options.magnetEnabled,
     moveCallbacks: createEffectMoveCallbacks(args.options),
     pixelsPerSecond: args.options.pixelsPerSecond,
@@ -195,7 +235,8 @@ export function useProjectTimelineEffectInteractions(
   options: UseProjectTimelineEffectInteractionsOptions
 ) {
   const interactionRef = useRef<EffectInteraction | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const localCleanupRef = useRef<(() => void) | null>(null);
+  const cleanupRef = options.pointerSessionCleanupRef ?? localCleanupRef;
   const { selectedEffectSelection, setOptimisticSelection } = useResolvedEffectSelection(
     options.project,
     options.selection

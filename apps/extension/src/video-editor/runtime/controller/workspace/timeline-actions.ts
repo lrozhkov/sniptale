@@ -161,6 +161,11 @@ export function createWorkspaceTimelineEditingActions(
   selectedClipActions: SelectedClipActions
 ) {
   return {
+    historyTransaction: {
+      beginProjectHistoryTransaction: store.beginProjectHistoryTransaction,
+      endProjectHistoryTransaction: store.endProjectHistoryTransaction,
+      isProjectHistoryTransactionCurrent: store.isProjectHistoryTransactionCurrent,
+    },
     onClearPlaybackRange: workspace.clearPlaybackRange,
     onDeleteSelectedClip: selectedClipActions.deleteSelectedClip,
     onDeleteSelectedTimelineObject: () =>

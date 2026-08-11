@@ -26,6 +26,7 @@ function createLatestState(): PlaybackLatestState {
     placementMode: null,
     playbackRange: null,
     project: createEmptyVideoProject('Playback shortcut ownership'),
+    projectHistoryTransactionActive: false,
     selectedActionEvent: null,
     selectedClipId: null,
     selectedMotionRegion: null,
@@ -174,6 +175,30 @@ it('deletes selected object tracks through playback shortcuts', async () => {
   });
 
   expect(handlers.deleteObjectTrack).toHaveBeenCalledWith('visual-cursor');
+});
+
+it('leaves mutation shortcuts inert during a project-history transaction', async () => {
+  const handlers = createHandlers();
+  act(() => {
+    root?.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={{
+          ...createLatestState(),
+          projectHistoryTransactionActive: true,
+          selectedClipId: 'clip-1',
+          selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
+        }}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+  await act(async () => undefined);
+
+  const event = dispatchDeleteKeyDown(document.body);
+
+  expect(event.defaultPrevented).toBe(false);
+  expect(handlers.deleteClip).not.toHaveBeenCalled();
 });
 
 it('leaves Space ownership with text-entry targets', async () => {

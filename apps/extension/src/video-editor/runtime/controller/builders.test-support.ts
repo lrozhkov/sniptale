@@ -3,6 +3,9 @@ import type { VideoEditorState } from '../../state/store';
 import type { VideoEditorActionHandlers } from '../commands';
 
 export const BUILDER_STORE_ACTION_NAMES = [
+  'beginProjectHistoryTransaction',
+  'endProjectHistoryTransaction',
+  'isProjectHistoryTransactionCurrent',
   'setProject',
   'setRecordingTelemetry',
   'updateProject',

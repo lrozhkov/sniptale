@@ -4,6 +4,7 @@ import type { TimelinePreviewViewport } from '../../../contracts/timeline-previe
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
+import type { VideoEditorProjectHistoryTransactionActions } from '../../../contracts/commands/history';
 import type { VideoEditorSessionActions } from '../../../contracts/commands/session';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
@@ -26,6 +27,7 @@ interface VideoEditorTimelineState {
 }
 
 interface VideoEditorTimelineActions {
+  historyTransaction: VideoEditorProjectHistoryTransactionActions;
   insertion: VideoEditorInsertionActions & {
     onUnsupportedFileDrop: () => void;
   };

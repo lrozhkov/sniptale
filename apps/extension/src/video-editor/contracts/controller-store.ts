@@ -28,6 +28,7 @@ export interface VideoEditorControllerStorePort
   pixelsPerSecond: number;
   placementMode: VideoEditorPlacementMode | null;
   project: VideoProject | null;
+  projectHistoryTransactionActive: boolean;
   projectHistoryStatus: VideoEditorProjectHistoryStatus;
   recordingId: string | null;
   recordingTelemetry: RecordingTelemetryEntry | null;

@@ -9,6 +9,7 @@ export function getCurrentVideoEditorProjectSnapshot() {
 function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
   return {
     cancelExport: state.cancelExport,
+    beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
     closeTrackGap: state.closeTrackGap,
     completeExport: state.completeExport,
     currentTime: state.currentTime,
@@ -33,6 +34,8 @@ function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
     setSaveState: state.setSaveState,
     undoProject: state.undoProject,
     redoProject: state.redoProject,
+    endProjectHistoryTransaction: state.endProjectHistoryTransaction,
+    isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
     splitClipAt: state.splitClipAt,
     updateExportStatus: state.updateExportStatus,
   };
@@ -189,9 +192,12 @@ function selectVideoEditorControllerStorePort(
     ...selectVideoEditorWorkspaceSelectionStoreSlice(state),
     ...selectVideoEditorShellStoreSlice(state),
     ...selectVideoEditorActionStoreSlice(state),
+    projectHistoryTransactionActive: runtime.projectHistory.transaction !== null,
     projectHistoryStatus: {
-      canUndo: runtime.projectHistory.past.length > 0,
-      canRedo: runtime.projectHistory.future.length > 0,
+      canUndo:
+        runtime.projectHistory.transaction === null && runtime.projectHistory.past.length > 0,
+      canRedo:
+        runtime.projectHistory.transaction === null && runtime.projectHistory.future.length > 0,
       error: runtime.projectHistory.error,
     },
   };

@@ -39,6 +39,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     currentTime: 2,
     isPlaying: false,
     playbackRange: null,
+    projectHistoryTransactionActive: false,
     placementMode: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
     selectedActionEvent: null,

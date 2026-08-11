@@ -67,6 +67,7 @@ function getProjectTimelineActionProps(
 
 function getTimelineMutationActionProps(controller: VideoEditorWorkspaceController) {
   return {
+    historyTransaction: controller.timeline.actions.historyTransaction,
     onAutoTransformRecording: controller.timeline.actions.onAutoTransformRecording,
     onAddTrackLogicalLane: controller.timeline.actions.onAddTrackLogicalLane,
     onClearPlaybackRange: controller.timeline.actions.onClearPlaybackRange,

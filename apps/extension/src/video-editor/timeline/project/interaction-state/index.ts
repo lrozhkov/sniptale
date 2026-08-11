@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
 import type { ProjectTimelineProps } from '../types';
@@ -25,7 +25,10 @@ function useProjectTimelineInteractions(
   props: ProjectTimelineProps,
   trackHeightByTrackId: TrackHeightState
 ) {
+  const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
   const { beginClipInteraction, dragGhost, trackLayoutModel, tracks } = useProjectTimelineDrag({
+    historyTransaction: props.historyTransaction,
+    pointerSessionCleanupRef,
     pixelsPerSecond: props.pixelsPerSecond,
     project: props.project,
     trackHeightByTrackId,
@@ -37,6 +40,8 @@ function useProjectTimelineInteractions(
     onTrimClipStart: props.onTrimClipStart,
   });
   const { beginEffectInteraction, selectedEffectSelection } = useProjectTimelineEffectInteractions({
+    historyTransaction: props.historyTransaction,
+    pointerSessionCleanupRef,
     magnetEnabled: props.magnetEnabled,
     pixelsPerSecond: props.pixelsPerSecond,
     project: props.project,

@@ -33,7 +33,8 @@ function createStoreOverrides(): VideoEditorState & VideoEditorControllerStorePo
 
   return {
     project,
-    projectHistory: { projectId: project.id, past: [], future: [], error: null },
+    projectHistory: { projectId: project.id, past: [], future: [], error: null, transaction: null },
+    projectHistoryTransactionActive: false,
     projectHistoryStatus: { canUndo: false, canRedo: false, error: null },
     recordingId: 'recording-1',
     isReady: true,

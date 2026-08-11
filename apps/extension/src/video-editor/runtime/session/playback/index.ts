@@ -19,6 +19,7 @@ interface PlaybackHookState {
   playbackRange: VideoEditorPlaybackRange | null;
   selection: VideoEditorSelection;
   placementMode: VideoEditorPlacementMode | null;
+  projectHistoryTransactionActive: boolean;
   selectedClipId: string | null;
   selectedActionEvent: PlaybackLatestState['selectedActionEvent'];
   selectedMotionRegion: PlaybackLatestState['selectedMotionRegion'];
@@ -129,6 +130,7 @@ function createPlaybackRuntimeState(
     project,
     playback.selection,
     playback.placementMode,
+    playback.projectHistoryTransactionActive,
     playback.selectedClipId,
     playback.selectedActionEvent,
     playback.selectedMotionRegion

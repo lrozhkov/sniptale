@@ -20,7 +20,7 @@ function createTimelineStore() {
   return create<VideoEditorState>()((set, get) => ({
     ...createVideoEditorTimelineState(set),
     ...createVideoEditorProjectActions(set, get),
-    ...createVideoEditorProjectHistoryActions(set),
+    ...createVideoEditorProjectHistoryActions(set, get),
     ...createExportStateActions(set),
   }));
 }

@@ -67,6 +67,7 @@ function createStoreState(): VideoEditorState {
       past: [],
       future: [],
       error: null,
+      transaction: null,
     },
     recordingId: 'recording-1',
     isReady: true,
@@ -336,6 +337,30 @@ describe('useVideoEditorController', () => {
     expect(result.current?.workspace?.history).toMatchObject({ canUndo: false, canRedo: false });
     result.current?.workspace?.history.onUndo();
     expect(store.undoProject).not.toHaveBeenCalled();
+  });
+
+  it('passes active history transactions to editor-wide shortcut state', () => {
+    const store = createStoreState();
+    store.projectHistory.transaction = {
+      before: structuredClone(store.project!),
+      changed: true,
+      lease: Symbol('active-history-transaction'),
+      projectId: store.project!.id,
+    };
+    prepareHookMocks(store);
+
+    function Harness(): React.JSX.Element {
+      useVideoEditorController();
+      return <div data-testid="controller" />;
+    }
+
+    renderToStaticMarkup(<Harness />);
+
+    expect(useVideoEditorRuntimeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playback: expect.objectContaining({ projectHistoryTransactionActive: true }),
+      })
+    );
   });
 
   it('returns the inspector to selection mode when manual modes are followed by selections', () => {

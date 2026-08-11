@@ -29,6 +29,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       currentTime: 0,
       isPlaying: false,
       playbackRange: null,
+      projectHistoryTransactionActive: false,
       selection: props.selection as never,
       placementMode: null,
       selectedClipId: null,

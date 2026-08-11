@@ -10,7 +10,7 @@ export type { VideoEditorState } from './types';
 const createVideoEditorStoreState: StateCreator<VideoEditorState> = (set, get) => ({
   ...createVideoEditorTimelineState(set),
   ...createVideoEditorProjectActions(set, get),
-  ...createVideoEditorProjectHistoryActions(set),
+  ...createVideoEditorProjectHistoryActions(set, get),
   ...createExportStateActions(set),
 });
 

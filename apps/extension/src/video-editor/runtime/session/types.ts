@@ -21,6 +21,7 @@ export interface UseVideoEditorRuntimeParams {
     currentTime: number;
     isPlaying: boolean;
     playbackRange: VideoEditorPlaybackRange | null;
+    projectHistoryTransactionActive: boolean;
     placementMode: VideoEditorPlacementMode | null;
     selection: VideoEditorSelection;
     selectedActionEvent: VideoProjectActionEvent | null;

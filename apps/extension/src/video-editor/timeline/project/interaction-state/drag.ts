@@ -7,8 +7,14 @@ import { buildTimelineTrackLayoutModel } from '../tracks/layout';
 import type { DragMode, TimelineClipDragGhost, TimelineInteraction } from '../types';
 import { applyTimelineDragMove, type MoveClipHandler } from './drag-move';
 import { isVideoEditorPresentedTrack } from '../../../project/operations/presented-tracks';
+import type {
+  VideoEditorProjectHistoryTransactionActions,
+  VideoEditorProjectHistoryTransactionLease,
+} from '../../../contracts/commands/history';
 
 interface UseProjectTimelineDragOptions {
+  historyTransaction: VideoEditorProjectHistoryTransactionActions;
+  pointerSessionCleanupRef?: React.MutableRefObject<(() => void) | null>;
   pixelsPerSecond: number;
   project: VideoProject;
   trackHeightByTrackId?: Record<string, VideoEditorTrackHeightMultiplier>;
@@ -21,10 +27,15 @@ interface UseProjectTimelineDragOptions {
 }
 
 const CLIP_DRAG_THRESHOLD_PX = 4;
+type TimelineClipPointerStartEvent = Pick<
+  React.PointerEvent,
+  'clientX' | 'clientY' | 'preventDefault' | 'stopPropagation'
+>;
 
 type TimelineDragSessionParams = Pick<
   UseProjectTimelineDragOptions,
   | 'onMoveClip'
+  | 'historyTransaction'
   | 'onSelectClip'
   | 'onSelectTrack'
   | 'onTimelinePreviewSuspendedChange'
@@ -41,6 +52,7 @@ type TimelineDragSessionParams = Pick<
 type TimelineDragListenerParams = Pick<
   TimelineDragSessionParams,
   | 'interactionRef'
+  | 'historyTransaction'
   | 'onMoveClip'
   | 'onTimelinePreviewSuspendedChange'
   | 'onTrimClipEnd'
@@ -77,7 +89,7 @@ function beginTimelineClipInteraction(
   params: TimelineDragSessionParams,
   args: {
     clip: VideoProjectClip;
-    event: React.PointerEvent;
+    event: TimelineClipPointerStartEvent;
     mode: DragMode;
   }
 ) {
@@ -88,14 +100,14 @@ function beginTimelineClipInteraction(
     params.onSelectTrack(args.clip.trackId);
   }
 
-  params.interactionRef.current = createTimelineInteraction(args.event, args.clip, args.mode);
   params.cleanupRef.current?.();
+  params.interactionRef.current = createTimelineInteraction(args.event, args.clip, args.mode);
   params.onTimelinePreviewSuspendedChange(true);
   params.cleanupRef.current = attachTimelinePointerListeners(params);
 }
 
 function createTimelineInteraction(
-  event: React.PointerEvent,
+  event: TimelineClipPointerStartEvent,
   clip: VideoProjectClip,
   mode: DragMode
 ): TimelineInteraction {
@@ -111,6 +123,8 @@ function createTimelineInteraction(
 }
 
 export function useProjectTimelineDrag({
+  historyTransaction,
+  pointerSessionCleanupRef,
   pixelsPerSecond,
   project,
   onMoveClip,
@@ -122,7 +136,8 @@ export function useProjectTimelineDrag({
   trackHeightByTrackId = {},
 }: UseProjectTimelineDragOptions) {
   const interactionRef = useRef<TimelineInteraction | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const localCleanupRef = useRef<(() => void) | null>(null);
+  const cleanupRef = pointerSessionCleanupRef ?? localCleanupRef;
   const [dragGhost, setDragGhost] = useState<TimelineClipDragGhost | null>(null);
   const { trackLayoutModel, tracks } = useTimelineDragModel(project, trackHeightByTrackId);
   const trackLayoutModelRef = useRef(trackLayoutModel);
@@ -136,13 +151,14 @@ export function useProjectTimelineDrag({
   );
 
   const beginClipInteraction = (
-    event: React.PointerEvent,
+    event: TimelineClipPointerStartEvent,
     clip: VideoProjectClip,
     mode: DragMode
   ) => {
     beginTimelineClipInteraction(
       {
         pixelsPerSecond,
+        historyTransaction,
         setDragGhost,
         cleanupRef,
         interactionRef,
@@ -177,6 +193,7 @@ function useTimelineDragModel(
 }
 
 function attachTimelinePointerListeners({
+  historyTransaction,
   interactionRef,
   pixelsPerSecond,
   trackLayoutModelRef,
@@ -187,8 +204,25 @@ function attachTimelinePointerListeners({
   setDragGhost,
 }: TimelineDragListenerParams): () => void {
   let dragActivated = false;
+  let historyTransactionLease: VideoEditorProjectHistoryTransactionLease | null = null;
+  let finished = false;
 
-  return startWindowPointerSession({
+  const endHistoryTransaction = () => {
+    if (!historyTransactionLease) return;
+    const lease = historyTransactionLease;
+    historyTransactionLease = null;
+    historyTransaction.endProjectHistoryTransaction(lease);
+  };
+  const finishInteraction = () => {
+    if (finished) return;
+    finished = true;
+    endHistoryTransaction();
+    interactionRef.current = null;
+    setDragGhost(null);
+    onTimelinePreviewSuspendedChange(false);
+  };
+
+  const cleanupPointerSession = startWindowPointerSession({
     onMove: (moveEvent) => {
       const interaction = interactionRef.current;
       if (!interaction) {
@@ -200,6 +234,16 @@ function attachTimelinePointerListeners({
       }
 
       dragActivated = true;
+      if (!historyTransactionLease) {
+        historyTransactionLease = historyTransaction.beginProjectHistoryTransaction();
+      }
+      if (
+        !historyTransactionLease ||
+        !historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
+      ) {
+        finishInteraction();
+        return;
+      }
       applyTimelineDragMove({
         interaction,
         moveEvent,
@@ -211,12 +255,13 @@ function attachTimelinePointerListeners({
         onTrimClipStart,
       });
     },
-    onEnd: () => {
-      interactionRef.current = null;
-      setDragGhost(null);
-      onTimelinePreviewSuspendedChange(false);
-    },
+    onEnd: finishInteraction,
   });
+
+  return () => {
+    cleanupPointerSession();
+    finishInteraction();
+  };
 }
 
 function shouldActivateTimelineDrag(

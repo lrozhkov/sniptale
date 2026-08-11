@@ -34,6 +34,7 @@ function buildRuntimeParams(
       currentTime: store.currentTime,
       playbackRange: workspace.playbackRange,
       placementMode: store.placementMode,
+      projectHistoryTransactionActive: store.projectHistoryTransactionActive,
       selection: store.selection,
       selectedActionEvent: selections.selectedActionEvent,
       selectedClipId: store.selectedClipId,

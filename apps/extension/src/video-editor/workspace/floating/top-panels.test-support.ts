@@ -75,6 +75,11 @@ function createTimelineEditActions(): Omit<
   'insertion' | keyof ReturnType<typeof createTimelineSelectionActions>
 > {
   return {
+    historyTransaction: {
+      beginProjectHistoryTransaction: () => Symbol('test-history-transaction'),
+      endProjectHistoryTransaction: noop(),
+      isProjectHistoryTransactionCurrent: () => true,
+    },
     onAddTrackLogicalLane: noop(),
     onAutoTransformRecording: noop(),
     onClearPlaybackRange: noop(),

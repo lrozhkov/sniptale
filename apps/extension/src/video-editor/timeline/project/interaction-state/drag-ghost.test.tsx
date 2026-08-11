@@ -14,6 +14,8 @@ import {
 } from '../../../../features/video/project/types';
 import { useProjectTimelineDrag } from './drag';
 
+const TEST_HISTORY_LEASE = Symbol('test-history-transaction');
+
 function createClip(trackId: string): VideoProjectClip {
   return {
     assetId: 'asset-1',
@@ -94,6 +96,11 @@ it('keeps the drag ghost visible across parent rerenders during a move', () => {
   function StatefulHarness() {
     const [revision, setRevision] = useState(0);
     const timelineDrag = useProjectTimelineDrag({
+      historyTransaction: {
+        beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
+        endProjectHistoryTransaction: () => undefined,
+        isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
+      },
       pixelsPerSecond: 10,
       project,
       onMoveClip: (...args) => {
