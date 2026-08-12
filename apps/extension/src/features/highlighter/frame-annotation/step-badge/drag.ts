@@ -8,6 +8,7 @@ import type {
   StepBadgeBoundarySide,
   StepBadgeManualPlacement,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { projectStepBadgeToFrameBoundary, type StepBadgeFrameRect } from './placement';
 import {
   identityFrameAnnotationCoordinateSpace,
@@ -18,28 +19,69 @@ function getKeyboardPlacement(args: {
   event: React.KeyboardEvent<HTMLButtonElement>;
   frameRect: StepBadgeFrameRect;
   placement: StepBadgeManualPlacement;
-  visualScale: number;
 }): StepBadgeManualPlacement | null {
-  const step = (args.event.shiftKey ? 10 : 1) * args.visualScale;
+  const step = args.event.shiftKey ? 10 : 1;
   const horizontal = args.placement.side === 'top' || args.placement.side === 'bottom';
   const axisSize = Math.max(1, horizontal ? args.frameRect.width : args.frameRect.height);
-  let direction = 0;
-  if (horizontal && args.event.key === 'ArrowLeft') direction = -1;
-  if (horizontal && args.event.key === 'ArrowRight') direction = 1;
-  if (!horizontal && args.event.key === 'ArrowUp') direction = -1;
-  if (!horizontal && args.event.key === 'ArrowDown') direction = 1;
-  if (direction === 0) return null;
-  return {
-    ...args.placement,
-    position: Math.max(0, Math.min(1, args.placement.position + (direction * step) / axisSize)),
-  };
+  const alongDirection = horizontal
+    ? args.event.key === 'ArrowLeft'
+      ? -1
+      : args.event.key === 'ArrowRight'
+        ? 1
+        : 0
+    : args.event.key === 'ArrowUp'
+      ? -1
+      : args.event.key === 'ArrowDown'
+        ? 1
+        : 0;
+  if (alongDirection !== 0) {
+    return {
+      ...args.placement,
+      position: Math.max(
+        0,
+        Math.min(1, args.placement.position + (alongDirection * step) / axisSize)
+      ),
+    };
+  }
+  const outwardKey =
+    args.placement.side === 'top'
+      ? 'ArrowUp'
+      : args.placement.side === 'right'
+        ? 'ArrowRight'
+        : args.placement.side === 'bottom'
+          ? 'ArrowDown'
+          : 'ArrowLeft';
+  const inwardKey =
+    args.placement.side === 'top'
+      ? 'ArrowDown'
+      : args.placement.side === 'right'
+        ? 'ArrowLeft'
+        : args.placement.side === 'bottom'
+          ? 'ArrowUp'
+          : 'ArrowRight';
+  const normalDirection = args.event.key === outwardKey ? 1 : args.event.key === inwardKey ? -1 : 0;
+  if (normalDirection === 0) return null;
+  const normalOffset = Math.max(
+    -STEP_BADGE_NORMAL_OFFSET_LIMIT,
+    Math.min(
+      STEP_BADGE_NORMAL_OFFSET_LIMIT,
+      (args.placement.normalOffset ?? 0) + normalDirection * step
+    )
+  );
+  if (normalOffset !== 0) return { ...args.placement, normalOffset };
+  const { normalOffset: _normalOffset, ...placementWithoutOffset } = args.placement;
+  return placementWithoutOffset;
 }
 
 function areStepBadgePlacementsEqual(
   left: StepBadgeManualPlacement,
   right: StepBadgeManualPlacement
 ): boolean {
-  return left.position === right.position && left.side === right.side;
+  return (
+    left.position === right.position &&
+    left.side === right.side &&
+    (left.normalOffset ?? 0) === (right.normalOffset ?? 0)
+  );
 }
 
 export function useStepBadgeBoundaryDrag(args: {
@@ -90,7 +132,6 @@ export function useStepBadgeBoundaryDrag(args: {
           y: point.y - args.visualOffset.y * (args.visualScale ?? 1),
         },
         previousSide: previousSideRef.current,
-        visualScale: args.visualScale ?? 1,
       });
       previousSideRef.current = placement.side;
       draftRef.current = placement;
@@ -134,7 +175,6 @@ export function useStepBadgeBoundaryDrag(args: {
         event,
         frameRect: args.frameRect,
         placement: args.initialPlacement,
-        visualScale: args.visualScale ?? 1,
       });
       if (!placement) return;
       event.preventDefault();

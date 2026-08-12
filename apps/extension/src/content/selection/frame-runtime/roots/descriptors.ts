@@ -156,6 +156,7 @@ function buildFrameStepBadgeDescriptor(frame: FrameData) {
     stepBadgeAlphabet: stepBadge?.alphabet,
     stepBadgeAnchor: stepBadge?.anchor,
     stepBadgeEnabled: stepBadge?.enabled,
+    stepBadgeManualNormalOffset: stepBadge?.manualPlacement?.normalOffset,
     stepBadgeManualPosition: stepBadge?.manualPlacement?.position,
     stepBadgeManualSide: stepBadge?.manualPlacement?.side,
     stepBadgeOffsetDirections: (stepBadge?.offsetDirections ?? []).join(','),

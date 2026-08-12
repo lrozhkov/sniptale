@@ -17,6 +17,20 @@ describe('step badge boundary placement', () => {
       x: 100,
       y: 170,
     });
+    expect(
+      getStepBadgeBoundaryCenter(frameRect, {
+        normalOffset: 24,
+        position: 0.25,
+        side: 'bottom',
+      })
+    ).toEqual({ x: 150, y: 224 });
+    expect(
+      getStepBadgeBoundaryCenter(frameRect, {
+        normalOffset: -18,
+        position: 0.75,
+        side: 'left',
+      })
+    ).toEqual({ x: 118, y: 170 });
   });
 
   it('maps the normalized position to the canonical frame boundary independent of stroke width', () => {
@@ -134,23 +148,57 @@ describe('step badge boundary placement', () => {
     });
   });
 
-  it('projects free pointer movement onto one exact frame border', () => {
+  it('projects free pointer movement into the anchored offset strip', () => {
     const placement = projectStepBadgeToFrameBoundary({
       frameRect,
       point: { x: 238, y: 52 },
     });
 
-    expect(placement).toEqual({ position: 0.69, side: 'top' });
-    expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 238, y: 80 });
+    expect(placement).toEqual({ normalOffset: 28, position: 0.69, side: 'top' });
+    expect(getStepBadgeBoundaryCenter(frameRect, placement)).toEqual({ x: 238, y: 52 });
   });
 
-  it('uses a corner dead zone to avoid switching sides for tiny pointer movements', () => {
+  it('preserves the anchored side and clamps inward and outward movement', () => {
     expect(
       projectStepBadgeToFrameBoundary({
         frameRect,
         point: { x: 302, y: 78 },
         previousSide: 'right',
       })
-    ).toEqual({ position: 0, side: 'right' });
+    ).toEqual({ normalOffset: 2, position: 0, side: 'right' });
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 20, y: 140 },
+        previousSide: 'right',
+      })
+    ).toEqual({ normalOffset: -48, position: 0.5, side: 'right' });
+    expect(
+      projectStepBadgeToFrameBoundary({
+        frameRect,
+        point: { x: 400, y: 140 },
+        previousSide: 'right',
+      })
+    ).toEqual({ normalOffset: 48, position: 0.5, side: 'right' });
+  });
+
+  it('renders signed normal offsets consistently at page zoom', () => {
+    const style = getStepBadgeStyle({
+      borderColor: '#111',
+      borderWidth: 4,
+      clickable: false,
+      settings: {
+        enabled: true,
+        manualPlacement: { normalOffset: 20, position: 0.75, side: 'bottom' },
+        type: 'number',
+        value: '4',
+      },
+      visualScale: 0.5,
+      zIndex: 10,
+    });
+
+    expect(style.transform).toBe(
+      'translate(-7.290000000000002px, 12.709999999999997px) scale(0.5)'
+    );
   });
 });

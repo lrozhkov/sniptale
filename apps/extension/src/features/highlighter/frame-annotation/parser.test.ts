@@ -8,6 +8,7 @@ import {
 import { createDefaultFrameCallout, createDefaultFrameStepBadge } from './defaults';
 import { createDefaultHighlighterSettings } from '../style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 
 describe('frame annotation snapshot boundary', () => {
   it('round-trips the versioned visual state without page or editor runtime metadata', () => {
@@ -53,6 +54,28 @@ describe('frame annotation snapshot boundary', () => {
       })
     ).toBeNull();
     expect(parseFrameAnnotationSnapshot({ ...snapshot, callout: undefined })).toBeNull();
+  });
+
+  it('round-trips bounded inward and outward step-badge offsets', () => {
+    const stepBadge: StepBadgeSettings = {
+      ...createDefaultFrameStepBadge(),
+      manualPlacement: { normalOffset: -32, position: 0.4, side: 'right' },
+    };
+    const snapshot = createFrameAnnotationSnapshot(
+      { id: 'frame-with-offset-badge', x: 0, y: 0, width: 100, height: 80, stepBadge },
+      0
+    );
+
+    expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+    expect(
+      parseFrameAnnotationSnapshot({
+        ...snapshot,
+        stepBadge: {
+          ...stepBadge,
+          manualPlacement: { normalOffset: 49, position: 0.4, side: 'right' },
+        },
+      })
+    ).toBeNull();
   });
 
   it('normalizes duplicate callout instance ids to stable collision-free identities', () => {

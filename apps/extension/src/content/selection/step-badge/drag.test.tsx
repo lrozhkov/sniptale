@@ -31,6 +31,7 @@ function Harness(props: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   initialPlacement: StepBadgeManualPlacement;
   visualOffset?: { x: number; y: number };
+  visualScale?: number;
 }) {
   const drag = useStepBadgeBoundaryDrag({
     ...(props.coordinateSpace ? { coordinateSpace: props.coordinateSpace } : {}),
@@ -38,6 +39,7 @@ function Harness(props: {
     initialPlacement: props.initialPlacement,
     onPositionChange,
     visualOffset: props.visualOffset ?? { x: 0, y: 0 },
+    ...(props.visualScale === undefined ? {} : { visualScale: props.visualScale }),
   });
   return (
     <button
@@ -94,7 +96,11 @@ describe('useStepBadgeBoundaryDrag', () => {
     );
 
     expect(onPositionChange).toHaveBeenCalledOnce();
-    expect(onPositionChange).toHaveBeenCalledWith({ position: 0.7, side: 'top' });
+    expect(onPositionChange).toHaveBeenCalledWith({
+      normalOffset: 38,
+      position: 0.7,
+      side: 'top',
+    });
     expect(handle.dataset['draft']).toContain('"position":0.7');
 
     act(() => root.render(<Harness initialPlacement={{ position: 0.7, side: 'top' }} />));
@@ -166,6 +172,15 @@ describe('useStepBadgeBoundaryDrag', () => {
     );
     expect(onPositionChange).toHaveBeenLastCalledWith({ position: 0.255, side: 'top' });
 
+    act(() =>
+      handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }))
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      normalOffset: 1,
+      position: 0.25,
+      side: 'top',
+    });
+
     act(() => root.render(<Harness initialPlacement={{ position: 0.5, side: 'left' }} />));
     act(() =>
       handle.dispatchEvent(
@@ -182,6 +197,59 @@ describe('useStepBadgeBoundaryDrag', () => {
     expect(onPositionChange).toHaveBeenLastCalledWith({
       position: 0.49166666666666664,
       side: 'left',
+    });
+  });
+
+  it('keeps pointer and keyboard normal offsets in CSS pixels at non-unit scale', () => {
+    act(() =>
+      root.render(
+        <Harness
+          initialPlacement={{ normalOffset: 20, position: 0.25, side: 'top' }}
+          visualScale={0.5}
+        />
+      )
+    );
+    const handle = host.querySelector('button') as HTMLButtonElement;
+    handle.setPointerCapture = vi.fn();
+
+    act(() =>
+      handle.dispatchEvent(
+        createPointerEvent('pointerdown', { clientX: 150, clientY: 60, pointerId: 12 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointermove', { clientX: 170, clientY: 50, pointerId: 12 })
+      )
+    );
+    act(() =>
+      document.dispatchEvent(
+        createPointerEvent('pointerup', { clientX: 170, clientY: 50, pointerId: 12 })
+      )
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      normalOffset: 30,
+      position: 0.35,
+      side: 'top',
+    });
+
+    act(() =>
+      root.render(
+        <Harness
+          initialPlacement={{ normalOffset: 20, position: 0.25, side: 'top' }}
+          visualScale={0.5}
+        />
+      )
+    );
+    act(() =>
+      handle.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp', shiftKey: true })
+      )
+    );
+    expect(onPositionChange).toHaveBeenLastCalledWith({
+      normalOffset: 30,
+      position: 0.25,
+      side: 'top',
     });
   });
 
