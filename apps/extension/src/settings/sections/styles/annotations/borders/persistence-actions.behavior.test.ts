@@ -83,7 +83,7 @@ describe('highlighter settings canonical actions', () => {
 
     expect(mocks.setEnabled).toHaveBeenCalledWith('system-default', false);
     expect(state.settings).toEqual(confirmed);
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('highlighter.section.templateHidden');
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
   it('does not emit success when the owner rejects the last-enabled toggle', async () => {

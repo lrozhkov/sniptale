@@ -1,11 +1,34 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { PopupStartupState } from '../../../composition/persistence/capture-settings/popup-startup';
 
 const mocks = vi.hoisted(() => ({
   bootstrapPopupStateMock: vi.fn(),
   consumePopupExportLaunchIntentMock: vi.fn<() => Promise<'export' | null>>(async () => null),
   errorMock: vi.fn(),
   stagePopupExportLaunchSelectionMock: vi.fn(),
+  loadPopupStartupStateMock: vi.fn<() => Promise<PopupStartupState>>(async () => ({
+    selection: 'remember-last' as const,
+    lastPage: 'home' as const,
+  })),
+  patchScreenshotSetupStateMock: vi.fn(async () => undefined),
   translateMock: vi.fn((key: string) => `translated:${key}`),
+}));
+
+vi.mock(
+  '../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    loadPopupStartupState: mocks.loadPopupStartupStateMock,
+  })
+);
+
+vi.mock('../../../composition/persistence/capture-settings/screenshot', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/capture-settings/screenshot')
+  >()),
+  patchScreenshotSetupState: mocks.patchScreenshotSetupStateMock,
 }));
 
 vi.mock('../export/runtime/tab-message-routing', (_importOriginal) => ({
@@ -37,7 +60,6 @@ function createParams() {
   return {
     refreshActiveTabCapabilities: vi.fn(async () => undefined),
     refreshGalleryStatus: vi.fn(async () => undefined),
-    setDisplayMode: vi.fn(),
     setHomeError: vi.fn(),
     setPage: vi.fn(),
     setIsReady: vi.fn(),
@@ -50,6 +72,7 @@ function createParams() {
     setSelectedPresetId: vi.fn(),
     setStartError: vi.fn(),
     setVideoCaptureMode: vi.fn(),
+    setScreenshotStartupMode: vi.fn(),
     setVideoSettings: vi.fn(),
     setViewportPresets: vi.fn(),
   };
@@ -70,10 +93,10 @@ function createDeferred<T>() {
 function createBootstrapState() {
   return {
     captureMode: 'visible' as const,
+    hasPostRecordResult: false,
     microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
     webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
-    quickActionsMode: 'grid' as const,
     recordingControlCapability: null,
     recordingStatusError: 'recording state unavailable',
     recordingState: { status: 'idle' } as const,
@@ -106,7 +129,6 @@ function expectBootstrappedStateApplied(
   expect(params.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
   expect(params.setQuickActions).toHaveBeenCalledWith(state.quickActions);
   expect(params.setQuickActionsReady).toHaveBeenCalledWith(true);
-  expect(params.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
   expect(params.setHomeError).toHaveBeenCalledWith(null);
   expect(params.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
   expect(params.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);
@@ -129,6 +151,12 @@ beforeEach(() => {
   mocks.consumePopupExportLaunchIntentMock.mockResolvedValue(null);
   mocks.errorMock.mockReset();
   mocks.stagePopupExportLaunchSelectionMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockResolvedValue({
+    selection: 'remember-last',
+    lastPage: 'home',
+  });
+  mocks.patchScreenshotSetupStateMock.mockReset();
   mocks.translateMock.mockClear();
 });
 
@@ -255,6 +283,55 @@ it('applies a consumed export launch intent before popup readiness', async () =>
   );
 });
 
+it('opens the video tab when bootstrap already contains a post-record result', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue({
+    ...createBootstrapState(),
+    hasPostRecordResult: true,
+  });
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.setPage).toHaveBeenCalledTimes(1);
+  expect(params.setPage).toHaveBeenCalledWith('video');
+});
+
+it('publishes an asynchronously loaded screenshot startup mode before popup readiness', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
+  mocks.loadPopupStartupStateMock.mockResolvedValueOnce({
+    selection: 'screenshots:desktop',
+    lastPage: 'home',
+  });
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.setScreenshotStartupMode).toHaveBeenCalledWith('desktop');
+  expect(params.setPage).toHaveBeenCalledWith('home');
+  expect(params.setScreenshotStartupMode.mock.invocationCallOrder[0]).toBeLessThan(
+    params.setIsReady.mock.invocationCallOrder[0]!
+  );
+});
+
+it('keeps the toolbar export intent above a fixed startup destination', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
+  mocks.consumePopupExportLaunchIntentMock.mockResolvedValueOnce('export');
+  mocks.loadPopupStartupStateMock.mockResolvedValueOnce({
+    selection: 'video:screen',
+    lastPage: 'video',
+  });
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.setPage).toHaveBeenCalledTimes(1);
+  expect(params.setPage).toHaveBeenCalledWith('export');
+  expect(params.setVideoCaptureMode).toHaveBeenCalledTimes(1);
+  expect(mocks.stagePopupExportLaunchSelectionMock).toHaveBeenCalledWith({
+    includeAnnotations: true,
+  });
+});
+
 it('keeps ordinary popup navigation when launch-intent delivery fails', async () => {
   const params = createParams();
   mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
@@ -265,7 +342,7 @@ it('keeps ordinary popup navigation when launch-intent delivery fails', async ()
     getParams: () => params,
   });
 
-  expect(params.setPage).not.toHaveBeenCalled();
+  expect(params.setPage).toHaveBeenCalledWith('home');
   expect(params.setIsReady).toHaveBeenCalledWith(true);
   expect(mocks.errorMock).toHaveBeenCalledWith(
     'Failed to consume popup export launch intent',

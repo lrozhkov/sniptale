@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { QuickAction } from '../../../../contracts/settings';
-import type { GalleryStatus } from './sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -74,12 +73,5 @@ export function createActiveTabCapabilities(
     export: supportedState,
     videoByMode: {} as ActiveTabCapabilities['videoByMode'],
     ...overrides,
-  };
-}
-
-export function createGalleryStatus(overrides: Partial<GalleryStatus> = {}): GalleryStatus {
-  return {
-    pressure: overrides.pressure ?? 'healthy',
-    text: overrides.text ?? 'Gallery usage healthy',
   };
 }

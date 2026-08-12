@@ -7,7 +7,7 @@ import {
   type SettingsCollectionItem,
   type SettingsCollectionMoveIntent,
 } from '../../../../section-surface';
-import { getHighlighterPresetCountLabel, getHighlighterPresetPreviewStyle } from './helpers';
+import { getHighlighterPresetPreviewStyle } from './helpers';
 import type { HighlighterPresetsProps } from './types';
 import {
   AnnotationTemplateQueryControls,
@@ -56,10 +56,7 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
       ),
       enabled: preset.enabled !== false,
       isDefault: settings.defaultBorderPresetId === preset.id,
-      badges:
-        preset.origin === 'system'
-          ? [{ id: 'system', label: translate('highlighter.section.systemBadge'), tone: 'neutral' }]
-          : [],
+      isBuiltIn: preset.origin === 'system',
       capabilities: {
         edit: true,
         toggle: true,
@@ -89,20 +86,20 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
     if (action.type === 'delete') void presets.handleDeletePreset(preset);
   };
   return (
-    <div className="mb-8 space-y-3">
-      <AnnotationTemplateQueryControls
-        activeFilterTagIds={tagState.state.activeFilterTagIds}
-        disabled={tagState.isLoading || tagState.error}
-        onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
-        onQueryChange={setQuery}
-        query={query}
-        tags={tagState.state.tags}
-      />
+    <div className="mb-8">
       <SettingsCollection
         ariaLabel={translate('highlighter.section.presetsLabel')}
-        title={translate('highlighter.section.presetsLabel')}
+        toolbarControls={
+          <AnnotationTemplateQueryControls
+            activeFilterTagIds={tagState.state.activeFilterTagIds}
+            disabled={tagState.isLoading || tagState.error}
+            onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+            onQueryChange={setQuery}
+            query={query}
+            tags={tagState.state.tags}
+          />
+        }
         items={items}
-        countLabel={`${items.length} ${getHighlighterPresetCountLabel(items.length)}`}
         addAction={{
           label: translate('highlighter.section.addButton'),
           onInvoke: presets.handleAddPreset,

@@ -180,3 +180,31 @@ it('owns outside dismissal, focus containment, restoration, and unmount cleanup'
   await act(async () => root.unmount());
   expect(onOpenChange).toHaveBeenLastCalledWith(false);
 });
+
+it('selects a surface immediately without management or favorite actions', async () => {
+  const onChange = vi.fn();
+  const root = createRoot(document.querySelector('#root')!);
+  await act(async () =>
+    root.render(
+      <SurfaceStyleSelector
+        actions={actions}
+        presentation="selection"
+        presets={presets}
+        value={style('#fff')}
+        onChange={onChange}
+      />
+    )
+  );
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.click()
+  );
+  expect(document.querySelector('[aria-label="Favorite"], [aria-label="В избранное"]')).toBeNull();
+  expect(document.querySelector('[data-ui="surface-style.apply"]')).toBeNull();
+  await act(async () =>
+    [...document.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Glass'))!
+      .click()
+  );
+  expect(onChange).toHaveBeenCalledWith(style('#ffffff80', 'backdrop-filter: blur(16px);'));
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+});

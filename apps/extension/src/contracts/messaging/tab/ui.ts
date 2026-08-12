@@ -84,7 +84,7 @@ export type TabUiRequestByType = {
 };
 
 export type TabUiResponseByType = {
-  [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeMessageResponse<Record<string, never>>;
+  [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeMessageResponse<Record<string, never>> | undefined;
   [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeMessageResponse<Record<string, never>>;
   [MessageType.ENABLE_HIGHLIGHTER_MODE]: RuntimeMessageResponse<Record<string, never>>;
   [MessageType.DISABLE_HIGHLIGHTER_MODE]: RuntimeMessageResponse<Record<string, never>>;

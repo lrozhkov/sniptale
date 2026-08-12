@@ -119,7 +119,7 @@ function resolveDirectProjectId(file) {
   }
 
   if (file.startsWith('tooling/test/harness/')) {
-    return null;
+    return TEST_HARNESS_TYPECHECK_PROJECT.id;
   }
 
   const matchingProductionProject = PRODUCTION_TYPECHECK_PROJECTS.find((project) =>

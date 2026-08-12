@@ -17,13 +17,19 @@ import {
   TestMediaStream,
 } from '../multi-source/media-stream.test-support';
 
-const { connectMicrophoneStreamMock, connectTabStreamMock, getMixedStreamMock, hasAudioMock } =
-  vi.hoisted(() => ({
-    connectMicrophoneStreamMock: vi.fn(),
-    connectTabStreamMock: vi.fn(),
-    getMixedStreamMock: vi.fn(),
-    hasAudioMock: vi.fn(),
-  }));
+const {
+  connectMicrophoneStreamMock,
+  connectTabStreamMock,
+  disconnectMicrophoneStreamMock,
+  getMixedStreamMock,
+  hasAudioMock,
+} = vi.hoisted(() => ({
+  connectMicrophoneStreamMock: vi.fn(),
+  connectTabStreamMock: vi.fn(),
+  disconnectMicrophoneStreamMock: vi.fn(),
+  getMixedStreamMock: vi.fn(),
+  hasAudioMock: vi.fn(),
+}));
 
 vi.mock('./audio-mixer-graph', () => ({
   AudioMixerGraph: vi.fn(function MockAudioMixerGraph() {
@@ -31,7 +37,7 @@ vi.mock('./audio-mixer-graph', () => ({
       cleanup: vi.fn().mockResolvedValue(undefined),
       connectMicrophoneStream: connectMicrophoneStreamMock,
       connectTabStream: connectTabStreamMock,
-      disconnectMicrophoneStream: vi.fn(),
+      disconnectMicrophoneStream: disconnectMicrophoneStreamMock,
       disconnectTabStream: vi.fn(),
       getMixedStream: getMixedStreamMock,
       hasAudio: hasAudioMock,
@@ -123,6 +129,70 @@ async function verifiesMicrophoneSettings(): Promise<void> {
   expect(connectMicrophoneStreamMock).toHaveBeenCalledWith(micStream, 1.5);
 }
 
+async function verifiesAtomicMicrophoneSwitch(): Promise<void> {
+  const initial = createAudioStream();
+  const replacement = createAudioStream();
+  vi.mocked(navigator.mediaDevices.getUserMedia)
+    .mockResolvedValueOnce(initial)
+    .mockResolvedValueOnce(replacement);
+  const mixer = new AudioMixer();
+  await mixer.addMicrophone('mic-1');
+  await mixer.switchMicrophone({ microphoneDeviceId: 'mic-2' });
+  expect(getOnlyAudioTrack(initial).stop).toHaveBeenCalledOnce();
+  expect(getOnlyAudioTrack(replacement).stop).not.toHaveBeenCalled();
+  expect(connectMicrophoneStreamMock).toHaveBeenLastCalledWith(replacement, 1);
+}
+
+async function verifiesFailedMicrophoneSwitchRollback(): Promise<void> {
+  const initial = createAudioStream();
+  const replacement = createAudioStream();
+  vi.mocked(navigator.mediaDevices.getUserMedia)
+    .mockResolvedValueOnce(initial)
+    .mockResolvedValueOnce(replacement);
+  const mixer = new AudioMixer();
+  await mixer.addMicrophone('mic-1');
+  connectMicrophoneStreamMock.mockImplementationOnce(() => {
+    throw new Error('graph failed');
+  });
+  await expect(mixer.switchMicrophone({ microphoneDeviceId: 'mic-2' })).rejects.toThrow(
+    'graph failed'
+  );
+  expect(getOnlyAudioTrack(initial).stop).not.toHaveBeenCalled();
+  expect(getOnlyAudioTrack(replacement).stop).toHaveBeenCalledOnce();
+  expect(connectMicrophoneStreamMock).toHaveBeenLastCalledWith(initial, 1);
+}
+
+async function verifiesSupersededMicrophoneSwitch(): Promise<void> {
+  const initial = createAudioStream();
+  const older = createAudioStream();
+  const newer = createAudioStream();
+  let resolveOlder!: (stream: MediaStream) => void;
+  let resolveNewer!: (stream: MediaStream) => void;
+  const olderPending = new Promise<MediaStream>((resolve) => {
+    resolveOlder = resolve;
+  });
+  const newerPending = new Promise<MediaStream>((resolve) => {
+    resolveNewer = resolve;
+  });
+  vi.mocked(navigator.mediaDevices.getUserMedia)
+    .mockResolvedValueOnce(initial)
+    .mockReturnValueOnce(olderPending)
+    .mockReturnValueOnce(newerPending);
+  const mixer = new AudioMixer();
+  await mixer.addMicrophone('mic-1');
+
+  const olderSwitch = mixer.switchMicrophone({ microphoneDeviceId: 'mic-2' });
+  const newerSwitch = mixer.switchMicrophone({ microphoneDeviceId: 'mic-3' });
+  resolveNewer(newer);
+  await newerSwitch;
+  resolveOlder(older);
+
+  await expect(olderSwitch).rejects.toThrow('superseded');
+  expect(getOnlyAudioTrack(older).stop).toHaveBeenCalledOnce();
+  expect(getOnlyAudioTrack(newer).stop).not.toHaveBeenCalled();
+  expect(connectMicrophoneStreamMock).toHaveBeenLastCalledWith(newer, 1);
+}
+
 async function verifiesMicrophoneFailure(): Promise<void> {
   vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValue(new Error('denied'));
   const mixer = new AudioMixer();
@@ -182,6 +252,15 @@ describe('AudioMixer', () => {
   it(
     'applies selected microphone processing settings and software gain',
     verifiesMicrophoneSettings
+  );
+  it('atomically replaces the microphone input', verifiesAtomicMicrophoneSwitch);
+  it(
+    'restores the previous microphone when graph replacement fails',
+    verifiesFailedMicrophoneSwitchRollback
+  );
+  it(
+    'rejects an older microphone switch that resolves after a newer one',
+    verifiesSupersededMicrophoneSwitch
   );
   it('throws a translated error when microphone access fails', verifiesMicrophoneFailure);
   it(

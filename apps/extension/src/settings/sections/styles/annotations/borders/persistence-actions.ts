@@ -39,25 +39,14 @@ function createTogglePresetEnabledHandler(state: HighlighterSettingsActionsState
     );
     if (!preset) return;
     const nextEnabled = preset.enabled === false;
-    const saved = await runSettingsMutation(state, () =>
-      setBorderPresetEnabled(presetId, nextEnabled)
-    );
-
-    if (saved) {
-      toast.success(
-        nextEnabled
-          ? translate('highlighter.section.templateShown')
-          : translate('highlighter.section.templateHidden')
-      );
-    }
+    await runSettingsMutation(state, () => setBorderPresetEnabled(presetId, nextEnabled));
   };
 }
 
 export function createHighlighterSettingsActions(state: HighlighterSettingsActionsState) {
   return {
     handleSetDefaultPreset: async (presetId: string) => {
-      const saved = await runSettingsMutation(state, () => setDefaultBorderPreset(presetId));
-      if (saved) toast.success(translate('highlighter.section.defaultUpdated'));
+      await runSettingsMutation(state, () => setDefaultBorderPreset(presetId));
     },
     handleUpdateBlurSettings: async (blurSettings: BlurSettings) => {
       await runSettingsMutation(state, () => saveDefaultBlurSettings(blurSettings));

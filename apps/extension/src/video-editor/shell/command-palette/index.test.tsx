@@ -35,6 +35,13 @@ describe('VideoEditorCommandPalette', () => {
           togglePlaying: vi.fn(),
           toggleSidebarCollapsed: vi.fn(),
         }}
+        history={{
+          canUndo: false,
+          canRedo: false,
+          error: null,
+          onUndo: vi.fn(),
+          onRedo: vi.fn(),
+        }}
         isOpen={true}
         onClose={vi.fn()}
       />

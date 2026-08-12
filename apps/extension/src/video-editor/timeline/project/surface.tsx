@@ -3,6 +3,7 @@ import { ProjectTimelineToolbar } from './toolbar';
 import type { ProjectTimelineProps } from './types';
 import type { useProjectTimelinePanelPrefs } from './panel/prefs';
 import type { useProjectTimelineState } from './interaction-state/index';
+import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/operations/telemetry-eligibility';
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
@@ -24,6 +25,7 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'playbackRange'
   | 'pixelsPerSecond'
   | 'project'
+  | 'recordingTelemetry'
   | 'selectedClip'
   | 'visibleRangeSeconds'
 > & {
@@ -56,7 +58,10 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           onPanelExpandedChange: props.panelPrefs.setPanelExpanded,
         }}
         visibleRangeSeconds={props.visibleRangeSeconds}
-        canAutoTransformRecording={props.project.baseRecordingId !== null}
+        canAutoTransformRecording={isRecordingTelemetryEligibleForAutoProcessing(
+          props.project,
+          props.recordingTelemetry
+        )}
         onClearPlaybackRange={props.onClearPlaybackRange}
         onSeekToStart={props.onSeekToStart}
         onAutoTransformRecording={props.onAutoTransformRecording}

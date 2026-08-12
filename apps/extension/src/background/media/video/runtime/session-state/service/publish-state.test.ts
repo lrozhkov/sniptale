@@ -25,15 +25,18 @@ describe('video-session-state publisher', () => {
     const applyBadgeState = vi.fn();
     const countdownBadgeTimer = { clear: vi.fn(), sync: vi.fn() };
     const sendRuntimeMessage = vi.fn().mockResolvedValue(undefined);
+    const sendContentSurfaceState = vi.fn().mockResolvedValue(undefined);
 
     const publisher = createVideoRecordingRuntimeStatePublisher({
       applyBadgeState,
       countdownBadgeTimer,
       sendRuntimeMessage,
+      sendContentSurfaceState,
     });
 
     const runtimeState = createRuntimeState();
     publisher.publishState(runtimeState);
+    await Promise.resolve();
 
     expect(applyBadgeState).toHaveBeenCalledWith(runtimeState);
     expect(countdownBadgeTimer.sync).toHaveBeenCalledTimes(1);
@@ -41,6 +44,34 @@ describe('video-session-state publisher', () => {
       type: VideoMessageType.RECORDING_STATE_SYNC,
       state: runtimeState,
     });
+    expect(sendContentSurfaceState).toHaveBeenCalledWith(runtimeState);
+  });
+
+  it('serializes content surface lifecycle delivery', async () => {
+    let releaseFirst!: () => void;
+    const first = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const sendContentSurfaceState = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce(undefined);
+    const publisher = createVideoRecordingRuntimeStatePublisher({
+      applyBadgeState: vi.fn(),
+      countdownBadgeTimer: { sync: vi.fn() },
+      sendRuntimeMessage: vi.fn().mockResolvedValue(undefined),
+      sendContentSurfaceState,
+    });
+    const paused = { ...createRuntimeState(), status: VideoRecordingStatus.PAUSED };
+    const idle = { ...createRuntimeState(), status: VideoRecordingStatus.IDLE };
+
+    publisher.publishState(paused);
+    publisher.publishState(idle);
+    await Promise.resolve();
+    expect(sendContentSurfaceState).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await first;
+    await vi.waitFor(() => expect(sendContentSurfaceState).toHaveBeenNthCalledWith(2, idle));
   });
 
   it('swallows sync errors from the popup bridge', async () => {
@@ -58,5 +89,22 @@ describe('video-session-state publisher', () => {
     await Promise.resolve();
 
     expect(sendRuntimeMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps runtime publication alive when the optional content surface disappears', async () => {
+    const sendRuntimeMessage = vi.fn().mockResolvedValue(undefined);
+    const sendContentSurfaceState = vi.fn().mockRejectedValue(new Error('tab navigated'));
+    const publisher = createVideoRecordingRuntimeStatePublisher({
+      applyBadgeState: vi.fn(),
+      countdownBadgeTimer: { sync: vi.fn() },
+      sendRuntimeMessage,
+      sendContentSurfaceState,
+    });
+
+    publisher.publishState(createRuntimeState());
+    await Promise.resolve();
+
+    expect(sendRuntimeMessage).toHaveBeenCalledOnce();
+    expect(sendContentSurfaceState).toHaveBeenCalledOnce();
   });
 });

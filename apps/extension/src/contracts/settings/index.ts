@@ -70,6 +70,7 @@ export interface Settings {
   /** @deprecated Read compatibility for settings written before localStoragePolicy. */
   saveCapturesToGallery: boolean;
   viewportPresets: ViewportPreset[];
+  /** @deprecated Read compatibility only; capture flows require an explicit viewport selection. */
   defaultViewportPresetId: string | null;
   presets?: SavePreset[];
   defaultImagePresetId?: string | null;
@@ -89,7 +90,13 @@ export type NormalizedSettings = Settings & { localStoragePolicy: LocalStoragePo
 
 export type SettingsPatch = Omit<
   Partial<Settings>,
-  'contentToolbar' | 'contextMenu' | 'fullPageCapture' | 'localStoragePolicy' | 'voiceInput'
+  | 'contentToolbar'
+  | 'contextMenu'
+  | 'defaultViewportPresetId'
+  | 'fullPageCapture'
+  | 'localStoragePolicy'
+  | 'saveCapturesToGallery'
+  | 'voiceInput'
 > & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
@@ -137,12 +144,13 @@ export interface PromptTemplate {
   lastUsedAt?: number;
 }
 
-export type QuickActionScreenshotMode = 'visible' | 'full' | 'selection';
+export type QuickActionScreenshotMode = 'visible' | 'full' | 'selection' | 'desktop';
 
 import {
   DEFAULT_COLOR_ACCENT,
   DEFAULT_COLOR_INFO,
   DEFAULT_COLOR_SELECTION,
+  DEFAULT_COLOR_SUCCESS,
 } from '@sniptale/ui/default-colors/constants';
 
 export type QuickActionDelay = 0 | 3 | 5 | 10;
@@ -165,19 +173,19 @@ export interface QuickActionOverlay {
 export type QuickActionOrigin = 'bundled' | 'user';
 
 export type BundledQuickActionId =
-  | 'default-fullscreen'
-  | 'default-edit-visible'
-  | 'default-selection'
-  | 'default-delayed-visible'
-  | 'default-copy-visible'
-  | 'default-copy-selection';
-
-export type QuickActionsDisplayMode = 'hidden' | 'list';
+  | 'default-visible-download'
+  | 'default-full-page-download'
+  | 'default-selection-download'
+  | 'default-visible-copy'
+  | 'default-visible-edit'
+  | 'default-desktop-capture'
+  | 'default-visible-library';
 
 export const SCREENSHOT_MODE_COLORS: Record<QuickActionScreenshotMode, string> = {
   visible: DEFAULT_COLOR_ACCENT,
   full: DEFAULT_COLOR_INFO,
   selection: DEFAULT_COLOR_SELECTION,
+  desktop: DEFAULT_COLOR_SUCCESS,
 };
 
 export interface QuickAction {
@@ -187,6 +195,7 @@ export interface QuickAction {
   icon: string;
   origin?: QuickActionOrigin;
   bundledId?: BundledQuickActionId | null;
+  customized?: boolean;
   hotkey?: HotkeyConfig | null;
   screenshotMode: QuickActionScreenshotMode;
   viewportPresetId?: string | null;

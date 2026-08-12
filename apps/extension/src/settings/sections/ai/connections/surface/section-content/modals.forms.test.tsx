@@ -160,6 +160,13 @@ async function renderUi(element: React.ReactNode) {
 
 function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvidersSectionState {
   const baseState: AiProvidersSectionState = {
+    catalogActions: {
+      clearProviderSecret: vi.fn().mockResolvedValue(undefined),
+      deleteModel: vi.fn().mockResolvedValue(undefined),
+      deleteProvider: vi.fn().mockResolvedValue(undefined),
+      moveModel: vi.fn().mockResolvedValue(undefined),
+      setDefaultModel: vi.fn().mockResolvedValue(undefined),
+    },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
@@ -177,10 +184,6 @@ function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvid
       closeModelModal: vi.fn(),
       setConfirmDelete: vi.fn(),
     },
-    handleDefaultModelChange: vi.fn().mockResolvedValue(undefined),
-    handleClearProviderSecret: vi.fn().mockResolvedValue(undefined),
-    handleDeleteProvider: vi.fn().mockResolvedValue(undefined),
-    handleDeleteModel: vi.fn().mockResolvedValue(undefined),
     reloadData: vi.fn().mockResolvedValue(undefined),
     getProviderName: vi.fn(() => 'OpenAI'),
   };

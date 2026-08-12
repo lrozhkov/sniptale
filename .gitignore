@@ -50,3 +50,7 @@ test-results/
 
 # Local task artifacts
 /tasks/
+
+# Optional local agent tooling
+/AGENTS.md
+/.agents/

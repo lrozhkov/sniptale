@@ -356,6 +356,24 @@ export const runtimePolicyStateDescriptors = [
     ttlMs: 5 * MINUTE_MS,
   },
   {
+    authorityFamily: 'video-recording-content-surface',
+    failClosedOnRestart: false,
+    id: 'video-recording-surface-lease',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/media/video/content-surface/surface-lease.ts',
+    proofModules: [
+      'apps/extension/src/background/media/video/content-surface/surface-lease.test.ts',
+    ],
+    requiresTtl: true,
+    restartBehavior:
+      'Session storage restores only the tab/document binding; every navigation rotates the ' +
+      'surface token, capability epoch, and peer generation.',
+    restartClass: 'durable-lease',
+    stateClass: 'capability',
+    storageClass: 'browser-session-storage',
+    ttlMs: 12 * 60 * MINUTE_MS,
+  },
+  {
     authorityFamily: 'video-capture-surface',
     failClosedOnRestart: false,
     id: 'video-capture-surface-sessions',

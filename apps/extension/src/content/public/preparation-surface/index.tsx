@@ -22,6 +22,7 @@ import {
   type ContentDrawingController,
 } from '../../../content/drawing/controller';
 import { useDrawingModeIntegration } from '../../../content/drawing/mode';
+import { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
 import {
   disableHighlighterMode,
   registerFrameCallbacks,
@@ -283,6 +284,10 @@ function usePreparationControllers(
       return aiController.handleAiPickContentStart(...args);
     },
   };
+  const videoRecordingController = useVideoRecordingSurfaceController({
+    onModeRequested: (enabled) => modeState.setVideoRecordingMode?.(enabled),
+    onToolbarRequested: () => modeState.setIsToolbarVisible(true),
+  });
 
   return {
     aiController: drawingAwareAiController,
@@ -291,11 +296,13 @@ function usePreparationControllers(
     modeController,
     scenarioController,
     screenshotController,
+    videoRecordingController,
   };
 }
 
 function usePreparationCaptureSync(
   modeState: ContentAppModeState,
+  modeController: PreparationSurfaceControllers['modeController'],
   screenshotController: PreparationSurfaceControllers['screenshotController'],
   ports: PreparationHostPorts
 ): void {
@@ -307,6 +314,7 @@ function usePreparationCaptureSync(
   });
   usePreparationSurfacePortSync(
     modeState,
+    modeController,
     screenshotController.handleTakeScreenshot,
     screenshotController.invalidateScreenshotRuns,
     ports.connectPort,
@@ -340,7 +348,12 @@ export function PreparationSurface(props: PreparationSurfaceProps) {
     ports: props.ports,
   });
 
-  usePreparationCaptureSync(modeState, controllers.screenshotController, props.ports);
+  usePreparationCaptureSync(
+    modeState,
+    controllers.modeController,
+    controllers.screenshotController,
+    props.ports
+  );
   usePreparationFrameCallbacks(props.ports.acceptsElement, frameManager);
   usePreparationViewportSync(modeState.currentViewport, props.onViewportChange);
 

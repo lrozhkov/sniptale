@@ -1,4 +1,4 @@
-import type { FabricObject, Textbox } from 'fabric';
+import { ActiveSelection, type FabricObject, type Textbox } from 'fabric';
 import {
   getDrawingObjectBounds,
   type DrawingBounds,
@@ -23,6 +23,15 @@ export function writeEditorDrawingObject(target: FabricObject, object: DrawingOb
 
 export function readEditorDrawingObject(target: FabricObject): DrawingObject | null {
   return parseEditorDrawingMetadata(target.sniptaleDrawingJson);
+}
+
+export function isEditorDrawingSelection(target: FabricObject): boolean {
+  if (readEditorDrawingObject(target)) return true;
+  return (
+    target instanceof ActiveSelection &&
+    target.getObjects().length > 0 &&
+    target.getObjects().every((object) => Boolean(readEditorDrawingObject(object)))
+  );
 }
 
 function translatePoint(point: DrawingPoint, x: number, y: number): DrawingPoint {

@@ -81,6 +81,34 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Экспорт',
     en: 'Export',
   },
+  undo: {
+    ru: 'Отменить',
+    en: 'Undo',
+  },
+  redo: {
+    ru: 'Повторить',
+    en: 'Redo',
+  },
+  undoShortcut: {
+    ru: 'Ctrl/⌘+Z',
+    en: 'Ctrl/⌘+Z',
+  },
+  redoShortcut: {
+    ru: 'Ctrl/⌘+Shift+Z или Ctrl+Y',
+    en: 'Ctrl/⌘+Shift+Z or Ctrl+Y',
+  },
+  nothingToUndo: {
+    ru: 'Нет действий для отмены',
+    en: 'Nothing to undo',
+  },
+  nothingToRedo: {
+    ru: 'Нет действий для повтора',
+    en: 'Nothing to redo',
+  },
+  historyError: {
+    ru: 'История изменений недоступна',
+    en: 'Edit history is unavailable',
+  },
   workspaceButton: {
     ru: 'Рабочая область',
     en: 'Workspace',

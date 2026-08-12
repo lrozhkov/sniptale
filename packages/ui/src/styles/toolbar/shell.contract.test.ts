@@ -40,6 +40,12 @@ describe('toolbar-shell contract', () => {
 
   it('keeps toolbar shell chrome and layout on the layout owner', () => {
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-toolbar {');
+    expect(toolbarShellLayoutStylesheet).toContain(
+      ".sniptale-toolbar[data-video-recording='true'] {"
+    );
+    expect(toolbarShellLayoutStylesheet).toMatch(
+      /\.sniptale-toolbar\[data-video-recording='true'\] \{[^}]*animation: none;/su
+    );
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-drag-handle {');
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-group {');
     expect(toolbarShellLayoutStylesheet).toContain('.sniptale-spacer {');

@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { Canvas, FabricObject } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { startEditorControllerDrawSession } from './draw-session';
 import { addEditorCanvasObject } from './object-add';
@@ -64,4 +67,32 @@ it('keeps transient cancellation mutations inside the transient owner', () => {
   ).toEqual({ changed: false, drawSession: null });
 
   expect(canvas.requestRenderAll).not.toHaveBeenCalled();
+});
+
+it('cancels selection before switching an active drawing tool to select', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const selected = new FabricObject();
+  canvas.add(selected);
+  canvas.setActiveObject(selected);
+  const discardActiveObject = vi.spyOn(canvas, 'discardActiveObject');
+  const switchToSelectTool = vi.fn();
+  const syncRuntimeState = vi.fn();
+  const options = {
+    activeTool: 'shape',
+    canvas,
+    clearCropSelection: vi.fn(),
+    cropGuide: null,
+    drawSession: null,
+    switchToSelectTool,
+    syncRuntimeState,
+  };
+
+  expect(cancelEditorTransientInteraction(options)).toMatchObject({ changed: true });
+  expect(discardActiveObject).toHaveBeenCalledOnce();
+  expect(switchToSelectTool).not.toHaveBeenCalled();
+
+  expect(cancelEditorTransientInteraction(options)).toMatchObject({ changed: true });
+  expect(switchToSelectTool).toHaveBeenCalledOnce();
+  expect(syncRuntimeState).toHaveBeenCalledTimes(2);
+  canvas.dispose();
 });

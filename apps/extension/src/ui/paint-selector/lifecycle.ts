@@ -99,9 +99,14 @@ export function usePaintSelectorLifecycle(options: {
 
 export function resolvePaintSelectorLayerStyle(
   baseStyle: CSSProperties,
-  anchor: HTMLElement | null
+  anchor: HTMLElement | null,
+  layout: 'solid' | 'gradient'
 ): CSSProperties {
-  const layerWidth = typeof window === 'undefined' ? 600 : Math.min(600, window.innerWidth - 16);
+  const preferredWidth = layout === 'solid' ? 328 : 600;
+  const layerWidth =
+    typeof window === 'undefined'
+      ? preferredWidth
+      : Math.min(preferredWidth, window.innerWidth - 16);
   const rect = anchor?.getBoundingClientRect();
   return {
     ...baseStyle,

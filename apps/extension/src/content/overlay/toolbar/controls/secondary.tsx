@@ -4,8 +4,29 @@ import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
 import { ToolbarDesignReviewControls } from './design-review';
 import { ToolbarDrawingControls } from './drawing';
+import { ToolbarVideoRecordingControls } from '../video-recording/controls';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
+
+export function shouldProjectVideoRecordingControls(
+  toolbarProps: {
+    aiPickMode?: boolean;
+    drawingMode?: boolean;
+    videoRecording?: unknown;
+    videoRecordingMode?: boolean;
+  },
+  viewModel: Pick<ToolbarViewModel, 'designReviewMode' | 'highlighterMode' | 'quickEditMode'>
+): boolean {
+  return Boolean(
+    toolbarProps.videoRecordingMode &&
+    toolbarProps.videoRecording &&
+    !toolbarProps.aiPickMode &&
+    !toolbarProps.drawingMode &&
+    !viewModel.designReviewMode &&
+    !viewModel.highlighterMode &&
+    !viewModel.quickEditMode
+  );
+}
 
 function resolveEffectiveInteractionMode(
   toolbarProps: ToolbarProps,
@@ -141,6 +162,21 @@ export function ToolbarSecondaryControls(props: {
 }) {
   const { toolbarProps, viewModel } = props;
   const { captureActionProps, interactionMode } = createSecondaryControlsRenderState(props);
+
+  if (shouldProjectVideoRecordingControls(toolbarProps, viewModel)) {
+    const recording = toolbarProps.videoRecording!;
+    return (
+      <ToolbarVideoRecordingControls
+        compactMenus={viewModel.derivedState.compactMenus}
+        displayMode={viewModel.derivedState.displayMode}
+        onCollapse={toolbarProps.onHide}
+        onCompactMenusChange={viewModel.derivedState.setCompactMenus}
+        onDisplayModeChange={viewModel.derivedState.setDisplayMode}
+        recording={recording}
+        toolbarMenuState={viewModel.toolbarMenuState}
+      />
+    );
+  }
 
   return (
     <>

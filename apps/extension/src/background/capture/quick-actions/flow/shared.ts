@@ -8,11 +8,13 @@ import type { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capab
 import type { WebSnapshotViewerPorts } from '../../page-preparation/viewer-ports';
 import type { PageAccessPort } from '../../../routing-contracts/page-access-port';
 import type { ViewportState } from '../../../routing-contracts/tab-mode-state';
+import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
 
 export type { ViewportState } from '../../../routing-contracts/tab-mode-state';
 
 export type ProcessQuickActionArgs = {
   actionId: string;
+  desktopSelection?: DesktopScreenshotSelection;
   screenshotModeState: Map<number, boolean>;
   tabId: number;
   pageCapability?: TabRuntimeCapability;

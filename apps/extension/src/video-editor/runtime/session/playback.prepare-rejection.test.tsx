@@ -28,6 +28,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       currentTime: props.currentTime,
       isPlaying: false,
       playbackRange: null,
+      projectHistoryTransactionActive: false,
       selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' } as never,
       placementMode: null,
       selectedClipId: null,

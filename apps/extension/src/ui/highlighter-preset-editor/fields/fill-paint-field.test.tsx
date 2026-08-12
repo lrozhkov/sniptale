@@ -5,10 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 
-const mocks = vi.hoisted(() => ({ picker: vi.fn(), resources: vi.fn() }));
-vi.mock('../../../composition/gradient-preset-resources/use-gradient-preset-catalog', () => ({
-  useGradientPresetCatalog: mocks.resources,
-}));
+const mocks = vi.hoisted(() => ({ picker: vi.fn() }));
 vi.mock('../../paint-selector', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../paint-selector')>()),
   CompactPaintSelector: (props: unknown) => {
@@ -19,9 +16,7 @@ vi.mock('../../paint-selector', async (importOriginal) => ({
 
 import { HighlighterFillPaintField } from './fill-paint-field';
 
-it('is the sole thin Highlighter adapter for the universal Paint selector and preset owner', () => {
-  const resources = { presets: [], actions: { onSave: vi.fn() } };
-  mocks.resources.mockReturnValue(resources);
+it('is the thin Highlighter adapter for the universal Paint selector and palette', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -38,14 +33,13 @@ it('is the sole thin Highlighter adapter for the universal Paint selector and pr
       />
     )
   );
-  expect(mocks.resources).toHaveBeenCalledWith('highlighter-frame-fill');
   expect(mocks.picker).toHaveBeenCalledWith(
     expect.objectContaining({
       value,
       onChange,
       onOpenChange,
-      presets: resources.presets,
-      presetActions: resources.actions,
+      palette: expect.arrayContaining(['#f97316', '#2563eb']),
+      recentColors: ['#123456ff'],
     })
   );
   act(() => root.unmount());
@@ -53,7 +47,6 @@ it('is the sole thin Highlighter adapter for the universal Paint selector and pr
 });
 
 it('keeps the floating interaction callback optional outside Content surfaces', () => {
-  mocks.resources.mockReturnValue({ presets: [], actions: {} });
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);

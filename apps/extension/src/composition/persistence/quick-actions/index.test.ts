@@ -12,13 +12,11 @@ const {
   isBundledQuickActionMock,
   mergeStoredQuickActionsMock,
   normalizeQuickActionMock,
-  sanitizeQuickActionsDisplayModeMock,
 } = vi.hoisted(() => ({
   getBundledQuickActionsMock: vi.fn(),
   isBundledQuickActionMock: vi.fn(),
   mergeStoredQuickActionsMock: vi.fn(),
   normalizeQuickActionMock: vi.fn(),
-  sanitizeQuickActionsDisplayModeMock: vi.fn(),
 }));
 
 vi.mock('../infrastructure/browser-storage', () => ({
@@ -43,11 +41,7 @@ vi.mock('../../../features/quick-actions-presets/catalog', () => ({
   getBundledQuickActions: getBundledQuickActionsMock,
   getQuickActionDisplayName: vi.fn(),
   isBundledQuickAction: isBundledQuickActionMock,
-}));
-
-vi.mock('../../../features/quick-actions-presets/display-mode', () => ({
-  DEFAULT_QUICK_ACTIONS_DISPLAY_MODE: 'list',
-  sanitizeQuickActionsDisplayMode: sanitizeQuickActionsDisplayModeMock,
+  resetBundledQuickAction: vi.fn(),
 }));
 
 vi.mock('../../../features/quick-actions-presets/normalization', () => ({
@@ -58,11 +52,8 @@ vi.mock('../../../features/quick-actions-presets/normalization', () => ({
 import {
   addQuickAction,
   deleteQuickAction,
-  getQuickActionsBootstrapData,
   getQuickActions,
-  getQuickActionsDisplayMode,
   saveQuickActions,
-  saveQuickActionsDisplayMode,
   updateQuickAction,
 } from './index';
 
@@ -73,7 +64,7 @@ function createAction(id: string, origin: 'bundled' | 'user' = 'user'): QuickAct
     name: `Action ${id}`,
     icon: 'Camera',
     origin,
-    bundledId: origin === 'bundled' ? ('default-fullscreen' as const) : null,
+    bundledId: origin === 'bundled' ? ('default-visible-download' as const) : null,
     hotkey: null,
     screenshotMode: 'visible',
     viewportPresetId: 'native',
@@ -96,9 +87,6 @@ function resetQuickActionsStorageMocks() {
     changed: false,
   }));
   isBundledQuickActionMock.mockReturnValue(false);
-  sanitizeQuickActionsDisplayModeMock.mockImplementation((mode: unknown) =>
-    mode === 'hidden' ? 'hidden' : 'list'
-  );
   browserStorageLocalGetMock.mockResolvedValue({});
   browserStorageLocalSetMock.mockResolvedValue(undefined);
 }
@@ -166,60 +154,6 @@ async function verifyAddUpdateDeleteFlow() {
   expect(browserStorageLocalSetMock).toHaveBeenCalledTimes(3);
 }
 
-async function verifyDisplayModeContracts() {
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  browserStorageLocalGetMock.mockResolvedValueOnce({
-    sniptale_quick_actions_display_mode: 'hidden',
-  });
-
-  await expect(getQuickActionsDisplayMode()).resolves.toBe('hidden');
-
-  const error = new Error('display mode failed');
-  browserStorageLocalGetMock.mockRejectedValueOnce(error);
-
-  await expect(getQuickActionsDisplayMode()).resolves.toBe('list');
-  expect(warnSpy).toHaveBeenCalledWith(
-    '[SharedQuickActionsStorage]',
-    'Failed to load quick actions display mode',
-    expect.objectContaining({ message: error.message })
-  );
-
-  browserStorageLocalGetMock.mockResolvedValueOnce({
-    sniptale_quick_actions_display_mode: 'invalid',
-  });
-
-  await expect(getQuickActionsDisplayMode()).resolves.toBe('list');
-  expect(warnSpy).toHaveBeenCalledWith(
-    '[SharedQuickActionsStorage]',
-    'Ignoring invalid quick actions display mode from storage',
-    { value: 'invalid' }
-  );
-
-  await saveQuickActionsDisplayMode('hidden');
-
-  expect(browserStorageLocalSetMock).toHaveBeenCalledWith({
-    sniptale_quick_actions_display_mode: 'hidden',
-  });
-}
-
-async function verifyBatchedBootstrapReadUsesOneStorageCall() {
-  const action = createAction('batched-1');
-  browserStorageLocalGetMock.mockResolvedValueOnce({
-    sniptale_quick_actions: [action],
-    sniptale_quick_actions_display_mode: 'hidden',
-  });
-
-  await expect(getQuickActionsBootstrapData()).resolves.toEqual({
-    actions: [action],
-    displayMode: 'hidden',
-  });
-
-  expect(browserStorageLocalGetMock).toHaveBeenCalledWith([
-    'sniptale_quick_actions',
-    'sniptale_quick_actions_display_mode',
-  ]);
-}
-
 async function verifyInvalidStoredQuickActionsAreDropped() {
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   const validAction = createAction('valid-1');
@@ -266,22 +200,6 @@ describe('quick-actions', () => {
     verifyInvalidStoredQuickActionsAreDropped
   );
   it('serializes concurrent quick-action mutations', verifyConcurrentMutationsAreSerialized);
-  it(
-    'loads and saves display mode with a fallback on storage failures',
-    verifyDisplayModeContracts
-  );
-  it(
-    'loads quick-actions bootstrap data through one batched storage read',
-    verifyBatchedBootstrapReadUsesOneStorageCall
-  );
-  it('preserves the row display mode when the sanitizer allows it', async () => {
-    sanitizeQuickActionsDisplayModeMock.mockReturnValueOnce('row');
-    browserStorageLocalGetMock.mockResolvedValueOnce({
-      sniptale_quick_actions_display_mode: 'row',
-    });
-
-    await expect(getQuickActionsDisplayMode()).resolves.toBe('row');
-  });
   it('drops invalid quick-action roots before migration runs', async () => {
     browserStorageLocalGetMock.mockResolvedValueOnce({
       sniptale_quick_actions: { broken: true },

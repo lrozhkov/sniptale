@@ -1,15 +1,5 @@
 import { defineMessageSource } from '../source';
 
-const SAVE_TO_GALLERY_DESCRIPTION_RU = [
-  'Скриншот попадёт во внутренний Media Hub независимо от выбранного действия:',
-  'скачать, открыть в редакторе или копировать.',
-].join(' ');
-
-const SAVE_TO_GALLERY_DESCRIPTION_EN = [
-  'The screenshot will be added to the internal Media Hub regardless of the chosen action:',
-  'download, open in editor, or copy.',
-].join(' ');
-
 export const savePresetsMessages = defineMessageSource({
   section: {
     title: {
@@ -17,32 +7,28 @@ export const savePresetsMessages = defineMessageSource({
       en: 'File saving',
     },
     subtitle: {
-      ru: 'Пресеты папок внутри Downloads и действие после захвата',
+      ru: 'Шаблоны папок внутри Downloads и действие после захвата',
       en: 'Folder presets inside Downloads and the action after capture',
     },
     captureActionLabel: {
       ru: 'Действие после захвата',
       en: 'Action after capture',
     },
-    saveToGalleryLabel: {
-      ru: 'Дополнительно сохранять в Галерею',
-      en: 'Also save to Gallery',
+    afterCaptureTitle: {
+      ru: 'После захвата',
+      en: 'After capture',
     },
-    saveToGalleryDescription: {
-      ru: SAVE_TO_GALLERY_DESCRIPTION_RU,
-      en: SAVE_TO_GALLERY_DESCRIPTION_EN,
+    captureActionDescription: {
+      ru: 'Действие по умолчанию для режима подготовки страницы. Быстрое действие может его переопределить.',
+      en: 'The default action for page preparation mode. A quick action can override it.',
     },
-    galleryToggleOnTitle: {
-      ru: 'Отключить сохранение в Галерею',
-      en: 'Disable Gallery saving',
+    downloadsTitle: {
+      ru: 'Скачивание',
+      en: 'Downloads',
     },
-    galleryToggleOffTitle: {
-      ru: 'Включить сохранение в Галерею',
-      en: 'Enable Gallery saving',
-    },
-    defaultPresetsLabel: {
-      ru: 'Пресеты по умолчанию',
-      en: 'Default presets',
+    downloadsDescription: {
+      ru: 'Шаблоны папок внутри системной папки Downloads для скачиваемых файлов.',
+      en: 'Folder templates inside the system Downloads folder for downloaded files.',
     },
     imagePresetLabel: {
       ru: 'Изображения',
@@ -57,11 +43,11 @@ export const savePresetsMessages = defineMessageSource({
       en: 'Export (ZIP)',
     },
     folderPresetsLabel: {
-      ru: 'Пресеты папок',
+      ru: 'Шаблоны папок',
       en: 'Folder presets',
     },
     emptyTitle: {
-      ru: 'Нет пресетов',
+      ru: 'Нет шаблонов',
       en: 'No presets',
     },
     emptyDescription: {
@@ -69,31 +55,19 @@ export const savePresetsMessages = defineMessageSource({
       en: 'Add a folder for saving screenshots and videos',
     },
     addButton: {
-      ru: 'Добавить пресет',
+      ru: 'Добавить шаблон',
       en: 'Add preset',
     },
     unsetOption: {
       ru: 'Не задан',
       en: 'Not set',
     },
-    countOne: {
-      ru: 'пресет',
-      en: 'preset',
-    },
-    countFew: {
-      ru: 'пресета',
-      en: 'presets',
-    },
-    countMany: {
-      ru: 'пресетов',
-      en: 'presets',
-    },
     deleteTitle: {
-      ru: 'Удалить пресет?',
+      ru: 'Удалить шаблон?',
       en: 'Delete preset?',
     },
     deleteMessagePrefix: {
-      ru: 'Пресет',
+      ru: 'Шаблон',
       en: 'Preset',
     },
     deleteMessageSuffix: {
@@ -113,7 +87,7 @@ export const savePresetsMessages = defineMessageSource({
       en: 'Save to the default folder',
     },
     captureActionAskPreset: {
-      ru: 'Выбор пресета',
+      ru: 'Выбор шаблона',
       en: 'Choose preset',
     },
     captureActionAskSystem: {
@@ -135,11 +109,11 @@ export const savePresetsMessages = defineMessageSource({
   },
   editor: {
     editTitle: {
-      ru: 'Редактировать пресет',
+      ru: 'Редактировать шаблон',
       en: 'Edit preset',
     },
     newTitle: {
-      ru: 'Новый пресет',
+      ru: 'Новый шаблон',
       en: 'New preset',
     },
     nameLabel: {
@@ -180,52 +154,44 @@ export const savePresetsMessages = defineMessageSource({
       ru: 'Действие после захвата обновлено',
       en: 'Action after capture updated',
     },
-    saveToGalleryEnabled: {
-      ru: 'Сохранение в Галерею включено',
-      en: 'Gallery saving enabled',
-    },
-    saveToGalleryDisabled: {
-      ru: 'Сохранение в Галерею отключено',
-      en: 'Gallery saving disabled',
-    },
     defaultImageUpdated: {
-      ru: 'Пресет по умолчанию для изображений обновлён',
+      ru: 'Шаблон по умолчанию для изображений обновлён',
       en: 'Default image preset updated',
     },
     defaultVideoUpdated: {
-      ru: 'Пресет по умолчанию для видео обновлён',
+      ru: 'Шаблон по умолчанию для видео обновлён',
       en: 'Default video preset updated',
     },
     defaultExportUpdated: {
-      ru: 'Пресет по умолчанию для экспорта обновлён',
+      ru: 'Шаблон по умолчанию для экспорта обновлён',
       en: 'Default export preset updated',
     },
     nameRequired: {
-      ru: 'Введите название пресета',
+      ru: 'Введите название шаблона',
       en: 'Enter a preset name',
     },
     presetUpdated: {
-      ru: 'Пресет обновлён',
+      ru: 'Шаблон обновлён',
       en: 'Preset updated',
     },
     presetCreated: {
-      ru: 'Пресет создан',
+      ru: 'Шаблон создан',
       en: 'Preset created',
     },
     presetHidden: {
-      ru: 'Пресет скрыт из диалога',
+      ru: 'Шаблон скрыт из диалога',
       en: 'Preset hidden from the dialog',
     },
     presetShown: {
-      ru: 'Пресет отображается в диалоге',
+      ru: 'Шаблон отображается в диалоге',
       en: 'Preset shown in the dialog',
     },
     presetInUseError: {
-      ru: 'Пресет используется в настройках по умолчанию или Быстрых действиях',
+      ru: 'Шаблон используется в настройках по умолчанию или Быстрых действиях',
       en: 'Preset is used in default settings or Quick Actions',
     },
     presetDeleted: {
-      ru: 'Пресет удалён',
+      ru: 'Шаблон удалён',
       en: 'Preset deleted',
     },
   },

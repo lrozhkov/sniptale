@@ -1,9 +1,9 @@
-import { settingsSectionClassName } from '../../../../section-surface';
+import {
+  settingsCompactWorkbenchClassName,
+  settingsSectionClassName,
+} from '../../../../section-surface';
 import { ImageSettingsSectionFormat } from './format';
-import { ImageSettingsSectionHeader } from './header';
 import { ImageSettingsSectionQuality } from './quality';
-import { ImageSettingsSectionSavingState } from './saving-state';
-import { ImageSettingsSectionTips } from './tips';
 import type { useImageSettingsSection } from './controller';
 
 export function ImageSettingsSectionContent({
@@ -12,12 +12,9 @@ export function ImageSettingsSectionContent({
   state: ReturnType<typeof useImageSettingsSection>;
 }) {
   return (
-    <div className={settingsSectionClassName}>
-      <ImageSettingsSectionHeader />
+    <div className={`${settingsSectionClassName} ${settingsCompactWorkbenchClassName} !space-y-1`}>
       <ImageSettingsSectionFormat state={state} />
       <ImageSettingsSectionQuality state={state} />
-      <ImageSettingsSectionSavingState isLoading={state.isLoading} />
-      <ImageSettingsSectionTips />
     </div>
   );
 }

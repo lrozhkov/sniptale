@@ -1,5 +1,5 @@
 import { translate } from '../../../../../../platform/i18n';
-import type { Settings, SavePreset } from '../../../../../../contracts/settings';
+import type { SavePreset, SettingsPatch } from '../../../../../../contracts/settings';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { sanitizePresetPathInput } from '@sniptale/foundation/utils/preset-path';
 import type { SavePresetsDialogState, SavePresetsSyncState } from '../../state/types';
@@ -7,7 +7,7 @@ import type { SavePresetsDialogState, SavePresetsSyncState } from '../../state/t
 export function createSavePresetAction(
   sync: SavePresetsSyncState,
   dialogState: SavePresetsDialogState,
-  persistSettings: (partialSettings: Partial<Settings>) => Promise<void>
+  persistSettings: (partialSettings: SettingsPatch) => Promise<void>
 ) {
   return async (name: string, path: string, enabled: boolean) => {
     const sanitizedPath = sanitizePresetPathInput(path);
@@ -43,12 +43,5 @@ export function createSavePresetAction(
       throw error;
     }
     dialogState.closeEditor();
-    toast.success(
-      translate(
-        dialogState.editingPreset
-          ? 'savePresets.messages.presetUpdated'
-          : 'savePresets.messages.presetCreated'
-      )
-    );
   };
 }

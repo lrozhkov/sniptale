@@ -1,13 +1,12 @@
-import { ShieldCheck } from 'lucide-react';
-
 import { translate } from '../../../../../platform/i18n';
 import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 import {
   settingsNeutralBadgeClassName,
+  settingsCompactWorkbenchClassName,
+  settingsPanelClassName,
   settingsSuccessBadgeClassName,
 } from '../../../../section-surface';
 import type { AiProvidersSectionState } from '../controller/types';
-import { aiProvidersSectionCardClassName } from './constants';
 import { SecretProtectionActions } from './secret-protection-actions';
 
 type SecretProtectionState = AiProvidersSectionState['secretProtection'];
@@ -58,11 +57,10 @@ export function AIProvidersSecretProtectionCard(props: { state: AiProvidersSecti
   const { secretProtection } = props.state;
 
   return (
-    <section className={aiProvidersSectionCardClassName}>
+    <section className={`${settingsCompactWorkbenchClassName} ${settingsPanelClassName}`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-            <ShieldCheck size={16} className="text-[var(--sniptale-color-success)]" />
+          <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('settings.aiProviders.secretProtectionTitle')}
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-dim)]">

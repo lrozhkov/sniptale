@@ -37,7 +37,6 @@ vi.mock('../bootstrap', (_importOriginal) => ({
     captureMode: 'visible',
     microphones: [],
     quickActions: [],
-    quickActionsMode: 'grid',
     recordingControlCapability: null,
     recordingState: { status: 'idle' },
     selectedPresetId: null,
@@ -68,7 +67,6 @@ function createParams(): PopupLifecycleParams {
     bootstrap: {
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
-      setDisplayMode: vi.fn(),
       setHomeError: vi.fn(),
       setPage: vi.fn(),
       setIsReady: vi.fn(),
@@ -80,6 +78,7 @@ function createParams(): PopupLifecycleParams {
       setSelectedPresetId: vi.fn(),
       setStartError,
       setVideoCaptureMode: vi.fn(),
+      setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
       setWebcamDevices: vi.fn(),

@@ -39,6 +39,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     currentTime: 2,
     isPlaying: false,
     playbackRange: null,
+    projectHistoryTransactionActive: false,
     placementMode: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
     selectedActionEvent: null,
@@ -65,6 +66,7 @@ function createProjectState(): UseVideoEditorRuntimeParams['projectState'] {
   return {
     setProject: fn(),
     updateProject: fn(),
+    syncProjectRevision: fn(),
     setReady: fn(),
     setError: fn(),
     setSaveState: fn(),

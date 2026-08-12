@@ -143,7 +143,7 @@ function drawFreehand(
     ...(preview ? { preview: true } : {}),
   });
   context.fillStyle = object.color;
-  context.globalAlpha = object.kind === 'marker' ? object.opacity : 1;
+  context.globalAlpha *= object.kind === 'marker' ? object.opacity : 1;
   fillPolygon(context, outline, projection);
 }
 
@@ -151,9 +151,10 @@ export function renderDrawingObject(
   context: CanvasRenderingContext2D,
   object: DrawingObject,
   projection: DrawingViewportProjection,
-  options: { readonly preview?: boolean } = {}
+  options: { readonly opacity?: number; readonly preview?: boolean } = {}
 ): void {
   context.save();
+  context.globalAlpha *= options.opacity ?? 1;
   applyDrawingObjectTransform(context, object, projection);
   if (object.kind === 'pencil' || object.kind === 'marker') {
     drawFreehand(context, object, projection, options.preview === true);

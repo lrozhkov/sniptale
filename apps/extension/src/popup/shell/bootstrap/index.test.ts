@@ -10,7 +10,7 @@ import {
 } from './index.test-support';
 
 const mocks = vi.hoisted(() => ({
-  getQuickActionsBootstrapDataMock: vi.fn(),
+  getQuickActionsMock: vi.fn(),
   loadMicrophoneDevicesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
 }));
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
-  getQuickActionsBootstrapData: mocks.getQuickActionsBootstrapDataMock,
+  getQuickActions: mocks.getQuickActionsMock,
 }));
 vi.mock('../../../platform/runtime-messaging', (_importOriginal) => ({
   createRuntimeMessagingTransport: () => mocks.runtimeTransportMock,
@@ -81,6 +81,7 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
   });
   expect(result).toEqual({
     captureMode: CaptureMode.TAB,
+    hasPostRecordResult: false,
     homeError: null,
     microphones: [{ deviceId: 'mic-2', label: 'Hydrated Mic' }],
     quickActions: [
@@ -89,7 +90,6 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
         status: true,
       }),
     ],
-    quickActionsMode: 'list',
     recordingControlCapability: {
       controlToken: 'control-token-1',
       recordingId: 'recording-1',
@@ -151,29 +151,26 @@ beforeEach(() => {
     async (_label: string, task: () => Promise<unknown>) => task()
   );
   mocks.startPopupPerfSpanMock.mockImplementation(() => createPerfSpan());
-  mocks.getQuickActionsBootstrapDataMock.mockResolvedValue({
-    actions: [
-      {
-        afterCapture: 'download_default',
-        exitAfterCapture: false,
-        icon: 'camera',
-        id: 'enabled',
-        name: 'Enabled',
-        screenshotMode: 'visible',
-        status: true,
-      },
-      {
-        afterCapture: 'download_default',
-        exitAfterCapture: false,
-        icon: 'camera',
-        id: 'disabled',
-        name: 'Disabled',
-        screenshotMode: 'full',
-        status: false,
-      },
-    ],
-    displayMode: 'list',
-  });
+  mocks.getQuickActionsMock.mockResolvedValue([
+    {
+      afterCapture: 'download_default',
+      exitAfterCapture: false,
+      icon: 'camera',
+      id: 'enabled',
+      name: 'Enabled',
+      screenshotMode: 'visible',
+      status: true,
+    },
+    {
+      afterCapture: 'download_default',
+      exitAfterCapture: false,
+      icon: 'camera',
+      id: 'disabled',
+      name: 'Disabled',
+      screenshotMode: 'full',
+      status: false,
+    },
+  ]);
   mocks.loadSettingsMock.mockResolvedValue(createPopupBootstrapSettings());
   mocks.loadVideoSettingsMock.mockResolvedValue(createPopupBootstrapVideoSettings());
   mocks.loadVideoUiStateMock.mockResolvedValue(createPopupBootstrapVideoUiState());

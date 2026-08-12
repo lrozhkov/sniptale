@@ -139,4 +139,16 @@ describe('useCalloutPresetCatalogController', () => {
     expect(latest?.editor.isOpen).toBe(true);
     expect(mocks.toastError).toHaveBeenCalledWith(expect.any(String));
   });
+
+  it('ignores actions that have no valid catalog target', async () => {
+    await act(async () => root?.render(<Harness />));
+
+    await act(async () => latest?.actions.delete(catalog.presets[0]!));
+    await act(async () => latest?.actions.toggle('missing'));
+    await act(async () => latest?.actions.moveBefore('missing', null));
+
+    expect(mocks.delete).not.toHaveBeenCalled();
+    expect(mocks.toggle).not.toHaveBeenCalled();
+    expect(mocks.reorder).toHaveBeenCalledWith(catalog.presets.map((preset) => preset.id));
+  });
 });

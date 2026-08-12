@@ -1,4 +1,5 @@
 import type { DesktopMediaRequestOptions } from './types';
+import { acquireDesktopStream as acquireSharedDesktopStream } from '../../../media/desktop-stream';
 
 const DESKTOP_STREAM_ACQUIRE_PHASE = 'desktop-stream-acquire' as const;
 const DISPLAY_MEDIA_ACQUIRE_PHASE = 'display-media-acquire' as const;
@@ -18,24 +19,5 @@ export function getDesktopMediaAcquirePhase(
 export async function acquireDesktopStream(
   options: DesktopMediaRequestOptions
 ): Promise<MediaStream> {
-  if (options.desktopStreamId) {
-    return navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId: options.desktopStreamId,
-          maxFrameRate: 60,
-        },
-      } as MediaTrackConstraints,
-    });
-  }
-
-  return navigator.mediaDevices.getDisplayMedia({
-    video: {
-      frameRate: { ideal: 60 },
-      ...(options.controlledCursorCaptureEnabled ? { cursor: 'never' as const } : {}),
-    },
-    audio: false,
-  });
+  return acquireSharedDesktopStream(options);
 }

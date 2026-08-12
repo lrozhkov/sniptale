@@ -1,6 +1,6 @@
 import type { NativeCaptureSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../../platform/i18n';
-import { settingsPanelClassName } from '../../../../section-surface';
+import { settingsCompactWorkbenchClassName } from '../../../../section-surface';
 import { ToggleRow } from '../components/toggle-row';
 import { NativeAdvancedFields } from './fields';
 
@@ -16,7 +16,7 @@ export function NativeCaptureView(props: {
   const updateAdvanced = (advanced: Partial<NativeCaptureSettings['video']['advanced']>) =>
     updateVideo({ advanced: { ...props.settings.video.advanced, ...advanced } });
   return (
-    <section className={[settingsPanelClassName, 'space-y-5'].join(' ')}>
+    <section className={[settingsCompactWorkbenchClassName, 'space-y-5'].join(' ')}>
       <ToggleRow
         checked={props.settings.screenshots.includeCursor}
         disabled={props.disabled}

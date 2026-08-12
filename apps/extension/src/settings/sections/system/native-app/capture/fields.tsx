@@ -3,8 +3,9 @@ import type {
   NativeCaptureSettings,
   NativeVideoFrameRate,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../../../../platform/i18n';
+import { SettingsControlRow } from '../../../../section-surface';
 import { ToggleRow } from '../components/toggle-row';
 
 const frameRateOptions: NativeVideoFrameRate[] = ['auto', 24, 30, 60];
@@ -32,8 +33,8 @@ export function NativeAdvancedFields(props: {
 }) {
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2">
-        <ProductField label={translate('settings.nativeApp.frameRate')}>
+      <div className="space-y-1">
+        <SettingsControlRow label={translate('settings.nativeApp.frameRate')}>
           <ProductSelect
             aria-label={translate('settings.nativeApp.frameRate')}
             disabled={props.disabled}
@@ -49,8 +50,8 @@ export function NativeAdvancedFields(props: {
               })
             }
           />
-        </ProductField>
-        <ProductField label={translate('settings.nativeApp.audioSourceMode')}>
+        </SettingsControlRow>
+        <SettingsControlRow label={translate('settings.nativeApp.audioSourceMode')}>
           <ProductSelect
             aria-label={translate('settings.nativeApp.audioSourceMode')}
             disabled={props.disabled}
@@ -63,8 +64,8 @@ export function NativeAdvancedFields(props: {
               props.updateAdvanced({ audioSourceMode: value as NativeAudioSourceMode })
             }
           />
-        </ProductField>
-        <ProductField label={translate('settings.nativeApp.audioBitrate')}>
+        </SettingsControlRow>
+        <SettingsControlRow label={translate('settings.nativeApp.audioBitrate')}>
           <ProductSelect
             aria-label={translate('settings.nativeApp.audioBitrate')}
             disabled={props.disabled}
@@ -77,10 +78,10 @@ export function NativeAdvancedFields(props: {
               props.updateAdvanced({ audioBitrateKbps: Number(value) as 96 | 128 | 160 | 192 })
             }
           />
-        </ProductField>
-        <ProductField
+        </SettingsControlRow>
+        <SettingsControlRow
           label={translate('settings.nativeApp.bitrateOverride')}
-          hint={translate('settings.nativeApp.bitrateOverrideHint')}
+          description={translate('settings.nativeApp.bitrateOverrideHint')}
         >
           <ProductInput
             key={props.settings.video.advanced.videoBitrateMbpsOverride ?? 'auto'}
@@ -93,8 +94,8 @@ export function NativeAdvancedFields(props: {
               props.updateAdvanced({ videoBitrateMbpsOverride: parseOptionalBitrate(value) })
             }
           />
-        </ProductField>
-        <ProductField label={translate('settings.nativeApp.maxDuration')}>
+        </SettingsControlRow>
+        <SettingsControlRow label={translate('settings.nativeApp.maxDuration')}>
           <ProductInput
             key={props.settings.video.advanced.maxDurationMinutes}
             defaultValue={props.settings.video.advanced.maxDurationMinutes}
@@ -108,7 +109,7 @@ export function NativeAdvancedFields(props: {
               })
             }
           />
-        </ProductField>
+        </SettingsControlRow>
       </div>
       <div className="space-y-1">
         <ToggleRow

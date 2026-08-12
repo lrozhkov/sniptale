@@ -1,4 +1,6 @@
 import {
+  resetGlobalSystemPrompt,
+  resetScenarioEditorSystemPrompt,
   saveGlobalSystemPrompt,
   saveScenarioEditorSystemPrompt,
 } from '../../../runtime/ai-settings/mutations';
@@ -11,7 +13,6 @@ const logger = createLogger({ namespace: 'SettingsAiPromptsSave' });
 export async function saveAiProvidersGlobalPrompt(globalPrompt: string): Promise<string | null> {
   try {
     await saveGlobalSystemPrompt(globalPrompt);
-    toast.success(translate('settings.aiProviders.globalPromptSavedMessage'));
     return null;
   } catch (error) {
     const message = [
@@ -27,7 +28,6 @@ export async function saveAiProvidersGlobalPrompt(globalPrompt: string): Promise
 export async function saveAiProvidersScenarioEditorPrompt(prompt: string): Promise<string | null> {
   try {
     await saveScenarioEditorSystemPrompt(prompt);
-    toast.success(translate('settings.aiProviders.scenarioEditorPromptSavedMessage'));
     return null;
   } catch (error) {
     const message = [
@@ -38,4 +38,37 @@ export async function saveAiProvidersScenarioEditorPrompt(prompt: string): Promi
     toast.error(message);
     return message;
   }
+}
+
+type PromptResetResult = { error: string | null };
+
+async function resetPrompt(args: {
+  errorSuffixKey:
+    | 'settings.aiProviders.globalPromptResetErrorSuffix'
+    | 'settings.aiProviders.scenarioEditorPromptResetErrorSuffix';
+  reset: () => Promise<void>;
+}): Promise<PromptResetResult> {
+  try {
+    await args.reset();
+    return { error: null };
+  } catch (error) {
+    const message = [translate('common.states.error'), translate(args.errorSuffixKey)].join('');
+    logger.error('Failed to reset AI prompt', error);
+    toast.error(message);
+    return { error: message };
+  }
+}
+
+export function resetAiProvidersGlobalPrompt(): Promise<PromptResetResult> {
+  return resetPrompt({
+    errorSuffixKey: 'settings.aiProviders.globalPromptResetErrorSuffix',
+    reset: resetGlobalSystemPrompt,
+  });
+}
+
+export function resetAiProvidersScenarioEditorPrompt(): Promise<PromptResetResult> {
+  return resetPrompt({
+    errorSuffixKey: 'settings.aiProviders.scenarioEditorPromptResetErrorSuffix',
+    reset: resetScenarioEditorSystemPrompt,
+  });
 }

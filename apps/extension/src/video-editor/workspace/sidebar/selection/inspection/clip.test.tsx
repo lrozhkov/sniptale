@@ -6,8 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectTrack,
 } from '../../../../../features/video/project/factories/creation';
-import { createTextClip } from '../../../../../features/video/project/factories/overlay-clip';
+import {
+  createSubtitleClip,
+  createTextClip,
+} from '../../../../../features/video/project/factories/overlay-clip';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
@@ -207,6 +211,33 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.fitScalePercentLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
+  });
+
+  it('keeps cursor-recognition controls out of video clip inspection', () => {
+    renderInspectPanel(createVideoProps());
+
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupTracking');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
+  });
+
+  it('keeps persisted subtitle clips out of clip inspection', () => {
+    const props = createProps();
+    const subtitleTrack = createVideoProjectTrack('Legacy subtitles', 4, VideoTrackKind.SUBTITLE);
+    const subtitleClip = createSubtitleClip(
+      subtitleTrack.id,
+      props.project.width,
+      props.project.height,
+      0
+    );
+    props.project.tracks.push(subtitleTrack);
+    props.project.clips.push(subtitleClip);
+    props.selectedClip = subtitleClip;
+    props.selection = { clipId: subtitleClip.id, kind: VideoEditorSelectionKind.CLIP };
+
+    renderInspectPanel(props);
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.selectionEmpty');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupGeneral');
   });
 });
 

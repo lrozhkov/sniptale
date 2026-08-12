@@ -18,13 +18,12 @@ vi.mock('../../../../features/quick-actions-presets/catalog', () => ({
   createBundledQuickAction: vi.fn(),
   getCaptureActionDescriptors: vi.fn(),
   getBundledQuickActionConfig: vi.fn(),
-  DEFAULT_QUICK_ACTIONS_DISPLAY_MODE: 'list',
   getBundledQuickActions: vi.fn(),
   getQuickActionDisplayName: (action: { id: string }) => `display:${action.id}`,
   isBundledQuickAction: vi.fn(),
   mergeStoredQuickActions: vi.fn(),
   normalizeQuickAction: vi.fn(),
-  sanitizeQuickActionsDisplayMode: vi.fn(),
+  resetBundledQuickAction: vi.fn(),
 }));
 
 vi.mock('./meta', () => ({

@@ -6,7 +6,10 @@ export function createIntegrationTemplatesState() {
   return {
     addTemplate: vi.fn(async () => undefined),
     isLoading: false,
-    removeTemplate: vi.fn(async () => undefined),
+    templateLifecycle: {
+      remove: vi.fn(async () => undefined),
+      restoreSystem: vi.fn(async () => undefined),
+    },
     selectTemplate: vi.fn(async () => 'Template content'),
     templates: [],
     updateTemplate: vi.fn(async () => undefined),

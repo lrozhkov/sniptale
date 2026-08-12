@@ -4,32 +4,9 @@ import { getVideoProject } from '../../../composition/persistence/projects';
 import { createVideoProjectListItem } from '../../../features/media-hub/video-project-list-items';
 import { ensureLibraryThumbnail } from '../../library/panel/thumbnails/ensure';
 import { useVideoEditorStore } from '../../state/store';
+import { waitForVideoEditorSave } from '../../runtime/session/save-readiness';
 
 type ReadyVideoProject = Extract<Awaited<ReturnType<typeof getVideoProject>>, { status: 'ready' }>;
-
-async function waitForVideoAutosave(projectId: string): Promise<void> {
-  const current = useVideoEditorStore.getState();
-  if (current.project?.id !== projectId) throw new Error('The open video project changed.');
-  if (current.saveState === 'saved') return;
-  if (current.saveState === 'error') throw new Error('The video project has unsaved changes.');
-  await new Promise<void>((resolve, reject) => {
-    const timeout = globalThis.setTimeout(() => {
-      unsubscribe();
-      reject(new Error('The video project did not finish saving.'));
-    }, 15_000);
-    const unsubscribe = useVideoEditorStore.subscribe((state) => {
-      if (state.project?.id !== projectId || state.saveState === 'error') {
-        globalThis.clearTimeout(timeout);
-        unsubscribe();
-        reject(new Error('The video project could not be saved.'));
-      } else if (state.saveState === 'saved') {
-        globalThis.clearTimeout(timeout);
-        unsubscribe();
-        resolve();
-      }
-    });
-  });
-}
 
 async function refreshPresentation(stored: ReadyVideoProject): Promise<void> {
   const item = createVideoProjectListItem(
@@ -62,7 +39,7 @@ export async function refreshSavedVideoProjectPresentation(
 }
 
 export async function promoteOpenVideoProject(projectId: string): Promise<void> {
-  await waitForVideoAutosave(projectId);
+  await waitForVideoEditorSave(projectId);
   const currentProject = useVideoEditorStore.getState().project;
   const stored = await getVideoProject(projectId);
   if (

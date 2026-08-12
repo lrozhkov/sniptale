@@ -87,10 +87,21 @@ it('forks any template in one click, guards unsaved return, and opens saving onl
   expect(host.querySelector('[aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
     translate('content.stepBadge.numberingSection')
   );
+  expect(
+    host.querySelector('.sniptale-settings-popover-header [data-settings-action="apply-to-future"]')
+  ).toBeNull();
+
+  const saveSection = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('content.stepBadge.saveSection')}"]`
+  )!;
+  act(() => saveSection.click());
 
   const applyToFuture = host.querySelector<HTMLButtonElement>(
     '[data-settings-action="apply-to-future"]'
   )!;
+  expect(
+    applyToFuture.closest('[data-ui="shared.highlighter-template-save-settings"]')
+  ).not.toBeNull();
   act(() => applyToFuture.click());
   expect(onApplyToFuture).not.toHaveBeenCalled();
   expect(

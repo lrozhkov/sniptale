@@ -19,10 +19,12 @@ vi.mock('../../../../section-surface/panel-controls', () => ({
   settingsDangerIconButtonClassName: 'danger-button',
   settingsEmptyStateClassName: 'empty-state',
   settingsInfoIconButtonClassName: 'info-button',
+  settingsModalClassName: 'settings-modal',
   settingsModalFieldSurfaceClassName: 'field-surface',
   settingsNeutralBadgeClassName: 'neutral-badge',
   settingsSuccessBadgeClassName: 'success-badge',
   SettingsDragHandle: () => <div data-testid="drag-handle">drag</div>,
+  SettingsControlRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SettingsRange: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="range" {...props} />
   ),
@@ -211,10 +213,12 @@ describe('HighlighterPresetsPanel', () => {
     const props = await renderPanel();
     const controls = await triggerPanelInteractions();
 
-    expect(container?.textContent).toContain('highlighter.section.presetsLabel');
+    expect(container?.querySelector('h2')).toBeNull();
+    const toolbar = container?.querySelector('[data-ui="settings.collection.toolbar"]');
+    expect(toolbar?.querySelector('[type="text"]')).not.toBeNull();
+    expect(toolbar?.textContent).toContain('highlighter.section.addButton');
     expect(container?.textContent).toContain('settings.collection.defaultBadge');
-    expect(container?.textContent).toContain('highlighter.section.systemBadge');
-    expect(container?.textContent).toContain('highlighter.section.countFew');
+    expect(container?.textContent).toContain('settings.collection.builtInBadge');
     expect(props.presets.handleAddPreset).toHaveBeenCalledOnce();
     expect(props.presets.handleSetDefaultPreset).toHaveBeenCalledWith('preset-custom');
     expect(props.presets.handleEditPreset).toHaveBeenCalledWith(

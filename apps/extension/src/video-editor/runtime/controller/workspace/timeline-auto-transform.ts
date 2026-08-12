@@ -5,23 +5,31 @@ import { autoTransformRecordingProject } from '../../../project/operations/auto-
 
 interface TimelineAutoTransformStore {
   project: VideoProject | null;
-  recordingId: string | null;
   setError: (error: string | null) => void;
   updateProject: (updater: (project: VideoProject) => VideoProject) => void;
 }
 
-export function createAutoTransformRecordingAction(store: TimelineAutoTransformStore) {
+export function createAutoTransformRecordingAction(
+  store: TimelineAutoTransformStore,
+  getProjectSnapshot: () => VideoProject | null
+) {
   return (settings: VideoAutoProcessingSettings) => {
     const project = store.project;
-    const recordingId = store.recordingId ?? project?.baseRecordingId ?? null;
+    const recordingId = project?.baseRecordingId ?? null;
     if (!project || !recordingId) return;
 
     const projectId = project.id;
     const projectRevision = project.updatedAt;
+    const isCurrent = () => {
+      const current = getProjectSnapshot();
+      return current?.id === projectId && current.updatedAt === projectRevision;
+    };
     void autoTransformRecordingProject(project, recordingId, settings)
       .then((nextProject) => {
         if (!nextProject) {
-          store.setError(translate('videoEditor.timeline.autoTransformUnavailable'));
+          if (isCurrent()) {
+            store.setError(translate('videoEditor.timeline.autoTransformUnavailable'));
+          }
           return;
         }
 
@@ -32,7 +40,9 @@ export function createAutoTransformRecordingAction(store: TimelineAutoTransformS
         );
       })
       .catch((error) => {
-        store.setError(error instanceof Error ? error.message : String(error));
+        if (isCurrent()) {
+          store.setError(error instanceof Error ? error.message : String(error));
+        }
       });
   };
 }

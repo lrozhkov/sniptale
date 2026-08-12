@@ -70,12 +70,16 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Use the current tab size for screenshots',
   },
   'content.toolbar.cursorLabel': {
-    ru: 'Курсор',
-    en: 'Cursor',
+    ru: 'Навигация',
+    en: 'Navigate',
   },
   'content.toolbar.cursorDefault': {
-    ru: 'Обычная работа со страницей без инструментов редактирования',
-    en: 'Use the page normally without editing tools',
+    ru: 'Обычная работа со страницей',
+    en: 'Interact with the page normally',
+  },
+  'content.toolbar.cursorDescription': {
+    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
+    en: 'Interact with the page normally',
   },
   'content.toolbar.aiEnable': {
     ru: 'Выберите элемент на странице и опишите изменение',

@@ -105,7 +105,9 @@ beforeEach(() => {
     return 0;
   };
   vi.stubGlobal('requestAnimationFrame', requestAnimationFrameMock);
-  loadSettingsMock.mockResolvedValue({ saveCapturesToGallery: false });
+  loadSettingsMock.mockResolvedValue({
+    localStoragePolicy: { defaultDestination: 'temporary' },
+  });
   persistBackgroundCaptureMock.mockResolvedValue({ successMessage: 'Saved' });
 });
 
@@ -141,7 +143,9 @@ async function expectStaleBackgroundViewportSkipsPersistenceAndFeedback() {
 
 async function expectStaleBackgroundViewportSkipsDispatchAfterSettingsAwait() {
   const runtime = createRuntime('copy');
-  const settings = createDeferred<{ saveCapturesToGallery: boolean }>();
+  const settings = createDeferred<{
+    localStoragePolicy: { defaultDestination: 'temporary' | 'library' };
+  }>();
   loadSettingsMock.mockReturnValueOnce(settings.promise);
 
   const capturePromise = runViewportScreenshot('visible', runtime, {
@@ -154,7 +158,7 @@ async function expectStaleBackgroundViewportSkipsDispatchAfterSettingsAwait() {
 
   await settleCaptureTimers();
   runtime.session.runGeneration = 2;
-  settings.resolve({ saveCapturesToGallery: false });
+  settings.resolve({ localStoragePolicy: { defaultDestination: 'temporary' } });
   await captureExpectation;
 
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();

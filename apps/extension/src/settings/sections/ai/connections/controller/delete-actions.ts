@@ -19,10 +19,8 @@ export async function handleAiProvidersDelete(props: {
   try {
     if (confirmDelete.type === 'provider') {
       await deleteAIProviderMutation(confirmDelete.item.id);
-      toast.success(translate('settings.aiProviders.providerDeleted'));
     } else {
       await deleteAIModel(confirmDelete.item.id);
-      toast.success(translate('settings.aiProviders.modelDeleted'));
     }
 
     await props.reloadData();

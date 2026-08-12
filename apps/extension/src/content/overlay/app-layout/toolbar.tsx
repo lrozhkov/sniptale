@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
 import {
@@ -15,6 +15,11 @@ import type {
   ContentAppScenarioState,
 } from './types';
 import type { CaptureActionType } from '../../../contracts/settings';
+import { clearAllPagePreparationChanges } from '../../application/page-preparation-reset';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../platform/i18n';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -139,7 +144,60 @@ function createToolbarAutoBlurProps(
   };
 }
 
+function clearPagePreparation(
+  toolbar: ContentAppLayoutToolbarProps,
+  modeController: ContentAppLayoutToolbarProps['modeController']
+) {
+  toolbar.drawingController?.finalizeInteraction();
+  const fullyCleared = clearAllPagePreparationChanges({
+    clearHighlights: modeController.handleClearHighlights,
+    history: pagePreparationHistory,
+    resetAnnotations: browserAnnotationSession.resetForDocument,
+  });
+  showToast(
+    translate(
+      fullyCleared
+        ? 'content.toolbar.allChangesCleared'
+        : 'content.toolbar.someChangesCouldNotBeCleared'
+    ),
+    fullyCleared ? 'info' : 'error'
+  );
+}
+
+function createVideoRecordingModeToggleHandler(toolbar: ContentAppLayoutToolbarProps) {
+  const { modeController } = toolbar;
+  return async (enabled: boolean, activationEvent?: Event): Promise<boolean> => {
+    if (!toolbar.videoRecording) return false;
+    try {
+      if (!enabled) {
+        const deactivated = await toolbar.videoRecording.onDeactivate();
+        if (deactivated) toolbar.setVideoRecordingMode?.(false);
+        return deactivated;
+      }
+      const activated = await toolbar.videoRecording.onActivate(activationEvent);
+      if (!activated) return false;
+      modeController.handleToggleHighlighterMode(false);
+      modeController.handleToggleDesignReviewMode(false);
+      modeController.handleToggleQuickEditMode(false);
+      modeController.handleToggleDrawingMode?.(false);
+      toolbar.setPinnedToolbarVisible(true);
+      toolbar.setVideoRecordingMode?.(true);
+      return true;
+    } catch (error) {
+      logger.error(
+        enabled
+          ? 'Failed to activate video recording toolbar'
+          : 'Failed to release video recording toolbar',
+        error
+      );
+      showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
+      return false;
+    }
+  };
+}
+
 function renderToolbarShell(args: {
+  canClearPagePreparation: boolean;
   designReview: ContentToolbarShellProps['designReview'];
   handleToggleScreenshotMode: (enabled: boolean) => void;
   scenarioToolbarProps: ReturnType<typeof buildScenarioToolbarProps>;
@@ -150,6 +208,7 @@ function renderToolbarShell(args: {
   const handleHideToolbar = () => {
     args.toolbar.setPinnedToolbarVisible(false);
   };
+  const handleToggleVideoRecordingMode = createVideoRecordingModeToggleHandler(args.toolbar);
 
   return (
     <div className="sniptale-app" data-hidden={args.toolbar.isCompletelyHidden ? 'true' : 'false'}>
@@ -175,9 +234,17 @@ function renderToolbarShell(args: {
         quickEditDocumentMode={modes.quickEditDocumentMode}
         quickEditMode={modes.quickEditMode}
         screenshotMode={modes.screenshotMode}
-        pinToTab={args.toolbar.pinToTab}
+        {...(modes.videoRecordingMode === undefined
+          ? {}
+          : { videoRecordingMode: modes.videoRecordingMode })}
+        {...(args.toolbar.videoRecording ? { videoRecording: args.toolbar.videoRecording } : {})}
+        onToggleVideoRecordingMode={handleToggleVideoRecordingMode}
+        pinToTab={Boolean(args.toolbar.pinToTab || modes.videoRecordingMode)}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}
-        pinToTabLocked={args.toolbar.captureAction === 'scenario' && modes.screenshotMode}
+        pinToTabLocked={
+          modes.videoRecordingMode ||
+          (args.toolbar.captureAction === 'scenario' && modes.screenshotMode)
+        }
         onCaptureActionChange={args.toolbar.setCaptureAction}
         onDisableAiPickMode={args.toolbar.aiController.handleDisableAiPickMode}
         onToggleDesignReviewPanel={args.designReview.panel.toggle}
@@ -185,6 +252,8 @@ function renderToolbarShell(args: {
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
+        onClearPagePreparation={() => clearPagePreparation(args.toolbar, modeController)}
+        canClearPagePreparation={args.canClearPagePreparation}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
         timerDelay={args.toolbar.timerDelay}
@@ -212,6 +281,11 @@ function renderToolbarShell(args: {
 }
 
 export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
+  const canClearPagePreparation = useSyncExternalStore(
+    pagePreparationHistory.subscribe,
+    () => pagePreparationHistory.getState().canUndo,
+    () => false
+  );
   const byClickBlocked = isScenarioByClickBlocked(toolbar.modes);
   const handleDisableScreenshotMode = () =>
     exitScreenshotModeFromUserAction({
@@ -246,6 +320,7 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
   });
 
   return renderToolbarShell({
+    canClearPagePreparation,
     designReview,
     handleToggleScreenshotMode,
     scenarioToolbarProps,

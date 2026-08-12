@@ -55,7 +55,11 @@ function createTemplatesHookState(
     error: null,
     addTemplate: vi.fn(async () => undefined),
     updateTemplate: vi.fn(async () => undefined),
-    removeTemplate: vi.fn(async () => undefined),
+    templateLifecycle: {
+      remove: vi.fn(async () => undefined),
+      restoreSystem: vi.fn(async () => undefined),
+      setEnabled: vi.fn(async () => undefined),
+    },
     selectTemplate: vi.fn(async () => ''),
     refreshTemplates: vi.fn(async () => undefined),
     ...overrides,
@@ -121,7 +125,7 @@ async function verifyCreateTemplateFlow() {
 
   expect(addTemplate).toHaveBeenCalledWith('Новый шаблон', 'Новый текст');
   expect(latestState?.isEditorOpen).toBe(false);
-  expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  expect(toastSuccessMock).not.toHaveBeenCalled();
   expect(toastErrorMock).not.toHaveBeenCalled();
 }
 
@@ -131,7 +135,11 @@ async function verifyDeleteTemplateFlow() {
 
   usePromptTemplatesMock.mockReturnValue(
     createTemplatesHookState({
-      removeTemplate,
+      templateLifecycle: {
+        remove: removeTemplate,
+        restoreSystem: vi.fn(async () => undefined),
+        setEnabled: vi.fn(async () => undefined),
+      },
       templates: [template],
     })
   );
@@ -139,7 +147,7 @@ async function verifyDeleteTemplateFlow() {
   await renderHarness();
 
   act(() => {
-    latestState?.handleDeleteTemplate(template);
+    latestState?.templateLifecycle.requestDelete(template);
   });
 
   expect(latestState?.confirmState.isOpen).toBe(true);
@@ -151,7 +159,7 @@ async function verifyDeleteTemplateFlow() {
 
   expect(removeTemplate).toHaveBeenCalledWith('template-delete');
   expect(latestState?.confirmState).toEqual({ isOpen: false, template: null });
-  expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  expect(toastSuccessMock).not.toHaveBeenCalled();
 }
 
 async function verifyEditTemplateFlow() {
@@ -186,6 +194,27 @@ async function verifyEditTemplateFlow() {
     content: 'Новый контент',
   });
   expect(latestState?.isEditorOpen).toBe(false);
+}
+
+async function verifyResetTemplateFlow() {
+  const resetTemplate = vi.fn(async () => undefined);
+  usePromptTemplatesMock.mockReturnValue(
+    createTemplatesHookState({
+      templateLifecycle: {
+        remove: vi.fn(async () => undefined),
+        restoreSystem: resetTemplate,
+        setEnabled: vi.fn(async () => undefined),
+      },
+    })
+  );
+
+  await renderHarness();
+  await act(async () => {
+    await latestState?.templateLifecycle.restore('default-translate');
+  });
+
+  expect(resetTemplate).toHaveBeenCalledWith('default-translate');
+  expect(toastSuccessMock).not.toHaveBeenCalled();
 }
 
 async function verifyCreateTemplateFailureFlow() {
@@ -230,7 +259,11 @@ async function verifyDeleteTemplateFailureFlow() {
 
   usePromptTemplatesMock.mockReturnValue(
     createTemplatesHookState({
-      removeTemplate,
+      templateLifecycle: {
+        remove: removeTemplate,
+        restoreSystem: vi.fn(async () => undefined),
+        setEnabled: vi.fn(async () => undefined),
+      },
       templates: [template],
     })
   );
@@ -238,7 +271,7 @@ async function verifyDeleteTemplateFailureFlow() {
   await renderHarness();
 
   act(() => {
-    latestState?.handleDeleteTemplate(template);
+    latestState?.templateLifecycle.requestDelete(template);
   });
 
   let thrownError: unknown;
@@ -257,6 +290,16 @@ async function verifyDeleteTemplateFailureFlow() {
   expect(toastErrorMock).toHaveBeenCalledTimes(1);
 }
 
+async function verifyMutationStateDoesNotBecomeInitialLoading() {
+  usePromptTemplatesMock.mockReturnValue(
+    createTemplatesHookState({ isLoading: false, isMutating: true })
+  );
+
+  await renderHarness();
+
+  expect(latestState?.status).toMatchObject({ isLoading: false, isMutating: true });
+}
+
 describe('useTemplatesSection', () => {
   it('creates a new template and closes the editor after save', verifyCreateTemplateFlow);
   it(
@@ -264,6 +307,7 @@ describe('useTemplatesSection', () => {
     verifyDeleteTemplateFlow
   );
   it('edits an existing template through the shared editor flow', verifyEditTemplateFlow);
+  it('restores a customized system template through the feature owner', verifyResetTemplateFlow);
   it(
     'keeps the editor open and shows an error toast when save fails',
     verifyCreateTemplateFailureFlow
@@ -271,5 +315,9 @@ describe('useTemplatesSection', () => {
   it(
     'keeps the delete dialog open and shows an error toast when delete fails',
     verifyDeleteTemplateFailureFlow
+  );
+  it(
+    'keeps initial loading separate from background mutation state',
+    verifyMutationStateDoesNotBecomeInitialLoading
   );
 });

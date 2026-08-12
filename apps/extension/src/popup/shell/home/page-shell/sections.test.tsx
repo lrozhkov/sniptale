@@ -1,51 +1,19 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   cleanupRenderedNode,
-  createGalleryStatus,
   createQuickAction,
   getContainer,
   renderNode,
 } from './popup-home.test.helpers';
 
-const { openGallerySpy, openImageEditorSpy, openScenarioEditorSpy, quickActionsBlockSpy } =
-  vi.hoisted(() => ({
-    openGallerySpy: vi.fn(),
-    openImageEditorSpy: vi.fn(),
-    openScenarioEditorSpy: vi.fn(),
-    quickActionsBlockSpy: vi.fn(),
-  }));
+const { quickActionsBlockSpy } = vi.hoisted(() => ({ quickActionsBlockSpy: vi.fn() }));
 
-vi.mock('../../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
-}));
-
-vi.mock('../../../../ui/popup-shell/action-button', (_importOriginal) => ({
-  PopupActionButton: (props: {
-    dataUi: string;
-    disabled?: boolean;
-    label: string;
-    title?: string;
-    onClick: () => void;
-  }) => (
-    <button
-      data-ui={props.dataUi}
-      disabled={props.disabled}
-      title={props.title}
-      onClick={props.onClick}
-    >
-      {props.label}
-    </button>
-  ),
-}));
-
-vi.mock('../../navigation/actions', (_importOriginal) => ({
-  openGallery: openGallerySpy,
-  openImageEditor: openImageEditorSpy,
-  openScenarioEditor: openScenarioEditorSpy,
 }));
 
 vi.mock('../quick-actions/block', (_importOriginal) => ({
@@ -55,34 +23,10 @@ vi.mock('../quick-actions/block', (_importOriginal) => ({
   },
 }));
 
-import { PopupHomeActionRow, PopupHomeErrorMessage, PopupHomeQuickActions } from './sections';
-
-function getActionRowButtons() {
-  return Array.from(getContainer()?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-}
-
-function expectActionRowTitles(buttons: HTMLButtonElement[]) {
-  expect(buttons).toHaveLength(4);
-  expect(buttons[0]?.title).toBe('Screenshot blocked');
-  expect(buttons[1]?.title).toBe('popup.home.imageEditorTitle');
-  expect(buttons[2]?.title).toBe('popup.home.scenarioEditorTitle');
-  expect(buttons[3]?.title).toBe('popup.home.galleryTitle. 82 MB used');
-}
-
-function clickActionRowButtons(buttons: HTMLButtonElement[]) {
-  act(() => {
-    buttons[0]?.click();
-    buttons[1]?.click();
-    buttons[2]?.click();
-    buttons[3]?.click();
-  });
-}
+import { PopupHomeErrorMessage, PopupHomeQuickActions } from './sections';
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  openGallerySpy.mockReset();
-  openImageEditorSpy.mockReset();
-  openScenarioEditorSpy.mockReset();
   quickActionsBlockSpy.mockReset();
 });
 
@@ -99,7 +43,6 @@ it('renders the quick-actions empty state when the owner is visible without acti
       quickActionsReady
       hasQuickActions={false}
       quickActions={[]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle={null}
       restrictionIndicatorTitle="Restricted"
@@ -107,15 +50,16 @@ it('renders the quick-actions empty state when the owner is visible without acti
     />
   );
 
-  const section = getContainer()?.querySelector('section');
+  const content = getContainer()?.firstElementChild;
 
-  expect(getContainer()?.textContent).toContain('popup.home.quickActionsTitle');
+  expect(getContainer()?.textContent).not.toContain('popup.home.quickActionsTitle');
   expect(getContainer()?.textContent).toContain('popup.home.quickActionsEmpty');
   expect(getContainer()?.querySelector('[data-testid="quick-actions-block"]')).toBeNull();
   expect(
     getContainer()?.querySelector('[data-ui="popup.home.quick-actions-restriction-indicator"]')
-  ).not.toBeNull();
-  expect(section?.className).toContain('rounded-[16px]');
+  ).toBeNull();
+  expect(content?.className).toContain('overflow-y-auto');
+  expect(getContainer()?.querySelector('section')).toBeNull();
 });
 
 it('forwards the quick-actions owner props to the list block and hides the section when disabled', async () => {
@@ -128,7 +72,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle="Blocked reason"
       restrictionIndicatorTitle={null}
@@ -140,7 +83,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
     expect.objectContaining({
       actions: [action],
       disabledTitle: 'Blocked reason',
-      displayMode: 'list',
       onTriggerAction,
       presets: [],
     })
@@ -152,7 +94,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
       quickActionsReady
       hasQuickActions
       quickActions={[action]}
-      displayMode="list"
       viewportPresets={[]}
       quickActionsDisabledTitle={null}
       restrictionIndicatorTitle={null}
@@ -161,28 +102,6 @@ it('forwards the quick-actions owner props to the list block and hides the secti
   );
 
   expect(getContainer()?.innerHTML).toBe('');
-});
-
-it('renders the action row titles and delegates button clicks', async () => {
-  const onOpenScreenshotMode = vi.fn();
-
-  await renderNode(
-    <PopupHomeActionRow
-      screenshotDisabled={false}
-      screenshotDisabledTitle="Screenshot blocked"
-      galleryStatus={createGalleryStatus({ text: '82 MB used' })}
-      onOpenScreenshotMode={onOpenScreenshotMode}
-    />
-  );
-
-  const buttons = getActionRowButtons();
-  expectActionRowTitles(buttons);
-  clickActionRowButtons(buttons);
-
-  expect(onOpenScreenshotMode).toHaveBeenCalled();
-  expect(openImageEditorSpy).toHaveBeenCalled();
-  expect(openScenarioEditorSpy).toHaveBeenCalled();
-  expect(openGallerySpy).toHaveBeenCalled();
 });
 
 it('renders the popup home error message copy', async () => {

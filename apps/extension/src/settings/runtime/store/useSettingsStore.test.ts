@@ -182,6 +182,7 @@ async function verifiesStaleLoadsDoNotResetQueuedWrites() {
     imageFormat: 'jpeg',
     imageQuality: 80,
   });
+  expect(store.getState().isLoading).toBe(false);
   expect(store.getState().error).toBeNull();
 }
 
@@ -211,7 +212,7 @@ async function verifiesStoreInstancesDoNotShareWriteQueueState() {
   expect(updateSettingsRuntimeStateMock).toHaveBeenCalledTimes(2);
   expect(secondStore.getState().settings).toMatchObject({ imageFormat: 'jpeg' });
   expect(secondStore.getState().isLoading).toBe(false);
-  expect(firstStore.getState().isLoading).toBe(true);
+  expect(firstStore.getState().isLoading).toBe(false);
 
   firstWrite.resolve({
     ...settingsFixture,
@@ -223,6 +224,19 @@ async function verifiesStoreInstancesDoNotShareWriteQueueState() {
 }
 
 function runUseSettingsStoreUpdateSuite() {
+  it('does not expose background writes as initial settings loading', async () => {
+    const store = await loadStore();
+    const write = createDeferred<typeof settingsFixture>();
+    updateSettingsRuntimeStateMock.mockReturnValueOnce(write.promise);
+
+    const update = store.getState().updateSettings({ imageQuality: 80 });
+    expect(store.getState().isLoading).toBe(false);
+
+    write.resolve({ ...settingsFixture, imageQuality: 80 });
+    await update;
+    expect(store.getState().isLoading).toBe(false);
+  });
+
   it(
     'serializes concurrent settings updates against the latest saved state',
     verifiesQueuedSettingsUpdatesUseTheLatestSavedState

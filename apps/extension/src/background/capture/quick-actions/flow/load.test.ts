@@ -16,7 +16,11 @@ vi.mock('../../../../composition/persistence/settings', async (importOriginal) =
   loadSettings: loadSettingsMock,
 }));
 
-import { loadQuickActionRuntimeContext, resolveQuickActionRuntimeContext } from './load';
+import {
+  loadQuickActionRuntimeContext,
+  loadScreenshotCaptureRuntimeContext,
+  resolveQuickActionRuntimeContext,
+} from './load';
 
 function createSettings(overrides: Partial<Settings> = {}): Settings {
   return {
@@ -99,7 +103,72 @@ describe('loadQuickActionRuntimeContext', () => {
   });
 });
 
+describe('loadScreenshotCaptureRuntimeContext', () => {
+  it('normalizes an allowed popup desktop config before creating the runtime context', async () => {
+    const context = await loadScreenshotCaptureRuntimeContext({
+      screenshotMode: 'desktop',
+      viewportPresetId: 'wide',
+      delay: 10,
+      afterCapture: 'edit',
+      imageFormat: 'webp',
+      imageQuality: 70,
+      exitAfterCapture: true,
+    });
+    expect(context).toMatchObject({
+      captureMode: 'desktop',
+      viewportPresetId: null,
+      delaySeconds: 0,
+      afterCapture: 'edit',
+      imageFormat: 'webp',
+      action: { exitAfterCapture: false, imageQuality: 70 },
+    });
+  });
+
+  it.each(['scenario', 'copy'] as const)(
+    'rejects unsupported desktop delivery %s at the runtime boundary',
+    async (afterCapture) => {
+      await expect(
+        loadScreenshotCaptureRuntimeContext({
+          screenshotMode: 'desktop',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture,
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        })
+      ).rejects.toThrow('unavailable for window or screen capture');
+    }
+  );
+
+  it('closes only tools opened by a direct popup tab capture', async () => {
+    const context = await loadScreenshotCaptureRuntimeContext({
+      screenshotMode: 'visible',
+      viewportPresetId: null,
+      delay: null,
+      afterCapture: 'download_default',
+      imageFormat: null,
+      imageQuality: null,
+      exitAfterCapture: false,
+    });
+
+    expect(context.action.exitAfterCapture).toBe(true);
+  });
+});
+
 describe('resolveQuickActionRuntimeContext', () => {
+  it.each(['scenario', 'ask_preset'] as const)(
+    'rejects the unsupported desktop sink %s at the runtime boundary',
+    (afterCapture) => {
+      expect(() =>
+        resolveQuickActionRuntimeContext(
+          createQuickAction({ screenshotMode: 'desktop', afterCapture }),
+          createSettings()
+        )
+      ).toThrow('unavailable for window or screen capture');
+    }
+  );
+
   it('fills the runtime defaults from the action and settings', () => {
     expect(
       resolveQuickActionRuntimeContext(
@@ -118,5 +187,14 @@ describe('resolveQuickActionRuntimeContext', () => {
       imageFormat: 'png',
       imageQuality: 90,
     });
+  });
+
+  it('does not inherit the retired global viewport default', () => {
+    expect(
+      resolveQuickActionRuntimeContext(
+        createQuickAction(),
+        createSettings({ defaultViewportPresetId: 'legacy-default' })
+      ).viewportPresetId
+    ).toBeNull();
   });
 });

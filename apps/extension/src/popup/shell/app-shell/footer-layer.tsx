@@ -1,12 +1,22 @@
-import { openDesignSystem, openGithubRepository, openSettings } from '../navigation/actions';
+import {
+  openGallery,
+  openGithubRepository,
+  openImageEditor,
+  openScenarioEditor,
+  openSettings,
+  openVideoEditor,
+} from '../navigation/actions';
 import PopupFooter from '../footer';
 
 export function FooterLayer() {
   return (
     <PopupFooter
-      onOpenDesignSystem={openDesignSystem}
+      onOpenGallery={openGallery}
       onOpenGithub={openGithubRepository}
+      onOpenImageEditor={openImageEditor}
+      onOpenScenarioEditor={openScenarioEditor}
       onOpenSettings={openSettings}
+      onOpenVideoEditor={openVideoEditor}
       showRestrictionIndicator={false}
       restrictionIndicatorTitle={null}
     />

@@ -4,6 +4,7 @@ export class AudioMixerGraph {
   private tabSource: MediaStreamAudioSourceNode | null = null;
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micGain: GainNode | null = null;
+  private silenceSource: ConstantSourceNode | null = null;
 
   private getInitializedAudioContext(): AudioContext {
     if (!this.audioContext) {
@@ -36,6 +37,10 @@ export class AudioMixerGraph {
     }
 
     this.destination = this.audioContext.createMediaStreamDestination();
+    this.silenceSource = this.audioContext.createConstantSource();
+    this.silenceSource.offset.value = 0;
+    this.silenceSource.connect(this.destination);
+    this.silenceSource.start();
   }
 
   connectTabStream(tabStream: MediaStream): void {
@@ -93,6 +98,9 @@ export class AudioMixerGraph {
   async cleanup(): Promise<void> {
     this.disconnectTabStream();
     this.disconnectMicrophoneStream();
+    this.silenceSource?.stop();
+    this.silenceSource?.disconnect();
+    this.silenceSource = null;
 
     if (this.audioContext && this.audioContext.state !== 'closed') {
       await this.audioContext.close();

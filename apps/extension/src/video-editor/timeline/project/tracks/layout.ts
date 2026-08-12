@@ -31,8 +31,6 @@ export interface TimelineTrackLayoutModel {
   totalTrackHeight: number;
 }
 
-const NEW_LOGICAL_LANE_HOVER_ZONE_PX = 36;
-
 export function buildTimelineTrackLayoutModel(params: {
   project: VideoProject;
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>;
@@ -133,64 +131,18 @@ export function resolveTrackPlacementFromClientY(params: {
     };
   }
 
-  const projectedY =
-    resolveOriginalLaneAnchorY(originalLayout, params.originalTimelineLaneId) +
-    params.currentClientY -
-    params.originalClientY;
-  const targetLayout = resolveDragTargetTrackLayout(
-    params.layoutModel.layouts,
-    originalLayout,
-    projectedY
-  );
+  const projectedY = originalLayout.center + params.currentClientY - params.originalClientY;
+  const targetLayout =
+    findContainingTrackLayout(params.layoutModel.layouts, projectedY) ??
+    findNearestTrackLayout(params.layoutModel.layouts, projectedY);
   if (!targetLayout) {
     return undefined;
   }
 
-  const relativeY = Math.max(0, projectedY - targetLayout.top);
-  const targetLane = findLogicalLaneMetrics(targetLayout, relativeY);
-  const fallbackRowIndex = Math.floor(relativeY / Math.max(1, targetLayout.logicalRowHeight));
   return {
-    timelineLaneId:
-      targetLane?.logicalLaneId ?? createVideoProjectClipLogicalLaneId(fallbackRowIndex),
+    timelineLaneId: createVideoProjectClipLogicalLaneId(0),
     trackId: targetLayout.trackId,
   };
-}
-
-function resolveOriginalLaneAnchorY(
-  originalLayout: TimelineTrackLayout,
-  originalTimelineLaneId: string | null | undefined
-): number {
-  const laneMetrics = originalTimelineLaneId
-    ? originalLayout.logicalLaneMetrics.get(originalTimelineLaneId)
-    : undefined;
-  return laneMetrics
-    ? originalLayout.top + laneMetrics.clipTop + laneMetrics.clipRowHeight / 2
-    : originalLayout.center;
-}
-
-function resolveDragTargetTrackLayout(
-  layouts: TimelineTrackLayout[],
-  originalLayout: TimelineTrackLayout,
-  projectedY: number
-): TimelineTrackLayout | undefined {
-  if (isInsideOriginalTrackCreationZone(originalLayout, projectedY)) {
-    return originalLayout;
-  }
-  return (
-    findContainingTrackLayout(layouts, projectedY) ?? findNearestTrackLayout(layouts, projectedY)
-  );
-}
-
-function isInsideOriginalTrackCreationZone(
-  originalLayout: TimelineTrackLayout,
-  projectedY: number
-): boolean {
-  const creationZoneHeight =
-    originalLayout.logicalRows > 1
-      ? originalLayout.trackBaseRowHeight * 2
-      : Math.min(originalLayout.logicalRowHeight * 0.75, NEW_LOGICAL_LANE_HOVER_ZONE_PX);
-  const extendedBottom = originalLayout.top + originalLayout.rowHeight + creationZoneHeight;
-  return projectedY >= originalLayout.top && projectedY < extendedBottom;
 }
 
 function findContainingTrackLayout(
@@ -215,14 +167,4 @@ function findNearestTrackLayout(
       ? layout
       : nearestLayout;
   }, undefined);
-}
-
-function findLogicalLaneMetrics(
-  layout: TimelineTrackLayout,
-  relativeY: number
-): TimelineLogicalLaneMetrics | undefined {
-  const metrics = [...layout.logicalLaneMetrics.values()];
-  return metrics.find(
-    (item) => relativeY >= item.rowTop && relativeY < item.rowTop + item.rowHeight
-  );
 }

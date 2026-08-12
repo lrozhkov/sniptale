@@ -17,7 +17,7 @@ function getSessionRecorders(session: MultiSourceSession): SessionRecorder[] {
 
 function stopSessionStreams(session: MultiSourceSession): void {
   stopRecorderStreams([...session.recorders, session.audioRecorder]);
-  session.webcamRecorder?.stream.getTracks().forEach((track) => track.stop());
+  session.webcamRecorder?.release();
   if (session.durationTimer) clearInterval(session.durationTimer);
 }
 

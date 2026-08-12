@@ -7,7 +7,11 @@ import type { RecordingTelemetryEntry } from './contracts';
 const logger = createLogger({ namespace: 'SharedRecordingTelemetryDb' });
 
 export async function saveRecordingTelemetry(entry: RecordingTelemetryEntry): Promise<void> {
-  await runWithIndexedDbMutation((db) => db.put(RECORDING_TELEMETRY_STORE, entry));
+  const parsedEntry = parseRecordingTelemetryEntry(entry);
+  if (!parsedEntry) {
+    throw new Error('Invalid recording telemetry entry.');
+  }
+  await runWithIndexedDbMutation((db) => db.put(RECORDING_TELEMETRY_STORE, parsedEntry));
 }
 
 export async function getRecordingTelemetry(
@@ -17,13 +21,13 @@ export async function getRecordingTelemetry(
   const rawEntry: unknown = await db.get(RECORDING_TELEMETRY_STORE, recordingId);
   const entry = parseRecordingTelemetryEntry(rawEntry);
 
-  if (!entry && rawEntry !== undefined) {
+  if ((!entry || entry.recordingId !== recordingId) && rawEntry !== undefined) {
     logger.warn('Ignoring invalid recording telemetry entry from IndexedDB', {
       recordingId,
     });
   }
 
-  return entry ?? undefined;
+  return entry?.recordingId === recordingId ? entry : undefined;
 }
 
 export async function deleteRecordingTelemetry(recordingId: string): Promise<void> {

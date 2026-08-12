@@ -28,8 +28,7 @@ function openHighlighterEditor(state: HighlighterCrudActionsState, preset?: Bord
 async function deleteHighlighterPreset(state: HighlighterCrudActionsState, preset: BorderPreset) {
   if (preset.origin === 'system') return;
   try {
-    const result = await runQueuedHighlighterMutation(state, () => deleteBorderPreset(preset.id));
-    if (result?.applied) toast.success(translate('highlighter.section.presetDeleted'));
+    await runQueuedHighlighterMutation(state, () => deleteBorderPreset(preset.id));
   } catch (error) {
     logger.error('Failed to delete highlighter preset', error);
     toast.error(
@@ -48,11 +47,6 @@ async function saveHighlighterPreset(state: HighlighterCrudActionsState, preset:
     );
     if (!result || result.outcome === 'rejected') return;
     state.setIsEditorOpen(false);
-    toast.success(
-      created
-        ? translate('highlighter.section.presetCreated')
-        : translate('highlighter.section.presetUpdated')
-    );
   } catch (error) {
     logger.error('Failed to save highlighter preset', error);
     toast.error(
@@ -63,10 +57,7 @@ async function saveHighlighterPreset(state: HighlighterCrudActionsState, preset:
 
 async function resetHighlighterPreset(state: HighlighterCrudActionsState, presetId: string) {
   try {
-    const result = await runQueuedHighlighterMutation(state, () =>
-      resetSystemBorderPreset(presetId)
-    );
-    if (result?.applied) toast.success(translate('highlighter.section.presetReset'));
+    await runQueuedHighlighterMutation(state, () => resetSystemBorderPreset(presetId));
   } catch (error) {
     logger.error('Failed to reset highlighter preset', error);
     toast.error(

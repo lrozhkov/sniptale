@@ -35,7 +35,7 @@ function writeTopologyFixture(
   }
   writeJson(root, 'package.json', { name: 'verify-runtime-topology-temp', type: 'module' });
   writeFile(root, '.dependency-cruiser.cjs', 'module.exports = {};\n');
-  writeFile(root, 'AGENTS.md', 'runtime topology\n');
+  writeFile(root, 'docs/agent-tooling/AGENTS.md', 'runtime topology\n');
   writeFile(root, 'docs/architecture/code-organization.md', 'runtime topology\n');
   writeFile(root, 'docs/tooling/code-quality.md', 'runtime topology\n');
   writeFile(root, 'docs/tooling/operator-handbook.md', 'runtime topology\n');

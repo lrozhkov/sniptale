@@ -6,7 +6,9 @@ const coreMocks = vi.hoisted(() => ({
   enableAISecretPassphraseProtection: vi.fn(),
   loadAISecretProtectionStatus: vi.fn(),
   lockAISecretProtection: vi.fn(),
+  resetGlobalSystemPrompt: vi.fn(),
   resetAISecretPassphraseProtection: vi.fn(),
+  resetScenarioEditorSystemPrompt: vi.fn(),
   saveChromeAiEnabled: vi.fn(),
   saveGlobalSystemPrompt: vi.fn(),
   saveScenarioEditorSystemPrompt: vi.fn(),
@@ -46,6 +48,8 @@ beforeEach(() => {
 it('dispatches value and secret-protection commands inside the same authority', async () => {
   await mutateStoredAISettings({ operation: 'save-global-prompt', prompt: 'global' });
   await mutateStoredAISettings({ operation: 'save-scenario-editor-prompt', prompt: 'scenario' });
+  await mutateStoredAISettings({ operation: 'reset-global-prompt' });
+  await mutateStoredAISettings({ operation: 'reset-scenario-editor-prompt' });
   await mutateStoredAISettings({ enabled: true, operation: 'save-chrome-ai-enabled' });
   await mutateStoredAISettings({
     operation: 'change-secret-passphrase-protection',
@@ -56,13 +60,15 @@ it('dispatches value and secret-protection commands inside the same authority', 
 
   expect(coreMocks.saveGlobalSystemPrompt).toHaveBeenCalledWith('global');
   expect(coreMocks.saveScenarioEditorSystemPrompt).toHaveBeenCalledWith('scenario');
+  expect(coreMocks.resetGlobalSystemPrompt).toHaveBeenCalledOnce();
+  expect(coreMocks.resetScenarioEditorSystemPrompt).toHaveBeenCalledOnce();
   expect(coreMocks.saveChromeAiEnabled).toHaveBeenCalledWith(true);
   expect(coreMocks.changeAISecretPassphraseProtection).toHaveBeenCalledWith({
     currentPassphrase: 'current',
     nextPassphrase: 'next',
   });
   expect(coreMocks.lockAISecretProtection).toHaveBeenCalledOnce();
-  expect(invariantMock).toHaveBeenCalledTimes(10);
+  expect(invariantMock).toHaveBeenCalledTimes(14);
 });
 
 it('dispatches remaining secret-protection commands and returns serialized status', async () => {

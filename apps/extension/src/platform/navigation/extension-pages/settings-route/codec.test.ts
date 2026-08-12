@@ -10,12 +10,14 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(13);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(12);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
-      annotations: ['borders', 'callouts', 'numbering'],
-      'storage-drafts': [],
+      annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
+      saving: ['settings', 'storage', 'templates'],
       'editor-resources': ['tools', 'palettes'],
+      'ai-connections': ['integrations', 'chrome-ai', 'security'],
+      'ai-prompts': ['templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
       'access-data': ['permissions', 'privacy'],
     });
@@ -23,9 +25,10 @@ describe('settings route codec', () => {
 
   it.each([
     ['appearance', 'interface-browser', undefined],
-    ['ai', 'ai-connections', undefined],
+    ['ai', 'ai-connections', 'integrations'],
     ['presets', 'screen-sizes', undefined],
-    ['saves', 'saving', undefined],
+    ['saves', 'saving', 'settings'],
+    ['storage-drafts', 'saving', 'storage'],
     ['highlighter', 'annotations', 'borders'],
     ['editor', 'editor-resources', 'tools'],
     ['image', 'media-quality', 'image'],
@@ -37,7 +40,7 @@ describe('settings route codec', () => {
     ['native-screenshots', 'native-app', 'capture'],
     ['native-video', 'native-app', 'capture'],
     ['native-telemetry', 'native-app', 'telemetry'],
-    ['templates', 'ai-prompts', undefined],
+    ['templates', 'ai-prompts', 'templates'],
     ['permissions', 'access-data', 'permissions'],
     ['privacy', 'access-data', 'privacy'],
   ])('normalizes legacy section %s', (legacy, section, view) => {
@@ -77,5 +80,17 @@ describe('settings route codec', () => {
     expect(buildSettingsRouteUrl(BASE, { section: 'annotations' }).searchParams.get('view')).toBe(
       'borders'
     );
+    expect(
+      buildSettingsRouteUrl(BASE, { section: 'annotations', view: 'tags' }).searchParams.get('view')
+    ).toBe('tags');
+    expect(buildSettingsRouteUrl(BASE, { section: 'ai-prompts' }).searchParams.get('view')).toBe(
+      'templates'
+    );
+    expect(buildSettingsRouteUrl(BASE, { section: 'saving' }).searchParams.get('view')).toBe(
+      'settings'
+    );
+    expect(
+      buildSettingsRouteUrl(BASE, { section: 'ai-connections' }).searchParams.get('view')
+    ).toBe('integrations');
   });
 });

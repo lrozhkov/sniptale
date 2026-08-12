@@ -1,24 +1,53 @@
-import { AlertTriangle, Blocks, Github, Settings2 } from 'lucide-react';
-import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import { isDesignSystemEnabled } from '../../../platform/config/design-system-access';
+import { AlertTriangle, Film, Github, Settings2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { PopupFooterAction } from './action';
+import { ImageAdjust, ImageStack, StoryboardFlow } from './application-icons';
 import { PopupFooterThemeToggle } from './theme-toggle';
 
-function getPopupFooterVersion(): string {
-  try {
-    return runtimeInfo.getManifest().version;
-  } catch {
-    return '';
-  }
-}
-
 export interface PopupFooterProps {
-  onOpenDesignSystem: () => void;
+  onOpenGallery: () => void;
+  onOpenImageEditor: () => void;
+  onOpenScenarioEditor: () => void;
+  onOpenVideoEditor: () => void;
   onOpenGithub: () => void;
   onOpenSettings: () => void;
   restrictionIndicatorTitle?: string | null;
   showRestrictionIndicator?: boolean;
+}
+
+function PopupFooterApplicationActions(props: PopupFooterProps) {
+  return (
+    <div className="flex shrink-0 items-center gap-1" data-ui="popup.footer.application-actions">
+      <PopupFooterAction
+        onClick={props.onOpenImageEditor}
+        icon={ImageAdjust}
+        label={translate('popup.common.footerImageEditor')}
+        iconOnly
+        dataUi="popup.footer.image-editor-button"
+      />
+      <PopupFooterAction
+        onClick={props.onOpenVideoEditor}
+        icon={Film}
+        label={translate('popup.common.footerVideoEditor')}
+        iconOnly
+        dataUi="popup.footer.video-editor-button"
+      />
+      <PopupFooterAction
+        onClick={props.onOpenScenarioEditor}
+        icon={StoryboardFlow}
+        label={translate('popup.common.footerScenarioEditor')}
+        iconOnly
+        dataUi="popup.footer.scenario-editor-button"
+      />
+      <PopupFooterAction
+        onClick={props.onOpenGallery}
+        icon={ImageStack}
+        label={translate('popup.common.footerGallery')}
+        iconOnly
+        dataUi="popup.footer.gallery-button"
+      />
+    </div>
+  );
 }
 
 function PopupFooterRestrictionIndicator({
@@ -46,15 +75,6 @@ function PopupFooterActions(props: PopupFooterProps) {
   return (
     <div className="ml-3 flex items-center gap-2">
       <PopupFooterThemeToggle />
-      {isDesignSystemEnabled() ? (
-        <PopupFooterAction
-          onClick={props.onOpenDesignSystem}
-          icon={Blocks}
-          label={translate('popup.common.footerDesignSystem')}
-          compact
-          dataUi="popup.footer.design-system-button"
-        />
-      ) : null}
       {props.showRestrictionIndicator && props.restrictionIndicatorTitle ? (
         <PopupFooterRestrictionIndicator
           restrictionIndicatorTitle={props.restrictionIndicatorTitle}
@@ -78,15 +98,20 @@ function PopupFooterActions(props: PopupFooterProps) {
 }
 
 export function PopupFooter({
-  onOpenDesignSystem,
+  onOpenGallery,
+  onOpenImageEditor,
+  onOpenScenarioEditor,
+  onOpenVideoEditor,
   onOpenGithub,
   onOpenSettings,
   restrictionIndicatorTitle,
   showRestrictionIndicator = false,
 }: PopupFooterProps) {
-  const version = getPopupFooterVersion();
   const actionsProps = {
-    onOpenDesignSystem,
+    onOpenGallery,
+    onOpenImageEditor,
+    onOpenScenarioEditor,
+    onOpenVideoEditor,
     onOpenGithub,
     onOpenSettings,
     showRestrictionIndicator,
@@ -107,8 +132,13 @@ export function PopupFooter({
         'text-[var(--sniptale-color-text-muted-strong)]',
       ].join(' ')}
     >
-      <div className="min-w-0 truncate text-[var(--sniptale-color-text-dim)]">
-        {version ? `v${version}` : null}
+      <div className="flex min-w-0 items-center gap-2">
+        <PopupFooterApplicationActions {...actionsProps} />
+        <div
+          aria-hidden="true"
+          className="h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+          data-ui="popup.footer.application-separator"
+        />
       </div>
       <PopupFooterActions {...actionsProps} />
     </footer>

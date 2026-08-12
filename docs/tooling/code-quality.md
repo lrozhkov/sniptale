@@ -2,7 +2,7 @@
 
 Updated: 2026-07-22
 
-This document owns the Sniptale quality model, guard families, baseline policy, and the boundary between deterministic enforcement and review judgment. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md), and command lookup in [operator-handbook.md](operator-handbook.md).
+This document owns the Sniptale quality model, guard families, baseline policy, and the boundary between deterministic enforcement and review judgment. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
 ## Quality Model
 
@@ -115,6 +115,6 @@ Heavy lifecycle tools stay in their owning lanes: repository audit in `qa:audit`
 
 ## Drift Control
 
-Workflow-policy changes keep `AGENTS.md`, affected active tooling documents, `.agents/**`, package scripts, wrappers, and machine policy synchronized. Deterministic tools and wrappers record validation coverage in `tooling/configs/qa/validation-manifest.json`.
+Workflow-policy changes keep `docs/agent-tooling/**`, affected active tooling documents, package scripts, wrappers, and machine policy synchronized. Deterministic tools and wrappers record validation coverage in `tooling/configs/qa/validation-manifest.json`.
 
 When a document starts mixing workflow, implementation policy, wrapper behavior, command catalogs, and quality policy, move each meaning back to its owner instead of growing another handbook.

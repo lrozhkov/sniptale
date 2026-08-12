@@ -46,6 +46,13 @@ async function renderUi(node: React.ReactNode) {
 
 function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvidersSectionState {
   return {
+    catalogActions: {
+      clearProviderSecret: vi.fn().mockResolvedValue(undefined),
+      deleteModel: vi.fn().mockResolvedValue(undefined),
+      deleteProvider: vi.fn().mockResolvedValue(undefined),
+      moveModel: vi.fn().mockResolvedValue(undefined),
+      setDefaultModel: vi.fn().mockResolvedValue(undefined),
+    },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
@@ -63,10 +70,6 @@ function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvid
       closeModelModal: vi.fn(),
       setConfirmDelete: vi.fn(),
     },
-    handleDefaultModelChange: vi.fn().mockResolvedValue(undefined),
-    handleClearProviderSecret: vi.fn().mockResolvedValue(undefined),
-    handleDeleteProvider: vi.fn().mockResolvedValue(undefined),
-    handleDeleteModel: vi.fn().mockResolvedValue(undefined),
     reloadData: vi.fn().mockResolvedValue(undefined),
     getProviderName: vi.fn(() => 'OpenAI'),
     ...overrides,
@@ -90,6 +93,29 @@ async function openFirstActionMenu() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+});
+
+it('maps model reorder intents to the model order owner', async () => {
+  const state = createState({
+    models: [MODEL, { ...MODEL, id: 'model-2', displayName: 'GPT 4.2' }],
+  });
+  await renderUi(<AIProvidersModelsCard state={state} />);
+
+  const firstDragHandle = container?.querySelector<HTMLElement>(
+    `[aria-label="${translate('settings.collection.dragHandle')}"]`
+  );
+  expect(firstDragHandle).toBeTruthy();
+
+  await openFirstActionMenu();
+  await act(async () => {
+    getButtons()
+      .find(
+        (button) =>
+          button.getAttribute('aria-label') === translate('settings.collection.actions.moveDown')
+      )
+      ?.click();
+  });
+  expect(state.catalogActions.moveModel).toHaveBeenCalledWith('model-1', null);
 });
 
 afterEach(async () => {
@@ -145,7 +171,7 @@ it('renders a compact clear-secret action only for providers with a stored key',
       ?.click();
   });
 
-  expect(state.handleClearProviderSecret).toHaveBeenCalledWith('provider-1');
+  expect(state.catalogActions.clearProviderSecret).toHaveBeenCalledWith('provider-1');
 
   await renderUi(
     <AIProvidersProvidersCard
@@ -190,7 +216,7 @@ it('renders model rows, default actions, and empty states when providers are una
 
   expect(state.modals.openModelModal).toHaveBeenCalledTimes(2);
   expect(state.modals.openModelModal).toHaveBeenCalledWith(MODEL);
-  expect(state.handleDefaultModelChange).toHaveBeenCalledWith('model-1');
+  expect(state.catalogActions.setDefaultModel).toHaveBeenCalledWith('model-1');
   expect(state.modals.setConfirmDelete).toHaveBeenCalledWith({ type: 'model', item: MODEL });
 
   const emptyState = createState({
@@ -241,4 +267,27 @@ it('renders chrome-ai status copy for setup, enabled, and unsupported states', a
   await renderUi(<AIProvidersChromeAiCard state={unsupportedState} />);
   expect(getButtons()[0]?.hasAttribute('disabled')).toBe(true);
   expect(container?.textContent).toContain(translate('settings.aiProviders.chromeAiUnsupported'));
+});
+
+it('runs the Chrome AI diagnostic only when the integration is enabled', async () => {
+  const chromeAi = { ...createMockChromeAiState(), enabled: true };
+  await renderUi(<AIProvidersChromeAiCard state={createState({ chromeAi })} />);
+
+  await act(async () => {
+    getButtons()
+      .find((button) => button.textContent === translate('settings.aiProviders.chromeAiTestAction'))
+      ?.click();
+  });
+  expect(chromeAi.handleTest).toHaveBeenCalledOnce();
+
+  await renderUi(
+    <AIProvidersChromeAiCard
+      state={createState({ chromeAi: { ...createMockChromeAiState(), enabled: false } })}
+    />
+  );
+  expect(
+    getButtons().find(
+      (button) => button.textContent === translate('settings.aiProviders.chromeAiTestAction')
+    )?.disabled
+  ).toBe(true);
 });

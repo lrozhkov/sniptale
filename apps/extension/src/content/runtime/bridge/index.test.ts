@@ -58,7 +58,7 @@ function createRegionSelectorControllerDeps() {
 }
 
 async function expectFirstHandlerWins() {
-  const parsedMessage = { type: 'ENABLE_SCREENSHOT_MODE' };
+  const parsedMessage = { type: 'ENABLE_HIGHLIGHTER_MODE' };
   parseContentTabMessage.mockReturnValue(parsedMessage);
   handleCoreModeMessage.mockReturnValue(false);
 
@@ -71,7 +71,7 @@ async function expectFirstHandlerWins() {
   );
 
   expect(
-    listener({ type: 'ENABLE_SCREENSHOT_MODE' }, {} as chrome.runtime.MessageSender, vi.fn())
+    listener({ type: 'ENABLE_HIGHLIGHTER_MODE' }, {} as chrome.runtime.MessageSender, vi.fn())
   ).toBe(false);
   expect(handleCoreModeMessage).toHaveBeenCalledWith(parsedMessage);
   expect(handleViewportMessage).not.toHaveBeenCalled();
@@ -91,7 +91,7 @@ async function expectInvalidPayloadStopsAtBoundary() {
   });
 
   expect(
-    listener({ type: 'ENABLE_SCREENSHOT_MODE' }, {} as chrome.runtime.MessageSender, vi.fn())
+    listener({ type: 'ENABLE_HIGHLIGHTER_MODE' }, {} as chrome.runtime.MessageSender, vi.fn())
   ).toBe(false);
   expect(warnSpy).toHaveBeenCalled();
   expect(handleCoreModeMessage).not.toHaveBeenCalled();

@@ -32,6 +32,7 @@ export type SettingsCollectionItem = {
     tone: 'neutral' | 'success' | 'warning';
   }[];
   enabled?: boolean;
+  isBuiltIn?: boolean;
   isDefault?: boolean;
   busy?: boolean;
   capabilities: {
@@ -59,9 +60,9 @@ export type SettingsCollectionProps = {
   ariaLabel: string;
   title?: ReactNode;
   description?: ReactNode;
+  toolbarControls?: ReactNode;
   items: readonly SettingsCollectionItem[];
   groups?: readonly SettingsCollectionGroup[];
-  countLabel?: ReactNode;
   addAction?: { label: string; disabled?: boolean; onInvoke(): void };
   state?: 'ready' | 'loading' | 'error';
   emptyState?: ReactNode;

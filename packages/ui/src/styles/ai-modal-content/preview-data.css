@@ -63,9 +63,9 @@
 }
 
 .sniptale-checkbox:checked {
-  background: color-mix(in srgb, var(--sniptale-accent) 14%, transparent);
-  border-color: var(--sniptale-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-accent) 10%, transparent);
+  background: var(--sniptale-color-accent);
+  border-color: var(--sniptale-color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 10%, transparent);
 }
 
 .sniptale-checkbox:checked::after {
@@ -75,7 +75,7 @@
   top: 2px;
   width: 4px;
   height: 8px;
-  border: solid var(--sniptale-accent);
+  border: solid var(--sniptale-color-text-inverse);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

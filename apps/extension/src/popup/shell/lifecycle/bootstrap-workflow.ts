@@ -8,6 +8,7 @@ import type {
 } from './contracts';
 import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
 import { stagePopupExportLaunchSelection } from '../export/selection/launch-selection';
+import { applyPopupStartupSelection, loadPopupStartupSelection } from './startup-routing';
 
 const logger = createLogger({ namespace: 'PopupLifecycle' });
 
@@ -25,7 +26,6 @@ function applyBootstrapSuccess(params: PopupLifecycleBootstrapParams, state: Pop
   params.setViewportPresets(state.viewportPresets);
   params.setQuickActions(state.quickActions);
   params.setQuickActionsReady(true);
-  params.setDisplayMode(state.quickActionsMode);
   params.setVideoSettings(state.videoSettings);
   params.setSelectedPresetId(state.selectedPresetId);
   params.setVideoCaptureMode(state.captureMode);
@@ -78,9 +78,10 @@ export async function bootstrapPopupLifecycle({
     getParams();
 
   try {
-    const [bootstrapState, launchPage] = await Promise.all([
+    const [bootstrapState, launchPage, startupState] = await Promise.all([
       bootstrapPopupState(),
       consumePopupExportLaunchIntent(),
+      loadPopupStartupSelection(),
     ]);
 
     if (cancelledRef()) {
@@ -88,9 +89,13 @@ export async function bootstrapPopupLifecycle({
     }
 
     applyBootstrapSuccess(getParams(), bootstrapState);
-    if (launchPage) {
+    if (bootstrapState.hasPostRecordResult) {
+      getParams().setPage('video');
+    } else if (launchPage) {
       stagePopupExportLaunchSelection({ includeAnnotations: true });
       getParams().setPage(launchPage);
+    } else {
+      await applyPopupStartupSelection(getParams(), startupState.selection, startupState.lastPage);
     }
     await refreshPopupSecondaryState({
       cancelledRef,

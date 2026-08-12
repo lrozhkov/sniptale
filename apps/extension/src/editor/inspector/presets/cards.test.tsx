@@ -69,7 +69,7 @@ it('filters tagged cards while pinning the selected template and exposes clear a
   expect(host.querySelector('[data-editor-template-card="hidden"]')).toBeNull();
   expect(host.textContent).toContain('Review');
 
-  const input = host.querySelector<HTMLInputElement>('input[type="search"]');
+  const input = host.querySelector<HTMLInputElement>('input[type="text"]');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, 'absent');

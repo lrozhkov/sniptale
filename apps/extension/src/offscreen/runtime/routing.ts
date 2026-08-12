@@ -47,6 +47,21 @@ import {
   deleteFrameAnnotationRasterJob,
 } from '../../composition/persistence/frame-annotation-raster-jobs';
 import { FrameAnnotationRasterizer } from '../frame-annotation-rasterizer';
+import {
+  cancelDesktopFrame,
+  captureDesktopFrame,
+  reserveDesktopFrame,
+  writeDesktopFrameClipboard,
+} from '../media/desktop-frame';
+import type { DesktopFrameResult } from '../media/desktop-frame';
+import {
+  answerCameraSourceOffer,
+  closeCameraSourcePeer,
+  switchCameraSourcePeerInput,
+  type CameraSourcePeerAnswer,
+} from '../recording/camera-source/peer';
+import { listVideoRecordingMediaDevices } from '../recording/camera-source/device-catalog';
+import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
@@ -100,6 +115,10 @@ export function resolveOffscreenErrorPhase(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
+    case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
@@ -108,6 +127,11 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES:
+      return 'runtime';
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
       return 'runtime';
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
       return 'stop';
@@ -122,13 +146,14 @@ export function resolveOffscreenRuntimeResponseMode(
   type: HandledOffscreenRuntimeMessageType
 ): ResponseMode {
   switch (type) {
-    case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
-    case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
-      return 'manual';
     case VideoMessageType.OFFSCREEN_START_RECORDING:
       return 'immediate-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
+    case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
@@ -136,9 +161,15 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES:
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:
       return 'deferred-ack';
+    case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
+    case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
     case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
       return 'manual';
   }
@@ -164,8 +195,32 @@ function buildStartRecordingArgs(
 export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
-): Promise<void | RecordingStopOutcome | 'applied' | 'stale'> {
+): Promise<
+  | void
+  | RecordingStopOutcome
+  | DesktopFrameResult
+  | CameraSourcePeerAnswer
+  | { mediaDevices: VideoRecordingMediaDevice[] }
+  | 'accepted'
+  | 'applied'
+  | 'copied'
+  | 'stale'
+> {
   switch (message.type) {
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
+      return answerCameraSourceOffer({
+        peerId: message.peerId,
+        offer: { type: 'offer', sdp: message.sdp },
+        settings: message.settings,
+      });
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
+      closeCameraSourcePeer(message.peerId);
+      return;
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:
+      await switchCameraSourcePeerInput(message.peerId, message.deviceId);
+      return;
+    case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES:
+      return { mediaDevices: await listVideoRecordingMediaDevices(message.deviceKind) };
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
@@ -181,6 +236,15 @@ export async function handleOffscreenRuntimeMessage(
         throw error;
       }
     }
+    case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
+      await writeDesktopFrameClipboard(message.dataUrl);
+      return 'copied';
+    case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
+      return reserveDesktopFrame(message.requestId);
+    case MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME:
+      return captureDesktopFrame(message);
+    case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
+      return cancelDesktopFrame(message.requestId);
     case VideoMessageType.GET_DESKTOP_MEDIA:
       await requestDesktopMedia(
         message.captureMode,
@@ -229,7 +293,7 @@ export async function handleOffscreenRuntimeMessage(
       resumeRecording(resolveRecordingSourceBinding(message));
       return;
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
-      updateRecordingSettings(resolveRecordingSourceBinding(message), message.settings);
+      await updateRecordingSettings(resolveRecordingSourceBinding(message), message.settings);
       return;
     case VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT:
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:

@@ -32,6 +32,7 @@ const FORBIDDEN_FILE_PATTERNS = [
     pattern: /(?:^|\/)(?:raw-diagnostics|raw-history|secret|private-key|token)[^/]*$/iu,
   },
 ];
+const HASHED_UI_TOKENS_BUNDLE_PATTERN = /^assets\/tokens-[a-z0-9_-]{8}\.js$/iu;
 const FORBIDDEN_TEXT_PATTERNS = [
   { message: 'sourcemap reference', pattern: /sourceMappingURL=/u },
   { message: 'trace-enabled release marker', pattern: /__TRACE_MESSAGES__|VITE_TRACE_MESSAGES/u },
@@ -221,12 +222,24 @@ async function verifyManifest(manifestContents, repoRoot, artifactPaths) {
   assertManifestPermissionPolicy(manifest, await readPolicyJson(repoRoot));
 }
 
+export function getForbiddenReleaseArtifactPathReason(relativePath) {
+  const normalizedPath = normalizeRelativePath(relativePath);
+  for (const { message, pattern } of FORBIDDEN_FILE_PATTERNS) {
+    if (
+      pattern.test(normalizedPath) &&
+      !(message === 'secret-like artifact' && HASHED_UI_TOKENS_BUNDLE_PATTERN.test(normalizedPath))
+    ) {
+      return message;
+    }
+  }
+  return null;
+}
+
 function verifyFilePath(relativePath) {
   verifyRetiredEffectArtifactPath(relativePath);
-  for (const { message, pattern } of FORBIDDEN_FILE_PATTERNS) {
-    if (pattern.test(relativePath)) {
-      throw new Error(`Release artifact contains forbidden ${message}: ${relativePath}`);
-    }
+  const forbiddenReason = getForbiddenReleaseArtifactPathReason(relativePath);
+  if (forbiddenReason) {
+    throw new Error(`Release artifact contains forbidden ${forbiddenReason}: ${relativePath}`);
   }
 }
 

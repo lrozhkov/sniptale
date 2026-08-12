@@ -3,6 +3,29 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "accepted.scc.background-runtime-media-composition.20260812",
+      "classification": "accepted-architecture",
+      "owner": "background-runtime-composition",
+      "risk": "New cross-owner imports could silently widen a privileged background dependency cycle.",
+      "reason": "The exact cycle records canonical action-kernel assembly, video lifecycle ownership, and application privacy-erasure orchestration.",
+      "removalCondition": "Remove the entry when those composition edges are replaced by a one-directional owner port.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "scc",
+        "key": "background-runtime-media-composition"
+      },
+      "scope": {
+        "edgeDigest": "e697e629f57689429cf0878d38a10b16bb72badaffe84490ae0057fae6d2c32b",
+        "id": "background-runtime-media-composition",
+        "owners": [
+          "apps/extension/src/background/application",
+          "apps/extension/src/background/media",
+          "apps/extension/src/background/runtime"
+        ]
+      },
+      "targetAction": "Keep the registered owner and edge set exact; reject any unreviewed expansion."
+    },
+    {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
       "classification": "accepted-architecture",
       "owner": "ai-secret-unlock-tests",
@@ -15,8 +38,8 @@
         "key": "apps/extension/src/background/ai/settings"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/ai/settings",
+        "count": 1,
         "lines": 12,
         "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece"
       },
@@ -35,8 +58,8 @@
         "key": "apps/extension/src/background/runtime/page-access"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/runtime/page-access",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8"
       },
@@ -55,30 +78,10 @@
         "key": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde"
-      },
-      "targetAction": "keep declarative descriptor or geometry repetition local"
-    },
-    {
-      "id": "accepted.jscpd.editor-controller-freehand.0d071be4fb41",
-      "classification": "accepted-architecture",
-      "owner": "editor-controller-freehand",
-      "risk": "Extraction could obscure owner-local declarative structure; unreviewed growth would increase maintenance cost.",
-      "reason": "The detected block is declarative descriptor/geometry data; extraction would obscure the catalog shape more than it would reduce maintenance risk.",
-      "removalCondition": "keep declarative descriptor or geometry repetition local",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/editor/controller/freehand"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/editor/controller/freehand",
-        "lines": 9,
-        "sampleFingerprint": "088168f00790609fe163b9e4e83e2199d176f0e34b3584d7a0c4fdd3f08b43f0"
       },
       "targetAction": "keep declarative descriptor or geometry repetition local"
     },
@@ -95,8 +98,8 @@
         "key": "apps/extension/src/scenario-editor/workspace/quick-edit"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/scenario-editor/workspace/quick-edit",
+        "count": 1,
         "lines": 35,
         "sampleFingerprint": "e48ed701389c6e4b063d0e56be271e0354c015d0abd6852a2d97187fc59d9df6"
       },
@@ -115,8 +118,8 @@
         "key": "packages/ui/src"
       },
       "scope": {
-        "count": 5,
         "family": "packages/ui/src",
+        "count": 5,
         "lines": 89,
         "sampleFingerprint": "6454ec8a1e84850236136ad0c6558752c292b32be82baa782fc264fd3fb44c80"
       },
@@ -159,30 +162,10 @@
         "key": "apps/extension/src/background/capture/native-app"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture/native-app",
+        "count": 1,
         "lines": 10,
         "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.composition-persistence-scenario.4647d3736115",
-      "classification": "tool-noise",
-      "owner": "composition-persistence-scenario",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/composition/persistence/scenario"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/composition/persistence/scenario",
-        "lines": 8,
-        "sampleFingerprint": "bacf2fc5aa7b239dff4352f7bbd5108029d33ef28afe59b8c4bda5fb4adf92ae"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -199,8 +182,8 @@
         "key": "apps/extension/src/content/selection/frame-settings-popover"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/frame-settings-popover",
+        "count": 1,
         "lines": 6,
         "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a"
       },
@@ -219,8 +202,8 @@
         "key": "apps/extension/src/features/editor/document"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/editor/document",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971"
       },
@@ -239,8 +222,8 @@
         "key": "apps/extension/src/features/video/composition"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/video/composition",
+        "count": 1,
         "lines": 13,
         "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8"
       },
@@ -259,8 +242,8 @@
         "key": "apps/extension/src/features/media-hub"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/media-hub",
+        "count": 1,
         "lines": 12,
         "sampleFingerprint": "cfec7dd03af566fb9a745004f2212301dfd53d0b7483b9b1e043d6584349543f"
       },
@@ -279,32 +262,12 @@
         "key": "apps/extension/src/video-editor/project/state"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/video-editor/project/state",
+        "count": 1,
         "lines": 9,
         "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.settings-sections-capture-media-quality-video.553ddf0b71ce",
-      "classification": "tool-noise",
-      "owner": "settings-capture-media-quality-video",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live samples are overlapping clones inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/settings/sections/capture/media-quality/video"
-      },
-      "scope": {
-        "count": 2,
-        "family": "apps/extension/src/settings/sections/capture/media-quality/video",
-        "lines": 81,
-        "sampleFingerprint": "553ddf0b71ce3cacf2a3878249647115e4499823a64cc7847f9e89faebde3722"
-      },
-      "targetAction": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them"
     },
     {
       "id": "noise.jscpd.content-parser-export-manager.a844b3c0f09f",
@@ -319,8 +282,8 @@
         "key": "apps/extension/src/content/parser/export-manager"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/parser/export-manager",
+        "count": 1,
         "lines": 23,
         "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a"
       },
@@ -339,8 +302,8 @@
         "key": "apps/extension/src/content/public/preparation-surface"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/public/preparation-surface",
+        "count": 1,
         "lines": 22,
         "sampleFingerprint": "79af704f37cc515dc3c80d356e52b02b0816643e3d52f13d439234cfa280aa7f"
       },
@@ -359,8 +322,8 @@
         "key": "tooling/qa/core"
       },
       "scope": {
-        "count": 1,
         "family": "tooling/qa/core",
+        "count": 1,
         "lines": 21,
         "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c"
       },
@@ -379,9 +342,9 @@
         "key": "apps/extension/src/background/capture/quick-actions"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture/quick-actions",
-        "lines": 18,
+        "count": 1,
+        "lines": 19,
         "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
@@ -399,52 +362,12 @@
         "key": "apps/extension/src/background/runtime/tab-mode-router-screenshot"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/runtime/tab-mode-router-screenshot",
+        "count": 1,
         "lines": 18,
         "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.content-selection-callout.3c8d27f404bb",
-      "classification": "tool-noise",
-      "owner": "content-selection-callout",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/content/selection/callout"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/content/selection/callout",
-        "lines": 15,
-        "sampleFingerprint": "3c8d27f404bba455297cf37c0fd1ff3d470d1f4ff05f971c786544aff93fbc31"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.content-selection-callout-apps-extension-src-content-selection-step-badge.2c323f43b348",
-      "classification": "tool-noise",
-      "owner": "content-selection-pointer-drag-consumers",
-      "risk": "Clone grouping can mistake declarative use of a shared owner for duplicated behavior; unreviewed growth could still conceal divergence.",
-      "reason": "The live sample is matching declarative call-site setup for the canonical pointer-drag owner, not duplicate drag-session behavior.",
-      "removalCondition": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge",
-        "lines": 14,
-        "sampleFingerprint": "2c323f43b348cf9d83850b47c410b961be4b0b70ea0fab095d7a7ba9737167cd"
-      },
-      "targetAction": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them"
     },
     {
       "id": "noise.jscpd.content-selection-frame-runtime.a8aecc935edd",
@@ -459,8 +382,8 @@
         "key": "apps/extension/src/content/selection/frame-runtime"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/frame-runtime",
+        "count": 1,
         "lines": 13,
         "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd"
       },
@@ -479,9 +402,9 @@
         "key": "apps/extension/src/content/selection/highlighter-hover-preview"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/highlighter-hover-preview",
-        "lines": 13,
+        "count": 1,
+        "lines": 10,
         "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
@@ -499,30 +422,10 @@
         "key": "apps/extension/src/background/capture-surface"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture-surface",
+        "count": 1,
         "lines": 11,
         "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.settings-sections-capture-screen-sizes.b80dffc340ce",
-      "classification": "tool-noise",
-      "owner": "settings-capture-screen-sizes",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/settings/sections/capture/screen-sizes"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/settings/sections/capture/screen-sizes",
-        "lines": 10,
-        "sampleFingerprint": "b80dffc340ce9bfbe5cc72d774acbe1cb707366b1171c391c51d6bfd608e245d"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -539,8 +442,8 @@
         "key": "tooling/qa/runtime"
       },
       "scope": {
-        "count": 1,
         "family": "tooling/qa/runtime",
+        "count": 1,
         "lines": 10,
         "sampleFingerprint": "976c2c57fd5f47f808f0e4626433d12b9e63749c6ecdd5acf2ee4df7a13494a1"
       },
@@ -559,12 +462,752 @@
         "key": "apps/extension/src/content/selection/interactive-frame"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/interactive-frame",
+        "count": 1,
         "lines": 9,
         "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "accepted.jscpd.settings-sections-styles.3ea4a5d66567",
+      "classification": "accepted-architecture",
+      "owner": "settings-sections-styles",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/styles"
+      },
+      "scope": {
+        "count": 9,
+        "family": "apps/extension/src/settings/sections/styles",
+        "lines": 157,
+        "sampleFingerprint": "3ea4a5d66567c1cf7e7b0860d3f0d6af5b004a208405894a654415d10a39c35a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter-frame-annotation.42dc97543f07",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 7,
+        "family": "apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 79,
+        "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co.842751ee8be7",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge"
+      },
+      "scope": {
+        "count": 5,
+        "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
+        "lines": 120,
+        "sampleFingerprint": "842751ee8be7f51fe28ab0368ed2e990410bc2707855f79bb69f89622d9c87d8"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter.506407403875",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter"
+      },
+      "scope": {
+        "count": 4,
+        "family": "apps/extension/src/features/highlighter",
+        "lines": 43,
+        "sampleFingerprint": "506407403875f4660d155aab8d327e2342e60c920a54ea6b05ceaf4160ab4c1d"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.ui-highlighter-preset-editor-callout-apps-extension-src-ui-highlighter-preset-editor-step-badge.8fecb6e30e20",
+      "classification": "accepted-architecture",
+      "owner": "ui-highlighter-preset-editor-callout-apps-extension-src-ui-highlighter-preset-editor-step-badge",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+        "lines": 138,
+        "sampleFingerprint": "8fecb6e30e2055574268370aae971b2590f3607e049c1f5f3d3d6908ec659992"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-image-aggregates.f6cde71e69ba",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-image-aggregates",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/image-aggregates"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/composition/persistence/image-aggregates",
+        "lines": 32,
+        "sampleFingerprint": "f6cde71e69bae887b381660b8243b1e35f8c2c4e28113f7823757b4c93fc7ace"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
+        "lines": 29,
+        "sampleFingerprint": "bc2c20338af1a8e924c0ed69c2063e42a733193046995dfffda1e322bb4fd3af"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.settings-sections-capture.ece3f933fd15",
+      "classification": "tool-noise",
+      "owner": "settings-sections-capture",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/capture"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/settings/sections/capture",
+        "lines": 81,
+        "sampleFingerprint": "ece3f933fd1572d135baeb4d2d71077fe93e906a4b9bce6a8207b4a9ae8eda0d"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont.239116b5b15c",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
+        "lines": 45,
+        "sampleFingerprint": "239116b5b15ca7c472c725c23b16a9f6eebd5506957616305fd098830a2ae047"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-frame-annotation-controls-frame.8d96f1d36cc9",
+      "classification": "tool-noise",
+      "owner": "composition-frame-annotation-controls-frame",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/frame"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/frame-annotation-controls/frame",
+        "lines": 31,
+        "sampleFingerprint": "8d96f1d36cc9feb24ef56ca5361d7145b70d0c41698cfadbd4a38f8bc28c608f"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-callout-presets.b273515ad5b3",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-callout-presets",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/callout-presets"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/persistence/callout-presets",
+        "lines": 26,
+        "sampleFingerprint": "b273515ad5b3c4fe12d8bab876401e2051e318f7a689199b9bd7925236583312"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.content-drawing.2129255a612e",
+      "classification": "tool-noise",
+      "owner": "content-drawing",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/drawing"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/content/drawing",
+        "lines": 20,
+        "sampleFingerprint": "2129255a612ed6ecd2c1f0c03879c5bf772be844fa53427741fc6e3441c0913a"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-scenario.c6fc6038ef1d",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-scenario",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/scenario"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/persistence/scenario",
+        "lines": 17,
+        "sampleFingerprint": "c6fc6038ef1de2f4020be9cfe5bbace660562d43bad5896c1df80e01673b2bef"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-instance.70c48226805e",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-instance",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/instance"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/editor/controller/instance",
+        "lines": 13,
+        "sampleFingerprint": "70c48226805eba8ae39955c617f852e6b20aec3397001cfefc0bd3046bfe1331"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.content-overlay-toolbar.e114d9ebc15d",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/overlay/toolbar"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/overlay/toolbar",
+        "lines": 120,
+        "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.design-system-previews-product-glass-controls.8383ea741d5f",
+      "classification": "accepted-architecture",
+      "owner": "design-system-previews-product-glass-controls",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/design-system/previews/product-glass-controls"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/design-system/previews/product-glass-controls",
+        "lines": 21,
+        "sampleFingerprint": "8383ea741d5fdf0ee09caa1deff26b87d6ed4d742302410fcd0e9505b1d1ad29"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-voice-apps-extension-src-content-voice-input.33a0a7c573cf",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-voice-apps-extension-src-content-voice-input",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
+        "lines": 19,
+        "sampleFingerprint": "33a0a7c573cf63e198e5fed40f2149cd79181dc2ea179d78032a09171e6482b2"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-document-apps-extension-src-editor-drawing-object.ea03b4a8b7ce",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-document-apps-extension-src-editor-drawing-object",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object",
+        "lines": 17,
+        "sampleFingerprint": "ea03b4a8b7ceb3932a9b52cd34623c7d44532cb31d2f5155ee53014bef436320"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter.13549feb0b14",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter",
+        "lines": 15,
+        "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.editor-controller-magnet.89d39fbbaec3",
+      "classification": "tool-noise",
+      "owner": "editor-controller-magnet",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/magnet"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/magnet",
+        "lines": 15,
+        "sampleFingerprint": "89d39fbbaec37fb9893b0711819f994f03ae03da968bde6f9764a7f95cd43171"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.package-foundation-src.9d198a6afa62",
+      "classification": "tool-noise",
+      "owner": "package-foundation-src",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "packages/foundation/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "packages/foundation/src",
+        "lines": 15,
+        "sampleFingerprint": "9d198a6afa62cd728183e12f42c6a5211cf3ae3539c2f1163dedf2cbd68531f8"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.settings-sections-capture-apps-extension-src-settings-sections-styles.6dbdf80b6bc3",
+      "classification": "accepted-architecture",
+      "owner": "settings-sections-capture-apps-extension-src-settings-sections-styles",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles",
+        "lines": 14,
+        "sampleFingerprint": "6dbdf80b6bc30cad798084d8ca51af675ab8d4f40f4f1c5293abf84f8b624d6a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector.f0e723f15aab",
+      "classification": "accepted-architecture",
+      "owner": "ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
+        "lines": 13,
+        "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-annotation-template-tags.40b1ab177da1",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-annotation-template-tags",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/annotation-template-tags"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/annotation-template-tags",
+        "lines": 12,
+        "sampleFingerprint": "40b1ab177da1a1f7c6615a656d887a2f4513fc43c1a3b26730f4097e97921a5f"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.content-drawing-apps-extension-src-content-overlay-toolbar.65bb61ab8424",
+      "classification": "accepted-architecture",
+      "owner": "content-drawing-apps-extension-src-content-overlay-toolbar",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar",
+        "lines": 12,
+        "sampleFingerprint": "65bb61ab8424ce5da3b8634a9a6404ff21cc5e8266e8cce28c24ab780a9235ea"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access.693f682864be",
+      "classification": "accepted-architecture",
+      "owner": "background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access",
+        "lines": 11,
+        "sampleFingerprint": "693f682864bee26de66516f7cd30343d7af6b22fe9bcce7b04cf9bd8d0784319"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.content-parser-page-preparation-apps-extension-src-features-highlighter-frame-annotation.e4e5c1e14803",
+      "classification": "accepted-architecture",
+      "owner": "content-parser-page-preparation-apps-extension-src-features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 10,
+        "sampleFingerprint": "e4e5c1e14803f609b5e7358b292cd1e5abf113eb9fcfe04611c4be681d340d9a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation.c7b1c86444f0",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 10,
+        "sampleFingerprint": "c7b1c86444f047025fe6d328fc124a63859417cbacd35fdf732621d6778a51f9"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client.00bf41e72976",
+      "classification": "accepted-architecture",
+      "owner": "background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
+        "lines": 9,
+        "sampleFingerprint": "00bf41e729769acfd5bac208081927b0a3cba7037d9409ac7cc62ab6a42a461e"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-capture-settings-packages-runtime-contracts-src.6f5a9cc811a3",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-capture-settings-packages-runtime-contracts-src",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src",
+        "lines": 9,
+        "sampleFingerprint": "6f5a9cc811a3fdf921142e846001017fcd6125328dca5784dedb5b4a282939eb"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-library-lifecycle-apps-extension-src-features-highlighter-frame-annotati.ea4e62de7d6f",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-library-lifecycle-apps-extension-src-features-highlighter-frame-annotati",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 9,
+        "sampleFingerprint": "ea4e62de7d6f811ccc777dee730580e485b11e90e68549a5ee4875512d1bad54"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.content-selection-frame-runtime-apps-extension-src-features-highlighter-step-badge-presets.ed1abff69676",
+      "classification": "accepted-architecture",
+      "owner": "content-selection-frame-runtime-apps-extension-src-features-highlighter-step-badge-presets",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets",
+        "lines": 9,
+        "sampleFingerprint": "ed1abff696763297002260de5b1574227b4607dfdbcb6f19456887d4f4067a9d"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.workflows-media-hub-backup-restore.dd7a3692af13",
+      "classification": "tool-noise",
+      "owner": "workflows-media-hub-backup-restore",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/workflows/media-hub-backup/restore"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/workflows/media-hub-backup/restore",
+        "lines": 9,
+        "sampleFingerprint": "dd7a3692af131e06b85dcbc76d278efdfe953018e07349a5abe7438f87527f70"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.background-capture-routing.753a87f9cd4b",
+      "classification": "tool-noise",
+      "owner": "background-capture-routing",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture/routing"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture/routing",
+        "lines": 8,
+        "sampleFingerprint": "753a87f9cd4bcf566f5bfc7094535d80cd0c4bc7c4277c876302eabfbf4ec099"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-step-badge-apps-extension-src-ui-highlighter-preset-editor.9ac5372f642f",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-step-badge-apps-extension-src-ui-highlighter-preset-editor",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+        "lines": 7,
+        "sampleFingerprint": "9ac5372f642fbf73d885691eebd7ec8759892eeefc8c63aed1c67ec03efc9884"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-instance-apps-extension-src-editor-controller-magnet.b2d3ad96f305",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-instance-apps-extension-src-editor-controller-magnet",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet",
+        "lines": 7,
+        "sampleFingerprint": "b2d3ad96f305a3ebb11c04b8aa2a42a41114e5a998daeb5d55ee57f3a9055067"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.editor-drawing-object.31e2a1681484",
+      "classification": "tool-noise",
+      "owner": "editor-drawing-object",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/drawing/object"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/drawing/object",
+        "lines": 6,
+        "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
     }
   ],
   "coverageOwners": [
@@ -723,6 +1366,7 @@
         "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
         "apps/extension/src/background/capture/popup-export/staged-archives.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
+        "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
@@ -828,7 +1472,6 @@
         "apps/extension/src/background/media-hub/recording-download.ts",
         "apps/extension/src/background/media-hub/web-snapshot-validation.ts",
         "apps/extension/src/background/media-hub/web-snapshot.ts",
-        "apps/extension/src/background/media/desktop-capture/source-picker.ts",
         "apps/extension/src/background/media/lifecycle.ts",
         "apps/extension/src/background/media/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/media/privacy-erasure/project-export.ts",
@@ -851,12 +1494,22 @@
         "apps/extension/src/background/media/video/capture-surface/session-registry.ts",
         "apps/extension/src/background/media/video/capture-surface/source-handshake.ts",
         "apps/extension/src/background/media/video/capture-viewport.ts",
+        "apps/extension/src/background/media/video/content-surface/camera-peer-cleanup.ts",
+        "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
+        "apps/extension/src/background/media/video/content-surface/commands.ts",
+        "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
+        "apps/extension/src/background/media/video/content-surface/route.ts",
+        "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
+        "apps/extension/src/background/media/video/content-surface/snapshot.ts",
+        "apps/extension/src/background/media/video/content-surface/start.ts",
+        "apps/extension/src/background/media/video/content-surface/surface-lease.ts",
         "apps/extension/src/background/media/video/manager/diagnostics.ts",
         "apps/extension/src/background/media/video/manager/flow-cancellation.ts",
         "apps/extension/src/background/media/video/manager/flow-countdown.ts",
         "apps/extension/src/background/media/video/manager/flow.ts",
         "apps/extension/src/background/media/video/manager/index.ts",
-        "apps/extension/src/background/media/video/manager/preflight.annotations.ts",
+        "apps/extension/src/background/media/video/manager/preflight.content-surface.ts",
         "apps/extension/src/background/media/video/manager/preflight.offscreen.ts",
         "apps/extension/src/background/media/video/manager/preflight.resolve-tab.ts",
         "apps/extension/src/background/media/video/manager/preflight.resolve.ts",
@@ -990,6 +1643,7 @@
         "apps/extension/src/background/routing-contracts/policy-state/types.ts",
         "apps/extension/src/background/routing-contracts/project-export-preauthorization.ts",
         "apps/extension/src/background/routing-contracts/response.ts",
+        "apps/extension/src/background/routing-contracts/runtime-messaging/content-toolbar-readiness.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/mock.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/services.ts",
         "apps/extension/src/background/routing-contracts/tab-mode-state.ts",
@@ -1127,6 +1781,7 @@
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/tab-mode-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/types.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-control-adapter.ts",
+        "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-recording-surface-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/video-control.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.ts",
@@ -1389,6 +2044,7 @@
         "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
         "apps/extension/src/background/capture/popup-export/staged-archives.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
+        "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
         "apps/extension/src/background/capture/quick-actions/flow/flows.ts",
         "apps/extension/src/background/capture/quick-actions/flow/load.ts",
@@ -1494,7 +2150,6 @@
         "apps/extension/src/background/media-hub/recording-download.ts",
         "apps/extension/src/background/media-hub/web-snapshot-validation.ts",
         "apps/extension/src/background/media-hub/web-snapshot.ts",
-        "apps/extension/src/background/media/desktop-capture/source-picker.ts",
         "apps/extension/src/background/media/lifecycle.ts",
         "apps/extension/src/background/media/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/media/privacy-erasure/project-export.ts",
@@ -1517,12 +2172,22 @@
         "apps/extension/src/background/media/video/capture-surface/session-registry.ts",
         "apps/extension/src/background/media/video/capture-surface/source-handshake.ts",
         "apps/extension/src/background/media/video/capture-viewport.ts",
+        "apps/extension/src/background/media/video/content-surface/camera-peer-cleanup.ts",
+        "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
+        "apps/extension/src/background/media/video/content-surface/commands.ts",
+        "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
+        "apps/extension/src/background/media/video/content-surface/route.ts",
+        "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
+        "apps/extension/src/background/media/video/content-surface/snapshot.ts",
+        "apps/extension/src/background/media/video/content-surface/start.ts",
+        "apps/extension/src/background/media/video/content-surface/surface-lease.ts",
         "apps/extension/src/background/media/video/manager/diagnostics.ts",
         "apps/extension/src/background/media/video/manager/flow-cancellation.ts",
         "apps/extension/src/background/media/video/manager/flow-countdown.ts",
         "apps/extension/src/background/media/video/manager/flow.ts",
         "apps/extension/src/background/media/video/manager/index.ts",
-        "apps/extension/src/background/media/video/manager/preflight.annotations.ts",
+        "apps/extension/src/background/media/video/manager/preflight.content-surface.ts",
         "apps/extension/src/background/media/video/manager/preflight.offscreen.ts",
         "apps/extension/src/background/media/video/manager/preflight.resolve-tab.ts",
         "apps/extension/src/background/media/video/manager/preflight.resolve.ts",
@@ -1656,6 +2321,7 @@
         "apps/extension/src/background/routing-contracts/policy-state/types.ts",
         "apps/extension/src/background/routing-contracts/project-export-preauthorization.ts",
         "apps/extension/src/background/routing-contracts/response.ts",
+        "apps/extension/src/background/routing-contracts/runtime-messaging/content-toolbar-readiness.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/mock.ts",
         "apps/extension/src/background/routing-contracts/runtime-messaging/services.ts",
         "apps/extension/src/background/routing-contracts/tab-mode-state.ts",
@@ -1793,6 +2459,7 @@
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/tab-mode-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/types.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-control-adapter.ts",
+        "apps/extension/src/background/runtime/routing/tab-dispatch/adapters/video-recording-surface-adapter.ts",
         "apps/extension/src/background/runtime/routing/tab-dispatch/video-control.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/index.ts",
         "apps/extension/src/background/runtime/tab-mode-router-screenshot/mode.ts",
@@ -2179,14 +2846,26 @@
         "apps/extension/src/composition/persistence/capture-settings/guards.ts",
         "apps/extension/src/composition/persistence/capture-settings/index.ts",
         "apps/extension/src/composition/persistence/capture-settings/native-guards.ts",
-        "apps/extension/src/composition/persistence/capture-settings/native-tray-guards.ts"
+        "apps/extension/src/composition/persistence/capture-settings/native-tray-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup-contracts.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot-contracts.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/composition/persistence/capture-settings/field-parser.ts",
         "apps/extension/src/composition/persistence/capture-settings/guards.ts",
         "apps/extension/src/composition/persistence/capture-settings/index.ts",
         "apps/extension/src/composition/persistence/capture-settings/native-guards.ts",
-        "apps/extension/src/composition/persistence/capture-settings/native-tray-guards.ts"
+        "apps/extension/src/composition/persistence/capture-settings/native-tray-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup-contracts.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/popup-startup.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot-contracts.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot-guards.ts",
+        "apps/extension/src/composition/persistence/capture-settings/screenshot.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -3047,6 +3726,7 @@
         "apps/extension/src/content/application/mode-session/disabled-listener.ts",
         "apps/extension/src/content/application/mode-session/index.ts",
         "apps/extension/src/content/application/mode-session/session.ts",
+        "apps/extension/src/content/application/page-preparation-reset/index.ts",
         "apps/extension/src/content/application/privileged-action-intent/index.ts",
         "apps/extension/src/content/application/runtime-services/services.ts",
         "apps/extension/src/content/drawing/box-resize.ts",
@@ -3272,6 +3952,7 @@
         "apps/extension/src/content/overlay/app/message-bridge/screenshot.ts",
         "apps/extension/src/content/overlay/app/message-bridge/toolbar.ts",
         "apps/extension/src/content/overlay/app/message-bridge/types.ts",
+        "apps/extension/src/content/overlay/app/message-bridge/working-modes.ts",
         "apps/extension/src/content/overlay/app/mode/index.ts",
         "apps/extension/src/content/overlay/app/view-state/helpers.ts",
         "apps/extension/src/content/overlay/app/view-state/hook.ts",
@@ -3424,6 +4105,7 @@
         "apps/extension/src/content/overlay/screenshot/session/capture.ts",
         "apps/extension/src/content/overlay/screenshot/session/elapsed.ts",
         "apps/extension/src/content/overlay/screenshot/session/immediate.ts",
+        "apps/extension/src/content/overlay/screenshot/session/quick-action-cleanup.ts",
         "apps/extension/src/content/overlay/screenshot/session/state.ts",
         "apps/extension/src/content/overlay/screenshot/types.ts",
         "apps/extension/src/content/overlay/state/ai-modal.store.ts",
@@ -3501,15 +4183,25 @@
         "apps/extension/src/content/overlay/toolbar/state/refs-and-position.ts",
         "apps/extension/src/content/overlay/toolbar/state/view-model.ts",
         "apps/extension/src/content/overlay/toolbar/types.ts",
+        "apps/extension/src/content/overlay/toolbar/video-recording/controls.tsx",
+        "apps/extension/src/content/overlay/toolbar/video-recording/dom-driver/drawing-clock.ts",
+        "apps/extension/src/content/overlay/toolbar/video-recording/drawing-controls.tsx",
+        "apps/extension/src/content/overlay/toolbar/video-recording/drawing-session.ts",
+        "apps/extension/src/content/overlay/toolbar/video-recording/media-menu.tsx",
+        "apps/extension/src/content/overlay/toolbar/video-recording/spotlight-menu.tsx",
         "apps/extension/src/content/overlay/toolbar/view.tsx",
-        "apps/extension/src/content/overlay/video-annotations/controller-actions.ts",
-        "apps/extension/src/content/overlay/video-annotations/handlers.ts",
-        "apps/extension/src/content/overlay/video-annotations/index.ts",
-        "apps/extension/src/content/overlay/video-annotations/runtime.ts",
-        "apps/extension/src/content/overlay/video-annotations/svg.ts",
         "apps/extension/src/content/overlay/video-clicks/dom-driver.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts",
         "apps/extension/src/content/overlay/video-countdown/index.tsx",
+        "apps/extension/src/content/overlay/video-recording/camera/geometry.ts",
+        "apps/extension/src/content/overlay/video-recording/camera/peer.ts",
+        "apps/extension/src/content/overlay/video-recording/camera/view.tsx",
+        "apps/extension/src/content/overlay/video-recording/session/controller.ts",
+        "apps/extension/src/content/overlay/video-recording/session/snapshot-projection.ts",
+        "apps/extension/src/content/overlay/video-recording/session/state.ts",
+        "apps/extension/src/content/overlay/video-recording/spotlight/view.tsx",
+        "apps/extension/src/content/overlay/video-recording/transport/client.ts",
+        "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
         "apps/extension/src/content/overlay/video-telemetry/artifacts.ts",
         "apps/extension/src/content/overlay/video-telemetry/controller.ts",
         "apps/extension/src/content/overlay/video-telemetry/events.ts",
@@ -3827,6 +4519,7 @@
         "apps/extension/src/content/runtime/bridge/region-overlay.ts",
         "apps/extension/src/content/runtime/bridge/router.ts",
         "apps/extension/src/content/runtime/bridge/types.ts",
+        "apps/extension/src/content/runtime/bridge/video-recording-surface.ts",
         "apps/extension/src/content/runtime/bridge/viewport.ts",
         "apps/extension/src/content/runtime/entrypoint/bootstrap.tsx",
         "apps/extension/src/content/runtime/entrypoint/diagnostics.ts",
@@ -4211,13 +4904,17 @@
         "apps/extension/src/content/overlay/ai/pick/runtime/target-resolution/legacy-fallback.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/target-resolution/table-row-search.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/target-resolution/target-lookup.ts",
-        "apps/extension/src/content/overlay/video-annotations/controller-actions.ts",
-        "apps/extension/src/content/overlay/video-annotations/handlers.ts",
-        "apps/extension/src/content/overlay/video-annotations/index.ts",
-        "apps/extension/src/content/overlay/video-annotations/runtime.ts",
-        "apps/extension/src/content/overlay/video-annotations/svg.ts",
         "apps/extension/src/content/overlay/video-clicks/dom-driver.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts",
+        "apps/extension/src/content/overlay/video-recording/camera/geometry.ts",
+        "apps/extension/src/content/overlay/video-recording/camera/peer.ts",
+        "apps/extension/src/content/overlay/video-recording/camera/view.tsx",
+        "apps/extension/src/content/overlay/video-recording/session/controller.ts",
+        "apps/extension/src/content/overlay/video-recording/session/snapshot-projection.ts",
+        "apps/extension/src/content/overlay/video-recording/session/state.ts",
+        "apps/extension/src/content/overlay/video-recording/spotlight/view.tsx",
+        "apps/extension/src/content/overlay/video-recording/transport/client.ts",
+        "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
         "apps/extension/src/content/parser/backends/contracts.ts",
         "apps/extension/src/content/parser/backends/index.ts",
         "apps/extension/src/content/parser/backends/legacy-tree-walker/index.ts",
@@ -5136,6 +5833,7 @@
         "apps/extension/src/editor/controller/events/runtime.source-sync.ts",
         "apps/extension/src/editor/controller/events/runtime.ts",
         "apps/extension/src/editor/controller/events/runtime.window.ts",
+        "apps/extension/src/editor/controller/events/selection-modifiers.ts",
         "apps/extension/src/editor/controller/events/text-target.ts",
         "apps/extension/src/editor/controller/events/types.ts",
         "apps/extension/src/editor/controller/history/index.ts",
@@ -5415,7 +6113,10 @@
         "apps/extension/src/editor/document/session-autosave/state.ts",
         "apps/extension/src/editor/drawing/object/blur.ts",
         "apps/extension/src/editor/drawing/object/canonicalize.ts",
-        "apps/extension/src/editor/drawing/object/controls.ts",
+        "apps/extension/src/editor/drawing/object/controls/apply.ts",
+        "apps/extension/src/editor/drawing/object/controls/arrow.ts",
+        "apps/extension/src/editor/drawing/object/controls/box.ts",
+        "apps/extension/src/editor/drawing/object/controls/chrome.ts",
         "apps/extension/src/editor/drawing/object/metadata.ts",
         "apps/extension/src/editor/drawing/object/vector.ts",
         "apps/extension/src/editor/drawing/options.tsx",
@@ -6089,6 +6790,7 @@
         "apps/extension/src/editor/controller/events/runtime.source-sync.ts",
         "apps/extension/src/editor/controller/events/runtime.ts",
         "apps/extension/src/editor/controller/events/runtime.window.ts",
+        "apps/extension/src/editor/controller/events/selection-modifiers.ts",
         "apps/extension/src/editor/controller/events/text-target.ts",
         "apps/extension/src/editor/controller/events/types.ts",
         "apps/extension/src/editor/controller/history/index.ts",
@@ -7484,14 +8186,14 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/features/quick-actions-presets/catalog.ts",
-        "apps/extension/src/features/quick-actions-presets/display-mode.ts",
         "apps/extension/src/features/quick-actions-presets/normalization.ts",
+        "apps/extension/src/features/quick-actions-presets/policy.ts",
         "apps/extension/src/features/quick-actions-presets/types.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/features/quick-actions-presets/catalog.ts",
-        "apps/extension/src/features/quick-actions-presets/display-mode.ts",
         "apps/extension/src/features/quick-actions-presets/normalization.ts",
+        "apps/extension/src/features/quick-actions-presets/policy.ts",
         "apps/extension/src/features/quick-actions-presets/types.ts"
       ],
       "unownedFocusedFiles": []
@@ -8448,6 +9150,8 @@
         "apps/extension/src/offscreen/frame-annotation-rasterizer/index.tsx",
         "apps/extension/src/offscreen/media-activity/lease.ts",
         "apps/extension/src/offscreen/media-activity/video-recording-lease.ts",
+        "apps/extension/src/offscreen/media/desktop-frame.ts",
+        "apps/extension/src/offscreen/media/desktop-stream.ts",
         "apps/extension/src/offscreen/offscreen.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
@@ -8574,6 +9278,9 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
+        "apps/extension/src/offscreen/recording/camera-source/device-catalog.ts",
+        "apps/extension/src/offscreen/recording/camera-source/peer.ts",
+        "apps/extension/src/offscreen/recording/camera-source/session.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
@@ -8651,6 +9358,8 @@
         "apps/extension/src/offscreen/frame-annotation-rasterizer/index.tsx",
         "apps/extension/src/offscreen/media-activity/lease.ts",
         "apps/extension/src/offscreen/media-activity/video-recording-lease.ts",
+        "apps/extension/src/offscreen/media/desktop-frame.ts",
+        "apps/extension/src/offscreen/media/desktop-stream.ts",
         "apps/extension/src/offscreen/offscreen.ts",
         "apps/extension/src/offscreen/project-export/application/use-case.ts",
         "apps/extension/src/offscreen/project-export/capabilities.ts",
@@ -8777,6 +9486,9 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
+        "apps/extension/src/offscreen/recording/camera-source/device-catalog.ts",
+        "apps/extension/src/offscreen/recording/camera-source/peer.ts",
+        "apps/extension/src/offscreen/recording/camera-source/session.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
         "apps/extension/src/offscreen/recording/controller.ts",
         "apps/extension/src/offscreen/recording/duration.ts",
@@ -8870,12 +9582,18 @@
       "reason": "All current production files in this owner family are in the deterministic coverage rollout.",
       "productionFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
+        "apps/extension/src/platform/media-utils/desktop-capture-source-picker.ts",
+        "apps/extension/src/platform/media-utils/desktop-frame.ts",
+        "apps/extension/src/platform/media-utils/desktop-screenshot-frame.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
         "apps/extension/src/platform/media-utils/video-recording.ts",
         "apps/extension/src/platform/media-utils/video-thumbnails.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
+        "apps/extension/src/platform/media-utils/desktop-capture-source-picker.ts",
+        "apps/extension/src/platform/media-utils/desktop-frame.ts",
+        "apps/extension/src/platform/media-utils/desktop-screenshot-frame.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
         "apps/extension/src/platform/media-utils/video-recording.ts",
         "apps/extension/src/platform/media-utils/video-thumbnails.ts"
@@ -8958,10 +9676,6 @@
         "apps/extension/src/popup/recording/video/footer/active-controls.tsx",
         "apps/extension/src/popup/recording/video/footer/index.tsx",
         "apps/extension/src/popup/recording/video/footer/warnings.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-options.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-secondary-panel.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-select.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-trigger.tsx",
         "apps/extension/src/popup/recording/video/output-resource-policy.ts",
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
@@ -8999,6 +9713,7 @@
         "apps/extension/src/popup/recording/video/setup/toggles/grid/controlled-cursor.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/index.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/microphone.tsx",
+        "apps/extension/src/popup/recording/video/setup/toggles/grid/toolbar-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/webcam.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/system-audio-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/types.ts",
@@ -9113,14 +9828,16 @@
         "apps/extension/src/popup/shell/gallery/status.ts",
         "apps/extension/src/popup/shell/home/page-shell/actions.ts",
         "apps/extension/src/popup/shell/home/page-shell/index.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/mode-selector.tsx",
         "apps/extension/src/popup/shell/home/page-shell/page-access-controls.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/action-row.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/buttons.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/empty-state.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/error-message.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/index.ts",
         "apps/extension/src/popup/shell/home/page-shell/sections/quick-actions-section.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/types.ts",
+        "apps/extension/src/popup/shell/home/page-shell/setup-fields.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/setup-panel.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/tools-panel.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/use-screenshot-setup.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/helpers.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/index.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
@@ -9133,6 +9850,7 @@
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
         "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
         "apps/extension/src/popup/shell/lifecycle/setup.ts",
+        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
@@ -9199,10 +9917,6 @@
         "apps/extension/src/popup/recording/video/footer/active-controls.tsx",
         "apps/extension/src/popup/recording/video/footer/index.tsx",
         "apps/extension/src/popup/recording/video/footer/warnings.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-options.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-secondary-panel.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-select.tsx",
-        "apps/extension/src/popup/recording/video/inline-controls/curtain-trigger.tsx",
         "apps/extension/src/popup/recording/video/output-resource-policy.ts",
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
@@ -9240,6 +9954,7 @@
         "apps/extension/src/popup/recording/video/setup/toggles/grid/controlled-cursor.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/index.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/microphone.tsx",
+        "apps/extension/src/popup/recording/video/setup/toggles/grid/toolbar-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/grid/webcam.tsx",
         "apps/extension/src/popup/recording/video/setup/toggles/system-audio-toggle.tsx",
         "apps/extension/src/popup/recording/video/setup/types.ts",
@@ -9354,14 +10069,16 @@
         "apps/extension/src/popup/shell/gallery/status.ts",
         "apps/extension/src/popup/shell/home/page-shell/actions.ts",
         "apps/extension/src/popup/shell/home/page-shell/index.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/mode-selector.tsx",
         "apps/extension/src/popup/shell/home/page-shell/page-access-controls.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/action-row.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/buttons.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/empty-state.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/error-message.tsx",
         "apps/extension/src/popup/shell/home/page-shell/sections/index.ts",
         "apps/extension/src/popup/shell/home/page-shell/sections/quick-actions-section.tsx",
-        "apps/extension/src/popup/shell/home/page-shell/sections/types.ts",
+        "apps/extension/src/popup/shell/home/page-shell/setup-fields.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/setup-panel.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/tools-panel.tsx",
+        "apps/extension/src/popup/shell/home/page-shell/use-screenshot-setup.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/helpers.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/index.ts",
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
@@ -9374,6 +10091,7 @@
         "apps/extension/src/popup/shell/lifecycle/effect.ts",
         "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
         "apps/extension/src/popup/shell/lifecycle/setup.ts",
+        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
@@ -10170,7 +10888,10 @@
         "apps/extension/src/settings/section-surface/collection/header.tsx",
         "apps/extension/src/settings/section-surface/collection/index.tsx",
         "apps/extension/src/settings/section-surface/collection/keyboard-reorder.ts",
+        "apps/extension/src/settings/section-surface/collection/layout-animation.ts",
         "apps/extension/src/settings/section-surface/collection/model.ts",
+        "apps/extension/src/settings/section-surface/collection/pointer-reorder-interaction.ts",
+        "apps/extension/src/settings/section-surface/collection/pointer-reorder.ts",
         "apps/extension/src/settings/section-surface/collection/reorder-interaction.ts",
         "apps/extension/src/settings/section-surface/collection/row-controls.tsx",
         "apps/extension/src/settings/section-surface/collection/row-identity.tsx",
@@ -10180,14 +10901,15 @@
         "apps/extension/src/settings/section-surface/loading-state.tsx",
         "apps/extension/src/settings/section-surface/panel-controls.tsx",
         "apps/extension/src/settings/section-surface/range-field.tsx",
+        "apps/extension/src/settings/section-surface/section-header-actions.tsx",
         "apps/extension/src/settings/section-surface/section-header.tsx",
         "apps/extension/src/settings/section-surface/subpage-tabs.tsx",
-        "apps/extension/src/settings/section-surface/text.helpers.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/chrome-ai.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/delete-actions.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/delete.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/index.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/model-options.ts",
+        "apps/extension/src/settings/sections/ai/connections/controller/model-order.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/provider-secret-actions.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/save.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/section/delete-handlers.ts",
@@ -10226,7 +10948,6 @@
         "apps/extension/src/settings/sections/ai/connections/surface/cards.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/chrome-ai-card.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/content.tsx",
-        "apps/extension/src/settings/sections/ai/connections/surface/header.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/helpers.ts",
         "apps/extension/src/settings/sections/ai/connections/surface/modals.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/models-card.tsx",
@@ -10255,18 +10976,14 @@
         "apps/extension/src/settings/sections/ai/prompts/templates/controller.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/delete-state.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/editor-state.ts",
-        "apps/extension/src/settings/sections/ai/prompts/templates/helpers.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/index.tsx",
         "apps/extension/src/settings/sections/ai/unlock/index.tsx",
         "apps/extension/src/settings/sections/ai/unlock/runtime.ts",
         "apps/extension/src/settings/sections/capture/media-quality/image/content.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/controller.ts",
         "apps/extension/src/settings/sections/capture/media-quality/image/format.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/header.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/index.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/quality.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/saving-state.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/tips.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/index.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/video/content.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/video/index.tsx",
@@ -10279,15 +10996,12 @@
         "apps/extension/src/settings/sections/capture/quick-actions/crud/index.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/crud/ordering.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/crud/persistence.ts",
-        "apps/extension/src/settings/sections/capture/quick-actions/display-mode.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/editor-fields.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/editor-output.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/editor.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/hotkey-input/controller.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/hotkey-input/index.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/index.tsx",
-        "apps/extension/src/settings/sections/capture/quick-actions/inline-confirmation/hook.ts",
-        "apps/extension/src/settings/sections/capture/quick-actions/inline-confirmation/index.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/list.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/loader.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/ordering.ts",
@@ -10334,27 +11048,25 @@
         "apps/extension/src/settings/sections/capture/screen-sizes/helpers.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/index.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/content.tsx",
-        "apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/dialogs.tsx",
-        "apps/extension/src/settings/sections/capture/screen-sizes/section-content/header.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/empty-state.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/view.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/types.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/sync.ts",
         "apps/extension/src/settings/sections/capture/storage-drafts/content.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
-        "apps/extension/src/settings/sections/general/interface-browser/content/section-header.tsx",
-        "apps/extension/src/settings/sections/general/interface-browser/content/switch-row.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/theme-chips.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/types.ts",
         "apps/extension/src/settings/sections/general/interface-browser/controller.ts",
         "apps/extension/src/settings/sections/general/interface-browser/copy.ts",
         "apps/extension/src/settings/sections/general/interface-browser/index.tsx",
+        "apps/extension/src/settings/sections/general/interface-browser/popup-startup-preference.ts",
         "apps/extension/src/settings/sections/styles/annotations/borders/blur-controls.tsx",
         "apps/extension/src/settings/sections/styles/annotations/borders/content.tsx",
         "apps/extension/src/settings/sections/styles/annotations/borders/crud-actions.ts",
@@ -10382,6 +11094,7 @@
         "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/tags/controller.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/editor.tsx",
         "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
@@ -10484,7 +11197,10 @@
         "apps/extension/src/settings/section-surface/collection/header.tsx",
         "apps/extension/src/settings/section-surface/collection/index.tsx",
         "apps/extension/src/settings/section-surface/collection/keyboard-reorder.ts",
+        "apps/extension/src/settings/section-surface/collection/layout-animation.ts",
         "apps/extension/src/settings/section-surface/collection/model.ts",
+        "apps/extension/src/settings/section-surface/collection/pointer-reorder-interaction.ts",
+        "apps/extension/src/settings/section-surface/collection/pointer-reorder.ts",
         "apps/extension/src/settings/section-surface/collection/reorder-interaction.ts",
         "apps/extension/src/settings/section-surface/collection/row-controls.tsx",
         "apps/extension/src/settings/section-surface/collection/row-identity.tsx",
@@ -10494,14 +11210,15 @@
         "apps/extension/src/settings/section-surface/loading-state.tsx",
         "apps/extension/src/settings/section-surface/panel-controls.tsx",
         "apps/extension/src/settings/section-surface/range-field.tsx",
+        "apps/extension/src/settings/section-surface/section-header-actions.tsx",
         "apps/extension/src/settings/section-surface/section-header.tsx",
         "apps/extension/src/settings/section-surface/subpage-tabs.tsx",
-        "apps/extension/src/settings/section-surface/text.helpers.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/chrome-ai.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/delete-actions.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/delete.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/index.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/model-options.ts",
+        "apps/extension/src/settings/sections/ai/connections/controller/model-order.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/provider-secret-actions.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/save.ts",
         "apps/extension/src/settings/sections/ai/connections/controller/section/delete-handlers.ts",
@@ -10540,7 +11257,6 @@
         "apps/extension/src/settings/sections/ai/connections/surface/cards.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/chrome-ai-card.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/content.tsx",
-        "apps/extension/src/settings/sections/ai/connections/surface/header.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/helpers.ts",
         "apps/extension/src/settings/sections/ai/connections/surface/modals.tsx",
         "apps/extension/src/settings/sections/ai/connections/surface/models-card.tsx",
@@ -10569,18 +11285,14 @@
         "apps/extension/src/settings/sections/ai/prompts/templates/controller.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/delete-state.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/editor-state.ts",
-        "apps/extension/src/settings/sections/ai/prompts/templates/helpers.ts",
         "apps/extension/src/settings/sections/ai/prompts/templates/index.tsx",
         "apps/extension/src/settings/sections/ai/unlock/index.tsx",
         "apps/extension/src/settings/sections/ai/unlock/runtime.ts",
         "apps/extension/src/settings/sections/capture/media-quality/image/content.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/controller.ts",
         "apps/extension/src/settings/sections/capture/media-quality/image/format.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/header.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/index.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/image/quality.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/saving-state.tsx",
-        "apps/extension/src/settings/sections/capture/media-quality/image/tips.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/index.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/video/content.tsx",
         "apps/extension/src/settings/sections/capture/media-quality/video/index.tsx",
@@ -10593,15 +11305,12 @@
         "apps/extension/src/settings/sections/capture/quick-actions/crud/index.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/crud/ordering.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/crud/persistence.ts",
-        "apps/extension/src/settings/sections/capture/quick-actions/display-mode.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/editor-fields.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/editor-output.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/editor.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/hotkey-input/controller.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/hotkey-input/index.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/index.tsx",
-        "apps/extension/src/settings/sections/capture/quick-actions/inline-confirmation/hook.ts",
-        "apps/extension/src/settings/sections/capture/quick-actions/inline-confirmation/index.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/list.tsx",
         "apps/extension/src/settings/sections/capture/quick-actions/loader.ts",
         "apps/extension/src/settings/sections/capture/quick-actions/ordering.ts",
@@ -10648,27 +11357,25 @@
         "apps/extension/src/settings/sections/capture/screen-sizes/helpers.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/index.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/content.tsx",
-        "apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/dialogs.tsx",
-        "apps/extension/src/settings/sections/capture/screen-sizes/section-content/header.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/empty-state.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/view.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/types.ts",
         "apps/extension/src/settings/sections/capture/screen-sizes/section-content/viewport-confirm-dialog.tsx",
         "apps/extension/src/settings/sections/capture/screen-sizes/sync.ts",
         "apps/extension/src/settings/sections/capture/storage-drafts/content.tsx",
+        "apps/extension/src/settings/sections/capture/storage-drafts/dialogs.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/index.tsx",
         "apps/extension/src/settings/sections/capture/storage-drafts/use-storage-drafts-state.ts",
         "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/controls-card.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/index.tsx",
-        "apps/extension/src/settings/sections/general/interface-browser/content/section-header.tsx",
-        "apps/extension/src/settings/sections/general/interface-browser/content/switch-row.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/theme-chips.tsx",
         "apps/extension/src/settings/sections/general/interface-browser/content/types.ts",
         "apps/extension/src/settings/sections/general/interface-browser/controller.ts",
         "apps/extension/src/settings/sections/general/interface-browser/copy.ts",
         "apps/extension/src/settings/sections/general/interface-browser/index.tsx",
+        "apps/extension/src/settings/sections/general/interface-browser/popup-startup-preference.ts",
         "apps/extension/src/settings/sections/styles/annotations/borders/blur-controls.tsx",
         "apps/extension/src/settings/sections/styles/annotations/borders/content.tsx",
         "apps/extension/src/settings/sections/styles/annotations/borders/crud-actions.ts",
@@ -10696,6 +11403,7 @@
         "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/tags/controller.ts",
+        "apps/extension/src/settings/sections/styles/annotations/tags/editor.tsx",
         "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
@@ -10792,6 +11500,7 @@
         "apps/extension/src/ui/annotation-template-query/assignment.tsx",
         "apps/extension/src/ui/annotation-template-query/chips.tsx",
         "apps/extension/src/ui/annotation-template-query/filter.tsx",
+        "apps/extension/src/ui/annotation-template-query/floating-filter-menu.tsx",
         "apps/extension/src/ui/annotation-template-query/index.ts",
         "apps/extension/src/ui/annotation-template-query/model.ts",
         "apps/extension/src/ui/annotation-template-query/state.ts"
@@ -11049,9 +11758,9 @@
         "apps/extension/src/ui/paint-selector/gradient-rail.tsx",
         "apps/extension/src/ui/paint-selector/index.tsx",
         "apps/extension/src/ui/paint-selector/lifecycle.ts",
+        "apps/extension/src/ui/paint-selector/mode-selector.tsx",
         "apps/extension/src/ui/paint-selector/mode-state.ts",
-        "apps/extension/src/ui/paint-selector/popup.tsx",
-        "apps/extension/src/ui/paint-selector/preset-controls.tsx"
+        "apps/extension/src/ui/paint-selector/popup.tsx"
       ],
       "rolloutFiles": [],
       "unownedFocusedFiles": []
@@ -11068,9 +11777,14 @@
         "apps/extension/src/ui/popup-shell/action-button/variants.tsx",
         "apps/extension/src/ui/popup-shell/action-footer/tokens.ts",
         "apps/extension/src/ui/popup-shell/footer/action.tsx",
+        "apps/extension/src/ui/popup-shell/footer/application-icons.tsx",
         "apps/extension/src/ui/popup-shell/footer/index.tsx",
         "apps/extension/src/ui/popup-shell/footer/theme-toggle.tsx",
         "apps/extension/src/ui/popup-shell/icon-state-button/index.tsx",
+        "apps/extension/src/ui/popup-shell/inline-curtain/options.tsx",
+        "apps/extension/src/ui/popup-shell/inline-curtain/secondary-panel.tsx",
+        "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+        "apps/extension/src/ui/popup-shell/inline-curtain/trigger.tsx",
         "apps/extension/src/ui/popup-shell/select/index.tsx"
       ],
       "rolloutFiles": [],
@@ -11086,7 +11800,9 @@
         "apps/extension/src/ui/surface-style-selector/editor-panel.tsx",
         "apps/extension/src/ui/surface-style-selector/index.tsx",
         "apps/extension/src/ui/surface-style-selector/layer-lifecycle.ts",
+        "apps/extension/src/ui/surface-style-selector/management-panel.tsx",
         "apps/extension/src/ui/surface-style-selector/preset-grid.tsx",
+        "apps/extension/src/ui/surface-style-selector/selection-panel.tsx",
         "apps/extension/src/ui/surface-style-selector/types.ts"
       ],
       "rolloutFiles": [],
@@ -11117,6 +11833,7 @@
         "apps/extension/src/video-editor/contracts/commands/annotation.ts",
         "apps/extension/src/video-editor/contracts/commands/effect-instance.ts",
         "apps/extension/src/video-editor/contracts/commands/export.ts",
+        "apps/extension/src/video-editor/contracts/commands/history.ts",
         "apps/extension/src/video-editor/contracts/commands/object-tracks.ts",
         "apps/extension/src/video-editor/contracts/commands/patches.ts",
         "apps/extension/src/video-editor/contracts/commands/project.ts",
@@ -11173,6 +11890,7 @@
         "apps/extension/src/video-editor/library/panel/body.tsx",
         "apps/extension/src/video-editor/library/panel/content.tsx",
         "apps/extension/src/video-editor/library/panel/index.tsx",
+        "apps/extension/src/video-editor/library/panel/lifecycle.ts",
         "apps/extension/src/video-editor/library/panel/lists.tsx",
         "apps/extension/src/video-editor/library/panel/media-preview.tsx",
         "apps/extension/src/video-editor/library/panel/rows.tsx",
@@ -11214,6 +11932,7 @@
         "apps/extension/src/video-editor/preview/stage/canvas/insert.ts",
         "apps/extension/src/video-editor/preview/stage/canvas/layers.tsx",
         "apps/extension/src/video-editor/preview/stage/canvas/layout.tsx",
+        "apps/extension/src/video-editor/preview/stage/canvas/navigator.tsx",
         "apps/extension/src/video-editor/preview/stage/canvas/root.tsx",
         "apps/extension/src/video-editor/preview/stage/canvas/runtime-error.tsx",
         "apps/extension/src/video-editor/preview/stage/canvas/selection-overlay.tsx",
@@ -11289,6 +12008,7 @@
         "apps/extension/src/video-editor/preview/stage/sizing/raster.ts",
         "apps/extension/src/video-editor/preview/stage/sizing/zoom.ts",
         "apps/extension/src/video-editor/preview/stage/types.ts",
+        "apps/extension/src/video-editor/project/history/index.ts",
         "apps/extension/src/video-editor/project/media-metadata/audio-peaks.ts",
         "apps/extension/src/video-editor/project/media-metadata/helpers.ts",
         "apps/extension/src/video-editor/project/media-metadata/index.ts",
@@ -11310,7 +12030,9 @@
         "apps/extension/src/video-editor/project/operations/export.ts",
         "apps/extension/src/video-editor/project/operations/import-validation.ts",
         "apps/extension/src/video-editor/project/operations/ops.ts",
+        "apps/extension/src/video-editor/project/operations/presented-tracks.ts",
         "apps/extension/src/video-editor/project/operations/source-timed-clips.ts",
+        "apps/extension/src/video-editor/project/operations/telemetry-eligibility.ts",
         "apps/extension/src/video-editor/project/operations/telemetry-lane.ts",
         "apps/extension/src/video-editor/project/operations/telemetry.ts",
         "apps/extension/src/video-editor/project/operations/time-ranges.ts",
@@ -11372,6 +12094,7 @@
         "apps/extension/src/video-editor/runtime/commands/export.ts",
         "apps/extension/src/video-editor/runtime/commands/helpers.ts",
         "apps/extension/src/video-editor/runtime/commands/index.ts",
+        "apps/extension/src/video-editor/runtime/commands/project-transition.ts",
         "apps/extension/src/video-editor/runtime/commands/project.ts",
         "apps/extension/src/video-editor/runtime/commands/types.ts",
         "apps/extension/src/video-editor/runtime/controller/builders.ts",
@@ -11388,6 +12111,7 @@
         "apps/extension/src/video-editor/runtime/controller/overlay-playback.ts",
         "apps/extension/src/video-editor/runtime/controller/playback-range.ts",
         "apps/extension/src/video-editor/runtime/controller/preview-preferences.ts",
+        "apps/extension/src/video-editor/runtime/controller/recording-telemetry.ts",
         "apps/extension/src/video-editor/runtime/controller/selected-clip-actions.ts",
         "apps/extension/src/video-editor/runtime/controller/selections.ts",
         "apps/extension/src/video-editor/runtime/controller/shared-actions.ts",
@@ -11406,25 +12130,6 @@
         "apps/extension/src/video-editor/runtime/controller/workspace/timeline-track-actions.ts",
         "apps/extension/src/video-editor/runtime/controller/workspace/timeline.ts",
         "apps/extension/src/video-editor/runtime/controller/workspace/types.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/analysis.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/decode.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/job.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/model/analysis.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/state.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/anchors.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/component-bounds.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/detector-guards.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/detector-predicates.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/detector-scoring.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/detector.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/index.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/motion.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/pixels.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/prototype.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/tracking-candidates.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/tracking.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/trajectory.ts",
-        "apps/extension/src/video-editor/runtime/cursor-detection/visual-track/types.ts",
         "apps/extension/src/video-editor/runtime/effect-runtime/index.ts",
         "apps/extension/src/video-editor/runtime/playback/rate-slider.ts",
         "apps/extension/src/video-editor/runtime/session/asset-urls.ts",
@@ -11433,6 +12138,7 @@
         "apps/extension/src/video-editor/runtime/session/effects.ts",
         "apps/extension/src/video-editor/runtime/session/export-event-route.ts",
         "apps/extension/src/video-editor/runtime/session/export-events.ts",
+        "apps/extension/src/video-editor/runtime/session/history-shortcuts.ts",
         "apps/extension/src/video-editor/runtime/session/index.ts",
         "apps/extension/src/video-editor/runtime/session/playback/cadence.ts",
         "apps/extension/src/video-editor/runtime/session/playback/index.ts",
@@ -11443,6 +12149,8 @@
         "apps/extension/src/video-editor/runtime/session/playback/shortcuts.ts",
         "apps/extension/src/video-editor/runtime/session/playback/state.ts",
         "apps/extension/src/video-editor/runtime/session/playback/ticker.ts",
+        "apps/extension/src/video-editor/runtime/session/save-readiness.ts",
+        "apps/extension/src/video-editor/runtime/session/save-retry.ts",
         "apps/extension/src/video-editor/runtime/session/timeline-frame-loader.ts",
         "apps/extension/src/video-editor/runtime/session/timeline-preview-cache.ts",
         "apps/extension/src/video-editor/runtime/session/timeline-preview-plans.ts",
@@ -11455,6 +12163,7 @@
         "apps/extension/src/video-editor/state/export-state/actions.ts",
         "apps/extension/src/video-editor/state/export-state/index.ts",
         "apps/extension/src/video-editor/state/export-state/transitions.ts",
+        "apps/extension/src/video-editor/state/history-actions.ts",
         "apps/extension/src/video-editor/state/placement-actions.ts",
         "apps/extension/src/video-editor/state/project-actions.ts",
         "apps/extension/src/video-editor/state/root-state.ts",
@@ -11533,7 +12242,6 @@
         "apps/extension/src/video-editor/timeline/project/toolbar/sections/zoom-control.tsx",
         "apps/extension/src/video-editor/timeline/project/toolbar/types.ts",
         "apps/extension/src/video-editor/timeline/project/tracks/lane-icons.tsx",
-        "apps/extension/src/video-editor/timeline/project/tracks/lane-rail.tsx",
         "apps/extension/src/video-editor/timeline/project/tracks/layout.ts",
         "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
         "apps/extension/src/video-editor/timeline/project/tracks/row.tsx",
@@ -11545,6 +12253,7 @@
         "apps/extension/src/video-editor/workspace/floating/actions.tsx",
         "apps/extension/src/video-editor/workspace/floating/document-bar.tsx",
         "apps/extension/src/video-editor/workspace/floating/index.tsx",
+        "apps/extension/src/video-editor/workspace/floating/inspector-resize.ts",
         "apps/extension/src/video-editor/workspace/floating/inspector-stack.tsx",
         "apps/extension/src/video-editor/workspace/floating/media-import.ts",
         "apps/extension/src/video-editor/workspace/floating/storage-promotion.ts",
@@ -11614,7 +12323,6 @@
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/body.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/clip-info.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/clip.tsx",
-        "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-detection.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/effects.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/helpers.tsx",
@@ -11650,8 +12358,6 @@
         "apps/extension/src/video-editor/workspace/sidebar/selection/shared/option-buttons.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/shared/panel.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/selection/shared/sliders.tsx",
-        "apps/extension/src/video-editor/workspace/sidebar/selection/track/controls.ts",
-        "apps/extension/src/video-editor/workspace/sidebar/selection/track/options.ts",
         "apps/extension/src/video-editor/workspace/sidebar/selection/track/sections.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/settings/index.tsx",
         "apps/extension/src/video-editor/workspace/sidebar/shell.tsx",
@@ -11735,6 +12441,7 @@
         "apps/extension/src/video-editor/state/export-state/actions.ts",
         "apps/extension/src/video-editor/state/export-state/index.ts",
         "apps/extension/src/video-editor/state/export-state/transitions.ts",
+        "apps/extension/src/video-editor/state/history-actions.ts",
         "apps/extension/src/video-editor/state/placement-actions.ts",
         "apps/extension/src/video-editor/state/project-actions.ts",
         "apps/extension/src/video-editor/state/root-state.ts",
@@ -12307,6 +13014,7 @@
         "packages/runtime-contracts/src/video/types/defaults.ts",
         "packages/runtime-contracts/src/video/types/messages.content.ts",
         "packages/runtime-contracts/src/video/types/messages.control.ts",
+        "packages/runtime-contracts/src/video/types/messages.surface.ts",
         "packages/runtime-contracts/src/video/types/microphone-processing.ts",
         "packages/runtime-contracts/src/video/types/native-settings.ts",
         "packages/runtime-contracts/src/video/types/output-profile.ts",
@@ -12431,6 +13139,7 @@
         "packages/runtime-contracts/src/video/types/defaults.ts",
         "packages/runtime-contracts/src/video/types/messages.content.ts",
         "packages/runtime-contracts/src/video/types/messages.control.ts",
+        "packages/runtime-contracts/src/video/types/messages.surface.ts",
         "packages/runtime-contracts/src/video/types/microphone-processing.ts",
         "packages/runtime-contracts/src/video/types/native-settings.ts",
         "packages/runtime-contracts/src/video/types/output-profile.ts",
@@ -12770,7 +13479,7 @@
       "remediation": "Remove or narrow the exclusion and assign the target to its real coverage owner.",
       "exactSource": {
         "path": "tooling/qa/core/verify-test-coverage.registry.mjs",
-        "contentHash": "5de9e86d18e2565253dd2e30be4629e0d9dc508824845bcde0500cd7c576bbc1"
+        "contentHash": "76c0890004a5ba71930efd3dc06247645ed0968ed767faba44fa1550782a9dee"
       },
       "consumers": [
         "tooling/qa/core/coverage-audit-report.mjs",
@@ -13092,6 +13801,7 @@
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
         "tooling/qa/core/messaging-default-imports.mjs",
+        "tooling/qa/core/verify-messaging.mjs",
         "tooling/qa/policy/index.mjs",
         "tooling/qa/policy/messaging.mjs"
       ]
@@ -13105,7 +13815,7 @@
       "remediation": "Burn the exact import population down when owner adapters replace default sends; never add a broad path.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging-default-baseline.mjs",
-        "contentHash": "a0994e23a8517d9f53f0701e11663e348cd9277a217447c0d2106ae81af6242d"
+        "contentHash": "32b6819c19ea050716d432a15330d6d31f3cde573ed8ce09f0cd4ae251408ff1"
       },
       "consumers": [
         "tooling/qa/policy/messaging-default-baseline.mjs",
@@ -13290,7 +14000,7 @@
       "remediation": "Review every ignore-pattern change against product roots and security scan coverage.",
       "exactSource": {
         "path": "tooling/qa/core/quality.config.mjs",
-        "contentHash": "0493742b7289fb0a84d445436d2c7bde0450e852f18fb6c3467a924f1db6ea7d"
+        "contentHash": "7314ebe6490c3054d9c543081525aab4396d5b6bf022630b318cc547f616596d"
       },
       "consumers": [
         "tooling/qa/audits/ast-grep.mjs",
@@ -13359,7 +14069,7 @@
       "remediation": "Keep prefixes limited to authoritative persistence owners and remove obsolete owner paths.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.data.mjs",
-        "contentHash": "c073bc4981a821cea66a89b885bf0a1f5b6cca0477448b6e36ade22fb6d31117"
+        "contentHash": "2dd8d6523f5b0017e167974750f150d73e3a4b6e05db99cddffe239dcfd67e90"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.data.mjs",
@@ -13656,6 +14366,27 @@
       ]
     },
     {
+      "id": "policy.source.agent-tooling-mjs.5721c21e0e",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/agent-tooling.mjs",
+        "contentHash": "499279b70fe691e39f2aaa630650246d6f5dd8434caa1cc67600623049f08009"
+      },
+      "consumers": [
+        "tooling/agent-tooling/agent-tooling.mjs",
+        "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/agent-tooling/install.mjs",
+        "tooling/agent-tooling/remove.mjs"
+      ],
+      "surfaces": [
+        "binding:PAYLOAD_ROOTS"
+      ]
+    },
+    {
       "id": "policy.source.ai-mjs.8194f48e93",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -13908,7 +14639,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/artifact-security.mjs",
-        "contentHash": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
+        "contentHash": "314522548f8a93a731e740bec46b25b1a0d9d5385371cc10c5758eb6cdabd8ed"
       },
       "consumers": [
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
@@ -14314,7 +15045,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "a24ae7ab03f7544389c109bbdde8b26bdec7038a74f71f80c4e8d2f5a47f18b8"
+        "contentHash": "389529d99a5fc8a5090db2ae39d044c044c96e925c40454beea76490a7d13e08"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -15945,7 +16676,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/e2e/extension-critical.helpers.ts",
-        "contentHash": "2dc121a2d59175ad25469aa89df29ffdc8217e9c4d0c1199bb1f9ae5eda68bab"
+        "contentHash": "64bc9401623c7e208cfaa5dddbd3a96c0e28ea13d911b22df09bdd71dd13eeca"
       },
       "consumers": [
         "tooling/test/e2e/extension-critical-media.spec.ts",
@@ -15960,9 +16691,9 @@
       ],
       "surfaces": [
         "binding:E2E_RUNTIME_SUCCESS_API_BEHAVIOR",
-        "property:applyGalleryScreenshotBootstrap/anonymous-139/entry",
-        "property:applyGalleryScreenshotBootstrap/anonymous-139/mediaLibrary",
-        "property:applyGalleryScreenshotBootstrap/anonymous-139/source",
+        "property:applyGalleryScreenshotBootstrap/anonymous-138/entry",
+        "property:applyGalleryScreenshotBootstrap/anonymous-138/mediaLibrary",
+        "property:applyGalleryScreenshotBootstrap/anonymous-138/source",
         "property:createRecordingRuntimeState/captureSource"
       ]
     },
@@ -16710,6 +17441,24 @@
       ],
       "surfaces": [
         "binding:FOCUSED_COVERAGE_OWNER_MAPPINGS"
+      ]
+    },
+    {
+      "id": "policy.source.install-mjs.56d19aa8fe",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/install.mjs",
+        "contentHash": "1700d7651eba396fb4a33340a568729b406462d2beab04faa0b15c7ee6c64c09"
+      },
+      "consumers": [
+        "tooling/agent-tooling/install.mjs"
+      ],
+      "surfaces": [
+        "binding:args"
       ]
     },
     {
@@ -17555,7 +18304,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/oss-release-validation.docs.mjs",
-        "contentHash": "63b6c9fcb8f96d48a7e7db6c38765df2996b3584c184c52ea61ce2edd24c7610"
+        "contentHash": "4f6541081b246c89a798e68bbc2c2822e172461bc1ac30924f9566c640c02220"
       },
       "consumers": [
         "tooling/qa/core/oss-release-consumer-discovery.test.ts",
@@ -17655,14 +18404,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/package-dist.mjs",
-        "contentHash": "45fb58ad0975e84df1e2f6f97221037090f7cd7781e345bd6f5d09f4cfc897d4"
+        "contentHash": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
       },
       "consumers": [
         "tooling/release/package-dist.mjs",
         "tooling/release/package-dist.test.ts"
       ],
       "surfaces": [
-        "binding:FORBIDDEN_ARCHIVE_PATH_PATTERNS",
         "property:createReleaseArchive/compressionOptions",
         "property:createReleaseArchive/excludedPaths"
       ]
@@ -18010,7 +18758,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight-docs.mjs",
-        "contentHash": "f54dbc831d1166969a0caabf1620b25cc360313732f87e7e13483f6e5c3aac55"
+        "contentHash": "c68283edb83ad3e24302a79abe24359911c87c40d71df33ee3f55c74f485c9ac"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-docs.mjs",
@@ -18191,7 +18939,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "fef204cf35535d336af9ad24adbec3a4848a5145586d5e891359f388692b3266"
+        "contentHash": "cfe8c299332d075c14d5c2cc66c9830006a359461b17eb03b064289e86d3aaef"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -18325,6 +19073,24 @@
       ]
     },
     {
+      "id": "policy.source.remove-mjs.399bc46d04",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/remove.mjs",
+        "contentHash": "340032a656000eec7b5c722a7eb5528f108b60e0e00e492c1c5eb0c9b94d1756"
+      },
+      "consumers": [
+        "tooling/agent-tooling/remove.mjs"
+      ],
+      "surfaces": [
+        "binding:args"
+      ]
+    },
+    {
       "id": "policy.source.report-mjs.2d012ea5b7",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18380,7 +19146,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/evidence/repo-audit-evidence/repository-profile.mjs",
-        "contentHash": "b8b2d3ed7329f8a9a892390354497bffaeba54b86b33f62b82e06418d74dcbb5"
+        "contentHash": "04d73f9feb5efe7de6e9ca756449c7166e85ef272c5e1fb0d7887bfb520cb2f0"
       },
       "consumers": [
         "tooling/qa/evidence/repo-audit-evidence/core.mjs",
@@ -18681,6 +19447,24 @@
       ]
     },
     {
+      "id": "policy.source.scenario-editor-visual-tsx.17f44ecdc6",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/scenario-editor-visual.tsx",
+        "contentHash": "5086e4e548a8bd6f061ca31b93febd4d45a0c91f977e3aab00fedf8fc978a257"
+      },
+      "consumers": [
+        "tooling/test/harness/scenario-editor-visual.tsx"
+      ],
+      "surfaces": [
+        "property:mountScenarioEditorVisualHarness/children"
+      ]
+    },
+    {
       "id": "policy.source.scenario-export-mjs.36b7fbe097",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18851,7 +19635,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/settings.mjs",
-        "contentHash": "0055705f645e8b1f57d35c94537e85c83274d23e79193e76dca38d579acd54ae"
+        "contentHash": "d0367105656bd93a4858384b38f436eff201d065f27c40afea45837c1554fdec"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18863,9 +19647,6 @@
         "property:testFiles[1]",
         "property:testFiles[10]",
         "property:testFiles[11]",
-        "property:testFiles[12]",
-        "property:testFiles[13]",
-        "property:testFiles[14]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -19284,6 +20065,7 @@
         "contentHash": "c92934a381a3198f892c4c3e489ab026388a56023e1ef0aa4848fbeb412b0c3c"
       },
       "consumers": [
+        "tooling/agent-tooling/agent-tooling.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
         "tooling/qa/audits/osv/severity.test.ts",
@@ -19611,7 +20393,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/typecheck-project-map.mjs",
-        "contentHash": "a46c867b34a8442c919ed110ac9eddd233966e988a56c095ce6670c8554938c1"
+        "contentHash": "1ef3bf63c5551c0d3168ff2dfe2c40e25f5b6908b82b99b2d5c5357305b705bd"
       },
       "consumers": [
         "tooling/qa/core/typecheck-project-map.mjs",
@@ -19967,7 +20749,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.scope.mjs",
-        "contentHash": "dea6867d066a4dca71358d7ac1f3d5ed25fc10d78410d6d7b2aec8b2b67930f6"
+        "contentHash": "03667dc0179d1d82993a90b10e7e3950f3481cd2a5059ad5f4b80dacfcb19d77"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
@@ -20734,7 +21516,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.code-steps.mjs",
-        "contentHash": "b0edd596bcec1e281105c27a37c56c5761af5864b868a6336dccd79078c9734b"
+        "contentHash": "62308fa2aed3bb865b3f34a128849fa495b5418ce5fe3df5c3af17e068c7d2fe"
       },
       "consumers": [
         "tooling/qa/core/qa-steps/contract.mjs",
@@ -20757,7 +21539,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.config.mjs",
-        "contentHash": "532c59cf9f149d50f4b2719fbb8ce342c92ba3a97ee8d0e44663e8e785915d66"
+        "contentHash": "bed4af45d6ab0375065c4a6e59cba6c542e531f3ae5b10edcf347973dc50e52f"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -20817,7 +21599,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "04cb85c00eabc0aed13a9c2ec5c405302c03a59148e8ca2af7153f85881e1700"
+        "contentHash": "5504165c79100a369fcce6f8634a81e68f680a099745d659b3d92170499071be"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
@@ -21288,18 +22070,20 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-messaging.mjs",
-        "contentHash": "0b7bfbb48c009c8c73e5e4345b4a947208b7adc178bcb6b5fce404a7edd580c8"
+        "contentHash": "7f2a63b84fa3fc83aabfe5d41c47e60abbafebd04852d932dcf6a6f1b5688c67"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.runtime.mjs",
-        "tooling/qa/core/verify-focused.code-steps.mjs",
+        "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-messaging.mjs",
         "tooling/qa/core/verify-messaging.test.ts"
       ],
       "surfaces": [
         "property:collectMessagingViolations/groupIds",
+        "property:runMessagingCheck/files",
         "property:runMessagingCheck/groupIds",
-        "property:runMessagingCheck/violations"
+        "property:runMessagingCheck/violations",
+        "property:runMessagingCheck/violations[1]"
       ]
     },
     {
@@ -21586,7 +22370,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/verify-runtime-topology.mjs",
-        "contentHash": "4fcd5420ea07694f3aa0d62f635b70ab624f20dd4ba2a176227a8bf5c3c1fef5"
+        "contentHash": "4dac70a3fa5b98cb127d26386dc58079ce07c76ec4d397e74006ec0125187f78"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",

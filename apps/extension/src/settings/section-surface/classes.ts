@@ -1,8 +1,4 @@
-import {
-  getControlSecondaryButtonClassName,
-  getFormActionRowClassName,
-  getFormPanelSurfaceClassName,
-} from '@sniptale/ui/control-language';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 
 export const settingsPageLayoutClassName = [
   'mx-auto grid h-full min-h-0 w-full max-w-[1320px] flex-1 gap-6 px-5 py-5',
@@ -26,7 +22,11 @@ export const settingsPageContentClassName = [
   'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-subtle)_30%,transparent)]',
 ].join(' ');
 
-export const settingsSectionClassName = 'animate-fadeIn space-y-8';
+export const settingsSectionClassName = 'animate-fadeIn space-y-6';
+
+// Simple forms stay narrow enough that a control remains visually connected to its label.
+// Catalogs, tables, and status dashboards intentionally do not use this constraint.
+export const settingsCompactWorkbenchClassName = 'w-full max-w-[720px]';
 
 export const settingsSectionHeadingWrapClassName =
   'flex flex-wrap items-start justify-between gap-4 border-b border-[var(--sniptale-color-border-soft)] pb-5';
@@ -34,13 +34,13 @@ export const settingsSectionHeadingWrapClassName =
 export const settingsSectionKickerClassName =
   'text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]';
 
-export const settingsSectionTitleClassName =
-  'text-[28px] font-semibold tracking-[-0.03em] text-[var(--sniptale-color-text-primary-strong)]';
-
 export const settingsSectionDescriptionClassName =
   'max-w-3xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]';
 
-export const settingsPanelClassName = getFormPanelSurfaceClassName();
+export const settingsPanelClassName = [
+  'border-b border-[var(--sniptale-color-border-soft)] pb-6',
+  'last:border-b-0 last:pb-0',
+].join(' ');
 
 export const settingsEmptyStateClassName = [
   'rounded-[18px] border px-4 py-8 text-center',
@@ -48,7 +48,7 @@ export const settingsEmptyStateClassName = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_42%,var(--sniptale-color-surface-panel)_58%)]',
 ].join(' ');
 
-export const settingsToggleRowClassName = getFormActionRowClassName({ emphasis: 'primary' });
+export const settingsToggleRowClassName = 'flex min-h-10 items-center justify-between gap-4 py-2.5';
 
 export const settingsAddButtonClassName = [
   'flex w-full',
@@ -67,7 +67,14 @@ export const settingsSuccessBadgeClassName = [
   'text-[var(--sniptale-color-success)]',
 ].join(' ');
 
-export const settingsModalFieldSurfaceClassName = 'sniptale-modal-field-surface';
+export const settingsModalFieldSurfaceClassName = '';
+
+export const settingsModalClassName = [
+  '!rounded-[12px]',
+  '[&_.sniptale-modal-header-sm]:px-5 [&_.sniptale-modal-header-sm]:py-3.5',
+  '[&_.sniptale-modal-body-sm]:px-5 [&_.sniptale-modal-body-sm]:py-4',
+  '[&_.sniptale-modal-footer-sm]:px-5 [&_.sniptale-modal-footer-sm]:py-3',
+].join(' ');
 
 export const settingsMetaLabelClassName =
   'text-[11px] font-semibold tracking-[0.08em] text-[var(--sniptale-color-text-muted)]';

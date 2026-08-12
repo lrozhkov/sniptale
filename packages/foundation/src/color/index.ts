@@ -50,8 +50,8 @@ function parseAlpha(value: string | undefined): number | null {
 
 function splitFunctionalChannels(body: string): string[] {
   return body
-    .replace(/\s*\/\s*/g, ',')
-    .split(/(?:\s*,\s*|\s+)/)
+    .replaceAll('/', ',')
+    .split(/[\s,]+/u)
     .filter(Boolean);
 }
 

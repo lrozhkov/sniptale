@@ -6,8 +6,6 @@ import type { QuickActionsSectionState } from './controller';
 type QuickActionsSectionCoreState = {
   actions: QuickAction[];
   confirmDelete: QuickAction | null;
-  confirmationMessage: string | null;
-  displayMode: 'list' | 'hidden';
   editingId: string | null;
   editForm: QuickAction | null;
   isLoading: boolean;
@@ -22,7 +20,6 @@ type QuickActionsSectionActionState = {
   handleSaveEdit: () => Promise<void>;
   handleToggleStatus: (id: string) => Promise<void>;
   setConfirmDelete: (action: QuickAction | null) => void;
-  setDisplayMode: (value: 'list' | 'hidden') => Promise<void>;
   updateFormField: (field: string, value: unknown) => void;
 };
 
@@ -73,7 +70,7 @@ function createDefaultUserAction() {
 function createDefaultBundledAction() {
   return createQuickAction({
     id: 'bundled-action',
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
     name: 'Selection',
     afterCapture: 'download_default',
@@ -108,11 +105,6 @@ export function createSectionState(
   return {
     actions: overrides.actions ?? [userAction, bundledAction],
     confirmDelete: overrides.confirmDelete === undefined ? userAction : overrides.confirmDelete,
-    confirmationMessage:
-      overrides.confirmationMessage === undefined
-        ? 'Quick action saved'
-        : overrides.confirmationMessage,
-    displayMode: overrides.displayMode ?? 'list',
     editingId: overrides.editingId === undefined ? userAction.id : overrides.editingId,
     editForm:
       overrides.editForm === undefined ? createDefaultEditForm(userAction) : overrides.editForm,
@@ -120,13 +112,13 @@ export function createSectionState(
     handleCancelEdit: overrides.handleCancelEdit ?? vi.fn(),
     handleDelete: overrides.handleDelete ?? vi.fn().mockResolvedValue(undefined),
     handleMoveBefore: overrides.handleMoveBefore ?? vi.fn().mockResolvedValue(undefined),
+    handleReset: overrides.handleReset ?? vi.fn().mockResolvedValue(undefined),
     handleEdit: overrides.handleEdit ?? vi.fn(),
     handleHotkeyError: overrides.handleHotkeyError ?? vi.fn(),
     handleSaveEdit: overrides.handleSaveEdit ?? vi.fn().mockResolvedValue(undefined),
     handleToggleStatus: overrides.handleToggleStatus ?? vi.fn().mockResolvedValue(undefined),
     isLoading: overrides.isLoading ?? false,
     setConfirmDelete: overrides.setConfirmDelete ?? vi.fn(),
-    setDisplayMode: overrides.setDisplayMode ?? vi.fn().mockResolvedValue(undefined),
     updateFormField: overrides.updateFormField ?? vi.fn(),
   };
 }

@@ -57,7 +57,7 @@ it('parses the controlled cursor capture flag and rejects invalid values', () =>
 it('keeps valid string and numeric settings while counting invalid field variants', () => {
   expect(
     parseCurrentVideoSettings({
-      autoFadeDelay: 300,
+      autoFadeDelay: 30,
       countdownSeconds: '3',
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
@@ -68,7 +68,7 @@ it('keeps valid string and numeric settings while counting invalid field variant
     invalidFieldCount: 1,
     value: {
       ...CURRENT_VIDEO_SETTINGS_CONTRACT,
-      autoFadeDelay: 300,
+      autoFadeDelay: 30,
       controlledCursorCaptureEnabled: false,
       diagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',

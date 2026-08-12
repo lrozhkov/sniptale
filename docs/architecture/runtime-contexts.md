@@ -42,6 +42,8 @@ Viewer preparation has one sanctioned one-way exception: `apps/extension/src/web
 
 - `apps/extension/src/editor/index.tsx` owns image workspace state, Fabric integration, editing commands, and editor persistence adapters. Its document-load path retains the owner-local legacy Fabric arrow-group compatibility backend.
 - `apps/extension/src/video-editor/index.tsx` owns video workspace state, timeline editing, project persistence adapters, and the parent-side EffectV1 preview adapter.
+- The video editor's project-history owner retains at most 100 undoable actions for the active project in memory. It resets on accepted project replacement and never becomes a durable project or persistence authority.
+- Activated timeline pointer gestures open one explicit project-history transaction, so all intermediate clip, trim, and effect-lane updates commit as one undoable action when the gesture ends.
 - `apps/extension/src/video-editor/contracts/**` is the page-local exchange seam for cross-owner DTOs and command ports. It stays independent of React, Zustand, and video-editor product surfaces; `apps/extension/src/video-editor/runtime/controller/store.ts` is the sole runtime adapter from the full Zustand state to the explicit controller port.
 - `apps/extension/src/scenario-editor/index.tsx` owns scenario authoring, presentation, and scenario-specific project adapters. Shared scenario contracts and projections remain under named app-core owners rather than direct editor imports.
 
@@ -53,11 +55,11 @@ Page-local workspace state is disposable or advisory until an explicit persisten
 
 ## Offscreen document
 
-`apps/extension/src/offscreen/offscreen.html` and `apps/extension/src/offscreen/offscreen.ts` define the offscreen runtime. It owns approved media capture, recording, viewport, export, and one-shot voice-input work delegated by the background service worker. `background/offscreen-document` owns the shared document lifecycle as a sibling of the runtime composition root; feature owners must not place generic lifecycle authority under runtime, video, or voice input.
+`apps/extension/src/offscreen/offscreen.html` and `apps/extension/src/offscreen/offscreen.ts` define the offscreen runtime. It owns approved media capture, one-shot desktop-frame encoding and PNG clipboard delivery, recording, viewport, export, and one-shot voice-input work delegated by the background service worker. `background/offscreen-document` owns the shared document lifecycle as a sibling of the runtime composition root; feature owners must not place generic lifecycle authority under runtime, video, or voice input.
 
 Offscreen commands accept only the verified background/offscreen channel and validate freshness, capability, and rate limits before parsing or mutating idempotency state. Side-effect commands key duplicate execution by authority generation and request, job, or recording identity.
 
-Reusable voice input is owned by `workflows/voice-input`, `background/voice-input`, and `offscreen/voice-input`. Settings is the first registered consumer, not the feature owner. New annotation, comment, or editor consumers reuse the Port contract and client but require an explicit consumer-policy entry; transcript and normalized audio-level events remain scoped to the Port that owns the active session. The background translates a private offscreen session nonce to the consumer session identity so delayed events cannot cross Port ownership, even when a consumer reuses an identifier. Video recording and speech recognition contend on one atomic offscreen media-activity lease.
+Reusable voice input is owned by `workflows/voice-input`, `background/voice-input`, and `offscreen/voice-input`. Settings is the first registered consumer, not the feature owner. New annotation, comment, or editor consumers reuse the Port contract and client but require an explicit consumer-policy entry; transcript and normalized audio-level events remain scoped to the Port that owns the active session. The background translates a private offscreen session nonce to the consumer session identity so delayed events cannot cross Port ownership, even when a consumer reuses an identifier. Video recording, desktop-frame capture, and speech recognition contend on one atomic offscreen media-activity lease.
 
 ## Effect runtime sandbox
 

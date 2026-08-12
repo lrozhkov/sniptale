@@ -5,6 +5,7 @@ import { afterCaptureLabels, qualityOptions } from './section/constants';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
 import { settingsMetaLabelClassName, settingsToggleRowClassName } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
+import { getAllowedQuickActionAfterCaptureActions } from '../../../../features/quick-actions-presets/policy';
 
 type QuickActionsEditorOutputState = Pick<QuickActionsSectionState, 'editForm' | 'updateFormField'>;
 
@@ -21,8 +22,12 @@ export function QuickActionsEditorPrimaryOutputField(props: {
 export function QuickActionsEditorAdvancedOutputFields(props: {
   state: QuickActionsEditorOutputState;
 }) {
+  if (props.state.editForm?.afterCapture === 'copy') {
+    return null;
+  }
+
   return (
-    <div className="mb-4 grid gap-4 md:grid-cols-2">
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <QuickActionsFormatField state={props.state} />
       <QuickActionsQualityField state={props.state} />
     </div>
@@ -34,7 +39,7 @@ export function QuickActionsEditorToggleRow(props: {
   includeExitAfterCapture?: boolean;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-2 sm:grid-cols-2">
       <QuickActionsBooleanToggle
         checked={Boolean(props.state.editForm?.status)}
         label={translate('settings.quickActions.enabledLabel')}
@@ -56,10 +61,11 @@ export function QuickActionsEditorToggleRow(props: {
 function QuickActionsFormatField(props: { state: QuickActionsEditorOutputState }) {
   return (
     <div>
-      <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
         {translate('settings.quickActions.imageFormatLabel')}
       </label>
       <ProductSelect
+        controlSize="sm"
         value={props.state.editForm?.imageFormat || ''}
         onChange={(value) =>
           props.state.updateFormField('imageFormat', (value || null) as QuickAction['imageFormat'])
@@ -79,10 +85,11 @@ function QuickActionsFormatField(props: { state: QuickActionsEditorOutputState }
 function QuickActionsQualityField(props: { state: QuickActionsEditorOutputState }) {
   return (
     <div>
-      <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
         {translate('settings.quickActions.qualityLabel')}
       </label>
       <ProductSelect
+        controlSize="sm"
         value={
           props.state.editForm?.imageQuality === null
             ? ''
@@ -106,19 +113,23 @@ function QuickActionsQualityField(props: { state: QuickActionsEditorOutputState 
 }
 
 function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputState }) {
+  const allowedActions = props.state.editForm
+    ? getAllowedQuickActionAfterCaptureActions(props.state.editForm)
+    : null;
   return (
     <div>
-      <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+      <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
         {translate('settings.quickActions.afterCaptureLabel')}
       </label>
       <ProductSelect
+        controlSize="sm"
         value={props.state.editForm?.afterCapture ?? 'download_default'}
         onChange={(value) =>
           props.state.updateFormField('afterCapture', value as CaptureActionType)
         }
-        options={(Object.entries(afterCaptureLabels) as [CaptureActionType, string][]).map(
-          ([value, label]) => ({ value, label })
-        )}
+        options={(Object.entries(afterCaptureLabels) as [CaptureActionType, string][])
+          .filter(([value]) => !allowedActions || allowedActions.has(value))
+          .map(([value, label]) => ({ value, label }))}
       />
     </div>
   );
@@ -130,9 +141,9 @@ function QuickActionsBooleanToggle(props: {
   onToggle: () => void;
 }) {
   return (
-    <div className={settingsToggleRowClassName}>
+    <div className={`${settingsToggleRowClassName} !min-h-9 !py-1.5`}>
       <label className="text-sm text-[var(--sniptale-color-text-muted)]">{props.label}</label>
-      <SettingsSwitch checked={props.checked} onClick={props.onToggle} />
+      <SettingsSwitch checked={props.checked} size="sm" onClick={props.onToggle} />
     </div>
   );
 }

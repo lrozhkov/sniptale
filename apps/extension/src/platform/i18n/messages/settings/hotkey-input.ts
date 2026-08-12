@@ -6,8 +6,16 @@ export const settingsHotkeyInputMessages = defineMessageSource({
     en: 'Press a key combination...',
   },
   modifierRequired: {
-    ru: 'Используйте комбинацию с Ctrl, Shift или Alt',
-    en: 'Use a combination with Ctrl, Shift, or Alt',
+    ru: 'Используйте Ctrl, Alt или Command',
+    en: 'Use Ctrl, Alt, or Command',
+  },
+  altGrConflict: {
+    ru: 'Сочетание Ctrl + Alt недоступно',
+    en: 'Ctrl + Alt combinations are unavailable',
+  },
+  unsupportedKey: {
+    ru: 'Эту клавишу нельзя назначить',
+    en: 'This key cannot be assigned',
   },
   reservedCombination: {
     ru: 'Эта комбинация зарезервирована браузером',
@@ -26,7 +34,7 @@ export const settingsHotkeyInputMessages = defineMessageSource({
     en: 'Clear',
   },
   recordingHint: {
-    ru: 'Нажмите комбинацию клавиш (Esc для отмены)',
-    en: 'Press a key combination (Esc to cancel)',
+    ru: 'Ctrl, Alt или Command + клавиша · Esc — отмена',
+    en: 'Ctrl, Alt, or Command + key · Esc to cancel',
   },
 });

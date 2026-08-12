@@ -6,6 +6,7 @@ import { browserScriptingExecuteScriptMock, sendTabMessageMock } from './service
 import {
   injectContentRuntimeAndAwaitReady,
   waitForContentRuntimeReady,
+  waitForContentScreenshotMode,
   waitForContentToolbarReady,
 } from './readiness';
 
@@ -32,9 +33,13 @@ it('waits for the top-level content runtime after injecting the runtime', async 
     injectImmediately: false,
     target: { allFrames: true, tabId: 7 },
   });
-  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
-    type: VideoMessageType.GET_VIEWPORT_COORDS,
-  });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    7,
+    {
+      type: VideoMessageType.GET_VIEWPORT_COORDS,
+    },
+    { frameId: 0 }
+  );
 });
 
 it('retries readiness while the newly injected runtime has not registered its bridge yet', async () => {
@@ -96,6 +101,22 @@ it('waits for the React toolbar bridge instead of accepting the earlier core lis
   expect(sendTabMessage).toHaveBeenNthCalledWith(1, 12, {
     type: MessageType.TOOLBAR_STATUS,
   });
+  expect(sendTabMessage).toHaveBeenCalledTimes(2);
+  expect(wait).toHaveBeenCalledWith(50);
+});
+
+it('waits until the toolbar confirms that screenshot mode was applied', async () => {
+  const wait = vi.fn(async () => undefined);
+  const sendTabMessage = vi
+    .fn()
+    .mockResolvedValueOnce({ screenshotMode: false, success: true, visible: false })
+    .mockResolvedValueOnce({ screenshotMode: true, success: true, visible: false });
+
+  await expect(waitForContentScreenshotMode(12, true, { sendTabMessage, wait })).resolves.toEqual({
+    screenshotMode: true,
+    visible: false,
+  });
+
   expect(sendTabMessage).toHaveBeenCalledTimes(2);
   expect(wait).toHaveBeenCalledWith(50);
 });

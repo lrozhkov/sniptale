@@ -1,54 +1,49 @@
-import { Check, Funnel, Search, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Funnel, Search, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   AnnotationTemplateTag,
   AnnotationTemplateTagId,
 } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { translate } from '../../platform/i18n';
+import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-menu';
+
+const FILTER_TRIGGER_BASE_CLASS_NAME = [
+  'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg',
+  'border px-2 text-xs transition-colors',
+].join(' ');
+const FILTER_TRIGGER_ACTIVE_CLASS_NAME = [
+  'border-[var(--sniptale-color-border-accent-strong)]',
+  'bg-[var(--sniptale-color-accent-soft)]',
+  'text-[var(--sniptale-color-accent-emphasis)]',
+].join(' ');
+const FILTER_TRIGGER_IDLE_CLASS_NAME = [
+  'border-[var(--sniptale-color-border-soft)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+  'hover:text-[var(--sniptale-color-text-primary)]',
+].join(' ');
 
 export function AnnotationTemplateQueryControls(props: {
   activeFilterTagIds: readonly AnnotationTemplateTagId[];
   compact?: boolean;
   disabled?: boolean;
   onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   onQueryChange: (query: string) => void;
   query: string;
   tags: readonly AnnotationTemplateTag[];
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const floating = useFloatingFilterMenu(open, setOpen);
   const activeCount = props.activeFilterTagIds.length;
+  const onFloatingInteractionChange = props.onFloatingInteractionChange;
+
   useEffect(() => {
     if (!open) return;
-    queueMicrotask(() =>
-      menuRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus()
-    );
-    const onPointerDown = (event: PointerEvent) => {
-      const root = rootRef.current;
-      if (root && !event.composedPath().includes(root)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      setOpen(false);
-      queueMicrotask(() => triggerRef.current?.focus());
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
-    };
-  }, [open]);
-  const toggle = (tagId: AnnotationTemplateTagId) => {
-    const next = props.activeFilterTagIds.includes(tagId)
-      ? props.activeFilterTagIds.filter((id) => id !== tagId)
-      : [...props.activeFilterTagIds, tagId];
-    props.onActiveFilterTagIdsChange(next);
-  };
+    onFloatingInteractionChange?.(true);
+    return () => onFloatingInteractionChange?.(false);
+  }, [onFloatingInteractionChange, open]);
+
   return (
     <div className="flex items-center gap-2" data-ui="shared.annotation-template-query.controls">
       <label
@@ -62,10 +57,10 @@ export function AnnotationTemplateQueryControls(props: {
         <span className="sr-only">{translate('highlighter.templateTags.searchLabel')}</span>
         <input
           aria-label={translate('highlighter.templateTags.searchLabel')}
-          className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+          className="min-w-0 flex-1 cursor-text bg-transparent text-xs outline-none focus:placeholder-transparent"
           onChange={(event) => props.onQueryChange(event.currentTarget.value)}
           placeholder={translate('highlighter.templateTags.searchPlaceholder')}
-          type="search"
+          type="text"
           value={props.query}
         />
         {props.query ? (
@@ -78,67 +73,51 @@ export function AnnotationTemplateQueryControls(props: {
           </button>
         ) : null}
       </label>
-      <div className="relative" ref={rootRef}>
+      <div className="relative" data-floating-ui-owner-id={floating.ownerId} ref={floating.rootRef}>
         <button
           aria-expanded={open}
           aria-haspopup="menu"
           aria-label={translate('highlighter.templateTags.filterLabel')}
+          aria-pressed={activeCount > 0}
           className={[
-            'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-2',
-            'border-[var(--sniptale-color-border-soft)] text-xs',
+            FILTER_TRIGGER_BASE_CLASS_NAME,
+            activeCount > 0 ? FILTER_TRIGGER_ACTIVE_CLASS_NAME : FILTER_TRIGGER_IDLE_CLASS_NAME,
           ].join(' ')}
+          data-active={activeCount > 0 ? 'true' : 'false'}
           disabled={props.disabled || props.tags.length === 0}
-          onClick={() => setOpen((value) => !value)}
-          ref={triggerRef}
+          onClick={() => {
+            if (!open) floating.position();
+            setOpen((value) => !value);
+          }}
+          ref={floating.triggerRef}
           type="button"
         >
           <Funnel aria-hidden="true" size={14} />
           {activeCount > 0 ? <span>{activeCount}</span> : null}
         </button>
-        {open ? (
-          <div
-            className={[
-              'absolute right-0 top-10 z-30 max-h-56 w-52 overflow-auto rounded-xl border p-1.5',
-              'border-[var(--sniptale-color-border-soft)]',
-              'bg-[var(--sniptale-color-surface-panel)] shadow-xl',
-            ].join(' ')}
-            role="menu"
-            ref={menuRef}
-          >
-            {props.tags.map((tag) => (
-              <button
-                aria-checked={props.activeFilterTagIds.includes(tag.id)}
-                className={[
-                  'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs',
-                  'hover:bg-[var(--sniptale-color-surface-input)]',
-                ].join(' ')}
-                key={tag.id}
-                onClick={() => toggle(tag.id)}
-                role="menuitemcheckbox"
-                type="button"
-              >
-                <span aria-hidden="true" className="w-4">
-                  {props.activeFilterTagIds.includes(tag.id) ? <Check size={13} /> : null}
-                </span>
-                <span className="truncate">{tag.label}</span>
-              </button>
-            ))}
-            {activeCount > 0 ? (
-              <button
-                className={[
-                  'mt-1 w-full rounded-lg px-2 py-1.5 text-left text-xs',
-                  'text-[var(--sniptale-color-accent)]',
-                  'hover:bg-[var(--sniptale-color-surface-input)]',
-                ].join(' ')}
-                onClick={() => props.onActiveFilterTagIdsChange([])}
-                type="button"
-              >
-                {translate('highlighter.templateTags.clearFilter')}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        <FloatingFilterMenu
+          activeFilterTagIds={props.activeFilterTagIds}
+          menuRef={floating.menuRef}
+          onActiveFilterTagIdsChange={props.onActiveFilterTagIdsChange}
+          open={open}
+          ownerId={floating.ownerId}
+          style={floating.style}
+          tags={props.tags}
+          triggerRef={floating.triggerRef}
+        />
       </div>
+    </div>
+  );
+}
+
+export function AnnotationTemplateQueryResults(props: { children: ReactNode; loading: boolean }) {
+  return (
+    <div
+      aria-busy={props.loading}
+      className="min-h-[var(--sniptale-preset-list-max-height,96px)]"
+      data-ui="shared.annotation-template-query.results"
+    >
+      <div className={props.loading ? 'invisible' : undefined}>{props.children}</div>
     </div>
   );
 }

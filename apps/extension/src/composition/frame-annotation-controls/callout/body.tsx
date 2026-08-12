@@ -16,7 +16,13 @@ import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/h
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
 import { createTemplateSourceAction, type TemplateSourceControl } from '../popover/template-source';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
-import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
+import {
+  ApplyToFutureFramesGuard,
+  ApplyToFutureFramesSetting,
+  useApplyToFutureFrames,
+} from '../popover/apply-future';
+
+const ignoreFloatingInteractionChange = () => undefined;
 
 export function createCalloutAnchorPlacement(
   anchor: CalloutAnchor
@@ -55,6 +61,12 @@ export function CalloutSettingsPopoverContent(props: {
     templates: props.presets,
   });
   const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
+  const onUseForNewFrames =
+    workflow.session.mode === 'temporary' &&
+    props.headerContext === 'element' &&
+    props.onApplyToFuture
+      ? applyToFuture.request
+      : undefined;
   return (
     <>
       <SettingsPopoverHeader
@@ -63,16 +75,6 @@ export function CalloutSettingsPopoverContent(props: {
               action: {
                 label: translate('content.templateFork.backToTemplates'),
                 onClick: workflow.requestTemplates,
-              },
-            }
-          : {})}
-        {...(workflow.session.mode === 'temporary' &&
-        props.headerContext === 'element' &&
-        props.onApplyToFuture
-          ? {
-              applyToFutureAction: {
-                label: translate('content.templateFork.applyToFuture'),
-                onClick: applyToFuture.request,
               },
             }
           : {})}
@@ -122,6 +124,7 @@ export function CalloutSettingsPopoverContent(props: {
             });
           }}
           onForkPreset={workflow.fork}
+          onFloatingInteractionChange={props.onNestedLayerChange ?? ignoreFloatingInteractionChange}
           {...(props.onResetPreset ? { onResetPreset: props.onResetPreset } : {})}
           onTogglePreset={props.onTogglePreset}
           pendingPresetIds={props.pendingPresetIds}
@@ -150,6 +153,11 @@ export function CalloutSettingsPopoverContent(props: {
           }
           saveSection={{
             ...props.saveSection,
+            ...(onUseForNewFrames
+              ? {
+                  leadingContent: <ApplyToFutureFramesSetting onClick={onUseForNewFrames} />,
+                }
+              : {}),
             onCreate: (name) =>
               props.saveSection.onCreate(name, workflow.session.sourceTemplate?.tagIds ?? []),
             onCreated: workflow.completeSave,

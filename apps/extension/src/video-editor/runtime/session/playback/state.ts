@@ -18,6 +18,7 @@ export function createPlaybackLatestState(
   project: VideoProject | null,
   selection: VideoEditorSelection,
   placementMode: VideoEditorPlacementMode | null,
+  projectHistoryTransactionActive: boolean,
   selectedClipId: string | null,
   selectedActionEvent: PlaybackLatestState['selectedActionEvent'],
   selectedMotionRegion: PlaybackLatestState['selectedMotionRegion']
@@ -28,6 +29,7 @@ export function createPlaybackLatestState(
     placementMode,
     playbackRange,
     project,
+    projectHistoryTransactionActive,
     selection,
     selectedActionEvent,
     selectedClipId,

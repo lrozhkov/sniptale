@@ -24,6 +24,7 @@ function createWebcamRecorder(
     filenameSuffix: 'webcam',
     kind: 'webcam',
     recorder: {} as MediaRecorder,
+    release: vi.fn(),
     recordingId: 'rec-webcam',
     stream: {} as MediaStream,
     trackSettings: { height: 720, width: 1280 },
@@ -54,12 +55,12 @@ it('rejects webcam project input when recorded dimensions are unavailable', () =
 });
 
 it('stops webcam recorder streams when rollback owns a created recorder', () => {
-  const stop = vi.fn();
+  const release = vi.fn();
   const recorder = createWebcamRecorder({
-    stream: { getTracks: () => [{ stop }] } as unknown as MediaStream,
+    release,
   });
 
   stopWebcamRecorderStream(null);
   stopWebcamRecorderStream(recorder);
-  expect(stop).toHaveBeenCalledOnce();
+  expect(release).toHaveBeenCalledOnce();
 });

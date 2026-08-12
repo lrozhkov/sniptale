@@ -4,7 +4,6 @@ import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
 import { TimelineIconButton } from '../controls/icon-button';
 import { getTrackKindIcon, TimelineLaneIconFrame } from './lane-icons';
-import { ProjectTimelineLogicalLaneRail } from './lane-rail';
 import type { TimelineTrackLayout } from './layout';
 
 interface ProjectTimelineTrackRowProps {
@@ -12,7 +11,6 @@ interface ProjectTimelineTrackRowProps {
   isSelected: boolean;
   track: VideoProject['tracks'][number];
   trackLayout: TimelineTrackLayout | undefined;
-  onAddTrackLogicalLane: (trackId: string) => void;
   onSelectTrack: (trackId: string) => void;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
@@ -23,7 +21,6 @@ export function ProjectTimelineTrackRow({
   isSelected,
   track,
   trackLayout,
-  onAddTrackLogicalLane,
   onSelectTrack,
   onToggleTrackLock,
   onToggleTrackVisibility,
@@ -48,12 +45,6 @@ export function ProjectTimelineTrackRow({
           onToggleTrackVisibility={onToggleTrackVisibility}
         />
       )}
-      <ProjectTimelineLogicalLaneRail
-        compactRows={compactRows}
-        track={track}
-        trackLayout={trackLayout}
-        onAddTrackLogicalLane={onAddTrackLogicalLane}
-      />
     </div>
   );
 }

@@ -153,5 +153,5 @@ async function shouldUseBackgroundResponseTimeout(actionType: CaptureActionType)
   }
 
   const settings = await loadSettings();
-  return !settings.saveCapturesToGallery;
+  return settings.localStoragePolicy.defaultDestination !== 'library';
 }

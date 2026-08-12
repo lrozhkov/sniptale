@@ -1,4 +1,4 @@
-import type { Canvas, FabricObject, TPointerEvent } from 'fabric';
+import type { Canvas, FabricObject, TPointerEvent, Transform } from 'fabric';
 import {
   createDrawingBounds,
   createDrawingObject,
@@ -13,13 +13,23 @@ import { activateTextTarget, isTextTarget } from './text-target';
 import { completeDrawWorkflowFromBindings } from './draw-completion';
 import type { EditorControllerEventBindings, EditorControllerEventHandlers } from './types';
 import { handleStepMouseDown } from '../tools/step-drawing/pointer';
-import { readEditorDrawingObject, writeEditorDrawingObject } from '../../drawing/object/metadata';
+import {
+  isEditorDrawingSelection,
+  readEditorDrawingObject,
+  writeEditorDrawingObject,
+} from '../../drawing/object/metadata';
 import {
   createEditorDrawingFabricObject,
   replaceEditorDrawingFabricGeometry,
   updateEditorDrawingPathDraft,
 } from '../../drawing/object/vector';
 import { createEditorDrawingBlurObject } from '../../drawing/object/blur';
+import {
+  beginEditorSelectionModifierGesture,
+  finishEditorSelectionModifierGesture,
+  finishEditorSelectionModifierMouseDown,
+  type EditorSelectionModifierGesture,
+} from './selection-modifiers';
 
 function clearSelection(canvas: Canvas, bindings: EditorControllerEventBindings): void {
   if (canvas.getActiveObjects().length === 0) return;
@@ -92,10 +102,11 @@ function startBlur(bindings: EditorControllerEventBindings, point: import('fabri
 function startDrawing(
   bindings: EditorControllerEventBindings,
   canvas: Canvas,
-  event: { e: TPointerEvent; target?: FabricObject }
+  event: { e: TPointerEvent; target?: FabricObject; transform?: Pick<Transform, 'target'> | null }
 ): void {
   const tool = bindings.getActiveTool();
   if (tool === 'select') return;
+  if (event.transform && isEditorDrawingSelection(event.transform.target)) return;
   if (cropDown(bindings, canvas, tool, event)) return;
   const point = canvas.getScenePoint(event.e);
   if (tool === 'step') {
@@ -193,13 +204,29 @@ export function createEditorDrawingEventHandlers(
     point: import('fabric').Point;
     target: FabricObject;
   } | null = null;
+  let selectionModifierGesture: EditorSelectionModifierGesture | null = null;
 
   return {
     handlePathCreated: () => undefined,
-    handleMouseDownBefore: () => undefined,
-    handleMouseDown: (event) => {
-      if ('button' in event.e && event.e.button === 2) return;
+    handleMouseDownBefore: (event) => {
       const canvas = bindings.getCanvas();
+      if (!canvas) return;
+      selectionModifierGesture = beginEditorSelectionModifierGesture({
+        activeTool: bindings.getActiveTool(),
+        canvas,
+        event: event.e,
+        ...(event.target ? { target: event.target } : {}),
+      });
+    },
+    handleMouseDown: (event) => {
+      const canvas = bindings.getCanvas();
+      if (canvas) {
+        selectionModifierGesture = finishEditorSelectionModifierMouseDown(
+          canvas,
+          selectionModifierGesture
+        );
+      }
+      if ('button' in event.e && event.e.button === 2) return;
       if (!canvas || !bindings.getSource()) return;
       if (bindings.getActiveTool() === 'text' && isTextTarget(event.target)) {
         const point = canvas.getScenePoint(event.e);
@@ -225,6 +252,12 @@ export function createEditorDrawingEventHandlers(
     },
     handleMouseUp: () => {
       const canvas = bindings.getCanvas();
+      if (canvas && finishEditorSelectionModifierGesture(canvas, selectionModifierGesture)) {
+        selectionModifierGesture = null;
+        bindings.syncRuntimeState();
+        return;
+      }
+      selectionModifierGesture = null;
       if (canvas && textTargetCandidate) {
         activateTextTarget(canvas, textTargetCandidate.target, () => bindings.syncRuntimeState(), {
           selectAll: false,

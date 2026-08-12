@@ -17,6 +17,8 @@ const {
   runBestEffortMock,
   saveRecordingTelemetrySafelyMock,
   sendTabMessageMock,
+  surfaceLeaseState,
+  updateVideoRecordingSurfaceMock,
 } = vi.hoisted(() => ({
   awaitBestEffortMock: vi.fn(),
   appendControlledCursorTelemetryMock: vi.fn(),
@@ -35,6 +37,10 @@ const {
   runBestEffortMock: vi.fn(),
   saveRecordingTelemetrySafelyMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
+  surfaceLeaseState: {
+    current: null as null | { recordingId: string | null; surfaceSessionId: string; tabId: number },
+  },
+  updateVideoRecordingSurfaceMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -72,12 +78,19 @@ vi.mock('../controlled-cursor/messages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../controlled-cursor/messages')>()),
   disableControlledCursorCapture: disableControlledCursorCaptureMock,
 }));
+vi.mock('../../../content-surface/surface-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../content-surface/surface-lease')>()),
+  getVideoRecordingSurfaceLeaseSnapshot: () => surfaceLeaseState.current,
+  updateVideoRecordingSurface: updateVideoRecordingSurfaceMock,
+}));
 
 import { runStopSideEffects } from './effects';
 
 beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   vi.clearAllMocks();
+  surfaceLeaseState.current = null;
+  updateVideoRecordingSurfaceMock.mockResolvedValue(undefined);
   sendTabMessageMock.mockResolvedValue(undefined);
   awaitBestEffortMock.mockImplementation((promise: Promise<unknown>) => promise);
   runBestEffortMock.mockImplementation((promise: Promise<unknown>) => promise);
@@ -93,34 +106,6 @@ beforeEach(() => {
 
 function flushStopSideEffects(): Promise<void> {
   return Promise.resolve().then(() => Promise.resolve());
-}
-
-function mockTelemetryDisableMessage() {
-  sendTabMessageMock.mockImplementation((_tabId: number, message: { type: string }) => {
-    if (message.type === VideoMessageType.DISABLE_ANNOTATIONS) {
-      return Promise.resolve({
-        success: true,
-        telemetry: {
-          actionEvents: [],
-          viewport: {
-            devicePixelRatio: 1,
-            height: 720,
-            scrollX: 0,
-            scrollY: 100,
-            width: 1280,
-          },
-          cursorTrack: {
-            captureMode: 'separate',
-            samples: [{ id: 'sample-1', time: 0.2, visible: true, x: 10, y: 20 }],
-            skin: { color: '#fff', hidden: false, scale: 1, shadow: true },
-          },
-          signals: [],
-        },
-      });
-    }
-
-    return Promise.resolve(undefined);
-  });
 }
 
 function createControlledCursorTelemetry() {
@@ -162,9 +147,6 @@ it('hides stop overlays and disables annotations when tab recording stops', asyn
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: VideoMessageType.HIDE_COUNTDOWN,
   });
-  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
-    type: VideoMessageType.DISABLE_ANNOTATIONS,
-  });
 });
 
 it('skips tab side effects when no tab is available', () => {
@@ -179,7 +161,6 @@ it('skips tab side effects when no tab is available', () => {
 it('does not persist annotation telemetry when cursor telemetry capture is disabled', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(1234);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
-  mockTelemetryDisableMessage();
 
   runStopSideEffects({
     mode: CaptureMode.TAB,
@@ -188,9 +169,6 @@ it('does not persist annotation telemetry when cursor telemetry capture is disab
 
   await flushStopSideEffects();
 
-  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
-    type: VideoMessageType.DISABLE_ANNOTATIONS,
-  });
   expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
 });
 
@@ -199,6 +177,11 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
   getVideoRecordingIdMock.mockReturnValue('recording-1');
   getControlledCursorDisplaySurfaceMock.mockReturnValue('window');
   isControlledCursorCaptureEnabledMock.mockReturnValue(true);
+  surfaceLeaseState.current = {
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    tabId: 7,
+  };
   const telemetry = createControlledCursorTelemetry();
   disableControlledCursorCaptureMock.mockResolvedValue(telemetry);
   getControlledCursorTelemetryMock.mockReturnValue(telemetry);
@@ -209,6 +192,10 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
   });
 
   await flushStopSideEffects();
+
+  expect(updateVideoRecordingSurfaceMock).toHaveBeenCalledWith('surface-1', {
+    recordingId: null,
+  });
 
   expect(appendControlledCursorTelemetryMock).toHaveBeenCalledWith(telemetry);
   expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith({
@@ -244,17 +231,6 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
 });
 
 it('does not persist telemetry when recording metadata is unavailable', async () => {
-  sendTabMessageMock.mockImplementation((_tabId: number, message: { type: string }) => {
-    if (message.type === VideoMessageType.DISABLE_ANNOTATIONS) {
-      return Promise.resolve({
-        success: true,
-        telemetry: { actionEvents: [], cursorTrack: null, signals: [], viewport: null },
-      });
-    }
-
-    return Promise.resolve(undefined);
-  });
-
   runStopSideEffects({
     mode: CaptureMode.TAB,
     tabId: 7,

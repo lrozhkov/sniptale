@@ -54,6 +54,11 @@ import type {
   RuntimeFrameAnnotationRasterRequestByType,
   RuntimeFrameAnnotationRasterResponseByType,
 } from './frame-annotation-raster.types';
+import type {
+  RuntimeDesktopFrameRequestByType,
+  RuntimeDesktopFrameResponseByType,
+} from './desktop-frame.types';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
@@ -61,7 +66,8 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimeHarRequestByType &
   RuntimePrivacyErasureRequestByType &
-  RuntimeFrameAnnotationRasterRequestByType & {
+  RuntimeFrameAnnotationRasterRequestByType &
+  RuntimeDesktopFrameRequestByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       pageZoom?: number;
@@ -72,6 +78,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       autoStartSelection?: boolean;
       autoStartCaptureType?: 'visible' | 'full';
       toolbarVisible?: boolean;
+      workingMode?: ToolbarWorkingMode;
       surfaceCapabilityToken?: string;
       surfaceLeaseGeneration?: number;
       surfaceOperationGeneration?: number;
@@ -192,7 +199,8 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimeHarResponseByType &
   RuntimePrivacyErasureResponseByType &
-  RuntimeFrameAnnotationRasterResponseByType & {
+  RuntimeFrameAnnotationRasterResponseByType &
+  RuntimeDesktopFrameResponseByType & {
     [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.SCREENSHOT_MODE_STATUS]: ScreenshotModeStatusResponse;

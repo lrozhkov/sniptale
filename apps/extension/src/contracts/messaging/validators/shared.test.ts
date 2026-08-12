@@ -131,7 +131,7 @@ describe('shared messaging validators recording settings', () => {
     expect(
       isVideoRecordingSettings({
         ...DEFAULT_VIDEO_SETTINGS,
-        autoFadeDelay: 300,
+        autoFadeDelay: 3,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
         microphoneDeviceId: null,

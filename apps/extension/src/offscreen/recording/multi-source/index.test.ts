@@ -6,9 +6,11 @@ import {
   createTrackedStream,
 } from './media-stream.test-support';
 import { createDeferred, createSettings, FakeMediaRecorder } from './index.test-support';
+import { WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const {
   consumeDesktopStreamsMock,
+  acquireCameraSourceMock,
   disposeMultiSourceDesktopMediaMock,
   normalizeMultiSourceVideoStreamMock,
   createRecordingStagingCoordinatorMock,
@@ -18,6 +20,7 @@ const {
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   consumeDesktopStreamsMock: vi.fn(),
+  acquireCameraSourceMock: vi.fn(),
   disposeMultiSourceDesktopMediaMock: vi.fn(),
   normalizeMultiSourceVideoStreamMock: vi.fn(),
   createRecordingStagingCoordinatorMock: vi.fn(),
@@ -25,6 +28,11 @@ const {
   saveRecordingSafelyMock: vi.fn(),
   saveVideoProjectMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
+}));
+
+vi.mock('../camera-source/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../camera-source/session')>()),
+  acquireCameraSource: acquireCameraSourceMock,
 }));
 
 vi.mock('../../../composition/persistence/recordings/staging', async (importOriginal) => ({
@@ -130,6 +138,14 @@ beforeEach(() => {
       getUserMedia: vi.fn().mockResolvedValue(createAudioStream()),
     },
   });
+  acquireCameraSourceMock.mockImplementation(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    return {
+      release: () => stream.getTracks().forEach((track) => track.stop()),
+      stream,
+      trackSettings: stream.getVideoTracks()[0]?.getSettings() ?? {},
+    };
+  });
   consumeDesktopStreamsMock.mockReturnValue([
     { label: 'Window 1', stream: createStream(1280, 720) },
     { label: 'Window 2', stream: createStream(1024, 768) },
@@ -159,9 +175,9 @@ it('publishes started only after every required recorder emits its native start 
   await start;
 
   expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(1);
-  expect(FakeMediaRecorder.instances.every((recorder) => recorder.startTimeslices[0] === 0)).toBe(
-    true
-  );
+  expect(
+    FakeMediaRecorder.instances.every((recorder) => recorder.startTimeslices[0] === 1_000)
+  ).toBe(true);
   await stopMultiSourceRecording(true);
 });
 
@@ -422,7 +438,14 @@ it('updates live microphone and webcam track state on the active session', async
 
   await startMultiSourceRecording({
     recordingId: 'live-settings',
-    settings: { ...createSettings(), webcamEnabled: true },
+    settings: {
+      ...createSettings(),
+      webcamEnabled: true,
+      webcamPresentation: {
+        ...createSettings().webcamPresentation!,
+        mode: WebcamPresentationMode.SEPARATE_TRACK,
+      },
+    },
   });
 
   updateMultiSourceRecordingSettings({ microphoneEnabled: false, webcamEnabled: false });

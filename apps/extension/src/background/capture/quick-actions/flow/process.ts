@@ -1,11 +1,22 @@
 import type { ProcessQuickActionArgs } from './shared';
 import { loadQuickActionRuntimeContext } from './load';
 import { runCaptureFlow, runSelectionFlow } from './flows';
+import { runDesktopQuickAction } from '../desktop/workflow';
 
 export async function processQuickAction(
-  args: ProcessQuickActionArgs
-): Promise<{ result: 'accepted' | 'blocked' }> {
-  const context = await loadQuickActionRuntimeContext(args.actionId);
+  args: ProcessQuickActionArgs & {
+    runtimeContext?: Awaited<ReturnType<typeof loadQuickActionRuntimeContext>>;
+  }
+): Promise<{ result: 'accepted' | 'blocked' | 'cancelled' }> {
+  const context = args.runtimeContext ?? (await loadQuickActionRuntimeContext(args.actionId));
+
+  if (context.captureMode === 'desktop') {
+    return runDesktopQuickAction({
+      context,
+      ...(args.desktopSelection === undefined ? {} : { desktopSelection: args.desktopSelection }),
+      tabId: args.tabId,
+    });
+  }
 
   if (context.captureMode === 'selection') {
     return await runSelectionFlow({ ...args, ...context });

@@ -8,16 +8,15 @@ import { pathToFileURL } from 'node:url';
 
 import JSZip from 'jszip';
 
-import { verifyReleaseArchivePath, verifyReleaseArtifactFiles } from './artifact-security.mjs';
+import {
+  getForbiddenReleaseArtifactPathReason,
+  verifyReleaseArchivePath,
+  verifyReleaseArtifactFiles,
+} from './artifact-security.mjs';
 import { collectReleaseLegalSourceFiles } from './oss-release-policy.mjs';
 
 const ARCHIVE_FILE_DATE = new Date('1980-01-01T00:00:00.000Z');
 const MAX_RELEASE_ARCHIVE_FILE_BYTES = 50 * 1024 * 1024;
-const FORBIDDEN_ARCHIVE_PATH_PATTERNS = [
-  /\.map$/u,
-  /(?:^|\/)\.env(?:\.|$)/u,
-  /(?:^|\/)(?:raw-diagnostics|raw-history|secret|private-key|token)[^/]*$/iu,
-];
 
 export function formatBuildDate(date) {
   const year = String(date.getFullYear());
@@ -99,7 +98,7 @@ function collectManifestEntrypoints(value, paths = []) {
 }
 
 function assertSafeReleaseArchiveFile(file, contents) {
-  if (FORBIDDEN_ARCHIVE_PATH_PATTERNS.some((pattern) => pattern.test(file.relativePath))) {
+  if (getForbiddenReleaseArtifactPathReason(file.relativePath)) {
     throw new Error(`Release archive contains forbidden file: ${file.relativePath}`);
   }
   if (contents.byteLength > MAX_RELEASE_ARCHIVE_FILE_BYTES) {

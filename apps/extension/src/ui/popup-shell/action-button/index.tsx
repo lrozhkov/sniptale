@@ -7,6 +7,7 @@ export type { PopupActionButtonProps, PopupActionButtonTone } from './types';
 function buildPopupActionButtonVariantProps(args: {
   ariaLabel?: string;
   dataUi?: string;
+  centered: boolean;
   disabled: boolean;
   icon: PopupActionButtonProps['icon'];
   iconClassName: string;
@@ -26,6 +27,7 @@ function buildPopupActionButtonVariantProps(args: {
     onClick: args.onClick,
     trailing: args.trailing,
     rootClassName: args.rootClassName,
+    centered: args.centered,
     ...(args.ariaLabel === undefined ? {} : { ariaLabel: args.ariaLabel }),
     ...(args.title === undefined ? {} : { title: args.title }),
     ...(args.dataUi === undefined ? {} : { dataUi: args.dataUi }),
@@ -44,6 +46,7 @@ export function PopupActionButton({
   onClick,
   trailing,
   compact = false,
+  centered = false,
   dataUi,
 }: PopupActionButtonProps) {
   const rootClassName = getPopupActionButtonRootClassName(tone, disabled);
@@ -54,6 +57,7 @@ export function PopupActionButton({
     label,
     onClick,
     rootClassName,
+    centered,
     ...(ariaLabel === undefined ? {} : { ariaLabel }),
     ...(dataUi === undefined ? {} : { dataUi }),
     ...(subtitle === undefined ? {} : { subtitle }),

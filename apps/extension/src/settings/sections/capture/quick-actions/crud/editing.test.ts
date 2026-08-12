@@ -17,6 +17,7 @@ import {
   beginEditQuickAction,
   beginNewQuickAction,
   deleteQuickAction,
+  resetQuickAction,
   saveEditedQuickAction,
   updateQuickActionField,
 } from './editing';
@@ -44,11 +45,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('starts editing and skips bundled actions', () => {
+it('starts editing both bundled and user actions', () => {
   const setEditingId = vi.fn();
   const setEditForm = vi.fn();
   const bundled = createQuickAction({
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
   });
   const existing = createQuickAction({ id: 'action-2', name: 'Existing' });
@@ -59,28 +60,49 @@ it('starts editing and skips bundled actions', () => {
   updateQuickActionField(existing, 'name', 'Updated', setEditForm);
   updateQuickActionField(null, 'name', 'Ignored', setEditForm);
 
-  expect(setEditingId).toHaveBeenCalledTimes(2);
+  expect(setEditingId).toHaveBeenCalledTimes(3);
   expect(setEditForm).toHaveBeenCalledWith(expect.objectContaining({ name: '' }));
+  expect(setEditForm).toHaveBeenCalledWith(bundled);
   expect(setEditForm).toHaveBeenCalledWith(existing);
   expect(setEditForm).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Updated' }));
 });
 
+it('selects a valid desktop sink and clears fields that desktop capture cannot use', () => {
+  const setEditForm = vi.fn();
+  const scenarioAction = createQuickAction({
+    afterCapture: 'scenario',
+    delay: 5,
+    exitAfterCapture: true,
+    screenshotMode: 'visible',
+    viewportPresetId: 'native',
+  });
+
+  updateQuickActionField(scenarioAction, 'screenshotMode', 'desktop', setEditForm);
+
+  expect(setEditForm).toHaveBeenCalledWith(
+    expect.objectContaining({
+      afterCapture: 'download_default',
+      delay: null,
+      exitAfterCapture: false,
+      screenshotMode: 'desktop',
+      viewportPresetId: null,
+    })
+  );
+});
+
 it('saves created and edited actions and rejects invalid input', async () => {
-  const onConfirm = vi.fn();
   const onPersist = vi.fn().mockResolvedValue(true);
   const onResetEditor = vi.fn();
 
   await saveEditedQuickAction({
     actions: [createQuickAction({ id: 'existing', name: 'Old' })],
     editForm: createQuickAction({ id: 'existing', name: 'New' }),
-    onConfirm,
     onPersist,
     onResetEditor,
   });
   await saveEditedQuickAction({
     actions: [],
     editForm: createQuickAction({ id: 'created', name: 'Created' }),
-    onConfirm,
     onPersist,
     onResetEditor,
   });
@@ -88,63 +110,85 @@ it('saves created and edited actions and rejects invalid input', async () => {
     actions: [],
     editForm: createQuickAction({
       id: 'bundled',
-      bundledId: 'default-selection',
+      bundledId: 'default-selection-download',
       origin: 'bundled',
     }),
-    onConfirm,
     onPersist,
     onResetEditor,
   });
   await saveEditedQuickAction({
     actions: [],
     editForm: createQuickAction({ id: 'invalid', name: '   ' }),
-    onConfirm,
     onPersist,
     onResetEditor,
   });
 
-  expect(onConfirm).toHaveBeenCalledWith('settings.quickActions.messageUpdated');
-  expect(onConfirm).toHaveBeenCalledWith('settings.quickActions.messageCreated');
   expect(onPersist).toHaveBeenCalledWith([
     expect.objectContaining({ id: 'existing', name: 'New' }),
   ]);
   expect(onPersist).toHaveBeenCalledWith([
     expect.objectContaining({ id: 'created', name: 'Created' }),
   ]);
+  expect(onPersist).toHaveBeenCalledWith([
+    expect.objectContaining({
+      bundledId: 'default-selection-download',
+      customized: true,
+    }),
+  ]);
   expect(onResetEditor).toHaveBeenCalledTimes(3);
 });
 
+it('resets only the selected customized bundled action', async () => {
+  const onPersist = vi.fn().mockResolvedValue(true);
+  const bundled = createQuickAction({
+    bundledId: 'default-visible-copy',
+    customized: true,
+    id: 'default-visible-copy',
+    name: 'Customized copy',
+    origin: 'bundled',
+    screenshotMode: 'full',
+  });
+  const user = createQuickAction({ id: 'user-1', name: 'User action' });
+
+  await resetQuickAction([bundled, user], bundled.id, onPersist);
+
+  expect(onPersist).toHaveBeenCalledWith([
+    expect.objectContaining({
+      bundledId: 'default-visible-copy',
+      customized: false,
+      name: 'shared.defaults.quickActionVisibleCopy',
+      screenshotMode: 'visible',
+    }),
+    user,
+  ]);
+});
+
 it('deletes user actions only', async () => {
-  const onConfirm = vi.fn();
   const onPersist = vi.fn().mockResolvedValue(true);
   const user = createQuickAction({ id: 'user-1' });
   const bundled = createQuickAction({
     id: 'bundled-1',
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
   });
 
-  await deleteQuickAction([user], 'user-1', onPersist, onConfirm);
-  await deleteQuickAction([bundled], 'bundled-1', onPersist, onConfirm);
+  await deleteQuickAction([user], 'user-1', onPersist);
+  await deleteQuickAction([bundled], 'bundled-1', onPersist);
 
   expect(onPersist).toHaveBeenCalledWith([]);
-  expect(onConfirm).toHaveBeenCalledWith('settings.quickActions.messageDeleted');
 });
 
-it('skips success side effects when persistence reports failure', async () => {
-  const onConfirm = vi.fn();
+it('keeps the editor open when persistence reports failure', async () => {
   const onPersist = vi.fn().mockResolvedValue(false);
   const onResetEditor = vi.fn();
 
   await saveEditedQuickAction({
     actions: [],
     editForm: createQuickAction({ id: 'created', name: 'Created' }),
-    onConfirm,
     onPersist,
     onResetEditor,
   });
 
   expect(onPersist).toHaveBeenCalledTimes(1);
-  expect(onConfirm).not.toHaveBeenCalled();
   expect(onResetEditor).not.toHaveBeenCalled();
 });

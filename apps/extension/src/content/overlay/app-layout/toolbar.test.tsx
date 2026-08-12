@@ -7,12 +7,32 @@ import type { AutoBlurController } from '../auto-blur/controller';
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutScenarioProps, ContentAppLayoutToolbarProps } from './types';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
+import { createDrawingSession } from '../../../features/drawing/public';
+import { createContentDrawingController } from '../../drawing/controller';
+import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-session';
+import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
+import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 
-const { preloadContentScenarioRecorderSidebarMock, toolbarMock } = vi.hoisted(() => ({
+const {
+  clearAllPagePreparationChangesMock,
+  preloadContentScenarioRecorderSidebarMock,
+  showToastMock,
+  toolbarMock,
+} = vi.hoisted(() => ({
+  clearAllPagePreparationChangesMock: vi.fn(() => true),
   preloadContentScenarioRecorderSidebarMock: vi.fn(async () => undefined),
+  showToastMock: vi.fn(),
   toolbarMock: vi.fn((props: { scenario?: unknown }) => (
     <div data-ui="content.toolbar.mock">{JSON.stringify(props.scenario ?? null)}</div>
   )),
+}));
+
+vi.mock('../../application/page-preparation-reset', () => ({
+  clearAllPagePreparationChanges: clearAllPagePreparationChangesMock,
+}));
+
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  showToast: showToastMock,
 }));
 
 vi.mock('../toolbar/view', () => ({
@@ -25,6 +45,7 @@ vi.mock('./sidebar-lazy', () => ({
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({
+    error: vi.fn(),
     warn: vi.fn(),
   }),
 }));
@@ -123,6 +144,7 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
       handleEnableCursorMode: vi.fn(),
       handleHideToolbar: vi.fn(),
       handleToggleDesignReviewMode: vi.fn(),
+      handleToggleDrawingMode: vi.fn(),
       handleToggleHighlighterMode: vi.fn(),
       handleToggleNavigationLock: vi.fn(),
       handleToggleQuickEditDocumentMode: vi.fn(),
@@ -284,6 +306,25 @@ async function verifiesToolbarForwardsFutureFrameStyleSession() {
   );
 }
 
+async function verifiesNavigationClearUsesSharedResetOwner() {
+  const props = createProps();
+  const drawingController = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  const finalizeInteraction = vi.spyOn(drawingController, 'finalizeInteraction');
+  props.toolbar.drawingController = drawingController;
+  await renderShell(props);
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onClearPagePreparation: () => void;
+  };
+  lastToolbarProps.onClearPagePreparation();
+
+  expect(finalizeInteraction).toHaveBeenCalledOnce();
+  expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
+  expect(showToastMock).toHaveBeenCalledWith('Все изменения очищены', 'info');
+}
+
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
   await renderShell(props);
@@ -327,6 +368,69 @@ async function verifiesScenarioFinishUsesExplicitScreenshotExit() {
   expect(props.scenario.actions.openEditor).toHaveBeenCalledOnce();
 }
 
+async function verifiesVideoModeActivationKeepsToolbarVisible() {
+  const props = createProps();
+  let resolveActivation: (value: boolean) => void = () => undefined;
+  const activation = new Promise<boolean>((resolve) => {
+    resolveActivation = resolve;
+  });
+  const onActivate = vi.fn(() => activation);
+  const drawingOwner = createRecordingDrawingOwner();
+  const emptyAction = vi.fn();
+  props.toolbar.videoRecording = {
+    drawingOwner,
+    state: INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+    onActivate,
+    onCancelStart: emptyAction,
+    onCameraEnabledChange: emptyAction,
+    onCameraGeometryChange: emptyAction,
+    onCameraOffer: vi.fn(async () => 'answer'),
+    onCameraPeerClose: emptyAction,
+    onDeactivate: vi.fn(() => true),
+    onInteractionChange: emptyAction,
+    onMicrophoneEnabledChange: emptyAction,
+    onPause: emptyAction,
+    onResume: emptyAction,
+    onSpotlightEnabledChange: emptyAction,
+    onStart: emptyAction,
+    onStop: emptyAction,
+  } satisfies ToolbarVideoRecordingProps;
+  props.toolbar.setVideoRecordingMode = vi.fn();
+
+  await renderShell(props);
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onToggleVideoRecordingMode: (enabled: boolean, activationEvent?: Event) => Promise<boolean>;
+  };
+  const activationEvent = new Event('mousedown');
+
+  const activationResult = lastToolbarProps.onToggleVideoRecordingMode(true, activationEvent);
+  expect(onActivate).toHaveBeenCalledWith(activationEvent);
+  expect(props.toolbar.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(props.toolbar.modeController.handleToggleDrawingMode).not.toHaveBeenCalled();
+  expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+  expect(props.toolbar.setVideoRecordingMode).not.toHaveBeenCalled();
+
+  await act(async () => resolveActivation(true));
+  await expect(activationResult).resolves.toBe(true);
+  expect(props.toolbar.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(props.toolbar.modeController.handleToggleDrawingMode).toHaveBeenCalledWith(false);
+  expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
+  expect(props.toolbar.setVideoRecordingMode).toHaveBeenCalledWith(true);
+  expect(props.toolbar.setVideoRecordingMode).toHaveBeenCalledTimes(1);
+  drawingOwner.dispose();
+}
+
+async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
+  const props = createProps();
+  props.toolbar.isToolbarVisible = false;
+  props.toolbar.modes.videoRecordingMode = true;
+
+  await renderShell(props);
+
+  expect(container?.textContent).toBe('');
+  expect(toolbarMock).not.toHaveBeenCalled();
+}
+
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
 
@@ -361,5 +465,17 @@ describe('ContentToolbarShell', () => {
   it(
     'forwards the future-frame session style and mode action into the toolbar',
     verifiesToolbarForwardsFutureFrameStyleSession
+  );
+  it(
+    'routes Navigation clear through the shared page-preparation reset owner',
+    verifiesNavigationClearUsesSharedResetOwner
+  );
+  it(
+    'keeps the toolbar visible while switching transactionally into video recording mode',
+    verifiesVideoModeActivationKeepsToolbarVisible
+  );
+  it(
+    'leaves collapsed video mode to the canonical bottom-right show button surface',
+    verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface
   );
 });

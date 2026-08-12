@@ -2,7 +2,10 @@ import {
   CaptureMode,
   isVideoOutputProfile,
   parseVideoRecordingProfiles,
+  VIDEO_AUTO_FADE_DELAYS,
   VideoResolutionPreset,
+  WebcamPresentationMode,
+  WebcamPresentationShape,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
   type VideoRecordingRuntimeState,
@@ -48,6 +51,7 @@ const videoMp4CodecSet = new Set<string>(Object.values(VideoMp4Codec));
 const videoWebmCodecSet = new Set<string>(Object.values(VideoWebmCodec));
 const videoResolutionPresetSet = new Set<string>(Object.values(VideoResolutionPreset));
 const captureModeSet = new Set<string>(Object.values(CaptureMode));
+const videoAutoFadeDelaySet = new Set<number>(VIDEO_AUTO_FADE_DELAYS);
 
 function isEnumValue(value: unknown, allowedValues: ReadonlySet<string>): value is string {
   return isString(value) && allowedValues.has(value);
@@ -105,8 +109,58 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     parseVideoRecordingProfiles(value['qualityProfiles']) !== null &&
     isNumber(value['countdownSeconds']) &&
     isNumber(value['autoFadeDelay']) &&
+    videoAutoFadeDelaySet.has(value['autoFadeDelay']) &&
     isBoolean(value['diagnosticsEnabled']) &&
-    hasOptionalField(value, 'controlledCursorCaptureEnabled', isBoolean)
+    hasOptionalField(value, 'controlledCursorCaptureEnabled', isBoolean) &&
+    hasOptionalField(value, 'recordingSurface', isVideoRecordingSurfaceSettings) &&
+    hasOptionalField(value, 'webcamPresentation', isWebcamPresentationSettings)
+  );
+}
+
+function isVideoRecordingSurfaceSettings(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) =>
+      [
+        'toolbarEnabled',
+        'cursorSpotlightEnabled',
+        'cursorDimmingEnabled',
+        'cursorClickAnimationEnabled',
+      ].includes(key)
+    ) &&
+    isBoolean(value['toolbarEnabled']) &&
+    isBoolean(value['cursorSpotlightEnabled']) &&
+    hasOptionalField(value, 'cursorDimmingEnabled', isBoolean) &&
+    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean)
+  );
+}
+
+function isNormalizedPoint(value: unknown, minimum: number, maximum: number): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 2 &&
+    isNumber(value['x']) &&
+    value['x'] >= minimum &&
+    value['x'] <= maximum &&
+    isNumber(value['y']) &&
+    value['y'] >= minimum &&
+    value['y'] <= maximum
+  );
+}
+
+function isWebcamPresentationSettings(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 5 &&
+    (value['mode'] === WebcamPresentationMode.EMBEDDED ||
+      value['mode'] === WebcamPresentationMode.SEPARATE_TRACK) &&
+    (value['shape'] === WebcamPresentationShape.CIRCLE ||
+      value['shape'] === WebcamPresentationShape.RECTANGLE) &&
+    isNormalizedPoint(value['center'], 0, 1) &&
+    isNumber(value['sizeFraction']) &&
+    value['sizeFraction'] > 0 &&
+    value['sizeFraction'] <= 1 &&
+    isNormalizedPoint(value['cropOffset'], -1, 1)
   );
 }
 

@@ -24,8 +24,10 @@ import {
   deletePromptTemplate,
   getPromptTemplates,
   loadTemplateOrder,
+  resetPromptTemplate,
   savePromptTemplate,
   saveTemplateOrder,
+  setPromptTemplateEnabled,
   updateTemplateLastUsed,
 } from './index';
 
@@ -226,12 +228,28 @@ async function verifySystemTemplateMigrationAndToggle() {
   });
 
   browserStorageLocalGetMock.mockResolvedValueOnce(storedPromptTemplates(migrated));
-  await deletePromptTemplate(legacy.id);
+  await setPromptTemplateEnabled(legacy.id, false);
   expect(
     browserStorageLocalSetMock.mock.calls
       .at(-1)?.[0]
       .sniptale_prompt_templates.find((template: PromptTemplate) => template.id === legacy.id)
   ).toMatchObject({ enabled: false, isDefault: true });
+
+  await expect(deletePromptTemplate(legacy.id)).rejects.toThrow('cannot be deleted');
+}
+
+async function verifySystemTemplateSaveReturnsCustomizedRecord() {
+  const canonical = createSystemPromptTemplateCatalog('en')[0]!;
+  browserStorageLocalGetMock.mockResolvedValueOnce(storedPromptTemplates([canonical]));
+
+  await expect(
+    savePromptTemplate({ ...canonical, content: 'Customized instruction' })
+  ).resolves.toMatchObject({
+    content: 'Customized instruction',
+    customized: true,
+    isDefault: true,
+    systemRevision: PROMPT_TEMPLATE_CATALOG_REVISION,
+  });
 }
 
 async function verifyCustomizedSystemTemplateSurvivesMigration() {
@@ -245,6 +263,32 @@ async function verifyCustomizedSystemTemplateSurvivesMigration() {
   browserStorageLocalGetMock.mockResolvedValueOnce(storedPromptTemplates([customized]));
   const loaded = await getPromptTemplates();
   expect(loaded[0]).toMatchObject({ content: 'My custom instruction', customized: true });
+}
+
+async function verifyCustomizedSystemTemplateReset() {
+  const canonical = createSystemPromptTemplateCatalog('en')[0]!;
+  const customized = {
+    ...canonical,
+    content: 'My custom instruction',
+    customized: true,
+    enabled: false,
+    lastUsedAt: 450,
+  };
+  browserStorageLocalGetMock.mockResolvedValueOnce(storedPromptTemplates([customized]));
+
+  const restored = await resetPromptTemplate(canonical.id, 'en');
+
+  expect(restored).toEqual({ ...canonical, enabled: false, lastUsedAt: 450 });
+  expect(
+    browserStorageLocalSetMock.mock.calls[0]?.[0].sniptale_prompt_templates.find(
+      (template: PromptTemplate) => template.id === canonical.id
+    )
+  ).toEqual(restored);
+
+  await expect(resetPromptTemplate('user-template', 'en')).rejects.toThrow(
+    'is not a system template'
+  );
+  expect(browserStorageLocalSetMock).toHaveBeenCalledTimes(1);
 }
 
 function verifyRevisionlessDefaultsUseHistoricalFingerprints() {
@@ -330,8 +374,16 @@ describe('prompt-templates', () => {
     verifySystemTemplateMigrationAndToggle
   );
   it(
+    'returns the persisted customized state after editing a system template',
+    verifySystemTemplateSaveReturnsCustomizedRecord
+  );
+  it(
     'preserves customized system templates during catalog migration',
     verifyCustomizedSystemTemplateSurvivesMigration
+  );
+  it(
+    'restores customized system templates from the localized catalog',
+    verifyCustomizedSystemTemplateReset
   );
   it(
     'updates revisionless defaults through historical fingerprints without overwriting custom copy',

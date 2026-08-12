@@ -189,6 +189,25 @@ function verifyGenericBoundaryParserFacades() {
   });
 
   expect(runtimeMessage.type).toBe(MessageType.TRIGGER_QUICK_ACTION);
+  const screenshotMessage = parseRuntimeRequestMessage({
+    type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+    config: {
+      screenshotMode: 'desktop',
+      viewportPresetId: null,
+      delay: null,
+      afterCapture: 'download_default',
+      imageFormat: null,
+      imageQuality: null,
+      exitAfterCapture: false,
+    },
+  });
+  expect(screenshotMessage.type).toBe(MessageType.TRIGGER_SCREENSHOT_CAPTURE);
+  expect(() =>
+    parseRuntimeRequestMessage({
+      type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+      config: { screenshotMode: 'desktop', afterCapture: 'scenario' },
+    })
+  ).toThrow();
   expect(parseRuntimeResponseForRequest(runtimeMessage, { success: true })).toEqual({
     success: true,
   });
@@ -247,6 +266,14 @@ function verifyWebSnapshotTabAuthorityFieldParsing() {
   ).toThrow(MessageContractError);
 }
 
+function verifyScreenshotEnableAsyncAckParsing() {
+  const message = parseTabRequestMessage({ type: MessageType.ENABLE_SCREENSHOT_MODE });
+  expect(parseTabResponseForRequest(message, { success: true, result: 'accepted' })).toEqual({
+    success: true,
+    result: 'accepted',
+  });
+}
+
 describe('message boundary parsers', () => {
   it('accepts valid background runtime messages', verifyBackgroundRuntimeMessageParsing);
   it(
@@ -276,6 +303,10 @@ describe('message boundary parsers', () => {
     verifyRemovedNavigationLockMessagesRejected
   );
   it('parses generic runtime and tab boundary facades', verifyGenericBoundaryParserFacades);
+  it(
+    'accepts the routed screenshot enable async acknowledgement',
+    verifyScreenshotEnableAsyncAckParsing
+  );
   it(
     'accepts screenshot mode status capability fields',
     verifyScreenshotModeStatusCapabilityResponseParsing

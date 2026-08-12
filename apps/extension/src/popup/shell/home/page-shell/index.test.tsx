@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   cleanupRenderedNode,
   createActiveTabCapabilities,
-  createGalleryStatus,
   createQuickAction,
   getContainer,
   renderNode,
@@ -68,35 +67,25 @@ function getQuickActionsProxyProps() {
   };
 }
 
-function getActionRowProxyProps() {
-  return popupHomeActionRowSpy.mock.calls[0]?.[0] as {
-    onOpenScreenshotMode: () => void;
-  };
-}
-
 function expectRestrictedHomeSections(quickAction: ReturnType<typeof createQuickAction>) {
   expect(usePopupHomeActionsSpy).toHaveBeenCalledWith({
+    quickActions: [quickAction],
     quickActionsDisabledReason: 'Quick actions blocked',
     screenshotDisabledReason: 'Screenshots blocked',
   });
   expect(popupHomeQuickActionsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
-      displayMode: 'hidden',
-      hasQuickActions: false,
+      hasQuickActions: true,
       quickActions: [quickAction],
       quickActionsReady: true,
       quickActionsDisabledTitle: 'popup.common.restrictedPageFeatures',
-      shouldShowQuickActions: false,
+      shouldShowQuickActions: true,
     })
   );
-  expect(popupHomeActionRowSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      galleryStatus: expect.objectContaining({ text: '51 MB used' }),
-      screenshotDisabled: true,
-      screenshotDisabledTitle: 'popup.common.restrictedPageFeatures',
-    })
+  expect(popupHomeActionRowSpy).not.toHaveBeenCalled();
+  expect(getContainer()?.querySelector('[data-testid="error-proxy"]')?.textContent).toBe(
+    'Quick action failed'
   );
-  expect(getContainer()?.querySelector('[data-testid="error-proxy"]')).toBeNull();
 }
 
 async function renderRestrictedHomePage(quickAction: ReturnType<typeof createQuickAction>) {
@@ -104,14 +93,12 @@ async function renderRestrictedHomePage(quickAction: ReturnType<typeof createQui
     <PopupHomePage
       quickActions={[quickAction]}
       quickActionsReady
-      displayMode="hidden"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities({
         isRestrictedPage: true,
         quickActions: { reason: 'Quick actions blocked', supported: false },
         screenshotMode: { reason: 'Screenshots blocked', supported: false },
       })}
-      galleryStatus={createGalleryStatus({ text: '51 MB used' })}
     />
   );
 }
@@ -136,8 +123,10 @@ beforeEach(() => {
   usePopupHomeActionsSpy.mockReset();
   usePopupHomeActionsSpy.mockReturnValue({
     actionError: null,
+    capturePending: false,
     handleOpenScreenshotMode: vi.fn(),
     handleQuickAction: vi.fn(),
+    handleScreenshotCapture: vi.fn(),
   });
 });
 
@@ -153,8 +142,10 @@ it('maps capability state into home sections and suppresses errors on restricted
 
   usePopupHomeActionsSpy.mockReturnValue({
     actionError: 'Quick action failed',
+    capturePending: false,
     handleOpenScreenshotMode,
     handleQuickAction,
+    handleScreenshotCapture: vi.fn(),
   });
 
   const quickAction = createQuickAction({ id: 'quick-action-1' });
@@ -164,12 +155,14 @@ it('maps capability state into home sections and suppresses errors on restricted
 
   await act(async () => {
     getQuickActionsProxyProps().onTriggerAction('quick-action-1');
-    getActionRowProxyProps().onOpenScreenshotMode();
+    (
+      getContainer()?.querySelector('[aria-label="popup.home.toolsLabel"]') as HTMLButtonElement
+    ).click();
     await Promise.resolve();
   });
 
   expect(handleQuickAction).toHaveBeenCalledWith('quick-action-1');
-  expect(handleOpenScreenshotMode).toHaveBeenCalled();
+  expect(handleOpenScreenshotMode).not.toHaveBeenCalled();
 });
 
 it('renders the home error surface on unrestricted pages', async () => {
@@ -183,10 +176,8 @@ it('renders the home error surface on unrestricted pages', async () => {
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
-      galleryStatus={null}
     />
   );
 
@@ -201,10 +192,8 @@ it('renders bootstrap home errors even when no action handler error is present',
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
-      galleryStatus={null}
       homeError="Failed to load quick actions"
     />
   );
@@ -220,10 +209,8 @@ it('forwards the quick-actions readiness state to the section owner', async () =
     <PopupHomePage
       quickActions={[]}
       quickActionsReady={false}
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
-      galleryStatus={null}
     />
   );
 

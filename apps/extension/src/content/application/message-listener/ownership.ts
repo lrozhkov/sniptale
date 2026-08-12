@@ -25,7 +25,6 @@ type UiRuntimeBridgeMessageType =
   | VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
 
 const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
-  MessageType.ENABLE_SCREENSHOT_MODE,
   MessageType.DISABLE_SCREENSHOT_MODE,
   MessageType.ENABLE_HIGHLIGHTER_MODE,
   MessageType.DISABLE_HIGHLIGHTER_MODE,
@@ -39,14 +38,14 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.GET_VIEWPORT_COORDS,
   VideoMessageType.SHOW_COUNTDOWN,
   VideoMessageType.HIDE_COUNTDOWN,
-  VideoMessageType.ENABLE_ANNOTATIONS,
-  VideoMessageType.DISABLE_ANNOTATIONS,
   VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
   VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
   VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
+  VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+  VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.SHOW_REGION_SELECTOR,
   VideoMessageType.HIDE_REGION_SELECTOR,
   VideoMessageType.REGION_SELECTED,

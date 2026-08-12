@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { createPopupPreviewStream } from './webcam-preview.test-support';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -31,13 +31,14 @@ function createSettings() {
   };
 }
 
-async function renderPanel(onSettingsChange = vi.fn()) {
+async function renderPanel(onSettingsChange = vi.fn(), captureMode: CaptureMode = CaptureMode.TAB) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   await act(async () =>
     root?.render(
       <WebcamSettingsPanel
+        captureMode={captureMode}
         currentDeviceId="cam-1"
         settings={createSettings()}
         onSettingsChange={onSettingsChange}
@@ -79,4 +80,28 @@ it('renders camera settings and emits quality changes', async () => {
   expect(onSettingsChange).toHaveBeenCalledWith({
     webcamQuality: expect.objectContaining({ resolution: '720P' }),
   });
+});
+
+it('shows embedded presentation controls for tab recording', async () => {
+  const onSettingsChange = await renderPanel();
+
+  expect(container?.textContent).toContain('popup.video.webcamPresentationEmbedded');
+  expect(container?.textContent).toContain('popup.video.webcamPresentationCircle');
+
+  await act(async () => {
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent?.includes('popup.video.webcamPresentationSeparateTrack'))
+      ?.click();
+  });
+
+  expect(onSettingsChange).toHaveBeenCalledWith({
+    webcamPresentation: expect.objectContaining({ mode: 'separate-track' }),
+  });
+});
+
+it('does not offer embedded presentation for window capture', async () => {
+  await renderPanel(vi.fn(), CaptureMode.SCREEN);
+
+  expect(container?.textContent).not.toContain('popup.video.webcamPresentationEmbedded');
+  expect(container?.textContent).not.toContain('popup.video.webcamPresentationShapeLabel');
 });

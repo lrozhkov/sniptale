@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CopyPlus, Eye, EyeOff } from 'lucide-react';
 
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
+import type { AnnotationTemplateTag } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import {
   ProductGlassPresetItem,
   ProductGlassPresetList,
@@ -35,13 +36,18 @@ import { useOpeningPresetSelection } from '../popover/preset-order';
 import {
   AnnotationTemplateQueryControls,
   AnnotationTemplateQueryEmpty,
-  AnnotationTemplateTagChips,
+  AnnotationTemplatePresetMetaLine,
+  AnnotationTemplateQueryResults,
   queryAnnotationTemplateValues,
   resolveAnnotationTemplateTags,
   useAnnotationTemplateTagState,
 } from '../../../ui/annotation-template-query';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
-import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
+import {
+  ApplyToFutureFramesGuard,
+  ApplyToFutureFramesSetting,
+  useApplyToFutureFrames,
+} from '../popover/apply-future';
 import {
   FrameBlurControls,
   FrameDecorationToggle,
@@ -105,6 +111,12 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
     templates: props.globalSettings.borderPresets,
   });
   const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
+  const onUseForNewFrames =
+    workflow.session.mode === 'temporary' &&
+    props.headerContext === 'element' &&
+    props.onApplyToFuture
+      ? applyToFuture.request
+      : undefined;
 
   return (
     <>
@@ -114,16 +126,6 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
               action: {
                 label: translate('content.templateFork.backToTemplates'),
                 onClick: workflow.requestTemplates,
-              },
-            }
-          : {})}
-        {...(workflow.session.mode === 'temporary' &&
-        props.headerContext === 'element' &&
-        props.onApplyToFuture
-          ? {
-              applyToFutureAction: {
-                label: translate('content.templateFork.applyToFuture'),
-                onClick: applyToFuture.request,
               },
             }
           : {})}
@@ -207,6 +209,7 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
             mode={workflow.session.mode === 'templates' ? 'preset' : 'manual'}
             onForkPreset={workflow.fork}
             onCreated={workflow.completeSave}
+            {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
             {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
             onClose={props.onClose}
             {...(props.onFloatingInteractionChange
@@ -245,6 +248,7 @@ function FrameBorderSection(props: {
   };
   manualStatus?: string;
   onCreated: () => void;
+  onUseForNewFrames?: () => void;
   onForkPreset: (preset: BorderPreset) => void;
   saveSectionRequest?: number;
   mode: 'preset' | 'manual';
@@ -268,6 +272,9 @@ function FrameBorderSection(props: {
           handleTogglePresetEnabled={props.handleTogglePresetEnabled}
           locale={locale}
           onClose={props.onClose}
+          {...(props.onFloatingInteractionChange
+            ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+            : {})}
           pendingPresetIds={props.pendingPresetIds}
           {...(props.selectedPresetId === undefined
             ? {}
@@ -288,6 +295,7 @@ function FramePresetMode(props: {
   handleTogglePresetEnabled: (preset: BorderPreset) => void;
   locale: ReturnType<typeof useAppLocale>;
   onClose: () => void;
+  onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
 }) {
@@ -310,37 +318,42 @@ function FramePresetMode(props: {
         compact
         disabled={tagState.isLoading || tagState.error}
         onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
         onQueryChange={setQuery}
         query={query}
         tags={tagState.state.tags}
       />
-      {orderedPresets.length === 0 ? (
-        <AnnotationTemplateQueryEmpty
-          hasFilter={tagState.state.activeFilterTagIds.length > 0}
-          onClearFilter={() => void tagState.setActiveFilterTagIds([])}
-          onClearQuery={() => setQuery('')}
-          query={query}
-        />
-      ) : (
-        <ProductGlassPresetList scrollable variant="menu">
-          {orderedPresets.map((preset) => (
-            <FramePresetRow
-              {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
-              enabledPresetCount={props.enabledPresetCount}
-              onForkPreset={props.onForkPreset}
-              handleSelectPreset={props.handleSelectPreset}
-              handleTogglePresetEnabled={props.handleTogglePresetEnabled}
-              key={preset.id}
-              locale={props.locale}
-              onClose={props.onClose}
-              pending={props.pendingPresetIds.has(preset.id)}
-              preset={preset}
-              selected={props.selectedPresetId === preset.id}
-              tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
-            />
-          ))}
-        </ProductGlassPresetList>
-      )}
+      <AnnotationTemplateQueryResults loading={tagState.isLoading}>
+        {orderedPresets.length === 0 ? (
+          <AnnotationTemplateQueryEmpty
+            hasFilter={tagState.state.activeFilterTagIds.length > 0}
+            onClearFilter={() => void tagState.setActiveFilterTagIds([])}
+            onClearQuery={() => setQuery('')}
+            query={query}
+          />
+        ) : (
+          <ProductGlassPresetList scrollable variant="menu">
+            {orderedPresets.map((preset) => (
+              <FramePresetRow
+                {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
+                enabledPresetCount={props.enabledPresetCount}
+                onForkPreset={props.onForkPreset}
+                handleSelectPreset={props.handleSelectPreset}
+                handleTogglePresetEnabled={props.handleTogglePresetEnabled}
+                key={preset.id}
+                locale={props.locale}
+                onClose={props.onClose}
+                pending={props.pendingPresetIds.has(preset.id)}
+                preset={preset}
+                selected={props.selectedPresetId === preset.id}
+                tags={resolveAnnotationTemplateTags(preset.tagIds, tagState.state.tags)}
+              />
+            ))}
+          </ProductGlassPresetList>
+        )}
+      </AnnotationTemplateQueryResults>
     </>
   );
 }
@@ -356,7 +369,7 @@ function FramePresetRow(props: {
   pending: boolean;
   preset: BorderPreset;
   selected: boolean;
-  tags: Parameters<typeof AnnotationTemplateTagChips>[0]['tags'];
+  tags: readonly AnnotationTemplateTag[];
 }) {
   const displayName = getBorderPresetDisplayName(props.preset, props.locale);
   const isEnabled = props.preset.enabled !== false;
@@ -388,8 +401,10 @@ function FramePresetRow(props: {
       >
         <ProductGlassPresetPreview style={getBorderPresetPreviewStyle(props.preset)} />
         <ProductGlassPresetMeta>
-          <PresetNameWithOverflowHint name={displayName} />
-          <AnnotationTemplateTagChips tags={props.tags} />
+          <AnnotationTemplatePresetMetaLine
+            name={<PresetNameWithOverflowHint name={displayName} />}
+            tags={props.tags}
+          />
         </ProductGlassPresetMeta>
       </ProductGlassPresetItem>
       <span className="sniptale-frame-style-preset-actions">
@@ -454,6 +469,7 @@ function FrameManualMode(props: {
   };
   manualStatus?: string;
   onCreated: () => void;
+  onUseForNewFrames?: () => void;
   saveSectionRequest?: number;
   onFloatingInteractionChange?: (open: boolean) => void;
 }) {
@@ -474,6 +490,11 @@ function FrameManualMode(props: {
           <BorderManualSaveSettings
             disabled={Boolean(props.manual.cssError)}
             isSaving={props.manual.isSaving}
+            {...(props.onUseForNewFrames
+              ? {
+                  leadingContent: <ApplyToFutureFramesSetting onClick={props.onUseForNewFrames} />,
+                }
+              : {})}
             onSave={props.manual.save}
             onCreated={props.onCreated}
             onOverwritten={props.onCreated}

@@ -20,6 +20,24 @@ function createProfileId(): string {
     : `custom:${Date.now()}`;
 }
 
+function moveProfileBefore(
+  profiles: readonly VideoRecordingProfile[],
+  profileId: string,
+  beforeProfileId: string | null
+): readonly VideoRecordingProfile[] {
+  if (profileId === beforeProfileId) return profiles;
+  const sourceIndex = profiles.findIndex((profile) => profile.id === profileId);
+  if (sourceIndex < 0) return profiles;
+  const next = profiles.filter((profile) => profile.id !== profileId);
+  const insertionIndex =
+    beforeProfileId === null
+      ? next.length
+      : next.findIndex((profile) => profile.id === beforeProfileId);
+  if (insertionIndex < 0) return profiles;
+  next.splice(insertionIndex, 0, profiles[sourceIndex]!);
+  return next.every((profile, index) => profile.id === profiles[index]?.id) ? profiles : next;
+}
+
 export function useVideoQualityProfiles() {
   const [settings, setSettings] = useState<VideoRecordingSettings | null>(null);
   const [editor, setEditor] = useState<ProfileEditorState>(null);
@@ -111,8 +129,24 @@ export function useVideoQualityProfiles() {
     }));
   };
 
+  const reorderProfile = async (profileId: string, beforeProfileId: string | null) => {
+    if (!settings) return;
+    const preview = moveProfileBefore(settings.qualityProfiles, profileId, beforeProfileId);
+    if (preview === settings.qualityProfiles) return;
+    await commit((current) => {
+      const qualityProfiles = moveProfileBefore(
+        current.qualityProfiles,
+        profileId,
+        beforeProfileId
+      );
+      return qualityProfiles === current.qualityProfiles
+        ? current
+        : { ...current, qualityProfiles: [...qualityProfiles] };
+    });
+  };
+
   return {
-    actions: { confirmDelete, saveProfile, selectProfile },
+    actions: { confirmDelete, reorderProfile, saveProfile, selectProfile },
     dialogs: { deleteProfile, editor, setDeleteProfile, setEditor },
     profiles: {
       builtIn: BUILT_IN_VIDEO_RECORDING_QUALITY_PROFILES,

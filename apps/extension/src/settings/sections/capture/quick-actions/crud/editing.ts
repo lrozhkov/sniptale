@@ -1,8 +1,12 @@
 import type { QuickAction } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
-import { isBundledQuickAction } from '../../../../../features/quick-actions-presets/catalog';
+import {
+  isBundledQuickAction,
+  resetBundledQuickAction,
+} from '../../../../../features/quick-actions-presets/catalog';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { createDefaultQuickAction } from '../section/helpers';
+import { normalizeQuickActionEditorPolicy } from '../../../../../features/quick-actions-presets/policy';
 
 export function beginNewQuickAction(
   setEditingId: (value: string) => void,
@@ -18,10 +22,6 @@ export function beginEditQuickAction(
   setEditingId: (value: string) => void,
   setEditForm: (value: QuickAction) => void
 ) {
-  if (isBundledQuickAction(action)) {
-    return;
-  }
-
   setEditingId(action.id);
   setEditForm({ ...action });
 }
@@ -36,7 +36,7 @@ export function updateQuickActionField<K extends keyof QuickAction>(
     return;
   }
 
-  setEditForm({ ...editForm, [field]: value });
+  setEditForm(normalizeQuickActionEditorPolicy({ ...editForm, [field]: value }));
 }
 
 export async function saveEditedQuickAction(props: {
@@ -44,14 +44,8 @@ export async function saveEditedQuickAction(props: {
   editForm: QuickAction | null;
   onPersist: (actions: QuickAction[]) => Promise<boolean>;
   onResetEditor: () => void;
-  onConfirm: (message: string) => void;
 }) {
   if (!props.editForm) {
-    return;
-  }
-
-  if (isBundledQuickAction(props.editForm)) {
-    props.onResetEditor();
     return;
   }
 
@@ -60,32 +54,46 @@ export async function saveEditedQuickAction(props: {
     return;
   }
 
-  const existingIndex = props.actions.findIndex((action) => action.id === props.editForm?.id);
+  const normalizedEditForm = normalizeQuickActionEditorPolicy({
+    ...props.editForm,
+    ...(isBundledQuickAction(props.editForm) ? { customized: true } : {}),
+  });
+  const existingIndex = props.actions.findIndex((action) => action.id === normalizedEditForm.id);
   const updatedActions =
     existingIndex >= 0
-      ? props.actions.map((action, index) => (index === existingIndex ? props.editForm! : action))
-      : [...props.actions, props.editForm];
+      ? props.actions.map((action, index) =>
+          index === existingIndex ? normalizedEditForm : action
+        )
+      : [...props.actions, normalizedEditForm];
 
   const wasPersisted = await props.onPersist(updatedActions);
   if (!wasPersisted) {
     return;
   }
 
-  props.onConfirm(
-    translate(
-      existingIndex >= 0
-        ? 'settings.quickActions.messageUpdated'
-        : 'settings.quickActions.messageCreated'
-    )
-  );
   props.onResetEditor();
+}
+
+export async function resetQuickAction(
+  actions: QuickAction[],
+  id: string,
+  onPersist: (actions: QuickAction[]) => Promise<boolean>
+) {
+  const index = actions.findIndex((action) => action.id === id);
+  if (index < 0) return;
+
+  const resetAction = resetBundledQuickAction(actions[index]!);
+  if (!resetAction) return;
+
+  await onPersist(
+    actions.map((action, actionIndex) => (actionIndex === index ? resetAction : action))
+  );
 }
 
 export async function deleteQuickAction(
   actions: QuickAction[],
   id: string,
-  onPersist: (actions: QuickAction[]) => Promise<boolean>,
-  onConfirm: (message: string) => void
+  onPersist: (actions: QuickAction[]) => Promise<boolean>
 ) {
   const action = actions.find((candidate) => candidate.id === id);
 
@@ -93,9 +101,5 @@ export async function deleteQuickAction(
     return;
   }
 
-  const wasPersisted = await onPersist(actions.filter((action) => action.id !== id));
-  if (!wasPersisted) {
-    return;
-  }
-  onConfirm(translate('settings.quickActions.messageDeleted'));
+  await onPersist(actions.filter((action) => action.id !== id));
 }

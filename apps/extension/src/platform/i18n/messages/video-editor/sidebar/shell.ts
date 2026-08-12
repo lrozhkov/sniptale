@@ -9,6 +9,10 @@ export const videoEditorSidebarShellMessages = defineMessageSource({
     ru: 'Сжать инспектор',
     en: 'Collapse inspector',
   },
+  resizeInspector: {
+    ru: 'Изменить ширину инспектора',
+    en: 'Resize inspector',
+  },
   projectTitle: {
     ru: 'Проект',
     en: 'Project',

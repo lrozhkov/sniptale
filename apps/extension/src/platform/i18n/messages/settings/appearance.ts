@@ -97,6 +97,29 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Предпочтение языка',
     en: 'Language preference',
   },
+  popupStartupLabel: {
+    ru: 'Стартовый экран',
+    en: 'Start screen',
+  },
+  popupStartupAriaLabel: {
+    ru: 'Что показывать при открытии основного меню',
+    en: 'What to show when opening the main menu',
+  },
+  popupStartupOptions: {
+    'remember-last': {
+      ru: 'Продолжить с последнего места',
+      en: 'Continue where I left off',
+    },
+    'screenshots:quick-actions': { ru: 'Снимки — Действия', en: 'Screenshots — Shortcuts' },
+    'screenshots:tab': { ru: 'Снимки — Вкладка', en: 'Screenshots — Tab' },
+    'screenshots:desktop': { ru: 'Снимки — Окно', en: 'Screenshots — Window' },
+    'screenshots:tools': { ru: 'Снимки — Инструменты', en: 'Screenshots — Tools' },
+    'video:tab': { ru: 'Видео — Вкладка', en: 'Video — Tab' },
+    'video:area': { ru: 'Видео — Область', en: 'Video — Area' },
+    'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
+    'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
+    export: { ru: 'Экспорт', en: 'Export' },
+  },
   themeModeLabel: {
     ru: 'Режим темы',
     en: 'Theme mode',
@@ -142,24 +165,24 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: RAW_DIAGNOSTICS_DESCRIPTION_EN,
   },
   contextMenuTitle: {
-    ru: 'Встраивание в контекстное меню',
-    en: 'Browser context menu integration',
+    ru: 'Контекстное меню браузера',
+    en: 'Browser context menu',
   },
   contextMenuDescription: {
     ru: 'Управляет тем, какие разделы и страницы Sniptale доступны из контекстного меню браузера.',
     en: 'Controls which Sniptale sections and pages are available from the browser context menu.',
   },
   contextMenuEnabledLabel: {
-    ru: 'Встраивание в контекстное меню',
-    en: 'Enable context menu integration',
+    ru: 'Показывать меню Sniptale',
+    en: 'Show the Sniptale menu',
   },
   contextMenuEnabledDescription: {
     ru: 'Добавить корневое меню Sniptale в контекстное меню браузера.',
     en: 'Add the Sniptale root item to the browser context menu.',
   },
   contextMenuVisibleItemsLabel: {
-    ru: 'Показывать пункты',
-    en: 'Visible items',
+    ru: 'Команды в меню',
+    en: 'Menu commands',
   },
   contextMenuScreenshotsLabel: {
     ru: 'Снимки',
@@ -174,7 +197,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Video',
   },
   contextMenuVideoDescription: {
-    ru: 'Запись вкладки, области, пресета и окна.',
+    ru: 'Запись вкладки, области, шаблона и окна.',
     en: 'Tab, area, preset, and window recording.',
   },
   contextMenuExportLabel: {

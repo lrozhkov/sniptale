@@ -19,6 +19,8 @@ const {
   handleTriggerQuickActionMock,
   browserTabsGetMock,
   ensureActivePageAccessRuntimeMock,
+  loadQuickActionRuntimeContextMock,
+  waitForContentToolbarReadyMock,
 } = vi.hoisted(() => ({
   handleFullCaptureMock: vi.fn(),
   handleVisibleCaptureMock: vi.fn(),
@@ -38,6 +40,18 @@ const {
   handleTriggerQuickActionMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   ensureActivePageAccessRuntimeMock: vi.fn(),
+  loadQuickActionRuntimeContextMock: vi.fn(),
+  waitForContentToolbarReadyMock: vi.fn(),
+}));
+
+vi.mock('../../../runtime/page-access/readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/page-access/readiness')>()),
+  waitForContentToolbarReady: waitForContentToolbarReadyMock,
+}));
+
+vi.mock('../../quick-actions/flow/load', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../quick-actions/flow/load')>()),
+  loadQuickActionRuntimeContext: loadQuickActionRuntimeContextMock,
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -117,6 +131,7 @@ function createRouteArgs() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetScreenshotSurfaceSessionsForTests();
+  loadQuickActionRuntimeContextMock.mockResolvedValue({ captureMode: 'visible' });
   handleVisibleCaptureMock.mockReturnValue(true);
   handleVisibleCaptureForCropMock.mockReturnValue(true);
   handleFullCaptureMock.mockReturnValue(true);
@@ -134,6 +149,7 @@ beforeEach(() => {
   handleTriggerQuickActionMock.mockReturnValue(true);
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  waitForContentToolbarReadyMock.mockResolvedValue({ screenshotMode: false, visible: false });
 });
 
 it('renews a screenshot surface only for its preauthorized content document', async () => {
@@ -316,7 +332,8 @@ it('passes owned snapshot viewer ports through quick-action routing context', as
 
   expect(handleTriggerQuickActionMock).toHaveBeenCalledWith(
     { type: 'TRIGGER_QUICK_ACTION', actionId: 'viewer-action' },
-    expect.objectContaining({ webSnapshotViewerPorts: args.webSnapshotViewerPorts })
+    expect.objectContaining({ webSnapshotViewerPorts: args.webSnapshotViewerPorts }),
+    expect.objectContaining({ captureMode: 'visible' })
   );
   expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(42);
 });

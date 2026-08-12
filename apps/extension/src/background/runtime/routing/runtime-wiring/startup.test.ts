@@ -5,6 +5,7 @@ const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => tru
 const migrateStepBadgeSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 const cleanupDrafts = vi.hoisted(() => vi.fn(async () => undefined));
+const recoverPendingVideoRecordingCameraPeerCleanup = vi.hoisted(() => vi.fn(async () => true));
 const loadSettings = vi.hoisted(() =>
   vi.fn(async () => ({
     localStoragePolicy: {
@@ -48,6 +49,11 @@ vi.mock('../../../../composition/persistence/step-badge-presets', async (importO
 vi.mock('../../page-access/service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime,
+}));
+
+vi.mock('../../../media/video/content-surface/camera-peer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../media/video/content-surface/camera-peer')>()),
+  recoverPendingVideoRecordingCameraPeerCleanup,
 }));
 
 import {
@@ -106,6 +112,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
   expect(migrateCalloutSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(migrateStepBadgeSystemPresetCatalog).toHaveBeenCalledOnce();
   expect(resetVideoRecordingRuntimeState).toHaveBeenCalledOnce();
+  expect(recoverPendingVideoRecordingCameraPeerCleanup).toHaveBeenCalledOnce();
   expect(recoverVideoCaptureSurfaceOnStartup).toHaveBeenCalledWith(ensureActivePageAccessRuntime);
   expect(logger.warn).toHaveBeenCalledWith(
     'Failed to request persistent storage',

@@ -13,8 +13,8 @@ import { isViewportPresetAllowedForVideoCaptureMode } from '../../../../../featu
 import { orderViewportPresetsForSelector } from '../../../../../features/viewport-presets/operations';
 import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
-import type { InlineCurtainOption } from '../../inline-controls/curtain-options';
+import { InlineCurtainSelect } from '../../../../../ui/popup-shell/inline-curtain/select';
+import type { InlineCurtainOption } from '../../../../../ui/popup-shell/inline-curtain/options';
 import {
   getVideoPresetAvailabilityDescription,
   useVideoPresetAvailability,

@@ -11,11 +11,14 @@ import {
 } from '@sniptale/runtime-contracts/video/types/webcam-quality';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
+// Chromium ignores explicit content-capture dimensions above half of media::limits::kMaxDimension.
+const MAX_CHROMIUM_CONTENT_CAPTURE_DIMENSION = 16_383;
 
 export async function acquireRecordingSourceStream(params: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  viewport?: { width: number; height: number; devicePixelRatio?: number };
 }) {
   if (params.captureMode === CaptureMode.SCREEN) {
     return acquireDesktopStream(params.settings);
@@ -63,11 +66,56 @@ async function acquireCameraStream(settings: VideoRecordingSettings) {
   };
 }
 
-function createTabSourceConstraints(streamId: string): MediaTrackConstraints {
+type TabCaptureViewport = {
+  devicePixelRatio?: number;
+  height: number;
+  width: number;
+};
+
+function resolvePhysicalTabCaptureSize(
+  viewport: TabCaptureViewport | undefined
+): { height: number; width: number } | null {
+  if (!viewport) return null;
+  const { devicePixelRatio, height, width } = viewport;
+  if (
+    typeof devicePixelRatio !== 'number' ||
+    !Number.isFinite(devicePixelRatio) ||
+    devicePixelRatio <= 0 ||
+    !Number.isFinite(height) ||
+    height <= 0 ||
+    !Number.isFinite(width) ||
+    width <= 0
+  ) {
+    throw new Error('Tab capture viewport geometry is invalid');
+  }
+  const physicalHeight = Math.round(height * devicePixelRatio);
+  const physicalWidth = Math.round(width * devicePixelRatio);
+  if (!Number.isSafeInteger(physicalHeight) || !Number.isSafeInteger(physicalWidth)) {
+    throw new Error('Tab capture physical geometry is invalid');
+  }
+  if (
+    physicalHeight > MAX_CHROMIUM_CONTENT_CAPTURE_DIMENSION ||
+    physicalWidth > MAX_CHROMIUM_CONTENT_CAPTURE_DIMENSION
+  ) {
+    throw new Error('Tab capture physical geometry exceeds Chromium limits');
+  }
+  return {
+    height: Math.max(1, physicalHeight),
+    width: Math.max(1, physicalWidth),
+  };
+}
+
+function createTabSourceConstraints(
+  streamId: string,
+  physicalSize: { height: number; width: number } | null = null
+): MediaTrackConstraints {
   return {
     mandatory: {
       chromeMediaSource: 'tab',
       chromeMediaSourceId: streamId,
+      // Chromium seeds its WebContents capture scaler from the requested maximum frame size.
+      // Keep that request on the tab's existing physical pixel grid; output scaling happens later.
+      ...(physicalSize ? { maxHeight: physicalSize.height, maxWidth: physicalSize.width } : {}),
     },
   } as MediaTrackConstraints;
 }
@@ -76,22 +124,27 @@ async function acquireTabStream({
   streamId,
   settings,
   captureMode,
+  viewport,
 }: {
   streamId: string;
   settings: VideoRecordingSettings;
   captureMode?: CaptureMode;
+  viewport?: TabCaptureViewport;
 }) {
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
     ? createTabSourceConstraints(streamId)
     : false;
+  const requestedPhysicalSize = resolvePhysicalTabCaptureSize(viewport);
 
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: audioConstraints,
-    video: createTabSourceConstraints(streamId),
+    video: createTabSourceConstraints(streamId, requestedPhysicalSize),
   });
   const cursorCaptureMode = resolveCursorCaptureMode(stream, settings, captureMode);
   logger.debug('Acquired tab capture stream', {
     hasAudio: Boolean(audioConstraints),
+    requestedPhysicalSize,
+    trackSettings: getTrackSettings(stream),
   });
   return {
     stream,
@@ -109,15 +162,31 @@ function readStringSetting(settings: unknown, key: string): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function readNumberSetting(settings: unknown, key: string): number | null {
+  if (!isRecord(settings)) return null;
+  const value = settings[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 function getTrackSettings(stream: MediaStream): {
+  aspectRatio: number | null;
   cursor: string | null;
   displaySurface: string | null;
+  frameRate: number | null;
+  height: number | null;
+  resizeMode: string | null;
+  width: number | null;
 } {
   const videoTrack = stream.getVideoTracks()[0];
   const settings: unknown = videoTrack?.getSettings();
   return {
+    aspectRatio: readNumberSetting(settings, 'aspectRatio'),
     cursor: readStringSetting(settings, 'cursor'),
     displaySurface: readStringSetting(settings, 'displaySurface'),
+    frameRate: readNumberSetting(settings, 'frameRate'),
+    height: readNumberSetting(settings, 'height'),
+    resizeMode: readStringSetting(settings, 'resizeMode'),
+    width: readNumberSetting(settings, 'width'),
   };
 }
 

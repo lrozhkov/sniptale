@@ -190,15 +190,51 @@ export const popupVideoMediaMessages = defineMessageSource({
     en: 'Settings',
   },
   webcamSettingsActionAria: {
-    ru: 'Настроить качество камеры',
-    en: 'Configure camera quality',
+    ru: 'Настроить камеру',
+    en: 'Configure camera',
   },
   webcamQualityTitle: {
     ru: 'Настройка камеры',
     en: 'Camera settings',
   },
+  webcamPresentationModeLabel: {
+    ru: 'Размещение',
+    en: 'Placement',
+  },
+  webcamPresentationEmbedded: {
+    ru: 'На странице',
+    en: 'On page',
+  },
+  webcamPresentationSeparateTrack: {
+    ru: 'Отдельная дорожка',
+    en: 'Separate track',
+  },
+  webcamPresentationShapeLabel: {
+    ru: 'Форма на странице',
+    en: 'On-page shape',
+  },
+  webcamPresentationCircle: {
+    ru: 'Круг',
+    en: 'Circle',
+  },
+  webcamPresentationRectangle: {
+    ru: 'Прямоугольник 16:9',
+    en: '16:9 rectangle',
+  },
+  webcamPresentationSize: {
+    ru: 'Размер на странице',
+    en: 'Size on page',
+  },
+  webcamPresentationCropHorizontal: {
+    ru: 'Кадрирование по горизонтали',
+    en: 'Horizontal crop',
+  },
+  webcamPresentationCropVertical: {
+    ru: 'Кадрирование по вертикали',
+    en: 'Vertical crop',
+  },
   webcamQualityBrowserNotice: {
-    ru: 'Браузер отдаёт диапазоны возможностей камеры, поэтому пресеты применяются как предпочтительные значения.',
+    ru: 'Браузер отдаёт диапазоны возможностей камеры, поэтому шаблоны применяются как предпочтительные значения.',
     en: 'The browser exposes camera capability ranges, so presets are applied as preferred values.',
   },
   webcamQualityPreviewLoading: {

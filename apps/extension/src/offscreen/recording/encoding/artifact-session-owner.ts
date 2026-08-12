@@ -15,6 +15,11 @@ type ArtifactSessionPhase =
   | 'failed'
   | 'aborted';
 
+// Persist bounded chunks without asking MediaRecorder to emit continuously. A zero
+// timeslice can saturate OPFS with tiny writes and make a short recording take many
+// seconds to drain when stopping.
+const RECORDING_CHUNK_TIMESLICE_MS = 1_000;
+
 interface RecordingArtifactLifecycleCallbacks {
   onFailure?(error: Error): void;
   onStart?(): void;
@@ -76,7 +81,7 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
     }
     this.phase = 'starting';
     try {
-      this.recorder.start(0);
+      this.recorder.start(RECORDING_CHUNK_TIMESLICE_MS);
     } catch (error) {
       this.fail(error);
       throw error;

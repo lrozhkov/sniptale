@@ -34,12 +34,12 @@
     {
       "category": "archive-integration",
       "path": "package.json",
-      "sha256": "48ac28ef3ae89e983b74c04ef9c16ac296846794dac772d918d162836a58cbc2"
+      "sha256": "f1d96564c6db942c3c153d9e8dffb3d4dfb1e1ece6e4b97597e7d3e5db526b7f"
     },
     {
       "category": "release-command",
       "path": "package.json",
-      "sha256": "48ac28ef3ae89e983b74c04ef9c16ac296846794dac772d918d162836a58cbc2"
+      "sha256": "f1d96564c6db942c3c153d9e8dffb3d4dfb1e1ece6e4b97597e7d3e5db526b7f"
     },
     {
       "category": "bundled-font",
@@ -64,7 +64,7 @@
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/harness-freshness-step.mjs",
-      "sha256": "50fff314a4c4d203dcabc9e28d08ddcb891d8173ee538b271664f2ff76727d45"
+      "sha256": "882c8d31060b08751be9424bb8b12cc37b553f9a451e646d37c65ac4b7745bef"
     },
     {
       "category": "archive-integration",
@@ -129,7 +129,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/artifact-security.mjs",
-      "sha256": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
+      "sha256": "314522548f8a93a731e740bec46b25b1a0d9d5385371cc10c5758eb6cdabd8ed"
     },
     {
       "category": "bundled-font",
@@ -149,7 +149,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/package-dist.mjs",
-      "sha256": "45fb58ad0975e84df1e2f6f97221037090f7cd7781e345bd6f5d09f4cfc897d4"
+      "sha256": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
     }
   ]
 }

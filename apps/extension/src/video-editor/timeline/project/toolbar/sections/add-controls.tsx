@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Captions, ChevronDown, Music, Plus, StickyNote, Video } from 'lucide-react';
+import { ChevronDown, Music, Plus, StickyNote, Video } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -26,11 +26,6 @@ const TRACK_MENU_OPTIONS = [
     icon: <StickyNote size={14} strokeWidth={2.1} />,
     kind: VideoTrackKind.OVERLAY,
     labelKey: 'videoEditor.timeline.addOverlayTrack',
-  },
-  {
-    icon: <Captions size={14} strokeWidth={2.1} />,
-    kind: VideoTrackKind.SUBTITLE,
-    labelKey: 'videoEditor.timeline.addSubtitleTrack',
   },
 ] as const;
 

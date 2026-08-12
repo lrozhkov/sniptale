@@ -41,16 +41,17 @@ function createBuildArgs() {
 
   return {
     args: {
+      catalogActions: {
+        clearProviderSecret: actions.handleClearProviderSecret,
+        deleteModel: actions.handleDeleteModel,
+        deleteProvider: actions.handleDeleteProvider,
+        moveModel: vi.fn(),
+        setDefaultModel: actions.handleDefaultModelChange,
+      },
       chromeAi,
       secretProtection,
       dataState: createBuildDataState(),
-      deleteHandlers: {
-        handleDeleteModel: actions.handleDeleteModel,
-        handleDeleteProvider: actions.handleDeleteProvider,
-      },
-      handleClearProviderSecret: actions.handleClearProviderSecret,
       getProviderName: actions.getProviderName,
-      handleDefaultModelChange: actions.handleDefaultModelChange,
       modalState: modals as never,
       reloadData: actions.reloadData,
     },
@@ -84,10 +85,12 @@ it('builds the ai providers controller state from owner-local props', () => {
       status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
     }),
     defaultModelId: 'model-1',
-    handleDeleteModel,
-    handleDeleteProvider,
-    handleClearProviderSecret,
-    handleDefaultModelChange,
+    catalogActions: {
+      clearProviderSecret: handleClearProviderSecret,
+      deleteModel: handleDeleteModel,
+      deleteProvider: handleDeleteProvider,
+      setDefaultModel: handleDefaultModelChange,
+    },
     isLoading: false,
     modelOptions: [{ label: 'OpenAI / GPT 4.1' }],
     modals,

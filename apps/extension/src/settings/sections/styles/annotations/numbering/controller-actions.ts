@@ -10,10 +10,7 @@ import {
 } from '../../../../../composition/persistence/step-badge-presets';
 import type { StepBadgePresetCatalogController } from './types';
 
-type StepBadgePresetMutate = (
-  operation: () => Promise<{ outcome: string }>,
-  success?: Parameters<typeof import('../../../../../platform/i18n').translate>[0]
-) => Promise<boolean>;
+type StepBadgePresetMutate = (operation: () => Promise<{ outcome: string }>) => Promise<boolean>;
 
 function reorderBefore(catalog: StepBadgePresetCatalog, sourceId: string, beforeId: string | null) {
   const next = catalog.presets.filter((preset) => preset.id !== sourceId);
@@ -36,10 +33,7 @@ export function createStepBadgePresetCatalogActions(args: {
     closeEditor: () => args.setEditor({ isOpen: false }),
     delete: async (preset) => {
       if (preset.origin !== 'system')
-        await args.mutate(
-          () => deleteStoredStepBadgePreset(preset.id),
-          'highlighter.stepBadgePresets.messages.deleted'
-        );
+        await args.mutate(() => deleteStoredStepBadgePreset(preset.id));
     },
     edit: (preset) => args.setEditor({ isOpen: true, preset }),
     moveBefore: async (id, beforeId) => {
@@ -48,30 +42,23 @@ export function createStepBadgePresetCatalogActions(args: {
       await args.mutate(() => updateStoredStepBadgePresetOrder(next.map((preset) => preset.id)));
     },
     reset: async (id) => {
-      await args.mutate(
-        () => resetStoredSystemStepBadgePreset(id),
-        'highlighter.stepBadgePresets.messages.reset'
-      );
+      await args.mutate(() => resetStoredSystemStepBadgePreset(id));
     },
     save: async (preset) => {
       const exists = args.catalog?.presets.some((item) => item.id === preset.id) ?? false;
-      const saved = await args.mutate(
-        () =>
-          exists
-            ? updateStoredStepBadgePreset({
-                id: preset.id,
-                name: preset.name,
-                settings: preset.settings,
-                tagIds: preset.tagIds,
-              })
-            : createUserStepBadgePreset({
-                name: preset.name,
-                settings: preset.settings,
-                tagIds: preset.tagIds,
-              }),
+      const saved = await args.mutate(() =>
         exists
-          ? 'highlighter.stepBadgePresets.messages.updated'
-          : 'highlighter.stepBadgePresets.messages.created'
+          ? updateStoredStepBadgePreset({
+              id: preset.id,
+              name: preset.name,
+              settings: preset.settings,
+              tagIds: preset.tagIds,
+            })
+          : createUserStepBadgePreset({
+              name: preset.name,
+              settings: preset.settings,
+              tagIds: preset.tagIds,
+            })
       );
       if (saved) args.setEditor({ isOpen: false });
     },

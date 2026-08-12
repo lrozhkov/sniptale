@@ -36,8 +36,6 @@ export type ViewportMessage = Extract<
       | VideoMessageType.GET_VIEWPORT_COORDS
       | VideoMessageType.SHOW_COUNTDOWN
       | VideoMessageType.HIDE_COUNTDOWN
-      | VideoMessageType.ENABLE_ANNOTATIONS
-      | VideoMessageType.DISABLE_ANNOTATIONS
       | VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION
       | VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION
       | VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE
@@ -77,8 +75,6 @@ export function isViewportMessage(message: ContentRuntimeMessage): message is Vi
     message.type === VideoMessageType.GET_VIEWPORT_COORDS ||
     message.type === VideoMessageType.SHOW_COUNTDOWN ||
     message.type === VideoMessageType.HIDE_COUNTDOWN ||
-    message.type === VideoMessageType.ENABLE_ANNOTATIONS ||
-    message.type === VideoMessageType.DISABLE_ANNOTATIONS ||
     message.type === VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION ||
     message.type === VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION ||
     message.type === VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE ||

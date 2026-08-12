@@ -15,6 +15,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Неизвестная ошибка',
     en: 'Unknown error',
   },
+  videoRecordingActionFailed: {
+    ru: 'Не удалось выполнить действие с записью. Повторите попытку.',
+    en: 'The recording action failed. Try again.',
+  },
   viewportConflictError: {
     ru: VIEWPORT_CONFLICT_ERROR_RU,
     en: VIEWPORT_CONFLICT_ERROR_EN,
@@ -44,12 +48,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Navigation lock',
   },
   cursorDefault: {
-    ru: 'Обычная работа со страницей без инструментов редактирования',
-    en: 'Use the page normally without editing tools',
+    ru: 'Обычная работа со страницей',
+    en: 'Interact with the page normally',
   },
   cursorLabel: {
-    ru: 'Курсор',
-    en: 'Cursor',
+    ru: 'Навигация',
+    en: 'Navigate',
+  },
+  cursorDescription: {
+    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
+    en: 'Interact with the page normally',
   },
   cursorEnable: {
     ru: 'Вернуться к обычной работе со страницей',
@@ -60,6 +68,40 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Рисуйте и добавляйте быстрые пометки поверх страницы',
     en: 'Draw and add quick markup over the page',
   },
+  videoRecordingLabel: { ru: 'Запись видео', en: 'Video recording' },
+  videoRecordingEnable: {
+    ru: 'Записывайте вкладку, рисуйте и управляйте камерой прямо на странице',
+    en: 'Record the tab, draw, and control the camera directly on the page',
+  },
+  videoRecordingPinned: {
+    ru: 'Панель закреплена, пока выбран режим записи видео',
+    en: 'The toolbar stays pinned while video recording mode is selected',
+  },
+  videoRecordingStart: { ru: 'Записать видео', en: 'Record video' },
+  videoRecordingStartHint: {
+    ru: 'Начать запись с текущими настройками из раздела «Видео» во всплывающем окне',
+    en: 'Start recording with the current settings from the Video tab in the popup',
+  },
+  videoRecordingCancelStart: { ru: 'Отменить запуск', en: 'Cancel start' },
+  videoRecordingPause: { ru: 'Пауза', en: 'Pause' },
+  videoRecordingResume: { ru: 'Продолжить', en: 'Resume' },
+  videoRecordingStop: { ru: 'Остановить запись', en: 'Stop recording' },
+  videoRecordingStopping: { ru: 'Завершение записи', en: 'Finishing recording' },
+  videoRecordingMicrophone: { ru: 'Микрофон', en: 'Microphone' },
+  videoRecordingCamera: { ru: 'Камера', en: 'Camera' },
+  videoRecordingCameraPreviewUnavailable: {
+    ru: 'Предпросмотр камеры недоступен',
+    en: 'Camera preview is unavailable',
+  },
+  videoRecordingDevicesLoading: { ru: 'Загрузка устройств…', en: 'Loading devices…' },
+  videoRecordingDevicesEmpty: { ru: 'Устройства не найдены', en: 'No devices found' },
+  videoRecordingMedia: { ru: 'Микрофон и камера', en: 'Microphone and camera' },
+  videoRecordingSpotlight: { ru: 'Подсветка курсора', en: 'Cursor spotlight' },
+  videoRecordingCursorHalo: { ru: 'Контур курсора', en: 'Cursor halo' },
+  videoRecordingCursorDimming: { ru: 'Затемнение страницы', en: 'Dim page' },
+  videoRecordingClickAnimation: { ru: 'Анимация клика', en: 'Click animation' },
+  videoRecordingModeControls: { ru: 'Режим взаимодействия', en: 'Interaction mode' },
+  videoRecordingActions: { ru: 'Управление записью', en: 'Recording controls' },
   drawingUnavailable: {
     ru: 'Рисование недоступно для страницы с несколькими независимыми областями прокрутки',
     en: 'Drawing is unavailable on pages with multiple independent scroll areas',
@@ -125,6 +167,14 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingDeselect: { ru: 'Снять выделение', en: 'Deselect' },
   drawingDelete: { ru: 'Удалить выбранное', en: 'Delete selected' },
   drawingClear: { ru: 'Очистить рисунки', en: 'Clear drawings' },
+  recordingNavigation: { ru: 'Навигация', en: 'Navigation' },
+  recordingDrawingEraser: { ru: 'Ластик', en: 'Eraser' },
+  recordingDrawingAutoHide: {
+    ru: 'Автоматически скрывать рисунки',
+    en: 'Automatically hide drawings',
+  },
+  recordingDrawingAutoHideOff: { ru: 'Выключено', en: 'Off' },
+  recordingDrawingAutoHideSeconds: { ru: 'секунд', en: 'seconds' },
   aiLabel: {
     ru: 'ИИ-редактор',
     en: 'AI editor',
@@ -192,6 +242,10 @@ export const contentToolbarModesMessages = defineMessageSource({
   clearFrames: {
     ru: 'Очистить все рамки',
     en: 'Clear all frames',
+  },
+  clearPagePreparation: {
+    ru: 'Очистить все изменения',
+    en: 'Clear all changes',
   },
   autoBlur: {
     ru: 'Размытие данных',

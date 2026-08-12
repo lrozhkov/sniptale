@@ -1,85 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { tabVideoMessageContracts } from './video';
-
-function createVideoSettings() {
-  return {
-    ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 0,
-    controlledCursorCaptureEnabled: false,
-    countdownSeconds: 3,
-    microphoneEnabled: true,
-  };
-}
-
-function verifyEnableAnnotationsContract() {
-  expect(
-    tabVideoMessageContracts[VideoMessageType.ENABLE_ANNOTATIONS]?.parseRequest({
-      recordingId: 'recording-1',
-      settings: createVideoSettings(),
-      type: VideoMessageType.ENABLE_ANNOTATIONS,
-    })
-  ).toEqual({
-    recordingId: 'recording-1',
-    settings: createVideoSettings(),
-    type: VideoMessageType.ENABLE_ANNOTATIONS,
-  });
-  expect(
-    tabVideoMessageContracts[VideoMessageType.ENABLE_ANNOTATIONS]?.parseResponse({
-      success: true,
-      viewport: {
-        devicePixelRatio: 1,
-        height: 720,
-        scrollX: 0,
-        scrollY: 100,
-        width: 1280,
-      },
-    })
-  ).toEqual({
-    success: true,
-    viewport: {
-      devicePixelRatio: 1,
-      height: 720,
-      scrollX: 0,
-      scrollY: 100,
-      width: 1280,
-    },
-  });
-}
-
-function verifyDisableAnnotationsContract() {
-  expect(
-    tabVideoMessageContracts[VideoMessageType.DISABLE_ANNOTATIONS]?.parseResponse({
-      success: true,
-      telemetry: {
-        actionEvents: [],
-        cursorTrack: null,
-        viewport: null,
-      },
-    })
-  ).toEqual({
-    success: true,
-    telemetry: {
-      actionEvents: [],
-      cursorTrack: null,
-      viewport: null,
-    },
-  });
-
-  expect(() =>
-    tabVideoMessageContracts[VideoMessageType.DISABLE_ANNOTATIONS]?.parseResponse({
-      success: true,
-      telemetry: {
-        actionEvents: [{ id: 'bad' }],
-        cursorTrack: null,
-        viewport: null,
-      },
-    })
-  ).toThrow(MessageContractError);
-}
 
 function verifyControlledCursorCaptureLifecycleContracts() {
   expect(
@@ -172,8 +96,6 @@ function verifyRegionSelectionContracts() {
 }
 
 describe('tab-contracts/video region capture contracts', () => {
-  it('validates the enable-annotations contract', verifyEnableAnnotationsContract);
-  it('validates the disable-annotations contract', verifyDisableAnnotationsContract);
   it(
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts
@@ -183,4 +105,37 @@ describe('tab-contracts/video region capture contracts', () => {
     verifyViewportCursorProjectionContracts
   );
   it('validates region-selection request binding contracts', verifyRegionSelectionContracts);
+});
+
+describe('tab-contracts/video recording surface lifecycle', () => {
+  it('validates recording state sync sent from background to the owning content tab', () => {
+    const message = {
+      type: VideoMessageType.RECORDING_STATE_SYNC,
+      state: {
+        captureMode: null,
+        captureSource: null,
+        countdownEndsAt: null,
+        duration: 12,
+        error: null,
+        liveMedia: null,
+        status: VideoRecordingStatus.RECORDING,
+        viewportPresetId: null,
+      },
+    };
+
+    expect(
+      tabVideoMessageContracts[VideoMessageType.RECORDING_STATE_SYNC]?.parseRequest(message)
+    ).toEqual(message);
+    expect(
+      tabVideoMessageContracts[VideoMessageType.RECORDING_STATE_SYNC]?.parseResponse({
+        success: true,
+      })
+    ).toEqual({ success: true });
+    expect(() =>
+      tabVideoMessageContracts[VideoMessageType.RECORDING_STATE_SYNC]?.parseRequest({
+        ...message,
+        state: { ...message.state, duration: '12' },
+      })
+    ).toThrow(MessageContractError);
+  });
 });

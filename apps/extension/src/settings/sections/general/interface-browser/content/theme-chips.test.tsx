@@ -47,7 +47,7 @@ describe('ThemeChips', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the theme mode tiles and forwards selection changes', async () => {
+  it('renders one compact icon selector without descriptions and forwards changes', async () => {
     const state = createState();
 
     await renderWithState(state);
@@ -55,6 +55,11 @@ describe('ThemeChips', () => {
     expect(container?.textContent).toContain(state.themeOptions[0].label);
     expect(container?.textContent).toContain(state.themeOptions[1].label);
     expect(container?.textContent).toContain(state.themeOptions[2].label);
+    expect(container?.textContent).not.toContain(state.themeOptions[0].description);
+    expect(container?.querySelectorAll('svg')).toHaveLength(3);
+    expect(container?.querySelector('[aria-pressed="true"]')?.textContent).toContain(
+      state.themeOptions[0].label
+    );
 
     const lightButton = container?.querySelector('button:nth-of-type(2)') as HTMLButtonElement;
     expect(lightButton).toBeTruthy();

@@ -54,7 +54,7 @@ export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
 
 const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
   {
-    id: 'default-fullscreen',
+    id: 'default-visible-download',
     icon: 'MonitorDown',
     nameKey: 'shared.defaults.quickActionVisibleDownload',
     screenshotMode: 'visible',
@@ -62,15 +62,15 @@ const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
     delay: null,
   },
   {
-    id: 'default-edit-visible',
-    icon: 'PencilLine',
-    nameKey: 'shared.defaults.quickActionVisibleEdit',
-    screenshotMode: 'visible',
-    afterCapture: 'edit',
+    id: 'default-full-page-download',
+    icon: 'Maximize',
+    nameKey: 'shared.defaults.quickActionFullPageDownload',
+    screenshotMode: 'full',
+    afterCapture: 'download_default',
     delay: null,
   },
   {
-    id: 'default-selection',
+    id: 'default-selection-download',
     icon: 'SquareDashedMousePointer',
     nameKey: 'shared.defaults.quickActionSelectionDownload',
     screenshotMode: 'selection',
@@ -78,15 +78,7 @@ const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
     delay: null,
   },
   {
-    id: 'default-delayed-visible',
-    icon: 'Clock3',
-    nameKey: 'shared.defaults.quickActionVisibleDelayed',
-    screenshotMode: 'visible',
-    afterCapture: 'download_default',
-    delay: 5,
-  },
-  {
-    id: 'default-copy-visible',
+    id: 'default-visible-copy',
     icon: 'ClipboardCopy',
     nameKey: 'shared.defaults.quickActionVisibleCopy',
     screenshotMode: 'visible',
@@ -94,11 +86,29 @@ const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
     delay: null,
   },
   {
-    id: 'default-copy-selection',
-    icon: 'Scan',
-    nameKey: 'shared.defaults.quickActionSelectionCopy',
-    screenshotMode: 'selection',
-    afterCapture: 'copy',
+    id: 'default-visible-edit',
+    icon: 'PencilLine',
+    nameKey: 'shared.defaults.quickActionVisibleEdit',
+    screenshotMode: 'visible',
+    afterCapture: 'edit',
+    delay: null,
+  },
+  {
+    id: 'default-desktop-capture',
+    icon: 'Monitor',
+    nameKey: 'shared.defaults.quickActionDesktopDownload',
+    screenshotMode: 'desktop',
+    afterCapture: 'download_default',
+    delay: null,
+    imageFormat: null,
+    exitAfterCapture: false,
+  },
+  {
+    id: 'default-visible-library',
+    icon: 'FileImage',
+    nameKey: 'shared.defaults.quickActionVisibleLibrary',
+    screenshotMode: 'visible',
+    afterCapture: 'save_to_library',
     delay: null,
   },
 ] as const;
@@ -142,14 +152,15 @@ export function createBundledQuickAction(config: BundledQuickActionConfig): Quic
     icon: config.icon,
     origin: 'bundled',
     bundledId: config.id,
+    customized: false,
     hotkey: null,
     screenshotMode: config.screenshotMode,
     viewportPresetId: null,
     delay: config.delay,
     afterCapture: config.afterCapture,
-    imageFormat: 'png',
+    imageFormat: config.imageFormat === undefined ? 'png' : config.imageFormat,
     imageQuality: null,
-    exitAfterCapture: true,
+    exitAfterCapture: config.exitAfterCapture ?? true,
   };
 }
 
@@ -158,10 +169,17 @@ export function getBundledQuickActions(): QuickAction[] {
 }
 
 export function getQuickActionDisplayName(
-  action: Pick<QuickAction, 'name' | 'id' | 'origin' | 'bundledId'>
+  action: Pick<QuickAction, 'name' | 'id' | 'origin' | 'bundledId' | 'customized'>
 ): string {
   const bundledConfig = getBundledQuickActionConfig(action);
-  return bundledConfig ? translate(bundledConfig.nameKey) : action.name;
+  return bundledConfig && action.customized !== true
+    ? translate(bundledConfig.nameKey)
+    : action.name;
+}
+
+export function resetBundledQuickAction(action: QuickAction): QuickAction | null {
+  const config = getBundledQuickActionConfig(action);
+  return config ? createBundledQuickAction(config) : null;
 }
 
 export function isBundledQuickAction(

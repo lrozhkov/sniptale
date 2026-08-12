@@ -3,6 +3,7 @@ import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/messa
 import { createWebSnapshotViewerPorts } from '../../capture/lifecycle';
 import {
   buildScreenshotModeStatusResponse,
+  disableScreenshotMode,
   disableScreenshotModeForContent,
   enableScreenshotMode,
   getScreenshotPresetAvailabilities,
@@ -13,6 +14,40 @@ import { respondAsyncRoute, respondAsyncSuccess } from '../../routing-contracts/
 import type { TabModeContext } from './shared';
 import { isScreenshotModeMessage } from './shared';
 import { getPreauthorizedContentActionRouteMessage } from '../../capture/routes';
+import { openVideoRecordingSurfaceFromPopup } from '../../media/video/content-surface/start';
+import {
+  getVideoRecordingTabId,
+  hasActiveVideoRecordingSession,
+  isVideoRecordingPreparationInProgress,
+  isVideoRecordingStopInProgress,
+} from '../../media/video/session-state';
+
+function assertWorkingModeAvailableDuringRecording(
+  tabId: number,
+  workingMode: Extract<TabModeMessage, { type: 'ENABLE_SCREENSHOT_MODE' }>['workingMode']
+): void {
+  if (workingMode === undefined || workingMode === 'video-recording') return;
+  const recordingOwnsTab = getVideoRecordingTabId() === tabId;
+  if (
+    recordingOwnsTab &&
+    (hasActiveVideoRecordingSession() ||
+      isVideoRecordingPreparationInProgress() ||
+      isVideoRecordingStopInProgress())
+  ) {
+    throw new Error('Stop the active video recording before switching toolbar mode');
+  }
+}
+
+function createWorkingModeCommitGuard(
+  tabId: number,
+  workingMode: Extract<TabModeMessage, { type: 'ENABLE_SCREENSHOT_MODE' }>['workingMode']
+) {
+  if (workingMode === undefined || workingMode === 'video-recording') return undefined;
+  return () => {
+    assertWorkingModeAvailableDuringRecording(tabId, workingMode);
+    return true;
+  };
+}
 
 function handleScreenshotModeStatus(context: TabModeContext): boolean {
   return buildScreenshotModeStatusResponse(
@@ -22,6 +57,17 @@ function handleScreenshotModeStatus(context: TabModeContext): boolean {
     context.sendResponse,
     context.senderDocumentId ?? null
   );
+}
+
+function syncWorkingModeState(
+  context: TabModeContext,
+  workingMode: Extract<TabModeMessage, { type: 'ENABLE_SCREENSHOT_MODE' }>['workingMode']
+): void {
+  if (workingMode === undefined) return;
+  if (workingMode === 'highlighter') context.highlighterModeState.set(context.resolvedTabId, true);
+  else context.highlighterModeState.delete(context.resolvedTabId);
+  if (workingMode === 'quick-edit') context.quickEditModeState.set(context.resolvedTabId, true);
+  else context.quickEditModeState.delete(context.resolvedTabId);
 }
 
 export function routeScreenshotModeMessage(
@@ -34,7 +80,17 @@ export function routeScreenshotModeMessage(
 
   switch (message.type) {
     case MessageType.ENABLE_SCREENSHOT_MODE: {
+      try {
+        assertWorkingModeAvailableDuringRecording(context.resolvedTabId, message.workingMode);
+      } catch (error) {
+        context.sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return true;
+      }
       const senderBinding = getPreauthorizedContentActionRouteMessage(message);
+      const commitGuard = createWorkingModeCommitGuard(context.resolvedTabId, message.workingMode);
       respondAsyncSuccess(
         enableScreenshotMode(
           context.resolvedTabId,
@@ -42,8 +98,28 @@ export function routeScreenshotModeMessage(
           context.viewportState,
           context.viewportOwnerState,
           context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
-          senderBinding ? { surfaceDocumentId: senderBinding.documentId } : {}
-        ),
+          {
+            ...(commitGuard ? { commitGuard } : {}),
+            ...(senderBinding ? { surfaceDocumentId: senderBinding.documentId } : {}),
+            ...(message.workingMode === undefined ? {} : { workingMode: message.workingMode }),
+          }
+        ).then(() => {
+          if (message.workingMode === 'video-recording') {
+            return openVideoRecordingSurfaceFromPopup(context.resolvedTabId)
+              .then(() => syncWorkingModeState(context, message.workingMode))
+              .catch(async (error: unknown) => {
+                await disableScreenshotMode(
+                  context.resolvedTabId,
+                  context.screenshotModeState,
+                  context.viewportState,
+                  context.viewportOwnerState,
+                  context.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts()
+                );
+                throw error;
+              });
+          }
+          syncWorkingModeState(context, message.workingMode);
+        }),
         context.sendResponse
       );
       return true;

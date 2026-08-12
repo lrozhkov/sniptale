@@ -21,7 +21,6 @@ const runtimeCleanupMocks = vi.hoisted(() => ({
   disableHighlighterMode: vi.fn(),
   disableQuickEditMode: vi.fn(),
   disableSelectionMode: vi.fn(),
-  disableVideoAnnotations: vi.fn(),
   disableVideoTelemetry: vi.fn(),
   disposeViewportCursorProjection: vi.fn(),
   hideVideoCountdown: vi.fn(),
@@ -84,14 +83,6 @@ vi.mock('../overlay/video-countdown', () => ({
   showVideoCountdown: vi.fn(),
 }));
 
-vi.mock('../overlay/video-annotations', () => ({
-  VideoAnnotationsController: undefined,
-  VideoAnnotationsControllerDeps: undefined,
-  createVideoAnnotationsController: vi.fn(),
-  disableVideoAnnotations: runtimeCleanupMocks.disableVideoAnnotations,
-  enableVideoAnnotations: vi.fn(),
-}));
-
 vi.mock('../overlay/video-telemetry', () => ({
   disableVideoTelemetry: runtimeCleanupMocks.disableVideoTelemetry,
   enableVideoTelemetry: vi.fn(),
@@ -137,7 +128,6 @@ function expectRuntimeDisposersRan(): void {
   expect(runtimeCleanupMocks.disableAiPickModeIfLoaded).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableSelectionMode).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.hideVideoCountdown).toHaveBeenCalledTimes(1);
-  expect(runtimeCleanupMocks.disableVideoAnnotations).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableVideoTelemetry).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disposeViewportCursorProjection).toHaveBeenCalledTimes(1);
   expect(regionSelectorControllerMocks.controller.dispose).toHaveBeenCalledTimes(1);

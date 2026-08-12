@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createDrawingSession } from '../../features/drawing/public';
-import type { ContentDrawingController } from './controller';
+import { createContentDrawingController, type ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
 
 vi.mock('../platform/dom-host', async (importOriginal) => ({
@@ -66,4 +66,35 @@ it('owns Escape outside the canvas without exposing the browser default focus fr
   expect(onExit).toHaveBeenCalledOnce();
   window.removeEventListener('keydown', shiftBubble);
   act(() => root.unmount());
+});
+
+it('returns recording drawing directly to navigation on the first Escape', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const controller = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  controller.session.setActiveTool('pencil');
+  const onExit = vi.fn();
+  act(() =>
+    root.render(
+      <DrawingSurface
+        active
+        chromeHidden={false}
+        controller={controller}
+        escapeImmediately
+        onExit={onExit}
+      />
+    )
+  );
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+
+  expect(controller.session.getSnapshot().activeTool).toBe('select');
+  expect(onExit).toHaveBeenCalledOnce();
+  act(() => root.unmount());
+  controller.session.dispose();
 });

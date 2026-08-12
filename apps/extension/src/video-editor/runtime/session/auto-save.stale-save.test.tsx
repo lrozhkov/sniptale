@@ -63,7 +63,7 @@ afterEach(() => {
 it('rejects a stale autosave without rebasing it onto the latest persisted project', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave stale retry');
-  const setSaveState = vi.fn<(state: 'saved' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
 
   saveVideoProject.mockRejectedValueOnce(createStaleSaveError());
   getVideoProject.mockResolvedValue({
@@ -72,12 +72,14 @@ it('rejects a stale autosave without rebasing it onto the latest persisted proje
     workspaceRevision: 4,
   });
   renderAutosaveHarness(project, setSaveState, useVideoEditorAutoSave);
+  const editedProject = { ...project, name: 'Autosave stale retry edited' };
+  renderAutosaveHarness(editedProject, setSaveState, useVideoEditorAutoSave);
 
   await flushAutoSaveTimers();
 
   expect(getVideoProject).toHaveBeenCalledWith(project.id);
   expect(saveVideoProject).toHaveBeenCalledOnce();
-  expect(saveVideoProject).toHaveBeenCalledWith(project, {
+  expect(saveVideoProject).toHaveBeenCalledWith(editedProject, {
     expectedWorkspaceRevision: 4,
   });
   expect(setSaveState).toHaveBeenCalledWith('error');
@@ -91,7 +93,7 @@ function createStaleSaveError(): Error {
 
 function renderAutosaveHarness(
   project: ReturnType<typeof createEmptyVideoProject>,
-  setSaveState: (state: 'saved' | 'saving' | 'error' | 'idle') => void,
+  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void,
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave']
 ) {
   act(() => {
@@ -107,7 +109,7 @@ function renderAutosaveHarness(
 
 function AutosaveHarness(props: {
   project: ReturnType<typeof createEmptyVideoProject>;
-  setSaveState: (state: 'saved' | 'saving' | 'error' | 'idle') => void;
+  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void;
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave'];
 }) {
   props.useVideoEditorAutoSave(

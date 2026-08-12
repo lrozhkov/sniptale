@@ -1,11 +1,9 @@
-import { translate } from '../../../../../../platform/i18n';
-import type { Settings, SavePreset } from '../../../../../../contracts/settings';
-import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import type { SavePreset, SettingsPatch } from '../../../../../../contracts/settings';
 import type { SavePresetsSyncState } from '../../state/types';
 
 export function createTogglePresetEnabledAction(
   sync: SavePresetsSyncState,
-  persistSettings: (partialSettings: Partial<Settings>) => Promise<void>
+  persistSettings: (partialSettings: SettingsPatch) => Promise<void>
 ) {
   return async (preset: SavePreset) => {
     const previousPresets = sync.presets;
@@ -20,10 +18,5 @@ export function createTogglePresetEnabledAction(
       sync.setPresets(previousPresets);
       throw error;
     }
-    toast.success(
-      preset.enabled
-        ? translate('savePresets.messages.presetHidden')
-        : translate('savePresets.messages.presetShown')
-    );
   };
 }

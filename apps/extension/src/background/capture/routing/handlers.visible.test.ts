@@ -123,7 +123,7 @@ beforeEach(() => {
 });
 
 describe('capture-router-handlers.visible', () => {
-  it('handles visible capture with gallery persistence and download execution', async () => {
+  it('handles visible capture with temporary persistence and download execution', async () => {
     const context = createContext();
 
     expect(handleVisibleCapture(context)).toBe(true);
@@ -135,7 +135,7 @@ describe('capture-router-handlers.visible', () => {
       'data:image/png;base64,1',
       'visible.png',
       42,
-      'library'
+      'temporary'
     );
     expect(persistScenarioCaptureFromBackgroundMock).toHaveBeenCalledWith(
       expect.objectContaining({

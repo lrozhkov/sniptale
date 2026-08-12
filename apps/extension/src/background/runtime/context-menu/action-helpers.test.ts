@@ -155,17 +155,15 @@ it('sends tab toasts through the shared tab messaging seam', async () => {
   });
 });
 
-it('falls back to the default video preset when ui state points to a missing preset', async () => {
+it('does not fall back to the retired global viewport default', async () => {
   loadVideoUiStateMock.mockResolvedValue({
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
   });
-  await expect(resolveContextMenuVideoPreset(contextMenuSettingsFixture)).resolves.toBe(
-    'preset-default'
-  );
+  await expect(resolveContextMenuVideoPreset(contextMenuSettingsFixture)).resolves.toBeNull();
 });
 
-it('returns null when neither the ui state nor the default preset can be resolved', async () => {
+it('returns null when the explicit video preset cannot be resolved', async () => {
   loadVideoUiStateMock.mockResolvedValue({
     captureMode: CaptureMode.TAB,
     viewportPresetId: 'missing-preset',
@@ -178,7 +176,7 @@ it('returns null when neither the ui state nor the default preset can be resolve
   ).resolves.toBeNull();
 });
 
-it('falls back from a disabled preferred preset and rejects a disabled default', async () => {
+it('rejects a disabled explicit video preset', async () => {
   const settings = {
     ...contextMenuSettingsFixture,
     viewportPresets: contextMenuSettingsFixture.viewportPresets.map((preset) => ({
@@ -187,7 +185,7 @@ it('falls back from a disabled preferred preset and rejects a disabled default',
     })),
   };
 
-  await expect(resolveContextMenuVideoPreset(settings)).resolves.toBe('preset-default');
+  await expect(resolveContextMenuVideoPreset(settings)).resolves.toBeNull();
 
   await expect(
     resolveContextMenuVideoPreset({

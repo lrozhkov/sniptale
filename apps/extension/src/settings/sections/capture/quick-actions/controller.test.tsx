@@ -7,28 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuickAction } from '../../../../contracts/settings';
 import { useQuickActionsController } from './controller';
 
-const {
-  getQuickActionsDisplayModeMock,
-  getQuickActionsMock,
-  loggerErrorMock,
-  saveQuickActionsDisplayModeMock,
-  saveQuickActionsMock,
-  toastErrorMock,
-} = vi.hoisted(() => ({
-  saveQuickActionsMock: vi.fn(),
-  saveQuickActionsDisplayModeMock: vi.fn(),
-  getQuickActionsMock: vi.fn(),
-  getQuickActionsDisplayModeMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  toastErrorMock: vi.fn(),
-}));
+const { getQuickActionsMock, loggerErrorMock, saveQuickActionsMock, toastErrorMock } = vi.hoisted(
+  () => ({
+    saveQuickActionsMock: vi.fn(),
+    getQuickActionsMock: vi.fn(),
+    loggerErrorMock: vi.fn(),
+    toastErrorMock: vi.fn(),
+  })
+);
 
 vi.mock('../../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal()),
   getQuickActions: getQuickActionsMock,
-  getQuickActionsDisplayMode: getQuickActionsDisplayModeMock,
   saveQuickActions: saveQuickActionsMock,
-  saveQuickActionsDisplayMode: saveQuickActionsDisplayModeMock,
 }));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
@@ -95,10 +86,7 @@ beforeEach(() => {
   vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   saveQuickActionsMock.mockReset();
   saveQuickActionsMock.mockResolvedValue(undefined);
-  saveQuickActionsDisplayModeMock.mockReset();
-  saveQuickActionsDisplayModeMock.mockResolvedValue(undefined);
   getQuickActionsMock.mockReset();
-  getQuickActionsDisplayModeMock.mockReset();
   loggerErrorMock.mockReset();
   toastErrorMock.mockReset();
 });
@@ -117,7 +105,6 @@ afterEach(() => {
 
 async function verifyQuickActionCreateFlow() {
   getQuickActionsMock.mockResolvedValue([]);
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
 
   await renderHarness();
   await flushEffects();
@@ -152,14 +139,12 @@ async function verifyQuickActionCreateFlow() {
     }),
   ]);
   expect(latestState?.editingId).toBeNull();
-  expect(latestState?.confirmationMessage).toBeTruthy();
 }
 
 async function verifyQuickActionUpdateAndDeleteFlow() {
   const existingAction = createQuickAction({ id: 'action-edit', name: 'Старое действие' });
 
   getQuickActionsMock.mockResolvedValue([existingAction]);
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
 
   await renderHarness();
   await flushEffects();

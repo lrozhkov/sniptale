@@ -29,6 +29,7 @@ export interface ProjectListItem {
 export interface SaveStateMeta {
   label: string;
   className: string;
+  state?: 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 }
 
 export interface VideoEditorLibrariesState {

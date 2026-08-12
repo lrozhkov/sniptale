@@ -113,6 +113,7 @@ function PresetEditorBody(props: {
           </div>
         </div>
         <CalloutManualSettings
+          manageSurfaceStyles
           settings={createInspectorSettings(props.content, props.placement, props.style)}
           positionSection={
             <div className="grid gap-2" data-ui="shared.callout-preset-editor.position">

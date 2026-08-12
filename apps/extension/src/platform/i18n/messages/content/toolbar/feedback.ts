@@ -25,6 +25,14 @@ export const contentToolbarFeedbackMessages = defineMessageSource({
     ru: 'Все рамки очищены',
     en: 'All frames cleared',
   },
+  allChangesCleared: {
+    ru: 'Все изменения очищены',
+    en: 'All changes cleared',
+  },
+  someChangesCouldNotBeCleared: {
+    ru: 'Не удалось очистить часть изменений',
+    en: 'Some changes could not be cleared',
+  },
   quickEditModeEnabled: {
     ru: 'Режим редактирования включён.',
     en: 'Edit mode enabled.',

@@ -21,6 +21,7 @@ export interface UseVideoEditorRuntimeParams {
     currentTime: number;
     isPlaying: boolean;
     playbackRange: VideoEditorPlaybackRange | null;
+    projectHistoryTransactionActive: boolean;
     placementMode: VideoEditorPlacementMode | null;
     selection: VideoEditorSelection;
     selectedActionEvent: VideoProjectActionEvent | null;
@@ -44,6 +45,7 @@ export interface UseVideoEditorRuntimeParams {
   projectState: {
     setProject: VideoEditorSessionActions['setProject'];
     updateProject: VideoEditorSessionActions['updateProject'];
+    syncProjectRevision: VideoEditorSessionActions['syncProjectRevision'];
     setReady: VideoEditorSessionActions['setReady'];
     setError: VideoEditorSessionActions['setError'];
     setSaveState: VideoEditorSessionActions['setSaveState'];

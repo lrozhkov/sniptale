@@ -35,14 +35,21 @@ function isPoint(value: unknown): value is { x: number; y: number } {
   return isRecord(value) && isNumber(value['x']) && isNumber(value['y']);
 }
 
+function isNonNegativeNumber(value: unknown): value is number {
+  return isNumber(value) && value >= 0;
+}
+
 export function isViewportInfo(value: unknown): value is RecordingTelemetryViewportInfo {
   return (
     isRecord(value) &&
     isNumber(value['width']) &&
+    value['width'] > 0 &&
     isNumber(value['height']) &&
+    value['height'] > 0 &&
     isNumber(value['scrollX']) &&
     isNumber(value['scrollY']) &&
     isNumber(value['devicePixelRatio']) &&
+    value['devicePixelRatio'] > 0 &&
     hasOptionalField(value, 'outerWidth', isNumber) &&
     hasOptionalField(value, 'outerHeight', isNumber) &&
     hasOptionalField(value, 'viewportOffsetX', isNumber) &&
@@ -67,7 +74,7 @@ export function isVideoProjectCursorTrack(value: unknown): value is VideoProject
       (sample) =>
         isRecord(sample) &&
         isString(sample['id']) &&
-        isNumber(sample['time']) &&
+        isNonNegativeNumber(sample['time']) &&
         isNumber(sample['x']) &&
         isNumber(sample['y']) &&
         isBoolean(sample['visible'])
@@ -80,8 +87,8 @@ export function isVideoProjectActionEvent(value: unknown): value is VideoProject
     isRecord(value) &&
     isString(value['id']) &&
     isString(value['kind']) &&
-    isNumber(value['time']) &&
-    isNumber(value['duration']) &&
+    isNonNegativeNumber(value['time']) &&
+    isNonNegativeNumber(value['duration']) &&
     isString(value['label']) &&
     isString(value['preset']) &&
     isRecord(value['data']) &&
@@ -94,8 +101,9 @@ export function isRecordingTelemetrySignal(value: unknown): value is RecordingTe
     isRecord(value) &&
     isString(value['id']) &&
     isString(value['kind']) &&
-    isNumber(value['startTime']) &&
-    isNumber(value['endTime']) &&
+    isNonNegativeNumber(value['startTime']) &&
+    isNonNegativeNumber(value['endTime']) &&
+    value['endTime'] >= value['startTime'] &&
     isRecord(value['data']) &&
     (value['point'] === null || isPoint(value['point']))
   );

@@ -21,6 +21,22 @@ export const popupCommonMessages = defineMessageSource({
     ru: 'GitHub',
     en: 'GitHub',
   },
+  footerImageEditor: {
+    ru: 'Редактор изображений',
+    en: 'Image editor',
+  },
+  footerVideoEditor: {
+    ru: 'Редактор видео',
+    en: 'Video editor',
+  },
+  footerScenarioEditor: {
+    ru: 'Редактор сценариев',
+    en: 'Scenario editor',
+  },
+  footerGallery: {
+    ru: 'Библиотека',
+    en: 'Library',
+  },
   footerThemeToggleAria: {
     ru: 'Переключатель темы интерфейса',
     en: 'Interface theme toggle',

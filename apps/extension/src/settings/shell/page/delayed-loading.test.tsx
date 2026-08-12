@@ -198,7 +198,6 @@ describe('SettingsPage delayed loading', () => {
         'ai-connections',
         'screen-sizes',
         'saving',
-        'storage-drafts',
         'annotations',
         'editor-resources',
         'media-quality',

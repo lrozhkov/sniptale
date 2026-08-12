@@ -40,14 +40,12 @@ function createSyncState(): SavePresetsSyncState {
     defaultVideoPresetId: 'b',
     isLoading: false,
     presets: [createPreset('a', 0), createPreset('b', 1)],
-    saveCapturesToGallery: false,
     settings: createSettings(),
     setCaptureAction: vi.fn(),
     setDefaultExportPresetId: vi.fn(),
     setDefaultImagePresetId: vi.fn(),
     setDefaultVideoPresetId: vi.fn(),
     setPresets: vi.fn(),
-    setSaveCapturesToGallery: vi.fn(),
     updateSettings: vi.fn(async () => undefined),
   };
   return sync;
@@ -80,7 +78,7 @@ it('deletes the confirmed preset and clears matching default ids', async () => {
     })
   );
   expect(dialogState.closeDeleteDialog).toHaveBeenCalledTimes(1);
-  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetDeleted');
+  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
 });
 
 it('returns early when no preset is confirmed for deletion', async () => {

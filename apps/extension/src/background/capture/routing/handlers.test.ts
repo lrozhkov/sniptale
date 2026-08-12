@@ -149,7 +149,7 @@ async function verifiesVisibleCaptureDownloadFlow() {
     'data:image/png;base64,1',
     'visible.png',
     42,
-    'library'
+    'temporary'
   );
   expect(persistScenarioCaptureFromBackgroundMock).toHaveBeenCalledWith(
     expect.objectContaining({

@@ -1,7 +1,6 @@
-import type { QuickAction, QuickActionsDisplayMode } from '../../../contracts/settings';
+import type { QuickAction } from '../../../contracts/settings';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 
-type StoredQuickActionsDisplayMode = QuickActionsDisplayMode | 'row';
 type LegacyQuickActionAfterCapture = NonNullable<QuickAction['afterCapture']> | 'download';
 type StoredQuickAction = Omit<QuickAction, 'afterCapture'> & {
   afterCapture?: LegacyQuickActionAfterCapture | null;
@@ -14,12 +13,13 @@ interface ParsedQuickActionsStorageValue {
 }
 
 const bundledQuickActionIds = new Set<NonNullable<QuickAction['bundledId']>>([
-  'default-fullscreen',
-  'default-edit-visible',
-  'default-selection',
-  'default-delayed-visible',
-  'default-copy-visible',
-  'default-copy-selection',
+  'default-visible-download',
+  'default-full-page-download',
+  'default-selection-download',
+  'default-visible-copy',
+  'default-visible-edit',
+  'default-desktop-capture',
+  'default-visible-library',
 ]);
 
 const quickActionOrigins = new Set<NonNullable<QuickAction['origin']>>(['bundled', 'user']);
@@ -27,6 +27,7 @@ const quickActionScreenshotModes = new Set<QuickAction['screenshotMode']>([
   'visible',
   'full',
   'selection',
+  'desktop',
 ]);
 const quickActionDelays = new Set<Exclude<NonNullable<QuickAction['delay']>, undefined>>([
   0, 3, 5, 10,
@@ -38,6 +39,7 @@ const quickActionAfterCaptureValues = new Set<LegacyQuickActionAfterCapture>([
   'scenario',
   'edit',
   'copy',
+  'save_to_library',
   'download',
 ]);
 const quickActionImageFormats = new Set<
@@ -109,6 +111,7 @@ function isStoredQuickAction(value: unknown): value is StoredQuickAction {
     quickActionScreenshotModes.has(value['screenshotMode'] as QuickAction['screenshotMode']) &&
     isBoolean(value['exitAfterCapture']) &&
     hasOptionalField(value, 'origin', isQuickActionOrigin) &&
+    hasOptionalField(value, 'customized', isBoolean) &&
     hasOptionalField(
       value,
       'bundledId',
@@ -174,10 +177,4 @@ export function parseStoredQuickActions(value: unknown): ParsedQuickActionsStora
     hasInvalidRoot: false,
     invalidEntryCount: value.length - actions.length,
   };
-}
-
-export function parseStoredQuickActionsDisplayMode(
-  value: unknown
-): StoredQuickActionsDisplayMode | null {
-  return value === 'hidden' || value === 'list' || value === 'row' ? value : null;
 }

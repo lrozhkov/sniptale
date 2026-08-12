@@ -7,28 +7,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { QuickAction } from '../../../../contracts/settings';
 import { useQuickActionsController } from './controller';
 
-const {
-  getQuickActionsDisplayModeMock,
-  getQuickActionsMock,
-  loggerErrorMock,
-  saveQuickActionsDisplayModeMock,
-  saveQuickActionsMock,
-  toastErrorMock,
-} = vi.hoisted(() => ({
-  saveQuickActionsMock: vi.fn(),
-  saveQuickActionsDisplayModeMock: vi.fn(),
-  getQuickActionsMock: vi.fn(),
-  getQuickActionsDisplayModeMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
-  toastErrorMock: vi.fn(),
-}));
+const { getQuickActionsMock, loggerErrorMock, saveQuickActionsMock, toastErrorMock } = vi.hoisted(
+  () => ({
+    saveQuickActionsMock: vi.fn(),
+    getQuickActionsMock: vi.fn(),
+    loggerErrorMock: vi.fn(),
+    toastErrorMock: vi.fn(),
+  })
+);
 
 vi.mock('../../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal()),
   getQuickActions: getQuickActionsMock,
-  getQuickActionsDisplayMode: getQuickActionsDisplayModeMock,
   saveQuickActions: saveQuickActionsMock,
-  saveQuickActionsDisplayMode: saveQuickActionsDisplayModeMock,
 }));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
@@ -69,7 +60,7 @@ function createQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
 
 function createBundledQuickAction(overrides: Partial<QuickAction> = {}): QuickAction {
   return createQuickAction({
-    bundledId: 'default-selection',
+    bundledId: 'default-selection-download',
     origin: 'bundled',
     ...overrides,
   });
@@ -103,10 +94,7 @@ beforeEach(() => {
   vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   saveQuickActionsMock.mockReset();
   saveQuickActionsMock.mockResolvedValue(undefined);
-  saveQuickActionsDisplayModeMock.mockReset();
-  saveQuickActionsDisplayModeMock.mockResolvedValue(undefined);
   getQuickActionsMock.mockReset();
-  getQuickActionsDisplayModeMock.mockReset();
   loggerErrorMock.mockReset();
   toastErrorMock.mockReset();
 });
@@ -125,14 +113,12 @@ afterEach(() => {
 
 async function loadController(actions: QuickAction[]) {
   getQuickActionsMock.mockResolvedValue(actions);
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
   await renderHarness();
   await flushEffects();
 }
 
 it('keeps the controller stable when the initial quick-actions load fails', async () => {
   getQuickActionsMock.mockRejectedValue(new Error('load failed'));
-  getQuickActionsDisplayModeMock.mockResolvedValue('list');
 
   await renderHarness();
   await flushEffects();
@@ -142,16 +128,8 @@ it('keeps the controller stable when the initial quick-actions load fails', asyn
   expect(loggerErrorMock).toHaveBeenCalledWith('Failed to load quick actions', expect.any(Error));
 });
 
-it('persists display-mode and status changes', async () => {
+it('persists status changes', async () => {
   await loadController([createQuickAction({ id: 'action-1', status: true })]);
-
-  await act(async () => {
-    await latestState?.setDisplayMode('hidden');
-  });
-
-  expect(saveQuickActionsDisplayModeMock).toHaveBeenCalledWith('hidden');
-  expect(latestState?.displayMode).toBe('hidden');
-  expect(latestState?.confirmationMessage).toBe('Настройка сохранена');
 
   await act(async () => {
     await latestState?.handleToggleStatus('action-1');
@@ -163,7 +141,7 @@ it('persists display-mode and status changes', async () => {
   expect(latestState?.actions[0]?.status).toBe(false);
 });
 
-it('blocks invalid and bundled quick-action mutations', async () => {
+it('edits and resets bundled actions but still blocks their deletion', async () => {
   const bundledAction = createBundledQuickAction({ id: 'bundled-1' });
   await loadController([bundledAction]);
 
@@ -180,13 +158,33 @@ it('blocks invalid and bundled quick-action mutations', async () => {
   act(() => {
     latestState?.handleEdit(bundledAction);
   });
-  expect(latestState?.editingId).toBe('00000000-0000-4000-8000-000000000001');
+  expect(latestState?.editingId).toBe('bundled-1');
+
+  act(() => {
+    latestState?.updateFormField('name', 'Customized factory action');
+  });
+  await act(async () => {
+    await latestState?.handleSaveEdit();
+  });
+  expect(saveQuickActionsMock).toHaveBeenCalledWith([
+    expect.objectContaining({ customized: true, name: 'Customized factory action' }),
+  ]);
+
+  await act(async () => {
+    await latestState?.handleReset('bundled-1');
+  });
+  expect(saveQuickActionsMock).toHaveBeenLastCalledWith([
+    expect.objectContaining({
+      bundledId: 'default-selection-download',
+      customized: false,
+    }),
+  ]);
 
   await act(async () => {
     await latestState?.handleDelete('bundled-1');
   });
 
-  expect(saveQuickActionsMock).not.toHaveBeenCalled();
+  expect(saveQuickActionsMock).toHaveBeenCalledTimes(2);
 });
 
 it('reorders quick actions and surfaces hotkey errors through the toast seam', async () => {

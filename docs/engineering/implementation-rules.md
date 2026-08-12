@@ -2,7 +2,7 @@
 
 Updated: 2026-07-22
 
-This document owns Sniptale implementation decisions: topology, boundaries, state, security, code shape, and proof shape. Workflow order belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](../tooling/code-quality.md), and wrapper behavior in [wrapper-summary.md](../tooling/wrapper-summary.md).
+This document owns Sniptale implementation decisions: topology, boundaries, state, security, code shape, and proof shape. Workflow order belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), quality policy in [code-quality.md](../tooling/code-quality.md), and wrapper behavior in [wrapper-summary.md](../tooling/wrapper-summary.md).
 
 ## Preflight Shape
 
@@ -86,4 +86,4 @@ Proof follows affected risk and consumers rather than edited filenames. Shared/p
 
 Test-profile cost does not redefine risk. Exact owner-direct execution is valid only when deterministic owner mappings are complete and the diff stays below the machine-owned small-change limits. A deleted production consolidation may also use exact owner-direct proof when its complete HEAD consumer frontier and current redirect closure are graph-closed inside one owner and every surviving changed production file has deterministic tests. Public/shared, runtime, persistence, messaging, parser/export, ambiguous, uncovered, cross-owner, or over-budget changes otherwise retain transitive affected-test discovery.
 
-For an escaped defect, add failing proof first and record what existing QA missed, why it escaped, and whether a deterministic same-change guard improvement is warranted. Required review and wrapper sequencing remain owned by `AGENTS.md`.
+For an escaped defect, add failing proof first and record what existing QA missed, why it escaped, and whether a deterministic same-change guard improvement is warranted. Required review and wrapper sequencing remain owned by the [optional agent workflow](../agent-tooling/AGENTS.md).

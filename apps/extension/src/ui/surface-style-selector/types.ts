@@ -18,6 +18,7 @@ export type SurfaceStyleSelectorActions = {
 export type SurfaceStyleSelectorProps = {
   actions: SurfaceStyleSelectorActions;
   disabled?: boolean;
+  presentation?: 'management' | 'selection';
   onChange: (style: SurfaceStyle) => void;
   onOpenChange?: (open: boolean) => void;
   presets: readonly SurfaceStylePresetOption[];

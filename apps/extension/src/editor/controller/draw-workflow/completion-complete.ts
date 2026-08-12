@@ -3,6 +3,7 @@ import { isTextbox } from '../core/helpers';
 import { applyEditorObjectInteractionControls } from '../document/interaction-controls/apply';
 import { clearRichShapeToolOrigin } from '../tools/rich-shape-drawing/origin';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { applyEditorDrawingInteractionControls } from '../../drawing/object/controls/apply';
 import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
 import type { completeEditorDrawSession } from '../transient';
 import type { DrawWorkflowState } from './completion-types';
@@ -21,6 +22,7 @@ export function createCompletedDrawWorkflowState(
     clearRichShapeToolOrigin(completion.object);
   }
   applyEditorObjectInteractionControls(completion.object);
+  applyEditorDrawingInteractionControls(completion.object);
   if (completion.completedTool === 'pencil' || completion.completedTool === 'marker') {
     canvas.discardActiveObject();
   } else {

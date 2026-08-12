@@ -2,7 +2,7 @@ import { defineMessageSource } from '../source';
 
 export const settingsEditorMessages = defineMessageSource({
   subtitle: {
-    ru: 'Пресеты инструментов и палитры редактора изображений и рисования на странице.',
+    ru: 'Шаблоны инструментов и палитры редактора изображений и рисования на странице.',
     en: 'Tool presets and palettes for the image editor and page drawing.',
   },
   toolPresetsTitle: {
@@ -10,7 +10,7 @@ export const settingsEditorMessages = defineMessageSource({
     en: 'Tool settings',
   },
   toolPresetsDescription: {
-    ru: 'Выберите инструмент и управляйте сохранёнными пресетами редактора.',
+    ru: 'Выберите инструмент и управляйте сохранёнными шаблонами редактора.',
     en: 'Pick a tool and manage the saved editor presets.',
   },
   paletteTitle: {
@@ -21,32 +21,8 @@ export const settingsEditorMessages = defineMessageSource({
     ru: 'Цвета из этой палитры используются в инструментах и фоне сцены.',
     en: 'These palette colors are used by tools and the scene background.',
   },
-  presetCountOne: {
-    ru: 'пресет',
-    en: 'preset',
-  },
-  presetCountFew: {
-    ru: 'пресета',
-    en: 'presets',
-  },
-  presetCountMany: {
-    ru: 'пресетов',
-    en: 'presets',
-  },
-  colorCountOne: {
-    ru: 'цвет',
-    en: 'color',
-  },
-  colorCountFew: {
-    ru: 'цвета',
-    en: 'colors',
-  },
-  colorCountMany: {
-    ru: 'цветов',
-    en: 'colors',
-  },
   createInEditorHint: {
-    ru: 'Новые пресеты создаются прямо в инспекторе редактора через кнопку сохранения.',
+    ru: 'Новые шаблоны создаются прямо в инспекторе редактора через кнопку сохранения.',
     en: 'Create new presets directly from the editor inspector with the save button.',
   },
   paletteShapeStroke: {

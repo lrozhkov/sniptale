@@ -7,6 +7,7 @@ import { routeResolvedTabModeMessage } from './tab-mode-adapter';
 import { normalizeResolvedTabMessage, rejectMissingResolvedTabId } from './tab-id';
 import type { ResolvedTabRouteArgs, UnresolvedTabRouteArgs } from './types';
 import { routeResolvedVideoControlMessage } from './video-control-adapter';
+import { routeResolvedVideoRecordingSurfaceMessage } from './video-recording-surface-adapter';
 
 export function routeAuthorizedTabAction(args: UnresolvedTabRouteArgs): void {
   if (routePopupRecordingControlWithoutTabId(args)) {
@@ -43,6 +44,7 @@ function routeResolvedTabMessage(args: ResolvedTabRouteArgs): boolean {
     routeResolvedTabModeMessage(args) ||
     routeResolvedScenarioMessage(args) ||
     routeResolvedCaptureMessage(args) ||
+    routeResolvedVideoRecordingSurfaceMessage(args) ||
     routeResolvedVideoControlMessage(args)
   );
 }

@@ -504,8 +504,8 @@ export function setViewportDrawState(
 
 export function updateRecordingSettings(
   binding: RecordingSourceBinding,
-  patch: { microphoneEnabled?: boolean; webcamEnabled?: boolean }
-): void {
+  patch: Parameters<typeof applyRecordingSettings>[0]
+): Promise<void> {
   assertActiveRecordingBinding(binding);
-  applyRecordingSettings(patch);
+  return applyRecordingSettings(patch);
 }

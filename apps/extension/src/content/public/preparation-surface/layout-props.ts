@@ -12,6 +12,8 @@ import type { useToolbarModeController } from '../../../content/overlay/toolbar/
 import type { useFrameManager } from '../../../content/selection/frame-runtime/react/useFrameManager';
 import type { PreparationHostPorts } from './types';
 import type { ContentDrawingController } from '../../../content/drawing/controller';
+import type { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
+import { buildContentModeFlags } from '../../../content/overlay/app/view-state/helpers';
 
 type FrameManager = ReturnType<typeof useFrameManager>;
 
@@ -22,6 +24,7 @@ export type PreparationSurfaceControllers = {
   modeController: ReturnType<typeof useToolbarModeController>;
   scenarioController: ReturnType<typeof useScenarioController>;
   screenshotController: ReturnType<typeof useScreenshotController>;
+  videoRecordingController: ReturnType<typeof useVideoRecordingSurfaceController>;
 };
 
 type PreparationLayoutProjectionArgs = {
@@ -105,15 +108,7 @@ function projectPreparationToolbar(
       !modeState.drawingMode,
     isToolbarVisible: modeState.isToolbarVisible,
     modeController: controllers.modeController,
-    modes: {
-      aiPickMode: modeState.aiPickMode,
-      designReviewMode: modeState.designReviewMode,
-      ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
-      highlighterMode: modeState.highlighterMode,
-      quickEditDocumentMode: modeState.quickEditDocumentMode,
-      quickEditMode: modeState.quickEditMode,
-      screenshotMode: modeState.screenshotMode,
-    },
+    modes: buildContentModeFlags(modeState),
     pinToTab: modeState.pinToTab,
     pinToTabAvailable: modeState.pinToTabAvailable,
     setFutureFrameEffectMode: frameManager.setFutureFrameEffectMode,
@@ -125,7 +120,11 @@ function projectPreparationToolbar(
     setPinToTab: modeState.setPinToTab,
     setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setTimerDelay: modeState.setTimerDelay,
+    ...(modeState.setVideoRecordingMode === undefined
+      ? {}
+      : { setVideoRecordingMode: modeState.setVideoRecordingMode }),
     timerDelay: modeState.timerDelay,
+    videoRecording: controllers.videoRecordingController,
   };
 }
 

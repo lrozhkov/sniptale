@@ -54,7 +54,6 @@ function renderList() {
         onEdit={handlers.onEdit}
         onSavePreset={handlers.onSavePreset}
         onToggleEnabled={handlers.onToggleEnabled}
-        presetCountLabel="presets"
         presets={[createPreset()]}
       />
     );
@@ -84,7 +83,6 @@ function renderEmptyList() {
         onEdit={vi.fn()}
         onSavePreset={vi.fn(async () => undefined)}
         onToggleEnabled={vi.fn(async () => undefined)}
-        presetCountLabel="presets"
         presets={[]}
       />
     );

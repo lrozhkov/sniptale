@@ -16,6 +16,8 @@ import {
 } from '../../../../features/video/project/types';
 import { useProjectTimelineDrag } from './drag';
 
+const TEST_HISTORY_LEASE = Symbol('test-history-transaction');
+
 let beginClipInteraction: ReturnType<typeof useProjectTimelineDrag>['beginClipInteraction'] | null =
   null;
 let container: HTMLDivElement | null = null;
@@ -37,7 +39,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('creates a third logical lane before moving the preview to the lower physical track', () => {
+it('moves directly to the lower physical track without creating a logical lane', () => {
   const project = createEmptyVideoProject('Third lane drag');
   const trackId = project.tracks[0]!.id;
   const clip = createClip(trackId);
@@ -65,13 +67,13 @@ it('creates a third logical lane before moving the preview to the lower physical
     dispatchTimelinePointerMove(120, 92);
   });
 
-  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, trackId, 'line-3');
+  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, project.tracks[1]!.id, 'line-1');
   expect(container?.querySelector('[data-ghost-lane]')?.getAttribute('data-ghost-lane')).toBe(
-    'line-3'
+    'line-1'
   );
 });
 
-it('keeps extending logical lanes during one drag instead of falling to the lower physical track', () => {
+it('keeps a long drag on a real target track instead of extending logical lanes', () => {
   const project = createProjectWithTwoTracks();
   const trackId = project.tracks[0]!.id;
   const clip = createClip(trackId);
@@ -94,9 +96,9 @@ it('keeps extending logical lanes during one drag instead of falling to the lowe
     dispatchTimelinePointerMove(120, 180);
   });
 
-  expect(moves.at(-1)).toEqual(['clip-1', 7, trackId, 'line-4']);
+  expect(moves.at(-1)).toEqual(['clip-1', 7, project.tracks.at(-1)!.id, 'line-1']);
   expect(container?.querySelector('[data-ghost-lane]')?.getAttribute('data-ghost-lane')).toBe(
-    'line-4'
+    'line-1'
   );
 });
 
@@ -131,6 +133,11 @@ function renderStatefulDragHarness(project: VideoProject, onMove: MoveClipCallba
   function StatefulHarness() {
     const [currentProject, setCurrentProject] = useState(project);
     const timelineDrag = useProjectTimelineDrag({
+      historyTransaction: {
+        beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
+        endProjectHistoryTransaction: () => undefined,
+        isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
+      },
       pixelsPerSecond: 10,
       project: currentProject,
       onMoveClip: (clipId, startTime, trackId, timelineLaneId) => {
@@ -158,6 +165,11 @@ function createTimelineHarness(props: {
 }) {
   return function TimelineHarness() {
     const timelineDrag = useProjectTimelineDrag({
+      historyTransaction: {
+        beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
+        endProjectHistoryTransaction: () => undefined,
+        isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
+      },
       pixelsPerSecond: 10,
       project: props.project,
       onMoveClip: props.onMoveClip,

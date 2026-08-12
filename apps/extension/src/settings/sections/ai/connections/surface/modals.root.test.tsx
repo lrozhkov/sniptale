@@ -181,7 +181,7 @@ it('renders section modals root and forwards provider/model closeouts plus delet
 
   await renderSectionModals({
     reloadData,
-    handleDeleteProvider,
+    catalogActions: { deleteProvider: handleDeleteProvider },
     modals: {
       provider: { open: true, provider: null },
       model: { open: true, model: null },
@@ -210,7 +210,7 @@ it('routes model deletion and explicit modal payloads through the section modals
   const handleDeleteModel = vi.fn();
 
   await renderSectionModals({
-    handleDeleteModel,
+    catalogActions: { deleteModel: handleDeleteModel },
     modals: {
       provider: { open: true, provider: PROVIDER },
       model: { open: true, model: MODEL },

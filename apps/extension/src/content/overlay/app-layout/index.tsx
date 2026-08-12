@@ -6,6 +6,8 @@ import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutProps } from './types';
 import { DrawingSurface } from '../../drawing/surface';
+import { VideoRecordingSpotlight } from '../video-recording/spotlight/view';
+import { EmbeddedRecordingCamera } from '../video-recording/camera/view';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
@@ -34,6 +36,69 @@ function ContentScenarioRecorderSidebarSlot(props: {
   );
 }
 
+function VideoRecordingSurfaceSlot(props: {
+  chromeHidden: boolean;
+  toolbar: ContentAppLayoutProps['toolbar'];
+}) {
+  const recording = props.toolbar.videoRecording;
+  const videoMode = props.toolbar.modes.videoRecordingMode;
+  return (
+    <>
+      {videoMode && recording ? (
+        <DrawingSurface
+          active={recording.state.interaction === 'drawing'}
+          chromeHidden={props.chromeHidden}
+          controller={recording.drawingOwner.controller}
+          escapeImmediately
+          showSelectionChrome={false}
+          onExit={() => recording.onInteractionChange('navigation')}
+          visualEffects={{
+            getOpacity: recording.drawingOwner.getVisualOpacity,
+            getRevision: recording.drawingOwner.getVisualRevision,
+            subscribe: recording.drawingOwner.subscribeVisualChanges,
+          }}
+        />
+      ) : null}
+      <VideoRecordingSpotlight
+        cursorHaloEnabled={Boolean(
+          videoMode &&
+          recording?.state.interaction === 'navigation' &&
+          recording.state.spotlightEnabled
+        )}
+        cursorDimmingEnabled={Boolean(
+          videoMode &&
+          recording?.state.interaction === 'navigation' &&
+          recording.state.spotlightDimmingEnabled
+        )}
+        clickAnimationEnabled={Boolean(
+          videoMode &&
+          recording?.state.interaction === 'navigation' &&
+          recording.state.spotlightClickAnimationEnabled
+        )}
+      />
+      <EmbeddedRecordingCamera
+        enabled={Boolean(
+          videoMode &&
+          recording?.state.surfaceSessionId &&
+          recording.state.cameraEnabled &&
+          !recording.state.cameraPreviewSuppressed &&
+          recording.state.webcamPresentation.mode === 'embedded'
+        )}
+        {...(recording ? { peerGeneration: recording.state.peerGeneration } : {})}
+        {...(recording ? { geometry: recording.state.webcamPresentation } : {})}
+        interactive={recording?.state.interaction === 'navigation'}
+        {...(recording
+          ? {
+              onOffer: recording.onCameraOffer,
+              onPeerClose: recording.onCameraPeerClose,
+              onGeometryChange: recording.onCameraGeometryChange,
+            }
+          : {})}
+      />
+    </>
+  );
+}
+
 export function ContentAppLayout(props: ContentAppLayoutProps) {
   const isCaptureUiHidden = props.toolbar.isCompletelyHidden;
   const designReview = useDesignReviewController({
@@ -42,6 +107,7 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
 
   return (
     <>
+      <VideoRecordingSurfaceSlot chromeHidden={isCaptureUiHidden} toolbar={props.toolbar} />
       {props.toolbar.modes.screenshotMode && props.toolbar.drawingController ? (
         <DrawingSurface
           active={props.toolbar.modes.drawingMode === true}

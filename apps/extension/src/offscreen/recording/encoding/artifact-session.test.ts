@@ -95,7 +95,7 @@ describe('recording artifact session', () => {
     });
 
     session.start();
-    expect(session.recorder.start).toHaveBeenCalledWith(0);
+    expect(session.recorder.start).toHaveBeenCalledWith(1_000);
     const artifact = await session.stop();
 
     expect(await artifact.file.text()).toBe('requestedterminal');

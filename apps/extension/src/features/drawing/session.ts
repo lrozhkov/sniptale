@@ -32,6 +32,7 @@ export interface DrawingSession {
   commitObject(object: DrawingObject, options?: { select?: boolean }): void;
   replaceObject(object: DrawingObject): void;
   replaceObjects(objects: readonly DrawingObject[]): void;
+  deleteObjects(objectIds: readonly string[]): void;
   deleteSelected(): void;
   clear(): void;
   dispose(): void;
@@ -195,11 +196,19 @@ class DrawingSessionOwner implements DrawingSession {
   }
 
   deleteSelected() {
-    if (this.selectedObjectIds.length === 0) return;
-    const selected = new Set(this.selectedObjectIds);
-    const objects = this.document.objects.filter((object) => !selected.has(object.id));
-    if (objects.length !== this.document.objects.length)
-      this.commitDocument({ version: 1, objects }, []);
+    this.deleteObjects(this.selectedObjectIds);
+  }
+
+  deleteObjects(objectIds: readonly string[]) {
+    if (objectIds.length === 0) return;
+    const deleted = new Set(objectIds);
+    const objects = this.document.objects.filter((object) => !deleted.has(object.id));
+    if (objects.length !== this.document.objects.length) {
+      this.commitDocument(
+        { version: 1, objects },
+        this.selectedObjectIds.filter((selectedId) => !deleted.has(selectedId))
+      );
+    }
   }
 
   clear() {

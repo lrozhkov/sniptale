@@ -1,13 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { DEFAULT_QUICK_ACTIONS_DISPLAY_MODE } from '../../../features/quick-actions-presets/display-mode';
 import { type StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
+import type { ScreenshotSetupMode } from '../../../composition/persistence/capture-settings';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -164,22 +160,34 @@ function usePopupSessionState() {
 function usePopupCapturePresetState() {
   const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
   const [quickActionsReady, setQuickActionsReady] = useState(false);
-  const [displayMode, setDisplayMode] = useState<QuickActionsDisplayMode>(
-    DEFAULT_QUICK_ACTIONS_DISPLAY_MODE
-  );
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState<CaptureMode>(CaptureMode.TAB);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [screenshotStartupMode, setScreenshotStartupMode] = useState<ScreenshotSetupMode | null>(
+    null
+  );
+  const screenshotStartupSupersededRef = useRef(false);
+  const publishScreenshotStartupMode = useCallback<
+    Dispatch<SetStateAction<ScreenshotSetupMode | null>>
+  >((nextMode) => {
+    if (screenshotStartupSupersededRef.current) return;
+    setScreenshotStartupMode(nextMode);
+  }, []);
+  const clearScreenshotStartupMode = useCallback(() => {
+    screenshotStartupSupersededRef.current = true;
+    setScreenshotStartupMode(null);
+  }, []);
 
   return {
-    displayMode,
     quickActions,
     quickActionsReady,
     selectedPresetId,
-    setDisplayMode,
+    screenshotStartupMode,
+    clearScreenshotStartupMode,
     setQuickActions,
     setQuickActionsReady,
     setSelectedPresetId,
+    setScreenshotStartupMode: publishScreenshotStartupMode,
     setVideoCaptureMode,
     setViewportPresets,
     videoCaptureMode,

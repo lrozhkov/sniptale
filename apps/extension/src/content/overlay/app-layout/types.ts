@@ -18,6 +18,7 @@ import type { ToolbarViewportSelection } from '../toolbar/types';
 import type { ToolbarFutureFrameCalloutActions, ToolbarFutureFrameStyle } from '../toolbar/types';
 import type { EffectMode } from '../../../features/highlighter/contracts';
 import type { ContentDrawingController } from '../../drawing/controller';
+import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 
 type ContentAppAiController = Omit<UseAiPickControllerResult, 'handleCancelAIPrompt'> & {
   handleCancelAIPrompt?: UseAiPickControllerResult['handleCancelAIPrompt'];
@@ -33,6 +34,7 @@ type ContentAppModes = {
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
   screenshotMode: boolean;
+  videoRecordingMode?: boolean;
 };
 
 export type ContentAppScenarioActions = {
@@ -107,7 +109,9 @@ export type ContentAppLayoutToolbarProps = {
   setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
   setPinnedToolbarVisible: (visible: boolean) => void;
   setTimerDelay: (delay: number) => void;
+  setVideoRecordingMode?: (enabled: boolean) => void;
   timerDelay: number;
+  videoRecording?: ToolbarVideoRecordingProps;
 };
 
 export type ContentAppLayoutDialogsProps = {

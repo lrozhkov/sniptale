@@ -12,6 +12,7 @@ const logger = createLogger({ namespace: 'OffscreenAudioMixer' });
 export class AudioMixer {
   private readonly graph = new AudioMixerGraph();
   private micStream: MediaStream | null = null;
+  private microphoneGeneration = 0;
 
   private stopStreamTracks(stream: MediaStream | null): void {
     stream?.getTracks().forEach((track) => track.stop());
@@ -22,6 +23,7 @@ export class AudioMixer {
   }
 
   private releaseMicrophoneStream(): void {
+    this.microphoneGeneration += 1;
     this.graph.disconnectMicrophoneStream();
     this.stopStreamTracks(this.micStream);
     this.micStream = null;
@@ -50,26 +52,53 @@ export class AudioMixer {
 
   async addMicrophone(settingsOrDeviceId?: MicrophoneMixerSettings | string | null): Promise<void> {
     await this.initialize();
+    let candidate: MediaStream | null = null;
 
     try {
       this.releaseMicrophoneStream();
+      const operationGeneration = this.microphoneGeneration;
       const settings = normalizeMicrophoneMixerSettings(settingsOrDeviceId);
-      this.micStream = await navigator.mediaDevices.getUserMedia({
+      candidate = await navigator.mediaDevices.getUserMedia({
         audio: buildMicrophoneAudioConstraints(settings),
       });
-
-      const microphoneStream = this.micStream;
-      if (!microphoneStream) {
-        throw new Error('Microphone stream was not initialized');
+      if (operationGeneration !== this.microphoneGeneration) {
+        this.stopStreamTracks(candidate);
+        throw new Error('Microphone initialization was superseded');
       }
-
-      this.graph.connectMicrophoneStream(microphoneStream, resolveMicrophoneGain(settings));
+      this.graph.connectMicrophoneStream(candidate, resolveMicrophoneGain(settings));
+      this.micStream = candidate;
 
       logger.log('Microphone added');
     } catch (error) {
+      if (candidate && candidate !== this.micStream) this.stopStreamTracks(candidate);
       this.releaseMicrophoneStream();
       logger.error('Failed to add microphone', error);
       throw new Error(translate('popup.video.microphoneAccessError'), { cause: error });
+    }
+  }
+
+  async switchMicrophone(settings: MicrophoneMixerSettings): Promise<void> {
+    const operationGeneration = (this.microphoneGeneration += 1);
+    const candidate = await navigator.mediaDevices.getUserMedia({
+      audio: buildMicrophoneAudioConstraints(settings),
+    });
+    if (operationGeneration !== this.microphoneGeneration) {
+      this.stopStreamTracks(candidate);
+      throw new Error('Microphone switch was superseded');
+    }
+    const previous = this.micStream;
+    try {
+      this.graph.disconnectMicrophoneStream();
+      this.graph.connectMicrophoneStream(candidate, resolveMicrophoneGain(settings));
+      this.micStream = candidate;
+      this.stopStreamTracks(previous);
+    } catch (error) {
+      this.stopStreamTracks(candidate);
+      if (previous) {
+        this.graph.connectMicrophoneStream(previous, resolveMicrophoneGain(settings));
+      }
+      this.micStream = previous;
+      throw error;
     }
   }
 
@@ -82,6 +111,10 @@ export class AudioMixer {
     this.micStream?.getAudioTracks().forEach((track) => {
       track.enabled = enabled;
     });
+  }
+
+  hasMicrophone(): boolean {
+    return this.micStream !== null;
   }
 
   getMixedStream(): MediaStream {

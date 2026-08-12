@@ -9,28 +9,50 @@ import {
 import { toErrorMessage } from './helpers';
 import type { UseVideoEditorActionHandlersParams, VideoEditorActionHandlers } from './types';
 import type { VideoEditorConfirmDialogState } from '../controller/workspace-state';
+import { waitForVideoEditorSave } from '../session/save-readiness';
+import { beginProjectTransition } from './project-transition';
 
 const logger = createLogger({ namespace: 'VideoEditorProjects' });
 
-async function loadProjectWorkspace(
+export async function loadProjectWorkspace(
   projectId: string,
   params: UseVideoEditorActionHandlersParams
 ): Promise<void> {
-  const project = await openPersistedProject(projectId);
-  params.applyLoadedProject(project, project.baseRecordingId);
-  await Promise.all([
-    params.libraries.refreshProjects(),
-    params.libraries.refreshProjectExports(project.id),
-  ]);
+  const transition = beginProjectTransition();
+  try {
+    if (params.project && params.project.id !== projectId) {
+      await waitForVideoEditorSave(params.project.id);
+      if (!transition.isCurrent()) return;
+    }
+    const project = await openPersistedProject(projectId);
+    if (!transition.isCurrent()) return;
+    params.applyLoadedProject(project, project.baseRecordingId);
+    await Promise.all([
+      params.libraries.refreshProjects(),
+      params.libraries.refreshProjectExports(project.id),
+    ]);
+  } finally {
+    transition.complete();
+  }
 }
 
 async function createProjectWorkspace(params: UseVideoEditorActionHandlersParams): Promise<void> {
-  const project = await createBlankProject();
-  params.applyLoadedProject(project, null);
-  await Promise.all([
-    params.libraries.refreshProjects(),
-    params.libraries.refreshProjectExports(project.id),
-  ]);
+  const transition = beginProjectTransition();
+  try {
+    if (params.project) {
+      await waitForVideoEditorSave(params.project.id);
+      if (!transition.isCurrent()) return;
+    }
+    const project = await createBlankProject();
+    if (!transition.isCurrent()) return;
+    params.applyLoadedProject(project, null);
+    await Promise.all([
+      params.libraries.refreshProjects(),
+      params.libraries.refreshProjectExports(project.id),
+    ]);
+  } finally {
+    transition.complete();
+  }
 }
 
 export async function deleteProjectWorkspace(
@@ -89,6 +111,7 @@ export function useProjectHandlers(
       } catch (projectError) {
         logger.error('Failed to open project', projectError);
         params.setError(toErrorMessage(projectError));
+        throw projectError;
       }
     },
     [params]

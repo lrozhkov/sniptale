@@ -4,6 +4,7 @@ import {
   getBundledQuickActionConfig,
   getBundledQuickActions,
 } from './catalog';
+import { normalizeQuickActionPolicy } from './policy';
 
 function normalizeAfterCapture(action: QuickAction): QuickAction {
   const normalizedAfterCapture =
@@ -18,11 +19,11 @@ function normalizeAfterCapture(action: QuickAction): QuickAction {
 }
 
 function toUserQuickAction(action: QuickAction): QuickAction {
-  return {
+  return normalizeQuickActionPolicy({
     ...normalizeAfterCapture(action),
     origin: 'user' as QuickActionOrigin,
     bundledId: null,
-  };
+  });
 }
 
 function areQuickActionsEqual(left: QuickAction[], right: QuickAction[]) {
@@ -37,10 +38,19 @@ export function normalizeQuickAction(action: QuickAction): QuickAction {
   }
 
   const bundledAction = createBundledQuickAction(bundledConfig);
-  return {
+  if (action.customized === true) {
+    return normalizeQuickActionPolicy({
+      ...normalizeAfterCapture(action),
+      id: bundledConfig.id,
+      origin: 'bundled',
+      bundledId: bundledConfig.id,
+      customized: true,
+    });
+  }
+  return normalizeQuickActionPolicy({
     ...bundledAction,
     ...(typeof action.status === 'undefined' ? {} : { status: action.status }),
-  };
+  });
 }
 
 export function mergeStoredQuickActions(storedActions: QuickAction[]) {

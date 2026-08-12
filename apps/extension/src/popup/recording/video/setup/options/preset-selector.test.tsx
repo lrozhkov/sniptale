@@ -267,12 +267,16 @@ it('keeps a preset disabled when runtime availability fails', async () => {
     container?.querySelector<HTMLButtonElement>('button')?.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+  await flushEffects();
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalled();
   const presetButton = container
     ?.querySelector<HTMLElement>('[title="Preset"]')
     ?.closest<HTMLButtonElement>('button');
+  await vi.waitFor(() =>
+    expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected')
+  );
   expect(presetButton?.disabled).toBe(false);
   expect(presetButton?.getAttribute('aria-disabled')).toBe('true');
-  expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected');
   const notification = container?.querySelector('[role="status"]');
   expect(
     notification && presetButton

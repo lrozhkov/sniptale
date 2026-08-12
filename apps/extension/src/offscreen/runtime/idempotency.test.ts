@@ -10,6 +10,9 @@ import {
 import type { HandledOffscreenRuntimeMessageType } from './routing';
 
 const handledCommandTypes = [
+  MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+  MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME,
   VideoMessageType.GET_DESKTOP_MEDIA,
   VideoMessageType.DISPOSE_DESKTOP_MEDIA,
   VideoMessageType.OFFSCREEN_START_RECORDING,
@@ -29,6 +32,7 @@ it('declares idempotency policy for every offscreen side-effect route', () => {
     'desktopMediaRequestId',
     'requestId',
     'sessionId',
+    'peerId',
     'runtime',
   ]);
 
@@ -74,6 +78,50 @@ it('tracks job-correlated export commands and shares duplicate completion', asyn
 
   await expect(first.completeWith(Promise.resolve())).resolves.toBeUndefined();
   await expect(duplicate.completion).resolves.toBeUndefined();
+});
+
+it('shares one camera negotiation per peer without replaying it across peers', async () => {
+  const firstPeer = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'camera-generation',
+    message: {
+      peerId: 'camera-peer-1',
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+    },
+  });
+  const duplicateFirstPeer = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'camera-generation',
+    message: {
+      peerId: 'camera-peer-1',
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+    },
+  });
+  const secondPeer = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'camera-generation',
+    message: {
+      peerId: 'camera-peer-2',
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+    },
+  });
+
+  expect(firstPeer).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+  expect(duplicateFirstPeer).toEqual({ duplicate: true, completion: expect.any(Promise) });
+  expect(secondPeer).toEqual({ duplicate: false, completeWith: expect.any(Function) });
+
+  if (
+    !('completeWith' in firstPeer) ||
+    !('completion' in duplicateFirstPeer) ||
+    !('completeWith' in secondPeer)
+  ) {
+    throw new Error('Expected peer-scoped camera negotiation tracking');
+  }
+
+  await expect(firstPeer.completeWith(Promise.resolve('peer-1-answer'))).resolves.toBe(
+    'peer-1-answer'
+  );
+  await expect(duplicateFirstPeer.completion).resolves.toBe('peer-1-answer');
+  await expect(secondPeer.completeWith(Promise.resolve('peer-2-answer'))).resolves.toBe(
+    'peer-2-answer'
+  );
 });
 
 it('does not mutate idempotency state for commands that are intentionally untracked', () => {

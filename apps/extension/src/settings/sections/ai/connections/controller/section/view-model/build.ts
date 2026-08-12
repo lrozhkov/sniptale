@@ -14,13 +14,8 @@ export type AiProvidersSectionControllerBuildProps = {
   };
   chromeAi: AiProvidersSectionState['chromeAi'];
   secretProtection: AiProvidersSectionState['secretProtection'];
-  deleteHandlers: {
-    handleDeleteModel: AiProvidersSectionState['handleDeleteModel'];
-    handleDeleteProvider: AiProvidersSectionState['handleDeleteProvider'];
-  };
+  catalogActions: AiProvidersSectionState['catalogActions'];
   getProviderName: AiProvidersSectionState['getProviderName'];
-  handleClearProviderSecret: AiProvidersSectionState['handleClearProviderSecret'];
-  handleDefaultModelChange: AiProvidersSectionState['handleDefaultModelChange'];
   modalState: AiProvidersSectionState['modals'];
   reloadData: AiProvidersSectionState['reloadData'];
 };
@@ -29,14 +24,11 @@ export function buildAiProvidersSectionControllerState(
   props: AiProvidersSectionControllerBuildProps
 ): AiProvidersSectionState {
   return {
+    catalogActions: props.catalogActions,
     chromeAi: props.chromeAi,
     secretProtection: props.secretProtection,
     defaultModelId: props.dataState.defaultModelId,
     getProviderName: props.getProviderName,
-    handleClearProviderSecret: props.handleClearProviderSecret,
-    handleDeleteModel: props.deleteHandlers.handleDeleteModel,
-    handleDeleteProvider: props.deleteHandlers.handleDeleteProvider,
-    handleDefaultModelChange: props.handleDefaultModelChange,
     isLoading: props.dataState.isLoading,
     modelOptions: buildAiProvidersModelOptions({
       getProviderName: props.getProviderName,

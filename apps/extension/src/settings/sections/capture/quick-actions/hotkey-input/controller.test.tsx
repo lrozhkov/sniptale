@@ -10,8 +10,6 @@ import { type HotkeyKeyboardEvent, useHotkeyInputController } from './controller
 
 const mocks = vi.hoisted(() => ({
   formatHotkeyMock: vi.fn(),
-  hotkeyToKeyStringMock: vi.fn(),
-  isHotkeyReservedMock: vi.fn(),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -25,12 +23,6 @@ vi.mock('../../../../../features/keyboard-shortcuts/hotkey-format', async (impor
     typeof import('../../../../../features/keyboard-shortcuts/hotkey-format')
   >()),
   formatHotkey: mocks.formatHotkeyMock,
-}));
-
-vi.mock('../../../../../features/keyboard-shortcuts/hotkeys', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../features/keyboard-shortcuts/hotkeys')>()),
-  hotkeyToKeyString: mocks.hotkeyToKeyStringMock,
-  isHotkeyReserved: mocks.isHotkeyReservedMock,
 }));
 
 type ControllerState = ReturnType<typeof useHotkeyInputController>;
@@ -125,8 +117,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.formatHotkeyMock.mockImplementation((value: HotkeyConfig) => `${value.key}-formatted`);
-  mocks.hotkeyToKeyStringMock.mockImplementation((value: HotkeyConfig) => value.key);
-  mocks.isHotkeyReservedMock.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -167,22 +157,22 @@ async function verifyValidHotkeyAndEscapeHandling() {
 
   act(() => {
     getState().handleFocus();
-    getState().handleKeyDown(createKeyboardEvent('K', { ctrlKey: true }));
-    getState().handleKeyDown(createKeyboardEvent('σ', { code: 'KeyS', ctrlKey: true }));
+    getState().handleKeyDown(createKeyboardEvent('E', { ctrlKey: true }));
+    getState().handleKeyDown(createKeyboardEvent('β', { altKey: true, code: 'KeyB' }));
   });
 
   expect(onChange).toHaveBeenNthCalledWith(1, {
     altKey: false,
     ctrlKey: true,
-    key: 'K',
+    key: 'E',
     metaKey: false,
     shiftKey: false,
   });
   expect(getState().isRecording).toBe(false);
   expect(onChange).toHaveBeenNthCalledWith(2, {
-    altKey: false,
-    ctrlKey: true,
-    key: 'S',
+    ctrlKey: false,
+    key: 'B',
+    altKey: true,
     metaKey: false,
     shiftKey: false,
   });
@@ -191,7 +181,8 @@ async function verifyValidHotkeyAndEscapeHandling() {
     getState().handleKeyDown(createKeyboardEvent('Escape'));
   });
 
-  expect(onChange).toHaveBeenNthCalledWith(3, null);
+  expect(onChange).toHaveBeenCalledTimes(2);
+  expect(getState().isRecording).toBe(false);
 }
 
 async function verifyModifierValidation() {
@@ -210,39 +201,31 @@ async function verifyModifierValidation() {
 
 async function verifyFunctionAndSpaceKeys() {
   const onChange = vi.fn();
-  await renderHarness({ onChange });
+  const onError = vi.fn();
+  await renderHarness({ onChange, onError });
 
   act(() => {
-    getState().handleKeyDown(createKeyboardEvent('F8'));
+    getState().handleKeyDown(createKeyboardEvent('F8', { ctrlKey: true }));
     getState().handleKeyDown(createKeyboardEvent(' ', { ctrlKey: true }));
   });
 
   expect(onChange).toHaveBeenNthCalledWith(1, {
-    altKey: false,
-    ctrlKey: false,
-    key: 'F8',
-    metaKey: false,
-    shiftKey: false,
-  });
-  expect(onChange).toHaveBeenNthCalledWith(2, {
     altKey: false,
     ctrlKey: true,
     key: 'Space',
     metaKey: false,
     shiftKey: false,
   });
+  expect(onError).toHaveBeenCalledWith('settings.hotkeyInput.unsupportedKey');
 }
 
 function runKeyHandlingSuite() {
   it(
-    'records valid hotkeys, clears on escape, and resets recording mode after success',
+    'records valid hotkeys, cancels on escape, and resets recording mode after success',
     verifyValidHotkeyAndEscapeHandling
   );
   it('reports missing modifiers and ignores modifier-only keys', verifyModifierValidation);
-  it(
-    'accepts function keys without modifiers and maps the space bar to the Space token',
-    verifyFunctionAndSpaceKeys
-  );
+  it('rejects function keys and maps the space bar to the Space token', verifyFunctionAndSpaceKeys);
 }
 
 describe('useHotkeyInputController key handling', runKeyHandlingSuite);

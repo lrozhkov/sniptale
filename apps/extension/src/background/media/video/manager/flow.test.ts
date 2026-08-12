@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 
 import {
   announceCaptureSource,
-  enableAnnotationsOrAbort,
+  prepareContentSurfaceOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   finalizeRecordingStart,
   resolveCaptureSourceForMode,
@@ -18,7 +18,7 @@ import {
 import {
   abortIfCancelled,
   announceCaptureSource as announceCaptureSourceFromFacade,
-  enableAnnotationsOrAbort as enableAnnotationsOrAbortFromFacade,
+  prepareContentSurfaceOrAbort as prepareContentSurfaceOrAbortFromFacade,
   ensureOffscreenDocumentReadyOrAbort as ensureOffscreenDocumentReadyOrAbortFromFacade,
   finalizeRecordingStart as finalizeRecordingStartFromFacade,
   handleIncompleteCountdown,
@@ -29,7 +29,7 @@ import {
 
 it('re-exports the flow helpers from their ownership seams without wrapping them', () => {
   expect(announceCaptureSourceFromFacade).toBe(announceCaptureSource);
-  expect(enableAnnotationsOrAbortFromFacade).toBe(enableAnnotationsOrAbort);
+  expect(prepareContentSurfaceOrAbortFromFacade).toBe(prepareContentSurfaceOrAbort);
   expect(ensureOffscreenDocumentReadyOrAbortFromFacade).toBe(ensureOffscreenDocumentReadyOrAbort);
   expect(finalizeRecordingStartFromFacade).toBe(finalizeRecordingStart);
   expect(resolveCaptureSourceForModeFromFacade).toBe(resolveCaptureSourceForMode);

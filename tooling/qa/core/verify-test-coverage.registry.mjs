@@ -112,7 +112,7 @@ export const COVERAGE_ROLLOUT_GROUPS = [
       'apps/extension/src/content/parser/popup-export/',
       'apps/extension/src/content/selection/region-selector/',
       'apps/extension/src/content/selection/selection-mode/',
-      'apps/extension/src/content/overlay/video-annotations/',
+      'apps/extension/src/content/overlay/video-recording/',
       'apps/extension/src/content/overlay/video-clicks/',
     ],
     files: COVERAGE_ROLLOUT_EXACT_FILES?.contentSelectionAndCapture,

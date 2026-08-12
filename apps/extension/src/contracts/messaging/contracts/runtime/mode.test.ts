@@ -35,6 +35,28 @@ describe('runtimeModeMessageContracts', () => {
     });
   });
 
+  it('accepts only known toolbar working modes', () => {
+    const contract = runtimeModeMessageContracts[MessageType.ENABLE_SCREENSHOT_MODE];
+    expect(
+      contract.parseRequest({
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        workingMode: 'drawing',
+      })
+    ).toMatchObject({ workingMode: 'drawing' });
+    expect(
+      contract.parseRequest({
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        workingMode: 'video-recording',
+      })
+    ).toMatchObject({ workingMode: 'video-recording' });
+    expect(() =>
+      contract.parseRequest({
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        workingMode: 'inspect',
+      })
+    ).toThrow(/ENABLE_SCREENSHOT_MODE/);
+  });
+
   it('accepts tab-scoped screenshot mode status responses', () => {
     expect(
       runtimeModeMessageContracts[MessageType.SCREENSHOT_MODE_STATUS].parseResponse({

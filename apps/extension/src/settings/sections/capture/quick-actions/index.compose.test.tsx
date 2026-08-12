@@ -101,7 +101,6 @@ function updateEditorSelections(
   setSelectValue(selects[3]!, '5');
   setSelectValue(selects[4]!, 'jpeg');
   setSelectValue(selects[5]!, '90');
-  setSelectValue(selects[6]!, 'hidden');
 
   expect(state.updateFormField).toHaveBeenCalledWith('screenshotMode', 'selection');
   expect(state.updateFormField).toHaveBeenCalledWith('afterCapture', 'copy');
@@ -109,7 +108,6 @@ function updateEditorSelections(
   expect(state.updateFormField).toHaveBeenCalledWith('delay', 5);
   expect(state.updateFormField).toHaveBeenCalledWith('imageFormat', 'jpeg');
   expect(state.updateFormField).toHaveBeenCalledWith('imageQuality', 90);
-  expect(state.setDisplayMode).toHaveBeenCalledWith('hidden');
 }
 
 function triggerQuickActionsButtons(container: HTMLDivElement) {
@@ -188,8 +186,8 @@ describe('QuickActionsSection compose tree', () => {
     await renderQuickActionsSection();
 
     const container = getQuickActionsContainer()!;
-    expect(container.textContent).toContain('Quick action saved');
-    expect(container.textContent).toContain('settings.quickActions.bundledBadge');
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.textContent).toContain('settings.collection.builtInBadge');
     expect(container.textContent).toContain('settings.quickActions.editTitle');
     expect(container.textContent).toContain('settings.quickActions.deleteActionTitle');
     expect(
@@ -204,5 +202,40 @@ describe('QuickActionsSection compose tree', () => {
     await triggerConfirmDialog(container);
 
     expectComposeHandlers(state);
+  });
+
+  it('offers per-row restore for customized factory actions without deletion', async () => {
+    const baseState = createSectionState();
+    const bundledAction = {
+      ...baseState.actions[1]!,
+      bundledId: 'default-selection-download' as const,
+      customized: true,
+      id: 'default-selection-download',
+    };
+    const state = createSectionState({
+      actions: [bundledAction],
+      confirmDelete: null,
+      editForm: null,
+      editingId: null,
+    });
+    useQuickActionsControllerSpy.mockReturnValue(state);
+    await renderQuickActionsSection();
+    const container = getQuickActionsContainer()!;
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="settings.collection.actions.menu"]')
+        ?.click();
+    });
+    const reset = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="settings.quickActions.resetAction"]'
+    );
+    expect(reset).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="settings.collection.actions.delete"]')
+    ).toBeNull();
+
+    act(() => reset?.click());
+    expect(state.handleReset).toHaveBeenCalledWith('default-selection-download');
   });
 });

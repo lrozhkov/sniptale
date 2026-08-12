@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CompactSelect } from '../compact-inspector-controls';
@@ -17,6 +17,7 @@ export function TemplateSaveSettings(props: {
   duplicateNameErrorLabel: string;
   error?: string | null;
   isSaving?: boolean;
+  leadingContent?: ReactNode;
   nameLabel: string;
   onCreate: (name: string) => Promise<boolean>;
   onCreated?: () => void;
@@ -47,6 +48,12 @@ export function TemplateSaveSettings(props: {
   const unavailable = props.disabled === true || props.isSaving === true;
   return (
     <div className="grid gap-3" data-ui="shared.highlighter-template-save-settings">
+      {props.leadingContent ? (
+        <>
+          {props.leadingContent}
+          <div className="h-px bg-[var(--sniptale-color-border-soft)]" />
+        </>
+      ) : null}
       <div className="grid gap-1.5">
         <label className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
           {props.createLabel}

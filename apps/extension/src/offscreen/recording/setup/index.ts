@@ -17,7 +17,7 @@ import {
   waitForSourceMetadata,
 } from '../stream/video-source';
 import { acquireRecordingSourceStream } from './capture';
-import { attachMicrophoneAudioIfEnabled } from './video';
+import { attachMicrophoneAudioIfEnabled, prepareStableTabRecordingAudio } from './video';
 import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
 import {
   applyVideoTrackContentHint,
@@ -207,6 +207,7 @@ export async function prepareRecordingStream(
     streamId: params.streamId,
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
+    ...(params.viewport === undefined ? {} : { viewport: params.viewport }),
   });
   recordingContext.sourceStream = sourceStream;
   const raw = await readRawSource(sourceStream);
@@ -223,7 +224,11 @@ export async function prepareRecordingStream(
     output.frameRate
   );
   recordingContext.videoStream = output.stream;
-  await attachMicrophoneAudioIfEnabled(params.settings);
+  if (params.captureMode === CaptureMode.TAB || params.captureMode === CaptureMode.TAB_CROP) {
+    await prepareStableTabRecordingAudio(params.settings);
+  } else {
+    await attachMicrophoneAudioIfEnabled(params.settings);
+  }
   applyVideoTrackContentHint(
     outputTrack,
     params.captureMode === CaptureMode.CAMERA

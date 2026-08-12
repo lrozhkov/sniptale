@@ -22,6 +22,7 @@ export interface PlaybackLatestState {
   placementMode: VideoEditorPlacementMode | null;
   playbackRange: VideoEditorPlaybackRange | null;
   project: VideoProject | null;
+  projectHistoryTransactionActive: boolean;
   selection: VideoEditorSelection;
   selectedActionEvent: NonNullable<NonNullable<VideoProject['actionEvents']>[number]> | null;
   selectedClipId: string | null;

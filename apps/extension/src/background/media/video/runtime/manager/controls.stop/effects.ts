@@ -20,6 +20,10 @@ import {
   type StopFailureLogger,
   type StopFailureLogging,
 } from './failure-logging';
+import {
+  getVideoRecordingSurfaceLeaseSnapshot,
+  updateVideoRecordingSurface,
+} from '../../../content-surface/surface-lease';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -67,6 +71,11 @@ async function disableAnnotationsAndPersistTelemetry(
     return;
   }
 
+  const surface = getVideoRecordingSurfaceLeaseSnapshot();
+  if (surface?.tabId === tabId) {
+    await updateVideoRecordingSurface(surface.surfaceSessionId, { recordingId: null });
+  }
+
   const recordingId = getVideoRecordingId();
   const telemetry = await collectTelemetrySnapshot(tabId, failureLogger);
 
@@ -94,9 +103,6 @@ async function collectTelemetrySnapshot(
   failureLogger: StopFailureLogger
 ): Promise<ReturnType<typeof getControlledCursorTelemetry> | null> {
   if (!isControlledCursorCaptureEnabled()) {
-    await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
-      type: VideoMessageType.DISABLE_ANNOTATIONS,
-    });
     return null;
   }
 

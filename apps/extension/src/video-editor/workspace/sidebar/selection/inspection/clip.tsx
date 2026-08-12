@@ -24,11 +24,11 @@ import {
 import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroup } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
-import { ClipCursorDetectionPanel } from './cursor-detection';
+import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
-  if (!clip) {
+  if (!clip || !isVideoEditorPresentedClip(props.project, clip)) {
     return <SelectionEmptyState />;
   }
 
@@ -149,7 +149,6 @@ function createStandardClipGroups(
       visible: styleFields !== null,
     },
     createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
-    createObjectTrackingGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;
 }
 
@@ -177,25 +176,6 @@ function createFrameContent(
 
 function isMediaFrameClip(clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>) {
   return isVideoClip(clip) || clip.type === VideoProjectClipType.IMAGE;
-}
-
-function createObjectTrackingGroup(
-  props: WorkspaceSidebarSelectionPanelProps,
-  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  locked: boolean
-) {
-  return {
-    id: 'object-tracking',
-    label: translate('videoEditor.sidebar.inspectorGroupTracking'),
-    content: (
-      <ClipCursorDetectionPanel
-        clipId={clip.id}
-        cursorDetection={props.cursorDetection}
-        project={props.project}
-      />
-    ),
-    visible: isVideoClip(clip) && !locked,
-  } as const;
 }
 
 function createTimingGroup(

@@ -3,6 +3,7 @@ import type {
   RuntimeMessageResponse,
 } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 import type { RecordingStateResponse, RecordingTabResponse } from '../contracts/response-types';
 
@@ -15,6 +16,25 @@ type RuntimeRecordingStartResult = RuntimeRecordingCommandResult & {
 };
 
 export type RuntimeVideoSessionResponseByType = {
+  [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<Record<string, never>>;
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: RuntimeMessageResponse<{
+    result?: unknown;
+    snapshot?: VideoRecordingSurfaceSnapshot;
+  }>;
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: RuntimeMessageResponse<{ sdp?: string }>;
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE]: RuntimeMessageResponse<Record<string, never>>;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: RuntimeMessageResponse<{
+    sdp?: string;
+  }>;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: RuntimeMessageResponse<{
+    mediaDevices?: Array<{ deviceId: string; kind: 'audioinput' | 'videoinput'; label: string }>;
+  }>;
   [VideoMessageType.START_RECORDING]: RuntimeMessageResponse<RuntimeRecordingStartResult>;
   [VideoMessageType.CANCEL_RECORDING_START]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.STOP_RECORDING]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;

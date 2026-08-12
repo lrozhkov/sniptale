@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ToolbarModeButtons } from './modes';
 import { useToolbarMenuState } from '../state/menu';
 import type { ToolbarModeButtonsProps } from './mode-types';
+import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -17,23 +18,29 @@ let root: Root | null = null;
 
 function ModeButtonsHarness(params: {
   aiPickMode?: boolean;
+  canClearPagePreparation?: boolean;
   designReviewMode?: boolean;
   drawingMode?: boolean;
   onDisableAiPickMode?: () => void;
+  onClearPagePreparation?: () => void;
   onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
   onToggleDesignReview?: () => void;
   onToggleDrawing?: () => void;
   onToggleQuickEdit?: () => void;
+  onToggleVideoRecording?: (activationEvent?: Event) => Promise<boolean> | boolean | void;
   pendingMode?: 'quick-edit' | 'highlighter' | null;
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
+  videoRecordingMode?: boolean;
 }) {
   const toolbarMenuState = useToolbarMenuState();
   const props: ToolbarModeButtonsProps = {
     isCursorMode: true,
     aiPickMode: params.aiPickMode ?? false,
+    canClearPagePreparation: params.canClearPagePreparation ?? false,
     designReviewMode: params.designReviewMode ?? false,
     drawingMode: params.drawingMode ?? false,
+    videoRecordingMode: params.videoRecordingMode ?? false,
     compactMenus: true,
     displayMode: 'vertical',
     sidebarVisible: true,
@@ -44,11 +51,13 @@ function ModeButtonsHarness(params: {
     toolbarMenuState,
     onEnableCursorMode: vi.fn(),
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
+    onClearPagePreparation: params.onClearPagePreparation ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
     onToggleQuickEdit: params.onToggleQuickEdit ?? vi.fn(),
     onToggleHighlighter: vi.fn(),
+    onToggleVideoRecording: params.onToggleVideoRecording ?? vi.fn(),
   };
 
   return <ToolbarModeButtons {...props} />;
@@ -57,16 +66,20 @@ function ModeButtonsHarness(params: {
 function renderModeButtons(
   params: {
     aiPickMode?: boolean;
+    canClearPagePreparation?: boolean;
     designReviewMode?: boolean;
     drawingMode?: boolean;
     onDisableAiPickMode?: () => void;
+    onClearPagePreparation?: () => void;
     onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
     onToggleDesignReview?: () => void;
     onToggleDrawing?: () => void;
     onToggleQuickEdit?: () => void;
+    onToggleVideoRecording?: (activationEvent?: Event) => Promise<boolean> | boolean | void;
     pendingMode?: 'quick-edit' | 'highlighter' | null;
     quickEditDocumentMode?: boolean;
     quickEditMode?: boolean;
+    videoRecordingMode?: boolean;
   } = {}
 ) {
   if (!container) {
@@ -104,6 +117,84 @@ it('activates Drawing through its distinct Working Mode option', () => {
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
   expect(onToggleDrawing).toHaveBeenCalledTimes(1);
+});
+
+it('activates Video Recording from the real mode-menu mousedown event', () => {
+  const onToggleVideoRecording = vi.fn();
+  renderModeButtons({ onToggleVideoRecording });
+  act(() => queryModeSelectorButton()?.click());
+  const activationEvent = createBridgedMouseEvent(
+    'mousedown',
+    new MouseEvent('pointerdown', { button: 0, buttons: 1 })
+  );
+
+  act(() => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.mode-option.video-recording"]')
+      ?.dispatchEvent(activationEvent);
+  });
+
+  expect(onToggleVideoRecording).toHaveBeenCalledWith(activationEvent);
+  expect(
+    document.querySelector('[data-ui="content.toolbar.mode-option.video-recording"]')
+  ).toBeNull();
+});
+
+it('deactivates an active Video Recording surface before selecting another working mode', async () => {
+  const onToggleVideoRecording = vi.fn().mockResolvedValue(true);
+  const onToggleQuickEdit = vi.fn();
+  renderModeButtons({ videoRecordingMode: true, onToggleVideoRecording, onToggleQuickEdit });
+  act(() => queryModeSelectorButton()?.click());
+
+  await act(async () => {
+    queryQuickEditModeOption()?.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+    );
+    await Promise.resolve();
+  });
+
+  expect(onToggleVideoRecording).toHaveBeenCalledOnce();
+  expect(onToggleQuickEdit).toHaveBeenCalledOnce();
+});
+
+it('restores Drawing when it is selected after deactivating Video Recording', async () => {
+  const onToggleVideoRecording = vi.fn().mockResolvedValue(true);
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ videoRecordingMode: true, onToggleVideoRecording, onToggleDrawing });
+  act(() => queryModeSelectorButton()?.click());
+
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.mode-option.drawing"]')
+      ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+  });
+
+  expect(onToggleVideoRecording).toHaveBeenCalledOnce();
+  expect(onToggleDrawing).toHaveBeenCalledOnce();
+});
+
+it('shows the clear-all action in Navigation and routes it to the reset owner', () => {
+  const onClearPagePreparation = vi.fn();
+  renderModeButtons({ canClearPagePreparation: true, onClearPagePreparation });
+
+  const clearButton = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
+  );
+  expect(clearButton?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
+  expect(clearButton?.querySelector('svg')?.classList.contains('lucide-brush-cleaning')).toBe(true);
+
+  act(() => clearButton?.click());
+  expect(onClearPagePreparation).toHaveBeenCalledOnce();
+});
+
+it('disables the clear-all action while page preparation history is empty', () => {
+  renderModeButtons();
+  expect(
+    document.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
+    )?.disabled
+  ).toBe(true);
 });
 
 afterEach(() => {
@@ -188,6 +279,7 @@ it('orders Working Mode options as Cursor, Drawing, Annotations, Content Editing
     'content.toolbar.mode-option.highlighter',
     'content.toolbar.mode-option.quick-edit',
     'content.toolbar.mode-option.design-review',
+    'content.toolbar.mode-option.video-recording',
   ]);
 });
 
@@ -197,6 +289,12 @@ it('separates non-cursor mode tools without duplicating the cursor capture divid
   expect(
     container?.querySelector('[data-ui="content.toolbar.mode-leading-divider"]')
   ).not.toBeNull();
+});
+
+it('keeps video mode selector directly adjacent to toolbar settings', () => {
+  renderModeButtons({ videoRecordingMode: true });
+
+  expect(container?.querySelector('[data-ui="content.toolbar.mode-leading-divider"]')).toBeNull();
 });
 
 it('closes the menu without toggling off the already selected mode', () => {
@@ -233,12 +331,12 @@ it('offers Design Review as a standalone mode and no longer adds a Quick Edit in
   expect(onToggleDesignReview).toHaveBeenCalledOnce();
 });
 
-it('uses a highlighter glyph for annotations instead of the border glyph', () => {
+it('uses the annotation glyph instead of the border glyph', () => {
   renderModeButtons();
   act(() => queryModeSelectorButton()?.click());
 
   const icon = document.querySelector('[data-ui="content.toolbar.mode-option.highlighter"] svg');
-  expect(icon?.getAttribute('class')).toContain('lucide-highlighter');
+  expect(icon?.getAttribute('class')).toContain('lucide-message-square-plus');
   expect(icon?.getAttribute('class')).not.toContain('lucide-square');
 });
 

@@ -19,8 +19,10 @@ import {
   buildAppearanceLocaleOptions,
   buildAppearanceThemeOptions,
   buildAppearanceContextMenuOptions,
+  buildPopupStartupOptions,
 } from './copy';
 import { useSettingsStore } from '../../../runtime/store/useSettingsStore';
+import { usePopupStartupPreference } from './popup-startup-preference';
 
 const logger = createLogger({ namespace: 'settings:appearance' });
 
@@ -65,10 +67,12 @@ export function useAppearanceSection() {
   const locale = useAppLocale();
   const { settings, updateSettings } = useSettingsStore();
   const { languagePreference, preference } = useStoredAppearancePreferences();
+  const popupStartup = usePopupStartupPreference();
   const contextMenuOptions = useMemo(() => buildAppearanceContextMenuOptions(locale), [locale]);
   const localeOptions = useMemo(() => buildAppearanceLocaleOptions(locale), [locale]);
   const resolvedTheme = useMemo(() => resolveAppTheme(preference), [preference]);
   const themeOptions = useMemo(() => buildAppearanceThemeOptions(locale), [locale]);
+  const popupStartupOptions = useMemo(() => buildPopupStartupOptions(locale), [locale]);
 
   return {
     contextMenu: settings.contextMenu,
@@ -77,15 +81,17 @@ export function useAppearanceSection() {
     locale,
     localeOptions,
     preference,
+    popupStartup: {
+      loading: popupStartup.popupStartupLoading,
+      options: popupStartupOptions,
+      selection: popupStartup.popupStartupSelection,
+      updateSelection: popupStartup.updatePopupStartupSelection,
+    },
     resolvedTheme,
-    rawDiagnosticsEnabled: settings.rawDiagnosticsEnabled,
     setLanguagePreference: persistLanguagePreference,
     setPreference: persistThemePreference,
     updateContextMenu: async (patch: Partial<typeof settings.contextMenu>) => {
       await updateSettings({ contextMenu: patch });
-    },
-    updateRawDiagnosticsEnabled: async (enabled: boolean) => {
-      await updateSettings({ rawDiagnosticsEnabled: enabled });
     },
     themeOptions,
   };

@@ -8,6 +8,7 @@ import { getLineConnectorState } from './line-connector';
 import { projectCalloutPerimeterPosition, resolveCalloutAttachmentPosition } from './tail-drag';
 import { FRAME_ANNOTATION_Z_INDEX } from '../interaction/z-index';
 import { projectCalloutCardStyle } from '../../surface-style/card-projection';
+import { resolveCalloutColorBindings } from '../../callout-color-bindings';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
 const MIN_CALLOUT_CONTENT_WIDTH = '1ch';
@@ -102,7 +103,13 @@ export function getCalloutLayoutState(args: {
     dynamicTail,
     calloutPos,
     calloutDimensions: positionDimensions,
-    wrapperStyle: getCalloutWrapperStyle(args.settings, calloutPos, effectiveZIndex),
+    wrapperStyle: getCalloutWrapperStyle(
+      args.settings,
+      calloutPos,
+      effectiveZIndex,
+      dynamicTail,
+      visualScale
+    ),
     cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing, dynamicTail),
     editableStyle: getCalloutEditableStyle(args.settings),
   };
@@ -280,16 +287,29 @@ function getManualCalloutPosition(
 }
 
 function getCalloutWrapperStyle(
-  _settings: CalloutSettings,
+  settings: CalloutSettings,
   calloutPos: { x: number; y: number },
-  effectiveZIndex: number
+  effectiveZIndex: number,
+  connector:
+    | ReturnType<typeof getDynamicTailState>
+    | ReturnType<typeof getLineConnectorState>
+    | null,
+  visualScale: number
 ): CSSProperties {
+  const surface = resolveCalloutColorBindings(settings.style, {}).surface;
+  const shadowOffset = Math.max(1, surface.shadow / 3) * visualScale;
+  const shadowBlur = surface.shadow * visualScale;
+  const unifiedShadow =
+    connector?.kind === 'wedge' && surface.shadow > 0
+      ? `drop-shadow(0 ${shadowOffset}px ${shadowBlur}px ${surface.shadowColor})`
+      : undefined;
   return {
     position: 'fixed',
     left: calloutPos.x,
     top: calloutPos.y,
     zIndex: effectiveZIndex,
     pointerEvents: 'auto',
+    ...(unifiedShadow ? { filter: unifiedShadow } : {}),
   };
 }
 
@@ -308,6 +328,7 @@ function getCalloutCloudStyle(
   });
   return {
     ...projectedCard,
+    ...(connector?.kind === 'wedge' ? { boxShadow: 'none' } : {}),
     position: 'relative',
     // The surface cannot depend on runtime-global resets: maxWidth owns the complete bubble.
     boxSizing: 'border-box',

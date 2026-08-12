@@ -18,6 +18,7 @@ export function drawDrawingFrame(args: {
   root: PageScrollRoot;
   showChrome: boolean;
   suppressText?: boolean;
+  getObjectOpacity?: (objectId: string) => number;
 }): void {
   const { canvas, objects, draft, selectedIds, root, showChrome, suppressText = false } = args;
   const ratio = Math.max(1, window.devicePixelRatio || 1);
@@ -45,7 +46,10 @@ export function drawDrawingFrame(args: {
   }
   resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) => {
     if (!suppressText || object.kind !== 'text')
-      renderDrawingObject(context, object, projection, preview ? { preview: true } : {});
+      renderDrawingObject(context, object, projection, {
+        opacity: args.getObjectOpacity?.(object.id) ?? 1,
+        ...(preview ? { preview: true } : {}),
+      });
   });
   if (showChrome && draft?.kind === 'marquee') {
     renderDrawingMarquee(context, draft.start, draft.current, projection);

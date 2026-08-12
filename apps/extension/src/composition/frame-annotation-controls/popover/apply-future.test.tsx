@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from './apply-future';
+import {
+  ApplyToFutureFramesGuard,
+  ApplyToFutureFramesSetting,
+  useApplyToFutureFrames,
+} from './apply-future';
+import { translate } from '../../../platform/i18n';
 
 afterEach(() => document.body.replaceChildren());
 
@@ -60,5 +65,23 @@ it('does not open or apply when a surface has no future-settings action', () => 
   const button = host.querySelector<HTMLButtonElement>('button')!;
   act(() => button.click());
   expect(button.dataset['confirming']).toBe('false');
+  act(() => root.unmount());
+});
+
+it('presents the future-frame action as a described save setting', () => {
+  const onClick = vi.fn();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<ApplyToFutureFramesSetting onClick={onClick} />));
+  const setting = host.querySelector('[data-ui="content.template-fork.apply-to-future-setting"]');
+  expect(setting?.textContent).toContain(
+    translate('content.templateFork.futureSettingsDescription')
+  );
+  const action = setting?.querySelector<HTMLButtonElement>(
+    '[data-settings-action="apply-to-future"]'
+  );
+  act(() => action?.click());
+  expect(onClick).toHaveBeenCalledOnce();
   act(() => root.unmount());
 });

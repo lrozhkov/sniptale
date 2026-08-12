@@ -14,7 +14,7 @@ import {
   type SettingsCollectionMoveIntent,
 } from '../../../section-surface';
 import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from './section/constants';
-import { getDelayLabel, getQuickActionCountLabel, getViewportPresetLabel } from './section/helpers';
+import { getDelayLabel, getViewportPresetLabel } from './section/helpers';
 import type { QuickActionsSectionState } from './controller';
 
 export function QuickActionsList(props: {
@@ -42,20 +42,16 @@ export function QuickActionsList(props: {
       preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-accent)]" />,
       enabled: action.status,
       busy: props.state.isLoading,
-      badges: isBundledQuickAction(action)
-        ? [
-            {
-              id: 'bundled',
-              label: translate('settings.quickActions.bundledBadge'),
-              tone: 'neutral',
-            },
-          ]
-        : [],
+      isBuiltIn: isBundledQuickAction(action),
       capabilities: {
-        edit: !isBundledQuickAction(action),
+        edit: true,
         toggle: true,
         delete: !isBundledQuickAction(action),
+        reset: isBundledQuickAction(action) && action.customized === true,
         reorder: true,
+      },
+      actionLabels: {
+        reset: translate('settings.quickActions.resetAction'),
       },
     };
   });
@@ -65,14 +61,13 @@ export function QuickActionsList(props: {
     if (!action) return;
     if (intent.type === 'toggle') void props.state.handleToggleStatus(action.id);
     if (intent.type === 'edit') props.state.handleEdit(action);
+    if (intent.type === 'reset') void props.state.handleReset(action.id);
     if (intent.type === 'delete') props.state.setConfirmDelete(action);
   };
   return (
     <SettingsCollection
       ariaLabel={translate('settings.quickActions.savedActionsLabel')}
-      title={translate('settings.quickActions.savedActionsLabel')}
       items={items}
-      countLabel={`${items.length} ${getQuickActionCountLabel(items.length)}`}
       state={props.state.isLoading ? 'loading' : 'ready'}
       emptyState={
         props.state.editingId ? null : (

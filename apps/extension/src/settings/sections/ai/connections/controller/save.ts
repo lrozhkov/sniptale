@@ -16,7 +16,6 @@ export async function saveAiProvidersDefaultModel(
   try {
     await saveDefaultModelId(modelId);
     setDefaultModelId(modelId);
-    toast.success(translate('settings.aiProviders.defaultModelUpdated'));
     return true;
   } catch (error) {
     logger.error('Failed to save default AI model', error);

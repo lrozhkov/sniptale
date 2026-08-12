@@ -21,6 +21,13 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     disconnect: vi.fn(),
     gain: { value: 1 },
   };
+  const silenceSource = {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    offset: { value: 1 },
+    start: vi.fn(),
+    stop: vi.fn(),
+  };
   const close = vi.fn().mockResolvedValue(undefined);
   const resume = vi.fn().mockResolvedValue(undefined);
 
@@ -28,6 +35,7 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     createMediaStreamDestination: vi.fn(() => destination),
     createMediaStreamSource,
     createGain: vi.fn(() => gainNode),
+    createConstantSource: vi.fn(() => silenceSource),
     close,
     resume,
     state: options?.state ?? 'running',
@@ -45,6 +53,7 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     createMediaStreamSource,
     destination,
     gainNode,
+    silenceSource,
     resume,
   };
 }
@@ -63,6 +72,9 @@ async function verifiesInitialization(): Promise<void> {
   expect(harness.AudioContextMock).toHaveBeenCalledTimes(1);
   expect(graph.getMixedStream()).toBe(harness.destination.stream);
   expect(harness.resume).not.toHaveBeenCalled();
+  expect(harness.silenceSource.offset.value).toBe(0);
+  expect(harness.silenceSource.connect).toHaveBeenCalledWith(harness.destination);
+  expect(harness.silenceSource.start).toHaveBeenCalledOnce();
 }
 
 async function verifiesSuspendedContextResume(): Promise<void> {
@@ -128,6 +140,8 @@ async function verifiesCleanup(): Promise<void> {
   await graph.cleanup();
 
   expect(harness.close).toHaveBeenCalledTimes(1);
+  expect(harness.silenceSource.stop).toHaveBeenCalledOnce();
+  expect(harness.silenceSource.disconnect).toHaveBeenCalledOnce();
   expect(() => graph.getMixedStream()).toThrow('AudioMixer not initialized');
 }
 

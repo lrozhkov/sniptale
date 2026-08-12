@@ -63,6 +63,8 @@
     "qa:raw:knip": "knip",
     "qa:raw:semgrep": "semgrep",
     "qa:raw:codeql": "codeql",
+    "agents:install": "node tooling/agent-tooling/install.mjs",
+    "agents:remove": "node tooling/agent-tooling/remove.mjs",
     "backup:repo": "bash tooling/backup/sc-backup.sh",
     "backup:prod": "bash tooling/backup/sc-prod-backup.sh",
     "build": "tsc && vite build --config apps/extension/vite.config.ts",

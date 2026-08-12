@@ -140,8 +140,9 @@ function verifiesRecordingBackedSummaries() {
   renderInspectPanel(props);
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
-  expect(container?.textContent).toContain('videoEditor.sidebar.cursorTrackUnavailable');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorTrackUnavailable');
   expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
+  expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
 }
 
 function verifiesLegacyScrollIsIgnored() {

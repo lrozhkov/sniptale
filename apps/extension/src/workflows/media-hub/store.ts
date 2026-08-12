@@ -111,6 +111,7 @@ export async function saveRecordingTelemetrySafely(entry: RecordingTelemetryEntr
   await withMediaHubWriteGuard(translate('shared.mediaHub.saveRecordingAction'), () =>
     saveRecordingTelemetry(entry)
   );
+  publishMediaHubLibraryChanged('update', [`recording:${entry.recordingId}`]);
 }
 
 export async function saveProjectAssetSafely(

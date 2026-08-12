@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createAckingViewerPortRegistration } from '../../capture/page-preparation/viewer-ports.test-support';
 
-const mocks = vi.hoisted(() => ({ browserTabsGet: vi.fn(), loadSettings: vi.fn() }));
+const mocks = vi.hoisted(() => ({ browserTabsGet: vi.fn() }));
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
   runtimeInfo: { getURL: (path: string) => `chrome-extension://test/${path}` },
@@ -12,11 +12,6 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: vi.fn() }),
 }));
-vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
-  loadSettings: mocks.loadSettings,
-}));
-
 import { resetScreenshotSurfaceSessionsForTests } from '../../capture-surface/screenshot-session';
 import { disableScreenshotMode, enableScreenshotMode } from './mode';
 
@@ -28,24 +23,9 @@ beforeEach(() => {
     id: 5,
     url: 'chrome-extension://test/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=s1',
   });
-  mocks.loadSettings.mockResolvedValue({
-    defaultViewportPresetId: 'wide',
-    viewportPresets: [
-      {
-        kind: 'user',
-        id: 'wide',
-        name: 'Wide',
-        target: 'viewport',
-        width: 1440,
-        height: 900,
-        enabled: true,
-        order: 0,
-      },
-    ],
-  });
 });
 
-it('routes an exact viewport preset through the viewer-local preparation surface', async () => {
+it('opens the viewer preparation surface at its current size', async () => {
   const screenshotModeState = new Map<number, boolean>();
   const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>();
   const viewportState = new Map<
@@ -56,19 +36,14 @@ it('routes an exact viewport preset through the viewer-local preparation surface
   const ports = new Map([[5, registration]]);
 
   await enableScreenshotMode(5, screenshotModeState, viewportState, viewportOwnerState, ports);
-  expect(viewportOwnerState.get(5)).toBe('viewer');
+  expect(viewportOwnerState.has(5)).toBe(false);
   expect(registration.port.postMessage).toHaveBeenNthCalledWith(
     1,
     expect.objectContaining({
       command: {
         type: 'ENABLE_SCREENSHOT_MODE',
         surfaceCapabilityToken: expect.any(String),
-        viewport: {
-          presetId: 'wide',
-          target: 'viewport',
-          width: 1440,
-          height: 900,
-        },
+        viewport: null,
       },
     })
   );
@@ -83,22 +58,7 @@ it('routes an exact viewport preset through the viewer-local preparation surface
   expect(screenshotModeState.has(5)).toBe(false);
 });
 
-it('keeps browser-window defaults disabled in the snapshot viewer', async () => {
-  mocks.loadSettings.mockResolvedValue({
-    defaultViewportPresetId: 'window-wide',
-    viewportPresets: [
-      {
-        kind: 'user',
-        id: 'window-wide',
-        name: 'Wide window',
-        target: 'window',
-        width: 1440,
-        height: 900,
-        enabled: true,
-        order: 0,
-      },
-    ],
-  });
+it('does not emit a legacy default warning in the snapshot viewer', async () => {
   const screenshotModeState = new Map<number, boolean>();
   const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>();
   const viewportState = new Map();
@@ -115,7 +75,6 @@ it('keeps browser-window defaults disabled in the snapshot viewer', async () => 
   expect(registration.port.postMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       command: expect.objectContaining({
-        surfaceWarning: expect.any(String),
         viewport: null,
       }),
     })

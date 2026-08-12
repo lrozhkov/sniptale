@@ -45,8 +45,10 @@ describe('CalloutPresetsPanel', () => {
     const markup = renderToStaticMarkup(<CalloutPresetsPanel controller={createController()} />);
     expect(markup.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(6);
     expect(markup).toContain('settings.collection.defaultBadge');
-    expect(markup).toContain('highlighter.calloutPresets.systemBadge');
+    expect(markup).toContain('settings.collection.builtInBadge');
     expect(markup).toContain('highlighter.calloutPresets.add');
+    expect(markup).not.toContain('<h2');
+    expect(markup).not.toContain('highlighter.calloutPresets.description');
   });
 
   it('renders loading and error states without a catalog', () => {

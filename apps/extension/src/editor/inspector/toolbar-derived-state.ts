@@ -8,6 +8,7 @@ export type ToolbarInspector = Exclude<EditorInspector, 'tool'>;
 
 export interface EditorToolbarSelectionState {
   hasSelection: boolean;
+  selectedObjectsAreDrawing?: boolean;
   selectedObjectCount: number;
   selectedObjectId?: string | null;
   selectedObjectLabel?: string | null;

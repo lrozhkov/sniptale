@@ -9,12 +9,12 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isNumber,
-  isRecordingTelemetrySnapshot,
   isString,
-  isVideoRecordingSettings,
+  isVideoRecordingRuntimeState,
   isViewportInfo,
   isViewportRegion,
 } from '../../validators/index';
+import { isVideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 const regionSelectionBindingGuard = {
@@ -28,30 +28,27 @@ const viewportCursorProjectionAuthorityGuard = {
 };
 
 export const tabVideoMessageContracts = {
-  [VideoMessageType.ENABLE_ANNOTATIONS]: {
+  [VideoMessageType.RECORDING_STATE_SYNC]: {
     parseRequest: createGuardParser(
-      'tab ENABLE_ANNOTATIONS message',
+      'tab RECORDING_STATE_SYNC message',
       createMessageGuard({
-        type: VideoMessageType.ENABLE_ANNOTATIONS,
-        required: { settings: isVideoRecordingSettings },
-        optional: { recordingId: isString },
+        type: VideoMessageType.RECORDING_STATE_SYNC,
+        required: { state: isVideoRecordingRuntimeState },
       })
     ),
     parseResponse: createGuardParser(
-      'tab ENABLE_ANNOTATIONS response',
-      createRuntimeResponseGuard({ optional: { viewport: isViewportInfo } })
+      'tab RECORDING_STATE_SYNC response',
+      createRuntimeResponseGuard()
     ),
   },
-  [VideoMessageType.DISABLE_ANNOTATIONS]: {
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: {
     parseRequest: createGuardParser(
-      'tab DISABLE_ANNOTATIONS message',
-      createMessageGuard({ type: VideoMessageType.DISABLE_ANNOTATIONS })
+      'tab VIDEO_RECORDING_SURFACE_SNAPSHOT message',
+      isVideoRecordingSurfaceSnapshotMessage
     ),
     parseResponse: createGuardParser(
-      'tab DISABLE_ANNOTATIONS response',
-      createRuntimeResponseGuard({
-        optional: { telemetry: isRecordingTelemetrySnapshot },
-      })
+      'tab VIDEO_RECORDING_SURFACE_SNAPSHOT response',
+      createRuntimeResponseGuard()
     ),
   },
   [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: {

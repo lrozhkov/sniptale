@@ -59,7 +59,6 @@ it('owns the complete quick-action mutation transaction', async () => {
   const setActions = vi.fn();
   const setEditingId = vi.fn();
   const setEditForm = vi.fn();
-  const showConfirmation = vi.fn();
   const crud = createQuickActionsCrud({
     actions: [action],
     editForm,
@@ -67,7 +66,6 @@ it('owns the complete quick-action mutation transaction', async () => {
     setActions,
     setEditingId,
     setEditForm,
-    showConfirmation,
   });
 
   crud.handleAdd();
@@ -86,6 +84,5 @@ it('owns the complete quick-action mutation transaction', async () => {
   ]);
   expect(persistenceMocks.saveQuickActions).toHaveBeenNthCalledWith(3, []);
   expect(setActions).toHaveBeenCalledTimes(3);
-  expect(showConfirmation).toHaveBeenCalledTimes(2);
   expect(resetEditor).toHaveBeenCalledTimes(2);
 });

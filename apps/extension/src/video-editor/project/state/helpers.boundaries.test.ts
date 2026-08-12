@@ -15,6 +15,7 @@ import {
   isTrackCompatibleWithClip,
   resolveEditableClipOperation,
 } from './helpers';
+import { resetVideoEditorProjectHistory } from '../history';
 
 function createProjectState(): VideoEditorProjectState {
   const project = createEmptyVideoProject('Helpers');
@@ -22,6 +23,7 @@ function createProjectState(): VideoEditorProjectState {
   return {
     currentTime: 1,
     project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
     selection: { kind: VideoEditorSelectionKind.SCENE },
     selectedClipId: null,
     selectedTrackId: project.tracks[0]?.id ?? null,

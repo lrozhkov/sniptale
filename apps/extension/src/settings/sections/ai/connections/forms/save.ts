@@ -10,7 +10,6 @@ import {
 } from '../../../../runtime/ai-settings/mutations';
 import { translate } from '../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import type {
   ModelFormData,
   ProviderFormData,
@@ -55,12 +54,10 @@ async function persistProviderForm(args: {
 
   if (args.isEditing && args.provider) {
     await updateAIProvider(nextProvider);
-    toast.success(translate('settings.aiProviders.providerUpdated'));
     return;
   }
 
   await addAIProvider(nextProvider);
-  toast.success(translate('settings.aiProviders.providerCreated'));
 }
 
 function assertProviderBaseUrlPolicy(baseUrl: string): void {
@@ -140,7 +137,6 @@ export async function saveProviderForm(args: ProviderFormSaveParams): Promise<vo
     logger.error('Failed to save provider form', error);
     const message = buildMutationFailureMessage(error, buildProviderSaveErrorMessage());
     args.setErrors({ submit: message });
-    toast.error(message);
   } finally {
     if (didStartSave) {
       args.setIsSaving(false);
@@ -161,7 +157,6 @@ async function persistModelForm(args: {
       modelCode: args.formData.modelCode,
       ...(args.formData.systemPrompt ? { systemPrompt: args.formData.systemPrompt } : {}),
     });
-    toast.success(translate('settings.aiProviders.modelUpdated'));
     return;
   }
 
@@ -172,7 +167,6 @@ async function persistModelForm(args: {
     modelCode: args.formData.modelCode,
     ...(args.formData.systemPrompt ? { systemPrompt: args.formData.systemPrompt } : {}),
   });
-  toast.success(translate('settings.aiProviders.modelCreated'));
 }
 
 export type ModelFormSaveParams = {
@@ -211,7 +205,6 @@ export async function saveModelForm(args: ModelFormSaveParams): Promise<void> {
     logger.error('Failed to save model form', error);
     const message = buildMutationFailureMessage(error, buildModelSaveErrorMessage());
     args.setErrors({ submit: message });
-    toast.error(message);
   } finally {
     args.setIsSaving(false);
   }

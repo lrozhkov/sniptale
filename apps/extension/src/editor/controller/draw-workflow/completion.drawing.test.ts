@@ -39,6 +39,19 @@ describe('drawing completion history', () => {
     expect(commitHistory).toHaveBeenCalledOnce();
     expect(syncRuntimeState).toHaveBeenCalledOnce();
     expect(surface.setActiveObject).toHaveBeenCalledWith(object);
+    expect(object.borderColor).toBe('#2563eb');
+    expect(object.borderDashArray).toEqual([4, 3]);
+    expect(Object.keys(object.controls)).toEqual([
+      'tl',
+      'mt',
+      'tr',
+      'mr',
+      'br',
+      'mb',
+      'bl',
+      'ml',
+      'mtr',
+    ]);
   });
 
   it('defers text history until the editing lifecycle commits content', () => {

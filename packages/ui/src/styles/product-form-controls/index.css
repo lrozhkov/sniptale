@@ -76,16 +76,8 @@
 }
 
 .sniptale-product-toggle-checked {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 26%,
-    var(--sniptale-color-border-soft) 74%
-  );
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-accent-soft) 34%,
-    var(--sniptale-color-surface-panel) 66%
-  );
+  border-color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-accent);
 }
 
 .sniptale-product-toggle-thumb {
@@ -109,14 +101,10 @@
 
 .sniptale-product-toggle-checked .sniptale-product-toggle-thumb {
   transform: translateX(18px);
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-panel) 62%,
-    var(--sniptale-color-accent-soft-strong) 38%
-  );
+  background: var(--sniptale-color-text-inverse);
   box-shadow:
     0 3px 8px color-mix(in srgb, var(--sniptale-color-overlay) 26%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 16%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-border-subtle) 16%, transparent);
 }
 
 .sniptale-product-toggle-sm.sniptale-product-toggle-checked .sniptale-product-toggle-thumb {

@@ -72,7 +72,6 @@ export const VIDEO_EDITOR_EFFECT_ENABLE_LABEL = translate(
 export const VIDEO_EDITOR_PLAY_LABEL = translate('videoEditor.timeline.play', 'ru');
 export const VIDEO_EDITOR_PAUSE_LABEL = translate('videoEditor.timeline.pause', 'ru');
 export const QUICK_ACTIONS_KEY = 'sniptale_quick_actions';
-export const QUICK_ACTIONS_DISPLAY_MODE_KEY = 'sniptale_quick_actions_display_mode';
 
 export type HarnessRuntimeMessage = {
   type?: string;

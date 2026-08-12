@@ -5,15 +5,12 @@ import {
 } from './permissions-lib/required-disclosures';
 
 const requiredGrantCardClassName = [
-  'grid gap-3 rounded-[14px] border p-4',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,var(--sniptale-color-surface-canvas)_22%)]',
+  'grid gap-3 border-b px-4 py-3 last:border-b-0 md:border-b-0 md:border-r',
+  'border-[var(--sniptale-color-border-soft)] md:[&:nth-child(2n)]:border-r-0',
 ].join(' ');
 
 const requiredGrantIconClassName = [
-  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[8px] border',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-muted)_76%,transparent)]',
+  'flex h-8 w-8 flex-shrink-0 items-center justify-center',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -54,7 +51,12 @@ export function RequiredManifestPermissionDisclosureList() {
         </p>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2">
+      <div
+        className={[
+          'grid overflow-hidden rounded-[12px] border md:grid-cols-2',
+          'border-[var(--sniptale-color-border-soft)]',
+        ].join(' ')}
+      >
         {requiredManifestPermissionDisclosures.map((disclosure) => (
           <RequiredManifestGrantCard key={disclosure.id} disclosure={disclosure} />
         ))}

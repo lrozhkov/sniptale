@@ -18,7 +18,7 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Quick actions',
   },
   subtitle: {
-    ru: 'Создавайте пресеты для мгновенного захвата скриншотов',
+    ru: 'Создавайте шаблоны для мгновенного захвата скриншотов',
     en: 'Create presets for instant screenshot capture',
   },
   basicsSection: {
@@ -74,7 +74,7 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Screenshot mode',
   },
   screenEmulationLabel: {
-    ru: 'Пресет размера',
+    ru: 'Шаблон размера',
     en: 'Size preset',
   },
   delayLabel: {
@@ -102,28 +102,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     en: 'Enabled',
   },
   exitAfterCaptureLabel: {
-    ru: 'Выйти после захвата',
-    en: 'Exit after capture',
-  },
-  displayModeTitle: {
-    ru: 'Отображение в меню',
-    en: 'Menu display',
-  },
-  displayModeList: {
-    ru: 'Списком',
-    en: 'List',
-  },
-  displayModeListDescription: {
-    ru: 'Показывать быстрые действия вертикальным списком',
-    en: 'Show quick actions as a vertical list',
-  },
-  displayModeHidden: {
-    ru: 'Не показывать',
-    en: 'Hidden',
-  },
-  displayModeHiddenDescription: {
-    ru: 'Скрыть в главном меню',
-    en: 'Hide from the main menu',
+    ru: 'Закрыть инструменты после захвата',
+    en: 'Close tools after capture',
   },
   savedActionsLabel: {
     ru: 'Сохранённые действия',
@@ -145,6 +125,10 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Добавить действие',
     en: 'Add action',
   },
+  resetAction: {
+    ru: 'Восстановить заводские настройки',
+    en: 'Restore factory settings',
+  },
   screenshotModeVisible: {
     ru: 'Видимая область',
     en: 'Visible area',
@@ -157,12 +141,16 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Выделенная область',
     en: 'Selected area',
   },
+  screenshotModeDesktop: {
+    ru: 'Окно или экран',
+    en: 'Window or screen',
+  },
   afterCaptureDownloadDefault: {
     ru: 'Скачать в папку по умолчанию',
     en: 'Download to the default folder',
   },
   afterCaptureAskPreset: {
-    ru: 'Выбор пресета',
+    ru: 'Выбор шаблона',
     en: 'Choose preset',
   },
   afterCaptureAskSystem: {
@@ -205,37 +193,9 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Включить',
     en: 'Enable',
   },
-  countOne: {
-    ru: 'действие',
-    en: 'action',
-  },
-  countFew: {
-    ru: 'действия',
-    en: 'actions',
-  },
-  countMany: {
-    ru: 'действий',
-    en: 'actions',
-  },
   validationNameRequired: {
     ru: 'Название обязательно',
     en: 'Name is required',
-  },
-  messageUpdated: {
-    ru: 'Действие обновлено',
-    en: 'Action updated',
-  },
-  messageCreated: {
-    ru: 'Действие создано',
-    en: 'Action created',
-  },
-  messageDeleted: {
-    ru: 'Действие удалено',
-    en: 'Action deleted',
-  },
-  messageSettingSaved: {
-    ru: 'Настройка сохранена',
-    en: 'Setting saved',
   },
   bundledBadge: {
     ru: 'Предустановлено',

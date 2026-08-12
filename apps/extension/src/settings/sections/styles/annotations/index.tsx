@@ -1,9 +1,5 @@
 import { translate } from '../../../../platform/i18n';
-import {
-  settingsSectionClassName,
-  SettingsSectionHeader,
-  SettingsSubpageTabs,
-} from '../../../section-surface';
+import { settingsSectionClassName, SettingsSubpageTabs } from '../../../section-surface';
 import { HighlighterSection } from './borders';
 import { CalloutPresetCatalogSettings, useCalloutPresetCatalogController } from './callouts';
 import { StepBadgePresetCatalogSettings, useStepBadgePresetCatalogController } from './numbering';
@@ -13,7 +9,6 @@ function CalloutsSection() {
   const controller = useCalloutPresetCatalogController();
   return (
     <section className={settingsSectionClassName}>
-      <SettingsSectionHeader kicker={translate('settings.navigation.views.callouts')} />
       <CalloutPresetCatalogSettings controller={controller} />
     </section>
   );
@@ -23,7 +18,6 @@ function NumberingSection() {
   const controller = useStepBadgePresetCatalogController();
   return (
     <section className={settingsSectionClassName}>
-      <SettingsSectionHeader kicker={translate('settings.navigation.views.numbering')} />
       <StepBadgePresetCatalogSettings controller={controller} />
     </section>
   );
@@ -45,7 +39,7 @@ export function AnnotationsSection(props: {
           { id: 'borders', label: translate('settings.navigation.views.borders') },
           { id: 'callouts', label: translate('settings.navigation.views.callouts') },
           { id: 'numbering', label: translate('settings.navigation.views.numbering') },
-          { id: 'tags', label: translate('highlighter.templateTags.tab') },
+          { id: 'tags', label: translate('settings.navigation.views.tags') },
         ]}
         onChange={props.onViewChange}
       />

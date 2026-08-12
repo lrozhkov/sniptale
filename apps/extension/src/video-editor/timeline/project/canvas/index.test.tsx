@@ -119,7 +119,7 @@ it('renders ruler loop markers when a playback range is active', () => {
   expect(container?.textContent).toContain('0:03.500');
 });
 
-it('renders the telemetry lane whenever timeline visibility is enabled', () => {
+it('renders the telemetry lane only when timeline visibility and telemetry are available', () => {
   renderCanvas({
     recordingTelemetry: {
       actionEvents: [],
@@ -142,7 +142,7 @@ it('renders the telemetry lane whenever timeline visibility is enabled', () => {
     telemetryLaneVisible: true,
   });
 
-  expect(container?.textContent).toContain('videoEditor.timeline.telemetryLaneEmpty');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLaneEmpty');
 });
 
 it('does not render telemetry empty text when the telemetry lane is hidden', () => {

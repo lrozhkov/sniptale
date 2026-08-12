@@ -140,6 +140,10 @@ export function getQuickActionSurfaceTransactionTabIds(): number[] {
   return [...transactions.keys()];
 }
 
+export function shouldCloseQuickActionTools(tabId: number): boolean {
+  return transactions.get(tabId)?.ownsSession === true;
+}
+
 export function forgetQuickActionSurfaceTransaction(tabId: number): void {
   transactions.delete(tabId);
 }

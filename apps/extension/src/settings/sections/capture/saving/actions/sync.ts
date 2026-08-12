@@ -10,7 +10,6 @@ export function useSavePresetsSync() {
   const [defaultVideoPresetId, setDefaultVideoPresetId] = useState<string | null>(null);
   const [defaultExportPresetId, setDefaultExportPresetId] = useState<string | null>(null);
   const [captureAction, setCaptureAction] = useState<CaptureActionType>('download_default');
-  const [saveCapturesToGallery, setSaveCapturesToGallery] = useState(false);
 
   useEffect(() => {
     setPresets(settings.presets ?? []);
@@ -18,7 +17,6 @@ export function useSavePresetsSync() {
     setDefaultVideoPresetId(settings.defaultVideoPresetId ?? null);
     setDefaultExportPresetId(settings.defaultExportPresetId ?? null);
     setCaptureAction(settings.captureAction ?? 'download_default');
-    setSaveCapturesToGallery(settings.saveCapturesToGallery ?? false);
   }, [settings]);
 
   return {
@@ -28,13 +26,11 @@ export function useSavePresetsSync() {
     defaultVideoPresetId,
     isLoading,
     presets,
-    saveCapturesToGallery,
     setCaptureAction,
     setDefaultExportPresetId,
     setDefaultImagePresetId,
     setDefaultVideoPresetId,
     setPresets,
-    setSaveCapturesToGallery,
     settings,
     updateSettings,
   };

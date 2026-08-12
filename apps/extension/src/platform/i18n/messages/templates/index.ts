@@ -26,6 +26,10 @@ export const templatesMessages = defineMessageSource({
       ru: 'Добавить шаблон',
       en: 'Add template',
     },
+    restoreAction: {
+      ru: 'Восстановить встроенный шаблон',
+      en: 'Restore built-in template',
+    },
     deleteDefaultTitle: {
       ru: 'Удалить стандартный шаблон?',
       en: 'Delete default template?',
@@ -41,18 +45,6 @@ export const templatesMessages = defineMessageSource({
     deleteMessageSuffix: {
       ru: '?',
       en: '?',
-    },
-    countOne: {
-      ru: 'шаблон',
-      en: 'template',
-    },
-    countFew: {
-      ru: 'шаблона',
-      en: 'templates',
-    },
-    countMany: {
-      ru: 'шаблонов',
-      en: 'templates',
     },
   },
   editor: {
@@ -110,6 +102,10 @@ export const templatesMessages = defineMessageSource({
       ru: 'Шаблон создан',
       en: 'Template created',
     },
+    restored: {
+      ru: 'Встроенный шаблон восстановлен',
+      en: 'Built-in template restored',
+    },
     deleteErrorSuffix: {
       ru: ' удаления шаблона',
       en: ' deleting the template',
@@ -117,6 +113,10 @@ export const templatesMessages = defineMessageSource({
     saveErrorSuffix: {
       ru: ' сохранения шаблона',
       en: ' saving the template',
+    },
+    resetErrorSuffix: {
+      ru: ' восстановления встроенного шаблона',
+      en: ' restoring the built-in template',
     },
   },
 });

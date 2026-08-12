@@ -93,21 +93,28 @@ function createScenarioCapturePayload(): ScenarioRuntimeCapturePayload {
 }
 
 it('routes capture persistence helper decisions', async () => {
-  const noGallery = await maybePersistScreenshotInMediaHub(
-    { saveCapturesToGallery: false },
+  const temporaryAsset = await maybePersistScreenshotInMediaHub(
+    {},
     'data:image/png;base64,1',
     'visible.png',
     42
   );
-  const withGallery = await maybePersistScreenshotInMediaHub(
-    { saveCapturesToGallery: true },
+  const libraryAsset = await maybePersistScreenshotInMediaHub(
+    {
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'library',
+        draftRetentionDays: 7,
+        videoDraftRetentionDays: 7,
+      },
+    },
     'data:image/png;base64,2',
     'visible.png',
     42
   );
 
-  expect(noGallery).toBe('asset-1');
-  expect(withGallery).toBe('asset-1');
+  expect(temporaryAsset).toBe('asset-1');
+  expect(libraryAsset).toBe('asset-1');
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenNthCalledWith(
     1,
     'data:image/png;base64,1',
@@ -223,7 +230,12 @@ it('persists gallery and scenario payloads before returning the captured data ur
   const capturePromise = createCaptureDeliveryPromise(Promise.resolve('data:image/png;base64,9'), {
     settings: {
       defaultImagePresetId: null,
-      saveCapturesToGallery: true,
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'library',
+        draftRetentionDays: 7,
+        videoDraftRetentionDays: 7,
+      },
     },
     filename: 'visible.png',
     resolvedTabId: 42,

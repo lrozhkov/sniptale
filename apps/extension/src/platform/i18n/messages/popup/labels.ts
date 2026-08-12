@@ -14,7 +14,7 @@ export const popupLabelsMessages = defineMessageSource({
     en: 'Area',
   },
   captureModePreset: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   captureModeScreen: {
@@ -90,7 +90,7 @@ export const popupLabelsMessages = defineMessageSource({
     en: 'Screen',
   },
   sourceViewportPreset: {
-    ru: 'Viewport-пресет',
+    ru: 'Viewport-шаблон',
     en: 'Viewport preset',
   },
   sourceViewportPrefix: {

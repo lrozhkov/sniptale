@@ -9,8 +9,10 @@ export type AISettingsMutationCommand =
   | { operation: 'clear-provider-secret' | 'delete-provider'; providerId: string }
   | { operation: 'add-model' | 'update-model'; model: AIModel }
   | { operation: 'delete-model'; modelId: string }
+  | { operation: 'move-model'; modelId: string; beforeModelId: string | null }
   | { operation: 'save-default-model'; defaultModelId: string | null }
   | { operation: 'save-global-prompt' | 'save-scenario-editor-prompt'; prompt: string }
+  | { operation: 'reset-global-prompt' | 'reset-scenario-editor-prompt' }
   | { operation: 'save-chrome-ai-enabled'; enabled: boolean }
   | { operation: 'enable-secret-passphrase-protection'; passphrase: string }
   | { operation: 'disable-secret-passphrase-protection'; passphrase?: string | undefined }

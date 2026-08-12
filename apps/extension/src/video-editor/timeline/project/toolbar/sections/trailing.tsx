@@ -1,4 +1,4 @@
-import { Focus, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Focus, Maximize2, PanelLeftClose, PanelLeftOpen, Rows3 } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { TimelineIconButton } from '../../controls/icon-button';
 import type { ProjectTimelineToolbarProps } from '../types';
@@ -50,7 +50,7 @@ function ProjectTimelineTrackViewControls({
       <TimelineIconButton
         active={trackView.compactRows}
         dataUi="video-editor.timeline.toolbar.compact-tracks"
-        icon={<Minimize2 size={13} strokeWidth={2.2} />}
+        icon={<Rows3 size={14} strokeWidth={2.2} />}
         onClick={() => trackView.onCompactRowsChange(!trackView.compactRows)}
         title={translate('videoEditor.timeline.trackPanelCompactToggle')}
       />

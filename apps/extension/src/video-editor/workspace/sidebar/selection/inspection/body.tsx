@@ -18,7 +18,6 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'selectedMotionRegion'
     | 'selectedObjectTrack'
     | 'selectedTrack'
-    | 'cursorDetection'
     | 'placementMode'
     | 'onSetSceneBackground'
     | 'onPreviewSceneBackground'
@@ -125,7 +124,6 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     selectedTrack: props.selectedTrack ?? null,
     selectedTransition: props.selectedTransition ?? null,
     placementMode: props.placementMode ?? null,
-    cursorDetection: props.cursorDetection,
     recentColors: props.recentColors ?? [],
     ...createSelectionSceneClipUpdateDefaults(props),
     onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent,

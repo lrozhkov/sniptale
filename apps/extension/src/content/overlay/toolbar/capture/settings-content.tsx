@@ -1,5 +1,5 @@
 import React from 'react';
-import { Columns2, EyeOff, Pin, PinOff, Rows3, X } from 'lucide-react';
+import { Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import {
@@ -142,6 +142,7 @@ function renderToolbarSettingsUtilityItems(props: {
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   screenshotMode: boolean;
+  showPinItem?: boolean;
 }) {
   return (
     <>
@@ -156,10 +157,10 @@ function renderToolbarSettingsUtilityItems(props: {
           props.onCompactMenusChange(!props.compactMenus);
         }}
       />
-      {renderPinToTabItem(props)}
+      {props.showPinItem !== false ? renderPinToTabItem(props) : null}
       <ProductToolbarMenuDivider />
       {renderActionItem({
-        icon: <EyeOff className="sniptale-popover-icon" />,
+        icon: <PanelBottomClose className="sniptale-popover-icon" />,
         label: translate('content.toolbar.hideToolbar'),
         onAction: () => props.onHide(),
         onClose: props.onClose,
@@ -270,6 +271,7 @@ type ToolbarSettingsDropdownProps = {
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
   screenshotMode: boolean;
+  showPinItem?: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   viewportRightInset?: number;
 };

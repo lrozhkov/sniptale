@@ -9,6 +9,13 @@ vi.mock('./build', async (importOriginal) => {
   const original = await importOriginal<typeof import('./build')>();
 
   return {
+    catalogActions: {
+      clearProviderSecret: vi.fn(),
+      deleteModel: vi.fn(),
+      deleteProvider: vi.fn(),
+      moveModel: vi.fn(),
+      setDefaultModel: vi.fn(),
+    },
     ...original,
     buildAiProvidersSectionControllerState:
       controllerMocks.buildAiProvidersSectionControllerStateMock,
@@ -30,12 +37,7 @@ function createControllerDependencies() {
       models: [],
       providers: [],
     },
-    deleteHandlers: {
-      handleDeleteModel: vi.fn(),
-      handleDeleteProvider: vi.fn(),
-    },
     getProviderName: vi.fn(),
-    handleDefaultModelChange: vi.fn(),
     modalState: {
       confirmDelete: null,
       closeModelModal: vi.fn(),

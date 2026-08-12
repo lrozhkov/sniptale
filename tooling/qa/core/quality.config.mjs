@@ -38,7 +38,7 @@ export const IGNORED_ROOT_SEGMENTS = new Set([
 export const FORMATTABLE_FILE_PATTERN = /\.(?:ts|tsx|js|mjs|cjs|json|css|html|yml|yaml|py)$/;
 export const FORMATTER_EXCLUDE_PATTERNS = [/^tooling\/configs\//];
 
-export const WORKSPACE_ONLY_IGNORE_PATTERNS = [/^tasks\//];
+export const WORKSPACE_ONLY_IGNORE_PATTERNS = [/^\.agents(?:\/|$)/u, /^AGENTS\.md$/u, /^tasks\//u];
 
 export const DATA_FILE_PATTERNS = [
   /^tooling\/configs\//,

@@ -4,6 +4,9 @@ import { disableDesignReviewMode } from '../../../selection/design-review';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { DiagnosticLoggerController } from '../../../application/diagnostics/runtime';
 import type { ScreenshotStartContext } from '../../screenshot/types';
+import type { UseToolbarModeControllerResult } from '../../toolbar/mode-controller/types';
+import { selectToolbarWorkingMode } from '../message-bridge/working-modes';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
   ContentAppModeState,
   ContentAppModeFlags,
@@ -24,6 +27,7 @@ export type ContentRuntimeBridgeParams = {
   ) => Promise<void>;
   invalidateScreenshotRuns: () => ScreenshotStartContext | undefined;
   modeControls: ReturnType<typeof buildContentModeControls>;
+  modeController: UseToolbarModeControllerResult;
   modeFlags: ContentAppModeFlags;
   quickActionState: ContentRuntimeQuickActionState;
   visibilityState: ReturnType<typeof buildContentVisibilityState>;
@@ -39,6 +43,9 @@ export function buildContentModeFlags(modeState: ContentAppModeStateValue): Cont
     quickEditDocumentMode: modeState.quickEditDocumentMode,
     quickEditMode: modeState.quickEditMode,
     screenshotMode: modeState.screenshotMode,
+    ...(modeState.videoRecordingMode === undefined
+      ? {}
+      : { videoRecordingMode: modeState.videoRecordingMode }),
   };
 }
 
@@ -55,6 +62,9 @@ export function buildContentModeControls(
     setNavigationLockEnabled: modeState.setNavigationLockEnabled,
     setQuickEditMode: modeState.setQuickEditMode,
     setScreenshotMode: modeState.setScreenshotMode,
+    ...(modeState.setVideoRecordingMode === undefined
+      ? {}
+      : { setVideoRecordingMode: modeState.setVideoRecordingMode }),
   };
 }
 
@@ -147,6 +157,9 @@ export function buildRuntimeMessageBridgeParams(
     modeState: {
       aiPickMode: params.modeFlags.aiPickMode,
       designReviewMode: params.modeFlags.designReviewMode,
+      ...(params.modeFlags.drawingMode === undefined
+        ? {}
+        : { drawingMode: params.modeFlags.drawingMode }),
       highlighterMode: params.modeFlags.highlighterMode,
       isToolbarVisible: params.visibilityState.isToolbarVisible,
       quickEditMode: params.modeFlags.quickEditMode,
@@ -167,6 +180,9 @@ export function buildRuntimeMessageBridgeParams(
       invalidateScreenshotRuns: params.invalidateScreenshotRuns,
       queueAutoStartCapture: params.visibilityState.queueAutoStartCapture,
       setCurrentViewport: params.viewportState.setCurrentViewport,
+    },
+    workingModes: {
+      select: (mode: ToolbarWorkingMode) => selectToolbarWorkingMode(params.modeController, mode),
     },
   };
 }

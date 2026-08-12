@@ -5,11 +5,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { handleViewportMessage } from './viewport';
 
-const { disableVideoAnnotations, enableVideoAnnotations } = vi.hoisted(() => ({
-  disableVideoAnnotations: vi.fn(),
-  enableVideoAnnotations: vi.fn(),
-}));
-
 const { disableVideoTelemetry, enableVideoTelemetry, pauseVideoTelemetry, resumeVideoTelemetry } =
   vi.hoisted(() => ({
     disableVideoTelemetry: vi.fn(),
@@ -17,16 +12,6 @@ const { disableVideoTelemetry, enableVideoTelemetry, pauseVideoTelemetry, resume
     pauseVideoTelemetry: vi.fn(),
     resumeVideoTelemetry: vi.fn(),
   }));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ log: vi.fn() }),
-}));
-
-vi.mock('../../overlay/video-annotations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../overlay/video-annotations')>()),
-  disableVideoAnnotations,
-  enableVideoAnnotations,
-}));
 
 vi.mock('../../overlay/video-telemetry', () => ({
   disableVideoTelemetry,
@@ -88,8 +73,6 @@ it('routes controlled cursor bootstrap through the telemetry owner without page 
   ).toBe(false);
 
   expect(enableVideoTelemetry).toHaveBeenCalledWith('recording-1', 4.5);
-  expect(enableVideoAnnotations).not.toHaveBeenCalled();
-  expect(disableVideoAnnotations).not.toHaveBeenCalled();
   expect(regionSelectorController.hideRecordingOverlay).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
     success: true,
@@ -116,7 +99,6 @@ it('routes controlled cursor disable through the telemetry owner', () => {
   ).toBe(false);
 
   expect(disableVideoTelemetry).toHaveBeenCalledOnce();
-  expect(disableVideoAnnotations).not.toHaveBeenCalled();
   expect(regionSelectorController.hideRecordingOverlay).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({
     success: true,
@@ -151,7 +133,5 @@ it('routes controlled cursor capture pause and resume through telemetry owner', 
     )
   ).toBe(false);
   expect(resumeVideoTelemetry).toHaveBeenCalledOnce();
-  expect(enableVideoAnnotations).not.toHaveBeenCalled();
-  expect(disableVideoAnnotations).not.toHaveBeenCalled();
   expect(regionSelectorController.hideRecordingOverlay).not.toHaveBeenCalled();
 });

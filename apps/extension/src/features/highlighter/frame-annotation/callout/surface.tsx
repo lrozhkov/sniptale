@@ -109,6 +109,10 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
     titleEnabled: props.settings.style.title.enabled,
     titleText: props.settings.content.titleText,
   });
+  const cardCustomStyles =
+    props.dynamicTail?.kind === 'wedge'
+      ? { ...customStyles.card, boxShadow: undefined }
+      : customStyles.card;
   return (
     <>
       <div
@@ -130,7 +134,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         )}
         <div
           ref={props.containerRef as Ref<HTMLDivElement>}
-          style={{ ...props.cloudStyle, ...customStyles.card }}
+          style={{ ...props.cloudStyle, ...cardCustomStyles }}
         >
           {props.settings.style.title.enabled ? (
             <>

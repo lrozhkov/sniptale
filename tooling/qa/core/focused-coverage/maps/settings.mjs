@@ -3,13 +3,12 @@ export const SETTINGS_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'settings-viewport-presets',
     productionPrefix: 'apps/extension/src/settings/sections/capture/screen-sizes/',
-    reason: 'Viewport preset CRUD, grouping, defaults, and sync are covered by focused suites.',
+    reason: 'Viewport template CRUD, grouping, ordering, and sync are covered by focused suites.',
     testFiles: [
       'apps/extension/src/settings/sections/capture/screen-sizes/content.test.tsx',
       'apps/extension/src/settings/sections/capture/screen-sizes/controller.test.tsx',
       'apps/extension/src/settings/sections/capture/screen-sizes/helpers.test.ts',
       'apps/extension/src/settings/sections/capture/screen-sizes/index.test.tsx',
-      'apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.test.tsx',
       'apps/extension/src/settings/sections/capture/screen-sizes/section-content/list/empty-state.test.tsx',
     ],
   },
@@ -77,8 +76,7 @@ export const SETTINGS_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'settings-image-section',
     productionFile: 'apps/extension/src/settings/sections/capture/media-quality/image/format.tsx',
-    reason:
-      'Image format, quality, saving, and tip surfaces are covered by the real content suite.',
+    reason: 'Image format, quality, and saving surfaces are covered by the real content suite.',
     testFiles: [
       'apps/extension/src/settings/sections/capture/media-quality/image/content.test.tsx',
     ],
@@ -87,29 +85,7 @@ export const SETTINGS_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'settings-image-section',
     productionFile: 'apps/extension/src/settings/sections/capture/media-quality/image/quality.tsx',
-    reason:
-      'Image format, quality, saving, and tip surfaces are covered by the real content suite.',
-    testFiles: [
-      'apps/extension/src/settings/sections/capture/media-quality/image/content.test.tsx',
-    ],
-  },
-  {
-    exclusive: true,
-    owner: 'settings-image-section',
-    productionFile:
-      'apps/extension/src/settings/sections/capture/media-quality/image/saving-state.tsx',
-    reason:
-      'Image format, quality, saving, and tip surfaces are covered by the real content suite.',
-    testFiles: [
-      'apps/extension/src/settings/sections/capture/media-quality/image/content.test.tsx',
-    ],
-  },
-  {
-    exclusive: true,
-    owner: 'settings-image-section',
-    productionFile: 'apps/extension/src/settings/sections/capture/media-quality/image/tips.tsx',
-    reason:
-      'Image format, quality, saving, and tip surfaces are covered by the real content suite.',
+    reason: 'Image format, quality, and saving surfaces are covered by the real content suite.',
     testFiles: [
       'apps/extension/src/settings/sections/capture/media-quality/image/content.test.tsx',
     ],
@@ -154,16 +130,5 @@ export const SETTINGS_OWNER_MAPPINGS = [
     reason:
       'Template header, list, empty, loading, and row branches are covered by the content suite.',
     testFiles: ['apps/extension/src/settings/sections/ai/prompts/templates/content.test.tsx'],
-  },
-  {
-    exclusive: true,
-    owner: 'settings-default-viewport',
-    productionFile:
-      'apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.tsx',
-    reason:
-      'Default viewport options, target grouping, and loading state are covered by its focused suite.',
-    testFiles: [
-      'apps/extension/src/settings/sections/capture/screen-sizes/section-content/default-viewport.test.tsx',
-    ],
   },
 ];

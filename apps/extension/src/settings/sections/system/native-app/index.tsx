@@ -2,7 +2,6 @@ import { ShieldAlert } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import {
-  settingsMetaLabelClassName,
   settingsSectionClassName,
   settingsPanelClassName,
   SettingsSubpageTabs,
@@ -28,20 +27,6 @@ function NativeAppErrorPanel({ error }: { error: string | null }) {
   );
 }
 
-function NativeAppHeader() {
-  return (
-    <header className="border-b border-[var(--sniptale-color-border-soft)] pb-4">
-      <p className={settingsMetaLabelClassName}>{translate('settings.navigation.nativeApp')}</p>
-      <h1 className="mt-2 text-xl font-semibold text-[var(--sniptale-color-text-primary-strong)]">
-        {translate('settings.nativeApp.title')}
-      </h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
-        {translate('settings.nativeApp.description')}
-      </p>
-    </header>
-  );
-}
-
 type NativeAppView = 'connection' | 'capture' | 'commands' | 'telemetry';
 
 function resolveView(view?: string): NativeAppView {
@@ -54,8 +39,6 @@ export function NativeAppSection(props: { onViewChange?: (view: string) => void;
 
   return (
     <section className={settingsSectionClassName}>
-      <NativeAppHeader />
-      <NativeAppErrorPanel error={controller.error} />
       <SettingsSubpageTabs
         activeId={view}
         ariaLabel={translate('settings.navigation.nativeApp')}
@@ -67,6 +50,7 @@ export function NativeAppSection(props: { onViewChange?: (view: string) => void;
         ]}
         onChange={props.onViewChange}
       />
+      <NativeAppErrorPanel error={controller.error} />
       {view === 'connection' ? (
         <NativeConnectionView
           status={controller.status}

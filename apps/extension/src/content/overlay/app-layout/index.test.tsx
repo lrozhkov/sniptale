@@ -5,19 +5,28 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AutoBlurController } from '../auto-blur/controller';
 import type { ContentAppLayoutDialogsProps, ContentAppLayoutProps } from './types';
+import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-session';
+import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
 
-const { contentDialogStackMock, contentScenarioRecorderSidebarMock, contentToolbarShellMock } =
-  vi.hoisted(() => ({
-    contentDialogStackMock: vi.fn((props: { dialogs: ContentAppLayoutDialogsProps }) => (
-      <div data-ui="content.layout.dialogs">{String(Boolean(props.dialogs))}</div>
-    )),
-    contentScenarioRecorderSidebarMock: vi.fn((_props: Record<string, unknown>) => (
-      <div data-ui="content.layout.sidebar" />
-    )),
-    contentToolbarShellMock: vi.fn((_props: Record<string, unknown>) => (
-      <div data-ui="content.layout.toolbar" />
-    )),
-  }));
+const {
+  contentDialogStackMock,
+  contentScenarioRecorderSidebarMock,
+  contentToolbarShellMock,
+  embeddedRecordingCameraMock,
+} = vi.hoisted(() => ({
+  contentDialogStackMock: vi.fn((props: { dialogs: ContentAppLayoutDialogsProps }) => (
+    <div data-ui="content.layout.dialogs">{String(Boolean(props.dialogs))}</div>
+  )),
+  contentScenarioRecorderSidebarMock: vi.fn((_props: Record<string, unknown>) => (
+    <div data-ui="content.layout.sidebar" />
+  )),
+  contentToolbarShellMock: vi.fn((_props: Record<string, unknown>) => (
+    <div data-ui="content.layout.toolbar" />
+  )),
+  embeddedRecordingCameraMock: vi.fn((_props: Record<string, unknown>) => (
+    <div data-ui="content.layout.recording-camera" />
+  )),
+}));
 
 vi.mock('./dialogs', () => ({
   ContentDialogStack: (props: { dialogs: ContentAppLayoutDialogsProps }) =>
@@ -31,6 +40,17 @@ vi.mock('./sidebar-lazy', () => ({
 
 vi.mock('./toolbar', () => ({
   ContentToolbarShell: (props: Record<string, unknown>) => contentToolbarShellMock(props),
+}));
+
+vi.mock('../../drawing/surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../drawing/surface')>()),
+  DrawingSurface: () => null,
+}));
+
+vi.mock('../video-recording/spotlight/view', () => ({ VideoRecordingSpotlight: () => null }));
+
+vi.mock('../video-recording/camera/view', () => ({
+  EmbeddedRecordingCamera: (props: Record<string, unknown>) => embeddedRecordingCameraMock(props),
 }));
 
 import { ContentAppLayout } from '.';
@@ -160,7 +180,7 @@ function createScenarioProps() {
   };
 }
 
-function createProps() {
+function createProps(): ContentAppLayoutProps {
   return {
     dialogs: {
       aiController: createAiController(),
@@ -210,7 +230,7 @@ function createProps() {
       setTimerDelay: vi.fn(),
       timerDelay: 0,
     },
-  } satisfies ContentAppLayoutProps;
+  };
 }
 
 async function renderLayout(props: ReturnType<typeof createProps>) {
@@ -289,4 +309,47 @@ describe('ContentAppLayout', () => {
     'skips rendering the lazy sidebar slot while scenario sidebar visibility is inactive',
     verifiesSidebarSlotSkipsHiddenStates
   );
+  it('keeps the embedded camera visible while the video toolbar is collapsed', async () => {
+    const props = createProps();
+    const drawingOwner = createRecordingDrawingOwner();
+    props.toolbar.isToolbarVisible = false;
+    props.toolbar.modes.videoRecordingMode = true;
+    props.toolbar.videoRecording = {
+      drawingOwner,
+      state: {
+        ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+        cameraEnabled: true,
+        peerGeneration: 1,
+        surfaceSessionId: 'surface-1',
+        webcamPresentation: {
+          ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE.webcamPresentation,
+          mode: 'embedded',
+        },
+      },
+      onActivate: vi.fn(() => true),
+      onCancelStart: vi.fn(),
+      onCameraEnabledChange: vi.fn(),
+      onCameraGeometryChange: vi.fn(),
+      onCameraOffer: vi.fn(async () => 'answer'),
+      onCameraPeerClose: vi.fn(),
+      onDeactivate: vi.fn(() => true),
+      onInteractionChange: vi.fn(),
+      onMicrophoneEnabledChange: vi.fn(),
+      onPause: vi.fn(),
+      onResume: vi.fn(),
+      onSpotlightEnabledChange: vi.fn(),
+      onStart: vi.fn(),
+      onStop: vi.fn(),
+    };
+
+    await renderLayout(props);
+
+    expect(embeddedRecordingCameraMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true })
+    );
+    expect(contentToolbarShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({ toolbar: expect.objectContaining({ isToolbarVisible: false }) })
+    );
+    drawingOwner.dispose();
+  });
 });

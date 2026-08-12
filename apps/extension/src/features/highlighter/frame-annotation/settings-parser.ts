@@ -6,10 +6,6 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isOptionalRecord(value: unknown): value is Record<string, unknown> | undefined {
-  return value === undefined || isRecord(value);
-}
-
 function isSafeFrameCss(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 20_000) return false;
   const validation = validateCssPolicyString(value);
@@ -66,8 +62,7 @@ function hasSafeColorFields(value: Record<string, unknown>, fields: readonly str
   return fields.every((field) => isSafeCssColor(value[field]));
 }
 
-function isBorderSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+function isBorderSettings(value: Record<string, unknown>): boolean {
   const padding = value['padding'];
   const effects = value['effects'];
   return (
@@ -102,7 +97,7 @@ function isBorderSettings(value: unknown): boolean {
 
 export function parseBorderSettings(value: unknown): AppliedBorderSettings | undefined | null {
   if (value === undefined) return undefined;
-  if (!isBorderSettings(value) || !isRecord(value)) return null;
+  if (!isRecord(value) || !isBorderSettings(value)) return null;
   const color = normalizeColor(value['color'] as string);
   const fillColor = normalizeColor(
     typeof value['fillColor'] === 'string' ? value['fillColor'] : '#00000000'
@@ -144,8 +139,7 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
   };
 }
 
-function isBlurSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+function isBlurSettings(value: Record<string, unknown>): boolean {
   return (
     isFiniteNumber(value['amount']) &&
     isOneOf(value['blurType'], ['gaussian', 'pixelate', 'distortion', 'solid']) &&
@@ -172,7 +166,7 @@ function isBlurSettings(value: unknown): boolean {
 
 export function parseBlurSettings(value: unknown): BlurSettings | undefined | null {
   if (value === undefined) return undefined;
-  if (!isBlurSettings(value) || !isRecord(value)) return null;
+  if (!isRecord(value) || !isBlurSettings(value)) return null;
   const strokeColor = isSafeCssColor(value['strokeColor'])
     ? normalizeColor(value['strokeColor'])
     : null;
@@ -206,7 +200,8 @@ export function parseBlurSettings(value: unknown): BlurSettings | undefined | nu
 }
 
 export function isFocusSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   return (
     isFiniteNumber(value['opacity']) &&
     value['opacity'] >= 0 &&
@@ -275,7 +270,8 @@ function isStepBadgeStyle(value: unknown): boolean {
 }
 
 export function isStepBadgeSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   const style = value['style'];
   return (
     typeof value['enabled'] === 'boolean' &&
@@ -478,7 +474,8 @@ function isCalloutConnector(value: unknown): boolean {
 }
 
 export function isCalloutSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   const content = value['content'];
   const placement = value['placement'];
   const style = value['style'];

@@ -3,7 +3,6 @@ import type { WorkspaceSidebarProps } from './props';
 
 type WorkspaceSidebarPanelContentPropKeys =
   | 'activeProjectId'
-  | 'cursorDetection'
   | 'diagnosticsContent'
   | 'gridSettings'
   | 'inspectorMode'

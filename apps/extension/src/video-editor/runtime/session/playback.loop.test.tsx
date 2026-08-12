@@ -64,6 +64,7 @@ function PlaybackLoopHarness(props: {
       currentTime: props.currentTime,
       isPlaying: true,
       playbackRange: { start: 0.5, end: 0.8 },
+      projectHistoryTransactionActive: false,
       selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' } as never,
       placementMode: null,
       selectedClipId: 'clip-1',

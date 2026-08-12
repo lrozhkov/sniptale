@@ -1,6 +1,6 @@
 export { announceCaptureSource } from './transport.announce';
 export {
-  enableAnnotationsOrAbort,
+  prepareContentSurfaceOrAbort,
   enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,

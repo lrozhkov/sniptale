@@ -8,8 +8,13 @@ export function SettingsCollectionReorderHandle(props: {
   active: boolean;
   dragInstructionsId: string;
   item: SettingsCollectionItem;
-  onDragEnd(): void;
-  onDragStart(itemId: string): void;
+  onPointerStart(
+    itemId: string,
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    root: HTMLElement | null
+  ): void;
   onKeyboardMove(itemId: string, direction: -1 | 1): void;
   onKeyboardCancel(): void;
   onKeyboardToggle(itemId: string): void;
@@ -20,10 +25,10 @@ export function SettingsCollectionReorderHandle(props: {
       aria-label={translate('settings.collection.dragHandle')}
       aria-describedby={props.dragInstructionsId}
       aria-pressed={props.active}
+      title={translate('settings.collection.dragHandle')}
       disabled={props.item.busy}
-      draggable={!props.item.busy}
       className={[
-        'rounded focus-visible:outline-none focus-visible:ring-2',
+        'touch-none rounded focus-visible:outline-none focus-visible:ring-2',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
       onKeyDown={(event) => {
@@ -38,8 +43,18 @@ export function SettingsCollectionReorderHandle(props: {
           props.onKeyboardMove(props.item.id, event.key === 'ArrowUp' ? -1 : 1);
         }
       }}
-      onDragStart={() => props.onDragStart(props.item.id)}
-      onDragEnd={props.onDragEnd}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || props.item.busy) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        props.onPointerStart(
+          props.item.id,
+          event.pointerId,
+          event.clientX,
+          event.clientY,
+          event.currentTarget.closest<HTMLElement>('[data-settings-collection-root]')
+        );
+      }}
     >
       <SettingsDragHandle className="pointer-events-none" />
     </button>
@@ -51,19 +66,21 @@ export function SettingsCollectionPrimaryActions(props: {
   onAction(action: SettingsCollectionAction): void;
 }) {
   const { item, onAction } = props;
+  const toggleLabel = translate(
+    item.enabled === false
+      ? 'settings.collection.actions.enable'
+      : 'settings.collection.actions.disable'
+  );
+  const editLabel = translate('settings.collection.actions.edit');
   return (
     <>
       {item.capabilities.toggle ? (
         <SettingsSwitch
           checked={item.enabled !== false}
           size="sm"
-          aria-label={translate(
-            item.enabled === false
-              ? 'settings.collection.actions.enable'
-              : 'settings.collection.actions.disable'
-          )}
+          aria-label={toggleLabel}
           disabled={item.busy || item.disabledActions?.toggle !== undefined}
-          title={item.disabledActions?.toggle}
+          title={item.disabledActions?.toggle ?? toggleLabel}
           onClick={() =>
             onAction({
               type: 'toggle',
@@ -76,8 +93,8 @@ export function SettingsCollectionPrimaryActions(props: {
       {item.capabilities.edit ? (
         <button
           type="button"
-          aria-label={translate('settings.collection.actions.edit')}
-          title={item.disabledActions?.edit}
+          aria-label={editLabel}
+          title={item.disabledActions?.edit ?? editLabel}
           disabled={item.busy || item.disabledActions?.edit !== undefined}
           className={[
             'flex h-8 w-8 items-center justify-center rounded-lg',

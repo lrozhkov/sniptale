@@ -78,6 +78,20 @@ describe('highlighter preset mutation guards', () => {
     ).toBeNull();
   });
 
+  it('applies a changed preset id sequence even when order values remain sequential', () => {
+    const settings = createDefaultHighlighterSettings();
+    const orderedIds = settings.borderPresets.map((preset) => preset.id);
+    const [first, second, ...rest] = orderedIds;
+
+    const result = reorderPresets(settings, [second!, first!, ...rest]);
+
+    expect(result?.borderPresets.map((preset) => preset.id)).toEqual([second, first, ...rest]);
+    expect(result?.borderPresets.map((preset) => preset.order)).toEqual(
+      orderedIds.map((_, index) => index)
+    );
+    expect(result?.catalogCustomized).toBe(true);
+  });
+
   it('does not rewrite unchanged user or system presets', () => {
     const settings = createDefaultHighlighterSettings();
     const system = settings.borderPresets[0]!;

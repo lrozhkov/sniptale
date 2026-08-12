@@ -48,6 +48,15 @@ export const VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS = [
   'video-recording-control-lease',
 ] as const satisfies readonly PolicyStateId[];
 
+export const VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS = [
+  'content-action-activation-keys',
+  'content-action-capabilities',
+  'content-action-runtime-tokens',
+  'content-action-trusted-event-proofs',
+  'video-recording-control-lease',
+  'video-recording-surface-lease',
+] as const satisfies readonly PolicyStateId[];
+
 export const PROJECT_EXPORT_RUNTIME_POLICY_STATE_IDS = [
   'project-export-capabilities',
   'project-export-job-ledger',

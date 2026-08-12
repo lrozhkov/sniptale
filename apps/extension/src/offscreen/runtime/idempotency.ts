@@ -26,6 +26,7 @@ type OffscreenIdempotencyMessage = {
   desktopMediaRequestId?: unknown;
   generation?: unknown;
   jobId?: unknown;
+  peerId?: unknown;
   recordingId?: unknown;
   requestId?: unknown;
   reference?: unknown;
@@ -50,6 +51,22 @@ const idempotencyPolicyByType = {
   [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
     idempotent: true,
     reason: 'frame annotation rasterization is correlated by the staged immutable job reference',
+  },
+  [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {
+    idempotent: true,
+    reason: 'clipboard write is correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME]: {
+    idempotent: true,
+    reason: 'desktop screenshot reservation is correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: {
+    idempotent: true,
+    reason: 'desktop frame consumption is one-shot and correlated by requestId',
+  },
+  [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME]: {
+    idempotent: false,
+    reason: 'desktop reservation cleanup is deliberately repeatable',
   },
   [VideoMessageType.GET_DESKTOP_MEDIA]: {
     idempotent: true,
@@ -91,6 +108,22 @@ const idempotencyPolicyByType = {
     idempotent: false,
     reason: 'recording settings are a latest-value command',
   },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: {
+    idempotent: true,
+    reason: 'camera negotiation is bound to one document peer generation',
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
+    idempotent: true,
+    reason: 'closing the same document peer repeatedly is safe',
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: {
+    idempotent: false,
+    reason: 'camera input switching is a serialized latest-value mutation',
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: {
+    idempotent: false,
+    reason: 'media device enumeration is a read-like command with permission-sensitive results',
+  },
   [VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT]: {
     idempotent: true,
     reason: 'project export start is correlated by jobId',
@@ -124,6 +157,7 @@ export const OFFSCREEN_COMMAND_CORRELATION_KEYS = [
   'desktopMediaRequestId',
   'requestId',
   'sessionId',
+  'peerId',
   'runtime',
 ] as const;
 
@@ -159,6 +193,9 @@ function readCorrelationId(message: OffscreenIdempotencyMessage): string {
   }
   if (typeof message.sessionId === 'string' && message.sessionId.length > 0) {
     return message.sessionId;
+  }
+  if (typeof message.peerId === 'string' && message.peerId.length > 0) {
+    return message.peerId;
   }
 
   return 'runtime';

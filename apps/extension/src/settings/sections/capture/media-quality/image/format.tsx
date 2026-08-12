@@ -1,25 +1,9 @@
 import { translate } from '../../../../../platform/i18n';
 import { FORMAT_OPTIONS } from './constants';
-import { settingsCardClassName } from '../../../../section-surface/panel-controls';
-import { settingsMetaLabelClassName } from '../../../../section-surface';
+import { SettingsControlRow } from '../../../../section-surface';
 import type { useImageSettingsSection } from './controller';
 
-const imageSettingsCardClassName = settingsCardClassName;
-
-const imageSettingsFormatCardSelectedClassName = [
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,var(--sniptale-color-border-soft)_82%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_18%,var(--sniptale-color-surface-panel)_82%)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_6%,transparent)]',
-].join(' ');
-
-const imageSettingsFormatCardIdleClassName = [
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_42%,transparent)]',
-  'hover:border-[var(--sniptale-color-border-strong)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_64%,transparent)]',
-].join(' ');
-
-function ImageSettingsFormatCard({
+function ImageSettingsFormatOption({
   isSelected,
   onSelect,
   option,
@@ -28,41 +12,23 @@ function ImageSettingsFormatCard({
   onSelect: () => void;
   option: (typeof FORMAT_OPTIONS)[number];
 }) {
-  const radioClassName = isSelected
-    ? 'border-[var(--sniptale-color-accent)]'
-    : 'border-[var(--sniptale-color-border-strong)]';
-
-  const labelClassName = isSelected
-    ? 'font-medium text-[var(--sniptale-color-accent)]'
-    : 'font-medium text-[var(--sniptale-color-text-secondary)]';
-
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={isSelected}
+      title={translate(option.labelKey)}
       onClick={onSelect}
       className={[
-        'relative rounded-lg border p-3 text-left transition-all',
+        'inline-flex h-7 min-w-[4rem] items-center justify-center rounded-md px-2.5',
+        'text-xs transition-colors focus-visible:outline-none focus-visible:ring-2',
+        'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
         isSelected
-          ? imageSettingsFormatCardSelectedClassName
-          : imageSettingsFormatCardIdleClassName,
+          ? 'bg-[var(--sniptale-color-surface-panel)] font-semibold text-[var(--sniptale-color-text-primary)]'
+          : 'font-medium text-[var(--sniptale-color-text-muted)] hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
-      <div className="mb-1 flex items-center gap-2">
-        <div
-          className={[
-            'flex h-4 w-4 items-center justify-center rounded-full border-2',
-            radioClassName,
-          ].join(' ')}
-        >
-          {isSelected ? (
-            <div className="h-2 w-2 rounded-full bg-[var(--sniptale-color-accent)]" />
-          ) : null}
-        </div>
-        <span className={labelClassName}>{translate(option.labelKey)}</span>
-      </div>
-      <p className="ml-6 text-xs text-[var(--sniptale-color-text-dim)]">
-        {translate(option.descriptionKey)}
-      </p>
+      {translate(option.labelKey)}
     </button>
   );
 }
@@ -73,13 +39,14 @@ export function ImageSettingsSectionFormat({
   state: ReturnType<typeof useImageSettingsSection>;
 }) {
   return (
-    <div className={`mb-4 ${imageSettingsCardClassName}`}>
-      <label className={`mb-3 block ${settingsMetaLabelClassName}`}>
-        {translate('imageSettings.section.formatLabel')}
-      </label>
-      <div className="grid gap-3 md:grid-cols-3">
+    <SettingsControlRow label={translate('imageSettings.section.formatLabel')}>
+      <div
+        role="radiogroup"
+        aria-label={translate('imageSettings.section.formatLabel')}
+        className="inline-flex w-fit gap-0.5 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-0.5"
+      >
         {FORMAT_OPTIONS.map((option) => (
-          <ImageSettingsFormatCard
+          <ImageSettingsFormatOption
             key={option.value}
             option={option}
             isSelected={state.imageFormat === option.value}
@@ -87,6 +54,6 @@ export function ImageSettingsSectionFormat({
           />
         ))}
       </div>
-    </div>
+    </SettingsControlRow>
   );
 }

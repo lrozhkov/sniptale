@@ -92,6 +92,7 @@ it('edits system presets and physically deletes only user presets', async () => 
 
   await actions.handleDeletePreset(user);
   expect(mocks.delete).toHaveBeenCalledWith('user-1');
+  expect(mocks.toastSuccess).not.toHaveBeenCalled();
 });
 
 it('delegates create, update, and reset to canonical owner commands', async () => {
@@ -109,6 +110,7 @@ it('delegates create, update, and reset to canonical owner commands', async () =
 
   await actions.handleResetPreset('system-default');
   expect(mocks.reset).toHaveBeenCalledWith('system-default');
+  expect(mocks.toastSuccess).not.toHaveBeenCalled();
 });
 
 it('surfaces mutation failures without closing the editor', async () => {

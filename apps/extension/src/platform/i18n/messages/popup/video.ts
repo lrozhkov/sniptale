@@ -32,7 +32,7 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Allow camera access first',
   },
   modePresetLabel: {
-    ru: 'Вкладка с пресетом размера',
+    ru: 'Вкладка с шаблоном размера',
     en: 'Tab with size preset',
   },
   modePresetHint: {
@@ -56,11 +56,11 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Recording size selector',
   },
   presetPlaceholder: {
-    ru: 'Выберите пресет',
+    ru: 'Выберите шаблон',
     en: 'Select a preset',
   },
   presetEmpty: {
-    ru: 'Пресеты не настроены',
+    ru: 'Шаблоны не настроены',
     en: 'No presets configured',
   },
   presetNativeLabel: {
@@ -72,15 +72,15 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Do not resize the page viewport or browser window',
   },
   presetAria: {
-    ru: 'Пресет размера записи',
+    ru: 'Шаблон размера записи',
     en: 'Recording size preset',
   },
   manageSizePresets: {
-    ru: 'Управление пресетами размеров…',
+    ru: 'Управление шаблонами размеров…',
     en: 'Manage presets…',
   },
   choosePresetError: {
-    ru: 'Сначала выберите пресет',
+    ru: 'Сначала выберите шаблон',
     en: 'Select a preset first',
   },
   ...popupVideoMediaMessages,
@@ -100,6 +100,18 @@ export const popupVideoMessages = defineMessageSource({
   systemAudioDisabledDescription: {
     ru: 'Недоступно для режима Экран',
     en: 'Unavailable in Screen mode',
+  },
+  recordingToolbarLabel: {
+    ru: 'Показать тулбар',
+    en: 'Show toolbar',
+  },
+  recordingToolbarDescription: {
+    ru: 'Открыть панель инструментов записи на вкладке',
+    en: 'Open the recording tools on the tab',
+  },
+  recordingToolbarDisabledDescription: {
+    ru: 'Панель доступна только для записи вкладки или области вкладки',
+    en: 'The toolbar is available only for tab or tab-area recording',
   },
   controlledCursorLabel: {
     ru: 'История действий',

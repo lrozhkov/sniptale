@@ -13,6 +13,7 @@ function PlaybackEscapeHarness(props: { clearPlacementMode: () => void }) {
       currentTime: 0.25,
       isPlaying: false,
       playbackRange: null,
+      projectHistoryTransactionActive: false,
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
       placementMode: { kind: 'motion-focus', motionRegionId: 'motion-1' },
       selectedClipId: null,

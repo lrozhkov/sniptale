@@ -25,6 +25,14 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoControlMessage } from '../../../../../contracts/video/types/messages';
+import type {
+  ActivateVideoRecordingSurfaceMessage,
+  ReleaseVideoRecordingSurfaceMessage,
+  StartSavedTabVideoRecordingMessage,
+  VideoRecordingSurfaceCommandMessage,
+  VideoRecordingCameraOfferMessage,
+  VideoRecordingCameraCloseMessage,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { RouteCaptureMessage } from '../../../../capture/routes';
 
 export type BackgroundInternalSignalMessage =
@@ -56,7 +64,16 @@ export type BackgroundTabMessage =
   | ScenarioMessage
   | PopupExportViewerMessage
   | TabModeMessage
-  | VideoControlMessage;
+  | VideoControlMessage
+  | VideoRecordingSurfaceMessage;
+
+export type VideoRecordingSurfaceMessage =
+  | ActivateVideoRecordingSurfaceMessage
+  | ReleaseVideoRecordingSurfaceMessage
+  | StartSavedTabVideoRecordingMessage
+  | VideoRecordingSurfaceCommandMessage
+  | VideoRecordingCameraOfferMessage
+  | VideoRecordingCameraCloseMessage;
 
 export type PopupExportViewerMessage =
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]

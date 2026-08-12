@@ -54,6 +54,7 @@ function createSidecar(): RecordingSidecarRecorder {
     filenameSuffix: 'webcam',
     kind: 'webcam',
     recorder,
+    release: vi.fn(() => stream.getTracks().forEach((track) => track.stop())),
     recordingId: 'rec-webcam',
     stream,
     trackSettings: { frameRate: 30, height: 720, width: 1280 },

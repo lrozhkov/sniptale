@@ -2,14 +2,15 @@ import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
 import { translate } from '../../platform/i18n';
 import { useSurfaceStyleSelectorController } from './controller';
-import { SurfaceStyleEditorPanel } from './editor-panel';
-import { SurfaceStylePresetGrid } from './preset-grid';
+import { SurfaceStyleManagementPanel } from './management-panel';
+import { SurfaceStyleSelectionPanel } from './selection-panel';
 import type { SurfaceStyleSelectorProps } from './types';
 
 export type { SurfaceStyleSelectorActions, SurfaceStyleSelectorProps } from './types';
 
 export function SurfaceStyleSelector(props: SurfaceStyleSelectorProps) {
   const controller = useSurfaceStyleSelectorController(props);
+  const management = props.presentation !== 'selection';
 
   return (
     <div
@@ -43,30 +44,11 @@ export function SurfaceStyleSelector(props: SurfaceStyleSelectorProps) {
           role="dialog"
           aria-label={translate('content.callout.surfaceStyle.title')}
         >
-          <SurfaceStylePresetGrid
-            actions={props.actions}
-            draft={controller.state.draft}
-            name={controller.state.name}
-            onDraftChange={controller.actions.setDraft}
-            presets={props.presets}
-          />
-          <SurfaceStyleEditorPanel
-            actions={props.actions}
-            canonicalCss={controller.state.canonicalCss}
-            {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
-            draft={controller.state.draft}
-            name={controller.state.name}
-            onApply={() => {
-              props.onChange({
-                ...controller.state.draft,
-                surfaceCss: controller.state.canonicalCss ?? '',
-              });
-              controller.actions.notifyOpen(false);
-            }}
-            onCancel={() => controller.actions.notifyOpen(false)}
-            onDraftChange={controller.actions.setDraft}
-            onNameChange={controller.actions.setName}
-          />
+          {management ? (
+            <SurfaceStyleManagementPanel controller={controller} selector={props} />
+          ) : (
+            <SurfaceStyleSelectionPanel controller={controller} selector={props} />
+          )}
         </div>
       ) : null}
     </div>

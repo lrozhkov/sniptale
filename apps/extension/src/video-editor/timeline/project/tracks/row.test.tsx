@@ -42,7 +42,6 @@ it('blurs track state icon buttons after pointer activation', () => {
         isSelected={false}
         track={project.tracks[0]!}
         trackLayout={trackLayout}
-        onAddTrackLogicalLane={vi.fn()}
         onSelectTrack={vi.fn()}
         onToggleTrackLock={vi.fn()}
         onToggleTrackVisibility={vi.fn()}

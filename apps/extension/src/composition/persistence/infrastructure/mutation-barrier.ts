@@ -125,6 +125,8 @@ export type PersistenceMutationDomain =
   | 'drawing-tool-preferences'
   | 'gradient-presets'
   | 'highlighter-settings'
+  | 'popup-startup'
+  | 'screenshot-setup'
   | 'step-badge-presets'
   | 'surface-style-presets'
   | 'video-settings';

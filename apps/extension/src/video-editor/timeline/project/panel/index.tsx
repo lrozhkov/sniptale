@@ -14,6 +14,8 @@ import { UtilityLaneControlRow, UtilityProjectLaneControlRow } from './utility';
 import type { useProjectTimelinePanelPrefs } from './prefs';
 
 export function ProjectTimelineExpandedRows(props: {
+  cursorLaneVisible: boolean;
+  showTelemetryLane: boolean;
   trackLayoutModel: TimelineTrackLayoutModel;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   project: VideoProject;
@@ -26,12 +28,14 @@ export function ProjectTimelineExpandedRows(props: {
 }) {
   return (
     <div className="min-w-0 bg-[color:var(--sniptale-color-surface-panel)]">
-      <UtilityLaneControlRow
-        label={translate('videoEditor.timeline.telemetryLane')}
-        rowHeight={TELEMETRY_LANE_ROW_HEIGHT}
-        visible={props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible}
-        onVisibleChange={props.trackPanelPrefs.setCollapsedTelemetryLaneVisible}
-      />
+      {props.showTelemetryLane ? (
+        <UtilityLaneControlRow
+          label={translate('videoEditor.timeline.telemetryLane')}
+          rowHeight={TELEMETRY_LANE_ROW_HEIGHT}
+          visible={props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible}
+          onVisibleChange={props.trackPanelPrefs.setCollapsedTelemetryLaneVisible}
+        />
+      ) : null}
       {props.tracks.map((track, index) => (
         <ProjectTrackControlRow
           key={track.id}
@@ -46,6 +50,7 @@ export function ProjectTimelineExpandedRows(props: {
         />
       ))}
       <ProjectTimelineExpandedEffectRows
+        cursorLaneVisible={props.cursorLaneVisible}
         project={props.project}
         trackPanelPrefs={props.trackPanelPrefs}
         onClearUtilityLane={props.onClearUtilityLane}
@@ -57,6 +62,7 @@ export function ProjectTimelineExpandedRows(props: {
 }
 
 function ProjectTimelineExpandedEffectRows(props: {
+  cursorLaneVisible: boolean;
   project: VideoProject;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
@@ -67,12 +73,14 @@ function ProjectTimelineExpandedEffectRows(props: {
 
   return (
     <>
-      <UtilityLaneControlRow
-        label={translate('videoEditor.timeline.cursorLane')}
-        rowHeight={EFFECT_LANE_ROW_HEIGHT}
-        visible={props.trackPanelPrefs.prefs.collapsedCursorLaneVisible}
-        onVisibleChange={props.trackPanelPrefs.setCollapsedCursorLaneVisible}
-      />
+      {props.cursorLaneVisible ? (
+        <UtilityLaneControlRow
+          label={translate('videoEditor.timeline.cursorLane')}
+          rowHeight={EFFECT_LANE_ROW_HEIGHT}
+          visible={props.trackPanelPrefs.prefs.collapsedCursorLaneVisible}
+          onVisibleChange={props.trackPanelPrefs.setCollapsedCursorLaneVisible}
+        />
+      ) : null}
       <UtilityProjectLaneControlRow
         height={EFFECT_LANE_ROW_HEIGHT}
         label={translate('videoEditor.timeline.actionsLane')}

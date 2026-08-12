@@ -1,8 +1,4 @@
-import {
-  createCaptureActionChangeAction,
-  createDefaultPresetChangeAction,
-  createToggleSaveToGalleryAction,
-} from './defaults';
+import { createCaptureActionChangeAction, createDefaultPresetChangeAction } from './defaults';
 import { createConfirmDeletePresetAction } from './preset/confirm-delete';
 import { createDeletePresetGuard } from './preset/delete-guard';
 import { createMovePresetBeforeAction } from './preset/drop';
@@ -27,6 +23,5 @@ export function createSavePresetsActions(
     handleMoveBefore: createMovePresetBeforeAction(sync, persistSettings),
     handleSavePreset: createSavePresetAction(sync, dialogState, persistSettings),
     handleTogglePresetEnabled: createTogglePresetEnabledAction(sync, persistSettings),
-    handleToggleSaveToGallery: createToggleSaveToGalleryAction(sync, persistSettings),
   };
 }

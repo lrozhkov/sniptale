@@ -160,6 +160,7 @@ it('routes authorized popup capture messages without page access refresh', () =>
       message: { type: MessageType.TRIGGER_QUICK_ACTION, actionId: 'action-1' },
       pageAccessPort: expect.objectContaining({
         ensureActivePageAccessRuntime: expect.any(Function),
+        waitForContentToolbarReady: expect.any(Function),
       }),
       resolvedTabId: 17,
     })
@@ -187,6 +188,7 @@ it('routes authorized content capture messages after verifying page access', asy
     expect.objectContaining({
       pageAccessPort: expect.objectContaining({
         ensureActivePageAccessRuntime: expect.any(Function),
+        waitForContentToolbarReady: expect.any(Function),
       }),
       resolvedTabId: 17,
     })

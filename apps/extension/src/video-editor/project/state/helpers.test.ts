@@ -23,6 +23,7 @@ import {
   resolveEditableClipOperation,
   updateSourceTimedClipTiming,
 } from './helpers';
+import { resetVideoEditorProjectHistory } from '../history';
 
 function createLinkedProject(): VideoProject {
   const project = createEmptyVideoProject('Helpers');
@@ -120,6 +121,7 @@ function verifyProjectHelperGuards(): void {
     {
       currentTime: 5,
       project,
+      projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'clip', clipId: 'video-1' },
       selectedClipId: 'video-1',
       selectedTrackId: project.tracks[0]!.id,
@@ -209,6 +211,7 @@ function expectMotionSelectionCleanup(project: VideoProject): void {
       currentTime: 1,
       placementMode: createMotionFocusPlacementMode('motion-1'),
       project: motionProject,
+      projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
       selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,
@@ -244,6 +247,7 @@ function expectActionPlacementPreserved(project: VideoProject): void {
       currentTime: 1,
       placementMode: createActionPointPlacementMode('action-1'),
       project: actionProject,
+      projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'action-segment', actionEventId: 'action-1' },
       selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,
@@ -280,6 +284,7 @@ function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject
       currentTime: 1,
       placementMode: createMotionFocusPlacementMode('motion-1'),
       project: motionProject,
+      projectHistory: resetVideoEditorProjectHistory(project.id),
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
       selectedClipId: null,
       selectedTrackId: project.tracks[0]!.id,

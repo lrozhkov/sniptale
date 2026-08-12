@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SavePreset, Settings } from '../../../../../contracts/settings';
+import type { SavePreset, Settings, SettingsPatch } from '../../../../../contracts/settings';
 import { buildSavePresetsViewModel, createSavePresetsActions, createSettingsPersister } from '.';
 const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
@@ -64,11 +64,8 @@ function createSyncState(settings: Settings) {
     defaultVideoPresetId: settings.defaultVideoPresetId ?? null,
     isLoading: false,
     presets: [...(settings.presets ?? [])],
-    saveCapturesToGallery: settings.saveCapturesToGallery,
     settings,
-    updateSettings: vi.fn(async (value: Partial<Settings>) => {
-      sync.settings = { ...sync.settings, ...value };
-    }),
+    updateSettings: vi.fn(async (_value: SettingsPatch) => undefined),
     setCaptureAction: vi.fn((value) => {
       sync.captureAction = value;
     }),
@@ -87,9 +84,6 @@ function createSyncState(settings: Settings) {
     setPresets: vi.fn((value) => {
       sync.presets = value;
     }),
-    setSaveCapturesToGallery: vi.fn((value) => {
-      sync.saveCapturesToGallery = value;
-    }),
   };
   return sync;
 }
@@ -97,11 +91,9 @@ function createHarness(overrides?: {
   presets?: SavePreset[];
   confirmDelete?: SavePreset | null;
   editingPreset?: SavePreset;
-  saveCapturesToGallery?: boolean;
 }) {
   const settings = createSettings({
     presets: overrides?.presets ?? [createPreset('a', 0), createPreset('b', 1)],
-    saveCapturesToGallery: overrides?.saveCapturesToGallery ?? false,
   });
   const sync = createSyncState(settings);
   const dialogState = {
@@ -139,13 +131,11 @@ describe('save presets section view model and persister', () => {
       { value: 'a', label: 'Preset a' },
       { value: 'b', label: 'Preset b' },
     ]);
-    expect(model.presetCountLabel).toBeTruthy();
 
-    await persist({ captureAction: 'copy', saveCapturesToGallery: true });
+    await persist({ captureAction: 'copy' });
 
     expect(sync.updateSettings).toHaveBeenCalledWith({
       captureAction: 'copy',
-      saveCapturesToGallery: true,
     });
   });
 });
@@ -168,7 +158,7 @@ describe('save presets section delete action', () => {
       })
     );
     expect(dialogState.closeDeleteDialog).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetDeleted');
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 });
 
@@ -181,21 +171,19 @@ describe('save presets section change and reorder actions', () => {
       'defaultVideoPresetId',
       'a',
       sync.setDefaultVideoPresetId,
-      sync.defaultVideoPresetId,
-      'savePresets.messages.defaultVideoUpdated'
+      sync.defaultVideoPresetId
     );
     await actions.handleDefaultPresetChange(
       'defaultExportPresetId',
       '',
       sync.setDefaultExportPresetId,
-      sync.defaultExportPresetId,
-      'savePresets.messages.defaultExportUpdated'
+      sync.defaultExportPresetId
     );
 
     expect(sync.captureAction).toBe('copy');
     expect(sync.defaultVideoPresetId).toBe('a');
     expect(sync.defaultExportPresetId).toBeNull();
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.captureActionUpdated');
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 
   it('reorders presets through the canonical insertion intent', async () => {
@@ -208,6 +196,24 @@ describe('save presets section change and reorder actions', () => {
       { id: 'a', order: 1 },
     ]);
     expect(sync.updateSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls compact controls back when persistence fails', async () => {
+    const { sync, actions } = createHarness();
+    sync.updateSettings.mockRejectedValue(new Error('write failed'));
+
+    await expect(actions.handleCaptureActionChange('copy')).rejects.toThrow('write failed');
+    expect(sync.captureAction).toBe('download_default');
+
+    await expect(
+      actions.handleDefaultPresetChange(
+        'defaultVideoPresetId',
+        'a',
+        sync.setDefaultVideoPresetId,
+        sync.defaultVideoPresetId
+      )
+    ).rejects.toThrow('write failed');
+    expect(sync.defaultVideoPresetId).toBeNull();
   });
 });
 
@@ -237,7 +243,7 @@ describe('save presets section validation actions', () => {
       path: 'Shots--/nested',
     });
     expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetCreated');
+    expect(toastSuccessMock).not.toHaveBeenCalled();
 
     const callCount = sync.updateSettings.mock.calls.length;
     await actions.handleSavePreset('   ', 'ignored', true);
@@ -264,20 +270,16 @@ describe('save presets section edit validation actions', () => {
       path: 'Existing',
     });
     expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetUpdated');
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 });
 
 describe('save presets section toggle actions', () => {
-  it('toggles preset visibility and gallery saving with the corresponding success toasts', async () => {
-    const { sync, actions } = createHarness({ saveCapturesToGallery: false });
+  it('toggles preset visibility without redundant success toasts', async () => {
+    const { sync, actions } = createHarness();
     await actions.handleTogglePresetEnabled(sync.presets[0]!);
     await actions.handleTogglePresetEnabled(sync.presets[0]!);
-    await actions.handleToggleSaveToGallery();
-    await actions.handleToggleSaveToGallery();
 
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetHidden');
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetShown');
-    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.saveToGalleryEnabled');
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 });

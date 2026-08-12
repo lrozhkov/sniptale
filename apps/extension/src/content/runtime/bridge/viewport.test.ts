@@ -2,57 +2,21 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  MessageType,
-  type ResponseSender,
-} from '@sniptale/runtime-contracts/messaging/message-types';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import type { ContentRuntimeMessage } from './types';
 import { handleViewportMessage } from './viewport';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const {
-  loggerLog,
-  disableVideoAnnotations,
-  enableVideoAnnotations,
-  disableVideoTelemetry,
-  enableVideoTelemetry,
-  pauseVideoTelemetry,
-  resumeVideoTelemetry,
   hideVideoCountdown,
   showVideoCountdown,
   disableViewportCursorProjection,
   enableViewportCursorProjection,
 } = vi.hoisted(() => ({
-  loggerLog: vi.fn(),
-  disableVideoAnnotations: vi.fn(),
-  enableVideoAnnotations: vi.fn(),
-  disableVideoTelemetry: vi.fn(),
-  enableVideoTelemetry: vi.fn(),
-  pauseVideoTelemetry: vi.fn(),
-  resumeVideoTelemetry: vi.fn(),
   hideVideoCountdown: vi.fn(),
   showVideoCountdown: vi.fn(),
   disableViewportCursorProjection: vi.fn(),
   enableViewportCursorProjection: vi.fn(),
-}));
-
-vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ log: loggerLog }),
-}));
-
-vi.mock('../../overlay/video-annotations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../overlay/video-annotations')>()),
-  disableVideoAnnotations,
-  enableVideoAnnotations,
-}));
-
-vi.mock('../../overlay/video-telemetry', () => ({
-  disableVideoTelemetry,
-  enableVideoTelemetry,
-  pauseVideoTelemetry,
-  resumeVideoTelemetry,
 }));
 
 vi.mock('../../overlay/video-countdown', () => ({
@@ -84,19 +48,6 @@ function createViewportInfo() {
     width: 1280,
     x: 0,
     y: 0,
-  };
-}
-
-function createVideoRecordingSettings() {
-  return {
-    ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 0,
-    countdownSeconds: 0,
-    diagnosticsEnabled: false,
-    microphoneDeviceId: null,
-    microphoneEnabled: true,
-    quality: VideoQuality.HIGH,
-    systemAudioEnabled: true,
   };
 }
 
@@ -167,10 +118,6 @@ function registerCountdownTests() {
   });
 }
 
-function registerAnnotationTests() {
-  registerAnnotationLifecycleTest();
-}
-
 function registerViewportCursorProjectionTests() {
   it('routes the viewport cursor projection through its content-owned lifecycle', () => {
     const sendResponse = vi.fn();
@@ -214,80 +161,6 @@ function registerViewportCursorProjectionTests() {
   });
 }
 
-function createTelemetrySnapshot() {
-  return {
-    actionEvents: [],
-    cursorTrack: null,
-    signals: [],
-    viewport: createViewportInfo(),
-  };
-}
-
-function expectAnnotationEnableWithTelemetry(
-  sendResponse: ResponseSender,
-  regionSelectorController: ReturnType<typeof createRegionSelectorController>,
-  settings: ReturnType<typeof createVideoRecordingSettings>
-) {
-  expect(
-    handleViewportMessage(
-      {
-        type: VideoMessageType.ENABLE_ANNOTATIONS,
-        recordingId: 'recording-1',
-        settings,
-      },
-      sendResponse,
-      createViewportInfo,
-      regionSelectorController
-    )
-  ).toBe(false);
-  expect(loggerLog).toHaveBeenCalledWith('Enabling video annotations with settings', {
-    ...settings,
-  });
-  expect(enableVideoAnnotations).toHaveBeenCalledWith(settings);
-  expect(enableVideoTelemetry).toHaveBeenCalledWith('recording-1');
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: true,
-    viewport: createViewportInfo(),
-  });
-}
-
-function registerAnnotationLifecycleTest() {
-  it('boots telemetry alongside annotations when a recording id is provided', () => {
-    const sendResponse = vi.fn();
-    const regionSelectorController = createRegionSelectorController();
-    const settings = createVideoRecordingSettings();
-    disableVideoTelemetry.mockReturnValue(createTelemetrySnapshot());
-
-    expectAnnotationEnableWithTelemetry(sendResponse, regionSelectorController, settings);
-  });
-
-  it('returns telemetry when annotations are disabled after a recording session', () => {
-    const sendResponse = vi.fn();
-    const regionSelectorController = createRegionSelectorController();
-    const settings = createVideoRecordingSettings();
-    disableVideoTelemetry.mockReturnValue(createTelemetrySnapshot());
-
-    expectAnnotationEnableWithTelemetry(sendResponse, regionSelectorController, settings);
-
-    expect(
-      handleViewportMessage(
-        { type: VideoMessageType.DISABLE_ANNOTATIONS },
-        sendResponse,
-        createViewportInfo,
-        regionSelectorController
-      )
-    ).toBe(false);
-    expect(disableVideoAnnotations).toHaveBeenCalledOnce();
-    expect(disableVideoTelemetry).toHaveBeenCalledOnce();
-    expect(disableViewportCursorProjection).not.toHaveBeenCalled();
-    expect(regionSelectorController.hideRecordingOverlay).toHaveBeenCalledOnce();
-    expect(sendResponse).toHaveBeenCalledWith({
-      success: true,
-      telemetry: createTelemetrySnapshot(),
-    });
-  });
-}
-
 function registerDefaultMessageTest() {
   it('returns null for unrelated viewport messages', () => {
     expect(
@@ -318,7 +191,6 @@ describe('handleViewportMessage', () => {
 
   registerViewportCoordsTest();
   registerCountdownTests();
-  registerAnnotationTests();
   registerViewportCursorProjectionTests();
   registerDefaultMessageTest();
 });

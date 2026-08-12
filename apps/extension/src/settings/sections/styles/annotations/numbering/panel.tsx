@@ -55,16 +55,7 @@ export function StepBadgePresetsPanel({
     enabled: preset.enabled !== false,
     isDefault: controller.catalog?.defaultPresetId === preset.id,
     busy: controller.isSaving,
-    badges:
-      preset.origin === 'system'
-        ? [
-            {
-              id: 'system',
-              label: translate('highlighter.stepBadgePresets.systemBadge'),
-              tone: 'neutral',
-            },
-          ]
-        : [],
+    isBuiltIn: preset.origin === 'system',
     capabilities: {
       edit: true,
       toggle: true,
@@ -93,19 +84,19 @@ export function StepBadgePresetsPanel({
     if (action.type === 'delete') void controller.actions.delete(preset);
   };
   return (
-    <div className="space-y-3">
-      <AnnotationTemplateQueryControls
-        activeFilterTagIds={tagState.state.activeFilterTagIds}
-        disabled={tagState.isLoading || tagState.error}
-        onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
-        onQueryChange={setQuery}
-        query={query}
-        tags={tagState.state.tags}
-      />
+    <div>
       <SettingsCollection
         ariaLabel={translate('highlighter.stepBadgePresets.title')}
-        title={translate('highlighter.stepBadgePresets.title')}
-        description={translate('highlighter.stepBadgePresets.description')}
+        toolbarControls={
+          <AnnotationTemplateQueryControls
+            activeFilterTagIds={tagState.state.activeFilterTagIds}
+            disabled={tagState.isLoading || tagState.error}
+            onActiveFilterTagIdsChange={tagState.setActiveFilterTagIds}
+            onQueryChange={setQuery}
+            query={query}
+            tags={tagState.state.tags}
+          />
+        }
         items={items}
         state={controller.isLoading ? 'loading' : controller.error ? 'error' : 'ready'}
         errorState={translate('highlighter.stepBadgePresets.messages.loadError')}

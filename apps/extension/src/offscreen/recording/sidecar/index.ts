@@ -29,9 +29,7 @@ export function hasActiveSidecarSession(): boolean {
 }
 
 function stopSidecarStreams(recorders: RecordingSidecarRecorder[]): void {
-  recorders.forEach((sidecar) => {
-    sidecar.stream.getTracks().forEach((track) => track.stop());
-  });
+  recorders.forEach((sidecar) => sidecar.release());
 }
 
 export async function initializeSidecarRecorders(params: {

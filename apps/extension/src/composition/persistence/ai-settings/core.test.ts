@@ -94,8 +94,8 @@ function installStorageState({
   localSetMock.mockImplementation(async (payload: Record<string, unknown>) => {
     Object.assign(localState, payload);
   });
-  localRemoveMock.mockImplementation(async (keys: string[]) => {
-    for (const key of keys) {
+  localRemoveMock.mockImplementation(async (keys: string | string[]) => {
+    for (const key of Array.isArray(keys) ? keys : [keys]) {
       delete localState[key];
     }
   });
@@ -217,6 +217,8 @@ async function verifyLocalOnlyDefaultStorage() {
     loadDefaultModelId,
     loadGlobalSystemPrompt,
     loadScenarioEditorSystemPrompt,
+    resetGlobalSystemPrompt,
+    resetScenarioEditorSystemPrompt,
     saveDefaultModelId,
     saveGlobalSystemPrompt,
     saveScenarioEditorSystemPrompt,
@@ -229,6 +231,8 @@ async function verifyLocalOnlyDefaultStorage() {
   await saveDefaultModelId('model-99');
   await saveGlobalSystemPrompt('Updated prompt');
   await saveScenarioEditorSystemPrompt('Updated scenario prompt');
+  await resetGlobalSystemPrompt();
+  await resetScenarioEditorSystemPrompt();
 
   expect(localSetMock).toHaveBeenNthCalledWith(1, {
     sniptale_ai_default_model: 'model-99',
@@ -241,6 +245,12 @@ async function verifyLocalOnlyDefaultStorage() {
   });
   expect(syncSetMock).not.toHaveBeenCalled();
   expect(syncRemoveMock).not.toHaveBeenCalled();
+  expect(localRemoveMock).toHaveBeenNthCalledWith(1, 'sniptale_ai_global_prompt');
+  expect(localRemoveMock).toHaveBeenNthCalledWith(2, 'sniptale_ai_scenario_editor_prompt');
+  await expect(loadGlobalSystemPrompt()).resolves.toBe(DEFAULT_GLOBAL_SYSTEM_PROMPT);
+  await expect(loadScenarioEditorSystemPrompt()).resolves.toBe(
+    DEFAULT_SCENARIO_EDITOR_SYSTEM_PROMPT
+  );
 }
 
 async function verifyInvalidStoredValuesFallback() {

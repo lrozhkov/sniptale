@@ -2,6 +2,9 @@ import { vi } from 'vitest';
 import type { VideoEditorState } from '../../state/store';
 
 const STORE_ACTION_NAMES = [
+  'beginProjectHistoryTransaction',
+  'endProjectHistoryTransaction',
+  'isProjectHistoryTransactionCurrent',
   'openExportDialog',
   'renameProject',
   'renameTrack',
@@ -41,6 +44,9 @@ const STORE_ACTION_NAMES = [
   'addShapeOverlay',
   'updateClipTransform',
   'updateProject',
+  'syncProjectRevision',
+  'undoProject',
+  'redoProject',
   'detachClipGroup',
   'updateClipMuted',
   'updateClipVolume',

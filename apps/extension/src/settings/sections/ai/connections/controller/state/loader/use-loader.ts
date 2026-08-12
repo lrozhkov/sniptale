@@ -24,6 +24,7 @@ async function reloadAiProvidersRuntimeData(props: {
     await ensureDefaultAiProvidersModel(loadedDefaultId, loadedModels, props.setDefaultModelId);
   } catch (error) {
     reportAiProvidersLoaderError(error);
+    throw error;
   } finally {
     props.setIsLoading(false);
   }
@@ -64,7 +65,7 @@ export function useAiProvidersLoader(
   ]);
 
   useEffect(() => {
-    void reloadData();
+    void reloadData().catch(() => undefined);
   }, [reloadData]);
 
   return { reloadData };

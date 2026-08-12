@@ -2,7 +2,7 @@ import { defineMessageSource } from '../source';
 
 export const contentSaveDialogMessages = defineMessageSource({
   title: {
-    ru: 'Выбор пресета сохранения',
+    ru: 'Выбор шаблона сохранения',
     en: 'Choose save preset',
   },
   subtitle: {
@@ -30,15 +30,15 @@ export const contentSaveDialogMessages = defineMessageSource({
     en: '...',
   },
   loadingPresetsSuffix: {
-    ru: ' пресетов...',
+    ru: ' шаблонов...',
     en: ' presets...',
   },
   noPresets: {
-    ru: 'Нет активных пресетов. Откройте настройки и добавьте путь.',
+    ru: 'Нет активных шаблонов. Откройте настройки и добавьте путь.',
     en: 'No active presets. Open settings and add a path.',
   },
   loadError: {
-    ru: 'Не удалось загрузить пресеты. Попробуйте снова позже или откройте настройки.',
+    ru: 'Не удалось загрузить шаблоны. Попробуйте снова позже или откройте настройки.',
     en: 'Failed to load presets. Try again later or open settings.',
   },
   otherFolderLabel: {
@@ -50,7 +50,7 @@ export const contentSaveDialogMessages = defineMessageSource({
     en: 'Opens the system save-file dialog',
   },
   rememberPreset: {
-    ru: 'Запомнить выбранный пресет до перезагрузки вкладки',
+    ru: 'Запомнить выбранный шаблон до перезагрузки вкладки',
     en: 'Remember the selected preset until the tab reloads',
   },
 });

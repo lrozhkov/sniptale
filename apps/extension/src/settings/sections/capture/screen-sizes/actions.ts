@@ -16,21 +16,14 @@ import type { useViewportPresetsSync } from './sync';
 
 async function commitPresets(
   sync: ReturnType<typeof useViewportPresetsSync>,
-  nextPresets: ViewportPreset[],
-  nextDefaultId: string | null = sync.defaultViewportPresetId
+  nextPresets: ViewportPreset[]
 ) {
   const previousPresets = sync.viewportPresets;
-  const previousDefaultId = sync.defaultViewportPresetId;
   sync.setViewportPresets(nextPresets);
-  sync.setDefaultViewportPresetId(nextDefaultId);
   try {
-    await sync.updateSettings({
-      viewportPresets: nextPresets,
-      defaultViewportPresetId: nextDefaultId,
-    });
+    await sync.updateSettings({ viewportPresets: nextPresets });
   } catch (error) {
     sync.setViewportPresets(previousPresets);
-    sync.setDefaultViewportPresetId(previousDefaultId);
     throw error;
   }
 }
@@ -52,22 +45,6 @@ async function runMutation<T>(
   }
 }
 
-function createDefaultViewportChangeHandler(sync: ReturnType<typeof useViewportPresetsSync>) {
-  return async (newId: string | null) => {
-    await runMutation(sync, async () => {
-      const previousId = sync.defaultViewportPresetId;
-      sync.setDefaultViewportPresetId(newId);
-      try {
-        await sync.updateSettings({ defaultViewportPresetId: newId });
-        toast.success(translate('viewportPresets.messages.defaultUpdated'));
-      } catch (error) {
-        sync.setDefaultViewportPresetId(previousId);
-        throw error;
-      }
-    });
-  };
-}
-
 function createViewportPresetSaveHandler(
   sync: ReturnType<typeof useViewportPresetsSync>,
   dialogs: ReturnType<typeof useViewportPresetsDialogs>
@@ -83,13 +60,6 @@ function createViewportPresetSaveHandler(
         );
         await commitPresets(sync, nextPresets);
         dialogs.setIsViewportEditorOpen(false);
-        toast.success(
-          translate(
-            dialogs.editingViewport
-              ? 'viewportPresets.messages.presetUpdated'
-              : 'viewportPresets.messages.presetCreated'
-          )
-        );
       },
       { rethrow: true }
     );
@@ -105,10 +75,7 @@ function createViewportDeleteConfirmHandler(
     if (!preset || preset.kind === 'system') return;
     await runMutation(sync, async () => {
       const nextPresets = sync.viewportPresets.filter((item) => item.id !== preset.id);
-      const nextDefaultId =
-        sync.defaultViewportPresetId === preset.id ? null : sync.defaultViewportPresetId;
-      await commitPresets(sync, nextPresets, nextDefaultId);
-      toast.success(translate('viewportPresets.messages.presetDeleted'));
+      await commitPresets(sync, nextPresets);
       dialogs.setViewportConfirmOpen(false);
       dialogs.setViewportToDelete(null);
     });
@@ -125,7 +92,6 @@ export function useViewportPresetActions(
       dialogs.setEditingViewport(undefined);
       dialogs.setIsViewportEditorOpen(true);
     },
-    handleDefaultViewportChange: createDefaultViewportChangeHandler(sync),
     handleDeleteViewportPreset: (preset: ViewportPreset) => {
       if (preset.kind === 'system') return;
       dialogs.setViewportToDelete(preset);
@@ -147,31 +113,18 @@ export function useViewportPresetActions(
       if (preset.kind !== 'system') return;
       await runMutation(sync, async () => {
         await commitPresets(sync, resetSystemViewportPreset(sync.viewportPresets, preset));
-        toast.success(translate('viewportPresets.messages.presetReset'));
       });
     },
     handleSaveViewportPreset: createViewportPresetSaveHandler(sync, dialogs),
     handleToggleViewportPreset: async (preset: ViewportPreset) => {
       await runMutation(sync, async () => {
         const enabled = !preset.enabled;
-        const nextDefaultId =
-          !enabled && sync.defaultViewportPresetId === preset.id
-            ? null
-            : sync.defaultViewportPresetId;
         await commitPresets(
           sync,
           normalizeViewportPresetOrder(
             sync.viewportPresets.map((item) =>
               item.id === preset.id ? { ...item, enabled } : { ...item }
             )
-          ),
-          nextDefaultId
-        );
-        toast.success(
-          translate(
-            enabled
-              ? 'viewportPresets.messages.presetEnabled'
-              : 'viewportPresets.messages.presetDisabled'
           )
         );
       });

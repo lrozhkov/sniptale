@@ -5,7 +5,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
-  enableAnnotationsOrAbort,
+  prepareContentSurfaceOrAbort,
   enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,
@@ -45,8 +45,8 @@ it('aborts after offscreen setup when cancellation fires', async () => {
   expect(abortStart).toHaveBeenCalledWith(7, CaptureMode.TAB, 'offscreen setup');
 });
 
-it('returns null when annotation setup completes after cancellation', async () => {
-  const enableAnnotations = vi.fn(async () => ({
+it('returns null when content surface setup completes after cancellation', async () => {
+  const prepareContentSurface = vi.fn(async () => ({
     devicePixelRatio: 1,
     height: 720,
     scrollX: 0,
@@ -56,14 +56,14 @@ it('returns null when annotation setup completes after cancellation', async () =
   const abortStart = vi.fn(() => true);
 
   await expect(
-    enableAnnotationsOrAbort(12, CaptureMode.TAB, createVideoSettings(), undefined, {
+    prepareContentSurfaceOrAbort(12, CaptureMode.TAB, createVideoSettings(), undefined, {
       abortStart,
-      enableAnnotationsIfNeeded: enableAnnotations,
+      prepareContentSurfaceIfNeeded: prepareContentSurface,
     })
   ).resolves.toBeNull();
 
-  expect(enableAnnotations).toHaveBeenCalledOnce();
-  expect(abortStart).toHaveBeenCalledWith(12, CaptureMode.TAB, 'annotation setup');
+  expect(prepareContentSurface).toHaveBeenCalledOnce();
+  expect(abortStart).toHaveBeenCalledWith(12, CaptureMode.TAB, 'content surface setup');
 });
 
 it('resolves capture sources through injected mode-specific dependencies', async () => {
@@ -147,13 +147,13 @@ it('returns the annotation viewport when setup succeeds without cancellation', a
     scrollY: 0,
     width: 1280,
   };
-  const enableAnnotations = vi.fn(async () => viewport);
+  const prepareContentSurface = vi.fn(async () => viewport);
   const abortStart = vi.fn(() => false);
 
   await expect(
-    enableAnnotationsOrAbort(12, CaptureMode.TAB, createVideoSettings(), undefined, {
+    prepareContentSurfaceOrAbort(12, CaptureMode.TAB, createVideoSettings(), undefined, {
       abortStart,
-      enableAnnotationsIfNeeded: enableAnnotations,
+      prepareContentSurfaceIfNeeded: prepareContentSurface,
     })
   ).resolves.toBe(viewport);
 });

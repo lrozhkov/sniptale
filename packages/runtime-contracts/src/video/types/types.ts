@@ -116,6 +116,41 @@ export const VideoRecordingAudioMode = {
 export type VideoRecordingAudioMode =
   (typeof VideoRecordingAudioMode)[keyof typeof VideoRecordingAudioMode];
 
+export const VIDEO_AUTO_FADE_DELAYS = [0, 3, 5, 10, 30] as const;
+
+export type VideoAutoFadeDelay = (typeof VIDEO_AUTO_FADE_DELAYS)[number];
+
+export const WebcamPresentationMode = {
+  EMBEDDED: 'embedded',
+  SEPARATE_TRACK: 'separate-track',
+} as const;
+
+export type WebcamPresentationMode =
+  (typeof WebcamPresentationMode)[keyof typeof WebcamPresentationMode];
+
+export const WebcamPresentationShape = {
+  CIRCLE: 'circle',
+  RECTANGLE: 'rectangle',
+} as const;
+
+export type WebcamPresentationShape =
+  (typeof WebcamPresentationShape)[keyof typeof WebcamPresentationShape];
+
+export interface VideoRecordingSurfaceSettings {
+  toolbarEnabled: boolean;
+  cursorSpotlightEnabled: boolean;
+  cursorDimmingEnabled?: boolean;
+  cursorClickAnimationEnabled?: boolean;
+}
+
+export interface WebcamPresentationSettings {
+  mode: WebcamPresentationMode;
+  shape: WebcamPresentationShape;
+  center: { x: number; y: number };
+  sizeFraction: number;
+  cropOffset: { x: number; y: number };
+}
+
 export interface VideoRecordingSettings {
   microphoneEnabled: boolean;
   microphoneDeviceId: string | null;
@@ -135,6 +170,8 @@ export interface VideoRecordingSettings {
   autoFadeDelay: number;
   diagnosticsEnabled: boolean;
   controlledCursorCaptureEnabled?: boolean;
+  recordingSurface?: VideoRecordingSurfaceSettings;
+  webcamPresentation?: WebcamPresentationSettings;
   native?: NativeCaptureSettings;
 }
 
@@ -167,7 +204,10 @@ export function createVideoRecordingLiveMediaState(
 
 export function updateVideoRecordingLiveMediaState(
   current: VideoRecordingLiveMediaState | null | undefined,
-  patch: Pick<Partial<VideoRecordingSettings>, 'microphoneEnabled' | 'webcamEnabled'>
+  patch: Pick<
+    Partial<VideoRecordingSettings>,
+    'microphoneDeviceId' | 'microphoneEnabled' | 'webcamDeviceId' | 'webcamEnabled'
+  >
 ): VideoRecordingLiveMediaState | null {
   if (!current) {
     return null;
@@ -175,9 +215,13 @@ export function updateVideoRecordingLiveMediaState(
 
   return {
     ...current,
+    ...(patch.microphoneDeviceId === undefined
+      ? {}
+      : { microphoneDeviceId: patch.microphoneDeviceId }),
     ...(patch.microphoneEnabled === undefined
       ? {}
       : { microphoneEnabled: patch.microphoneEnabled }),
+    ...(patch.webcamDeviceId === undefined ? {} : { webcamDeviceId: patch.webcamDeviceId }),
     ...(patch.webcamEnabled === undefined ? {} : { webcamEnabled: patch.webcamEnabled }),
   };
 }

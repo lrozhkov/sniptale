@@ -44,6 +44,20 @@ export function moveKeyboardPreview(
   return { ...preview, itemIds };
 }
 
+export function moveReorderPreviewToTarget(
+  preview: SettingsCollectionKeyboardPreview,
+  targetItemId: string,
+  placement: 'before' | 'after'
+): SettingsCollectionKeyboardPreview {
+  if (targetItemId === preview.itemId || !preview.itemIds.includes(targetItemId)) return preview;
+  const itemIds = preview.itemIds.filter((itemId) => itemId !== preview.itemId);
+  const targetIndex = itemIds.indexOf(targetItemId);
+  const insertionIndex = placement === 'before' ? targetIndex : targetIndex + 1;
+  itemIds.splice(insertionIndex, 0, preview.itemId);
+  if (itemIds.every((itemId, index) => preview.itemIds[index] === itemId)) return preview;
+  return { ...preview, itemIds };
+}
+
 export function resolveKeyboardPreviewGroups(
   groups: readonly SettingsCollectionResolvedGroup[],
   preview: SettingsCollectionKeyboardPreview | null
@@ -62,7 +76,8 @@ export function resolveKeyboardPreviewGroups(
 
 export function getKeyboardPreviewIntent(
   groups: readonly SettingsCollectionResolvedGroup[],
-  preview: SettingsCollectionKeyboardPreview
+  preview: SettingsCollectionKeyboardPreview,
+  source: SettingsCollectionMoveIntent['source'] = 'keyboard'
 ): SettingsCollectionMoveIntent | null {
   if (!isKeyboardPreviewCurrent(groups, preview)) return null;
   const originalIds = preview.baselineItemIds;
@@ -73,6 +88,6 @@ export function getKeyboardPreviewIntent(
     itemId: preview.itemId,
     groupId: preview.groupId,
     beforeItemId: preview.itemIds[itemIndex + 1] ?? null,
-    source: 'keyboard',
+    source,
   };
 }

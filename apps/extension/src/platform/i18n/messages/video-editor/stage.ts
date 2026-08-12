@@ -113,6 +113,10 @@ export const videoEditorStageMessages = defineMessageSource({
     ru: 'Вписать',
     en: 'Fit',
   },
+  previewNavigator: {
+    ru: 'Навигатор холста',
+    en: 'Canvas navigator',
+  },
   previewPreferencesLoadFailure: {
     ru: 'Не удалось загрузить настройки превью.',
     en: 'Preview settings could not be loaded.',

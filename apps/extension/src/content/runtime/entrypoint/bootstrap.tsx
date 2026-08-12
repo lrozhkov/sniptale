@@ -56,6 +56,34 @@ function readWindowViewportInfo(): ViewportInfo {
   };
 }
 
+function installPageZoomSynchronization(): () => void {
+  let disposed = false;
+  let requestGeneration = 0;
+  const synchronize = () => {
+    const generation = ++requestGeneration;
+    const pageZoomRevision = getContentUiPageZoomRevision();
+    void getContentRuntimeServices()
+      .messaging.sendRuntimeMessage({ type: MessageType.SCREENSHOT_MODE_STATUS })
+      .then((response) => {
+        if (
+          !disposed &&
+          generation === requestGeneration &&
+          response.success &&
+          typeof response.pageZoom === 'number'
+        ) {
+          setContentUiPageZoomAtRevision(response.pageZoom, pageZoomRevision);
+        }
+      })
+      .catch(() => undefined);
+  };
+  synchronize();
+  window.addEventListener('resize', synchronize);
+  return () => {
+    disposed = true;
+    window.removeEventListener('resize', synchronize);
+  };
+}
+
 /**
  * Boots the top-level content UI and wires its runtime ownership seams.
  */
@@ -89,15 +117,7 @@ export function initializeTopLevelContentEntry(): void {
   const root = createRoot(appContainer);
   root.render(<App />);
   const disposeContentRuntime = initializeTopLevelContentRuntime(readWindowViewportInfo);
-  const pageZoomRevision = getContentUiPageZoomRevision();
-  void getContentRuntimeServices()
-    .messaging.sendRuntimeMessage({ type: MessageType.SCREENSHOT_MODE_STATUS })
-    .then((response) => {
-      if (response.success && typeof response.pageZoom === 'number') {
-        setContentUiPageZoomAtRevision(response.pageZoom, pageZoomRevision);
-      }
-    })
-    .catch(() => undefined);
+  const disposePageZoomSynchronization = installPageZoomSynchronization();
   const disposeToastHostAdapter = installContentToastHostAdapter();
   registerContentRuntimeCleanup(() => {
     try {
@@ -105,6 +125,7 @@ export function initializeTopLevelContentEntry(): void {
     } finally {
       try {
         disposeContentUiScaleCompensation();
+        disposePageZoomSynchronization();
         disposeToastHostAdapter();
         root.unmount();
       } finally {

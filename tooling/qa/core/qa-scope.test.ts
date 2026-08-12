@@ -12,16 +12,20 @@ it('routes harness-owned policy and shared guidance without blind spots', async 
     const module = await importFresh<typeof import('./qa-scope.mjs')>('./qa-scope.mjs');
     expect(
       module.partitionQaScopeFiles([
-        'AGENTS.md',
-        '.agents/skills/security-code-review/SKILL.md',
+        'docs/agent-tooling/AGENTS.md',
+        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
         'tooling/configs/qa/guardrail-policy.data.json',
         'src/example.ts',
       ])
     ).toEqual({
-      productFiles: ['AGENTS.md', '.agents/skills/security-code-review/SKILL.md', 'src/example.ts'],
+      productFiles: [
+        'docs/agent-tooling/AGENTS.md',
+        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
+        'src/example.ts',
+      ],
       harnessFiles: [
-        'AGENTS.md',
-        '.agents/skills/security-code-review/SKILL.md',
+        'docs/agent-tooling/AGENTS.md',
+        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
         'tooling/configs/qa/guardrail-policy.data.json',
       ],
     });
@@ -151,6 +155,7 @@ describe('shared QA controls', () => {
         '.prettierrc.json',
         '.github/workflows/quality-gate.yml',
         '.husky/pre-push',
+        'docs/agent-tooling/AGENTS.md',
         'docs/tooling/code-quality.md',
       ];
 

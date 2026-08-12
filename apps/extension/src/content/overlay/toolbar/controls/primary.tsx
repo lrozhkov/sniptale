@@ -14,6 +14,11 @@ export function ToolbarPrimaryControls(props: {
     aiPickMode: toolbarProps.aiPickMode ?? false,
     designReviewMode: toolbarProps.designReviewMode ?? false,
     drawingMode: toolbarProps.drawingMode ?? false,
+    videoRecordingMode: toolbarProps.videoRecordingMode ?? false,
+    videoRecordingModeLocked:
+      toolbarProps.videoRecordingMode === true &&
+      toolbarProps.videoRecording?.state.phase !== 'idle' &&
+      toolbarProps.videoRecording?.state.phase !== 'error',
     compactMenus: viewModel.derivedState.compactMenus,
     displayMode: viewModel.derivedState.displayMode,
     sidebarVisible: toolbarProps.scenario?.sidebarVisible ?? false,
@@ -21,6 +26,15 @@ export function ToolbarPrimaryControls(props: {
     quickEditMode: viewModel.quickEditMode,
     highlighterMode: viewModel.highlighterMode,
     toolbarMenuState: viewModel.toolbarMenuState,
+    pinToTab: toolbarProps.pinToTab ?? false,
+    pinToTabAvailable: toolbarProps.pinToTabAvailable ?? false,
+    pinToTabLocked: toolbarProps.pinToTabLocked ?? false,
+    onPinToTabChange: toolbarProps.onPinToTabChange ?? (() => undefined),
+    onHide: toolbarProps.onHide,
+    ...(toolbarProps.onClearPagePreparation === undefined
+      ? {}
+      : { onClearPagePreparation: toolbarProps.onClearPagePreparation }),
+    canClearPagePreparation: toolbarProps.canClearPagePreparation ?? false,
     ...(typeof viewModel.pendingInteractionMode === 'undefined'
       ? {}
       : { pendingMode: viewModel.pendingInteractionMode }),
@@ -39,6 +53,11 @@ export function ToolbarPrimaryControls(props: {
     onToggleHighlighter: () => {
       void viewModel.toggleMode('highlighter');
     },
+    onToggleVideoRecording: (activationEvent?: Event) =>
+      toolbarProps.onToggleVideoRecordingMode?.(
+        !(toolbarProps.videoRecordingMode ?? false),
+        activationEvent
+      ),
   };
 
   return <ToolbarModeButtons {...modeButtonProps} />;

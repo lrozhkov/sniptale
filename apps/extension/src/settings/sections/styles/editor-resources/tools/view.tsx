@@ -9,7 +9,6 @@ import {
   type SettingsCollectionItem,
   type SettingsCollectionMoveIntent,
 } from '../../../../section-surface';
-import { getSettingsCountLabel } from '../../../../section-surface/text.helpers';
 import { useToolPresetsController } from './controller';
 import { getToolPresetOwnerLabel, TOOL_PRESET_OWNERS } from './families';
 
@@ -22,9 +21,7 @@ export function ToolPresetsSettings() {
     preview: renderEditorPresetPreview(selection.owner, preset),
     enabled: preset.enabled,
     isDefault: preset.id === collection.defaultPresetId,
-    badges: preset.isSystemDefault
-      ? [{ id: 'system', label: translate('highlighter.section.systemBadge'), tone: 'neutral' }]
-      : [],
+    isBuiltIn: preset.isSystemDefault === true,
     capabilities: {
       toggle: true,
       setDefault: preset.id !== collection.defaultPresetId,
@@ -71,11 +68,6 @@ export function ToolPresetsSettings() {
         ariaLabel={translate('settings.editor.toolPresetsTitle')}
         title={translate('settings.editor.toolPresetsTitle')}
         items={items}
-        countLabel={`${items.length} ${getSettingsCountLabel(items.length, {
-          one: 'settings.editor.presetCountOne',
-          few: 'settings.editor.presetCountFew',
-          many: 'settings.editor.presetCountMany',
-        })}`}
         onAction={onAction}
         onMove={onMove}
       />

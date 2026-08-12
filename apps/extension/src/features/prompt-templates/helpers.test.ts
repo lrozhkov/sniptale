@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { PromptTemplate } from '../../contracts/settings';
 import {
+  applyPromptTemplateOrder,
   createPromptTemplateDraft,
+  movePromptTemplateBefore,
   requirePromptTemplateUpdate,
   sortPromptTemplates,
   touchPromptTemplateSelection,
@@ -93,6 +95,29 @@ function verifyPromptTemplateSelectionTouch() {
   expect(updatedTemplates[0]?.lastUsedAt).toBe(50);
 }
 
+function verifyPersistedPromptTemplateOrder() {
+  const templates = [
+    createTemplate({ id: 'first' }),
+    createTemplate({ id: 'second' }),
+    createTemplate({ id: 'third' }),
+  ];
+  expect(applyPromptTemplateOrder(templates, ['third', 'missing', 'first'])).toEqual([
+    templates[2],
+    templates[0],
+    templates[1],
+  ]);
+  expect(movePromptTemplateBefore(templates, 'first', null).map((item) => item.id)).toEqual([
+    'second',
+    'third',
+    'first',
+  ]);
+  expect(movePromptTemplateBefore(templates, 'third', 'second').map((item) => item.id)).toEqual([
+    'first',
+    'third',
+    'second',
+  ]);
+}
+
 describe('prompt-templates state helpers', () => {
   it(
     'sorts last-used templates ahead of defaults and ordinary templates',
@@ -107,4 +132,5 @@ describe('prompt-templates state helpers', () => {
     'touches selected templates and re-sorts the list by last use',
     verifyPromptTemplateSelectionTouch
   );
+  it('applies and updates the persisted manual order', verifyPersistedPromptTemplateOrder);
 });

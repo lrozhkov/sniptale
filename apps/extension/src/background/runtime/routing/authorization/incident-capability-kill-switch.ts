@@ -11,6 +11,7 @@ export type IncidentCapabilityFamily =
   | 'privileged-tab-route:scenario'
   | 'privileged-tab-route:tab-mode'
   | 'privileged-tab-route:video-control'
+  | 'privileged-tab-route:video-recording-surface'
   | 'project-export-runtime'
   | 'video-control-camera-recorder-route'
   | 'video-control-no-tab-route'

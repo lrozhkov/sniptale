@@ -1,15 +1,6 @@
 import type { BorderPreset } from '../../../../../features/highlighter/contracts';
 import { resolveBorderShadowVisual } from '../../../../../features/highlighter/style';
-import { getSettingsCountLabel } from '../../../../section-surface/text.helpers.ts';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
-
-export function getHighlighterPresetCountLabel(count: number) {
-  return getSettingsCountLabel(count, {
-    one: 'highlighter.section.countOne',
-    few: 'highlighter.section.countFew',
-    many: 'highlighter.section.countMany',
-  });
-}
 
 export function getHighlighterPresetPreviewStyle(preset: BorderPreset): React.CSSProperties {
   const shadowVisual = resolveBorderShadowVisual(preset.shadow, preset.color);

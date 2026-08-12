@@ -1,11 +1,12 @@
 import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
 import {
-  settingsPanelClassName,
+  settingsCompactWorkbenchClassName,
+  SettingsControlRow,
   settingsSectionClassName,
-  SettingsSectionHeader,
 } from '../../../section-surface';
 import type { VoiceInputSettingsController } from './controller-contract';
 
@@ -23,7 +24,7 @@ const secondaryButtonClassName = [
   'border-[var(--sniptale-color-border-soft)] bg-transparent text-[var(--sniptale-color-text-primary)]',
   'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
-const fieldClassName = [
+const textareaClassName = [
   'w-full rounded-[14px] border border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-canvas)] px-3 py-2 text-sm',
   'text-[var(--sniptale-color-text-primary)] focus-visible:outline-none focus-visible:ring-2',
@@ -95,12 +96,7 @@ function StatusCard(props: {
   error?: boolean;
 }) {
   return (
-    <div
-      className={[
-        'min-w-0 border-b border-[var(--sniptale-color-border-soft)] py-3 last:border-b-0',
-        'md:border-b-0 md:border-r md:px-4 md:first:pl-0 md:last:border-r-0 md:last:pr-0',
-      ].join(' ')}
-    >
+    <div className="min-w-0 py-2.5">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--sniptale-color-text-muted)]">
         {props.label}
       </p>
@@ -138,7 +134,7 @@ function ErrorNotice({
   return (
     <div
       role="alert"
-      className={`${settingsPanelClassName} flex gap-3 text-sm text-[var(--sniptale-color-danger)]`}
+      className="flex max-w-[720px] gap-3 text-sm text-[var(--sniptale-color-danger)]"
     >
       <AlertCircle aria-hidden="true" className="h-5 w-5 shrink-0" />
       <p>{message}</p>
@@ -218,7 +214,7 @@ function VoiceInputStatusGrid({ controller }: { controller: VoiceInputSettingsCo
 
   return (
     <div
-      className={`${settingsPanelClassName} grid md:grid-cols-2 xl:grid-cols-4`}
+      className={`${settingsCompactWorkbenchClassName} grid gap-x-8 sm:grid-cols-2`}
       aria-live="polite"
     >
       <StatusCard
@@ -262,38 +258,40 @@ function VoiceInputPreferencesPanel({
   controller: VoiceInputSettingsController;
 }) {
   return (
-    <div className={`${settingsPanelClassName} grid gap-5 md:grid-cols-3`}>
-      <label className="space-y-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        <span>{translate('settings.voiceInput.microphoneLabel')}</span>
-        <select
-          className={fieldClassName}
+    <div className={`${settingsCompactWorkbenchClassName} space-y-1`}>
+      <SettingsControlRow label={translate('settings.voiceInput.microphoneLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.voiceInput.microphoneLabel')}
           disabled={active || controller.preferences.saving || controller.status.microphonesLoading}
           value={controller.preferences.microphoneDeviceId ?? ''}
-          onChange={(event) => {
-            void controller.preferences.setMicrophoneDeviceId(event.target.value || null);
+          onChange={(value) => {
+            void controller.preferences.setMicrophoneDeviceId(value || null);
           }}
-        >
-          <option value="">{translate('settings.voiceInput.microphoneDefault')}</option>
-          {controller.preferences.microphoneDeviceId &&
-          !controller.status.microphones.some(
-            (device) => device.deviceId === controller.preferences.microphoneDeviceId
-          ) ? (
-            <option value={controller.preferences.microphoneDeviceId}>
-              {translate('settings.voiceInput.microphoneUnavailable')}
-            </option>
-          ) : null}
-          {controller.status.microphones.map((device, index) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label ||
-                `${translate('settings.voiceInput.microphoneFallback')} ${index + 1}`}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="space-y-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        <span>{translate('settings.voiceInput.languageLabel')}</span>
-        <select
-          className={fieldClassName}
+          options={[
+            { value: '', label: translate('settings.voiceInput.microphoneDefault') },
+            ...(controller.preferences.microphoneDeviceId &&
+            !controller.status.microphones.some(
+              (device) => device.deviceId === controller.preferences.microphoneDeviceId
+            )
+              ? [
+                  {
+                    value: controller.preferences.microphoneDeviceId,
+                    label: translate('settings.voiceInput.microphoneUnavailable'),
+                  },
+                ]
+              : []),
+            ...controller.status.microphones.map((device, index) => ({
+              value: device.deviceId,
+              label:
+                device.label ||
+                `${translate('settings.voiceInput.microphoneFallback')} ${index + 1}`,
+            })),
+          ]}
+        />
+      </SettingsControlRow>
+      <SettingsControlRow label={translate('settings.voiceInput.languageLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.voiceInput.languageLabel')}
           disabled={
             active ||
             controller.preferences.saving ||
@@ -301,20 +299,18 @@ function VoiceInputPreferencesPanel({
             controller.status.installing
           }
           value={controller.preferences.language}
-          onChange={(event) => {
-            void controller.preferences.setLanguage(
-              event.target.value === 'en-US' ? 'en-US' : 'ru-RU'
-            );
+          onChange={(value) => {
+            void controller.preferences.setLanguage(value === 'en-US' ? 'en-US' : 'ru-RU');
           }}
-        >
-          <option value="ru-RU">{translate('settings.voiceInput.languageRu')}</option>
-          <option value="en-US">{translate('settings.voiceInput.languageEn')}</option>
-        </select>
-      </label>
-      <label className="space-y-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        <span>{translate('settings.voiceInput.modeLabel')}</span>
-        <select
-          className={fieldClassName}
+          options={[
+            { value: 'ru-RU', label: translate('settings.voiceInput.languageRu') },
+            { value: 'en-US', label: translate('settings.voiceInput.languageEn') },
+          ]}
+        />
+      </SettingsControlRow>
+      <SettingsControlRow label={translate('settings.voiceInput.modeLabel')}>
+        <ProductSelect
+          aria-label={translate('settings.voiceInput.modeLabel')}
           disabled={
             active ||
             controller.preferences.saving ||
@@ -322,18 +318,20 @@ function VoiceInputPreferencesPanel({
             controller.status.installing
           }
           value={controller.preferences.mode}
-          onChange={(event) => {
+          onChange={(value) => {
             void controller.preferences.setMode(
-              event.target.value === 'browser-managed' ? 'browser-managed' : 'local-first'
+              value === 'browser-managed' ? 'browser-managed' : 'local-first'
             );
           }}
-        >
-          <option value="local-first">{translate('settings.voiceInput.modeLocalFirst')}</option>
-          <option value="browser-managed">
-            {translate('settings.voiceInput.modeBrowserManaged')}
-          </option>
-        </select>
-      </label>
+          options={[
+            { value: 'local-first', label: translate('settings.voiceInput.modeLocalFirst') },
+            {
+              value: 'browser-managed',
+              label: translate('settings.voiceInput.modeBrowserManaged'),
+            },
+          ]}
+        />
+      </SettingsControlRow>
     </div>
   );
 }
@@ -529,7 +527,7 @@ function VoiceInputTestPanel({
     (controller.status.snapshot.localAvailability === 'downloadable' ||
       controller.status.snapshot.localAvailability === 'downloading');
   return (
-    <div className={`${settingsPanelClassName} space-y-4`}>
+    <div className={`${settingsCompactWorkbenchClassName} space-y-4`}>
       <div>
         <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary-strong)]">
           {translate('settings.voiceInput.testTitle')}
@@ -541,7 +539,7 @@ function VoiceInputTestPanel({
       <label className="block space-y-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
         <span>{translate('settings.voiceInput.textareaLabel')}</span>
         <textarea
-          className={`${fieldClassName} min-h-36 resize-y leading-6`}
+          className={`${textareaClassName} min-h-36 resize-y leading-6`}
           placeholder={translate('settings.voiceInput.textareaPlaceholder')}
           readOnly={active}
           value={transcript}
@@ -566,12 +564,6 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
   const active = isActive(controller);
   return (
     <section className={settingsSectionClassName}>
-      <SettingsSectionHeader
-        kicker={translate('settings.voiceInput.kicker')}
-        title={translate('settings.voiceInput.title')}
-        description={translate('settings.voiceInput.description')}
-      />
-
       <VoiceInputStatusGrid controller={controller} />
 
       <ErrorNotice
@@ -585,7 +577,7 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
 
       <div
         className={[
-          'space-y-1 border-l-2 border-[var(--sniptale-color-border-soft)] pl-3',
+          `${settingsCompactWorkbenchClassName} space-y-1`,
           'text-xs leading-5 text-[var(--sniptale-color-text-muted)]',
         ].join(' ')}
       >

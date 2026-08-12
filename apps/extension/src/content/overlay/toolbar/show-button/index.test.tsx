@@ -127,6 +127,19 @@ async function expectButtonRemovalWhenNotNeeded() {
   expect(document.getElementById('sniptale-show-toolbar-btn')).toBeNull();
 }
 
+async function expectVideoModeUsesCanonicalCollapsedButton() {
+  await renderHarness({
+    countdownActive: false,
+    isCompletelyHidden: false,
+    isToolbarVisible: false,
+    onShowToolbar: vi.fn(),
+    screenshotMode: false,
+    videoRecordingMode: true,
+  });
+
+  expect(document.getElementById('sniptale-show-toolbar-btn')).toBeTruthy();
+}
+
 function runUseShowToolbarButtonSuite() {
   it(
     'reuses the same toolbar button across rerenders and routes clicks through the latest callback',
@@ -135,6 +148,10 @@ function runUseShowToolbarButtonSuite() {
   it(
     'removes the toolbar button when screenshot mode no longer needs it',
     expectButtonRemovalWhenNotNeeded
+  );
+  it(
+    'uses the canonical collapsed toolbar button for video recording mode',
+    expectVideoModeUsesCanonicalCollapsedButton
   );
 }
 

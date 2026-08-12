@@ -9,6 +9,7 @@ import {
   ProductModalFooter,
   ProductModalHeader,
 } from '@sniptale/ui/product-modal';
+import { settingsModalClassName } from '../../../../section-surface';
 import type { AiProvidersSectionState, AiSecretProtectionDialogMode } from '../controller/types';
 
 type SecretProtectionState = AiProvidersSectionState['secretProtection'];
@@ -226,6 +227,7 @@ export function SecretProtectionDialog(props: { state: SecretProtectionState }) 
     <ProductModal
       closeOnBackdrop={!dialog.isSubmitting}
       maxWidth="420px"
+      dialogClassName={settingsModalClassName}
       onClose={props.state.handleCloseDialog}
       width="calc(100vw - 32px)"
     >

@@ -8,7 +8,7 @@ export type CaptureModeLabel = 'visible' | 'full';
 
 export type CapturePersistenceSettings = Pick<
   Settings,
-  'defaultImagePresetId' | 'localStoragePolicy' | 'saveCapturesToGallery'
+  'defaultImagePresetId' | 'localStoragePolicy'
 >;
 
 export type StartCapturePorts = {

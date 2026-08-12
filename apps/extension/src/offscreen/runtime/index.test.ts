@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  answerCameraSourceOfferMock,
   browserRuntimeSubscribeToMessagesMock,
   loggerDebugMock,
   parseOffscreenRuntimeMessageMock,
@@ -9,7 +10,9 @@ const {
   resumeRecordingMock,
   startRecordingMock,
   stopRecordingMock,
+  switchCameraSourcePeerInputMock,
 } = vi.hoisted(() => ({
+  answerCameraSourceOfferMock: vi.fn(),
   browserRuntimeSubscribeToMessagesMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   parseOffscreenRuntimeMessageMock: vi.fn(),
@@ -18,6 +21,14 @@ const {
   resumeRecordingMock: vi.fn(),
   startRecordingMock: vi.fn(),
   stopRecordingMock: vi.fn(),
+  switchCameraSourcePeerInputMock: vi.fn(),
+}));
+
+vi.mock('../recording/camera-source/peer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recording/camera-source/peer')>()),
+  answerCameraSourceOffer: answerCameraSourceOfferMock,
+  closeCameraSourcePeer: vi.fn(),
+  switchCameraSourcePeerInput: switchCameraSourcePeerInputMock,
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
@@ -182,9 +193,59 @@ function createDeferred<T>() {
 
 function resetOffscreenRuntimeMocks() {
   vi.clearAllMocks();
+  answerCameraSourceOfferMock.mockResolvedValue({ type: 'answer', sdp: 'camera-answer-sdp' });
   requestDesktopMediaMock.mockResolvedValue(undefined);
   startRecordingMock.mockResolvedValue(undefined);
   stopRecordingMock.mockResolvedValue(undefined);
+}
+
+async function verifiesCameraOfferReturnsDeferredSdpAnswer() {
+  const listener = await captureSubscriptionListener();
+  const sendResponse = vi.fn();
+  const settings = createExportSettings();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+
+  const keepChannelOpen = emitTrustedRuntimeMessage(
+    listener,
+    {
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+      peerId: 'camera-peer-1',
+      sdp: 'camera-offer-sdp',
+      settings,
+    },
+    sendResponse
+  );
+
+  expect(keepChannelOpen).toBe(true);
+  await flushRuntimeRouting();
+
+  expect(answerCameraSourceOfferMock).toHaveBeenCalledWith({
+    peerId: 'camera-peer-1',
+    offer: { type: 'offer', sdp: 'camera-offer-sdp' },
+    settings,
+  });
+  expect(sendResponse).toHaveBeenCalledWith({ success: true, sdp: 'camera-answer-sdp' });
+}
+
+async function verifiesCameraSwitchKeepsTheExistingPeer() {
+  const listener = await captureSubscriptionListener();
+  const sendResponse = vi.fn();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+
+  const keepChannelOpen = emitTrustedRuntimeMessage(
+    listener,
+    {
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId: 'camera-2',
+      peerId: 'camera-peer-1',
+    },
+    sendResponse
+  );
+
+  expect(keepChannelOpen).toBe(true);
+  await flushRuntimeRouting();
+  expect(switchCameraSourcePeerInputMock).toHaveBeenCalledWith('camera-peer-1', 'camera-2');
+  expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }
 
 async function verifiesValidatedMessageRouting() {
@@ -367,5 +428,13 @@ describe('offscreen-runtime', () => {
   it(
     'acknowledges terminal recorder failures as one terminal stop result',
     verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse
+  );
+  it(
+    'returns the camera SDP answer through the deferred runtime response channel',
+    verifiesCameraOfferReturnsDeferredSdpAnswer
+  );
+  it(
+    'switches the active camera source without replacing its peer',
+    verifiesCameraSwitchKeepsTheExistingPeer
   );
 });

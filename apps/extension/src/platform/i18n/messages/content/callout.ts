@@ -42,6 +42,9 @@ export const contentCalloutMessages = defineMessageSource({
   manualBackground: { ru: 'Фон и тень', en: 'Background & shadow' },
   surfaceStyle: {
     title: { ru: 'Стиль поверхности', en: 'Surface style' },
+    backgroundType: { ru: 'Тип фона', en: 'Background type' },
+    color: { ru: 'Цвет', en: 'Color' },
+    surface: { ru: 'Поверхность', en: 'Surface' },
     custom: { ru: 'Свой', en: 'Custom' },
     paint: { ru: 'Заливка', en: 'Paint' },
     advancedCss: { ru: 'Расширенный CSS', en: 'Advanced CSS' },

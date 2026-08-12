@@ -39,9 +39,11 @@ vi.mock('../../../section-surface/panel-controls', () => ({
   settingsEmptyStateClassName: 'empty-state',
   settingsInfoIconButtonClassName: 'info-button',
   settingsModalFieldSurfaceClassName: 'field-surface',
+  settingsModalClassName: 'settings-modal',
   settingsNeutralBadgeClassName: 'neutral-badge',
   settingsSuccessBadgeClassName: 'success-badge',
   SettingsDragHandle: () => <div data-testid="drag-handle">drag</div>,
+  SettingsControlRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SettingsRange: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="range" {...props} />
   ),
@@ -170,5 +172,14 @@ describe('quick actions editor output', () => {
 
     expect(selects[2]?.disabled).toBe(true);
     expect(buttons).toHaveLength(1);
+  });
+
+  it('does not offer clipboard delivery for window or screen capture', async () => {
+    const state = createState({ editForm: { screenshotMode: 'desktop' } });
+    await renderOutput(state, false);
+
+    expect(
+      Array.from(container?.querySelectorAll('option') ?? []).map((option) => option.value)
+    ).not.toContain('copy');
   });
 });

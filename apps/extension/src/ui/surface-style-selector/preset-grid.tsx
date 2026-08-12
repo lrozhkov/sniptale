@@ -7,6 +7,7 @@ import type { SurfaceStyleSelectorProps } from './types';
 export function SurfaceStylePresetGrid(props: {
   actions: SurfaceStyleSelectorProps['actions'];
   draft: SurfaceStyle;
+  selectionOnly?: boolean;
   name: string;
   onDraftChange: (style: SurfaceStyle) => void;
   presets: SurfaceStyleSelectorProps['presets'];
@@ -48,72 +49,74 @@ export function SurfaceStylePresetGrid(props: {
               }}
             />
             <span className="block truncate">
-              {preset.favorite ? '★ ' : ''}
+              {!props.selectionOnly && preset.favorite ? '★ ' : ''}
               {preset.name}
             </span>
           </button>
-          <div className="mt-1 flex flex-wrap gap-1">
-            <button
-              type="button"
-              aria-label={translate('content.callout.surfaceStyle.favorite')}
-              onClick={() => void props.actions.onToggleFavorite(preset.id)}
-            >
-              ★
-            </button>
-            <button
-              type="button"
-              aria-label={translate('content.callout.surfaceStyle.duplicate')}
-              onClick={() =>
-                void props.actions.onDuplicate(
-                  preset.id,
-                  `${preset.name}${translate('content.callout.surfaceStyle.duplicateNameSuffix')}`
-                )
-              }
-            >
-              ⧉
-            </button>
-            {preset.origin === 'user' ? (
-              <>
-                <button
-                  type="button"
-                  aria-label={translate('content.callout.surfaceStyle.update')}
-                  onClick={() => void props.actions.onUpdate(preset.id, props.draft)}
-                >
-                  ↻
-                </button>
-                <button
-                  type="button"
-                  aria-label={translate('content.callout.surfaceStyle.rename')}
-                  onClick={() =>
-                    props.name.trim() && void props.actions.onRename(preset.id, props.name.trim())
-                  }
-                >
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  aria-label={translate('content.callout.surfaceStyle.delete')}
-                  onClick={() => void props.actions.onDelete(preset.id)}
-                >
-                  ×
-                </button>
-                <button
-                  type="button"
-                  aria-label={translate('content.callout.surfaceStyle.moveUp')}
-                  onClick={() => move(preset.id, -1)}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  aria-label={translate('content.callout.surfaceStyle.moveDown')}
-                  onClick={() => move(preset.id, 1)}
-                >
-                  ↓
-                </button>
-              </>
-            ) : null}
-          </div>
+          {!props.selectionOnly ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              <button
+                type="button"
+                aria-label={translate('content.callout.surfaceStyle.favorite')}
+                onClick={() => void props.actions.onToggleFavorite(preset.id)}
+              >
+                ★
+              </button>
+              <button
+                type="button"
+                aria-label={translate('content.callout.surfaceStyle.duplicate')}
+                onClick={() =>
+                  void props.actions.onDuplicate(
+                    preset.id,
+                    `${preset.name}${translate('content.callout.surfaceStyle.duplicateNameSuffix')}`
+                  )
+                }
+              >
+                ⧉
+              </button>
+              {preset.origin === 'user' ? (
+                <>
+                  <button
+                    type="button"
+                    aria-label={translate('content.callout.surfaceStyle.update')}
+                    onClick={() => void props.actions.onUpdate(preset.id, props.draft)}
+                  >
+                    ↻
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate('content.callout.surfaceStyle.rename')}
+                    onClick={() =>
+                      props.name.trim() && void props.actions.onRename(preset.id, props.name.trim())
+                    }
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate('content.callout.surfaceStyle.delete')}
+                    onClick={() => void props.actions.onDelete(preset.id)}
+                  >
+                    ×
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate('content.callout.surfaceStyle.moveUp')}
+                    onClick={() => move(preset.id, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={translate('content.callout.surfaceStyle.moveDown')}
+                    onClick={() => move(preset.id, 1)}
+                  >
+                    ↓
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

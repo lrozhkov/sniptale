@@ -31,9 +31,12 @@ export function buildPopupFooterSharedPreviews(locale: AppLocale): DesignSystemV
       'shared.ui.popup-footer',
       'default',
       <PopupFooter
-        onOpenDesignSystem={() => undefined}
+        onOpenGallery={() => undefined}
         onOpenGithub={() => undefined}
+        onOpenImageEditor={() => undefined}
+        onOpenScenarioEditor={() => undefined}
         onOpenSettings={() => undefined}
+        onOpenVideoEditor={() => undefined}
       />
     ),
   ];

@@ -180,10 +180,70 @@ it('allows only popup quick-action targeted capture routes without a sender tab'
   ).toBe(true);
   expect(
     canRoute(
+      {
+        type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+        tabId: 7,
+        config: {
+          screenshotMode: 'desktop',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture: 'download_default',
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        },
+      },
+      createSender({ url: POPUP_URL })
+    )
+  ).toBe(true);
+  expect(
+    canRoute(
+      {
+        type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+        tabId: 7,
+        config: {
+          screenshotMode: 'visible',
+          viewportPresetId: null,
+          delay: null,
+          afterCapture: 'download_default',
+          imageFormat: null,
+          imageQuality: null,
+          exitAfterCapture: false,
+        },
+      },
+      createTopLevelContentSender()
+    )
+  ).toBe(false);
+  expect(
+    canRoute(
       { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
       createSender({ url: POPUP_URL })
     )
   ).toBe(false);
+});
+
+it('accepts popup desktop selections only from the popup document', () => {
+  runtimeInfoGetUrlMock.mockReturnValue(
+    'chrome-extension://test/apps/extension/src/popup/index.html'
+  );
+  const message = {
+    actionId: 'desktop-action',
+    desktopSelection: {
+      dataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=',
+      height: 1,
+      requestId: 'request-1',
+      reservationToken: 'reservation-1',
+      status: 'selected' as const,
+      width: 1,
+    },
+    tabId: 7,
+    type: MessageType.TRIGGER_QUICK_ACTION,
+  };
+
+  expect(canRoute(message, createSender({ url: POPUP_URL }))).toBe(true);
+  expect(canRoute(message, createTopLevelContentSender())).toBe(false);
+  expect(canRoute(message, createSender({ url: VIEWER_URL }))).toBe(false);
 });
 
 it('allows owned snapshot viewer routes and rejects unrelated extension pages', () => {

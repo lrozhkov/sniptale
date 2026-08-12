@@ -5,6 +5,7 @@ import { createEmptyVideoProject } from '../../../features/video/project/factori
 import { VideoExportFormat, VideoExportQualityPreset } from '../../../features/video/project/types';
 import { createSceneSelection } from '../../project/selection/model';
 import type { VideoEditorState } from '../../state/store';
+import type { VideoEditorWorkspaceState } from './workspace-state';
 import { useVideoEditorController } from './index';
 import { createHookStoreActions, createWorkspaceHookPreviewState } from './index.test-support';
 const useVideoEditorStoreMock = vi.fn();
@@ -15,6 +16,7 @@ const useVideoEditorActionHandlersMock = vi.fn();
 const useVideoEditorSelectionsMock = vi.fn();
 const useVideoEditorOverlayPlaybackMock = vi.fn();
 const getSaveStateMetaMock = vi.fn();
+const useVideoEditorProjectHistoryShortcutsMock = vi.fn();
 const baseProject = { ...createEmptyVideoProject('Hook Test') };
 vi.mock('../../state/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../state/store')>()),
@@ -48,6 +50,10 @@ vi.mock('../app-model/utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../app-model/utils')>()),
   getSaveStateMeta: (...args: unknown[]) => getSaveStateMetaMock(...args),
 }));
+vi.mock('../session/history-shortcuts', () => ({
+  useVideoEditorProjectHistoryShortcuts: (params: unknown) =>
+    useVideoEditorProjectHistoryShortcutsMock(params),
+}));
 
 function createStoreState(): VideoEditorState {
   return {
@@ -55,6 +61,13 @@ function createStoreState(): VideoEditorState {
       ...baseProject,
       clips: [],
       tracks: baseProject.tracks,
+    },
+    projectHistory: {
+      projectId: baseProject.id,
+      past: [],
+      future: [],
+      error: null,
+      transaction: null,
     },
     recordingId: 'recording-1',
     isReady: true,
@@ -175,7 +188,7 @@ function createActionHandlerMocks() {
 
 function prepareHookMocks(
   store: VideoEditorState,
-  workspaceState: ReturnType<typeof createWorkspaceHookState> = createWorkspaceHookState()
+  workspaceState: VideoEditorWorkspaceState = createWorkspaceHookState()
 ) {
   useVideoEditorStoreMock.mockImplementation(
     (selector?: (state: VideoEditorState) => unknown) => selector?.(store) ?? store
@@ -261,6 +274,94 @@ describe('useVideoEditorController', () => {
     'keeps shell state available while the active project is still loading',
     verifyControllerWithoutActiveProject
   );
+
+  it('blocks history shortcuts and commands while confirmation is open', () => {
+    const store = createStoreState();
+    store.exportState.dialogOpen = false;
+    store.projectHistory.past = [structuredClone(store.project!)];
+    const baseWorkspaceState = createWorkspaceHookState();
+    const workspaceState = {
+      ...baseWorkspaceState,
+      confirm: {
+        ...baseWorkspaceState.confirm,
+        dialog: {
+          title: 'Discard changes?',
+          message: 'Body',
+          confirmText: 'Discard',
+          cancelText: 'Keep',
+        },
+      },
+    };
+    const result: { current: ReturnType<typeof useVideoEditorController> | null } = {
+      current: null,
+    };
+    prepareHookMocks(store, workspaceState);
+
+    function Harness(): React.JSX.Element {
+      result.current = useVideoEditorController();
+      return <button type="button">Confirm</button>;
+    }
+
+    renderToStaticMarkup(<Harness />);
+
+    expect(useVideoEditorProjectHistoryShortcutsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false })
+    );
+    expect(result.current?.workspace?.history).toMatchObject({ canUndo: false, canRedo: false });
+    result.current?.workspace?.history.onUndo();
+    result.current?.workspace?.history.onRedo();
+    expect(store.undoProject).not.toHaveBeenCalled();
+    expect(store.redoProject).not.toHaveBeenCalled();
+  });
+
+  it('blocks history shortcuts and commands while export failure is open', () => {
+    const store = createStoreState();
+    store.exportState.dialogOpen = false;
+    store.exportState.error = 'Export failed';
+    store.projectHistory.past = [structuredClone(store.project!)];
+    const result: { current: ReturnType<typeof useVideoEditorController> | null } = {
+      current: null,
+    };
+    prepareHookMocks(store);
+
+    function Harness(): React.JSX.Element {
+      result.current = useVideoEditorController();
+      return <div data-testid="controller" />;
+    }
+
+    renderToStaticMarkup(<Harness />);
+
+    expect(useVideoEditorProjectHistoryShortcutsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false })
+    );
+    expect(result.current?.workspace?.history).toMatchObject({ canUndo: false, canRedo: false });
+    result.current?.workspace?.history.onUndo();
+    expect(store.undoProject).not.toHaveBeenCalled();
+  });
+
+  it('passes active history transactions to editor-wide shortcut state', () => {
+    const store = createStoreState();
+    store.projectHistory.transaction = {
+      before: structuredClone(store.project!),
+      changed: true,
+      lease: Symbol('active-history-transaction'),
+      projectId: store.project!.id,
+    };
+    prepareHookMocks(store);
+
+    function Harness(): React.JSX.Element {
+      useVideoEditorController();
+      return <div data-testid="controller" />;
+    }
+
+    renderToStaticMarkup(<Harness />);
+
+    expect(useVideoEditorRuntimeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playback: expect.objectContaining({ projectHistoryTransactionActive: true }),
+      })
+    );
+  });
 
   it('returns the inspector to selection mode when manual modes are followed by selections', () => {
     const store = createStoreState();

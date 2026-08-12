@@ -20,6 +20,7 @@ const {
   readCaptureSurfaceJournalMock,
   hasOwnerLeaseMock,
   releaseOwnersMock,
+  releaseVideoRecordingSurfaceMock,
   disableViewportCursorProjectionMock,
 } = vi.hoisted(() => ({
   clearActiveVideoRecordingLeaseMock: vi.fn(),
@@ -40,6 +41,7 @@ const {
   readCaptureSurfaceJournalMock: vi.fn(),
   hasOwnerLeaseMock: vi.fn(),
   releaseOwnersMock: vi.fn(),
+  releaseVideoRecordingSurfaceMock: vi.fn(),
   disableViewportCursorProjectionMock: vi.fn(),
 }));
 
@@ -47,6 +49,10 @@ vi.mock('../video/recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+}));
+vi.mock('../video/content-surface/surface-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../video/content-surface/surface-lease')>()),
+  releaseVideoRecordingSurface: releaseVideoRecordingSurfaceMock,
 }));
 vi.mock('../video/runtime/manager', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/runtime/manager')>()),
@@ -120,6 +126,7 @@ beforeEach(() => {
   readCaptureSurfaceJournalMock.mockResolvedValue([]);
   hasOwnerLeaseMock.mockReturnValue(false);
   releaseOwnersMock.mockResolvedValue(undefined);
+  releaseVideoRecordingSurfaceMock.mockResolvedValue(false);
   disableViewportCursorProjectionMock.mockResolvedValue(undefined);
 });
 
@@ -269,6 +276,25 @@ it('quiesces offscreen work and removes corrupt durable media authorities before
     clearActiveVideoRecordingLeaseMock.mock.invocationCallOrder[0] ?? 0
   );
   expect(finishVideoRecordingStopMock).toHaveBeenCalledTimes(2);
+});
+
+it('still contains offscreen media when invalid-state surface retirement fails', async () => {
+  inspectPersistedLeaseMock.mockResolvedValueOnce({ status: 'invalid' });
+  inspectActiveProjectExportJobLedgerEntryMock.mockResolvedValueOnce({ status: 'invalid' });
+  releaseVideoRecordingSurfaceMock.mockRejectedValueOnce(new Error('surface retirement failed'));
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(closeOffscreenDocumentForPrivacyErasureMock).toHaveBeenCalledOnce();
+  expect(clearActiveVideoRecordingLeaseMock).not.toHaveBeenCalled();
+  expect(clearProjectExportJobLedgerForPrivacyErasureMock).not.toHaveBeenCalled();
+  expect(result).toContainEqual(
+    expect.objectContaining({
+      error: 'invalid-media-state-recovery-failed',
+      id: 'recording-runtime-state',
+      status: 'failed',
+    })
+  );
 });
 
 it('waits for verified offscreen closure before reporting media cleanup success', async () => {

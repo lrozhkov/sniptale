@@ -92,8 +92,8 @@ describe('callout settings views', () => {
     expect(markup).toContain('sniptale-settings-popover-destructive-action');
     expect(markup).toContain('sniptale-settings-popover-close');
     expect(markup).not.toContain('data-callout-settings-mode-switch');
-    expect(markup).not.toContain('Сохранить как пресет');
-    expect(markup).not.toContain('Название пресета');
+    expect(markup).not.toContain('Сохранить как шаблон');
+    expect(markup).not.toContain('Название шаблона');
     expect(markup).not.toContain('data-callout-anchor=');
   });
 

@@ -2,10 +2,13 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { handleQuickAction } from '../quick-actions/index';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { CaptureRouteContext } from './types';
+import type { QuickActionRuntimeContext } from '../quick-actions/flow/shared';
+import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
 
 export function handleTriggerQuickAction(
-  message: { actionId: string },
-  context: CaptureRouteContext
+  message: { actionId: string; desktopSelection?: DesktopScreenshotSelection },
+  context: CaptureRouteContext,
+  runtimeContext?: QuickActionRuntimeContext
 ): boolean {
   browserTabs
     .get(context.resolvedTabId)
@@ -19,6 +22,10 @@ export function handleTriggerQuickAction(
         captureGuardState: context.captureGuardState,
         pageAccessPort: context.pageAccessPort,
         webSnapshotViewerPorts: context.webSnapshotViewerPorts,
+        ...(message.desktopSelection === undefined
+          ? {}
+          : { desktopSelection: message.desktopSelection }),
+        ...(runtimeContext === undefined ? {} : { runtimeContext }),
       })
     )
     .then((response) => {

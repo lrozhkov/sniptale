@@ -101,7 +101,7 @@ describe('Popup video controls i18n', () => {
     expect(translate('popup.video.countdownLabel', 'en')).toBe('Countdown');
     expect(translate('popup.video.countdownZeroOption', 'ru')).toBe('Выкл.');
     expect(translate('popup.video.countdownZeroOption', 'en')).toBe('Off');
-    expect(translate('popup.video.manageSizePresets', 'ru')).toBe('Управление пресетами размеров…');
+    expect(translate('popup.video.manageSizePresets', 'ru')).toBe('Управление шаблонами размеров…');
     expect(translate('popup.video.manageSizePresets', 'en')).toBe('Manage presets…');
   });
 });

@@ -55,7 +55,8 @@ function isPlainPopupPreparationOpenFlow(request: RuntimeMessageRequest): boolea
     request.quickActionOverlay === undefined &&
     request.autoStartSelection !== true &&
     request.autoStartCaptureType === undefined &&
-    request.viewport === undefined
+    request.viewport === undefined &&
+    request.workingMode === undefined
   );
 }
 
@@ -164,6 +165,7 @@ function handleEnableScreenshotMode(
 
   queueAutoStartCaptureIfNeeded(request, params);
   enableScreenshotModeState(request, params);
+  if (request.workingMode) params.workingModes.select(request.workingMode);
   if (request.surfaceWarning) showToast(request.surfaceWarning, 'warning', 5000);
 
   sendResponse({ success: true });

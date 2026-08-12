@@ -5,12 +5,17 @@ import { authorizeContentSender } from '../../../routing-contracts/capabilities/
 import { isPopupTabRouteSenderUrl } from '../capabilities/popup-tab/route-capabilities';
 
 type CaptureRouteSenderPolicyArgs = {
-  message: { type: string };
+  message: { type: string; desktopSelection?: unknown };
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
 
-export type PrivilegedTabRouteFamily = 'capture' | 'scenario' | 'tab-mode' | 'video-control';
+export type PrivilegedTabRouteFamily =
+  | 'capture'
+  | 'scenario'
+  | 'tab-mode'
+  | 'video-control'
+  | 'video-recording-surface';
 
 type PrivilegedTabRouteSenderPolicyArgs = {
   family: PrivilegedTabRouteFamily;
@@ -30,6 +35,7 @@ const privilegedTabRouteAuthorizationMatrix = {
   scenario: { popup: false, senderOwnedTab: true, viewer: true },
   'tab-mode': { popup: true, senderOwnedTab: true, viewer: false },
   'video-control': { popup: true, senderOwnedTab: false, viewer: false },
+  'video-recording-surface': { popup: false, senderOwnedTab: true, viewer: false },
 } satisfies Record<PrivilegedTabRouteFamily, TabRouteAuthorizationPolicy>;
 
 const unauthorizedRouteErrors = {
@@ -37,10 +43,15 @@ const unauthorizedRouteErrors = {
   scenario: 'Unauthorized scenario route sender',
   'tab-mode': 'Unauthorized tab-mode route sender',
   'video-control': 'Unauthorized video-control route sender',
+  'video-recording-surface': 'Unauthorized video recording surface sender',
 } satisfies Record<PrivilegedTabRouteFamily, string>;
 
 const editorCaptureRoutes = new Set<string>([MessageType.EXECUTE_SAVE]);
-const popupCaptureRoutes = new Set<string>([MessageType.TRIGGER_QUICK_ACTION]);
+const popupCaptureRoutes = new Set<string>([
+  MessageType.TRIGGER_QUICK_ACTION,
+  MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+  MessageType.TRIGGER_SCREENSHOT_CAPTURE,
+]);
 const viewerCaptureRoutes = new Set<string>([
   MessageType.FETCH_WEB_SNAPSHOT_ASSET,
   MessageType.REGISTER_WEB_SNAPSHOT_ASSETS,
@@ -91,6 +102,15 @@ function isAuthorizedViewerCaptureRoute(
 }
 
 export function canRouteCaptureMessageFromSender(args: CaptureRouteSenderPolicyArgs): boolean {
+  if (args.message.desktopSelection !== undefined) {
+    return isAuthorizedPopupCaptureRoute(args.message, args.sender);
+  }
+  if (
+    args.message.type === MessageType.TRIGGER_SCREENSHOT_CAPTURE ||
+    args.message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
+  ) {
+    return isAuthorizedPopupCaptureRoute(args.message, args.sender);
+  }
   return (
     authorizeContentSender(args.sender, args.resolvedTabId).allowed ||
     isAuthorizedEditorCaptureRoute(args.message, args.sender) ||

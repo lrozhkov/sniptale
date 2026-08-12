@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../interaction-controls/apply', () => ({
+  applyEditorActiveSelectionInteractionControls: vi.fn(),
   applyEditorObjectInteractionControls: mocks.applyEditorObjectInteractionControls,
 }));
 vi.mock('./geometry-refresh', () => ({
@@ -27,7 +28,8 @@ vi.mock('./rich-shape-controls', () => ({
 vi.mock('./textbox-lifecycle', () => ({
   attachEditorTextboxLifecycle: mocks.attachEditorTextboxLifecycle,
 }));
-vi.mock('../../../drawing/object/controls', () => ({
+vi.mock('../../../drawing/object/controls/apply', () => ({
+  applyEditorDrawingActiveSelectionChrome: vi.fn(),
   applyEditorDrawingInteractionControls: mocks.applyEditorDrawingInteractionControls,
 }));
 

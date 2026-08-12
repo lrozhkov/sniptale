@@ -95,11 +95,11 @@ export const editorCompactSharedMessages = defineMessageSource({
     en: 'Strong',
   },
   shapePreset: {
-    ru: 'Пресет рамки',
+    ru: 'Шаблон рамки',
     en: 'Border preset',
   },
   shapePresetFallback: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   notSelected: {

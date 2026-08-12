@@ -82,7 +82,6 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onMoveEffectInstance?: WorkspaceSidebarProps['onMoveEffectInstance'];
   onUpdateEffectInstance?: WorkspaceSidebarProps['onUpdateEffectInstance'];
   onUpsertObjectTrackCorrectionAnchor?: WorkspaceSidebarProps['onUpsertObjectTrackCorrectionAnchor'];
-  cursorDetection?: WorkspaceSidebarProps['cursorDetection'];
   placementMode: VideoEditorPlacementMode | null;
   project: VideoProject;
   recentColors: string[];

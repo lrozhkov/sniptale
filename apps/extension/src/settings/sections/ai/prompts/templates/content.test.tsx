@@ -69,6 +69,7 @@ function createTemplate(overrides: Partial<PromptTemplate> = {}): PromptTemplate
     name: overrides.name ?? 'Template 1',
     content: overrides.content ?? 'Template body',
     isDefault: overrides.isDefault ?? false,
+    ...(overrides.customized === undefined ? {} : { customized: overrides.customized }),
     ...(overrides.lastUsedAt === undefined ? {} : { lastUsedAt: overrides.lastUsedAt }),
   };
 }
@@ -79,12 +80,16 @@ function createProps(overrides: Partial<Parameters<typeof TemplatesSectionConten
     closeTemplateEditor: vi.fn(),
     confirmDelete: vi.fn(async () => undefined),
     confirmState: { isOpen: false, template: null },
-    handleDeleteTemplate: vi.fn(),
     handleEditTemplate: vi.fn(),
     handleSaveTemplate: vi.fn(async () => undefined),
+    templateLifecycle: {
+      move: vi.fn(async () => undefined),
+      requestDelete: vi.fn(),
+      restore: vi.fn(async () => undefined),
+      setEnabled: vi.fn(async () => undefined),
+    },
     isEditorOpen: false,
-    isLoading: false,
-    submitError: null,
+    status: { isLoading: false, isMutating: false, mutatingTemplateId: null, submitError: null },
     openNewTemplateEditor: vi.fn(),
     templates: [],
     ...(overrides.editingTemplate === undefined
@@ -145,12 +150,22 @@ function verifyEmptyStateAndAddAction() {
 }
 
 function verifyTemplateRowActionsAndDialogs() {
-  const template = createTemplate({ id: 'template-2', name: 'Template 2', isDefault: true });
+  const systemTemplate = createTemplate({
+    id: 'template-2',
+    name: 'Template 2',
+    isDefault: true,
+    customized: true,
+  });
+  const userTemplate = createTemplate({ id: 'template-user', name: 'User template' });
   const props = renderSection({
-    confirmState: { isOpen: true, template },
-    editingTemplate: { id: template.id, name: template.name, content: template.content },
+    confirmState: { isOpen: true, template: userTemplate },
+    editingTemplate: {
+      id: systemTemplate.id,
+      name: systemTemplate.name,
+      content: systemTemplate.content,
+    },
     isEditorOpen: true,
-    templates: [template],
+    templates: [systemTemplate, userTemplate],
   });
   act(() => {
     container
@@ -158,8 +173,30 @@ function verifyTemplateRowActionsAndDialogs() {
         `button[aria-label="${translate('settings.collection.actions.edit')}"]`
       )
       ?.click();
-    [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
-      .find((button) => button.textContent === translate('settings.collection.actions.delete'))
+    container
+      ?.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('settings.collection.actions.disable')}"]`
+      )
+      ?.click();
+    container
+      ?.querySelectorAll<HTMLButtonElement>(
+        `button[aria-label="${translate('settings.collection.actions.menu')}"]`
+      )[0]
+      ?.click();
+    container
+      ?.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('templates.section.restoreAction')}"]`
+      )
+      ?.click();
+    container
+      ?.querySelectorAll<HTMLButtonElement>(
+        `button[aria-label="${translate('settings.collection.actions.menu')}"]`
+      )[1]
+      ?.click();
+    container
+      ?.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('settings.collection.actions.delete')}"]`
+      )
       ?.click();
     container?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
       if (button.textContent === translate('common.actions.delete')) {
@@ -171,33 +208,84 @@ function verifyTemplateRowActionsAndDialogs() {
     });
   });
 
-  expect(props.handleEditTemplate).toHaveBeenCalledWith(template);
-  expect(props.handleDeleteTemplate).toHaveBeenCalledWith(template);
+  expect(props.handleEditTemplate).toHaveBeenCalledWith(systemTemplate);
+  expect(props.templateLifecycle.requestDelete).toHaveBeenCalledWith(userTemplate);
+  expect(props.templateLifecycle.restore).toHaveBeenCalledWith(systemTemplate.id);
+  expect(props.templateLifecycle.setEnabled).toHaveBeenCalledWith(systemTemplate.id, false);
+  expect(container?.textContent).not.toContain(translate('settings.collection.defaultBadge'));
+  expect(container?.textContent).not.toContain(translate('settings.collection.builtInBadge'));
   expect(props.confirmDelete).toHaveBeenCalledTimes(1);
   expect(props.closeDeleteDialog).toHaveBeenCalledTimes(1);
   expect(promptTemplateEditorPropsSpy).toHaveBeenLastCalledWith(
     expect.objectContaining({
       isOpen: true,
-      template: expect.objectContaining({ id: template.id }),
+      template: expect.objectContaining({ id: systemTemplate.id }),
     })
   );
   expect(confirmDialogPropsSpy).toHaveBeenLastCalledWith(
     expect.objectContaining({
       isOpen: true,
-      title: translate('templates.section.deleteDefaultTitle'),
+      title: translate('templates.section.deleteCustomTitle'),
     })
   );
 }
 
 function verifyTemplatesLoadingStateDelay() {
-  renderSection({ isLoading: true });
+  renderSection({
+    status: { isLoading: true, isMutating: false, mutatingTemplateId: null, submitError: null },
+  });
   expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeTruthy();
   expect(container?.textContent).not.toContain(translate('templates.section.emptyTitle'));
+}
+
+function verifyTemplatesStayVisibleWhileMutating() {
+  renderSection({
+    status: {
+      isLoading: false,
+      isMutating: true,
+      mutatingTemplateId: 'template-1',
+      submitError: null,
+    },
+    templates: [createTemplate()],
+  });
+  expect(container?.textContent).toContain('Template 1');
+  expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeFalsy();
+}
+
+function verifyOnlyMutatingTemplateRowIsBusy() {
+  renderSection({
+    status: {
+      isLoading: false,
+      isMutating: true,
+      mutatingTemplateId: 'template-1',
+      submitError: null,
+    },
+    templates: [
+      createTemplate({ id: 'template-1', name: 'Template 1' }),
+      createTemplate({ id: 'template-2', name: 'Template 2' }),
+    ],
+  });
+  expect(
+    container?.querySelector('[data-settings-collection-item="template-1"]')?.className
+  ).toContain('cursor-wait');
+  expect(
+    container?.querySelector('[data-settings-collection-item="template-2"]')?.className
+  ).not.toContain('cursor-wait');
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-settings-collection-item="template-2"] button[role="switch"]'
+    )?.disabled
+  ).toBe(false);
 }
 
 function runTemplatesSectionContentSuite() {
   it('renders the empty templates state and opens the add flow', verifyEmptyStateAndAddAction);
   it('delays the card loading placeholder while templates load', verifyTemplatesLoadingStateDelay);
+  it(
+    'keeps template rows mounted while a mutation is saving',
+    verifyTemplatesStayVisibleWhileMutating
+  );
+  it('marks only the template being updated as busy', verifyOnlyMutatingTemplateRowIsBusy);
   it(
     'routes row actions, hover updates, editor props, and delete dialog events',
     verifyTemplateRowActionsAndDialogs

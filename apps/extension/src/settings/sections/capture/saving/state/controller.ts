@@ -62,6 +62,5 @@ export function useSavePresetsSection() {
     handleMoveBefore: actions.handleMoveBefore,
     handleSavePreset: actions.handleSavePreset,
     handleTogglePresetEnabled: actions.handleTogglePresetEnabled,
-    handleToggleSaveToGallery: actions.handleToggleSaveToGallery,
   };
 }

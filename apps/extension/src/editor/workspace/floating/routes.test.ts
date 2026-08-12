@@ -74,3 +74,31 @@ it('suppresses drawers and selection toolbar for dismissed, empty, crop, and fra
     })
   ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: null });
 });
+
+it('keeps the generic lock toolbar away from single and multi drawing selections', () => {
+  for (const selection of [
+    {
+      ...emptySelection,
+      hasSelection: true,
+      selectedObjectCount: 1,
+      selectedObjectType: 'shape',
+      selectedObjectsAreDrawing: true,
+    },
+    {
+      ...emptySelection,
+      hasSelection: true,
+      selectedObjectCount: 3,
+      selectedObjectType: null,
+      selectedObjectsAreDrawing: true,
+    },
+  ]) {
+    expect(
+      resolveFloatingSurfaceRoute({
+        activeTool: 'select',
+        hasImage: true,
+        inspector: 'tool',
+        selection,
+      }).canvasSelectionToolbar
+    ).toBe(false);
+  }
+});

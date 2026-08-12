@@ -4,15 +4,21 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 const mocks = vi.hoisted(() => ({
   abandonCursor: vi.fn(),
   beginCursor: vi.fn(),
+  beginSurfaceRebind: vi.fn(),
+  closeCameraPeer: vi.fn(),
   cursorEnabled: false,
   ensurePageAccess: vi.fn(),
   enableViewportCursorProjection: vi.fn(),
   getRuntimeState: vi.fn(),
   loggerWarn: vi.fn(),
+  loadVideoSettings: vi.fn(),
   readViewport: vi.fn(),
   restoreCursor: vi.fn(),
   restoreOverlay: vi.fn(),
+  sendTabMessage: vi.fn(),
   suspendCursor: vi.fn(),
+  surfaceLease: null as null | Record<string, unknown>,
+  updateSurface: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -46,6 +52,32 @@ vi.mock('../controlled-cursor/navigation-effects', async (importOriginal) => ({
   restoreControlledCursorEffects: mocks.restoreCursor,
   suspendControlledCursorEffects: mocks.suspendCursor,
 }));
+vi.mock('../../../content-surface/surface-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../content-surface/surface-lease')>()),
+  beginVideoRecordingSurfaceRebind: mocks.beginSurfaceRebind,
+  getVideoRecordingSurfaceLeaseSnapshot: () => mocks.surfaceLease,
+  updateVideoRecordingSurface: mocks.updateSurface,
+}));
+vi.mock('../../../content-surface/camera-peer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../content-surface/camera-peer')>()),
+  closeVideoRecordingCameraPeerForLease: mocks.closeCameraPeer,
+}));
+vi.mock('../../../content-surface/snapshot', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../content-surface/snapshot')>()),
+  createVideoRecordingSurfaceSnapshot: vi.fn(() => ({ lifecycle: 'ready' })),
+}));
+vi.mock('../../../../../../composition/persistence/capture-settings', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../../composition/persistence/capture-settings')
+  >()),
+  loadVideoSettings: mocks.loadVideoSettings,
+}));
+vi.mock('../../../../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../../routing-contracts/runtime-messaging/services')
+  >()),
+  getBackgroundRuntimeMessaging: () => ({ sendTabMessage: mocks.sendTabMessage }),
+}));
 
 import {
   abandonTabNavigationPageEffects,
@@ -68,10 +100,13 @@ const binding = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.beginCursor.mockReturnValue(11);
+  mocks.beginSurfaceRebind.mockResolvedValue(undefined);
+  mocks.closeCameraPeer.mockResolvedValue(undefined);
   mocks.cursorEnabled = false;
   mocks.ensurePageAccess.mockResolvedValue(undefined);
   mocks.enableViewportCursorProjection.mockResolvedValue(undefined);
   mocks.getRuntimeState.mockReturnValue({ captureMode: CaptureMode.TAB, cropRegion: null });
+  mocks.loadVideoSettings.mockResolvedValue({});
   mocks.readViewport.mockResolvedValue({
     devicePixelRatio: 2,
     height: 720,
@@ -84,12 +119,16 @@ beforeEach(() => {
   });
   mocks.restoreCursor.mockResolvedValue(undefined);
   mocks.restoreOverlay.mockResolvedValue(true);
+  mocks.sendTabMessage.mockResolvedValue(undefined);
   mocks.suspendCursor.mockResolvedValue(undefined);
+  mocks.surfaceLease = null;
+  mocks.updateSurface.mockResolvedValue(undefined);
 });
 
 it('resolves only page-owned effects and does nothing for plain TAB', async () => {
   const effects = resolveTabNavigationPageEffects();
   expect(effects).toEqual({
+    contentSurface: false,
     controlledCursor: false,
     cropOverlay: false,
     viewportCursorProjection: false,
@@ -100,6 +139,143 @@ it('resolves only page-owned effects and does nothing for plain TAB', async () =
   await restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess);
   expect(mocks.ensurePageAccess).not.toHaveBeenCalled();
   expect(mocks.suspendCursor).not.toHaveBeenCalled();
+});
+
+it('suspends and restores the content recording surface across navigation', async () => {
+  const lease = {
+    capabilityEpoch: 2,
+    documentGeneration: 1,
+    entry: 'popup',
+    lifecycle: 'binding',
+    peerGeneration: 2,
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    tabId: 7,
+    toolbarRequested: true,
+  };
+  mocks.surfaceLease = lease;
+  mocks.updateSurface.mockResolvedValue({ ...lease, lifecycle: 'ready' });
+  const effects = resolveTabNavigationPageEffects();
+  expect(effects.contentSurface).toBe(true);
+
+  await suspendTabNavigationPageEffects(effects, binding);
+  expect(mocks.closeCameraPeer).toHaveBeenCalledWith(lease);
+  expect(mocks.beginSurfaceRebind).toHaveBeenCalledWith(7);
+  await restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess);
+  expect(mocks.updateSurface).toHaveBeenCalledWith('surface-1', { lifecycle: 'ready' });
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+    7,
+    expect.objectContaining({
+      type: 'VIDEO_RECORDING_SURFACE_SNAPSHOT',
+      surfaceToken: 'token-1',
+    })
+  );
+});
+
+it('advances the document generation when stale camera cleanup must be retried', async () => {
+  mocks.surfaceLease = {
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    tabId: 7,
+  };
+  mocks.closeCameraPeer.mockRejectedValueOnce(new Error('peer unavailable'));
+  await suspendTabNavigationPageEffects(
+    {
+      contentSurface: true,
+      controlledCursor: false,
+      cropOverlay: false,
+      viewportCursorProjection: false,
+    },
+    binding
+  );
+  expect(mocks.updateSurface).toHaveBeenCalledWith('surface-1', { lifecycle: 'degraded' });
+  expect(mocks.beginSurfaceRebind).toHaveBeenCalledWith(7);
+});
+
+it('retries degraded peer cleanup before publishing a rebound surface', async () => {
+  const degraded = {
+    capabilityEpoch: 1,
+    documentGeneration: 0,
+    lifecycle: 'degraded',
+    peerGeneration: 0,
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    tabId: 7,
+  };
+  const rebound = {
+    ...degraded,
+    capabilityEpoch: 2,
+    documentGeneration: 1,
+    lifecycle: 'binding',
+    peerGeneration: 1,
+    surfaceToken: 'token-2',
+  };
+  mocks.surfaceLease = degraded;
+  mocks.beginSurfaceRebind.mockResolvedValueOnce(rebound);
+  mocks.updateSurface.mockResolvedValueOnce({ ...rebound, lifecycle: 'ready' });
+
+  await restoreTabNavigationPageEffects(
+    {
+      contentSurface: true,
+      controlledCursor: false,
+      cropOverlay: false,
+      viewportCursorProjection: false,
+    },
+    binding,
+    mocks.ensurePageAccess
+  );
+
+  expect(mocks.closeCameraPeer).toHaveBeenCalledWith(degraded);
+  expect(mocks.beginSurfaceRebind).toHaveBeenCalledWith(7);
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+    7,
+    expect.objectContaining({ surfaceToken: 'token-2' })
+  );
+});
+
+it('restores the toolbar in degraded state while failed camera cleanup remains queued', async () => {
+  const degraded = {
+    capabilityEpoch: 1,
+    documentGeneration: 0,
+    lifecycle: 'degraded',
+    peerGeneration: 0,
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    tabId: 7,
+    toolbarRequested: true,
+  };
+  const rebound = {
+    ...degraded,
+    capabilityEpoch: 2,
+    documentGeneration: 1,
+    lifecycle: 'binding',
+    peerGeneration: 1,
+    surfaceToken: 'token-2',
+  };
+  mocks.surfaceLease = degraded;
+  mocks.closeCameraPeer.mockRejectedValueOnce(new Error('offscreen unavailable'));
+  mocks.beginSurfaceRebind.mockResolvedValueOnce(rebound);
+  mocks.updateSurface.mockResolvedValueOnce({ ...rebound, lifecycle: 'degraded' });
+
+  await restoreTabNavigationPageEffects(
+    {
+      contentSurface: true,
+      controlledCursor: false,
+      cropOverlay: false,
+      viewportCursorProjection: false,
+    },
+    binding,
+    mocks.ensurePageAccess
+  );
+
+  expect(mocks.updateSurface).toHaveBeenCalledWith('surface-1', { lifecycle: 'degraded' });
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+    7,
+    expect.objectContaining({ surfaceToken: 'token-2' })
+  );
 });
 
 it('restores viewport cursor projection after canonical page access without making failure critical', async () => {

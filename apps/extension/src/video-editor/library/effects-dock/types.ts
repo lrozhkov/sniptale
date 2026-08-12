@@ -1,5 +1,4 @@
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
-import type { VideoAnnotationTemplateCreateInput } from '../../../features/video/project/annotation/template-input';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { EffectLibraryOperations } from './operations';
 
@@ -14,7 +13,6 @@ export interface VideoEditorEffectsLibraryDockProps {
   isLoading: boolean;
   isOpen: boolean;
   operations: EffectLibraryOperations;
-  onAddAnnotation(input: VideoAnnotationTemplateCreateInput): void;
   onApplyEffect(args: {
     catalog: EffectBundleCatalogEntry;
     documentId: string;

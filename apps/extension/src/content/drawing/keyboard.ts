@@ -72,6 +72,7 @@ export function useDrawingEscapeOwnership(args: {
   cancelText: () => void;
   editText: (object: DrawingTextObject) => void;
   hasTextDraft: boolean;
+  exitImmediately?: boolean;
   onExit?: () => void;
   pointerDraftRef: RefObject<unknown | null>;
   session: DrawingSession;
@@ -88,6 +89,15 @@ export function useDrawingEscapeOwnership(args: {
       }
       event.stopPropagation();
       event.stopImmediatePropagation();
+      if (args.exitImmediately) {
+        event.preventDefault();
+        args.cancelDraft();
+        args.cancelText();
+        args.session.select(null);
+        args.session.setActiveTool('select');
+        args.onExit?.();
+        return;
+      }
       handleDrawingKeyDown({
         event,
         hasDraft: Boolean(args.pointerDraftRef.current || args.hasTextDraft),

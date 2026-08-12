@@ -1,10 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import type {
-  QuickAction,
-  QuickActionsDisplayMode,
-  ViewportPreset,
-} from '../../../../contracts/settings';
+import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../../features/media-hub/storage-capacity';
 import type {
@@ -18,6 +14,7 @@ import type { WebcamOption } from '../../../recording/webcam';
 import type { RefreshWebcamDevicesOptions } from '../../../recording/webcam-flow';
 import type { PopupPage } from '../../navigation/actions';
 import type { RecordingControlCapability } from '../recording-control-capability';
+import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
 
 interface PopupRuntimeSessionState {
   homeError: string | null;
@@ -31,17 +28,18 @@ interface PopupRuntimeSessionState {
 interface PopupRuntimePresetState {
   quickActions: QuickAction[];
   quickActionsReady: boolean;
-  displayMode: QuickActionsDisplayMode;
   viewportPresets: ViewportPreset[];
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
+  screenshotStartupMode: ScreenshotSetupMode | null;
+  clearScreenshotStartupMode: () => void;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
-  setDisplayMode: Dispatch<SetStateAction<QuickActionsDisplayMode>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
+  setScreenshotStartupMode: Dispatch<SetStateAction<ScreenshotSetupMode | null>>;
 }
 
 interface PopupRuntimeRecordingState {

@@ -153,8 +153,8 @@ export function AIProvidersSectionModals(props: { state: AiProvidersSectionState
           message={getAiProviderDeleteMessage(modals.confirmDelete)}
           onConfirm={
             modals.confirmDelete.type === 'provider'
-              ? props.state.handleDeleteProvider
-              : props.state.handleDeleteModel
+              ? props.state.catalogActions.deleteProvider
+              : props.state.catalogActions.deleteModel
           }
           onCancel={() => modals.setConfirmDelete(null)}
         />

@@ -13,6 +13,7 @@ vi.mock('../../../project/operations/auto-transform', () => ({
 }));
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
+  project.baseRecordingId = 'recording-1';
   const authority = { project };
   const store = {
     project,
@@ -42,7 +43,7 @@ it('passes wizard settings into the recording auto-transform action', async () =
   const nextProject = { ...store.project, name: 'Transformed' };
 
   autoTransformRecordingProjectMock.mockResolvedValue(nextProject);
-  createAutoTransformRecordingAction(store)(settings);
+  createAutoTransformRecordingAction(store, () => authority.project)(settings);
   await Promise.resolve();
 
   expect(autoTransformRecordingProjectMock).toHaveBeenCalledWith(
@@ -60,7 +61,7 @@ it('keeps the stale project guard for async auto-transform results', async () =>
   const nextProject = { ...project, name: 'Late transform' };
 
   autoTransformRecordingProjectMock.mockResolvedValue(nextProject);
-  createAutoTransformRecordingAction(store)(createRemoveSettings());
+  createAutoTransformRecordingAction(store, () => authority.project)(createRemoveSettings());
   authority.project = { ...project, updatedAt: project.updatedAt + 1 };
   await Promise.resolve();
 
@@ -69,3 +70,23 @@ it('keeps the stale project guard for async auto-transform results', async () =>
   expect(authority.project.name).toBe('Original');
   expect(authority.project.updatedAt).toBe(project.updatedAt + 1);
 });
+
+it.each(['unavailable', 'rejected'] as const)(
+  'suppresses stale %s feedback after project replacement',
+  async (outcome) => {
+    const project = createEmptyVideoProject('Original');
+    const { authority, store } = createStore(project);
+    if (outcome === 'unavailable') {
+      autoTransformRecordingProjectMock.mockResolvedValue(null);
+    } else {
+      autoTransformRecordingProjectMock.mockRejectedValue(new Error('late failure'));
+    }
+
+    createAutoTransformRecordingAction(store, () => authority.project)(createRemoveSettings());
+    authority.project = { ...project, id: 'replacement-project' };
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(store.setError).not.toHaveBeenCalled();
+  }
+);

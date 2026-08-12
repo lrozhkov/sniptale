@@ -1,6 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductModal, ProductModalFooter, ProductModalHeader } from '@sniptale/ui/product-modal';
+import { settingsModalClassName } from '../../../../section-surface';
 
 type AiProvidersFormModalLayoutProps = {
   children: React.ReactNode;
@@ -31,9 +32,11 @@ function resolveAiProvidersSubmitLabel(isEditing: boolean, isSaving: boolean) {
 export function AiProvidersFormModalLayout(props: AiProvidersFormModalLayoutProps) {
   return (
     <ProductModal
-      width="480px"
-      maxHeight="85vh"
+      width="440px"
+      maxWidth="calc(100vw - 32px)"
+      maxHeight="80vh"
       scrollable
+      dialogClassName={settingsModalClassName}
       onClose={props.onClose}
       onKeyDown={handleAiProvidersModalKeyDown(props.onClose)}
     >
@@ -48,11 +51,17 @@ export function AiProvidersFormModalLayout(props: AiProvidersFormModalLayoutProp
       {props.children}
 
       <ProductModalFooter compact>
-        <ProductActionButton onClick={props.onClose} tone="secondary" disabled={props.isSaving}>
+        <ProductActionButton
+          compact
+          onClick={props.onClose}
+          tone="secondary"
+          disabled={props.isSaving}
+        >
           {translate('common.actions.cancel')}
         </ProductActionButton>
         <ProductActionButton
           type="submit"
+          compact
           onClick={props.onSubmit}
           tone="primary"
           disabled={props.isSaving}

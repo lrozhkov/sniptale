@@ -36,7 +36,7 @@ import { AIProvidersSection } from '.';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function renderSection() {
+async function renderSection(props: Parameters<typeof AIProvidersSection>[0] = {}) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -44,7 +44,7 @@ async function renderSection() {
   }
 
   await act(async () => {
-    root?.render(<AIProvidersSection />);
+    root?.render(<AIProvidersSection {...props} />);
   });
 }
 
@@ -84,12 +84,15 @@ it('renders the content owner state once ai providers data is ready', async () =
   };
   aiProvidersSectionMocks.useAiProvidersSectionMock.mockReturnValue(state);
 
-  await renderSection();
+  const onViewChange = vi.fn();
+  await renderSection({ onViewChange, view: 'security' });
 
   expect(container?.textContent).toContain('content');
   expect(aiProvidersSectionMocks.contentMock).toHaveBeenCalledWith(
     expect.objectContaining({
       state,
+      onViewChange,
+      view: 'security',
     })
   );
 });

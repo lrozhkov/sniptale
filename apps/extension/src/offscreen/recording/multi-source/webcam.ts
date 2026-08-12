@@ -22,7 +22,7 @@ export function createMultiSourceWebcamRecorder(params: {
 }
 
 export function stopWebcamRecorderStream(source: RecordingSidecarRecorder | null): void {
-  source?.stream.getTracks().forEach((track) => track.stop());
+  source?.release();
 }
 
 export function createWebcamProjectInput(

@@ -78,7 +78,7 @@ export const editorSidebarMessages = defineMessageSource({
     en: 'Gradient to',
   },
   noSavePresets: {
-    ru: 'Нет активных пресетов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
+    ru: 'Нет активных шаблонов. Добавьте путь в настройках, чтобы быстро сохранять в папку без системного диалога.',
     en: 'No active presets. Add a path in settings to save quickly without the system dialog.',
   },
 });

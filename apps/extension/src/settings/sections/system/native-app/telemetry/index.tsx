@@ -1,5 +1,5 @@
 import type { NativeCaptureSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { settingsPanelClassName } from '../../../../section-surface';
+import { settingsCompactWorkbenchClassName } from '../../../../section-surface';
 import { NativeTelemetryFields } from './fields';
 
 export function NativeTelemetryView(props: {
@@ -16,7 +16,7 @@ export function NativeTelemetryView(props: {
       },
     });
   return (
-    <section className={settingsPanelClassName}>
+    <section className={`${settingsCompactWorkbenchClassName} !max-w-[640px]`}>
       <NativeTelemetryFields
         disabled={props.disabled}
         settings={props.settings}

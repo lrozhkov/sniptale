@@ -156,6 +156,44 @@ function routeDuplicateOffscreenCommand(
 }
 
 function buildOffscreenCommandSuccessResponse(result: unknown) {
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    'mediaDevices' in result &&
+    Array.isArray(result.mediaDevices)
+  ) {
+    return { success: true, mediaDevices: result.mediaDevices };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    'type' in result &&
+    result.type === 'answer' &&
+    'sdp' in result &&
+    typeof result.sdp === 'string'
+  ) {
+    return { success: true, sdp: result.sdp };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    'result' in result &&
+    result.result === 'captured' &&
+    'dataUrl' in result &&
+    typeof result.dataUrl === 'string' &&
+    'width' in result &&
+    typeof result.width === 'number' &&
+    'height' in result &&
+    typeof result.height === 'number'
+  ) {
+    return {
+      success: true,
+      result: 'captured',
+      dataUrl: result.dataUrl,
+      width: result.width,
+      height: result.height,
+    };
+  }
   if (isTerminalStopFailure(result)) {
     return {
       success: true,
@@ -164,6 +202,9 @@ function buildOffscreenCommandSuccessResponse(result: unknown) {
     };
   }
   if (result === 'applied' || result === 'stale') {
+    return { success: true, result };
+  }
+  if (result === 'copied') {
     return { success: true, result };
   }
   return { success: true, result: 'accepted' };

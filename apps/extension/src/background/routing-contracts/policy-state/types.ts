@@ -30,6 +30,7 @@ export type PolicyStateId =
   | 'video-camera-recorder-grant'
   | 'video-post-record-results'
   | 'video-recording-control-lease'
+  | 'video-recording-surface-lease'
   | 'voice-input-port-session-authority'
   | 'web-snapshot-staged-blobs';
 

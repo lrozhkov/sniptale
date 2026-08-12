@@ -19,6 +19,7 @@ import type { VideoEditorImportPlacement } from '../../contracts/insertion';
 import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
+import type { VideoEditorProjectHistoryTransactionActions } from '../../contracts/commands/history';
 
 export interface ProjectTimelineInsertionActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -38,6 +39,7 @@ export interface ProjectTimelineInsertionActions {
 }
 
 export interface ProjectTimelineProps {
+  historyTransaction: VideoEditorProjectHistoryTransactionActions;
   project: VideoProject;
   currentTime: number;
   pixelsPerSecond: number;

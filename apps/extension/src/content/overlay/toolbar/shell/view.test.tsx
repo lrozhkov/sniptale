@@ -17,6 +17,7 @@ vi.mock('../controls/primary', () => ({
 
 vi.mock('../controls/secondary', () => ({
   ToolbarSecondaryControls: () => <div data-testid="toolbar-secondary" />,
+  shouldProjectVideoRecordingControls: vi.fn(),
 }));
 
 function renderToolbarShell(

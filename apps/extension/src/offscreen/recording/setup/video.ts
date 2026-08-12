@@ -67,3 +67,25 @@ export async function attachMicrophoneAudioIfEnabled(settings: VideoRecordingSet
     ...recordingContext.audioMixer.getMixedStream().getAudioTracks(),
   ]);
 }
+
+export async function prepareStableTabRecordingAudio(settings: VideoRecordingSettings) {
+  const videoTracks = recordingContext.videoStream?.getVideoTracks();
+  if (!videoTracks?.length) return;
+
+  recordingContext.audioMixer = new AudioMixer();
+  await recordingContext.audioMixer.initialize();
+  if (settings.systemAudioEnabled && recordingContext.sourceStream) {
+    await recordingContext.audioMixer
+      .addTabAudio(recordingContext.sourceStream)
+      .catch((error) => logger.warn('Failed to add source audio', error));
+  }
+  if (settings.microphoneEnabled) {
+    await recordingContext.audioMixer
+      .addMicrophone(settings)
+      .catch((error) => logger.warn('Failed to add microphone', error));
+  }
+  recordingContext.videoStream = new MediaStream([
+    ...videoTracks,
+    ...recordingContext.audioMixer.getMixedStream().getAudioTracks(),
+  ]);
+}

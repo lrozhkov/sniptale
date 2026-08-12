@@ -2,7 +2,7 @@
 
 Updated: 2026-07-25
 
-Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
+Short command and review-skill lookup. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), implementation decisions in [implementation-rules.md](../engineering/implementation-rules.md), quality policy in [code-quality.md](code-quality.md), and wrapper lifecycle in [wrapper-summary.md](wrapper-summary.md).
 
 ## Canonical Entrypoints
 
@@ -10,7 +10,7 @@ Short command and review-skill lookup. Workflow belongs in [AGENTS.md](../../AGE
 | --- | --- | --- |
 | Read-only context | `npm run qa:preflight` | Accepts `-- --files <paths...>` before a diff exists. |
 | In-progress product proof | `npm run qa:checkpoint` | Focused current-diff gate; does not build or commit. |
-| Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
+| Harness/shared-control proof | `npm run qa:release-harness` | Required for `tooling/**`, `.github/workflows/**`, `docs/agent-tooling/**`, hooks, QA-affecting root/config files, and active `docs/tooling/**` guidance. |
 | Normal implementation closeout | `npm run qa:closeout -- -m "message"` | Owns checkpoint/build handoff, staging, task-artifact guard, and commit. |
 | Publish committed changes | `git push` | The pre-push hook proves the immutable pushed range with checkpoint/build and applicable harness verification; it never promotes a new branch push to `qa:release` or `build:release`. |
 | Release-grade product proof | `npm run qa:release` | Release preparation or explicit audit-grade proof. |
@@ -32,10 +32,10 @@ Checkpoint formatting is always sequential and finishes before any verification 
 
 | Skill | Use |
 | --- | --- |
-| [Security Code Review](../../.agents/skills/security-code-review/SKILL.md) | Privilege, trust, privacy, secrets, AI/data, import/export, sanitization, and manifest risk. |
-| [Architecture Code Review](../../.agents/skills/architecture-code-review/SKILL.md) | Runtime ownership, contracts, state authority, parser, UI/i18n/design-system, and broad topology risk. |
-| [Topology Plan Review](../../.agents/skills/topology-plan-review/SKILL.md) | Pre-move bounded-manifest planning or independent review of a completed green large move. |
-| [Repo Audit](../../.agents/skills/repo-audit/SKILL.md) | Explicit whole-repository architecture/security/tooling/documentation audit only. |
+| [Security Code Review](../agent-tooling/.agents/skills/security-code-review/SKILL.md) | Privilege, trust, privacy, secrets, AI/data, import/export, sanitization, and manifest risk. |
+| [Architecture Code Review](../agent-tooling/.agents/skills/architecture-code-review/SKILL.md) | Runtime ownership, contracts, state authority, parser, UI/i18n/design-system, and broad topology risk. |
+| [Topology Plan Review](../agent-tooling/.agents/skills/topology-plan-review/SKILL.md) | Pre-move bounded-manifest planning or independent review of a completed green large move. |
+| [Repo Audit](../agent-tooling/.agents/skills/repo-audit/SKILL.md) | Explicit whole-repository architecture/security/tooling/documentation audit only. |
 
 Required closeout reviews run as independent read-only agents without inherited context only after the complete candidate and applicable harness plus checkpoint proof are green. Invoke them only when the current diff actually changes the skill's risk seam; owner-local extraction, test/proof-only changes, literal clone removal, and mechanical moves that preserve behavior, ownership, contracts, dependency direction, parser semantics, and security authority close as `not required: low-risk change`. Topology planning mode may run before implementation and is not the required closeout review.
 

@@ -54,7 +54,7 @@ beforeEach(() => {
     recordingId: 'recording-1',
     streamInstanceId: 'stream-instance-1',
   });
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     liveMedia: {
@@ -90,6 +90,20 @@ it('forwards live settings to offscreen and publishes live media state', async (
   });
 });
 
+it('publishes a hot-swapped microphone as the selected live device', async () => {
+  await expect(updateRecordingSettings({ microphoneDeviceId: 'mic-2' })).resolves.toEqual({
+    result: 'accepted',
+  });
+
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    liveMedia: expect.objectContaining({
+      microphoneDeviceId: 'mic-2',
+      microphoneEnabled: true,
+      microphoneSelected: true,
+    }),
+  });
+});
+
 it('does not mutate live media state when no recording is active', async () => {
   hasActiveVideoRecordingSessionMock.mockReturnValue(false);
 
@@ -117,6 +131,17 @@ it('reports offscreen update failures without committing live media state', asyn
     'Failed to update recording settings',
     expect.any(Error)
   );
+});
+
+it('rejects an explicit offscreen failure acknowledgement without publishing live state', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'device denied' });
+
+  await expect(updateRecordingSettings({ webcamDeviceId: 'cam-2' })).resolves.toEqual({
+    error: 'device denied',
+    result: 'failed',
+  });
+
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
 });
 
 it('keeps a null live media snapshot null after a successful update', async () => {

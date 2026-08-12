@@ -99,6 +99,13 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
       .strict(),
     baseMutationSchema
       .extend({
+        beforeModelId: aiRecordIdSchema.nullable(),
+        modelId: aiRecordIdSchema,
+        operation: z.literal('move-model'),
+      })
+      .strict(),
+    baseMutationSchema
+      .extend({
         defaultModelId: defaultModelIdSchema,
         operation: z.literal('save-default-model'),
       })
@@ -115,6 +122,8 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
         prompt: z.string().max(50000),
       })
       .strict(),
+    baseMutationSchema.extend({ operation: z.literal('reset-global-prompt') }).strict(),
+    baseMutationSchema.extend({ operation: z.literal('reset-scenario-editor-prompt') }).strict(),
     baseMutationSchema
       .extend({ enabled: z.boolean(), operation: z.literal('save-chrome-ai-enabled') })
       .strict(),

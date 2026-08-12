@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   createDrawingBounds,
+  findDrawingObjectsIntersectingPath,
   getDrawingObjectBounds,
   getDrawingShapePoints,
   hitTestDrawingDocument,
@@ -25,6 +26,35 @@ it('normalizes reverse drags and selects the topmost object', () => {
   };
   const top = { id: 'top', kind: 'blur' as const, bounds: { x: 10, y: 10, width: 20, height: 20 } };
   expect(hitTestDrawingDocument([bottom, top], { x: 15, y: 15 })?.id).toBe('top');
+});
+
+it('finds every object crossed by a sparse eraser path without returning nearby misses', () => {
+  const objects = [
+    {
+      id: 'left',
+      kind: 'rectangle' as const,
+      bounds: { x: 10, y: 10, width: 20, height: 20 },
+      color: '#000000',
+      width: 2,
+    },
+    {
+      id: 'right',
+      kind: 'ellipse' as const,
+      bounds: { x: 70, y: 10, width: 20, height: 20 },
+      color: '#000000',
+      width: 2,
+    },
+    { id: 'miss', kind: 'blur' as const, bounds: { x: 40, y: 60, width: 20, height: 20 } },
+  ];
+
+  expect(
+    findDrawingObjectsIntersectingPath(objects, [
+      { x: 0, y: 20 },
+      { x: 100, y: 20 },
+    ]).map((object) => object.id)
+  ).toEqual(['left', 'right']);
+  expect(findDrawingObjectsIntersectingPath(objects, [{ x: 50, y: 70 }])).toEqual([objects[2]]);
+  expect(findDrawingObjectsIntersectingPath(objects, [])).toEqual([]);
 });
 
 it('handles every geometry family and rejects misses', () => {

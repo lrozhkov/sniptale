@@ -20,6 +20,7 @@ const {
   isScenarioMessageMock,
   isTabModeMessageMock,
   isVideoControlMessageMock,
+  isVideoRecordingSurfaceMessageMock,
   isVideoRuntimeMessageMock,
   loggerDebugMock,
   loggerErrorMock,
@@ -53,6 +54,7 @@ const {
   isScenarioMessageMock: vi.fn(),
   isTabModeMessageMock: vi.fn(),
   isVideoControlMessageMock: vi.fn(),
+  isVideoRecordingSurfaceMessageMock: vi.fn(),
   isVideoRuntimeMessageMock: vi.fn(),
   loggerDebugMock: vi.fn(),
   loggerErrorMock: vi.fn(),
@@ -133,6 +135,7 @@ vi.mock('../../../apps/extension/src/background/runtime/routing/message-guards/g
   isScenarioMessage: isScenarioMessageMock,
   isTabModeMessage: isTabModeMessageMock,
   isVideoControlMessage: isVideoControlMessageMock,
+  isVideoRecordingSurfaceMessage: isVideoRecordingSurfaceMessageMock,
 }));
 vi.mock('../../../apps/extension/src/background/capture/page-preparation/viewer-ports', () => ({
   createWebSnapshotViewerPorts: () => new Map(),
@@ -183,6 +186,7 @@ export {
   isScenarioMessageMock,
   isTabModeMessageMock,
   isVideoControlMessageMock,
+  isVideoRecordingSurfaceMessageMock,
   isVideoRuntimeMessageMock,
   loggerErrorMock,
   loggerWarnMock,
@@ -268,7 +272,11 @@ export function resetRuntimeMessagingMocks() {
   mockRoutesAsUnhandled(isBackgroundInternalSignalMessageMock, isBackgroundTabMessageMock);
   mockRoutesAsUnhandled(isPopupExportViewerMessageMock, isRouteCaptureMessageMock);
   mockRoutesAsUnhandled(isScenarioMessageMock, isTabModeMessageMock);
-  mockRoutesAsUnhandled(isVideoControlMessageMock, isVideoRuntimeMessageMock);
+  mockRoutesAsUnhandled(
+    isVideoControlMessageMock,
+    isVideoRecordingSurfaceMessageMock,
+    isVideoRuntimeMessageMock
+  );
   browserScriptingExecuteScriptMock.mockResolvedValue([
     { frameId: 0, result: { assetId: 'snapshot-1', success: true, warnings: [] } },
   ]);

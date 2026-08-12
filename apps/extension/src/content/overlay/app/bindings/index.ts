@@ -136,6 +136,9 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   useShowToolbarButton({
     countdownActive: params.countdownActive,
     screenshotMode: params.modeFlags.screenshotMode,
+    ...(params.modeFlags.videoRecordingMode === undefined
+      ? {}
+      : { videoRecordingMode: params.modeFlags.videoRecordingMode }),
     isToolbarVisible: params.visibilityState.isToolbarVisible,
     isCompletelyHidden: params.visibilityState.isCompletelyHidden,
     onShowToolbar: handleShowToolbar,

@@ -4,12 +4,14 @@ import { createInitialExportState } from './export-state';
 import { createProjectStateActions } from './project-actions';
 import { createSelectionStateActions as createTimelineSelectionStateActions } from './selection-actions';
 import type { VideoEditorState } from './types';
+import { createEmptyVideoEditorProjectHistory } from '../project/history';
 
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 
 export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
   return {
     project: null,
+    projectHistory: createEmptyVideoEditorProjectHistory(),
     recordingId: null,
     isReady: false,
     error: null,

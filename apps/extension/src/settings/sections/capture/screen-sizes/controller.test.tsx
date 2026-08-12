@@ -126,10 +126,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('creates, edits across target groups, moves, and selects presets through atomic settings writes', async () => {
+it('creates, edits across target groups, and moves presets through atomic settings writes', async () => {
   const { updateSettings } = await renderHarness();
   expect(requireState().model.presets).toHaveLength(3);
-  expect(requireState().list.countLabel).toBe('viewportPresets.section.countFew');
 
   act(() => requireState().editor.onAdd());
   expect(requireState().editor.isOpen).toBe(true);
@@ -161,18 +160,27 @@ it('creates, edits across target groups, moves, and selects presets through atom
     target: 'window',
   });
 
-  await act(async () => requireState().list.onMoveBefore('window-1', null));
-  await act(async () => requireState().defaultField.onChange('window-1'));
-  expect(requireState().defaultField.selectedPresetId).toBe('window-1');
-  expect(updateSettings).toHaveBeenCalledWith({ defaultViewportPresetId: 'window-1' });
-  expect(mocks.toastSuccess).toHaveBeenCalledWith('viewportPresets.messages.defaultUpdated');
+  await act(async () =>
+    requireState().list.onMoveBefore('user-created', customizedSystemPreset.id)
+  );
+  expect(updateSettings).toHaveBeenLastCalledWith({
+    viewportPresets: [
+      expect.objectContaining({ id: 'user-created', order: 0 }),
+      expect.objectContaining({ id: customizedSystemPreset.id, order: 1 }),
+      expect.objectContaining({ id: windowPreset.id, order: 0 }),
+      expect.objectContaining({ id: viewportPreset.id, order: 1 }),
+    ],
+  });
+  expect(updateSettings).not.toHaveBeenCalledWith(
+    expect.objectContaining({ defaultViewportPresetId: expect.anything() })
+  );
+  expect(mocks.toastSuccess).not.toHaveBeenCalled();
 });
 
-it('clears disabled/deleted defaults, protects system deletion, and resets customized system data', async () => {
+it('toggles presets, protects system deletion, and resets customized system data', async () => {
   await renderHarness();
 
   await act(async () => requireState().list.onToggle(viewportPreset));
-  expect(requireState().defaultField.selectedPresetId).toBeNull();
   expect(requireState().model.presets.find((preset) => preset.id === 'viewport-1')).toMatchObject({
     enabled: false,
   });
@@ -210,7 +218,6 @@ it('rolls optimistic state back when persistence rejects and closes both dialogs
   expect(requireState().model.presets.find((preset) => preset.id === 'viewport-1')).toMatchObject({
     enabled: true,
   });
-  expect(requireState().defaultField.selectedPresetId).toBe('viewport-1');
   expect(mocks.toastError).toHaveBeenCalledWith('viewportPresets.messages.updateFailed');
 
   act(() => {
@@ -240,7 +247,8 @@ it('blocks overlapping mutations so a failed optimistic write cannot be resurrec
   act(() => {
     first = requireState().list.onToggle(viewportPreset);
   });
-  expect(requireState().model.isLoading).toBe(true);
+  expect(requireState().model.isLoading).toBe(false);
+  expect(requireState().model.isMutating).toBe(true);
   await act(async () => requireState().list.onMoveBefore(windowPreset.id, null));
   expect(updateSettings).toHaveBeenCalledTimes(1);
 
@@ -250,6 +258,7 @@ it('blocks overlapping mutations so a failed optimistic write cannot be resurrec
     requireState().model.presets.find((preset) => preset.id === viewportPreset.id)
   ).toMatchObject({ enabled: true });
   expect(requireState().model.isLoading).toBe(false);
+  expect(requireState().model.isMutating).toBe(false);
 });
 
 it('rejects an overlong preset name without writing settings', async () => {

@@ -84,6 +84,7 @@ function createBridgeParams(overrides: BridgeOverrides = {}) {
       setQuickActionToastCountdown: vi.fn(),
       setTimerDelay: vi.fn(),
     },
+    workingModes: { select: vi.fn() },
     viewport: {
       clearPendingAutoStartCapture: vi.fn(),
       handleTakeScreenshot: overrides.handleTakeScreenshot ?? vi.fn().mockResolvedValue(undefined),

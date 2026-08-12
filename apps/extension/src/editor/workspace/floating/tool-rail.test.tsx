@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { EditorTool } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorFloatingToolRail } from './tool-rail';
@@ -50,7 +51,12 @@ function createProps(
   };
 }
 
-function renderToolRail(props: EditorToolbarContentProps & { leftDrawerOpen?: boolean }) {
+function renderToolRail(
+  props: EditorToolbarContentProps & {
+    leftDrawerOpen?: boolean;
+    onToggleActiveToolOptions?: (tool: EditorTool) => void;
+  }
+) {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -88,7 +94,7 @@ it('routes primary drawing and retained inspector actions from the floating rail
   expect(queryUi('editor.floating.tool-rail.text')).not.toBeNull();
   expect(queryUi('editor.floating.tool-rail.eraser')).toBeNull();
   act(() => {
-    getButton(translate('editor.tools.text')).click();
+    getToolButton('text').click();
     getButton(translate('editor.toolbar.resize')).click();
     getButton(translate('editor.toolbar.frame')).click();
   });
@@ -97,6 +103,26 @@ it('routes primary drawing and retained inspector actions from the floating rail
   expect(props.onActivateTool).not.toHaveBeenCalledWith('crop');
   expect(props.onToggleInspector).toHaveBeenCalledWith('canvas-size');
   expect(props.onToggleInspector).toHaveBeenCalledWith('frame');
+});
+
+it('describes drawing modifiers and toggles options on a repeated active-tool click', () => {
+  const onToggleActiveToolOptions = vi.fn();
+  renderToolRail({
+    ...createProps({
+      activeTool: 'shape',
+      isToolButtonActive: (tool) => tool === 'shape',
+    }),
+    onToggleActiveToolOptions,
+  });
+
+  const shapeLabel = `${translate('editor.tools.shape')}\n${translate(
+    'content.toolbar.drawingShapeModifierHint'
+  )}`;
+  const shapeButton = getToolButton('shape');
+  expect(shapeButton.getAttribute('aria-label')).toBe(shapeLabel);
+  act(() => shapeButton.click());
+
+  expect(onToggleActiveToolOptions).toHaveBeenCalledWith('shape');
 });
 
 it('uses a centered compact rail instead of a full-height column', () => {
@@ -167,11 +193,7 @@ it('renders undo, redo, and reset under the left tool rail and routes actions', 
 it('keeps document-required controls disabled before an image is loaded', () => {
   renderToolRail(createProps({ hasImage: false }));
 
-  expect(
-    getButton(
-      `${translate('editor.tools.text')} · ${translate('editor.toolbar.documentRequiredReason')}`
-    ).disabled
-  ).toBe(true);
+  expect(getToolButton('text').disabled).toBe(true);
 });
 
 function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
@@ -184,4 +206,10 @@ function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
 
 function queryUi(dataUi: string) {
   return container?.querySelector(`[data-ui="${dataUi}"]`) ?? null;
+}
+
+function getToolButton(tool: string): HTMLButtonElement {
+  const button = queryUi(`editor.floating.tool-rail.${tool}`);
+  expect(button).not.toBeNull();
+  return button as HTMLButtonElement;
 }

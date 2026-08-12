@@ -62,7 +62,8 @@ it('forwards image settings state into the image content shell', async () => {
     isLoading: false,
     isQualityDisabled: true,
     handleFormatChange: vi.fn(async () => undefined),
-    handleQualityChange: vi.fn(async () => undefined),
+    handleQualityCommit: vi.fn(async () => undefined),
+    handleQualityPreview: vi.fn(),
   };
 
   useImageSettingsSectionSpy.mockReturnValue(sectionState);

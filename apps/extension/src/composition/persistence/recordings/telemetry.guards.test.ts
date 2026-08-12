@@ -90,6 +90,25 @@ describe('shared recording telemetry db guards', () => {
     ).toBeNull();
   });
 
+  it('rejects semantically invalid identity, timestamps, and temporal ranges', () => {
+    expect(
+      parseRecordingTelemetryEntry({ ...createTelemetryEntry(), recordingId: '  ' })
+    ).toBeNull();
+    expect(parseRecordingTelemetryEntry({ ...createTelemetryEntry(), updatedAt: 0 })).toBeNull();
+    expect(
+      parseRecordingTelemetryEntry({
+        ...createTelemetryEntry(),
+        signals: [
+          {
+            ...createTelemetryEntry().signals[0],
+            endTime: 0.1,
+            startTime: 0.2,
+          },
+        ],
+      })
+    ).toBeNull();
+  });
+
   it('backfills missing segmented telemetry arrays for legacy entries', () => {
     const { signals: _signals, ...legacyEntry } = createTelemetryEntry();
 

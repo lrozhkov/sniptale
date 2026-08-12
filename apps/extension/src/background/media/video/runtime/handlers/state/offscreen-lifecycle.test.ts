@@ -13,11 +13,14 @@ vi.mock(
 const {
   finishVideoRecordingStopMock,
   finalizeRecordingDiagnosticsMock,
+  getRecordingTabIdMock,
   getVideoRecordingIdMock,
   clearRecordingStartActivationWatchdogMock,
   markOffscreenDocumentReadyMock,
   notifyRecordingStartFailedMock,
   openVideoEditorPageMock,
+  openPopupMock,
+  getTabMock,
   resetCompletedVideoRecordingSessionMock,
   resetRecordingTabIdMock,
   resetVideoRecordingRuntimeStateMock,
@@ -33,11 +36,14 @@ const {
 } = vi.hoisted(() => ({
   finishVideoRecordingStopMock: vi.fn(),
   finalizeRecordingDiagnosticsMock: vi.fn(),
+  getRecordingTabIdMock: vi.fn(),
   getVideoRecordingIdMock: vi.fn(),
   clearRecordingStartActivationWatchdogMock: vi.fn(),
   markOffscreenDocumentReadyMock: vi.fn(),
   notifyRecordingStartFailedMock: vi.fn(),
   openVideoEditorPageMock: vi.fn(),
+  openPopupMock: vi.fn(),
+  getTabMock: vi.fn(),
   resetCompletedVideoRecordingSessionMock: vi.fn(),
   resetRecordingTabIdMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
@@ -77,6 +83,12 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
   createLogger: vi.fn(() => ({ error: vi.fn(), log: vi.fn(), warn: vi.fn() })),
 }));
+vi.mock('@sniptale/platform/browser/action', () => ({
+  browserAction: { openPopup: openPopupMock },
+}));
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: getTabMock },
+}));
 vi.mock('../../../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../../platform/runtime-messaging')>()),
   sendRuntimeMessage: sendRuntimeMessageMock,
@@ -89,6 +101,7 @@ vi.mock('../../session-state', async (importOriginal) => ({
 vi.mock('../../manager', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../manager')>()),
   finalizeRecordingDiagnostics: finalizeRecordingDiagnosticsMock,
+  getRecordingTabId: getRecordingTabIdMock,
   notifyRecordingStartFailed: notifyRecordingStartFailedMock,
   resetRecordingTabId: resetRecordingTabIdMock,
 }));
@@ -162,6 +175,9 @@ beforeEach(() => {
   markOffscreenDocumentReadyMock.mockReturnValue(true);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   getVideoRecordingIdMock.mockReturnValue('rec-1');
+  getRecordingTabIdMock.mockReturnValue(17);
+  getTabMock.mockResolvedValue({ active: true, id: 17, windowId: 4 });
+  openPopupMock.mockResolvedValue(undefined);
   openVideoEditorPageMock.mockResolvedValue(undefined);
   waitForStopSideEffectsMock.mockResolvedValue(undefined);
   restoreCurrentRecordingFromLeaseMock.mockResolvedValue(false);
@@ -529,7 +545,7 @@ it('ignores stale offscreen recording errors and saved notifications', async () 
   expectSupersededLifecycleResponse(sendResponse);
 });
 
-it('never opens the video editor automatically after a recording is saved', async () => {
+it('opens the video popup without navigating directly to the editor after save', async () => {
   const sendResponse = createSendResponse();
 
   getVideoRecordingIdMock.mockReturnValue('rec-2');
@@ -541,6 +557,7 @@ it('never opens the video editor automatically after a recording is saved', asyn
   });
   await flushAsyncRoute();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
+  expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
   expect(persistPendingVideoPostRecordResultMock).toHaveBeenCalledWith({
     primaryRecordingId: 'rec-2',
     projectId: null,
@@ -564,4 +581,35 @@ it('never opens the video editor automatically after a recording is saved', asyn
   await flushAsyncRoute();
   expect(openVideoEditorPageMock).not.toHaveBeenCalled();
   expectSupersededLifecycleResponse(sendResponse);
+});
+
+it('accepts a completed replay without requiring the original recording tab', async () => {
+  const sendResponse = createSendResponse();
+  getRecordingTabIdMock.mockReturnValue(null);
+  readStoredVideoPostRecordResultMock.mockResolvedValue({
+    acknowledgedBy: null,
+    createdAt: 1,
+    expiresAt: null,
+    result: { primaryRecordingId: 'rec-1', projectId: null, recordingId: 'rec-1' },
+    status: 'ready',
+  });
+
+  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(openPopupMock).not.toHaveBeenCalled();
+  expect(persistPendingVideoPostRecordResultMock).not.toHaveBeenCalled();
+  expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('opens the post-record popup when persistence is already synchronized', async () => {
+  const sendResponse = createSendResponse();
+  persistPendingVideoPostRecordResultMock.mockResolvedValueOnce('acknowledged');
+
+  handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, sendResponse);
+  await flushAsyncRoute();
+
+  expect(commitPendingVideoPostRecordResultMock).not.toHaveBeenCalled();
+  expect(openPopupMock).toHaveBeenCalledWith({ windowId: 4 });
+  expectAcceptedLifecycleResponse(sendResponse);
 });

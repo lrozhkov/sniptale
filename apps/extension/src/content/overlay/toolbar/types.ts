@@ -10,6 +10,48 @@ import type {
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import type { ContentDrawingController } from '../../drawing/controller';
+import type {
+  VideoRecordingToolbarInteraction,
+  VideoRecordingToolbarState,
+} from '../video-recording/session/state';
+import type {
+  RecordingDrawingAutoHideDelay,
+  RecordingDrawingOwner,
+} from './video-recording/drawing-session';
+import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+
+export interface ToolbarVideoRecordingProps {
+  drawingOwner: RecordingDrawingOwner;
+  state: VideoRecordingToolbarState;
+  onActivate: (activationEvent?: Event) => Promise<boolean> | boolean;
+  onCancelStart: () => Promise<void> | void;
+  onCameraEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onCameraDeviceChange?: (deviceId: string) => Promise<void> | void;
+  onCameraGeometryChange: (
+    appearance: Pick<
+      ToolbarVideoRecordingProps['state']['webcamPresentation'],
+      'shape' | 'center' | 'sizeFraction' | 'cropOffset'
+    >
+  ) => Promise<void> | void;
+  onCameraOffer: (sdp: string) => Promise<string>;
+  onCameraPeerClose: () => Promise<void> | void;
+  onDeactivate: () => Promise<boolean> | boolean;
+  onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
+  onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
+  onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onMicrophoneDeviceChange?: (deviceId: string) => Promise<void> | void;
+  onLoadMediaDevices?: (kind: 'audioinput' | 'videoinput') => Promise<VideoRecordingMediaDevice[]>;
+  onPause: () => Promise<void> | void;
+  onResume: () => Promise<void> | void;
+  onSpotlightEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onSpotlightSettingsChange?: (settings: {
+    cursorHaloEnabled: boolean;
+    cursorDimmingEnabled: boolean;
+    clickAnimationEnabled: boolean;
+  }) => Promise<void> | void;
+  onStart: (activationEvent?: Event) => Promise<void> | void;
+  onStop: () => Promise<void> | void;
+}
 
 export type ToolbarViewportSelection = {
   presetId?: string;
@@ -99,12 +141,18 @@ export interface ToolbarProps {
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
   screenshotMode?: boolean;
+  videoRecordingMode?: boolean;
+  videoRecording?: ToolbarVideoRecordingProps;
   isCursorMode?: boolean;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
   onDisableAiPickMode?: () => void;
   onEnableCursorMode?: () => void;
+  onToggleVideoRecordingMode?: (
+    enabled: boolean,
+    activationEvent?: Event
+  ) => Promise<boolean> | boolean | void;
   onToggleDesignReviewPanel?: () => void;
   onPinToTabChange?: (
     value: boolean,
@@ -116,6 +164,8 @@ export interface ToolbarProps {
   ) => void;
   onHide: () => void;
   onClearHighlights: () => void;
+  onClearPagePreparation?: () => void;
+  canClearPagePreparation?: boolean;
   autoBlur?: ToolbarAutoBlurProps;
   onToggleNavigationLock?: (enabled: boolean) => void;
   timerDelay: number;

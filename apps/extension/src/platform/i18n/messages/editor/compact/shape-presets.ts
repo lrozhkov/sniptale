@@ -50,23 +50,23 @@ export const editorCompactShapePresetMessages = defineMessageSource({
     en: 'Rounded',
   },
   shapePresetShort: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   saveShapePreset: {
-    ru: 'Сохранить как пресет рамки',
+    ru: 'Сохранить как шаблон рамки',
     en: 'Save as border preset',
   },
   shapeCustomCssBoundaryHint: {
-    ru: 'Additional CSS сохраняется в пресете и применяется только в content runtime, не на canvas редактора.',
+    ru: 'Additional CSS сохраняется в шаблоне и применяется только в content runtime, не на canvas редактора.',
     en: 'Additional CSS is saved with the preset and applies only in content runtime, not on the editor canvas.',
   },
   saveShapePresetSaved: {
-    ru: 'Пресет рамки сохранён',
+    ru: 'Шаблон рамки сохранён',
     en: 'Border preset saved',
   },
   saveShapePresetFailed: {
-    ru: 'Не удалось сохранить пресет рамки',
+    ru: 'Не удалось сохранить шаблон рамки',
     en: 'Could not save border preset',
   },
   editorRectanglePresetName: {

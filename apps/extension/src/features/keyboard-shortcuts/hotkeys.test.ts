@@ -63,4 +63,24 @@ describe('utils hotkeys', () => {
     setNavigator('MacIntel', 'Macintosh');
     expect(hotkeyToKeyString(createHotkey({ key: 'tab', metaKey: true }))).toBe('Cmd+Tab');
   });
+
+  it('validates newly assigned quick-action shortcuts without changing runtime matching', async () => {
+    const { getQuickActionHotkeyValidationFailure } = await import('./hotkeys');
+
+    expect(getQuickActionHotkeyValidationFailure(createHotkey({ key: 'K', shiftKey: true }))).toBe(
+      'modifier-required'
+    );
+    expect(
+      getQuickActionHotkeyValidationFailure(createHotkey({ altKey: true, ctrlKey: true, key: 'K' }))
+    ).toBe('altgr-conflict');
+    expect(getQuickActionHotkeyValidationFailure(createHotkey({ ctrlKey: true, key: 'F8' }))).toBe(
+      'unsupported-key'
+    );
+    expect(getQuickActionHotkeyValidationFailure(createHotkey({ ctrlKey: true, key: 'R' }))).toBe(
+      'reserved'
+    );
+    expect(
+      getQuickActionHotkeyValidationFailure(createHotkey({ altKey: true, key: 'Space' }))
+    ).toBe(null);
+  });
 });

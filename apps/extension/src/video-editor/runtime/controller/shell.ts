@@ -2,6 +2,7 @@ import type { VideoEditorRuntimeController } from '../session';
 import type { VideoEditorActionHandlers } from '../commands';
 import type { VideoEditorWorkspaceState } from './workspace-state';
 import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
+import type { VideoEditorProjectHistoryController } from '../../contracts/commands/history';
 import type {
   VideoEditorCommandPaletteController,
   VideoEditorOverlaysController,
@@ -73,5 +74,18 @@ export function createVideoEditorCommandPaletteController(args: {
     toggleDiagnostics: () => args.store.setDiagnosticsOpen(!args.store.diagnosticsOpen),
     togglePlaying: args.runtime.togglePlayback,
     toggleSidebarCollapsed: args.workspace.toggleSidebarCollapsed,
+  };
+}
+
+export function createVideoEditorHistoryController(
+  store: VideoEditorControllerStorePort,
+  enabled: boolean
+): VideoEditorProjectHistoryController {
+  return {
+    canUndo: enabled && store.projectHistoryStatus.canUndo,
+    canRedo: enabled && store.projectHistoryStatus.canRedo,
+    error: store.projectHistoryStatus.error,
+    onUndo: enabled ? store.undoProject : () => undefined,
+    onRedo: enabled ? store.redoProject : () => undefined,
   };
 }

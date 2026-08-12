@@ -25,6 +25,8 @@ export const highlighterMessages = defineMessageSource({
     assignmentLabel: { ru: 'Теги', en: 'Tags' },
     assignmentEmpty: { ru: 'Теги ещё не созданы', en: 'No tags created yet' },
     add: { ru: 'Создать тег', en: 'Create tag' },
+    createTitle: { ru: 'Новый тег', en: 'New tag' },
+    editTitle: { ru: 'Изменить тег', en: 'Edit tag' },
     name: { ru: 'Название тега', en: 'Tag name' },
     usage: { ru: 'Используется: {count}', en: 'Used: {count}' },
     rename: { ru: 'Переименовать', en: 'Rename' },
@@ -61,6 +63,9 @@ export const highlighterMessages = defineMessageSource({
     midpoint: { ru: 'Средняя точка', en: 'Midpoint' },
     midpointAfter: { ru: 'Средняя точка после', en: 'Midpoint after' },
     gradientStop: { ru: 'Точка градиента', en: 'Gradient stop' },
+    gradientStops: { ru: 'Цветовые точки', en: 'Color stops' },
+    addStopHint: { ru: 'Нажмите на шкалу, чтобы добавить', en: 'Click the rail to add' },
+    removeStop: { ru: 'Удалить цветовую точку', en: 'Remove color stop' },
     repeat: { ru: 'Повторять', en: 'Repeat' },
     span: { ru: 'Шаг повтора', en: 'Repeat span' },
     radiusX: { ru: 'Радиус X', en: 'Radius X' },
@@ -304,18 +309,6 @@ export const highlighterMessages = defineMessageSource({
     presetsLabel: {
       ru: 'Шаблоны рамок',
       en: 'Border templates',
-    },
-    countOne: {
-      ru: 'шаблон',
-      en: 'template',
-    },
-    countFew: {
-      ru: 'шаблона',
-      en: 'templates',
-    },
-    countMany: {
-      ru: 'шаблонов',
-      en: 'templates',
     },
     defaultBadge: {
       ru: 'По умолчанию',

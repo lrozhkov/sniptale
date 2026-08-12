@@ -48,10 +48,35 @@ describe('video toggle grid view', () => {
       onSettingsChange,
     });
 
-    expect(element.props.className).toContain('grid-cols-5');
-    expect(element.props.children).toHaveLength(5);
+    expect(element.props.className).toContain('grid-cols-6');
+    expect(element.props.children).toHaveLength(6);
     expect(element.props.children[3].props.disabled).toBe(true);
-    expect(element.props.children[3].props.disabledReason).toBe('unsupported');
+    expect(element.props.children[4].props.disabled).toBe(true);
+    expect(element.props.children[4].props.disabledReason).toBe('unsupported');
+  });
+
+  it('adds the recording toolbar toggle only for tab-based capture', () => {
+    const sharedProps = {
+      settings: createSettings(),
+      controlledCursorDisabled: false,
+      controlledCursorDisabledReason: null,
+      systemAudioDisabled: false,
+      diagnosticsDisabled: false,
+      onToggleMicrophone: vi.fn(),
+      onToggleWebcam: vi.fn(),
+      onSettingsChange: vi.fn(),
+    };
+
+    for (const captureMode of [CaptureMode.TAB, CaptureMode.TAB_CROP]) {
+      const element = VideoToggleGrid({ ...sharedProps, captureMode });
+      expect(element.props.className).toContain('grid-cols-6');
+      expect(element.props.children).toHaveLength(6);
+      expect(element.props.children[3]).not.toBeNull();
+    }
+
+    const camera = VideoToggleGrid({ ...sharedProps, captureMode: CaptureMode.CAMERA });
+    expect(camera.props.className).toContain('grid-cols-6');
+    expect(camera.props.children[3].props.disabled).toBe(true);
   });
 
   it('forces the webcam toggle active and disabled when camera mode locks the webcam', () => {

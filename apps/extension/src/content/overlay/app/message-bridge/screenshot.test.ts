@@ -47,6 +47,7 @@ function createBridgeParams() {
       screenshotMode: false,
     },
     quickAction: createQuickActionState(quickActionOverlayRef, setQuickActionOverlay),
+    workingModes: { select: vi.fn() },
     viewport: {
       clearPendingAutoStartCapture: vi.fn(),
       handleTakeScreenshotRef: {
@@ -271,6 +272,22 @@ async function expectFailedTeardownPreservesLocalModeState() {
   });
 }
 
+function expectRequestedWorkingModeIsSelected() {
+  const params = createBridgeParams();
+  const sendResponse = vi.fn();
+
+  expect(
+    handleScreenshotModeMessage(
+      { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'drawing' },
+      params,
+      sendResponse
+    )
+  ).toBe(true);
+
+  expect(params.workingModes.select).toHaveBeenCalledWith('drawing');
+  expect(params.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(true);
+}
+
 function runHandleScreenshotModeMessageSuite() {
   beforeEach(() => {
     setScreenshotSurfaceCapabilityToken(null);
@@ -299,6 +316,7 @@ function runHandleScreenshotModeMessageSuite() {
     'preserves local mode state when Design Review teardown cannot restore the page',
     expectFailedTeardownPreservesLocalModeState
   );
+  it('selects an explicit toolbar working mode', expectRequestedWorkingModeIsSelected);
 }
 
 beforeEach(() => {

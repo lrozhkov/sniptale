@@ -42,6 +42,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'video-capture-surface-sessions',
   'video-post-record-results',
   'video-recording-control-lease',
+  'video-recording-surface-lease',
   'voice-input-port-session-authority',
   'web-snapshot-staged-blobs',
 ] as const satisfies readonly PolicyStateId[];

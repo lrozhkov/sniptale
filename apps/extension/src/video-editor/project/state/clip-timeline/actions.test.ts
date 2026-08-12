@@ -10,11 +10,14 @@ import {
 } from '../../../../features/video/project/types';
 import { createVideoEditorProjectClipTimelineActions } from './actions';
 import type { VideoEditorProjectState } from '../contracts';
+import { resetVideoEditorProjectHistory } from '../../history';
 
 function createMutableState() {
+  const project = createEmptyVideoProject('Timeline actions');
   let state = {
     currentTime: 0,
-    project: createEmptyVideoProject('Timeline actions'),
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
     selectedClipId: null,
     selectedTrackId: null,
     selection: { kind: 'scene' },

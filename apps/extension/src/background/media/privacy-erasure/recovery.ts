@@ -20,10 +20,27 @@ import {
   verified,
   verifiedExportParticipants,
 } from './result';
+import { releaseVideoRecordingSurface } from '../video/content-surface/surface-lease';
 
 export async function recoverInvalidDurableMediaState() {
+  let containmentFailed = false;
+  try {
+    await releaseVideoRecordingSurface();
+  } catch {
+    containmentFailed = true;
+  }
   try {
     await closeOffscreenDocumentForPrivacyErasure();
+  } catch {
+    containmentFailed = true;
+  }
+  if (containmentFailed) {
+    return [
+      failed(RECORDING_PARTICIPANT_ID, 'invalid-media-state-recovery-failed'),
+      ...failedExportParticipants('invalid-media-state-recovery-failed'),
+    ];
+  }
+  try {
     await waitForStopSideEffects();
     if (!(await cleanupVideoCaptureSurfacesForPrivacyErasure())) {
       throw new Error('invalid-media-state-surface-recovery-unverified');

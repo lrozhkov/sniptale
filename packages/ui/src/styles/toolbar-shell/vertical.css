@@ -51,7 +51,7 @@
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-wrapper {
   width: var(--sniptale-toolbar-button-size);
-  height: calc(var(--sniptale-toolbar-button-size) + 12px);
+  height: calc(var(--sniptale-toolbar-button-size) + 18px);
   flex-direction: column;
 }
 
@@ -68,21 +68,21 @@
 }
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-full-page-chevron {
-  flex: 0 0 12px;
+  flex: 0 0 18px;
   min-width: var(--sniptale-toolbar-button-size);
   width: var(--sniptale-toolbar-button-size);
   max-width: var(--sniptale-toolbar-button-size);
-  min-height: 12px;
-  height: 12px;
-  max-height: 12px;
+  min-height: 18px;
+  height: 18px;
+  max-height: 18px;
   border-inline-start-width: 1px;
   border-block-start-width: 0;
   border-radius: 0 0 var(--sniptale-radius-md) var(--sniptale-radius-md);
 }
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-full-page-chevron svg {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   transform: rotate(-90deg);
 }
 

@@ -1,12 +1,15 @@
 import type { VideoProject } from '../../../features/video/project/types/index';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
+import { isVideoEditorPresentedClip } from '../operations/presented-tracks';
 
 export function createSceneSelection(): VideoEditorSelection {
   return { kind: VideoEditorSelectionKind.SCENE };
 }
 
 export function resolveInitialVideoEditorSelection(project: VideoProject): VideoEditorSelection {
-  const firstVisualClip = project.clips.find((clip) => clip.type !== 'AUDIO');
+  const firstVisualClip = project.clips.find(
+    (clip) => clip.type !== 'AUDIO' && isVideoEditorPresentedClip(project, clip)
+  );
   if (firstVisualClip) {
     return {
       kind: VideoEditorSelectionKind.CLIP,

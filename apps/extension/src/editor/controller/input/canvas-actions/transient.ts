@@ -30,23 +30,17 @@ export function cancelEditorTransientInteraction(
   let changed = false;
   let nextDrawSession = drawSession;
 
-  if (drawSession?.object) {
-    canvas.remove(drawSession.object);
-    nextDrawSession = null;
+  if (drawSession?.object || cropGuide) {
+    if (drawSession?.object) {
+      canvas.remove(drawSession.object);
+      nextDrawSession = null;
+    }
+    if (cropGuide) clearCropSelection();
     changed = true;
-  }
-
-  if (cropGuide) {
-    clearCropSelection();
-    changed = true;
-  }
-
-  if (canvas.getActiveObjects().length > 0) {
+  } else if (canvas.getActiveObjects().length > 0) {
     canvas.discardActiveObject();
     changed = true;
-  }
-
-  if (activeTool !== 'select') {
+  } else if (activeTool !== 'select') {
     switchToSelectTool();
     changed = true;
   }

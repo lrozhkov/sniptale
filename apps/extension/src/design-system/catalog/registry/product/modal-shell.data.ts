@@ -67,7 +67,7 @@ export const PRODUCT_DESIGN_SYSTEM_MODAL_SHELL_REGISTRY: DesignSystemRegistryEnt
         'save-dialog',
         'Save dialog',
         'Save dialog',
-        'Специализированный shell для выбора сохранения и списков пресетов.',
+        'Специализированный shell для выбора сохранения и списков шаблонов.',
         'Specialized shell for save-choice flows and preset lists.',
         [
           'Использует `.sniptale-save-dialog` и сопутствующие элементы из overlays.',

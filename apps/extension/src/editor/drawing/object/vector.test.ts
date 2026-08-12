@@ -119,6 +119,8 @@ describe('Fabric drawing adapter', () => {
       replacement.width,
       4
     );
+    expect(committed?.kind === 'text' ? committed.bounds.x : 0).toBe(20);
+    expect(committed?.kind === 'text' ? committed.bounds.y : 0).toBe(30);
   });
 
   it('updates freehand draft geometry in place for stable pointer performance', () => {

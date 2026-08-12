@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const {
   announceCaptureSourceMock,
   browserTabsGetMock,
-  enableAnnotationsOrAbortMock,
+  prepareContentSurfaceOrAbortMock,
   enableViewportCursorProjectionOrAbortMock,
   ensureOffscreenDocumentReadyMock,
   ensureOffscreenDocumentReadyOrAbortMock,
@@ -15,7 +15,7 @@ const {
 } = vi.hoisted(() => ({
   announceCaptureSourceMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
-  enableAnnotationsOrAbortMock: vi.fn(),
+  prepareContentSurfaceOrAbortMock: vi.fn(),
   enableViewportCursorProjectionOrAbortMock: vi.fn(),
   ensureOffscreenDocumentReadyMock: vi.fn(),
   ensureOffscreenDocumentReadyOrAbortMock: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('./flow', async (importOriginal) => ({
   resolveCaptureSourceForMode: resolveCaptureSourceForModeMock,
 }));
 vi.mock('./transport.resolve', () => ({
-  enableAnnotationsOrAbort: enableAnnotationsOrAbortMock,
+  prepareContentSurfaceOrAbort: prepareContentSurfaceOrAbortMock,
   enableViewportCursorProjectionOrAbort: enableViewportCursorProjectionOrAbortMock,
   ensureOffscreenDocumentReadyOrAbort: ensureOffscreenDocumentReadyOrAbortMock,
 }));
@@ -85,7 +85,7 @@ beforeEach(() => {
   getVideoCaptureModeCapabilityMock.mockReturnValue({ reason: null, supported: true });
   prepareVideoCaptureSurfaceMock.mockResolvedValue(null);
   ensureOffscreenDocumentReadyOrAbortMock.mockResolvedValue(true);
-  enableAnnotationsOrAbortMock.mockResolvedValue(undefined);
+  prepareContentSurfaceOrAbortMock.mockResolvedValue(undefined);
   enableViewportCursorProjectionOrAbortMock.mockResolvedValue(true);
   readLiveViewportMock.mockResolvedValue({
     devicePixelRatio: 2,
@@ -183,7 +183,7 @@ it('applies the final surface before acquiring the tab stream', async () => {
     generation: 1,
     recordingId: 'recording-1',
   });
-  expect(enableAnnotationsOrAbortMock.mock.invocationCallOrder[0]).toBeLessThan(
+  expect(prepareContentSurfaceOrAbortMock.mock.invocationCallOrder[0]).toBeLessThan(
     enableViewportCursorProjectionOrAbortMock.mock.invocationCallOrder[0] ??
       Number.POSITIVE_INFINITY
   );
@@ -299,7 +299,7 @@ it('fails closed when offscreen, annotation, or source preparation is cancelled'
     })
   ).resolves.toBeNull();
 
-  enableAnnotationsOrAbortMock.mockResolvedValueOnce(null);
+  prepareContentSurfaceOrAbortMock.mockResolvedValueOnce(null);
   await expect(
     initializeRecordingContext({
       captureMode: CaptureMode.TAB,

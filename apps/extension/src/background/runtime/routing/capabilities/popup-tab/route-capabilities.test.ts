@@ -133,6 +133,18 @@ it('ignores malformed capability requests before sender authorization', () => {
   expect(sendResponse).not.toHaveBeenCalled();
 });
 
+it('allows the popup to consume its tab-bound launch intent without page access', async () => {
+  hasActivePageAccessMock.mockResolvedValue(false);
+
+  const issued = await issueCapability({
+    operation: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+  });
+
+  expect(issued.success).toBe(true);
+  expect(browserTabsGetMock).not.toHaveBeenCalled();
+  expect(hasActivePageAccessMock).not.toHaveBeenCalled();
+});
+
 it('consumes matching capabilities once and rejects replay', async () => {
   const issued = await issueCapability();
 

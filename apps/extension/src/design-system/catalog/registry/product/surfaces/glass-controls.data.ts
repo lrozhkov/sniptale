@@ -105,7 +105,7 @@ export const PRODUCT_DESIGN_SYSTEM_GLASS_CONTROLS_REGISTRY: DesignSystemRegistry
         'preset-list',
         'Preset list',
         'Preset list',
-        'Список пресетов с превью, названием и активным состоянием.',
+        'Список шаблонов с превью, названием и активным состоянием.',
         'Preset list with preview, name, and active state.',
         [
           'Использует `.sniptale-glass-preset-list` и `.sniptale-glass-preset-item`.',

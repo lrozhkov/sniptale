@@ -1,4 +1,5 @@
 import type { BorderPreset } from '../../../features/highlighter/contracts';
+import type { ReactNode } from 'react';
 import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { TemplateSaveSettings } from '../template-save-settings';
@@ -6,6 +7,7 @@ import { TemplateSaveSettings } from '../template-save-settings';
 export function BorderManualSaveSettings(props: {
   disabled?: boolean;
   isSaving: boolean;
+  leadingContent?: ReactNode;
   onFloatingInteractionChange?: (open: boolean) => void;
   onCreated?: () => void;
   onOverwritten?: (templateId: string) => void;
@@ -24,6 +26,7 @@ export function BorderManualSaveSettings(props: {
       createdStatusLabel={translate('content.overlayControls.frameStyleCreated')}
       duplicateNameErrorLabel={translate('content.overlayControls.frameStyleTemplateNameExists')}
       isSaving={props.isSaving}
+      {...(props.leadingContent ? { leadingContent: props.leadingContent } : {})}
       nameLabel={translate('content.overlayControls.frameStylePresetName')}
       onCreate={(name) => props.onSave({ name })}
       {...(props.onCreated ? { onCreated: props.onCreated } : {})}

@@ -1,15 +1,20 @@
 import React, { useRef } from 'react';
 import {
   Bot,
+  BrushCleaning,
   Check,
-  Highlighter,
-  MousePointer2,
+  MessageSquarePlus,
   MousePointerClick,
+  PanelBottomClose,
   Pencil,
+  Pin,
+  PinOff,
+  SwatchBook,
   TextCursor,
   TextCursorInput,
+  Touchpad,
+  Video,
 } from 'lucide-react';
-import { DesignReviewModeIcon } from '../../design-review/icons';
 import { translate } from '../../../../platform/i18n';
 import {
   ContentToolbarButton,
@@ -31,17 +36,25 @@ import {
 import { getToolbarMenuPosition } from '../menu/position';
 import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
+import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
-type ToolbarInteractionMode = 'cursor' | 'design-review' | 'drawing' | 'highlighter' | 'quick-edit';
+type ToolbarInteractionMode =
+  | 'cursor'
+  | 'design-review'
+  | 'drawing'
+  | 'highlighter'
+  | 'quick-edit'
+  | 'video-recording';
 const TOOLBAR_INTERACTION_MODES: readonly ToolbarInteractionMode[] = [
   'cursor',
   'drawing',
   'highlighter',
   'quick-edit',
   'design-review',
+  'video-recording',
 ];
 
 function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode {
@@ -65,6 +78,10 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
     return 'highlighter';
   }
 
+  if (props.videoRecordingMode) {
+    return 'video-recording';
+  }
+
   return 'cursor';
 }
 
@@ -73,14 +90,16 @@ function getModeIcon(mode: ToolbarInteractionMode) {
     case 'quick-edit':
       return <TextCursorInput size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'design-review':
-      return <DesignReviewModeIcon size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <SwatchBook size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'drawing':
       return <Pencil size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+    case 'video-recording':
+      return <Video size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
-      return <Highlighter size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <MessageSquarePlus size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
     default:
-      return <MousePointer2 size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <Touchpad size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
   }
 }
 
@@ -101,6 +120,11 @@ function getModeCopy(mode: ToolbarInteractionMode) {
         hint: translate('content.toolbar.drawingEnable'),
         label: translate('content.toolbar.drawingLabel'),
       };
+    case 'video-recording':
+      return {
+        hint: translate('content.toolbar.videoRecordingEnable'),
+        label: translate('content.toolbar.videoRecordingLabel'),
+      };
     case 'highlighter':
       return {
         hint: translate('content.toolbar.highlighterEnable'),
@@ -109,7 +133,7 @@ function getModeCopy(mode: ToolbarInteractionMode) {
     case 'cursor':
     default:
       return {
-        hint: translate('content.toolbar.cursorDefault'),
+        hint: translate('content.toolbar.cursorDescription'),
         label: translate('content.toolbar.cursorLabel'),
       };
   }
@@ -129,37 +153,54 @@ function createModeSelectionHandler(
       return;
     }
 
-    switch (mode) {
-      case 'quick-edit':
-        if (props.aiPickMode) {
-          props.onDisableAiPickMode?.();
-        } else {
-          props.onToggleQuickEdit();
-        }
-        break;
-      case 'design-review':
-        props.onToggleDesignReview();
-        break;
-      case 'drawing':
-        props.onToggleDrawing?.();
-        break;
-      case 'highlighter':
-        props.onToggleHighlighter();
-        break;
-      case 'cursor':
-        if (!props.isCursorMode) {
-          props.onEnableCursorMode?.();
-        }
-        break;
-    }
+    const selectMode = () => {
+      switch (mode) {
+        case 'quick-edit':
+          if (props.aiPickMode) {
+            props.onDisableAiPickMode?.();
+          } else {
+            props.onToggleQuickEdit();
+          }
+          break;
+        case 'design-review':
+          props.onToggleDesignReview();
+          break;
+        case 'drawing':
+          props.onToggleDrawing?.();
+          break;
+        case 'video-recording':
+          void props.onToggleVideoRecording?.(event.nativeEvent);
+          break;
+        case 'highlighter':
+          props.onToggleHighlighter();
+          break;
+        case 'cursor':
+          if (!props.isCursorMode) {
+            props.onEnableCursorMode?.();
+          }
+          break;
+      }
+      onClose();
+    };
 
-    onClose();
+    if (props.videoRecordingMode && mode !== 'video-recording') {
+      if (props.videoRecordingModeLocked) return;
+      void Promise.resolve(props.onToggleVideoRecording?.(event.nativeEvent)).then(
+        (deactivated) => {
+          if (deactivated !== false) selectMode();
+        },
+        () => undefined
+      );
+      return;
+    }
+    selectMode();
   };
 }
 
 function ModeMenuItem(props: {
   mode: ToolbarInteractionMode;
   selected: boolean;
+  disabled?: boolean;
   onSelect: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const copy = getModeCopy(props.mode);
@@ -173,6 +214,7 @@ function ModeMenuItem(props: {
         event.stopPropagation();
       }}
       selected={props.selected}
+      {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
     >
       {getModeIcon(props.mode)}
       <ProductToolbarMenuItemCopy hint={copy.hint} label={copy.label} />
@@ -222,6 +264,9 @@ function ToolbarModeMenu(props: {
               key={mode}
               mode={mode}
               selected={selected}
+              disabled={
+                props.triggerProps.videoRecordingModeLocked === true && mode !== 'video-recording'
+              }
               onSelect={createModeSelectionHandler(
                 mode,
                 selected,
@@ -344,6 +389,11 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
         <div className="sniptale-mode-wrapper">
           <ModeSelectorButton
             label={buttonCopy.label}
+            title={
+              selectedMode === 'cursor'
+                ? translate('content.toolbar.cursorDefault')
+                : buttonCopy.label
+            }
             disabled={pending}
             menuIndicator
             onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
@@ -362,14 +412,70 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
             />
           ) : null}
         </div>
+        {selectedMode === 'cursor' ? <NavigationToolbarActions {...props} /> : null}
       </ContentToolbarGroup>
-      {selectedMode === 'cursor' ? null : (
+      {selectedMode === 'cursor' || selectedMode === 'video-recording' ? null : (
         <ContentToolbarDivider
           className="sniptale-mode-leading-divider"
           dataUi="content.toolbar.mode-leading-divider"
         />
       )}
       <ToolbarQuickEditModeButtons {...props} />
+    </>
+  );
+}
+
+function NavigationToolbarActions(props: ToolbarModeButtonsProps) {
+  const pinned = props.pinToTab === true || props.pinToTabLocked === true;
+  return (
+    <>
+      <ContentToolbarButton
+        type="button"
+        dataUi="content.toolbar.navigation.clear-page-preparation"
+        tone="danger"
+        disabled={props.canClearPagePreparation !== true}
+        title={translate('content.toolbar.clearPagePreparation')}
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onClearPagePreparation?.();
+        }}
+      >
+        <BrushCleaning size={18} strokeWidth={2} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        active={pinned}
+        aria-pressed={pinned}
+        dataUi="content.toolbar.navigation.pin-to-tab"
+        disabled={props.pinToTabLocked === true || props.pinToTabAvailable !== true}
+        title={
+          props.pinToTabLocked
+            ? translate('content.toolbar.pinToTabLockedHint')
+            : !props.pinToTabAvailable
+              ? translate('content.toolbar.pinToTabUnavailableHint')
+              : translate('content.toolbar.pinToTab')
+        }
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onPinToTabChange?.(
+            props.pinToTab !== true,
+            createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
+          );
+        }}
+      >
+        {pinned ? <Pin size={18} strokeWidth={2} /> : <PinOff size={18} strokeWidth={2} />}
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        dataUi="content.toolbar.navigation.collapse"
+        title={translate('content.toolbar.hideToolbar')}
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onHide?.();
+        }}
+      >
+        <PanelBottomClose size={18} strokeWidth={2} />
+      </ContentToolbarButton>
     </>
   );
 }

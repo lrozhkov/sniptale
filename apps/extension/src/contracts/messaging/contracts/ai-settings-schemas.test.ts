@@ -36,6 +36,17 @@ it('parses AI secret passphrase unlock mutations', () => {
   });
 });
 
+it('parses prompt reset mutations without accepting prompt payloads', () => {
+  const resetMessage = {
+    operation: 'reset-global-prompt',
+    type: MessageType.AI_SETTINGS_MUTATION,
+  } as const;
+  expect(aiSettingsMutationMessageSchema.parse(resetMessage)).toEqual(resetMessage);
+  expect(() =>
+    aiSettingsMutationMessageSchema.parse({ ...resetMessage, prompt: 'unexpected override' })
+  ).toThrow(/prompt/);
+});
+
 it('parses background-owned AI secret protection status reads and responses', () => {
   expect(
     aiSettingsMutationMessageSchema.parse({
@@ -157,4 +168,25 @@ it('rejects removed default-model capability messages', () => {
       type: MessageType.AI_SETTINGS_MUTATION,
     })
   ).toThrow(/capabilityToken/);
+});
+
+it('accepts bounded model reorder commands and rejects extra fields', () => {
+  expect(
+    aiSettingsMutationMessageSchema.parse({
+      beforeModelId: 'model-1',
+      modelId: 'model-2',
+      operation: 'move-model',
+      type: MessageType.AI_SETTINGS_MUTATION,
+    })
+  ).toMatchObject({ operation: 'move-model' });
+
+  expect(() =>
+    aiSettingsMutationMessageSchema.parse({
+      beforeModelId: null,
+      modelId: 'model-2',
+      operation: 'move-model',
+      unexpected: true,
+      type: MessageType.AI_SETTINGS_MUTATION,
+    })
+  ).toThrow(/unexpected/);
 });

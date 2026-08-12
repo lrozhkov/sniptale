@@ -7,12 +7,7 @@ import {
   createSavePresetsState,
   shouldConfirmDelete,
 } from '.';
-import {
-  getCaptureActionOptions,
-  getPresetCountLabel,
-  isPresetUsed,
-  reorderPresetsBefore,
-} from './helpers';
+import { getCaptureActionOptions, isPresetUsed, reorderPresetsBefore } from './helpers';
 import type { SavePresetsActions, SavePresetsDialogsState, SavePresetsSyncState } from './types';
 
 function createPreset(id: string): SavePreset {
@@ -33,13 +28,11 @@ function createSyncState(): SavePresetsSyncState {
     defaultVideoPresetId: 'video',
     isLoading: false,
     presets: [createPreset('image')],
-    saveCapturesToGallery: true,
     setCaptureAction: vi.fn(),
     setDefaultExportPresetId: vi.fn(),
     setDefaultImagePresetId: vi.fn(),
     setDefaultVideoPresetId: vi.fn(),
     setPresets: vi.fn(),
-    setSaveCapturesToGallery: vi.fn(),
     settings: {} as SavePresetsSyncState['settings'],
     updateSettings: vi.fn(async () => undefined),
   };
@@ -68,7 +61,6 @@ function createActions(): SavePresetsActions {
     handleMoveBefore: vi.fn(async () => undefined),
     handleSavePreset: vi.fn(async () => undefined),
     handleTogglePresetEnabled: vi.fn(async () => undefined),
-    handleToggleSaveToGallery: vi.fn(async () => undefined),
   };
 }
 
@@ -78,9 +70,8 @@ describe('save-presets section state helpers', () => {
       expect.objectContaining({ value: 'save_to_library' })
     );
   });
-  it('formats counts, detects assigned presets, and reorders valid targets', () => {
+  it('detects assigned presets and reorders valid targets', () => {
     const presets = [createPreset('a'), createPreset('b'), createPreset('c')];
-    expect(getPresetCountLabel(2)).toBeTruthy();
     expect(isPresetUsed('a', 'a', null, null)).toBe(true);
     expect(isPresetUsed('b', null, 'b', null)).toBe(true);
     expect(isPresetUsed('c', null, null, 'c')).toBe(true);
@@ -111,7 +102,6 @@ async function verifySplitStateHelpers(): Promise<void> {
   const actions = createActions();
   const viewModel = {
     captureActionOptions: [{ label: 'Default', value: 'download_default' as const }],
-    presetCountLabel: '1 preset',
     presetOptions: [{ label: 'Preset image', value: 'image' }],
   };
 
@@ -122,8 +112,7 @@ async function verifySplitStateHelpers(): Promise<void> {
     'defaultImagePresetId',
     'image-next',
     sync.setDefaultImagePresetId,
-    'image',
-    'savePresets.messages.defaultImageUpdated'
+    'image'
   );
   expectCreatedSavePresetState(sync, dialogState, viewModel);
 }
@@ -136,7 +125,6 @@ function expectCreatedSavePresetState(
   expect(createSavePresetsState(sync, dialogState, viewModel)).toEqual(
     expect.objectContaining({
       editingPreset: dialogState.editingPreset,
-      presetCountLabel: '1 preset',
       presets: sync.presets,
     })
   );

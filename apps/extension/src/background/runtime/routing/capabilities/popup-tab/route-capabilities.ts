@@ -127,7 +127,14 @@ function issuePopupTabRouteCapability(
   return token;
 }
 
-async function isPopupTabRouteTargetAuthorized(tabId: number): Promise<boolean> {
+async function isPopupTabRouteTargetAuthorized(
+  tabId: number,
+  operation: PopupTabRouteOperation
+): Promise<boolean> {
+  if (operation === MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT) {
+    return true;
+  }
+
   const tab = await browserTabs.get(tabId);
   if (isOwnedSnapshotViewerPage(tab.url)) {
     return true;
@@ -156,7 +163,7 @@ export function routePopupTabRouteCapabilityRequest(
     return true;
   }
 
-  void isPopupTabRouteTargetAuthorized(capabilityRequest.tabId)
+  void isPopupTabRouteTargetAuthorized(capabilityRequest.tabId, capabilityRequest.operation)
     .then((authorized) => {
       if (!authorized) {
         sendResponse(createRouteErrorResponse('Page access is required for export.'));

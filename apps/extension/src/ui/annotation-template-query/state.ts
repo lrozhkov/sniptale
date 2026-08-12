@@ -17,11 +17,32 @@ const EMPTY_STATE: AnnotationTemplateTagState = {
   tags: [],
 };
 
+function enqueueActiveFilterPersistence(
+  queueRef: { current: Promise<void> },
+  tagIds: AnnotationTemplateTagId[]
+): Promise<void> {
+  const operation = queueRef.current.then(async () => {
+    const result = await setActiveAnnotationTemplateTagFilter(tagIds);
+    if (result.outcome !== 'applied' && result.outcome !== 'unchanged') {
+      throw new Error('Annotation template tag filter was not applied');
+    }
+  });
+  queueRef.current = operation.then(
+    () => undefined,
+    () => undefined
+  );
+  return operation;
+}
+
 export function useAnnotationTemplateTagState(enabled = true) {
   const [state, setState] = useState<AnnotationTemplateTagState>(EMPTY_STATE);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const generationRef = useRef(0);
+  const committedRef = useRef(EMPTY_STATE);
+  const mutationRevisionRef = useRef(0);
+  const pendingMutationCountRef = useRef(0);
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     if (!enabled) {
       setIsLoading(false);
@@ -32,6 +53,7 @@ export function useAnnotationTemplateTagState(enabled = true) {
     void loadAnnotationTemplateTagState()
       .then((next) => {
         if (generation !== generationRef.current || observedNewerState) return;
+        committedRef.current = next;
         setState(next);
         setError(false);
       })
@@ -44,7 +66,12 @@ export function useAnnotationTemplateTagState(enabled = true) {
     const unsubscribe = subscribeToAnnotationTemplateTagState((next) => {
       if (generation !== generationRef.current) return;
       observedNewerState = true;
-      setState(next);
+      committedRef.current = next;
+      setState((current) =>
+        pendingMutationCountRef.current > 0
+          ? { ...next, activeFilterTagIds: current.activeFilterTagIds }
+          : next
+      );
       setError(false);
       setIsLoading(false);
     });
@@ -54,13 +81,17 @@ export function useAnnotationTemplateTagState(enabled = true) {
     };
   }, [enabled]);
   const setActiveFilterTagIds = useCallback(async (tagIds: AnnotationTemplateTagId[]) => {
+    const revision = ++mutationRevisionRef.current;
+    pendingMutationCountRef.current += 1;
+    setState((current) => ({ ...current, activeFilterTagIds: tagIds }));
     try {
-      const result = await setActiveAnnotationTemplateTagFilter(tagIds);
-      if (result.outcome !== 'applied' && result.outcome !== 'unchanged') {
-        toast.error(translate('highlighter.templateTags.saveError'));
-      }
+      await enqueueActiveFilterPersistence(persistenceQueueRef, tagIds);
+      committedRef.current = { ...committedRef.current, activeFilterTagIds: tagIds };
     } catch {
       toast.error(translate('highlighter.templateTags.saveError'));
+      if (mutationRevisionRef.current === revision) setState(committedRef.current);
+    } finally {
+      pendingMutationCountRef.current = Math.max(0, pendingMutationCountRef.current - 1);
     }
   }, []);
   return { error, isLoading, setActiveFilterTagIds, state };

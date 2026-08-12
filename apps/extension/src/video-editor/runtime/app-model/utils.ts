@@ -1,5 +1,6 @@
 import { translate } from '../../../platform/i18n';
 import type { SaveStateMeta } from './types';
+import type { VideoEditorSaveState } from '../../contracts/session-state';
 
 const NON_TEXT_ENTRY_INPUT_TYPES = new Set([
   'button',
@@ -31,10 +32,11 @@ export function buildVideoEditorUrl(projectId: string, recordingId: string | nul
 /**
  * Maps store save state into user-facing label and shell styling.
  */
-export function getSaveStateMeta(saveState: 'idle' | 'saving' | 'saved' | 'error'): SaveStateMeta {
+export function getSaveStateMeta(saveState: VideoEditorSaveState): SaveStateMeta {
   if (saveState === 'saved') {
     return {
       label: translate('common.states.saved'),
+      state: 'saved',
       className:
         'border-[color:color-mix(in_srgb,var(--sniptale-color-success)_30%,var(--sniptale-color-border-soft)_70%)] ' +
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-success-soft)_88%,transparent)] ' +
@@ -45,6 +47,7 @@ export function getSaveStateMeta(saveState: 'idle' | 'saving' | 'saved' | 'error
   if (saveState === 'saving') {
     return {
       label: translate('common.states.saving'),
+      state: 'saving',
       className:
         'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_30%,var(--sniptale-color-border-soft)_70%)] ' +
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_14%,transparent)] ' +
@@ -52,9 +55,21 @@ export function getSaveStateMeta(saveState: 'idle' | 'saving' | 'saved' | 'error
     };
   }
 
+  if (saveState === 'dirty') {
+    return {
+      label: translate('common.states.dirty'),
+      state: 'dirty',
+      className:
+        'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_30%,var(--sniptale-color-border-soft)_70%)] ' +
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning-soft)_72%,transparent)] ' +
+        'text-[var(--sniptale-color-warning)]',
+    };
+  }
+
   if (saveState === 'error') {
     return {
       label: translate('common.states.error'),
+      state: 'error',
       className:
         'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_30%,var(--sniptale-color-border-soft)_70%)] ' +
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_72%,var(--sniptale-color-surface-panel)_28%)] ' +
@@ -64,6 +79,7 @@ export function getSaveStateMeta(saveState: 'idle' | 'saving' | 'saved' | 'error
 
   return {
     label: translate('common.states.saved'),
+    state: 'idle',
     className:
       'border-[var(--sniptale-color-border-soft)] ' +
       'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_78%,transparent)] ' +

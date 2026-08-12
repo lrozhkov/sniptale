@@ -5,7 +5,7 @@ import { readOssReleaseConsumerManifest } from './oss-release-consumer-discovery
 
 const WORKFLOW_ORDER_MARKER = '`implementation → qa:checkpoint → required review → qa:closeout`';
 const WORKFLOW_ORDER_DOCS = [
-  'AGENTS.md',
+  'docs/agent-tooling/AGENTS.md',
   'docs/tooling/code-quality.md',
   'docs/tooling/wrapper-summary.md',
 ];

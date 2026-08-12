@@ -16,6 +16,7 @@ type ContentAppToolbarLayoutViewModel = Pick<
   | 'modeController'
   | 'modeState'
   | 'screenshotController'
+  | 'videoRecordingController'
 >;
 type ContentAppDialogsLayoutViewModel = Pick<
   ContentAppViewModel,
@@ -83,6 +84,9 @@ function createToolbarLayoutSection(
       quickEditDocumentMode: viewModel.modeState.quickEditDocumentMode,
       quickEditMode: viewModel.modeState.quickEditMode,
       screenshotMode: viewModel.modeState.screenshotMode,
+      ...(viewModel.modeState.videoRecordingMode === undefined
+        ? {}
+        : { videoRecordingMode: viewModel.modeState.videoRecordingMode }),
     },
     pinToTab: viewModel.modeState.pinToTab,
     pinToTabAvailable: viewModel.modeState.pinToTabAvailable,
@@ -98,7 +102,11 @@ function createToolbarLayoutSection(
     setPinToTab: viewModel.modeState.setPinToTab,
     setPinnedToolbarVisible: viewModel.modeState.setPinnedToolbarVisible,
     setTimerDelay: viewModel.modeState.setTimerDelay,
+    ...(viewModel.modeState.setVideoRecordingMode === undefined
+      ? {}
+      : { setVideoRecordingMode: viewModel.modeState.setVideoRecordingMode }),
     timerDelay: viewModel.modeState.timerDelay,
+    videoRecording: viewModel.videoRecordingController,
   };
 }
 

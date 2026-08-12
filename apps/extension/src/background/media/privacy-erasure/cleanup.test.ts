@@ -16,6 +16,7 @@ const {
   inspectPersistedLeaseMock,
   hasOwnerLeaseMock,
   readCaptureSurfaceJournalMock,
+  releaseVideoRecordingSurfaceMock,
   releaseOwnersMock,
   requestProjectExportJobCancelMock,
   resetRecordingIdMock,
@@ -37,6 +38,7 @@ const {
   inspectPersistedLeaseMock: vi.fn(),
   hasOwnerLeaseMock: vi.fn(),
   readCaptureSurfaceJournalMock: vi.fn(),
+  releaseVideoRecordingSurfaceMock: vi.fn(),
   releaseOwnersMock: vi.fn(),
   requestProjectExportJobCancelMock: vi.fn(),
   resetRecordingIdMock: vi.fn(),
@@ -52,6 +54,10 @@ vi.mock('../video/recording-control-lease', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/recording-control-lease')>()),
   clearActiveVideoRecordingLease: clearActiveVideoRecordingLeaseMock,
   ensureActiveVideoRecordingLeaseHydrated: ensureActiveVideoRecordingLeaseHydratedMock,
+}));
+vi.mock('../video/content-surface/surface-lease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../video/content-surface/surface-lease')>()),
+  releaseVideoRecordingSurface: releaseVideoRecordingSurfaceMock,
 }));
 vi.mock('../video/runtime/camera-recorder-control', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../video/runtime/camera-recorder-control')>()),
@@ -124,6 +130,7 @@ beforeEach(() => {
   inspectPersistedLeaseMock.mockResolvedValue({ status: 'absent' });
   hasOwnerLeaseMock.mockReturnValue(false);
   readCaptureSurfaceJournalMock.mockResolvedValue([]);
+  releaseVideoRecordingSurfaceMock.mockResolvedValue(false);
   releaseOwnersMock.mockResolvedValue(undefined);
   requestProjectExportJobCancelMock.mockResolvedValue(null);
   sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
@@ -368,5 +375,22 @@ it('closes offscreen as containment when voice input cleanup cannot be verified'
   });
   expect(result).toContainEqual(
     expect.objectContaining({ id: 'recording-runtime-state', status: 'verified-empty' })
+  );
+});
+
+it('closes offscreen even when video surface retirement fails', async () => {
+  releaseVideoRecordingSurfaceMock.mockRejectedValueOnce(
+    new Error('camera close and cleanup ledger failed')
+  );
+
+  const result = await mediaPrivacyErasureCleanupAdapter.cleanup();
+
+  expect(closeOffscreenDocumentForPrivacyErasureMock).toHaveBeenCalledOnce();
+  expect(result).toContainEqual(
+    expect.objectContaining({
+      error: 'recording-stop-failed',
+      id: 'recording-runtime-state',
+      status: 'failed',
+    })
   );
 });

@@ -181,6 +181,13 @@ describe('ToolbarSettingsDropdown', () => {
     expect(createTrustedContentActionIntentSource).toHaveBeenCalledOnce();
   });
 
+  it('uses the same collapse glyph as the Navigate toolbar action', () => {
+    renderSettingsDropdown();
+
+    const collapseButton = findButton('content.toolbar.hideToolbar');
+    expect(collapseButton?.querySelector('svg')?.classList).toContain('lucide-panel-bottom-close');
+  });
+
   it('preserves the native exit gesture for screenshot capability recovery', () => {
     const { onDisableScreenshotMode } = renderSettingsDropdown();
     const exitButton = findButton('content.toolbar.screenshotDisable');

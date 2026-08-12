@@ -4,6 +4,8 @@ import {
   resolveContentUiViewport,
 } from '@sniptale/ui/floating-interactions/scale';
 
+const TOOLBAR_MENU_VERTICAL_CLEARANCE_PX = 18;
+
 export function getToolbarMenuPosition(
   anchor: HTMLElement | null,
   menuHeight: number,
@@ -26,5 +28,7 @@ export function getToolbarMenuPosition(
   });
   const spaceBelow = viewport.height - rect.y - rect.height;
   const spaceAbove = rect.y;
-  return spaceBelow < menuHeight && spaceAbove > spaceBelow ? 'up' : 'down';
+  return spaceBelow < menuHeight + TOOLBAR_MENU_VERTICAL_CLEARANCE_PX && spaceAbove > spaceBelow
+    ? 'up'
+    : 'down';
 }

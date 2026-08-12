@@ -18,9 +18,12 @@ import {
 import { resetVideoRecordingRuntimeState } from '../../session-state';
 import {
   notifyRecordingStartFailed,
+  getRecordingTabId,
   resetRecordingTabId,
   finalizeRecordingDiagnostics,
 } from '../../manager';
+import { browserAction } from '@sniptale/platform/browser/action';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { clearRecordingStartActivationWatchdog } from '../../../manager/start-activation-watchdog';
 import { markOffscreenDocumentReady } from '../../../../../offscreen-document/service';
 import { releaseVideoCaptureSurface } from '../../../capture-surface';
@@ -194,6 +197,7 @@ async function processVideoSavedToIdb(
   const existingState = await readStoredVideoPostRecordResult();
   if (isCompletedPostRecordReplay(existingState, message)) {
     await consumeRecordingCompletionOutbox(message, false);
+    await openPostRecordPopup();
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
@@ -205,13 +209,28 @@ async function processVideoSavedToIdb(
   const synchronized = await synchronizePostRecordResult(message);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
     await consumeRecordingCompletionOutbox(message, false);
+    await openPostRecordPopup();
     finalizeSavedRecordingCompletion(message);
     return 'accepted';
   }
   await completeSavedRecordingPersistence(message.recordingId);
   await consumeRecordingCompletionOutbox(message, true);
+  await openPostRecordPopup();
   finalizeSavedRecordingCompletion(message);
   return 'accepted';
+}
+
+async function openPostRecordPopup(): Promise<void> {
+  const tabId = getRecordingTabId();
+  if (tabId === null) return;
+  try {
+    const tab = await browserTabs.get(tabId);
+    if (typeof tab.windowId === 'number') {
+      await browserAction.openPopup({ windowId: tab.windowId });
+    }
+  } catch (error) {
+    logger.warn('Failed to open the video post-record popup', error);
+  }
 }
 
 function toPostRecordResult(message: SavedRecordingMessage) {

@@ -3,15 +3,58 @@ import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import { handleTriggerQuickAction } from '../actions.quick-action';
 import type { CaptureRouteAdapterContext } from './types';
+import {
+  loadQuickActionRuntimeContext,
+  loadScreenshotCaptureRuntimeContext,
+} from '../../quick-actions/flow/load';
+import { reserveDesktopQuickAction } from '../../quick-actions/desktop/workflow';
 
 export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {
-  if (args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION') {
+  if (
+    args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION' &&
+    args.routeArgs.message.type !== 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' &&
+    args.routeArgs.message.type !== 'TRIGGER_SCREENSHOT_CAPTURE'
+  ) {
     return false;
   }
   const message = args.routeArgs.message;
-  void authorizePageAccess(args)
-    .then(() => {
-      handleTriggerQuickAction(message, args.context);
+  if (message.type === 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE') {
+    void loadDesktopScreenshotPreparationContext(message)
+      .then(async (runtimeContext) => {
+        const preparation = await reserveDesktopQuickAction({
+          context: runtimeContext,
+          tabId: args.context.resolvedTabId,
+        });
+        args.context.sendResponse({
+          success: true,
+          result: 'ready',
+          imageFormat: runtimeContext.imageFormat,
+          imageQuality: runtimeContext.imageQuality,
+          ...preparation,
+        });
+      })
+      .catch((error: unknown) => args.context.sendResponse(createRouteErrorResponse(error)));
+    return true;
+  }
+  const runtimeContextPromise =
+    message.type === 'TRIGGER_QUICK_ACTION'
+      ? loadQuickActionRuntimeContext(message.actionId)
+      : loadScreenshotCaptureRuntimeContext(message.config);
+  void runtimeContextPromise
+    .then(async (runtimeContext) => {
+      await authorizePageAccess(args, runtimeContext.captureMode);
+      handleTriggerQuickAction(
+        message.type === 'TRIGGER_QUICK_ACTION'
+          ? message
+          : {
+              actionId: 'popup-screenshot-setup',
+              ...(message.desktopSelection === undefined
+                ? {}
+                : { desktopSelection: message.desktopSelection }),
+            },
+        args.context,
+        runtimeContext
+      );
     })
     .catch((error: unknown) => {
       args.context.sendResponse(createRouteErrorResponse(error));
@@ -19,7 +62,31 @@ export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boole
   return true;
 }
 
-async function authorizePageAccess(args: CaptureRouteAdapterContext): Promise<void> {
+async function loadDesktopScreenshotPreparationContext(
+  message: Extract<
+    CaptureRouteAdapterContext['routeArgs']['message'],
+    { type: 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' }
+  >
+) {
+  const runtimeContext =
+    message.actionId !== undefined
+      ? await loadQuickActionRuntimeContext(message.actionId)
+      : message.config !== undefined
+        ? await loadScreenshotCaptureRuntimeContext(message.config)
+        : null;
+  if (!runtimeContext || runtimeContext.captureMode !== 'desktop') {
+    throw new Error('Desktop screenshot preparation requires a desktop capture configuration');
+  }
+  return runtimeContext;
+}
+
+async function authorizePageAccess(
+  args: CaptureRouteAdapterContext,
+  captureMode: string
+): Promise<void> {
+  if (captureMode === 'desktop') {
+    return;
+  }
   const tabId = args.context.resolvedTabId;
   const tab = await browserTabs.get(tabId);
   if (isOwnedSnapshotViewerPage(tab.url)) {
@@ -32,4 +99,5 @@ async function authorizePageAccess(args: CaptureRouteAdapterContext): Promise<vo
   }
 
   await pageAccessPort.ensureActivePageAccessRuntime(tabId);
+  await pageAccessPort.waitForContentToolbarReady?.(tabId);
 }

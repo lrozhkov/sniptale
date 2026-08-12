@@ -213,7 +213,11 @@ export function reorderPresets(
 ): HighlighterSettings | null {
   const borderPresets = reorderBorderPresets(settings.borderPresets, orderedIds);
   if (
-    borderPresets.every((preset, index) => preset.order === settings.borderPresets[index]?.order)
+    borderPresets.every(
+      (preset, index) =>
+        preset.id === settings.borderPresets[index]?.id &&
+        preset.order === settings.borderPresets[index]?.order
+    )
   ) {
     return null;
   }

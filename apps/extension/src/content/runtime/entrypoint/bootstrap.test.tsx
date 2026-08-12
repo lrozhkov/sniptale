@@ -12,6 +12,7 @@ const {
   logTopLevelContentScriptLoadMock,
   rootUnmountMock,
   runtimeCleanupMock,
+  sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   createRootMock: vi.fn(),
   initializeTopLevelContentRuntimeMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   logTopLevelContentScriptLoadMock: vi.fn(),
   rootUnmountMock: vi.fn(),
   runtimeCleanupMock: vi.fn(),
+  sendRuntimeMessageMock: vi.fn(),
 }));
 
 const CONTENT_RUNTIME_MARKER_ATTRIBUTE = 'data-sniptale-content-runtime';
@@ -35,6 +37,12 @@ vi.mock('../../overlay/app/view', () => ({
 vi.mock('../bootstrap', () => ({
   ContentRuntimeCleanup: undefined,
   initializeTopLevelContentRuntime: initializeTopLevelContentRuntimeMock,
+}));
+
+vi.mock('../../application/runtime-services/services', () => ({
+  getContentRuntimeServices: () => ({
+    messaging: { sendRuntimeMessage: sendRuntimeMessageMock },
+  }),
 }));
 
 vi.mock('../ui-activation-bridge', () => ({
@@ -112,6 +120,7 @@ beforeEach(() => {
   Reflect.deleteProperty(globalThis, '__sniptaleContentRuntimeCleanup');
   createRootMock.mockReturnValue({ render: vi.fn(), unmount: rootUnmountMock });
   initializeTopLevelContentRuntimeMock.mockReturnValue(runtimeCleanupMock);
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, pageZoom: 1 });
   document.documentElement.removeAttribute('data-theme');
   document.body.removeAttribute('data-theme');
   document.documentElement.style.colorScheme = '';
@@ -168,6 +177,19 @@ it('ignores repeated initialization when the content host already exists', async
   expect(createRootMock).toHaveBeenCalledTimes(1);
   expect(installContentUiActivationBridgeMock).toHaveBeenCalledTimes(1);
   expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledTimes(1);
+});
+
+it('resynchronizes page zoom after viewport emulation changes the content viewport', async () => {
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  initializeTopLevelContentEntry();
+  await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(1));
+  const callsBeforeResize = sendRuntimeMessageMock.mock.calls.length;
+
+  window.dispatchEvent(new Event('resize'));
+
+  await vi.waitFor(() =>
+    expect(sendRuntimeMessageMock.mock.calls.length).toBeGreaterThan(callsBeforeResize)
+  );
 });
 
 it('replaces an unmarked content host from an outdated runtime', async () => {

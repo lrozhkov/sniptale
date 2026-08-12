@@ -127,11 +127,11 @@ export function syncCaptureAction(params: ScreenshotControllerParams): void {
   }
 }
 
-export function closeQuickActionCapture(
+export async function closeQuickActionCapture(
   params: ScreenshotControllerParams,
   runtime: ScreenshotControllerRuntime,
   runToken?: number
-): void {
+): Promise<void> {
   if (!isCurrentScreenshotRun(runtime, runToken)) {
     return;
   }
@@ -149,11 +149,15 @@ export function closeQuickActionCapture(
   );
   params.setIsToolbarVisible(false);
   try {
-    void getContentRuntimeServices().messaging.sendRuntimeMessage(
+    const response = await getContentRuntimeServices().messaging.sendRuntimeMessage(
       createDisableScreenshotModeRequest()
     );
+    if (response?.success === false || response?.error) {
+      throw new Error(response.error || 'Screenshot surface cleanup failed');
+    }
   } catch (error) {
-    logger.error('Screenshot surface binding is unavailable during quick-action cleanup', error);
+    logger.error('Failed to release quick-action screenshot surface', error);
+    throw error;
   }
 }
 
@@ -163,7 +167,9 @@ export function cancelQuickActionCountdown(
   session: Pick<ScreenshotControllerSession, 'countdownLock'>
 ): void {
   session.countdownLock = null;
-  closeQuickActionCapture(params, runtime);
+  void closeQuickActionCapture(params, runtime).catch((error) => {
+    logger.error('Failed to close cancelled quick-action capture', error);
+  });
 }
 
 export function prepareScreenshotMode(

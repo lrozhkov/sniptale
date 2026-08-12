@@ -64,7 +64,7 @@ function createControlledTabSettings(): VideoRecordingSettings {
   };
 }
 
-it('keeps the Chrome tab source binding isolated from standard track constraints', async () => {
+it('requests the measured physical viewport as the maximum TAB source size', async () => {
   const getUserMedia = vi.fn().mockResolvedValue({
     getTracks: () => [{ stop: vi.fn() }],
     getVideoTracks: () => [{ getSettings: () => ({ cursor: 'never' }), readyState: 'live' }],
@@ -76,6 +76,7 @@ it('keeps the Chrome tab source binding isolated from standard track constraints
     captureMode: CaptureMode.TAB,
     settings: createControlledTabSettings(),
     streamId: 'tab-stream-controlled',
+    viewport: { devicePixelRatio: 1.25, height: 947, width: 1919 },
   });
 
   expect(getUserMedia).toHaveBeenCalledWith({
@@ -84,6 +85,8 @@ it('keeps the Chrome tab source binding isolated from standard track constraints
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'tab-stream-controlled',
+        maxHeight: 1184,
+        maxWidth: 2399,
       },
     },
   });
@@ -98,7 +101,7 @@ it('keeps the Chrome tab source binding isolated from standard track constraints
 });
 
 it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
-  'uses only the canonical Chrome source binding for %s',
+  'keeps the physical viewport source request for %s independent from output settings',
   async (captureMode) => {
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: vi.fn() }],
@@ -112,6 +115,7 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
         captureMode,
         settings: { ...createControlledTabSettings(), controlledCursorCaptureEnabled: false },
         streamId: 'tab-stream-source',
+        viewport: { devicePixelRatio: 2, height: 720, width: 1280 },
       })
     ).resolves.toEqual(expect.objectContaining({ cursorCaptureMode: null }));
 
@@ -121,6 +125,8 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
         mandatory: {
           chromeMediaSource: 'tab',
           chromeMediaSourceId: 'tab-stream-source',
+          maxHeight: 1440,
+          maxWidth: 2560,
         },
       },
     });
@@ -163,6 +169,86 @@ it('uses the same isolated source binding for system audio and video', async () 
       },
     },
   });
+});
+
+it('does not copy video size constraints onto TAB system audio', async () => {
+  const getUserMedia = vi.fn().mockResolvedValue({
+    getTracks: () => [{ stop: vi.fn() }],
+    getVideoTracks: () => [{ getSettings: () => ({}), readyState: 'live' }],
+    id: 'tab-stream',
+  });
+  installMediaDevicesMocks({ getUserMedia });
+
+  await acquireRecordingSourceStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...createControlledTabSettings(),
+      controlledCursorCaptureEnabled: false,
+      systemAudioEnabled: true,
+    },
+    streamId: 'tab-stream-physical-audio',
+    viewport: { devicePixelRatio: 1.5, height: 900, width: 1440 },
+  });
+
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-physical-audio',
+      },
+    },
+    video: {
+      mandatory: {
+        chromeMediaSource: 'tab',
+        chromeMediaSourceId: 'tab-stream-physical-audio',
+        maxHeight: 1350,
+        maxWidth: 2160,
+      },
+    },
+  });
+});
+
+it.each([
+  { devicePixelRatio: 0, height: 720, width: 1280 },
+  { devicePixelRatio: Number.NaN, height: 720, width: 1280 },
+  { devicePixelRatio: 2, height: 0, width: 1280 },
+  { devicePixelRatio: 2, height: 720, width: Number.POSITIVE_INFINITY },
+])(
+  'rejects invalid TAB physical viewport geometry before capture: $width × $height',
+  async (viewport) => {
+    const getUserMedia = vi.fn();
+    installMediaDevicesMocks({ getUserMedia });
+
+    await expect(
+      acquireRecordingSourceStream({
+        captureMode: CaptureMode.TAB,
+        settings: createControlledTabSettings(),
+        streamId: 'tab-stream-invalid-viewport',
+        viewport,
+      })
+    ).rejects.toThrow('Tab capture viewport geometry is invalid');
+
+    expect(getUserMedia).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  { devicePixelRatio: 1, height: 1080, width: 16_384 },
+  { devicePixelRatio: 2, height: 8192, width: 1280 },
+])('rejects TAB dimensions Chromium would silently replace: $width × $height', async (viewport) => {
+  const getUserMedia = vi.fn();
+  installMediaDevicesMocks({ getUserMedia });
+
+  await expect(
+    acquireRecordingSourceStream({
+      captureMode: CaptureMode.TAB,
+      settings: createControlledTabSettings(),
+      streamId: 'tab-stream-oversized-viewport',
+      viewport,
+    })
+  ).rejects.toThrow('Tab capture physical geometry exceeds Chromium limits');
+
+  expect(getUserMedia).not.toHaveBeenCalled();
 });
 
 it('keeps controlled tab telemetry alive when native cursor exclusion was not requested', async () => {

@@ -159,7 +159,6 @@ describe('useSavePresetsSection', () => {
 
     expect(typeof getState().handleSavePreset).toBe('function');
     expect(typeof getState().handleTogglePresetEnabled).toBe('function');
-    expect(typeof getState().handleToggleSaveToGallery).toBe('function');
     expect(typeof getState().handleCaptureActionChange).toBe('function');
   });
 });

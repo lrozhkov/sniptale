@@ -28,6 +28,37 @@ export function sortPromptTemplates(templates: PromptTemplate[]): PromptTemplate
   });
 }
 
+export function applyPromptTemplateOrder(
+  templates: PromptTemplate[],
+  orderedIds: readonly string[]
+): PromptTemplate[] {
+  const byId = new Map(templates.map((template) => [template.id, template]));
+  const ordered = orderedIds.flatMap((id) => {
+    const template = byId.get(id);
+    if (!template) return [];
+    byId.delete(id);
+    return [template];
+  });
+  return [...ordered, ...templates.filter((template) => byId.has(template.id))];
+}
+
+export function movePromptTemplateBefore(
+  templates: PromptTemplate[],
+  itemId: string,
+  beforeItemId: string | null
+): PromptTemplate[] {
+  const item = templates.find((template) => template.id === itemId);
+  if (!item || beforeItemId === itemId) return templates;
+  const next = templates.filter((template) => template.id !== itemId);
+  const targetIndex =
+    beforeItemId === null
+      ? next.length
+      : next.findIndex((template) => template.id === beforeItemId);
+  if (targetIndex < 0) return templates;
+  next.splice(targetIndex, 0, item);
+  return next.every((template, index) => template.id === templates[index]?.id) ? templates : next;
+}
+
 export function createPromptTemplateDraft(args: {
   id: string;
   name: string;

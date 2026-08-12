@@ -7,7 +7,6 @@ import {
   isSystemViewportPresetCustomized,
   normalizeViewportPresetOrder,
 } from '../../../../features/viewport-presets/operations';
-import { getSettingsCountLabel } from '../../../section-surface/text.helpers.ts';
 
 export interface ViewportPresetDraft {
   name: string;
@@ -95,16 +94,19 @@ export function moveViewportPresetBefore(
       : sameTarget.findIndex((item) => item.id === beforePresetId);
   if (insertionIndex < 0) return [...presets];
   sameTarget.splice(insertionIndex, 0, preset);
+  const reorderedTarget = sameTarget.map((item, order) => ({ ...item, order }));
   const byTarget = new Map<ViewportPresetTarget, ViewportPreset[]>([
     [
       'viewport',
       preset.target === 'viewport'
-        ? sameTarget
+        ? reorderedTarget
         : presets.filter((item) => item.target === 'viewport'),
     ],
     [
       'window',
-      preset.target === 'window' ? sameTarget : presets.filter((item) => item.target === 'window'),
+      preset.target === 'window'
+        ? reorderedTarget
+        : presets.filter((item) => item.target === 'window'),
     ],
   ]);
   return normalizeViewportPresetOrder([...byTarget.get('viewport')!, ...byTarget.get('window')!]);
@@ -116,12 +118,4 @@ export function getDeleteMessage(preset?: ViewportPreset): string {
       preset ? getViewportPresetDisplayName(preset) : ''
     }"` + `${translate('viewportPresets.section.deleteMessageSuffix')}`
   );
-}
-
-export function getViewportPresetCountLabel(count: number): string {
-  return getSettingsCountLabel(count, {
-    one: 'viewportPresets.section.countOne',
-    few: 'viewportPresets.section.countFew',
-    many: 'viewportPresets.section.countMany',
-  });
 }

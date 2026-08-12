@@ -10,7 +10,7 @@ describe('shared preview copy', () => {
   });
 
   it('localizes product preview copy through the product preview source', () => {
-    expect(getProductPreviewCopy('ru').saveDialogPresetPathsLabel).toBe('Пути пресетов');
+    expect(getProductPreviewCopy('ru').saveDialogPresetPathsLabel).toBe('Пути шаблонов');
     expect(getProductPreviewCopy('en').saveDialogPresetPathsLabel).toBe('Preset paths');
   });
 });

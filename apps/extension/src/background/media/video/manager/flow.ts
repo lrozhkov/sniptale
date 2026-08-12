@@ -1,7 +1,7 @@
 export {
   announceCaptureSource,
   beginPreparedRecording,
-  enableAnnotationsOrAbort,
+  prepareContentSurfaceOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   finalizeRecordingStart,
   resolveCaptureSourceForMode,

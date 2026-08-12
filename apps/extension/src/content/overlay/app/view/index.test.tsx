@@ -86,6 +86,7 @@ function createModeState() {
     quickEditMode: false,
     saveDialogState: null,
     screenshotMode: true,
+    videoRecordingMode: true,
     sessionActivePresetId: null,
     setCaptureAction: vi.fn(),
     setCurrentViewport: vi.fn(),
@@ -93,6 +94,7 @@ function createModeState() {
     setSaveDialogState: vi.fn(),
     setSessionActivePresetId: vi.fn(),
     setTimerDelay: vi.fn(),
+    setVideoRecordingMode: vi.fn(),
     timerDelay: 5,
   };
 }
@@ -153,6 +155,7 @@ function createViewModel() {
     modeState: createModeState(),
     scenarioController: createScenarioController(),
     screenshotController: createScreenshotController(),
+    videoRecordingController: { kind: 'video-recording-controller' },
   } as unknown as ContentAppViewModel;
 }
 
@@ -208,6 +211,11 @@ async function verifiesGroupedLayoutProps() {
   expect(firstCall?.[0].toolbar.modes.drawingMode).toBe(false);
   expect(firstCall?.[0].toolbar.modeController.handleToggleDrawingMode).toBe(
     viewModel.modeController.handleToggleDrawingMode
+  );
+  expect(firstCall?.[0].toolbar.videoRecording).toBe(viewModel.videoRecordingController);
+  expect(firstCall?.[0].toolbar.modes.videoRecordingMode).toBe(true);
+  expect(firstCall?.[0].toolbar.setVideoRecordingMode).toBe(
+    viewModel.modeState.setVideoRecordingMode
   );
 }
 

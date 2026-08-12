@@ -4,27 +4,10 @@ import { translate } from '../../../../../platform/i18n';
 import type { PromptTemplate } from '../../../../../contracts/settings';
 import {
   SettingsCollection,
-  SettingsSectionHeader,
   type SettingsCollectionAction,
   type SettingsCollectionItem,
+  type SettingsCollectionMoveIntent,
 } from '../../../../section-surface';
-import { getTemplateCountLabel } from './helpers';
-
-const templateIconClassName = [
-  'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_24%,var(--sniptale-color-border-soft)_76%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_10%,transparent)]',
-  'text-[var(--sniptale-color-info)]',
-].join(' ');
-
-export function TemplatesHeader() {
-  return (
-    <SettingsSectionHeader
-      description={translate('templates.section.subtitle')}
-      kicker={translate('settings.navigation.templates')}
-    />
-  );
-}
 
 function EmptyState() {
   return (
@@ -41,9 +24,14 @@ function EmptyState() {
 }
 
 export function TemplatesList(props: {
+  isBusy: boolean;
   isLoading: boolean;
+  mutatingTemplateId: string | null;
   onDelete: (template: PromptTemplate) => void;
   onEdit: (template: PromptTemplate) => void;
+  onMove: (itemId: string, beforeItemId: string | null) => Promise<void>;
+  onReset: (templateId: string) => void;
+  onToggle: (templateId: string, enabled: boolean) => void;
   onAdd: () => void;
   templates: PromptTemplate[];
 }) {
@@ -51,12 +39,18 @@ export function TemplatesList(props: {
     id: template.id,
     title: template.name,
     meta: template.content,
-    preview: <MessageSquare size={14} className={templateIconClassName} />,
-    busy: props.isLoading,
-    badges: template.isDefault
-      ? [{ id: 'system', label: translate('settings.collection.defaultBadge'), tone: 'neutral' }]
-      : [],
-    capabilities: { edit: true, delete: true },
+    enabled: template.enabled !== false,
+    busy: props.mutatingTemplateId === template.id,
+    capabilities: {
+      edit: true,
+      delete: template.isDefault !== true,
+      reorder: true,
+      reset: template.isDefault === true && template.customized === true,
+      toggle: true,
+    },
+    actionLabels: {
+      reset: translate('templates.section.restoreAction'),
+    },
   }));
   const byId = new Map(props.templates.map((template) => [template.id, template]));
   const onAction = (action: SettingsCollectionAction) => {
@@ -64,21 +58,25 @@ export function TemplatesList(props: {
     if (!template) return;
     if (action.type === 'edit') props.onEdit(template);
     if (action.type === 'delete') props.onDelete(template);
+    if (action.type === 'reset') props.onReset(template.id);
+    if (action.type === 'toggle') props.onToggle(template.id, action.nextChecked);
+  };
+  const onMove = (intent: SettingsCollectionMoveIntent) => {
+    void props.onMove(intent.itemId, intent.beforeItemId);
   };
   return (
     <SettingsCollection
       ariaLabel={translate('templates.section.savedLabel')}
-      title={translate('templates.section.savedLabel')}
       items={items}
-      countLabel={`${items.length} ${getTemplateCountLabel(items.length)}`}
       state={props.isLoading ? 'loading' : 'ready'}
       emptyState={<EmptyState />}
       addAction={{
         label: translate('templates.section.addButton'),
-        disabled: props.isLoading,
+        disabled: props.isLoading || props.isBusy,
         onInvoke: props.onAdd,
       }}
       onAction={onAction}
+      onMove={onMove}
     />
   );
 }

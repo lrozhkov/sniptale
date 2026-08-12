@@ -12,16 +12,11 @@ export function shouldConfirmDelete(preset: SavePreset, sync: SavePresetsSyncSta
 
 function createDefaultPresetChangeHandler(
   field: 'defaultExportPresetId' | 'defaultImagePresetId' | 'defaultVideoPresetId',
-  messageKey:
-    | 'savePresets.messages.defaultExportUpdated'
-    | 'savePresets.messages.defaultImageUpdated'
-    | 'savePresets.messages.defaultVideoUpdated',
   getValue: () => string | null,
   setValue: (value: string | null) => void,
   actions: SavePresetsActions
 ) {
-  return (value: string) =>
-    actions.handleDefaultPresetChange(field, value, setValue, getValue(), messageKey);
+  return (value: string) => actions.handleDefaultPresetChange(field, value, setValue, getValue());
 }
 
 export function createDefaultPresetHandlers(
@@ -31,21 +26,18 @@ export function createDefaultPresetHandlers(
   return {
     handleDefaultExportChange: createDefaultPresetChangeHandler(
       'defaultExportPresetId',
-      'savePresets.messages.defaultExportUpdated',
       () => sync.defaultExportPresetId,
       sync.setDefaultExportPresetId,
       actions
     ),
     handleDefaultImageChange: createDefaultPresetChangeHandler(
       'defaultImagePresetId',
-      'savePresets.messages.defaultImageUpdated',
       () => sync.defaultImagePresetId,
       sync.setDefaultImagePresetId,
       actions
     ),
     handleDefaultVideoChange: createDefaultPresetChangeHandler(
       'defaultVideoPresetId',
-      'savePresets.messages.defaultVideoUpdated',
       () => sync.defaultVideoPresetId,
       sync.setDefaultVideoPresetId,
       actions
@@ -68,10 +60,8 @@ export function createSavePresetsState(
     editingPreset: dialogState.editingPreset,
     isEditorOpen: dialogState.isEditorOpen,
     isLoading: sync.isLoading,
-    presetCountLabel: viewModel.presetCountLabel,
     presetOptions: viewModel.presetOptions,
     presets: sync.presets,
-    saveCapturesToGallery: sync.saveCapturesToGallery,
   };
 }
 

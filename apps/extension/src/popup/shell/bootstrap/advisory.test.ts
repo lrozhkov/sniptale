@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getQuickActionsBootstrapDataMock: vi.fn(),
+  getQuickActionsMock: vi.fn(),
   loadMicrophoneDevicesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
 
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
-  getQuickActionsBootstrapData: mocks.getQuickActionsBootstrapDataMock,
+  getQuickActions: mocks.getQuickActionsMock,
 }));
 
 vi.mock('../../../platform/runtime-messaging', (_importOriginal) => ({
@@ -141,14 +141,13 @@ describe('popup-bootstrap advisory fallbacks', () => {
   it('keeps bootstrapping when quick-actions sources fail', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    mocks.getQuickActionsBootstrapDataMock.mockRejectedValueOnce(new Error('actions failed'));
+    mocks.getQuickActionsMock.mockRejectedValueOnce(new Error('actions failed'));
 
     const module = await importPopupBootstrapModule();
     const result = await module.bootstrapPopupState();
 
     expect(result.homeError).toBe('popup.home.quickActionsLoadError');
     expect(result.quickActions).toEqual([]);
-    expect(result.quickActionsMode).toBe('list');
     expect(errorSpy).toHaveBeenCalledWith(
       '[PopupBootstrap]',
       'Failed to bootstrap quick actions',

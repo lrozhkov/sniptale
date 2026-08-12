@@ -10,6 +10,7 @@ import {
 import type { CreateScreenshotControllerActionsArgs } from './action-types';
 import type { ScreenshotType } from '../types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
+import { closeFailedQuickActionCapture } from './quick-action-cleanup';
 
 export async function runImmediateScreenshot(
   type: ScreenshotType,
@@ -35,13 +36,14 @@ export async function runImmediateScreenshot(
     }
 
     if (shouldExitAfterQuickActionCapture(args.params.quickActionOverlayRef)) {
-      closeQuickActionCapture(args.params, args.runtime, runToken);
+      await closeQuickActionCapture(args.params, args.runtime, runToken);
       return;
     }
 
     restoreVisibleUiState(args.runtime, runToken);
   } catch (error) {
-    restoreVisibleUiState(args.runtime, runToken);
+    const quickActionClosed = await closeFailedQuickActionCapture(args, runToken);
+    if (!quickActionClosed) restoreVisibleUiState(args.runtime, runToken);
     if (isStaleScreenshotRunError(error)) {
       return;
     }

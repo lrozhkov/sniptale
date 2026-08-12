@@ -20,6 +20,7 @@ import {
 } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
+import { settingsModalClassName } from '../../../../section-surface';
 import {
   getCodecLabel,
   getContainerLabel,
@@ -182,15 +183,23 @@ export function VideoQualityProfileEditor(props: {
   };
 
   return (
-    <ProductModal isOpen onClose={props.onClose} width="460px" maxHeight="88vh" scrollable>
+    <ProductModal
+      isOpen
+      onClose={props.onClose}
+      width="480px"
+      maxHeight="84vh"
+      scrollable
+      dialogClassName={settingsModalClassName}
+    >
       <ProductModalHeader
+        compact
         title={translate(
           props.profile ? 'settings.videoQuality.editTitle' : 'settings.videoQuality.createTitle'
         )}
         onClose={props.onClose}
       />
       <ProductModalBody compact asForm onSubmit={onSubmit}>
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           <ProductField label={translate('settings.videoQuality.nameLabel')}>
             <ProductInput
               autoFocus
@@ -200,7 +209,7 @@ export function VideoQualityProfileEditor(props: {
               onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
             />
           </ProductField>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
             <VideoProfileFormatFields
               configuration={draft.configuration}
               onChange={(configuration) => setDraft({ ...draft, configuration })}

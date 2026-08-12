@@ -81,9 +81,12 @@ type AiSettingsMutationOperation =
   | 'add-model'
   | 'update-model'
   | 'delete-model'
+  | 'move-model'
   | 'save-default-model'
   | 'save-global-prompt'
   | 'save-scenario-editor-prompt'
+  | 'reset-global-prompt'
+  | 'reset-scenario-editor-prompt'
   | 'save-chrome-ai-enabled'
   | 'enable-secret-passphrase-protection'
   | 'disable-secret-passphrase-protection'
@@ -106,12 +109,17 @@ export type AiSettingsMutationMessage =
   | (AiSettingsMutationBase<'delete-provider'> & { providerId: string })
   | (AiSettingsMutationBase<'add-model' | 'update-model'> & { model: AIModel })
   | (AiSettingsMutationBase<'delete-model'> & { modelId: string })
+  | (AiSettingsMutationBase<'move-model'> & {
+      modelId: string;
+      beforeModelId: string | null;
+    })
   | (AiSettingsMutationBase<'save-default-model'> & {
       defaultModelId: string | null;
     })
   | (AiSettingsMutationBase<'save-global-prompt' | 'save-scenario-editor-prompt'> & {
       prompt: string;
     })
+  | AiSettingsMutationBase<'reset-global-prompt' | 'reset-scenario-editor-prompt'>
   | (AiSettingsMutationBase<'save-chrome-ai-enabled'> & { enabled: boolean })
   | (AiSettingsMutationBase<'enable-secret-passphrase-protection'> & { passphrase: string })
   | (AiSettingsMutationBase<'disable-secret-passphrase-protection'> & {

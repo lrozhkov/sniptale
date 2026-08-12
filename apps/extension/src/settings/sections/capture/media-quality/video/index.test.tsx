@@ -32,6 +32,7 @@ function createState(
   return {
     actions: {
       confirmDelete: vi.fn(async () => undefined),
+      reorderProfile: vi.fn(async () => undefined),
       saveProfile: vi.fn(async () => undefined),
       selectProfile: vi.fn(async () => undefined),
     },

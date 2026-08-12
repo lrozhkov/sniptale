@@ -2,6 +2,7 @@ import type {
   StepBadgePreset,
   StepBadgeTemplateSettings,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type { ReactNode } from 'react';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { getStepBadgePresetDisplayName } from '../../../features/highlighter/step-badge-presets/display-name';
@@ -15,6 +16,7 @@ export function StepBadgeSaveSection(props: {
     tagIds?: readonly string[]
   ) => Promise<{ id?: string; outcome: string }>;
   onFloatingInteractionChange?: (open: boolean) => void;
+  leadingContent?: ReactNode;
   onCreated?: (templateId: string) => void;
   onUpdate: (
     preset: StepBadgePreset,
@@ -31,6 +33,7 @@ export function StepBadgeSaveSection(props: {
       createLabel={translate('content.stepBadge.saveAsTemplate')}
       duplicateNameErrorLabel={translate('content.stepBadge.templateNameExists')}
       nameLabel={translate('content.stepBadge.templateName')}
+      {...(props.leadingContent ? { leadingContent: props.leadingContent } : {})}
       onCreate={(name) =>
         (props.createTagIds
           ? props.onCreate(name, props.settings, props.createTagIds)

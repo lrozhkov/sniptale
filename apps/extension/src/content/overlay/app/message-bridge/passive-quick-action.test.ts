@@ -62,6 +62,7 @@ function createBridgeParams(): RuntimeMessageBridgeParams {
       setQuickActionToastCountdown: vi.fn(),
       setTimerDelay: vi.fn(),
     },
+    workingModes: { select: vi.fn() },
     viewport: {
       clearPendingAutoStartCapture: vi.fn(),
       handleTakeScreenshotRef: {

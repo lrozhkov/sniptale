@@ -1,1 +1,1 @@
-export { getScreenCaptureSource } from '../../desktop-capture/source-picker';
+export { getScreenCaptureSource } from '../../../../platform/media-utils/desktop-capture-source-picker';

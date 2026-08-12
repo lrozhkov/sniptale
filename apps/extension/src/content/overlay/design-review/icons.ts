@@ -1,4 +1,4 @@
 export {
   MessagesSquare as FeedbackCollectionIcon,
-  MonitorCheck as DesignReviewModeIcon,
+  ScanEye as DesignReviewModeIcon,
 } from 'lucide-react';

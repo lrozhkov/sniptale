@@ -1,4 +1,4 @@
-import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
+import { InlineCurtainSelect } from '../../../../../ui/popup-shell/inline-curtain/select';
 import type { ReactNode } from 'react';
 
 type VideoMediaDeviceOption = { deviceId: string; label: string };

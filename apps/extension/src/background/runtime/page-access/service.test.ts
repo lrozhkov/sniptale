@@ -221,9 +221,11 @@ it('refreshes active all-sites page access by reinjecting the current content ru
     injectImmediately: false,
     target: { allFrames: true, tabId: 7 },
   });
-  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
-    type: VideoMessageType.GET_VIEWPORT_COORDS,
-  });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    7,
+    { type: VideoMessageType.GET_VIEWPORT_COORDS },
+    { frameId: 0 }
+  );
 });
 
 it('does not refresh content runtime when the tab has no active page access', async () => {

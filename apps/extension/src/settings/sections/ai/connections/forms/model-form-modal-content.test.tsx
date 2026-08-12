@@ -51,7 +51,9 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
 vi.mock('@sniptale/ui/product-modal/actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-modal/actions')>()),
   ProductActionButton: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button onClick={props.onClick}>{props.children}</button>
+    <button type={props.type ?? 'button'} onClick={props.onClick}>
+      {props.children}
+    </button>
   ),
 }));
 
@@ -161,7 +163,9 @@ function verifyMissingProvidersState() {
   const props = renderContent({ providers: [] });
 
   act(() => {
-    container?.querySelectorAll<HTMLButtonElement>('button').forEach((button) => button.click());
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent === translate('common.actions.close'))
+      ?.click();
   });
 
   expect(container?.textContent).toContain(

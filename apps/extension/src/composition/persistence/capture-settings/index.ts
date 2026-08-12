@@ -9,6 +9,14 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 
+export {
+  DEFAULT_SCREENSHOT_SETUP_STATE,
+  loadScreenshotSetupState,
+  patchScreenshotSetupState,
+  type ScreenshotSetupMode,
+  type ScreenshotSetupState,
+} from './screenshot';
+
 const VIDEO_SETTINGS_KEY = 'sniptale_video_settings';
 const VIDEO_UI_STATE_KEY = 'sniptale_video_ui_state';
 const logger = createLogger({ namespace: 'SharedVideoStorage' });

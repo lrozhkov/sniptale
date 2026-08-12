@@ -11,10 +11,15 @@ import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { createViewportPresentationContext } from '../viewport-context';
 
-function createMountedCanvas(canvasElement: HTMLCanvasElement) {
+export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   const canvas = new Canvas(canvasElement, {
+    altActionKey: 'ctrlKey',
+    centeredKey: 'ctrlKey',
     preserveObjectStacking: true,
     selection: true,
+    selectionKey: 'ctrlKey',
+    uniformScaling: false,
+    uniScaleKey: 'shiftKey',
   });
   canvas.backgroundColor = 'transparent';
   canvas.setDimensions({ width: 0, height: 0 });

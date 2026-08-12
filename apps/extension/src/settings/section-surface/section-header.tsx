@@ -1,37 +1,23 @@
-import type { ElementType, ReactNode } from 'react';
-
 import {
   settingsSectionDescriptionClassName,
   settingsSectionHeadingWrapClassName,
   settingsSectionKickerClassName,
-  settingsSectionTitleClassName,
 } from './classes';
+import { SettingsSectionHeaderActionSlot } from './section-header-actions';
 
 type SettingsSectionHeaderProps = {
-  title?: string;
-  description?: string;
-  kicker?: string;
-  aside?: ReactNode;
-  as?: ElementType;
+  description: string;
+  kicker: string;
 };
 
-export function SettingsSectionHeader({
-  as,
-  aside,
-  description,
-  kicker,
-  title,
-}: SettingsSectionHeaderProps) {
-  const TitleTag = as ?? 'h1';
-
+export function SettingsSectionHeader({ description, kicker }: SettingsSectionHeaderProps) {
   return (
     <header className={settingsSectionHeadingWrapClassName}>
       <div className="min-w-0 space-y-2">
-        {kicker ? <p className={settingsSectionKickerClassName}>{kicker}</p> : null}
-        {title ? <TitleTag className={settingsSectionTitleClassName}>{title}</TitleTag> : null}
-        {description ? <p className={settingsSectionDescriptionClassName}>{description}</p> : null}
+        <h1 className={settingsSectionKickerClassName}>{kicker}</h1>
+        <p className={settingsSectionDescriptionClassName}>{description}</p>
       </div>
-      {aside ? <div className="flex-shrink-0">{aside}</div> : null}
+      <SettingsSectionHeaderActionSlot />
     </header>
   );
 }

@@ -21,7 +21,7 @@ let root: Root;
 
 function getMenuTrigger(itemId: string): HTMLButtonElement | null {
   return container.querySelector(
-    `[data-settings-collection-item="${itemId}"] [aria-haspopup="menu"]`
+    `[data-settings-collection-item="${itemId}"] [aria-label="Действия"][aria-expanded]`
   );
 }
 
@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe('SettingsCollection interactions', () => {
-  it('owns exclusive menu dismissal, keyboard navigation, and focus restoration', () => {
+  it('owns one inline action tray, outside dismissal, and focus restoration', () => {
     act(() =>
       root.render(
         <SettingsCollection ariaLabel="Menus" items={items} onAction={vi.fn()} onMove={vi.fn()} />
@@ -48,42 +48,23 @@ describe('SettingsCollection interactions', () => {
     const firstTrigger = getMenuTrigger('first');
     const secondTrigger = getMenuTrigger('second');
     act(() => firstTrigger?.click());
-    expect(container.querySelectorAll('[role="menu"]:not([hidden])')).toHaveLength(1);
-    expect(document.activeElement?.getAttribute('role')).toBe('menuitem');
-    const openMenu = container.querySelector<HTMLElement>('[role="menu"]:not([hidden])');
-    act(() => openMenu?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
-    expect(document.activeElement?.textContent).toContain('Удалить');
-    act(() =>
-      openMenu?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+    expect(container.querySelectorAll('[role="toolbar"][aria-hidden="false"]')).toHaveLength(1);
+    expect(document.activeElement?.getAttribute('data-collection-inline-action')).toBe(
+      'set-default'
     );
-    expect(document.activeElement?.textContent).toContain('Сделать по умолчанию');
-    act(() =>
-      openMenu?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-    );
-    expect(document.activeElement?.textContent).toContain('Переместить вниз');
-    act(() =>
-      openMenu?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
-    );
-    expect(document.activeElement?.textContent).toContain('Сделать по умолчанию');
 
     act(() => secondTrigger?.click());
-    expect(container.querySelectorAll('[role="menu"]:not([hidden])')).toHaveLength(1);
+    expect(container.querySelectorAll('[role="toolbar"][aria-hidden="false"]')).toHaveLength(1);
     expect(firstTrigger?.getAttribute('aria-expanded')).toBe('false');
     act(() =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     );
-    expect(container.querySelector('[role="menu"]:not([hidden])')).toBeNull();
+    expect(container.querySelector('[role="toolbar"][aria-hidden="false"]')).toBeNull();
     expect(document.activeElement).toBe(secondTrigger);
 
     act(() => firstTrigger?.click());
-    const reopenedMenu = container.querySelector<HTMLElement>('[role="menu"]:not([hidden])');
-    act(() =>
-      reopenedMenu?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
-    );
-    expect(container.querySelector('[role="menu"]:not([hidden])')).toBeNull();
-    act(() => firstTrigger?.click());
     act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
-    expect(container.querySelector('[role="menu"]:not([hidden])')).toBeNull();
+    expect(container.querySelector('[role="toolbar"][aria-hidden="false"]')).toBeNull();
     expect(document.activeElement).toBe(firstTrigger);
   });
 

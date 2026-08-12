@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   contextMenu: vi.fn(() => <div data-ui="context-menu" />),
-  switchRow: vi.fn(),
   themeChips: vi.fn(() => <div data-ui="theme-chips" />),
 }));
 
@@ -40,25 +39,12 @@ vi.mock('./context-menu-controls', () => ({
 vi.mock('./theme-chips', () => ({
   ThemeChips: mocks.themeChips,
 }));
-vi.mock('./switch-row', () => ({
-  AppearanceSwitchRow: (props: { checked: boolean; label: string; onToggle: () => void }) => {
-    mocks.switchRow(props);
-    return (
-      <button
-        type="button"
-        aria-label={props.label}
-        aria-pressed={props.checked}
-        onClick={props.onToggle}
-      />
-    );
-  },
-}));
-
 import { AppearanceControlsCard } from './controls-card';
 import {
   buildAppearanceContextMenuOptions,
   buildAppearanceLocaleOptions,
   buildAppearanceThemeOptions,
+  buildPopupStartupOptions,
 } from '../copy';
 import type { AppearanceSectionState } from './types';
 
@@ -83,13 +69,17 @@ function createState(overrides: Partial<AppearanceSectionState> = {}): Appearanc
     locale: 'en',
     localeOptions: buildAppearanceLocaleOptions('en'),
     preference: 'system',
-    rawDiagnosticsEnabled: false,
+    popupStartup: {
+      loading: false,
+      options: buildPopupStartupOptions('en'),
+      selection: 'remember-last',
+      updateSelection: vi.fn().mockResolvedValue(undefined),
+    },
     resolvedTheme: 'light',
     setLanguagePreference: vi.fn(),
     setPreference: vi.fn(),
     themeOptions: buildAppearanceThemeOptions('en'),
     updateContextMenu: vi.fn().mockResolvedValue(undefined),
-    updateRawDiagnosticsEnabled: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -118,6 +108,8 @@ it('renders appearance owners and routes locale controls', () => {
 
   expect(container?.querySelector('[data-ui="theme-chips"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="context-menu"]')).not.toBeNull();
+  expect(container?.firstElementChild?.className).not.toContain('divide-y');
+  expect(container?.firstElementChild?.className).not.toContain('rounded');
 
   const select = container?.querySelector<HTMLSelectElement>(
     '[aria-label="settings.appearance.languageSelectAriaLabel"]'
@@ -129,6 +121,17 @@ it('renders appearance owners and routes locale controls', () => {
     }
   });
   expect(state.setLanguagePreference).toHaveBeenCalledWith('en');
+
+  const startupSelect = container?.querySelector<HTMLSelectElement>(
+    '[aria-label="settings.appearance.popupStartupAriaLabel"]'
+  );
+  act(() => {
+    if (startupSelect) {
+      startupSelect.value = 'video:screen';
+      startupSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  expect(state.popupStartup.updateSelection).toHaveBeenCalledWith('video:screen');
   expect(mocks.themeChips).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
   expect(mocks.contextMenu).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
 });

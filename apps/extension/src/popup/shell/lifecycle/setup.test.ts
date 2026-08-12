@@ -7,6 +7,7 @@ import type { PopupLifecycleParams } from './contracts';
 const mocks = vi.hoisted(() => ({
   activatedListener: undefined as (() => void) | undefined,
   bootstrapPopupStateMock: vi.fn(),
+  loadPopupStartupStateMock: vi.fn(),
   mediaHubListener: undefined as ((event: { type: string }) => void) | undefined,
   recordingHandlers: undefined as
     | {
@@ -48,6 +49,16 @@ vi.mock('../bootstrap', (_importOriginal) => ({
   bootstrapPopupState: mocks.bootstrapPopupStateMock,
 }));
 
+vi.mock(
+  '../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    loadPopupStartupState: mocks.loadPopupStartupStateMock,
+  })
+);
+
 vi.mock('../message-sync', (_importOriginal) => ({
   subscribeToRecordingMessages: mocks.subscribeToRecordingMessagesMock,
 }));
@@ -64,7 +75,6 @@ function createBootstrapState() {
     microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
     webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
-    quickActionsMode: 'grid' as const,
     recordingControlCapability: null,
     recordingState: { status: 'idle' } as const,
     selectedPresetId: 'preset-1',
@@ -94,7 +104,6 @@ function createParams(): PopupLifecycleParams {
     bootstrap: {
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
-      setDisplayMode: vi.fn(),
       setHomeError: vi.fn(),
       setPage: vi.fn(),
       setIsReady: vi.fn(),
@@ -106,6 +115,7 @@ function createParams(): PopupLifecycleParams {
       setSelectedPresetId: vi.fn(),
       setStartError,
       setVideoCaptureMode: vi.fn(),
+      setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
       setWebcamDevices: vi.fn(),
@@ -149,7 +159,6 @@ function expectBootstrappedStateApplied(
   expect(params.bootstrap.setViewportPresets).toHaveBeenCalledWith(state.viewportPresets);
   expect(params.bootstrap.setQuickActions).toHaveBeenCalledWith(state.quickActions);
   expect(params.bootstrap.setQuickActionsReady).toHaveBeenCalledWith(true);
-  expect(params.bootstrap.setDisplayMode).toHaveBeenCalledWith(state.quickActionsMode);
   expect(params.bootstrap.setHomeError).toHaveBeenCalledWith(null);
   expect(params.bootstrap.setVideoSettings).toHaveBeenCalledWith(state.videoSettings);
   expect(params.bootstrap.setSelectedPresetId).toHaveBeenCalledWith(state.selectedPresetId);
@@ -200,6 +209,11 @@ beforeEach(() => {
   mocks.subscribeToMediaHubEventsMock.mockReset();
   mocks.subscribeToRecordingMessagesMock.mockReset();
   mocks.bootstrapPopupStateMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockReset();
+  mocks.loadPopupStartupStateMock.mockResolvedValue({
+    selection: 'remember-last',
+    lastPage: 'home',
+  });
 
   mocks.subscribeToActivatedMock.mockImplementation((listener: () => void) => {
     mocks.activatedListener = listener;
@@ -241,8 +255,9 @@ describe('setupPopupLifecycle', () => {
     mocks.bootstrapPopupStateMock.mockResolvedValue(state);
 
     const cleanup = setupPopupLifecycle(() => params);
-    await flushAsyncWork();
-    await flushAsyncWork();
+    await vi.waitFor(() => {
+      expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
+    });
 
     expectBootstrappedStateApplied(params, state);
 
@@ -316,10 +331,10 @@ describe('setupPopupLifecycle error handling', () => {
     );
 
     setupPopupLifecycle(() => params);
-    await flushAsyncWork();
-    await flushAsyncWork();
+    await vi.waitFor(() => {
+      expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
+    });
 
-    expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
     expect(errorSpy).toHaveBeenCalledWith(
       '[PopupLifecycle]',
       'Failed to refresh popup secondary state',

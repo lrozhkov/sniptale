@@ -43,6 +43,8 @@ vi.mock('./notifications', () => ({
 
 import { handleQuickAction } from './index';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { DEFAULT_SETTINGS } from '../../../composition/persistence/settings';
+import type { QuickActionRuntimeContext } from './flow/shared';
 
 function createArgs() {
   return {
@@ -59,6 +61,34 @@ function createArgs() {
       ensureActivePageAccessRuntime: vi.fn(),
       ensureNativeVisibleCaptureAuthority: vi.fn(),
     },
+  };
+}
+
+function createDesktopRuntimeContext(): QuickActionRuntimeContext {
+  const action = {
+    bundledId: null,
+    delay: null,
+    exitAfterCapture: false,
+    hotkey: null,
+    icon: 'Monitor',
+    id: 'desktop-action',
+    imageFormat: 'png' as const,
+    imageQuality: null,
+    name: 'Desktop capture',
+    origin: 'user' as const,
+    screenshotMode: 'desktop' as const,
+    status: true,
+    viewportPresetId: null,
+  };
+  return {
+    action,
+    afterCapture: 'download_default',
+    captureMode: 'desktop',
+    delaySeconds: 0,
+    imageFormat: 'png',
+    imageQuality: 90,
+    settings: DEFAULT_SETTINGS,
+    viewportPresetId: null,
   };
 }
 
@@ -146,6 +176,20 @@ it('logs and notifies when processQuickAction throws', async () => {
   expect(loggerErrorMock).toHaveBeenCalledWith('Quick action failed', expect.any(Error));
   expect(notifyQuickActionErrorMock).toHaveBeenCalledWith(12, expect.any(Error));
   expect(args.captureGuardState.isCapturing).toBe(false);
+});
+
+it('returns desktop failures to the popup without trying a content-script toast', async () => {
+  const args = createArgs();
+  processQuickActionMock.mockRejectedValue(new Error('desktop capture failed'));
+
+  await expect(
+    handleQuickAction({
+      ...args,
+      runtimeContext: createDesktopRuntimeContext(),
+    })
+  ).resolves.toEqual({ error: 'desktop capture failed', result: 'failed' });
+
+  expect(notifyQuickActionErrorMock).not.toHaveBeenCalled();
 });
 
 it('normalizes non-error quick-action flow failures', async () => {

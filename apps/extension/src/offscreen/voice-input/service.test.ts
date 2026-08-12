@@ -10,6 +10,7 @@ import {
 } from '@sniptale/platform/browser/user-media';
 import {
   VoiceInputPortMessageType,
+  parseVoiceInputSnapshot,
   type VoiceInputServerEvent,
 } from '@sniptale/runtime-contracts/voice-input';
 import {
@@ -607,6 +608,21 @@ describe('offscreen voice input media ownership', () => {
       expect.objectContaining({ errorCode: 'busy-speech' })
     );
     if (externalSpeech.acquired) externalSpeech.lease.release();
+  });
+
+  it('reports a desktop screenshot lease through the typed voice snapshot boundary', () => {
+    const desktopScreenshot = acquireOffscreenMediaActivityLease('desktop-screenshot');
+    const harness = createHarness();
+
+    const busySnapshot = start(harness.service, 'desktop-busy');
+
+    expect(busySnapshot).toMatchObject({
+      busyOwner: 'video-recording',
+      errorCode: 'busy-video',
+      phase: 'error',
+    });
+    expect(parseVoiceInputSnapshot(busySnapshot)).toEqual(busySnapshot);
+    if (desktopScreenshot.acquired) desktopScreenshot.lease.release();
   });
 
   it('contains transport rejection and ignores callbacks from a finished generation', async () => {

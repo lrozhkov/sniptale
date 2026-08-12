@@ -11,11 +11,7 @@ import { type QuickActionsSectionState } from './controller';
 import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
 import { formatViewportPresetDimensions } from '../../../../features/viewport-presets/format';
 
-const iconPickerClassName = [
-  'flex flex-wrap gap-1 rounded-md border p-2',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_42%,transparent)]',
-].join(' ');
+const iconPickerClassName = ['flex min-h-9 flex-wrap items-center gap-1'].join(' ');
 
 const activeIconButtonClassName = [
   'border border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,var(--sniptale-color-border-soft)_82%)]',
@@ -49,12 +45,13 @@ function buildViewportPresetOptions(viewportPresets: ViewportPreset[] | undefine
 
 export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSectionState }) {
   return (
-    <div className="mb-4 grid grid-cols-2 gap-4">
+    <div className="grid gap-3 sm:grid-cols-2">
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.nameLabel')}
         </label>
         <ProductInput
+          className="h-9"
           type="text"
           value={props.state.editForm?.name ?? ''}
           onChange={(event) => props.state.updateFormField('name', event.target.value)}
@@ -63,7 +60,7 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
       </div>
 
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.iconLabel')}
         </label>
         <div className={iconPickerClassName}>
@@ -94,9 +91,9 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
 
 export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActionsSectionState }) {
   return (
-    <div className="mb-4 grid grid-cols-2 gap-4">
+    <div className="grid gap-3 sm:grid-cols-2">
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.hotkeyLabel')}
         </label>
         <HotkeyInput
@@ -108,10 +105,11 @@ export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActi
       </div>
 
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.screenshotModeLabel')}
         </label>
         <ProductSelect
+          controlSize="sm"
           value={props.state.editForm?.screenshotMode ?? 'visible'}
           onChange={(value) =>
             props.state.updateFormField('screenshotMode', value as QuickAction['screenshotMode'])
@@ -126,6 +124,10 @@ export function QuickActionsEditorPrimaryCaptureFields(props: { state: QuickActi
               value: 'selection',
               label: translate('settings.quickActions.screenshotModeSelection'),
             },
+            {
+              value: 'desktop',
+              label: translate('settings.quickActions.screenshotModeDesktop'),
+            },
           ]}
         />
       </div>
@@ -137,15 +139,23 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
   state: QuickActionsSectionState;
   viewportPresets: ViewportPreset[] | undefined;
 }) {
+  if (props.state.editForm?.screenshotMode === 'desktop') {
+    return null;
+  }
+
   const viewportPresetOptions = buildViewportPresetOptions(props.viewportPresets);
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-4">
+    <div className="grid gap-3 sm:grid-cols-2">
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.screenEmulationLabel')}
         </label>
         <ProductSelect
+          controlSize="sm"
+          menuClassName="!max-h-52"
+          menuPlacement="auto"
+          menuScrollable
           value={props.state.editForm?.viewportPresetId ?? ''}
           onChange={(value) => props.state.updateFormField('viewportPresetId', value || null)}
           options={viewportPresetOptions}
@@ -153,10 +163,11 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
       </div>
 
       <div>
-        <label className={`mb-2 block ${settingsMetaLabelClassName}`}>
+        <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.delayLabel')}
         </label>
         <ProductSelect
+          controlSize="sm"
           value={props.state.editForm?.delay === null ? '' : String(props.state.editForm?.delay)}
           onChange={(value) =>
             props.state.updateFormField(

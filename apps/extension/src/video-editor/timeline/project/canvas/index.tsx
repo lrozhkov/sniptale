@@ -113,6 +113,7 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
       <ProjectTimelineCanvasContent
         {...props}
         cursorLaneVisible={model.cursorLaneVisible}
+        telemetryLaneVisible={model.telemetryLaneVisible}
         hoverTime={model.hoverPreview.hoverTime}
         playheadHeight={model.playheadHeight}
         playheadX={props.currentTime * props.pixelsPerSecond}
@@ -131,11 +132,12 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     trackLayoutModel: props.trackLayoutModel,
     tracks: props.tracks,
   });
-  const cursorLaneVisible = props.cursorLaneVisible !== false;
+  const cursorLaneVisible = props.cursorLaneVisible !== false && props.project.cursorTrack !== null;
+  const telemetryLaneVisible = props.telemetryLaneVisible && props.recordingTelemetry !== null;
   const playheadHeight = resolveTimelinePlayheadHeight({
     cursorLaneVisible,
     project: props.project,
-    telemetryLaneVisible: props.telemetryLaneVisible,
+    telemetryLaneVisible,
     trackLayoutModel,
   });
   const hoverPreview = useTimelineHoverPreview({
@@ -154,6 +156,7 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     playheadHeight,
     publishPreviewViewport,
     rulerMarkers,
+    telemetryLaneVisible,
     trackLayoutModel,
   };
 }

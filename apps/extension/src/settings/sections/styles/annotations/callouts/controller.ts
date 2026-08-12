@@ -40,10 +40,7 @@ type ControllerActions = CalloutPresetCatalogController['actions'];
 
 function createCatalogActions(args: {
   catalog: CalloutPresetCatalog | null;
-  mutate: (
-    operation: () => Promise<{ outcome: string }>,
-    successKey?: Parameters<typeof translate>[0]
-  ) => Promise<boolean>;
+  mutate: (operation: () => Promise<{ outcome: string }>) => Promise<boolean>;
   setEditor: (state: CalloutPresetCatalogController['editor']) => void;
 }): ControllerActions {
   return {
@@ -51,10 +48,7 @@ function createCatalogActions(args: {
     closeEditor: () => args.setEditor({ isOpen: false }),
     delete: async (preset) => {
       if (preset.origin === 'system') return;
-      await args.mutate(
-        () => deleteCalloutPreset(preset.id),
-        'highlighter.calloutPresets.messages.deleted'
-      );
+      await args.mutate(() => deleteCalloutPreset(preset.id));
     },
     edit: (preset) => args.setEditor({ isOpen: true, preset }),
     moveBefore: async (id, beforeId) => {
@@ -63,42 +57,32 @@ function createCatalogActions(args: {
       await args.mutate(() => updateCalloutPresetsOrder(ordered.map((preset) => preset.id)));
     },
     reset: async (id) => {
-      await args.mutate(
-        () => resetSystemCalloutPreset(id),
-        'highlighter.calloutPresets.messages.reset'
-      );
+      await args.mutate(() => resetSystemCalloutPreset(id));
     },
     save: async (preset) => {
       const exists = args.catalog?.presets.some((item) => item.id === preset.id) ?? false;
-      const saved = await args.mutate(
-        () =>
-          exists
-            ? updateCalloutPreset({
-                content: preset.content,
-                id: preset.id,
-                name: preset.name,
-                placement: preset.placement,
-                style: preset.style,
-                tagIds: preset.tagIds,
-              })
-            : createUserCalloutPreset({
-                content: preset.content,
-                name: preset.name,
-                placement: preset.placement,
-                style: preset.style,
-                tagIds: preset.tagIds,
-              }),
+      const saved = await args.mutate(() =>
         exists
-          ? 'highlighter.calloutPresets.messages.updated'
-          : 'highlighter.calloutPresets.messages.created'
+          ? updateCalloutPreset({
+              content: preset.content,
+              id: preset.id,
+              name: preset.name,
+              placement: preset.placement,
+              style: preset.style,
+              tagIds: preset.tagIds,
+            })
+          : createUserCalloutPreset({
+              content: preset.content,
+              name: preset.name,
+              placement: preset.placement,
+              style: preset.style,
+              tagIds: preset.tagIds,
+            })
       );
       if (saved) args.setEditor({ isOpen: false });
     },
     setDefault: async (id) => {
-      await args.mutate(
-        () => setDefaultCalloutPreset(id),
-        'highlighter.calloutPresets.messages.defaultUpdated'
-      );
+      await args.mutate(() => setDefaultCalloutPreset(id));
     },
     toggle: async (id) => {
       const preset = args.catalog?.presets.find((item) => item.id === id);
@@ -153,10 +137,7 @@ export function useCalloutPresetCatalogController(): CalloutPresetCatalogControl
   }, [refresh]);
 
   const mutate = useCallback(
-    async (
-      operation: () => Promise<{ outcome: string }>,
-      successKey?: Parameters<typeof translate>[0]
-    ) => {
+    async (operation: () => Promise<{ outcome: string }>) => {
       let accepted = false;
       const run = async () => {
         setIsSaving(true);
@@ -169,7 +150,6 @@ export function useCalloutPresetCatalogController(): CalloutPresetCatalogControl
           accepted = true;
           if (result.outcome === 'applied') {
             await refresh(false);
-            if (successKey) toast.success(translate(successKey));
           }
         } catch (caught) {
           logger.error('Failed to mutate callout presets', caught);

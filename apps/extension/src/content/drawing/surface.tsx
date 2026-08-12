@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import {
   getDrawingObjectBounds,
@@ -48,6 +48,8 @@ function consumeTextGestureClick(ref: React.MutableRefObject<TextPointerGesture>
 }
 
 const DRAWING_MODE_HOST_CLASS = 'sniptale-drawing-mode-active';
+const NO_VISUAL_EFFECTS_SUBSCRIPTION = () => () => undefined;
+const ZERO_VISUAL_EFFECTS_REVISION = () => 0;
 function resolveDrawingCanvasCursor(active: boolean, tool: DrawingTool): string {
   if (!active || tool === 'select') return 'default';
   return tool === 'text' ? 'text' : 'crosshair';
@@ -321,16 +323,28 @@ export function DrawingSurface(props: {
   active: boolean;
   chromeHidden: boolean;
   controller: ContentDrawingController;
+  escapeImmediately?: boolean;
   onExit?: () => void;
+  showSelectionChrome?: boolean;
+  visualEffects?: {
+    getOpacity(objectId: string): number;
+    getRevision(): number;
+    subscribe(listener: () => void): () => void;
+  };
 }) {
   const { active, chromeHidden, controller } = props;
+  const getObjectOpacity = props.visualEffects?.getOpacity;
   const snapshot = useDrawingSessionSnapshot(controller.session);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewportRevision, setViewportRevision] = useState(0);
+  const visualRevision = useSyncExternalStore(
+    props.visualEffects?.subscribe ?? NO_VISUAL_EFFECTS_SUBSCRIPTION,
+    props.visualEffects?.getRevision ?? ZERO_VISUAL_EFFECTS_REVISION,
+    ZERO_VISUAL_EFFECTS_REVISION
+  );
   const textEditor = useDrawingTextEditor(controller);
   const {
     cancel: cancelText,
-    commit: commitText,
     draft: textDraft,
     finalize: finalizeText,
     setDraft: setTextDraft,
@@ -349,6 +363,7 @@ export function DrawingSurface(props: {
     cancelText: textEditor.cancel,
     editText: textEditor.edit,
     hasTextDraft: Boolean(textEditor.draft),
+    exitImmediately: props.escapeImmediately ?? false,
     ...(props.onExit === undefined ? {} : { onExit: props.onExit }),
     pointerDraftRef: pointer.draftRef,
     session: controller.session,
@@ -381,7 +396,10 @@ export function DrawingSurface(props: {
     draftRevision,
     objects: frameObjects,
     selectedIds: snapshot.selectedObjectIds,
+    showSelectionChrome: props.showSelectionChrome ?? true,
     setViewportRevision,
+    visualRevision,
+    ...(getObjectOpacity ? { getObjectOpacity } : {}),
   });
 
   const finalizeInteraction = useCallback(() => {
@@ -398,63 +416,113 @@ export function DrawingSurface(props: {
         root: controller.getScrollRoot(),
         showChrome: false,
         suppressText: true,
+        ...(getObjectOpacity ? { getObjectOpacity } : {}),
       });
     }
-  }, [canvasRef, controller, finalizeDraft, finalizeText]);
+  }, [canvasRef, controller, finalizeDraft, finalizeText, getObjectOpacity]);
   useDrawingInteractionLifecycle({ active, controller, finalizeInteraction });
 
   const frameRenderables = resolveDrawingFrameRenderables(frameObjects, draftRef.current);
   const blurObjects = frameRenderables.flatMap(({ object }) =>
     object.kind === 'blur' ? [object] : []
   );
-  const textObjects = frameRenderables.flatMap(({ object }) =>
-    object.kind === 'text' ? [object] : []
-  );
   const projection = getDrawingViewportProjection(root);
   void viewportRevision;
   return (
+    <DrawingSurfaceContent
+      active={active}
+      blurObjects={blurObjects}
+      canvasRef={canvasRef}
+      controller={controller}
+      editingTextObject={editingTextObject}
+      frameObjects={frameObjects}
+      pointer={pointer}
+      projection={projection}
+      root={root}
+      snapshot={snapshot}
+      textDraft={textDraft}
+      textEditor={textEditor}
+      viewportRevision={viewportRevision}
+      {...(props.onExit === undefined ? {} : { onExit: props.onExit })}
+      {...(getObjectOpacity ? { getObjectOpacity } : {})}
+    />
+  );
+}
+
+function DrawingSurfaceContent(props: {
+  active: boolean;
+  blurObjects: DrawingObject[];
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  controller: ContentDrawingController;
+  editingTextObject: DrawingObject | null | undefined;
+  frameObjects: readonly DrawingObject[];
+  getObjectOpacity?: (objectId: string) => number;
+  onExit?: () => void;
+  pointer: DrawingPointerRuntime;
+  projection: DrawingPoint;
+  root: PageScrollRoot;
+  snapshot: DrawingSessionSnapshot;
+  textDraft: DrawingTextDraft | null;
+  textEditor: DrawingTextEditorRuntime;
+  viewportRevision: number;
+}) {
+  const textObjects = resolveDrawingFrameRenderables(
+    props.frameObjects,
+    props.pointer.draftRef.current
+  ).flatMap(({ object }) => (object.kind === 'text' ? [object] : []));
+  return (
     <div
-      aria-hidden={!active}
+      aria-hidden={!props.active}
       data-ui="content.drawing.surface"
-      style={{ position: 'fixed', inset: 0, pointerEvents: active ? 'auto' : 'none' }}
+      style={{ position: 'fixed', inset: 0, pointerEvents: props.active ? 'auto' : 'none' }}
       {...DRAWING_SURFACE_EVENT_SHIELD}
     >
-      <DrawingBlurLayer objects={blurObjects} projection={projection} root={root} />
-      <DrawingTextLayer objects={textObjects} projection={projection} root={root} />
+      <DrawingBlurLayer
+        objects={props.blurObjects}
+        projection={props.projection}
+        root={props.root}
+        {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
+      />
+      <DrawingTextLayer
+        objects={textObjects}
+        projection={props.projection}
+        root={props.root}
+        {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
+      />
       <DrawingCanvasLayer
-        active={active}
-        canvasRef={canvasRef}
-        controller={controller}
-        pointer={pointer}
-        root={root}
-        snapshot={snapshot}
-        textEditor={textEditor}
+        active={props.active}
+        canvasRef={props.canvasRef}
+        controller={props.controller}
+        pointer={props.pointer}
+        root={props.root}
+        snapshot={props.snapshot}
+        textEditor={props.textEditor}
         {...(props.onExit === undefined ? {} : { onExit: props.onExit })}
       />
-      {active && textDraft ? (
+      {props.active && props.textDraft ? (
         <DrawingTextEditor
-          draft={textDraft}
-          layoutRevision={viewportRevision}
-          projection={projection}
+          draft={props.textDraft}
+          layoutRevision={props.viewportRevision}
+          projection={props.projection}
           style={
-            editingTextObject?.kind === 'text'
+            props.editingTextObject?.kind === 'text'
               ? {
-                  backgroundColor: editingTextObject.backgroundColor,
-                  color: editingTextObject.color,
-                  fontFamily: editingTextObject.fontFamily ?? 'sans',
-                  fontSize: editingTextObject.fontSize,
+                  backgroundColor: props.editingTextObject.backgroundColor,
+                  color: props.editingTextObject.color,
+                  fontFamily: props.editingTextObject.fontFamily ?? 'sans',
+                  fontSize: props.editingTextObject.fontSize,
                 }
-              : snapshot.defaults.text
+              : props.snapshot.defaults.text
           }
-          onCancel={cancelText}
-          onChange={setTextDraft}
-          onCommit={commitText}
+          onCancel={props.textEditor.cancel}
+          onChange={props.textEditor.setDraft}
+          onCommit={props.textEditor.commit}
         />
       ) : null}
-      {active && snapshot.activeTool === 'select' ? (
+      {props.active && props.snapshot.activeTool === 'select' ? (
         <DrawingObjectList
-          objects={snapshot.document.objects}
-          onSelect={(id) => controller.session.select(id)}
+          objects={props.snapshot.document.objects}
+          onSelect={(id) => props.controller.session.select(id)}
         />
       ) : null}
     </div>
@@ -485,7 +553,10 @@ function useDrawingFrameRedraw(args: {
   draftRevision: number;
   objects: readonly DrawingObject[];
   selectedIds: readonly string[];
+  showSelectionChrome: boolean;
   setViewportRevision: Dispatch<SetStateAction<number>>;
+  visualRevision: number;
+  getObjectOpacity?: (objectId: string) => number;
 }) {
   const {
     active,
@@ -496,6 +567,7 @@ function useDrawingFrameRedraw(args: {
     draftRevision,
     objects,
     selectedIds,
+    showSelectionChrome,
     setViewportRevision,
   } = args;
   const redraw = useCallback(() => {
@@ -507,10 +579,21 @@ function useDrawingFrameRedraw(args: {
       draft: draftRef.current,
       selectedIds,
       root: controller.getScrollRoot(),
-      showChrome: active && !chromeHidden,
+      showChrome: active && !chromeHidden && showSelectionChrome,
       suppressText: true,
+      ...(args.getObjectOpacity ? { getObjectOpacity: args.getObjectOpacity } : {}),
     });
-  }, [active, canvasRef, chromeHidden, controller, draftRef, objects, selectedIds]);
+  }, [
+    active,
+    canvasRef,
+    chromeHidden,
+    controller,
+    draftRef,
+    objects,
+    selectedIds,
+    showSelectionChrome,
+    args.getObjectOpacity,
+  ]);
 
   useEffect(() => {
     let frame = requestAnimationFrame(redraw);
@@ -532,10 +615,11 @@ function useDrawingFrameRedraw(args: {
       window.visualViewport?.removeEventListener('resize', schedule);
       window.visualViewport?.removeEventListener('scroll', schedule);
     };
-  }, [controller, draftRevision, redraw, setViewportRevision]);
+  }, [controller, draftRevision, redraw, setViewportRevision, args.visualRevision]);
 }
 
 function DrawingBlurLayer(props: {
+  getObjectOpacity?: (objectId: string) => number;
   objects: DrawingObject[];
   projection: DrawingPoint;
   root: NonNullable<ReturnType<ContentDrawingController['getScrollRoot']>>;
@@ -563,6 +647,7 @@ function DrawingBlurLayer(props: {
           width: bounds.width,
           height: bounds.height,
           backdropFilter: 'blur(10px)',
+          opacity: props.getObjectOpacity?.(object.id) ?? 1,
           transform: `rotate(${getDrawingObjectRotation(object)}deg)`,
           transformOrigin: 'center',
           ...(clipPath ? { clipPath } : {}),
@@ -573,6 +658,7 @@ function DrawingBlurLayer(props: {
 }
 
 function DrawingTextLayer(props: {
+  getObjectOpacity?: (objectId: string) => number;
   objects: Extract<DrawingObject, { kind: 'text' }>[];
   projection: DrawingPoint;
   root: NonNullable<ReturnType<ContentDrawingController['getScrollRoot']>>;
@@ -584,6 +670,7 @@ function DrawingTextLayer(props: {
       clip={clip}
       object={object}
       projection={props.projection}
+      opacity={props.getObjectOpacity?.(object.id) ?? 1}
     />
   ));
 }
@@ -592,6 +679,7 @@ function DrawingTextObject(props: {
   clip: DOMRect | null;
   object: Extract<DrawingObject, { kind: 'text' }>;
   projection: DrawingPoint;
+  opacity: number;
 }) {
   const contentRef = useRef<HTMLSpanElement>(null);
   const { object } = props;
@@ -627,6 +715,7 @@ function DrawingTextObject(props: {
         left,
         overflow: 'visible',
         pointerEvents: 'none',
+        opacity: props.opacity,
         position: 'fixed',
         top,
         transform: `rotate(${getDrawingObjectRotation(object)}deg)`,

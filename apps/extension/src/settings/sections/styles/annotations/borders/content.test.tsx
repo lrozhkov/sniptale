@@ -109,8 +109,6 @@ function createProps() {
 }
 
 function verifyRenderedState({ preset, presets, props }: ReturnType<typeof createProps>) {
-  expect(container?.textContent).toContain('settings.navigation.highlighter');
-  expect(container?.textContent).toContain('highlighter.section.subtitle');
   expect(presetsPanelPropsSpy).toHaveBeenCalledWith({
     presets: props.presets,
     settings: props.settings,

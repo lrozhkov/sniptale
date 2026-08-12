@@ -217,6 +217,14 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     ru: 'Выберите запись в списке, чтобы увидеть превью и параметры.',
     en: 'Select a recording to preview it and inspect its settings.',
   },
+  mediaPreviewZoomLabel: {
+    ru: 'Масштаб превью',
+    en: 'Preview zoom',
+  },
+  mediaPreviewUnavailable: {
+    ru: 'Видео недоступно для предпросмотра',
+    en: 'Video preview is unavailable',
+  },
   mediaPreviewTypeLabel: {
     ru: 'Тип',
     en: 'Type',

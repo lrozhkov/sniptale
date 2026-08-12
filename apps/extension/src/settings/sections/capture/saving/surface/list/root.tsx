@@ -34,9 +34,7 @@ export function PresetsList(props: SavePresetsListProps) {
       <div className="mb-4">
         <SettingsCollection
           ariaLabel={translate('savePresets.section.folderPresetsLabel')}
-          title={translate('savePresets.section.folderPresetsLabel')}
           items={items}
-          countLabel={`${items.length} ${props.presetCountLabel}`}
           emptyState={<PresetsListEmptyState />}
           addAction={{
             label: translate('savePresets.section.addButton'),

@@ -14,7 +14,13 @@ vi.mock('../../sections/system/access-data', () => ({
   AccessDataSection: ({ view }: { view?: string }) => `access:${view}`,
 }));
 
-import { renderSettingsRouteContent, shouldDeferSettingsTab } from './sections';
+import {
+  preloadDeferredSettingsSections,
+  renderSettingsRouteContent,
+  renderSettingsRouteHeader,
+  shouldDeferSettingsTab,
+} from './sections';
+import { SETTINGS_NAV_ITEMS } from '../navigation/registry';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -39,6 +45,18 @@ describe('settings page section registry', () => {
       isValidElement(renderSettingsRouteContent({ section: 'interface-browser' }, vi.fn()))
     ).toBe(true);
   });
+  it('renders exactly one shell-owned compact header for every canonical section', async () => {
+    for (const item of SETTINGS_NAV_ITEMS) {
+      await render(renderSettingsRouteHeader(item.id));
+      expect(container?.querySelectorAll('h1')).toHaveLength(1);
+      expect(container?.querySelector('h1')?.textContent).not.toBe('');
+      expect(container?.querySelector('header p')?.textContent).not.toBe('');
+      act(() => root?.unmount());
+      root = null;
+      container?.remove();
+      container = null;
+    }
+  });
   it('preloads and resolves route views through composition owners', async () => {
     await render(
       <Suspense fallback="loading">
@@ -47,4 +65,11 @@ describe('settings page section registry', () => {
     );
     expect(container?.textContent).toBe('access:privacy');
   });
+  it('preloads every deferred owner once and reuses the completed preload', async () => {
+    const firstPreload = preloadDeferredSettingsSections();
+    const secondPreload = preloadDeferredSettingsSections();
+    expect(secondPreload).toBe(firstPreload);
+    await expect(firstPreload).resolves.toBeUndefined();
+    expect(preloadDeferredSettingsSections()).toBe(firstPreload);
+  }, 15_000);
 });

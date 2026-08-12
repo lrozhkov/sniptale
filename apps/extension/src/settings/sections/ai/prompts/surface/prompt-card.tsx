@@ -1,29 +1,26 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
+import { RotateCcw } from 'lucide-react';
 import { settingsModalFieldSurfaceClassName } from '../../../../section-surface/panel-controls';
 import type { AiProvidersPromptViewState } from '../state/types';
-
-const promptSaveButtonClassName = [
-  'rounded-lg border bg-transparent px-4 py-2 text-sm font-medium',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_28%,var(--sniptale-color-border-soft)_72%)]',
-  'text-[var(--sniptale-color-text-primary)] transition-all',
-  'hover:border-[var(--sniptale-color-border-accent-strong)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]',
-].join(' ');
 
 interface AiProvidersPromptCardProps {
   descriptionKey:
     | 'settings.aiProviders.globalPromptDescription'
     | 'settings.aiProviders.scenarioEditorPromptDescription';
   prompt: AiProvidersPromptViewState;
-  saveButtonKey:
-    | 'settings.aiProviders.globalPromptSaveButton'
-    | 'settings.aiProviders.scenarioEditorPromptSaveButton';
+  titleKey:
+    | 'settings.aiProviders.globalPromptTitle'
+    | 'settings.aiProviders.scenarioEditorPromptTitle';
 }
 
 export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
   return (
     <>
+      <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+        {translate(props.titleKey)}
+      </h2>
       <p className="mb-3 text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
         {translate(props.descriptionKey)}
       </p>
@@ -42,21 +39,35 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
             onMouseDown={props.prompt.handleResizeStart}
           />
         </div>
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex justify-end gap-2">
+          {props.prompt.status.canReset ? (
+            <button
+              type="button"
+              aria-label={translate('settings.aiProviders.globalPromptResetButton')}
+              title={translate('settings.aiProviders.globalPromptResetButton')}
+              disabled={props.prompt.status.isSaving}
+              onClick={() => {
+                void props.prompt.handleReset();
+              }}
+              className={getControlSecondaryButtonClassName({ density: 'compact' })}
+            >
+              <RotateCcw aria-hidden="true" size={15} />
+            </button>
+          ) : null}
           <button
             type="button"
-            disabled={props.prompt.isSaving}
+            disabled={props.prompt.status.isSaving || !props.prompt.status.isDirty}
             onClick={() => {
               void props.prompt.handleSave();
             }}
-            className={promptSaveButtonClassName}
+            className={getControlSecondaryButtonClassName({ density: 'compact' })}
           >
-            {translate(props.saveButtonKey)}
+            {translate('common.actions.save')}
           </button>
         </div>
-        {props.prompt.saveError ? (
+        {props.prompt.status.saveError ? (
           <p className="mt-2 text-sm text-[var(--sniptale-color-danger)]">
-            {props.prompt.saveError}
+            {props.prompt.status.saveError}
           </p>
         ) : null}
       </div>

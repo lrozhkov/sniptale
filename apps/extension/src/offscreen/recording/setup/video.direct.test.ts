@@ -41,7 +41,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 }));
 
 import { recordingContext } from '../context';
-import { attachMicrophoneAudioIfEnabled } from './video';
+import { attachMicrophoneAudioIfEnabled, prepareStableTabRecordingAudio } from './video';
 
 function createSettings(overrides: Partial<VideoRecordingSettings> = {}): VideoRecordingSettings {
   return {
@@ -70,6 +70,18 @@ it('leaves audio untouched when microphone capture is disabled', async () => {
   await attachMicrophoneAudioIfEnabled(createSettings());
 
   expect(audioMixerInstances).toHaveLength(0);
+});
+
+it('creates a stable silent tab audio output before a microphone is enabled live', async () => {
+  recordingContext.videoStream = createStream(1280, 720);
+
+  await prepareStableTabRecordingAudio(createSettings());
+
+  expect(audioMixerInstances).toHaveLength(1);
+  expect(audioMixerInstances[0]?.initialize).toHaveBeenCalledOnce();
+  expect(audioMixerInstances[0]?.addMicrophone).not.toHaveBeenCalled();
+  expect(recordingContext.videoStream?.getVideoTracks()).toHaveLength(1);
+  expect(recordingContext.videoStream?.getAudioTracks()).toHaveLength(1);
 });
 
 it('skips direct microphone access when the current recording stream has no video track', async () => {

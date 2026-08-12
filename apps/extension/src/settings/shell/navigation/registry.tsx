@@ -1,7 +1,6 @@
 import {
   Bot,
   FolderOpen,
-  Database,
   Image,
   MessageSquare,
   Mic,
@@ -19,6 +18,7 @@ import type { SettingsSectionId } from '../../../platform/navigation/extension-p
 import type { ComponentType } from 'react';
 
 export type SettingsNavItem = {
+  description: TranslationKey;
   id: SettingsSectionId;
   icon: LucideIcon;
   label: TranslationKey;
@@ -37,6 +37,7 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
     items: [
       {
         id: 'interface-browser',
+        description: 'settings.navigation.descriptions.interfaceBrowser',
         label: 'settings.navigation.interfaceBrowser',
         icon: SlidersHorizontal,
       },
@@ -46,41 +47,98 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
     id: 'captureSaving',
     label: 'settings.navigation.groups.captureSaving',
     items: [
-      { id: 'quick-actions', label: 'settings.navigation.quickActions', icon: Zap },
-      { id: 'screen-sizes', label: 'settings.navigation.screenSizes', icon: Monitor },
-      { id: 'media-quality', label: 'settings.navigation.mediaQuality', icon: Image },
-      { id: 'saving', label: 'settings.navigation.saving', icon: FolderOpen },
-      { id: 'storage-drafts', label: 'settings.navigation.storageDrafts', icon: Database },
+      {
+        id: 'quick-actions',
+        description: 'settings.navigation.descriptions.quickActions',
+        label: 'settings.navigation.quickActions',
+        icon: Zap,
+      },
+      {
+        id: 'screen-sizes',
+        description: 'settings.navigation.descriptions.screenSizes',
+        label: 'settings.navigation.screenSizes',
+        icon: Monitor,
+      },
+      {
+        id: 'media-quality',
+        description: 'settings.navigation.descriptions.mediaQuality',
+        label: 'settings.navigation.mediaQuality',
+        icon: Image,
+      },
+      {
+        id: 'saving',
+        description: 'settings.navigation.descriptions.saving',
+        label: 'settings.navigation.saving',
+        icon: FolderOpen,
+      },
     ],
   },
   {
     id: 'stylesTemplates',
     label: 'settings.navigation.groups.stylesTemplates',
     items: [
-      { id: 'annotations', label: 'settings.navigation.annotations', icon: Sparkles },
-      { id: 'editor-resources', label: 'settings.navigation.editorResources', icon: Palette },
+      {
+        id: 'annotations',
+        description: 'settings.navigation.descriptions.annotations',
+        label: 'settings.navigation.annotations',
+        icon: Sparkles,
+      },
+      {
+        id: 'editor-resources',
+        description: 'settings.navigation.descriptions.editorResources',
+        label: 'settings.navigation.editorResources',
+        icon: Palette,
+      },
     ],
   },
   {
     id: 'ai',
     label: 'settings.navigation.groups.ai',
     items: [
-      { id: 'ai-connections', label: 'settings.navigation.aiConnections', icon: Bot },
-      { id: 'ai-prompts', label: 'settings.navigation.aiPrompts', icon: MessageSquare },
+      {
+        id: 'ai-connections',
+        description: 'settings.navigation.descriptions.aiConnections',
+        label: 'settings.navigation.aiConnections',
+        icon: Bot,
+      },
+      {
+        id: 'ai-prompts',
+        description: 'settings.navigation.descriptions.aiPrompts',
+        label: 'settings.navigation.aiPrompts',
+        icon: MessageSquare,
+      },
     ],
   },
   {
     id: 'system',
     label: 'settings.navigation.groups.system',
     items: [
-      { id: 'voice-input', label: 'settings.navigation.voiceInput', icon: Mic },
-      { id: 'native-app', label: 'settings.navigation.nativeApp', icon: MonitorCog },
-      { id: 'access-data', label: 'settings.navigation.accessData', icon: ShieldCheck },
+      {
+        id: 'voice-input',
+        description: 'settings.navigation.descriptions.voiceInput',
+        label: 'settings.navigation.voiceInput',
+        icon: Mic,
+      },
+      {
+        id: 'native-app',
+        description: 'settings.navigation.descriptions.nativeApp',
+        label: 'settings.navigation.nativeApp',
+        icon: MonitorCog,
+      },
+      {
+        id: 'access-data',
+        description: 'settings.navigation.descriptions.accessData',
+        label: 'settings.navigation.accessData',
+        icon: ShieldCheck,
+      },
     ],
   },
 ] as const;
 
 export const SETTINGS_NAV_ITEMS = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
+export const SETTINGS_NAV_ITEMS_BY_ID = Object.fromEntries(
+  SETTINGS_NAV_ITEMS.map((item) => [item.id, item])
+) as Record<SettingsSectionId, SettingsNavItem>;
 
 export type SettingsSectionModule = Record<
   string,
@@ -110,10 +168,6 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   saving: {
     load: () => import('../../sections/capture/saving'),
     exportName: 'SavePresetsSection',
-  },
-  'storage-drafts': {
-    load: () => import('../../sections/capture/storage-drafts'),
-    exportName: 'StorageDraftsSection',
   },
   annotations: {
     load: () => import('../../sections/styles/annotations'),

@@ -66,6 +66,8 @@ it('renders a context inspector surface without introducing a layers panel', () 
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector"');
   expect(markup).toContain('data-ui="mock-context-inspector-header"');
   expect(markup).toContain('data-ui="mock-context-inspector-content"');
+  expect(markup).toContain('data-ui="video-editor.floating.context-inspector.resize"');
+  expect(markup).toContain('role="separator"');
   expect(markup).not.toContain('layers');
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({

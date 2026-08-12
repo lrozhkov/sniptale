@@ -69,6 +69,7 @@ function createBridgeParams() {
       screenshotMode: false,
     },
     quickAction: createQuickActionState(quickActionOverlayRef, setQuickActionOverlay),
+    workingModes: { select: vi.fn() },
     viewport: {
       clearPendingAutoStartCapture: vi.fn(),
       handleTakeScreenshotRef: {

@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings } from '../../../../contracts/settings';
 
-const { loadQuickActionRuntimeContextMock, runCaptureFlowMock, runSelectionFlowMock } = vi.hoisted(
-  () => ({
-    loadQuickActionRuntimeContextMock: vi.fn(),
-    runCaptureFlowMock: vi.fn(),
-    runSelectionFlowMock: vi.fn(),
-  })
-);
+const {
+  loadQuickActionRuntimeContextMock,
+  runCaptureFlowMock,
+  runDesktopQuickActionMock,
+  runSelectionFlowMock,
+} = vi.hoisted(() => ({
+  loadQuickActionRuntimeContextMock: vi.fn(),
+  runCaptureFlowMock: vi.fn(),
+  runDesktopQuickActionMock: vi.fn(),
+  runSelectionFlowMock: vi.fn(),
+}));
 
 vi.mock('./load', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./load')>()),
@@ -17,6 +21,11 @@ vi.mock('./load', async (importOriginal) => ({
 vi.mock('./flows', () => ({
   runCaptureFlow: runCaptureFlowMock,
   runSelectionFlow: runSelectionFlowMock,
+}));
+
+vi.mock('../desktop/workflow', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../desktop/workflow')>()),
+  runDesktopQuickAction: runDesktopQuickActionMock,
 }));
 
 import { processQuickAction } from './process';
@@ -50,7 +59,7 @@ function createSettings(): Settings {
 function createQuickAction(
   overrides: Partial<{
     id: string;
-    screenshotMode: 'visible' | 'full' | 'selection';
+    screenshotMode: 'visible' | 'full' | 'selection' | 'desktop';
     afterCapture: 'download_default' | 'ask_preset' | 'ask_system' | 'scenario' | 'edit' | 'copy';
     exitAfterCapture: boolean;
   }> = {}
@@ -66,7 +75,7 @@ function createQuickAction(
   };
 }
 
-function createRuntimeContext(captureMode: 'visible' | 'selection' = 'visible') {
+function createRuntimeContext(captureMode: 'visible' | 'selection' | 'desktop' = 'visible') {
   return {
     action: createQuickAction({
       id: captureMode === 'selection' ? 'selection-action' : 'action-1',
@@ -130,6 +139,21 @@ describe('processQuickAction', () => {
         captureMode: 'visible',
       })
     );
+    expect(runSelectionFlowMock).not.toHaveBeenCalled();
+  });
+
+  it('routes desktop quick actions without entering a tab capture flow', async () => {
+    loadQuickActionRuntimeContextMock.mockResolvedValueOnce(createRuntimeContext('desktop'));
+
+    await processQuickAction(createProcessArgs());
+
+    expect(runDesktopQuickActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tabId: 19,
+        context: expect.objectContaining({ captureMode: 'desktop' }),
+      })
+    );
+    expect(runCaptureFlowMock).not.toHaveBeenCalled();
     expect(runSelectionFlowMock).not.toHaveBeenCalled();
   });
 });

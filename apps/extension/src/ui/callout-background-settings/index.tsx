@@ -6,6 +6,7 @@ import { CalloutBackgroundSettingsView } from './view';
 
 export function CalloutBackgroundSettings(props: {
   disabled?: boolean;
+  manageStyles?: boolean;
   onChange: (style: CalloutVisualStyle) => void;
   onOpenChange?: (open: boolean) => void;
   style: CalloutVisualStyle;
@@ -16,6 +17,7 @@ export function CalloutBackgroundSettings(props: {
   return (
     <CalloutBackgroundSettingsView
       actions={resources.actions}
+      manageStyles={props.manageStyles === true}
       {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
       onChange={props.onChange}
       {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}

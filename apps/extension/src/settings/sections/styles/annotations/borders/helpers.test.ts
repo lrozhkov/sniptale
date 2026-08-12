@@ -6,7 +6,6 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 import {
-  getHighlighterPresetCountLabel,
   getHighlighterPresetPreviewStyle,
   normalizeHighlighterPresetOrders,
   reorderHighlighterPresetsBefore,
@@ -37,8 +36,6 @@ function createPreset(
 }
 
 describe('highlighter-section helpers', () => {
-  it('resolves localized count labels for singular, few, and many forms', verifyCountLabels);
-
   it('builds preview styles for each supported shadow level', verifyPreviewShadowStyles);
 
   it('uses canonical color alpha in the preset preview', () => {
@@ -75,12 +72,6 @@ describe('highlighter-section helpers', () => {
     ]);
   });
 });
-
-function verifyCountLabels(): void {
-  expect(getHighlighterPresetCountLabel(1)).toBe('highlighter.section.countOne');
-  expect(getHighlighterPresetCountLabel(2)).toBe('highlighter.section.countFew');
-  expect(getHighlighterPresetCountLabel(5)).toBe('highlighter.section.countMany');
-}
 
 function verifyPreviewShadowStyles(): void {
   expect(

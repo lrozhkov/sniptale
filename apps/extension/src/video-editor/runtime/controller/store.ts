@@ -2,9 +2,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { useVideoEditorStore, type VideoEditorState } from '../../state/store';
 import type { VideoEditorControllerStorePort } from '../../contracts/controller-store';
 
+export function getCurrentVideoEditorProjectSnapshot() {
+  return useVideoEditorStore.getState().project;
+}
+
 function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
   return {
     cancelExport: state.cancelExport,
+    beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
     closeTrackGap: state.closeTrackGap,
     completeExport: state.completeExport,
     currentTime: state.currentTime,
@@ -14,6 +19,7 @@ function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
     isPlaying: state.isPlaying,
     pixelsPerSecond: state.pixelsPerSecond,
     project: state.project,
+    projectHistory: state.projectHistory,
     recordingTelemetry: state.recordingTelemetry,
     recordingId: state.recordingId,
     selectedClipId: state.selectedClipId,
@@ -22,9 +28,14 @@ function selectVideoEditorRuntimeStoreSlice(state: VideoEditorState) {
     setError: state.setError,
     setPlaying: state.setPlaying,
     setProject: state.setProject,
+    syncProjectRevision: state.syncProjectRevision,
     setRecordingTelemetry: state.setRecordingTelemetry,
     setReady: state.setReady,
     setSaveState: state.setSaveState,
+    undoProject: state.undoProject,
+    redoProject: state.redoProject,
+    endProjectHistoryTransaction: state.endProjectHistoryTransaction,
+    isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
     splitClipAt: state.splitClipAt,
     updateExportStatus: state.updateExportStatus,
   };
@@ -174,12 +185,21 @@ function selectVideoEditorActionStoreSlice(state: VideoEditorState) {
 function selectVideoEditorControllerStorePort(
   state: VideoEditorState
 ): VideoEditorControllerStorePort {
+  const runtime = selectVideoEditorRuntimeStoreSlice(state);
   return {
-    ...selectVideoEditorRuntimeStoreSlice(state),
+    ...runtime,
     ...selectVideoEditorWorkspaceSceneStoreSlice(state),
     ...selectVideoEditorWorkspaceSelectionStoreSlice(state),
     ...selectVideoEditorShellStoreSlice(state),
     ...selectVideoEditorActionStoreSlice(state),
+    projectHistoryTransactionActive: runtime.projectHistory.transaction !== null,
+    projectHistoryStatus: {
+      canUndo:
+        runtime.projectHistory.transaction === null && runtime.projectHistory.past.length > 0,
+      canRedo:
+        runtime.projectHistory.transaction === null && runtime.projectHistory.future.length > 0,
+      error: runtime.projectHistory.error,
+    },
   };
 }
 

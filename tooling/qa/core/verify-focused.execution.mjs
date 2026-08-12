@@ -26,6 +26,7 @@ import { runManualMockExportParityCheck } from '../guards/quality/verify-manual-
 import { runManifestPermissionsCheck } from '../guards/architecture/verify-manifest-permissions.mjs';
 import { runRuntimeTopologyCheck } from '../guards/architecture/verify-runtime-topology.mjs';
 import { runSecurityCheck } from '../guards/security/verify-security.mjs';
+import { runMessagingCheck } from './verify-messaging.mjs';
 import { runSonarjsCheck } from './verify-sonarjs.mjs';
 import { runStructuralRiskCheck } from './verify-structural-risk.mjs';
 import { timeAsyncStep, timeSyncStep } from './step-timing.helpers.mjs';
@@ -95,7 +96,7 @@ function runManualMockExportParityStep(targetFiles) {
   );
 }
 
-async function runFocusedCodeSteps(codeFiles) {
+async function runFocusedCodeSteps(codeFiles, targetFiles) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
   const steps = [];
   for (const [label, header, runner] of FOCUSED_CODE_VIOLATION_STEPS) {
@@ -111,6 +112,15 @@ async function runFocusedCodeSteps(codeFiles) {
       )
     );
   }
+  steps.push(
+    await timeAsyncStep(async () =>
+      createViolationStep(
+        'Messaging',
+        'Messaging guardrail violations found:',
+        runMessagingCheck({ files: behavioralCodeFiles, targetFiles })
+      )
+    )
+  );
   return steps;
 }
 
@@ -213,6 +223,7 @@ export async function collectFocusedLightLane({
   qualityCodeFiles = codeFiles,
   qualityJsLikeFiles = jsLikeFiles,
   qualityTargetFiles = existingTargetFiles,
+  targetFiles = existingTargetFiles,
   shouldRunManifestPermissions,
   shouldRunRuntimeTopology,
 }) {
@@ -223,7 +234,7 @@ export async function collectFocusedLightLane({
       timeSyncStep(() => runAiHygieneStep(qualityCodeFiles, baseline)),
       timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
       timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
-      ...(await runFocusedCodeSteps(qualityCodeFiles)),
+      ...(await runFocusedCodeSteps(qualityCodeFiles, targetFiles)),
     ],
     triggeredStaticSteps: runFocusedTriggeredStaticChecks({
       deferOwnerGuards: true,

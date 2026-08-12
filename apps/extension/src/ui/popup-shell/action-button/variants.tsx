@@ -11,7 +11,7 @@ const COMPACT_BUTTON_CLASS_NAME =
 const COMPACT_BUTTON_SURFACE_CLASS_NAME = 'rounded-[12px] px-0 outline-none transition-all';
 
 const DEFAULT_BUTTON_CLASS_NAME =
-  'relative flex h-12 min-h-12 min-w-0 items-center justify-start gap-2 overflow-hidden';
+  'relative flex h-12 min-h-12 min-w-0 items-center gap-2 overflow-hidden';
 
 const DEFAULT_BUTTON_SURFACE_CLASS_NAME =
   'rounded-[12px] px-3.5 text-[12px] font-medium leading-tight';
@@ -33,6 +33,7 @@ interface PopupActionButtonVariantProps {
   trailing?: ReactNode;
   dataUi?: string;
   rootClassName: string;
+  centered?: boolean;
 }
 
 function renderPopupActionButtonFrame(args: {
@@ -106,7 +107,13 @@ export function PopupActionButtonCompact(props: PopupActionButtonVariantProps) {
 
 function renderDefaultContent(props: PopupActionButtonVariantProps) {
   return (
-    <span className="flex min-w-0 flex-1 items-center justify-between gap-2.5">
+    <span
+      className={
+        props.centered
+          ? 'flex min-w-0 flex-none items-center justify-between gap-2.5'
+          : 'flex min-w-0 flex-1 items-center justify-between gap-2.5'
+      }
+    >
       <PopupActionButtonDefaultContent
         label={props.label}
         subtitle={props.subtitle}
@@ -122,6 +129,7 @@ export function PopupActionButtonDefault(props: PopupActionButtonVariantProps) {
       DEFAULT_BUTTON_CLASS_NAME,
       DEFAULT_BUTTON_SURFACE_CLASS_NAME,
       DEFAULT_BUTTON_INTERACTION_CLASS_NAME,
+      props.centered ? 'justify-center' : 'justify-start',
       props.rootClassName,
     ],
     content: renderDefaultContent(props),

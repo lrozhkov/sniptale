@@ -4,7 +4,7 @@ import {
   type VideoRecordingSettings,
   type VideoOutputDimensions,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { InlineCurtainSelect } from '../../inline-controls/curtain-select';
+import { InlineCurtainSelect } from '../../../../../ui/popup-shell/inline-curtain/select';
 import { OutputSettingsPanel } from '../output-card/panel';
 import { getRecordingProfileOptions } from './options';
 

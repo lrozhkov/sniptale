@@ -44,15 +44,19 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
 
 vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-modal')>()),
-  ProductModal: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
+  ProductModal: (props: { children: React.ReactNode; maxHeight?: string; width?: string }) => (
+    <div data-max-height={props.maxHeight} data-width={props.width}>
+      {props.children}
+    </div>
+  ),
   ProductModalBody: (props: {
     asForm?: boolean;
     children: React.ReactNode;
     onSubmit?: React.FormEventHandler<HTMLFormElement>;
   }) => <form onSubmit={props.onSubmit}>{props.children}</form>,
   ProductModalFooter: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
-  ProductModalHeader: (props: { onClose: () => void; title: string }) => (
-    <header>
+  ProductModalHeader: (props: { compact?: boolean; onClose: () => void; title: string }) => (
+    <header data-compact={String(props.compact)}>
       {props.title}
       <button type="button" onClick={props.onClose}>
         close
@@ -129,6 +133,9 @@ afterEach(() => {
 it('creates a named profile and submits the selected output combination', () => {
   const props = renderEditor();
   expect(container?.textContent).toContain('settings.videoQuality.createTitle');
+  expect(container?.firstElementChild?.getAttribute('data-width')).toBe('480px');
+  expect(container?.firstElementChild?.getAttribute('data-max-height')).toBe('84vh');
+  expect(container?.querySelector('header')?.getAttribute('data-compact')).toBe('true');
   expect(container?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
   expect(
     Array.from(container?.querySelectorAll('select') ?? []).every(

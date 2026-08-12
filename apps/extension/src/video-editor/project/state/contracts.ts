@@ -3,9 +3,11 @@ import type { VideoProject } from '../../../features/video/project/types/index';
 import type { VideoEditorPlacementMode } from '../../contracts/placement';
 import type { VideoEditorSelection } from '../../contracts/selection';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
+import type { VideoEditorProjectHistoryState } from '../history';
 
 export interface VideoEditorProjectSliceState {
   project: VideoProject | null;
+  projectHistory: VideoEditorProjectHistoryState;
   currentTime: number;
   placementMode: VideoEditorPlacementMode | null;
   selection: VideoEditorSelection;

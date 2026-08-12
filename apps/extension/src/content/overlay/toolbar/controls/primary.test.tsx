@@ -86,6 +86,7 @@ function createToolbarPrimaryToolbarProps(params: ToolbarPrimaryFixtureParams) {
     onDisableAiPickMode: vi.fn(),
     onEnableCursorMode: vi.fn(),
     onHide: vi.fn(),
+    onPinToTabChange: vi.fn(),
     onTakeScreenshot: vi.fn(),
     onTimerDelayChange: vi.fn(),
     onToggleHighlighterMode: vi.fn(),
@@ -94,6 +95,9 @@ function createToolbarPrimaryToolbarProps(params: ToolbarPrimaryFixtureParams) {
     onToggleQuickEditMode: vi.fn(),
     onToggleScreenshotMode: vi.fn(),
     scenario: createScenarioState(),
+    pinToTab: false,
+    pinToTabAvailable: true,
+    pinToTabLocked: false,
     timerDelay: 0,
   };
 }
@@ -219,7 +223,7 @@ describe('ToolbarPrimaryControls', () => {
     const modeButton = queryModeSelectorButton();
 
     expect(modeButton?.getAttribute('data-active')).toBe('true');
-    expect(modeButton?.getAttribute('title')).toBe('Курсор');
+    expect(modeButton?.getAttribute('title')).toBe('Обычная работа со страницей');
 
     const active = createToolbarPrimaryControlsProps({ aiPickMode: true, isCursorMode: false });
     renderToolbarPrimaryControls(active.props);
@@ -243,6 +247,30 @@ describe('ToolbarPrimaryControls', () => {
     expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
   });
 
+  it('shows pin and collapse actions only next to Navigation', () => {
+    const navigation = createToolbarPrimaryControlsProps();
+    renderToolbarPrimaryControls(navigation.props);
+
+    const pin = document.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.pin-to-tab"]'
+    );
+    const collapse = document.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.collapse"]'
+    );
+    expect(pin).not.toBeNull();
+    expect(collapse).not.toBeNull();
+
+    act(() => pin?.click());
+    act(() => collapse?.click());
+    expect(navigation.props.toolbarProps.onPinToTabChange).toHaveBeenCalledWith(true, undefined);
+    expect(navigation.props.toolbarProps.onHide).toHaveBeenCalledOnce();
+
+    const editing = createToolbarPrimaryControlsProps({ quickEditMode: true });
+    renderToolbarPrimaryControls(editing.props);
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.pin-to-tab"]')).toBeNull();
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.collapse"]')).toBeNull();
+  });
+
   it('keeps Content Editing icon pinned to toolbar size and AI out of Working Mode', async () => {
     const rendered = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(rendered.props);
@@ -250,6 +278,20 @@ describe('ToolbarPrimaryControls', () => {
     openModeMenu(queryModeSelectorButton());
     expectModeMenuIcon('quick-edit');
     expect(document.querySelector('[data-ui="content.toolbar.mode-option.ai"]')).toBeNull();
+  });
+
+  it('uses the Navigation, Annotations, and Design review glyphs in the mode selector', () => {
+    const rendered = createToolbarPrimaryControlsProps();
+    renderToolbarPrimaryControls(rendered.props);
+
+    expect(queryModeSelectorButton()?.querySelector('svg')?.classList).toContain('lucide-touchpad');
+    openModeMenu(queryModeSelectorButton());
+    expect(
+      document.querySelector('[data-ui="content.toolbar.mode-option.highlighter"] svg')?.classList
+    ).toContain('lucide-message-square-plus');
+    expect(
+      document.querySelector('[data-ui="content.toolbar.mode-option.design-review"] svg')?.classList
+    ).toContain('lucide-swatch-book');
   });
 });
 

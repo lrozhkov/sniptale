@@ -88,7 +88,7 @@ export function collectHarnessInventoryViolations(
           })
         )
       : []),
-    ...(inventoryTargets.has(OSS_RELEASE_CONSUMER_INVENTORY)
+    ...((context.harnessVerificationTargetFiles ?? []).length > 0
       ? ossInventoryValidator().violations.map((message) => ({
           rule: 'oss-release-consumer-inventory',
           file: OSS_RELEASE_CONSUMER_INVENTORY,

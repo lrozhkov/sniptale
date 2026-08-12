@@ -77,18 +77,6 @@ export const settingsAiProvidersProviderMessages = defineMessageSource({
     ru: 'Например: OpenAI, Local LLM',
     en: 'Example: OpenAI, Local LLM',
   },
-  providerConnectionTypeLabel: {
-    ru: 'Тип подключения',
-    en: 'Connection type',
-  },
-  providerConnectionTypeValue: {
-    ru: 'OpenAI-Compatible API',
-    en: 'OpenAI-Compatible API',
-  },
-  providerConnectionTypeHint: {
-    ru: 'Пока поддерживается только OpenAI-совместимый API',
-    en: 'Only an OpenAI-compatible API is supported for now',
-  },
   providerApiUrlLabel: {
     ru: 'API URL *',
     en: 'API URL *',

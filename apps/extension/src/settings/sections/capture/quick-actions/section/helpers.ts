@@ -4,7 +4,6 @@ import type {
   ViewportPreset,
 } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
-import { getSettingsCountLabel } from '../../../../section-surface/text.helpers.ts';
 import { getViewportPresetDisplayName } from '../../../../../features/viewport-presets/display-name';
 import { formatViewportPresetDimensions } from '../../../../../features/viewport-presets/format';
 
@@ -33,14 +32,6 @@ export function getDelayLabel(delay: QuickActionDelay | null | undefined): strin
   return delay === 0
     ? translate('settings.quickActions.delayNone')
     : `${delay} ${translate('settings.quickActions.delayShortSuffix')}`;
-}
-
-export function getQuickActionCountLabel(count: number): string {
-  return getSettingsCountLabel(count, {
-    one: 'settings.quickActions.countOne',
-    few: 'settings.quickActions.countFew',
-    many: 'settings.quickActions.countMany',
-  });
 }
 
 export function createDefaultQuickAction(): QuickAction {

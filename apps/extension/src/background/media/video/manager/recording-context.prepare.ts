@@ -8,7 +8,7 @@ import { acquireVideoCaptureSurface } from '../capture-surface';
 import { setVideoRecordingTabId } from '../session-state';
 import { announceCaptureSource, resolveCaptureSourceForMode } from './flow';
 import {
-  enableAnnotationsOrAbort,
+  prepareContentSurfaceOrAbort,
   enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
 } from './transport.resolve';
@@ -23,7 +23,7 @@ type RecordingContext = {
   settings: VideoRecordingSettings;
   surface: AppliedCaptureSurface | null;
   tabId: number | null;
-  viewport?: NonNullable<Awaited<ReturnType<typeof enableAnnotationsOrAbort>>>;
+  viewport?: NonNullable<Awaited<ReturnType<typeof prepareContentSurfaceOrAbort>>>;
   viewportPresetId: string | null;
 };
 
@@ -87,7 +87,7 @@ export async function initializeRecordingContext(props: {
   );
   if (!offscreenReady) return null;
 
-  const viewport = await enableAnnotationsOrAbort(tabId, captureMode, settings, recordingId);
+  const viewport = await prepareContentSurfaceOrAbort(tabId, captureMode, settings, recordingId);
   if (viewport === null) return null;
   if (
     surface?.target === 'viewport' &&

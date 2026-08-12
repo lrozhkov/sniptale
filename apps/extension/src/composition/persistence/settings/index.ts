@@ -228,12 +228,6 @@ function applySettingsPatch(
   currentSettings: NormalizedSettings,
   settingsPatch: SettingsPatch
 ): NormalizedSettings {
-  const legacyDestination =
-    settingsPatch.saveCapturesToGallery === undefined
-      ? undefined
-      : settingsPatch.saveCapturesToGallery
-        ? 'library'
-        : 'temporary';
   return normalizeLoadedSettings({
     ...currentSettings,
     ...settingsPatch,
@@ -254,7 +248,6 @@ function applySettingsPatch(
     localStoragePolicy: {
       ...currentSettings.localStoragePolicy,
       ...settingsPatch.localStoragePolicy,
-      ...(legacyDestination === undefined ? {} : { defaultDestination: legacyDestination }),
     },
     voiceInput: {
       ...DEFAULT_VOICE_INPUT_SETTINGS,

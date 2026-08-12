@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   refreshPresentation: vi.fn(),
   videoState: {
     project: { id: 'video-1', updatedAt: 20 } as { id: string; updatedAt: number } | null,
-    saveState: 'saved' as 'error' | 'saved' | 'saving',
+    saveState: 'saved' as 'dirty' | 'error' | 'saved' | 'saving',
   },
 }));
 

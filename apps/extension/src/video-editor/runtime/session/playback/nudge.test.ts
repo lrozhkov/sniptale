@@ -19,6 +19,7 @@ function createLatestState(project: ReturnType<typeof createEmptyVideoProject>) 
     placementMode: null,
     playbackRange: null,
     project,
+    projectHistoryTransactionActive: false,
   };
 }
 

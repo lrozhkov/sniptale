@@ -14,8 +14,6 @@ import {
 
 const mocks = vi.hoisted(() => ({
   formatHotkeyMock: vi.fn(),
-  hotkeyToKeyStringMock: vi.fn(),
-  isHotkeyReservedMock: vi.fn(),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -29,12 +27,6 @@ vi.mock('../../../../../features/keyboard-shortcuts/hotkey-format', async (impor
     typeof import('../../../../../features/keyboard-shortcuts/hotkey-format')
   >()),
   formatHotkey: mocks.formatHotkeyMock,
-}));
-
-vi.mock('../../../../../features/keyboard-shortcuts/hotkeys', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../features/keyboard-shortcuts/hotkeys')>()),
-  hotkeyToKeyString: mocks.hotkeyToKeyStringMock,
-  isHotkeyReserved: mocks.isHotkeyReservedMock,
 }));
 
 type ControllerState = ReturnType<typeof useHotkeyInputController>;
@@ -123,8 +115,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.formatHotkeyMock.mockImplementation((value: HotkeyConfig) => `${value.key}-formatted`);
-  mocks.hotkeyToKeyStringMock.mockImplementation((value: HotkeyConfig) => value.key);
-  mocks.isHotkeyReservedMock.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -143,7 +133,6 @@ afterEach(() => {
 describe('useHotkeyInputController reserved shortcuts', () => {
   it('shows reserved feedback and restores the previous display value after timeout', async () => {
     const onError = vi.fn();
-    mocks.hotkeyToKeyStringMock.mockReturnValue('Ctrl+R');
 
     await renderHarness({ onError, value: createHotkeyValue('P') });
 
@@ -152,7 +141,7 @@ describe('useHotkeyInputController reserved shortcuts', () => {
     });
 
     expect(onError).toHaveBeenCalledWith('settings.hotkeyInput.reservedCombination');
-    expect(getState().displayValue).toBe('settings.hotkeyInput.reservedDisplay');
+    expect(getState().displayValue).toBe('settings.hotkeyInput.reservedCombination');
 
     await act(async () => {
       vi.advanceTimersByTime(1500);
@@ -161,12 +150,9 @@ describe('useHotkeyInputController reserved shortcuts', () => {
     expect(getState().displayValue).toBe('P-formatted');
   });
 
-  it('clears the reserved reset timeout on unmount and rejects utility-reserved shortcuts', async () => {
+  it('clears feedback timeout on unmount and rejects operating-system shortcuts', async () => {
     const onChange = vi.fn();
     const onError = vi.fn();
-    mocks.hotkeyToKeyStringMock.mockReturnValue('Ctrl+R');
-    mocks.isHotkeyReservedMock.mockReturnValue(true);
-
     await renderHarness({ onChange, onError, value: createHotkeyValue('P') });
 
     const baselineFormatHotkeyCalls = mocks.formatHotkeyMock.mock.calls.length;
@@ -181,13 +167,13 @@ describe('useHotkeyInputController reserved shortcuts', () => {
 
     await renderHarness({ onChange, onError });
     act(() => {
-      getState().handleKeyDown(createKeyboardEvent('K', { ctrlKey: true, shiftKey: true }));
+      getState().handleKeyDown(createKeyboardEvent('Tab', { altKey: true }));
     });
 
     expect(mocks.formatHotkeyMock.mock.calls.length).toBe(baselineFormatHotkeyCalls);
     expect(onChange).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith('settings.hotkeyInput.reservedCombination');
-    expect(getState().displayValue).toBe('settings.hotkeyInput.reservedDisplay');
+    expect(getState().displayValue).toBe('settings.hotkeyInput.reservedCombination');
   });
 });
 

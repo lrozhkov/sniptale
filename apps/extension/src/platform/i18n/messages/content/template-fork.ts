@@ -12,14 +12,22 @@ export const contentTemplateForkMessages = defineMessageSource({
   goToSave: { ru: 'Перейти к сохранению', en: 'Go to saving' },
   discard: { ru: 'Сбросить изменения', en: 'Discard changes' },
   continueEditing: { ru: 'Продолжить настройку', en: 'Continue editing' },
-  applyToFuture: { ru: 'Для следующих', en: 'Use for next' },
+  futureSettingsTitle: { ru: 'Настройки новых рамок', en: 'New frame settings' },
+  futureSettingsDescription: {
+    ru: 'Используйте текущие параметры для рамок, которые будут созданы после этой.',
+    en: 'Use the current settings for frames created after this one.',
+  },
+  futureSettingsAction: {
+    ru: 'Использовать для новых рамок',
+    en: 'Use for new frames',
+  },
   applyToFutureTitle: {
-    ru: 'Применить к следующим рамкам?',
-    en: 'Use these settings for next frames?',
+    ru: 'Использовать для новых рамок?',
+    en: 'Use these settings for new frames?',
   },
   applyToFutureDescription: {
-    ru: 'Текущие настройки основного тулбара будут заменены. Новые рамки получат этот стиль; уже установленные рамки не изменятся.',
-    en: 'Current main-toolbar settings will be replaced. New frames will use this style; existing frames will not change.',
+    ru: 'Настройки создания рамок в основном тулбаре будут заменены текущими. Уже созданные рамки не изменятся.',
+    en: 'Frame creation settings in the main toolbar will be replaced with the current settings. Existing frames will not change.',
   },
   applyToFutureConfirm: { ru: 'Применить', en: 'Apply' },
 });

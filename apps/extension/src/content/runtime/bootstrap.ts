@@ -11,7 +11,6 @@ import { disableQuickEditMode } from '../selection/quick-edit';
 import { disableDesignReviewMode } from '../selection/design-review';
 import { disableSelectionMode } from '../selection/selection-mode';
 import { hideVideoCountdown } from '../overlay/video-countdown';
-import { disableVideoAnnotations } from '../overlay/video-annotations';
 import { disableVideoTelemetry } from '../overlay/video-telemetry';
 import { disposeViewportCursorProjection } from '../overlay/viewport-cursor-projection';
 import type { RegionSelectorController } from '../selection/region-selector/types';
@@ -147,7 +146,6 @@ export function initializeTopLevelContentRuntime(
       { resource: 'AI pick mode', run: disableAiPickModeIfLoaded },
       { resource: 'selection mode', run: disableSelectionMode },
       { resource: 'video countdown', run: hideVideoCountdown },
-      { resource: 'video annotations', run: disableVideoAnnotations },
       { resource: 'video telemetry', run: disableVideoTelemetry },
       { resource: 'viewport cursor projection', run: disposeViewportCursorProjection },
       { resource: 'region selector controller', run: () => regionSelectorController.dispose() },

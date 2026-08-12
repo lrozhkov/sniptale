@@ -12,6 +12,16 @@ import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
 it('keeps webcam recording disabled for a fresh user', () => {
   expect(DEFAULT_VIDEO_SETTINGS.webcamEnabled).toBe(false);
+  expect(DEFAULT_VIDEO_SETTINGS.autoFadeDelay).toBe(0);
+  expect(DEFAULT_VIDEO_SETTINGS.recordingSurface).toEqual({
+    toolbarEnabled: false,
+    cursorSpotlightEnabled: false,
+    cursorDimmingEnabled: false,
+    cursorClickAnimationEnabled: false,
+  });
+  expect(DEFAULT_VIDEO_SETTINGS.webcamPresentation).toEqual(
+    expect.objectContaining({ mode: 'embedded', shape: 'circle', sizeFraction: 0.22 })
+  );
 });
 
 it('clamps video source counts and derives the recording audio policy', () => {
@@ -47,8 +57,19 @@ it('creates and updates live media state from recording settings', () => {
       webcamSelected: true,
     })
   );
-  expect(updateVideoRecordingLiveMediaState(liveMedia, { microphoneEnabled: false })).toEqual(
-    expect.objectContaining({ microphoneEnabled: false, webcamEnabled: true })
+  expect(
+    updateVideoRecordingLiveMediaState(liveMedia, {
+      microphoneDeviceId: 'mic-2',
+      microphoneEnabled: false,
+      webcamDeviceId: 'cam-2',
+    })
+  ).toEqual(
+    expect.objectContaining({
+      microphoneDeviceId: 'mic-2',
+      microphoneEnabled: false,
+      webcamDeviceId: 'cam-2',
+      webcamEnabled: true,
+    })
   );
   expect(updateVideoRecordingLiveMediaState(null, { webcamEnabled: false })).toBeNull();
 });

@@ -1,4 +1,4 @@
-import type { Settings } from '../../../../../contracts/settings';
+import type { Settings, SettingsPatch } from '../../../../../contracts/settings';
 import type { CaptureActionType, SavePreset } from '../../../../../contracts/settings';
 
 export interface SavePresetsSyncState {
@@ -8,7 +8,6 @@ export interface SavePresetsSyncState {
   defaultVideoPresetId: string | null;
   isLoading: boolean;
   presets: SavePreset[];
-  saveCapturesToGallery: boolean;
   setCaptureAction: (value: CaptureActionType) => void;
   setDefaultExportPresetId: (
     value: string | null | ((prev: string | null) => string | null)
@@ -20,9 +19,8 @@ export interface SavePresetsSyncState {
     value: string | null | ((prev: string | null) => string | null)
   ) => void;
   setPresets: (value: SavePreset[]) => void;
-  setSaveCapturesToGallery: (value: boolean) => void;
   settings: Settings;
-  updateSettings: (value: Partial<Settings>) => Promise<void>;
+  updateSettings: (value: SettingsPatch) => Promise<void>;
 }
 
 export interface SavePresetsDialogState {
@@ -47,17 +45,12 @@ export interface SavePresetsActions {
     field: 'defaultImagePresetId' | 'defaultVideoPresetId' | 'defaultExportPresetId',
     value: string,
     onChange: (id: string | null) => void,
-    previousValue: string | null,
-    successKey:
-      | 'savePresets.messages.defaultExportUpdated'
-      | 'savePresets.messages.defaultImageUpdated'
-      | 'savePresets.messages.defaultVideoUpdated'
+    previousValue: string | null
   ) => Promise<void>;
   handleDeletePreset: (preset: SavePreset) => void;
   handleMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
   handleSavePreset: (name: string, path: string, enabled: boolean) => Promise<void>;
   handleTogglePresetEnabled: (preset: SavePreset) => Promise<void>;
-  handleToggleSaveToGallery: () => Promise<void>;
 }
 
 export interface SavePresetsRowHandlers {
@@ -74,7 +67,6 @@ export interface SavePresetsListProps extends SavePresetsRowHandlers {
   onCloseDeleteDialog: () => void;
   onCloseEditor: () => void;
   onSavePreset: (name: string, path: string, enabled: boolean) => Promise<void>;
-  presetCountLabel: string;
   presets: SavePreset[];
   onMoveBefore: (presetId: string, beforePresetId: string | null) => Promise<void>;
 }

@@ -26,7 +26,7 @@ const SETTINGS_ITEM_IDLE_HOVER_CLASS_NAME = [
 ].join(' ');
 
 const SETTINGS_ACTIVE_MARKER_CLASS_NAME =
-  'absolute left-3 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full ' +
+  'absolute left-1 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full ' +
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_84%,transparent)]';
 
 function getSettingsSidebarFooterLabel() {

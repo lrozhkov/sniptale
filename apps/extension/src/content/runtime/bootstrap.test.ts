@@ -36,7 +36,6 @@ const runtimeCleanupMocks = vi.hoisted(() => ({
   disableHighlighterMode: vi.fn(),
   disableQuickEditMode: vi.fn(),
   disableSelectionMode: vi.fn(),
-  disableVideoAnnotations: vi.fn(),
   disableVideoTelemetry: vi.fn(),
   hideVideoCountdown: vi.fn(),
 }));
@@ -97,14 +96,6 @@ vi.mock('../selection/selection-mode', () => ({
 vi.mock('../overlay/video-countdown', () => ({
   hideVideoCountdown: runtimeCleanupMocks.hideVideoCountdown,
   showVideoCountdown: vi.fn(),
-}));
-
-vi.mock('../overlay/video-annotations', () => ({
-  VideoAnnotationsController: undefined,
-  VideoAnnotationsControllerDeps: undefined,
-  createVideoAnnotationsController: vi.fn(),
-  disableVideoAnnotations: runtimeCleanupMocks.disableVideoAnnotations,
-  enableVideoAnnotations: vi.fn(),
 }));
 
 vi.mock('../overlay/video-telemetry', () => ({

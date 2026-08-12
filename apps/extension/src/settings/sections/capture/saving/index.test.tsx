@@ -4,9 +4,18 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { savePresetsSectionContentSpy, useSavePresetsSectionSpy } = vi.hoisted(() => ({
-  savePresetsSectionContentSpy: vi.fn(),
-  useSavePresetsSectionSpy: vi.fn(),
+const { savePresetsSectionContentSpy, storageDraftsSectionSpy, useSavePresetsSectionSpy } =
+  vi.hoisted(() => ({
+    savePresetsSectionContentSpy: vi.fn(),
+    storageDraftsSectionSpy: vi.fn(),
+    useSavePresetsSectionSpy: vi.fn(),
+  }));
+
+vi.mock('../storage-drafts', () => ({
+  StorageDraftsSection: (props: unknown) => {
+    storageDraftsSectionSpy(props);
+    return <div data-testid="storage-drafts-section" />;
+  },
 }));
 
 vi.mock('./surface/content', () => ({
@@ -37,7 +46,7 @@ function getContentProps() {
   };
 }
 
-async function renderSection() {
+async function renderSection(view?: string) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -45,14 +54,24 @@ async function renderSection() {
   }
 
   await act(async () => {
-    root?.render(<SavePresetsSection />);
+    root?.render(<SavePresetsSection {...(view === undefined ? {} : { view })} />);
   });
 }
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   savePresetsSectionContentSpy.mockReset();
+  storageDraftsSectionSpy.mockReset();
   useSavePresetsSectionSpy.mockReset();
+});
+
+it('keeps storage management on its own subpage', async () => {
+  useSavePresetsSectionSpy.mockReturnValue(createSectionState());
+
+  await renderSection('storage');
+
+  expect(savePresetsSectionContentSpy).not.toHaveBeenCalled();
+  expect(storageDraftsSectionSpy).toHaveBeenCalledWith({ view: 'storage' });
 });
 
 afterEach(() => {

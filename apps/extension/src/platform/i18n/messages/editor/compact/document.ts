@@ -22,7 +22,7 @@ export const editorCompactDocumentMessages = defineMessageSource({
     en: 'Save to folder',
   },
   saveToFolderNote: {
-    ru: 'Выберите пресет для быстрого сохранения без системного диалога.',
+    ru: 'Выберите шаблон для быстрого сохранения без системного диалога.',
     en: 'Choose a preset to save quickly without the system dialog.',
   },
   exportSettingsNote: {
@@ -66,7 +66,7 @@ export const editorCompactDocumentMessages = defineMessageSource({
     en: 'Resize target',
   },
   sizePreset: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   customSizePreset: {

@@ -11,6 +11,7 @@ import {
   type RuntimeMessageBridgeQuickActionControls,
   type RuntimeMessageBridgeViewportControls,
 } from './helpers';
+import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { ScreenshotStartContext } from '../../screenshot/types';
 
@@ -20,6 +21,9 @@ interface UseRuntimeMessageBridgeParams {
   modeControls: RuntimeMessageBridgeModeControls;
   modeState: RuntimeMessageBridgeModeState;
   quickAction: RuntimeMessageBridgeQuickActionControls;
+  workingModes: {
+    select: (mode: ToolbarWorkingMode) => void;
+  };
   viewport: Omit<RuntimeMessageBridgeViewportControls, 'handleTakeScreenshotRef'> & {
     handleTakeScreenshot: (
       type: 'visible' | 'full' | 'selection',
@@ -39,6 +43,7 @@ function buildBridgeParams(
     modeControls: params.modeControls,
     modeState: params.modeState,
     quickAction: params.quickAction,
+    workingModes: params.workingModes,
     viewport: {
       clearPendingAutoStartCapture: params.viewport.clearPendingAutoStartCapture,
       handleTakeScreenshotRef,

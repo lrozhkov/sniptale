@@ -22,6 +22,7 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - `tooling/qa` contains QA wrappers, deterministic guards, audits, and policy implementations.
 - `tooling/configs` contains passive machine-readable policy and baselines.
 - `tooling/release` owns release packaging and artifact-security tooling.
+- `tooling/agent-tooling` owns explicit installation and removal for the optional local agent kit.
 - `tooling/backup` writes local archives under ignored `.backup/`.
 - `.tmp` contains generated local reports and tooling artifacts.
 - `tasks` contains workspace-only task artifacts and is not staged.
@@ -37,4 +38,4 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - [EffectV1 bundles](video-effect-bundles.md) owns the imported effect contract.
 - [DESIGN.md](../../DESIGN.md) owns product UX, accessibility, theme, and interaction requirements.
 
-Implementation workflow and proof rules live in [AGENTS.md](../../AGENTS.md) and [implementation rules](../engineering/implementation-rules.md). Security boundaries live in [data handling](../security/data-handling.md), [manifest permissions](../security/manifest-permissions.md), and the [threat model](../security/threat-model.md).
+Implementation workflow and proof rules live in the [optional agent workflow](../agent-tooling/AGENTS.md) and [implementation rules](../engineering/implementation-rules.md). Security boundaries live in [data handling](../security/data-handling.md), [manifest permissions](../security/manifest-permissions.md), and the [threat model](../security/threat-model.md).

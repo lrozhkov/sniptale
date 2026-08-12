@@ -76,7 +76,7 @@ function expectSharedOffscreenLifecycleOwnership() {
 function expectActiveWorkflowDocPaths() {
   const codeQuality = fs.readFileSync(path.join(repoRoot, 'docs/tooling/code-quality.md'), 'utf8');
   const repoAuditSkill = fs.readFileSync(
-    path.join(repoRoot, '.agents/skills/repo-audit/SKILL.md'),
+    path.join(repoRoot, 'docs/agent-tooling/.agents/skills/repo-audit/SKILL.md'),
     'utf8'
   );
 
@@ -213,8 +213,12 @@ describe('active QA policy path integrity', () => {
     expect(isDataCarrierFile(configPath)).toBe(true);
   });
 
-  it('keeps review skills visible to diff fingerprints and QA partitioning', () => {
-    expect(isIgnoredRelativePath('.agents/skills/topology-plan-review/SKILL.md')).toBe(false);
+  it('keeps tracked review skills visible while local installed copies stay ignored', () => {
+    expect(
+      isIgnoredRelativePath('docs/agent-tooling/.agents/skills/topology-plan-review/SKILL.md')
+    ).toBe(false);
+    expect(isIgnoredRelativePath('.agents/skills/topology-plan-review/SKILL.md')).toBe(true);
+    expect(isIgnoredRelativePath('AGENTS.md')).toBe(true);
   });
 });
 

@@ -16,9 +16,13 @@ export function createPromptSource(
   return {
     globalPrompt: 'Global prompt',
     globalPromptRef: { current: null },
+    persistedGlobalPrompt: 'Global prompt',
+    persistedScenarioEditorPrompt: 'Scenario prompt',
     scenarioEditorPrompt: 'Scenario prompt',
     scenarioEditorPromptRef: { current: null },
     setGlobalPromptState: () => undefined,
+    setPersistedGlobalPrompt: () => undefined,
+    setPersistedScenarioEditorPrompt: () => undefined,
     setScenarioEditorPromptState: () => undefined,
     ...overrides,
   };

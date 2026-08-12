@@ -297,6 +297,42 @@ export function hitTestDrawingDocument(
   return null;
 }
 
+/**
+ * Returns every object touched by a pointer path. Sparse pointer samples are interpolated so a
+ * fast eraser gesture cannot jump over a narrow object between browser events.
+ */
+export function findDrawingObjectsIntersectingPath(
+  objects: readonly DrawingObject[],
+  path: readonly DrawingPoint[],
+  tolerance = 6
+): DrawingObject[] {
+  if (path.length === 0 || objects.length === 0) return [];
+  const step = Math.max(1, tolerance);
+  const touched = new Set<string>();
+  const testPoint = (point: DrawingPoint) => {
+    for (const object of objects) {
+      if (!touched.has(object.id) && hitTestDrawingObject(object, point, tolerance)) {
+        touched.add(object.id);
+      }
+    }
+  };
+  testPoint(path[0]!);
+  for (let index = 1; index < path.length; index += 1) {
+    const start = path[index - 1]!;
+    const end = path[index]!;
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    const segments = Math.max(1, Math.ceil(distance / step));
+    for (let segment = 1; segment <= segments; segment += 1) {
+      const progress = segment / segments;
+      testPoint({
+        x: start.x + (end.x - start.x) * progress,
+        y: start.y + (end.y - start.y) * progress,
+      });
+    }
+  }
+  return objects.filter((object) => touched.has(object.id));
+}
+
 export function translateDrawingObject(object: DrawingObject, delta: DrawingPoint): DrawingObject {
   const move = (point: DrawingPoint) => ({ x: point.x + delta.x, y: point.y + delta.y });
   if (object.kind === 'pencil' || object.kind === 'marker') {

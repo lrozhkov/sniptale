@@ -86,7 +86,9 @@ describe('SettingsSidebar', () => {
     expect(activeButton?.className).toContain(
       'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_20%,var(--sniptale-color-border-soft)_80%)]'
     );
-    expect(activeButton?.querySelector('div')).toBeTruthy();
+    const activeMarker = activeButton?.querySelector('div');
+    expect(activeMarker?.className).toContain('left-1');
+    expect(activeMarker?.className).not.toContain('left-3');
   });
 
   it('routes item clicks through the provided tab change handler', () => {

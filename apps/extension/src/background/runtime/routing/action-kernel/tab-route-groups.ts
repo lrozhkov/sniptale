@@ -8,6 +8,7 @@ import {
   webSnapshotRouteDescriptor,
 } from '../../../capture/routing/route-descriptors';
 import { videoControlRouteDescriptor } from '../../../media/video/runtime/manager/route-descriptors';
+import { videoRecordingSurfaceRouteDescriptor } from '../../../media/video/content-surface/route-descriptors';
 import { scenarioRouteDescriptor } from '../../../scenario/router/route-descriptors';
 import { tabModeRouteDescriptor } from '../../tab-mode-router/route-descriptors';
 import { popupExportTabRouteDescriptor } from '../boundary/popup-export-route-descriptors';
@@ -25,4 +26,5 @@ export const tabRouteGroups = [
   gallerySaveRouteDescriptor,
   webSnapshotRouteDescriptor,
   videoControlRouteDescriptor,
+  videoRecordingSurfaceRouteDescriptor,
 ] as const satisfies readonly ActionRouteGroup[];

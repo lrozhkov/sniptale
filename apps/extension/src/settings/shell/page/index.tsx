@@ -2,6 +2,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
 import { DelayedSettingsCenteredLoadingState } from '../../section-surface/loading-state';
+import { SettingsSectionHeaderActionsProvider } from '../../section-surface';
 import { SettingsSidebar } from '../navigation/sidebar';
 import { SettingsCommandPalette } from '../command-palette';
 import { settingsPageContentClassName, settingsPageLayoutClassName } from '../../section-surface';
@@ -14,6 +15,7 @@ import { AISecretUnlockPage } from '../../sections/ai/unlock';
 import {
   preloadDeferredSettingsSections,
   renderSettingsRouteContent,
+  renderSettingsRouteHeader,
   shouldDeferSettingsTab,
 } from './sections';
 import { useSettingsRoute } from '../route/history';
@@ -25,6 +27,7 @@ function SettingsPageSurface(props: {
   const content = renderSettingsRouteContent(props.route, (view) =>
     props.onRouteChange(updateSettingsRouteView(props.route, view))
   );
+  const header = renderSettingsRouteHeader(props.route.section);
 
   return (
     <div data-ui="settings.page.layout" className={settingsPageLayoutClassName}>
@@ -36,12 +39,15 @@ function SettingsPageSurface(props: {
         data-ui="settings.page.content"
         className={[settingsPageContentClassName, 'min-h-0 overflow-hidden'].join(' ')}
       >
-        <div className="h-full min-h-0 pb-4 pr-5 pt-4 lg:pb-5 lg:pr-6 lg:pt-5">
+        <div className="flex h-full min-h-0 flex-col">
+          <div data-ui="settings.page.header" className="shrink-0 px-5 pt-4 lg:px-8 lg:pt-6">
+            {header}
+          </div>
           <div
             data-ui="settings.page.content-scroll"
             className={[
-              'h-full min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain',
-              '[scrollbar-gutter:stable] p-6 lg:p-8',
+              'min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain',
+              '[scrollbar-gutter:stable] px-5 pb-4 pt-4 lg:px-8 lg:pb-6 lg:pt-4',
             ].join(' ')}
           >
             {shouldDeferSettingsTab(props.route.section) ? (
@@ -53,30 +59,6 @@ function SettingsPageSurface(props: {
         </div>
       </main>
     </div>
-  );
-}
-
-function SettingsPageBackdrop() {
-  return (
-    <>
-      <div className="pointer-events-none fixed inset-0" aria-hidden="true" />
-      <div
-        className={[
-          'pointer-events-none fixed inset-x-0 top-0 h-[320px]',
-          'bg-[radial-gradient(circle_at_top,' +
-            'color-mix(in_srgb,var(--sniptale-color-accent-soft)_26%,transparent),' +
-            'transparent_68%)]',
-        ].join(' ')}
-      />
-      <div
-        className={[
-          'pointer-events-none fixed inset-y-0 right-0 w-[28vw]',
-          'bg-[radial-gradient(circle_at_center,' +
-            'color-mix(in_srgb,var(--sniptale-color-info)_10%,transparent),' +
-            'transparent_74%)]',
-        ].join(' ')}
-      />
-    </>
   );
 }
 
@@ -135,7 +117,6 @@ function SettingsPageMain() {
         'text-[var(--sniptale-color-text-primary)]'
       }
     >
-      <SettingsPageBackdrop />
       <SettingsPageSurface route={route} onRouteChange={navigate} />
       <SettingsCommandPalette
         isOpen={commandPaletteOpen}
@@ -150,5 +131,11 @@ function SettingsPageMain() {
 
 export function SettingsPage() {
   const isAIUnlockPage = new URL(globalThis.location.href).searchParams.get('aiUnlock') === '1';
-  return isAIUnlockPage ? <AISecretUnlockPage /> : <SettingsPageMain />;
+  return isAIUnlockPage ? (
+    <AISecretUnlockPage />
+  ) : (
+    <SettingsSectionHeaderActionsProvider>
+      <SettingsPageMain />
+    </SettingsSectionHeaderActionsProvider>
+  );
 }

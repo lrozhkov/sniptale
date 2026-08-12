@@ -75,6 +75,11 @@ function createTimelineEditActions(): Omit<
   'insertion' | keyof ReturnType<typeof createTimelineSelectionActions>
 > {
   return {
+    historyTransaction: {
+      beginProjectHistoryTransaction: () => Symbol('test-history-transaction'),
+      endProjectHistoryTransaction: noop(),
+      isProjectHistoryTransactionCurrent: () => true,
+    },
     onAddTrackLogicalLane: noop(),
     onAutoTransformRecording: noop(),
     onClearPlaybackRange: noop(),
@@ -212,6 +217,13 @@ export function createFloatingWorkspaceController(): VideoEditorWorkspaceControl
   return {
     diagnostics: { isOpen: false, onClose: noop(), recordingId: null },
     header: createHeaderController(),
+    history: {
+      canUndo: false,
+      canRedo: false,
+      error: null,
+      onUndo: noop(),
+      onRedo: noop(),
+    },
     layout: {
       audioRecordingDialogOpen: false,
       closeAudioRecordingDialog: noop(),

@@ -38,7 +38,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 's',
   },
   actionPresetLabel: {
-    ru: 'Пресет',
+    ru: 'Шаблон',
     en: 'Preset',
   },
   temporalEasingLinear: {

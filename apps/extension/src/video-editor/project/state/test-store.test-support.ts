@@ -5,6 +5,7 @@ import { createActionPointPlacementMode } from '../selection/placement';
 import { createSceneSelection, resolveInitialVideoEditorSelection } from '../selection/model';
 import { createVideoEditorProjectActions } from './actions';
 import type { VideoEditorProjectState } from './contracts';
+import { createEmptyVideoEditorProjectHistory, resetVideoEditorProjectHistory } from '../history';
 
 interface VideoEditorProjectTestState extends VideoEditorProjectState {
   clearPlacementMode: () => void;
@@ -24,6 +25,7 @@ interface VideoEditorProjectTestState extends VideoEditorProjectState {
 export function createVideoEditorProjectTestStore() {
   return create<VideoEditorProjectTestState>()((set, get) => ({
     project: null,
+    projectHistory: createEmptyVideoEditorProjectHistory(),
     currentTime: 0,
     placementMode: null,
     selection: createSceneSelection(),
@@ -60,6 +62,7 @@ export function createVideoEditorProjectTestStore() {
       const selection = resolveInitialVideoEditorSelection(hydratedProject);
       set({
         project: hydratedProject,
+        projectHistory: resetVideoEditorProjectHistory(hydratedProject.id),
         selectedClipId: selection.kind === 'clip' ? selection.clipId : null,
         selectedTrackId: hydratedProject.tracks[0]?.id ?? null,
         selection,

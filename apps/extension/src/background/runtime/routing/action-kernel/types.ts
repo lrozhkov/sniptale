@@ -50,6 +50,7 @@ export type ActionRouteAuthorityFamily =
   | 'video-control-no-tab-route'
   | 'video-control-owner-no-tab-route'
   | 'video-control-privileged-tab-route'
+  | 'video-recording-surface-privileged-tab-route'
   | 'video-runtime-owner-policy';
 
 export type ActionRouteKeepChannelBehaviorSource =

@@ -7,6 +7,8 @@ import type { VideoProject } from '../../../features/video/project/types/index';
 import type { VideoEditorLibrariesState } from '../app-model/types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
 import { replaceVideoEditorUrl } from '../browser-driver';
+import { useVideoEditorSaveRetryGeneration } from './save-retry';
+import { publishVideoEditorSaveReadiness } from './save-readiness';
 
 const logger = createLogger({ namespace: 'VideoEditorAutoSave' });
 
@@ -18,8 +20,9 @@ export function useVideoEditorAutoSave(
   recordingId: string | null,
   setSaveState: VideoEditorSessionActions['setSaveState'],
   refreshProjects: VideoEditorLibrariesState['refreshProjects'],
-  syncProjectRevision?: VideoEditorSessionActions['updateProject']
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision']
 ): void {
+  const retryGeneration = useVideoEditorSaveRetryGeneration();
   const saveGenerationRef = useRef(0);
   const revisionSyncRef = useRef<{ id: string; revision: number } | null>(null);
   const initialProjectUpdatedAtRef = useRef<number | null>(null);
@@ -44,7 +47,7 @@ export function useVideoEditorAutoSave(
       setSaveState,
       ...(syncProjectRevision ? { syncProjectRevision } : {}),
     });
-  }, [project, recordingId, refreshProjects, setSaveState, syncProjectRevision]);
+  }, [project, recordingId, refreshProjects, retryGeneration, setSaveState, syncProjectRevision]);
 }
 
 function scheduleVideoEditorAutoSave(args: {
@@ -58,21 +61,25 @@ function scheduleVideoEditorAutoSave(args: {
   saveGenerationRef: MutableRefObject<number>;
   saveQueueRef: MutableRefObject<Promise<void>>;
   setSaveState: VideoEditorSessionActions['setSaveState'];
-  syncProjectRevision?: VideoEditorSessionActions['updateProject'];
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision'];
 }): () => void {
-  resetAutosaveRevisionForProject(
+  const projectChanged = resetAutosaveRevisionForProject(
     args.project,
     args.initialProjectUpdatedAtRef,
     args.persistedProjectIdRef,
     args.persistedRevisionRef
   );
+  if (projectChanged) {
+    setPublishedSaveState(args, 'saved');
+    return () => undefined;
+  }
   if (consumeAutosaveRevisionSync(args.project, args.revisionSyncRef)) {
-    args.setSaveState('saved');
+    setPublishedSaveState(args, 'saved');
     return () => undefined;
   }
   const saveGeneration = args.saveGenerationRef.current + 1;
   args.saveGenerationRef.current = saveGeneration;
-  args.setSaveState('saving');
+  setPublishedSaveState(args, 'dirty');
   const timer = window.setTimeout(() => {
     runScheduledVideoProjectSave(args, saveGeneration);
   }, 350);
@@ -86,12 +93,12 @@ function runScheduledVideoProjectSave(
   args: Parameters<typeof scheduleVideoEditorAutoSave>[0],
   saveGeneration: number
 ): void {
-  queueVideoProjectSave(args)
+  queueVideoProjectSave(args, saveGeneration)
     .then(() => {
       if (args.saveGenerationRef.current !== saveGeneration) {
         return;
       }
-      args.setSaveState('saved');
+      setPublishedSaveState(args, 'saved');
       replaceVideoEditorUrl(args.project.id, args.recordingId);
       void args.refreshProjects();
     })
@@ -100,22 +107,20 @@ function runScheduledVideoProjectSave(
         return;
       }
       logger.error('Failed to save project', saveError);
-      args.setSaveState('error');
+      setPublishedSaveState(args, 'error');
     });
 }
 
-function queueVideoProjectSave(args: {
-  initialProjectUpdatedAtRef: MutableRefObject<number | null>;
-  persistedProjectIdRef: MutableRefObject<string | null>;
-  persistedRevisionRef: MutableRefObject<number | null | undefined>;
-  project: VideoProject;
-  revisionSyncRef: MutableRefObject<{ id: string; revision: number } | null>;
-  saveQueueRef: MutableRefObject<Promise<void>>;
-  syncProjectRevision?: VideoEditorSessionActions['updateProject'];
-}): Promise<VideoProject> {
+function queueVideoProjectSave(
+  args: Parameters<typeof scheduleVideoEditorAutoSave>[0],
+  saveGeneration: number
+): Promise<VideoProject> {
   const savePromise = args.saveQueueRef.current
     .catch(() => undefined)
     .then(async () => {
+      if (args.saveGenerationRef.current === saveGeneration) {
+        setPublishedSaveState(args, 'saving');
+      }
       const expectedWorkspaceRevision =
         args.persistedRevisionRef.current === undefined
           ? await resolveInitialWorkspaceRevision(
@@ -144,6 +149,14 @@ function queueVideoProjectSave(args: {
   return savePromise;
 }
 
+function setPublishedSaveState(
+  args: Parameters<typeof scheduleVideoEditorAutoSave>[0],
+  saveState: Parameters<VideoEditorSessionActions['setSaveState']>[0]
+): void {
+  args.setSaveState(saveState);
+  publishVideoEditorSaveReadiness({ projectId: args.project.id, saveState });
+}
+
 async function resolveInitialWorkspaceRevision(
   project: VideoProject,
   initialProjectUpdatedAt: number | null
@@ -167,13 +180,14 @@ function resetAutosaveRevisionForProject(
   initialProjectUpdatedAtRef: MutableRefObject<number | null>,
   projectIdRef: MutableRefObject<string | null>,
   revisionRef: MutableRefObject<number | null | undefined>
-): void {
+): boolean {
   if (projectIdRef.current === project.id) {
-    return;
+    return false;
   }
   projectIdRef.current = project.id;
   initialProjectUpdatedAtRef.current = project.updatedAt;
   revisionRef.current = undefined;
+  return true;
 }
 
 function consumeAutosaveRevisionSync(
@@ -196,7 +210,7 @@ function syncSavedProjectRevision(args: {
   project: VideoProject;
   revisionSyncRef: MutableRefObject<{ id: string; revision: number } | null>;
   savedProject: VideoProject;
-  syncProjectRevision?: VideoEditorSessionActions['updateProject'];
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision'];
 }): void {
   if (!args.syncProjectRevision || args.savedProject.updatedAt === args.project.updatedAt) {
     return;
@@ -206,9 +220,5 @@ function syncSavedProjectRevision(args: {
     id: args.savedProject.id,
     revision: args.savedProject.updatedAt,
   };
-  args.syncProjectRevision((currentProject) =>
-    currentProject === args.project
-      ? { ...currentProject, updatedAt: args.savedProject.updatedAt }
-      : currentProject
-  );
+  args.syncProjectRevision(args.project, args.savedProject.updatedAt);
 }

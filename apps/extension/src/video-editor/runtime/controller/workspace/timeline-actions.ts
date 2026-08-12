@@ -8,6 +8,7 @@ import type { VideoEditorControllerStorePort } from '../../../contracts/controll
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import { createTimelineTrackActions } from './timeline-track-actions';
 import { createAutoTransformRecordingAction } from './timeline-auto-transform';
+import { getCurrentVideoEditorProjectSnapshot } from '../store';
 
 type TimelineWorkspace = Pick<
   VideoEditorWorkspaceState,
@@ -160,13 +161,21 @@ export function createWorkspaceTimelineEditingActions(
   selectedClipActions: SelectedClipActions
 ) {
   return {
+    historyTransaction: {
+      beginProjectHistoryTransaction: store.beginProjectHistoryTransaction,
+      endProjectHistoryTransaction: store.endProjectHistoryTransaction,
+      isProjectHistoryTransactionCurrent: store.isProjectHistoryTransactionCurrent,
+    },
     onClearPlaybackRange: workspace.clearPlaybackRange,
     onDeleteSelectedClip: selectedClipActions.deleteSelectedClip,
     onDeleteSelectedTimelineObject: () =>
       deleteSelectedTimelineObject(store.selection, store, selectedClipActions),
     onDuplicateSelectedClip: selectedClipActions.duplicateSelectedClip,
     onUpdateSelectedClipPlaybackRate: createSelectedClipPlaybackRateAction(store),
-    onAutoTransformRecording: createAutoTransformRecordingAction(store),
+    onAutoTransformRecording: createAutoTransformRecordingAction(
+      store,
+      getCurrentVideoEditorProjectSnapshot
+    ),
     onMoveActionEvent: createActionEventMover(store),
     onResizeActionEvent: createActionEventResizer(store),
     onCloseTrackGap: store.closeTrackGap,

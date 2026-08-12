@@ -3,7 +3,11 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 import type { Settings } from '../../../contracts/settings';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
-import { createVisibleCapturePromise, runStartCaptureUseCase } from './start-capture-use-case';
+import {
+  createVisibleCapturePromise,
+  maybePersistScreenshotInMediaHub,
+  runStartCaptureUseCase,
+} from './start-capture-use-case';
 import type { StartCapturePorts } from './ports';
 
 function createSettings(overrides: Partial<Settings> = {}): Settings {
@@ -77,9 +81,39 @@ it('selects viewport capture when viewport dimensions are available', async () =
   expect(cropCapture).not.toHaveBeenCalled();
 });
 
+it('stores an explicit save-to-library action in the library', async () => {
+  const saveScreenshotToMediaHubFromDataUrl = vi.fn(async () => 'asset-1');
+
+  await expect(
+    maybePersistScreenshotInMediaHub(
+      {},
+      'data:image/png;base64,library',
+      'visible.png',
+      42,
+      'save_to_library',
+      { saveScreenshotToMediaHubFromDataUrl }
+    )
+  ).resolves.toBe('asset-1');
+
+  expect(saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
+    'data:image/png;base64,library',
+    'visible.png',
+    42,
+    'library'
+  );
+});
+
 it('persists gallery and scenario outputs before returning the capture payload', async () => {
   const ports = createPorts(
-    createSettings({ captureAction: 'scenario', saveCapturesToGallery: true })
+    createSettings({
+      captureAction: 'scenario',
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'library',
+        draftRetentionDays: 7,
+        videoDraftRetentionDays: 7,
+      },
+    })
   );
   const scenarioSessionService = createScenarioSessionServiceStub();
   const scenarioCapture = createScenarioCapturePayload();
@@ -121,7 +155,16 @@ it('persists gallery and scenario outputs before returning the capture payload',
 });
 
 it('marks the capture job failed when persistence rejects', async () => {
-  const ports = createPorts(createSettings({ saveCapturesToGallery: true }));
+  const ports = createPorts(
+    createSettings({
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'library',
+        draftRetentionDays: 7,
+        videoDraftRetentionDays: 7,
+      },
+    })
+  );
   vi.mocked(ports.saveScreenshotToMediaHubFromDataUrl).mockRejectedValueOnce(
     new Error('gallery unavailable')
   );

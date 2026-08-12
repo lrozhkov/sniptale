@@ -31,7 +31,11 @@ export const quickActionRouteDescriptor = {
   authorityFamily: 'quick-action-privileged-tab-route',
   handlerAdapter: 'routeTabAction',
   keepChannelBehaviorSource: 'tab-routing-adapter',
-  messageTypes: ['TRIGGER_QUICK_ACTION'],
+  messageTypes: [
+    'TRIGGER_QUICK_ACTION',
+    'PREPARE_DESKTOP_SCREENSHOT_CAPTURE',
+    'TRIGGER_SCREENSHOT_CAPTURE',
+  ],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.quick-action.ts',
 } as const;
 

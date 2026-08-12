@@ -3,7 +3,7 @@ import {
   createDesktopMediaSourceChooser as createBackgroundDesktopMediaSourceChooser,
   type DesktopCaptureSourcePickerDeps,
   type DesktopMediaSourceChooserResult,
-} from '../../desktop-capture/source-picker';
+} from '../../../../platform/media-utils/desktop-capture-source-picker';
 
 export type { DesktopMediaSourceChooserResult };
 

@@ -87,10 +87,8 @@ function renderPopupHomePage(
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities()}
-      galleryStatus={null}
       pageAccess={{
         disabledReason: 'popup.home.pageAccessRequired',
         error: null,
@@ -150,6 +148,7 @@ it('shows page-access activation controls when page tooling is not active', asyn
   expect(getContainer()?.textContent).toContain('popup.home.alwaysEnableSite');
   expect(getContainer()?.textContent).toContain('popup.home.alwaysEnableAllSites');
   expect(usePopupHomeActionsSpy).toHaveBeenLastCalledWith({
+    quickActions: [],
     quickActionsDisabledReason: 'popup.home.pageAccessRequired',
     screenshotDisabledReason: 'popup.home.pageAccessRequired',
   });
@@ -164,6 +163,7 @@ it('renders page-access status load failures without keeping actions disabled', 
 
   expect(getContainer()?.textContent).toContain('status failed');
   expect(usePopupHomeActionsSpy).toHaveBeenLastCalledWith({
+    quickActions: [],
     quickActionsDisabledReason: null,
     screenshotDisabledReason: null,
   });
@@ -179,6 +179,7 @@ it('surfaces page-access request failures after an activation action', async () 
   expect(getContainer()?.textContent).toContain('activation denied');
   expect(pageAccessHandleRequestSpy).toHaveBeenCalledWith('activate-current-tab');
   expect(usePopupHomeActionsSpy).toHaveBeenLastCalledWith({
+    quickActions: [],
     quickActionsDisabledReason: 'popup.home.pageAccessRequired',
     screenshotDisabledReason: 'popup.home.pageAccessRequired',
   });
@@ -209,10 +210,8 @@ it('does not read page-access status for restricted tabs', async () => {
     <PopupHomePage
       quickActions={[]}
       quickActionsReady
-      displayMode="list"
       viewportPresets={[]}
       activeTabCapabilities={createActiveTabCapabilities({ isRestrictedPage: true })}
-      galleryStatus={null}
     />
   );
 
