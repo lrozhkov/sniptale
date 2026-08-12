@@ -129,7 +129,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/artifact-security.mjs",
-      "sha256": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
+      "sha256": "314522548f8a93a731e740bec46b25b1a0d9d5385371cc10c5758eb6cdabd8ed"
     },
     {
       "category": "bundled-font",
@@ -149,7 +149,7 @@
     {
       "category": "archive-integration",
       "path": "tooling/release/package-dist.mjs",
-      "sha256": "45fb58ad0975e84df1e2f6f97221037090f7cd7781e345bd6f5d09f4cfc897d4"
+      "sha256": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
     }
   ]
 }
