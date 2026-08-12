@@ -13,6 +13,7 @@ import type { useFrameManager } from '../../../content/selection/frame-runtime/r
 import type { PreparationHostPorts } from './types';
 import type { ContentDrawingController } from '../../../content/drawing/controller';
 import type { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
+import { buildContentModeFlags } from '../../../content/overlay/app/view-state/helpers';
 
 type FrameManager = ReturnType<typeof useFrameManager>;
 
@@ -107,18 +108,7 @@ function projectPreparationToolbar(
       !modeState.drawingMode,
     isToolbarVisible: modeState.isToolbarVisible,
     modeController: controllers.modeController,
-    modes: {
-      aiPickMode: modeState.aiPickMode,
-      designReviewMode: modeState.designReviewMode,
-      ...(modeState.drawingMode === undefined ? {} : { drawingMode: modeState.drawingMode }),
-      highlighterMode: modeState.highlighterMode,
-      quickEditDocumentMode: modeState.quickEditDocumentMode,
-      quickEditMode: modeState.quickEditMode,
-      screenshotMode: modeState.screenshotMode,
-      ...(modeState.videoRecordingMode === undefined
-        ? {}
-        : { videoRecordingMode: modeState.videoRecordingMode }),
-    },
+    modes: buildContentModeFlags(modeState),
     pinToTab: modeState.pinToTab,
     pinToTabAvailable: modeState.pinToTabAvailable,
     setFutureFrameEffectMode: frameManager.setFutureFrameEffectMode,

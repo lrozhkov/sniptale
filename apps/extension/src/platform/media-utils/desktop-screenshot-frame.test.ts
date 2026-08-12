@@ -89,6 +89,17 @@ it('keeps capture available when Chrome omits cursor confirmation and still chec
   expect(unsupportedSurface.stop).toHaveBeenCalledOnce();
   unsupportedSurface.createElement.mockRestore();
 
+  const constraintlessSurface = installCaptureSurface();
+  Object.defineProperty(constraintlessSurface.track, 'applyConstraints', {
+    configurable: true,
+    value: undefined,
+  });
+  await expect(
+    captureDesktopScreenshotFrame({ streamId: 'stream', imageFormat: 'webp', imageQuality: 90 })
+  ).resolves.toMatchObject({ width: 1280, height: 720 });
+  expect(constraintlessSurface.stop).toHaveBeenCalledOnce();
+  constraintlessSurface.createElement.mockRestore();
+
   const sizeSurface = installCaptureSurface({ width: 0 });
   await expect(
     captureDesktopScreenshotFrame({ streamId: 'stream', imageFormat: 'png', imageQuality: 90 })

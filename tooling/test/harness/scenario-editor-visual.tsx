@@ -6,7 +6,7 @@ import {
   SCENARIO_VISUAL_BASELINE_SLIDE_IDS,
 } from '../../../apps/extension/src/scenario-editor/workspace/visual-baseline/fixtures';
 import { ScenarioV3EditorShell } from '../../../apps/extension/src/scenario-editor/page-shell';
-import { saveScenarioAsset } from '../../../apps/extension/src/composition/persistence/scenario/projects';
+import { commitScenarioAggregateMutation } from '../../../apps/extension/src/composition/persistence/scenario/aggregate-mutations';
 import {
   initializeAppTheme,
   type AppThemePreference,
@@ -37,24 +37,20 @@ function applyHarnessDocumentStyles(): void {
   document.getElementById('root')?.style.setProperty('height', '100%');
 }
 
-async function seedScenarioVisualAssets(projectId: string): Promise<void> {
-  await Promise.all(
-    createScenarioVisualBaselineAssets(projectId).map((asset) => saveScenarioAsset(asset))
-  );
-}
-
 async function mountScenarioEditorVisualHarness(): Promise<void> {
   await harnessReady;
   applyHarnessDocumentStyles();
   initializeAppTheme(readThemePreference());
 
   const project = createScenarioVisualBaselineProject();
-  await seedScenarioVisualAssets(project.id);
+  const committed = await commitScenarioAggregateMutation(project, {
+    children: { assetPuts: createScenarioVisualBaselineAssets(project.id) },
+  });
 
   createRoot(document.getElementById('root')!).render(
     <ScenarioV3EditorShell
       initialSlideId={readInitialSlideId()}
-      project={project}
+      project={committed.project}
       onProjectChange={() => undefined}
     />
   );

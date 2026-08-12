@@ -19,7 +19,6 @@ export async function runImmediateScreenshot(
   contentIntentSource?: ContentPrivilegedActionIntentSource
 ) {
   hideAllToasts();
-  let quickActionClosed = false;
 
   try {
     if (type === 'selection') {
@@ -38,13 +37,12 @@ export async function runImmediateScreenshot(
 
     if (shouldExitAfterQuickActionCapture(args.params.quickActionOverlayRef)) {
       await closeQuickActionCapture(args.params, args.runtime, runToken);
-      quickActionClosed = true;
       return;
     }
 
     restoreVisibleUiState(args.runtime, runToken);
   } catch (error) {
-    if (!quickActionClosed) quickActionClosed = await closeFailedQuickActionCapture(args, runToken);
+    const quickActionClosed = await closeFailedQuickActionCapture(args, runToken);
     if (!quickActionClosed) restoreVisibleUiState(args.runtime, runToken);
     if (isStaleScreenshotRunError(error)) {
       return;

@@ -6,10 +6,6 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isOptionalRecord(value: unknown): value is Record<string, unknown> | undefined {
-  return value === undefined || isRecord(value);
-}
-
 function isSafeFrameCss(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 20_000) return false;
   const validation = validateCssPolicyString(value);
@@ -67,7 +63,8 @@ function hasSafeColorFields(value: Record<string, unknown>, fields: readonly str
 }
 
 function isBorderSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   const padding = value['padding'];
   const effects = value['effects'];
   return (
@@ -145,7 +142,8 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
 }
 
 function isBlurSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   return (
     isFiniteNumber(value['amount']) &&
     isOneOf(value['blurType'], ['gaussian', 'pixelate', 'distortion', 'solid']) &&
@@ -206,7 +204,8 @@ export function parseBlurSettings(value: unknown): BlurSettings | undefined | nu
 }
 
 export function isFocusSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   return (
     isFiniteNumber(value['opacity']) &&
     value['opacity'] >= 0 &&
@@ -275,7 +274,8 @@ function isStepBadgeStyle(value: unknown): boolean {
 }
 
 export function isStepBadgeSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   const style = value['style'];
   return (
     typeof value['enabled'] === 'boolean' &&
@@ -478,7 +478,8 @@ function isCalloutConnector(value: unknown): boolean {
 }
 
 export function isCalloutSettings(value: unknown): boolean {
-  if (!isOptionalRecord(value) || value === undefined) return value === undefined;
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
   const content = value['content'];
   const placement = value['placement'];
   const style = value['style'];

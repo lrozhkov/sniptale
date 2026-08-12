@@ -4,15 +4,15 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=8, tool-noise=21.
-- Enforced source: jscpd=27, license=1, scc=1.
+- Classification: accepted-architecture=32, tool-noise=28.
+- Enforced source: jscpd=58, license=1, scc=1.
 
 ## Active structural debt
 
 
 ## Duplication
 
-- accepted-architecture=6, tool-noise=21. Every family is exact-count, exact-lines, and sample-fingerprinted.
+- accepted-architecture=30, tool-noise=28. Every family is exact-count, exact-lines, and sample-fingerprinted.
 - Highest-line actionable families:
 
 ## Focused coverage rollout
@@ -24,5 +24,5 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registered policy dispositions
 
-- permanent-policy=24, tool-filter=352.
+- permanent-policy=24, tool-filter=353.
 - Exact scopes, source hashes, owners, reasons, remediation, and expiry data remain in the machine registry.

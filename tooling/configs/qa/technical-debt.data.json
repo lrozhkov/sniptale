@@ -38,8 +38,8 @@
         "key": "apps/extension/src/background/ai/settings"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/ai/settings",
+        "count": 1,
         "lines": 12,
         "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece"
       },
@@ -58,8 +58,8 @@
         "key": "apps/extension/src/background/runtime/page-access"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/runtime/page-access",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8"
       },
@@ -78,30 +78,10 @@
         "key": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde"
-      },
-      "targetAction": "keep declarative descriptor or geometry repetition local"
-    },
-    {
-      "id": "accepted.jscpd.editor-controller-freehand.0d071be4fb41",
-      "classification": "accepted-architecture",
-      "owner": "editor-controller-freehand",
-      "risk": "Extraction could obscure owner-local declarative structure; unreviewed growth would increase maintenance cost.",
-      "reason": "The detected block is declarative descriptor/geometry data; extraction would obscure the catalog shape more than it would reduce maintenance risk.",
-      "removalCondition": "keep declarative descriptor or geometry repetition local",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/editor/controller/freehand"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/editor/controller/freehand",
-        "lines": 9,
-        "sampleFingerprint": "088168f00790609fe163b9e4e83e2199d176f0e34b3584d7a0c4fdd3f08b43f0"
       },
       "targetAction": "keep declarative descriptor or geometry repetition local"
     },
@@ -118,8 +98,8 @@
         "key": "apps/extension/src/scenario-editor/workspace/quick-edit"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/scenario-editor/workspace/quick-edit",
+        "count": 1,
         "lines": 35,
         "sampleFingerprint": "e48ed701389c6e4b063d0e56be271e0354c015d0abd6852a2d97187fc59d9df6"
       },
@@ -138,8 +118,8 @@
         "key": "packages/ui/src"
       },
       "scope": {
-        "count": 5,
         "family": "packages/ui/src",
+        "count": 5,
         "lines": 89,
         "sampleFingerprint": "6454ec8a1e84850236136ad0c6558752c292b32be82baa782fc264fd3fb44c80"
       },
@@ -182,30 +162,10 @@
         "key": "apps/extension/src/background/capture/native-app"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture/native-app",
+        "count": 1,
         "lines": 10,
         "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.composition-persistence-scenario.4647d3736115",
-      "classification": "tool-noise",
-      "owner": "composition-persistence-scenario",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/composition/persistence/scenario"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/composition/persistence/scenario",
-        "lines": 8,
-        "sampleFingerprint": "bacf2fc5aa7b239dff4352f7bbd5108029d33ef28afe59b8c4bda5fb4adf92ae"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -222,8 +182,8 @@
         "key": "apps/extension/src/content/selection/frame-settings-popover"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/frame-settings-popover",
+        "count": 1,
         "lines": 6,
         "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a"
       },
@@ -242,8 +202,8 @@
         "key": "apps/extension/src/features/editor/document"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/editor/document",
+        "count": 1,
         "lines": 14,
         "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971"
       },
@@ -262,8 +222,8 @@
         "key": "apps/extension/src/features/video/composition"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/video/composition",
+        "count": 1,
         "lines": 13,
         "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8"
       },
@@ -282,8 +242,8 @@
         "key": "apps/extension/src/features/media-hub"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/features/media-hub",
+        "count": 1,
         "lines": 12,
         "sampleFingerprint": "cfec7dd03af566fb9a745004f2212301dfd53d0b7483b9b1e043d6584349543f"
       },
@@ -302,32 +262,12 @@
         "key": "apps/extension/src/video-editor/project/state"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/video-editor/project/state",
+        "count": 1,
         "lines": 9,
         "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.settings-sections-capture-media-quality-video.553ddf0b71ce",
-      "classification": "tool-noise",
-      "owner": "settings-capture-media-quality-video",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live samples are overlapping clones inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/settings/sections/capture/media-quality/video"
-      },
-      "scope": {
-        "count": 2,
-        "family": "apps/extension/src/settings/sections/capture/media-quality/video",
-        "lines": 81,
-        "sampleFingerprint": "553ddf0b71ce3cacf2a3878249647115e4499823a64cc7847f9e89faebde3722"
-      },
-      "targetAction": "keep the overlapping same-file blocks visible and remove the entry if jscpd stops reporting them"
     },
     {
       "id": "noise.jscpd.content-parser-export-manager.a844b3c0f09f",
@@ -342,8 +282,8 @@
         "key": "apps/extension/src/content/parser/export-manager"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/parser/export-manager",
+        "count": 1,
         "lines": 23,
         "sampleFingerprint": "a844b3c0f09f82f2d30ba8328625b9206185569d633b49d9cc31be6d2665772a"
       },
@@ -362,8 +302,8 @@
         "key": "apps/extension/src/content/public/preparation-surface"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/public/preparation-surface",
+        "count": 1,
         "lines": 22,
         "sampleFingerprint": "79af704f37cc515dc3c80d356e52b02b0816643e3d52f13d439234cfa280aa7f"
       },
@@ -382,8 +322,8 @@
         "key": "tooling/qa/core"
       },
       "scope": {
-        "count": 1,
         "family": "tooling/qa/core",
+        "count": 1,
         "lines": 21,
         "sampleFingerprint": "c471b9017a2b3ebfb00fd8baf018768cd6e956fe7848b2325e7f31743415e99c"
       },
@@ -402,9 +342,9 @@
         "key": "apps/extension/src/background/capture/quick-actions"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture/quick-actions",
-        "lines": 18,
+        "count": 1,
+        "lines": 19,
         "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
@@ -422,52 +362,12 @@
         "key": "apps/extension/src/background/runtime/tab-mode-router-screenshot"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/runtime/tab-mode-router-screenshot",
+        "count": 1,
         "lines": 18,
         "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.content-selection-callout.3c8d27f404bb",
-      "classification": "tool-noise",
-      "owner": "content-selection-callout",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/content/selection/callout"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/content/selection/callout",
-        "lines": 15,
-        "sampleFingerprint": "3c8d27f404bba455297cf37c0fd1ff3d470d1f4ff05f971c786544aff93fbc31"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.content-selection-callout-apps-extension-src-content-selection-step-badge.2c323f43b348",
-      "classification": "tool-noise",
-      "owner": "content-selection-pointer-drag-consumers",
-      "risk": "Clone grouping can mistake declarative use of a shared owner for duplicated behavior; unreviewed growth could still conceal divergence.",
-      "reason": "The live sample is matching declarative call-site setup for the canonical pointer-drag owner, not duplicate drag-session behavior.",
-      "removalCondition": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/content/selection/callout <-> apps/extension/src/content/selection/step-badge",
-        "lines": 14,
-        "sampleFingerprint": "2c323f43b348cf9d83850b47c410b961be4b0b70ea0fab095d7a7ba9737167cd"
-      },
-      "targetAction": "keep the shared-owner call sites exact and remove the entry if jscpd stops grouping them"
     },
     {
       "id": "noise.jscpd.content-selection-frame-runtime.a8aecc935edd",
@@ -482,8 +382,8 @@
         "key": "apps/extension/src/content/selection/frame-runtime"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/frame-runtime",
+        "count": 1,
         "lines": 13,
         "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd"
       },
@@ -502,9 +402,9 @@
         "key": "apps/extension/src/content/selection/highlighter-hover-preview"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/highlighter-hover-preview",
-        "lines": 13,
+        "count": 1,
+        "lines": 10,
         "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
@@ -522,30 +422,10 @@
         "key": "apps/extension/src/background/capture-surface"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/background/capture-surface",
+        "count": 1,
         "lines": 11,
         "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
-      "id": "noise.jscpd.settings-sections-capture-screen-sizes.b80dffc340ce",
-      "classification": "tool-noise",
-      "owner": "settings-capture-screen-sizes",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/settings/sections/capture/screen-sizes"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/settings/sections/capture/screen-sizes",
-        "lines": 10,
-        "sampleFingerprint": "b80dffc340ce9bfbe5cc72d774acbe1cb707366b1171c391c51d6bfd608e245d"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
@@ -562,8 +442,8 @@
         "key": "tooling/qa/runtime"
       },
       "scope": {
-        "count": 1,
         "family": "tooling/qa/runtime",
+        "count": 1,
         "lines": 10,
         "sampleFingerprint": "976c2c57fd5f47f808f0e4626433d12b9e63749c6ecdd5acf2ee4df7a13494a1"
       },
@@ -582,12 +462,752 @@
         "key": "apps/extension/src/content/selection/interactive-frame"
       },
       "scope": {
-        "count": 1,
         "family": "apps/extension/src/content/selection/interactive-frame",
+        "count": 1,
         "lines": 9,
         "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f"
       },
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
+    },
+    {
+      "id": "accepted.jscpd.settings-sections-styles.3ea4a5d66567",
+      "classification": "accepted-architecture",
+      "owner": "settings-sections-styles",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/styles"
+      },
+      "scope": {
+        "count": 9,
+        "family": "apps/extension/src/settings/sections/styles",
+        "lines": 157,
+        "sampleFingerprint": "3ea4a5d66567c1cf7e7b0860d3f0d6af5b004a208405894a654415d10a39c35a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter-frame-annotation.42dc97543f07",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 7,
+        "family": "apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 79,
+        "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co.842751ee8be7",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-callout-apps-extension-src-composition-frame-annotation-co",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge"
+      },
+      "scope": {
+        "count": 5,
+        "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
+        "lines": 120,
+        "sampleFingerprint": "842751ee8be7f51fe28ab0368ed2e990410bc2707855f79bb69f89622d9c87d8"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter.506407403875",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter"
+      },
+      "scope": {
+        "count": 4,
+        "family": "apps/extension/src/features/highlighter",
+        "lines": 43,
+        "sampleFingerprint": "506407403875f4660d155aab8d327e2342e60c920a54ea6b05ceaf4160ab4c1d"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.ui-highlighter-preset-editor-callout-apps-extension-src-ui-highlighter-preset-editor-step-badge.8fecb6e30e20",
+      "classification": "accepted-architecture",
+      "owner": "ui-highlighter-preset-editor-callout-apps-extension-src-ui-highlighter-preset-editor-step-badge",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+        "lines": 138,
+        "sampleFingerprint": "8fecb6e30e2055574268370aae971b2590f3607e049c1f5f3d3d6908ec659992"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-image-aggregates.f6cde71e69ba",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-image-aggregates",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/image-aggregates"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/composition/persistence/image-aggregates",
+        "lines": 32,
+        "sampleFingerprint": "f6cde71e69bae887b381660b8243b1e35f8c2c4e28113f7823757b4c93fc7ace"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets"
+      },
+      "scope": {
+        "count": 3,
+        "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
+        "lines": 29,
+        "sampleFingerprint": "bc2c20338af1a8e924c0ed69c2063e42a733193046995dfffda1e322bb4fd3af"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.settings-sections-capture.ece3f933fd15",
+      "classification": "tool-noise",
+      "owner": "settings-sections-capture",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/capture"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/settings/sections/capture",
+        "lines": 81,
+        "sampleFingerprint": "ece3f933fd1572d135baeb4d2d71077fe93e906a4b9bce6a8207b4a9ae8eda0d"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont.239116b5b15c",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-frame-apps-extension-src-composition-frame-annotation-cont",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/frame-annotation-controls/frame <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
+        "lines": 45,
+        "sampleFingerprint": "239116b5b15ca7c472c725c23b16a9f6eebd5506957616305fd098830a2ae047"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-frame-annotation-controls-frame.8d96f1d36cc9",
+      "classification": "tool-noise",
+      "owner": "composition-frame-annotation-controls-frame",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/frame"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/frame-annotation-controls/frame",
+        "lines": 31,
+        "sampleFingerprint": "8d96f1d36cc9feb24ef56ca5361d7145b70d0c41698cfadbd4a38f8bc28c608f"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-callout-presets.b273515ad5b3",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-callout-presets",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/callout-presets"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/persistence/callout-presets",
+        "lines": 26,
+        "sampleFingerprint": "b273515ad5b3c4fe12d8bab876401e2051e318f7a689199b9bd7925236583312"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.content-drawing.2129255a612e",
+      "classification": "tool-noise",
+      "owner": "content-drawing",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/drawing"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/content/drawing",
+        "lines": 20,
+        "sampleFingerprint": "2129255a612ed6ecd2c1f0c03879c5bf772be844fa53427741fc6e3441c0913a"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-scenario.c6fc6038ef1d",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-scenario",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/scenario"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/composition/persistence/scenario",
+        "lines": 17,
+        "sampleFingerprint": "c6fc6038ef1de2f4020be9cfe5bbace660562d43bad5896c1df80e01673b2bef"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-instance.70c48226805e",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-instance",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/instance"
+      },
+      "scope": {
+        "count": 2,
+        "family": "apps/extension/src/editor/controller/instance",
+        "lines": 13,
+        "sampleFingerprint": "70c48226805eba8ae39955c617f852e6b20aec3397001cfefc0bd3046bfe1331"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.content-overlay-toolbar.e114d9ebc15d",
+      "classification": "tool-noise",
+      "owner": "content-overlay-toolbar",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/overlay/toolbar"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/overlay/toolbar",
+        "lines": 120,
+        "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.design-system-previews-product-glass-controls.8383ea741d5f",
+      "classification": "accepted-architecture",
+      "owner": "design-system-previews-product-glass-controls",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/design-system/previews/product-glass-controls"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/design-system/previews/product-glass-controls",
+        "lines": 21,
+        "sampleFingerprint": "8383ea741d5fdf0ee09caa1deff26b87d6ed4d742302410fcd0e9505b1d1ad29"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-voice-apps-extension-src-content-voice-input.33a0a7c573cf",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-voice-apps-extension-src-content-voice-input",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
+        "lines": 19,
+        "sampleFingerprint": "33a0a7c573cf63e198e5fed40f2149cd79181dc2ea179d78032a09171e6482b2"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-document-apps-extension-src-editor-drawing-object.ea03b4a8b7ce",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-document-apps-extension-src-editor-drawing-object",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object",
+        "lines": 17,
+        "sampleFingerprint": "ea03b4a8b7ceb3932a9b52cd34623c7d44532cb31d2f5155ee53014bef436320"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter.13549feb0b14",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter",
+        "lines": 15,
+        "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.editor-controller-magnet.89d39fbbaec3",
+      "classification": "tool-noise",
+      "owner": "editor-controller-magnet",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/magnet"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/magnet",
+        "lines": 15,
+        "sampleFingerprint": "89d39fbbaec37fb9893b0711819f994f03ae03da968bde6f9764a7f95cd43171"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.package-foundation-src.9d198a6afa62",
+      "classification": "tool-noise",
+      "owner": "package-foundation-src",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "packages/foundation/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "packages/foundation/src",
+        "lines": 15,
+        "sampleFingerprint": "9d198a6afa62cd728183e12f42c6a5211cf3ae3539c2f1163dedf2cbd68531f8"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.settings-sections-capture-apps-extension-src-settings-sections-styles.6dbdf80b6bc3",
+      "classification": "accepted-architecture",
+      "owner": "settings-sections-capture-apps-extension-src-settings-sections-styles",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles",
+        "lines": 14,
+        "sampleFingerprint": "6dbdf80b6bc30cad798084d8ca51af675ab8d4f40f4f1c5293abf84f8b624d6a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector.f0e723f15aab",
+      "classification": "accepted-architecture",
+      "owner": "ui-highlighter-preset-editor-apps-extension-src-ui-surface-style-selector",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
+        "lines": 13,
+        "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.composition-persistence-annotation-template-tags.40b1ab177da1",
+      "classification": "tool-noise",
+      "owner": "composition-persistence-annotation-template-tags",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/annotation-template-tags"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/annotation-template-tags",
+        "lines": 12,
+        "sampleFingerprint": "40b1ab177da1a1f7c6615a656d887a2f4513fc43c1a3b26730f4097e97921a5f"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.content-drawing-apps-extension-src-content-overlay-toolbar.65bb61ab8424",
+      "classification": "accepted-architecture",
+      "owner": "content-drawing-apps-extension-src-content-overlay-toolbar",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar",
+        "lines": 12,
+        "sampleFingerprint": "65bb61ab8424ce5da3b8634a9a6404ff21cc5e8266e8cce28c24ab780a9235ea"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access.693f682864be",
+      "classification": "accepted-architecture",
+      "owner": "background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access",
+        "lines": 11,
+        "sampleFingerprint": "693f682864bee26de66516f7cd30343d7af6b22fe9bcce7b04cf9bd8d0784319"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.content-parser-page-preparation-apps-extension-src-features-highlighter-frame-annotation.e4e5c1e14803",
+      "classification": "accepted-architecture",
+      "owner": "content-parser-page-preparation-apps-extension-src-features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 10,
+        "sampleFingerprint": "e4e5c1e14803f609b5e7358b292cd1e5abf113eb9fcfe04611c4be681d340d9a"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation.c7b1c86444f0",
+      "classification": "accepted-architecture",
+      "owner": "features-highlighter-callout-presets-apps-extension-src-features-highlighter-frame-annotation",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/features/highlighter/callout-presets <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 10,
+        "sampleFingerprint": "c7b1c86444f047025fe6d328fc124a63859417cbacd35fdf732621d6778a51f9"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client.00bf41e72976",
+      "classification": "accepted-architecture",
+      "owner": "background-frame-annotation-raster-apps-extension-src-composition-frame-annotation-raster-client",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
+        "lines": 9,
+        "sampleFingerprint": "00bf41e729769acfd5bac208081927b0a3cba7037d9409ac7cc62ab6a42a461e"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-capture-settings-packages-runtime-contracts-src.6f5a9cc811a3",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-capture-settings-packages-runtime-contracts-src",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src",
+        "lines": 9,
+        "sampleFingerprint": "6f5a9cc811a3fdf921142e846001017fcd6125328dca5784dedb5b4a282939eb"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.composition-persistence-library-lifecycle-apps-extension-src-features-highlighter-frame-annotati.ea4e62de7d6f",
+      "classification": "accepted-architecture",
+      "owner": "composition-persistence-library-lifecycle-apps-extension-src-features-highlighter-frame-annotati",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+        "lines": 9,
+        "sampleFingerprint": "ea4e62de7d6f811ccc777dee730580e485b11e90e68549a5ee4875512d1bad54"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.content-selection-frame-runtime-apps-extension-src-features-highlighter-step-badge-presets.ed1abff69676",
+      "classification": "accepted-architecture",
+      "owner": "content-selection-frame-runtime-apps-extension-src-features-highlighter-step-badge-presets",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets",
+        "lines": 9,
+        "sampleFingerprint": "ed1abff696763297002260de5b1574227b4607dfdbcb6f19456887d4f4067a9d"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.workflows-media-hub-backup-restore.dd7a3692af13",
+      "classification": "tool-noise",
+      "owner": "workflows-media-hub-backup-restore",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/workflows/media-hub-backup/restore"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/workflows/media-hub-backup/restore",
+        "lines": 9,
+        "sampleFingerprint": "dd7a3692af131e06b85dcbc76d278efdfe953018e07349a5abe7438f87527f70"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "noise.jscpd.background-capture-routing.753a87f9cd4b",
+      "classification": "tool-noise",
+      "owner": "background-capture-routing",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/background/capture/routing"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/background/capture/routing",
+        "lines": 8,
+        "sampleFingerprint": "753a87f9cd4bcf566f5bfc7094535d80cd0c4bc7c4277c876302eabfbf4ec099"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.jscpd.composition-frame-annotation-controls-step-badge-apps-extension-src-ui-highlighter-preset-editor.9ac5372f642f",
+      "classification": "accepted-architecture",
+      "owner": "composition-frame-annotation-controls-step-badge-apps-extension-src-ui-highlighter-preset-editor",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+        "lines": 7,
+        "sampleFingerprint": "9ac5372f642fbf73d885691eebd7ec8759892eeefc8c63aed1c67ec03efc9884"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "accepted.jscpd.editor-controller-instance-apps-extension-src-editor-controller-magnet.b2d3ad96f305",
+      "classification": "accepted-architecture",
+      "owner": "editor-controller-instance-apps-extension-src-editor-controller-magnet",
+      "risk": "A generic extraction could collapse independent typed owners; unreviewed growth could still hide a shared operation.",
+      "reason": "The live matches are declarative, versioned, boundary-local, or runtime-specific shapes owned by independently changing typed domains; sharing them would create a broader cross-owner contract without removing one behavioral authority.",
+      "removalCondition": "Remove when the matched domains acquire one proven shared change reason and a narrower canonical owner.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet",
+        "lines": 7,
+        "sampleFingerprint": "b2d3ad96f305a3ebb11c04b8aa2a42a41114e5a998daeb5d55ee57f3a9055067"
+      },
+      "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
+    },
+    {
+      "id": "noise.jscpd.editor-drawing-object.31e2a1681484",
+      "classification": "tool-noise",
+      "owner": "editor-drawing-object",
+      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
+      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
+      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
+      "reviewBy": "2027-08-12",
+      "source": {
+        "kind": "jscpd",
+        "key": "apps/extension/src/editor/drawing/object"
+      },
+      "scope": {
+        "count": 1,
+        "family": "apps/extension/src/editor/drawing/object",
+        "lines": 6,
+        "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
+      },
+      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
     }
   ],
   "coverageOwners": [
@@ -8953,6 +9573,7 @@
       "productionFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
         "apps/extension/src/platform/media-utils/desktop-capture-source-picker.ts",
+        "apps/extension/src/platform/media-utils/desktop-frame.ts",
         "apps/extension/src/platform/media-utils/desktop-screenshot-frame.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
         "apps/extension/src/platform/media-utils/video-recording.ts",
@@ -8961,6 +9582,7 @@
       "rolloutFiles": [
         "apps/extension/src/platform/media-utils/data-url.ts",
         "apps/extension/src/platform/media-utils/desktop-capture-source-picker.ts",
+        "apps/extension/src/platform/media-utils/desktop-frame.ts",
         "apps/extension/src/platform/media-utils/desktop-screenshot-frame.ts",
         "apps/extension/src/platform/media-utils/image-thumbnail.ts",
         "apps/extension/src/platform/media-utils/video-recording.ts",
@@ -18755,6 +19377,24 @@
         "property:size",
         "property:size[1]",
         "property:size[2]"
+      ]
+    },
+    {
+      "id": "policy.source.scenario-editor-visual-tsx.17f44ecdc6",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/harness/scenario-editor-visual.tsx",
+        "contentHash": "5086e4e548a8bd6f061ca31b93febd4d45a0c91f977e3aab00fedf8fc978a257"
+      },
+      "consumers": [
+        "tooling/test/harness/scenario-editor-visual.tsx"
+      ],
+      "surfaces": [
+        "property:mountScenarioEditorVisualHarness/children"
       ]
     },
     {
