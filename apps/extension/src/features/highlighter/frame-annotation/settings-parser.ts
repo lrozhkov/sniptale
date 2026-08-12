@@ -62,9 +62,7 @@ function hasSafeColorFields(value: Record<string, unknown>, fields: readonly str
   return fields.every((field) => isSafeCssColor(value[field]));
 }
 
-function isBorderSettings(value: unknown): boolean {
-  if (value === undefined) return true;
-  if (!isRecord(value)) return false;
+function isBorderSettings(value: Record<string, unknown>): boolean {
   const padding = value['padding'];
   const effects = value['effects'];
   return (
@@ -99,7 +97,7 @@ function isBorderSettings(value: unknown): boolean {
 
 export function parseBorderSettings(value: unknown): AppliedBorderSettings | undefined | null {
   if (value === undefined) return undefined;
-  if (!isBorderSettings(value) || !isRecord(value)) return null;
+  if (!isRecord(value) || !isBorderSettings(value)) return null;
   const color = normalizeColor(value['color'] as string);
   const fillColor = normalizeColor(
     typeof value['fillColor'] === 'string' ? value['fillColor'] : '#00000000'
@@ -141,9 +139,7 @@ export function parseBorderSettings(value: unknown): AppliedBorderSettings | und
   };
 }
 
-function isBlurSettings(value: unknown): boolean {
-  if (value === undefined) return true;
-  if (!isRecord(value)) return false;
+function isBlurSettings(value: Record<string, unknown>): boolean {
   return (
     isFiniteNumber(value['amount']) &&
     isOneOf(value['blurType'], ['gaussian', 'pixelate', 'distortion', 'solid']) &&
@@ -170,7 +166,7 @@ function isBlurSettings(value: unknown): boolean {
 
 export function parseBlurSettings(value: unknown): BlurSettings | undefined | null {
   if (value === undefined) return undefined;
-  if (!isBlurSettings(value) || !isRecord(value)) return null;
+  if (!isRecord(value) || !isBlurSettings(value)) return null;
   const strokeColor = isSafeCssColor(value['strokeColor'])
     ? normalizeColor(value['strokeColor'])
     : null;
