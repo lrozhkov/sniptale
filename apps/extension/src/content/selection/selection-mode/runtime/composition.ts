@@ -86,6 +86,7 @@ export function createSelectionModeRuntime(args: {
     getMaxSelectionHeight,
     getMaxSelectionWidth,
     handleClick: (event, iframe) => getHandlers().handleClick(event, iframe),
+    handleDragStart: (event) => getHandlers().handleDragStart(event),
     handleKeyDown: (event) => getHandlers().handleKeyDown(event),
     handleMouseDown: (event, iframe) => getHandlers().handleMouseDown(event, iframe),
     handleMouseLeave: () => getHandlers().handleMouseLeave(),

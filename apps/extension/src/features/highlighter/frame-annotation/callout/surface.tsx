@@ -100,6 +100,38 @@ function renderTitleMeasure(props: CalloutBodyProps, customStyles: ResolvedCallo
   );
 }
 
+function getWedgeContentSurfaceOverrides(hasWedge: boolean): CSSProperties {
+  if (!hasWedge) return {};
+  return {
+    backdropFilter: 'none',
+    background: 'transparent',
+    backgroundColor: 'transparent',
+    backgroundImage: 'none',
+    borderColor: 'transparent',
+    boxShadow: 'none',
+    filter: 'none',
+    opacity: 1,
+    outlineColor: 'transparent',
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  };
+}
+
+function getWedgeWrapperSurfaceOverrides(
+  hasWedge: boolean,
+  wrapperStyle: CSSProperties,
+  cardStyles: CSSProperties
+): CSSProperties {
+  if (!hasWedge) return {};
+  const filter = [wrapperStyle.filter, cardStyles.filter]
+    .filter((value) => value !== undefined && value !== 'none')
+    .join(' ');
+  return {
+    filter,
+    ...(cardStyles.opacity === undefined ? {} : { opacity: cardStyles.opacity }),
+  };
+}
+
 function renderCalloutPortalContent(props: CalloutBodyProps) {
   const controlsPortalTarget = props.controlsPortalTarget ?? props.portalTarget;
   const customStyles = resolveCalloutCustomCss(props.settings.style.customCss).styles;
@@ -109,10 +141,13 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
     titleEnabled: props.settings.style.title.enabled,
     titleText: props.settings.content.titleText,
   });
-  const cardCustomStyles =
-    props.dynamicTail?.kind === 'wedge'
-      ? { ...customStyles.card, boxShadow: undefined }
-      : customStyles.card;
+  const hasWedge = props.dynamicTail?.kind === 'wedge';
+  const wedgeSurfaceOverrides = getWedgeContentSurfaceOverrides(hasWedge);
+  const wedgeWrapperOverrides = getWedgeWrapperSurfaceOverrides(
+    hasWedge,
+    props.wrapperStyle,
+    customStyles.card
+  );
   return (
     <>
       <div
@@ -120,7 +155,10 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         className="sniptale-callout"
         data-frame-id={props.frameId}
         data-theme={props.portalTheme ?? undefined}
-        style={mergeThemeScopedStyle(props.portalTheme, props.wrapperStyle)}
+        style={mergeThemeScopedStyle(props.portalTheme, {
+          ...props.wrapperStyle,
+          ...wedgeWrapperOverrides,
+        })}
         onClick={props.handleClick}
         onMouseDown={(event) => event.stopPropagation()}
         onMouseEnter={props.handleMouseEnter}
@@ -134,7 +172,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
         )}
         <div
           ref={props.containerRef as Ref<HTMLDivElement>}
-          style={{ ...props.cloudStyle, ...cardCustomStyles }}
+          style={{ ...customStyles.card, ...props.cloudStyle, ...wedgeSurfaceOverrides }}
         >
           {props.settings.style.title.enabled ? (
             <>

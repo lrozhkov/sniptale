@@ -264,7 +264,7 @@ it('omits only capture-hidden frame decoration while retaining its number and co
   expect(html).toContain('sniptale-callout');
 });
 
-it('covers callout badge fallbacks and disabled/measurement variants', () => {
+it('keeps callout badge text explicit and covers disabled/measurement variants', () => {
   const badge = createDefaultFrameCallout().style.badge;
   expect(renderToStaticMarkup(<FrameCalloutBadge badge={{ ...badge, enabled: false }} />)).toBe('');
   expect(
@@ -283,7 +283,7 @@ it('covers callout badge fallbacks and disabled/measurement variants', () => {
       titleEnabled: true,
       titleText: 'Title',
     })
-  ).toBe('Title');
+  ).toBe('');
   expect(
     resolveFrameCalloutBadgeText({
       badgeText: '',
@@ -291,7 +291,7 @@ it('covers callout badge fallbacks and disabled/measurement variants', () => {
       titleEnabled: false,
       titleText: '',
     })
-  ).toBe('Body');
+  ).toBe('');
 });
 
 it('renders every callout side, connector, accent edge, and body badge placement', async () => {

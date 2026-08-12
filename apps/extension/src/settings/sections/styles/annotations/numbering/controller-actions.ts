@@ -11,6 +11,10 @@ import {
 import type { StepBadgePresetCatalogController } from './types';
 
 type StepBadgePresetMutate = (operation: () => Promise<{ outcome: string }>) => Promise<boolean>;
+type StepBadgeCatalogActions = Omit<
+  StepBadgePresetCatalogController['actions'],
+  'setNewSessionEnabled' | 'setNewSessionTemplateSource'
+>;
 
 function reorderBefore(catalog: StepBadgePresetCatalog, sourceId: string, beforeId: string | null) {
   const next = catalog.presets.filter((preset) => preset.id !== sourceId);
@@ -27,7 +31,7 @@ export function createStepBadgePresetCatalogActions(args: {
   catalog: StepBadgePresetCatalog | null;
   mutate: StepBadgePresetMutate;
   setEditor: (editor: StepBadgePresetCatalogController['editor']) => void;
-}): StepBadgePresetCatalogController['actions'] {
+}): StepBadgeCatalogActions {
   return {
     add: () => args.setEditor({ isOpen: true }),
     closeEditor: () => args.setEditor({ isOpen: false }),

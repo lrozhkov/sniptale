@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   reorder: vi.fn(),
   reset: vi.fn(),
   setDefault: vi.fn(),
+  setSessionDefaults: vi.fn(),
   subscribe: vi.fn(),
   toastError: vi.fn(),
   toggle: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('../../../../../composition/persistence/step-badge-presets', async (impo
   loadStepBadgePresetCatalog: mocks.load,
   resetStoredSystemStepBadgePreset: mocks.reset,
   setDefaultStoredStepBadgePreset: mocks.setDefault,
+  updateStepBadgeSessionDefaults: mocks.setSessionDefaults,
   setStoredStepBadgePresetEnabled: mocks.toggle,
   subscribeToStepBadgePresetCatalog: mocks.subscribe,
   updateStoredStepBadgePreset: mocks.update,
@@ -68,6 +70,7 @@ beforeEach(() => {
     mocks.reorder,
     mocks.reset,
     mocks.setDefault,
+    mocks.setSessionDefaults,
     mocks.toggle,
     mocks.update,
   ]) {
@@ -123,6 +126,20 @@ describe('useStepBadgePresetCatalogController', () => {
     expect(mocks.reset).toHaveBeenCalled();
     expect(mocks.delete).toHaveBeenCalledWith(user.id);
     expect(mocks.reorder).toHaveBeenCalled();
+  });
+
+  it('persists the enabled state and template source for the next session', async () => {
+    await act(async () => root?.render(<Harness />));
+    await act(async () => latest?.actions.setNewSessionEnabled(true));
+    await act(async () => latest?.actions.setNewSessionTemplateSource('forced'));
+    expect(mocks.setSessionDefaults).toHaveBeenNthCalledWith(1, {
+      enabled: true,
+      templateSource: 'frame-default',
+    });
+    expect(mocks.setSessionDefaults).toHaveBeenNthCalledWith(2, {
+      enabled: false,
+      templateSource: 'forced',
+    });
   });
 
   it('keeps the editor open and surfaces rejected and failed writes', async () => {

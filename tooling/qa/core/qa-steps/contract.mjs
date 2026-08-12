@@ -42,6 +42,7 @@ function violationLabels(tuples) {
 const CHECKPOINT_LABELS = [
   ...tupleLabels(FOCUSED_DIRECT_STEPS),
   ...violationLabels(FOCUSED_CODE_VIOLATION_STEPS),
+  'Messaging',
   ...FOCUSED_TRIGGERED_STEP_DEFINITIONS.map(({ label }) => label),
   ...tupleLabels(ADVISORY_STEPS),
 ];

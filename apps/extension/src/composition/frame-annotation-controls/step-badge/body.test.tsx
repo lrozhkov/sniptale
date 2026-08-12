@@ -186,7 +186,7 @@ it('uses the fallback fork handler and supports the optional template source con
   act(() =>
     host
       .querySelector<HTMLButtonElement>(
-        `[title="${translate('content.stepBadge.templateSourceForcedHint')}"]`
+        `[title="${translate('content.stepBadge.templateSourceFrameHint')}"]`
       )
       ?.click()
   );

@@ -118,12 +118,14 @@ it('builds and opens gallery pages through runtime urls', async () => {
   await openGalleryPage();
   await openGalleryPage({ openStorageManager: true });
   await openGalleryPage({ recordingId: 'recording-9' });
+  await openGalleryPage({ recordingId: 'recording-draft', scope: 'temporary' });
   await openGalleryWebSnapshotsPage();
 
   expect(runtimeGetUrlMock).toHaveBeenNthCalledWith(1, 'apps/extension/src/gallery/index.html');
   expect(runtimeGetUrlMock).toHaveBeenNthCalledWith(2, 'apps/extension/src/gallery/index.html');
   expect(runtimeGetUrlMock).toHaveBeenNthCalledWith(3, 'apps/extension/src/gallery/index.html');
   expect(runtimeGetUrlMock).toHaveBeenNthCalledWith(4, 'apps/extension/src/gallery/index.html');
+  expect(runtimeGetUrlMock).toHaveBeenNthCalledWith(5, 'apps/extension/src/gallery/index.html');
   expect(browserTabsCreateMock).toHaveBeenNthCalledWith(1, {
     url: 'chrome-extension://test/apps/extension/src/gallery/index.html',
   });
@@ -134,6 +136,11 @@ it('builds and opens gallery pages through runtime urls', async () => {
     url: 'chrome-extension://test/apps/extension/src/gallery/index.html?folder=recording&recordingId=recording-9',
   });
   expect(browserTabsCreateMock).toHaveBeenNthCalledWith(4, {
+    url:
+      'chrome-extension://test/apps/extension/src/gallery/index.html' +
+      '?folder=recording&recordingId=recording-draft&scope=temporary',
+  });
+  expect(browserTabsCreateMock).toHaveBeenNthCalledWith(5, {
     url: 'chrome-extension://test/apps/extension/src/gallery/index.html?folder=web-snapshot',
   });
 });

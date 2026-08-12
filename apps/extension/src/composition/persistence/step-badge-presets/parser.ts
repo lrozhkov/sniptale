@@ -7,8 +7,9 @@ import {
 import { validateStepBadgeCustomCss } from '../../../features/highlighter/step-badge-custom-css';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
-export const STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION = 1;
+export const STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION = 2;
 export const MAX_USER_STEP_BADGE_PRESETS = 16;
 export const MAX_STEP_BADGE_PRESET_NAME_LENGTH = 64;
 
@@ -36,11 +37,19 @@ interface StoredUserPreset {
 export interface StoredStepBadgePresetCatalog {
   catalogCustomized?: boolean;
   defaultPresetId?: string;
+  newSessionDefaults?: AnnotationSessionDefaults;
   placements?: StoredPlacement[];
   schemaVersion?: number;
   systemCatalogRevision?: number;
   systemOverrides?: StoredSystemOverride[];
   userPresets?: StoredUserPreset[];
+}
+
+function parseSessionDefaults(value: unknown): AnnotationSessionDefaults | null {
+  if (!isPlainRecord(value) || !isBoolean(value['enabled'])) return null;
+  const templateSource = value['templateSource'];
+  if (templateSource !== 'frame-default' && templateSource !== 'forced') return null;
+  return { enabled: value['enabled'], templateSource };
 }
 
 interface ParsedStoredStepBadgePresetCatalog {
@@ -277,6 +286,11 @@ export function parseStoredStepBadgePresetCatalog(
   else if (value['defaultPresetId'] !== undefined) invalid.count += 1;
   if (isBoolean(value['catalogCustomized'])) parsed.catalogCustomized = value['catalogCustomized'];
   else if (value['catalogCustomized'] !== undefined) invalid.count += 1;
+  if (value['newSessionDefaults'] !== undefined) {
+    const defaults = parseSessionDefaults(value['newSessionDefaults']);
+    if (defaults) parsed.newSessionDefaults = defaults;
+    else invalid.count += 1;
+  }
   const placements = parsePlacements(value['placements'], invalid);
   const users = parseUsers(value['userPresets'], invalid);
   const overrides = parseOverrides(value['systemOverrides'], invalid);

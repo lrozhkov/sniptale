@@ -72,6 +72,17 @@ export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle
   };
 }
 
+export function cloneForkedCalloutStyle(
+  presetStyle: CalloutVisualStyle,
+  currentStyle: CalloutVisualStyle
+): CalloutVisualStyle {
+  const forkedStyle = cloneCalloutStyle(presetStyle);
+  return {
+    ...forkedStyle,
+    badge: { ...forkedStyle.badge, text: currentStyle.badge.text },
+  };
+}
+
 export function cloneCalloutSettings(settings: CalloutSettings): CalloutSettings {
   return {
     content: { ...settings.content },

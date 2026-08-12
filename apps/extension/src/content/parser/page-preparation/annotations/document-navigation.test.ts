@@ -3,7 +3,24 @@
 import { expect, it, vi } from 'vitest';
 import { subscribeToBrowserAnnotationDocumentNavigation } from './document-navigation';
 
-it('notifies once for each distinct same-document URL', () => {
+it('keeps annotations across fragment-only navigation', () => {
+  window.history.replaceState({}, '', '/article');
+  const onNavigation = vi.fn();
+  const unsubscribe = subscribeToBrowserAnnotationDocumentNavigation({
+    onNavigation,
+    windowObject: window,
+  });
+
+  window.history.pushState({}, '', '/article#see-also');
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+  window.history.pushState({}, '', '/article#references');
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+  expect(onNavigation).not.toHaveBeenCalled();
+  unsubscribe();
+});
+
+it('notifies once for each distinct same-document page identity', () => {
   const onNavigation = vi.fn();
   const unsubscribe = subscribeToBrowserAnnotationDocumentNavigation({
     onNavigation,
@@ -17,6 +34,21 @@ it('notifies once for each distinct same-document URL', () => {
   window.dispatchEvent(new PopStateEvent('popstate'));
 
   expect(onNavigation).toHaveBeenCalledTimes(2);
+  unsubscribe();
+});
+
+it('treats a query change as a new page identity', () => {
+  window.history.replaceState({}, '', '/article?view=summary#top');
+  const onNavigation = vi.fn();
+  const unsubscribe = subscribeToBrowserAnnotationDocumentNavigation({
+    onNavigation,
+    windowObject: window,
+  });
+
+  window.history.pushState({}, '', '/article?view=details#top');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+
+  expect(onNavigation).toHaveBeenCalledOnce();
   unsubscribe();
 });
 

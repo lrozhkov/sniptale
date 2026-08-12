@@ -2,6 +2,7 @@ import type {
   CalloutPreset,
   CalloutPresetCatalog,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { AnnotationTemplateSource } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 type CalloutPresetEditorState = {
   isOpen: boolean;
@@ -22,6 +23,8 @@ export type CalloutPresetCatalogController = {
     moveBefore: (id: string, beforeId: string | null) => Promise<void>;
     reset: (id: string) => Promise<void>;
     save: (preset: CalloutPreset) => Promise<void>;
+    setNewSessionEnabled: (enabled: boolean) => Promise<void>;
+    setNewSessionTemplateSource: (source: AnnotationTemplateSource) => Promise<void>;
     setDefault: (id: string) => Promise<void>;
     toggle: (id: string) => Promise<void>;
   };

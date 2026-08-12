@@ -15,6 +15,7 @@ import {
   setDefaultCalloutPreset,
   subscribeToCalloutPresetCatalog,
   updateCalloutPreset,
+  updateCalloutSessionDefaults,
   updateCalloutPresetsOrder,
 } from '../../../../../composition/persistence/callout-presets';
 import type { CalloutPresetCatalogController } from './types';
@@ -80,6 +81,22 @@ function createCatalogActions(args: {
             })
       );
       if (saved) args.setEditor({ isOpen: false });
+    },
+    setNewSessionEnabled: async (enabled) => {
+      await args.mutate(() =>
+        updateCalloutSessionDefaults({
+          enabled,
+          templateSource: args.catalog?.newSessionDefaults?.templateSource ?? 'frame-default',
+        })
+      );
+    },
+    setNewSessionTemplateSource: async (templateSource) => {
+      await args.mutate(() =>
+        updateCalloutSessionDefaults({
+          enabled: args.catalog?.newSessionDefaults?.enabled ?? false,
+          templateSource,
+        })
+      );
     },
     setDefault: async (id) => {
       await args.mutate(() => setDefaultCalloutPreset(id));

@@ -1,6 +1,7 @@
 import type { StepBadgeAnchor } from './step-badge';
 import type { Paint } from '@sniptale/foundation/paint';
 import type { AnnotationTemplateTagId } from './annotation-template-tags';
+import type { AnnotationSessionDefaults } from './border-preset';
 
 export type CalloutAnchor = StepBadgeAnchor;
 export type CalloutSide = 'top' | 'bottom' | 'left' | 'right' | 'auto';
@@ -248,6 +249,7 @@ export interface CalloutPreset {
 export interface CalloutPresetCatalog {
   catalogCustomized: boolean;
   defaultPresetId: string;
+  newSessionDefaults?: AnnotationSessionDefaults;
   presets: CalloutPreset[];
   systemCatalogRevision: number;
 }

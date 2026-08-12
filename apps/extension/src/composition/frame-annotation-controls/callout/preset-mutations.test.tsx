@@ -33,9 +33,22 @@ vi.mock('../../../composition/persistence/callout-presets', async (importOrigina
 vi.mock('./body', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./body')>()),
   CalloutSettingsPopoverContent: (props: Record<string, any>) => (
-    <button data-action="fork-inactive" onClick={() => props['onForkPreset'](calloutPreset)}>
-      fork
-    </button>
+    <>
+      <button data-action="apply-inactive" onClick={() => props['onApplyPreset'](calloutPreset)}>
+        apply
+      </button>
+      <button data-action="fork-inactive" onClick={() => props['onForkPreset'](calloutPreset)}>
+        fork
+      </button>
+      <button
+        data-action="customize-style"
+        onClick={() =>
+          props['handleSettingChange']({ style: { surface: { backgroundColor: '#abcdef' } } })
+        }
+      >
+        customize
+      </button>
+    </>
   ),
 }));
 
@@ -116,6 +129,9 @@ it('forks a requested inactive creation template into live temporary settings', 
   document.body.append(anchor);
   const onChange = vi.fn();
 
+  const settings = createDefaultFrameCallout();
+  settings.content.titleText = 'Live heading';
+  settings.style.badge.text = 'Live badge';
   await act(async () =>
     root?.render(
       <FutureCalloutSettingsPopover
@@ -124,7 +140,7 @@ it('forks a requested inactive creation template into live temporary settings', 
         onChange={onChange}
         onClose={vi.fn()}
         onDisable={vi.fn()}
-        settings={createDefaultFrameCallout()}
+        settings={settings}
       />
     )
   );
@@ -132,10 +148,92 @@ it('forks a requested inactive creation template into live temporary settings', 
 
   expect(onChange).toHaveBeenCalledWith(
     expect.objectContaining({
-      content: expect.objectContaining({ titleText: calloutPreset.content.titleText }),
+      content: expect.objectContaining({ titleText: 'Live heading' }),
       placement: expect.objectContaining(calloutPreset.placement),
       style: expect.objectContaining({
         surface: expect.objectContaining({ backgroundColor: '#123456' }),
+      }),
+    })
+  );
+  expect(onChange.mock.calls[0]?.[0]).toMatchObject({
+    content: { titleText: 'Live heading' },
+    style: { badge: { text: 'Live badge' } },
+  });
+  expect(onChange.mock.calls[0]?.[0].sourcePresetId).toBeUndefined();
+  await act(async () =>
+    root?.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen={false}
+        onChange={onChange}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        settings={settings}
+      />
+    )
+  );
+  anchor.remove();
+});
+
+it('still applies the heading and badge stored in a requested creation template', async () => {
+  const anchor = document.createElement('button');
+  document.body.append(anchor);
+  const onChange = vi.fn();
+  const settings = createDefaultFrameCallout();
+  settings.content.titleText = 'Live heading';
+  settings.style.badge.text = 'Live badge';
+
+  await act(async () =>
+    root?.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={onChange}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        settings={settings}
+      />
+    )
+  );
+  act(() => document.querySelector<HTMLButtonElement>('[data-action="apply-inactive"]')?.click());
+
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      content: expect.objectContaining({ titleText: calloutPreset.content.titleText }),
+      sourcePresetId: calloutPreset.id,
+      style: expect.objectContaining({
+        surface: expect.objectContaining({ backgroundColor: '#123456' }),
+      }),
+    })
+  );
+  anchor.remove();
+});
+
+it('detaches a future callout from its template when its style is customized', async () => {
+  const anchor = document.createElement('button');
+  document.body.append(anchor);
+  const onChange = vi.fn();
+  const settings = createDefaultFrameCallout();
+  settings.sourcePresetId = 'source-template';
+
+  await act(async () =>
+    root?.render(
+      <FutureCalloutSettingsPopover
+        anchorEl={anchor}
+        isOpen
+        onChange={onChange}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        settings={settings}
+      />
+    )
+  );
+  act(() => document.querySelector<HTMLButtonElement>('[data-action="customize-style"]')?.click());
+
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      style: expect.objectContaining({
+        surface: expect.objectContaining({ backgroundColor: '#abcdef' }),
       }),
     })
   );

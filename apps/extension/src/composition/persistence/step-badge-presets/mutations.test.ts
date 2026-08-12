@@ -6,9 +6,22 @@ import {
   reorderStepBadgePresets,
   resetSystemStepBadgePreset,
   setDefaultStepBadgePreset,
+  setStepBadgeSessionDefaults,
   setStepBadgePresetEnabled,
   updateStepBadgePreset,
 } from './mutations';
+
+it('changes new-session defaults without mutating the source catalog', () => {
+  const catalog = resolveStoredStepBadgePresetCatalog({});
+  const next = setStepBadgeSessionDefaults(catalog, {
+    enabled: true,
+    templateSource: 'forced',
+  })!;
+  expect(next.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
+  expect(next.catalogCustomized).toBe(false);
+  expect(catalog.newSessionDefaults).toEqual({ enabled: false, templateSource: 'frame-default' });
+  expect(setStepBadgeSessionDefaults(next, next.newSessionDefaults!)).toBeNull();
+});
 
 it('protects systems and the final enabled template while customizing systems in place', () => {
   const catalog = resolveStoredStepBadgePresetCatalog({});

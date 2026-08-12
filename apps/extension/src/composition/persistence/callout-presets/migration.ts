@@ -10,6 +10,7 @@ import {
   SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
 } from '../../../features/highlighter/callout-presets/catalog';
 import { CALLOUT_PRESET_STORAGE_SCHEMA_VERSION, type StoredCalloutPresetCatalog } from './parser';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 function comparePlacement(left: CalloutPreset, right: CalloutPreset): number {
   return left.order - right.order || left.id.localeCompare(right.id);
@@ -91,13 +92,22 @@ export function resolveStoredCalloutPresetCatalog(
   return {
     catalogCustomized: customized,
     defaultPresetId: resolveDefaultId(presets, stored.defaultPresetId),
+    newSessionDefaults: {
+      ...(stored.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS),
+    },
     presets: presets.map((preset, order) => ({ ...preset, order })),
     systemCatalogRevision: SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
   };
 }
 
 export function cloneCalloutPresetCatalog(catalog: CalloutPresetCatalog): CalloutPresetCatalog {
-  return { ...catalog, presets: catalog.presets.map(cloneCalloutPreset) };
+  return {
+    ...catalog,
+    ...(catalog.newSessionDefaults
+      ? { newSessionDefaults: { ...catalog.newSessionDefaults } }
+      : {}),
+    presets: catalog.presets.map(cloneCalloutPreset),
+  };
 }
 
 export function serializeCalloutPresetCatalog(
@@ -106,6 +116,9 @@ export function serializeCalloutPresetCatalog(
   return {
     catalogCustomized: catalog.catalogCustomized,
     defaultPresetId: catalog.defaultPresetId,
+    newSessionDefaults: {
+      ...(catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS),
+    },
     placements: catalog.presets.map((preset) => ({
       enabled: preset.enabled !== false,
       id: preset.id,

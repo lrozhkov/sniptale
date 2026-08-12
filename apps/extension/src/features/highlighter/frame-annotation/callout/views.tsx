@@ -4,7 +4,7 @@ import { translate } from '../../../../platform/i18n';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import { ProductGlassToolbar, ProductGlassToolbarButton } from '@sniptale/ui/product-glass-toolbar';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getRepresentativeColor, serializePaintToCss } from '@sniptale/foundation/paint';
 import type { getDynamicTailState } from './dynamic-tail';
 import type { getLineConnectorState } from './line-connector';
 import type {
@@ -151,47 +151,90 @@ export function renderDynamicCalloutTail(
     );
   }
   return (
-    <svg
-      className="sniptale-callout-dynamic-tail"
-      aria-hidden="true"
-      focusable="false"
-      preserveAspectRatio="xMinYMin meet"
-      style={tail.style}
-      viewBox={tail.viewBox}
-    >
-      <path
-        d={tail.path}
-        fill="none"
-        pointerEvents="stroke"
-        stroke="transparent"
-        strokeWidth={18 * visualScale}
-      />
-      {style.surface.borderWidth > 0 ? (
+    <DynamicWedgeSurface
+      {...(customStyles === undefined ? {} : { customStyles })}
+      style={style}
+      tail={tail}
+      visualScale={visualScale}
+    />
+  );
+}
+
+function DynamicWedgeSurface(props: {
+  customStyles?: ResolvedCalloutCustomCss;
+  style: CalloutVisualStyle;
+  tail: ReturnType<typeof getDynamicTailState>;
+  visualScale: number;
+}) {
+  const useHtmlSurface = shouldUseHtmlWedgeSurface(props);
+  return (
+    <>
+      {useHtmlSurface ? (
+        <div
+          aria-hidden="true"
+          data-ui="content.callout.unified-surface"
+          style={projectUnifiedWedgeSurfaceStyle(props)}
+        />
+      ) : null}
+      <svg
+        className="sniptale-callout-dynamic-tail"
+        aria-hidden="true"
+        focusable="false"
+        preserveAspectRatio="xMinYMin meet"
+        style={props.tail.style}
+        viewBox={props.tail.viewBox}
+      >
+        <path
+          d={props.tail.path}
+          fill="none"
+          pointerEvents="stroke"
+          stroke="transparent"
+          strokeWidth={18 * props.visualScale}
+        />
         <path
           data-ui="content.callout.tail-outline"
-          d={tail.outlinePath}
-          fill={getRepresentativeColor(style.surface.fillPaint)}
+          d={props.tail.outlinePath}
+          fill={useHtmlSurface ? 'none' : getRepresentativeColor(props.style.surface.fillPaint)}
           pointerEvents="none"
-          stroke={style.surface.borderColor}
+          stroke={props.style.surface.borderWidth > 0 ? props.style.surface.borderColor : 'none'}
           strokeDasharray={getCalloutStrokeDasharray(
-            style.surface.borderStyle,
-            style.surface.borderWidth
+            props.style.surface.borderStyle,
+            props.style.surface.borderWidth
           )}
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth={style.surface.borderWidth * visualScale}
-          style={customStyles?.connector}
+          strokeWidth={props.style.surface.borderWidth * props.visualScale}
+          style={props.customStyles?.connector}
         />
-      ) : (
-        <path
-          d={tail.path}
-          fill={getRepresentativeColor(style.surface.fillPaint)}
-          pointerEvents="none"
-          style={customStyles?.connector}
-        />
-      )}
-    </svg>
+      </svg>
+    </>
   );
+}
+
+function shouldUseHtmlWedgeSurface(props: Parameters<typeof DynamicWedgeSurface>[0]): boolean {
+  return (
+    props.style.surface.fillPaint.kind !== 'solid' ||
+    Object.keys(props.customStyles?.card ?? {}).length > 0
+  );
+}
+
+function projectUnifiedWedgeSurfaceStyle(
+  props: Parameters<typeof DynamicWedgeSurface>[0]
+): React.CSSProperties {
+  const cardStyles = props.customStyles?.card ?? {};
+  return {
+    ...props.tail.style,
+    background: cardStyles.background ?? serializePaintToCss(props.style.surface.fillPaint),
+    backgroundColor: cardStyles.backgroundColor,
+    backgroundImage: cardStyles.backgroundImage,
+    backgroundPosition: cardStyles.backgroundPosition,
+    backgroundRepeat: cardStyles.backgroundRepeat,
+    backgroundSize: cardStyles.backgroundSize,
+    backdropFilter: cardStyles.backdropFilter,
+    boxShadow: cardStyles.boxShadow,
+    clipPath: `path("${props.tail.outlinePath}")`,
+    pointerEvents: 'none',
+  };
 }
 
 export function renderCalloutAccentEdge(

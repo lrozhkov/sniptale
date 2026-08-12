@@ -34,6 +34,8 @@ function createController(): CalloutPresetCatalogController {
       moveBefore: vi.fn(),
       reset: vi.fn(),
       save: vi.fn(),
+      setNewSessionEnabled: vi.fn(),
+      setNewSessionTemplateSource: vi.fn(),
       setDefault: vi.fn(),
       toggle: vi.fn(),
     },
@@ -47,7 +49,7 @@ describe('CalloutPresetsPanel', () => {
     expect(markup).toContain('settings.collection.defaultBadge');
     expect(markup).toContain('settings.collection.builtInBadge');
     expect(markup).toContain('highlighter.calloutPresets.add');
-    expect(markup).not.toContain('<h2');
+    expect(markup).toContain('highlighter.calloutPresets.newSession.sectionTitle');
     expect(markup).not.toContain('highlighter.calloutPresets.description');
   });
 
@@ -95,6 +97,7 @@ describe('CalloutPresetsPanel', () => {
     }
     expect(controller.actions.add).toHaveBeenCalled();
     expect(controller.actions.edit).toHaveBeenCalled();
+    expect(controller.actions.setNewSessionEnabled).toHaveBeenCalledWith(true);
     await act(async () => root.unmount());
     container.remove();
   });

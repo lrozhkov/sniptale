@@ -25,21 +25,27 @@ function readNavigationEventSource(windowObject: Window): AnnotationNavigationEv
   return isAnnotationNavigationEventSource(source) ? source : null;
 }
 
-/** Watches URL identity changes that do not recreate the content-script document. */
+function readPageIdentity(windowObject: Window): string {
+  const url = new URL(windowObject.location.href);
+  url.hash = '';
+  return url.href;
+}
+
+/** Watches page identity changes that do not recreate the content-script document. */
 export function subscribeToBrowserAnnotationDocumentNavigation(args: {
   onNavigation: AnnotationDocumentNavigationListener;
   windowObject?: Window;
 }): () => void {
   const windowObject = args.windowObject ?? window;
   const navigationSource = readNavigationEventSource(windowObject);
-  let currentUrl = windowObject.location.href;
+  let currentPageIdentity = readPageIdentity(windowObject);
 
   const checkPageIdentity = () => {
-    const nextUrl = windowObject.location.href;
-    if (nextUrl === currentUrl) {
+    const nextPageIdentity = readPageIdentity(windowObject);
+    if (nextPageIdentity === currentPageIdentity) {
       return;
     }
-    currentUrl = nextUrl;
+    currentPageIdentity = nextPageIdentity;
     args.onNavigation();
   };
   const eventListener: EventListener = () => checkPageIdentity();

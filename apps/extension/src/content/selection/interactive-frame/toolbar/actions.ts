@@ -64,6 +64,33 @@ export function startFrameCalloutEditing(
   props.clearSelection?.();
 }
 
+export function addAdditionalFrameCallout(
+  props: Pick<
+    InteractiveFrameToolbarProps,
+    'closePopover' | 'frame' | 'onUpdate' | 'setIsCalloutEditing' | 'setState'
+  > & {
+    clearSelection?: InteractiveFrameToolbarProps['clearSelection'];
+    setActiveCalloutIndex?: InteractiveFrameToolbarProps['setActiveCalloutIndex'];
+    setTempFrame?: InteractiveFrameToolbarProps['setTempFrame'];
+    stageCalloutFrame?: InteractiveFrameToolbarProps['stageCalloutFrame'];
+  }
+) {
+  if (!props.frame.callout?.enabled) return null;
+  const appended = appendFrameCallout(props.frame, createDefaultFrameCallout());
+  if (!appended) return null;
+  const nextFrame = appended.frame as typeof props.frame;
+  if (props.stageCalloutFrame) props.stageCalloutFrame(nextFrame);
+  else props.setTempFrame?.(nextFrame);
+  props.closePopover();
+  pagePreparationHistory.beginTransaction(`callout-editing:${props.frame.id}`);
+  props.onUpdate(nextFrame);
+  props.setActiveCalloutIndex?.(appended.calloutIndex);
+  props.setState('idle');
+  props.setIsCalloutEditing(true);
+  props.clearSelection?.();
+  return nextFrame;
+}
+
 export function createInteractiveFrameToolbarActions(
   props: InteractiveFrameToolbarProps,
   captureVisibilityToggle?: () => void
@@ -103,30 +130,7 @@ export function createInteractiveFrameToolbarActions(
       event.preventDefault();
       event.stopPropagation();
       event.nativeEvent.stopImmediatePropagation();
-      if (!props.frame.callout?.enabled) return;
-      let appended = appendFrameCallout(props.frame, createDefaultFrameCallout());
-      let nextFrame: typeof props.frame;
-      if (props.stageCalloutFrame) {
-        appended = null;
-        nextFrame = props.stageCalloutFrame((current) => {
-          const latest = appendFrameCallout(current, createDefaultFrameCallout());
-          if (!latest) return current;
-          appended = latest;
-          return latest.frame as typeof props.frame;
-        });
-      } else {
-        if (!appended) return;
-        nextFrame = appended.frame as typeof props.frame;
-        props.setTempFrame?.(nextFrame);
-      }
-      if (!appended) return;
-      props.closePopover();
-      pagePreparationHistory.beginTransaction(`callout-editing:${props.frame.id}`);
-      props.onUpdate(nextFrame);
-      props.setActiveCalloutIndex?.(appended.calloutIndex);
-      props.setState('idle');
-      props.setIsCalloutEditing(true);
-      props.clearSelection?.();
+      addAdditionalFrameCallout(props);
     },
   };
 }

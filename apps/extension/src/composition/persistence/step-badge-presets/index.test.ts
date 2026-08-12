@@ -43,9 +43,16 @@ it('migrates, serializes concurrent CRUD, and protects systems', async () => {
     owner.createUserStepBadgePreset({ name: 'Second', settings }),
   ]);
   expect([first.outcome, second.outcome]).toEqual(['applied', 'applied']);
+  await expect(
+    owner.updateStepBadgeSessionDefaults({ enabled: true, templateSource: 'forced' })
+  ).resolves.toMatchObject({ outcome: 'applied' });
   expect(
     (await owner.loadStepBadgePresetCatalog()).presets.filter((preset) => preset.origin === 'user')
   ).toHaveLength(2);
+  expect((await owner.loadStepBadgePresetCatalog()).newSessionDefaults).toEqual({
+    enabled: true,
+    templateSource: 'forced',
+  });
   await expect(owner.deleteStoredStepBadgePreset('system-classic')).resolves.toEqual({
     outcome: 'rejected',
     reason: 'system-delete',

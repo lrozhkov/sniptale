@@ -45,25 +45,11 @@ export function FrameCalloutBadge(props: {
   );
 }
 
-function getBodyText(bodyHtml: string) {
-  if (typeof DOMParser !== 'undefined') {
-    return new DOMParser().parseFromString(bodyHtml, 'text/html').body.textContent?.trim() ?? '';
-  }
-  return bodyHtml
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 export function resolveFrameCalloutBadgeText(args: {
   badgeText: string;
   bodyHtml: string;
   titleEnabled: boolean;
   titleText: string;
 }) {
-  return (
-    args.badgeText.trim() ||
-    (args.titleEnabled ? args.titleText.trim() : '') ||
-    getBodyText(args.bodyHtml)
-  );
+  return args.badgeText.trim();
 }

@@ -38,6 +38,19 @@ it('accepts a format-only harness failure without requiring later lanes', () => 
   ).not.toThrow();
 });
 
+it('accepts the separately scheduled focused messaging step in a failed checkpoint', () => {
+  expect(() =>
+    assertQaExecutionContract({
+      wrapperId: 'qa:checkpoint',
+      mode: 'product',
+      steps: [
+        { label: 'Format', status: 'failed' },
+        { label: 'Messaging', status: 'ok' },
+      ],
+    })
+  ).not.toThrow();
+});
+
 it('rejects an incomplete harness population after the format barrier passed', () => {
   expect(() =>
     assertQaExecutionContract({

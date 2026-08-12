@@ -14,6 +14,7 @@ import {
   createFrameQuickActions,
   FrameQuickActionButtons,
   frameTriggerControlStyle,
+  frameTriggerIconStyle,
 } from './trigger-actions';
 import {
   canFitFrameQuickActions,
@@ -24,6 +25,7 @@ import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { resolveContentShadowRoot } from '../../../platform/dom-host';
 import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 import type { FrameCaptureVisibilityState } from './capture-visibility-state';
+import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 import {
   resolveStableFrameTriggerPosition,
   suspendFrameTriggerPlacement,
@@ -35,14 +37,19 @@ type InteractiveFrameToolbarTriggerProps = {
   captureVisibility: FrameCaptureVisibilityState;
   isVisible: boolean;
   closePopover: () => void;
+  clearSelection?: () => void;
   handleStartEditing: () => void;
   hoverFrame: (frameId: string) => void;
   popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   scheduleHoverFrameHide: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
   setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
+  setActiveCalloutIndex?: React.Dispatch<React.SetStateAction<number>>;
+  setTempFrame?: React.Dispatch<React.SetStateAction<FrameData>>;
+  stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   onUpdate: (frame: FrameData) => void;
+  canAddCallout?: boolean;
 };
 
 function useTriggerPositionRefresh(isVisible: boolean) {
@@ -102,7 +109,7 @@ function FrameToolbarTriggerButton(props: {
       }}
       style={frameTriggerControlStyle}
     >
-      <MoreHorizontal size={17} aria-hidden="true" />
+      <MoreHorizontal size={17} aria-hidden="true" style={frameTriggerIconStyle} />
     </button>
   );
 }
@@ -121,6 +128,7 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
 
   const quickActions = createFrameQuickActions({
     ...props,
+    canAddCallout: props.canAddCallout ?? canAppendFrameCallout(props.frame),
     captureVisibility: props.captureVisibility,
     toggleQuickPopover,
   });
@@ -149,7 +157,7 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
         position: 'fixed',
         left: position.x - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
         top: position.y - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         zIndex: Z_INDEX_FLOATING_UI,
       })}
     >

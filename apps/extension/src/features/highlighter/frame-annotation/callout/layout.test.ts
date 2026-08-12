@@ -60,6 +60,50 @@ describe('getCalloutLayoutState', () => {
     expect(layout.cloudStyle.boxShadow).toBe('none');
   });
 
+  it('keeps the configured card shadow when a line connector uses a surface inset', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings: {
+        ...settings,
+        style: {
+          ...settings.style,
+          connector: { ...settings.style.connector, kind: 'line' },
+          customCss: '[card]\nbox-shadow: inset 0 1px 0 #ffffff59;',
+          surface: { ...settings.style.surface, shadow: 12, shadowColor: '#ff0000' },
+        },
+      },
+      zIndex: 20,
+    });
+
+    expect(layout.wrapperStyle.filter).toBeUndefined();
+    expect(layout.cloudStyle.boxShadow).toContain('0 4px 12px #ff0000');
+    expect(layout.cloudStyle.boxShadow).toContain('inset 0 1px 0 #ffffff59');
+  });
+
+  it('uses one transparent HTML card for a borderless translucent wedge contour', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings: {
+        ...settings,
+        style: {
+          ...settings.style,
+          customCss: '[card]\nbackground: #ffffff80;',
+          surface: { ...settings.style.surface, borderWidth: 0 },
+        },
+      },
+      zIndex: 20,
+    });
+
+    expect(layout.dynamicTail?.kind).toBe('wedge');
+    expect(layout.cloudStyle.background).toBe('transparent');
+    expect(layout.cloudStyle.borderColor).toBe('transparent');
+    expect(layout.cloudStyle.boxShadow).toBe('none');
+  });
+
   it('leaves the HTML cloud transparent for the flush combined bubble and wedge contour', () => {
     const layout = getCalloutLayoutState({
       dimensions: { width: 160, height: 48 },

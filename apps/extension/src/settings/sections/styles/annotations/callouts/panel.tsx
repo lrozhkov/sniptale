@@ -17,6 +17,8 @@ import {
   resolveAnnotationTemplateTags,
   useAnnotationTemplateTagState,
 } from '../../../../../ui/annotation-template-query';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { AnnotationNewSessionDefaults } from '../new-session-defaults';
 
 type Preset = NonNullable<CalloutPresetCatalogController['catalog']>['presets'][number];
 
@@ -91,6 +93,24 @@ export function CalloutPresetsPanel({
   };
   return (
     <div>
+      <AnnotationNewSessionDefaults
+        copy={{
+          enabledDescription: translate('highlighter.calloutPresets.newSession.enabledDescription'),
+          enabledLabel: translate('highlighter.calloutPresets.newSession.enabledLabel'),
+          frameTemplate: translate('highlighter.calloutPresets.newSession.frameTemplate'),
+          primaryTemplate: translate('highlighter.calloutPresets.newSession.primaryTemplate'),
+          sourceDescription: translate('highlighter.calloutPresets.newSession.sourceDescription'),
+          sourceLabel: translate('highlighter.calloutPresets.newSession.sourceLabel'),
+          sectionDescription: translate('highlighter.calloutPresets.newSession.sectionDescription'),
+          sectionTitle: translate('highlighter.calloutPresets.newSession.sectionTitle'),
+        }}
+        defaults={controller.catalog?.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS}
+        disabled={controller.isLoading || controller.isSaving || !controller.catalog}
+        onEnabledChange={(enabled) => void controller.actions.setNewSessionEnabled(enabled)}
+        onTemplateSourceChange={(source) =>
+          void controller.actions.setNewSessionTemplateSource(source)
+        }
+      />
       <SettingsCollection
         ariaLabel={translate('highlighter.calloutPresets.title')}
         toolbarControls={

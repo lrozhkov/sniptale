@@ -32,6 +32,7 @@ import {
 function createSetupListenerHandlers() {
   return {
     handleClick: vi.fn(),
+    handleDragStart: vi.fn(),
     handleKeyDown: vi.fn(),
     handleMouseDown: vi.fn(),
     handleMouseLeave: vi.fn(),

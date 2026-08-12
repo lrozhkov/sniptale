@@ -20,7 +20,7 @@ import {
 } from './settings';
 import { createCalloutPresetSessionSync } from './callout-defaults';
 import { createStepBadgePresetSessionSync } from './step-badge-defaults';
-import { setFutureFrameCallout } from './future-callout';
+import { resetFutureFrameCallout } from './future-callout';
 import { resetAnnotationTemplateSources } from './annotation-template-source';
 import { ensureLinkedAnnotationTemplateCatalogsReady } from './linked-annotation-templates';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -58,7 +58,7 @@ export function setupFrameSessionSyncListeners({
   reorderStepBadge,
   withHistoryCommit,
 }: FrameSessionSyncArgs) {
-  setFutureFrameCallout(null);
+  resetFutureFrameCallout();
   resetAnnotationTemplateSources();
   const loadSettings = createFrameSessionSettingsLoader({
     globalEffectModeRef,
@@ -99,7 +99,7 @@ export function setupFrameSessionSyncListeners({
     cleanupWindowListeners,
   });
   return () => {
-    setFutureFrameCallout(null);
+    resetFutureFrameCallout();
     resetAnnotationTemplateSources();
     cleanupFrameSession();
     cleanupCalloutPresetSync();

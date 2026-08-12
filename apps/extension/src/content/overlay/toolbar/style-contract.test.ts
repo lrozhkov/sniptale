@@ -267,6 +267,8 @@ it('keeps open main-toolbar menus above the page without disabling toolbar contr
     /\.sniptale-toolbar-positioner:has\(> \.sniptale-toolbar\[data-menu-open='true'\]\)\s*\{[^}]*z-index:\s*2147483646;[^}]*pointer-events:\s*auto;/su
   );
   expect(toolbarMenuSurfaceStylesheet).toContain('.sniptale-main-toolbar-popover');
+  expect(toolbarMenuSurfaceStylesheet).toContain(':not(#sniptale-resize-handles-portal)');
+  expect(toolbarMenuSurfaceStylesheet).toContain(':not(#sniptale-frame-size-panel-portal)');
   expect(toolbarMenuSurfaceStylesheet).toContain(':has(> .sniptale-main-toolbar-popover)');
   expect(toolbarMenuSurfaceStylesheet).toContain(':not(.sniptale-modal)');
   expect(toolbarMenuSurfaceStylesheet).toMatch(/:not\(\s*\.sniptale-modal-backdrop\s*\)/su);

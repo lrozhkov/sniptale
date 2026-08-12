@@ -24,16 +24,12 @@ it('delegates idle pointer downs to the idle handler', async () => {
     isExtensionUIElement: vi.fn(),
   } satisfies Pick<SelectionModeEventOptions, 'isExtensionUIElement'>;
 
-  handleSelectionModeMouseDown(
-    new MouseEvent('mousedown'),
-    state,
-    options as Pick<SelectionModeEventOptions, 'isExtensionUIElement'>
-  );
+  handleSelectionModeMouseDown(new MouseEvent('mousedown'), state, options);
 
   expect(handleSelectionModeIdleMouseDown).toHaveBeenCalledWith(
     expect.any(MouseEvent),
     state,
-    options.isExtensionUIElement,
+    options,
     target
   );
 });

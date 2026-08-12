@@ -7,6 +7,7 @@ import {
   reorderPresets,
   resetSystemPreset,
   setDefaultPreset,
+  setCalloutSessionDefaults,
   setPresetEnabled,
   updatePreset,
 } from './mutations';
@@ -21,6 +22,17 @@ function createCatalog(): CalloutPresetCatalog {
 }
 
 describe('callout preset catalog mutations', () => {
+  it('changes new-session defaults without mutating the source catalog', () => {
+    const catalog = createCatalog();
+    const next = setCalloutSessionDefaults(catalog, {
+      enabled: true,
+      templateSource: 'forced',
+    })!;
+    expect(next.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
+    expect(next.catalogCustomized).toBe(false);
+    expect(catalog.newSessionDefaults).toBeUndefined();
+    expect(setCalloutSessionDefaults(next, next.newSessionDefaults!)).toBeNull();
+  });
   it('adds, updates, deletes, and rejects invalid user preset transitions', () => {
     const catalog = createCatalog();
     const style = catalog.presets[0]!.style;

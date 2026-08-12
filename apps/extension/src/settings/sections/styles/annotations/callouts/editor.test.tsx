@@ -85,6 +85,8 @@ function createController(index: number): CalloutPresetCatalogController {
       moveBefore: vi.fn(),
       reset: vi.fn(),
       save: vi.fn(),
+      setNewSessionEnabled: vi.fn(),
+      setNewSessionTemplateSource: vi.fn(),
       setDefault: vi.fn(),
       toggle: vi.fn(),
     },

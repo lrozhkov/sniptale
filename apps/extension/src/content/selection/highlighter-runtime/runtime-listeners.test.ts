@@ -58,6 +58,16 @@ describe('registerHighlighterRuntimeListeners', () => {
     });
 
     expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'dragstart',
+      hoverController.handleDragStart,
+      { capture: true }
+    );
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+      'mousedown',
+      hoverController.handleMouseDown,
+      { capture: true }
+    );
+    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
       'mousemove',
       hoverController.handleMouseMove,
       { capture: true }
@@ -96,7 +106,7 @@ describe('registerHighlighterRuntimeListeners', () => {
 
     cleanup();
 
-    expect(iframeListenerMocks.cleanupFns).toHaveLength(9);
+    expect(iframeListenerMocks.cleanupFns).toHaveLength(11);
     expect(iframeListenerMocks.cleanupFns.every((fn) => fn.mock.calls.length === 1)).toBe(true);
   });
 

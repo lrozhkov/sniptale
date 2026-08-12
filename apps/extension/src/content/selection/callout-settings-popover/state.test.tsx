@@ -113,6 +113,8 @@ describe('useCalloutSettingsPopoverState', () => {
 
   it('forks an inactive preset as a temporary copy while preserving the existing position', () => {
     settings = createDefaultCalloutSettings(undefined, 'system-callout-bubble');
+    settings.content.titleText = 'Live heading';
+    settings.style.badge.text = 'Live badge';
     settings.placement = {
       ...settings.placement,
       manualPlacement: { centerOffsetX: 20, centerOffsetY: 30 },
@@ -125,14 +127,17 @@ describe('useCalloutSettingsPopoverState', () => {
     act(() => latestState?.forkPreset(preset));
 
     expect(latestState?.localSettings.sourcePresetId).toBeUndefined();
-    expect(latestState?.localSettings.style).toEqual(preset.style);
+    expect(latestState?.localSettings.content.titleText).toBe('Live heading');
+    expect(latestState?.localSettings.style).toMatchObject({
+      ...preset.style,
+      badge: { ...preset.style.badge, text: 'Live badge' },
+    });
     expect(latestState?.localSettings.placement).toEqual(settings.placement);
     expect(listener).toHaveBeenCalledWith({
       frameId: 'frame-1',
       settings: expect.objectContaining({
-        content: { titleText: preset.content.titleText },
         sourcePresetId: undefined,
-        style: preset.style,
+        style: expect.objectContaining({ badge: expect.objectContaining({ text: 'Live badge' }) }),
       }),
     });
     cleanup();

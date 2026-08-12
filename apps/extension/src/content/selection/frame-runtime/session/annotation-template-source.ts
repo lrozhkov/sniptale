@@ -12,6 +12,7 @@ const DEFAULT_SOURCES: AnnotationTemplateSources = {
 
 // policyStateIds: [] - session-local annotation template preferences grant no capability or authorization.
 let sources = DEFAULT_SOURCES;
+let initializedKinds = new Set<keyof AnnotationTemplateSources>();
 const listeners = new Set<() => void>();
 
 export function getAnnotationTemplateSources(): AnnotationTemplateSources {
@@ -27,12 +28,25 @@ export function setAnnotationTemplateSource(
   kind: keyof AnnotationTemplateSources,
   source: AnnotationTemplateSource
 ): void {
+  initializedKinds.add(kind);
+  if (sources[kind] === source) return;
+  sources = { ...sources, [kind]: source };
+  listeners.forEach((listener) => listener());
+}
+
+export function initializeAnnotationTemplateSource(
+  kind: keyof AnnotationTemplateSources,
+  source: AnnotationTemplateSource
+): void {
+  if (initializedKinds.has(kind)) return;
+  initializedKinds.add(kind);
   if (sources[kind] === source) return;
   sources = { ...sources, [kind]: source };
   listeners.forEach((listener) => listener());
 }
 
 export function resetAnnotationTemplateSources(): void {
+  initializedKinds = new Set();
   if (sources === DEFAULT_SOURCES) return;
   sources = DEFAULT_SOURCES;
   listeners.forEach((listener) => listener());

@@ -5,13 +5,41 @@ import {
 } from '../../../features/highlighter/callout-presets/catalog';
 import { resolveStoredCalloutPresetCatalog, serializeCalloutPresetCatalog } from './migration';
 import { parseStoredCalloutPresetCatalog } from './parser';
+import { setCalloutSessionDefaults } from './mutations';
 
 it('creates a fully enabled default catalog and compactly round-trips it', () => {
   const fresh = resolveStoredCalloutPresetCatalog({});
   expect(fresh.presets).toHaveLength(6);
   expect(fresh.defaultPresetId).toBe('system-callout-bubble');
+  expect(fresh.newSessionDefaults).toEqual({ enabled: false, templateSource: 'frame-default' });
   expect(fresh.presets.every((preset) => preset.enabled !== false)).toBe(true);
   expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(fresh))).toEqual(fresh);
+});
+
+it('round-trips explicit defaults for the next highlighter session', () => {
+  const catalog = resolveStoredCalloutPresetCatalog({
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  });
+  expect(catalog.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
+  expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(catalog))).toEqual(
+    catalog
+  );
+});
+
+it('keeps an untouched catalog open to newly introduced system presets after defaults change', () => {
+  const configured = setCalloutSessionDefaults(resolveStoredCalloutPresetCatalog({}), {
+    enabled: true,
+    templateSource: 'forced',
+  })!;
+  const stored = serializeCalloutPresetCatalog(configured);
+  const omittedSystemId = configured.presets.at(-1)!.id;
+  const migrated = resolveStoredCalloutPresetCatalog({
+    ...stored,
+    placements: (stored.placements ?? []).filter((item) => item.id !== omittedSystemId),
+  });
+
+  expect(stored.catalogCustomized).toBe(false);
+  expect(migrated.presets.find((preset) => preset.id === omittedSystemId)?.enabled).toBe(true);
 });
 
 it('migrates absent tag metadata and compactly round-trips assigned tags', () => {

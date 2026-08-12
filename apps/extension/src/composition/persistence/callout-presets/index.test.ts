@@ -56,12 +56,16 @@ it('migrates once and supports committed CRUD invariants', async () => {
   await expect(owner.setDefaultCalloutPreset(created.id!)).resolves.toMatchObject({
     outcome: 'applied',
   });
+  await expect(
+    owner.updateCalloutSessionDefaults({ enabled: true, templateSource: 'forced' })
+  ).resolves.toMatchObject({ outcome: 'applied' });
   await expect(owner.deleteCalloutPreset('system-callout-bubble')).resolves.toEqual({
     outcome: 'rejected',
     reason: 'system-delete',
   });
   const loaded = await owner.loadCalloutPresetCatalog();
   expect(loaded.defaultPresetId).toBe(created.id);
+  expect(loaded.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
 });
 
 it('serializes concurrent commands and re-reads the latest committed value', async () => {

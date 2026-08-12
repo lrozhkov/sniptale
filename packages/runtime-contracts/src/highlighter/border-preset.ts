@@ -16,6 +16,16 @@ export type BorderPresetOrigin = 'system' | 'user';
 export type BorderPresetBlurType = 'gaussian' | 'distortion' | 'pixelate' | 'solid';
 export type AnnotationTemplateSource = 'frame-default' | 'forced';
 
+export interface AnnotationSessionDefaults {
+  enabled: boolean;
+  templateSource: AnnotationTemplateSource;
+}
+
+export const DEFAULT_ANNOTATION_SESSION_DEFAULTS: AnnotationSessionDefaults = {
+  enabled: false,
+  templateSource: 'frame-default',
+};
+
 export interface BorderPresetEffects {
   blur: {
     amount: number;

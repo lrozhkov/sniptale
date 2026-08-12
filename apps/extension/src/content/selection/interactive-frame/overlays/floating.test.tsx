@@ -3,7 +3,10 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createFrameDataFixture } from '../../frame-runtime/test-support';
+import {
+  createCalloutSettingsFixture,
+  createFrameDataFixture,
+} from '../../frame-runtime/test-support';
 
 vi.mock('../toolbar', () => ({
   InteractiveFrameToolbar: (props: { captureVisibility: { hiddenDuringCapture: boolean } }) => (
@@ -17,11 +20,15 @@ vi.mock('../toolbar', () => ({
 vi.mock('../toolbar/trigger', () => ({
   InteractiveFrameToolbarTrigger: (props: {
     captureVisibility: { hiddenDuringCapture: boolean; toggle: () => void };
+    canAddCallout?: boolean;
+    frame: ReturnType<typeof createFrameDataFixture>;
   }) => (
     <button
       type="button"
       data-ui="test.frame-trigger-visibility"
       data-hidden={String(props.captureVisibility.hiddenDuringCapture)}
+      data-additional-count={String(props.frame.additionalCallouts?.length ?? 0)}
+      data-can-add-callout={String(props.canAddCallout)}
       onClick={props.captureVisibility.toggle}
     />
   ),
@@ -79,6 +86,90 @@ afterEach(() => {
 });
 
 describe('InteractiveFrameFloatingUi', () => {
+  it('feeds staged callouts to the mini trigger while a new comment is being edited', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps();
+    props.isCalloutEditing = true;
+    props.tempFrame = {
+      ...props.frame,
+      additionalCallouts: Array.from({ length: 4 }, () => createCalloutSettingsFixture()),
+    };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<InteractiveFrameFloatingUi {...props} />));
+
+    expect(
+      container.querySelector<HTMLElement>('[data-ui="test.frame-trigger-visibility"]')?.dataset[
+        'additionalCount'
+      ]
+    ).toBe('4');
+    expect(
+      container.querySelector<HTMLElement>('[data-ui="test.frame-trigger-visibility"]')?.dataset[
+        'canAddCallout'
+      ]
+    ).toBe('false');
+    act(() => root.unmount());
+  });
+
+  it('keeps the mini trigger on the staged callout limit after comment editing stops', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps();
+    props.frame = {
+      ...props.frame,
+      callout: createCalloutSettingsFixture(),
+      additionalCallouts: Array.from({ length: 3 }, () => createCalloutSettingsFixture()),
+    };
+    props.tempFrame = {
+      ...props.frame,
+      additionalCallouts: Array.from({ length: 4 }, () => createCalloutSettingsFixture()),
+    };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<InteractiveFrameFloatingUi {...props} />));
+
+    expect(
+      container.querySelector<HTMLElement>('[data-ui="test.frame-trigger-visibility"]')?.dataset[
+        'additionalCount'
+      ]
+    ).toBe('4');
+    expect(
+      container.querySelector<HTMLElement>('[data-ui="test.frame-trigger-visibility"]')?.dataset[
+        'canAddCallout'
+      ]
+    ).toBe('false');
+    act(() => root.unmount());
+  });
+
+  it('keeps the mini action owned by the staged collection while the persisted frame catches up', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps();
+    props.frame = {
+      ...props.frame,
+      callout: createCalloutSettingsFixture(),
+      additionalCallouts: Array.from({ length: 4 }, () => createCalloutSettingsFixture()),
+    };
+    props.tempFrame = {
+      ...props.frame,
+      additionalCallouts: Array.from({ length: 3 }, () => createCalloutSettingsFixture()),
+    };
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+
+    act(() => root.render(<InteractiveFrameFloatingUi {...props} />));
+
+    const trigger = container.querySelector<HTMLElement>(
+      '[data-ui="test.frame-trigger-visibility"]'
+    );
+    expect(trigger?.dataset['additionalCount']).toBe('3');
+    expect(trigger?.dataset['canAddCallout']).toBe('true');
+    act(() => root.unmount());
+  });
+
   it('shares capture visibility between the frame action and selected toolbar immediately', () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const props = createProps();

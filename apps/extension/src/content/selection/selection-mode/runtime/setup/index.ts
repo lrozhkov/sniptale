@@ -4,6 +4,7 @@ import { createSelectionModeHoverFrameHandlers } from '../../ui/hover';
 
 export interface SelectionModeRuntimePointerHandlers {
   handleClick: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
+  handleDragStart: (event: DragEvent) => void;
   handleKeyDown: (event: KeyboardEvent) => void;
   handleMouseDown: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
   handleMouseLeave: () => void;
@@ -51,6 +52,7 @@ export type SelectionModeRuntimeActionsArgs = ReturnType<typeof createSelectionM
 function createListenerHandlers(args: SelectionModeRuntimePointerHandlers) {
   return {
     handleClick: args.handleClick,
+    handleDragStart: args.handleDragStart,
     handleKeyDown: args.handleKeyDown,
     handleMouseDown: args.handleMouseDown,
     handleMouseLeave: args.handleMouseLeave,

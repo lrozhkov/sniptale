@@ -16,15 +16,18 @@ export function isSelectionModeControl(target: HTMLElement): boolean {
 export function handleSelectionModeIdleMouseDown(
   event: MouseEvent,
   state: SelectionModeInteractionState,
-  isExtensionUIElement: (target: HTMLElement) => boolean,
+  options: {
+    isExtensionUIElement: (target: HTMLElement) => boolean;
+  },
   target: HTMLElement
 ): void {
-  if (isExtensionUIElement(target)) {
+  if (options.isExtensionUIElement(target)) {
     stopSelectionModeEvent(event);
     return;
   }
 
   stopSelectionModeEvent(event);
+  state.hoveredElement = target;
   state.mouseDownPoint = { x: event.clientX, y: event.clientY };
   state.hasMovedEnough = false;
 }

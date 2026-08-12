@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+  handleSelectionModeDragStart,
   handleSelectionModeMouseDown,
   handleSelectionModeMouseLeave,
   handleSelectionModeMouseMove,
@@ -53,9 +54,10 @@ function createOptions(): SelectionModeEventOptions {
 
 function createPointerEvent(
   target: HTMLElement | null,
-  coords: { clientX: number; clientY: number }
+  coords: { clientX: number; clientY: number },
+  type = 'mousemove'
 ): MouseEvent {
-  const event = new MouseEvent('mousemove', {
+  const event = new MouseEvent(type, {
     cancelable: true,
     clientX: coords.clientX,
     clientY: coords.clientY,
@@ -87,13 +89,19 @@ function registerHideHoverTest() {
 }
 
 function registerThresholdDragTest() {
-  it('starts a drag selection once the pointer crosses the drag threshold', () => {
+  it('captures the pointer on mouse down and updates the area once movement crosses the threshold', () => {
     const target = document.createElement('section');
-    const state = createState({
-      currentState: 'idle',
-      mouseDownPoint: { x: 10, y: 20 },
-    });
+    const state = createState();
     const options = createOptions();
+    vi.mocked(options.startDragSelection).mockImplementation(() => {
+      state.currentState = 'drag';
+    });
+
+    handleSelectionModeMouseDown(
+      createPointerEvent(target, { clientX: 10, clientY: 20 }, 'mousedown'),
+      state,
+      options
+    );
 
     handleSelectionModeMouseMove(
       createPointerEvent(target, { clientX: 24, clientY: 33 }),
@@ -101,10 +109,11 @@ function registerThresholdDragTest() {
       options
     );
 
-    expect(state.hoveredElement).toBeNull();
+    expect(state.hoveredElement).toBe(target);
     expect(state.hasMovedEnough).toBe(true);
     expect(options.showHoverFrame).not.toHaveBeenCalled();
     expect(options.startDragSelection).toHaveBeenCalledWith(10, 20);
+    expect(options.updateDragSelection).toHaveBeenCalledWith(24, 33);
   });
 }
 
@@ -208,6 +217,34 @@ function registerAnchorDragFallbackTest() {
   });
 }
 
+function registerAnchorNativeDragTest() {
+  it('converts an anchor native drag into region selection without waiting for mouseup', () => {
+    const anchor = document.createElement('a');
+    anchor.href = '/target';
+    const state = createState({
+      currentState: 'hover',
+      hoveredElement: anchor,
+      mouseDownPoint: { x: 20, y: 30 },
+    });
+    const options = createOptions();
+    const dragStart = new MouseEvent('dragstart', {
+      cancelable: true,
+      clientX: 140,
+      clientY: 120,
+    }) as DragEvent;
+    vi.spyOn(dragStart, 'preventDefault');
+    vi.spyOn(dragStart, 'stopImmediatePropagation');
+
+    handleSelectionModeDragStart(dragStart, state, options);
+
+    expect(options.startDragSelection).toHaveBeenCalledWith(20, 30);
+    expect(options.updateDragSelection).toHaveBeenCalledWith(140, 120);
+    expect(state.hasMovedEnough).toBe(true);
+    expect(dragStart.preventDefault).toHaveBeenCalledOnce();
+    expect(dragStart.stopImmediatePropagation).toHaveBeenCalledOnce();
+  });
+}
+
 describe('selection-mode pointer events', () => {
   registerHideHoverTest();
   registerThresholdDragTest();
@@ -215,4 +252,5 @@ describe('selection-mode pointer events', () => {
   registerDragFinalizeTest();
   registerSkipNextClickTest();
   registerAnchorDragFallbackTest();
+  registerAnchorNativeDragTest();
 });

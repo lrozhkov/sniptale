@@ -4,6 +4,9 @@ import { getDynamicTailState } from './dynamic-tail';
 import { getLineConnectorState } from './line-connector';
 import { renderCalloutAccentEdge, renderDynamicCalloutTail } from './views';
 import { createDefaultCalloutSettings } from './model';
+import { applySurfaceStyleToCallout } from '../../surface-style/operations';
+import { getSystemSurfaceStylePresets } from '../../surface-style/system-presets';
+import { resolveCalloutCustomCss } from '../../callout-custom-css';
 
 it('clips a double-width accent against the rounded card contour', () => {
   const style = createDefaultCalloutSettings().style;
@@ -61,7 +64,9 @@ it('renders a wide transparent hover corridor around the visible callout connect
   style.surface.borderColor = '#ff7a00';
   style.surface.borderStyle = 'dashed';
   style.surface.borderWidth = 3;
-  const markup = renderToStaticMarkup(renderDynamicCalloutTail(tail, style));
+  const markup = renderToStaticMarkup(
+    renderDynamicCalloutTail(tail, style, resolveCalloutCustomCss(style.customCss).styles)
+  );
 
   expect(markup.match(/<path/g)).toHaveLength(2);
   expect(markup).toContain('stroke="transparent"');
@@ -72,10 +77,62 @@ it('renders a wide transparent hover corridor around the visible callout connect
   expect(markup).not.toContain('pointer-events:auto');
   expect(markup).toContain('preserveAspectRatio="xMinYMin meet"');
   expect(markup).toContain('data-ui="content.callout.tail-outline"');
+  expect(markup).not.toContain('data-ui="content.callout.unified-surface"');
   expect(markup).toContain('fill="#252830ff"');
   expect(markup).toContain('stroke="#ff7a00"');
   expect(markup).toContain('stroke-dasharray="12 7.5"');
   expect(markup).toContain('stroke-width="3"');
+});
+
+it('renders a borderless wedge and bubble as one translucent contour', () => {
+  const tail = getDynamicTailState({
+    borderRadius: 10,
+    borderWidth: 0,
+    frameRect: { x: 100, y: 100, width: 160, height: 120 },
+    bubbleRect: { x: 120, y: 20, width: 160, height: 48 },
+    preferredSide: 'top',
+    tailSize: 8,
+  });
+  const style = createDefaultCalloutSettings().style;
+  style.surface.borderWidth = 0;
+  style.surface.fillPaint = { kind: 'solid', color: '#ffffff80' };
+
+  const markup = renderToStaticMarkup(
+    renderDynamicCalloutTail(tail, style, resolveCalloutCustomCss(style.customCss).styles)
+  );
+
+  expect(markup).toContain('data-ui="content.callout.tail-outline"');
+  expect(markup).toContain(`d="${tail.outlinePath}"`);
+  expect(markup).not.toContain('data-ui="content.callout.unified-surface"');
+  expect(markup).toContain('fill="#ffffff80"');
+  expect(markup).toContain('stroke="none"');
+});
+
+it('clips gradient paint and backdrop behavior on one HTML wedge-and-bubble surface', () => {
+  const tail = getDynamicTailState({
+    borderRadius: 10,
+    borderWidth: 0,
+    frameRect: { x: 100, y: 100, width: 160, height: 120 },
+    bubbleRect: { x: 120, y: 20, width: 160, height: 48 },
+    preferredSide: 'top',
+    tailSize: 8,
+  });
+  const clearTint = getSystemSurfaceStylePresets().find(
+    (preset) => preset.id === 'system-surface-clear-tint'
+  )!;
+  const style = applySurfaceStyleToCallout(createDefaultCalloutSettings().style, clearTint.style);
+
+  const markup = renderToStaticMarkup(
+    renderDynamicCalloutTail(tail, style, resolveCalloutCustomCss(style.customCss).styles)
+  );
+
+  expect(markup).toContain('data-ui="content.callout.unified-surface"');
+  expect(markup).toContain('background:linear-gradient(');
+  expect(markup).toContain('backdrop-filter:blur(10px) saturate(1.25)');
+  expect(markup).toContain('box-shadow:inset 0 1px 0 rgba(255, 255, 255, 0.35)');
+  expect(markup).toContain('clip-path:path(&quot;');
+  expect(markup).not.toContain('<foreignObject');
+  expect(markup).toContain(`d="${tail.outlinePath}"`);
 });
 
 it('renders independently sized endpoint markers including a boundary-centered ring-dot', () => {

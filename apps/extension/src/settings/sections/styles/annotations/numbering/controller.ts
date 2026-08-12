@@ -5,6 +5,7 @@ import { translate } from '../../../../../platform/i18n';
 import {
   loadStepBadgePresetCatalog,
   subscribeToStepBadgePresetCatalog,
+  updateStepBadgeSessionDefaults,
 } from '../../../../../composition/persistence/step-badge-presets';
 import type { StepBadgePresetCatalogController } from './types';
 import { createStepBadgePresetCatalogActions } from './controller-actions';
@@ -83,6 +84,24 @@ export function useStepBadgePresetCatalogController(): StepBadgePresetCatalogCon
     error,
     isLoading,
     isSaving,
-    actions: createStepBadgePresetCatalogActions({ catalog, mutate, setEditor }),
+    actions: {
+      ...createStepBadgePresetCatalogActions({ catalog, mutate, setEditor }),
+      setNewSessionEnabled: async (enabled) => {
+        await mutate(() =>
+          updateStepBadgeSessionDefaults({
+            enabled,
+            templateSource: catalog?.newSessionDefaults?.templateSource ?? 'frame-default',
+          })
+        );
+      },
+      setNewSessionTemplateSource: async (templateSource) => {
+        await mutate(() =>
+          updateStepBadgeSessionDefaults({
+            enabled: catalog?.newSessionDefaults?.enabled ?? false,
+            templateSource,
+          })
+        );
+      },
+    },
   };
 }

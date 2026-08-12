@@ -322,13 +322,13 @@ function getCalloutCloudStyle(
     | null
 ): CSSProperties {
   const { surface, typography } = settings.style;
-  const hasWedgeOutline = connector?.kind === 'wedge' && surface.borderWidth > 0;
+  const hasWedge = connector?.kind === 'wedge';
   const projectedCard = projectCalloutCardStyle(settings.style, {
-    suppressNativeFill: hasWedgeOutline,
+    suppressNativeFill: hasWedge,
   });
   return {
     ...projectedCard,
-    ...(connector?.kind === 'wedge' ? { boxShadow: 'none' } : {}),
+    ...(hasWedge ? { background: 'transparent', boxShadow: 'none' } : {}),
     position: 'relative',
     // The surface cannot depend on runtime-global resets: maxWidth owns the complete bubble.
     boxSizing: 'border-box',
@@ -337,7 +337,7 @@ function getCalloutCloudStyle(
     maxWidth: typography.maxWidth,
     color: surface.textColor,
     border: `${surface.borderWidth}px ${surface.borderStyle} ${
-      hasWedgeOutline ? 'transparent' : surface.borderColor
+      hasWedge ? 'transparent' : surface.borderColor
     }`,
     borderRadius: surface.radius,
     padding: `${surface.paddingY}px ${surface.paddingX}px`,

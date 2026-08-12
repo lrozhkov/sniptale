@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "version_name": "0.2.0",
   "minimum_chrome_version": "140",
-  "description": "Your new favorite tool for recording the browser workspace",
+  "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "incognito": "not_allowed",
   "permissions": [
     "storage",

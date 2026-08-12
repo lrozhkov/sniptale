@@ -15,6 +15,8 @@ import {
   cloneStepBadgeTemplate,
   createStepBadgeSettingsFromTemplate,
 } from '../../../../features/highlighter/step-badge-presets/catalog';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { initializeAnnotationTemplateSource } from './annotation-template-source';
 
 const logger = createLogger({ namespace: 'ContentStepBadgeDefaults' });
 
@@ -48,8 +50,9 @@ export function createStepBadgePresetSessionSync(
   let active = true;
   let generation = 0;
   let lastDefaultKey: string | null = null;
+  let sessionDefaultsApplied = false;
 
-  const applyCatalog = (catalog: StepBadgePresetCatalog) => {
+  const applyCatalog = (catalog: StepBadgePresetCatalog, applySessionDefaults = true) => {
     if (!active) return;
     const preset = getDefaultPreset(catalog);
     if (!preset) return;
@@ -59,11 +62,23 @@ export function createStepBadgePresetSessionSync(
       (lastDefaultKey !== null && templateKey(settingsTemplate(current)) === lastDefaultKey);
     if (canReplace) {
       const next = createStepBadgeSettingsFromTemplate(preset.settings, preset.id);
-      next.enabled = current?.enabled ?? false;
+      const defaults = catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS;
+      next.enabled =
+        applySessionDefaults && !sessionDefaultsApplied
+          ? current?.enabled === true || defaults.enabled
+          : (current?.enabled ?? false);
       sessionTemplateRef.current = next;
     }
     lastDefaultKey = templateKey(preset.settings);
+    if (applySessionDefaults && !sessionDefaultsApplied) {
+      sessionDefaultsApplied = true;
+      const defaults = catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS;
+      initializeAnnotationTemplateSource('stepBadge', defaults.templateSource);
+    }
   };
+
+  const snapshot = getLoadedStepBadgePresetCatalogSnapshot();
+  if (snapshot) applyCatalog(snapshot, false);
 
   const loadGeneration = ++generation;
   void loadStepBadgePresetCatalog()

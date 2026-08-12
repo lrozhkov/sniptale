@@ -11087,6 +11087,7 @@
         "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/callouts/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/index.tsx",
+        "apps/extension/src/settings/sections/styles/annotations/new-session-defaults.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller-actions.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/editor.tsx",
@@ -11396,6 +11397,7 @@
         "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/callouts/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/index.tsx",
+        "apps/extension/src/settings/sections/styles/annotations/new-session-defaults.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller-actions.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/editor.tsx",
@@ -14000,7 +14002,7 @@
       "remediation": "Review every ignore-pattern change against product roots and security scan coverage.",
       "exactSource": {
         "path": "tooling/qa/core/quality.config.mjs",
-        "contentHash": "7314ebe6490c3054d9c543081525aab4396d5b6bf022630b318cc547f616596d"
+        "contentHash": "8b46f360604995721833bda20c5f2c9cf5803213310d60f47e8a499654cb388a"
       },
       "consumers": [
         "tooling/qa/audits/ast-grep.mjs",
@@ -15840,7 +15842,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/contract.mjs",
-        "contentHash": "fb5d138342db914cd09587955dbf955a4b5f2464f631c980c2667b1a3759b9b3"
+        "contentHash": "e9829e7e21b383698dc6708be5431a2e75c242b73c541a9d86ff2e7f1887cb04"
       },
       "consumers": [
         "tooling/qa/core/checkpoint-result.helpers.mjs",

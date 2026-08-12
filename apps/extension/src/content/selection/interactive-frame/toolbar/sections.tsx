@@ -9,6 +9,7 @@ import {
   FrameAnnotationToolbarEffectButton,
   FrameAnnotationToolbarStepButton,
 } from '../../../../features/highlighter/frame-annotation/floating-toolbar';
+import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 
 export function InteractiveFrameToolbarEffectButtons(props: {
   effectMode: InteractiveFrameToolbarProps['effectMode'];
@@ -100,7 +101,7 @@ export function InteractiveFrameToolbarMiddleSection(props: {
       />
       {calloutEnabled ? (
         <FrameAnnotationToolbarAddCalloutButton
-          disabled={(props.frame.additionalCallouts?.length ?? 0) >= 4}
+          disabled={!canAppendFrameCallout(props.frame)}
           onClick={props.handleAddCalloutClick}
           onMouseDown={props.handleButtonMouseDown}
           title={translate('content.interactiveFrame.calloutAddAnother')}

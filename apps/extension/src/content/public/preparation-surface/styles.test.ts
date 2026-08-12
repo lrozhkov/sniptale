@@ -64,8 +64,7 @@ describe('content entrypoint styles', () => {
     );
     expect(effectsStyles).toContain('scrollbar-width: thin;');
     expect(effectsStyles).toContain('::-webkit-scrollbar');
-    expect(effectsStyles).toContain('.sniptale-drawing-canvas:focus-visible');
-    expect(effectsStyles).toContain('var(--sniptale-color-border-accent-strong)');
+    expect(effectsStyles).not.toContain('.sniptale-drawing-canvas:focus-visible');
     expect(frameSettingsStyles).toContain('.sniptale-frame-style-preset-row');
     expect(calloutSettingsStyles).toContain('.sniptale-callout-preset-row');
     expect(calloutSettingsStyles).toContain('.sniptale-step-badge-popover {');

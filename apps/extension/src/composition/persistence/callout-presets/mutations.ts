@@ -3,6 +3,7 @@ import type {
   CalloutPresetCatalog,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   cloneCalloutVisualStyle,
   getCanonicalSystemCalloutPreset,
@@ -136,6 +137,22 @@ export function setDefaultPreset(
   const current = catalog.presets.find((preset) => preset.id === presetId);
   if (!current || current.enabled === false || catalog.defaultPresetId === presetId) return null;
   return { ...withCustomization(catalog), defaultPresetId: presetId };
+}
+
+export function setCalloutSessionDefaults(
+  catalog: CalloutPresetCatalog,
+  defaults: AnnotationSessionDefaults
+): CalloutPresetCatalog | null {
+  if (
+    catalog.newSessionDefaults?.enabled === defaults.enabled &&
+    catalog.newSessionDefaults.templateSource === defaults.templateSource
+  ) {
+    return null;
+  }
+  return {
+    ...catalog,
+    newSessionDefaults: { ...defaults },
+  };
 }
 
 export function reorderPresets(

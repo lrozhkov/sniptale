@@ -65,6 +65,14 @@ it('can start on the web snapshot folder from the gallery URL', () => {
   expect(value.state.folderFilter).toBe('web-snapshot');
 });
 
+it('can start in the temporary scope from the gallery URL', () => {
+  window.history.replaceState(null, '', '/gallery.html?scope=temporary');
+
+  const value = renderHook();
+
+  expect(value.state.scope).toBe('temporary');
+});
+
 it('updates filter state through each owner-local setter', () => {
   const value = renderHook();
 

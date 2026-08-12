@@ -1,4 +1,5 @@
 import type { AnnotationTemplateTagId } from './annotation-template-tags';
+import type { AnnotationSessionDefaults } from './border-preset';
 
 export type StepBadgeType = 'number' | 'letter' | 'manual';
 export type StepBadgeAlphabet = 'cyrillic' | 'latin';
@@ -119,6 +120,7 @@ export interface StepBadgePreset {
 
 export interface StepBadgePresetCatalog {
   defaultPresetId: string;
+  newSessionDefaults?: AnnotationSessionDefaults;
   presets: StepBadgePreset[];
   systemCatalogRevision: number;
   catalogCustomized?: boolean;

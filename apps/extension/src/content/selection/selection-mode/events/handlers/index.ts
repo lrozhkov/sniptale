@@ -4,6 +4,7 @@ import { logSelectionModeRuntime } from '../../diag';
 import type { SelectionModeInteractionState } from '../types';
 import { handleSelectionModeClick, handleSelectionModeKeyDown } from '../commands';
 import {
+  handleSelectionModeDragStart,
   handleSelectionModeMouseDown,
   handleSelectionModeMouseLeave,
   handleSelectionModeMouseMove,
@@ -93,6 +94,9 @@ function createSelectionModePointerLogger(
 
 function createSelectionModePointerLifecycleHandlers(args: SelectionModeEventHandlersContext) {
   return {
+    handleDragStart(event: DragEvent) {
+      handleSelectionModeDragStart(event, args.state, args.selectionModeEvents);
+    },
     handleMouseDown(event: MouseEvent, iframe?: HTMLIFrameElement) {
       logSelectionModeEvent('MouseDown received', {
         currentState: args.state.currentState,

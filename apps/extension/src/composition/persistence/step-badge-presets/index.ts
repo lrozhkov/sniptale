@@ -22,9 +22,11 @@ import {
   reorderStepBadgePresets,
   resetSystemStepBadgePreset,
   setDefaultStepBadgePreset,
+  setStepBadgeSessionDefaults,
   setStepBadgePresetEnabled,
   updateStepBadgePreset,
 } from './mutations';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   MAX_STEP_BADGE_PRESET_NAME_LENGTH,
   MAX_USER_STEP_BADGE_PRESETS,
@@ -239,6 +241,12 @@ export function setDefaultStoredStepBadgePreset(id: string) {
     return next
       ? { outcome: 'applied', catalog: next }
       : { outcome: 'rejected', reason: 'disabled-default' };
+  });
+}
+export function updateStepBadgeSessionDefaults(defaults: AnnotationSessionDefaults) {
+  return command((catalog) => {
+    const next = setStepBadgeSessionDefaults(catalog, defaults);
+    return next ? { outcome: 'applied', catalog: next } : { outcome: 'unchanged' };
   });
 }
 export function updateStoredStepBadgePresetOrder(ids: string[]) {

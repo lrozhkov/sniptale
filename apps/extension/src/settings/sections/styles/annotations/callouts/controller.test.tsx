@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   reorder: vi.fn(),
   reset: vi.fn(),
   setDefault: vi.fn(),
+  setSessionDefaults: vi.fn(),
   subscribe: vi.fn(),
   toastError: vi.fn(),
   toggle: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../../../../../composition/persistence/callout-presets', async (importO
   resetSystemCalloutPreset: mocks.reset,
   setCalloutPresetEnabled: mocks.toggle,
   setDefaultCalloutPreset: mocks.setDefault,
+  updateCalloutSessionDefaults: mocks.setSessionDefaults,
   subscribeToCalloutPresetCatalog: mocks.subscribe,
   updateCalloutPreset: mocks.update,
   updateCalloutPresetsOrder: mocks.reorder,
@@ -66,6 +68,7 @@ beforeEach(() => {
   mocks.reorder.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.reset.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.setDefault.mockReset().mockResolvedValue({ outcome: 'applied' });
+  mocks.setSessionDefaults.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.toggle.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.update.mockReset().mockResolvedValue({ outcome: 'applied' });
 });
@@ -98,6 +101,20 @@ describe('useCalloutPresetCatalogController', () => {
     await act(async () => latest?.actions.setDefault('system-callout-card'));
     expect(mocks.setDefault).toHaveBeenCalledWith('system-callout-card');
     expect(mocks.load).toHaveBeenCalledTimes(2);
+  });
+
+  it('persists both new-session defaults without changing the active catalog locally', async () => {
+    await act(async () => root?.render(<Harness />));
+    await act(async () => latest?.actions.setNewSessionEnabled(true));
+    await act(async () => latest?.actions.setNewSessionTemplateSource('forced'));
+    expect(mocks.setSessionDefaults).toHaveBeenNthCalledWith(1, {
+      enabled: true,
+      templateSource: 'frame-default',
+    });
+    expect(mocks.setSessionDefaults).toHaveBeenNthCalledWith(2, {
+      enabled: false,
+      templateSource: 'forced',
+    });
   });
 
   it('routes CRUD, visibility, reset, and ordering without expanding border state', async () => {

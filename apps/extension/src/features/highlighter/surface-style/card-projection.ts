@@ -21,6 +21,17 @@ export function projectCalloutCardStyle(
   });
   const cardCss = extractCalloutCardCss(style.customCss);
   const custom = cardCss === null ? null : projectCanonicalSurfaceCss(cardCss);
+  const nativeShadow =
+    resolved.surface.shadow > 0
+      ? `0 ${Math.max(1, resolved.surface.shadow / 3)}px ${resolved.surface.shadow}px ${resolved.surface.shadowColor}`
+      : null;
+  const customShadow = custom?.['boxShadow'];
+  const boxShadow =
+    nativeShadow === null
+      ? (customShadow ?? 'none')
+      : customShadow === undefined || customShadow === 'none'
+        ? nativeShadow
+        : `${nativeShadow}, ${customShadow}`;
   return {
     background: frameColors?.suppressNativeFill
       ? 'transparent'
@@ -29,12 +40,9 @@ export function projectCalloutCardStyle(
     borderStyle: resolved.surface.borderStyle,
     borderWidth: resolved.surface.borderWidth,
     borderRadius: resolved.surface.radius,
-    boxShadow:
-      resolved.surface.shadow > 0
-        ? `0 ${Math.max(1, resolved.surface.shadow / 3)}px ${resolved.surface.shadow}px ${resolved.surface.shadowColor}`
-        : 'none',
     color: resolved.surface.textColor,
     padding: `${resolved.surface.paddingY}px ${resolved.surface.paddingX}px`,
     ...(custom ?? {}),
+    boxShadow,
   };
 }
