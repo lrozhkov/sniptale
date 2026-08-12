@@ -14000,7 +14000,7 @@
       "remediation": "Review every ignore-pattern change against product roots and security scan coverage.",
       "exactSource": {
         "path": "tooling/qa/core/quality.config.mjs",
-        "contentHash": "3ccaed04013845690aa93c43633d0ca1cf286e688cf72d45563cd4a5d012cf83"
+        "contentHash": "7314ebe6490c3054d9c543081525aab4396d5b6bf022630b318cc547f616596d"
       },
       "consumers": [
         "tooling/qa/audits/ast-grep.mjs",
@@ -14374,18 +14374,16 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/agent-tooling/agent-tooling.mjs",
-        "contentHash": "03aa28f2d27bec889a80e0cd701bba37966ec812d7cd9472df27098691713ade"
+        "contentHash": "499279b70fe691e39f2aaa630650246d6f5dd8434caa1cc67600623049f08009"
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.mjs",
         "tooling/agent-tooling/agent-tooling.test.ts",
         "tooling/agent-tooling/install.mjs",
-        "tooling/agent-tooling/pack.mjs",
         "tooling/agent-tooling/remove.mjs"
       ],
       "surfaces": [
-        "binding:PAYLOAD_ROOTS",
-        "property:packAgentTooling/compressionOptions"
+        "binding:PAYLOAD_ROOTS"
       ]
     },
     {

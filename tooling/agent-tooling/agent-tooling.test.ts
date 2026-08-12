@@ -1,15 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 
-import {
-  collectAgentToolingFiles,
-  installAgentTooling,
-  packAgentTooling,
-  removeAgentTooling,
-} from './agent-tooling.mjs';
+import { installAgentTooling, removeAgentTooling } from './agent-tooling.mjs';
 import { createTempRoot } from '../qa/core/test-helpers';
 
 function createKit() {
@@ -56,22 +50,5 @@ describe('optional agent tooling', () => {
     expect(() => installAgentTooling({ destinationRoot, sourceDirectory })).toThrow('--force');
     expect(() => removeAgentTooling({ destinationRoot, sourceDirectory })).toThrow('--force');
     removeAgentTooling({ destinationRoot, force: true, sourceDirectory });
-  });
-
-  it('creates a deterministic archive with only installable payload files', async () => {
-    const { root, sourceDirectory } = createKit();
-    const first = path.join(root, 'first.zip');
-    const second = path.join(root, 'second.zip');
-
-    await packAgentTooling({ destination: first, sourceDirectory });
-    await packAgentTooling({ destination: second, sourceDirectory });
-    expect(readFileSync(first)).toEqual(readFileSync(second));
-
-    const zip = await JSZip.loadAsync(readFileSync(first));
-    const entries = Object.values(zip.files)
-      .filter((entry) => !entry.dir)
-      .map((entry) => entry.name)
-      .sort();
-    expect(entries).toEqual(collectAgentToolingFiles(sourceDirectory));
   });
 });

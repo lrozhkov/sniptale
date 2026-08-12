@@ -22,7 +22,7 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - `tooling/qa` contains QA wrappers, deterministic guards, audits, and policy implementations.
 - `tooling/configs` contains passive machine-readable policy and baselines.
 - `tooling/release` owns release packaging and artifact-security tooling.
-- `tooling/agent-tooling` owns explicit installation, removal, and derived ZIP packaging for the optional local agent kit.
+- `tooling/agent-tooling` owns explicit installation and removal for the optional local agent kit.
 - `tooling/backup` writes local archives under ignored `.backup/`.
 - `.tmp` contains generated local reports and tooling artifacts.
 - `tasks` contains workspace-only task artifacts and is not staged.

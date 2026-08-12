@@ -41,7 +41,7 @@ This build can run natively on Windows. Linux, or WSL with the repository and `n
 
 ### Optional agent tooling
 
-Repository-local agent instructions and review skills are opt-in. Install ignored local copies of `AGENTS.md` and `.agents/**` with `npm run agents:install`; this command is never run by dependency installation, hooks, CI, or QA. The reviewable source, removal command, conflict behavior, and optional ZIP packaging command are documented in [Optional agent tooling](docs/agent-tooling/README.md).
+Repository-local agent instructions and review skills are opt-in. Install ignored local copies of `AGENTS.md` and `.agents/**` with `npm run agents:install`; this command is never run by dependency installation, hooks, CI, or QA. The reviewable source, removal command, and conflict behavior are documented in [Optional agent tooling](docs/agent-tooling/README.md).
 
 ## Why this project exists
 

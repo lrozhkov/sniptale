@@ -34,7 +34,7 @@ Active documentation is organized by ownership. This tree contains current autho
 - [Technical debt](engineering/tech-debt-report.md) is the generated human view of the machine debt registry.
 - [Operator handbook](tooling/operator-handbook.md) routes commands; [wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior; [code quality](tooling/code-quality.md) owns gate and exception policy.
 - [WSL setup](tooling/wsl-setup.md) owns environment setup, and [repository root inventory](tooling/repo-root-inventory.md) owns required root entries.
-- [Optional agent tooling](agent-tooling/README.md) owns opt-in installation, removal, and derived ZIP packaging for local agent instructions and skills.
+- [Optional agent tooling](agent-tooling/README.md) owns opt-in installation and removal for local agent instructions and skills.
 - [Data handling](security/data-handling.md), [manifest permissions](security/manifest-permissions.md), and [threat model](security/threat-model.md) own security policy.
 - [Provenance](oss/provenance.md) and [release](oss/release.md) own redistribution evidence and local release procedure.
 - [CONTRIBUTING.md](../CONTRIBUTING.md) owns issue and proposal guidance and records the current external code-contribution policy; [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) governs participation.

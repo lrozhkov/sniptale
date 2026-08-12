@@ -64,7 +64,6 @@
     "qa:raw:semgrep": "semgrep",
     "qa:raw:codeql": "codeql",
     "agents:install": "node tooling/agent-tooling/install.mjs",
-    "agents:pack": "node tooling/agent-tooling/pack.mjs",
     "agents:remove": "node tooling/agent-tooling/remove.mjs",
     "backup:repo": "bash tooling/backup/sc-backup.sh",
     "backup:prod": "bash tooling/backup/sc-prod-backup.sh",

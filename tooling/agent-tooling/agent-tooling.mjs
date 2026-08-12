@@ -5,22 +5,16 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
   rmdirSync,
-  writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import JSZip from 'jszip';
-
 export const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 export const sourceRoot = path.join(repoRoot, 'docs/agent-tooling');
-export const archivePath = path.join(repoRoot, 'artifacts/agent-tooling.zip');
 
 const PAYLOAD_ROOTS = ['AGENTS.md', '.agents'];
-const ZIP_TIMESTAMP = new Date('1980-01-01T00:00:00.000Z');
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/');
@@ -161,30 +155,4 @@ export function removeAgentTooling({
   }
   pruneEmptyDirectories(destinationRoot, files);
   return files;
-}
-
-export async function packAgentTooling({
-  destination = archivePath,
-  sourceDirectory = sourceRoot,
-} = {}) {
-  const zip = new JSZip();
-  const files = collectAgentToolingFiles(sourceDirectory);
-  for (const relativePath of files) {
-    zip.file(relativePath, readFileSync(path.join(sourceDirectory, relativePath)), {
-      createFolders: false,
-      date: ZIP_TIMESTAMP,
-      unixPermissions: 0o100644,
-    });
-  }
-  const contents = await zip.generateAsync({
-    compression: 'DEFLATE',
-    compressionOptions: { level: 9 },
-    platform: 'UNIX',
-    type: 'nodebuffer',
-  });
-  mkdirSync(path.dirname(destination), { recursive: true });
-  const temporaryPath = `${destination}.tmp`;
-  writeFileSync(temporaryPath, contents);
-  renameSync(temporaryPath, destination);
-  return { destination, files };
 }
