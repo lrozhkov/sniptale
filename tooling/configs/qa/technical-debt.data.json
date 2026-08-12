@@ -1497,8 +1497,10 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer-cleanup.ts",
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
+        "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
+        "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
         "apps/extension/src/background/media/video/content-surface/snapshot.ts",
         "apps/extension/src/background/media/video/content-surface/start.ts",
         "apps/extension/src/background/media/video/content-surface/surface-lease.ts",
@@ -2173,8 +2175,10 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer-cleanup.ts",
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
+        "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
+        "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
         "apps/extension/src/background/media/video/content-surface/snapshot.ts",
         "apps/extension/src/background/media/video/content-surface/start.ts",
         "apps/extension/src/background/media/video/content-surface/surface-lease.ts",
@@ -4184,6 +4188,7 @@
         "apps/extension/src/content/overlay/toolbar/video-recording/drawing-controls.tsx",
         "apps/extension/src/content/overlay/toolbar/video-recording/drawing-session.ts",
         "apps/extension/src/content/overlay/toolbar/video-recording/media-menu.tsx",
+        "apps/extension/src/content/overlay/toolbar/video-recording/spotlight-menu.tsx",
         "apps/extension/src/content/overlay/toolbar/view.tsx",
         "apps/extension/src/content/overlay/video-clicks/dom-driver.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts",
@@ -4196,6 +4201,7 @@
         "apps/extension/src/content/overlay/video-recording/session/state.ts",
         "apps/extension/src/content/overlay/video-recording/spotlight/view.tsx",
         "apps/extension/src/content/overlay/video-recording/transport/client.ts",
+        "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
         "apps/extension/src/content/overlay/video-telemetry/artifacts.ts",
         "apps/extension/src/content/overlay/video-telemetry/controller.ts",
         "apps/extension/src/content/overlay/video-telemetry/events.ts",
@@ -4513,6 +4519,7 @@
         "apps/extension/src/content/runtime/bridge/region-overlay.ts",
         "apps/extension/src/content/runtime/bridge/router.ts",
         "apps/extension/src/content/runtime/bridge/types.ts",
+        "apps/extension/src/content/runtime/bridge/video-recording-surface.ts",
         "apps/extension/src/content/runtime/bridge/viewport.ts",
         "apps/extension/src/content/runtime/entrypoint/bootstrap.tsx",
         "apps/extension/src/content/runtime/entrypoint/diagnostics.ts",
@@ -4907,6 +4914,7 @@
         "apps/extension/src/content/overlay/video-recording/session/state.ts",
         "apps/extension/src/content/overlay/video-recording/spotlight/view.tsx",
         "apps/extension/src/content/overlay/video-recording/transport/client.ts",
+        "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
         "apps/extension/src/content/parser/backends/contracts.ts",
         "apps/extension/src/content/parser/backends/index.ts",
         "apps/extension/src/content/parser/backends/legacy-tree-walker/index.ts",
@@ -9270,6 +9278,7 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
+        "apps/extension/src/offscreen/recording/camera-source/device-catalog.ts",
         "apps/extension/src/offscreen/recording/camera-source/peer.ts",
         "apps/extension/src/offscreen/recording/camera-source/session.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
@@ -9477,6 +9486,7 @@
         "apps/extension/src/offscreen/project-export/service/state.ts",
         "apps/extension/src/offscreen/project-export/timing.ts",
         "apps/extension/src/offscreen/project-export/types.ts",
+        "apps/extension/src/offscreen/recording/camera-source/device-catalog.ts",
         "apps/extension/src/offscreen/recording/camera-source/peer.ts",
         "apps/extension/src/offscreen/recording/camera-source/session.ts",
         "apps/extension/src/offscreen/recording/context/index.ts",
@@ -13791,6 +13801,7 @@
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
         "tooling/qa/core/messaging-default-imports.mjs",
+        "tooling/qa/core/verify-messaging.mjs",
         "tooling/qa/policy/index.mjs",
         "tooling/qa/policy/messaging.mjs"
       ]
@@ -20324,7 +20335,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/typecheck-project-map.mjs",
-        "contentHash": "a46c867b34a8442c919ed110ac9eddd233966e988a56c095ce6670c8554938c1"
+        "contentHash": "1ef3bf63c5551c0d3168ff2dfe2c40e25f5b6908b82b99b2d5c5357305b705bd"
       },
       "consumers": [
         "tooling/qa/core/typecheck-project-map.mjs",
@@ -21447,7 +21458,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.code-steps.mjs",
-        "contentHash": "b0edd596bcec1e281105c27a37c56c5761af5864b868a6336dccd79078c9734b"
+        "contentHash": "62308fa2aed3bb865b3f34a128849fa495b5418ce5fe3df5c3af17e068c7d2fe"
       },
       "consumers": [
         "tooling/qa/core/qa-steps/contract.mjs",
@@ -21530,7 +21541,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.execution.mjs",
-        "contentHash": "04cb85c00eabc0aed13a9c2ec5c405302c03a59148e8ca2af7153f85881e1700"
+        "contentHash": "5504165c79100a369fcce6f8634a81e68f680a099745d659b3d92170499071be"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.dead-exports.helpers.test.ts",
@@ -22001,18 +22012,20 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-messaging.mjs",
-        "contentHash": "0b7bfbb48c009c8c73e5e4345b4a947208b7adc178bcb6b5fce404a7edd580c8"
+        "contentHash": "7f2a63b84fa3fc83aabfe5d41c47e60abbafebd04852d932dcf6a6f1b5688c67"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.runtime.mjs",
-        "tooling/qa/core/verify-focused.code-steps.mjs",
+        "tooling/qa/core/verify-focused.execution.mjs",
         "tooling/qa/core/verify-messaging.mjs",
         "tooling/qa/core/verify-messaging.test.ts"
       ],
       "surfaces": [
         "property:collectMessagingViolations/groupIds",
+        "property:runMessagingCheck/files",
         "property:runMessagingCheck/groupIds",
-        "property:runMessagingCheck/violations"
+        "property:runMessagingCheck/violations",
+        "property:runMessagingCheck/violations[1]"
       ]
     },
     {

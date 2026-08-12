@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { collectDefaultRuntimeMessagingImportReport } from './messaging-default-imports.mjs';
-import { collectMessagingViolations } from './verify-messaging.mjs';
+import { collectMessagingViolations, runMessagingCheck } from './verify-messaging.mjs';
 
 const tempDirs: string[] = [];
 
@@ -179,6 +179,45 @@ function verifiesDefaultRuntimeMessagingImportBaselineRemoval() {
   ]);
 }
 
+function verifiesFocusedDefaultRuntimeMessagingImportBaselineRemoval() {
+  const root = createTempRoot();
+  const removedPath = 'apps/extension/src/content/logic/removed.ts';
+  const retainedPath = 'apps/extension/src/content/logic/retained.ts';
+  writeFile(
+    root,
+    retainedPath,
+    "import { sendRuntimeMessage } from '../../platform/runtime-messaging';\n"
+  );
+
+  const report = runMessagingCheck({
+    baseline: new Set([`${removedPath}#sendRuntimeMessage`, `${retainedPath}#sendRuntimeMessage`]),
+    files: [],
+    root,
+    targetFiles: [removedPath],
+  });
+
+  expect(report.defaultRuntimeMessagingImports.currentCount).toBe(1);
+  expect(report.defaultRuntimeMessagingImports.removed).toEqual([
+    `${removedPath}#sendRuntimeMessage`,
+  ]);
+  expect(report.defaultRuntimeMessagingImports.imports).toEqual([
+    expect.objectContaining({ file: retainedPath, importName: 'sendRuntimeMessage' }),
+  ]);
+  expect(report.violations).toEqual([
+    expect.objectContaining({
+      message: expect.stringContaining('Removed default runtime messaging import baseline'),
+      rule: 'messaging-default-runtime-transport-import',
+    }),
+  ]);
+}
+
+function verifiesDefaultCallScansTheWorkspace() {
+  const report = runMessagingCheck({ baseline: new Set() });
+
+  expect(report.skipped).not.toBe(true);
+  expect(report.files.length).toBeGreaterThan(0);
+}
+
 describe('collectMessagingViolations', () => {
   it(
     'flags direct runtime messaging outside the allowlist',
@@ -210,4 +249,9 @@ describe('collectMessagingViolations', () => {
     'flags removed default runtime messaging import baseline entries',
     verifiesDefaultRuntimeMessagingImportBaselineRemoval
   );
+  it(
+    'flags removed baseline entries in focused file scope',
+    verifiesFocusedDefaultRuntimeMessagingImportBaselineRemoval
+  );
+  it('scans the workspace when invoked without a file scope', verifiesDefaultCallScansTheWorkspace);
 });

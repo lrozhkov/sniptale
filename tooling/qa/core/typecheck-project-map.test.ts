@@ -121,7 +121,7 @@ it('maps owner-local tests and test-support files to owner test projects', () =>
   });
 });
 
-it('falls back to full typecheck for broad shared and ambiguous harness changes', () => {
+it('falls back to full typecheck for broad shared changes', () => {
   expect(
     resolveAffectedTypecheckProjects([
       'packages/runtime-contracts/src/messaging/message-types/index.ts',
@@ -138,7 +138,12 @@ it('falls back to full typecheck for broad shared and ambiguous harness changes'
     mode: 'full',
     reason: 'broad shared contract owner changed',
   });
+});
+
+it('routes test harness changes through the generated harness project', () => {
   expect(resolveAffectedTypecheckProjects(['tooling/test/harness/popup.tsx'])).toMatchObject({
-    mode: 'full',
+    mode: 'affected',
+    projectIds: expect.arrayContaining(['test-harness']),
+    reason: 'changed owner projects',
   });
 });

@@ -70,6 +70,30 @@ it('keeps executable policy changes behind a fresh harness stamp', () => {
   expect(harnessStateAsserter).toHaveBeenCalledWith(context, 'qa:checkpoint');
 });
 
+it('validates the live OSS consumer inventory for every harness change', () => {
+  const ossInventoryValidator = vi.fn(() => ({
+    violations: ['OSS release consumer manifest is incomplete or stale'],
+  }));
+
+  const violations = collectHarnessInventoryViolations(
+    {
+      harnessTargetFiles: ['tooling/release/package-dist.mjs'],
+      harnessInventoryTargetFiles: [],
+      harnessVerificationTargetFiles: ['tooling/release/package-dist.mjs'],
+    },
+    { ossInventoryValidator }
+  );
+
+  expect(ossInventoryValidator).toHaveBeenCalledOnce();
+  expect(violations).toEqual([
+    {
+      file: 'tooling/configs/qa/oss-release-consumers.data.json',
+      message: 'OSS release consumer manifest is incomplete or stale',
+      rule: 'oss-release-consumer-inventory',
+    },
+  ]);
+});
+
 it('owner-validates the exact coverage rollout inventory without consulting a harness stamp', () => {
   const harnessStateAsserter = vi.fn();
   const step = collectHarnessFreshnessStep(

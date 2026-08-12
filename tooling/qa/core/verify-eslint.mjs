@@ -57,7 +57,7 @@ async function summarizeEslintResultsWithInstance(
 }
 
 export async function summarizeEslintResults(results, options = {}) {
-  const eslint = new ESLint({ cache: true, cwd: process.cwd() });
+  const eslint = new ESLint({ cache: true, cacheStrategy: 'content', cwd: process.cwd() });
   return summarizeEslintResultsWithInstance(eslint, results, options);
 }
 
@@ -71,6 +71,7 @@ export async function lintWithEslint({
 } = {}) {
   const eslint = new ESLint({
     cache: true,
+    cacheStrategy: 'content',
     cwd: process.cwd(),
     ...(overrideConfig ? { overrideConfig } : {}),
   });

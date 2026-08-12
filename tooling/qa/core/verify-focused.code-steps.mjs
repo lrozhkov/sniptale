@@ -8,7 +8,6 @@ import { runHistoryTransactionLifecycleCheck } from './verify-history-transactio
 import { runInstanceOwnershipCheck } from './verify-instance-ownership.mjs';
 import { runInterfaceSurfaceCheck } from './verify-interface-surfaces.mjs';
 import { runLifecycleIntentCheck } from './verify-lifecycle-intent.mjs';
-import { runMessagingCheck } from './verify-messaging.mjs';
 import { runNamingCheck } from './verify-naming.mjs';
 import { runParserSnapshotPurityCheck } from './verify-parser-snapshot-purity.mjs';
 import { runReadPathSideEffectCheck } from './verify-read-path-side-effects.mjs';
@@ -43,7 +42,6 @@ export const FOCUSED_CODE_VIOLATION_STEPS = [
     'Suppression directive violations found:',
     runSuppressionDirectiveCheck,
   ],
-  ['Messaging', 'Messaging guardrail violations found:', runMessagingCheck],
   ['Browser adapters', 'Browser adapter guardrail violations found:', runBrowserAdapterCheck],
   ['Read path side effects', 'Read-path side-effect violations found:', runReadPathSideEffectCheck],
   ['Read-safe naming', 'Read-safe naming violations found:', runReadSafeNamingCheck],

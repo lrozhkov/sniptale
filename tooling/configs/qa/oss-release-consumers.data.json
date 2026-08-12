@@ -64,7 +64,7 @@
     {
       "category": "validator-integration",
       "path": "tooling/qa/core/harness-freshness-step.mjs",
-      "sha256": "50fff314a4c4d203dcabc9e28d08ddcb891d8173ee538b271664f2ff76727d45"
+      "sha256": "882c8d31060b08751be9424bb8b12cc37b553f9a451e646d37c65ac4b7745bef"
     },
     {
       "category": "archive-integration",
