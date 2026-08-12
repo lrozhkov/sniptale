@@ -196,6 +196,7 @@ it('materializes the selected output geometry for a normal full-tab source', asy
     captureMode: CaptureMode.TAB,
     settings,
     streamId: 'stream-1',
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
   });
   expect(mocks.resolveTabGeometry).toHaveBeenCalledWith(
     { x: 0, y: 0, width: 1280, height: 720 },
@@ -239,6 +240,7 @@ it('starts viewport-preset output behind a closed frame gate', async () => {
     captureMode: CaptureMode.TAB,
     settings,
     streamId: 'stream-viewport',
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
   });
   expect(prepared.tabOutputControls).toBe(tabOutputControls);
 });
@@ -492,6 +494,28 @@ it('encodes a 2560x1440 full-tab source as an exact 854x480 output', async () =>
   );
   expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 480, width: 854 });
   expect(recordingContext.videoStream?.getVideoTracks()[0]?.contentHint).toBe('text');
+});
+
+it('forwards measured TAB density to source acquisition before output geometry is created', async () => {
+  const source = createRecordingStream(2560, 1440);
+  mocks.acquire.mockResolvedValueOnce({ cursorCaptureMode: null, stream: source });
+
+  await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings,
+    streamId: 'stream-physical-viewport',
+    viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+  });
+
+  expect(mocks.acquire).toHaveBeenCalledWith(
+    expect.objectContaining({
+      captureMode: CaptureMode.TAB,
+      viewport: { width: 1280, height: 720, devicePixelRatio: 2 },
+    })
+  );
+  expect(mocks.acquire.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.createTabOutput.mock.invocationCallOrder[0]!
+  );
 });
 
 it('uses the measured TAB viewport as Source output authority instead of the screen-sized raw track', async () => {

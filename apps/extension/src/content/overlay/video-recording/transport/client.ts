@@ -28,6 +28,8 @@ export type SurfaceIdentity = {
   surfaceToken: string;
 };
 
+const RETIRED_CAMERA_PEER_ERROR = 'Unauthorized or stale camera peer';
+
 export async function activateVideoRecordingSurface(event: Event) {
   const message = await attachContentActionIntent(
     { type: VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE },
@@ -63,6 +65,9 @@ export async function closeVideoRecordingCameraPeer(identity: SurfaceIdentity): 
     documentGeneration: identity.documentGeneration,
     peerGeneration: identity.peerGeneration,
   });
+  // Background may retire the lease before React disposes its matching local peer.
+  // Closing that already-retired generation is idempotent; unrelated failures remain visible.
+  if (response?.success === false && response.error === RETIRED_CAMERA_PEER_ERROR) return;
   if (!response?.success) throw new Error(response?.error ?? 'Camera peer close failed');
 }
 

@@ -118,6 +118,15 @@ it('retains caller authority when peer close or surface release is rejected', as
   await expect(releaseVideoRecordingSurface(identity)).rejects.toThrow('cleanup rejected');
 });
 
+it('treats an already-retired camera peer as an idempotent close', async () => {
+  sendRuntimeMessage.mockResolvedValue({
+    success: false,
+    error: 'Unauthorized or stale camera peer',
+  });
+
+  await expect(closeVideoRecordingCameraPeer(identity)).resolves.toBeUndefined();
+});
+
 it('projects validated surface and runtime subscriptions', () => {
   const surfaceListener = vi.fn();
   const runtimeListener = vi.fn();

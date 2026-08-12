@@ -207,6 +207,7 @@ export async function prepareRecordingStream(
     streamId: params.streamId,
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
+    ...(params.viewport === undefined ? {} : { viewport: params.viewport }),
   });
   recordingContext.sourceStream = sourceStream;
   const raw = await readRawSource(sourceStream);
