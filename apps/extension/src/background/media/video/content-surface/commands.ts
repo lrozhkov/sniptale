@@ -148,11 +148,14 @@ async function applyLiveSettingsWithDurableCommit(
       requireAcceptedResult(rollback, ['accepted']);
     } catch (rollbackError) {
       await updateVideoRecordingSurface(message.surfaceSessionId, { lifecycle: 'degraded' });
-      throw new Error(
-        `Durable settings update failed and live rollback was not accepted: ${
+      throw new AggregateError(
+        [error, rollbackError],
+        `Durable settings update failed: ${
+          error instanceof Error ? error.message : String(error)
+        }; live rollback was not accepted: ${
           rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
         }`,
-        { cause: error }
+        { cause: rollbackError }
       );
     }
     throw error;

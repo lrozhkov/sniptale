@@ -277,22 +277,29 @@ it('marks the surface degraded when a durable failure cannot restore live media'
     recordingId: 'recording-1',
     tabId: 12,
   });
+  const rollbackError = { error: 'rollback rejected', result: 'failed' } as const;
+  const storageError = new Error('storage failed');
   mocks.updateRecordingSettings
     .mockResolvedValueOnce({ result: 'accepted' })
-    .mockResolvedValueOnce({ error: 'rollback rejected', result: 'failed' });
-  mocks.patchVideoSettings.mockRejectedValueOnce(new Error('storage failed'));
+    .mockResolvedValueOnce(rollbackError);
+  mocks.patchVideoSettings.mockRejectedValueOnce(storageError);
 
-  await expect(
-    runVideoRecordingSurfaceCommand(12, {
-      type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
-      surfaceSessionId: lease.surfaceSessionId,
-      surfaceToken: lease.surfaceToken,
-      capabilityEpoch: lease.capabilityEpoch,
-      documentGeneration: lease.documentGeneration,
-      recordingId: 'recording-1',
-      command: { kind: 'select-webcam-device', deviceId: 'cam-2' },
-    })
-  ).rejects.toThrow('live rollback was not accepted: rollback rejected');
+  const commandPromise = runVideoRecordingSurfaceCommand(12, {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: lease.surfaceSessionId,
+    surfaceToken: lease.surfaceToken,
+    capabilityEpoch: lease.capabilityEpoch,
+    documentGeneration: lease.documentGeneration,
+    recordingId: 'recording-1',
+    command: { kind: 'select-webcam-device', deviceId: 'cam-2' },
+  });
+  await expect(commandPromise).rejects.toMatchObject({
+    cause: expect.objectContaining({ message: 'rollback rejected' }),
+    errors: [storageError, expect.objectContaining({ message: 'rollback rejected' })],
+    message: expect.stringMatching(
+      /Durable settings update failed: storage failed; live rollback was not accepted: rollback rejected/u
+    ),
+  });
   expect((await import('./surface-lease')).getVideoRecordingSurfaceLeaseSnapshot()).toMatchObject({
     lifecycle: 'degraded',
   });

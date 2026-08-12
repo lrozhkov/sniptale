@@ -3,7 +3,6 @@ const SEND_RUNTIME_MESSAGE_BASELINE_FILES = [
   'apps/extension/src/background/media/video/runtime/handlers/export/reconcile.ts',
   'apps/extension/src/background/media/video/runtime/handlers/state/offscreen-lifecycle.ts',
   'apps/extension/src/background/media/video/runtime/session-state/service/runtime-state-service.ts',
-  'apps/extension/src/editor/document/file-actions/gallery-update.ts',
   'apps/extension/src/editor/document/file-actions/save.ts',
   'apps/extension/src/offscreen/recording/finalizer.ts',
   'apps/extension/src/offscreen/recording/multi-source/duration.ts',
