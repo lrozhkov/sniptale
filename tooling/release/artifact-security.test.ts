@@ -117,6 +117,29 @@ it('accepts a release artifact that matches manifest policy', async () => {
   ).resolves.toBeUndefined();
 });
 
+it('accepts hashed token-named bundles but rejects token payload files', async () => {
+  const repoRoot = await createRepoRoot();
+
+  await expect(
+    verifyReleaseArtifactFiles({
+      files: createFiles({ path: 'assets/tokens-Bnweetmb.js' }),
+      repoRoot,
+    })
+  ).resolves.toBeUndefined();
+  for (const forbiddenPath of [
+    'token.json',
+    'assets/token-abcdefgh.js',
+    'assets/secret-abcdefgh.js',
+    'assets/private-key-abcdefgh.js',
+    'assets/raw-diagnostics-abcdefgh.js',
+    'assets/raw-history-abcdefgh.js',
+  ]) {
+    await expect(
+      verifyReleaseArtifactFiles({ files: createFiles({ path: forbiddenPath }), repoRoot })
+    ).rejects.toThrow(`Release artifact contains forbidden secret-like artifact: ${forbiddenPath}`);
+  }
+});
+
 it('rejects a missing or altered release legal payload', async () => {
   const repoRoot = await createRepoRoot();
   const withoutNotice = createFiles().filter((file) => file.relativePath !== 'NOTICE');

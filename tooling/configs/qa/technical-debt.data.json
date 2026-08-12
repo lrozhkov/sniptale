@@ -14607,7 +14607,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/artifact-security.mjs",
-        "contentHash": "385f9f13852db836f230f7c38ef8978545e0402a8a5682b7317140a3d283b4ec"
+        "contentHash": "314522548f8a93a731e740bec46b25b1a0d9d5385371cc10c5758eb6cdabd8ed"
       },
       "consumers": [
         "tooling/release/artifact-security-dynamic-sandbox-worker.test.ts",
@@ -18354,14 +18354,13 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/release/package-dist.mjs",
-        "contentHash": "45fb58ad0975e84df1e2f6f97221037090f7cd7781e345bd6f5d09f4cfc897d4"
+        "contentHash": "9494c36cfcf9ccb9c5e0ddfe76783e7353568ef72f2c875eb6410a4761b44e50"
       },
       "consumers": [
         "tooling/release/package-dist.mjs",
         "tooling/release/package-dist.test.ts"
       ],
       "surfaces": [
-        "binding:FORBIDDEN_ARCHIVE_PATH_PATTERNS",
         "property:createReleaseArchive/compressionOptions",
         "property:createReleaseArchive/excludedPaths"
       ]

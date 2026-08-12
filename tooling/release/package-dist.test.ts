@@ -133,6 +133,32 @@ it('rejects source maps in the release archive', async () => {
   ).rejects.toThrow('Release archive contains forbidden file: assets/popup.js.map');
 });
 
+it('accepts hashed token-named bundles but rejects token payload files', async () => {
+  const root = await createReleaseRoot();
+  await fs.writeFile(
+    path.join(root, 'dist', 'assets', 'tokens-Bnweetmb.js'),
+    'export const ok = 1;'
+  );
+
+  await expect(createReleaseArchive({ repoRoot: root })).resolves.toEqual(expect.any(String));
+
+  for (const forbiddenPath of [
+    'token.json',
+    'assets/token-abcdefgh.js',
+    'assets/secret-abcdefgh.js',
+    'assets/private-key-abcdefgh.js',
+    'assets/raw-diagnostics-abcdefgh.js',
+    'assets/raw-history-abcdefgh.js',
+  ]) {
+    const absolutePath = path.join(root, 'dist', forbiddenPath);
+    await fs.writeFile(absolutePath, '{"secret":"value"}');
+    await expect(createReleaseArchive({ repoRoot: root })).rejects.toThrow(
+      `Release archive contains forbidden file: ${forbiddenPath}`
+    );
+    await fs.rm(absolutePath);
+  }
+});
+
 it('rejects a dist file that collides with a required legal payload path', async () => {
   const root = await createReleaseRoot();
   await fs.writeFile(path.join(root, 'dist', 'NOTICE'), 'spoofed notice');
