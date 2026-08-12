@@ -84,7 +84,6 @@ async function verifyVideoSettingsContracts() {
       ...DEFAULT_VIDEO_SETTINGS.outputProfile,
       quality: VideoQuality.MEDIUM,
     },
-    autoFadeDelay: 8,
     diagnosticsEnabled: true,
   });
 

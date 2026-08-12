@@ -32,6 +32,7 @@ it('declares idempotency policy for every offscreen side-effect route', () => {
     'desktopMediaRequestId',
     'requestId',
     'sessionId',
+    'peerId',
     'runtime',
   ]);
 

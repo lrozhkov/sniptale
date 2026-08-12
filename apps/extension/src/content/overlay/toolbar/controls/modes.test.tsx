@@ -217,6 +217,7 @@ it('orders Working Mode options as Cursor, Drawing, Annotations, Content Editing
     'content.toolbar.mode-option.highlighter',
     'content.toolbar.mode-option.quick-edit',
     'content.toolbar.mode-option.design-review',
+    'content.toolbar.mode-option.video-recording',
   ]);
 });
 

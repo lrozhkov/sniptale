@@ -27,13 +27,16 @@ export async function updateRecordingSettings(
 
   try {
     const binding = await requireActiveVideoRecordingSourceBinding();
-    await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
       attachOffscreenCommandCapability({
         type: VideoMessageType.OFFSCREEN_UPDATE_SETTINGS,
         ...binding,
         settings,
       })
     );
+    if (!response?.success) {
+      throw new Error(response?.error ?? 'Offscreen settings update was not acknowledged');
+    }
     const currentState = getVideoRecordingRuntimeState();
     setVideoRecordingRuntimeState({
       liveMedia: updateVideoRecordingLiveMediaState(currentState.liveMedia, settings),

@@ -9,12 +9,11 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isNumber,
-  isRecordingTelemetrySnapshot,
   isString,
-  isVideoRecordingSettings,
   isViewportInfo,
   isViewportRegion,
 } from '../../validators/index';
+import { isVideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 const regionSelectionBindingGuard = {
@@ -28,30 +27,14 @@ const viewportCursorProjectionAuthorityGuard = {
 };
 
 export const tabVideoMessageContracts = {
-  [VideoMessageType.ENABLE_ANNOTATIONS]: {
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: {
     parseRequest: createGuardParser(
-      'tab ENABLE_ANNOTATIONS message',
-      createMessageGuard({
-        type: VideoMessageType.ENABLE_ANNOTATIONS,
-        required: { settings: isVideoRecordingSettings },
-        optional: { recordingId: isString },
-      })
+      'tab VIDEO_RECORDING_SURFACE_SNAPSHOT message',
+      isVideoRecordingSurfaceSnapshotMessage
     ),
     parseResponse: createGuardParser(
-      'tab ENABLE_ANNOTATIONS response',
-      createRuntimeResponseGuard({ optional: { viewport: isViewportInfo } })
-    ),
-  },
-  [VideoMessageType.DISABLE_ANNOTATIONS]: {
-    parseRequest: createGuardParser(
-      'tab DISABLE_ANNOTATIONS message',
-      createMessageGuard({ type: VideoMessageType.DISABLE_ANNOTATIONS })
-    ),
-    parseResponse: createGuardParser(
-      'tab DISABLE_ANNOTATIONS response',
-      createRuntimeResponseGuard({
-        optional: { telemetry: isRecordingTelemetrySnapshot },
-      })
+      'tab VIDEO_RECORDING_SURFACE_SNAPSHOT response',
+      createRuntimeResponseGuard()
     ),
   },
   [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: {

@@ -1,15 +1,5 @@
 import type { VideoMessageType } from '../messages/index';
-import type { CaptureMode, VideoRecordingSettings, ViewportInfo } from './types';
-
-export interface EnableAnnotationsMessage {
-  type: typeof VideoMessageType.ENABLE_ANNOTATIONS;
-  settings: VideoRecordingSettings;
-  recordingId?: string;
-}
-
-export interface DisableAnnotationsMessage {
-  type: typeof VideoMessageType.DISABLE_ANNOTATIONS;
-}
+import type { CaptureMode, ViewportInfo } from './types';
 
 export interface ViewportCursorProjectionAuthority {
   generation: number;
@@ -162,8 +152,6 @@ export interface DesktopMediaFailedMessage {
 }
 
 export type ContentVideoMessage =
-  | EnableAnnotationsMessage
-  | DisableAnnotationsMessage
   | EnableViewportCursorProjectionMessage
   | DisableViewportCursorProjectionMessage
   | EnableControlledCursorCaptureMessage

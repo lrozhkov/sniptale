@@ -54,8 +54,8 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     reason:
       'Video manager preflight, start, watchdog, and announcement messaging are covered by focused manager suites.',
     testFiles: [
-      'apps/extension/src/background/media/video/manager/preflight.annotations.test.ts',
-      'apps/extension/src/background/media/video/manager/preflight.annotations.controlled.test.ts',
+      'apps/extension/src/background/media/video/manager/preflight.content-surface.test.ts',
+      'apps/extension/src/background/media/video/manager/preflight.content-surface.controlled.test.ts',
       'apps/extension/src/background/media/video/manager/preflight.resolve.test.ts',
       'apps/extension/src/background/media/video/manager/preflight.resolve.multi-source.test.ts',
       'apps/extension/src/background/media/video/manager/preflight.resolve.multi-source-failure.test.ts',

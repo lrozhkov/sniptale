@@ -19,6 +19,7 @@ import {
 } from '../../../media/lifecycle';
 import { type BackgroundModeState, type RuntimeWiringLogger } from './shared';
 import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { recoverPendingVideoRecordingCameraPeerCleanup } from '../../../media/video/content-surface/camera-peer';
 
 export function runStartupMaintenance(
   state: BackgroundModeState,
@@ -72,6 +73,9 @@ export function runStartupMaintenance(
   });
 
   resetVideoRecordingRuntimeState();
+  recoverPendingVideoRecordingCameraPeerCleanup().catch((error) => {
+    logger.warn('Embedded camera peer retirement recovery failed', error);
+  });
   recoverVideoCaptureSurfaceOnStartup(ensureActivePageAccessRuntime).catch((error) => {
     logger.warn('Capture surface recovery failed; new preset mutations remain blocked', error);
   });

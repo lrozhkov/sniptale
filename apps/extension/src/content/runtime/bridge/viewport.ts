@@ -1,8 +1,6 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
-import { disableVideoAnnotations, enableVideoAnnotations } from '../../overlay/video-annotations';
 import {
   disableVideoTelemetry,
   enableVideoTelemetry,
@@ -21,8 +19,6 @@ import {
   type ViewportMessage,
 } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
-
-const logger = createLogger({ namespace: 'ContentRuntimeViewportBridge' });
 
 function acknowledgeViewportMessage(sendResponse: ResponseSender): false {
   sendResponse({ success: true });
@@ -47,31 +43,6 @@ export function handleViewportMessage(
   );
 }
 
-function handleEnableAnnotationsMessage(
-  message: Extract<ViewportMessage, { type: VideoMessageType.ENABLE_ANNOTATIONS }>,
-  sendResponse: ResponseSender,
-  getViewportInfo: () => ViewportInfo
-): false {
-  logger.log('Enabling video annotations with settings', message.settings);
-  enableVideoAnnotations(message.settings);
-  if (message.recordingId) {
-    enableVideoTelemetry(message.recordingId);
-  }
-  sendResponse({ success: true, viewport: getViewportInfo() });
-  return false;
-}
-
-function handleDisableAnnotationsMessage(
-  sendResponse: ResponseSender,
-  regionSelectorController: Pick<RegionSelectorController, 'hideRecordingOverlay'>
-): false {
-  const telemetry = disableVideoTelemetry();
-  disableVideoAnnotations();
-  regionSelectorController.hideRecordingOverlay();
-  sendResponse(telemetry ? { success: true, telemetry } : { success: true });
-  return false;
-}
-
 function handleEnableControlledCursorCaptureMessage(
   message: Extract<ViewportMessage, { type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE }>,
   sendResponse: ResponseSender,
@@ -92,7 +63,7 @@ function handleKnownViewportMessage(
   message: ViewportMessage,
   sendResponse: ResponseSender,
   getViewportInfo: () => ViewportInfo,
-  regionSelectorController: Pick<RegionSelectorController, 'hideRecordingOverlay'>
+  _regionSelectorController: Pick<RegionSelectorController, 'hideRecordingOverlay'>
 ): false | true {
   switch (message.type) {
     case VideoMessageType.GET_VIEWPORT_COORDS:
@@ -115,10 +86,6 @@ function handleKnownViewportMessage(
     case VideoMessageType.HIDE_COUNTDOWN:
       hideVideoCountdown();
       return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.ENABLE_ANNOTATIONS:
-      return handleEnableAnnotationsMessage(message, sendResponse, getViewportInfo);
-    case VideoMessageType.DISABLE_ANNOTATIONS:
-      return handleDisableAnnotationsMessage(sendResponse, regionSelectorController);
     case VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION:
       if (
         !enableViewportCursorProjection({

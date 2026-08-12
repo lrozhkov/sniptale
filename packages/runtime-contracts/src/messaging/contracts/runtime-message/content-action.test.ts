@@ -1,5 +1,6 @@
 import { expectTypeOf, it } from 'vitest';
 import { MessageType } from '../../message-types';
+import { VideoMessageType } from '../../../video/messages';
 import type { ContentPrivilegedActionType } from '../../../protocol/content-privileged-action';
 import type {
   RuntimeContentActionRequestByType,
@@ -7,6 +8,12 @@ import type {
 } from './content-action';
 
 it('exposes content action request and response contract types', () => {
+  expectTypeOf<
+    RuntimeContentActionRequestByType[typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]
+  >().toMatchTypeOf<{
+    type: typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
+    contentIntent: { requestId: string; token: string };
+  }>();
   expectTypeOf<
     RuntimeContentActionRequestByType[typeof MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN]
   >().toMatchTypeOf<{

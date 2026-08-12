@@ -59,17 +59,11 @@ export const mediaPrivacyErasureCleanupAdapter = {
     }
 
     const [recording, projectExport] = await Promise.all([
-      cleanupRecording(),
+      cleanupRecording().catch(() => failed(RECORDING_PARTICIPANT_ID, 'recording-stop-failed')),
       cleanupProjectExport(exportLedger, { sendRuntimeMessage }),
     ]);
     const mediaResults = [recording, ...projectExport];
     const results = [voiceInputResult, ...mediaResults];
-    if (
-      mediaResults.some((result) => result.severity === 'required' && result.status === 'failed')
-    ) {
-      return results;
-    }
-
     try {
       await closeOffscreenDocumentForPrivacyErasure();
       return results;

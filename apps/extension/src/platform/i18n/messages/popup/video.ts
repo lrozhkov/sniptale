@@ -101,6 +101,14 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Недоступно для режима Экран',
     en: 'Unavailable in Screen mode',
   },
+  recordingToolbarLabel: {
+    ru: 'Показать тулбар',
+    en: 'Show toolbar',
+  },
+  recordingToolbarDescription: {
+    ru: 'Открыть панель инструментов записи на вкладке',
+    en: 'Open the recording tools on the tab',
+  },
   controlledCursorLabel: {
     ru: 'История действий',
     en: 'Action history',

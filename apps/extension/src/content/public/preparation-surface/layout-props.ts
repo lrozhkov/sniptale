@@ -12,6 +12,7 @@ import type { useToolbarModeController } from '../../../content/overlay/toolbar/
 import type { useFrameManager } from '../../../content/selection/frame-runtime/react/useFrameManager';
 import type { PreparationHostPorts } from './types';
 import type { ContentDrawingController } from '../../../content/drawing/controller';
+import type { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
 
 type FrameManager = ReturnType<typeof useFrameManager>;
 
@@ -22,6 +23,7 @@ export type PreparationSurfaceControllers = {
   modeController: ReturnType<typeof useToolbarModeController>;
   scenarioController: ReturnType<typeof useScenarioController>;
   screenshotController: ReturnType<typeof useScreenshotController>;
+  videoRecordingController: ReturnType<typeof useVideoRecordingSurfaceController>;
 };
 
 type PreparationLayoutProjectionArgs = {
@@ -113,6 +115,9 @@ function projectPreparationToolbar(
       quickEditDocumentMode: modeState.quickEditDocumentMode,
       quickEditMode: modeState.quickEditMode,
       screenshotMode: modeState.screenshotMode,
+      ...(modeState.videoRecordingMode === undefined
+        ? {}
+        : { videoRecordingMode: modeState.videoRecordingMode }),
     },
     pinToTab: modeState.pinToTab,
     pinToTabAvailable: modeState.pinToTabAvailable,
@@ -125,7 +130,11 @@ function projectPreparationToolbar(
     setPinToTab: modeState.setPinToTab,
     setPinnedToolbarVisible: modeState.setPinnedToolbarVisible,
     setTimerDelay: modeState.setTimerDelay,
+    ...(modeState.setVideoRecordingMode === undefined
+      ? {}
+      : { setVideoRecordingMode: modeState.setVideoRecordingMode }),
     timerDelay: modeState.timerDelay,
+    videoRecording: controllers.videoRecordingController,
   };
 }
 

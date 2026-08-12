@@ -1,9 +1,13 @@
 import { translate } from '../../../../../platform/i18n';
-import { type VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  type CaptureMode,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMediaDeviceSelector } from './media-device-selector';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
 
 export function VideoWebcamSelector({
+  captureMode,
   required = false,
   settings,
   webcamDevices,
@@ -11,6 +15,7 @@ export function VideoWebcamSelector({
   onWebcamDeviceChange,
   onSettingsChange,
 }: {
+  captureMode: CaptureMode;
   required?: boolean;
   settings: VideoRecordingSettings;
   webcamDevices: Array<{ deviceId: string; label: string }>;
@@ -39,6 +44,7 @@ export function VideoWebcamSelector({
         label: translate('popup.video.webcamSettingsAction'),
         panel: (
           <WebcamSettingsPanel
+            captureMode={captureMode}
             currentDeviceId={settings.webcamDeviceId ?? null}
             settings={settings}
             onSettingsChange={onSettingsChange}

@@ -11,10 +11,10 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { enableAnnotationsIfNeeded } from './preflight.annotations';
+import { prepareContentSurfaceIfNeeded } from './preflight.content-surface';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-type AnnotationDeps = NonNullable<Parameters<typeof enableAnnotationsIfNeeded>[4]>;
+type AnnotationDeps = NonNullable<Parameters<typeof prepareContentSurfaceIfNeeded>[4]>;
 
 function createVideoSettings(): VideoRecordingSettings {
   return {
@@ -53,7 +53,7 @@ it('allows cursor-track bootstrap outside TAB mode when the content bridge respo
   };
 
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       CaptureMode.SCREEN,
       createVideoSettings(),
@@ -66,7 +66,7 @@ it('allows cursor-track bootstrap outside TAB mode when the content bridge respo
   ).resolves.toEqual(viewport);
 
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       CaptureMode.TAB_CROP,
       createVideoSettings(),
@@ -101,7 +101,7 @@ async function expectDedicatedControlledCursorBootstrap(captureMode: CaptureMode
   };
 
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       captureMode,
       createVideoSettings(),
@@ -118,7 +118,7 @@ async function expectDedicatedControlledCursorBootstrap(captureMode: CaptureMode
 
 it('requires a recording id and viewport metadata for controlled cursor bootstrap', async () => {
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       CaptureMode.TAB,
       createVideoSettings(),
@@ -128,7 +128,7 @@ it('requires a recording id and viewport metadata for controlled cursor bootstra
   ).rejects.toThrow('Не удалось подготовить управляемый захват курсора');
 
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       CaptureMode.TAB,
       createVideoSettings(),
@@ -148,7 +148,7 @@ it('uses the dedicated controlled cursor bootstrap message for recording telemet
 
 it('skips unsupported capture modes when cursor telemetry is disabled', async () => {
   await expect(
-    enableAnnotationsIfNeeded(
+    prepareContentSurfaceIfNeeded(
       5,
       CaptureMode.SCREEN,
       {
@@ -161,31 +161,4 @@ it('skips unsupported capture modes when cursor telemetry is disabled', async ()
       })
     )
   ).resolves.toBeUndefined();
-});
-
-it('returns undefined when plain annotation bootstrap does not provide a viewport', async () => {
-  const sendTabMessageMock = vi.fn().mockResolvedValue({ success: true });
-
-  await expect(
-    enableAnnotationsIfNeeded(
-      5,
-      CaptureMode.TAB,
-      {
-        ...createVideoSettings(),
-        controlledCursorCaptureEnabled: false,
-      },
-      undefined,
-      createAnnotationDeps({
-        sendTabMessage: sendTabMessageMock,
-      })
-    )
-  ).resolves.toBeUndefined();
-
-  expect(sendTabMessageMock).toHaveBeenCalledWith(5, {
-    type: VideoMessageType.ENABLE_ANNOTATIONS,
-    settings: {
-      ...createVideoSettings(),
-      controlledCursorCaptureEnabled: false,
-    },
-  });
 });

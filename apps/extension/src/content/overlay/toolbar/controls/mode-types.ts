@@ -14,7 +14,15 @@ export interface ToolbarModeButtonsProps {
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
   highlighterMode: boolean;
-  pendingMode?: 'ai' | 'cursor' | 'design-review' | 'drawing' | 'highlighter' | 'quick-edit' | null;
+  pendingMode?:
+    | 'ai'
+    | 'cursor'
+    | 'design-review'
+    | 'drawing'
+    | 'highlighter'
+    | 'quick-edit'
+    | 'video-recording'
+    | null;
   toolbarMenuState: ToolbarMenuState;
   onEnableCursorMode?: () => void;
   onDisableAiPickMode?: () => void;
@@ -23,6 +31,9 @@ export interface ToolbarModeButtonsProps {
   onToggleDrawing?: () => void;
   onToggleQuickEdit: () => void;
   onToggleHighlighter: () => void;
+  videoRecordingMode?: boolean;
+  videoRecordingModeLocked?: boolean;
+  onToggleVideoRecording?: (activationEvent?: Event) => void;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;

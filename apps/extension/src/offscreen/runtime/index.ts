@@ -159,6 +159,16 @@ function buildOffscreenCommandSuccessResponse(result: unknown) {
   if (
     typeof result === 'object' &&
     result !== null &&
+    'type' in result &&
+    result.type === 'answer' &&
+    'sdp' in result &&
+    typeof result.sdp === 'string'
+  ) {
+    return { success: true, sdp: result.sdp };
+  }
+  if (
+    typeof result === 'object' &&
+    result !== null &&
     'result' in result &&
     result.result === 'captured' &&
     'dataUrl' in result &&

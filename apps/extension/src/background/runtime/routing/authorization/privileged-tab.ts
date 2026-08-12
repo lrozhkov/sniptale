@@ -1,5 +1,6 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { VideoRecordingSurfaceMessage } from '../message-guards/guards/shared';
 import {
   markPreauthorizedContentActionRouteMessage,
   type RouteCaptureMessage,
@@ -27,7 +28,7 @@ import {
 export type PrivilegedTabRouteAuthorizationRequest = {
   family: PrivilegedTabRouteFamily;
   kind: 'privileged-tab-route';
-  message?: RouteCaptureMessage | TabModeMessage | undefined;
+  message?: RouteCaptureMessage | TabModeMessage | VideoRecordingSurfaceMessage | undefined;
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
 };
@@ -69,7 +70,7 @@ function authorizeHarStopRoute(
 }
 
 function authorizePrivilegedTabCapabilityRoute(
-  message: RouteCaptureMessage | TabModeMessage,
+  message: RouteCaptureMessage | TabModeMessage | VideoRecordingSurfaceMessage,
   resolvedTabId: number,
   sender: chrome.runtime.MessageSender | undefined
 ): IpcAuthorizationResult {

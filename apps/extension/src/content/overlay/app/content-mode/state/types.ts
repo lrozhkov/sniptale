@@ -13,6 +13,7 @@ export type ContentAppModeFlags = {
   quickEditDocumentMode: boolean;
   quickEditMode: boolean;
   screenshotMode: boolean;
+  videoRecordingMode?: boolean;
 };
 
 export type ContentAppQuickActionState = {
@@ -66,6 +67,7 @@ export type ContentAppModeControls = {
   setQuickEditDocumentMode: (enabled: boolean) => void;
   setQuickEditMode: (enabled: boolean) => void;
   setScreenshotMode: (enabled: boolean) => void;
+  setVideoRecordingMode?: (enabled: boolean) => void;
 };
 
 export type ContentAppRuntimeModeControls = ContentAppModeControls &

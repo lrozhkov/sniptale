@@ -12,7 +12,7 @@ const controlCapability = {
 const recordingSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
-  autoFadeDelay: 1,
+  autoFadeDelay: 3,
 };
 
 it('rejects unknown capture modes on start recording requests', () => {

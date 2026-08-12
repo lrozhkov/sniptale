@@ -26,6 +26,7 @@ import {
   SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS,
   TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS,
   VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS,
+  VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS,
 } from './policy-registry.policy-state';
 import type {
   AuthorizationPolicyRegistryEntry,
@@ -68,6 +69,10 @@ export const authorizationPolicyRegistryEntries = [
   createPrivilegedTabPolicyEntry('scenario', SCENARIO_PRIVILEGED_TAB_POLICY_STATE_IDS),
   createPrivilegedTabPolicyEntry('tab-mode', TAB_MODE_PRIVILEGED_TAB_POLICY_STATE_IDS),
   createPrivilegedTabPolicyEntry('video-control', VIDEO_CONTROL_PRIVILEGED_TAB_POLICY_STATE_IDS),
+  createPrivilegedTabPolicyEntry(
+    'video-recording-surface',
+    VIDEO_RECORDING_SURFACE_PRIVILEGED_TAB_POLICY_STATE_IDS
+  ),
   {
     authorizationMode: 'sync',
     authorize: authorizeRegisteredVideoControlNoTabPolicy,
@@ -105,7 +110,7 @@ export const authorizationPolicyRegistryEntries = [
 ] as const satisfies readonly AuthorizationPolicyRegistryEntry[];
 
 function createPrivilegedTabPolicyEntry(
-  family: 'capture' | 'scenario' | 'tab-mode' | 'video-control',
+  family: 'capture' | 'scenario' | 'tab-mode' | 'video-control' | 'video-recording-surface',
   policyStateIds: readonly PolicyStateId[]
 ): AuthorizationPolicyRegistryEntry {
   return {

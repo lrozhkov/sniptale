@@ -68,7 +68,7 @@ function registerFullVideoSettingsTests() {
   it('parses a fully valid video settings payload', () => {
     expect(
       parseCurrentVideoSettings({
-        autoFadeDelay: 250,
+        autoFadeDelay: 30,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
         echoCancellation: false,
@@ -83,15 +83,17 @@ function registerFullVideoSettingsTests() {
         },
         sourceCount: 2,
         systemAudioEnabled: true,
+        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: true },
         webcamDeviceId: 'cam-1',
         webcamEnabled: true,
+        webcamPresentation: DEFAULT_VIDEO_SETTINGS.webcamPresentation,
       })
     ).toEqual({
       hasInvalidRoot: false,
       invalidFieldCount: 0,
       value: {
         ...CURRENT_VIDEO_SETTINGS_CONTRACT,
-        autoFadeDelay: 250,
+        autoFadeDelay: 30,
         countdownSeconds: 3,
         diagnosticsEnabled: true,
         echoCancellation: false,
@@ -106,8 +108,10 @@ function registerFullVideoSettingsTests() {
         },
         sourceCount: 2,
         systemAudioEnabled: true,
+        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: true },
         webcamDeviceId: 'cam-1',
         webcamEnabled: true,
+        webcamPresentation: DEFAULT_VIDEO_SETTINGS.webcamPresentation,
       },
     });
   });
@@ -133,6 +137,37 @@ function registerPartialVideoSettingsTests() {
     expect(parseCurrentVideoSettings({ microphoneGain: 3 }).value).toEqual({
       ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       microphoneGain: 2,
+    });
+  });
+
+  it('accepts only supported drawing auto-hide delays', () => {
+    expect(parseCurrentVideoSettings({ autoFadeDelay: 10 }).value).toEqual({
+      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+      autoFadeDelay: 10,
+    });
+    expect(parseCurrentVideoSettings({ autoFadeDelay: 8 })).toEqual({
+      hasInvalidRoot: false,
+      invalidFieldCount: 1,
+      value: CURRENT_VIDEO_SETTINGS_CONTRACT,
+    });
+  });
+
+  it('rejects malformed recording surface and webcam presentation values independently', () => {
+    expect(
+      parseCurrentVideoSettings({
+        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: false },
+        webcamPresentation: {
+          ...DEFAULT_VIDEO_SETTINGS.webcamPresentation,
+          center: { x: 2, y: 0.5 },
+        },
+      })
+    ).toEqual({
+      hasInvalidRoot: false,
+      invalidFieldCount: 1,
+      value: {
+        ...CURRENT_VIDEO_SETTINGS_CONTRACT,
+        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: false },
+      },
     });
   });
 

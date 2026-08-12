@@ -28,6 +28,12 @@ import type {
   ScreenshotImageFormat,
 } from '@sniptale/runtime-contracts/capture/action';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import {
+  isActivateVideoRecordingSurfaceMessage,
+  isStartSavedTabVideoRecordingMessage,
+  isVideoRecordingSurfaceSnapshot,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 function isDesktopScreenshotPreparationRequest(value: unknown): value is {
   type: typeof MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
@@ -74,6 +80,38 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
 }
 
 export const contentActionRuntimeContracts = {
+  [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: {
+    parseRequest: createGuardParser(
+      'runtime START_SAVED_TAB_VIDEO_RECORDING message',
+      isStartSavedTabVideoRecordingMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime START_SAVED_TAB_VIDEO_RECORDING response',
+      createRuntimeResponseGuard({
+        optional: {
+          surfaceSessionId: isString,
+          surfaceToken: isString,
+          snapshot: isVideoRecordingSurfaceSnapshot,
+        },
+      })
+    ),
+  },
+  [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: {
+    parseRequest: createGuardParser(
+      'runtime ACTIVATE_VIDEO_RECORDING_SURFACE message',
+      isActivateVideoRecordingSurfaceMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime ACTIVATE_VIDEO_RECORDING_SURFACE response',
+      createRuntimeResponseGuard({
+        optional: {
+          surfaceSessionId: isString,
+          surfaceToken: isString,
+          snapshot: isVideoRecordingSurfaceSnapshot,
+        },
+      })
+    ),
+  },
   [MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE]: {
     parseRequest: createGuardParser(
       'runtime PREPARE_DESKTOP_SCREENSHOT_CAPTURE message',

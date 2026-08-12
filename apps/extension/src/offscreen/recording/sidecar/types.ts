@@ -7,6 +7,7 @@ export type RecordingSidecarRecorder = {
   filenameSuffix: string;
   kind: 'webcam';
   recorder: MediaRecorder;
+  release: () => void;
   recordingId: string;
   stream: MediaStream;
   trackSettings: MediaTrackSettings;

@@ -24,10 +24,32 @@ import type {
   CaptureSource,
   VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import type {
+  ReleaseVideoRecordingSurfaceMessage,
+  VideoRecordingSurfaceCommandMessage,
+  VideoRecordingCameraOfferMessage,
+  VideoRecordingCameraCloseMessage,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export type { RuntimeVideoSessionResponseByType } from './session-responses';
 
 export type RuntimeVideoSessionRequestByType = {
+  [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: ReleaseVideoRecordingSurfaceMessage;
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: VideoRecordingSurfaceCommandMessage;
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: VideoRecordingCameraOfferMessage;
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE]: VideoRecordingCameraCloseMessage;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: {
+    type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
+    capabilityToken: string;
+    peerId: string;
+    sdp: string;
+    settings: VideoRecordingSettings;
+  };
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
+    type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE;
+    capabilityToken: string;
+    peerId: string;
+  };
   [VideoMessageType.START_RECORDING]: {
     type: typeof VideoMessageType.START_RECORDING;
     settings: VideoRecordingSettings;

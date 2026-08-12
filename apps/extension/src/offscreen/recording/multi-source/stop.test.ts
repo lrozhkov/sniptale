@@ -4,6 +4,7 @@ import type { FinalizedRecordingStagingArtifact } from '../../../composition/per
 import { createMultiSourceLifecycle, type MultiSourceSession } from './state';
 import { setActiveMultiSourceSession } from './state';
 import { stopMultiSourceSession } from './stop';
+import { createTrackedStream } from './media-stream.test-support';
 
 function createArtifact(id: string): FinalizedRecordingStagingArtifact {
   const file = new File(['media'], `${id}.webm`, { type: 'video/webm' });
@@ -81,4 +82,33 @@ it('aborts staging instead of finalizing a discarded artifact set', async () => 
 
   expect(session.staging.abort).toHaveBeenCalledOnce();
   expect(finalizeSession).not.toHaveBeenCalled();
+});
+
+it('releases only the recording-owned webcam lease during normal stop', async () => {
+  const session = createSession();
+  const webcamRelease = vi.fn();
+  const webcamArtifact = createArtifact('rec-webcam');
+  session.webcamRecorder = {
+    artifact: null,
+    artifactSession: {
+      abort: vi.fn(),
+      recorder: {} as MediaRecorder,
+      setLifecycleCallbacks: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn().mockResolvedValue(webcamArtifact),
+    },
+    filenameSuffix: '-webcam',
+    kind: 'webcam',
+    recorder: {} as MediaRecorder,
+    recordingId: webcamArtifact.artifactId,
+    release: webcamRelease,
+    stream: createTrackedStream(),
+    trackSettings: { height: 720, width: 1280 },
+  };
+  const finalizeSession = vi.fn().mockResolvedValue(undefined);
+  setActiveMultiSourceSession(session);
+
+  await stopMultiSourceSession({ discard: false, finalizeSession, session });
+
+  expect(webcamRelease).toHaveBeenCalledOnce();
 });

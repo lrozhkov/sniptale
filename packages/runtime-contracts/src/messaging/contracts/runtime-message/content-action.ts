@@ -1,4 +1,6 @@
 import type { MessageType } from '../../message-types';
+import type { VideoMessageType } from '../../../video/messages';
+import type { VideoRecordingSurfaceActivation } from '../../../video/types/messages.surface';
 import type { RuntimeMessageResponse } from '../response';
 import type {
   DesktopScreenshotSelection,
@@ -19,6 +21,14 @@ import type {
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
 export type RuntimeContentActionRequestByType = {
+  [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: {
+    type: typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
+    contentIntent: ContentPrivilegedActionCapability;
+  };
+  [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: {
+    type: typeof VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE;
+    contentIntent: ContentPrivilegedActionCapability;
+  };
   [MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY]: {
     type: typeof MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY;
     purpose: ContentPrivilegedActionActivationPurpose;
@@ -78,6 +88,8 @@ export type RuntimeContentActionRequestByType = {
 };
 
 export type RuntimeContentActionResponseByType = {
+  [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: RuntimeMessageResponse<VideoRecordingSurfaceActivation>;
+  [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<VideoRecordingSurfaceActivation>;
   [MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY]: RuntimeMessageResponse<{
     activationKey?: ContentPrivilegedActionActivationKey;
   }>;

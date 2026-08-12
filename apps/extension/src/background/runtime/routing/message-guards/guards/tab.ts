@@ -5,6 +5,14 @@ import {
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoControlMessage } from '../../../../../contracts/video/types/messages';
+import {
+  isActivateVideoRecordingSurfaceMessage,
+  isReleaseVideoRecordingSurfaceMessage,
+  isStartSavedTabVideoRecordingMessage,
+  isVideoRecordingSurfaceCommandMessage,
+  isVideoRecordingCameraOfferMessage,
+  isVideoRecordingCameraCloseMessage,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { RouteCaptureMessage } from '../../../../capture/routes';
 import { scenarioRouteMessageTypes } from '../../../../scenario/router/route-descriptors';
 import type {
@@ -13,6 +21,7 @@ import type {
   PopupExportViewerMessage,
   RuntimeMessageEnvelope,
   ScenarioMessage,
+  VideoRecordingSurfaceMessage,
 } from './shared';
 
 const backgroundInternalSignalTypes = [
@@ -94,12 +103,22 @@ const videoControlMessageTypes = [
   VideoMessageType.UPDATE_SETTINGS,
 ] as const satisfies ReadonlyArray<VideoControlMessage['type']>;
 
+const videoRecordingSurfaceMessageTypes = [
+  VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+  VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
+  VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE,
+  VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+  VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER,
+  VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE,
+] as const satisfies ReadonlyArray<VideoRecordingSurfaceMessage['type']>;
+
 export const backgroundTabMessageTypes = [
   ...tabModeMessageTypes,
   ...scenarioMessageTypes,
   ...popupExportViewerMessageTypes,
   ...captureMessageTypes,
   ...videoControlMessageTypes,
+  ...videoRecordingSurfaceMessageTypes,
 ] as const satisfies ReadonlyArray<BackgroundTabMessage['type']>;
 
 export function isBackgroundInternalSignalMessage(
@@ -138,6 +157,19 @@ export function isVideoControlMessage(
   return videoControlMessageTypes.includes(message.type as VideoControlMessage['type']);
 }
 
+export function isVideoRecordingSurfaceMessage(
+  message: RuntimeMessageEnvelope
+): message is VideoRecordingSurfaceMessage {
+  return (
+    isStartSavedTabVideoRecordingMessage(message) ||
+    isActivateVideoRecordingSurfaceMessage(message) ||
+    isReleaseVideoRecordingSurfaceMessage(message) ||
+    isVideoRecordingSurfaceCommandMessage(message) ||
+    isVideoRecordingCameraOfferMessage(message) ||
+    isVideoRecordingCameraCloseMessage(message)
+  );
+}
+
 export function isBackgroundTabMessage(
   message: RuntimeMessageEnvelope
 ): message is BackgroundTabMessage {
@@ -146,6 +178,7 @@ export function isBackgroundTabMessage(
     isScenarioMessage(message) ||
     isPopupExportViewerMessage(message) ||
     isRouteCaptureMessage(message) ||
-    isVideoControlMessage(message)
+    isVideoControlMessage(message) ||
+    isVideoRecordingSurfaceMessage(message)
   );
 }

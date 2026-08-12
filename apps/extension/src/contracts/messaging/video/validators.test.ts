@@ -109,7 +109,7 @@ it('accepts controlled cursor capture settings with microphone processing settin
   expect(
     isVideoRecordingSettings({
       ...DEFAULT_VIDEO_SETTINGS,
-      autoFadeDelay: 300,
+      autoFadeDelay: 30,
       controlledCursorCaptureEnabled: true,
       countdownSeconds: 3,
       diagnosticsEnabled: true,
@@ -136,7 +136,7 @@ it('rejects invalid video recording settings flag and source count values', () =
   expect(
     isVideoRecordingSettings({
       ...DEFAULT_VIDEO_SETTINGS,
-      autoFadeDelay: 300,
+      autoFadeDelay: 30,
       controlledCursorCaptureEnabled: 'yes',
       countdownSeconds: 3,
       diagnosticsEnabled: true,
@@ -150,7 +150,7 @@ it('rejects invalid video recording settings flag and source count values', () =
   expect(
     isVideoRecordingSettings({
       ...DEFAULT_VIDEO_SETTINGS,
-      autoFadeDelay: 300,
+      autoFadeDelay: 30,
       countdownSeconds: 3,
       diagnosticsEnabled: true,
       microphoneDeviceId: null,
@@ -159,6 +159,27 @@ it('rejects invalid video recording settings flag and source count values', () =
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,
+    })
+  ).toBe(false);
+  expect(
+    isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
+      autoFadeDelay: 8,
+    })
+  ).toBe(false);
+  expect(
+    isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
+      recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: 'yes' },
+    })
+  ).toBe(false);
+  expect(
+    isVideoRecordingSettings({
+      ...DEFAULT_VIDEO_SETTINGS,
+      webcamPresentation: {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation,
+        cropOffset: { x: 2, y: 0 },
+      },
     })
   ).toBe(false);
 });

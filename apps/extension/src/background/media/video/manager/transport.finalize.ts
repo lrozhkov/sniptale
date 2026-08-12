@@ -7,7 +7,7 @@ import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/t
 import { getCaptureSurfaceService, type AppliedCaptureSurface } from '../../../capture-surface';
 import { cancelVideoSourceReadyWait, waitForVideoSourceReady } from '../capture-surface';
 import { supportsSystemAudio } from '../capture-source';
-import type { enableAnnotationsIfNeeded, resolveCaptureSource } from './preflight';
+import type { prepareContentSurfaceIfNeeded, resolveCaptureSource } from './preflight';
 import { attemptDiagnosticsStart } from './diagnostics';
 import { sendOffscreenBeginRecording, sendOffscreenStartRecording } from './start-helpers';
 import { markVideoRecordingOffscreenStartDispatched } from '../session-state';
@@ -24,7 +24,7 @@ type RecordingStartContext = {
   settings: VideoRecordingSettings;
   surface: AppliedCaptureSurface | null;
   streamInstanceId: string;
-  viewport?: Awaited<ReturnType<typeof enableAnnotationsIfNeeded>>;
+  viewport?: Awaited<ReturnType<typeof prepareContentSurfaceIfNeeded>>;
 };
 
 function resolveOffscreenStartSettings(

@@ -5,18 +5,11 @@ import type {
   RecordingTelemetryResponse,
   ViewportCoordsResponse,
 } from '../contracts/response-types';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
+import type { VideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export type TabVideoRequestByType = {
-  [VideoMessageType.ENABLE_ANNOTATIONS]: {
-    type: typeof VideoMessageType.ENABLE_ANNOTATIONS;
-    settings: VideoRecordingSettings;
-    recordingId?: string;
-  };
-  [VideoMessageType.DISABLE_ANNOTATIONS]: {
-    type: typeof VideoMessageType.DISABLE_ANNOTATIONS;
-  };
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: VideoRecordingSurfaceSnapshotMessage;
   [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: ViewportCursorProjectionAuthority & {
     type: typeof VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
   };
@@ -75,8 +68,9 @@ export type TabVideoRequestByType = {
 };
 
 export type TabVideoResponseByType = {
-  [VideoMessageType.ENABLE_ANNOTATIONS]: ViewportCoordsResponse;
-  [VideoMessageType.DISABLE_ANNOTATIONS]: RecordingTelemetryResponse;
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
   [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: RuntimeMessageResponse<
     Record<string, never>
   >;

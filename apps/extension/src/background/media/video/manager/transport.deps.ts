@@ -3,7 +3,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import type { resolveCaptureSource } from './preflight';
 import {
   ensureOffscreenDocumentReady,
-  enableAnnotationsIfNeeded,
+  prepareContentSurfaceIfNeeded,
   resolveCaptureSource as resolveCaptureSourceImpl,
 } from './preflight';
 import { abortVideoRecordingStartIfCancelled } from './flow-cancellation';
@@ -19,8 +19,8 @@ export type OffscreenSetupDeps = {
   abortStart: typeof abortVideoRecordingStartIfCancelled;
 };
 
-export type AnnotationSetupDeps = {
-  enableAnnotationsIfNeeded: typeof enableAnnotationsIfNeeded;
+export type ContentSurfaceSetupDeps = {
+  prepareContentSurfaceIfNeeded: typeof prepareContentSurfaceIfNeeded;
   abortStart: typeof abortVideoRecordingStartIfCancelled;
 };
 
@@ -35,9 +35,9 @@ export const defaultOffscreenSetupDeps: OffscreenSetupDeps = {
   logger: createLogger({ namespace: 'BackgroundVideoFlowTransport:Offscreen' }),
 };
 
-export const defaultAnnotationSetupDeps: AnnotationSetupDeps = {
+export const defaultContentSurfaceSetupDeps: ContentSurfaceSetupDeps = {
   abortStart: abortVideoRecordingStartIfCancelled,
-  enableAnnotationsIfNeeded,
+  prepareContentSurfaceIfNeeded,
 };
 
 export const announceCaptureSourceLogger = createLogger({

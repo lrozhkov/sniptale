@@ -59,6 +59,7 @@
     "./video/types/defaults": "./src/video/types/defaults.ts",
     "./video/types/messages.content": "./src/video/types/messages.content.ts",
     "./video/types/messages.control": "./src/video/types/messages.control.ts",
+    "./video/types/messages.surface": "./src/video/types/messages.surface.ts",
     "./video/types/microphone-processing": "./src/video/types/microphone-processing.ts",
     "./video/types/native-settings": "./src/video/types/native-settings.ts",
     "./video/types/sidecar": "./src/video/types/sidecar.ts",

@@ -15,7 +15,7 @@ it('accepts both viewport and window preset surfaces on recording start', () => 
     streamInstanceId: 'stream-instance-1',
     settings: {
       ...DEFAULT_VIDEO_SETTINGS,
-      autoFadeDelay: 1,
+      autoFadeDelay: 3,
       countdownSeconds: 0,
     },
   };

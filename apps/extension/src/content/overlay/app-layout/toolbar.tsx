@@ -172,6 +172,26 @@ function renderToolbarShell(args: {
       fullyCleared ? 'info' : 'error'
     );
   };
+  const handleToggleVideoRecordingMode = (enabled: boolean, activationEvent?: Event) => {
+    if (enabled) {
+      modeController.handleToggleScreenshotMode(false);
+      modeController.handleToggleHighlighterMode(false);
+      modeController.handleToggleDesignReviewMode(false);
+      modeController.handleToggleQuickEditMode(false);
+      args.toolbar.drawingController?.finalizeInteraction();
+      if (!args.toolbar.videoRecording) return;
+      void Promise.resolve(args.toolbar.videoRecording.onActivate(activationEvent)).then(
+        (activated) => {
+          if (activated) args.toolbar.setVideoRecordingMode?.(true);
+        }
+      );
+      return;
+    }
+    if (!args.toolbar.videoRecording) return;
+    void Promise.resolve(args.toolbar.videoRecording.onDeactivate()).then((deactivated) => {
+      if (deactivated) args.toolbar.setVideoRecordingMode?.(false);
+    });
+  };
 
   return (
     <div className="sniptale-app" data-hidden={args.toolbar.isCompletelyHidden ? 'true' : 'false'}>
@@ -197,9 +217,17 @@ function renderToolbarShell(args: {
         quickEditDocumentMode={modes.quickEditDocumentMode}
         quickEditMode={modes.quickEditMode}
         screenshotMode={modes.screenshotMode}
-        pinToTab={args.toolbar.pinToTab}
+        {...(modes.videoRecordingMode === undefined
+          ? {}
+          : { videoRecordingMode: modes.videoRecordingMode })}
+        {...(args.toolbar.videoRecording ? { videoRecording: args.toolbar.videoRecording } : {})}
+        onToggleVideoRecordingMode={handleToggleVideoRecordingMode}
+        pinToTab={Boolean(args.toolbar.pinToTab || modes.videoRecordingMode)}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}
-        pinToTabLocked={args.toolbar.captureAction === 'scenario' && modes.screenshotMode}
+        pinToTabLocked={
+          modes.videoRecordingMode ||
+          (args.toolbar.captureAction === 'scenario' && modes.screenshotMode)
+        }
         onCaptureActionChange={args.toolbar.setCaptureAction}
         onDisableAiPickMode={args.toolbar.aiController.handleDisableAiPickMode}
         onToggleDesignReviewPanel={args.designReview.panel.toggle}

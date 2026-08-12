@@ -9,6 +9,7 @@ export function useContentModeFlags() {
   const [aiPickMode, setAiPickMode] = useState(false);
   const [designReviewMode, setDesignReviewMode] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
+  const [videoRecordingMode, setVideoRecordingMode] = useState(false);
 
   const flags: ContentAppModeFlags = {
     aiPickMode,
@@ -18,6 +19,7 @@ export function useContentModeFlags() {
     quickEditDocumentMode,
     quickEditMode,
     screenshotMode,
+    videoRecordingMode,
   };
   const controls: ContentAppModeControls = {
     setAiPickMode,
@@ -27,6 +29,7 @@ export function useContentModeFlags() {
     setQuickEditDocumentMode,
     setQuickEditMode,
     setScreenshotMode,
+    setVideoRecordingMode,
   };
 
   return { controls, flags };

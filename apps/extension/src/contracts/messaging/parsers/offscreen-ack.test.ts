@@ -11,7 +11,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 function createRecordingSettings() {
   return {
     ...DEFAULT_VIDEO_SETTINGS,
-    autoFadeDelay: 300,
+    autoFadeDelay: 30,
     countdownSeconds: 0,
     diagnosticsEnabled: true,
   };

@@ -142,6 +142,16 @@ it('shows the saving panel while recording stop or discard is in progress', asyn
   expect(mocks.captureModeSelectorMock).not.toHaveBeenCalled();
 });
 
+it('shows the saving panel for the authoritative stopping phase', async () => {
+  const props = createProps();
+  await renderBody({
+    ...props,
+    recordingState: { ...props.recordingState, status: VideoRecordingStatus.STOPPING },
+  });
+  expect(mocks.savingPanelMock).toHaveBeenCalledOnce();
+  expect(mocks.recordingPanelMock).not.toHaveBeenCalled();
+});
+
 it('lets an authoritative post-record result override stale stopping state', async () => {
   const onAcknowledgePostRecord = vi.fn().mockResolvedValue(undefined);
   const postRecordResult = {
@@ -198,6 +208,21 @@ it('passes actual webcam settings into the active recording panel', async () => 
         webcamSettings: { frameRate: 30, height: 720, width: 1280 },
       }),
     })
+  );
+});
+
+it('derives active media state from saved settings when runtime media is absent', async () => {
+  const props = createProps();
+  await renderBody({
+    ...props,
+    microphoneDevices: [{ deviceId: 'missing-label', label: 'Other mic' }],
+    recordingState: {
+      ...props.recordingState,
+      status: VideoRecordingStatus.PAUSED,
+    },
+  });
+  expect(mocks.recordingPanelMock).toHaveBeenCalledWith(
+    expect.objectContaining({ mediaSelection: expect.any(Object) })
   );
 });
 

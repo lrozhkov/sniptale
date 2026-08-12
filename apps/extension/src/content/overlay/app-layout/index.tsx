@@ -6,6 +6,8 @@ import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility
 import { ContentToolbarShell } from './toolbar';
 import type { ContentAppLayoutProps } from './types';
 import { DrawingSurface } from '../../drawing/surface';
+import { VideoRecordingSpotlight } from '../video-recording/spotlight/view';
+import { EmbeddedRecordingCamera } from '../video-recording/camera/view';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
@@ -42,6 +44,39 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
 
   return (
     <>
+      {props.toolbar.modes.videoRecordingMode && props.toolbar.videoRecording ? (
+        <DrawingSurface
+          active={props.toolbar.videoRecording.state.interaction === 'drawing'}
+          chromeHidden={isCaptureUiHidden}
+          controller={props.toolbar.videoRecording.drawingOwner.controller}
+          onExit={() => props.toolbar.videoRecording?.onInteractionChange('navigation')}
+        />
+      ) : null}
+      <VideoRecordingSpotlight
+        active={Boolean(
+          props.toolbar.modes.videoRecordingMode &&
+          props.toolbar.videoRecording?.state.interaction === 'navigation' &&
+          props.toolbar.videoRecording.state.spotlightEnabled
+        )}
+      />
+      <EmbeddedRecordingCamera
+        enabled={Boolean(
+          props.toolbar.videoRecording?.state.surfaceSessionId &&
+          props.toolbar.videoRecording.state.cameraEnabled &&
+          props.toolbar.videoRecording.state.webcamPresentation.mode === 'embedded'
+        )}
+        {...(props.toolbar.videoRecording
+          ? { geometry: props.toolbar.videoRecording.state.webcamPresentation }
+          : {})}
+        interactive={props.toolbar.videoRecording?.state.interaction === 'navigation'}
+        {...(props.toolbar.videoRecording
+          ? {
+              onOffer: props.toolbar.videoRecording.onCameraOffer,
+              onPeerClose: props.toolbar.videoRecording.onCameraPeerClose,
+              onGeometryChange: props.toolbar.videoRecording.onCameraGeometryChange,
+            }
+          : {})}
+      />
       {props.toolbar.modes.screenshotMode && props.toolbar.drawingController ? (
         <DrawingSurface
           active={props.toolbar.modes.drawingMode === true}

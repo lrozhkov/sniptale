@@ -4,6 +4,7 @@ import type { ToolbarProps } from '../types';
 import { ToolbarUtilityButtons } from './utilities';
 import { ToolbarDesignReviewControls } from './design-review';
 import { ToolbarDrawingControls } from './drawing';
+import { ToolbarVideoRecordingControls } from '../video-recording/controls';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -141,6 +142,16 @@ export function ToolbarSecondaryControls(props: {
 }) {
   const { toolbarProps, viewModel } = props;
   const { captureActionProps, interactionMode } = createSecondaryControlsRenderState(props);
+
+  if (toolbarProps.videoRecordingMode && toolbarProps.videoRecording) {
+    return (
+      <ToolbarVideoRecordingControls
+        compactMenus={viewModel.derivedState.compactMenus}
+        displayMode={viewModel.derivedState.displayMode}
+        recording={toolbarProps.videoRecording}
+      />
+    );
+  }
 
   return (
     <>

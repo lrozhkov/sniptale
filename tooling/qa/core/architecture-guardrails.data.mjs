@@ -34,6 +34,8 @@ export const RAW_STORAGE_MUTATION_BASELINE = {
 };
 
 export const RAW_STORAGE_MUTATION_OWNER_PATHS = [
+  { path: 'apps/extension/src/background/media/video/content-surface/camera-peer-cleanup.ts' },
+  { path: 'apps/extension/src/background/media/video/content-surface/surface-lease.ts' },
   { path: 'apps/extension/src/background/capture/download/save-directory/' },
   { path: 'apps/extension/src/content/overlay/ai/persistence/' },
   { path: 'apps/extension/src/content/overlay/auto-blur/persistence/' },

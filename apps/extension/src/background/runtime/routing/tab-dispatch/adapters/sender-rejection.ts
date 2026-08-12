@@ -1,5 +1,9 @@
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
-import { isRouteCaptureMessage, isTabModeMessage } from '../../message-guards/guards/tab';
+import {
+  isRouteCaptureMessage,
+  isTabModeMessage,
+  isVideoRecordingSurfaceMessage,
+} from '../../message-guards/guards/tab';
 import { authorizeIPCMessage } from '../../authorization/index';
 import type { TabRouteArgs } from '../../boundary/shared';
 import type { PrivilegedTabRouteFamily } from '../../boundary/sender-policy';
@@ -12,7 +16,9 @@ export function rejectUnauthorizedRouteSender(
     family,
     kind: 'privileged-tab-route',
     message:
-      isRouteCaptureMessage(args.message) || isTabModeMessage(args.message)
+      isRouteCaptureMessage(args.message) ||
+      isTabModeMessage(args.message) ||
+      isVideoRecordingSurfaceMessage(args.message)
         ? args.message
         : undefined,
     resolvedTabId: args.resolvedTabId,

@@ -19,6 +19,7 @@ import { getCaptureSurfaceService } from '../../capture-surface';
 import { disableViewportCursorProjection } from '../video/capture-surface/cursor-projection';
 import { forgetCameraRecorderControlGrant } from '../video/runtime/camera-recorder-control';
 import { failed, RECORDING_PARTICIPANT_ID, verified } from './result';
+import { releaseVideoRecordingSurface } from '../video/content-surface/surface-lease';
 
 export function resetRecordingRuntimeStateForPrivacyErasure(): void {
   forgetCameraRecorderControlGrant();
@@ -77,6 +78,7 @@ async function cleanupRecordingLease(
 }
 
 export async function cleanupRecording(): Promise<ErasureParticipantResult> {
+  await releaseVideoRecordingSurface();
   let lease;
   try {
     lease = await ensureActiveVideoRecordingLeaseHydrated();

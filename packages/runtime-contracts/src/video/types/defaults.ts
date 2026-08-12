@@ -1,5 +1,9 @@
 import { DEFAULT_VIDEO_OUTPUT_PROFILE } from './output-profile';
-import { VideoAutoProcessingAction } from './types';
+import {
+  VideoAutoProcessingAction,
+  WebcamPresentationMode,
+  WebcamPresentationShape,
+} from './types';
 import type { VideoAutoProcessingSettings, VideoRecordingSettings } from './types';
 import { DEFAULT_WEBCAM_QUALITY_SETTINGS } from './webcam-quality';
 import { DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID } from './quality-profiles';
@@ -20,9 +24,20 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   qualityProfileId: DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID,
   qualityProfiles: [],
   countdownSeconds: 3,
-  autoFadeDelay: 3,
+  autoFadeDelay: 0,
   diagnosticsEnabled: false,
   controlledCursorCaptureEnabled: false,
+  recordingSurface: {
+    toolbarEnabled: false,
+    cursorSpotlightEnabled: false,
+  },
+  webcamPresentation: {
+    mode: WebcamPresentationMode.EMBEDDED,
+    shape: WebcamPresentationShape.CIRCLE,
+    center: { x: 0.86, y: 0.82 },
+    sizeFraction: 0.22,
+    cropOffset: { x: 0, y: 0 },
+  },
   native: {
     screenshots: {
       includeCursor: true,

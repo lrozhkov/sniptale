@@ -12,11 +12,22 @@ import {
   restoreControlledCursorEffects,
   suspendControlledCursorEffects,
 } from '../controlled-cursor/navigation-effects';
+import {
+  beginVideoRecordingSurfaceRebind,
+  getVideoRecordingSurfaceLeaseSnapshot,
+  updateVideoRecordingSurface,
+} from '../../../content-surface/surface-lease';
+import { createVideoRecordingSurfaceSnapshot } from '../../../content-surface/snapshot';
+import { closeVideoRecordingCameraPeerForLease } from '../../../content-surface/camera-peer';
+import { loadVideoSettings } from '../../../../../../composition/persistence/capture-settings';
+import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 const CROP_OVERLAY_RETRY_DELAYS_MS = [0, 100, 250, 500, 1000, 2000] as const;
 const logger = createLogger({ namespace: 'BackgroundVideoTabNavigationPageEffects' });
 
 export type TabNavigationPageEffects = {
+  contentSurface?: boolean;
   controlledCursor: boolean;
   cropOverlay: boolean;
   viewportCursorProjection: boolean;
@@ -45,6 +56,7 @@ export function resolveTabNavigationPageEffects(
   viewportCursorProjection = false
 ): TabNavigationPageEffects {
   return {
+    contentSurface: getVideoRecordingSurfaceLeaseSnapshot() !== null,
     controlledCursor: isControlledCursorCaptureEnabled(),
     cropOverlay: getVideoRecordingRuntimeState().captureMode === CaptureMode.TAB_CROP,
     viewportCursorProjection,
@@ -66,13 +78,62 @@ export async function suspendTabNavigationPageEffects(
   effects: TabNavigationPageEffects,
   binding: TabNavigationEffectBinding
 ): Promise<void> {
+  if (effects.contentSurface) {
+    const current = getVideoRecordingSurfaceLeaseSnapshot();
+    if (current?.tabId === binding.tabId) {
+      try {
+        await closeVideoRecordingCameraPeerForLease(current);
+      } catch (error) {
+        await updateVideoRecordingSurface(current.surfaceSessionId, { lifecycle: 'degraded' });
+        throw error;
+      }
+    }
+    await beginVideoRecordingSurfaceRebind(binding.tabId);
+  }
   if (effects.controlledCursor) {
     await suspendControlledCursorEffects(binding);
   }
 }
 
 function hasRestorablePageEffects(effects: TabNavigationPageEffects): boolean {
-  return effects.controlledCursor || effects.cropOverlay || effects.viewportCursorProjection;
+  return (
+    effects.contentSurface ||
+    effects.controlledCursor ||
+    effects.cropOverlay ||
+    effects.viewportCursorProjection
+  );
+}
+
+async function restoreContentSurfaceEffect(
+  enabled: boolean,
+  binding: TabNavigationEffectBinding
+): Promise<void> {
+  if (!enabled || !binding.isCurrent()) return;
+  const current = getVideoRecordingSurfaceLeaseSnapshot();
+  if (!current || current.tabId !== binding.tabId || current.recordingId !== binding.recordingId) {
+    return;
+  }
+  let restorable = current;
+  if (current.lifecycle === 'degraded') {
+    try {
+      await closeVideoRecordingCameraPeerForLease(current);
+      restorable = (await beginVideoRecordingSurfaceRebind(binding.tabId)) ?? current;
+    } catch (error) {
+      logger.warn('Embedded camera cleanup remains degraded after navigation', error);
+      return;
+    }
+  }
+  const ready =
+    (await updateVideoRecordingSurface(restorable.surfaceSessionId, { lifecycle: 'ready' })) ??
+    restorable;
+  if (!binding.isCurrent()) return;
+  const settings = await loadVideoSettings();
+  if (!binding.isCurrent()) return;
+  await getBackgroundRuntimeMessaging().sendTabMessage(binding.tabId, {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+    snapshot: createVideoRecordingSurfaceSnapshot(ready, settings),
+    surfaceToken: ready.surfaceToken,
+  });
 }
 
 async function ensurePageEffectsAccess(
@@ -197,6 +258,10 @@ export async function restoreTabNavigationPageEffects(
   if (!(await ensurePageEffectsAccess(effects, binding, ensurePageAccess))) {
     return { controlledCursorRestored: !effects.controlledCursor, liveViewport: null };
   }
+  if (!binding.isCurrent()) {
+    return { controlledCursorRestored: true, liveViewport: null };
+  }
+  await restoreContentSurfaceEffect(effects.contentSurface === true, binding);
   if (!binding.isCurrent()) {
     return { controlledCursorRestored: true, liveViewport: null };
   }

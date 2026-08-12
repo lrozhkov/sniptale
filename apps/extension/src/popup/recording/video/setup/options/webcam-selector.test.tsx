@@ -9,7 +9,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
-import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import {
   WebcamFrameRatePreset,
   WebcamResolutionPreset,
@@ -74,6 +74,7 @@ function createSettings(
 it('shows webcam loading and empty states through i18n labels', () => {
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.TAB}
       settings={createSettings({ webcamDeviceId: 'cam-1' })}
       webcamDevices={[]}
       isLoadingWebcams
@@ -86,6 +87,7 @@ it('shows webcam loading and empty states through i18n labels', () => {
 
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.TAB}
       settings={createSettings({ webcamDeviceId: null })}
       webcamDevices={[]}
       isLoadingWebcams={false}
@@ -100,6 +102,7 @@ it('shows webcam loading and empty states through i18n labels', () => {
 it('hides the webcam selector until webcam capture is enabled', () => {
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.TAB}
       settings={createSettings({ webcamDeviceId: null, webcamEnabled: false })}
       webcamDevices={[]}
       isLoadingWebcams={false}
@@ -114,6 +117,7 @@ it('hides the webcam selector until webcam capture is enabled', () => {
 it('shows the required camera selector without changing a disabled saved preference', () => {
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.CAMERA}
       required
       settings={createSettings({ webcamDeviceId: null, webcamEnabled: false })}
       webcamDevices={[]}
@@ -131,6 +135,7 @@ it('shows the webcam select control and emits selected device changes', async ()
 
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.TAB}
       settings={createSettings({ webcamDeviceId: 'cam-1' })}
       webcamDevices={[{ deviceId: 'cam-2', label: 'USB Camera' }]}
       isLoadingWebcams={false}
@@ -156,6 +161,7 @@ it('shows the webcam select control and emits selected device changes', async ()
 it('shows a separate camera settings action', () => {
   renderNode(
     <VideoWebcamSelector
+      captureMode={CaptureMode.TAB}
       settings={createSettings({ webcamDeviceId: 'cam-1' })}
       webcamDevices={[{ deviceId: 'cam-1', label: 'USB Camera' }]}
       isLoadingWebcams={false}

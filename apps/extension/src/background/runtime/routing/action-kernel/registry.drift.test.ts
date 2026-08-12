@@ -33,6 +33,7 @@ const ownerRouteDescriptorFiles = [
   'apps/extension/src/background/media/video/runtime/handlers/export/route-descriptors.ts',
   'apps/extension/src/background/media/video/runtime/handlers/state/route-descriptors.ts',
   'apps/extension/src/background/media/video/runtime/manager/route-descriptors.ts',
+  'apps/extension/src/background/media/video/content-surface/route-descriptors.ts',
   'apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts',
   'apps/extension/src/background/runtime/native-app/route-descriptors.ts',
   'apps/extension/src/background/runtime/page-access/route-descriptors.ts',
@@ -63,6 +64,7 @@ const policyBackedAuthorityFamilies: Partial<Record<ActionRouteAuthorityFamily, 
   'video-control-no-tab-route': 'video-control-no-tab-route',
   'video-control-owner-no-tab-route': 'video-control-owner-no-tab-route',
   'video-control-privileged-tab-route': 'privileged-tab-route:video-control',
+  'video-recording-surface-privileged-tab-route': 'privileged-tab-route:video-recording-surface',
 };
 
 const ownerLocalPolicyAuthorityFamilies = new Set<ActionRouteAuthorityFamily>([

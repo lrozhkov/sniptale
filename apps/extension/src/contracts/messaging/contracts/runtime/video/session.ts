@@ -21,6 +21,13 @@ import {
   CaptureMode,
   type VideoPostRecordResult,
 } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  isReleaseVideoRecordingSurfaceMessage,
+  isVideoRecordingSurfaceCommandMessage,
+  isVideoRecordingSurfaceSnapshot,
+  isVideoRecordingCameraOfferMessage,
+  isVideoRecordingCameraCloseMessage,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type PartialRuntimeRegistry = Partial<
   MessageContractRegistry<RuntimeRequestByType, RuntimeResponseByType>
@@ -95,6 +102,77 @@ function isStartRecordingRequest(
 }
 
 export const runtimeVideoSessionMessageContracts = {
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: {
+    parseRequest: createGuardParser(
+      'runtime VIDEO_RECORDING_CAMERA_OFFER message',
+      isVideoRecordingCameraOfferMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime VIDEO_RECORDING_CAMERA_OFFER response',
+      createRuntimeResponseGuard({ optional: { sdp: isString } })
+    ),
+  },
+  [VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE]: {
+    parseRequest: createGuardParser(
+      'runtime VIDEO_RECORDING_CAMERA_CLOSE message',
+      isVideoRecordingCameraCloseMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime VIDEO_RECORDING_CAMERA_CLOSE response',
+      createRuntimeResponseGuard()
+    ),
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+        required: {
+          capabilityToken: isString,
+          peerId: isString,
+          sdp: isString,
+          settings: isVideoRecordingSettings,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER response',
+      createRuntimeResponseGuard({ optional: { sdp: isString } })
+    ),
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE,
+        required: { capabilityToken: isString, peerId: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE response',
+      createRuntimeResponseGuard()
+    ),
+  },
+  [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: {
+    parseRequest: createGuardParser(
+      'runtime RELEASE_VIDEO_RECORDING_SURFACE message',
+      isReleaseVideoRecordingSurfaceMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime RELEASE_VIDEO_RECORDING_SURFACE response',
+      createRuntimeResponseGuard()
+    ),
+  },
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: {
+    parseRequest: createGuardParser(
+      'runtime VIDEO_RECORDING_SURFACE_COMMAND message',
+      isVideoRecordingSurfaceCommandMessage
+    ),
+    parseResponse: createGuardParser(
+      'runtime VIDEO_RECORDING_SURFACE_COMMAND response',
+      createRuntimeResponseGuard({ optional: { snapshot: isVideoRecordingSurfaceSnapshot } })
+    ),
+  },
   [VideoMessageType.START_RECORDING]: {
     parseRequest: createGuardParser('runtime START_RECORDING message', isStartRecordingRequest),
     parseResponse: createGuardParser(

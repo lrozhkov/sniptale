@@ -54,7 +54,7 @@ beforeEach(() => {
     recordingId: 'recording-1',
     streamInstanceId: 'stream-instance-1',
   });
-  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   getVideoRecordingRuntimeStateMock.mockReturnValue({
     liveMedia: {
@@ -117,6 +117,17 @@ it('reports offscreen update failures without committing live media state', asyn
     'Failed to update recording settings',
     expect.any(Error)
   );
+});
+
+it('rejects an explicit offscreen failure acknowledgement without publishing live state', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'device denied' });
+
+  await expect(updateRecordingSettings({ webcamDeviceId: 'cam-2' })).resolves.toEqual({
+    error: 'device denied',
+    result: 'failed',
+  });
+
+  expect(setVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
 });
 
 it('keeps a null live media snapshot null after a successful update', async () => {

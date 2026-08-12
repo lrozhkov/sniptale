@@ -26,7 +26,7 @@ const startRecordingContract =
 const recordingSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   countdownSeconds: 0,
-  autoFadeDelay: 1,
+  autoFadeDelay: 3,
 };
 
 it('accepts valid cursor capture modes on offscreen recording started messages', () => {

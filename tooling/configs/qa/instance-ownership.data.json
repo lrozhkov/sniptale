@@ -16,7 +16,6 @@
         "apps/extension/src/content/selection/quick-edit.ts",
         "apps/extension/src/content/selection/selection-mode.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts",
-        "apps/extension/src/content/overlay/video-annotations/index.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts"
       ],
       "rule": "facade-default-owner"
@@ -45,7 +44,6 @@
         "apps/extension/src/content/selection/selection-mode.controller.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text-resolver.controller.ts",
         "apps/extension/src/content/parser/dom-utils/dom-helpers-text.ts",
-        "apps/extension/src/content/overlay/video-annotations/index.ts",
         "apps/extension/src/content/overlay/video-clicks/index.ts"
       ],
       "rule": "no-top-level-mutable-runtime-state"

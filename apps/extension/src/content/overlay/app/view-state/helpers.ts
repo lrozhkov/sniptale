@@ -43,6 +43,9 @@ export function buildContentModeFlags(modeState: ContentAppModeStateValue): Cont
     quickEditDocumentMode: modeState.quickEditDocumentMode,
     quickEditMode: modeState.quickEditMode,
     screenshotMode: modeState.screenshotMode,
+    ...(modeState.videoRecordingMode === undefined
+      ? {}
+      : { videoRecordingMode: modeState.videoRecordingMode }),
   };
 }
 
@@ -59,6 +62,9 @@ export function buildContentModeControls(
     setNavigationLockEnabled: modeState.setNavigationLockEnabled,
     setQuickEditMode: modeState.setQuickEditMode,
     setScreenshotMode: modeState.setScreenshotMode,
+    ...(modeState.setVideoRecordingMode === undefined
+      ? {}
+      : { setVideoRecordingMode: modeState.setVideoRecordingMode }),
   };
 }
 

@@ -22,6 +22,7 @@ import {
   type ContentDrawingController,
 } from '../../../content/drawing/controller';
 import { useDrawingModeIntegration } from '../../../content/drawing/mode';
+import { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
 import {
   disableHighlighterMode,
   registerFrameCallbacks,
@@ -283,6 +284,10 @@ function usePreparationControllers(
       return aiController.handleAiPickContentStart(...args);
     },
   };
+  const videoRecordingController = useVideoRecordingSurfaceController({
+    onModeRequested: (enabled) => modeState.setVideoRecordingMode?.(enabled),
+    onToolbarRequested: () => modeState.setIsToolbarVisible(true),
+  });
 
   return {
     aiController: drawingAwareAiController,
@@ -291,6 +296,7 @@ function usePreparationControllers(
     modeController,
     scenarioController,
     screenshotController,
+    videoRecordingController,
   };
 }
 

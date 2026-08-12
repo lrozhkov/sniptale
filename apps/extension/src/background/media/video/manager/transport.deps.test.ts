@@ -2,12 +2,12 @@ import { expect, it } from 'vitest';
 
 import { abortVideoRecordingStartIfCancelled } from './flow-cancellation';
 import {
-  enableAnnotationsIfNeeded,
+  prepareContentSurfaceIfNeeded,
   ensureOffscreenDocumentReady,
   resolveCaptureSource,
 } from './preflight';
 import {
-  defaultAnnotationSetupDeps,
+  defaultContentSurfaceSetupDeps,
   defaultCaptureSourceResolverDeps,
   defaultOffscreenSetupDeps,
 } from './transport.deps';
@@ -15,7 +15,9 @@ import {
 it('wires transport default deps to the canonical owner seams', () => {
   expect(defaultCaptureSourceResolverDeps.resolveCaptureSource).toBe(resolveCaptureSource);
   expect(defaultOffscreenSetupDeps.ensureOffscreenDocumentReady).toBe(ensureOffscreenDocumentReady);
-  expect(defaultAnnotationSetupDeps.enableAnnotationsIfNeeded).toBe(enableAnnotationsIfNeeded);
+  expect(defaultContentSurfaceSetupDeps.prepareContentSurfaceIfNeeded).toBe(
+    prepareContentSurfaceIfNeeded
+  );
   expect(defaultOffscreenSetupDeps.abortStart).toBe(abortVideoRecordingStartIfCancelled);
-  expect(defaultAnnotationSetupDeps.abortStart).toBe(abortVideoRecordingStartIfCancelled);
+  expect(defaultContentSurfaceSetupDeps.abortStart).toBe(abortVideoRecordingStartIfCancelled);
 });

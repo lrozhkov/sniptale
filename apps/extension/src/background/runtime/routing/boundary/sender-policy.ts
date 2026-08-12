@@ -10,7 +10,12 @@ type CaptureRouteSenderPolicyArgs = {
   sender: chrome.runtime.MessageSender | undefined;
 };
 
-export type PrivilegedTabRouteFamily = 'capture' | 'scenario' | 'tab-mode' | 'video-control';
+export type PrivilegedTabRouteFamily =
+  | 'capture'
+  | 'scenario'
+  | 'tab-mode'
+  | 'video-control'
+  | 'video-recording-surface';
 
 type PrivilegedTabRouteSenderPolicyArgs = {
   family: PrivilegedTabRouteFamily;
@@ -30,6 +35,7 @@ const privilegedTabRouteAuthorizationMatrix = {
   scenario: { popup: false, senderOwnedTab: true, viewer: true },
   'tab-mode': { popup: true, senderOwnedTab: true, viewer: false },
   'video-control': { popup: true, senderOwnedTab: false, viewer: false },
+  'video-recording-surface': { popup: false, senderOwnedTab: true, viewer: false },
 } satisfies Record<PrivilegedTabRouteFamily, TabRouteAuthorizationPolicy>;
 
 const unauthorizedRouteErrors = {
@@ -37,6 +43,7 @@ const unauthorizedRouteErrors = {
   scenario: 'Unauthorized scenario route sender',
   'tab-mode': 'Unauthorized tab-mode route sender',
   'video-control': 'Unauthorized video-control route sender',
+  'video-recording-surface': 'Unauthorized video recording surface sender',
 } satisfies Record<PrivilegedTabRouteFamily, string>;
 
 const editorCaptureRoutes = new Set<string>([MessageType.EXECUTE_SAVE]);

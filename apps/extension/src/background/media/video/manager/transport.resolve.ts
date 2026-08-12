@@ -1,10 +1,10 @@
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
-  defaultAnnotationSetupDeps,
+  defaultContentSurfaceSetupDeps,
   defaultCaptureSourceResolverDeps,
   defaultOffscreenSetupDeps,
-  type AnnotationSetupDeps,
+  type ContentSurfaceSetupDeps,
   type CaptureSourceResolverDeps,
   type OffscreenSetupDeps,
 } from './transport.deps';
@@ -66,15 +66,20 @@ export async function ensureOffscreenDocumentReadyOrAbort(
   return !deps.abortStart(tabId, captureMode, 'offscreen setup');
 }
 
-export async function enableAnnotationsOrAbort(
+export async function prepareContentSurfaceOrAbort(
   tabId: number,
   captureMode: CaptureMode,
   settings: VideoRecordingSettings,
   recordingId?: string,
-  deps: AnnotationSetupDeps = defaultAnnotationSetupDeps
+  deps: ContentSurfaceSetupDeps = defaultContentSurfaceSetupDeps
 ) {
-  const viewport = await deps.enableAnnotationsIfNeeded(tabId, captureMode, settings, recordingId);
-  if (deps.abortStart(tabId, captureMode, 'annotation setup')) {
+  const viewport = await deps.prepareContentSurfaceIfNeeded(
+    tabId,
+    captureMode,
+    settings,
+    recordingId
+  );
+  if (deps.abortStart(tabId, captureMode, 'content surface setup')) {
     return null;
   }
   return viewport;

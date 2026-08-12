@@ -107,4 +107,17 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
     sideEffects: 'recording start cancellation, stop, pause, resume, or live settings updates',
     transitiveStateOwner: 'background video runtime recording owner',
   },
+  'video-recording-surface-privileged-tab-route': {
+    acceptedSenderClass: 'owned top-frame content document bound to its tab',
+    errorShape: 'video recording surface route error response',
+    freshnessReplayPolicy:
+      'one-shot trusted intent for entry plus surface token, tab, document generation, ' +
+      'capability epoch, and recording id for commands',
+    requiredAuthority: 'video recording surface privileged tab authorization policy',
+    responseShape: 'surface activation, snapshot, or command response',
+    sideEffects:
+      'saved tab recording start, content surface binding, recording controls, or embedded camera settings',
+    transitiveStateOwner:
+      'background video content-surface lease and recording-control lease owners',
+  },
 } as const satisfies Record<string, ActionRouteContract>;

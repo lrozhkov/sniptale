@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "background-runtime-media-composition",
+    "debtId": "accepted.scc.background-runtime-media-composition.20260812",
+    "owner": "background-runtime-composition",
+    "reason": "Allowed composition: the action-kernel/runtime wiring owns route assembly while media owns video lifecycle and application owns privacy erasure orchestration.",
+    "owners": [
+      "apps/extension/src/background/application",
+      "apps/extension/src/background/media",
+      "apps/extension/src/background/runtime"
+    ],
+    "edges": [
+      ["apps/extension/src/background/application", "apps/extension/src/background/media"],
+      ["apps/extension/src/background/media", "apps/extension/src/background/runtime"],
+      ["apps/extension/src/background/runtime", "apps/extension/src/background/application"],
+      ["apps/extension/src/background/runtime", "apps/extension/src/background/media"]
+    ]
+  }
+]

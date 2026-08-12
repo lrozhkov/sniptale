@@ -107,6 +107,14 @@ const idempotencyPolicyByType = {
     idempotent: false,
     reason: 'recording settings are a latest-value command',
   },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: {
+    idempotent: true,
+    reason: 'camera negotiation is bound to one document peer generation',
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
+    idempotent: true,
+    reason: 'closing the same document peer repeatedly is safe',
+  },
   [VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT]: {
     idempotent: true,
     reason: 'project export start is correlated by jobId',
@@ -140,6 +148,7 @@ export const OFFSCREEN_COMMAND_CORRELATION_KEYS = [
   'desktopMediaRequestId',
   'requestId',
   'sessionId',
+  'peerId',
   'runtime',
 ] as const;
 

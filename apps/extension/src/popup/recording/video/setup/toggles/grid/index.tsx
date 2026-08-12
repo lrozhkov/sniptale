@@ -1,14 +1,15 @@
 import {
-  type CaptureMode,
+  CaptureMode,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoDiagnosticsToggle } from '../diagnostics-toggle';
 import { VideoSystemAudioToggle } from '../system-audio-toggle';
 import { VideoControlledCursorToggle } from './controlled-cursor';
 import { VideoMicrophoneToggle } from './microphone';
+import { VideoRecordingToolbarToggle } from './toolbar-toggle';
 import { VideoWebcamToggle } from './webcam';
 
-const VIDEO_TOGGLE_GRID_CLASS_NAME = 'mt-2.5 mr-1 grid grid-cols-5 gap-1.5';
+const VIDEO_TOGGLE_GRID_CLASS_NAME = 'mt-2.5 mr-1 grid gap-1.5';
 
 type VideoToggleGridProps = {
   captureMode: CaptureMode;
@@ -35,8 +36,12 @@ export function VideoToggleGrid({
   onToggleWebcam,
   onSettingsChange,
 }: VideoToggleGridProps) {
+  const toolbarAvailable = captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
+
   return (
-    <div className={VIDEO_TOGGLE_GRID_CLASS_NAME}>
+    <div
+      className={`${VIDEO_TOGGLE_GRID_CLASS_NAME} ${toolbarAvailable ? 'grid-cols-6' : 'grid-cols-5'}`}
+    >
       <VideoMicrophoneToggle
         active={settings.microphoneEnabled}
         onToggleMicrophone={onToggleMicrophone}
@@ -51,6 +56,9 @@ export function VideoToggleGrid({
         systemAudioDisabled={systemAudioDisabled}
         onSettingsChange={onSettingsChange}
       />
+      {toolbarAvailable ? (
+        <VideoRecordingToolbarToggle settings={settings} onSettingsChange={onSettingsChange} />
+      ) : null}
       <VideoControlledCursorToggle
         captureMode={captureMode}
         controlledCursorCaptureEnabled={settings.controlledCursorCaptureEnabled}

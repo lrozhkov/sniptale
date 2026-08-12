@@ -156,6 +156,7 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
         onSettingsChange={props.onSettingsChange}
       />
       <VideoWebcamSelector
+        captureMode={props.captureMode}
         required={props.captureMode === CaptureMode.CAMERA}
         settings={props.settings}
         webcamDevices={props.webcamDevices}

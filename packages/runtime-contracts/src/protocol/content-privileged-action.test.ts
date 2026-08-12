@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 
 import { CaptureMessageType, MessageType } from '../messaging/message-types';
+import { VideoMessageType } from '../video/messages';
 import { CONTENT_PRIVILEGED_ACTION_TYPES } from './content-privileged-action';
 import {
   isContentPrivilegedActionActivationKey,
@@ -30,6 +31,8 @@ it('matches the exact protected message type set', () => {
     MessageType.TRIGGER_QUICK_ACTION,
     MessageType.CONTENT_RUNTIME_WAKEUP,
     MessageType.AI_SETTINGS_NAVIGATION,
+    VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+    VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
   ]);
 });
 

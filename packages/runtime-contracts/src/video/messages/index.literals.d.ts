@@ -2,6 +2,26 @@ declare module './index' {
   export namespace VideoMessageType {
     type OPEN_VIDEO_RECORDER = typeof import('./index').VideoMessageType.OPEN_VIDEO_RECORDER;
     type START_RECORDING = typeof import('./index').VideoMessageType.START_RECORDING;
+    type START_SAVED_TAB_VIDEO_RECORDING =
+      typeof import('./index').VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
+    type ACTIVATE_VIDEO_RECORDING_SURFACE =
+      typeof import('./index').VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE;
+    type RELEASE_VIDEO_RECORDING_SURFACE =
+      typeof import('./index').VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE;
+    type VIDEO_RECORDING_SURFACE_SNAPSHOT =
+      typeof import('./index').VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT;
+    type VIDEO_RECORDING_SURFACE_COMMAND =
+      typeof import('./index').VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND;
+    type VIDEO_RECORDING_CAMERA_OFFER =
+      typeof import('./index').VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER;
+    type VIDEO_RECORDING_CAMERA_ANSWER =
+      typeof import('./index').VideoMessageType.VIDEO_RECORDING_CAMERA_ANSWER;
+    type VIDEO_RECORDING_CAMERA_CLOSE =
+      typeof import('./index').VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE;
+    type OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER =
+      typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
+    type OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE =
+      typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE;
     type CANCEL_RECORDING_START = typeof import('./index').VideoMessageType.CANCEL_RECORDING_START;
     type STOP_RECORDING = typeof import('./index').VideoMessageType.STOP_RECORDING;
     type PAUSE_RECORDING = typeof import('./index').VideoMessageType.PAUSE_RECORDING;
@@ -49,8 +69,6 @@ declare module './index' {
     type OFFSCREEN_ERROR = typeof import('./index').VideoMessageType.OFFSCREEN_ERROR;
     type GET_VIEWPORT_COORDS = typeof import('./index').VideoMessageType.GET_VIEWPORT_COORDS;
     type GET_RECORDING_TAB_ID = typeof import('./index').VideoMessageType.GET_RECORDING_TAB_ID;
-    type ENABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.ENABLE_ANNOTATIONS;
-    type DISABLE_ANNOTATIONS = typeof import('./index').VideoMessageType.DISABLE_ANNOTATIONS;
     type ENABLE_VIEWPORT_CURSOR_PROJECTION =
       typeof import('./index').VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
     type DISABLE_VIEWPORT_CURSOR_PROJECTION =

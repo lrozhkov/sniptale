@@ -13,6 +13,7 @@ import {
   TextCursor,
   TextCursorInput,
   Touchpad,
+  Video,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import {
@@ -40,13 +41,20 @@ import { createTrustedContentActionIntentSource } from '../../../application/pri
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
 
-type ToolbarInteractionMode = 'cursor' | 'design-review' | 'drawing' | 'highlighter' | 'quick-edit';
+type ToolbarInteractionMode =
+  | 'cursor'
+  | 'design-review'
+  | 'drawing'
+  | 'highlighter'
+  | 'quick-edit'
+  | 'video-recording';
 const TOOLBAR_INTERACTION_MODES: readonly ToolbarInteractionMode[] = [
   'cursor',
   'drawing',
   'highlighter',
   'quick-edit',
   'design-review',
+  'video-recording',
 ];
 
 function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode {
@@ -56,6 +64,10 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
 
   if (props.designReviewMode) {
     return 'design-review';
+  }
+
+  if (props.videoRecordingMode) {
+    return 'video-recording';
   }
 
   if (props.drawingMode) {
@@ -81,6 +93,8 @@ function getModeIcon(mode: ToolbarInteractionMode) {
       return <ScanEye size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'drawing':
       return <Pencil size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+    case 'video-recording':
+      return <Video size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'highlighter':
       return <MessageSquarePlus size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'cursor':
@@ -105,6 +119,11 @@ function getModeCopy(mode: ToolbarInteractionMode) {
       return {
         hint: translate('content.toolbar.drawingEnable'),
         label: translate('content.toolbar.drawingLabel'),
+      };
+    case 'video-recording':
+      return {
+        hint: translate('content.toolbar.videoRecordingEnable'),
+        label: translate('content.toolbar.videoRecordingLabel'),
       };
     case 'highlighter':
       return {
@@ -134,6 +153,11 @@ function createModeSelectionHandler(
       return;
     }
 
+    if (props.videoRecordingMode && mode !== 'video-recording') {
+      if (props.videoRecordingModeLocked) return;
+      props.onToggleVideoRecording?.(event.nativeEvent);
+    }
+
     switch (mode) {
       case 'quick-edit':
         if (props.aiPickMode) {
@@ -147,6 +171,9 @@ function createModeSelectionHandler(
         break;
       case 'drawing':
         props.onToggleDrawing?.();
+        break;
+      case 'video-recording':
+        props.onToggleVideoRecording?.(event.nativeEvent);
         break;
       case 'highlighter':
         props.onToggleHighlighter();
@@ -165,6 +192,7 @@ function createModeSelectionHandler(
 function ModeMenuItem(props: {
   mode: ToolbarInteractionMode;
   selected: boolean;
+  disabled?: boolean;
   onSelect: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const copy = getModeCopy(props.mode);
@@ -178,6 +206,7 @@ function ModeMenuItem(props: {
         event.stopPropagation();
       }}
       selected={props.selected}
+      {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
     >
       {getModeIcon(props.mode)}
       <ProductToolbarMenuItemCopy hint={copy.hint} label={copy.label} />
@@ -227,6 +256,9 @@ function ToolbarModeMenu(props: {
               key={mode}
               mode={mode}
               selected={selected}
+              disabled={
+                props.triggerProps.videoRecordingModeLocked === true && mode !== 'video-recording'
+              }
               onSelect={createModeSelectionHandler(
                 mode,
                 selected,
