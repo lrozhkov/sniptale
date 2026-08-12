@@ -2,7 +2,7 @@
 
 Updated: 2026-07-26
 
-This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in [AGENTS.md](../../AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
+This document owns wrapper lifecycle, scope/freshness state, locks, handoffs, and observability. Workflow belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), quality policy in [code-quality.md](code-quality.md), and command lookup in [operator-handbook.md](operator-handbook.md).
 
 The canonical order is `implementation → qa:checkpoint → required review → qa:closeout`. Wrapper speed and scope describe tool cost, not permission for weaker architecture or proof.
 
@@ -12,7 +12,7 @@ The live scope classifier is `tooling/qa/core/qa-scope.mjs`.
 
 - Product targets are implementation/application/package files plus shared controls.
 - Harness targets include `tooling/**` plus shared controls.
-- Shared controls participate in both scopes: `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
+- Shared controls participate in both scopes: `.github/workflows/**`, `docs/agent-tooling/**`, hooks, QA-affecting root/package/lock/TypeScript/Vite configuration, and active `docs/tooling/**` guidance.
 
 Whenever the current diff has executable harness targets, run `npm run qa:release-harness` before a consumer wrapper that requires its freshness stamp. Exact machine-owned technical-debt, OSS-consumer, and coverage-rollout inventories are data-only targets: checkpoint runs their owner validators without requiring a fresh harness stamp. The exemption belongs only to exact files classified by `qa-scope`, including an author-maintained data module when it has an explicit owner validator; it is never execution evidence for another policy file. Policy JSON, baselines, allowlists, and executable registries are not data-only. Documentation lists the categories; the classifier remains authoritative.
 

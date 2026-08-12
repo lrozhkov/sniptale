@@ -7,7 +7,7 @@ import { renderPreflightReport } from './preflight.mjs';
 it('renders deduplicated owner, structural, advisory, and proof sections', () => {
   const output = renderPreflightReport({
     context: { targetFiles: ['apps/extension/src/composition/persistence/storage/session.ts'] },
-    relevantDocs: ['AGENTS.md'],
+    relevantDocs: ['docs/agent-tooling/AGENTS.md'],
     ownerRuntime: ['extension:composition:persistence'],
     guardrailReport: {
       clusters: ['owner:shared=1'],
@@ -150,7 +150,7 @@ it('bounds large scope and boundary inventories without hiding later report sect
   const createReport = (files) =>
     renderPreflightReport({
       context: { mode: 'explicit-files', targetFiles: files },
-      relevantDocs: ['AGENTS.md'],
+      relevantDocs: ['docs/agent-tooling/AGENTS.md'],
       ownerRuntime: ['extension:content:selection'],
       guardrailReport: { buildScopeForecast: ['extension artifact build'] },
       structuralPressure: ['attention=0'],

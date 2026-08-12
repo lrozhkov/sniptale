@@ -161,7 +161,7 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
     'qa:release-harness qa:checkpoint qa:release qa:audit Corresponding Source AGPL-3.0-or-later\n'
   );
   for (const relativePath of [
-    'AGENTS.md',
+    'docs/agent-tooling/AGENTS.md',
     'docs/tooling/code-quality.md',
     'docs/tooling/wrapper-summary.md',
   ]) {

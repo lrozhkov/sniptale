@@ -14,7 +14,7 @@ export const OWNER_LOCAL_SCOPES = [
   { name: 'design-system', prefix: 'apps/extension/src/design-system' },
 ];
 
-const OWNER_LOCAL_ADJUNCT_PATTERNS = [/^docs\//u, /^\.agents\//u, /^AGENTS\.md$/u];
+const OWNER_LOCAL_ADJUNCT_PATTERNS = [/^docs\//u];
 
 function findOwnerScope(file) {
   return OWNER_LOCAL_SCOPES.find((scope) => file.startsWith(scope.prefix)) ?? null;

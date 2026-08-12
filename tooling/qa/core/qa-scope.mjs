@@ -7,7 +7,7 @@ export const HARNESS_QA_SUITE = 'harness';
 export const ALL_QA_SUITE = 'all';
 export const HARNESS_QA_GUIDANCE = [
   'run npm run qa:release-harness for executable tooling/**, QA-affecting root configuration,',
-  'hooks, .agents/**, AGENTS.md, or active tooling guidance; machine-owned inventory-only changes',
+  'hooks, docs/agent-tooling/**, or active tooling guidance; machine-owned inventory-only changes',
   'use their owner validators without a fresh harness stamp',
 ].join(' ');
 
@@ -56,7 +56,12 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'video-runtime-routing.mjs',
   'web-snapshot.mjs',
 ]);
-const SHARED_CONTROL_PATTERNS = [/^\.github\/workflows\//u, /^\.husky\//u, /^docs\/tooling\//u];
+const SHARED_CONTROL_PATTERNS = [
+  /^\.github\/workflows\//u,
+  /^\.husky\//u,
+  /^docs\/agent-tooling\//u,
+  /^docs\/tooling\//u,
+];
 const VITE_CONFIG_PATTERN = /(?:^|\/)vite\.config\.[cm]?[jt]s$/u;
 const SHARED_CONTROL_FILES = new Set([
   '.dependency-cruiser.cjs',
@@ -64,7 +69,6 @@ const SHARED_CONTROL_FILES = new Set([
   '.npmrc',
   '.prettierignore',
   '.prettierrc.json',
-  'AGENTS.md',
   'eslint.config.js',
   'package-lock.json',
   'package.json',
@@ -78,7 +82,6 @@ export function isSharedControlQaFile(file) {
     (basename.startsWith('tsconfig.') && basename.endsWith('.json'));
   return (
     SHARED_CONTROL_FILES.has(file) ||
-    file.startsWith('.agents/') ||
     SHARED_CONTROL_PATTERNS.some((pattern) => pattern.test(file)) ||
     isTypeScriptConfig ||
     VITE_CONFIG_PATTERN.test(file)

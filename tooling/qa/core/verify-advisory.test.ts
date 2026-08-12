@@ -51,7 +51,7 @@ it('rejects explicit file scopes because advisory is diff-only', async () => {
 
   expect(() =>
     module.runAdvisoryVerification({
-      files: ['AGENTS.md', 'tooling/qa/core/verify-advisory.mjs'],
+      files: ['docs/agent-tooling/AGENTS.md', 'tooling/qa/core/verify-advisory.mjs'],
     })
   ).toThrow(/current uncommitted diff only/u);
 });

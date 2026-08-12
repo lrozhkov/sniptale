@@ -17,7 +17,7 @@ export const RUNTIME_SOURCE_PATTERN = {
 export const SRC_SOURCE_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
 
 export const RUNTIME_TOPOLOGY_TRIGGER_FILES = new Set([
-  'AGENTS.md',
+  'docs/agent-tooling/AGENTS.md',
   '.dependency-cruiser.cjs',
   'DESIGN.md',
   'docs/architecture/code-organization.md',

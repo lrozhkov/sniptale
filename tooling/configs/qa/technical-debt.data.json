@@ -14000,7 +14000,7 @@
       "remediation": "Review every ignore-pattern change against product roots and security scan coverage.",
       "exactSource": {
         "path": "tooling/qa/core/quality.config.mjs",
-        "contentHash": "0493742b7289fb0a84d445436d2c7bde0450e852f18fb6c3467a924f1db6ea7d"
+        "contentHash": "3ccaed04013845690aa93c43633d0ca1cf286e688cf72d45563cd4a5d012cf83"
       },
       "consumers": [
         "tooling/qa/audits/ast-grep.mjs",
@@ -14363,6 +14363,29 @@
       ],
       "surfaces": [
         "property:collectAndPersistAdvisoryReport/findings"
+      ]
+    },
+    {
+      "id": "policy.source.agent-tooling-mjs.5721c21e0e",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/agent-tooling.mjs",
+        "contentHash": "03aa28f2d27bec889a80e0cd701bba37966ec812d7cd9472df27098691713ade"
+      },
+      "consumers": [
+        "tooling/agent-tooling/agent-tooling.mjs",
+        "tooling/agent-tooling/agent-tooling.test.ts",
+        "tooling/agent-tooling/install.mjs",
+        "tooling/agent-tooling/pack.mjs",
+        "tooling/agent-tooling/remove.mjs"
+      ],
+      "surfaces": [
+        "binding:PAYLOAD_ROOTS",
+        "property:packAgentTooling/compressionOptions"
       ]
     },
     {
@@ -17423,6 +17446,24 @@
       ]
     },
     {
+      "id": "policy.source.install-mjs.56d19aa8fe",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/install.mjs",
+        "contentHash": "1700d7651eba396fb4a33340a568729b406462d2beab04faa0b15c7ee6c64c09"
+      },
+      "consumers": [
+        "tooling/agent-tooling/install.mjs"
+      ],
+      "surfaces": [
+        "binding:args"
+      ]
+    },
+    {
       "id": "policy.source.jscpd-baseline-contract-mjs.e36597a230",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18265,7 +18306,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/oss-release-validation.docs.mjs",
-        "contentHash": "63b6c9fcb8f96d48a7e7db6c38765df2996b3584c184c52ea61ce2edd24c7610"
+        "contentHash": "4f6541081b246c89a798e68bbc2c2822e172461bc1ac30924f9566c640c02220"
       },
       "consumers": [
         "tooling/qa/core/oss-release-consumer-discovery.test.ts",
@@ -18719,7 +18760,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight-docs.mjs",
-        "contentHash": "f54dbc831d1166969a0caabf1620b25cc360313732f87e7e13483f6e5c3aac55"
+        "contentHash": "c68283edb83ad3e24302a79abe24359911c87c40d71df33ee3f55c74f485c9ac"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-docs.mjs",
@@ -18900,7 +18941,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "fef204cf35535d336af9ad24adbec3a4848a5145586d5e891359f388692b3266"
+        "contentHash": "cfe8c299332d075c14d5c2cc66c9830006a359461b17eb03b064289e86d3aaef"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -19034,6 +19075,24 @@
       ]
     },
     {
+      "id": "policy.source.remove-mjs.399bc46d04",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/agent-tooling/remove.mjs",
+        "contentHash": "340032a656000eec7b5c722a7eb5528f108b60e0e00e492c1c5eb0c9b94d1756"
+      },
+      "consumers": [
+        "tooling/agent-tooling/remove.mjs"
+      ],
+      "surfaces": [
+        "binding:args"
+      ]
+    },
+    {
       "id": "policy.source.report-mjs.2d012ea5b7",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -19089,7 +19148,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/evidence/repo-audit-evidence/repository-profile.mjs",
-        "contentHash": "b8b2d3ed7329f8a9a892390354497bffaeba54b86b33f62b82e06418d74dcbb5"
+        "contentHash": "04d73f9feb5efe7de6e9ca756449c7166e85ef272c5e1fb0d7887bfb520cb2f0"
       },
       "consumers": [
         "tooling/qa/evidence/repo-audit-evidence/core.mjs",
@@ -20008,6 +20067,7 @@
         "contentHash": "c92934a381a3198f892c4c3e489ab026388a56023e1ef0aa4848fbeb412b0c3c"
       },
       "consumers": [
+        "tooling/agent-tooling/agent-tooling.test.ts",
         "tooling/qa/audits/execution-error.test.ts",
         "tooling/qa/audits/execution-evidence.test.ts",
         "tooling/qa/audits/osv/severity.test.ts",
@@ -20691,7 +20751,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-all.scope.mjs",
-        "contentHash": "dea6867d066a4dca71358d7ac1f3d5ed25fc10d78410d6d7b2aec8b2b67930f6"
+        "contentHash": "03667dc0179d1d82993a90b10e7e3950f3481cd2a5059ad5f4b80dacfcb19d77"
       },
       "consumers": [
         "tooling/qa/core/guardrail-preflight-scope.mjs",
@@ -21481,7 +21541,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.config.mjs",
-        "contentHash": "532c59cf9f149d50f4b2719fbb8ce342c92ba3a97ee8d0e44663e8e785915d66"
+        "contentHash": "bed4af45d6ab0375065c4a6e59cba6c542e531f3ae5b10edcf347973dc50e52f"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -22312,7 +22372,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/verify-runtime-topology.mjs",
-        "contentHash": "4fcd5420ea07694f3aa0d62f635b70ab624f20dd4ba2a176227a8bf5c3c1fef5"
+        "contentHash": "4dac70a3fa5b98cb127d26386dc58079ce07c76ec4d397e74006ec0125187f78"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",

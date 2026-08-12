@@ -16,7 +16,7 @@ import { collectContentRuntimeReferenceViolations } from './content-runtime-topo
 const MANIFEST_PATH = 'apps/extension/manifest.json';
 const RUNTIME_CONTEXTS_DOC_PATH = 'docs/architecture/runtime-contexts.md';
 const ACTIVE_TOPOLOGY_FILES = [
-  'AGENTS.md',
+  'docs/agent-tooling/AGENTS.md',
   'DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',

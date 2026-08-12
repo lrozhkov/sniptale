@@ -18,7 +18,7 @@ function contributionFixture() {
   const root = createTempRoot('oss-release-contribution-policy-');
   const workflow = '`implementation → qa:checkpoint → required review → qa:closeout`\n';
   for (const relativePath of [
-    'AGENTS.md',
+    'docs/agent-tooling/AGENTS.md',
     'docs/tooling/code-quality.md',
     'docs/tooling/wrapper-summary.md',
   ]) {

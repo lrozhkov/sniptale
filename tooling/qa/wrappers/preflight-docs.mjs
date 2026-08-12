@@ -79,7 +79,7 @@ function collectArchitectureDocs(targetFiles) {
 
 export function collectRelevantDocs(targetFiles) {
   const docs = [
-    'AGENTS.md',
+    'docs/agent-tooling/AGENTS.md',
     'docs/engineering/implementation-rules.md',
     'docs/architecture/repository-overview.md',
     ...collectArchitectureDocs(targetFiles),

@@ -50,3 +50,9 @@ test-results/
 
 # Local task artifacts
 /tasks/
+
+# Optional local agent tooling and derived sharing artifact
+/AGENTS.md
+/.agents/
+/artifacts/agent-tooling-*.zip
+/artifacts/agent-tooling.zip

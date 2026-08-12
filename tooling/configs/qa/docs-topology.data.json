@@ -30,22 +30,23 @@
   ],
   "rootDocuments": [
     ".github/pull_request_template.md",
-    "AGENTS.md",
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "DESIGN.md",
     "README.md"
   ],
   "skillDocuments": [
-    ".agents/README.md",
-    ".agents/skills/architecture-code-review/SKILL.md",
-    ".agents/skills/architecture-code-review/references/architecture-review-checklist.md",
-    ".agents/skills/repo-audit/SKILL.md",
-    ".agents/skills/repo-audit/references/repo-audit-checklist.md",
-    ".agents/skills/security-code-review/SKILL.md",
-    ".agents/skills/security-code-review/references/security-review-checklist.md",
-    ".agents/skills/topology-plan-review/SKILL.md",
-    ".agents/skills/topology-plan-review/references/topology-plan-review-checklist.md"
+    "docs/agent-tooling/README.md",
+    "docs/agent-tooling/AGENTS.md",
+    "docs/agent-tooling/.agents/README.md",
+    "docs/agent-tooling/.agents/skills/architecture-code-review/SKILL.md",
+    "docs/agent-tooling/.agents/skills/architecture-code-review/references/architecture-review-checklist.md",
+    "docs/agent-tooling/.agents/skills/repo-audit/SKILL.md",
+    "docs/agent-tooling/.agents/skills/repo-audit/references/repo-audit-checklist.md",
+    "docs/agent-tooling/.agents/skills/security-code-review/SKILL.md",
+    "docs/agent-tooling/.agents/skills/security-code-review/references/security-review-checklist.md",
+    "docs/agent-tooling/.agents/skills/topology-plan-review/SKILL.md",
+    "docs/agent-tooling/.agents/skills/topology-plan-review/references/topology-plan-review-checklist.md"
   ],
   "productDocuments": [],
   "requiredIndexContractFragments": [

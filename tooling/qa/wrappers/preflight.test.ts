@@ -395,8 +395,8 @@ it('does not route markdown docs through structural analysis', async () => {
   const root = createTempRoot('qa-preflight-docs-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"qa-preflight-docs-temp"}\n');
-  writeFile(root, 'AGENTS.md', `${'long documentation line '.repeat(20)}\n`);
-  runGit(root, 'add', 'package.json', 'AGENTS.md');
+  writeFile(root, 'docs/agent-tooling/AGENTS.md', `${'long documentation line '.repeat(20)}\n`);
+  runGit(root, 'add', 'package.json', 'docs/agent-tooling/AGENTS.md');
   runGit(root, 'commit', '-m', 'init');
 
   const result = await withCwd(root, async () => {
@@ -405,7 +405,7 @@ it('does not route markdown docs through structural analysis', async () => {
       import.meta.url
     );
     return module.collectPreflightReport({
-      files: ['AGENTS.md'],
+      files: ['docs/agent-tooling/AGENTS.md'],
     });
   });
 

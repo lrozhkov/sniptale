@@ -39,6 +39,10 @@ Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**,
 
 This build can run natively on Windows. Linux, or WSL with the repository and `node_modules` stored inside the WSL Linux filesystem rather than under `/mnt/c`, is required only for the repository's supported full development and QA workflow. See [WSL setup](docs/tooling/wsl-setup.md), the [Release guide](docs/oss/release.md), and the [Operator handbook](docs/tooling/operator-handbook.md) for those workflows and all other commands.
 
+### Optional agent tooling
+
+Repository-local agent instructions and review skills are opt-in. Install ignored local copies of `AGENTS.md` and `.agents/**` with `npm run agents:install`; this command is never run by dependency installation, hooks, CI, or QA. The reviewable source, removal command, conflict behavior, and optional ZIP packaging command are documented in [Optional agent tooling](docs/agent-tooling/README.md).
+
 ## Why this project exists
 
 Sniptale began as my first pet project for testing a practical question: **can a person who is not a software developer build and continue maintaining a complex application through coding agents?**
@@ -267,7 +271,7 @@ Repository-local commands remain the QA authority. GitHub Actions applies the sa
 
 These guardrails reduce risk; they do not prove correctness. A green pipeline is not a substitute for real-user testing, browser and operating-system compatibility work, production observability, performance profiling, malicious-page testing, fuzzing, or an independent professional security assessment.
 
-The operating model is documented in [AGENTS.md](AGENTS.md), [Implementation rules](docs/engineering/implementation-rules.md), [Code quality](docs/tooling/code-quality.md), and the [Operator handbook](docs/tooling/operator-handbook.md).
+The operating model is documented in the [optional agent workflow](docs/agent-tooling/AGENTS.md), [Implementation rules](docs/engineering/implementation-rules.md), [Code quality](docs/tooling/code-quality.md), and the [Operator handbook](docs/tooling/operator-handbook.md).
 
 ## Known gaps and next priorities
 
@@ -294,7 +298,7 @@ Until those decisions are made, the alpha should be evaluated as a transparent e
 - `packages/platform` — browser, storage, transport, observability, media, and security adapters.
 - `packages/ui` — reusable presentation primitives.
 - `tooling` — quality gates, inventories, security checks, test runners, release tooling, and audit evidence.
-- `.agents/skills` — repository-specific review skills used by coding agents.
+- `docs/agent-tooling` — reviewable source for optional repository-local agent instructions and skills.
 - `docs` — active architecture, engineering, security, tooling, provenance, and release documentation.
 
 ## Documentation

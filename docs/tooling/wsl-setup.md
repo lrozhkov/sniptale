@@ -2,7 +2,7 @@
 
 Updated: 2026-07-25
 
-Canonical environment setup for Sniptale on WSL. Workflow and QA decisions remain in `AGENTS.md`; this document only establishes and repairs the Linux toolchain.
+Canonical environment setup for Sniptale on WSL. Workflow and QA decisions remain in the [optional agent workflow](../agent-tooling/AGENTS.md); this document only establishes and repairs the Linux toolchain.
 
 ## Target State
 
@@ -93,6 +93,8 @@ rm -rf node_modules
 npm ci
 ```
 
+Repository-local agent instructions and skills are separate from dependency installation. Install them explicitly with `npm run agents:install` only when wanted; see [Optional agent tooling](../agent-tooling/README.md).
+
 Confirm native packages include Linux artifacts:
 
 ```bash
@@ -111,7 +113,7 @@ npm run test:unit
 npm run build
 ```
 
-Use `npm run qa:preflight` for repository context. Use `qa:release-harness`, `qa:checkpoint`, required independent review, and `qa:closeout` only for a real implementation diff according to `AGENTS.md`.
+Use `npm run qa:preflight` for repository context. Use `qa:release-harness`, `qa:checkpoint`, required independent review, and `qa:closeout` only for a real implementation diff according to the [optional agent workflow](../agent-tooling/AGENTS.md).
 
 Check the resource ceiling seen by WSL with `nproc`, `lscpu`, and `free -h`. A `.wslconfig` entry such as `processors=12` and `memory=16GB` permits the VM to reach those values; it does not reserve them away from Windows. On a 6-core/12-thread i7-8700K, the QA scheduler therefore defaults to 8 CPU tokens rather than treating all 12 logical threads as independent physical cores. It also leaves roughly 3 GiB outside the 12 GiB QA memory budget so Windows/WSL services do not force normal verification into swap.
 

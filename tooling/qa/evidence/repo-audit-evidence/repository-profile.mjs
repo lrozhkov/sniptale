@@ -68,7 +68,7 @@ function getTopDirectories(trackedFiles, topCount) {
 }
 
 function readRepoLocalSkills(rootDir) {
-  const skillsDir = path.join(rootDir, '.agents', 'skills');
+  const skillsDir = path.join(rootDir, 'docs', 'agent-tooling', '.agents', 'skills');
   if (!fs.existsSync(skillsDir)) {
     return [];
   }
