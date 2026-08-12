@@ -89,7 +89,9 @@ export async function bootstrapPopupLifecycle({
     }
 
     applyBootstrapSuccess(getParams(), bootstrapState);
-    if (launchPage) {
+    if (bootstrapState.hasPostRecordResult) {
+      getParams().setPage('video');
+    } else if (launchPage) {
       stagePopupExportLaunchSelection({ includeAnnotations: true });
       getParams().setPage(launchPage);
     } else {

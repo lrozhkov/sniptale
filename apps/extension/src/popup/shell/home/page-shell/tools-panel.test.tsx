@@ -16,7 +16,7 @@ it('opens the toolbar directly or with each supported working mode selected', as
   await renderNode(<ScreenshotToolsPanel disabledReason={null} onOpen={onOpen} />);
 
   const buttons = [...(getContainer()?.querySelectorAll('button') ?? [])];
-  expect(buttons).toHaveLength(5);
+  expect(buttons).toHaveLength(6);
   buttons.forEach((button) => button.click());
 
   expect(onOpen.mock.calls).toEqual([
@@ -25,10 +25,13 @@ it('opens the toolbar directly or with each supported working mode selected', as
     ['highlighter'],
     ['quick-edit'],
     ['design-review'],
+    ['video-recording'],
   ]);
   expect(getContainer()?.textContent).toContain('popup.home.toolsOpenLabel');
   expect(getContainer()?.textContent).not.toContain('content.toolbar.designReviewEnable');
   expect(buttons[4]?.title).toBe('content.toolbar.designReviewEnable');
+  expect(buttons[4]?.querySelector('svg')?.getAttribute('class')).toContain('lucide-swatch-book');
+  expect(buttons[5]?.title).toBe('content.toolbar.videoRecordingEnable');
 });
 
 it('disables every tools action when page preparation is unavailable', async () => {

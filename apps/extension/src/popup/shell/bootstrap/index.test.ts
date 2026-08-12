@@ -81,6 +81,7 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
   });
   expect(result).toEqual({
     captureMode: CaptureMode.TAB,
+    hasPostRecordResult: false,
     homeError: null,
     microphones: [{ deviceId: 'mic-2', label: 'Hydrated Mic' }],
     quickActions: [

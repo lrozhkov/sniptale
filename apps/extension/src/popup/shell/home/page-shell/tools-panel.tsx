@@ -1,9 +1,10 @@
 import {
   MessageSquarePlus,
   Pencil,
-  ScanEye,
+  SwatchBook,
   TextCursorInput,
   Touchpad,
+  Video,
   type LucideIcon,
 } from 'lucide-react';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -46,10 +47,17 @@ const tools: ReadonlyArray<{
   },
   {
     mode: 'design-review',
-    icon: ScanEye,
+    icon: SwatchBook,
     labelKey: 'content.toolbar.designReviewLabel',
     hintKey: 'content.toolbar.designReviewEnable',
     dataUi: 'popup.home.tools.design-review',
+  },
+  {
+    mode: 'video-recording',
+    icon: Video,
+    labelKey: 'content.toolbar.videoRecordingLabel',
+    hintKey: 'content.toolbar.videoRecordingEnable',
+    dataUi: 'popup.home.tools.video-recording',
   },
 ];
 

@@ -19,8 +19,8 @@ it('keeps canonical content tab control types in the content boundary', () => {
   expect(hasBoundaryType(contentTabTypes, MessageType.EXPORT_POPUP_BUILD_PACKAGE)).toBe(true);
 });
 
-it('keeps runtime-only video sync messages out of the content tab boundary', () => {
-  expect(hasBoundaryType(contentTabTypes, VideoMessageType.RECORDING_STATE_SYNC)).toBe(false);
+it('routes recording state sync to the content tab boundary without exposing offscreen events', () => {
+  expect(hasBoundaryType(contentTabTypes, VideoMessageType.RECORDING_STATE_SYNC)).toBe(true);
   expect(hasBoundaryType(contentTabTypes, VideoMessageType.OFFSCREEN_ERROR)).toBe(false);
 });
 

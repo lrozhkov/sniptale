@@ -53,6 +53,7 @@ export function ToolbarShellContent(props: {
           dragging={derivedState.isDragging}
           dataUi="content.toolbar.root"
           data-display-mode={derivedState.displayMode}
+          data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
           data-menu-open={menuOpen ? 'true' : undefined}
           onMouseOverCapture={onHoverCapture}
         >

@@ -9,6 +9,9 @@ import type { ContentAppLayoutScenarioProps, ContentAppLayoutToolbarProps } from
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 import { createDrawingSession } from '../../../features/drawing/public';
 import { createContentDrawingController } from '../../drawing/controller';
+import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-session';
+import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
+import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 
 const {
   clearAllPagePreparationChangesMock,
@@ -42,6 +45,7 @@ vi.mock('./sidebar-lazy', () => ({
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({
+    error: vi.fn(),
     warn: vi.fn(),
   }),
 }));
@@ -140,6 +144,7 @@ function createToolbarProps(): ContentAppLayoutToolbarProps {
       handleEnableCursorMode: vi.fn(),
       handleHideToolbar: vi.fn(),
       handleToggleDesignReviewMode: vi.fn(),
+      handleToggleDrawingMode: vi.fn(),
       handleToggleHighlighterMode: vi.fn(),
       handleToggleNavigationLock: vi.fn(),
       handleToggleQuickEditDocumentMode: vi.fn(),
@@ -363,6 +368,69 @@ async function verifiesScenarioFinishUsesExplicitScreenshotExit() {
   expect(props.scenario.actions.openEditor).toHaveBeenCalledOnce();
 }
 
+async function verifiesVideoModeActivationKeepsToolbarVisible() {
+  const props = createProps();
+  let resolveActivation: (value: boolean) => void = () => undefined;
+  const activation = new Promise<boolean>((resolve) => {
+    resolveActivation = resolve;
+  });
+  const onActivate = vi.fn(() => activation);
+  const drawingOwner = createRecordingDrawingOwner();
+  const emptyAction = vi.fn();
+  props.toolbar.videoRecording = {
+    drawingOwner,
+    state: INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+    onActivate,
+    onCancelStart: emptyAction,
+    onCameraEnabledChange: emptyAction,
+    onCameraGeometryChange: emptyAction,
+    onCameraOffer: vi.fn(async () => 'answer'),
+    onCameraPeerClose: emptyAction,
+    onDeactivate: vi.fn(() => true),
+    onInteractionChange: emptyAction,
+    onMicrophoneEnabledChange: emptyAction,
+    onPause: emptyAction,
+    onResume: emptyAction,
+    onSpotlightEnabledChange: emptyAction,
+    onStart: emptyAction,
+    onStop: emptyAction,
+  } satisfies ToolbarVideoRecordingProps;
+  props.toolbar.setVideoRecordingMode = vi.fn();
+
+  await renderShell(props);
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onToggleVideoRecordingMode: (enabled: boolean, activationEvent?: Event) => Promise<boolean>;
+  };
+  const activationEvent = new Event('mousedown');
+
+  const activationResult = lastToolbarProps.onToggleVideoRecordingMode(true, activationEvent);
+  expect(onActivate).toHaveBeenCalledWith(activationEvent);
+  expect(props.toolbar.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(props.toolbar.modeController.handleToggleDrawingMode).not.toHaveBeenCalled();
+  expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+  expect(props.toolbar.setVideoRecordingMode).not.toHaveBeenCalled();
+
+  await act(async () => resolveActivation(true));
+  await expect(activationResult).resolves.toBe(true);
+  expect(props.toolbar.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(props.toolbar.modeController.handleToggleDrawingMode).toHaveBeenCalledWith(false);
+  expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
+  expect(props.toolbar.setVideoRecordingMode).toHaveBeenCalledWith(true);
+  expect(props.toolbar.setVideoRecordingMode).toHaveBeenCalledTimes(1);
+  drawingOwner.dispose();
+}
+
+async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
+  const props = createProps();
+  props.toolbar.isToolbarVisible = false;
+  props.toolbar.modes.videoRecordingMode = true;
+
+  await renderShell(props);
+
+  expect(container?.textContent).toBe('');
+  expect(toolbarMock).not.toHaveBeenCalled();
+}
+
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
 
@@ -401,5 +469,13 @@ describe('ContentToolbarShell', () => {
   it(
     'routes Navigation clear through the shared page-preparation reset owner',
     verifiesNavigationClearUsesSharedResetOwner
+  );
+  it(
+    'keeps the toolbar visible while switching transactionally into video recording mode',
+    verifiesVideoModeActivationKeepsToolbarVisible
+  );
+  it(
+    'leaves collapsed video mode to the canonical bottom-right show button surface',
+    verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface
   );
 });

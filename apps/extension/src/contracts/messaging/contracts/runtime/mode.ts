@@ -42,6 +42,7 @@ const toolbarWorkingModes = new Set([
   'highlighter',
   'quick-edit',
   'design-review',
+  'video-recording',
 ]);
 
 function isToolbarWorkingMode(value: unknown): boolean {

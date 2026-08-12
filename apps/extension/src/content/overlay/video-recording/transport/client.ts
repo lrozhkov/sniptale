@@ -1,19 +1,23 @@
-import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
-  isVideoRecordingSurfaceSnapshotMessage,
   isActivateVideoRecordingSurfaceMessage,
   isStartSavedTabVideoRecordingMessage,
   type VideoRecordingSurfaceCommand,
-  type VideoRecordingSurfaceSnapshot,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   attachContentActionIntent,
   createTrustedContentActionIntentSource,
 } from '../../../application/privileged-action-intent';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
-import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
-import { isVideoRecordingRuntimeState } from '../../../../contracts/messaging/validators';
+import {
+  clearVideoRecordingSurfaceSnapshot,
+  subscribeToVideoRecordingRuntimeState,
+} from './snapshot-channel';
+
+export {
+  receiveVideoRecordingSurfaceSnapshot,
+  subscribeToVideoRecordingSurfaceSnapshots,
+} from './snapshot-channel';
 
 export type SurfaceIdentity = {
   capabilityEpoch: number;
@@ -80,6 +84,7 @@ export async function releaseVideoRecordingSurface(identity: SurfaceIdentity): P
     surfaceToken: identity.surfaceToken,
   });
   if (!response?.success) throw new Error(response?.error ?? 'Recording surface release failed');
+  clearVideoRecordingSurfaceSnapshot();
 }
 
 export async function sendVideoRecordingSurfaceCommand(
@@ -99,33 +104,4 @@ export async function sendVideoRecordingSurfaceCommand(
   return response;
 }
 
-export function subscribeToVideoRecordingSurfaceSnapshots(
-  listener: (snapshot: VideoRecordingSurfaceSnapshot, surfaceToken?: string) => void
-): () => void {
-  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return () => undefined;
-  return browserRuntime.subscribeToMessages((message: unknown) => {
-    if (!isVideoRecordingSurfaceSnapshotMessage(message)) return undefined;
-    listener(message.snapshot, message.surfaceToken);
-    return undefined;
-  });
-}
-
-export function subscribeToVideoRecordingRuntimeState(
-  listener: (state: VideoRecordingRuntimeState) => void
-): () => void {
-  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return () => undefined;
-  return browserRuntime.subscribeToMessages((message: unknown) => {
-    if (
-      typeof message !== 'object' ||
-      message === null ||
-      !('type' in message) ||
-      !('state' in message) ||
-      message.type !== VideoMessageType.RECORDING_STATE_SYNC ||
-      !isVideoRecordingRuntimeState(message.state)
-    ) {
-      return undefined;
-    }
-    listener(message.state);
-    return undefined;
-  });
-}
+export { subscribeToVideoRecordingRuntimeState };

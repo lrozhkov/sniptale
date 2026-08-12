@@ -138,12 +138,14 @@ function createViewModel(params: {
     },
     designReviewMode: params.designReviewMode ?? false,
     derivedState: {
+      compactMenus: false,
       currentViewport: null,
       displayMode: 'vertical' as const,
       isLoading: false,
       lockDisabled: false,
       navigationLockEnabled: false,
       setDisplayMode: vi.fn(),
+      setCompactMenus: vi.fn(),
       toggleNavigationLock: vi.fn(),
     },
     ...(params.highlighterMode === undefined
@@ -155,6 +157,19 @@ function createViewModel(params: {
     quickEditMode: false,
     quickEditDocumentMode: false,
     screenshotMode: true,
+    toolbarMenuState: {
+      activeMenuType: null,
+      closeMenu: vi.fn(),
+      closeMenus: vi.fn(),
+      setActiveMenuType: vi.fn(),
+      setShowCaptureMenu: vi.fn(),
+      setShowTimerMenu: vi.fn(),
+      setViewportMenuOpen: vi.fn(),
+      showCaptureMenu: false,
+      showTimerMenu: false,
+      toggleMenu: vi.fn(),
+      viewportMenuOpen: false,
+    },
     toggleMode: vi.fn(),
   };
 }
@@ -296,6 +311,46 @@ async function verifiesDesignReviewControls() {
 }
 
 describe('ToolbarSecondaryControls', () => {
+  it('restores ordinary capture controls whenever another working mode conflicts with stale video state', async () => {
+    const { shouldProjectVideoRecordingControls } = await import('./secondary');
+    const recording = { state: { phase: 'idle' } };
+    const baseViewModel = {
+      designReviewMode: false,
+      highlighterMode: false,
+      quickEditMode: false,
+    };
+    expect(
+      shouldProjectVideoRecordingControls(
+        {
+          videoRecordingMode: true,
+          videoRecording: recording,
+          drawingMode: false,
+          aiPickMode: false,
+        },
+        baseViewModel
+      )
+    ).toBe(true);
+    for (const conflict of [
+      { drawingMode: true },
+      { aiPickMode: true },
+      { viewModel: { designReviewMode: true } },
+      { viewModel: { highlighterMode: true } },
+      { viewModel: { quickEditMode: true } },
+    ]) {
+      expect(
+        shouldProjectVideoRecordingControls(
+          {
+            videoRecordingMode: true,
+            videoRecording: recording,
+            drawingMode: false,
+            aiPickMode: false,
+            ...conflict,
+          },
+          { ...baseViewModel, ...conflict.viewModel }
+        )
+      ).toBe(false);
+    }
+  });
   it(
     'passes scenario props to capture actions only when after-capture action is scenario',
     verifiesScenarioCaptureForwarding

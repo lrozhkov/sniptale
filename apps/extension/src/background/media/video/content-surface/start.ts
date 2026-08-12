@@ -9,13 +9,41 @@ import { ensureActivePageAccessRuntime } from '../../../runtime/page-access/serv
 import { resolveContextMenuVideoPreset } from '../../../runtime/context-menu/action-helpers';
 import { startRecording } from '../manager';
 import { createVideoRecordingSurfaceSnapshot } from './snapshot';
-import { requestVideoRecordingSurface, updateVideoRecordingSurface } from './surface-lease';
+import {
+  ensureVideoRecordingSurfaceLeaseHydrated,
+  requestVideoRecordingSurface,
+  updateVideoRecordingSurface,
+} from './surface-lease';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
+import { browserAction } from '@sniptale/platform/browser/action';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const PREVIOUS_RECORDING_ERROR = 'Resolve the previous recording before starting another.';
+const logger = createLogger({ namespace: 'VideoRecordingContentSurfaceStart' });
+
+async function openPreviousRecordingResolution(tabId: number): Promise<void> {
+  try {
+    const tab = await browserTabs.get(tabId);
+    if (tab.active === true && typeof tab.windowId === 'number') {
+      await browserAction.openPopup({ windowId: tab.windowId });
+    }
+  } catch (error) {
+    logger.warn('Failed to open previous recording resolution popup', error);
+  }
+}
 
 export async function activateVideoRecordingSurface(tabId: number) {
   const settings = await loadVideoSettings();
-  const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId });
+  const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  const lease =
+    existingLease?.tabId === tabId
+      ? existingLease
+      : await requestVideoRecordingSurface({ entry: 'manual', tabId });
   const readyLease = (await updateVideoRecordingSurface(lease.surfaceSessionId, {
     lifecycle: 'ready',
+    toolbarRequested: true,
   }))!;
   return {
     success: true,
@@ -25,12 +53,33 @@ export async function activateVideoRecordingSurface(tabId: number) {
   };
 }
 
+export async function openVideoRecordingSurfaceFromPopup(tabId: number): Promise<void> {
+  const settings = await loadVideoSettings();
+  const lease = await requestVideoRecordingSurface({
+    entry: 'popup',
+    tabId,
+    toolbarRequested: true,
+  });
+  const readyLease = (await updateVideoRecordingSurface(lease.surfaceSessionId, {
+    lifecycle: 'ready',
+  }))!;
+  await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+    snapshot: createVideoRecordingSurfaceSnapshot(readyLease, settings),
+    surfaceToken: readyLease.surfaceToken,
+  });
+}
+
 export async function startSavedTabVideoRecording(
   tabId: number,
   ownerSenderUrl: string | undefined
 ) {
   if (!ownerSenderUrl) throw new Error('Unauthorized recording surface sender');
-  const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId });
+  const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  const lease =
+    existingLease?.tabId === tabId
+      ? existingLease
+      : await requestVideoRecordingSurface({ entry: 'manual', tabId });
   await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
   await ensureMediaHubStorageHeadroom();
   const [settings, appSettings, uiState] = await Promise.all([
@@ -49,7 +98,12 @@ export async function startSavedTabVideoRecording(
     viewportPresetId,
     ownerSenderUrl
   );
-  if (result.result === 'failed') throw new Error(result.error);
+  if (result.result === 'failed') {
+    if (result.error === PREVIOUS_RECORDING_ERROR) {
+      await openPreviousRecordingResolution(tabId);
+    }
+    throw new Error(result.error);
+  }
   const recordingId = result.result === 'accepted' ? result.recordingId : null;
   const next = (await updateVideoRecordingSurface(lease.surfaceSessionId, {
     lifecycle: result.result === 'accepted' ? 'ready' : 'degraded',
@@ -57,7 +111,6 @@ export async function startSavedTabVideoRecording(
   }))!;
   return {
     success: result.result === 'accepted',
-    result: result.result,
     snapshot: createVideoRecordingSurfaceSnapshot(next, settings),
     surfaceSessionId: next.surfaceSessionId,
     surfaceToken: next.surfaceToken,

@@ -5,6 +5,7 @@ import {
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ContentPrivilegedActionType } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   resetContentPrivilegedActionCapabilitiesForTests,
   routeContentPrivilegedActionActivationKeyRequest,
@@ -136,6 +137,20 @@ it.each([MessageType.DOWNLOAD_BROWSER_ANNOTATIONS, MessageType.OPEN_EXPORT_MODAL
     });
   }
 );
+
+it.each([
+  VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
+  VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+])('consumes trusted-event activation for video surface action %s', (actionType) => {
+  const sender = contentSender();
+  const activationKey = readActivationKey(requestActivationKey(sender));
+
+  expect(requestRuntimeToken(sender, activationKey, actionType).mock.calls[0]?.[0]).toEqual({
+    runtimeToken: { runtimeToken: 'content-token-1' },
+    success: true,
+  });
+  expect(requestActivationKey(sender).mock.calls[0]?.[0]).toMatchObject({ success: true });
+});
 
 it('rejects forged activation proofs', () => {
   const sender = contentSender();

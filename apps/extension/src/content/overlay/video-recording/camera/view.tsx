@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Video } from 'lucide-react';
 import {
   constrainEmbeddedCameraGeometry,
@@ -7,6 +13,7 @@ import {
   type EmbeddedCameraGeometry,
 } from './geometry';
 import { useEmbeddedCameraPeer } from './peer';
+import { translate } from '../../../../platform/i18n';
 
 const DRAG_THRESHOLD = 4;
 
@@ -22,9 +29,10 @@ type CameraDrag = {
 function useEmbeddedCameraGeometry(
   configuredGeometry: EmbeddedCameraGeometry | undefined,
   interactive: boolean,
-  onGeometryChange: ((geometry: EmbeddedCameraGeometry) => void) | undefined
+  onGeometryChange: ((geometry: EmbeddedCameraGeometry) => Promise<void> | void) | undefined
 ) {
   const [geometry, setGeometry] = useState(configuredGeometry ?? DEFAULT_EMBEDDED_CAMERA_GEOMETRY);
+  const [dragging, setDragging] = useState(false);
   const geometryRef = useRef(geometry);
   const dragRef = useRef<CameraDrag | null>(null);
   useEffect(() => {
@@ -42,8 +50,11 @@ function useEmbeddedCameraGeometry(
     setGeometry(constrained);
   };
   const finish = () => {
+    const drag = dragRef.current;
     dragRef.current = null;
-    onGeometryChange?.(geometryRef.current);
+    setDragging(false);
+    if (!drag || !onGeometryChange) return;
+    void Promise.resolve(onGeometryChange(geometryRef.current)).catch(() => update(drag.origin));
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -75,6 +86,7 @@ function useEmbeddedCameraGeometry(
       );
       return;
     }
+    setDragging(true);
     update({
       ...drag.origin,
       center: {
@@ -83,11 +95,12 @@ function useEmbeddedCameraGeometry(
       },
     });
   };
-  return { finish, geometry, onPointerDown, onPointerMove };
+  return { dragging, finish, geometry, onPointerDown, onPointerMove };
 }
 
 function CameraMedia(props: {
   cropOffset: EmbeddedCameraGeometry['cropOffset'];
+  error: boolean;
   stream: MediaStream | null;
   width: number;
 }) {
@@ -95,6 +108,17 @@ function CameraMedia(props: {
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = props.stream;
   }, [props.stream]);
+  if (props.error) {
+    return (
+      <div
+        role="alert"
+        className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center text-xs text-white/80"
+      >
+        <Video size={Math.max(18, props.width * 0.18)} />
+        <span>{translate('content.toolbar.videoRecordingCameraPreviewUnavailable')}</span>
+      </div>
+    );
+  }
   if (!props.stream) {
     return (
       <div className="flex h-full w-full items-center justify-center text-white/70">
@@ -120,7 +144,9 @@ function CameraMedia(props: {
 
 function CameraResizeHandles() {
   return (['nw', 'ne', 'se', 'sw'] as const).map((corner) => (
-    <span
+    <button
+      type="button"
+      aria-label={translate('content.toolbar.videoRecordingCamera')}
       key={corner}
       data-resize="true"
       data-corner={corner}
@@ -130,6 +156,8 @@ function CameraResizeHandles() {
         height: 12,
         background: 'white',
         borderRadius: 6,
+        border: 0,
+        cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
         transition: 'opacity 120ms ease',
         ...(corner.includes('n') ? { top: 4 } : { bottom: 4 }),
         ...(corner.includes('w') ? { left: 4 } : { right: 4 }),
@@ -143,19 +171,38 @@ export function EmbeddedRecordingCamera(props: {
   enabled: boolean;
   geometry?: EmbeddedCameraGeometry;
   interactive: boolean;
-  onGeometryChange?: (geometry: EmbeddedCameraGeometry) => void;
+  peerGeneration?: number;
+  onGeometryChange?: (geometry: EmbeddedCameraGeometry) => Promise<void> | void;
   onOffer?: (sdp: string) => Promise<string>;
   onPeerClose?: () => Promise<void> | void;
 }) {
   const { enabled, geometry: configuredGeometry, onOffer, onPeerClose } = props;
+  const [peerError, setPeerError] = useState(false);
+  const [, setViewportRevision] = useState(0);
+  useEffect(() => {
+    const updateViewport = () => setViewportRevision((revision) => revision + 1);
+    window.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('resize', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.visualViewport?.removeEventListener('resize', updateViewport);
+    };
+  }, []);
+  useEffect(() => setPeerError(false), [enabled, onOffer]);
   const interaction = useEmbeddedCameraGeometry(
     configuredGeometry,
     props.interactive,
     props.onGeometryChange
   );
-  const { geometry } = interaction;
+  const geometry = constrainEmbeddedCameraGeometry(interaction.geometry, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  const handlePeerError = useCallback(() => setPeerError(true), []);
   const stream = useEmbeddedCameraPeer({
     enabled,
+    onError: handlePeerError,
+    ...(props.peerGeneration === undefined ? {} : { peerGeneration: props.peerGeneration }),
     ...(onOffer ? { onOffer } : {}),
     ...(onPeerClose ? { onPeerClose } : {}),
   });
@@ -179,7 +226,7 @@ export function EmbeddedRecordingCamera(props: {
         borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
         overflow: 'hidden',
         pointerEvents: props.interactive ? 'auto' : 'none',
-        cursor: props.interactive ? 'grab' : 'default',
+        cursor: props.interactive ? (interaction.dragging ? 'grabbing' : 'grab') : 'default',
         background: 'var(--sniptale-color-surface-elevated, #18181b)',
         border: '2px solid color-mix(in srgb, white 75%, transparent)',
         boxShadow: '0 8px 28px rgba(0,0,0,.3)',
@@ -190,7 +237,12 @@ export function EmbeddedRecordingCamera(props: {
       onPointerUp={interaction.finish}
       onPointerCancel={interaction.finish}
     >
-      <CameraMedia cropOffset={geometry.cropOffset} stream={stream} width={width} />
+      <CameraMedia
+        cropOffset={geometry.cropOffset}
+        error={peerError}
+        stream={stream}
+        width={width}
+      />
       <CameraResizeHandles />
     </div>
   );

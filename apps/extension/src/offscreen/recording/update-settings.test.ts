@@ -93,6 +93,24 @@ it('toggles the single-source microphone through the audio mixer when present', 
   expect(setMicrophoneEnabled).toHaveBeenCalledWith(false);
 });
 
+it('acquires and connects a microphone enabled after recording start', async () => {
+  const mixer = new AudioMixer();
+  vi.spyOn(mixer, 'hasMicrophone').mockReturnValue(false);
+  const addMicrophone = vi.spyOn(mixer, 'addMicrophone').mockResolvedValue(undefined);
+  recordingContext.audioMixer = mixer;
+
+  await updateRecordingSettings({
+    microphoneDeviceId: 'mic-live',
+    microphoneEnabled: true,
+    echoCancellation: false,
+  });
+
+  expect(addMicrophone).toHaveBeenCalledWith({
+    echoCancellation: false,
+    microphoneDeviceId: 'mic-live',
+  });
+});
+
 it('falls back to audio tracks on the single-source recording stream', () => {
   const stream = createAudioStream();
   const [firstTrack] = stream.getAudioTracks();

@@ -2,6 +2,7 @@
 import type { VideoRecordingSurfaceCommandMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   loadVideoSettings,
+  mutateVideoSettings,
   patchVideoSettings,
 } from '../../../../composition/persistence/capture-settings';
 import {
@@ -18,6 +19,12 @@ import {
   validateVideoRecordingSurfaceCapability,
 } from './surface-lease';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  closeVideoRecordingCameraPeerForLease,
+  listVideoRecordingMediaDevices,
+  switchVideoRecordingCameraPeerInput,
+} from './camera-peer';
+import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
   'set-microphone-enabled',
@@ -25,9 +32,20 @@ const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['comm
   'select-microphone-device',
   'select-webcam-device',
   'update-embedded-camera',
+  'set-toolbar-requested',
+  'set-auto-fade-delay',
+  'set-spotlight-settings',
+  'list-media-devices',
 ]);
 
-export async function runVideoRecordingSurfaceCommand(
+const SERIALIZED_MEDIA_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'set-microphone-enabled',
+  'set-webcam-enabled',
+  'select-microphone-device',
+  'select-webcam-device',
+]);
+
+async function requireAuthorizedSurfaceCommand(
   tabId: number,
   message: VideoRecordingSurfaceCommandMessage
 ) {
@@ -45,21 +63,74 @@ export async function runVideoRecordingSurfaceCommand(
   ) {
     throw new Error('Unauthorized or stale video recording surface command');
   }
-  if (message.recordingId === null && !IDLE_SETTINGS_COMMANDS.has(message.command.kind)) {
+  return lease;
+}
+
+export async function runVideoRecordingSurfaceCommand(
+  tabId: number,
+  message: VideoRecordingSurfaceCommandMessage
+) {
+  const lease = await requireAuthorizedSurfaceCommand(tabId, message);
+  if (
+    message.recordingId === null &&
+    message.command.kind !== 'cancel-start' &&
+    !IDLE_SETTINGS_COMMANDS.has(message.command.kind)
+  ) {
     throw new Error('Recording lifecycle commands require an active recording');
   }
 
-  const result = await applySurfaceCommand(message);
-  const settings = await loadVideoSettings();
-  return {
-    success: true,
-    result,
-    snapshot: createVideoRecordingSurfaceSnapshot(lease, settings),
+  const execute = async (authorizedLease: typeof lease) => {
+    const result = await applySurfaceCommand(tabId, message);
+    const [settings, currentLease] = await Promise.all([
+      loadVideoSettings(),
+      ensureVideoRecordingSurfaceLeaseHydrated(),
+    ]);
+    return {
+      success: true,
+      result,
+      snapshot: createVideoRecordingSurfaceSnapshot(currentLease ?? authorizedLease, settings),
+    };
   };
+
+  if (SERIALIZED_MEDIA_COMMANDS.has(message.command.kind)) {
+    return runSerializedVideoRecordingMediaMutation(message.surfaceSessionId, async () => {
+      const currentLease = await requireAuthorizedSurfaceCommand(tabId, message);
+      return execute(currentLease);
+    });
+  }
+
+  return execute(lease);
 }
 
-async function applySurfaceCommand(message: VideoRecordingSurfaceCommandMessage): Promise<unknown> {
+async function applySurfaceCommand(
+  tabId: number,
+  message: VideoRecordingSurfaceCommandMessage
+): Promise<unknown> {
   switch (message.command.kind) {
+    case 'list-media-devices':
+      return { mediaDevices: await listVideoRecordingMediaDevices(message.command.deviceKind) };
+    case 'set-toolbar-requested':
+      await updateVideoRecordingSurface(message.surfaceSessionId, {
+        toolbarRequested: message.command.enabled,
+      });
+      return { result: 'updated' };
+    case 'set-auto-fade-delay':
+      await patchVideoSettings({ autoFadeDelay: message.command.delay });
+      return { result: 'updated' };
+    case 'set-spotlight-settings': {
+      const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled } = message.command;
+      await mutateVideoSettings((current) => ({
+        ...current,
+        recordingSurface: {
+          ...current.recordingSurface,
+          toolbarEnabled: current.recordingSurface?.toolbarEnabled ?? false,
+          cursorSpotlightEnabled: cursorHaloEnabled,
+          cursorDimmingEnabled,
+          cursorClickAnimationEnabled: clickAnimationEnabled,
+        },
+      }));
+      return { result: 'updated' };
+    }
     case 'cancel-start':
       return requireAcceptedResult(await cancelRecordingStart(), [
         'accepted',
@@ -75,14 +146,18 @@ async function applySurfaceCommand(message: VideoRecordingSurfaceCommandMessage)
       return applyLiveSettingsWithDurableCommit(
         message,
         { microphoneEnabled: message.command.enabled },
-        (settings) => ({ microphoneEnabled: settings.microphoneEnabled })
+        buildMicrophoneLivePatch
       );
     case 'set-webcam-enabled':
-      return applyLiveSettingsWithDurableCommit(
+      await applyLiveSettingsWithDurableCommit(
         message,
         { webcamEnabled: message.command.enabled },
         (settings) => ({ webcamEnabled: settings.webcamEnabled === true })
       );
+      if (message.command.enabled) {
+        await advanceCameraPreviewPeer(message.surfaceSessionId);
+      }
+      return { result: 'accepted' };
     case 'select-microphone-device':
       return applyLiveSettingsWithDurableCommit(
         message,
@@ -90,17 +165,64 @@ async function applySurfaceCommand(message: VideoRecordingSurfaceCommandMessage)
         buildMicrophoneLivePatch
       );
     case 'select-webcam-device':
-      return applyLiveSettingsWithDurableCommit(
+      if (!message.recordingId) {
+        return switchIdleCameraWithDurableCommit(tabId, message, message.command.deviceId);
+      }
+      await applyLiveSettingsWithDurableCommit(
         message,
         { webcamDeviceId: message.command.deviceId },
         (settings) => ({ webcamDeviceId: settings.webcamDeviceId ?? null })
       );
+      return { result: 'accepted' };
     case 'update-embedded-camera': {
       const webcamPresentation = { mode: 'embedded' as const, ...message.command.appearance };
       await patchVideoSettings({ webcamPresentation });
       return { result: 'updated' };
     }
   }
+}
+
+async function switchIdleCameraWithDurableCommit(
+  tabId: number,
+  message: VideoRecordingSurfaceCommandMessage,
+  deviceId: string | null
+) {
+  const previous = await loadVideoSettings();
+  const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  if (!lease || lease.surfaceSessionId !== message.surfaceSessionId) {
+    throw new Error('Camera preview surface is unavailable');
+  }
+  await switchVideoRecordingCameraPeerInput(lease, deviceId);
+  try {
+    await requireAuthorizedSurfaceCommand(tabId, message);
+    await patchVideoSettings({ webcamDeviceId: deviceId });
+  } catch (error) {
+    try {
+      await switchVideoRecordingCameraPeerInput(lease, previous.webcamDeviceId ?? null);
+    } catch (rollbackError) {
+      await updateVideoRecordingSurface(message.surfaceSessionId, { lifecycle: 'degraded' });
+      throw new AggregateError(
+        [error, rollbackError],
+        `Durable camera selection failed: ${
+          error instanceof Error ? error.message : String(error)
+        }; preview rollback failed: ${
+          rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+        }`,
+        { cause: rollbackError }
+      );
+    }
+    throw error;
+  }
+  return { result: 'accepted' };
+}
+
+async function advanceCameraPreviewPeer(surfaceSessionId: string): Promise<void> {
+  const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  if (lease?.surfaceSessionId !== surfaceSessionId) return;
+  await closeVideoRecordingCameraPeerForLease(lease).catch(() => undefined);
+  await updateVideoRecordingSurface(surfaceSessionId, {
+    peerGeneration: lease.peerGeneration + 1,
+  });
 }
 
 function requireAcceptedResult<T extends { error?: string; result: string }>(
@@ -120,6 +242,7 @@ function buildMicrophoneLivePatch(settings: VideoRecordingSettings) {
       ? {}
       : { echoCancellation: settings.echoCancellation }),
     microphoneDeviceId: settings.microphoneDeviceId,
+    microphoneEnabled: settings.microphoneEnabled,
     ...(settings.microphoneGain === undefined ? {} : { microphoneGain: settings.microphoneGain }),
     ...(settings.noiseSuppression === undefined
       ? {}

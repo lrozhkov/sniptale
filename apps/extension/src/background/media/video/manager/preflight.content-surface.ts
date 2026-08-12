@@ -78,6 +78,7 @@ async function bindContentSurfaceIfRequested(
     ? ((await updateVideoRecordingSurface(existingLease.surfaceSessionId, {
         lifecycle: 'ready',
         recordingId: recordingId ?? existingLease.recordingId,
+        toolbarRequested: existingLease.toolbarRequested || toolbarRequested,
       })) ?? existingLease)
     : await requestVideoRecordingSurface({
         entry: 'popup',

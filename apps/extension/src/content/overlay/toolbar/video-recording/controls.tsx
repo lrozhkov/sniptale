@@ -1,12 +1,11 @@
 import {
-  CircleStop,
+  Circle,
   LoaderCircle,
   Mic,
   MicOff,
   Pause,
-  Pin,
   Play,
-  ScanEye,
+  Square,
   Video,
   VideoOff,
   X,
@@ -19,9 +18,13 @@ import {
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarVideoRecordingProps } from '../types';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RecordingDrawingControls, type RecordingDrawingInteractionMode } from './drawing-controls';
 import { RecordingMediaSplitControl } from './media-menu';
+import { RecordingSpotlightMenu } from './spotlight-menu';
+import { ToolbarSettingsMenu } from '../capture/settings';
+import type { ToolbarMenuState } from '../state/menu';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 
 function formatDuration(durationSeconds: number): string {
   const seconds = Math.max(0, Math.floor(durationSeconds));
@@ -34,29 +37,58 @@ function formatDuration(durationSeconds: number): string {
 }
 
 function RecordingStatus(props: { state: ToolbarVideoRecordingProps['state'] }) {
-  if (props.state.phase === 'idle') return null;
+  const showDuration =
+    props.state.phase === 'recording' ||
+    props.state.phase === 'paused' ||
+    props.state.phase === 'stopping';
+  if (!showDuration && !props.state.error) return null;
   return (
     <div
-      className="sniptale-timer-badge"
-      data-ui="content.toolbar.video-recording.status"
       aria-live="polite"
+      className="sniptale-video-recording-status"
+      data-ui="content.toolbar.video-recording.status"
     >
-      <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--sniptale-color-danger)]" />
-      {formatDuration(props.state.durationSeconds)}
+      {showDuration ? (
+        <span className="sniptale-video-recording-duration">
+          {formatDuration(props.state.durationSeconds)}
+        </span>
+      ) : null}
     </div>
   );
+}
+
+function useRecordingErrorToast(error: string | null): void {
+  const shownErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!error) {
+      shownErrorRef.current = null;
+      return;
+    }
+    if (shownErrorRef.current === error) return;
+    shownErrorRef.current = error;
+    showToast(error, 'error');
+  }, [error]);
+}
+
+function runToolbarAction(action: () => Promise<void> | void): void {
+  void Promise.resolve(action()).catch(() => {
+    // The controller projects the failure into the toolbar state.
+  });
 }
 
 function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProps }) {
   const { state } = props.recording;
   if (state.phase === 'starting') {
     return (
-      <ContentToolbarButton
-        title={translate('content.toolbar.videoRecordingCancelStart')}
-        onClick={() => void props.recording.onCancelStart()}
-      >
-        <X size={18} />
-      </ContentToolbarButton>
+      <>
+        <ContentToolbarButton
+          dataUi="content.toolbar.video-recording.cancel-start"
+          title={translate('content.toolbar.videoRecordingCancelStart')}
+          onClick={() => runToolbarAction(props.recording.onCancelStart)}
+        >
+          <X size={18} />
+        </ContentToolbarButton>
+      </>
     );
   }
   if (state.phase === 'recording' || state.phase === 'paused') {
@@ -64,45 +96,84 @@ function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProp
     return (
       <>
         <ContentToolbarButton
+          dataUi={
+            paused
+              ? 'content.toolbar.video-recording.resume'
+              : 'content.toolbar.video-recording.pause'
+          }
           active={paused}
           title={translate(
             paused ? 'content.toolbar.videoRecordingResume' : 'content.toolbar.videoRecordingPause'
           )}
-          onClick={() => void (paused ? props.recording.onResume() : props.recording.onPause())}
+          onClick={() =>
+            runToolbarAction(paused ? props.recording.onResume : props.recording.onPause)
+          }
         >
-          {paused ? <Play size={18} /> : <Pause size={18} />}
+          {paused ? (
+            <Play style={{ height: 16, width: 16 }} strokeWidth={2.25} />
+          ) : (
+            <Pause style={{ height: 16, width: 16 }} strokeWidth={2.25} />
+          )}
         </ContentToolbarButton>
         <ContentToolbarButton
+          dataUi="content.toolbar.video-recording.stop"
           tone="danger"
           title={translate('content.toolbar.videoRecordingStop')}
-          onClick={() => void props.recording.onStop()}
+          onClick={() => runToolbarAction(props.recording.onStop)}
         >
-          <CircleStop size={18} />
+          <Square style={{ height: 13, width: 13 }} fill="currentColor" strokeWidth={2} />
         </ContentToolbarButton>
       </>
     );
   }
   if (state.phase === 'stopping') {
     return (
-      <ContentToolbarButton disabled title={translate('content.toolbar.videoRecordingStopping')}>
-        <LoaderCircle size={18} className="animate-spin" />
-      </ContentToolbarButton>
+      <>
+        <ContentToolbarButton
+          disabled
+          dataUi="content.toolbar.video-recording.stopping"
+          title={translate('content.toolbar.videoRecordingStopping')}
+        >
+          <LoaderCircle size={18} className="animate-spin" />
+        </ContentToolbarButton>
+      </>
     );
   }
   return (
-    <ContentToolbarButton
-      tone="danger"
-      title={translate('content.toolbar.videoRecordingStart')}
-      onClick={(event) => void props.recording.onStart(event.nativeEvent)}
-    >
-      <Video size={18} />
-    </ContentToolbarButton>
+    <>
+      <ContentToolbarButton
+        dataUi="content.toolbar.video-recording.start"
+        tone="danger"
+        title={translate('content.toolbar.videoRecordingStartHint')}
+        onClick={(event) => void props.recording.onStart(event.nativeEvent)}
+      >
+        <Circle
+          style={{ height: 13, width: 13 }}
+          fill="currentColor"
+          strokeWidth={2}
+          className="text-[var(--sniptale-color-danger)]"
+        />
+      </ContentToolbarButton>
+    </>
   );
 }
 
-function MediaControls(props: { recording: ToolbarVideoRecordingProps }) {
+function MediaControls(props: {
+  displayMode: ContentToolbarDisplayMode;
+  recording: ToolbarVideoRecordingProps;
+  toolbarMenuState: ToolbarMenuState;
+}) {
+  const { onLoadMediaDevices } = props.recording;
   const busy =
     props.recording.state.phase === 'starting' || props.recording.state.phase === 'stopping';
+  const loadMicrophones = useCallback(
+    () => onLoadMediaDevices?.('audioinput') ?? Promise.resolve([]),
+    [onLoadMediaDevices]
+  );
+  const loadCameras = useCallback(
+    () => onLoadMediaDevices?.('videoinput') ?? Promise.resolve([]),
+    [onLoadMediaDevices]
+  );
   return (
     <ContentToolbarGroup aria-label={translate('content.toolbar.videoRecordingMedia')}>
       <RecordingMediaSplitControl
@@ -111,15 +182,19 @@ function MediaControls(props: { recording: ToolbarVideoRecordingProps }) {
         disabled={busy}
         inactiveIcon={MicOff}
         kind="audioinput"
+        dataUi="content.toolbar.video-recording.microphone"
+        displayMode={props.displayMode}
         label={translate('content.toolbar.videoRecordingMicrophone')}
         selectedDeviceId={props.recording.state.microphoneDeviceId}
+        menuType="recording-microphone"
+        toolbarMenuState={props.toolbarMenuState}
+        {...(onLoadMediaDevices ? { onLoadDevices: loadMicrophones } : {})}
         onToggle={() =>
           props.recording.onMicrophoneEnabledChange(!props.recording.state.microphoneEnabled)
         }
         {...(props.recording.onMicrophoneDeviceChange
           ? {
-              onDeviceChange: (deviceId) =>
-                void props.recording.onMicrophoneDeviceChange?.(deviceId),
+              onDeviceChange: (deviceId) => props.recording.onMicrophoneDeviceChange?.(deviceId),
             }
           : {})}
       />
@@ -129,11 +204,16 @@ function MediaControls(props: { recording: ToolbarVideoRecordingProps }) {
         disabled={busy}
         inactiveIcon={VideoOff}
         kind="videoinput"
+        dataUi="content.toolbar.video-recording.camera"
+        displayMode={props.displayMode}
         label={translate('content.toolbar.videoRecordingCamera')}
         selectedDeviceId={props.recording.state.webcamDeviceId}
+        menuType="recording-camera"
+        toolbarMenuState={props.toolbarMenuState}
+        {...(onLoadMediaDevices ? { onLoadDevices: loadCameras } : {})}
         onToggle={() => props.recording.onCameraEnabledChange(!props.recording.state.cameraEnabled)}
         {...(props.recording.onCameraDeviceChange
-          ? { onDeviceChange: (deviceId) => void props.recording.onCameraDeviceChange?.(deviceId) }
+          ? { onDeviceChange: (deviceId) => props.recording.onCameraDeviceChange?.(deviceId) }
           : {})}
       />
     </ContentToolbarGroup>
@@ -143,8 +223,13 @@ function MediaControls(props: { recording: ToolbarVideoRecordingProps }) {
 export function ToolbarVideoRecordingControls(props: {
   compactMenus?: boolean;
   displayMode: ContentToolbarDisplayMode;
+  onCollapse(): void;
+  onCompactMenusChange(compact: boolean): void;
+  onDisplayModeChange(displayMode: ContentToolbarDisplayMode): void;
   recording: ToolbarVideoRecordingProps;
+  toolbarMenuState: ToolbarMenuState;
 }) {
+  useRecordingErrorToast(props.recording.state.error);
   const navigation = props.recording.state.interaction === 'navigation';
   const busy =
     props.recording.state.phase === 'starting' || props.recording.state.phase === 'stopping';
@@ -154,43 +239,87 @@ export function ToolbarVideoRecordingControls(props: {
     setInteractionMode(mode);
     props.recording.onInteractionChange(mode === 'navigation' ? 'navigation' : 'drawing');
   };
+  const collapse = () => {
+    setMode('navigation');
+    props.onCollapse();
+  };
   return (
     <>
-      <ContentToolbarGroup aria-label={translate('content.toolbar.videoRecordingModeControls')}>
-        <ContentToolbarButton
-          active
-          disabled
-          title={translate('content.toolbar.videoRecordingPinned')}
-        >
-          <Pin size={18} />
-        </ContentToolbarButton>
+      <ContentToolbarGroup dataUi="content.toolbar.video-recording.settings-group">
+        <ToolbarSettingsMenu
+          compactMenus={props.compactMenus ?? false}
+          displayMode={props.displayMode}
+          onClose={collapse}
+          onCompactMenusChange={props.onCompactMenusChange}
+          onDisableScreenshotMode={() => undefined}
+          onDisplayModeChange={props.onDisplayModeChange}
+          onPinToTabChange={() => undefined}
+          pinToTab
+          pinToTabAvailable
+          pinToTabLocked
+          screenshotMode={false}
+          showPinItem={false}
+          toolbarMenuState={props.toolbarMenuState}
+        />
       </ContentToolbarGroup>
+      <ContentToolbarDivider />
+      {props.displayMode === 'vertical' ? (
+        <ContentToolbarGroup
+          aria-label={translate('content.toolbar.videoRecordingActions')}
+          className="sniptale-video-recording-lifecycle"
+          dataUi="content.toolbar.video-recording.lifecycle"
+        >
+          <RecordingStatus state={props.recording.state} />
+          <RecordingLifecycleControl recording={props.recording} />
+        </ContentToolbarGroup>
+      ) : null}
       <RecordingDrawingControls
+        actionTail={
+          <RecordingSpotlightMenu
+            compact={props.compactMenus ?? false}
+            disabled={busy || !navigation}
+            displayMode={props.displayMode}
+            toolbarMenuState={props.toolbarMenuState}
+            settings={{
+              cursorHaloEnabled: props.recording.state.spotlightEnabled,
+              cursorDimmingEnabled: props.recording.state.spotlightDimmingEnabled,
+              clickAnimationEnabled: props.recording.state.spotlightClickAnimationEnabled,
+            }}
+            onChange={(settings) => {
+              if (props.recording.onSpotlightSettingsChange) {
+                return props.recording.onSpotlightSettingsChange(settings);
+              }
+              return props.recording.onSpotlightEnabledChange(settings.cursorHaloEnabled);
+            }}
+          />
+        }
         compactMenus={props.compactMenus ?? false}
         displayMode={props.displayMode}
         interactionMode={navigation ? 'navigation' : interactionMode}
         disabled={busy}
         owner={props.recording.drawingOwner}
+        toolbarMenuState={props.toolbarMenuState}
+        {...(props.recording.onAutoHideDelayChange
+          ? { onAutoHideDelayChange: props.recording.onAutoHideDelayChange }
+          : {})}
         onInteractionModeChange={setMode}
       />
-      <ContentToolbarGroup aria-label={translate('content.toolbar.videoRecordingSpotlight')}>
-        <ContentToolbarButton
-          active={props.recording.state.spotlightEnabled && navigation}
-          disabled={busy || !navigation}
-          title={translate('content.toolbar.videoRecordingSpotlight')}
-          onClick={() =>
-            void props.recording.onSpotlightEnabledChange(!props.recording.state.spotlightEnabled)
-          }
-        >
-          <ScanEye size={18} />
-        </ContentToolbarButton>
-      </ContentToolbarGroup>
       <ContentToolbarDivider />
-      <MediaControls recording={props.recording} />
-      <ContentToolbarGroup aria-label={translate('content.toolbar.videoRecordingActions')}>
-        <RecordingStatus state={props.recording.state} />
-        <RecordingLifecycleControl recording={props.recording} />
-      </ContentToolbarGroup>
+      <MediaControls
+        displayMode={props.displayMode}
+        recording={props.recording}
+        toolbarMenuState={props.toolbarMenuState}
+      />
+      {props.displayMode === 'horizontal' ? (
+        <ContentToolbarGroup
+          aria-label={translate('content.toolbar.videoRecordingActions')}
+          className="sniptale-video-recording-lifecycle"
+          dataUi="content.toolbar.video-recording.lifecycle"
+        >
+          <RecordingStatus state={props.recording.state} />
+          <RecordingLifecycleControl recording={props.recording} />
+        </ContentToolbarGroup>
+      ) : null}
     </>
   );
 }

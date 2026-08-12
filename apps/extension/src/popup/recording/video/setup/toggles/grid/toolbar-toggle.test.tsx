@@ -8,12 +8,17 @@ vi.mock('../../../../../../platform/i18n', async (importOriginal) => ({
 
 import { VideoRecordingToolbarToggle } from './toolbar-toggle';
 
-it('preserves spotlight preference while toggling toolbar auto-open', () => {
+it('preserves every spotlight preference while toggling toolbar auto-open', () => {
   const onSettingsChange = vi.fn();
   const element = VideoRecordingToolbarToggle({
     settings: {
       ...DEFAULT_VIDEO_SETTINGS,
-      recordingSurface: { toolbarEnabled: false, cursorSpotlightEnabled: true },
+      recordingSurface: {
+        toolbarEnabled: false,
+        cursorSpotlightEnabled: true,
+        cursorDimmingEnabled: true,
+        cursorClickAnimationEnabled: true,
+      },
     },
     onSettingsChange,
   });
@@ -21,7 +26,12 @@ it('preserves spotlight preference while toggling toolbar auto-open', () => {
   expect(element.props.active).toBe(false);
   element.props.onClick();
   expect(onSettingsChange).toHaveBeenCalledWith({
-    recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: true },
+    recordingSurface: {
+      toolbarEnabled: true,
+      cursorSpotlightEnabled: true,
+      cursorDimmingEnabled: true,
+      cursorClickAnimationEnabled: true,
+    },
   });
 });
 
@@ -36,4 +46,15 @@ it('defaults the missing recording surface preferences while enabling the toolba
   expect(onSettingsChange).toHaveBeenCalledWith({
     recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: false },
   });
+});
+
+it('keeps the toolbar control mounted but disabled outside tab capture', () => {
+  const element = VideoRecordingToolbarToggle({
+    settings: DEFAULT_VIDEO_SETTINGS,
+    disabled: true,
+    onSettingsChange: vi.fn(),
+  });
+
+  expect(element.props.disabled).toBe(true);
+  expect(element.props.description).toBe('popup.video.recordingToolbarDisabledDescription');
 });

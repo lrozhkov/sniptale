@@ -2,14 +2,18 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { contentActionRuntimeContracts } from '../../../../contracts/messaging/contracts/runtime/actions/content-action';
 
 const mocks = vi.hoisted(() => ({
+  openPopup: vi.fn(),
   cancelRecordingStart: vi.fn(),
   ensureHeadroom: vi.fn(),
+  ensureOffscreenDocument: vi.fn(),
   ensurePageAccess: vi.fn(),
   loadSettings: vi.fn(),
   loadVideoSettings: vi.fn(),
   loadVideoUiState: vi.fn(),
+  mutateVideoSettings: vi.fn(),
   patchVideoSettings: vi.fn(),
   pauseRecording: vi.fn(),
   resolvePreset: vi.fn(),
@@ -17,7 +21,16 @@ const mocks = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
   startRecording: vi.fn(),
   stopRecording: vi.fn(),
+  waitForOffscreenReady: vi.fn(),
   updateRecordingSettings: vi.fn(),
+  getTab: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/action', () => ({
+  browserAction: { openPopup: mocks.openPopup },
+}));
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: mocks.getTab },
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -42,6 +55,7 @@ vi.mock('../../../../composition/persistence/capture-settings', async (importOri
   >()),
   loadVideoSettings: mocks.loadVideoSettings,
   loadVideoUiState: mocks.loadVideoUiState,
+  mutateVideoSettings: mocks.mutateVideoSettings,
   patchVideoSettings: mocks.patchVideoSettings,
 }));
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
@@ -75,6 +89,11 @@ vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOr
   >()),
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.sendRuntimeMessage }),
 }));
+vi.mock('../../../offscreen-document/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../offscreen-document/service')>()),
+  ensureOffscreenDocument: mocks.ensureOffscreenDocument,
+  waitForOffscreenReady: mocks.waitForOffscreenReady,
+}));
 
 import { routeVideoRecordingSurfaceMessage } from './route';
 import {
@@ -89,6 +108,7 @@ import {
 import { runVideoRecordingSurfaceCommand } from './commands';
 import {
   beginVideoRecordingSurfaceRebind,
+  ensureVideoRecordingSurfaceLeaseHydrated,
   requestVideoRecordingSurface,
   resetVideoRecordingSurfaceLeaseForTests,
 } from './surface-lease';
@@ -101,6 +121,10 @@ beforeEach(() => {
   resetVideoRecordingCameraPeerRetryForTests();
   resetVideoRecordingSurfaceLeaseForTests();
   mocks.ensureHeadroom.mockResolvedValue(undefined);
+  mocks.getTab.mockResolvedValue({ active: true, windowId: 7 });
+  mocks.openPopup.mockResolvedValue(undefined);
+  mocks.ensureOffscreenDocument.mockResolvedValue(false);
+  mocks.waitForOffscreenReady.mockResolvedValue(undefined);
   mocks.ensurePageAccess.mockResolvedValue(undefined);
   mocks.loadSettings.mockResolvedValue({ viewportPresets: [] });
   mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
@@ -109,6 +133,9 @@ beforeEach(() => {
     viewportPresetId: 'preset-1',
   });
   mocks.patchVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
+  mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
+    mutation(DEFAULT_VIDEO_SETTINGS)
+  );
   mocks.cancelRecordingStart.mockResolvedValue({ result: 'cancelled-before-active' });
   mocks.pauseRecording.mockResolvedValue({ result: 'accepted' });
   mocks.resumeRecording.mockResolvedValue({ result: 'accepted' });
@@ -148,6 +175,47 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
     })
   );
   expect(sendResponse.mock.calls[0]?.[0]).not.toHaveProperty('controlToken');
+  expect(
+    contentActionRuntimeContracts[VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING].parseResponse(
+      sendResponse.mock.calls[0]?.[0]
+    )
+  ).toEqual(sendResponse.mock.calls[0]?.[0]);
+});
+
+it('preserves manual surface authority while start is pending so cancel-start remains valid', async () => {
+  const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
+  let resolveStart!: (value: { result: 'accepted'; recordingId: string }) => void;
+  mocks.startRecording.mockImplementationOnce(
+    () => new Promise((resolve) => (resolveStart = resolve))
+  );
+  const started = vi.fn();
+  routeVideoRecordingSurfaceMessage({
+    message: {
+      type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      contentIntent: { requestId: 'request-1', token: 'intent-1' },
+    },
+    resolvedTabId: 12,
+    sendResponse: started,
+    sender: { url: 'https://example.test/page' },
+  });
+  await vi.waitFor(() => expect(mocks.startRecording).toHaveBeenCalledOnce());
+
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+      surfaceSessionId: lease.surfaceSessionId,
+      surfaceToken: lease.surfaceToken,
+      capabilityEpoch: lease.capabilityEpoch,
+      documentGeneration: lease.documentGeneration,
+      recordingId: null,
+      command: { kind: 'cancel-start' },
+    })
+  ).resolves.toEqual(expect.objectContaining({ success: true }));
+  resolveStart({ result: 'accepted', recordingId: 'recording-1' });
+  await flush();
+  expect(started).toHaveBeenCalledWith(
+    expect.objectContaining({ success: true, surfaceToken: lease.surfaceToken })
+  );
 });
 
 it('rejects stale document commands before invoking recording controls', async () => {
@@ -348,6 +416,37 @@ it('activates and releases the manual surface with matching authority', async ()
   expect(released).toHaveBeenCalledWith({ success: true, result: 'released' });
 });
 
+it('restores toolbar persistence when a hidden active surface is manually reopened', async () => {
+  const hidden = await requestVideoRecordingSurface({
+    entry: 'manual',
+    recordingId: 'recording-1',
+    tabId: 12,
+    toolbarRequested: false,
+  });
+  const activated = vi.fn();
+  routeVideoRecordingSurfaceMessage({
+    message: {
+      type: VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
+      contentIntent: { requestId: 'request-reopen', token: 'intent-reopen' },
+    },
+    resolvedTabId: 12,
+    sendResponse: activated,
+    sender: { url: 'https://example.test/page' },
+  });
+  await flush();
+
+  expect(activated).toHaveBeenCalledWith(
+    expect.objectContaining({
+      snapshot: expect.objectContaining({ toolbarRequested: true }),
+      success: true,
+      surfaceSessionId: hidden.surfaceSessionId,
+    })
+  );
+  await expect(ensureVideoRecordingSurfaceLeaseHydrated()).resolves.toEqual(
+    expect.objectContaining({ toolbarRequested: true })
+  );
+});
+
 it('routes valid camera offer and close commands through the stable offscreen peer', async () => {
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   mocks.sendRuntimeMessage
@@ -416,9 +515,20 @@ it('executes lifecycle and live media surface commands for an active recording',
   await command({ kind: 'resume' });
   await command({ kind: 'stop' });
   await command({ kind: 'set-microphone-enabled', enabled: false });
-  await command({ kind: 'set-webcam-enabled', enabled: true });
+  const enabledCamera = await command({ kind: 'set-webcam-enabled', enabled: true });
+  expect(enabledCamera.snapshot.peerGeneration).toBe(lease.peerGeneration + 1);
   await command({ kind: 'select-microphone-device', deviceId: 'mic-2' });
-  await command({ kind: 'select-webcam-device', deviceId: 'cam-2' });
+  const switchedCamera = await command({ kind: 'select-webcam-device', deviceId: 'cam-2' });
+  expect(switchedCamera.snapshot.peerGeneration).toBe(lease.peerGeneration + 1);
+  const hidden = await command({ kind: 'set-toolbar-requested', enabled: false });
+  expect(hidden.snapshot.toolbarRequested).toBe(false);
+  await command({ kind: 'set-auto-fade-delay', delay: 5 });
+  await command({
+    kind: 'set-spotlight-settings',
+    cursorHaloEnabled: true,
+    cursorDimmingEnabled: false,
+    clickAnimationEnabled: true,
+  });
   await command({
     kind: 'update-embedded-camera',
     appearance: DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
@@ -428,7 +538,25 @@ it('executes lifecycle and live media surface commands for an active recording',
   expect(mocks.pauseRecording).toHaveBeenCalledOnce();
   expect(mocks.resumeRecording).toHaveBeenCalledOnce();
   expect(mocks.stopRecording).toHaveBeenCalledWith(false);
-  expect(mocks.patchVideoSettings).toHaveBeenCalledTimes(5);
+  expect(mocks.patchVideoSettings).toHaveBeenCalledTimes(6);
+  expect(mocks.mutateVideoSettings).toHaveBeenCalledOnce();
+  const spotlightMutation = mocks.mutateVideoSettings.mock.calls[0]?.[0];
+  expect(
+    spotlightMutation({
+      ...DEFAULT_VIDEO_SETTINGS,
+      recordingSurface: {
+        toolbarEnabled: false,
+        cursorSpotlightEnabled: false,
+        cursorDimmingEnabled: true,
+        cursorClickAnimationEnabled: false,
+      },
+    }).recordingSurface
+  ).toEqual({
+    toolbarEnabled: false,
+    cursorSpotlightEnabled: true,
+    cursorDimmingEnabled: false,
+    cursorClickAnimationEnabled: true,
+  });
   expect(mocks.updateRecordingSettings).toHaveBeenCalledTimes(4);
 });
 
@@ -448,9 +576,114 @@ it('allows idle settings but rejects idle lifecycle commands', async () => {
       command: { kind: 'set-webcam-enabled', enabled: true },
     })
   ).resolves.toEqual(expect.objectContaining({ success: true }));
+  const switchedCamera = await runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'select-webcam-device', deviceId: 'cam-2' },
+  });
+  expect(switchedCamera.snapshot).toMatchObject({
+    peerGeneration: lease.peerGeneration + 1,
+  });
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId: 'cam-2',
+    })
+  );
+  expect(mocks.updateRecordingSettings).not.toHaveBeenCalled();
+  await runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'select-microphone-device', deviceId: 'mic-2' },
+  });
+  expect(mocks.patchVideoSettings).toHaveBeenCalledWith({ microphoneDeviceId: 'mic-2' });
+  expect(mocks.updateRecordingSettings).not.toHaveBeenCalled();
   await expect(
     runVideoRecordingSurfaceCommand(12, { ...base, command: { kind: 'pause' } })
   ).rejects.toThrow('require an active recording');
+});
+
+it('rolls an idle preview back when its selected camera cannot be persisted', async () => {
+  const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
+  mocks.patchVideoSettings.mockRejectedValueOnce(new Error('storage failed'));
+
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+      surfaceSessionId: lease.surfaceSessionId,
+      surfaceToken: lease.surfaceToken,
+      capabilityEpoch: lease.capabilityEpoch,
+      documentGeneration: lease.documentGeneration,
+      recordingId: null,
+      command: { kind: 'select-webcam-device', deviceId: 'cam-2' },
+    })
+  ).rejects.toThrow('storage failed');
+
+  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId: 'cam-2',
+    })
+  );
+  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId: DEFAULT_VIDEO_SETTINGS.webcamDeviceId ?? null,
+    })
+  );
+});
+
+it('rejects and rolls back an idle camera switch invalidated by document rebind', async () => {
+  const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
+  let resolveSwitch!: (value: { success: true; result: 'accepted' }) => void;
+  mocks.sendRuntimeMessage.mockImplementationOnce(
+    () =>
+      new Promise<{ success: true; result: 'accepted' }>((resolve) => {
+        resolveSwitch = resolve;
+      })
+  );
+  const switching = runVideoRecordingSurfaceCommand(12, {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: lease.surfaceSessionId,
+    surfaceToken: lease.surfaceToken,
+    capabilityEpoch: lease.capabilityEpoch,
+    documentGeneration: lease.documentGeneration,
+    recordingId: null,
+    command: { kind: 'select-webcam-device', deviceId: 'cam-2' },
+  });
+  await vi.waitFor(() => expect(resolveSwitch).toBeTypeOf('function'));
+
+  await beginVideoRecordingSurfaceRebind(12);
+  resolveSwitch({ success: true, result: 'accepted' });
+
+  await expect(switching).rejects.toThrow('Unauthorized or stale');
+  expect(mocks.patchVideoSettings).not.toHaveBeenCalled();
+  expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId: DEFAULT_VIDEO_SETTINGS.webcamDeviceId ?? null,
+    })
+  );
+});
+
+it('rejects toolbar visibility commands with a mismatched recording binding', async () => {
+  const lease = await requestVideoRecordingSurface({
+    entry: 'manual',
+    recordingId: 'recording-1',
+    tabId: 12,
+  });
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+      surfaceSessionId: lease.surfaceSessionId,
+      surfaceToken: lease.surfaceToken,
+      capabilityEpoch: lease.capabilityEpoch,
+      documentGeneration: lease.documentGeneration,
+      recordingId: null,
+      command: { kind: 'set-toolbar-requested', enabled: false },
+    })
+  ).rejects.toThrow('Unauthorized or stale');
 });
 
 it('surfaces unavailable presets, failed starts, and missing sender authority', async () => {
@@ -492,7 +725,24 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   );
 });
 
-async function routeStartWithoutSender() {
+it('opens the video popup when a previous recording must be resolved', async () => {
+  mocks.startRecording.mockResolvedValueOnce({
+    error: 'Resolve the previous recording before starting another.',
+    result: 'failed',
+  });
+
+  const response = await routeStartWithoutSender('https://example.test/page');
+
+  expect(response).toEqual(
+    expect.objectContaining({
+      error: 'Resolve the previous recording before starting another.',
+      success: false,
+    })
+  );
+  expect(mocks.openPopup).toHaveBeenCalledWith({ windowId: 7 });
+});
+
+async function routeStartWithoutSender(senderUrl?: string) {
   const response = vi.fn();
   routeVideoRecordingSurfaceMessage({
     message: {
@@ -501,7 +751,7 @@ async function routeStartWithoutSender() {
     },
     resolvedTabId: 12,
     sendResponse: response,
-    sender: undefined,
+    sender: senderUrl ? { url: senderUrl } : undefined,
   });
   await flush();
   return response.mock.calls[0]?.[0];

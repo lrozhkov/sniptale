@@ -33,7 +33,7 @@ export interface ToolbarModeButtonsProps {
   onToggleHighlighter: () => void;
   videoRecordingMode?: boolean;
   videoRecordingModeLocked?: boolean;
-  onToggleVideoRecording?: (activationEvent?: Event) => void;
+  onToggleVideoRecording?: (activationEvent?: Event) => Promise<boolean> | boolean | void;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;

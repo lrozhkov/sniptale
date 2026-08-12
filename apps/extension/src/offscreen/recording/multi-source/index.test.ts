@@ -175,9 +175,9 @@ it('publishes started only after every required recorder emits its native start 
   await start;
 
   expect(findRuntimeMessages('OFFSCREEN_RECORDING_STARTED')).toHaveLength(1);
-  expect(FakeMediaRecorder.instances.every((recorder) => recorder.startTimeslices[0] === 0)).toBe(
-    true
-  );
+  expect(
+    FakeMediaRecorder.instances.every((recorder) => recorder.startTimeslices[0] === 1_000)
+  ).toBe(true);
   await stopMultiSourceRecording(true);
 });
 

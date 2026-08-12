@@ -50,6 +50,17 @@ export type RuntimeVideoSessionRequestByType = {
     capabilityToken: string;
     peerId: string;
   };
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: {
+    type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH;
+    capabilityToken: string;
+    deviceId: string | null;
+    peerId: string;
+  };
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: {
+    type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES;
+    capabilityToken: string;
+    deviceKind: 'audioinput' | 'videoinput';
+  };
   [VideoMessageType.START_RECORDING]: {
     type: typeof VideoMessageType.START_RECORDING;
     settings: VideoRecordingSettings;

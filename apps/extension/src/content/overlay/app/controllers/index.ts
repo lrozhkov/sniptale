@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { disableAiPickModeIfLoaded } from '../../ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../selection/highlighter';
 import { disableQuickEditDocumentMode, disableQuickEditMode } from '../../../selection/quick-edit';
@@ -15,6 +16,7 @@ import {
   type ContentDrawingController,
 } from '../../../drawing/controller';
 import { useDrawingModeIntegration } from '../../../drawing/mode';
+import { useVideoRecordingSurfaceController } from '../../video-recording/session/controller';
 
 function disableAiPickModeDeferred() {
   disableAiPickModeIfLoaded();
@@ -149,6 +151,51 @@ function useContentScreenshotAutoStartEffect(
   });
 }
 
+function hasConflictingNonVideoMode(modeState: ContentAppModeStateValue): boolean {
+  return Boolean(
+    modeState.aiPickMode ||
+    modeState.designReviewMode ||
+    modeState.drawingMode ||
+    modeState.highlighterMode ||
+    modeState.quickEditMode
+  );
+}
+
+function useVideoRecordingModeConflictRecovery(args: {
+  disableDrawing: () => void;
+  modeController: ReturnType<typeof useToolbarModeController>;
+  modeState: ContentAppModeStateValue;
+  videoRecordingController: ReturnType<typeof useVideoRecordingSurfaceController>;
+}) {
+  const { disableDrawing, modeController, modeState, videoRecordingController } = args;
+  const recoveryPendingRef = useRef(false);
+  useEffect(() => {
+    if (!modeState.videoRecordingMode || !hasConflictingNonVideoMode(modeState)) {
+      recoveryPendingRef.current = false;
+      return;
+    }
+    if (
+      videoRecordingController.state.phase === 'idle' ||
+      videoRecordingController.state.phase === 'error'
+    ) {
+      if (recoveryPendingRef.current) return;
+      recoveryPendingRef.current = true;
+      void videoRecordingController
+        .onDeactivate()
+        .catch(() => undefined)
+        .finally(() => {
+          recoveryPendingRef.current = false;
+        });
+      return;
+    }
+    disableDrawing();
+    modeController.handleToggleDesignReviewMode(false);
+    modeController.handleToggleHighlighterMode(false);
+    modeController.handleToggleQuickEditMode(false);
+    modeState.setAiPickMode(false);
+  }, [disableDrawing, modeController, modeState, videoRecordingController]);
+}
+
 export function useContentAppControllers(
   modeState: ContentAppModeStateValue,
   dependencies: ContentAppControllerDependencies
@@ -176,6 +223,16 @@ export function useContentAppControllers(
     scenarioController,
     drawingController
   );
+  const videoRecordingController = useVideoRecordingSurfaceController({
+    onModeRequested: (enabled) => modeState.setVideoRecordingMode?.(enabled),
+    onToolbarRequested: () => modeState.setIsToolbarVisible(true),
+  });
+  useVideoRecordingModeConflictRecovery({
+    disableDrawing,
+    modeController,
+    modeState,
+    videoRecordingController,
+  });
   useContentScreenshotAutoStartEffect(modeState, screenshotController);
 
   return {
@@ -184,5 +241,6 @@ export function useContentAppControllers(
     modeController,
     scenarioController,
     screenshotController,
+    videoRecordingController,
   };
 }

@@ -1,5 +1,5 @@
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { acquireCameraSource, type CameraSourceLease } from './session';
+import { acquireCameraSource, switchCameraSourceInput, type CameraSourceLease } from './session';
 
 export type CameraSourcePeerAnswer = {
   sdp: string;
@@ -31,26 +31,32 @@ type CameraPeerConnection = Pick<
 
 const PEER_ESTABLISHMENT_TIMEOUT_MS = 30_000;
 const PEER_DISCONNECTED_TIMEOUT_MS = 10_000;
+const ICE_GATHERING_TIMEOUT_MS = 3_000;
 
 type CameraSourcePeerDependencies = {
   acquireSource: (settings: VideoRecordingSettings) => Promise<CameraSourceLease>;
   createConnection: () => CameraPeerConnection;
+  switchInput?: (deviceId: string | null) => Promise<void>;
 };
 
 function waitForIceGathering(record: PeerRecord): Promise<void> {
   if (record.connection.iceGatheringState === 'complete') return Promise.resolve();
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      record.connection.removeEventListener('icegatheringstatechange', handleStateChange);
+      record.cancelNegotiation = null;
+      action();
+    };
     const handleStateChange = () => {
       if (record.connection.iceGatheringState !== 'complete') return;
-      record.connection.removeEventListener('icegatheringstatechange', handleStateChange);
-      record.cancelNegotiation = null;
-      resolve();
+      finish(resolve);
     };
-    record.cancelNegotiation = (error) => {
-      record.connection.removeEventListener('icegatheringstatechange', handleStateChange);
-      record.cancelNegotiation = null;
-      reject(error);
-    };
+    const timeout = setTimeout(() => finish(resolve), ICE_GATHERING_TIMEOUT_MS);
+    record.cancelNegotiation = (error) => finish(() => reject(error));
     record.connection.addEventListener('icegatheringstatechange', handleStateChange);
   });
 }
@@ -64,6 +70,7 @@ function requireAnswer(description: RTCSessionDescription | null): CameraSourceP
 
 export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) {
   const peers = new Map<string, PeerRecord>();
+  const pendingPeerIds = new Set<string>();
 
   const close = (peerId: string): void => {
     const record = peers.get(peerId);
@@ -118,9 +125,15 @@ export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) 
       settings: VideoRecordingSettings;
     }): Promise<CameraSourcePeerAnswer> {
       if (peers.has(params.peerId)) {
-        throw new Error(`Camera source peer ${params.peerId} is already active.`);
+        close(params.peerId);
       }
-      const lease = await deps.acquireSource(params.settings);
+      pendingPeerIds.add(params.peerId);
+      let lease: CameraSourceLease;
+      try {
+        lease = await deps.acquireSource(params.settings);
+      } finally {
+        pendingPeerIds.delete(params.peerId);
+      }
       let connection: CameraPeerConnection;
       try {
         connection = deps.createConnection();
@@ -160,6 +173,16 @@ export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) 
       [...peers.keys()].forEach(close);
     },
 
+    async switchInput(peerId: string, deviceId: string | null): Promise<void> {
+      if (!peers.has(peerId) && !pendingPeerIds.has(peerId)) {
+        throw new Error(`Camera source peer ${peerId} is not active.`);
+      }
+      if (!deps.switchInput) {
+        throw new Error('Camera source input switching is unavailable.');
+      }
+      await deps.switchInput(deviceId);
+    },
+
     has(peerId: string): boolean {
       return peers.has(peerId);
     },
@@ -169,7 +192,10 @@ export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) 
 const cameraSourcePeerOwner = createCameraSourcePeerOwner({
   acquireSource: acquireCameraSource,
   createConnection: () => new RTCPeerConnection(),
+  switchInput: switchCameraSourceInput,
 });
 
 export const answerCameraSourceOffer = cameraSourcePeerOwner.answerOffer;
 export const closeCameraSourcePeer = cameraSourcePeerOwner.close;
+export const closeAllCameraSourcePeers = cameraSourcePeerOwner.closeAll;
+export const switchCameraSourcePeerInput = cameraSourcePeerOwner.switchInput;

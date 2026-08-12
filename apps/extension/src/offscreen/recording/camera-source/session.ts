@@ -4,8 +4,6 @@ import {
   resolveWebcamFrameRatePresetValue,
   resolveWebcamQualitySettings,
 } from '@sniptale/runtime-contracts/video/types/webcam-quality';
-import { createRecordingGeometryPlan } from '../geometry/plan';
-import { resolveContainedFrame } from '../geometry/contain-frame';
 import { createCanvasVideoOutput } from '../stream/canvas-video-output';
 import { resolveFixedVideoFrameRate } from '../stream/frame-pump';
 import { createSourceVideo, waitForSourceMetadata } from '../stream/video-source';
@@ -23,7 +21,10 @@ type CameraSourceSession = {
   leasedTracks: Set<MediaStreamTrack>;
   leases: number;
   output: MediaStream | null;
+  profileKey: string;
   raw: MediaStream;
+  requestedDeviceId: string | null;
+  qualityConstraints: MediaTrackConstraints;
   video: HTMLVideoElement;
 };
 
@@ -33,15 +34,62 @@ type CameraSourceDependencies = {
   waitForMetadata: (video: HTMLVideoElement) => Promise<void>;
 };
 
-function buildVideoConstraints(settings: VideoRecordingSettings): MediaTrackConstraints {
+const EMBEDDED_CAMERA_PREVIEW_MAX_EDGE = 640;
+const EMBEDDED_CAMERA_PREVIEW_MAX_FRAME_RATE = 30;
+
+function resolveCameraSourceProfileKey(settings: VideoRecordingSettings): string {
+  if (settings.webcamPresentation?.mode === 'embedded') return 'embedded-preview';
+  const quality = resolveWebcamQualitySettings(settings);
+  return `separate-track:${quality.resolution}:${quality.frameRate}`;
+}
+
+function resolveCameraOutputDimensions(
+  settings: VideoRecordingSettings,
+  source: { height: number; width: number }
+): { height: number; width: number } {
+  if (settings.webcamPresentation?.mode !== 'embedded') return source;
+  const scale = Math.min(
+    1,
+    EMBEDDED_CAMERA_PREVIEW_MAX_EDGE / source.width,
+    EMBEDDED_CAMERA_PREVIEW_MAX_EDGE / source.height
+  );
   return {
-    ...(settings.webcamDeviceId ? { deviceId: { exact: settings.webcamDeviceId } } : {}),
-    ...buildWebcamQualityConstraints(resolveWebcamQualitySettings(settings)),
+    height: Math.max(2, Math.round((source.height * scale) / 2) * 2),
+    width: Math.max(2, Math.round((source.width * scale) / 2) * 2),
   };
 }
 
-function buildReplacementVideoConstraints(deviceId: string | null): MediaTrackConstraints {
-  return deviceId ? { deviceId: { exact: deviceId } } : {};
+function buildCameraInputQualityConstraints(
+  settings: VideoRecordingSettings
+): MediaTrackConstraints {
+  const requested = buildWebcamQualityConstraints(resolveWebcamQualitySettings(settings));
+  if (settings.webcamPresentation?.mode !== 'embedded') return requested;
+  return {
+    ...requested,
+    frameRate: {
+      ideal: EMBEDDED_CAMERA_PREVIEW_MAX_FRAME_RATE,
+      max: EMBEDDED_CAMERA_PREVIEW_MAX_FRAME_RATE,
+    },
+    height: { max: EMBEDDED_CAMERA_PREVIEW_MAX_EDGE },
+    width: { ideal: EMBEDDED_CAMERA_PREVIEW_MAX_EDGE, max: EMBEDDED_CAMERA_PREVIEW_MAX_EDGE },
+  };
+}
+
+function buildVideoConstraints(settings: VideoRecordingSettings): MediaTrackConstraints {
+  return {
+    ...(settings.webcamDeviceId ? { deviceId: { exact: settings.webcamDeviceId } } : {}),
+    ...buildCameraInputQualityConstraints(settings),
+  };
+}
+
+function buildReplacementVideoConstraints(
+  deviceId: string | null,
+  qualityConstraints: MediaTrackConstraints
+): MediaTrackConstraints {
+  return {
+    ...qualityConstraints,
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  };
 }
 
 function stopStream(stream: MediaStream): void {
@@ -63,21 +111,16 @@ function createNormalizedCameraOutput(
   target: CameraSourceSession,
   settings: VideoRecordingSettings
 ): MediaStream {
-  const geometry = createRecordingGeometryPlan({
-    frameRateCap: settings.outputProfile.frameRate,
-    outputBasis: { height: target.video.videoHeight, width: target.video.videoWidth },
-    resolution: settings.outputProfile.resolution,
-    sourceRect: {
-      x: 0,
-      y: 0,
-      height: target.video.videoHeight,
-      width: target.video.videoWidth,
-    },
+  // Embedded camera is composed by the tab itself. Keep the stable preview track
+  // at the camera's negotiated size instead of upscaling every frame to the main
+  // recording output resolution in the offscreen document.
+  target.dimensions = resolveCameraOutputDimensions(settings, {
+    height: target.video.videoHeight,
+    width: target.video.videoWidth,
   });
-  target.dimensions = geometry.outputSize;
   return createCanvasVideoOutput({
     contentHint: 'motion',
-    dimensions: geometry.outputSize,
+    dimensions: target.dimensions,
     frameRate: target.frameRate,
     initializeDrawing: ({ canvas, context }) => ({
       drawLiveFrame: () => {
@@ -86,21 +129,24 @@ function createNormalizedCameraOutput(
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.fillStyle = '#000000';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        const source = { x: 0, y: 0, height: video.videoHeight, width: video.videoWidth };
-        const destination = resolveContainedFrame(source, canvas);
-        context.imageSmoothingEnabled =
-          source.width !== destination.width || source.height !== destination.height;
-        if (context.imageSmoothingEnabled) context.imageSmoothingQuality = 'high';
+        const sourceAspect = video.videoWidth / video.videoHeight;
+        const outputAspect = canvas.width / canvas.height;
+        const sourceWidth =
+          sourceAspect > outputAspect ? video.videoHeight * outputAspect : video.videoWidth;
+        const sourceHeight =
+          sourceAspect > outputAspect ? video.videoHeight : video.videoWidth / outputAspect;
+        const sourceX = (video.videoWidth - sourceWidth) / 2;
+        const sourceY = (video.videoHeight - sourceHeight) / 2;
         context.drawImage(
           video,
-          source.x,
-          source.y,
-          source.width,
-          source.height,
-          destination.x,
-          destination.y,
-          destination.width,
-          destination.height
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height
         );
         return true;
       },
@@ -114,6 +160,7 @@ async function initializeCameraSourceSession(args: {
   isCurrent: () => boolean;
   settings: VideoRecordingSettings;
 }): Promise<CameraSourceSession> {
+  const qualityConstraints = buildCameraInputQualityConstraints(args.settings);
   const raw = await args.deps.acquireRawStream({
     audio: false,
     video: buildVideoConstraints(args.settings),
@@ -126,11 +173,14 @@ async function initializeCameraSourceSession(args: {
     if (!args.isCurrent()) throw new Error('Camera source initialization was superseded.');
     const quality = resolveWebcamQualitySettings(args.settings);
     const selectedFrameRate = resolveWebcamFrameRatePresetValue(quality.frameRate);
+    const requestedFrameRate = Math.min(
+      selectedFrameRate ?? args.settings.outputProfile.frameRate,
+      args.settings.outputProfile.frameRate
+    );
     const frameRate = resolveFixedVideoFrameRate(
-      Math.min(
-        selectedFrameRate ?? args.settings.outputProfile.frameRate,
-        args.settings.outputProfile.frameRate
-      ),
+      args.settings.webcamPresentation?.mode === 'embedded'
+        ? Math.min(requestedFrameRate, EMBEDDED_CAMERA_PREVIEW_MAX_FRAME_RATE)
+        : requestedFrameRate,
       sourceTrack.getSettings().frameRate
     );
     const target: CameraSourceSession = {
@@ -140,7 +190,10 @@ async function initializeCameraSourceSession(args: {
       leasedTracks: new Set(),
       leases: 0,
       output: null,
+      profileKey: resolveCameraSourceProfileKey(args.settings),
+      qualityConstraints,
       raw,
+      requestedDeviceId: args.settings.webcamDeviceId ?? null,
       video,
     };
     target.output = createNormalizedCameraOutput(target, args.settings);
@@ -152,9 +205,113 @@ async function initializeCameraSourceSession(args: {
   }
 }
 
+async function acquireCameraSourceLease(args: {
+  closeSession: (target: CameraSourceSession) => void;
+  ensureRequestedInput: (target: CameraSourceSession, deviceId: string | null) => Promise<void>;
+  isCurrent: (target: CameraSourceSession) => boolean;
+  settings: VideoRecordingSettings;
+  target: CameraSourceSession;
+}): Promise<CameraSourceLease> {
+  const { target } = args;
+  target.leases += 1;
+  let leasedTrack: MediaStreamTrack | null = null;
+  let stream: MediaStream | null = null;
+  try {
+    await args.ensureRequestedInput(target, args.settings.webcamDeviceId ?? null);
+    if (!args.isCurrent(target)) throw new Error('Camera source is no longer active.');
+    if (!target.output) throw new Error('Normalized camera source is not available.');
+    const outputTrack = requireVideoTrack(
+      target.output,
+      'Normalized camera source is missing a video track.'
+    );
+    leasedTrack = outputTrack.clone();
+    stream = new MediaStream([leasedTrack]);
+    target.leasedTracks.add(leasedTrack);
+  } catch (error) {
+    target.leases = Math.max(0, target.leases - 1);
+    if (target.leases === 0) args.closeSession(target);
+    throw error;
+  }
+  let released = false;
+  return {
+    release: () => {
+      if (released) return;
+      released = true;
+      stopStream(stream!);
+      target.leasedTracks.delete(leasedTrack!);
+      target.leases = Math.max(0, target.leases - 1);
+      if (target.leases === 0) args.closeSession(target);
+    },
+    stream,
+    trackSettings: {
+      ...target.dimensions,
+      frameRate: target.frameRate,
+    },
+  };
+}
+
+function createCameraInputSwitcher(args: {
+  deps: CameraSourceDependencies;
+  getGeneration: () => number;
+  getSession: () => CameraSourceSession | null;
+  nextGeneration: () => number;
+}) {
+  let pendingInputSwitch: Promise<void> | null = null;
+  let pendingInputSwitchDeviceId: string | null = null;
+
+  const replaceInput = async (
+    target: CameraSourceSession,
+    deviceId: string | null
+  ): Promise<void> => {
+    const switchGeneration = args.nextGeneration();
+    const candidate = await args.deps.acquireRawStream({
+      audio: false,
+      video: buildReplacementVideoConstraints(deviceId, target.qualityConstraints),
+    });
+    let candidateVideo: HTMLVideoElement | null = null;
+    try {
+      requireVideoTrack(candidate, 'Replacement camera stream is missing a video track.');
+      candidateVideo = args.deps.createVideo(candidate);
+      await args.deps.waitForMetadata(candidateVideo);
+      if (args.getGeneration() !== switchGeneration || args.getSession() !== target) {
+        throw new Error('Camera source switch was superseded.');
+      }
+      const previousRaw = target.raw;
+      const previousVideo = target.video;
+      target.raw = candidate;
+      target.requestedDeviceId = deviceId;
+      target.video = candidateVideo;
+      stopStream(previousRaw);
+      releaseVideo(previousVideo);
+    } catch (error) {
+      if (candidateVideo) releaseVideo(candidateVideo);
+      stopStream(candidate);
+      throw error;
+    }
+  };
+
+  return async (target: CameraSourceSession, deviceId: string | null): Promise<void> => {
+    if (target.requestedDeviceId === deviceId) return;
+    if (pendingInputSwitch && pendingInputSwitchDeviceId === deviceId) {
+      await pendingInputSwitch;
+      return;
+    }
+    pendingInputSwitchDeviceId = deviceId;
+    const pending = replaceInput(target, deviceId).finally(() => {
+      if (pendingInputSwitch === pending) {
+        pendingInputSwitch = null;
+        pendingInputSwitchDeviceId = null;
+      }
+    });
+    pendingInputSwitch = pending;
+    await pending;
+  };
+}
+
 export function createCameraSourceOwner(deps: CameraSourceDependencies) {
   let session: CameraSourceSession | null = null;
   let pendingInitialization: Promise<CameraSourceSession> | null = null;
+  let pendingInitializationProfileKey: string | null = null;
   let generation = 0;
 
   const closeSession = (target: CameraSourceSession): void => {
@@ -178,74 +335,57 @@ export function createCameraSourceOwner(deps: CameraSourceDependencies) {
   };
 
   const ensureSession = async (settings: VideoRecordingSettings): Promise<CameraSourceSession> => {
-    if (session) return session;
+    const profileKey = resolveCameraSourceProfileKey(settings);
+    if (session?.profileKey === profileKey) return session;
+    if (session) {
+      if (session.leases > 0) {
+        throw new Error(
+          'Camera source profile cannot change while incompatible leases are active.'
+        );
+      }
+      closeSession(session);
+    }
+    if (pendingInitialization && pendingInitializationProfileKey !== profileKey) {
+      generation += 1;
+      await pendingInitialization.catch(() => undefined);
+      return ensureSession(settings);
+    }
     if (!pendingInitialization) {
       const pending = initialize(settings).finally(() => {
-        if (pendingInitialization === pending) pendingInitialization = null;
+        if (pendingInitialization === pending) {
+          pendingInitialization = null;
+          pendingInitializationProfileKey = null;
+        }
       });
       pendingInitialization = pending;
+      pendingInitializationProfileKey = profileKey;
     }
     return pendingInitialization;
   };
 
+  const ensureRequestedInput = createCameraInputSwitcher({
+    deps,
+    getGeneration: () => generation,
+    getSession: () => session,
+    nextGeneration: () => (generation += 1),
+  });
+
   return {
     async acquire(settings: VideoRecordingSettings): Promise<CameraSourceLease> {
       const target = await ensureSession(settings);
-      if (session !== target) throw new Error('Camera source is no longer active.');
-      if (!target.output) throw new Error('Normalized camera source is not available.');
-      const outputTrack = requireVideoTrack(
-        target.output,
-        'Normalized camera source is missing a video track.'
-      );
-      const leasedTrack = outputTrack.clone();
-      const stream = new MediaStream([leasedTrack]);
-      target.leases += 1;
-      target.leasedTracks.add(leasedTrack);
-      let released = false;
-      return {
-        release: () => {
-          if (released) return;
-          released = true;
-          stopStream(stream);
-          target.leasedTracks.delete(leasedTrack);
-          target.leases = Math.max(0, target.leases - 1);
-          if (target.leases === 0) closeSession(target);
-        },
-        stream,
-        trackSettings: {
-          ...target.dimensions,
-          frameRate: target.frameRate,
-        },
-      };
+      return acquireCameraSourceLease({
+        closeSession,
+        ensureRequestedInput,
+        isCurrent: (candidate) => session === candidate,
+        settings,
+        target,
+      });
     },
 
     async switchInput(deviceId: string | null): Promise<void> {
-      const target = session;
+      const target = session ?? (pendingInitialization ? await pendingInitialization : null);
       if (!target) throw new Error('Camera source is not active.');
-      const switchGeneration = (generation += 1);
-      const candidate = await deps.acquireRawStream({
-        audio: false,
-        video: buildReplacementVideoConstraints(deviceId),
-      });
-      let candidateVideo: HTMLVideoElement | null = null;
-      try {
-        requireVideoTrack(candidate, 'Replacement camera stream is missing a video track.');
-        candidateVideo = deps.createVideo(candidate);
-        await deps.waitForMetadata(candidateVideo);
-        if (generation !== switchGeneration || session !== target) {
-          throw new Error('Camera source switch was superseded.');
-        }
-        const previousRaw = target.raw;
-        const previousVideo = target.video;
-        target.raw = candidate;
-        target.video = candidateVideo;
-        stopStream(previousRaw);
-        releaseVideo(previousVideo);
-      } catch (error) {
-        if (candidateVideo) releaseVideo(candidateVideo);
-        stopStream(candidate);
-        throw error;
-      }
+      await ensureRequestedInput(target, deviceId);
     },
 
     setEnabled(enabled: boolean): void {

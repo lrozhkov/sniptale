@@ -31,6 +31,8 @@ export interface VideoRecordingSurfaceSnapshot {
   toolbarRequested: boolean;
   capabilityEpoch: number;
   cursorSpotlightEnabled: boolean;
+  cursorDimmingEnabled?: boolean;
+  cursorClickAnimationEnabled?: boolean;
   peerGeneration: number;
   status: VideoRecordingStatus;
   duration: number;
@@ -41,6 +43,12 @@ export interface VideoRecordingSurfaceSnapshot {
   webcamPresentation: WebcamPresentationSettings;
   errorCode: string | null;
 }
+
+export type VideoRecordingMediaDevice = {
+  deviceId: string;
+  kind: 'audioinput' | 'videoinput';
+  label: string;
+};
 
 export interface VideoRecordingSurfaceActivation {
   surfaceSessionId: string;
@@ -72,6 +80,15 @@ export interface VideoRecordingSurfaceSnapshotMessage {
 
 export type VideoRecordingSurfaceCommand =
   | { kind: 'cancel-start' | 'pause' | 'resume' | 'stop' }
+  | { kind: 'list-media-devices'; deviceKind: 'audioinput' | 'videoinput' }
+  | { kind: 'set-toolbar-requested'; enabled: boolean }
+  | { kind: 'set-auto-fade-delay'; delay: VideoAutoFadeDelay }
+  | {
+      kind: 'set-spotlight-settings';
+      cursorHaloEnabled: boolean;
+      cursorDimmingEnabled: boolean;
+      clickAnimationEnabled: boolean;
+    }
   | { kind: 'set-microphone-enabled' | 'set-webcam-enabled'; enabled: boolean }
   | { kind: 'select-microphone-device' | 'select-webcam-device'; deviceId: string | null }
   | {
@@ -164,26 +181,30 @@ export function isVideoRecordingSurfaceSnapshot(
 ): value is VideoRecordingSurfaceSnapshot {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'surfaceSessionId',
-      'autoFadeDelay',
-      'documentGeneration',
-      'lifecycle',
-      'recordingId',
-      'entry',
-      'toolbarRequested',
-      'capabilityEpoch',
-      'cursorSpotlightEnabled',
-      'peerGeneration',
-      'status',
-      'duration',
-      'microphoneEnabled',
-      'microphoneDeviceId',
-      'webcamEnabled',
-      'webcamDeviceId',
-      'webcamPresentation',
-      'errorCode',
-    ])
+    !Object.keys(value).every((key) =>
+      [
+        'surfaceSessionId',
+        'autoFadeDelay',
+        'documentGeneration',
+        'lifecycle',
+        'recordingId',
+        'entry',
+        'toolbarRequested',
+        'capabilityEpoch',
+        'cursorSpotlightEnabled',
+        'peerGeneration',
+        'status',
+        'duration',
+        'microphoneEnabled',
+        'microphoneDeviceId',
+        'webcamEnabled',
+        'webcamDeviceId',
+        'webcamPresentation',
+        'errorCode',
+        'cursorDimmingEnabled',
+        'cursorClickAnimationEnabled',
+      ].includes(key)
+    )
   ) {
     return false;
   }
@@ -198,6 +219,10 @@ export function isVideoRecordingSurfaceSnapshot(
     typeof value['toolbarRequested'] === 'boolean' &&
     isFiniteNonNegativeNumber(value['capabilityEpoch']) &&
     typeof value['cursorSpotlightEnabled'] === 'boolean' &&
+    (value['cursorDimmingEnabled'] === undefined ||
+      typeof value['cursorDimmingEnabled'] === 'boolean') &&
+    (value['cursorClickAnimationEnabled'] === undefined ||
+      typeof value['cursorClickAnimationEnabled'] === 'boolean') &&
     isFiniteNonNegativeNumber(value['peerGeneration']) &&
     isRecordingStatus(value['status']) &&
     isFiniteNonNegativeNumber(value['duration']) &&
@@ -292,6 +317,34 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
 
   if (['cancel-start', 'pause', 'resume', 'stop'].includes(value['kind'])) {
     return hasExactKeys(value, ['kind']);
+  }
+  if (value['kind'] === 'list-media-devices') {
+    return (
+      hasExactKeys(value, ['kind', 'deviceKind']) &&
+      (value['deviceKind'] === 'audioinput' || value['deviceKind'] === 'videoinput')
+    );
+  }
+  if (value['kind'] === 'set-toolbar-requested') {
+    return hasExactKeys(value, ['kind', 'enabled']) && typeof value['enabled'] === 'boolean';
+  }
+  if (value['kind'] === 'set-auto-fade-delay') {
+    return (
+      hasExactKeys(value, ['kind', 'delay']) &&
+      VIDEO_AUTO_FADE_DELAYS.includes(value['delay'] as VideoAutoFadeDelay)
+    );
+  }
+  if (value['kind'] === 'set-spotlight-settings') {
+    return (
+      hasExactKeys(value, [
+        'kind',
+        'cursorHaloEnabled',
+        'cursorDimmingEnabled',
+        'clickAnimationEnabled',
+      ]) &&
+      typeof value['cursorHaloEnabled'] === 'boolean' &&
+      typeof value['cursorDimmingEnabled'] === 'boolean' &&
+      typeof value['clickAnimationEnabled'] === 'boolean'
+    );
   }
   if (value['kind'] === 'set-microphone-enabled' || value['kind'] === 'set-webcam-enabled') {
     return hasExactKeys(value, ['kind', 'enabled']) && typeof value['enabled'] === 'boolean';

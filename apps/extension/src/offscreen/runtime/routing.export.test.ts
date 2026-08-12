@@ -11,6 +11,7 @@ const {
   createSourceVideoMock,
   disposeMultiSourceDesktopMediaMock,
   getProjectExportCapabilitiesMock,
+  listVideoRecordingMediaDevicesMock,
   parseOffscreenRuntimeMessageMock,
   pauseRecordingMock,
   reconcileProjectExportJobsMock,
@@ -35,6 +36,7 @@ const {
   createSourceVideoMock: vi.fn(),
   disposeMultiSourceDesktopMediaMock: vi.fn(),
   getProjectExportCapabilitiesMock: vi.fn(),
+  listVideoRecordingMediaDevicesMock: vi.fn(),
   parseOffscreenRuntimeMessageMock: vi.fn(),
   pauseRecordingMock: vi.fn(),
   reconcileProjectExportJobsMock: vi.fn(),
@@ -123,6 +125,11 @@ vi.mock('../../composition/persistence/project-export-inputs', async (importOrig
   consumeProjectExportInput: consumeProjectExportInputMock,
 }));
 
+vi.mock('../recording/camera-source/device-catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../recording/camera-source/device-catalog')>()),
+  listVideoRecordingMediaDevices: listVideoRecordingMediaDevicesMock,
+}));
+
 import {
   handleOffscreenRuntimeMessage,
   parseOffscreenRuntimeMessageOrNull,
@@ -146,6 +153,9 @@ beforeEach(() => {
   cancelProjectExportMock.mockResolvedValue(undefined);
   consumeProjectExportInputMock.mockResolvedValue(createProject());
   getProjectExportCapabilitiesMock.mockResolvedValue({ formats: [] });
+  listVideoRecordingMediaDevicesMock.mockResolvedValue([
+    { deviceId: 'camera-a', kind: 'videoinput', label: 'Camera A' },
+  ]);
   requestDesktopMediaMock.mockResolvedValue(undefined);
   recordingContextMock.sourceStream = null;
   recordingContextMock.sourceVideoHeight = 720;
@@ -174,6 +184,11 @@ function createRecordingSettings() {
 }
 
 async function routeRecordingRuntimeMessages(): Promise<void> {
+  await handleOffscreenRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+    capabilityToken: 'test-capability',
+    deviceKind: 'videoinput',
+  });
   await handleOffscreenRuntimeMessage({
     type: VideoMessageType.GET_DESKTOP_MEDIA,
     capabilityToken: 'test-capability',
@@ -284,6 +299,9 @@ it('classifies handled offscreen export message phases and response modes', () =
   );
   expect(
     resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE)
+  ).toBe('deferred-ack');
+  expect(
+    resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER)
   ).toBe('deferred-ack');
   expect(resolveOffscreenRuntimeResponseMode(VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE)).toBe(
     'manual'
@@ -716,6 +734,7 @@ it('routes recording and project export runtime messages to their owners', async
     sourceCount: 2,
     sourceIndex: 1,
   });
+  expect(listVideoRecordingMediaDevicesMock).toHaveBeenCalledWith('videoinput');
   expect(disposeMultiSourceDesktopMediaMock).toHaveBeenCalledOnce();
   expect(startRecordingMock).toHaveBeenCalledWith({
     generation: 1,

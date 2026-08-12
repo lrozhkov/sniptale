@@ -243,6 +243,7 @@ export async function enableScreenshotMode(
   viewportOwnerState: ViewportOwnerState,
   webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map(),
   options: {
+    commitGuard?: ScreenshotModeCommitGuard;
     surfaceDocumentId?: string;
     toolbarVisible?: boolean;
     workingMode?: ToolbarWorkingMode;

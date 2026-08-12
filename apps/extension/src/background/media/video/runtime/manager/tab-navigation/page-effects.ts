@@ -85,9 +85,12 @@ export async function suspendTabNavigationPageEffects(
         await closeVideoRecordingCameraPeerForLease(current);
       } catch (error) {
         await updateVideoRecordingSurface(current.surfaceSessionId, { lifecycle: 'degraded' });
-        throw error;
+        logger.warn('Embedded camera cleanup was deferred before navigation', error);
       }
     }
+    // Rebinding invalidates the old document and peer generations even when
+    // offscreen cleanup must be retried later. Toolbar restoration must not be
+    // coupled to retirement of an optional camera peer.
     await beginVideoRecordingSurfaceRebind(binding.tabId);
   }
   if (effects.controlledCursor) {
@@ -114,18 +117,20 @@ async function restoreContentSurfaceEffect(
     return;
   }
   let restorable = current;
+  let cameraCleanupDegraded = false;
   if (current.lifecycle === 'degraded') {
     try {
       await closeVideoRecordingCameraPeerForLease(current);
-      restorable = (await beginVideoRecordingSurfaceRebind(binding.tabId)) ?? current;
     } catch (error) {
+      cameraCleanupDegraded = true;
       logger.warn('Embedded camera cleanup remains degraded after navigation', error);
-      return;
     }
+    restorable = (await beginVideoRecordingSurfaceRebind(binding.tabId)) ?? current;
   }
   const ready =
-    (await updateVideoRecordingSurface(restorable.surfaceSessionId, { lifecycle: 'ready' })) ??
-    restorable;
+    (await updateVideoRecordingSurface(restorable.surfaceSessionId, {
+      lifecycle: cameraCleanupDegraded ? 'degraded' : 'ready',
+    })) ?? restorable;
   if (!binding.isCurrent()) return;
   const settings = await loadVideoSettings();
   if (!binding.isCurrent()) return;

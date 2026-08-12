@@ -83,7 +83,12 @@ function registerFullVideoSettingsTests() {
         },
         sourceCount: 2,
         systemAudioEnabled: true,
-        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: true },
+        recordingSurface: {
+          toolbarEnabled: true,
+          cursorSpotlightEnabled: true,
+          cursorDimmingEnabled: false,
+          cursorClickAnimationEnabled: false,
+        },
         webcamDeviceId: 'cam-1',
         webcamEnabled: true,
         webcamPresentation: DEFAULT_VIDEO_SETTINGS.webcamPresentation,
@@ -108,7 +113,12 @@ function registerFullVideoSettingsTests() {
         },
         sourceCount: 2,
         systemAudioEnabled: true,
-        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: true },
+        recordingSurface: {
+          toolbarEnabled: true,
+          cursorSpotlightEnabled: true,
+          cursorDimmingEnabled: false,
+          cursorClickAnimationEnabled: false,
+        },
         webcamDeviceId: 'cam-1',
         webcamEnabled: true,
         webcamPresentation: DEFAULT_VIDEO_SETTINGS.webcamPresentation,
@@ -155,7 +165,12 @@ function registerPartialVideoSettingsTests() {
   it('rejects malformed recording surface and webcam presentation values independently', () => {
     expect(
       parseCurrentVideoSettings({
-        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: false },
+        recordingSurface: {
+          toolbarEnabled: true,
+          cursorSpotlightEnabled: false,
+          cursorDimmingEnabled: false,
+          cursorClickAnimationEnabled: false,
+        },
         webcamPresentation: {
           ...DEFAULT_VIDEO_SETTINGS.webcamPresentation,
           center: { x: 2, y: 0.5 },
@@ -166,7 +181,12 @@ function registerPartialVideoSettingsTests() {
       invalidFieldCount: 1,
       value: {
         ...CURRENT_VIDEO_SETTINGS_CONTRACT,
-        recordingSurface: { toolbarEnabled: true, cursorSpotlightEnabled: false },
+        recordingSurface: {
+          toolbarEnabled: true,
+          cursorSpotlightEnabled: false,
+          cursorDimmingEnabled: false,
+          cursorClickAnimationEnabled: false,
+        },
       },
     });
   });

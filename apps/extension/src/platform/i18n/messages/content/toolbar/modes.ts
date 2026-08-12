@@ -15,6 +15,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Неизвестная ошибка',
     en: 'Unknown error',
   },
+  videoRecordingActionFailed: {
+    ru: 'Не удалось выполнить действие с записью. Повторите попытку.',
+    en: 'The recording action failed. Try again.',
+  },
   viewportConflictError: {
     ru: VIEWPORT_CONFLICT_ERROR_RU,
     en: VIEWPORT_CONFLICT_ERROR_EN,
@@ -74,6 +78,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'The toolbar stays pinned while video recording mode is selected',
   },
   videoRecordingStart: { ru: 'Записать видео', en: 'Record video' },
+  videoRecordingStartHint: {
+    ru: 'Начать запись с текущими настройками из раздела «Видео» во всплывающем окне',
+    en: 'Start recording with the current settings from the Video tab in the popup',
+  },
   videoRecordingCancelStart: { ru: 'Отменить запуск', en: 'Cancel start' },
   videoRecordingPause: { ru: 'Пауза', en: 'Pause' },
   videoRecordingResume: { ru: 'Продолжить', en: 'Resume' },
@@ -81,8 +89,17 @@ export const contentToolbarModesMessages = defineMessageSource({
   videoRecordingStopping: { ru: 'Завершение записи', en: 'Finishing recording' },
   videoRecordingMicrophone: { ru: 'Микрофон', en: 'Microphone' },
   videoRecordingCamera: { ru: 'Камера', en: 'Camera' },
+  videoRecordingCameraPreviewUnavailable: {
+    ru: 'Предпросмотр камеры недоступен',
+    en: 'Camera preview is unavailable',
+  },
+  videoRecordingDevicesLoading: { ru: 'Загрузка устройств…', en: 'Loading devices…' },
+  videoRecordingDevicesEmpty: { ru: 'Устройства не найдены', en: 'No devices found' },
   videoRecordingMedia: { ru: 'Микрофон и камера', en: 'Microphone and camera' },
   videoRecordingSpotlight: { ru: 'Подсветка курсора', en: 'Cursor spotlight' },
+  videoRecordingCursorHalo: { ru: 'Контур курсора', en: 'Cursor halo' },
+  videoRecordingCursorDimming: { ru: 'Затемнение страницы', en: 'Dim page' },
+  videoRecordingClickAnimation: { ru: 'Анимация клика', en: 'Click animation' },
   videoRecordingModeControls: { ru: 'Режим взаимодействия', en: 'Interaction mode' },
   videoRecordingActions: { ru: 'Управление записью', en: 'Recording controls' },
   drawingUnavailable: {

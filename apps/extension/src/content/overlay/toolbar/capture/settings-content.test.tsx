@@ -185,7 +185,7 @@ describe('ToolbarSettingsDropdown', () => {
     renderSettingsDropdown();
 
     const collapseButton = findButton('content.toolbar.hideToolbar');
-    expect(collapseButton?.querySelector('svg')?.classList).toContain('lucide-panel-top-close');
+    expect(collapseButton?.querySelector('svg')?.classList).toContain('lucide-panel-bottom-close');
   });
 
   it('preserves the native exit gesture for screenshot capability recovery', () => {

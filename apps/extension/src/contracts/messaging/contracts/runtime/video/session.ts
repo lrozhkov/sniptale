@@ -46,6 +46,16 @@ function isNonEmptyString(value: unknown): value is string {
   return isString(value) && value.length > 0;
 }
 
+function isVideoRecordingMediaDevice(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => ['deviceId', 'kind', 'label'].includes(key)) &&
+    isString(value['deviceId']) &&
+    (value['kind'] === 'audioinput' || value['kind'] === 'videoinput') &&
+    isString(value['label'])
+  );
+}
+
 function isPostRecordAcknowledgementResult(value: unknown): value is 'acknowledged' | 'stale' {
   return value === 'acknowledged' || value === 'stale';
 }
@@ -119,7 +129,7 @@ export const runtimeVideoSessionMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime VIDEO_RECORDING_CAMERA_CLOSE response',
-      createRuntimeResponseGuard()
+      createRuntimeResponseGuard({ optional: { result: isString } })
     ),
   },
   [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER]: {
@@ -150,7 +160,44 @@ export const runtimeVideoSessionMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE response',
-      createRuntimeResponseGuard()
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+        required: {
+          capabilityToken: isString,
+          deviceId: (value) => value === null || isString(value),
+          peerId: isString,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH response',
+      createRuntimeResponseGuard({ optional: { result: isString } })
+    ),
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES message',
+      createMessageGuard({
+        type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+        required: {
+          capabilityToken: isString,
+          deviceKind: (value) => value === 'audioinput' || value === 'videoinput',
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES response',
+      createRuntimeResponseGuard({
+        optional: {
+          mediaDevices: (value) => Array.isArray(value) && value.every(isVideoRecordingMediaDevice),
+        },
+      })
     ),
   },
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: {
@@ -160,7 +207,7 @@ export const runtimeVideoSessionMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime RELEASE_VIDEO_RECORDING_SURFACE response',
-      createRuntimeResponseGuard()
+      createRuntimeResponseGuard({ optional: { result: isString } })
     ),
   },
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: {
@@ -170,7 +217,9 @@ export const runtimeVideoSessionMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime VIDEO_RECORDING_SURFACE_COMMAND response',
-      createRuntimeResponseGuard({ optional: { snapshot: isVideoRecordingSurfaceSnapshot } })
+      createRuntimeResponseGuard({
+        optional: { result: isRecord, snapshot: isVideoRecordingSurfaceSnapshot },
+      })
     ),
   },
   [VideoMessageType.START_RECORDING]: {

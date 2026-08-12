@@ -7,6 +7,11 @@ import {
   listPendingVideoRecordingCameraPeerCleanup,
   retainVideoRecordingCameraPeerCleanup,
 } from './camera-peer-cleanup';
+import {
+  ensureOffscreenDocument,
+  waitForOffscreenReady,
+} from '../../../offscreen-document/service';
+import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type CameraPeerLease = {
   documentGeneration: number;
@@ -33,6 +38,27 @@ async function sendClose(peerId: string): Promise<void> {
   if (!response?.success) {
     throw new Error(response?.error ?? 'Camera peer close was not acknowledged');
   }
+}
+
+export async function ensureVideoRecordingCameraOffscreenReady(): Promise<void> {
+  await ensureOffscreenDocument('Preview recording camera and enumerate media devices');
+  await waitForOffscreenReady();
+}
+
+export async function listVideoRecordingMediaDevices(
+  deviceKind: 'audioinput' | 'videoinput'
+): Promise<VideoRecordingMediaDevice[]> {
+  await ensureVideoRecordingCameraOffscreenReady();
+  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+      deviceKind,
+    })
+  );
+  if (!response?.success || !response.mediaDevices) {
+    throw new Error(response?.error ?? 'Media device enumeration was not acknowledged');
+  }
+  return response.mediaDevices;
 }
 
 function schedulePendingPeerRetirement(stopRequested: boolean): void {
@@ -84,6 +110,23 @@ export async function closeVideoRecordingCameraPeerForLease(lease: CameraPeerLea
       );
     }
     throw error;
+  }
+}
+
+export async function switchVideoRecordingCameraPeerInput(
+  lease: CameraPeerLease,
+  deviceId: string | null
+): Promise<void> {
+  await ensureVideoRecordingCameraOffscreenReady();
+  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH,
+      deviceId,
+      peerId: getVideoRecordingCameraPeerId(lease),
+    })
+  );
+  if (!response?.success) {
+    throw new Error(response?.error ?? 'Camera input switch was not acknowledged');
   }
 }
 

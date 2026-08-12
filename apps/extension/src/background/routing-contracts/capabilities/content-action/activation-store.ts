@@ -8,6 +8,7 @@ import {
   CaptureMessageType,
   MessageType,
 } from '@sniptale/runtime-contracts/messaging/message-types';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { ContentSenderBinding } from './capability-store';
 import { createPrivilegedCapabilityStore } from '../privileged-authority/state';
 import { requirePolicyStateTtlMs } from '../policy/ttl';
@@ -68,6 +69,8 @@ function getPurposeActionTypes(
     MessageType.TRIGGER_QUICK_ACTION,
     MessageType.CONTENT_RUNTIME_WAKEUP,
     MessageType.AI_SETTINGS_NAVIGATION,
+    VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
+    VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
   ];
 }
 

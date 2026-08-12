@@ -175,6 +175,58 @@ it('allows start recording responses to carry the recording control capability',
   });
 });
 
+it('accepts canonical successful content-surface command and release results', () => {
+  expect(
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND
+    ].parseResponse({
+      success: true,
+      result: { result: 'accepted' },
+    })
+  ).toEqual({ success: true, result: { result: 'accepted' } });
+  expect(
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE
+    ].parseResponse({ success: true, result: 'released' })
+  ).toEqual({ success: true, result: 'released' });
+  expect(
+    runtimeVideoSessionMessageContracts[
+      VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE
+    ].parseResponse({ success: true, result: 'closed' })
+  ).toEqual({ success: true, result: 'closed' });
+});
+
+it('validates kind-specific offscreen media-device catalog messages', () => {
+  const contract =
+    runtimeVideoSessionMessageContracts[VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES];
+  expect(
+    contract.parseRequest({
+      capabilityToken: 'offscreen-capability',
+      deviceKind: 'videoinput',
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+    })
+  ).toEqual({
+    capabilityToken: 'offscreen-capability',
+    deviceKind: 'videoinput',
+    type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+  });
+  expect(
+    contract.parseResponse({
+      success: true,
+      mediaDevices: [{ deviceId: 'camera-a', kind: 'videoinput', label: '' }],
+    })
+  ).toEqual({
+    success: true,
+    mediaDevices: [{ deviceId: 'camera-a', kind: 'videoinput', label: '' }],
+  });
+  expect(() =>
+    contract.parseRequest({
+      capabilityToken: 'offscreen-capability',
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES,
+    })
+  ).toThrow(/MEDIA_DEVICES/);
+});
+
 it('registers launch tokens and accepts only tokenless same-tab reconnect requests', () => {
   expect(
     runtimeVideoSessionMessageContracts[

@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
 import { createCameraSourcePeerOwner } from './peer';
+import type { CameraSourceLease } from './session';
 
 class TestPeerConnection extends EventTarget {
   connectionState: RTCPeerConnectionState = 'new';
@@ -159,12 +160,101 @@ it('answers a non-trickle offer with the leased stable camera track', async () =
   expect(release).toHaveBeenCalledOnce();
 });
 
-it('rejects duplicate peer identities without acquiring another source lease', async () => {
-  const acquireSource = vi.fn().mockResolvedValue({
-    release: vi.fn(),
-    stream: createTrackedStream(),
-    trackSettings: {},
+it('switches the stable camera source only for an active preview peer', async () => {
+  const switchInput = vi.fn().mockResolvedValue(undefined);
+  const owner = createCameraSourcePeerOwner({
+    acquireSource: vi.fn().mockResolvedValue({
+      release: vi.fn(),
+      stream: createTrackedStream(),
+      trackSettings: {},
+    }),
+    createConnection: () => new TestPeerConnection(),
+    switchInput,
   });
+  await owner.answerOffer({
+    offer: { sdp: 'remote-offer', type: 'offer' },
+    peerId: 'active-preview',
+    settings: DEFAULT_VIDEO_SETTINGS,
+  });
+
+  await expect(owner.switchInput('active-preview', 'camera-2')).resolves.toBeUndefined();
+  await expect(owner.switchInput('stale-preview', 'camera-3')).rejects.toThrow(
+    'Camera source peer stale-preview is not active'
+  );
+  expect(switchInput).toHaveBeenCalledOnce();
+  expect(switchInput).toHaveBeenCalledWith('camera-2');
+  owner.closeAll();
+});
+
+it('accepts a source switch while the matching preview peer is still acquiring its lease', async () => {
+  let resolveLease!: (lease: CameraSourceLease) => void;
+  const leasePromise = new Promise<CameraSourceLease>((resolve) => {
+    resolveLease = resolve;
+  });
+  const switchInput = vi.fn().mockResolvedValue(undefined);
+  const owner = createCameraSourcePeerOwner({
+    acquireSource: vi.fn().mockReturnValue(leasePromise),
+    createConnection: () => new TestPeerConnection(),
+    switchInput,
+  });
+  const answer = owner.answerOffer({
+    offer: { sdp: 'remote-offer', type: 'offer' },
+    peerId: 'pending-preview',
+    settings: DEFAULT_VIDEO_SETTINGS,
+  });
+
+  await expect(owner.switchInput('pending-preview', null)).resolves.toBeUndefined();
+  expect(switchInput).toHaveBeenCalledWith(null);
+  resolveLease({ release: vi.fn(), stream: createTrackedStream(), trackSettings: {} });
+  await answer;
+  owner.closeAll();
+});
+
+it('returns the available local answer when ICE gathering does not reach complete', async () => {
+  vi.useFakeTimers();
+  const connection = new TestPeerConnection();
+  connection.iceGatheringState = 'gathering';
+  const owner = createCameraSourcePeerOwner({
+    acquireSource: vi.fn().mockResolvedValue({
+      release: vi.fn(),
+      stream: createTrackedStream(),
+      trackSettings: {},
+    }),
+    createConnection: () => connection,
+  });
+
+  const answer = owner.answerOffer({
+    offer: { sdp: 'remote-offer', type: 'offer' },
+    peerId: 'slow-ice-peer',
+    settings: DEFAULT_VIDEO_SETTINGS,
+  });
+  await vi.advanceTimersByTimeAsync(3_000);
+
+  await expect(answer).resolves.toEqual({ sdp: 'local-answer', type: 'answer' });
+  owner.close('slow-ice-peer');
+  vi.useRealTimers();
+});
+
+it('atomically replaces a duplicate peer identity during document reconnect', async () => {
+  const firstRelease = vi.fn();
+  const secondRelease = vi.fn();
+  const acquireSource = vi
+    .fn()
+    .mockResolvedValue({
+      release: firstRelease,
+      stream: createTrackedStream(),
+      trackSettings: {},
+    })
+    .mockResolvedValueOnce({
+      release: firstRelease,
+      stream: createTrackedStream(),
+      trackSettings: {},
+    })
+    .mockResolvedValueOnce({
+      release: secondRelease,
+      stream: createTrackedStream(),
+      trackSettings: {},
+    });
   const owner = createCameraSourcePeerOwner({
     acquireSource,
     createConnection: () => new TestPeerConnection(),
@@ -176,9 +266,14 @@ it('rejects duplicate peer identities without acquiring another source lease', a
   };
 
   await owner.answerOffer(params);
-  await expect(owner.answerOffer(params)).rejects.toThrow('already active');
-  expect(acquireSource).toHaveBeenCalledOnce();
+  await expect(owner.answerOffer(params)).resolves.toEqual({
+    sdp: 'local-answer',
+    type: 'answer',
+  });
+  expect(acquireSource).toHaveBeenCalledTimes(2);
+  expect(firstRelease).toHaveBeenCalledOnce();
   owner.closeAll();
+  expect(secondRelease).toHaveBeenCalledOnce();
 });
 
 it('closes the connection and releases the camera lease when negotiation fails', async () => {

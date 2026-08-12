@@ -29,6 +29,12 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: RuntimeMessageResponse<
     Record<string, never>
   >;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: RuntimeMessageResponse<
+    Record<string, never>
+  >;
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: RuntimeMessageResponse<{
+    mediaDevices?: Array<{ deviceId: string; kind: 'audioinput' | 'videoinput'; label: string }>;
+  }>;
   [VideoMessageType.START_RECORDING]: RuntimeMessageResponse<RuntimeRecordingStartResult>;
   [VideoMessageType.CANCEL_RECORDING_START]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;
   [VideoMessageType.STOP_RECORDING]: RuntimeMessageResponse<RuntimeRecordingCommandResult>;

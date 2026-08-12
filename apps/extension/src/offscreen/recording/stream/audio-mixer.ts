@@ -113,6 +113,10 @@ export class AudioMixer {
     });
   }
 
+  hasMicrophone(): boolean {
+    return this.micStream !== null;
+  }
+
   getMixedStream(): MediaStream {
     return this.graph.getMixedStream();
   }

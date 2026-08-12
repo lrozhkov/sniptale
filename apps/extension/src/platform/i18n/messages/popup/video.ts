@@ -109,6 +109,10 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Открыть панель инструментов записи на вкладке',
     en: 'Open the recording tools on the tab',
   },
+  recordingToolbarDisabledDescription: {
+    ru: 'Панель доступна только для записи вкладки или области вкладки',
+    en: 'The toolbar is available only for tab or tab-area recording',
+  },
   controlledCursorLabel: {
     ru: 'История действий',
     en: 'Action history',

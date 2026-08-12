@@ -50,6 +50,11 @@ const mocks = vi.hoisted(() => ({
   useToolbarModeController: vi.fn((_args: ToolbarModeControllerMockArgs) => ({
     kind: 'mode-controller',
   })),
+  videoRecordingController: { kind: 'video-recording-controller' },
+  useVideoRecordingSurfaceController: vi.fn(
+    (_args: { onModeRequested: (enabled: boolean) => void; onToolbarRequested: () => void }) =>
+      mocks.videoRecordingController
+  ),
   preloadAIModal: vi.fn(async () => undefined),
 }));
 
@@ -99,6 +104,10 @@ vi.mock('../../../drawing/mode', async (importOriginal) => ({
   useDrawingModeIntegration: mocks.useDrawingModeIntegration,
 }));
 
+vi.mock('../../video-recording/session/controller', () => ({
+  useVideoRecordingSurfaceController: mocks.useVideoRecordingSurfaceController,
+}));
+
 import { useContentAppControllers } from '.';
 
 let container: HTMLDivElement | null = null;
@@ -130,6 +139,7 @@ function createModeState(): ContentAppControllersModeState {
     queueAutoStartCapture: vi.fn(),
     saveDialogState: null,
     screenshotMode: true,
+    videoRecordingMode: false,
     sessionActivePresetId: 'preset-1',
     setAiPickMode: vi.fn(),
     setCaptureAction: vi.fn(),
@@ -150,6 +160,7 @@ function createModeState(): ContentAppControllersModeState {
     setSessionActivePresetId: vi.fn(),
     setScreenshotMode: vi.fn(),
     setTimerDelay: vi.fn(),
+    setVideoRecordingMode: vi.fn(),
     timerDelay: 5,
   };
 }
@@ -270,6 +281,16 @@ function expectControllerResult() {
     handleToggleDrawingMode: expect.any(Function),
   });
   expect(latestControllers?.screenshotController).toBe(mocks.screenshotController);
+  expect(latestControllers?.videoRecordingController).toBe(mocks.videoRecordingController);
+}
+
+function expectVideoRecordingControllerArgs(modeState: ReturnType<typeof createModeState>) {
+  expect(mocks.useVideoRecordingSurfaceController).toHaveBeenCalledOnce();
+  const args = mocks.useVideoRecordingSurfaceController.mock.calls[0]?.[0];
+  args?.onModeRequested(true);
+  args?.onToolbarRequested();
+  expect(modeState.setVideoRecordingMode).toHaveBeenCalledWith(true);
+  expect(modeState.setIsToolbarVisible).toHaveBeenCalledWith(true);
 }
 
 beforeEach(() => {
@@ -294,6 +315,7 @@ async function expectControllerOwnerGrouping() {
   expectAiAndToolbarControllerArgs(modeState);
   expectScreenshotControllerArgs(modeState);
   expectAutoStartArgs(modeState);
+  expectVideoRecordingControllerArgs(modeState);
   expectControllerResult();
 }
 

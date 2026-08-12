@@ -7,6 +7,7 @@ import type { ContentRuntimeMessage } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
 import type { FullPageCaptureAgent } from '../../application/full-page-capture';
 import { handleFullPageCaptureMessage } from './full-page-capture';
+import { handleVideoRecordingSurfaceSnapshotMessage } from './video-recording-surface';
 
 export function createContentRuntimeMessageHandlers(
   message: ContentRuntimeMessage,
@@ -21,6 +22,7 @@ export function createContentRuntimeMessageHandlers(
   const regionOverlayDeps = createRegionOverlayBridgeDeps(regionSelectorController);
 
   return [
+    () => handleVideoRecordingSurfaceSnapshotMessage(message, sendResponse),
     () => handleCoreModeMessage(message),
     () => handleViewportMessage(message, sendResponse, getViewportInfo, regionSelectorController),
     () => handleRegionOverlayMessage(message, sendResponse, regionOverlayDeps),

@@ -3,30 +3,55 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const {
   buildScreenshotModeStatusResponseMock,
   cleanupScreenshotModeAfterNavigationMock,
+  disableScreenshotModeRollbackMock,
   disableScreenshotModeMock,
   enableScreenshotModeMock,
   getScreenshotPresetAvailabilitiesMock,
   handleApplyViewportPresetMock,
   handleReleaseViewportPresetMock,
+  openVideoRecordingSurfaceFromPopupMock,
+  getVideoRecordingTabIdMock,
+  hasActiveVideoRecordingSessionMock,
+  isVideoRecordingPreparationInProgressMock,
+  isVideoRecordingStopInProgressMock,
 } = vi.hoisted(() => ({
   buildScreenshotModeStatusResponseMock: vi.fn(),
   cleanupScreenshotModeAfterNavigationMock: vi.fn(),
+  disableScreenshotModeRollbackMock: vi.fn(),
   disableScreenshotModeMock: vi.fn(),
   enableScreenshotModeMock: vi.fn(),
   getScreenshotPresetAvailabilitiesMock: vi.fn(),
   handleApplyViewportPresetMock: vi.fn(),
   handleReleaseViewportPresetMock: vi.fn(),
+  openVideoRecordingSurfaceFromPopupMock: vi.fn(),
+  getVideoRecordingTabIdMock: vi.fn(),
+  hasActiveVideoRecordingSessionMock: vi.fn(),
+  isVideoRecordingPreparationInProgressMock: vi.fn(),
+  isVideoRecordingStopInProgressMock: vi.fn(),
 }));
 
 vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../tab-mode-router-screenshot')>()),
   buildScreenshotModeStatusResponse: buildScreenshotModeStatusResponseMock,
   cleanupScreenshotModeAfterNavigation: cleanupScreenshotModeAfterNavigationMock,
+  disableScreenshotMode: disableScreenshotModeRollbackMock,
   disableScreenshotModeForContent: disableScreenshotModeMock,
   enableScreenshotMode: enableScreenshotModeMock,
   getScreenshotPresetAvailabilities: getScreenshotPresetAvailabilitiesMock,
   handleApplyViewportPreset: handleApplyViewportPresetMock,
   handleReleaseViewportPreset: handleReleaseViewportPresetMock,
+}));
+
+vi.mock('../../media/video/content-surface/start', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../media/video/content-surface/start')>()),
+  openVideoRecordingSurfaceFromPopup: openVideoRecordingSurfaceFromPopupMock,
+}));
+vi.mock('../../media/video/session-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../media/video/session-state')>()),
+  getVideoRecordingTabId: getVideoRecordingTabIdMock,
+  hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
+  isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
+  isVideoRecordingStopInProgress: isVideoRecordingStopInProgressMock,
 }));
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -54,16 +79,24 @@ function createContext(): TabModeContext {
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   buildScreenshotModeStatusResponseMock.mockReturnValue(true);
   disableScreenshotModeMock.mockResolvedValue(undefined);
+  disableScreenshotModeRollbackMock.mockResolvedValue(undefined);
   enableScreenshotModeMock.mockResolvedValue(undefined);
   getScreenshotPresetAvailabilitiesMock.mockResolvedValue([{ status: 'available' }]);
   handleApplyViewportPresetMock.mockResolvedValue(undefined);
   handleReleaseViewportPresetMock.mockResolvedValue(undefined);
+  openVideoRecordingSurfaceFromPopupMock.mockResolvedValue(undefined);
+  getVideoRecordingTabIdMock.mockReturnValue(null);
+  hasActiveVideoRecordingSessionMock.mockReturnValue(false);
+  isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
+  isVideoRecordingStopInProgressMock.mockReturnValue(false);
 });
 
 it('routes screenshot mode messages through async success and delegated status handling', async () => {
@@ -143,10 +176,102 @@ it('forwards a requested working mode and synchronizes persisted mode flags', as
     context.viewportState,
     context.viewportOwnerState,
     context.webSnapshotViewerPorts,
-    { workingMode: 'highlighter' }
+    { commitGuard: expect.any(Function), workingMode: 'highlighter' }
   );
   expect(context.highlighterModeState.get(7)).toBe(true);
   expect(context.quickEditModeState.has(7)).toBe(false);
+});
+
+it('rejects popup tool mode changes while video recording owns the tab', () => {
+  const context = createContext();
+  getVideoRecordingTabIdMock.mockReturnValue(7);
+  hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+
+  expect(
+    routeScreenshotModeMessage(
+      { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'design-review' },
+      context
+    )
+  ).toBe(true);
+
+  expect(enableScreenshotModeMock).not.toHaveBeenCalled();
+  expect(context.sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: expect.stringContaining('Stop the active video recording'),
+  });
+});
+
+it('rolls back a popup tool mode when recording starts before screenshot commit', async () => {
+  const context = createContext();
+  enableScreenshotModeMock.mockImplementationOnce(async (...args: unknown[]) => {
+    const options = args.at(-1) as { commitGuard: () => boolean };
+    getVideoRecordingTabIdMock.mockReturnValue(7);
+    hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+    options.commitGuard();
+  });
+
+  routeScreenshotModeMessage(
+    { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'drawing' },
+    context
+  );
+  await flushPromises();
+
+  expect(context.sendResponse).toHaveBeenCalledWith({
+    success: false,
+    error: expect.stringContaining('Stop the active video recording'),
+  });
+  expect(context.highlighterModeState.has(7)).toBe(false);
+  expect(context.quickEditModeState.has(7)).toBe(false);
+});
+
+it('opens the background-owned video surface after preparing the popup toolbar', async () => {
+  const context = createContext();
+
+  expect(
+    routeScreenshotModeMessage(
+      { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'video-recording' },
+      context
+    )
+  ).toBe(true);
+  await flushPromises();
+
+  expect(enableScreenshotModeMock).toHaveBeenCalledWith(
+    7,
+    context.screenshotModeState,
+    context.viewportState,
+    context.viewportOwnerState,
+    context.webSnapshotViewerPorts,
+    { workingMode: 'video-recording' }
+  );
+  expect(openVideoRecordingSurfaceFromPopupMock).toHaveBeenCalledWith(7);
+  await vi.waitFor(() =>
+    expect(context.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' })
+  );
+});
+
+it('rolls back screenshot preparation when popup video-surface activation fails', async () => {
+  const context = createContext();
+  openVideoRecordingSurfaceFromPopupMock.mockRejectedValueOnce(new Error('surface unavailable'));
+
+  routeScreenshotModeMessage(
+    { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'video-recording' },
+    context
+  );
+  await flushPromises();
+
+  expect(disableScreenshotModeRollbackMock).toHaveBeenCalledWith(
+    7,
+    context.screenshotModeState,
+    context.viewportState,
+    context.viewportOwnerState,
+    context.webSnapshotViewerPorts
+  );
+  await vi.waitFor(() =>
+    expect(context.sendResponse).toHaveBeenCalledWith({
+      success: false,
+      error: 'surface unavailable',
+    })
+  );
 });
 
 it('binds content-originated screenshot enable to its preauthorized document', async () => {

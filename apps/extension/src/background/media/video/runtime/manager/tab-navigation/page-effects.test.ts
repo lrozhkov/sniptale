@@ -173,26 +173,24 @@ it('suspends and restores the content recording surface across navigation', asyn
   );
 });
 
-it('retains degraded authority when the stale camera peer cannot close', async () => {
+it('advances the document generation when stale camera cleanup must be retried', async () => {
   mocks.surfaceLease = {
     recordingId: 'recording-1',
     surfaceSessionId: 'surface-1',
     tabId: 7,
   };
   mocks.closeCameraPeer.mockRejectedValueOnce(new Error('peer unavailable'));
-  await expect(
-    suspendTabNavigationPageEffects(
-      {
-        contentSurface: true,
-        controlledCursor: false,
-        cropOverlay: false,
-        viewportCursorProjection: false,
-      },
-      binding
-    )
-  ).rejects.toThrow('peer unavailable');
+  await suspendTabNavigationPageEffects(
+    {
+      contentSurface: true,
+      controlledCursor: false,
+      cropOverlay: false,
+      viewportCursorProjection: false,
+    },
+    binding
+  );
   expect(mocks.updateSurface).toHaveBeenCalledWith('surface-1', { lifecycle: 'degraded' });
-  expect(mocks.beginSurfaceRebind).not.toHaveBeenCalled();
+  expect(mocks.beginSurfaceRebind).toHaveBeenCalledWith(7);
 });
 
 it('retries degraded peer cleanup before publishing a rebound surface', async () => {
@@ -231,6 +229,49 @@ it('retries degraded peer cleanup before publishing a rebound surface', async ()
 
   expect(mocks.closeCameraPeer).toHaveBeenCalledWith(degraded);
   expect(mocks.beginSurfaceRebind).toHaveBeenCalledWith(7);
+  expect(mocks.sendTabMessage).toHaveBeenCalledWith(
+    7,
+    expect.objectContaining({ surfaceToken: 'token-2' })
+  );
+});
+
+it('restores the toolbar in degraded state while failed camera cleanup remains queued', async () => {
+  const degraded = {
+    capabilityEpoch: 1,
+    documentGeneration: 0,
+    lifecycle: 'degraded',
+    peerGeneration: 0,
+    recordingId: 'recording-1',
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    tabId: 7,
+    toolbarRequested: true,
+  };
+  const rebound = {
+    ...degraded,
+    capabilityEpoch: 2,
+    documentGeneration: 1,
+    lifecycle: 'binding',
+    peerGeneration: 1,
+    surfaceToken: 'token-2',
+  };
+  mocks.surfaceLease = degraded;
+  mocks.closeCameraPeer.mockRejectedValueOnce(new Error('offscreen unavailable'));
+  mocks.beginSurfaceRebind.mockResolvedValueOnce(rebound);
+  mocks.updateSurface.mockResolvedValueOnce({ ...rebound, lifecycle: 'degraded' });
+
+  await restoreTabNavigationPageEffects(
+    {
+      contentSurface: true,
+      controlledCursor: false,
+      cropOverlay: false,
+      viewportCursorProjection: false,
+    },
+    binding,
+    mocks.ensurePageAccess
+  );
+
+  expect(mocks.updateSurface).toHaveBeenCalledWith('surface-1', { lifecycle: 'degraded' });
   expect(mocks.sendTabMessage).toHaveBeenCalledWith(
     7,
     expect.objectContaining({ surfaceToken: 'token-2' })

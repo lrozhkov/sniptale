@@ -26,13 +26,21 @@ export async function updateRecordingSettings(patch: LiveSettingsPatch): Promise
     if (hasActiveMultiSourceRecording() || !recordingContext.audioMixer) {
       throw new Error('Live microphone device switching is unavailable for this recording');
     }
-    await recordingContext.audioMixer.switchMicrophone({
-      ...(patch.autoGainControl === undefined ? {} : { autoGainControl: patch.autoGainControl }),
-      ...(patch.echoCancellation === undefined ? {} : { echoCancellation: patch.echoCancellation }),
-      microphoneDeviceId: patch.microphoneDeviceId,
-      ...(patch.microphoneGain === undefined ? {} : { microphoneGain: patch.microphoneGain }),
-      ...(patch.noiseSuppression === undefined ? {} : { noiseSuppression: patch.noiseSuppression }),
-    });
+    const enablingUninitializedMicrophone =
+      patch.microphoneEnabled === true && !recordingContext.audioMixer.hasMicrophone();
+    if (patch.microphoneEnabled !== false && !enablingUninitializedMicrophone) {
+      await recordingContext.audioMixer.switchMicrophone({
+        ...(patch.autoGainControl === undefined ? {} : { autoGainControl: patch.autoGainControl }),
+        ...(patch.echoCancellation === undefined
+          ? {}
+          : { echoCancellation: patch.echoCancellation }),
+        microphoneDeviceId: patch.microphoneDeviceId,
+        ...(patch.microphoneGain === undefined ? {} : { microphoneGain: patch.microphoneGain }),
+        ...(patch.noiseSuppression === undefined
+          ? {}
+          : { noiseSuppression: patch.noiseSuppression }),
+      });
+    }
   }
   if (patch.webcamEnabled !== undefined) {
     setCameraSourceEnabled(patch.webcamEnabled);
@@ -43,15 +51,30 @@ export async function updateRecordingSettings(patch: LiveSettingsPatch): Promise
   }
 
   if (patch.microphoneEnabled !== undefined) {
-    setSingleSourceMicrophoneEnabled(patch.microphoneEnabled);
+    await setSingleSourceMicrophoneEnabled(patch);
   }
   if (patch.webcamEnabled !== undefined) {
     setActiveSidecarWebcamEnabled(patch.webcamEnabled);
   }
 }
 
-function setSingleSourceMicrophoneEnabled(enabled: boolean): void {
+async function setSingleSourceMicrophoneEnabled(patch: LiveSettingsPatch): Promise<void> {
+  const enabled = patch.microphoneEnabled === true;
   if (recordingContext.audioMixer) {
+    if (enabled && !recordingContext.audioMixer.hasMicrophone()) {
+      await recordingContext.audioMixer.addMicrophone({
+        ...(patch.autoGainControl === undefined ? {} : { autoGainControl: patch.autoGainControl }),
+        ...(patch.echoCancellation === undefined
+          ? {}
+          : { echoCancellation: patch.echoCancellation }),
+        microphoneDeviceId: patch.microphoneDeviceId ?? null,
+        ...(patch.microphoneGain === undefined ? {} : { microphoneGain: patch.microphoneGain }),
+        ...(patch.noiseSuppression === undefined
+          ? {}
+          : { noiseSuppression: patch.noiseSuppression }),
+      });
+      return;
+    }
     recordingContext.audioMixer.setMicrophoneEnabled(enabled);
     return;
   }

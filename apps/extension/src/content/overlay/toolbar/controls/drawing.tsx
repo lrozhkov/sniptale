@@ -71,6 +71,7 @@ const tools: readonly DrawingToolDescriptor[] = [
 export interface ToolbarDrawingControlsOwner {
   readonly activeTool: DrawingTool | null;
   readonly showActions?: boolean;
+  readonly persistOptionsDisclosure?: boolean;
   readonly tools?: readonly DrawingTool[];
   onToolActivated(tool: DrawingTool): void;
   renderLeadingControls?(snapshot: DrawingSessionSnapshot): ReactNode;
@@ -151,6 +152,7 @@ export function ToolbarDrawingControls(props: {
   const { controller } = props;
   const snapshot = useDrawingSessionSnapshot(controller.session);
   const [collapsedOptionsTool, setCollapsedOptionsTool] = useState<DrawingTool | null>(null);
+  const [optionsSuppressed, setOptionsSuppressed] = useState(false);
   const optionsTool = resolveDrawingQuickOptionsTool(snapshot);
   const activeTool = props.owner ? props.owner.activeTool : snapshot.activeTool;
   const optionsAnchorTool =
@@ -178,15 +180,25 @@ export function ToolbarDrawingControls(props: {
             label={label}
             modifierHint={modifierHint}
             optionsTool={optionsTool}
-            showOptions={optionsAnchorTool === tool && collapsedOptionsTool !== tool}
+            showOptions={
+              optionsAnchorTool === tool &&
+              collapsedOptionsTool !== tool &&
+              !(props.owner?.persistOptionsDisclosure && optionsSuppressed)
+            }
             snapshot={snapshot}
             tool={tool}
             active={activeTool === tool}
             {...(props.owner?.onToolActivated ? { onActivated: props.owner.onToolActivated } : {})}
-            onActivateTool={() => setCollapsedOptionsTool(null)}
-            onToggleOptions={() =>
-              setCollapsedOptionsTool((current) => (current === tool ? null : tool))
-            }
+            onActivateTool={() => {
+              if (!props.owner?.persistOptionsDisclosure) setCollapsedOptionsTool(null);
+            }}
+            onToggleOptions={() => {
+              if (props.owner?.persistOptionsDisclosure) {
+                setOptionsSuppressed((current) => !current);
+              } else {
+                setCollapsedOptionsTool((current) => (current === tool ? null : tool));
+              }
+            }}
           />
         ))}
         {props.owner?.renderTrailingControls?.(snapshot)}

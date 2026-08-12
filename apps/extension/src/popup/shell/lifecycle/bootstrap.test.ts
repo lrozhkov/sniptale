@@ -93,6 +93,7 @@ function createDeferred<T>() {
 function createBootstrapState() {
   return {
     captureMode: 'visible' as const,
+    hasPostRecordResult: false,
     microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
     webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
@@ -280,6 +281,19 @@ it('applies a consumed export launch intent before popup readiness', async () =>
   expect(params.setPage.mock.invocationCallOrder[0]).toBeLessThan(
     params.setIsReady.mock.invocationCallOrder[0]!
   );
+});
+
+it('opens the video tab when bootstrap already contains a post-record result', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue({
+    ...createBootstrapState(),
+    hasPostRecordResult: true,
+  });
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.setPage).toHaveBeenCalledTimes(1);
+  expect(params.setPage).toHaveBeenCalledWith('video');
 });
 
 it('publishes an asynchronously loaded screenshot startup mode before popup readiness', async () => {

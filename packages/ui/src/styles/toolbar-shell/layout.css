@@ -23,6 +23,13 @@
   user-select: none;
 }
 
+/* Runtime recording snapshots may rebind the visible projection. Replaying the
+ * fractional shell scale makes one-pixel split-control borders visibly uneven. */
+.sniptale-toolbar[data-video-recording='true'] {
+  animation: none;
+  transition: none;
+}
+
 .sniptale-toolbar.sniptale-toolbar-dragging {
   opacity: 0.96;
   box-shadow:

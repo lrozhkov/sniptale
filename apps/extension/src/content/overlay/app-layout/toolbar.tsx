@@ -144,6 +144,58 @@ function createToolbarAutoBlurProps(
   };
 }
 
+function clearPagePreparation(
+  toolbar: ContentAppLayoutToolbarProps,
+  modeController: ContentAppLayoutToolbarProps['modeController']
+) {
+  toolbar.drawingController?.finalizeInteraction();
+  const fullyCleared = clearAllPagePreparationChanges({
+    clearHighlights: modeController.handleClearHighlights,
+    history: pagePreparationHistory,
+    resetAnnotations: browserAnnotationSession.resetForDocument,
+  });
+  showToast(
+    translate(
+      fullyCleared
+        ? 'content.toolbar.allChangesCleared'
+        : 'content.toolbar.someChangesCouldNotBeCleared'
+    ),
+    fullyCleared ? 'info' : 'error'
+  );
+}
+
+function createVideoRecordingModeToggleHandler(toolbar: ContentAppLayoutToolbarProps) {
+  const { modeController } = toolbar;
+  return async (enabled: boolean, activationEvent?: Event): Promise<boolean> => {
+    if (!toolbar.videoRecording) return false;
+    try {
+      if (!enabled) {
+        const deactivated = await toolbar.videoRecording.onDeactivate();
+        if (deactivated) toolbar.setVideoRecordingMode?.(false);
+        return deactivated;
+      }
+      const activated = await toolbar.videoRecording.onActivate(activationEvent);
+      if (!activated) return false;
+      modeController.handleToggleHighlighterMode(false);
+      modeController.handleToggleDesignReviewMode(false);
+      modeController.handleToggleQuickEditMode(false);
+      modeController.handleToggleDrawingMode?.(false);
+      toolbar.setPinnedToolbarVisible(true);
+      toolbar.setVideoRecordingMode?.(true);
+      return true;
+    } catch (error) {
+      logger.error(
+        enabled
+          ? 'Failed to activate video recording toolbar'
+          : 'Failed to release video recording toolbar',
+        error
+      );
+      showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
+      return false;
+    }
+  };
+}
+
 function renderToolbarShell(args: {
   canClearPagePreparation: boolean;
   designReview: ContentToolbarShellProps['designReview'];
@@ -156,42 +208,7 @@ function renderToolbarShell(args: {
   const handleHideToolbar = () => {
     args.toolbar.setPinnedToolbarVisible(false);
   };
-  const handleClearPagePreparation = () => {
-    args.toolbar.drawingController?.finalizeInteraction();
-    const fullyCleared = clearAllPagePreparationChanges({
-      clearHighlights: modeController.handleClearHighlights,
-      history: pagePreparationHistory,
-      resetAnnotations: browserAnnotationSession.resetForDocument,
-    });
-    showToast(
-      translate(
-        fullyCleared
-          ? 'content.toolbar.allChangesCleared'
-          : 'content.toolbar.someChangesCouldNotBeCleared'
-      ),
-      fullyCleared ? 'info' : 'error'
-    );
-  };
-  const handleToggleVideoRecordingMode = (enabled: boolean, activationEvent?: Event) => {
-    if (enabled) {
-      modeController.handleToggleScreenshotMode(false);
-      modeController.handleToggleHighlighterMode(false);
-      modeController.handleToggleDesignReviewMode(false);
-      modeController.handleToggleQuickEditMode(false);
-      args.toolbar.drawingController?.finalizeInteraction();
-      if (!args.toolbar.videoRecording) return;
-      void Promise.resolve(args.toolbar.videoRecording.onActivate(activationEvent)).then(
-        (activated) => {
-          if (activated) args.toolbar.setVideoRecordingMode?.(true);
-        }
-      );
-      return;
-    }
-    if (!args.toolbar.videoRecording) return;
-    void Promise.resolve(args.toolbar.videoRecording.onDeactivate()).then((deactivated) => {
-      if (deactivated) args.toolbar.setVideoRecordingMode?.(false);
-    });
-  };
+  const handleToggleVideoRecordingMode = createVideoRecordingModeToggleHandler(args.toolbar);
 
   return (
     <div className="sniptale-app" data-hidden={args.toolbar.isCompletelyHidden ? 'true' : 'false'}>
@@ -235,7 +252,7 @@ function renderToolbarShell(args: {
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
-        onClearPagePreparation={handleClearPagePreparation}
+        onClearPagePreparation={() => clearPagePreparation(args.toolbar, modeController)}
         canClearPagePreparation={args.canClearPagePreparation}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}

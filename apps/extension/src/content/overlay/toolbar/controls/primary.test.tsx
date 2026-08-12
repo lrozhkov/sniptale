@@ -291,7 +291,7 @@ describe('ToolbarPrimaryControls', () => {
     ).toContain('lucide-message-square-plus');
     expect(
       document.querySelector('[data-ui="content.toolbar.mode-option.design-review"] svg')?.classList
-    ).toContain('lucide-scan-eye');
+    ).toContain('lucide-swatch-book');
   });
 });
 

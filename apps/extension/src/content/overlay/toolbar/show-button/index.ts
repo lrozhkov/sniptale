@@ -8,6 +8,7 @@ interface UseShowToolbarButtonParams {
   isToolbarVisible: boolean;
   onShowToolbar: () => void;
   screenshotMode: boolean;
+  videoRecordingMode?: boolean;
 }
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -117,12 +118,17 @@ export function useShowToolbarButton({
   isToolbarVisible,
   onShowToolbar,
   screenshotMode,
+  videoRecordingMode = false,
 }: UseShowToolbarButtonParams): void {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const onShowToolbarRef = useRef(onShowToolbar);
   onShowToolbarRef.current = onShowToolbar;
 
-  const shouldShow = screenshotMode && !isToolbarVisible && !isCompletelyHidden && !countdownActive;
+  const shouldShow =
+    (screenshotMode || videoRecordingMode) &&
+    !isToolbarVisible &&
+    !isCompletelyHidden &&
+    !countdownActive;
 
   useShowToolbarButtonElement(shouldShow, buttonRef);
   useShowToolbarButtonClick(shouldShow, buttonRef, onShowToolbarRef);

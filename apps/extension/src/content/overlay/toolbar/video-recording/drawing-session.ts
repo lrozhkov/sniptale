@@ -17,6 +17,7 @@ export const RECORDING_DRAWING_AUTO_HIDE_DELAYS = [0, 3, 5, 10, 30] as const;
 export type RecordingDrawingAutoHideDelay = (typeof RECORDING_DRAWING_AUTO_HIDE_DELAYS)[number];
 
 type Expiry = {
+  fadeHandle: ReturnType<typeof setTimeout> | null;
   handle: ReturnType<typeof setTimeout> | null;
   remainingMs: number;
   startedAt: number | null;
@@ -26,6 +27,9 @@ export interface RecordingDrawingOwner {
   readonly controller: ContentDrawingController;
   erasePath(path: readonly DrawingPoint[], tolerance?: number): void;
   getAutoHideDelay(): RecordingDrawingAutoHideDelay;
+  getVisualRevision(): number;
+  getVisualOpacity(objectId: string): number;
+  subscribeVisualChanges(listener: () => void): () => void;
   setAutoHideDelay(delay: RecordingDrawingAutoHideDelay): void;
   setClockRunning(running: boolean): void;
   dispose(): void;
@@ -41,7 +45,9 @@ export function createRecordingDrawingOwner(options?: {
 }): RecordingDrawingOwner {
   const clock = options?.clock ?? createRecordingDrawingClockDriver();
   const expiries = new Map<string, Expiry>();
+  const visualListeners = new Set<() => void>();
   let autoHideDelay = options?.initialAutoHideDelay ?? 0;
+  let visualRevision = 0;
   let clockRunning = false;
   let disposed = false;
   let controller: ContentDrawingController;
@@ -49,7 +55,10 @@ export function createRecordingDrawingOwner(options?: {
   const cancelExpiry = (objectId: string) => {
     const expiry = expiries.get(objectId);
     if (expiry?.handle) clock.clearTimeout(expiry.handle);
+    if (expiry?.fadeHandle) clock.clearTimeout(expiry.fadeHandle);
     expiries.delete(objectId);
+    visualRevision += 1;
+    visualListeners.forEach((listener) => listener());
   };
   const expire = (objectId: string, expected: Expiry) => {
     if (disposed || expiries.get(objectId) !== expected) return;
@@ -60,11 +69,22 @@ export function createRecordingDrawingOwner(options?: {
     if (!clockRunning || expiry.remainingMs <= 0) return;
     expiry.startedAt = clock.now();
     expiry.handle = clock.setTimeout(() => expire(objectId, expiry), expiry.remainingMs);
+    const animate = () => {
+      if (!clockRunning || disposed || expiries.get(objectId) !== expiry) return;
+      visualRevision += 1;
+      visualListeners.forEach((listener) => listener());
+      const elapsed = expiry.startedAt === null ? 0 : clock.now() - expiry.startedAt;
+      if (expiry.remainingMs - elapsed > 0) {
+        expiry.fadeHandle = clock.setTimeout(animate, 50);
+      }
+    };
+    expiry.fadeHandle = clock.setTimeout(animate, Math.max(0, expiry.remainingMs - 300));
   };
   const scheduleExpiry = (objectId: string) => {
     cancelExpiry(objectId);
     if (autoHideDelay === 0) return;
     const expiry: Expiry = {
+      fadeHandle: null,
       handle: null,
       remainingMs: autoHideDelay * 1000,
       startedAt: null,
@@ -99,6 +119,18 @@ export function createRecordingDrawingOwner(options?: {
       controller.session.deleteObjects(touched.map((object) => object.id));
     },
     getAutoHideDelay: () => autoHideDelay,
+    getVisualRevision: () => visualRevision,
+    getVisualOpacity(objectId) {
+      const expiry = expiries.get(objectId);
+      if (!expiry) return 1;
+      const elapsed =
+        clockRunning && expiry.startedAt !== null ? clock.now() - expiry.startedAt : 0;
+      return Math.max(0, Math.min(1, (expiry.remainingMs - elapsed) / 300));
+    },
+    subscribeVisualChanges(listener) {
+      visualListeners.add(listener);
+      return () => visualListeners.delete(listener);
+    },
     setAutoHideDelay(delay) {
       autoHideDelay = delay;
     },
@@ -112,11 +144,15 @@ export function createRecordingDrawingOwner(options?: {
           continue;
         }
         if (expiry.handle) clock.clearTimeout(expiry.handle);
+        if (expiry.fadeHandle) clock.clearTimeout(expiry.fadeHandle);
         if (expiry.startedAt !== null) {
           expiry.remainingMs = Math.max(0, expiry.remainingMs - (clock.now() - expiry.startedAt));
         }
         expiry.handle = null;
+        expiry.fadeHandle = null;
         expiry.startedAt = null;
+        visualRevision += 1;
+        visualListeners.forEach((listener) => listener());
       }
     },
     dispose() {
@@ -124,6 +160,7 @@ export function createRecordingDrawingOwner(options?: {
       disposed = true;
       for (const objectId of [...expiries.keys()]) cancelExpiry(objectId);
       controller.session.dispose();
+      visualListeners.clear();
     },
   };
 }

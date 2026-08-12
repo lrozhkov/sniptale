@@ -90,6 +90,20 @@ it('forwards live settings to offscreen and publishes live media state', async (
   });
 });
 
+it('publishes a hot-swapped microphone as the selected live device', async () => {
+  await expect(updateRecordingSettings({ microphoneDeviceId: 'mic-2' })).resolves.toEqual({
+    result: 'accepted',
+  });
+
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
+    liveMedia: expect.objectContaining({
+      microphoneDeviceId: 'mic-2',
+      microphoneEnabled: true,
+      microphoneSelected: true,
+    }),
+  });
+});
+
 it('does not mutate live media state when no recording is active', async () => {
   hasActiveVideoRecordingSessionMock.mockReturnValue(false);
 

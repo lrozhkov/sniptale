@@ -19,6 +19,7 @@ import {
 } from './surface-lease';
 import {
   closeVideoRecordingCameraPeerForLease,
+  ensureVideoRecordingCameraOffscreenReady,
   getVideoRecordingCameraPeerId,
 } from './camera-peer';
 import { activateVideoRecordingSurface, startSavedTabVideoRecording } from './start';
@@ -43,7 +44,14 @@ export function routeVideoRecordingSurfaceMessage(args: {
   void handleSurfaceMessage(args)
     .then(args.sendResponse)
     .catch((error) => {
-      logger.error('Video recording surface command failed', error);
+      const commandKind =
+        args.message.type === VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND
+          ? `:${args.message.command.kind}`
+          : '';
+      logger.error(
+        `Video recording surface command failed [${args.message.type}${commandKind}]`,
+        error
+      );
       args.sendResponse(createRouteErrorResponse(error));
     });
 }
@@ -115,6 +123,8 @@ async function answerCameraOffer(tabId: number, message: VideoRecordingCameraOff
   const lease = await requireCameraPeerLease(tabId, message);
   const settings = await loadVideoSettings();
   await requireCameraPeerLease(tabId, message);
+  await ensureVideoRecordingCameraOffscreenReady();
+  await requireCameraPeerLease(tabId, message);
   const peerId = cameraPeerId(message);
   const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
@@ -136,6 +146,8 @@ async function answerCameraOffer(tabId: number, message: VideoRecordingCameraOff
 
 async function closeCameraPeer(tabId: number, message: VideoRecordingCameraCloseMessage) {
   const lease = await requireCameraPeerLease(tabId, message);
-  await closeVideoRecordingCameraPeerForLease(lease);
+  // The close owner durably retains failed retirement for retry. Treat that
+  // handoff as success so camera teardown cannot block changing toolbar modes.
+  await closeVideoRecordingCameraPeerForLease(lease).catch(() => undefined);
   return { success: true, result: 'closed' };
 }

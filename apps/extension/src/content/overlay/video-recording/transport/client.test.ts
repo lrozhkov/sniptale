@@ -1,13 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { sendRuntimeMessage, subscribeToMessages } = vi.hoisted(() => ({
+const { sendRuntimeMessage } = vi.hoisted(() => ({
   sendRuntimeMessage: vi.fn(),
-  subscribeToMessages: vi.fn(),
-}));
-
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  browserRuntime: { subscribeToMessages },
 }));
 
 vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
@@ -28,6 +22,7 @@ import {
   activateVideoRecordingSurface,
   closeVideoRecordingCameraPeer,
   releaseVideoRecordingSurface,
+  receiveVideoRecordingSurfaceSnapshot,
   requestVideoRecordingCameraAnswer,
   sendVideoRecordingSurfaceCommand,
   startSavedTabVideoRecording,
@@ -37,6 +32,7 @@ import {
 } from './client';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { receiveVideoRecordingRuntimeState } from './snapshot-channel';
 
 const identity: SurfaceIdentity = {
   capabilityEpoch: 4,
@@ -123,22 +119,11 @@ it('retains caller authority when peer close or surface release is rejected', as
 });
 
 it('projects validated surface and runtime subscriptions', () => {
-  const listeners: Array<(message: unknown) => unknown> = [];
-  subscribeToMessages.mockImplementation((listener: (message: unknown) => unknown) => {
-    listeners.push(listener);
-    return vi.fn();
-  });
-  Object.defineProperty(globalThis, 'chrome', {
-    configurable: true,
-    value: { runtime: { onMessage: {} } },
-  });
   const surfaceListener = vi.fn();
   const runtimeListener = vi.fn();
   subscribeToVideoRecordingSurfaceSnapshots(surfaceListener);
   subscribeToVideoRecordingRuntimeState(runtimeListener);
-  listeners[0]?.({ type: 'unrelated' });
-  listeners[0]?.({
-    type: 'VIDEO_RECORDING_SURFACE_SNAPSHOT',
+  receiveVideoRecordingSurfaceSnapshot({
     snapshot: {
       autoFadeDelay: 5,
       capabilityEpoch: 1,
@@ -161,20 +146,16 @@ it('projects validated surface and runtime subscriptions', () => {
     },
     surfaceToken: 'token-1',
   });
-  listeners[1]?.({ type: 'RECORDING_STATE_SYNC', state: { invalid: true } });
-  listeners[1]?.({
-    type: 'RECORDING_STATE_SYNC',
-    state: {
-      captureMode: null,
-      captureSource: null,
-      countdownEndsAt: null,
-      duration: 0,
-      error: null,
-      status: VideoRecordingStatus.IDLE,
-      viewportPresetId: null,
-    },
+  receiveVideoRecordingRuntimeState({
+    captureMode: null,
+    captureSource: null,
+    countdownEndsAt: null,
+    duration: 0,
+    error: null,
+    liveMedia: null,
+    status: VideoRecordingStatus.IDLE,
+    viewportPresetId: null,
   });
   expect(surfaceListener).toHaveBeenCalledWith(expect.any(Object), 'token-1');
   expect(runtimeListener).toHaveBeenCalledOnce();
-  Reflect.deleteProperty(globalThis, 'chrome');
 });

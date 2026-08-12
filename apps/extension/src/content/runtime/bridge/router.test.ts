@@ -5,6 +5,7 @@ const handleViewportMessage = vi.fn();
 const handleRegionOverlayMessage = vi.fn();
 const createRegionOverlayBridgeDeps = vi.fn();
 const handleFullPageCaptureMessage = vi.fn();
+const handleVideoRecordingSurfaceSnapshotMessage = vi.fn();
 
 vi.mock('./core', () => ({
   handleCoreModeMessage,
@@ -21,6 +22,10 @@ vi.mock('./region-overlay', () => ({
 
 vi.mock('./full-page-capture', () => ({
   handleFullPageCaptureMessage,
+}));
+
+vi.mock('./video-recording-surface', () => ({
+  handleVideoRecordingSurfaceSnapshotMessage,
 }));
 
 function createViewportInfo() {
@@ -50,6 +55,7 @@ describe('createContentRuntimeMessageHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createRegionOverlayBridgeDeps.mockReturnValue({ overlay: 'deps' });
+    handleVideoRecordingSurfaceSnapshotMessage.mockReturnValue(null);
   });
 
   it('creates handler closures that delegate to each bridge owner with shared deps', async () => {
@@ -68,9 +74,10 @@ describe('createContentRuntimeMessageHandlers', () => {
       fullPageCaptureAgent
     );
 
-    expect(handlers).toHaveLength(4);
+    expect(handlers).toHaveLength(5);
     handlers.forEach((handler) => handler());
 
+    expect(handleVideoRecordingSurfaceSnapshotMessage).toHaveBeenCalledWith(message, sendResponse);
     expect(handleCoreModeMessage).toHaveBeenCalledWith(message);
     expect(handleViewportMessage).toHaveBeenCalledWith(
       message,

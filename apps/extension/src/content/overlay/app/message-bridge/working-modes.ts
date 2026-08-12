@@ -20,5 +20,9 @@ export function selectToolbarWorkingMode(
       return;
     case 'design-review':
       modeController.handleToggleDesignReviewMode(true);
+      return;
+    case 'video-recording':
+      // The background-owned surface snapshot activates this mode after the toolbar is available.
+      return;
   }
 }

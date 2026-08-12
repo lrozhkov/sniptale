@@ -9,6 +9,7 @@ import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contra
 import type { VideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export type TabVideoRequestByType = {
+  [VideoMessageType.RECORDING_STATE_SYNC]: RuntimeRequestByType[typeof VideoMessageType.RECORDING_STATE_SYNC];
   [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: VideoRecordingSurfaceSnapshotMessage;
   [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: ViewportCursorProjectionAuthority & {
     type: typeof VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
@@ -68,6 +69,7 @@ export type TabVideoRequestByType = {
 };
 
 export type TabVideoResponseByType = {
+  [VideoMessageType.RECORDING_STATE_SYNC]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: RuntimeMessageResponse<
     Record<string, never>
   >;

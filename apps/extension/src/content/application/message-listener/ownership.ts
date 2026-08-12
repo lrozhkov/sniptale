@@ -22,8 +22,7 @@ type UiRuntimeBridgeMessageType =
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | MessageType.EXPORT_POPUP_CANCEL
   | VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER
-  | VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER
-  | VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT;
+  | VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
 
 const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   MessageType.DISABLE_SCREENSHOT_MODE,
@@ -45,6 +44,8 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.RESUME_CONTROLLED_CURSOR_CAPTURE,
+  VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+  VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.SHOW_REGION_SELECTOR,
   VideoMessageType.HIDE_REGION_SELECTOR,
   VideoMessageType.REGION_SELECTED,
@@ -72,7 +73,6 @@ const uiRuntimeBridgeMessageTypes = new Set<UiRuntimeBridgeMessageType>([
   MessageType.EXPORT_POPUP_CANCEL,
   VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER,
   VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER,
-  VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

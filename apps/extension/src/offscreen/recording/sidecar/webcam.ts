@@ -13,6 +13,7 @@ import { createRecordingArtifactSession } from '../encoding/artifact-session';
 import { buildSidecarFilename } from '../finalizer';
 import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 import { acquireCameraSource, type CameraSourceLease } from '../camera-source/session';
+import { closeAllCameraSourcePeers } from '../camera-source/peer';
 
 async function createWebcamMediaRecorder(params: {
   baseRecordingId: string;
@@ -74,6 +75,10 @@ export async function createWebcamSidecarRecorder(params: {
     return null;
   }
 
+  // A popup presentation change can race the content preview effect cleanup.
+  // Retire every embedded preview lease before acquiring the quality-preserving
+  // separate-track source, so the recorder never inherits the 640/30 preview profile.
+  closeAllCameraSourcePeers();
   const source = await acquireCameraSource(params.settings);
 
   return createWebcamMediaRecorder({

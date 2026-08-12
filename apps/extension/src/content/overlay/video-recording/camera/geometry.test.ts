@@ -2,10 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   constrainEmbeddedCameraGeometry,
   DEFAULT_EMBEDDED_CAMERA_GEOMETRY,
+  pickEmbeddedCameraGeometry,
   resizeEmbeddedCameraGeometry,
 } from './geometry';
 
 describe('embedded recording camera geometry', () => {
+  it('removes durable presentation fields before sending geometry commands', () => {
+    const geometry = pickEmbeddedCameraGeometry({
+      ...DEFAULT_EMBEDDED_CAMERA_GEOMETRY,
+      mode: 'embedded',
+    } as typeof DEFAULT_EMBEDDED_CAMERA_GEOMETRY & { mode: 'embedded' });
+
+    expect(geometry).toEqual(DEFAULT_EMBEDDED_CAMERA_GEOMETRY);
+    expect(geometry).not.toHaveProperty('mode');
+  });
+
   it('keeps the complete fixed-ratio camera inside the viewport', () => {
     const constrained = constrainEmbeddedCameraGeometry(
       {

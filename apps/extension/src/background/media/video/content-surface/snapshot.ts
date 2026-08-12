@@ -19,6 +19,8 @@ export function createVideoRecordingSurfaceSnapshot(
       : 0,
     capabilityEpoch: lease.capabilityEpoch,
     cursorSpotlightEnabled: settings.recordingSurface?.cursorSpotlightEnabled ?? false,
+    cursorDimmingEnabled: settings.recordingSurface?.cursorDimmingEnabled ?? false,
+    cursorClickAnimationEnabled: settings.recordingSurface?.cursorClickAnimationEnabled ?? false,
     documentGeneration: lease.documentGeneration,
     duration: state.duration,
     entry: lease.entry,

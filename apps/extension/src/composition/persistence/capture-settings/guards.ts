@@ -101,9 +101,21 @@ function parseOptionalRecordingSurface(
 
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['toolbarEnabled', 'cursorSpotlightEnabled']) ||
+    !Object.keys(value).every((key) =>
+      [
+        'toolbarEnabled',
+        'cursorSpotlightEnabled',
+        'cursorDimmingEnabled',
+        'cursorClickAnimationEnabled',
+      ].includes(key)
+    ) ||
     !isBoolean(value['toolbarEnabled']) ||
-    !isBoolean(value['cursorSpotlightEnabled'])
+    !isBoolean(value['cursorSpotlightEnabled']) ||
+    !(value['cursorDimmingEnabled'] === undefined || isBoolean(value['cursorDimmingEnabled'])) ||
+    !(
+      value['cursorClickAnimationEnabled'] === undefined ||
+      isBoolean(value['cursorClickAnimationEnabled'])
+    )
   ) {
     return INVALID_FIELD;
   }
@@ -111,6 +123,8 @@ function parseOptionalRecordingSurface(
   return {
     toolbarEnabled: value['toolbarEnabled'],
     cursorSpotlightEnabled: value['cursorSpotlightEnabled'],
+    cursorDimmingEnabled: value['cursorDimmingEnabled'] ?? false,
+    cursorClickAnimationEnabled: value['cursorClickAnimationEnabled'] ?? false,
   };
 }
 

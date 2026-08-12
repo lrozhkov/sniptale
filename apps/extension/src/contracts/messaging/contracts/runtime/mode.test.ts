@@ -43,6 +43,12 @@ describe('runtimeModeMessageContracts', () => {
         workingMode: 'drawing',
       })
     ).toMatchObject({ workingMode: 'drawing' });
+    expect(
+      contract.parseRequest({
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        workingMode: 'video-recording',
+      })
+    ).toMatchObject({ workingMode: 'video-recording' });
     expect(() =>
       contract.parseRequest({
         type: MessageType.ENABLE_SCREENSHOT_MODE,

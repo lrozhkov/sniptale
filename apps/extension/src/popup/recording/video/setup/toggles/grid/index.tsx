@@ -39,9 +39,7 @@ export function VideoToggleGrid({
   const toolbarAvailable = captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
 
   return (
-    <div
-      className={`${VIDEO_TOGGLE_GRID_CLASS_NAME} ${toolbarAvailable ? 'grid-cols-6' : 'grid-cols-5'}`}
-    >
+    <div className={`${VIDEO_TOGGLE_GRID_CLASS_NAME} grid-cols-6`}>
       <VideoMicrophoneToggle
         active={settings.microphoneEnabled}
         onToggleMicrophone={onToggleMicrophone}
@@ -56,9 +54,11 @@ export function VideoToggleGrid({
         systemAudioDisabled={systemAudioDisabled}
         onSettingsChange={onSettingsChange}
       />
-      {toolbarAvailable ? (
-        <VideoRecordingToolbarToggle settings={settings} onSettingsChange={onSettingsChange} />
-      ) : null}
+      <VideoRecordingToolbarToggle
+        settings={settings}
+        disabled={!toolbarAvailable}
+        onSettingsChange={onSettingsChange}
+      />
       <VideoControlledCursorToggle
         captureMode={captureMode}
         controlledCursorCaptureEnabled={settings.controlledCursorCaptureEnabled}

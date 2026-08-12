@@ -139,6 +139,8 @@ export type WebcamPresentationShape =
 export interface VideoRecordingSurfaceSettings {
   toolbarEnabled: boolean;
   cursorSpotlightEnabled: boolean;
+  cursorDimmingEnabled?: boolean;
+  cursorClickAnimationEnabled?: boolean;
 }
 
 export interface WebcamPresentationSettings {
@@ -202,7 +204,10 @@ export function createVideoRecordingLiveMediaState(
 
 export function updateVideoRecordingLiveMediaState(
   current: VideoRecordingLiveMediaState | null | undefined,
-  patch: Pick<Partial<VideoRecordingSettings>, 'microphoneEnabled' | 'webcamEnabled'>
+  patch: Pick<
+    Partial<VideoRecordingSettings>,
+    'microphoneDeviceId' | 'microphoneEnabled' | 'webcamDeviceId' | 'webcamEnabled'
+  >
 ): VideoRecordingLiveMediaState | null {
   if (!current) {
     return null;
@@ -210,9 +215,13 @@ export function updateVideoRecordingLiveMediaState(
 
   return {
     ...current,
+    ...(patch.microphoneDeviceId === undefined
+      ? {}
+      : { microphoneDeviceId: patch.microphoneDeviceId }),
     ...(patch.microphoneEnabled === undefined
       ? {}
       : { microphoneEnabled: patch.microphoneEnabled }),
+    ...(patch.webcamDeviceId === undefined ? {} : { webcamDeviceId: patch.webcamDeviceId }),
     ...(patch.webcamEnabled === undefined ? {} : { webcamEnabled: patch.webcamEnabled }),
   };
 }

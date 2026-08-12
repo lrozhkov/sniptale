@@ -19,6 +19,19 @@ describe('runtime-message-listener shared ownership routing', () => {
     expect(isUiRuntimeBridgeMessage({ type: VideoMessageType.SHOW_REGION_SELECTOR })).toBe(false);
   });
 
+  it('routes recording surface snapshots through the always-ready top-level bridge', () => {
+    const message = { type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT };
+
+    expect(isTopLevelContentRuntimeMessage(message)).toBe(true);
+    expect(isUiRuntimeBridgeMessage(message)).toBe(false);
+  });
+
+  it('routes recording lifecycle sync through the always-ready top-level bridge', () => {
+    const message = { type: VideoMessageType.RECORDING_STATE_SYNC };
+    expect(isTopLevelContentRuntimeMessage(message)).toBe(true);
+    expect(isUiRuntimeBridgeMessage(message)).toBe(false);
+  });
+
   it('keeps UI-only runtime messages out of the top-level content bridge', () => {
     expect(isUiRuntimeBridgeMessage({ type: MessageType.SHOW_TOOLBAR })).toBe(true);
     expect(isTopLevelContentRuntimeMessage({ type: MessageType.SHOW_TOOLBAR })).toBe(false);

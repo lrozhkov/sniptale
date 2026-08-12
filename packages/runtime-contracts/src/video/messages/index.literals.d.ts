@@ -22,6 +22,10 @@ declare module './index' {
       typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
     type OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE =
       typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE;
+    type OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH =
+      typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH;
+    type OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES =
+      typeof import('./index').VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES;
     type CANCEL_RECORDING_START = typeof import('./index').VideoMessageType.CANCEL_RECORDING_START;
     type STOP_RECORDING = typeof import('./index').VideoMessageType.STOP_RECORDING;
     type PAUSE_RECORDING = typeof import('./index').VideoMessageType.PAUSE_RECORDING;

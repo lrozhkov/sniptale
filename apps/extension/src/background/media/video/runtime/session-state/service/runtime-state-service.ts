@@ -5,6 +5,7 @@ import { applyBadgeState } from '../badge-state';
 import { createCountdownBadgeTimer } from '../timer';
 import { createIdleState } from './idle-state';
 import { createVideoRecordingRuntimeStatePublisher } from './publish-state';
+import { publishVideoRecordingSurfaceRuntimeState } from '../../../content-surface/runtime-state-sync';
 
 function createVideoRecordingRuntimeStateServiceImpl() {
   let runtimeState = createIdleState();
@@ -13,6 +14,7 @@ function createVideoRecordingRuntimeStateServiceImpl() {
     applyBadgeState,
     countdownBadgeTimer,
     sendRuntimeMessage,
+    sendContentSurfaceState: publishVideoRecordingSurfaceRuntimeState,
   });
 
   function publishCurrentState(): void {

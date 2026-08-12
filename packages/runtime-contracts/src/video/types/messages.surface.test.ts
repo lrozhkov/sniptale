@@ -114,6 +114,35 @@ it('validates release, snapshot, and command authority fields narrowly', () => {
   expect(
     isVideoRecordingSurfaceCommandMessage({
       ...command,
+      command: { kind: 'set-auto-fade-delay', delay: 5 },
+    })
+  ).toBe(true);
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...command,
+      command: {
+        kind: 'set-spotlight-settings',
+        cursorHaloEnabled: true,
+        cursorDimmingEnabled: false,
+        clickAnimationEnabled: true,
+      },
+    })
+  ).toBe(true);
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...command,
+      command: { kind: 'list-media-devices', deviceKind: 'audioinput' },
+    })
+  ).toBe(true);
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...command,
+      command: { kind: 'list-media-devices' },
+    })
+  ).toBe(false);
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...command,
       command: { kind: 'update-embedded-camera', appearance: { shape: 'circle' } },
     })
   ).toBe(false);

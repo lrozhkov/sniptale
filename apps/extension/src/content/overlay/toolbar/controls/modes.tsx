@@ -5,11 +5,11 @@ import {
   Check,
   MessageSquarePlus,
   MousePointerClick,
-  PanelTopClose,
+  PanelBottomClose,
   Pencil,
   Pin,
   PinOff,
-  ScanEye,
+  SwatchBook,
   TextCursor,
   TextCursorInput,
   Touchpad,
@@ -66,10 +66,6 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
     return 'design-review';
   }
 
-  if (props.videoRecordingMode) {
-    return 'video-recording';
-  }
-
   if (props.drawingMode) {
     return 'drawing';
   }
@@ -82,6 +78,10 @@ function getSelectedMode(props: ToolbarModeButtonsProps): ToolbarInteractionMode
     return 'highlighter';
   }
 
+  if (props.videoRecordingMode) {
+    return 'video-recording';
+  }
+
   return 'cursor';
 }
 
@@ -90,7 +90,7 @@ function getModeIcon(mode: ToolbarInteractionMode) {
     case 'quick-edit':
       return <TextCursorInput size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'design-review':
-      return <ScanEye size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return <SwatchBook size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'drawing':
       return <Pencil size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'video-recording':
@@ -153,39 +153,47 @@ function createModeSelectionHandler(
       return;
     }
 
+    const selectMode = () => {
+      switch (mode) {
+        case 'quick-edit':
+          if (props.aiPickMode) {
+            props.onDisableAiPickMode?.();
+          } else {
+            props.onToggleQuickEdit();
+          }
+          break;
+        case 'design-review':
+          props.onToggleDesignReview();
+          break;
+        case 'drawing':
+          props.onToggleDrawing?.();
+          break;
+        case 'video-recording':
+          void props.onToggleVideoRecording?.(event.nativeEvent);
+          break;
+        case 'highlighter':
+          props.onToggleHighlighter();
+          break;
+        case 'cursor':
+          if (!props.isCursorMode) {
+            props.onEnableCursorMode?.();
+          }
+          break;
+      }
+      onClose();
+    };
+
     if (props.videoRecordingMode && mode !== 'video-recording') {
       if (props.videoRecordingModeLocked) return;
-      props.onToggleVideoRecording?.(event.nativeEvent);
+      void Promise.resolve(props.onToggleVideoRecording?.(event.nativeEvent)).then(
+        (deactivated) => {
+          if (deactivated !== false) selectMode();
+        },
+        () => undefined
+      );
+      return;
     }
-
-    switch (mode) {
-      case 'quick-edit':
-        if (props.aiPickMode) {
-          props.onDisableAiPickMode?.();
-        } else {
-          props.onToggleQuickEdit();
-        }
-        break;
-      case 'design-review':
-        props.onToggleDesignReview();
-        break;
-      case 'drawing':
-        props.onToggleDrawing?.();
-        break;
-      case 'video-recording':
-        props.onToggleVideoRecording?.(event.nativeEvent);
-        break;
-      case 'highlighter':
-        props.onToggleHighlighter();
-        break;
-      case 'cursor':
-        if (!props.isCursorMode) {
-          props.onEnableCursorMode?.();
-        }
-        break;
-    }
-
-    onClose();
+    selectMode();
   };
 }
 
@@ -406,7 +414,7 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
         </div>
         {selectedMode === 'cursor' ? <NavigationToolbarActions {...props} /> : null}
       </ContentToolbarGroup>
-      {selectedMode === 'cursor' ? null : (
+      {selectedMode === 'cursor' || selectedMode === 'video-recording' ? null : (
         <ContentToolbarDivider
           className="sniptale-mode-leading-divider"
           dataUi="content.toolbar.mode-leading-divider"
@@ -466,7 +474,7 @@ function NavigationToolbarActions(props: ToolbarModeButtonsProps) {
           props.onHide?.();
         }}
       >
-        <PanelTopClose size={18} strokeWidth={2} />
+        <PanelBottomClose size={18} strokeWidth={2} />
       </ContentToolbarButton>
     </>
   );

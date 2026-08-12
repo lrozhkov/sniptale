@@ -20,6 +20,7 @@ import { createPopupVideoBootstrapPromises, loadPopupBootstrapVideoData } from '
 const logger = createLogger({ namespace: 'PopupBootstrap' });
 
 export type PopupBootstrapResult = {
+  hasPostRecordResult: boolean;
   viewportPresets: ViewportPreset[];
   quickActions: QuickAction[];
   videoSettings: VideoRecordingSettings;
@@ -123,6 +124,7 @@ function buildPopupBootstrapResult(data: PopupBootstrapData): PopupBootstrapResu
   return {
     captureMode: data.captureMode,
     homeError: data.homeError,
+    hasPostRecordResult: data.recordingResponse.postRecordResult !== undefined,
     microphones: data.microphones,
     webcams: data.webcams,
     quickActions: data.actions.filter((action) => action.status),

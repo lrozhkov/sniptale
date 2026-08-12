@@ -57,6 +57,27 @@ describe('recording drawing owner', () => {
     owner.dispose();
   });
 
+  it('animates opacity over the final 300ms and freezes the fade while paused', () => {
+    vi.useFakeTimers();
+    const owner = createRecordingDrawingOwner({ initialAutoHideDelay: 3 });
+    const visualChange = vi.fn();
+    owner.subscribeVisualChanges(visualChange);
+    owner.setClockRunning(true);
+    commitBox(owner, 'box');
+
+    vi.advanceTimersByTime(2_850);
+    expect(owner.getVisualOpacity('box')).toBeCloseTo(0.5, 1);
+    expect(visualChange).toHaveBeenCalled();
+    owner.setClockRunning(false);
+    const pausedOpacity = owner.getVisualOpacity('box');
+    vi.advanceTimersByTime(1_000);
+    expect(owner.getVisualOpacity('box')).toBe(pausedOpacity);
+    owner.setClockRunning(true);
+    vi.advanceTimersByTime(150);
+    expect(owner.controller.session.getSnapshot().document.objects).toHaveLength(0);
+    owner.dispose();
+  });
+
   it('erases every object touched by one sparse path in a single document commit', () => {
     const owner = createRecordingDrawingOwner();
     commitBox(owner, 'one', 10);

@@ -1,7 +1,6 @@
 import { ToolbarModeButtons } from './modes';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarPageEditingMode, ToolbarProps } from '../types';
-import { isVideoRecordingToolbarModeLocked } from '../../video-recording/session/state';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -18,8 +17,8 @@ export function ToolbarPrimaryControls(props: {
     videoRecordingMode: toolbarProps.videoRecordingMode ?? false,
     videoRecordingModeLocked:
       toolbarProps.videoRecordingMode === true &&
-      toolbarProps.videoRecording !== undefined &&
-      isVideoRecordingToolbarModeLocked(toolbarProps.videoRecording.state.phase),
+      toolbarProps.videoRecording?.state.phase !== 'idle' &&
+      toolbarProps.videoRecording?.state.phase !== 'error',
     compactMenus: viewModel.derivedState.compactMenus,
     displayMode: viewModel.derivedState.displayMode,
     sidebarVisible: toolbarProps.scenario?.sidebarVisible ?? false,

@@ -10,6 +10,7 @@ import {
   createRuntimeResponseGuard,
   isNumber,
   isString,
+  isVideoRecordingRuntimeState,
   isViewportInfo,
   isViewportRegion,
 } from '../../validators/index';
@@ -27,6 +28,19 @@ const viewportCursorProjectionAuthorityGuard = {
 };
 
 export const tabVideoMessageContracts = {
+  [VideoMessageType.RECORDING_STATE_SYNC]: {
+    parseRequest: createGuardParser(
+      'tab RECORDING_STATE_SYNC message',
+      createMessageGuard({
+        type: VideoMessageType.RECORDING_STATE_SYNC,
+        required: { state: isVideoRecordingRuntimeState },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'tab RECORDING_STATE_SYNC response',
+      createRuntimeResponseGuard()
+    ),
+  },
   [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: {
     parseRequest: createGuardParser(
       'tab VIDEO_RECORDING_SURFACE_SNAPSHOT message',

@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./capture', () => ({ acquireRecordingSourceStream: mocks.acquire }));
-vi.mock('./video', () => ({ attachMicrophoneAudioIfEnabled: mocks.attachMicrophone }));
+vi.mock('./video', () => ({
+  attachMicrophoneAudioIfEnabled: mocks.attachMicrophone,
+  prepareStableTabRecordingAudio: mocks.attachMicrophone,
+}));
 vi.mock('../stream/crop-stream', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../stream/crop-stream')>()),
   createCropStream: mocks.createCrop,

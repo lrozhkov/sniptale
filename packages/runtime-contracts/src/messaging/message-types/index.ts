@@ -118,7 +118,8 @@ export type ToolbarWorkingMode =
   | 'drawing'
   | 'highlighter'
   | 'quick-edit'
-  | 'design-review';
+  | 'design-review'
+  | 'video-recording';
 
 export { CaptureMessageType, CaptureType } from '../capture-messages';
 export type { CaptureArea } from '../capture-messages';

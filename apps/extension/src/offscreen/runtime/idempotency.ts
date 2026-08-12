@@ -26,6 +26,7 @@ type OffscreenIdempotencyMessage = {
   desktopMediaRequestId?: unknown;
   generation?: unknown;
   jobId?: unknown;
+  peerId?: unknown;
   recordingId?: unknown;
   requestId?: unknown;
   reference?: unknown;
@@ -115,6 +116,14 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'closing the same document peer repeatedly is safe',
   },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH]: {
+    idempotent: false,
+    reason: 'camera input switching is a serialized latest-value mutation',
+  },
+  [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_MEDIA_DEVICES]: {
+    idempotent: false,
+    reason: 'media device enumeration is a read-like command with permission-sensitive results',
+  },
   [VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT]: {
     idempotent: true,
     reason: 'project export start is correlated by jobId',
@@ -184,6 +193,9 @@ function readCorrelationId(message: OffscreenIdempotencyMessage): string {
   }
   if (typeof message.sessionId === 'string' && message.sessionId.length > 0) {
     return message.sessionId;
+  }
+  if (typeof message.peerId === 'string' && message.peerId.length > 0) {
+    return message.peerId;
   }
 
   return 'runtime';

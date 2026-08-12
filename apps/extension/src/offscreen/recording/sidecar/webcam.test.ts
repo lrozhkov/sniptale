@@ -9,16 +9,25 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { createTrackedStream } from '../multi-source/media-stream.test-support';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 
-const { acquireCameraSourceMock, buildVideoMediaRecorderOptionsMock, releaseCameraSourceMock } =
-  vi.hoisted(() => ({
-    acquireCameraSourceMock: vi.fn(),
-    buildVideoMediaRecorderOptionsMock: vi.fn(),
-    releaseCameraSourceMock: vi.fn(),
-  }));
+const {
+  acquireCameraSourceMock,
+  buildVideoMediaRecorderOptionsMock,
+  closeAllCameraSourcePeersMock,
+  releaseCameraSourceMock,
+} = vi.hoisted(() => ({
+  acquireCameraSourceMock: vi.fn(),
+  buildVideoMediaRecorderOptionsMock: vi.fn(),
+  closeAllCameraSourcePeersMock: vi.fn(),
+  releaseCameraSourceMock: vi.fn(),
+}));
 
 vi.mock('../camera-source/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../camera-source/session')>()),
   acquireCameraSource: acquireCameraSourceMock,
+}));
+vi.mock('../camera-source/peer', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../camera-source/peer')>()),
+  closeAllCameraSourcePeers: closeAllCameraSourcePeersMock,
 }));
 vi.mock('../../../platform/media-utils/video-recording', async (importOriginal) => {
   const original =
@@ -101,6 +110,10 @@ it('records the webcam through the sole normalized camera source', async () => {
   });
 
   expect(acquireCameraSourceMock).toHaveBeenCalledWith(settings);
+  expect(closeAllCameraSourcePeersMock).toHaveBeenCalledOnce();
+  expect(closeAllCameraSourcePeersMock.mock.invocationCallOrder[0]).toBeLessThan(
+    acquireCameraSourceMock.mock.invocationCallOrder[0]!
+  );
   expect(recorder?.recorder).toMatchObject({
     options: { videoBitsPerSecond: 8_000_000 },
     stream: recorder?.stream,

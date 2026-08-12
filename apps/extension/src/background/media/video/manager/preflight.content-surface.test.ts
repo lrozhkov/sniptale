@@ -155,3 +155,39 @@ it('binds an already-open manual video surface even when popup auto-open is disa
     expect.objectContaining({ type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT })
   );
 });
+
+it('promotes an existing camera-only surface when popup auto-open is enabled', async () => {
+  const existing = await requestVideoRecordingSurface({
+    entry: 'popup',
+    tabId: 5,
+    toolbarRequested: false,
+  });
+  const sendTabMessage = vi.fn().mockResolvedValue({
+    success: true,
+    viewport: { devicePixelRatio: 1, height: 720, scrollX: 0, scrollY: 0, width: 1280 },
+  });
+
+  await prepareContentSurfaceIfNeeded(
+    5,
+    CaptureMode.TAB,
+    {
+      ...DEFAULT_VIDEO_SETTINGS,
+      recordingSurface: { cursorSpotlightEnabled: false, toolbarEnabled: true },
+    },
+    'recording-promoted',
+    deps(sendTabMessage)
+  );
+
+  expect(getVideoRecordingSurfaceLeaseSnapshot()).toMatchObject({
+    recordingId: 'recording-promoted',
+    surfaceSessionId: existing.surfaceSessionId,
+    toolbarRequested: true,
+  });
+  expect(sendTabMessage).toHaveBeenCalledWith(
+    5,
+    expect.objectContaining({
+      snapshot: expect.objectContaining({ toolbarRequested: true }),
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+    })
+  );
+});

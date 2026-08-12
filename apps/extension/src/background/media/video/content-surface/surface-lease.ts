@@ -233,7 +233,9 @@ export function releaseVideoRecordingSurface(
     }
     if (args.surfaceToken !== undefined && current.surfaceToken !== args.surfaceToken) return false;
     if (args.tabId !== undefined && current.tabId !== args.tabId) return false;
-    await closeVideoRecordingCameraPeerForLease(current);
+    // Peer cleanup is retained for retry by the camera-peer owner. A missing or
+    // restarting offscreen document must never keep the content toolbar lease alive.
+    await closeVideoRecordingCameraPeerForLease(current).catch(() => undefined);
     await persist(null);
     activeLease = null;
     hydrated = true;

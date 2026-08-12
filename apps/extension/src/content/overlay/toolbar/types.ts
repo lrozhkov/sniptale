@@ -14,7 +14,11 @@ import type {
   VideoRecordingToolbarInteraction,
   VideoRecordingToolbarState,
 } from '../video-recording/session/state';
-import type { RecordingDrawingOwner } from './video-recording/drawing-session';
+import type {
+  RecordingDrawingAutoHideDelay,
+  RecordingDrawingOwner,
+} from './video-recording/drawing-session';
+import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export interface ToolbarVideoRecordingProps {
   drawingOwner: RecordingDrawingOwner;
@@ -32,12 +36,19 @@ export interface ToolbarVideoRecordingProps {
   onCameraOffer: (sdp: string) => Promise<string>;
   onCameraPeerClose: () => Promise<void> | void;
   onDeactivate: () => Promise<boolean> | boolean;
+  onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
   onMicrophoneDeviceChange?: (deviceId: string) => Promise<void> | void;
+  onLoadMediaDevices?: (kind: 'audioinput' | 'videoinput') => Promise<VideoRecordingMediaDevice[]>;
   onPause: () => Promise<void> | void;
   onResume: () => Promise<void> | void;
   onSpotlightEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onSpotlightSettingsChange?: (settings: {
+    cursorHaloEnabled: boolean;
+    cursorDimmingEnabled: boolean;
+    clickAnimationEnabled: boolean;
+  }) => Promise<void> | void;
   onStart: (activationEvent?: Event) => Promise<void> | void;
   onStop: () => Promise<void> | void;
 }
@@ -138,7 +149,10 @@ export interface ToolbarProps {
   pinToTabLocked?: boolean;
   onDisableAiPickMode?: () => void;
   onEnableCursorMode?: () => void;
-  onToggleVideoRecordingMode?: (enabled: boolean, activationEvent?: Event) => void;
+  onToggleVideoRecordingMode?: (
+    enabled: boolean,
+    activationEvent?: Event
+  ) => Promise<boolean> | boolean | void;
   onToggleDesignReviewPanel?: () => void;
   onPinToTabChange?: (
     value: boolean,

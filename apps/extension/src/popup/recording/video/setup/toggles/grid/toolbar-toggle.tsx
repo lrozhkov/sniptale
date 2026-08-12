@@ -5,9 +5,11 @@ import { PopupIconStateButton } from '../../../../../../ui/popup-shell/icon-stat
 
 export function VideoRecordingToolbarToggle({
   settings,
+  disabled = false,
   onSettingsChange,
 }: {
   settings: VideoRecordingSettings;
+  disabled?: boolean;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
   const active = settings.recordingSurface?.toolbarEnabled === true;
@@ -16,11 +18,17 @@ export function VideoRecordingToolbarToggle({
     <PopupIconStateButton
       icon={PanelTop}
       label={translate('popup.video.recordingToolbarLabel')}
-      description={translate('popup.video.recordingToolbarDescription')}
+      description={translate(
+        disabled
+          ? 'popup.video.recordingToolbarDisabledDescription'
+          : 'popup.video.recordingToolbarDescription'
+      )}
       active={active}
+      disabled={disabled}
       onClick={() =>
         onSettingsChange({
           recordingSurface: {
+            ...settings.recordingSurface,
             cursorSpotlightEnabled: settings.recordingSurface?.cursorSpotlightEnabled ?? false,
             toolbarEnabled: !active,
           },

@@ -15,6 +15,7 @@ type ToolbarSettingsMenuProps = {
   pinToTabLocked: boolean;
   sidebarVisible?: boolean;
   screenshotMode: boolean;
+  showPinItem?: boolean;
   displayMode: ContentToolbarDisplayMode;
   toolbarMenuState: ToolbarMenuState;
   onClose: () => void;
@@ -99,6 +100,7 @@ function renderToolbarSettingsDropdown(args: {
       pinToTabAvailable={args.props.pinToTabAvailable}
       pinToTabLocked={args.props.pinToTabLocked}
       screenshotMode={args.props.screenshotMode}
+      {...(args.props.showPinItem === undefined ? {} : { showPinItem: args.props.showPinItem })}
       triggerRef={args.triggerRef}
       viewportRightInset={args.props.sidebarVisible ? 348 : 0}
     />

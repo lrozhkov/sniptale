@@ -120,9 +120,18 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
 function isVideoRecordingSurfaceSettings(value: unknown): boolean {
   return (
     isRecord(value) &&
-    Object.keys(value).length === 2 &&
+    Object.keys(value).every((key) =>
+      [
+        'toolbarEnabled',
+        'cursorSpotlightEnabled',
+        'cursorDimmingEnabled',
+        'cursorClickAnimationEnabled',
+      ].includes(key)
+    ) &&
     isBoolean(value['toolbarEnabled']) &&
-    isBoolean(value['cursorSpotlightEnabled'])
+    isBoolean(value['cursorSpotlightEnabled']) &&
+    hasOptionalField(value, 'cursorDimmingEnabled', isBoolean) &&
+    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean)
   );
 }
 

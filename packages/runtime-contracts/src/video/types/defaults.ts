@@ -30,6 +30,8 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   recordingSurface: {
     toolbarEnabled: false,
     cursorSpotlightEnabled: false,
+    cursorDimmingEnabled: false,
+    cursorClickAnimationEnabled: false,
   },
   webcamPresentation: {
     mode: WebcamPresentationMode.EMBEDDED,
