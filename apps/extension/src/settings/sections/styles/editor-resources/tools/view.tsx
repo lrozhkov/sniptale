@@ -11,6 +11,7 @@ import {
 } from '../../../../section-surface';
 import { useToolPresetsController } from './controller';
 import { getToolPresetOwnerLabel, TOOL_PRESET_OWNERS } from './families';
+import { SurfaceStylePresetsSettings } from '../surface-styles/view';
 
 export function ToolPresetsSettings() {
   const state = useToolPresetsController();
@@ -50,30 +51,33 @@ export function ToolPresetsSettings() {
   };
 
   return (
-    <section className={`${settingsPanelClassName} space-y-4`}>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {TOOL_PRESET_OWNERS.map((owner) => (
-          <ProductActionButton
-            key={owner}
-            compact
-            tone="toggle"
-            active={selection.owner === owner}
-            onClick={() => selection.setOwner(owner)}
-          >
-            {getToolPresetOwnerLabel(owner)}
-          </ProductActionButton>
-        ))}
-      </div>
-      <SettingsCollection
-        ariaLabel={translate('settings.editor.toolPresetsTitle')}
-        title={translate('settings.editor.toolPresetsTitle')}
-        items={items}
-        onAction={onAction}
-        onMove={onMove}
-      />
-      <p className="text-xs text-[var(--sniptale-color-text-dim)]">
-        {translate('settings.editor.createInEditorHint')}
-      </p>
-    </section>
+    <div className={settingsPanelClassName}>
+      <section className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {TOOL_PRESET_OWNERS.map((owner) => (
+            <ProductActionButton
+              key={owner}
+              compact
+              tone="toggle"
+              active={selection.owner === owner}
+              onClick={() => selection.setOwner(owner)}
+            >
+              {getToolPresetOwnerLabel(owner)}
+            </ProductActionButton>
+          ))}
+        </div>
+        <SettingsCollection
+          ariaLabel={translate('settings.editor.toolPresetsTitle')}
+          title={translate('settings.editor.toolPresetsTitle')}
+          items={items}
+          onAction={onAction}
+          onMove={onMove}
+        />
+        <p className="text-xs text-[var(--sniptale-color-text-dim)]">
+          {translate('settings.editor.createInEditorHint')}
+        </p>
+      </section>
+      <SurfaceStylePresetsSettings />
+    </div>
   );
 }

@@ -10,10 +10,14 @@ const mocks = vi.hoisted(() => ({
   add: vi.fn(),
   delete: vi.fn(),
   duplicate: vi.fn(),
+  edit: vi.fn(),
+  enabled: vi.fn(),
   load: vi.fn(),
   rename: vi.fn(),
   reorder: vi.fn(),
   reset: vi.fn(),
+  resetPreset: vi.fn(),
+  setDefault: vi.fn(),
   subscribe: vi.fn(),
   toast: vi.fn(),
   toggle: vi.fn(),
@@ -24,12 +28,16 @@ vi.mock('../persistence/surface-style-presets', async (importOriginal) => ({
   addSurfaceStylePreset: mocks.add,
   deleteSurfaceStylePreset: mocks.delete,
   duplicateSurfaceStylePreset: mocks.duplicate,
+  editSurfaceStylePreset: mocks.edit,
   loadSurfaceStylePresetCatalog: mocks.load,
   renameSurfaceStylePreset: mocks.rename,
   reorderSurfaceStylePresets: mocks.reorder,
   resetSurfaceStylePresetCatalog: mocks.reset,
+  resetSurfaceStylePreset: mocks.resetPreset,
+  setDefaultSurfaceStylePresetId: mocks.setDefault,
   subscribeToSurfaceStylePresetCatalog: mocks.subscribe,
   toggleSurfaceStylePresetFavorite: mocks.toggle,
+  toggleSurfaceStylePresetEnabled: mocks.enabled,
   updateSurfaceStylePreset: mocks.update,
 }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
@@ -51,9 +59,13 @@ beforeEach(() => {
     mocks.add,
     mocks.delete,
     mocks.duplicate,
+    mocks.edit,
+    mocks.enabled,
     mocks.rename,
     mocks.reorder,
     mocks.reset,
+    mocks.resetPreset,
+    mocks.setDefault,
     mocks.toggle,
     mocks.update,
   ]) {
@@ -105,9 +117,13 @@ it('maps every catalog action and typed failure to controlled feedback', async (
     mocks.add,
     mocks.delete,
     mocks.duplicate,
+    mocks.edit,
+    mocks.enabled,
     mocks.rename,
     mocks.reorder,
     mocks.reset,
+    mocks.resetPreset,
+    mocks.setDefault,
     mocks.toggle,
     mocks.update,
   ]) {
@@ -125,6 +141,10 @@ it('maps every catalog action and typed failure to controlled feedback', async (
     expect(await latest.actions.onDuplicate(user.id, 'Copy')).toBe(true);
     expect(await latest.actions.onDelete(user.id)).toBe(true);
     expect(await latest.actions.onReorder([user.id])).toBe(true);
+    expect(await latest.actions.onEdit(user.id, 'Edited', user.style)).toBe(true);
+    expect(await latest.actions.onToggleEnabled(user.id)).toBe(true);
+    expect(await latest.actions.onSetDefault(user.id)).toBe(true);
+    expect(await latest.actions.onResetPreset('system-surface-frosted-light')).toBe(true);
     expect(await latest.actions.onToggleFavorite(user.id)).toBe(true);
     expect(await latest.actions.onReset()).toBe(true);
   });
@@ -134,6 +154,10 @@ it('maps every catalog action and typed failure to controlled feedback', async (
     user.id,
     expect.objectContaining({ name: 'Copy', style: user.style })
   );
+  expect(mocks.edit).toHaveBeenCalledWith(7, user.id, 'Edited', user.style);
+  expect(mocks.enabled).toHaveBeenCalledWith(7, user.id);
+  expect(mocks.setDefault).toHaveBeenCalledWith(7, user.id);
+  expect(mocks.resetPreset).toHaveBeenCalledWith(7, 'system-surface-frosted-light');
 
   mocks.delete.mockResolvedValueOnce({ outcome: 'stale-revision', catalog });
   mocks.delete.mockResolvedValueOnce({ outcome: 'quota', catalog });

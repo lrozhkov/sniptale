@@ -21,7 +21,7 @@ export function CalloutBackgroundSettings(props: {
       {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
       onChange={props.onChange}
       {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
-      presets={resources.presets}
+      presets={resources.presets.filter((preset) => preset.enabled)}
       style={props.style}
       unsafeForWrite={resources.catalog === null || resources.catalog.unsafeForWrite}
       value={value}

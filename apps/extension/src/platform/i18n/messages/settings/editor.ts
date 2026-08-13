@@ -53,4 +53,89 @@ export const settingsEditorMessages = defineMessageSource({
     ru: 'Не удалось сохранить палитру рисования',
     en: 'Could not save the drawing palette',
   },
+  presetName: {
+    ru: 'Название шаблона',
+    en: 'Preset name',
+  },
+  customizedBadge: {
+    ru: 'Изменён',
+    en: 'Modified',
+  },
+  defaultCannotDisable: {
+    ru: 'Шаблон по умолчанию нельзя отключить',
+    en: 'The default preset cannot be disabled',
+  },
+  defaultCannotDelete: {
+    ru: 'Сначала выберите другой шаблон по умолчанию',
+    en: 'Choose another default preset first',
+  },
+  disabledCannotBeDefault: {
+    ru: 'Сначала включите шаблон',
+    en: 'Enable the preset first',
+  },
+  surfaceStyles: {
+    title: {
+      ru: 'Стили поверхностей',
+      en: 'Surface styles',
+    },
+    description: {
+      ru: 'Оформление поверхностей выносок: заливка, прозрачность, размытие и тени.',
+      en: 'Callout surface styling: fill, transparency, blur, and shadows.',
+    },
+    add: {
+      ru: 'Добавить стиль',
+      en: 'Add style',
+    },
+    addTitle: {
+      ru: 'Новый стиль поверхности',
+      en: 'New surface style',
+    },
+    editTitle: {
+      ru: 'Изменить стиль поверхности',
+      en: 'Edit surface style',
+    },
+    cssEnabled: {
+      ru: 'Заливка и эффекты поверхности',
+      en: 'Fill and surface effects',
+    },
+    paintOnly: {
+      ru: 'Только заливка',
+      en: 'Fill only',
+    },
+  },
+  gradients: {
+    title: {
+      ru: 'Шаблоны градиентов',
+      en: 'Gradient presets',
+    },
+    description: {
+      ru: 'Готовые градиенты для заливок рамок и аннотаций.',
+      en: 'Reusable gradients for frame and annotation fills.',
+    },
+    add: {
+      ru: 'Добавить градиент',
+      en: 'Add gradient',
+    },
+    addTitle: {
+      ru: 'Новый шаблон градиента',
+      en: 'New gradient preset',
+    },
+    editTitle: {
+      ru: 'Изменить шаблон градиента',
+      en: 'Edit gradient preset',
+    },
+    paint: {
+      ru: 'Градиент',
+      en: 'Gradient',
+    },
+    gradientRequired: {
+      ru: 'Для шаблона нужно выбрать градиент.',
+      en: 'Choose a gradient for this preset.',
+    },
+    types: {
+      linear: { ru: 'Линейный', en: 'Linear' },
+      radial: { ru: 'Радиальный', en: 'Radial' },
+      conic: { ru: 'Конический', en: 'Conic' },
+    },
+  },
 });

@@ -8,9 +8,13 @@ import { createDefaultGradientPresetCatalog } from '../persistence/gradient-pres
 const mocks = vi.hoisted(() => ({
   add: vi.fn(),
   delete: vi.fn(),
+  enabled: vi.fn(),
   favorite: vi.fn(),
   load: vi.fn(),
   subscribe: vi.fn(),
+  default: vi.fn(),
+  reorder: vi.fn(),
+  reset: vi.fn(),
   update: vi.fn(),
   toast: vi.fn(),
   locale: 'en',
@@ -21,8 +25,12 @@ vi.mock('../persistence/gradient-presets', async (importOriginal) => ({
   addGradientPreset: mocks.add,
   deleteGradientPreset: mocks.delete,
   loadGradientPresetCatalog: mocks.load,
+  reorderGradientPresetCatalog: mocks.reorder,
+  resetGradientPreset: mocks.reset,
+  setDefaultGradientPresetForSurface: mocks.default,
   subscribeToGradientPresetCatalog: mocks.subscribe,
   toggleGradientPresetFavoriteForSurface: mocks.favorite,
+  toggleGradientPresetEnabled: mocks.enabled,
   updateGradientPreset: mocks.update,
 }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
@@ -47,14 +55,22 @@ beforeEach(() => {
   mocks.subscribe.mockReturnValue(vi.fn());
   mocks.add.mockResolvedValue('applied');
   mocks.delete.mockResolvedValue('applied');
+  mocks.enabled.mockResolvedValue('applied');
   mocks.favorite.mockResolvedValue('applied');
+  mocks.default.mockResolvedValue('applied');
+  mocks.reorder.mockResolvedValue('applied');
+  mocks.reset.mockResolvedValue('applied');
   mocks.update.mockResolvedValue('applied');
   vi.clearAllMocks();
   mocks.load.mockResolvedValue(catalog);
   mocks.subscribe.mockReturnValue(vi.fn());
   mocks.add.mockResolvedValue('applied');
   mocks.delete.mockResolvedValue('applied');
+  mocks.enabled.mockResolvedValue('applied');
   mocks.favorite.mockResolvedValue('applied');
+  mocks.default.mockResolvedValue('applied');
+  mocks.reorder.mockResolvedValue('applied');
+  mocks.reset.mockResolvedValue('applied');
   mocks.update.mockResolvedValue('applied');
 });
 
@@ -95,10 +111,19 @@ it('owns subscription, favorite projection and action adaptation', async () => {
     await resources.actions.onUpdate(catalog.presets[0]!.id, catalog.presets[0]!.gradient);
     await resources.actions.onToggleFavorite(catalog.presets[0]!.id);
     await resources.actions.onDelete(catalog.presets[0]!.id);
+    await resources.actions.onEdit('system-sunset', 'Edited', catalog.presets[0]!.gradient);
+    await resources.actions.onToggleEnabled(catalog.presets[1]!.id);
+    await resources.actions.onSetDefault(catalog.presets[1]!.id);
+    await resources.actions.onResetPreset(catalog.presets[1]!.id);
+    await resources.actions.onReorder(catalog.presets.map((preset) => preset.id));
   });
-  expect(mocks.update).toHaveBeenCalledOnce();
+  expect(mocks.update).toHaveBeenCalledTimes(2);
   expect(mocks.favorite).toHaveBeenCalledOnce();
   expect(mocks.delete).toHaveBeenCalledOnce();
+  expect(mocks.enabled).toHaveBeenCalledWith(catalog.presets[1]!.id);
+  expect(mocks.default).toHaveBeenCalledWith('highlighter-frame-fill', catalog.presets[1]!.id);
+  expect(mocks.reset).toHaveBeenCalledWith(catalog.presets[1]!.id);
+  expect(mocks.reorder).toHaveBeenCalledOnce();
 });
 
 it('reprojects system preset names when the locale changes', async () => {
@@ -115,6 +140,22 @@ it('reprojects system preset names when the locale changes', async () => {
   mocks.locale = 'ru';
   await act(async () => root?.render(<View />));
   expect(resources.presets[0]?.name).toBe('ru:highlighter.paintPicker.systemPresets.sunset');
+});
+
+it('preserves a customized system name instead of replacing it with localization', async () => {
+  const catalog = createDefaultGradientPresetCatalog();
+  catalog.presets[0]!.name = 'My sunset';
+  catalog.presets[0]!.customized = true;
+  mocks.load.mockResolvedValue(catalog);
+  function View() {
+    const resources = useGradientPresetCatalog('highlighter-frame-fill');
+    return <span>{resources.presets[0]?.name}</span>;
+  }
+  await act(async () => {
+    root?.render(<View />);
+    await Promise.resolve();
+  });
+  expect(host?.textContent).toBe('My sunset');
 });
 
 it('surfaces load and mutation failures without an unhandled rejection', async () => {

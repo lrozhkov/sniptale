@@ -8,6 +8,7 @@ import {
 import { usePalettesController } from './controller';
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
 import { CompactColorSelector } from '../../../../../ui/color-selector';
+import { GradientPresetsSettings } from '../gradients/view';
 
 export function PalettesSettings() {
   const state = usePalettesController();
@@ -41,31 +42,34 @@ export function PalettesSettings() {
   };
 
   return (
-    <section className="space-y-3">
-      <div
-        aria-label={translate('settings.editor.paletteTitle')}
-        className="flex flex-wrap items-center gap-2"
-        role="group"
-      >
-        {EDITOR_PALETTE_KEYS.map((key) => (
-          <ProductActionButton
-            aria-pressed={state.key === key}
-            key={key}
-            compact
-            tone="toggle"
-            active={state.key === key}
-            onClick={() => state.setKey(key)}
-          >
-            {getEditorPaletteLabel(key)}
-          </ProductActionButton>
-        ))}
-      </div>
-      <SettingsCollection
-        ariaLabel={translate('settings.editor.paletteTitle')}
-        items={items}
-        onAction={() => undefined}
-        onMove={onMove}
-      />
-    </section>
+    <div>
+      <section className="space-y-3">
+        <div
+          aria-label={translate('settings.editor.paletteTitle')}
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+        >
+          {EDITOR_PALETTE_KEYS.map((key) => (
+            <ProductActionButton
+              aria-pressed={state.key === key}
+              key={key}
+              compact
+              tone="toggle"
+              active={state.key === key}
+              onClick={() => state.setKey(key)}
+            >
+              {getEditorPaletteLabel(key)}
+            </ProductActionButton>
+          ))}
+        </div>
+        <SettingsCollection
+          ariaLabel={translate('settings.editor.paletteTitle')}
+          items={items}
+          onAction={() => undefined}
+          onMove={onMove}
+        />
+      </section>
+      <GradientPresetsSettings />
+    </div>
   );
 }

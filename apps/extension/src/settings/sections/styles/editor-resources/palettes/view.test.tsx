@@ -16,6 +16,9 @@ const state = vi.hoisted(() => ({
   } as any,
 }));
 vi.mock('./controller', () => ({ usePalettesController: () => state.value }));
+vi.mock('../gradients/view', () => ({
+  GradientPresetsSettings: () => <div>gradient-presets</div>,
+}));
 import { PalettesSettings } from './view';
 it('renders each palette color once as a picker without a duplicate heading or visible index', () => {
   const node = document.createElement('div');

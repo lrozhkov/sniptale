@@ -49,7 +49,10 @@ const presets = [
     name: 'Plain',
     origin: 'system' as const,
     order: 0,
+    customized: false,
+    enabled: true,
     favorite: false,
+    isDefault: true,
     style: style('#fff'),
   },
   {
@@ -57,7 +60,10 @@ const presets = [
     name: 'Glass',
     origin: 'user' as const,
     order: 0,
+    customized: false,
+    enabled: true,
     favorite: true,
+    isDefault: false,
     style: style('#ffffff80', 'backdrop-filter: blur(16px);'),
   },
 ];

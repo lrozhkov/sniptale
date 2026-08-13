@@ -18,6 +18,8 @@ const linear = (
   angle: number,
   order: number
 ): StoredGradientPreset => ({
+  customized: false,
+  enabled: true,
   id,
   name,
   order,
@@ -36,6 +38,8 @@ export const SYSTEM_GRADIENT_PRESETS: readonly StoredGradientPreset[] = [
   linear('system-ocean', 'system-ocean', ['#0f172aff', '#2563ebff'], 135, 1),
   linear('system-aurora', 'system-aurora', ['#22c55eff', '#8b5cf6ff'], 110, 2),
   {
+    customized: false,
+    enabled: true,
     id: 'system-radial-glow',
     name: 'system-radial-glow',
     order: 3,
@@ -53,6 +57,8 @@ export const SYSTEM_GRADIENT_PRESETS: readonly StoredGradientPreset[] = [
     },
   },
   {
+    customized: false,
+    enabled: true,
     id: 'system-conic-spectrum',
     name: 'system-conic-spectrum',
     order: 4,
@@ -83,6 +89,7 @@ export function createDefaultGradientPresetCatalog(): GradientPresetCatalog {
     revision: GRADIENT_PRESET_CATALOG_REVISION,
     presets: SYSTEM_GRADIENT_PRESETS.map(cloneGradientPreset),
     favoriteIdsBySurface: {},
+    defaultPresetIdBySurface: { 'highlighter-frame-fill': SYSTEM_GRADIENT_PRESETS[0]!.id },
   };
 }
 export function cloneGradientPresetCatalog(catalog: GradientPresetCatalog): GradientPresetCatalog {
@@ -92,6 +99,7 @@ export function cloneGradientPresetCatalog(catalog: GradientPresetCatalog): Grad
     favoriteIdsBySurface: Object.fromEntries(
       Object.entries(catalog.favoriteIdsBySurface).map(([key, ids]) => [key, [...(ids ?? [])]])
     ),
+    defaultPresetIdBySurface: { ...catalog.defaultPresetIdBySurface },
   };
 }
 export function normalizeGradientPresetPaint(gradient: Gradient): Gradient | null {

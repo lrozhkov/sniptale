@@ -5,13 +5,17 @@ import { translate, useAppLocale, type AppLocale } from '../../platform/i18n';
 import {
   addSurfaceStylePreset,
   deleteSurfaceStylePreset,
+  editSurfaceStylePreset,
   duplicateSurfaceStylePreset,
   loadSurfaceStylePresetCatalog,
   renameSurfaceStylePreset,
   reorderSurfaceStylePresets,
   resetSurfaceStylePresetCatalog,
+  resetSurfaceStylePreset,
+  setDefaultSurfaceStylePresetId,
   subscribeToSurfaceStylePresetCatalog,
   toggleSurfaceStylePresetFavorite,
+  toggleSurfaceStylePresetEnabled,
   updateSurfaceStylePreset,
   type SurfaceStylePresetCatalog,
   type SurfaceStylePresetMutationOutcome,
@@ -22,7 +26,15 @@ const createId = () =>
     ? `surface-${crypto.randomUUID()}`
     : `surface-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function systemName(id: string, locale: AppLocale): string {
+function canonicalSystemName(
+  id: string
+):
+  | 'content.callout.surfaceStyle.system.plain'
+  | 'content.callout.surfaceStyle.system.frostedLight'
+  | 'content.callout.surfaceStyle.system.frostedDark'
+  | 'content.callout.surfaceStyle.system.clearTint'
+  | 'content.callout.surfaceStyle.system.softElevated'
+  | null {
   const suffix = id
     .replace('system-surface-', '')
     .replace(/-([a-z])/gu, (_match, letter: string) => letter.toUpperCase());
@@ -33,7 +45,14 @@ function systemName(id: string, locale: AppLocale): string {
     clearTint: 'content.callout.surfaceStyle.system.clearTint',
     softElevated: 'content.callout.surfaceStyle.system.softElevated',
   } as const;
-  return suffix in keys ? translate(keys[suffix as keyof typeof keys], locale) : id;
+  return suffix in keys ? keys[suffix as keyof typeof keys] : null;
+}
+
+function systemName(id: string, storedName: string, locale: AppLocale): string {
+  const key = canonicalSystemName(id);
+  return key && storedName === key.replace('content.callout.', '')
+    ? translate(key, locale)
+    : storedName;
 }
 
 export function useSurfaceStylePresetCatalog() {
@@ -90,8 +109,9 @@ export function useSurfaceStylePresetCatalog() {
       catalog,
       presets: (catalog?.presets ?? []).map((preset) => ({
         ...preset,
-        name: preset.origin === 'system' ? systemName(preset.id, locale) : preset.name,
+        name: preset.origin === 'system' ? systemName(preset.id, preset.name, locale) : preset.name,
         favorite: catalog?.favoriteIds.includes(preset.id) ?? false,
+        isDefault: catalog?.defaultPresetId === preset.id,
       })),
       actions: {
         onCreate: (name: string, style: SurfaceStyle) =>
@@ -100,6 +120,8 @@ export function useSurfaceStylePresetCatalog() {
           ),
         onUpdate: (id: string, style: SurfaceStyle) =>
           run((revision) => updateSurfaceStylePreset(revision, id, style)),
+        onEdit: (id: string, name: string, style: SurfaceStyle) =>
+          run((revision) => editSurfaceStylePreset(revision, id, name, style)),
         onRename: (id: string, name: string) =>
           run((revision) => renameSurfaceStylePreset(revision, id, name)),
         onDuplicate: (id: string, name: string) =>
@@ -113,9 +135,29 @@ export function useSurfaceStylePresetCatalog() {
           ),
         onDelete: (id: string) => run((revision) => deleteSurfaceStylePreset(revision, id)),
         onReorder: (ids: readonly string[]) =>
+          run((revision) => {
+            const requested = new Set(ids);
+            const users = catalog!.presets.filter((preset) => preset.origin === 'user');
+            if (
+              requested.size !== users.length ||
+              users.some((preset) => !requested.has(preset.id))
+            )
+              return Promise.resolve({ outcome: 'rejected' as const, catalog: catalog! });
+            let userIndex = 0;
+            const allIds = catalog!.presets.map((preset) =>
+              preset.origin === 'user' ? ids[userIndex++]! : preset.id
+            );
+            return reorderSurfaceStylePresets(revision, allIds);
+          }),
+        onReorderAll: (ids: readonly string[]) =>
           run((revision) => reorderSurfaceStylePresets(revision, ids)),
         onToggleFavorite: (id: string) =>
           run((revision) => toggleSurfaceStylePresetFavorite(revision, id)),
+        onToggleEnabled: (id: string) =>
+          run((revision) => toggleSurfaceStylePresetEnabled(revision, id)),
+        onSetDefault: (id: string) =>
+          run((revision) => setDefaultSurfaceStylePresetId(revision, id)),
+        onResetPreset: (id: string) => run((revision) => resetSurfaceStylePreset(revision, id)),
         onReset: () => run((revision) => resetSurfaceStylePresetCatalog(revision)),
       },
     }),

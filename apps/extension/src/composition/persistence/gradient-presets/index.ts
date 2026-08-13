@@ -8,7 +8,7 @@ import {
   type GradientPresetCatalog,
   type GradientPresetMutationOutcome,
   type GradientPresetSurface,
-  type StoredGradientPreset,
+  type NewGradientPreset,
 } from './contracts';
 import { cloneGradientPresetCatalog } from './defaults';
 import {
@@ -16,7 +16,10 @@ import {
   deleteUserGradientPreset,
   reorderGradientPresets,
   toggleGradientPresetFavorite,
-  updateUserGradientPreset,
+  updateGradientPresetValues,
+  toggleGradientPresetEnabled as toggleEnabled,
+  setDefaultGradientPreset as setDefault,
+  resetSystemGradientPreset as resetSystem,
 } from './mutations';
 import { parseGradientPresetCatalog } from './parser';
 import { readGradientPresetCatalog, writeGradientPresetCatalog } from './storage';
@@ -60,23 +63,24 @@ async function mutate(
       if (loaded.unsafeForWrite) return 'rejected';
       const next = operation(cloneGradientPresetCatalog(loaded.catalog));
       if (!next) return 'rejected';
-      if (JSON.stringify(next) === JSON.stringify(loaded.catalog)) return 'unchanged';
+      if (JSON.stringify(next) === JSON.stringify(cloneGradientPresetCatalog(loaded.catalog)))
+        return 'unchanged';
       await writeGradientPresetCatalog(next, permit);
       cache(next);
       return 'applied';
     })
   );
 }
-export const addGradientPreset = (preset: StoredGradientPreset) =>
+export const addGradientPreset = (preset: NewGradientPreset) =>
   mutate((catalog) => addUserGradientPreset(catalog, preset));
 export const updateGradientPreset = (id: string, gradient: Gradient, name?: string) =>
-  mutate((catalog) => updateUserGradientPreset(catalog, id, gradient, name));
+  mutate((catalog) => updateGradientPresetValues(catalog, id, gradient, name));
 export const renameGradientPreset = (id: string, name: string) =>
   mutate((catalog) => {
     const preset = catalog.presets.find((item) => item.id === id);
-    return preset ? updateUserGradientPreset(catalog, id, preset.gradient, name) : null;
+    return preset ? updateGradientPresetValues(catalog, id, preset.gradient, name) : null;
   });
-export const duplicateGradientPreset = (sourceId: string, preset: StoredGradientPreset) =>
+export const duplicateGradientPreset = (sourceId: string, preset: NewGradientPreset) =>
   mutate((catalog) => {
     const source = catalog.presets.find((item) => item.id === sourceId);
     return source
@@ -87,6 +91,11 @@ export const deleteGradientPreset = (id: string) =>
   mutate((catalog) => deleteUserGradientPreset(catalog, id));
 export const reorderGradientPresetCatalog = (ids: readonly string[]) =>
   mutate((catalog) => reorderGradientPresets(catalog, ids));
+export const toggleGradientPresetEnabled = (id: string) =>
+  mutate((catalog) => toggleEnabled(catalog, id));
+export const setDefaultGradientPresetForSurface = (surface: GradientPresetSurface, id: string) =>
+  mutate((catalog) => setDefault(catalog, surface, id));
+export const resetGradientPreset = (id: string) => mutate((catalog) => resetSystem(catalog, id));
 export const toggleGradientPresetFavoriteForSurface = (
   surface: GradientPresetSurface,
   id: string

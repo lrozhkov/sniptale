@@ -3,7 +3,13 @@ import type {
   SurfaceStylePreset,
 } from '@sniptale/runtime-contracts/highlighter/surface-style';
 
-type SurfaceStylePresetOption = SurfaceStylePreset & { favorite: boolean; order: number };
+type SurfaceStylePresetOption = SurfaceStylePreset & {
+  customized: boolean;
+  enabled: boolean;
+  favorite: boolean;
+  isDefault: boolean;
+  order: number;
+};
 
 export type SurfaceStyleSelectorActions = {
   onCreate: (name: string, style: SurfaceStyle) => Promise<boolean>;

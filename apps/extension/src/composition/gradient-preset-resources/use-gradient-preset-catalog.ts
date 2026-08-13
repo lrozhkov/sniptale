@@ -8,6 +8,10 @@ import {
   loadGradientPresetCatalog,
   subscribeToGradientPresetCatalog,
   toggleGradientPresetFavoriteForSurface,
+  toggleGradientPresetEnabled,
+  setDefaultGradientPresetForSurface,
+  resetGradientPreset,
+  reorderGradientPresetCatalog,
   updateGradientPreset,
   type GradientPresetCatalog,
   type GradientPresetMutationOutcome,
@@ -80,13 +84,19 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
     () => ({
       presets: (catalog?.presets ?? []).map((preset) => ({
         ...preset,
-        name: preset.origin === 'system' ? getSystemPresetName(preset.id, locale) : preset.name,
+        name:
+          preset.origin === 'system' && preset.name === preset.id
+            ? getSystemPresetName(preset.id, locale)
+            : preset.name,
         favorite: catalog?.favoriteIdsBySurface[surface]?.includes(preset.id) ?? false,
+        isDefault: catalog?.defaultPresetIdBySurface[surface] === preset.id,
       })),
       actions: {
         onSave: (name: string, gradient: Gradient) =>
           run(() =>
             addGradientPreset({
+              customized: false,
+              enabled: true,
               id: createPresetId(),
               name,
               order: catalog?.presets.length ?? 0,
@@ -95,9 +105,21 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
             })
           ),
         onUpdate: (id: string, gradient: Gradient) => run(() => updateGradientPreset(id, gradient)),
+        onEdit: (id: string, name: string, gradient: Gradient) =>
+          run(() => updateGradientPreset(id, gradient, name)),
         onDelete: (id: string) => run(() => deleteGradientPreset(id)),
         onToggleFavorite: (id: string) =>
           run(() => toggleGradientPresetFavoriteForSurface(surface, id)),
+        onToggleEnabled: (id: string) => run(() => toggleGradientPresetEnabled(id)),
+        onSetDefault: (id: string) => run(() => setDefaultGradientPresetForSurface(surface, id)),
+        onResetPreset: (id: string) => run(() => resetGradientPreset(id)),
+        onReorder: (ids: readonly string[]) => run(() => reorderGradientPresetCatalog(ids)),
+        onRename: (id: string, name: string) => {
+          const preset = catalog?.presets.find((item) => item.id === id);
+          return preset
+            ? run(() => updateGradientPreset(id, preset.gradient, name))
+            : Promise.resolve(false);
+        },
       },
     }),
     [catalog, locale, run, surface]
