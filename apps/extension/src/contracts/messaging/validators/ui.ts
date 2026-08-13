@@ -15,7 +15,7 @@ export function isAppliedViewportPreset(value: unknown): value is AppliedViewpor
   return (
     isRecord(value) &&
     isString(value['presetId']) &&
-    (value['target'] === 'viewport' || value['target'] === 'window') &&
+    value['target'] === 'window' &&
     isNumber(value['width']) &&
     isNumber(value['height'])
   );

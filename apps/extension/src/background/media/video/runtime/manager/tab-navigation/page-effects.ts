@@ -5,7 +5,6 @@ import { readTabCaptureViewport } from '../../../capture-viewport';
 import { getVideoRecordingRuntimeState } from '../../session-state';
 import { isControlledCursorCaptureEnabled } from '../../../session-state';
 import { restoreRecordingOverlayAfterNavigation } from '../../../ui/overlay-restore';
-import { enableViewportCursorProjection } from '../../../capture-surface/cursor-projection';
 import {
   abandonControlledCursorNavigationEffects,
   beginControlledCursorNavigationEffects,
@@ -30,7 +29,6 @@ export type TabNavigationPageEffects = {
   contentSurface?: boolean;
   controlledCursor: boolean;
   cropOverlay: boolean;
-  viewportCursorProjection: boolean;
 };
 
 export type TabNavigationPageAccessVerifier = (
@@ -52,14 +50,11 @@ type TabNavigationPageEffectsResult = {
   liveViewport: ViewportInfo | null;
 };
 
-export function resolveTabNavigationPageEffects(
-  viewportCursorProjection = false
-): TabNavigationPageEffects {
+export function resolveTabNavigationPageEffects(): TabNavigationPageEffects {
   return {
     contentSurface: getVideoRecordingSurfaceLeaseSnapshot() !== null,
     controlledCursor: isControlledCursorCaptureEnabled(),
     cropOverlay: getVideoRecordingRuntimeState().captureMode === CaptureMode.TAB_CROP,
-    viewportCursorProjection,
   };
 }
 
@@ -84,14 +79,18 @@ export async function suspendTabNavigationPageEffects(
       try {
         await closeVideoRecordingCameraPeerForLease(current);
       } catch (error) {
-        await updateVideoRecordingSurface(current.surfaceSessionId, { lifecycle: 'degraded' });
+        await updateVideoRecordingSurface(
+          current.surfaceSessionId,
+          { lifecycle: 'degraded' },
+          { isCurrent: binding.isCurrent }
+        );
         logger.warn('Embedded camera cleanup was deferred before navigation', error);
       }
     }
     // Rebinding invalidates the old document and peer generations even when
     // offscreen cleanup must be retried later. Toolbar restoration must not be
     // coupled to retirement of an optional camera peer.
-    await beginVideoRecordingSurfaceRebind(binding.tabId);
+    await beginVideoRecordingSurfaceRebind(binding.tabId, { isCurrent: binding.isCurrent });
   }
   if (effects.controlledCursor) {
     await suspendControlledCursorEffects(binding);
@@ -99,12 +98,7 @@ export async function suspendTabNavigationPageEffects(
 }
 
 function hasRestorablePageEffects(effects: TabNavigationPageEffects): boolean {
-  return (
-    effects.contentSurface ||
-    effects.controlledCursor ||
-    effects.cropOverlay ||
-    effects.viewportCursorProjection
-  );
+  return effects.contentSurface || effects.controlledCursor || effects.cropOverlay;
 }
 
 async function restoreContentSurfaceEffect(
@@ -125,12 +119,17 @@ async function restoreContentSurfaceEffect(
       cameraCleanupDegraded = true;
       logger.warn('Embedded camera cleanup remains degraded after navigation', error);
     }
-    restorable = (await beginVideoRecordingSurfaceRebind(binding.tabId)) ?? current;
+    restorable =
+      (await beginVideoRecordingSurfaceRebind(binding.tabId, {
+        isCurrent: binding.isCurrent,
+      })) ?? current;
   }
   const ready =
-    (await updateVideoRecordingSurface(restorable.surfaceSessionId, {
-      lifecycle: cameraCleanupDegraded ? 'degraded' : 'ready',
-    })) ?? restorable;
+    (await updateVideoRecordingSurface(
+      restorable.surfaceSessionId,
+      { lifecycle: cameraCleanupDegraded ? 'degraded' : 'ready' },
+      { isCurrent: binding.isCurrent }
+    )) ?? restorable;
   if (!binding.isCurrent()) return;
   const settings = await loadVideoSettings();
   if (!binding.isCurrent()) return;
@@ -160,39 +159,6 @@ async function ensurePageEffectsAccess(
     }
     logger.warn('Optional recording page effects could not be restored after navigation', error);
     return false;
-  }
-}
-
-async function restoreViewportCursorProjectionEffect(
-  enabled: boolean,
-  binding: TabNavigationEffectBinding
-): Promise<void> {
-  if (!enabled) return;
-  try {
-    await enableViewportCursorProjection(binding.tabId, {
-      generation: binding.generation,
-      recordingId: binding.recordingId,
-    });
-  } catch (error) {
-    logger.warn('Viewport cursor projection could not be restored after navigation', error);
-  }
-}
-
-export async function restoreViewportCursorProjectionBeforeThaw(
-  effects: TabNavigationPageEffects,
-  binding: TabNavigationEffectBinding,
-  ensurePageAccess: TabNavigationPageAccessVerifier
-): Promise<void> {
-  if (!effects.viewportCursorProjection || !binding.isCurrent()) return;
-  try {
-    await ensurePageAccess(
-      binding.tabId,
-      'Viewport cursor projection cannot be restored on the navigated page.'
-    );
-    if (!binding.isCurrent()) return;
-    await restoreViewportCursorProjectionEffect(true, binding);
-  } catch (error) {
-    logger.warn('Viewport cursor projection could not be prepared before output resumed', error);
   }
 }
 
@@ -270,10 +236,6 @@ export async function restoreTabNavigationPageEffects(
   if (!binding.isCurrent()) {
     return { controlledCursorRestored: true, liveViewport: null };
   }
-  await restoreViewportCursorProjectionEffect(effects.viewportCursorProjection, binding);
-  if (!binding.isCurrent()) {
-    return { controlledCursorRestored: true, liveViewport: null };
-  }
   const liveViewport = await readPageEffectsViewport(effects, binding.tabId);
   if (!binding.isCurrent()) {
     return { controlledCursorRestored: true, liveViewport: null };
@@ -282,8 +244,7 @@ export async function restoreTabNavigationPageEffects(
     effects.controlledCursor,
     binding
   );
-  if (!controlledCursorRestored) return { controlledCursorRestored, liveViewport };
-  if (!binding.isCurrent()) return { controlledCursorRestored: true, liveViewport };
+  if (!binding.isCurrent()) return { controlledCursorRestored, liveViewport };
   await restoreCropOverlayPageEffect(effects.cropOverlay, binding);
-  return { controlledCursorRestored: true, liveViewport };
+  return { controlledCursorRestored, liveViewport };
 }

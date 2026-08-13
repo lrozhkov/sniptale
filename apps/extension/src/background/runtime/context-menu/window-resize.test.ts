@@ -74,7 +74,6 @@ describe('context menu browser-window resizing', () => {
   it.each([
     ['missing', settingsWithPreset({ id: 'another' })],
     ['disabled', settingsWithPreset({ enabled: false })],
-    ['unsupported-context', settingsWithPreset({ target: 'viewport' })],
   ])('rejects %s presets before mutating the browser window', async (reason, settings) => {
     loadSettingsMock.mockResolvedValue(settings);
 

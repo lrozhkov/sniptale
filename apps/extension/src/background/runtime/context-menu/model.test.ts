@@ -67,16 +67,6 @@ const viewportPresets = [
     target: 'window' as const,
     width: 1440,
   },
-  {
-    kind: 'user' as const,
-    enabled: true,
-    height: 720,
-    id: 'viewport-hd',
-    name: 'Viewport HD',
-    order: 0,
-    target: 'viewport' as const,
-    width: 1280,
-  },
 ];
 
 function buildDescriptors(settings = createContextMenuSettings()) {
@@ -265,7 +255,6 @@ function verifyWindowResizeDescriptors() {
     parentId: CONTEXT_MENU_WINDOW_RESIZE_ID,
     title: 'Window HD · 1280 × 720',
   });
-  expect(descriptors.some((item) => item.id.includes('viewport-hd'))).toBe(false);
   expect(descriptors.some((item) => item.id.includes('disabled-window'))).toBe(false);
   expect(disabledDescriptors.some((item) => item.id === CONTEXT_MENU_WINDOW_RESIZE_ID)).toBe(false);
 }

@@ -10,7 +10,7 @@ const validViewportPresets = normalizeViewportPresetOrder([
     kind: 'user' as const,
     id: 'tablet',
     name: 'Tablet',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 768,
     height: 1024,
     enabled: true,

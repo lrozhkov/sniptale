@@ -228,11 +228,11 @@ export function createModeState() {
       number,
       {
         presetId: string;
-        target: 'viewport' | 'window';
+        target: 'window' | 'window';
         width: number;
         height: number;
       } | null
-    >([[7, { presetId: 'test:viewport', target: 'viewport', width: 1280, height: 720 }]]),
+    >([[7, { presetId: 'test:viewport', target: 'window', width: 1280, height: 720 }]]),
     webSnapshotViewerPorts,
     scenarioSessionService: createScenarioSessionServiceStub(),
   };

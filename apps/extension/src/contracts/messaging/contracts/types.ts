@@ -129,8 +129,6 @@ export type {
   RuntimeOffscreenStartRecordingMessage,
   RuntimeOffscreenStopRecordingMessage,
   RuntimeOffscreenUpdateSettingsMessage,
-  RuntimeOffscreenRevalidateSourceMessage,
-  RuntimeOffscreenSetViewportDrawStateMessage,
 } from './offscreen-command.types.ts';
 
 export type RuntimePopupExportProgressMessage = {

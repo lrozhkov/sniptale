@@ -14,27 +14,12 @@ import {
 } from './operations';
 
 // policyStateIds: [] - these sets are immutable parser catalogs, not runtime authority.
-const targets = new Set<ViewportPresetTarget>(['viewport', 'window']);
+const targets = new Set<ViewportPresetTarget>(['window']);
 const systemKeys = new Set<SystemViewportPresetKey>(getSystemViewportPresetKeys());
-const LEGACY_CATALOG_REVISION = 1 as const;
-const legacySystemKeys = new Set<SystemViewportPresetKey>([
-  'viewportMobilePortrait',
-  'viewportMobileLandscape',
-  'viewportTabletPortrait',
-  'viewportTabletLandscape',
-  'viewportHd',
-  'windowHd',
-  'windowLaptop',
-  'windowDesktop',
-  'windowFullHd',
-]);
 
 type ParsedPresetEntry = {
   preset: ViewportPreset;
-  sourceCatalogRevision:
-    | typeof LEGACY_CATALOG_REVISION
-    | typeof VIEWPORT_PRESET_CATALOG_REVISION
-    | null;
+  sourceCatalogRevision: typeof VIEWPORT_PRESET_CATALOG_REVISION | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,8 +57,7 @@ function parseSystemPreset(value: Record<string, unknown>): ParsedPresetEntry | 
     !base ||
     typeof key !== 'string' ||
     !systemKeys.has(key as SystemViewportPresetKey) ||
-    (sourceCatalogRevision !== LEGACY_CATALOG_REVISION &&
-      sourceCatalogRevision !== VIEWPORT_PRESET_CATALOG_REVISION) ||
+    sourceCatalogRevision !== VIEWPORT_PRESET_CATALOG_REVISION ||
     typeof value['customized'] !== 'boolean' ||
     (nameOverride !== undefined && !isValidViewportPresetName(nameOverride))
   ) {
@@ -125,17 +109,6 @@ function isNormalizedCatalog(presets: readonly ViewportPreset[]): boolean {
   );
 }
 
-function migrateLegacyCatalog(presets: readonly ViewportPreset[]): ViewportPreset[] | undefined {
-  const addition = getCanonicalSystemViewportPreset('viewportFullHd');
-  if (presets.some((preset) => preset.id === addition.id)) return undefined;
-  const shifted = presets.map((preset) =>
-    preset.target === addition.target && preset.order >= addition.order
-      ? { ...preset, order: preset.order + 1 }
-      : preset
-  );
-  return normalizeViewportPresetOrder([...shifted, addition]);
-}
-
 export function parseViewportPresetCatalog(value: unknown): ViewportPreset[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const parsed = value.map(parsePreset);
@@ -149,14 +122,12 @@ export function parseViewportPresetCatalog(value: unknown): ViewportPreset[] | u
       entry.sourceCatalogRevision === null ? [] : [entry.sourceCatalogRevision]
     )
   );
-  const legacyCatalog = sourceRevisions.size === 1 && sourceRevisions.has(LEGACY_CATALOG_REVISION);
   const currentCatalog =
     sourceRevisions.size === 1 && sourceRevisions.has(VIEWPORT_PRESET_CATALOG_REVISION);
   if (
     ids.size !== presets.length ||
     new Set(keys).size !== keys.length ||
-    (!legacyCatalog && !currentCatalog) ||
-    (legacyCatalog && !hasExactSystemKeys(keys, legacySystemKeys)) ||
+    !currentCatalog ||
     (currentCatalog && !hasExactSystemKeys(keys, systemKeys)) ||
     [...targets].some((target) => {
       const group = presets.filter((preset) => preset.target === target);
@@ -166,5 +137,5 @@ export function parseViewportPresetCatalog(value: unknown): ViewportPreset[] | u
   ) {
     return undefined;
   }
-  return legacyCatalog ? migrateLegacyCatalog(presets) : normalizeViewportPresetOrder(presets);
+  return normalizeViewportPresetOrder(presets);
 }

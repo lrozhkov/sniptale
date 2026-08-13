@@ -169,7 +169,7 @@ async function verifyStoredSettings() {
       kind: 'user' as const,
       id: 'mobile',
       name: 'Mobile',
-      target: 'viewport' as const,
+      target: 'window' as const,
       width: 390,
       height: 844,
       enabled: true,
@@ -245,7 +245,7 @@ const invalidStoredSettingsFixture = {
       kind: 'user',
       id: 'mobile',
       name: 'Mobile',
-      target: 'viewport',
+      target: 'window',
       width: 390,
       height: 844,
       enabled: true,
@@ -370,15 +370,15 @@ describe('settings', () => {
     expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
 
-  it('reads revision-1 viewport settings with the new system preset without writing storage', async () => {
+  it('drops a revision-1 size catalog and restores the current window catalog', async () => {
     const legacyCatalog = createSystemViewportPresetCatalog()
-      .filter((preset) => preset.id !== 'system:viewport-full-hd')
+      .filter((preset) => preset.id !== 'system:window-full-hd')
       .map((preset) => ({ ...preset, catalogRevision: 1 }));
     const userPreset = {
       kind: 'user' as const,
       id: 'user-wide',
       name: 'Wide',
-      target: 'viewport' as const,
+      target: 'window' as const,
       width: 1600,
       height: 900,
       enabled: true,
@@ -394,10 +394,12 @@ describe('settings', () => {
     const settings = await loadSettings();
 
     expect(settings.viewportPresets).toContainEqual(
-      expect.objectContaining({ id: 'system:viewport-full-hd', width: 1920, height: 1080 })
+      expect.objectContaining({ id: 'system:window-full-hd', width: 1920, height: 1080 })
     );
-    expect(settings.viewportPresets).toContainEqual(expect.objectContaining({ id: userPreset.id }));
-    expect(settings.defaultViewportPresetId).toBe(userPreset.id);
+    expect(settings.viewportPresets).not.toContainEqual(
+      expect.objectContaining({ id: userPreset.id })
+    );
+    expect(settings.defaultViewportPresetId).toBeNull();
     expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
 });

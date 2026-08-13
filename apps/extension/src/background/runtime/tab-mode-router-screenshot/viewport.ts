@@ -16,8 +16,7 @@ import {
   markScreenshotSurfaceReleased,
 } from '../../capture-surface/screenshot-session';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
-import { sendViewerPreparationCommand, type WebSnapshotViewerPorts } from '../../capture/lifecycle';
-import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation';
+import type { WebSnapshotViewerPorts } from '../../capture/lifecycle';
 import { runScreenshotModeOperation } from './operation-queue';
 import type {
   ScreenshotViewport,
@@ -92,27 +91,6 @@ async function applyRegularPreset(
   };
 }
 
-async function applyViewerPreset(
-  tabId: number,
-  presetId: string,
-  ports: WebSnapshotViewerPorts
-): Promise<ScreenshotViewport> {
-  const preset = await requireEnabledPreset(presetId);
-  if (preset.target === 'window') throw new Error('unsupported-context');
-  await sendViewerPreparationCommand(ports, tabId, {
-    type: PREPARATION_SURFACE_RESIZE,
-    viewport: { presetId, target: 'viewport', width: preset.width, height: preset.height },
-  });
-  return { presetId, target: 'viewport', width: preset.width, height: preset.height };
-}
-
-async function releaseViewerPreset(tabId: number, ports: WebSnapshotViewerPorts): Promise<void> {
-  await sendViewerPreparationCommand(ports, tabId, {
-    type: PREPARATION_SURFACE_RESIZE,
-    viewport: null,
-  });
-}
-
 export async function handleApplyViewportPreset(
   tabId: number,
   presetId: string,
@@ -121,7 +99,7 @@ export async function handleApplyViewportPreset(
   senderDocumentId: string | null | undefined,
   viewportState: ViewportState,
   viewportOwnerState: ViewportOwnerState,
-  webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
+  _webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
 ): Promise<void> {
   return runScreenshotModeOperation(tabId, async () => {
     if (
@@ -145,32 +123,21 @@ export async function handleApplyViewportPreset(
     if (capability === TabRuntimeCapability.Restricted) throw new Error('unsupported-context');
     let viewport: ScreenshotViewport;
     try {
-      viewport =
-        capability === TabRuntimeCapability.OwnedSnapshotViewer
-          ? await applyViewerPreset(tabId, presetId, webSnapshotViewerPorts)
-          : await applyRegularPreset(tabId, presetId, surfaceSession);
+      viewport = await applyRegularPreset(tabId, presetId, surfaceSession);
     } catch (error) {
-      if (
-        capability === TabRuntimeCapability.Regular &&
-        !getCaptureSurfaceService().getApplied(tabId)
-      ) {
+      if (!getCaptureSurfaceService().getApplied(tabId)) {
         viewportOwnerState.delete(tabId);
         viewportState.set(tabId, null);
         await notifyViewportChanged(tabId, null).catch(() => undefined);
       }
       throw error;
     }
-    viewportOwnerState.set(
-      tabId,
-      capability === TabRuntimeCapability.OwnedSnapshotViewer ? 'viewer' : 'capture-surface'
-    );
+    viewportOwnerState.set(tabId, 'capture-surface');
     markScreenshotSurfaceApplied(tabId, operationGeneration);
     viewportState.set(tabId, viewport);
-    if (capability === TabRuntimeCapability.Regular) {
-      await notifyViewportChanged(tabId, viewport).catch((error) => {
-        logger.warn('Failed to notify content about applied size preset', error);
-      });
-    }
+    await notifyViewportChanged(tabId, viewport).catch((error) => {
+      logger.warn('Failed to notify content about applied size preset', error);
+    });
   });
 }
 
@@ -182,7 +149,7 @@ export async function handleReleaseViewportPreset(
   senderDocumentId: string | null | undefined,
   viewportState: ViewportState,
   viewportOwnerState: ViewportOwnerState,
-  webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
+  _webSnapshotViewerPorts: WebSnapshotViewerPorts = new Map()
 ): Promise<void> {
   return runScreenshotModeOperation(tabId, async () => {
     if (
@@ -207,9 +174,7 @@ export async function handleReleaseViewportPreset(
     }
     const tab = await browserTabs.get(tabId);
     const capability = classifyTabRuntimeCapability(tab);
-    if (capability === TabRuntimeCapability.OwnedSnapshotViewer) {
-      await releaseViewerPreset(tabId, webSnapshotViewerPorts);
-    } else if (capability === TabRuntimeCapability.Regular) {
+    if (capability !== TabRuntimeCapability.Restricted) {
       await releaseRegularSurface(tabId, leaseGeneration);
       await notifyViewportChanged(tabId, null).catch((error) => {
         logger.warn('Failed to notify content about restored current size', error);
@@ -228,49 +193,18 @@ export async function getScreenshotPresetAvailabilities(
 ): Promise<ViewportPresetAvailability[]> {
   const tab = await browserTabs.get(tabId);
   const capability = classifyTabRuntimeCapability(tab);
-  if (
-    (context === 'screenshot' && capability === TabRuntimeCapability.OwnedSnapshotViewer) ||
-    capability === TabRuntimeCapability.Restricted
-  ) {
+  if (capability === TabRuntimeCapability.Restricted) {
     const settings = await loadSettings();
     const presetsById = new Map(settings.viewportPresets.map((preset) => [preset.id, preset]));
-    if (capability === TabRuntimeCapability.Restricted) {
-      return presetIds.map((presetId) => {
-        const preset = presetsById.get(presetId);
-        return {
-          status: 'unavailable',
-          presetId,
-          target: preset?.target ?? null,
-          reason: 'unsupported-context',
-          ...(preset ? { required: { width: preset.width, height: preset.height } } : {}),
-        };
-      });
-    }
     return presetIds.map((presetId) => {
       const preset = presetsById.get(presetId);
-      if (!preset) {
-        return { status: 'unavailable', presetId, target: null, reason: 'missing' };
-      }
-      const required = { width: preset.width, height: preset.height };
-      if (!preset.enabled) {
-        return {
-          status: 'unavailable',
-          presetId,
-          target: preset.target,
-          reason: 'disabled',
-          required,
-        };
-      }
-      if (preset.target === 'window') {
-        return {
-          status: 'unavailable',
-          presetId,
-          target: 'window',
-          reason: 'unsupported-context',
-          required,
-        };
-      }
-      return { status: 'available', presetId, target: 'viewport', required };
+      return {
+        status: 'unavailable',
+        presetId,
+        target: preset?.target ?? null,
+        reason: 'unsupported-context',
+        ...(preset ? { required: { width: preset.width, height: preset.height } } : {}),
+      };
     });
   }
   return getCaptureSurfaceService().getAvailabilities({

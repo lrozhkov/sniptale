@@ -34,7 +34,7 @@ function createContext(sendResponse: (response?: unknown) => void) {
     resolvedTabId: 42,
     sendResponse,
     viewportState: new Map([
-      [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+      [42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }],
     ]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },

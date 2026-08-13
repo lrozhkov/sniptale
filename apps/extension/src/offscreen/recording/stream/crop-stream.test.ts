@@ -19,7 +19,7 @@ import {
   createStream,
   createTrackedStream,
 } from '../multi-source/media-stream.test-support';
-import { createCropStream, createGatedCropStream } from './crop-stream';
+import { createCropStream } from './crop-stream';
 
 function installCanvasOutput(width: number, height: number) {
   const output = createStream(width, height);
@@ -80,48 +80,6 @@ describe('crop stream', () => {
     output.getVideoTracks()[0]?.stop();
   });
 
-  it('applies a frozen resize mapping without changing the encoder canvas', async () => {
-    const { context, output } = installCanvasOutput(1904, 984);
-    const video = { videoHeight: 1440, videoWidth: 2560 };
-    mocks.createSourceVideo.mockReturnValue(video);
-
-    const gated = await createGatedCropStream(createStream(2560, 1440), {
-      fit: 'contain',
-      sourceRect: { x: 0, y: 58, width: 2560, height: 1324 },
-      outputSize: { width: 1904, height: 984 },
-    });
-    expect(gated.controls.setFrozen('resize-1', true)).toBe('applied');
-    expect(gated.controls.readFrozenSourceSize('resize-1')).toEqual({
-      height: 1440,
-      width: 2560,
-    });
-    expect(
-      gated.controls.applyFrozenSourceGeometry('resize-1', {
-        fit: 'contain',
-        sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-        outputSize: { width: 1904, height: 984 },
-      })
-    ).toBe('applied');
-    expect(gated.controls.setFrozen('resize-1', false)).toBe('applied');
-
-    expect(context.drawImage).toHaveBeenLastCalledWith(
-      video,
-      0,
-      0,
-      2560,
-      1440,
-      expect.closeTo((1904 - (2560 * 984) / 1440) / 2),
-      0,
-      expect.closeTo((2560 * 984) / 1440),
-      984
-    );
-    expect(output.getVideoTracks()[0]?.getSettings()).toMatchObject({
-      height: 984,
-      width: 1904,
-    });
-    output.getVideoTracks()[0]?.stop();
-  });
-
   it('caps the crop cadence once at the source track rate reported on start', async () => {
     const { output } = installCanvasOutput(1280, 720);
     const video = { videoHeight: 720, videoWidth: 1280 };
@@ -142,7 +100,7 @@ describe('crop stream', () => {
     output.getVideoTracks()[0]?.stop();
   });
 
-  it('rejects non-contain geometry and output dimension changes', async () => {
+  it('rejects non-contain geometry', async () => {
     installCanvasOutput(100, 80);
     mocks.createSourceVideo.mockReturnValue({ videoHeight: 80, videoWidth: 100 });
     const unsupportedFit = ['co', 'ver'].join('') as 'cover';
@@ -154,22 +112,6 @@ describe('crop stream', () => {
         outputSize: { width: 100, height: 80 },
       })
     ).rejects.toThrow('contain fit only');
-
-    const gated = await createGatedCropStream(createStream(100, 80), {
-      fit: 'contain',
-      sourceRect: { x: 0, y: 0, width: 100, height: 80 },
-      outputSize: { width: 100, height: 80 },
-    });
-    gated.controls.setFrozen('resize-1', true);
-    gated.controls.readFrozenSourceSize('resize-1');
-    expect(() =>
-      gated.controls.applyFrozenSourceGeometry('resize-1', {
-        fit: 'contain',
-        sourceRect: { x: 0, y: 0, width: 100, height: 80 },
-        outputSize: { width: 98, height: 78 },
-      })
-    ).toThrow('cannot change the encoded output dimensions');
-    gated.stream.getVideoTracks()[0]?.stop();
   });
 
   it('releases source ownership on setup failure and output stop', async () => {

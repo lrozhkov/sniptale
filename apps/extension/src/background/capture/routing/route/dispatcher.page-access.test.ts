@@ -77,8 +77,8 @@ function createRouteArgs() {
     sendResponse: vi.fn(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }]]),
     pageAccessPort: {
       ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
       ensureNativeVisibleCaptureAuthority: ensureNativeVisibleCaptureAuthorityMock,
@@ -339,7 +339,7 @@ it('rejects native visible capture without native capture authority before handl
   });
 });
 
-it('does not require native capture authority for viewport-backed visible capture', async () => {
+it('requires native capture authority for window-sized visible capture', async () => {
   const args = createRouteArgs();
 
   expect(
@@ -351,6 +351,6 @@ it('does not require native capture authority for viewport-backed visible captur
   await flushRouteAsync();
 
   expect(ensureActivePageAccessRuntimeMock).toHaveBeenCalledWith(42);
-  expect(ensureNativeVisibleCaptureAuthorityMock).not.toHaveBeenCalled();
+  expect(ensureNativeVisibleCaptureAuthorityMock).toHaveBeenCalledWith(42);
   expect(handleVisibleCaptureMock).toHaveBeenCalledOnce();
 });

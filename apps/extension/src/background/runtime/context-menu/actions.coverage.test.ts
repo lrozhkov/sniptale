@@ -100,7 +100,7 @@ function createDeps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
@@ -143,7 +143,7 @@ function resetContextMenuActionCoverageMocks(): void {
   getContextMenuVideoPresetAvailabilityMock.mockResolvedValue({
     status: 'requires-start-validation',
     presetId: 'preset-1',
-    target: 'viewport',
+    target: 'window',
     required: { width: 1280, height: 720 },
   });
   getViewportPresetErrorMessageMock.mockReturnValue(null);
@@ -295,7 +295,7 @@ it('reports whether a context-menu preset is currently resolvable', async () => 
   getContextMenuVideoPresetAvailabilityMock.mockResolvedValueOnce({
     status: 'unavailable',
     presetId: 'preset-1',
-    target: 'viewport',
+    target: 'window',
     reason: 'viewport-too-large',
   });
 

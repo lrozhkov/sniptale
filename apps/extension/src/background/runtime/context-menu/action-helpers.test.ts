@@ -127,7 +127,7 @@ function resetContextMenuActionHelperMocks(): void {
     Promise.resolve({
       status: 'requires-start-validation',
       presetId,
-      target: 'viewport',
+      target: 'window',
       required: { width: 1920, height: 1080 },
     })
   );
@@ -241,7 +241,7 @@ it('blocks an unavailable context-menu preset before recording starts', async ()
   captureSurfaceGetAvailabilityMock.mockResolvedValueOnce({
     status: 'unavailable',
     presetId: 'preset-alt',
-    target: 'viewport',
+    target: 'window',
     reason: 'viewport-too-large',
     required: { width: 1920, height: 1080 },
     available: { width: 1280, height: 720 },

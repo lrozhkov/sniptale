@@ -100,7 +100,7 @@ function createProcessArgs() {
     tabId: 19,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
     screenshotModeState: new Map<number, boolean>(),
   };

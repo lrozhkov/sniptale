@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  buildViewportCaptureScreenshotOptions,
-  createDebuggerCaptureDataUrl,
   finalizeCapturedDataUrl,
   resolveVisibleCaptureApiFormat,
   withHiddenFixedElements,
@@ -14,30 +12,8 @@ describe('capture-visible-flow format helpers', () => {
     expect(resolveVisibleCaptureApiFormat('jpeg')).toBe('jpeg');
   });
 
-  it('builds debugger viewport capture options from the viewport and settings', () => {
-    expect(
-      buildViewportCaptureScreenshotOptions(
-        { width: 1440, height: 900 },
-        { imageFormat: 'webp', imageQuality: 82 }
-      )
-    ).toEqual({
-      clip: {
-        height: 900,
-        scale: 1,
-        width: 1440,
-        x: 0,
-        y: 0,
-      },
-      format: 'png',
-      fromSurface: true,
-      quality: 82,
-    });
-  });
-
-  it('wraps debugger payloads as data URLs and only converts when WebP is requested', async () => {
+  it('only converts visible captures when WebP is requested', async () => {
     const convertPngToWebp = vi.fn().mockResolvedValue('data:image/webp;base64,converted');
-
-    expect(createDebuggerCaptureDataUrl('abc123', 'webp')).toBe('data:image/png;base64,abc123');
 
     await expect(
       finalizeCapturedDataUrl({

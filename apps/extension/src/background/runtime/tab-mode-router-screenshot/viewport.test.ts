@@ -71,7 +71,7 @@ const viewportPreset = {
   kind: 'user' as const,
   name: 'HD viewport',
   order: 0,
-  target: 'viewport' as const,
+  target: 'window' as const,
   width: 1280,
 };
 const windowPreset = { ...viewportPreset, id: 'window-1', target: 'window' as const };
@@ -81,7 +81,7 @@ function stateMaps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
@@ -101,7 +101,7 @@ beforeEach(() => {
     leaseId: 'lease-2',
     presetId: 'viewport-1',
     sessionId: 'screenshot-session-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
   mocks.release.mockResolvedValue(undefined);
@@ -111,7 +111,7 @@ beforeEach(() => {
     leaseId: 'lease-2',
     presetId: 'viewport-1',
     sessionId: 'screenshot-session-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
   mocks.sendTabMessage.mockResolvedValue(undefined);
@@ -121,7 +121,7 @@ beforeEach(() => {
       status: 'available',
       presetId: 'viewport-1',
       required: { height: 720, width: 1280 },
-      target: 'viewport',
+      target: 'window',
     },
   ]);
 });
@@ -162,7 +162,7 @@ it('replaces a previous matching surface transactionally', async () => {
     leaseId: 'lease-1',
     presetId: 'viewport-1',
     sessionId: 'screenshot-session-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
   const maps = stateMaps();
@@ -235,7 +235,7 @@ it('leaves cross-target rollback to the atomic capture-surface owner', async () 
     leaseId: 'lease-1',
     presetId: 'viewport-1',
     sessionId: 'screenshot-session-1',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
   };
   mocks.getApplied.mockReturnValue(current);
@@ -249,7 +249,7 @@ it('leaves cross-target rollback to the atomic capture-surface owner', async () 
   maps.viewportOwnerState.set(7, 'capture-surface');
   maps.viewportState.set(7, {
     presetId: 'viewport-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
     height: 720,
   });
@@ -343,47 +343,7 @@ it('rejects stale apply and release identities before privileged effects', async
   expect(mocks.release).not.toHaveBeenCalled();
 });
 
-it('resizes an owned viewer locally and keeps browser-window presets disabled', async () => {
-  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
-  const maps = stateMaps();
-  const ports = new Map();
-
-  await handleApplyViewportPreset(
-    7,
-    'viewport-1',
-    2,
-    'capability-1',
-    'document-1',
-    maps.viewportState,
-    maps.viewportOwnerState,
-    ports
-  );
-  expect(mocks.sendViewerPreparationCommand).toHaveBeenCalledWith(
-    ports,
-    7,
-    expect.objectContaining({
-      type: 'PREPARATION_SURFACE_RESIZE',
-      viewport: expect.objectContaining({ presetId: 'viewport-1', target: 'viewport' }),
-    })
-  );
-  expect(maps.viewportOwnerState.get(7)).toBe('viewer');
-  expect(mocks.sendTabMessage).not.toHaveBeenCalled();
-
-  await expect(
-    handleApplyViewportPreset(
-      7,
-      'window-1',
-      3,
-      'capability-1',
-      'document-1',
-      maps.viewportState,
-      maps.viewportOwnerState,
-      ports
-    )
-  ).rejects.toThrow('unsupported-context');
-});
-
-it('releases regular and viewer surfaces and clears projected state', async () => {
+it('releases a regular window surface and clears projected state', async () => {
   mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
   mocks.getApplied
     .mockReturnValueOnce({
@@ -408,24 +368,6 @@ it('releases regular and viewer surfaces and clears projected state', async () =
     viewport: null,
   });
   expect(regular.viewportState.get(7)).toBeNull();
-
-  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
-  const viewer = stateMaps();
-  const ports = new Map();
-  await handleReleaseViewportPreset(
-    7,
-    4,
-    3,
-    'capability-1',
-    'document-1',
-    viewer.viewportState,
-    viewer.viewportOwnerState,
-    ports
-  );
-  expect(mocks.sendViewerPreparationCommand).toHaveBeenLastCalledWith(ports, 7, {
-    type: 'PREPARATION_SURFACE_RESIZE',
-    viewport: null,
-  });
 });
 
 it('rejects Current size while the screenshot lease is suspended beneath video', async () => {
@@ -453,40 +395,17 @@ it('rejects Current size while the screenshot lease is suspended beneath video',
   expect(mocks.sendTabMessage).not.toHaveBeenCalled();
 });
 
-it('projects viewer, restricted, and regular availability in one batch without hidden fallback', async () => {
-  mocks.classify.mockReturnValue(TabRuntimeCapability.OwnedSnapshotViewer);
-  await expect(
-    getScreenshotPresetAvailabilities(7, ['viewport-1', 'window-1', 'missing'])
-  ).resolves.toEqual([
-    expect.objectContaining({ status: 'available', target: 'viewport' }),
-    expect.objectContaining({
-      status: 'unavailable',
-      reason: 'unsupported-context',
-      target: 'window',
-    }),
-    expect.objectContaining({ status: 'unavailable', reason: 'missing' }),
-  ]);
-  mocks.loadSettings.mockResolvedValueOnce({
-    viewportPresets: [{ ...viewportPreset, enabled: false }],
-  });
-  await expect(getScreenshotPresetAvailabilities(7, ['viewport-1'])).resolves.toEqual([
-    expect.objectContaining({
-      status: 'unavailable',
-      reason: 'disabled',
-      target: 'viewport',
-    }),
-  ]);
-
+it('projects restricted and regular window availability without a viewer fallback', async () => {
   mocks.classify.mockReturnValueOnce(TabRuntimeCapability.Restricted);
   await expect(getScreenshotPresetAvailabilities(7, ['viewport-1'])).resolves.toEqual([
     expect.objectContaining({ status: 'unavailable', reason: 'unsupported-context' }),
   ]);
 
   mocks.classify.mockReturnValueOnce(TabRuntimeCapability.Regular);
-  await getScreenshotPresetAvailabilities(7, ['viewport-1', 'window-1'], 'video');
+  await getScreenshotPresetAvailabilities(7, ['window-1'], 'video');
   expect(mocks.getAvailabilities).toHaveBeenCalledWith({
     context: 'video-tab',
-    presetIds: ['viewport-1', 'window-1'],
+    presetIds: ['window-1'],
     tabId: 7,
   });
 });

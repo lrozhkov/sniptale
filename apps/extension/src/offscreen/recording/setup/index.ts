@@ -5,7 +5,6 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { recordingContext } from '../context';
-import type { CropStreamControls } from '../stream/crop-stream';
 import {
   createTabOutputStream,
   resolveTabOutputGeometry,
@@ -31,7 +30,7 @@ type RecordingSetupParams = {
   captureMode?: CaptureMode;
   cropRegion?: { x: number; y: number; width: number; height: number };
   viewport?: { width: number; height: number; devicePixelRatio?: number };
-  surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
+  surface?: { presetId: string; target: 'window'; width: number; height: number };
   sourceBinding?: { generation: number; recordingId: string; streamInstanceId: string };
 };
 
@@ -40,7 +39,6 @@ export type RecordingSetupResult = {
   rawTrackSettings: MediaTrackSettings;
   rawVideoHeight: number;
   rawVideoWidth: number;
-  tabOutputControls: CropStreamControls | null;
   tabOutputGeometry: TabOutputGeometry | null;
   trackSettings: MediaTrackSettings;
 };
@@ -63,7 +61,6 @@ async function createOutputVideoStream(
   params: RecordingSetupParams,
   raw: { width: number; height: number }
 ): Promise<{
-  controls: CropStreamControls | null;
   frameRate: number;
   outputSize: VideoOutputDimensions;
   stream: MediaStream;
@@ -95,24 +92,8 @@ async function createOutputVideoStream(
         tracksFullViewport: params.captureMode === CaptureMode.TAB,
       }
     );
-    const tabOutput = await createTabOutputStream(source, tabOutputGeometry, {
-      frameRate,
-      initiallySuspended: params.surface?.target === 'viewport',
-      ...(params.captureMode === CaptureMode.TAB &&
-      params.surface?.target === 'viewport' &&
-      params.sourceBinding
-        ? {
-            onSourceInvalidated: (error: Error) => {
-              recordingContext.reportSourceInvalidation(params.sourceBinding!, error);
-            },
-            requiresFrameVerification: true,
-          }
-        : params.captureMode === CaptureMode.TAB && params.surface?.target === 'viewport'
-          ? { requiresFrameVerification: true }
-          : {}),
-    });
+    const tabOutput = await createTabOutputStream(source, tabOutputGeometry, { frameRate });
     return {
-      controls: tabOutput.controls,
       frameRate: tabOutput.frameRate,
       outputSize: tabOutputGeometry.outputSize,
       stream: tabOutput.stream,
@@ -122,7 +103,6 @@ async function createOutputVideoStream(
   if (params.captureMode === CaptureMode.CAMERA) {
     const fixedOutput = await createFixedOutputStream(source, params.settings);
     return {
-      controls: null,
       frameRate: fixedOutput.frameRate,
       outputSize: fixedOutput.outputSize,
       stream: fixedOutput.stream,
@@ -131,7 +111,6 @@ async function createOutputVideoStream(
   }
   const fixedOutput = await createFixedOutputStream(source, params.settings);
   return {
-    controls: null,
     frameRate: fixedOutput.frameRate,
     outputSize: fixedOutput.outputSize,
     stream: fixedOutput.stream,
@@ -204,13 +183,6 @@ function assertTabSourceGeometry(
   ) {
     throw new Error('source-dimensions-mismatch: tab source geometry is invalid');
   }
-  if (
-    params.surface?.target === 'viewport' &&
-    (params.viewport.width !== params.surface.width ||
-      params.viewport.height !== params.surface.height)
-  ) {
-    throw new Error('source-dimensions-mismatch: applied viewport geometry is unavailable');
-  }
 }
 
 export async function prepareRecordingStream(
@@ -255,7 +227,6 @@ export async function prepareRecordingStream(
     rawTrackSettings: raw.trackSettings,
     rawVideoHeight: raw.height,
     rawVideoWidth: raw.width,
-    tabOutputControls: output.controls,
     tabOutputGeometry: output.tabOutputGeometry,
     trackSettings: {
       ...outputTrackSettings,

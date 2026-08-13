@@ -145,7 +145,7 @@ function createSelectionArgs() {
     tabId: 17,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
@@ -172,7 +172,7 @@ function createCaptureArgs() {
         kind: 'user',
         id: 'preset-1',
         name: 'Preset 1',
-        target: 'viewport' as const,
+        target: 'window' as const,
         width: 1440,
         height: 900,
         enabled: true,
@@ -182,8 +182,8 @@ function createCaptureArgs() {
     tabId: 21,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-    >([[21, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]),
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+    >([[21, { presetId: 'test:viewport', target: 'window' as const, width: 1440, height: 900 }]]),
   };
 }
 
@@ -205,7 +205,7 @@ beforeEach(() => {
       if (args.viewportPresetId) {
         args.viewportState.set(args.tabId, {
           presetId: args.viewportPresetId,
-          target: 'viewport' as const,
+          target: 'window' as const,
           width: 1440,
           height: 900,
         });
@@ -332,7 +332,7 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
       type: MessageType.ENABLE_SCREENSHOT_MODE,
       viewport: {
         presetId: 'preset-1',
-        target: 'viewport' as const,
+        target: 'window' as const,
         width: 1440,
         height: 900,
       },
@@ -357,7 +357,7 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
     tabId: 21,
   });
   expect(sendViewerPreparationCommandMock).not.toHaveBeenCalled();
-  expect(ensureNativeVisibleCaptureAuthorityMock).not.toHaveBeenCalled();
+  expect(ensureNativeVisibleCaptureAuthorityMock).toHaveBeenCalledWith(21);
   expect(args.screenshotModeState.get(21)).toBe(true);
 });
 
@@ -367,7 +367,7 @@ it('blocks native visible quick actions without native visible-capture authority
     viewportPresetId: null,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
   ensureNativeVisibleCaptureAuthorityMock.mockRejectedValueOnce(new Error('capture authority'));
@@ -386,7 +386,7 @@ it('stops before messaging when surface preparation fails', async () => {
   args.tabId = 29;
   args.viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
   >();
 
   await expect(runCaptureFlow(args)).rejects.toThrow('surface unavailable');
@@ -456,7 +456,7 @@ it('routes owned viewer capture flows through the viewer port with preset viewpo
     type: MessageType.ENABLE_SCREENSHOT_MODE,
     viewport: {
       presetId: 'preset-1',
-      target: 'viewport' as const,
+      target: 'window' as const,
       width: 1440,
       height: 900,
     },

@@ -84,14 +84,6 @@ const idempotencyPolicyByType = {
     idempotent: true,
     reason: 'recording begin is bound to a recording and stream generation',
   },
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: {
-    idempotent: false,
-    reason: 'the latest viewport draw state must be applied after every navigation',
-  },
-  [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: {
-    idempotent: false,
-    reason: 'source revalidation is a read-like command',
-  },
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: {
     idempotent: true,
     reason: 'recording stop is scoped to the active recording generation',

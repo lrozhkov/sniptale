@@ -5,7 +5,6 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoProjectExportSettings } from '../../../features/video/project/types';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type { ViewportFrameVerification } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 type RuntimeOffscreenCommandCapability = {
   capabilityToken: string;
@@ -34,7 +33,7 @@ export type RuntimeOffscreenStartRecordingMessage = RuntimeOffscreenCommandCapab
   streamInstanceId: string;
   surface?: {
     presetId: string;
-    target: 'viewport' | 'window';
+    target: 'window';
     width: number;
     height: number;
   };
@@ -53,25 +52,6 @@ export type RuntimeOffscreenBeginRecordingMessage = RuntimeOffscreenCommandCapab
   recordingId: string;
   generation: number;
   streamInstanceId: string;
-};
-
-export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCapability & {
-  type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId?: string;
-  viewport?: ViewportInfo;
-  verification?: ViewportFrameVerification;
-};
-
-export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenCommandCapability & {
-  type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
-  frozen: boolean;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId: string;
 };
 
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {

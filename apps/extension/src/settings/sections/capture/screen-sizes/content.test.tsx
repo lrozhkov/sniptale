@@ -28,7 +28,7 @@ const viewportOne: UserViewportPreset = {
   kind: 'user',
   name: 'Phone',
   order: 0,
-  target: 'viewport',
+  target: 'window',
   width: 390,
 };
 const viewportTwo: UserViewportPreset = {
@@ -41,7 +41,7 @@ const viewportTwo: UserViewportPreset = {
   width: 1024,
 };
 const systemWindow: SystemViewportPreset = {
-  catalogRevision: 2,
+  catalogRevision: 3,
   customized: true,
   enabled: true,
   height: 720,
@@ -103,15 +103,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('groups viewport/window rows and renders type, size, disabled state, and friendly hints', () => {
+it('renders one window-size group with size, disabled state, and friendly hints', () => {
   const props = createProps();
   act(() => root?.render(<PresetsSectionContent {...props} />));
 
-  expect(container?.textContent).toContain('viewportPresets.groups.viewport');
   expect(container?.textContent).toContain('viewportPresets.groups.window');
-  expect(container?.textContent).toContain('viewportPresets.hints.viewport');
   expect(container?.textContent).toContain('viewportPresets.hints.window');
-  expect(container?.textContent?.split('viewportPresets.groups.viewport')).toHaveLength(2);
   expect(container?.textContent?.split('viewportPresets.groups.window')).toHaveLength(2);
   expect(container?.textContent).toContain('Phone');
   expect(container?.textContent).toContain('390 × 844');
@@ -165,7 +162,7 @@ it('routes toggle, movement, edit, reset, delete, and add collection intents', (
 
   expect(props.list.onToggle).toHaveBeenCalledWith(viewportOne);
   expect(props.list.onMoveBefore).toHaveBeenCalledWith(viewportTwo.id, viewportOne.id);
-  expect(props.list.onMoveBefore).toHaveBeenCalledWith(viewportOne.id, null);
+  expect(props.list.onMoveBefore).toHaveBeenCalledWith(viewportOne.id, systemWindow.id);
   expect(props.list.onEdit).toHaveBeenCalledWith(viewportOne);
   expect(props.list.onDelete).toHaveBeenCalledWith(viewportOne);
   expect(props.list.onReset).toHaveBeenCalledWith(systemWindow);
@@ -179,7 +176,7 @@ it('routes toggle, movement, edit, reset, delete, and add collection intents', (
       />
     )
   );
-  expect(container?.textContent).not.toContain('viewportPresets.groups.window');
+  expect(container?.textContent).toContain('viewportPresets.groups.window');
 });
 
 it('keeps preset rows mounted while a mutation is being persisted', () => {

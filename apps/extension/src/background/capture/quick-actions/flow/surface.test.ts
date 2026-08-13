@@ -81,7 +81,7 @@ function createPreset(overrides: Partial<UserViewportPreset> = {}): UserViewport
     kind: 'user',
     name: 'HD viewport',
     order: 0,
-    target: 'viewport',
+    target: 'window',
     width: 1280,
     ...overrides,
   };
@@ -134,7 +134,7 @@ beforeEach(() => {
     leaseId: 'lease-1',
     presetId: 'preset-1',
     sessionId: 'session-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
   mocks.release.mockResolvedValue(undefined);
@@ -154,22 +154,24 @@ it('keeps Current size native without resolving or applying a preset and returns
   expect(mocks.loadSettings).not.toHaveBeenCalled();
 });
 
-it('applies viewport presets locally in an owned snapshot viewer and rejects window presets', async () => {
+it('applies window presets through the canonical capture-surface service', async () => {
   const args = createArgs({ pageCapability: TabRuntimeCapability.OwnedSnapshotViewer });
   await applyQuickActionSurface(args);
   expect(args.viewportState.get(7)).toEqual({
     height: 720,
     presetId: 'preset-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
-  expect(mocks.apply).not.toHaveBeenCalled();
-  await releaseQuickActionSurface(7, args.viewportState);
-
-  mocks.loadSettings.mockResolvedValueOnce({
-    viewportPresets: [createPreset({ target: 'window' })],
+  expect(mocks.apply).toHaveBeenCalledWith({
+    context: 'quick-action',
+    generation: 1,
+    owner: 'quick-action',
+    presetId: 'preset-1',
+    sessionId: 'session-1',
+    tabId: 7,
   });
-  await expect(applyQuickActionSurface(args)).rejects.toThrow('unsupported-context');
+  await releaseQuickActionSurface(7, args.viewportState);
 });
 
 it('fails explicitly for missing, disabled, and runtime-unavailable presets', async () => {
@@ -234,7 +236,7 @@ it('uses the already-current physical size for a native quick action without a s
   const priorViewport = {
     height: 720,
     presetId: 'preset-a',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
   };
   const args = createArgs({ viewportPresetId: null });
@@ -264,7 +266,7 @@ it('nests preset B over A and releases only B so the surface owner restores A', 
   const priorViewport = {
     height: 720,
     presetId: 'preset-a',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
   };
   const args = createArgs();
@@ -285,7 +287,7 @@ it('nests preset B over A and releases only B so the surface owner restores A', 
     leaseId: 'lease-b',
     presetId: 'preset-1',
     sessionId: 'session-1',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
   });
   mocks.getApplied.mockReturnValue({

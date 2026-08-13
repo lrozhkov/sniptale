@@ -9,17 +9,12 @@ import {
 } from '../../overlay/video-telemetry';
 import { hideVideoCountdown, showVideoCountdown } from '../../overlay/video-countdown';
 import {
-  disableViewportCursorProjection,
-  enableViewportCursorProjection,
-} from '../../overlay/viewport-cursor-projection';
-import {
   isViewportMessage,
   type ContentRuntimeHandlerResult,
   type ContentRuntimeMessage,
   type ViewportMessage,
 } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
-import { hideViewportCalibration, showViewportCalibration } from '../../overlay/calibration';
 
 function acknowledgeViewportMessage(sendResponse: ResponseSender): false {
   sendResponse({ success: true });
@@ -81,54 +76,11 @@ function handleKnownViewportMessage(
         viewport: getViewportInfo(),
       });
       return true;
-    case VideoMessageType.SHOW_VIEWPORT_CALIBRATION:
-      sendResponse({
-        result: showViewportCalibration(
-          {
-            generation: message.generation,
-            recordingId: message.recordingId,
-            transitionId: message.transitionId,
-          },
-          message.pattern
-        ),
-        success: true,
-      });
-      return false;
-    case VideoMessageType.HIDE_VIEWPORT_CALIBRATION:
-      sendResponse({
-        result: hideViewportCalibration({
-          generation: message.generation,
-          recordingId: message.recordingId,
-          transitionId: message.transitionId,
-        }),
-        success: true,
-      });
-      return false;
     case VideoMessageType.SHOW_COUNTDOWN:
       showVideoCountdown(message.seconds || 3, message.sessionId);
       return acknowledgeViewportMessage(sendResponse);
     case VideoMessageType.HIDE_COUNTDOWN:
       hideVideoCountdown();
-      return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION:
-      if (
-        !enableViewportCursorProjection({
-          generation: message.generation,
-          recordingId: message.recordingId,
-        })
-      ) {
-        sendResponse({
-          error: 'Viewport cursor projection authority is retired or superseded',
-          success: false,
-        });
-        return false;
-      }
-      return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION:
-      disableViewportCursorProjection({
-        generation: message.generation,
-        recordingId: message.recordingId,
-      });
       return acknowledgeViewportMessage(sendResponse);
     case VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE:
       return handleEnableControlledCursorCaptureMessage(message, sendResponse, getViewportInfo);

@@ -64,7 +64,7 @@ describe('toolbar viewport change action', () => {
         viewport: { width: 800, height: 600 },
       });
     await handleToolbarViewportChange(
-      { height: 600, presetId: 'viewport-800', target: 'viewport', width: 800 },
+      { height: 600, presetId: 'viewport-800', target: 'window', width: 800 },
       setCurrentViewport
     );
     expect(setCurrentViewport).toHaveBeenCalledWith({ width: 800, height: 600 });
@@ -74,7 +74,7 @@ describe('toolbar viewport change action', () => {
       error: 'background.runtime.debuggerConflictKeywordExtension',
     });
     await handleToolbarViewportChange(
-      { height: 700, presetId: 'viewport-900', target: 'viewport', width: 900 },
+      { height: 700, presetId: 'viewport-900', target: 'window', width: 900 },
       setCurrentViewport
     );
     expect(viewportChangeMocks.showToast).toHaveBeenCalledWith(
@@ -96,7 +96,7 @@ describe('toolbar viewport change action', () => {
 
     viewportChangeMocks.sendRuntimeMessage.mockRejectedValueOnce(new Error('boom'));
     await handleToolbarViewportChange(
-      { height: 1, presetId: 'viewport-1', target: 'viewport', width: 1 },
+      { height: 1, presetId: 'viewport-1', target: 'window', width: 1 },
       setCurrentViewport
     );
 
@@ -148,7 +148,7 @@ describe('toolbar viewport change action', () => {
       });
 
     await handleToolbarViewportChange(
-      { height: 768, presetId: 'viewport-1024', target: 'viewport', width: 1024 },
+      { height: 768, presetId: 'viewport-1024', target: 'window', width: 1024 },
       setCurrentViewport,
       undefined,
       { grantToken: 'trusted-click', kind: 'background-auto-start' }
@@ -188,7 +188,7 @@ describe('toolbar viewport change action', () => {
       });
 
     await handleToolbarViewportChange(
-      { height: 720, presetId: 'viewport-1280', target: 'viewport', width: 1280 },
+      { height: 720, presetId: 'viewport-1280', target: 'window', width: 1280 },
       setCurrentViewport,
       undefined,
       { grantToken: 'trusted-click', kind: 'background-auto-start' }
@@ -214,7 +214,7 @@ describe('toolbar viewport change action', () => {
     const mutateViewport = vi.fn().mockRejectedValue(new Error('viewer rollback complete'));
 
     await handleToolbarViewportChange(
-      { height: 720, presetId: 'viewer-1280', target: 'viewport', width: 1280 },
+      { height: 720, presetId: 'viewer-1280', target: 'window', width: 1280 },
       setCurrentViewport,
       mutateViewport
     );

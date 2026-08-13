@@ -47,7 +47,7 @@ const preset = {
   kind: 'user' as const,
   id: 'wide',
   name: 'Wide',
-  target: 'viewport' as const,
+  target: 'window' as const,
   width: 1440,
   height: 900,
   enabled: true,
@@ -69,7 +69,7 @@ function state() {
     screenshot: new Map<number, boolean>(),
     viewport: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
     owner: new Map<number, 'capture-surface' | 'viewer'>(),
   };

@@ -22,80 +22,6 @@ function verifyControlledCursorCaptureLifecycleContracts() {
   });
 }
 
-function verifyViewportCursorProjectionContracts() {
-  for (const type of [
-    VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
-    VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
-  ]) {
-    expect(
-      tabVideoMessageContracts[type]?.parseRequest({
-        generation: 4,
-        recordingId: 'recording-1',
-        type,
-      })
-    ).toEqual({ generation: 4, recordingId: 'recording-1', type });
-    expect(() => tabVideoMessageContracts[type]?.parseRequest({ type })).toThrow(
-      MessageContractError
-    );
-    expect(tabVideoMessageContracts[type]?.parseResponse({ success: true })).toEqual({
-      success: true,
-    });
-  }
-}
-
-function verifyViewportCalibrationContracts() {
-  const pattern = {
-    edgeThicknessCss: 8,
-    colors: {
-      top: { red: 236, green: 32, blue: 58 },
-      right: { red: 38, green: 220, blue: 75 },
-      bottom: { red: 42, green: 72, blue: 232 },
-      left: { red: 226, green: 42, blue: 214 },
-    },
-  };
-  const authority = { generation: 4, recordingId: 'recording-1', transitionId: 'transition-1' };
-  expect(
-    tabVideoMessageContracts[VideoMessageType.SHOW_VIEWPORT_CALIBRATION]?.parseRequest({
-      ...authority,
-      pattern,
-      type: VideoMessageType.SHOW_VIEWPORT_CALIBRATION,
-    })
-  ).toMatchObject({ ...authority, pattern });
-  expect(
-    tabVideoMessageContracts[VideoMessageType.HIDE_VIEWPORT_CALIBRATION]?.parseRequest({
-      ...authority,
-      type: VideoMessageType.HIDE_VIEWPORT_CALIBRATION,
-    })
-  ).toMatchObject(authority);
-  expect(
-    tabVideoMessageContracts[VideoMessageType.SHOW_VIEWPORT_CALIBRATION]?.parseResponse({
-      result: 'applied',
-      success: true,
-    })
-  ).toEqual({ result: 'applied', success: true });
-  expect(
-    tabVideoMessageContracts[VideoMessageType.HIDE_VIEWPORT_CALIBRATION]?.parseResponse({
-      result: 'stale',
-      success: true,
-    })
-  ).toEqual({ result: 'stale', success: true });
-  expect(() =>
-    tabVideoMessageContracts[VideoMessageType.SHOW_VIEWPORT_CALIBRATION]?.parseRequest({
-      ...authority,
-      generation: 0,
-      pattern,
-      type: VideoMessageType.SHOW_VIEWPORT_CALIBRATION,
-    })
-  ).toThrow(MessageContractError);
-  expect(() =>
-    tabVideoMessageContracts[VideoMessageType.HIDE_VIEWPORT_CALIBRATION]?.parseRequest({
-      ...authority,
-      transitionId: 1,
-      type: VideoMessageType.HIDE_VIEWPORT_CALIBRATION,
-    })
-  ).toThrow(MessageContractError);
-}
-
 function verifyRegionSelectionContracts() {
   const binding = {
     regionSelectionCapabilityToken: 'token-1',
@@ -153,11 +79,6 @@ describe('tab-contracts/video region capture contracts', () => {
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts
   );
-  it(
-    'validates viewport cursor projection lifecycle contracts',
-    verifyViewportCursorProjectionContracts
-  );
-  it('validates viewport calibration lifecycle contracts', verifyViewportCalibrationContracts);
   it('validates region-selection request binding contracts', verifyRegionSelectionContracts);
 });
 

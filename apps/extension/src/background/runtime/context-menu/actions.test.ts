@@ -133,7 +133,7 @@ function createDeps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
@@ -152,7 +152,7 @@ function seedContextMenuActionMocks() {
         kind: 'user',
         id: 'preset-1',
         name: 'HD',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -162,7 +162,7 @@ function seedContextMenuActionMocks() {
         kind: 'user',
         id: 'preset-2',
         name: 'Full HD',
-        target: 'viewport',
+        target: 'window',
         width: 1920,
         height: 1080,
         enabled: true,
@@ -179,7 +179,7 @@ function seedContextMenuActionMocks() {
     Promise.resolve({
       status: 'requires-start-validation',
       presetId,
-      target: 'viewport',
+      target: 'window',
       required: { width: 1280, height: 720 },
     })
   );

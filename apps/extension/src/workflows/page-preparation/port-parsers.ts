@@ -23,10 +23,7 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
 
 function parseViewport(
   value: unknown
-):
-  | { presetId: string; target: 'viewport' | 'window'; width: number; height: number }
-  | null
-  | undefined {
+): { presetId: string; target: 'window'; width: number; height: number } | null | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -36,7 +33,7 @@ function parseViewport(
   if (
     !isRecord(value) ||
     !isString(value['presetId']) ||
-    (value['target'] !== 'viewport' && value['target'] !== 'window') ||
+    value['target'] !== 'window' ||
     !isNumber(value['width']) ||
     !isNumber(value['height'])
   ) {

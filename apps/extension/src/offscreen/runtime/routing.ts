@@ -7,10 +7,8 @@ import {
   requestDesktopMedia,
 } from '../recording/setup/desktop-media';
 import {
-  activateViewportOutput,
   pauseRecording,
   resumeRecording,
-  setViewportDrawState,
   startRecording,
   stopRecording,
   updateRecordingSettings,
@@ -20,20 +18,7 @@ import {
   assertRecordingBegin,
   cancelRecordingBegin,
 } from '../recording/start/gate';
-import { recordingContext } from '../recording/context';
-import {
-  createSourceVideo,
-  releaseSourceVideo,
-  waitForSourceMetadata,
-} from '../recording/stream/video-source';
-import {
-  remapTabOutputGeometry,
-  remapTabOutputGeometryFromObservedViewport,
-  revalidateTabOutputGeometry,
-} from '../recording/stream/tab-output';
-import type { OutputSize } from '../recording/stream/crop-stream';
 import type { RecordingStopOutcome } from '../recording/context';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import { buildDesktopMediaRequestOptions } from './desktop-media-options';
 import {
   handledOffscreenRuntimeMessageTypes,
@@ -65,8 +50,6 @@ import { listVideoRecordingMediaDevices } from '../recording/camera-source/devic
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
-
-const logger = createLogger({ namespace: 'OffscreenRuntimeRouting' });
 
 export type { HandledOffscreenRuntimeMessageType } from './message-types';
 type HandledMessage = Extract<
@@ -123,8 +106,6 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_START_RECORDING:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
-    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -157,7 +138,6 @@ export function resolveOffscreenRuntimeResponseMode(
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
@@ -171,7 +151,6 @@ export function resolveOffscreenRuntimeResponseMode(
       return 'deferred-ack';
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.OFFSCREEN_GET_PROJECT_EXPORT_CAPABILITIES:
-    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
       return 'manual';
   }
 }
@@ -262,21 +241,11 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);
       try {
-        activateViewportOutput(resolveRecordingSourceBinding(message));
         allowRecordingBegin(message);
       } catch (error) {
         cancelRecordingBegin(error instanceof Error ? error.message : String(error));
         throw error;
       }
-      return;
-    case VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE:
-      return setViewportDrawState(
-        resolveRecordingSourceBinding(message),
-        message.frozen,
-        message.transitionId
-      );
-    case VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE:
-      await revalidateSource(message, sendResponse);
       return;
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
       return await stopRecording(
@@ -314,160 +283,4 @@ function resolveRecordingSourceBinding(message: {
     generation: message.generation,
     streamInstanceId: message.streamInstanceId,
   };
-}
-
-type SourceRevalidationMessage = Extract<
-  HandledMessage,
-  { type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE }
->;
-
-function assertCurrentRecordingSource(message: SourceRevalidationMessage, stream: MediaStream) {
-  const binding = {
-    recordingId: message.recordingId,
-    generation: message.generation,
-    streamInstanceId: message.streamInstanceId,
-  };
-  if (recordingContext.sourceStream !== stream || !recordingContext.matchesSourceBinding(binding)) {
-    throw new Error('Recording source geometry changed during revalidation');
-  }
-}
-
-async function revalidateStaticSource(
-  message: SourceRevalidationMessage,
-  stream: MediaStream
-): Promise<OutputSize> {
-  const video = createSourceVideo(stream);
-  try {
-    await waitForSourceMetadata(video);
-    assertCurrentRecordingSource(message, stream);
-    if (
-      video.videoWidth !== recordingContext.sourceVideoWidth ||
-      video.videoHeight !== recordingContext.sourceVideoHeight
-    ) {
-      throw new Error('Recording source geometry changed during revalidation');
-    }
-    const tabOutputGeometry = recordingContext.tabOutputGeometry;
-    if (
-      tabOutputGeometry &&
-      !revalidateTabOutputGeometry(
-        tabOutputGeometry,
-        {
-          width: video.videoWidth,
-          height: video.videoHeight,
-        },
-        message.viewport
-          ? {
-              width: message.viewport.width,
-              height: message.viewport.height,
-              devicePixelRatio: message.viewport.devicePixelRatio,
-            }
-          : tabOutputGeometry.coordinateSpace
-      )
-    ) {
-      throw new Error('Recording tab output mapping changed during revalidation');
-    }
-    return { height: video.videoHeight, width: video.videoWidth };
-  } finally {
-    releaseSourceVideo(video);
-  }
-}
-
-async function refreshFrozenTabOutput(
-  message: SourceRevalidationMessage,
-  stream: MediaStream
-): Promise<OutputSize> {
-  const controls = recordingContext.tabOutputControls;
-  const geometry = recordingContext.tabOutputGeometry;
-  if (!controls || !geometry) throw new Error('Frozen tab output geometry is unavailable');
-  if (!message.transitionId) {
-    throw new Error('Viewport source revalidation transition ID is unavailable');
-  }
-  if (message.verification) {
-    const verification = await controls.verifyFrozenSourceFrame(
-      message.transitionId,
-      message.verification
-    );
-    if (verification.result !== 'applied' || !verification.frame) {
-      throw new Error('Viewport frame verification was superseded');
-    }
-    const { sourceSize } = verification.frame;
-    assertCurrentRecordingSource(message, stream);
-    if (message.verification.phase === 'clean') return sourceSize;
-    if (!message.viewport) {
-      throw new Error('Verified viewport remapping requires current viewport geometry');
-    }
-    const remappedGeometry = remapTabOutputGeometryFromObservedViewport(
-      geometry,
-      sourceSize,
-      verification.frame.viewportRect,
-      {
-        width: message.viewport.width,
-        height: message.viewport.height,
-        devicePixelRatio: message.viewport.devicePixelRatio,
-      }
-    );
-    if (controls.applyFrozenSourceGeometry(message.transitionId, remappedGeometry) !== 'applied') {
-      throw new Error('Viewport source revalidation was superseded');
-    }
-    recordingContext.sourceVideoHeight = sourceSize.height;
-    recordingContext.sourceVideoWidth = sourceSize.width;
-    recordingContext.tabOutputGeometry = remappedGeometry;
-    return sourceSize;
-  }
-  const sourceSize = controls.readFrozenSourceSize(message.transitionId);
-  assertCurrentRecordingSource(message, stream);
-  if (
-    recordingContext.tabOutputControls !== controls ||
-    recordingContext.tabOutputGeometry !== geometry
-  ) {
-    throw new Error('Recording tab output changed during source revalidation');
-  }
-  const coordinateSpace = message.viewport
-    ? {
-        width: message.viewport.width,
-        height: message.viewport.height,
-        devicePixelRatio: message.viewport.devicePixelRatio,
-      }
-    : geometry.coordinateSpace;
-  const remapOutcome = remapTabOutputGeometry(geometry, sourceSize, coordinateSpace);
-  if (
-    controls.applyFrozenSourceGeometry(message.transitionId, remapOutcome.geometry) !== 'applied'
-  ) {
-    throw new Error('Viewport source revalidation was superseded');
-  }
-  if (remapOutcome.kind === 'recoverable-contain') {
-    logger.warn(remapOutcome.warning);
-  }
-  recordingContext.sourceVideoHeight = sourceSize.height;
-  recordingContext.sourceVideoWidth = sourceSize.width;
-  recordingContext.tabOutputGeometry = remapOutcome.geometry;
-  return sourceSize;
-}
-
-async function revalidateSource(
-  message: SourceRevalidationMessage,
-  sendResponse?: ResponseSender
-): Promise<void> {
-  const stream = recordingContext.sourceStream;
-  if (!stream || !recordingContext.matchesSourceBinding(resolveRecordingSourceBinding(message))) {
-    sendResponse?.({ success: false, result: 'DENY', error: 'Recording source is unavailable' });
-    return;
-  }
-  try {
-    const sourceSize = recordingContext.tabOutputControls
-      ? await refreshFrozenTabOutput(message, stream)
-      : await revalidateStaticSource(message, stream);
-    sendResponse?.({
-      success: true,
-      result: 'ALLOW',
-      videoWidth: sourceSize.width,
-      videoHeight: sourceSize.height,
-    });
-  } catch (error) {
-    sendResponse?.({
-      success: false,
-      result: 'DENY',
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
 }

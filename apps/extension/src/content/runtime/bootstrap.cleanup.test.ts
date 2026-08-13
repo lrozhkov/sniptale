@@ -22,7 +22,6 @@ const runtimeCleanupMocks = vi.hoisted(() => ({
   disableQuickEditMode: vi.fn(),
   disableSelectionMode: vi.fn(),
   disableVideoTelemetry: vi.fn(),
-  disposeViewportCursorProjection: vi.fn(),
   hideVideoCountdown: vi.fn(),
 }));
 
@@ -90,11 +89,6 @@ vi.mock('../overlay/video-telemetry', () => ({
   resumeVideoTelemetry: vi.fn(),
 }));
 
-vi.mock('../overlay/viewport-cursor-projection', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../overlay/viewport-cursor-projection')>()),
-  disposeViewportCursorProjection: runtimeCleanupMocks.disposeViewportCursorProjection,
-}));
-
 vi.mock('./bridge', () => ({
   createContentRuntimeMessageListener: vi.fn(),
 }));
@@ -129,7 +123,6 @@ function expectRuntimeDisposersRan(): void {
   expect(runtimeCleanupMocks.disableSelectionMode).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.hideVideoCountdown).toHaveBeenCalledTimes(1);
   expect(runtimeCleanupMocks.disableVideoTelemetry).toHaveBeenCalledTimes(1);
-  expect(runtimeCleanupMocks.disposeViewportCursorProjection).toHaveBeenCalledTimes(1);
   expect(regionSelectorControllerMocks.controller.dispose).toHaveBeenCalledTimes(1);
 }
 

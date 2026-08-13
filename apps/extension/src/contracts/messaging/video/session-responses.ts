@@ -59,14 +59,6 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeMessageResponse<{ result?: 'ALLOW' | 'DENY' }>;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeRequiredAckResponse;
-  [VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE]: RuntimeMessageResponse<{
-    result?: 'ALLOW' | 'DENY';
-    videoWidth?: number;
-    videoHeight?: number;
-  }>;
-  [VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE]: RuntimeMessageResponse<{
-    result: 'applied' | 'stale';
-  }>;
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_RESUME_RECORDING]: RuntimeAckResponse;

@@ -1,19 +1,5 @@
 import type { VideoMessageType } from '../messages/index';
 import type { CaptureMode, ViewportInfo } from './types';
-import type { ViewportCalibrationPattern } from './viewport-calibration';
-
-export interface ViewportCursorProjectionAuthority {
-  generation: number;
-  recordingId: string;
-}
-
-export interface EnableViewportCursorProjectionMessage extends ViewportCursorProjectionAuthority {
-  type: typeof VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
-}
-
-export interface DisableViewportCursorProjectionMessage extends ViewportCursorProjectionAuthority {
-  type: typeof VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
-}
 
 export interface EnableControlledCursorCaptureMessage {
   type: typeof VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
@@ -45,21 +31,6 @@ export interface HideCountdownMessage {
 
 export interface GetViewportCoordsMessage {
   type: typeof VideoMessageType.GET_VIEWPORT_COORDS;
-}
-
-export interface ViewportCalibrationAuthority {
-  generation: number;
-  recordingId: string;
-  transitionId: string;
-}
-
-export interface ShowViewportCalibrationMessage extends ViewportCalibrationAuthority {
-  type: typeof VideoMessageType.SHOW_VIEWPORT_CALIBRATION;
-  pattern: ViewportCalibrationPattern;
-}
-
-export interface HideViewportCalibrationMessage extends ViewportCalibrationAuthority {
-  type: typeof VideoMessageType.HIDE_VIEWPORT_CALIBRATION;
 }
 
 export interface GetRecordingStateMessage {
@@ -168,8 +139,6 @@ export interface DesktopMediaFailedMessage {
 }
 
 export type ContentVideoMessage =
-  | EnableViewportCursorProjectionMessage
-  | DisableViewportCursorProjectionMessage
   | EnableControlledCursorCaptureMessage
   | DisableControlledCursorCaptureMessage
   | PauseControlledCursorCaptureMessage
@@ -177,8 +146,6 @@ export type ContentVideoMessage =
   | ShowCountdownMessage
   | HideCountdownMessage
   | GetViewportCoordsMessage
-  | ShowViewportCalibrationMessage
-  | HideViewportCalibrationMessage
   | ShowRegionSelectorMessage
   | HideRegionSelectorMessage
   | RegionSelectedMessage

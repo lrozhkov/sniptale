@@ -10,24 +10,16 @@ import { getViewportPresetErrorMessage } from '../../../../../features/viewport-
 import { createViewportPresetAvailabilityMap } from '../../../../../features/viewport-presets/availability';
 
 export function getVideoPresetAvailabilityDescription(
-  availability: ViewportPresetAvailabilityPayload | undefined,
-  target: ViewportPreset['target']
+  availability: ViewportPresetAvailabilityPayload | undefined
 ): string {
   if (!availability) return translate('viewportPresets.availability.checking');
-  if (availability?.status === 'requires-start-validation') {
-    return translate('viewportPresets.availability.pendingVideo');
-  }
   if (availability?.status === 'unavailable') {
     return (
       getViewportPresetErrorMessage(availability.reason) ??
       translate('viewportPresets.availability.unavailable')
     );
   }
-  return translate(
-    target === 'viewport'
-      ? 'viewportPresets.availability.pendingVideo'
-      : 'viewportPresets.hints.window'
-  );
+  return translate('viewportPresets.hints.window');
 }
 
 export function useVideoPresetAvailability(

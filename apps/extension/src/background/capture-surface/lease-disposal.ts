@@ -2,7 +2,6 @@ import type { CaptureSurfaceOwner } from '../storage/capture-surface/contracts';
 import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
 import { captureSurfaceSnapshotsEqual, restoreCaptureSurfaceSnapshot } from './restoration';
 import { CaptureSurfaceError, type CaptureSurfaceLeaseState } from './types';
-import { acknowledgeClosedViewportTab } from './viewport';
 import { getWindowSnapshot } from './window';
 
 export class CaptureSurfaceLeaseDisposal {
@@ -19,43 +18,12 @@ export class CaptureSurfaceLeaseDisposal {
           'A closing-tab surface is suspended beneath another owner'
         );
       }
-      if (state.applied.target === 'window') {
-        await this.terminateWindowState(state);
-        continue;
-      }
-      state.entry.phase = 'releasing';
-      state.entry.updatedAt = this.registry.nextTimestamp();
-      await this.registry.persist();
-      acknowledgeClosedViewportTab(tabId);
-      this.registry.remove(state);
-      await this.registry.persist();
+      await this.terminateWindowState(state);
     }
   }
 
-  async handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]> {
-    acknowledgeClosedViewportTab(tabId);
-    const stack = this.registry.getStack(tabId);
-    if (!stack?.some((state) => state.applied.target === 'viewport')) return [];
-    if (
-      stack.some((state) => state.applied.target === 'viewport' && state.entry.owner === 'video')
-    ) {
-      return [];
-    }
-
-    const removedOwners = new Set<CaptureSurfaceOwner>();
-    for (let index = stack.length - 1; index >= 0; index -= 1) {
-      const state = stack[index];
-      if (!state || state.applied.target !== 'viewport') continue;
-      removedOwners.add(state.entry.owner);
-      state.viewportAcquisitionOwned = false;
-      const child = stack[index + 1];
-      if (child) this.registry.discardSuspended(state, child);
-      else this.registry.remove(state);
-    }
-    const resumed = stack.at(-1);
-    if (resumed) resumed.entry.phase = 'applied';
-    await this.registry.persist();
-    return [...removedOwners];
+  async handleDebuggerDetach(_tabId: number): Promise<readonly CaptureSurfaceOwner[]> {
+    return [];
   }
 
   private async terminateWindowState(state: CaptureSurfaceLeaseState): Promise<void> {

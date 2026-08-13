@@ -40,7 +40,13 @@ it('rejects malformed viewport notifications', () => {
   expect(() =>
     contract.parseRequest({
       type: MessageType.VIEWPORT_CHANGED,
-      viewport: { height: 720, presetId: 'preset-1', target: 'viewport', width: '1280' },
+      viewport: { height: 720, presetId: 'preset-1', target: 'viewport', width: 1280 },
+    })
+  ).toThrow(/VIEWPORT_CHANGED/);
+  expect(() =>
+    contract.parseRequest({
+      type: MessageType.VIEWPORT_CHANGED,
+      viewport: { height: 720, presetId: 'preset-1', target: 'window', width: '1280' },
     })
   ).toThrow(/VIEWPORT_CHANGED/);
 });

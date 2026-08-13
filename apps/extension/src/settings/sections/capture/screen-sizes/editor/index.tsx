@@ -79,10 +79,8 @@ function renderViewportPresetEditorBody(args: {
         onSubmit={args.state.handlers.handleSubmit}
         setHeight={args.state.form.setHeight}
         setLabel={args.state.form.setLabel}
-        setTarget={args.state.form.setTarget}
         setWidth={args.state.form.setWidth}
         width={args.state.form.width}
-        target={args.state.form.target}
       />
       <ViewportPresetEditorFooter
         {...createViewportPresetEditorFooterProps({

@@ -122,8 +122,8 @@ export const runtimePolicyStateDescriptors = [
     oneShot: false,
     ownerModule: 'apps/extension/src/background/capture-surface/service.ts',
     proofModules: [
-      'apps/extension/src/background/capture-surface/service.leases.test.ts',
-      'apps/extension/src/background/capture-surface/service.recovery.test.ts',
+      'apps/extension/src/background/capture-surface/service.window-only.test.ts',
+      'apps/extension/src/background/capture-surface/restoration.window-only.test.ts',
       'apps/extension/src/background/capture-surface/screenshot-session.test.ts',
     ],
     requiresTtl: false,

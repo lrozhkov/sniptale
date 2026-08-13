@@ -66,7 +66,7 @@ function createProps(
         kind: 'user',
         id: 'preset-1',
         name: 'Preset',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -206,7 +206,7 @@ it('blocks a known TAB output that exceeds the shared live pixel-rate budget', (
           kind: 'user',
           name: '1440 × 900',
           order: 0,
-          target: 'viewport',
+          target: 'window',
           width: 1440,
         },
       ],
@@ -216,7 +216,7 @@ it('blocks a known TAB output that exceeds the shared live pixel-rate budget', (
   expect(viewModel).toEqual(
     expect.objectContaining({
       canStart: false,
-      knownOutputBasisDimensions: { height: 900, width: 1440 },
+      knownOutputBasisDimensions: null,
       startButtonLabel: 't:popup.video.startUnavailable',
       startDisabledReason: 't:popup.video.outputResourceUnsupported',
     })

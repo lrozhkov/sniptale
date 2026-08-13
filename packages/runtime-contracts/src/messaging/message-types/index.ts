@@ -126,7 +126,7 @@ export type { CaptureArea } from '../capture-messages';
 
 export interface AppliedViewportPresetPayload {
   presetId: string;
-  target: 'viewport' | 'window';
+  target: 'window';
   width: number;
   height: number;
 }
@@ -135,27 +135,19 @@ export type ViewportPresetAvailabilityPayload =
   | {
       status: 'available';
       presetId: string;
-      target: 'viewport' | 'window';
-      required: { width: number; height: number };
-    }
-  | {
-      status: 'requires-start-validation';
-      presetId: string;
-      target: 'viewport';
+      target: 'window';
       required: { width: number; height: number };
     }
   | {
       status: 'unavailable';
       presetId: string;
-      target: 'viewport' | 'window' | null;
+      target: 'window' | null;
       reason:
         | 'disabled'
         | 'missing'
         | 'unsupported-context'
-        | 'viewport-too-large'
         | 'window-too-large'
         | 'window-not-normal'
-        | 'zoom-not-100'
         | 'surface-busy'
         | 'permission-denied'
         | 'platform-rejected'

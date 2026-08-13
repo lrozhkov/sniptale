@@ -30,7 +30,7 @@ it('opens the viewer preparation surface at its current size', async () => {
   const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>();
   const viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
   >();
   const registration = createAckingViewerPortRegistration();
   const ports = new Map([[5, registration]]);

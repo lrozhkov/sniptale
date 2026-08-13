@@ -59,7 +59,7 @@ beforeEach(() => {
       {
         status: 'requires-start-validation',
         presetId: 'preset-1',
-        target: 'viewport',
+        target: 'window',
         required: { width: 1280, height: 720 },
       },
     ],
@@ -74,46 +74,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('describes loading, pending, available, and unavailable availability states', () => {
-  expect(getVideoPresetAvailabilityDescription(undefined, 'viewport')).toBe(
+it('describes loading, available, and unavailable window availability states', () => {
+  expect(getVideoPresetAvailabilityDescription(undefined)).toBe(
     't:viewportPresets.availability.checking'
   );
   expect(
-    getVideoPresetAvailabilityDescription(
-      {
-        status: 'requires-start-validation',
-        presetId: 'viewport-1',
-        target: 'viewport',
-        required: { width: 1280, height: 720 },
-      },
-      'viewport'
-    )
-  ).toBe('t:viewportPresets.availability.pendingVideo');
-  expect(
-    getVideoPresetAvailabilityDescription(
-      {
-        status: 'available',
-        presetId: 'window-1',
-        target: 'window',
-        required: { width: 1280, height: 720 },
-      },
-      'window'
-    )
+    getVideoPresetAvailabilityDescription({
+      status: 'available',
+      presetId: 'window-1',
+      target: 'window',
+      required: { width: 1280, height: 720 },
+    })
   ).toBe('t:viewportPresets.hints.window');
   expect(
-    getVideoPresetAvailabilityDescription(
-      {
-        status: 'unavailable',
-        presetId: 'viewport-1',
-        target: 'viewport',
-        reason: 'viewport-too-large',
-      },
-      'viewport'
-    )
-  ).toBe('t:viewportPresets.availability.viewportTooLarge');
+    getVideoPresetAvailabilityDescription({
+      status: 'unavailable',
+      presetId: 'window-1',
+      target: 'window',
+      reason: 'window-too-large',
+    })
+  ).toBe('t:viewportPresets.availability.windowTooLarge');
 });
 
-it('shows native size and viewport presets in an inline curtain', async () => {
+it('shows native size and window presets in an inline curtain', async () => {
   const onPresetChange = vi.fn();
 
   renderNode(
@@ -124,7 +107,7 @@ it('shows native size and viewport presets in an inline curtain', async () => {
           kind: 'user',
           id: 'preset-1',
           name: 'Preset',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -150,7 +133,7 @@ it('shows native size and viewport presets in an inline curtain', async () => {
   expect(container?.textContent).toContain('1\u00a0280 × 720');
   expect(container?.textContent).not.toContain('t:popup.video.presetNativeDescription');
   expect(container?.textContent?.split('t:viewportPresets.availability.pendingVideo').length).toBe(
-    2
+    1
   );
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'GET_VIEWPORT_PRESET_AVAILABILITY',
@@ -213,7 +196,7 @@ it('selects native size when the native curtain option is clicked', async () => 
           kind: 'user',
           id: 'preset-1',
           name: 'Preset',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -250,7 +233,7 @@ it('keeps a preset disabled when runtime availability fails', async () => {
           kind: 'user',
           id: 'preset-1',
           name: 'Preset',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -295,7 +278,7 @@ it('shows availability progress only when the batch request takes at least 400ms
     availabilities: Array<{
       status: 'requires-start-validation';
       presetId: string;
-      target: 'viewport';
+      target: 'window';
       required: { width: number; height: number };
     }>;
   }) => void;
@@ -311,7 +294,7 @@ it('shows availability progress only when the batch request takes at least 400ms
           kind: 'user',
           id: 'preset-1',
           name: 'Preset',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -341,7 +324,7 @@ it('shows availability progress only when the batch request takes at least 400ms
         {
           status: 'requires-start-validation',
           presetId: 'preset-1',
-          target: 'viewport',
+          target: 'window',
           required: { width: 1280, height: 720 },
         },
       ],
@@ -360,7 +343,7 @@ it('shows the screen limitation once instead of repeating it for every preset', 
           kind: 'user',
           id: 'preset-1',
           name: 'Viewport',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -397,9 +380,9 @@ it('disables viewport presets but keeps window presets selectable for crop recor
     success: true,
     availabilities: [
       {
-        status: 'requires-start-validation',
+        status: 'available',
         presetId: 'viewport-1',
-        target: 'viewport',
+        target: 'window',
         required: { width: 1280, height: 720 },
       },
       {
@@ -419,7 +402,7 @@ it('disables viewport presets but keeps window presets selectable for crop recor
           kind: 'user',
           id: 'viewport-1',
           name: 'Viewport',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -449,19 +432,14 @@ it('disables viewport presets but keeps window presets selectable for crop recor
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
   const viewportButton = buttons.find((button) => button.textContent?.includes('Viewport'));
   const windowButton = buttons.find((button) => button.textContent?.includes('Window'));
-  expect(viewportButton?.getAttribute('aria-disabled')).toBe('true');
+  expect(viewportButton?.getAttribute('aria-disabled')).not.toBe('true');
   expect(windowButton?.getAttribute('aria-disabled')).not.toBe('true');
-  expect(container?.textContent?.indexOf('t:viewportPresets.groups.window')).toBeLessThan(
-    container?.textContent?.indexOf('t:viewportPresets.groups.viewport') ?? -1
-  );
-  expect(container?.textContent).toContain(
-    't:viewportPresets.availability.cropViewportUnsupported'
-  );
+  expect(container?.textContent).toContain('t:viewportPresets.groups.window');
+  expect(container?.textContent).not.toContain('t:viewportPresets.groups.viewport');
 
   act(() => viewportButton?.click());
-  expect(onPresetChange).not.toHaveBeenCalled();
-  act(() => windowButton?.click());
-  expect(onPresetChange).toHaveBeenCalledWith('window-1');
+  expect(onPresetChange).toHaveBeenCalledWith('viewport-1');
+  expect(windowButton).toBeDefined();
 });
 
 it('can hide the preset selector when switching from tab capture to camera', async () => {
@@ -471,7 +449,7 @@ it('can hide the preset selector when switching from tab capture to camera', asy
         kind: 'user' as const,
         id: 'preset-1',
         name: 'Preset',
-        target: 'viewport' as const,
+        target: 'window' as const,
         width: 1280,
         height: 720,
         enabled: true,

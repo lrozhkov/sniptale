@@ -20,7 +20,7 @@ const viewportPreset: UserViewportPreset = {
   kind: 'user',
   name: 'Viewport',
   order: 0,
-  target: 'viewport',
+  target: 'window',
   width: 1280,
 };
 const secondViewportPreset: UserViewportPreset = {
@@ -30,7 +30,7 @@ const secondViewportPreset: UserViewportPreset = {
   order: 1,
 };
 const systemWindowPreset: SystemViewportPreset = {
-  catalogRevision: 2,
+  catalogRevision: 3,
   customized: false,
   enabled: true,
   height: 720,
@@ -86,7 +86,7 @@ it('creates presets in the next group position', () => {
   const presets = [viewportPreset, secondViewportPreset, systemWindowPreset];
 
   expect(
-    createViewportPreset({ height: 844, name: 'Phone', target: 'viewport', width: 390 }, presets)
+    createViewportPreset({ height: 844, name: 'Phone', target: 'window', width: 390 }, presets)
   ).toMatchObject({ id: 'created-preset', name: 'Phone', order: 2 });
 });
 
@@ -102,15 +102,15 @@ it('moves a preset before another item without restoring the stale stored order'
     viewportPreset.id,
     systemWindowPreset.id,
   ]);
-  expect(moved.map((preset) => preset.order)).toEqual([0, 1, 0]);
+  expect(moved.map((preset) => preset.order)).toEqual([0, 1, 2]);
 });
 
 it('accepts an 80-character name and rejects 81 characters at the mutation boundary', () => {
   expect(
-    createViewportPreset({ height: 720, name: 'a'.repeat(80), target: 'viewport', width: 1280 }, [])
+    createViewportPreset({ height: 720, name: 'a'.repeat(80), target: 'window', width: 1280 }, [])
   ).toMatchObject({ name: 'a'.repeat(80) });
   expect(() =>
-    createViewportPreset({ height: 720, name: 'a'.repeat(81), target: 'viewport', width: 1280 }, [])
+    createViewportPreset({ height: 720, name: 'a'.repeat(81), target: 'window', width: 1280 }, [])
   ).toThrow('name is invalid');
 });
 

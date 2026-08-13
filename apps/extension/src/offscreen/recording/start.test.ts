@@ -102,7 +102,7 @@ afterEach(() => {
 it('announces raw source metadata and starts only after background ALLOW', async () => {
   const surface = {
     presetId: 'preset-1',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
   };

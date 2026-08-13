@@ -12,14 +12,12 @@ import { disableDesignReviewMode } from '../selection/design-review';
 import { disableSelectionMode } from '../selection/selection-mode';
 import { hideVideoCountdown } from '../overlay/video-countdown';
 import { disableVideoTelemetry } from '../overlay/video-telemetry';
-import { disposeViewportCursorProjection } from '../overlay/viewport-cursor-projection';
 import type { RegionSelectorController } from '../selection/region-selector/types';
 import {
   createContentRuntimeServices,
   type ContentRuntimeServices,
 } from '../application/runtime-services/services';
 import { createFullPageCaptureAgent } from '../application/full-page-capture';
-import { disposeViewportCalibration } from '../overlay/calibration';
 
 type ViewportInfoReader = () => ViewportInfo;
 export type ContentRuntimeCleanup = () => void;
@@ -148,8 +146,6 @@ export function initializeTopLevelContentRuntime(
       { resource: 'selection mode', run: disableSelectionMode },
       { resource: 'video countdown', run: hideVideoCountdown },
       { resource: 'video telemetry', run: disableVideoTelemetry },
-      { resource: 'viewport cursor projection', run: disposeViewportCursorProjection },
-      { resource: 'viewport calibration', run: disposeViewportCalibration },
       { resource: 'region selector controller', run: () => regionSelectorController.dispose() },
     ];
 

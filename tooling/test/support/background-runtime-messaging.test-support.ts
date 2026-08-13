@@ -217,7 +217,7 @@ function createDeps() {
       number,
       {
         presetId: string;
-        target: 'viewport' | 'window';
+        target: 'window' | 'window';
         width: number;
         height: number;
       } | null

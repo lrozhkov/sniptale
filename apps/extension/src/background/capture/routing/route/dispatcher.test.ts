@@ -115,8 +115,8 @@ function createRouteArgs() {
     sendResponse: vi.fn(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }]]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {

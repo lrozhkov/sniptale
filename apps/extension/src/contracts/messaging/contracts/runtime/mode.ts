@@ -26,10 +26,8 @@ const availabilityReasons = new Set([
   'disabled',
   'missing',
   'unsupported-context',
-  'viewport-too-large',
   'window-too-large',
   'window-not-normal',
-  'zoom-not-100',
   'surface-busy',
   'permission-denied',
   'platform-rejected',
@@ -66,17 +64,17 @@ function isSize(value: unknown): value is { width: number; height: number } {
 function isViewportPresetAvailability(value: unknown): boolean {
   if (!isRecord(value) || !isString(value['presetId'])) return false;
   const target = value['target'];
-  if (value['status'] === 'available' || value['status'] === 'requires-start-validation') {
+  if (value['status'] === 'available') {
     return (
       hasOnlyFields(value, ['status', 'presetId', 'target', 'required']) &&
-      (target === 'viewport' || (value['status'] === 'available' && target === 'window')) &&
+      target === 'window' &&
       isSize(value['required'])
     );
   }
   return (
     value['status'] === 'unavailable' &&
     hasOnlyFields(value, ['status', 'presetId', 'target', 'reason', 'required', 'available']) &&
-    (target === null || target === 'viewport' || target === 'window') &&
+    (target === null || target === 'window') &&
     isString(value['reason']) &&
     availabilityReasons.has(value['reason']) &&
     (value['required'] === undefined || isSize(value['required'])) &&

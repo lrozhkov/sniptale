@@ -55,7 +55,7 @@ it('resets reconstructible, disposable, and durable background runtime state', a
   state.quickEditModeState.set(7, true);
   state.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     height: 600,
     width: 800,
   });

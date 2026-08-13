@@ -4,11 +4,6 @@ import { hideFixedElements, restoreFixedElements } from '../page-state/index';
 
 type VisibleCaptureSettings = Pick<Settings, 'imageFormat' | 'imageQuality'>;
 
-interface VisibleCaptureViewport {
-  width: number;
-  height: number;
-}
-
 interface FixedElementMaskingAdapter {
   hideFixedElements(tabId: number): Promise<number>;
   restoreFixedElements(tabId: number): Promise<void>;
@@ -31,38 +26,6 @@ export function resolveVisibleCaptureApiFormat(
   imageFormat: VisibleCaptureSettings['imageFormat']
 ): 'png' | 'jpeg' {
   return imageFormat === 'webp' ? 'png' : imageFormat;
-}
-
-/**
- * Builds the debugger screenshot payload for a fixed viewport capture.
- */
-export function buildViewportCaptureScreenshotOptions(
-  viewport: VisibleCaptureViewport,
-  settings: VisibleCaptureSettings
-) {
-  return {
-    format: resolveVisibleCaptureApiFormat(settings.imageFormat),
-    quality: settings.imageQuality,
-    clip: {
-      x: 0,
-      y: 0,
-      width: viewport.width,
-      height: viewport.height,
-      scale: 1,
-    },
-    fromSurface: true,
-  };
-}
-
-/**
- * Converts the debugger screenshot payload into a data URL that matches the captured wire format.
- */
-export function createDebuggerCaptureDataUrl(
-  data: string,
-  imageFormat: VisibleCaptureSettings['imageFormat']
-): string {
-  const wireFormat = resolveVisibleCaptureApiFormat(imageFormat);
-  return `data:image/${wireFormat};base64,${data}`;
 }
 
 /**

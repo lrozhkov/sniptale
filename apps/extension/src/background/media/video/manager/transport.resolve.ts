@@ -8,19 +8,6 @@ import {
   type CaptureSourceResolverDeps,
   type OffscreenSetupDeps,
 } from './transport.deps';
-import { enableViewportCursorProjection } from '../capture-surface/cursor-projection';
-import { abortVideoRecordingStartIfCancelled } from './flow-cancellation';
-import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
-
-type ViewportCursorProjectionSetupDeps = {
-  abortStart: typeof abortVideoRecordingStartIfCancelled;
-  enableViewportCursorProjection: typeof enableViewportCursorProjection;
-};
-
-const defaultViewportCursorProjectionSetupDeps: ViewportCursorProjectionSetupDeps = {
-  abortStart: abortVideoRecordingStartIfCancelled,
-  enableViewportCursorProjection,
-};
 
 export async function resolveCaptureSourceForMode(
   tabId: number | null,
@@ -83,14 +70,4 @@ export async function prepareContentSurfaceOrAbort(
     return null;
   }
   return viewport;
-}
-
-export async function enableViewportCursorProjectionOrAbort(
-  tabId: number,
-  captureMode: CaptureMode,
-  authority: ViewportCursorProjectionAuthority,
-  deps: ViewportCursorProjectionSetupDeps = defaultViewportCursorProjectionSetupDeps
-): Promise<boolean> {
-  await deps.enableViewportCursorProjection(tabId, authority);
-  return !deps.abortStart(tabId, captureMode, 'viewport cursor projection setup');
 }

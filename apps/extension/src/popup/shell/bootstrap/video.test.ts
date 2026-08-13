@@ -52,7 +52,7 @@ function createSettings(overrides: Record<string, unknown> = {}) {
         kind: 'user',
         id: 'preset-1',
         name: 'Compact',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -62,7 +62,7 @@ function createSettings(overrides: Record<string, unknown> = {}) {
         kind: 'user',
         id: 'preset-2',
         name: 'Full HD',
-        target: 'viewport',
+        target: 'window',
         width: 1920,
         height: 1080,
         enabled: true,
@@ -255,7 +255,7 @@ describe('popup-bootstrap video owner', () => {
     verifiesWebcamBootstrapFailureFallback
   );
 
-  it('drops a stored viewport preset when TAB_CROP state is restored', async () => {
+  it('retains a stored window preset when TAB_CROP state is restored', async () => {
     mocks.loadVideoUiStateMock.mockResolvedValue(
       createVideoUiState({
         captureMode: CaptureMode.TAB_CROP,
@@ -269,6 +269,6 @@ describe('popup-bootstrap video owner', () => {
     );
 
     expect(result.captureMode).toBe(CaptureMode.TAB_CROP);
-    expect(result.selectedPresetId).toBeNull();
+    expect(result.selectedPresetId).toBe('preset-1');
   });
 });

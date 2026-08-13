@@ -1,199 +1,21 @@
 // policyStateId: video-capture-surface-sessions
 // Source waiters are bound to one recording generation and stream instance.
-import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
-import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import type { RuntimeOffscreenSourceReadyMessage } from '../../../../contracts/messaging/contracts/types';
-import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
-import { captureViewportsEqual, readTabCaptureViewport } from '../capture-viewport';
-import { setViewportOutputFrozen } from './output-state';
 import { getVideoSurfaceSession } from './session-registry';
-import { verifyExactViewportOutput } from './exact-output-verification';
 
 const SOURCE_READY_TIMEOUT_MS = 10_000;
 
 type SourceReadyWaiter = {
-  admissionStarted: boolean;
   expectedStreamInstanceId: string;
-  expectedViewport: ViewportInfo | null;
   reject: (reason: unknown) => void;
   resolve: (streamInstanceId: string) => void;
-  tabId: number | null;
   timeout: ReturnType<typeof setTimeout>;
-  viewportMismatchPolicy: 'reject' | 'remap';
 };
-
-type VideoSurfaceSession = NonNullable<ReturnType<typeof getVideoSurfaceSession>>;
 
 const readyWaiters = new Map<string, SourceReadyWaiter>();
 
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function rejectVideoSourceReady(
-  recordingId: string,
-  waiter: SourceReadyWaiter,
-  reason: string
-): 'DENY' {
-  if (readyWaiters.get(recordingId) !== waiter) return 'DENY';
-  clearTimeout(waiter.timeout);
-  readyWaiters.delete(recordingId);
-  waiter.reject(new Error(reason));
-  return 'DENY';
-}
-
-function requireAppliedOutputState(result: 'applied' | 'stale', action: string): void {
-  if (result !== 'applied') {
-    throw new Error(`Starting crop output ${action} was superseded`);
-  }
-}
-
-function isCurrentSourceAdmission(
-  message: RuntimeOffscreenSourceReadyMessage,
-  waiter: SourceReadyWaiter,
-  session: VideoSurfaceSession
-): boolean {
-  return (
-    readyWaiters.get(message.recordingId) === waiter &&
-    getVideoSurfaceSession(message.recordingId) === session &&
-    message.generation === session.generation &&
-    message.streamInstanceId === waiter.expectedStreamInstanceId &&
-    session.streamInstanceId === message.streamInstanceId &&
-    !session.sourceReady
-  );
-}
-
-async function remapStartingCropSource(args: {
-  liveViewport: ViewportInfo;
-  message: RuntimeOffscreenSourceReadyMessage;
-}): Promise<{ height: number; width: number }> {
-  const binding = {
-    generation: args.message.generation,
-    recordingId: args.message.recordingId,
-    streamInstanceId: args.message.streamInstanceId,
-  };
-  const transitionId = createSecureRandomUuid(
-    'Secure starting crop transition generation is unavailable'
-  );
-  requireAppliedOutputState(await setViewportOutputFrozen(binding, true, transitionId), 'freeze');
-
-  let remapError: unknown = null;
-  let remappedSize: { height: number; width: number } | null = null;
-  try {
-    const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
-      attachOffscreenCommandCapability({
-        type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE,
-        ...binding,
-        transitionId,
-        viewport: args.liveViewport,
-      })
-    );
-    const remappedWidth = response?.videoWidth;
-    const remappedHeight = response?.videoHeight;
-    if (
-      response?.success !== true ||
-      response.result !== 'ALLOW' ||
-      !isPositiveFinite(remappedWidth) ||
-      !isPositiveFinite(remappedHeight)
-    ) {
-      throw new Error(response?.error ?? 'Starting crop source remapping failed');
-    }
-    remappedSize = { height: remappedHeight, width: remappedWidth };
-  } catch (error) {
-    remapError = error;
-  }
-
-  let resumeError: unknown = null;
-  try {
-    requireAppliedOutputState(
-      await setViewportOutputFrozen(binding, false, transitionId),
-      'resume'
-    );
-  } catch (error) {
-    resumeError = error;
-  }
-  if (remapError && resumeError) {
-    throw new AggregateError(
-      [remapError, resumeError],
-      'Starting crop remap failed and its output could not resume',
-      { cause: resumeError }
-    );
-  }
-  if (remapError) throw remapError;
-  if (resumeError) throw resumeError;
-  if (!remappedSize) throw new Error('Starting crop source remapping produced no dimensions');
-  return remappedSize;
-}
-
-async function verifyStartingViewportSource(args: {
-  liveViewport: ViewportInfo;
-  message: RuntimeOffscreenSourceReadyMessage;
-  tabId: number;
-}): Promise<{ height: number; width: number }> {
-  const binding = {
-    generation: args.message.generation,
-    recordingId: args.message.recordingId,
-    streamInstanceId: args.message.streamInstanceId,
-  };
-  const transitionId = createSecureRandomUuid(
-    'Secure starting viewport verification generation is unavailable'
-  );
-  requireAppliedOutputState(await setViewportOutputFrozen(binding, true, transitionId), 'freeze');
-  let verificationError: unknown = null;
-  let verified: { height: number; width: number } | null = null;
-  try {
-    verified = await verifyExactViewportOutput({
-      binding: { ...binding, tabId: args.tabId },
-      transitionId,
-      viewport: args.liveViewport,
-    });
-  } catch (error) {
-    verificationError = error;
-  }
-  let resumeError: unknown = null;
-  try {
-    requireAppliedOutputState(
-      await setViewportOutputFrozen(binding, false, transitionId),
-      'resume'
-    );
-  } catch (error) {
-    resumeError = error;
-  }
-  if (verificationError && resumeError) {
-    throw new AggregateError(
-      [verificationError, resumeError],
-      'Starting viewport verification failed and its output could not resume'
-    );
-  }
-  if (verificationError) throw verificationError;
-  if (resumeError) throw resumeError;
-  if (!verified) throw new Error('Starting viewport verification produced no dimensions');
-  return verified;
-}
-
-async function resolveAcceptedSourceSize(
-  message: RuntimeOffscreenSourceReadyMessage,
-  waiter: SourceReadyWaiter,
-  session: VideoSurfaceSession
-): Promise<{ height: number; width: number }> {
-  const initialSize = { height: message.videoHeight, width: message.videoWidth };
-  if (!waiter.expectedViewport || waiter.tabId === null) return initialSize;
-
-  const liveViewport = await readTabCaptureViewport(waiter.tabId);
-  if (!isCurrentSourceAdmission(message, waiter, session)) {
-    throw new Error('Recording source admission is no longer current');
-  }
-  const viewportMatches = captureViewportsEqual(waiter.expectedViewport, liveViewport);
-  if (!viewportMatches && waiter.viewportMismatchPolicy !== 'remap') {
-    throw new Error('The tab viewport changed while the recording source was opening');
-  }
-  if (session.applied?.target === 'viewport') {
-    return verifyStartingViewportSource({ liveViewport, message, tabId: waiter.tabId });
-  }
-  if (viewportMatches) return initialSize;
-  return remapStartingCropSource({ liveViewport, message });
 }
 
 export async function acceptVideoSourceReady(
@@ -204,37 +26,22 @@ export async function acceptVideoSourceReady(
   if (
     !session ||
     !waiter ||
-    waiter.admissionStarted ||
-    !isCurrentSourceAdmission(message, waiter, session)
-  ) {
-    return 'DENY';
-  }
-  if (
+    message.generation !== session.generation ||
     message.streamInstanceId !== waiter.expectedStreamInstanceId ||
-    session.streamInstanceId !== message.streamInstanceId
+    session.streamInstanceId !== message.streamInstanceId ||
+    session.sourceReady
   ) {
     return 'DENY';
   }
   if (!isPositiveFinite(message.videoWidth) || !isPositiveFinite(message.videoHeight)) {
-    return rejectVideoSourceReady(message.recordingId, waiter, 'source-dimensions-mismatch');
-  }
-  waiter.admissionStarted = true;
-  let sourceSize: { height: number; width: number };
-  try {
-    sourceSize = await resolveAcceptedSourceSize(message, waiter, session);
-  } catch (error) {
-    return rejectVideoSourceReady(
-      message.recordingId,
-      waiter,
-      error instanceof Error ? error.message : String(error)
-    );
-  }
-  if (!isCurrentSourceAdmission(message, waiter, session)) {
+    clearTimeout(waiter.timeout);
+    readyWaiters.delete(message.recordingId);
+    waiter.reject(new Error('Recording source reported invalid dimensions'));
     return 'DENY';
   }
   session.sourceReady = true;
-  session.sourceVideoHeight = sourceSize.height;
-  session.sourceVideoWidth = sourceSize.width;
+  session.sourceVideoHeight = message.videoHeight;
+  session.sourceVideoWidth = message.videoWidth;
   clearTimeout(waiter.timeout);
   readyWaiters.delete(message.recordingId);
   waiter.resolve(message.streamInstanceId);
@@ -243,10 +50,7 @@ export async function acceptVideoSourceReady(
 
 export function waitForVideoSourceReady(args: {
   expectedStreamInstanceId: string;
-  expectedViewport: ViewportInfo | null;
   recordingId: string;
-  tabId: number | null;
-  viewportMismatchPolicy?: 'reject' | 'remap';
 }): Promise<string> {
   const session = getVideoSurfaceSession(args.recordingId);
   if (!session) return Promise.reject(new Error('Video surface session is missing'));
@@ -257,14 +61,10 @@ export function waitForVideoSourceReady(args: {
       reject(new Error('Timed out while validating the recording source'));
     }, SOURCE_READY_TIMEOUT_MS);
     readyWaiters.set(args.recordingId, {
-      admissionStarted: false,
       expectedStreamInstanceId: args.expectedStreamInstanceId,
-      expectedViewport: args.expectedViewport,
       reject,
       resolve,
-      tabId: args.tabId,
       timeout,
-      viewportMismatchPolicy: args.viewportMismatchPolicy ?? 'reject',
     });
   });
 }

@@ -1,12 +1,12 @@
 import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  createGatedCropStream: vi.fn(),
+  createCropOutputStream: vi.fn(),
 }));
 
 vi.mock('./crop-stream', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./crop-stream')>()),
-  createGatedCropStream: mocks.createGatedCropStream,
+  createCropOutputStream: mocks.createCropOutputStream,
 }));
 
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -24,16 +24,13 @@ it('passes the canonical contain plan to the gated canvas without a sampling byp
       tracksFullViewport: true,
     }
   );
-  const output = { controls: {}, stream: {} };
-  mocks.createGatedCropStream.mockResolvedValueOnce(output);
+  const output = { frameRate: 30, stream: {} };
+  mocks.createCropOutputStream.mockResolvedValueOnce(output);
 
-  await expect(
-    createTabOutputStream(stream, geometry, { frameRate: 30, initiallySuspended: true })
-  ).resolves.toBe(output);
+  await expect(createTabOutputStream(stream, geometry, { frameRate: 30 })).resolves.toBe(output);
 
-  expect(mocks.createGatedCropStream).toHaveBeenCalledWith(stream, geometry, {
+  expect(mocks.createCropOutputStream).toHaveBeenCalledWith(stream, geometry, {
     frameRate: 30,
-    initiallySuspended: true,
   });
   expect(geometry).toMatchObject({
     fit: 'contain',

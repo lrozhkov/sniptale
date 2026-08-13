@@ -70,7 +70,7 @@ function createContext(): TabModeContext {
     viewportOwnerState: new Map(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
     webSnapshotViewerPorts: new Map(),
   };
@@ -398,7 +398,7 @@ it('routes get viewport status and rejects unsupported screenshot messages', () 
   const getViewportContext = createContext();
   getViewportContext.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1440,
     height: 900,
   });
@@ -409,7 +409,7 @@ it('routes get viewport status and rejects unsupported screenshot messages', () 
     success: true,
     viewport: {
       presetId: 'test:viewport',
-      target: 'viewport',
+      target: 'window',
       width: 1440,
       height: 900,
     },

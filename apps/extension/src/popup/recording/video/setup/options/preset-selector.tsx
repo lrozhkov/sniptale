@@ -29,23 +29,14 @@ function resolvePresetDetail(args: {
   screenDisabled: boolean;
 }): string | undefined {
   if (args.screenDisabled) return undefined;
-  if (args.modeUnavailable) {
-    return translate('viewportPresets.availability.cropViewportUnsupported');
-  }
   if (!args.preset.enabled) return translate('viewportPresets.messages.presetDisabled');
   return args.availability?.status === 'unavailable'
-    ? getVideoPresetAvailabilityDescription(args.availability, args.preset.target)
+    ? getVideoPresetAvailabilityDescription(args.availability)
     : undefined;
 }
 
-function resolvePresetGroupDescriptionKey(
-  modeUnavailable: boolean,
-  target: ViewportPreset['target']
-): TranslationKey {
-  if (modeUnavailable) return 'viewportPresets.availability.cropViewportUnsupported';
-  return target === 'viewport'
-    ? 'viewportPresets.availability.pendingVideo'
-    : 'viewportPresets.hints.window';
+function resolvePresetGroupDescriptionKey(): TranslationKey {
+  return 'viewportPresets.hints.window';
 }
 
 function createPresetOption(args: {
@@ -60,7 +51,7 @@ function createPresetOption(args: {
   const detail = resolvePresetDetail({ availability, modeUnavailable, preset, screenDisabled });
   const groupDescription = screenDisabled
     ? undefined
-    : translate(resolvePresetGroupDescriptionKey(modeUnavailable, preset.target));
+    : translate(resolvePresetGroupDescriptionKey());
   return {
     value: preset.id,
     label: getViewportPresetDisplayName(preset, locale),
@@ -72,11 +63,7 @@ function createPresetOption(args: {
       modeUnavailable ||
       availability === undefined ||
       availability.status === 'unavailable',
-    group: translate(
-      preset.target === 'viewport'
-        ? 'viewportPresets.groups.viewport'
-        : 'viewportPresets.groups.window'
-    ),
+    group: translate('viewportPresets.groups.window'),
     ...(groupDescription === undefined ? {} : { groupDescription }),
   };
 }
@@ -117,13 +104,7 @@ export function VideoPresetSelector({
   const screenNotice = screenDisabled
     ? translate('viewportPresets.availability.screenUnsupported')
     : undefined;
-  const cropNotice =
-    captureMode === CaptureMode.TAB_CROP &&
-    viewportPresets.some(
-      (preset) => !isViewportPresetAllowedForVideoCaptureMode(captureMode, preset)
-    )
-      ? translate('viewportPresets.availability.cropViewportUnsupported')
-      : undefined;
+  const cropNotice = undefined;
   const checking =
     !presetsUnavailable &&
     viewportPresets.some(

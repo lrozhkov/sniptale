@@ -42,6 +42,7 @@ vi.mock('../../debugger/workspace', async (importOriginal) => ({
 }));
 
 import { createAckingViewerPortRegistration } from '../../capture/page-preparation/viewer-ports.test-support';
+import { cleanupScreenshotModeAfterNavigation } from './navigation-cleanup';
 
 function resetViewerNavigationCleanupMocks() {
   clearViewportMock.mockReset();
@@ -51,13 +52,12 @@ function resetViewerNavigationCleanupMocks() {
 }
 
 async function verifyViewerViewportCleanupSkipsDebugger() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
   const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>([[5, 'viewer']]);
   const viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 390, height: 844 }]]);
+    { presetId: string; target: 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:window', target: 'window' as const, width: 390, height: 844 }]]);
   const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
 
   await cleanupScreenshotModeAfterNavigation(
@@ -75,13 +75,12 @@ async function verifyViewerViewportCleanupSkipsDebugger() {
 }
 
 async function verifyViewerViewportCleanupSkipsDebuggerAfterPortDisappears() {
-  const { cleanupScreenshotModeAfterNavigation } = await import('./navigation-cleanup');
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
   const viewportOwnerState = new Map<number, 'capture-surface' | 'viewer'>([[5, 'viewer']]);
   const viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 390, height: 844 }]]);
+    { presetId: string; target: 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:window', target: 'window' as const, width: 390, height: 844 }]]);
   const webSnapshotViewerPorts = new Map([[5, createAckingViewerPortRegistration()]]);
   const cleanupPromise = cleanupScreenshotModeAfterNavigation(
     5,

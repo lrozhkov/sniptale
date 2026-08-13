@@ -126,7 +126,7 @@ it('renders tab settings, applies field changes, and disables a pending capture'
           id: 'wide',
           kind: 'user',
           name: 'Wide',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,

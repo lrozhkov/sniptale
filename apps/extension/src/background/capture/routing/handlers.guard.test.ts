@@ -1,13 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n/index';
 
-const {
-  captureViewportWithClipTransactionMock,
-  getErrorMessageMock,
-  loadSettingsMock,
-  loggerLogMock,
-} = vi.hoisted(() => ({
-  captureViewportWithClipTransactionMock: vi.fn(),
+const { getErrorMessageMock, loadSettingsMock, loggerLogMock } = vi.hoisted(() => ({
   getErrorMessageMock: vi.fn((error: unknown) =>
     error instanceof Error ? error.message : String(error)
   ),
@@ -40,8 +34,6 @@ vi.mock('../index', () => ({
   captureFullPage: vi.fn(),
   captureFullPageTransaction: vi.fn(),
   captureFullPageForArchive: vi.fn(),
-  captureViewportWithClip: vi.fn(),
-  captureViewportWithClipTransaction: captureViewportWithClipTransactionMock,
   captureVisibleTab: vi.fn(),
   captureVisibleTabForCrop: vi.fn(),
   captureVisibleTabForCropTransaction: vi.fn(),
@@ -79,7 +71,7 @@ function createContext(): CaptureRouteContext {
     resolvedTabId: 42,
     sendResponse: vi.fn(),
     viewportState: new Map([
-      [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+      [42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }],
     ]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: true },
@@ -98,7 +90,6 @@ it('rejects visible captures while another capture is already running', async ()
   await Promise.resolve();
 
   expect(loadSettingsMock).not.toHaveBeenCalled();
-  expect(captureViewportWithClipTransactionMock).not.toHaveBeenCalled();
   expect(context.sendResponse).toHaveBeenCalledWith({
     success: false,
     error: translate('background.runtime.captureAlreadyRunning'),

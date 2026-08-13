@@ -1,28 +1,23 @@
 import type { CaptureSurfaceOwner } from '../storage/capture-surface/contracts';
-import { releaseViewportSurfaceAcquisition } from './viewport';
+import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
+import {
+  captureSurfaceSnapshotsEqual,
+  readCurrentSurfaceSnapshot,
+  restoreCaptureSurfaceSnapshot,
+} from './restoration';
 import type {
   BeforeCaptureSurfaceOwnerRelease,
   CaptureSurfaceLeaseState,
   CaptureSurfaceReleaseRequest,
 } from './types';
 import { CaptureSurfaceError } from './types';
-import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
-import {
-  captureSurfaceSnapshotsEqual,
-  readCurrentSurfaceSnapshot,
-  restoreCaptureSurfaceSnapshot,
-  transitionCaptureSurfaceSnapshot,
-} from './restoration';
 
 export class CaptureSurfaceLeaseRelease {
   constructor(private readonly registry: CaptureSurfaceLeaseRegistry) {}
 
   async abandonConflicted(request: CaptureSurfaceReleaseRequest): Promise<void> {
     const state = this.requireExactTopLease(request);
-    if (state.entry.phase !== 'conflict') {
-      throw new CaptureSurfaceError('stale-generation');
-    }
-    await this.releaseOwnedViewportAcquisition(state);
+    if (state.entry.phase !== 'conflict') throw new CaptureSurfaceError('stale-generation');
     const stack = this.registry.getStack(state.entry.tabId);
     const parent = stack?.at(-2);
     this.registry.remove(state);
@@ -36,35 +31,22 @@ export class CaptureSurfaceLeaseRelease {
   async release(request: CaptureSurfaceReleaseRequest): Promise<void> {
     const state = this.requireExactTopLease(request);
     const stack = this.registry.getStack(state.entry.tabId);
-
     state.entry.phase = 'releasing';
     state.entry.updatedAt = this.registry.nextTimestamp();
     await this.registry.persist();
     const observation = await readCurrentSurfaceSnapshot(state);
-    let acquisitionSettled = false;
-    try {
-      await this.restoreObservedSurface(state, observation.current);
-      const parent = stack?.at(-2);
-      if (parent && parent.applied.target !== state.applied.target) {
-        await this.resumeCrossTargetParent(state, parent);
-      }
-      acquisitionSettled = await this.transferViewportAcquisition(
-        state,
-        parent,
-        observation.acquired
-      );
-      await this.releaseOwnedViewportAcquisition(state);
-      if (!acquisitionSettled) {
-        await observation.releaseAcquisition();
-        acquisitionSettled = true;
-      }
-      this.registry.remove(state);
-      const resumedParent = stack?.at(-1);
-      if (resumedParent) resumedParent.entry.phase = 'applied';
+    if (captureSurfaceSnapshotsEqual(state.entry.applied, observation.current)) {
+      await restoreCaptureSurfaceSnapshot(state);
+    } else if (!captureSurfaceSnapshotsEqual(state.prior, observation.current)) {
+      state.entry.phase = 'conflict';
+      state.entry.updatedAt = this.registry.nextTimestamp();
       await this.registry.persist();
-    } finally {
-      if (!acquisitionSettled) await observation.releaseAcquisition();
+      throw new CaptureSurfaceError('restore-conflict');
     }
+    this.registry.remove(state);
+    const parent = stack?.at(-1);
+    if (parent) parent.entry.phase = 'applied';
+    await this.registry.persist();
   }
 
   private requireExactTopLease(request: CaptureSurfaceReleaseRequest): CaptureSurfaceLeaseState {
@@ -101,7 +83,7 @@ export class CaptureSurfaceLeaseRelease {
         owner: top.entry.owner,
         sessionId: top.entry.sessionId,
         tabId: top.entry.tabId,
-        target: top.entry.target,
+        target: 'window',
       });
       await this.release(top.applied);
     }
@@ -126,69 +108,8 @@ export class CaptureSurfaceLeaseRelease {
           'A requested owner lease cannot be safely removed from the active stack'
         );
       }
-      await this.releaseOwnedViewportAcquisition(suspended);
       await this.registry.persistDiscardedSuspended(suspended, child);
       this.registry.discardSuspended(suspended, child);
     }
-  }
-
-  private async restoreObservedSurface(
-    state: CaptureSurfaceLeaseState,
-    current: CaptureSurfaceLeaseState['prior']
-  ): Promise<void> {
-    if (captureSurfaceSnapshotsEqual(state.entry.applied, current)) {
-      await restoreCaptureSurfaceSnapshot(state);
-      return;
-    }
-    if (captureSurfaceSnapshotsEqual(state.prior, current)) return;
-    state.entry.phase = 'conflict';
-    state.entry.updatedAt = this.registry.nextTimestamp();
-    await this.registry.persist();
-    throw new CaptureSurfaceError('restore-conflict');
-  }
-
-  private async resumeCrossTargetParent(
-    state: CaptureSurfaceLeaseState,
-    parent: CaptureSurfaceLeaseState
-  ): Promise<void> {
-    try {
-      await transitionCaptureSurfaceSnapshot({
-        expected: [parent.prior],
-        next: parent.entry.applied,
-        state: parent,
-      });
-    } catch (error) {
-      state.entry.phase = 'conflict';
-      state.entry.updatedAt = this.registry.nextTimestamp();
-      await this.registry.persist();
-      throw error;
-    }
-  }
-
-  private async transferViewportAcquisition(
-    state: CaptureSurfaceLeaseState,
-    parent: CaptureSurfaceLeaseState | undefined,
-    observationAcquired: boolean
-  ): Promise<boolean> {
-    const sharesViewportClient =
-      parent?.applied.target === 'viewport' &&
-      state.applied.target === 'viewport' &&
-      (parent.entry.owner === 'video') === (state.entry.owner === 'video');
-    if (!sharesViewportClient) return false;
-    if (state.viewportAcquisitionOwned) {
-      parent.viewportAcquisitionOwned = true;
-      state.viewportAcquisitionOwned = false;
-    }
-    if (observationAcquired) parent.viewportAcquisitionOwned = true;
-    return observationAcquired;
-  }
-
-  private async releaseOwnedViewportAcquisition(state: CaptureSurfaceLeaseState): Promise<void> {
-    if (!state.viewportAcquisitionOwned) return;
-    await releaseViewportSurfaceAcquisition({
-      owner: state.entry.owner,
-      tabId: state.entry.tabId,
-    });
-    state.viewportAcquisitionOwned = false;
   }
 }

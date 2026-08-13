@@ -50,7 +50,7 @@ function verifiesQuickActionMeta() {
       kind: 'user',
       id: 'preset-1',
       name: 'Preset',
-      target: 'viewport',
+      target: 'window',
       width: 1280,
       height: 720,
       enabled: true,

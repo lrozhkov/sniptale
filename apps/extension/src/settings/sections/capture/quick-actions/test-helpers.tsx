@@ -89,7 +89,7 @@ const VIEWPORT_PRESETS: ViewportPreset[] = [
     id: 'desktop-1440',
     kind: 'user',
     name: 'Desktop',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1440,
     height: 900,
     enabled: true,

@@ -8,8 +8,8 @@ import {
 } from './contracts';
 import { getCanonicalSystemViewportPreset } from './catalog';
 
-const targetOrder: readonly ViewportPresetTarget[] = ['viewport', 'window'];
-const selectorTargetOrder: readonly ViewportPresetTarget[] = ['window', 'viewport'];
+const targetOrder: readonly ViewportPresetTarget[] = ['window'];
+const selectorTargetOrder: readonly ViewportPresetTarget[] = ['window'];
 
 type ViewportPresetSelectorGroup = {
   presets: ViewportPreset[];
@@ -43,7 +43,7 @@ export function assertValidViewportPresetValues(params: {
     throw new Error('Viewport preset name is invalid');
   }
   if (
-    (params.target !== 'viewport' && params.target !== 'window') ||
+    params.target !== 'window' ||
     !isValidViewportPresetDimension(params.width) ||
     !isValidViewportPresetDimension(params.height)
   ) {

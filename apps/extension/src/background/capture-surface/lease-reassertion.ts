@@ -1,7 +1,6 @@
 import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
 import type { CaptureSurfaceReleaseRequest } from './types';
 import { CaptureSurfaceError } from './types';
-import { prepareViewportSurface, setViewportSurface } from './viewport';
 import { getWindowSnapshot, windowSnapshotsEqual } from './window';
 import type { WindowSnapshot } from './restoration';
 
@@ -19,24 +18,6 @@ export class CaptureSurfaceLeaseReassertion {
     ) {
       throw new CaptureSurfaceError('stale-generation');
     }
-    if (state.applied.target === 'viewport') {
-      const prepared = await prepareViewportSurface({
-        owner: state.entry.owner,
-        tabId: state.entry.tabId,
-      });
-      try {
-        await setViewportSurface({
-          tabId: state.entry.tabId,
-          width: state.applied.width,
-          height: state.applied.height,
-        });
-        state.viewportAcquisitionOwned ||= prepared.acquired;
-      } catch (error) {
-        await prepared.releaseAcquisition();
-        throw error;
-      }
-      return;
-    }
     const current = await getWindowSnapshot(state.entry.windowId);
     if (!windowSnapshotsEqual(current, state.entry.applied as WindowSnapshot)) {
       state.entry.phase = 'conflict';
@@ -47,12 +28,7 @@ export class CaptureSurfaceLeaseReassertion {
 
   async detectWindowConflict(windowId: number): Promise<void> {
     const active = [...this.registry.values()]
-      .filter(
-        (state) =>
-          state.entry.windowId === windowId &&
-          state.applied.target === 'window' &&
-          state.entry.phase === 'applied'
-      )
+      .filter((state) => state.entry.windowId === windowId && state.entry.phase === 'applied')
       .at(-1);
     if (!active || active.entry.applied.type !== 'window') return;
     const current = await getWindowSnapshot(windowId).catch(() => null);

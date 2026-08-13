@@ -46,7 +46,7 @@ function createModeMaps() {
     viewportOwnerState: new Map(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
@@ -156,7 +156,7 @@ async function verifiesViewportRoutes() {
   const getViewportArgs = createRouteArgs({ type: MessageType.GET_VIEWPORT_STATUS });
   getViewportArgs.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1440,
     height: 900,
   });
@@ -166,7 +166,7 @@ async function verifiesViewportRoutes() {
     success: true,
     viewport: {
       presetId: 'test:viewport',
-      target: 'viewport',
+      target: 'window',
       width: 1440,
       height: 900,
     },

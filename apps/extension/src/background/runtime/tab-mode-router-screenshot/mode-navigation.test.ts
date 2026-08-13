@@ -67,14 +67,14 @@ describe('screenshot navigation cleanup', () => {
         leaseId: 'lease-1',
         generation: session.generation,
         presetId: 'wide',
-        target: 'viewport',
+        target: 'window',
         width: 1440,
         height: 900,
       })
       .mockReturnValueOnce(null);
     const screenshot = new Map([[5, true]]);
     const viewport = new Map([
-      [5, { presetId: 'wide', target: 'viewport' as const, width: 1440, height: 900 }],
+      [5, { presetId: 'wide', target: 'window' as const, width: 1440, height: 900 }],
     ]);
     const owner = new Map<number, 'capture-surface' | 'viewer'>([[5, 'capture-surface']]);
 

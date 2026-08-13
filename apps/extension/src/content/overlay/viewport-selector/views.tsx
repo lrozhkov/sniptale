@@ -23,7 +23,7 @@ import { groupViewportPresetsForSelector } from '../../../features/viewport-pres
 
 type CurrentViewport = {
   presetId?: string;
-  target?: 'viewport' | 'window';
+  target?: 'window';
   width: number;
   height: number;
 } | null;
@@ -76,9 +76,6 @@ function availabilityDetail(
   if (!preset.enabled) return translate('viewportPresets.messages.presetDisabled');
   if (!availability) return null;
   if (availability.status === 'available') return null;
-  if (availability.status === 'requires-start-validation') {
-    return translate('viewportPresets.availability.pendingVideo');
-  }
   const reason =
     getViewportPresetErrorMessage(availability.reason) ??
     translate('viewportPresets.availability.unavailable');

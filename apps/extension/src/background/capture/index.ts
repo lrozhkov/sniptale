@@ -4,8 +4,6 @@ import { transitionCaptureJob } from './jobs/state-machine';
 import type { FullPageCaptureTransaction } from './full-page/types';
 import { registerFullPageExportRun, throwIfFullPageCaptureAborted } from './full-page/cancellation';
 import {
-  captureViewportWithClip,
-  captureViewportWithClipTransaction,
   captureVisibleTab,
   captureVisibleTabForCrop,
   captureVisibleTabForCropTransaction,
@@ -17,8 +15,6 @@ export {
   captureVisibleTabForCrop,
   captureVisibleTabForCropTransaction,
   captureVisibleTabTransaction,
-  captureViewportWithClip,
-  captureViewportWithClipTransaction,
 };
 export { captureFullPage, captureFullPageTransaction } from './full-page/workflow';
 

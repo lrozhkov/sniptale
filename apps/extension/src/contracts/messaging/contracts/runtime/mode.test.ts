@@ -114,22 +114,16 @@ describe('runtimeModeMessageContracts', () => {
       target: 'window',
       required: { width: 1280, height: 720 },
     } as const;
-    const pending = {
-      status: 'requires-start-validation',
-      presetId: 'preset-2',
-      target: 'viewport',
-      required: { width: 1024, height: 768 },
-    } as const;
     const unavailable = {
       status: 'unavailable',
       presetId: 'preset-3',
-      target: 'viewport',
-      reason: 'viewport-too-large',
+      target: 'window',
+      reason: 'window-too-large',
       required: { width: 1920, height: 1080 },
       available: { width: 1440, height: 900 },
     } as const;
 
-    for (const availability of [available, pending, unavailable]) {
+    for (const availability of [available, unavailable]) {
       expect(contract.parseResponse({ success: true, availabilities: [availability] })).toEqual({
         success: true,
         availabilities: [availability],
@@ -139,7 +133,6 @@ describe('runtimeModeMessageContracts', () => {
     for (const availability of [
       { status: 'available' },
       { ...available, target: 'screen' },
-      { ...pending, target: 'window' },
       { ...unavailable, reason: 'unknown' },
       { ...available, required: { width: '1280', height: 720 } },
       { ...available, unexpected: true },
@@ -167,6 +160,12 @@ describe('runtimeModeMessageContracts', () => {
       runtimeModeMessageContracts[MessageType.SCREENSHOT_MODE_STATUS].parseResponse({
         success: true,
         viewport: { ...viewport, target: 'screen' },
+      })
+    ).toThrow(/SCREENSHOT_MODE_STATUS/);
+    expect(() =>
+      runtimeModeMessageContracts[MessageType.SCREENSHOT_MODE_STATUS].parseResponse({
+        success: true,
+        viewport: { ...viewport, target: 'viewport' },
       })
     ).toThrow(/SCREENSHOT_MODE_STATUS/);
     expect(() =>

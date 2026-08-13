@@ -1,35 +1,19 @@
 import { createSourceVideo, releaseSourceVideo, waitForSourceMetadata } from './video-source';
-import {
-  createCropFrameGate,
-  type CropFrameGate,
-  type CropStreamControls,
-  type CropStreamGeometry,
-  type OutputSize,
-} from './crop-frame-gate';
 import { resolveContainedFrame } from '../geometry/contain-frame';
 import { createCanvasVideoOutput } from './canvas-video-output';
 import { resolveFixedVideoFrameRate } from './frame-pump';
-import { createViewportFrameVerifier } from './viewport-frame-verifier';
 
-export type {
-  CropRect,
-  CropStreamControls,
-  CropStreamDrawStateResult,
-  CropStreamGeometry,
-  OutputSize,
-} from './crop-frame-gate';
-
-export type GatedCropStream = {
-  controls: CropStreamControls;
-  frameRate: number;
-  stream: MediaStream;
+type CropRect = { x: number; y: number; width: number; height: number };
+type OutputSize = { width: number; height: number };
+type CropStreamGeometry = {
+  fit?: 'contain' | 'cover' | 'source';
+  outputSize: OutputSize;
+  sourceRect: CropRect;
 };
 
-type CropStreamOptions = {
-  frameRate?: number;
-  initiallySuspended?: boolean;
-  onSourceInvalidated?: (error: Error) => void;
-  requiresFrameVerification?: boolean;
+export type CropOutputStream = {
+  frameRate: number;
+  stream: MediaStream;
 };
 
 function requirePositiveInteger(value: number, label: string): number {
@@ -61,18 +45,14 @@ function requireCropGeometry(geometry: CropStreamGeometry, source: OutputSize): 
   return { ...geometry, fit: 'contain' };
 }
 
-function fillFrameBackground(context: CanvasRenderingContext2D, outputSize: OutputSize): void {
-  context.fillStyle = '#000000';
-  context.fillRect(0, 0, outputSize.width, outputSize.height);
-}
-
 function drawContainedSourceFrame(params: {
   context: CanvasRenderingContext2D;
   geometry: CropStreamGeometry;
   video: HTMLVideoElement;
 }): void {
   const { sourceRect, outputSize } = params.geometry;
-  fillFrameBackground(params.context, outputSize);
+  params.context.fillStyle = '#000000';
+  params.context.fillRect(0, 0, outputSize.width, outputSize.height);
   const destination = resolveContainedFrame(sourceRect, outputSize);
   const scaled = sourceRect.width !== destination.width || sourceRect.height !== destination.height;
   params.context.imageSmoothingEnabled = scaled;
@@ -90,22 +70,16 @@ function drawContainedSourceFrame(params: {
   );
 }
 
-export async function createGatedCropStream(
+export async function createCropOutputStream(
   sourceStream: MediaStream,
   geometry: CropStreamGeometry,
-  options: CropStreamOptions = {}
-): Promise<GatedCropStream> {
+  options: { frameRate?: number } = {}
+): Promise<CropOutputStream> {
   const video = createSourceVideo(sourceStream);
   let ownershipTransferred = false;
-  let released = false;
-  const release = () => {
-    if (released) return;
-    released = true;
-    releaseSourceVideo(video);
-  };
   try {
     await waitForSourceMetadata(video);
-    let activeGeometry = requireCropGeometry(geometry, {
+    const activeGeometry = requireCropGeometry(geometry, {
       width: video.videoWidth,
       height: video.videoHeight,
     });
@@ -114,72 +88,30 @@ export async function createGatedCropStream(
       options.frameRate ?? sourceFrameRate ?? 30,
       sourceFrameRate
     );
-    let frameGate: CropFrameGate | null = null;
     const cropped = createCanvasVideoOutput({
       audioTracks: sourceStream.getAudioTracks(),
       dimensions: activeGeometry.outputSize,
       frameRate,
-      initializeDrawing: ({ canvas, context }) => {
-        const drawSourceFrame = () => {
-          if (!frameGate?.canDraw()) return false;
+      initializeDrawing: ({ context }) => ({
+        drawHeldFrame: () => false,
+        drawLiveFrame: () => {
           drawContainedSourceFrame({ context, geometry: activeGeometry, video });
           return true;
-        };
-        const drawHeldFrame = () => {
-          if (!frameGate?.canEmitHeldFrame()) return false;
-          context.drawImage(canvas, 0, 0);
-          return true;
-        };
-        frameGate = createCropFrameGate({
-          applyGeometry: (nextGeometry) => {
-            const validated = requireCropGeometry(nextGeometry, {
-              width: video.videoWidth,
-              height: video.videoHeight,
-            });
-            if (
-              validated.outputSize.width !== canvas.width ||
-              validated.outputSize.height !== canvas.height
-            ) {
-              throw new Error('Updated crop geometry cannot change the encoded output dimensions');
-            }
-            activeGeometry = validated;
-          },
-          drawCurrentFrame: drawSourceFrame,
-          initiallySuspended: options.initiallySuspended === true,
-          ...(options.onSourceInvalidated
-            ? { onSourceInvalidated: options.onSourceInvalidated }
-            : {}),
-          requiresFrameVerification: options.requiresFrameVerification === true,
-          ...(options.requiresFrameVerification
-            ? { verifyFrame: createViewportFrameVerifier(video) }
-            : {}),
-          video,
-        });
-        return { drawHeldFrame, drawLiveFrame: drawSourceFrame };
-      },
-      release: () => {
-        frameGate?.stop();
-        release();
-      },
+        },
+      }),
+      release: () => releaseSourceVideo(video),
     });
-    if (!frameGate) throw new Error('Crop output controls were not initialized');
     ownershipTransferred = true;
-    return {
-      controls: frameGate,
-      frameRate,
-      stream: cropped,
-    };
+    return { frameRate, stream: cropped };
   } finally {
-    if (!ownershipTransferred) {
-      release();
-    }
+    if (!ownershipTransferred) releaseSourceVideo(video);
   }
 }
 
 export async function createCropStream(
   sourceStream: MediaStream,
   geometry: CropStreamGeometry,
-  options: Omit<CropStreamOptions, 'initiallySuspended'> = {}
+  options: { frameRate?: number } = {}
 ): Promise<MediaStream> {
-  return (await createGatedCropStream(sourceStream, geometry, options)).stream;
+  return (await createCropOutputStream(sourceStream, geometry, options)).stream;
 }

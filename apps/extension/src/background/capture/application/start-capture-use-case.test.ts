@@ -49,36 +49,14 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('selects viewport capture when viewport dimensions are available', async () => {
-  const viewportCapture = vi.fn().mockResolvedValue('data:image/png;base64,viewport');
+it('uses the native visible-tab crop path for a window-sized capture', async () => {
   const cropCapture = vi.fn().mockResolvedValue('data:image/png;base64,crop');
 
-  await expect(
-    createVisibleCapturePromise(
-      viewportCapture,
-      cropCapture,
-      7,
-      new Map([
-        [
-          7,
-          {
-            presetId: 'test:viewport',
-            target: 'viewport' as const,
-            height: 200,
-            width: 300,
-          },
-        ],
-      ])
-    )
-  ).resolves.toBe('data:image/png;base64,viewport');
+  await expect(createVisibleCapturePromise(cropCapture, 7)).resolves.toBe(
+    'data:image/png;base64,crop'
+  );
 
-  expect(viewportCapture).toHaveBeenCalledWith(7, {
-    presetId: 'test:viewport',
-    target: 'viewport' as const,
-    height: 200,
-    width: 300,
-  });
-  expect(cropCapture).not.toHaveBeenCalled();
+  expect(cropCapture).toHaveBeenCalledWith(7);
 });
 
 it('stores an explicit save-to-library action in the library', async () => {

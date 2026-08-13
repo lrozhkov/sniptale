@@ -77,7 +77,7 @@ function createSettings() {
         kind: 'user',
         id: 'preset-2',
         name: 'Full HD',
-        target: 'viewport',
+        target: 'window',
         width: 1920,
         height: 1080,
         enabled: true,

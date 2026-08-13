@@ -100,7 +100,7 @@ it('does not dispatch a source after cancellation wins during diagnostics', asyn
 it('dispatches exact surface metadata and waits for source validation', async () => {
   const surface = {
     presetId: 'preset-1',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
     sessionId: 'recording-42',
@@ -121,21 +121,12 @@ it('dispatches exact surface metadata and waits for source validation', async ()
   ).resolves.toBe('stream-instance-1');
   expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
     expectedStreamInstanceId: 'stream-instance-1',
-    expectedViewport: null,
     recordingId: 'recording-42',
-    tabId: 12,
   });
   expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
     expect.objectContaining({ generation: 2, recordingId: 'recording-42', surface })
   );
-  expect(reassertSurfaceMock).toHaveBeenCalledWith({
-    generation: 2,
-    leaseId: 'lease-1',
-    sessionId: 'recording-42',
-  });
-  expect(waitForVideoSourceReadyMock.mock.invocationCallOrder[0]).toBeLessThan(
-    reassertSurfaceMock.mock.invocationCallOrder[0]!
-  );
+  expect(reassertSurfaceMock).not.toHaveBeenCalled();
 });
 
 it('does not bind ordinary full-tab startup to a second viewport measurement', async () => {
@@ -169,13 +160,11 @@ it('does not bind ordinary full-tab startup to a second viewport measurement', a
 
   expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
     expectedStreamInstanceId: 'stream-instance-1',
-    expectedViewport: null,
     recordingId: 'recording-42',
-    tabId: 12,
   });
 });
 
-it('requests an atomic remap when crop geometry changes during source opening', async () => {
+it('does not remap crop geometry during source opening', async () => {
   const viewport = {
     devicePixelRatio: 2,
     height: 720,
@@ -198,14 +187,11 @@ it('requests an atomic remap when crop geometry changes during source opening', 
 
   expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
     expectedStreamInstanceId: 'stream-instance-1',
-    expectedViewport: viewport,
     recordingId: 'recording-42',
-    tabId: 12,
-    viewportMismatchPolicy: 'remap',
   });
 });
 
-it('allows startup crop remapping for a window-target preset', async () => {
+it('keeps startup handshake independent from crop geometry for a window preset', async () => {
   const viewport = {
     devicePixelRatio: 2,
     height: 985,
@@ -241,10 +227,7 @@ it('allows startup crop remapping for a window-target preset', async () => {
 
   expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
     expectedStreamInstanceId: 'stream-window-crop',
-    expectedViewport: viewport,
     recordingId: 'recording-window-crop',
-    tabId: 12,
-    viewportMismatchPolicy: 'remap',
   });
 });
 
@@ -270,9 +253,7 @@ it('does not validate a SCREEN source against the initiating tab viewport', asyn
   });
   expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
     expectedStreamInstanceId: 'stream-instance-1',
-    expectedViewport: null,
     recordingId: 'recording-42',
-    tabId: 12,
   });
   expect(sendOffscreenStartRecordingMock).toHaveBeenCalledWith(
     expect.objectContaining({

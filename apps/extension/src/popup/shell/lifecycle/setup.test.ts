@@ -84,7 +84,7 @@ function createBootstrapState() {
         kind: 'user',
         id: 'preset-1',
         name: 'Desktop',
-        target: 'viewport',
+        target: 'window',
         width: 1366,
         height: 768,
         enabled: true,

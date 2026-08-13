@@ -17,19 +17,13 @@ const viewportPreset = {
   kind: 'user' as const,
   name: '1440 × 900',
   order: 0,
-  target: 'viewport' as const,
+  target: 'window' as const,
   width: 1440,
 };
 
-it('uses only an exact TAB viewport preset as a known logical output basis', () => {
-  expect(resolveKnownVideoOutputBasis(CaptureMode.TAB, viewportPreset)).toEqual({
-    height: 900,
-    width: 1440,
-  });
+it('does not infer source geometry from browser-window dimensions', () => {
+  expect(resolveKnownVideoOutputBasis(CaptureMode.TAB, viewportPreset)).toBeNull();
   expect(resolveKnownVideoOutputBasis(CaptureMode.TAB_CROP, viewportPreset)).toBeNull();
-  expect(
-    resolveKnownVideoOutputBasis(CaptureMode.TAB, { ...viewportPreset, target: 'window' })
-  ).toBeNull();
   expect(resolveKnownVideoOutputBasis(CaptureMode.SCREEN, viewportPreset)).toBeNull();
 });
 

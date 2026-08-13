@@ -56,7 +56,7 @@ function createRestoreState() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
     webSnapshotViewerPorts: new Map(),
   };
@@ -207,7 +207,7 @@ it('rejects and rolls back a delayed final enable when all-sites authority is re
       _screenshotModeState: Map<number, boolean>,
       _viewportState: Map<
         number,
-        { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+        { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
       >,
       _viewportOwnerState: Map<number, 'capture-surface' | 'viewer'>,
       _ports: Map<number, unknown>,

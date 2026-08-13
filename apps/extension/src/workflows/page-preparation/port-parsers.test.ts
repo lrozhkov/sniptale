@@ -52,7 +52,7 @@ describe('viewer preparation enable command parser', () => {
         type: MessageType.ENABLE_SCREENSHOT_MODE,
         viewport: {
           presetId: 'test:viewport',
-          target: 'viewport',
+          target: 'window',
           height: 720,
           width: 1280,
         },
@@ -70,7 +70,7 @@ describe('viewer preparation enable command parser', () => {
       type: MessageType.ENABLE_SCREENSHOT_MODE,
       viewport: {
         presetId: 'test:viewport',
-        target: 'viewport',
+        target: 'window',
         height: 720,
         width: 1280,
       },

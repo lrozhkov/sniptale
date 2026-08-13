@@ -21,7 +21,6 @@ import {
   stopMultiSourceRecording,
 } from './multi-source';
 import { updateRecordingSettings as applyRecordingSettings } from './update-settings';
-import type { CropStreamDrawStateResult } from './stream/crop-stream';
 import {
   PostRecordPublicationError,
   retryPendingPostRecordResult,
@@ -484,22 +483,6 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
     'resumed',
     recordingContext.currentRecordingId
   );
-}
-
-export function activateViewportOutput(binding: RecordingSourceBinding): void {
-  assertActiveRecordingBinding(binding);
-  recordingContext.tabOutputControls?.activate();
-}
-
-export function setViewportDrawState(
-  binding: RecordingSourceBinding,
-  frozen: boolean,
-  transitionId: string
-): CropStreamDrawStateResult {
-  assertActiveRecordingBinding(binding);
-  const controls = recordingContext.tabOutputControls;
-  if (!controls) throw new Error('Tab output frame controls are unavailable');
-  return controls.setFrozen(transitionId, frozen);
 }
 
 export function updateRecordingSettings(
