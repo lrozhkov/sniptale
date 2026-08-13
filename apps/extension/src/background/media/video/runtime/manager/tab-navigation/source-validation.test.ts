@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   readViewport: vi.fn(),
   reassert: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+  verifyExactViewportOutput: vi.fn(),
 }));
 
 vi.mock('../../../../../capture-surface', async (importOriginal) => ({
@@ -25,8 +26,12 @@ vi.mock('../../../capture-viewport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../capture-viewport')>()),
   readTabCaptureViewport: mocks.readViewport,
 }));
+vi.mock('../../../capture-surface/exact-output-verification', () => ({
+  verifyExactViewportOutput: mocks.verifyExactViewportOutput,
+}));
 
 import { reassertViewportSurface, revalidateTabSource } from './source-validation';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const binding = {
   generation: 2,
@@ -68,6 +73,7 @@ beforeEach(() => {
     videoWidth: 2560,
     videoHeight: 1440,
   });
+  mocks.verifyExactViewportOutput.mockResolvedValue({ height: 900, width: 1600 });
 });
 
 it('reasserts only an applied viewport lease', async () => {
@@ -107,6 +113,32 @@ it('reads and forwards the live viewport when the caller has not already measure
 it('uses an atomically restored viewport without reading it twice', async () => {
   await revalidateTabSource(binding, viewport);
   expect(mocks.readViewport).not.toHaveBeenCalled();
+});
+
+it('uses frame-verified recovery only for TAB plus an applied viewport preset', async () => {
+  await revalidateTabSource(
+    { ...binding, captureMode: CaptureMode.TAB },
+    viewport,
+    'navigation-frame-1',
+    'document-frame-1'
+  );
+
+  expect(mocks.verifyExactViewportOutput).toHaveBeenCalledWith({
+    binding: { ...binding, captureMode: CaptureMode.TAB },
+    documentId: 'document-frame-1',
+    transitionId: 'navigation-frame-1',
+    viewport,
+  });
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(session).toMatchObject({ sourceVideoHeight: 900, sourceVideoWidth: 1600 });
+
+  await revalidateTabSource(
+    { ...binding, captureMode: CaptureMode.TAB_CROP },
+    viewport,
+    'navigation-crop-1',
+    'document-frame-1'
+  );
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledOnce();
 });
 
 it('revalidates the raw source without depending on the navigated page runtime', async () => {

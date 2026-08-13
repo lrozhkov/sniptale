@@ -56,6 +56,11 @@ async function startRecordingInternal(
     ...(params.cropRegion === undefined ? {} : { cropRegion: params.cropRegion }),
     ...(params.viewport === undefined ? {} : { viewport: params.viewport }),
     ...(params.surface === undefined ? {} : { surface: params.surface }),
+    sourceBinding: {
+      generation: params.generation,
+      recordingId,
+      streamInstanceId: params.streamInstanceId,
+    },
   });
   if (!isStillStarting(recordingId)) {
     cleanupResources();
@@ -134,5 +139,10 @@ async function startRecordingInternal(
     cursorCaptureMode: prepared.cursorCaptureMode,
     trackSettings: prepared.trackSettings,
     durationTracker: recordingContext.durationTracker,
+    sourceBinding: {
+      generation: params.generation,
+      recordingId,
+      streamInstanceId: params.streamInstanceId,
+    },
   });
 }

@@ -13,6 +13,7 @@ import {
   isViewportRegion,
 } from '../../../../validators/index';
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
+import { isViewportFrameVerification } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 type ViewportDrawStateResponse = RuntimeMessageResponse<{
   result: 'applied' | 'stale';
@@ -117,7 +118,11 @@ export const runtimeVideoOffscreenViewportMessageContracts = {
           generation: isNumber,
           streamInstanceId: isString,
         },
-        optional: { transitionId: isString, viewport: isViewportInfo },
+        optional: {
+          transitionId: isString,
+          verification: isViewportFrameVerification,
+          viewport: isViewportInfo,
+        },
       })
     ),
     parseResponse: createGuardParser(

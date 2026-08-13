@@ -492,6 +492,43 @@ describe('primary recording bootstrap validation', () => {
 });
 
 describe('primary recording terminal failure publication', () => {
+  it('terminates the active recorder when its verified viewport source is invalidated', async () => {
+    const fixture = createControllableArtifactSession();
+    const sourceBinding = {
+      generation: 6,
+      recordingId: 'recording-lifecycle',
+      streamInstanceId: 'stream-6',
+    };
+    recordingContext.beginRecordingSession(sourceBinding.recordingId, sourceBinding.generation);
+    recordingContext.bindStreamInstance(sourceBinding);
+    recordingContext.videoStream = createVideoStream();
+    recordingContext.sourceStream = recordingContext.videoStream;
+    recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+    await finalizeRecordingBootstrap({
+      durationTracker: recordingContext.durationTracker,
+      resolvedRecordingId: sourceBinding.recordingId,
+      settings: DEFAULT_VIDEO_SETTINGS,
+      sourceBinding,
+      trackSettings: { frameRate: 30, height: 720, width: 1280 },
+    });
+    fixture.getCallbacks().onStart?.();
+
+    const error = new Error('Verified viewport source dimensions changed unexpectedly');
+    expect(recordingContext.reportSourceInvalidation(sourceBinding, error)).toBe('applied');
+
+    expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          error: error.message,
+          phase: 'runtime',
+          recordingId: sourceBinding.recordingId,
+          type: 'OFFSCREEN_ERROR',
+        }),
+      })
+    );
+  });
+
   it('preserves a source-ended finalization failure for a joining background STOP', async () => {
     const finalizationError = new Error('durable publication failed');
     finalizeRecordingMock.mockRejectedValueOnce(finalizationError);

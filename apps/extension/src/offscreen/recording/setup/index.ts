@@ -32,6 +32,7 @@ type RecordingSetupParams = {
   cropRegion?: { x: number; y: number; width: number; height: number };
   viewport?: { width: number; height: number; devicePixelRatio?: number };
   surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
+  sourceBinding?: { generation: number; recordingId: string; streamInstanceId: string };
 };
 
 export type RecordingSetupResult = {
@@ -97,6 +98,18 @@ async function createOutputVideoStream(
     const tabOutput = await createTabOutputStream(source, tabOutputGeometry, {
       frameRate,
       initiallySuspended: params.surface?.target === 'viewport',
+      ...(params.captureMode === CaptureMode.TAB &&
+      params.surface?.target === 'viewport' &&
+      params.sourceBinding
+        ? {
+            onSourceInvalidated: (error: Error) => {
+              recordingContext.reportSourceInvalidation(params.sourceBinding!, error);
+            },
+            requiresFrameVerification: true,
+          }
+        : params.captureMode === CaptureMode.TAB && params.surface?.target === 'viewport'
+          ? { requiresFrameVerification: true }
+          : {}),
     });
     return {
       controls: tabOutput.controls,

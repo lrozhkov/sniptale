@@ -281,7 +281,8 @@ it('revalidates viewport recording without interrupting the recorder', async () 
   expect(mocks.revalidateSource).toHaveBeenCalledWith(
     expect.objectContaining({ recordingId: 'recording-1' }),
     null,
-    'navigation-1'
+    'navigation-1',
+    'document-1'
   );
   expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
@@ -481,7 +482,8 @@ it('guards current-size TAB_CROP output with a tokenized navigation transaction'
   expect(mocks.revalidateSource).toHaveBeenCalledWith(
     expect.objectContaining({ recordingId: 'recording-1' }),
     null,
-    'navigation-1'
+    'navigation-1',
+    'document-1'
   );
   expectViewportDrawStates([true, false]);
   expect(mocks.stop).not.toHaveBeenCalled();
@@ -502,7 +504,8 @@ it('guards window-preset TAB_CROP output without reasserting viewport metrics', 
   expect(mocks.revalidateSource).toHaveBeenCalledWith(
     expect.objectContaining({ recordingId: 'recording-1' }),
     null,
-    'navigation-1'
+    'navigation-1',
+    'document-1'
   );
   expectViewportDrawStates([true, false]);
 });
@@ -719,7 +722,8 @@ it('keeps TAB_CROP recording active when its overlay cannot be restored', async 
   expect(mocks.revalidateSource).toHaveBeenCalledWith(
     expect.objectContaining({ recordingId: 'recording-1', tabId: 7 }),
     null,
-    'navigation-1'
+    'navigation-1',
+    'document-1'
   );
   expect(mocks.revalidateSource.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.restoreEffects.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY

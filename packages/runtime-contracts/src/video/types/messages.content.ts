@@ -1,5 +1,6 @@
 import type { VideoMessageType } from '../messages/index';
 import type { CaptureMode, ViewportInfo } from './types';
+import type { ViewportCalibrationPattern } from './viewport-calibration';
 
 export interface ViewportCursorProjectionAuthority {
   generation: number;
@@ -44,6 +45,21 @@ export interface HideCountdownMessage {
 
 export interface GetViewportCoordsMessage {
   type: typeof VideoMessageType.GET_VIEWPORT_COORDS;
+}
+
+export interface ViewportCalibrationAuthority {
+  generation: number;
+  recordingId: string;
+  transitionId: string;
+}
+
+export interface ShowViewportCalibrationMessage extends ViewportCalibrationAuthority {
+  type: typeof VideoMessageType.SHOW_VIEWPORT_CALIBRATION;
+  pattern: ViewportCalibrationPattern;
+}
+
+export interface HideViewportCalibrationMessage extends ViewportCalibrationAuthority {
+  type: typeof VideoMessageType.HIDE_VIEWPORT_CALIBRATION;
 }
 
 export interface GetRecordingStateMessage {
@@ -161,6 +177,8 @@ export type ContentVideoMessage =
   | ShowCountdownMessage
   | HideCountdownMessage
   | GetViewportCoordsMessage
+  | ShowViewportCalibrationMessage
+  | HideViewportCalibrationMessage
   | ShowRegionSelectorMessage
   | HideRegionSelectorMessage
   | RegionSelectedMessage

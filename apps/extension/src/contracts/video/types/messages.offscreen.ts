@@ -8,6 +8,7 @@ import type {
   ViewportInfo,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/index';
+import type { ViewportFrameVerification } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 export interface OffscreenStartRecordingMessage {
   type: typeof VideoMessageType.OFFSCREEN_START_RECORDING;
@@ -59,6 +60,7 @@ export interface OffscreenRevalidateSourceMessage {
   streamInstanceId: string;
   transitionId?: string;
   viewport?: ViewportInfo;
+  verification?: ViewportFrameVerification;
 }
 
 export interface OffscreenSetViewportDrawStateMessage {

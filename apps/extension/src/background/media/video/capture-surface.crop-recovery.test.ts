@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   retireViewportCursorProjectionAuthority: vi.fn(),
   release: vi.fn(),
   sendRuntimeMessage: vi.fn(),
+  verifyExactViewportOutput: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/security/secure-random-id', () => ({
@@ -51,6 +52,10 @@ vi.mock('./capture-surface/cursor-projection', async (importOriginal) => ({
   disableViewportCursorProjection: mocks.disableViewportCursorProjection,
   enableViewportCursorProjection: mocks.enableViewportCursorProjection,
   retireViewportCursorProjectionAuthority: mocks.retireViewportCursorProjectionAuthority,
+}));
+
+vi.mock('./capture-surface/exact-output-verification', () => ({
+  verifyExactViewportOutput: mocks.verifyExactViewportOutput,
 }));
 
 vi.mock('../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
@@ -93,6 +98,7 @@ beforeEach(() => {
     }
     return { success: true, result: 'applied' };
   });
+  mocks.verifyExactViewportOutput.mockResolvedValue({ height: 720, width: 1280 });
 });
 
 it('fails a persisted CROP plus viewport lease closed without reasserting or thawing it', async () => {
@@ -269,11 +275,10 @@ it('recovers a live viewport TAB session through fresh page geometry', async () 
     generation: 4,
     recordingId: 'recording-live-viewport',
   });
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+  expect(mocks.verifyExactViewportOutput).toHaveBeenCalledWith(
     expect.objectContaining({
-      recordingId: 'recording-live-viewport',
+      binding: expect.objectContaining({ recordingId: 'recording-live-viewport', tabId: 9 }),
       transitionId: 'recovery-transition-1',
-      type: 'OFFSCREEN_REVALIDATE_SOURCE',
       viewport: expect.objectContaining({ height: 1080, width: 1920 }),
     })
   );

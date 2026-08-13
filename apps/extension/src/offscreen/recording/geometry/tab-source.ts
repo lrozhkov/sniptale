@@ -237,6 +237,48 @@ export function remapTabOutputGeometry(
   });
 }
 
+export function remapTabOutputGeometryFromObservedViewport(
+  geometry: TabOutputGeometry,
+  sourceSize: RecordingPixelSize,
+  observedViewport: RecordingSampleRect,
+  coordinateSpace: TabOutputCoordinateSpace
+): TabOutputGeometry {
+  if (!geometry.tracksFullViewport) {
+    throw new Error('Observed viewport remapping is only valid for full viewport output');
+  }
+  const source = requirePositiveSize(sourceSize, 'Tab source');
+  const cssViewport = requireCoordinateSpace(coordinateSpace);
+  const values = [
+    observedViewport.x,
+    observedViewport.y,
+    observedViewport.width,
+    observedViewport.height,
+  ];
+  if (
+    !values.every((value) => Number.isFinite(value) && Number.isInteger(value)) ||
+    observedViewport.x < 0 ||
+    observedViewport.y < 0 ||
+    observedViewport.width <= 0 ||
+    observedViewport.height <= 0 ||
+    observedViewport.x + observedViewport.width > source.width ||
+    observedViewport.y + observedViewport.height > source.height
+  ) {
+    throw new Error('Observed viewport frame falls outside the raw tab source');
+  }
+  const requestedCrop = requireRequestedCrop(
+    { x: 0, y: 0, width: cssViewport.width, height: cssViewport.height },
+    cssViewport
+  );
+  return buildRemappedGeometry({
+    coordinateSpace: cssViewport,
+    geometry,
+    logicalContentRect: Object.freeze({ ...observedViewport }),
+    requestedCrop,
+    sourceRect: Object.freeze({ ...observedViewport }),
+    sourceSize: source,
+  });
+}
+
 function areSizesEqual(left: RecordingPixelSize, right: RecordingPixelSize): boolean {
   return left.width === right.width && left.height === right.height;
 }

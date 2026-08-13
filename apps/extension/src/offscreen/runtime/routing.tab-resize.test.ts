@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
       applyFrozenSourceGeometry: ReturnType<typeof vi.fn>;
       readFrozenSourceSize: ReturnType<typeof vi.fn>;
       setFrozen: ReturnType<typeof vi.fn>;
+      verifyFrozenSourceFrame?: ReturnType<typeof vi.fn>;
     },
     tabOutputGeometry: null as null | {
       coordinateSpace: { devicePixelRatio: number; height: number; width: number };
@@ -56,14 +57,33 @@ beforeEach(() => {
   mocks.stopRecording.mockResolvedValue({ result: 'accepted' });
 });
 
-it('remaps a resized full TAB viewport inside an unchanged raw proxy', async () => {
+it('remaps a full TAB from a marked frame and allows only a later clean frame', async () => {
   const applyFrozenSourceGeometry = vi.fn(() => 'applied');
+  const verifyFrozenSourceFrame = vi
+    .fn()
+    .mockResolvedValueOnce({
+      result: 'applied',
+      frame: {
+        presentedFrames: 10,
+        sourceSize: { height: 1080, width: 1920 },
+        viewportRect: { x: 120, y: 60, width: 1680, height: 945 },
+      },
+    })
+    .mockResolvedValueOnce({
+      result: 'applied',
+      frame: {
+        presentedFrames: 12,
+        sourceSize: { height: 1080, width: 1920 },
+        viewportRect: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    });
   mocks.context.sourceStream = { id: 'source-stream' };
   mocks.context.tabOutputControls = {
     activate: vi.fn(),
     applyFrozenSourceGeometry,
     readFrozenSourceSize: vi.fn(() => ({ height: 1440, width: 2560 })),
     setFrozen: vi.fn(),
+    verifyFrozenSourceFrame,
   };
   mocks.context.tabOutputGeometry = {
     coordinateSpace: { devicePixelRatio: 1, width: 1904, height: 985 },
@@ -83,6 +103,17 @@ it('remaps a resized full TAB viewport inside an unchanged raw proxy', async () 
     tracksFullViewport: true,
   };
   const sendResponse = vi.fn();
+  const verification = {
+    pattern: {
+      edgeThicknessCss: 8,
+      colors: {
+        top: { red: 236, green: 32, blue: 58 },
+        right: { red: 38, green: 220, blue: 75 },
+        bottom: { red: 42, green: 72, blue: 232 },
+        left: { red: 226, green: 42, blue: 214 },
+      },
+    },
+  } as const;
 
   await handleOffscreenRuntimeMessage(
     {
@@ -92,6 +123,7 @@ it('remaps a resized full TAB viewport inside an unchanged raw proxy', async () 
       recordingId: 'recording-1',
       streamInstanceId: 'stream-instance-1',
       transitionId: 'resize-1',
+      verification: { ...verification, phase: 'marked' },
       viewport: {
         devicePixelRatio: 1,
         height: 900,
@@ -112,16 +144,39 @@ it('remaps a resized full TAB viewport inside an unchanged raw proxy', async () 
       outputBasis: { width: 1904, height: 985 },
       outputSize: { width: 1904, height: 984 },
       requestedCrop: { x: 0, y: 0, width: 1600, height: 900 },
-      sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
+      sourceRect: { x: 120, y: 60, width: 1680, height: 945 },
       tracksFullViewport: true,
     })
   );
   expect(sendResponse).toHaveBeenCalledWith({
     result: 'ALLOW',
     success: true,
-    videoHeight: 1440,
-    videoWidth: 2560,
+    videoHeight: 1080,
+    videoWidth: 1920,
   });
+
+  await handleOffscreenRuntimeMessage(
+    {
+      type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE,
+      capabilityToken: 'test-capability',
+      generation: 1,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      transitionId: 'resize-1',
+      verification: { ...verification, phase: 'clean' },
+      viewport: {
+        devicePixelRatio: 1,
+        height: 900,
+        scrollX: 0,
+        scrollY: 0,
+        visualViewportScale: 1,
+        width: 1600,
+      },
+    },
+    sendResponse
+  );
+  expect(verifyFrozenSourceFrame).toHaveBeenCalledTimes(2);
+  expect(applyFrozenSourceGeometry).toHaveBeenCalledOnce();
 });
 
 it('warns and contains an invalidated TAB_CROP resize without denying STOP', async () => {

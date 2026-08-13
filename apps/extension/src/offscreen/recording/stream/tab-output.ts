@@ -1,6 +1,7 @@
 import {
   isSameTabOutputGeometry,
   remapTabOutputGeometry,
+  remapTabOutputGeometryFromObservedViewport,
   resolveTabOutputGeometry,
   revalidateTabOutputGeometry,
   type TabOutputGeometry,
@@ -10,6 +11,7 @@ import { createGatedCropStream, type GatedCropStream } from './crop-stream';
 export {
   isSameTabOutputGeometry,
   remapTabOutputGeometry,
+  remapTabOutputGeometryFromObservedViewport,
   resolveTabOutputGeometry,
   revalidateTabOutputGeometry,
 };
@@ -18,7 +20,12 @@ export type { TabOutputGeometry };
 export function createTabOutputStream(
   sourceStream: MediaStream,
   geometry: TabOutputGeometry,
-  options: { frameRate?: number; initiallySuspended?: boolean } = {}
+  options: {
+    frameRate?: number;
+    initiallySuspended?: boolean;
+    onSourceInvalidated?: (error: Error) => void;
+    requiresFrameVerification?: boolean;
+  } = {}
 ): Promise<GatedCropStream> {
   return createGatedCropStream(sourceStream, geometry, options);
 }

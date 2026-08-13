@@ -65,6 +65,7 @@
     "./video/types/sidecar": "./src/video/types/sidecar.ts",
     "./video/types/timeouts": "./src/video/types/timeouts.ts",
     "./video/types/types": "./src/video/types/types.ts",
+    "./video/types/viewport-calibration": "./src/video/types/viewport-calibration.ts",
     "./video/types/webcam-actual-settings": "./src/video/types/webcam-actual-settings.ts",
     "./video/types/webcam-quality": "./src/video/types/webcam-quality.ts",
     "./web-snapshot": "./src/web-snapshot/index.ts"

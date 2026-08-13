@@ -5,6 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoProjectExportSettings } from '../../../features/video/project/types';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { ViewportFrameVerification } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 type RuntimeOffscreenCommandCapability = {
   capabilityToken: string;
@@ -61,6 +62,7 @@ export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCap
   streamInstanceId: string;
   transitionId?: string;
   viewport?: ViewportInfo;
+  verification?: ViewportFrameVerification;
 };
 
 export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenCommandCapability & {

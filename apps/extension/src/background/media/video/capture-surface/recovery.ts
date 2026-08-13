@@ -27,6 +27,7 @@ import {
   stopPreparedRecoveredRecording,
   type VideoCaptureSurfacePageAccessVerifier,
 } from './recovery-cleanup';
+import { verifyExactViewportOutput } from './exact-output-verification';
 
 const logger = createLogger({ namespace: 'BackgroundVideoCaptureSurfaceRecovery' });
 
@@ -122,6 +123,7 @@ async function reconcileRecoveredTabOutput(
 ): Promise<void> {
   const applied = session.applied;
   const reassertViewport = applied?.target === 'viewport';
+  const requiresFrameVerifiedViewport = captureMode === CaptureMode.TAB && reassertViewport;
   const requiresExactOutputRecovery = captureMode === CaptureMode.TAB_CROP || reassertViewport;
   if (!requiresExactOutputRecovery) {
     if (applied) {
@@ -164,7 +166,22 @@ async function reconcileRecoveredTabOutput(
   ) {
     throw new Error('Recovered recording binding changed while page geometry was refreshed');
   }
-  await revalidateRecoveredVideoSource(session, { transitionId, viewport });
+  if (requiresFrameVerifiedViewport) {
+    const verified = await verifyExactViewportOutput({
+      binding: {
+        generation: session.generation,
+        recordingId: session.recordingId,
+        streamInstanceId: expectedStreamInstanceId!,
+        tabId: session.tabId,
+      },
+      transitionId,
+      viewport,
+    });
+    session.sourceVideoHeight = verified.height;
+    session.sourceVideoWidth = verified.width;
+  } else {
+    await revalidateRecoveredVideoSource(session, { transitionId, viewport });
+  }
   if (reassertViewport) {
     try {
       await enableViewportCursorProjection(session.tabId, {

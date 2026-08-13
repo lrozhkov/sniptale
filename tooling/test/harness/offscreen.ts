@@ -10,6 +10,11 @@ import {
   createRecordingStagingCoordinator,
   type RecordingStagingStorageAdapter,
 } from '../../../apps/extension/src/composition/persistence/recordings/staging';
+import { createGatedCropStream } from '../../../apps/extension/src/offscreen/recording/stream/crop-stream';
+import type {
+  CropStreamControls,
+  VerifiedViewportFrame,
+} from '../../../apps/extension/src/offscreen/recording/stream/crop-frame-gate';
 
 type HarnessMediaRecorderState = 'inactive' | 'recording' | 'paused';
 
@@ -34,6 +39,18 @@ type ColdHighResolutionRecordingResult = {
   width: number;
 };
 
+type ViewportFrameVerificationResult = {
+  cleanPendingWhileMarked: boolean;
+  cleanPendingWithPartialMarker: boolean;
+  earlyThawRejected: boolean;
+  firstLiveCorner: { blue: number; green: number; red: number };
+  lateGeometryRejected: boolean;
+  observedRect: { height: number; width: number; x: number; y: number };
+  pendingCorner: { blue: number; green: number; red: number };
+  sourceSize: { height: number; width: number };
+  staleThawResult: 'stale';
+};
+
 type OffscreenHarnessBridge = {
   reset: () => Promise<void>;
   stageProjectExportInput: (
@@ -44,6 +61,7 @@ type OffscreenHarnessBridge = {
   getMediaRecorderState: () => HarnessMediaRecorderState;
   recordColdHighResolutionSequence: () => Promise<ColdHighResolutionRecordingResult[]>;
   recordStaticCanvasArtifact: () => Promise<StaticCanvasRecordingResult>;
+  verifyFrameGatedViewportCrop: () => Promise<ViewportFrameVerificationResult>;
 };
 
 declare global {
@@ -325,6 +343,313 @@ async function recordStaticCanvasArtifact(): Promise<StaticCanvasRecordingResult
   };
 }
 
+async function waitForVideoFrames(video: HTMLVideoElement, count: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const wait = (remaining: number) => {
+      video.requestVideoFrameCallback(() => {
+        if (remaining <= 1) resolve();
+        else wait(remaining - 1);
+      });
+    };
+    wait(count);
+  });
+}
+
+function sampleVideoCorner(video: HTMLVideoElement, width: number, height: number) {
+  const sample = document.createElement('canvas');
+  sample.width = width;
+  sample.height = height;
+  const context = sample.getContext('2d', { alpha: false });
+  if (!context) throw new Error('Viewport verification sample canvas is unavailable');
+  context.drawImage(video, 0, 0);
+  const [red = 0, green = 0, blue = 0] = context.getImageData(2, 2, 1, 1).data;
+  return { blue, green, red };
+}
+
+const VIEWPORT_VERIFICATION_RECT = { x: 80, y: 45, width: 480, height: 270 } as const;
+const VIEWPORT_VERIFICATION_PATTERN = {
+  edgeThicknessCss: 8,
+  colors: {
+    top: { red: 236, green: 32, blue: 58 },
+    right: { red: 38, green: 220, blue: 75 },
+    bottom: { red: 42, green: 72, blue: 232 },
+    left: { red: 226, green: 42, blue: 214 },
+  },
+} as const;
+
+type ViewportVerificationSource = {
+  removeMarker: () => void;
+  showMarker: () => void;
+  showPartialMarker: () => void;
+  stop: () => void;
+  stream: MediaStream;
+};
+
+function createViewportVerificationSource(): ViewportVerificationSource {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('Viewport verification source canvas is unavailable');
+  let markerMode: 'full' | 'none' | 'partial' = 'none';
+  let viewportFill = '#2463eb';
+  const draw = () => {
+    context.fillStyle = '#f59e0b';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = viewportFill;
+    context.fillRect(
+      VIEWPORT_VERIFICATION_RECT.x,
+      VIEWPORT_VERIFICATION_RECT.y,
+      VIEWPORT_VERIFICATION_RECT.width,
+      VIEWPORT_VERIFICATION_RECT.height
+    );
+    if (markerMode === 'none') return;
+    const { edgeThicknessCss: thickness, colors } = VIEWPORT_VERIFICATION_PATTERN;
+    const color = (value: { red: number; green: number; blue: number }) =>
+      `rgb(${value.red}, ${value.green}, ${value.blue})`;
+    context.fillStyle = color(colors.top);
+    context.fillRect(
+      VIEWPORT_VERIFICATION_RECT.x,
+      VIEWPORT_VERIFICATION_RECT.y,
+      VIEWPORT_VERIFICATION_RECT.width,
+      thickness
+    );
+    context.fillStyle = color(colors.bottom);
+    context.fillRect(
+      VIEWPORT_VERIFICATION_RECT.x,
+      VIEWPORT_VERIFICATION_RECT.y + VIEWPORT_VERIFICATION_RECT.height - thickness,
+      VIEWPORT_VERIFICATION_RECT.width,
+      thickness
+    );
+    context.fillStyle = color(colors.left);
+    context.fillRect(
+      VIEWPORT_VERIFICATION_RECT.x,
+      VIEWPORT_VERIFICATION_RECT.y + thickness,
+      thickness,
+      VIEWPORT_VERIFICATION_RECT.height - thickness * 2
+    );
+    if (markerMode === 'full') {
+      context.fillStyle = color(colors.right);
+      context.fillRect(
+        VIEWPORT_VERIFICATION_RECT.x + VIEWPORT_VERIFICATION_RECT.width - thickness,
+        VIEWPORT_VERIFICATION_RECT.y + thickness,
+        thickness,
+        VIEWPORT_VERIFICATION_RECT.height - thickness * 2
+      );
+    }
+  };
+  draw();
+  const timer = setInterval(draw, 16);
+  const stream = canvas.captureStream(30);
+  return {
+    removeMarker: () => {
+      markerMode = 'none';
+      viewportFill = '#a3e635';
+      draw();
+    },
+    showMarker: () => {
+      markerMode = 'full';
+      draw();
+    },
+    showPartialMarker: () => {
+      markerMode = 'partial';
+      draw();
+    },
+    stop: () => clearInterval(timer),
+    stream,
+  };
+}
+
+function requireVerifiedFrame(
+  result: { frame?: VerifiedViewportFrame; result: 'applied' | 'stale' },
+  label: string
+): VerifiedViewportFrame {
+  if (result.result !== 'applied' || !result.frame) {
+    throw new Error(`Chromium ${label} viewport frame was not verified`);
+  }
+  return result.frame;
+}
+
+function requireRejectedOperation(operation: () => unknown, expectedMessage: string): true {
+  try {
+    operation();
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(expectedMessage)) return true;
+    throw error;
+  }
+  throw new Error(`Chromium viewport verification accepted ${expectedMessage}`);
+}
+
+async function verifyMarkerCleanup(params: {
+  controls: CropStreamControls;
+  outputVideo: HTMLVideoElement;
+  removeMarker: () => void;
+  showPartialMarker: () => void;
+  transitionId: string;
+}): Promise<{
+  cleanPendingWhileMarked: true;
+  cleanPendingWithPartialMarker: true;
+  frame: VerifiedViewportFrame;
+}> {
+  let cleanSettled = false;
+  const verification = params.controls
+    .verifyFrozenSourceFrame(params.transitionId, {
+      pattern: VIEWPORT_VERIFICATION_PATTERN,
+      phase: 'clean',
+    })
+    .finally(() => {
+      cleanSettled = true;
+    });
+  await withHarnessDeadline(
+    waitForVideoFrames(params.outputVideo, 3),
+    'marker-held clean rejection'
+  );
+  if (cleanSettled) {
+    throw new Error('Chromium clean verification accepted a frame with the marker present');
+  }
+  params.showPartialMarker();
+  await withHarnessDeadline(
+    waitForVideoFrames(params.outputVideo, 3),
+    'partial-marker clean rejection'
+  );
+  if (cleanSettled) {
+    throw new Error('Chromium clean verification accepted a partial marker frame');
+  }
+  params.removeMarker();
+  const result = await withHarnessDeadline(verification, 'clean viewport frame verification');
+  return {
+    cleanPendingWhileMarked: true,
+    cleanPendingWithPartialMarker: true,
+    frame: requireVerifiedFrame(result, 'clean'),
+  };
+}
+
+function rejectLateViewportGeometry(controls: CropStreamControls, transitionId: string): true {
+  return requireRejectedOperation(
+    () =>
+      controls.applyFrozenSourceGeometry(transitionId, {
+        fit: 'contain',
+        outputSize: {
+          width: VIEWPORT_VERIFICATION_RECT.width,
+          height: VIEWPORT_VERIFICATION_RECT.height,
+        },
+        sourceRect: { x: 0, y: 0, width: 640, height: 360 },
+      }),
+    'cannot change'
+  );
+}
+
+async function withHarnessDeadline<T>(work: Promise<T>, label: string): Promise<T> {
+  let timeoutId!: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Timed out during ${label}`)), 10_000);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+async function verifyFrameGatedViewportCrop(): Promise<ViewportFrameVerificationResult> {
+  const source = createViewportVerificationSource();
+  const gated = await withHarnessDeadline(
+    createGatedCropStream(
+      source.stream,
+      {
+        fit: 'contain',
+        outputSize: {
+          width: VIEWPORT_VERIFICATION_RECT.width,
+          height: VIEWPORT_VERIFICATION_RECT.height,
+        },
+        sourceRect: VIEWPORT_VERIFICATION_RECT,
+      },
+      { requiresFrameVerification: true }
+    ),
+    'source metadata and gated output creation'
+  );
+  const outputVideo = document.createElement('video');
+  outputVideo.muted = true;
+  outputVideo.srcObject = gated.stream;
+  try {
+    await withHarnessDeadline(outputVideo.play(), 'gated output playback');
+    await withHarnessDeadline(waitForVideoFrames(outputVideo, 2), 'initial safe viewport frames');
+    const transitionId = 'chromium-frame-verification';
+    if (gated.controls.setFrozen(transitionId, true) !== 'applied') {
+      throw new Error('Chromium viewport verification could not freeze output');
+    }
+    source.showMarker();
+    const markedFrame = requireVerifiedFrame(
+      await withHarnessDeadline(
+        gated.controls.verifyFrozenSourceFrame(transitionId, {
+          pattern: VIEWPORT_VERIFICATION_PATTERN,
+          phase: 'marked',
+        }),
+        'marked viewport frame verification'
+      ),
+      'marked'
+    );
+    if (
+      gated.controls.applyFrozenSourceGeometry(transitionId, {
+        fit: 'contain',
+        outputSize: {
+          width: VIEWPORT_VERIFICATION_RECT.width,
+          height: VIEWPORT_VERIFICATION_RECT.height,
+        },
+        sourceRect: markedFrame.viewportRect,
+      }) !== 'applied'
+    ) {
+      throw new Error('Chromium observed viewport crop was not applied');
+    }
+    const staleThawResult = gated.controls.setFrozen('chromium-stale-transition', false);
+    if (staleThawResult !== 'stale') {
+      throw new Error('Chromium viewport verification accepted a stale thaw');
+    }
+    const earlyThawRejected = requireRejectedOperation(
+      () => gated.controls.setFrozen(transitionId, false),
+      'clean source frame'
+    );
+    await withHarnessDeadline(waitForVideoFrames(outputVideo, 2), 'pending held output frames');
+    const pendingCorner = sampleVideoCorner(
+      outputVideo,
+      VIEWPORT_VERIFICATION_RECT.width,
+      VIEWPORT_VERIFICATION_RECT.height
+    );
+    const cleanup = await verifyMarkerCleanup({
+      controls: gated.controls,
+      outputVideo,
+      removeMarker: source.removeMarker,
+      showPartialMarker: source.showPartialMarker,
+      transitionId,
+    });
+    const lateGeometryRejected = rejectLateViewportGeometry(gated.controls, transitionId);
+
+    const firstLiveFrame = waitForVideoFrames(outputVideo, 1);
+    if (gated.controls.setFrozen(transitionId, false) !== 'applied') {
+      throw new Error('Chromium verified viewport output could not resume');
+    }
+    await withHarnessDeadline(firstLiveFrame, 'first live cropped output frame');
+    const firstLiveCorner = sampleVideoCorner(
+      outputVideo,
+      VIEWPORT_VERIFICATION_RECT.width,
+      VIEWPORT_VERIFICATION_RECT.height
+    );
+    return {
+      cleanPendingWhileMarked: cleanup.cleanPendingWhileMarked,
+      cleanPendingWithPartialMarker: cleanup.cleanPendingWithPartialMarker,
+      earlyThawRejected,
+      firstLiveCorner,
+      lateGeometryRejected,
+      observedRect: markedFrame.viewportRect,
+      pendingCorner,
+      sourceSize: markedFrame.sourceSize,
+      staleThawResult,
+    };
+  } finally {
+    source.stop();
+    outputVideo.pause();
+    outputVideo.srcObject = null;
+    gated.stream.getTracks().forEach((track) => track.stop());
+    source.stream.getTracks().forEach((track) => track.stop());
+  }
+}
+
 function getRoot() {
   return document.getElementById('root');
 }
@@ -378,6 +703,7 @@ window.__sniptaleOffscreenHarness = {
   },
   recordColdHighResolutionSequence,
   recordStaticCanvasArtifact,
+  verifyFrameGatedViewportCrop,
   stageProjectExportInput,
 };
 

@@ -234,7 +234,7 @@ it('starts viewport-preset output behind a closed frame gate', async () => {
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ outputSize: { width: 1920, height: 1080 } }),
-    { frameRate: 30, initiallySuspended: true }
+    { frameRate: 30, initiallySuspended: true, requiresFrameVerification: true }
   );
   expect(mocks.acquire).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
@@ -569,7 +569,7 @@ it('keeps the measured TAB viewport authoritative for Source with a viewport pre
   expect(mocks.createTabOutput).toHaveBeenCalledWith(
     source,
     expect.objectContaining({ outputSize: { width: 1904, height: 984 } }),
-    { frameRate: 30, initiallySuspended: true }
+    { frameRate: 30, initiallySuspended: true, requiresFrameVerification: true }
   );
   expect(prepared.trackSettings).toEqual({ frameRate: 30, height: 984, width: 1904 });
 });

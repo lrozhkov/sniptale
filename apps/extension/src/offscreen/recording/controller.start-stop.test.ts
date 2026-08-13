@@ -640,6 +640,7 @@ it('changes viewport drawing only for the active recording source binding', asyn
     applyFrozenSourceGeometry: vi.fn(() => 'applied' as const),
     readFrozenSourceSize: vi.fn(),
     setFrozen,
+    verifyFrozenSourceFrame: vi.fn(),
   };
   const start = startRecording(createStartParams());
 

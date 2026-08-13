@@ -50,6 +50,17 @@ type OffscreenHarnessBridge = {
     size: number;
     width: number;
   }>;
+  verifyFrameGatedViewportCrop: () => Promise<{
+    cleanPendingWhileMarked: boolean;
+    cleanPendingWithPartialMarker: boolean;
+    earlyThawRejected: boolean;
+    firstLiveCorner: { blue: number; green: number; red: number };
+    lateGeometryRejected: boolean;
+    observedRect: { height: number; width: number; x: number; y: number };
+    pendingCorner: { blue: number; green: number; red: number };
+    sourceSize: { height: number; width: number };
+    staleThawResult: 'stale';
+  }>;
   stageProjectExportInput: (
     jobId: string,
     project: VideoProject
@@ -77,6 +88,15 @@ async function recordStaticCanvasArtifact(page: Page) {
     ).__sniptaleOffscreenHarness;
     if (!bridge) throw new Error('Offscreen harness bridge is unavailable');
     return bridge.recordStaticCanvasArtifact();
+  });
+}
+
+async function verifyFrameGatedViewportCrop(page: Page) {
+  return page.evaluate(async () => {
+    const bridge = (window as Window & { __sniptaleOffscreenHarness?: OffscreenHarnessBridge })
+      .__sniptaleOffscreenHarness;
+    if (!bridge) throw new Error('Offscreen harness bridge is unavailable');
+    return bridge.verifyFrameGatedViewportCrop();
   });
 }
 
@@ -282,6 +302,29 @@ test('offscreen fixed-cadence canvas produces a full static recording artifact',
   expect(artifact.centerPixel.blue).toBeGreaterThan(100);
   expect(artifact.centerPixel.blue).toBeGreaterThan(artifact.centerPixel.red + 40);
   expect(artifact.centerPixel.blue).toBeGreaterThan(artifact.centerPixel.green + 40);
+});
+
+test('real Chromium verifies and crops a viewport frame inside a larger tab surface', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openOffscreenHarness(page, hostOrigin);
+
+  const result = await verifyFrameGatedViewportCrop(page);
+
+  expect(result).toMatchObject({
+    cleanPendingWhileMarked: true,
+    cleanPendingWithPartialMarker: true,
+    earlyThawRejected: true,
+    lateGeometryRejected: true,
+    observedRect: { x: 80, y: 45, width: 480, height: 270 },
+    sourceSize: { width: 640, height: 360 },
+    staleThawResult: 'stale',
+  });
+  expect(result.pendingCorner.blue).toBeGreaterThan(result.pendingCorner.red + 40);
+  expect(result.pendingCorner.blue).toBeGreaterThan(result.pendingCorner.green + 40);
+  expect(result.firstLiveCorner.green).toBeGreaterThan(result.firstLiveCorner.red + 40);
+  expect(result.firstLiveCorner.green).toBeGreaterThan(result.firstLiveCorner.blue + 40);
 });
 
 test('cold and subsequent high-resolution recordings flush media before STOP', async ({

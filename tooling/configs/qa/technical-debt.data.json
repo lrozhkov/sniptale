@@ -1486,6 +1486,7 @@
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
         "apps/extension/src/background/media/video/capture-surface/cursor-projection.ts",
+        "apps/extension/src/background/media/video/capture-surface/exact-output-verification.ts",
         "apps/extension/src/background/media/video/capture-surface/index.ts",
         "apps/extension/src/background/media/video/capture-surface/output-state.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery-cleanup.ts",
@@ -2165,6 +2166,7 @@
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
         "apps/extension/src/background/media/video/capture-surface/cursor-projection.ts",
+        "apps/extension/src/background/media/video/capture-surface/exact-output-verification.ts",
         "apps/extension/src/background/media/video/capture-surface/index.ts",
         "apps/extension/src/background/media/video/capture-surface/output-state.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery-cleanup.ts",
@@ -3978,6 +3980,7 @@
         "apps/extension/src/content/overlay/auto-blur/modal/use-border-preset-catalog.ts",
         "apps/extension/src/content/overlay/auto-blur/persistence/index.ts",
         "apps/extension/src/content/overlay/auto-blur/progress-overlay.tsx",
+        "apps/extension/src/content/overlay/calibration/index.ts",
         "apps/extension/src/content/overlay/clipboard-image/index.ts",
         "apps/extension/src/content/overlay/countdown-toast/index.tsx",
         "apps/extension/src/content/overlay/design-review/action-catalog.ts",
@@ -9337,6 +9340,7 @@
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
         "apps/extension/src/offscreen/recording/stream/video-source.ts",
+        "apps/extension/src/offscreen/recording/stream/viewport-frame-verifier.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
         "apps/extension/src/offscreen/runtime-messaging/best-effort.ts",
         "apps/extension/src/offscreen/runtime/authorization.ts",
@@ -9545,6 +9549,7 @@
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
         "apps/extension/src/offscreen/recording/stream/tab-output.ts",
         "apps/extension/src/offscreen/recording/stream/video-source.ts",
+        "apps/extension/src/offscreen/recording/stream/viewport-frame-verifier.ts",
         "apps/extension/src/offscreen/recording/update-settings.ts",
         "apps/extension/src/offscreen/runtime-messaging/best-effort.ts",
         "apps/extension/src/offscreen/runtime/authorization.ts",
@@ -13039,6 +13044,7 @@
         "packages/runtime-contracts/src/video/types/sidecar.ts",
         "packages/runtime-contracts/src/video/types/timeouts.ts",
         "packages/runtime-contracts/src/video/types/types.ts",
+        "packages/runtime-contracts/src/video/types/viewport-calibration.ts",
         "packages/runtime-contracts/src/video/types/webcam-actual-settings.ts",
         "packages/runtime-contracts/src/video/types/webcam-quality.ts",
         "packages/runtime-contracts/src/voice-input/index.ts",
@@ -13164,6 +13170,7 @@
         "packages/runtime-contracts/src/video/types/sidecar.ts",
         "packages/runtime-contracts/src/video/types/timeouts.ts",
         "packages/runtime-contracts/src/video/types/types.ts",
+        "packages/runtime-contracts/src/video/types/viewport-calibration.ts",
         "packages/runtime-contracts/src/video/types/webcam-actual-settings.ts",
         "packages/runtime-contracts/src/video/types/webcam-quality.ts",
         "packages/runtime-contracts/src/voice-input/index.ts",
@@ -18244,16 +18251,27 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "0c6fe5ff360c6afd670f7eade4130d11662475bfa8cab6d09a4772e494a494be"
+        "contentHash": "6df836d4d76fdae238f062e0e7d0b1f0e6f5ec49e31fadcd3dba6ea1eb750b42"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
       ],
       "surfaces": [
+        "binding:VIEWPORT_VERIFICATION_PATTERN",
+        "binding:VIEWPORT_VERIFICATION_RECT",
+        "property:bottom",
+        "property:colors",
+        "property:left",
         "property:readBlobVideoMetrics/centerPixel",
         "property:recordColdHighResolutionArtifact/dimensions",
         "property:recordColdHighResolutionArtifact/recorderOptions",
-        "property:recordStaticCanvasArtifact/dimensions"
+        "property:recordStaticCanvasArtifact/dimensions",
+        "property:rejectLateViewportGeometry/anonymous-529/outputSize",
+        "property:rejectLateViewportGeometry/anonymous-529/sourceRect",
+        "property:right",
+        "property:top",
+        "property:verifyFrameGatedViewportCrop/outputSize",
+        "property:verifyFrameGatedViewportCrop/outputSize[1]"
       ]
     },
     {

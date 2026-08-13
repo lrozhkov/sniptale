@@ -3,6 +3,7 @@ import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/t
 import {
   isSameTabOutputGeometry,
   remapTabOutputGeometry,
+  remapTabOutputGeometryFromObservedViewport,
   resolveTabOutputGeometry,
   revalidateTabOutputGeometry,
 } from './tab-source';
@@ -68,6 +69,45 @@ describe('tab recording geometry', () => {
     });
     expect(resized.outputBasis).toBe(initial.outputBasis);
     expect(resized.outputSize).toBe(initial.outputSize);
+  });
+
+  it('maps full TAB output to the frame-observed viewport instead of the raw tab bounds', () => {
+    const initial = resolveFullTab();
+    const remapped = remapTabOutputGeometryFromObservedViewport(
+      initial,
+      { width: 2560, height: 1440 },
+      { x: 128, y: 72, width: 2304, height: 1296 },
+      { width: 1600, height: 900, devicePixelRatio: 1 }
+    );
+
+    expect(remapped).toMatchObject({
+      logicalContentRect: { x: 128, y: 72, width: 2304, height: 1296 },
+      outputBasis: initial.outputBasis,
+      outputSize: initial.outputSize,
+      requestedCrop: { x: 0, y: 0, width: 1600, height: 900 },
+      sourceRect: { x: 128, y: 72, width: 2304, height: 1296 },
+    });
+  });
+
+  it('rejects observed viewport remapping for TAB_CROP and out-of-source frames', () => {
+    const full = resolveFullTab();
+    expect(() =>
+      remapTabOutputGeometryFromObservedViewport(
+        full,
+        { width: 2560, height: 1440 },
+        { x: 2000, y: 0, width: 800, height: 720 },
+        full.coordinateSpace
+      )
+    ).toThrow('outside the raw tab source');
+
+    expect(() =>
+      remapTabOutputGeometryFromObservedViewport(
+        { ...full, tracksFullViewport: false },
+        full.sourceSize,
+        full.sourceRect,
+        full.coordinateSpace
+      )
+    ).toThrow('only valid for full viewport output');
   });
 
   it('contains the available source when a TAB_CROP remap no longer fits', () => {

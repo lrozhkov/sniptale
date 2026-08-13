@@ -9,6 +9,7 @@ import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtim
 import { captureViewportsEqual, readTabCaptureViewport } from '../capture-viewport';
 import { setViewportOutputFrozen } from './output-state';
 import { getVideoSurfaceSession } from './session-registry';
+import { verifyExactViewportOutput } from './exact-output-verification';
 
 const SOURCE_READY_TIMEOUT_MS = 10_000;
 
@@ -126,6 +127,52 @@ async function remapStartingCropSource(args: {
   return remappedSize;
 }
 
+async function verifyStartingViewportSource(args: {
+  liveViewport: ViewportInfo;
+  message: RuntimeOffscreenSourceReadyMessage;
+  tabId: number;
+}): Promise<{ height: number; width: number }> {
+  const binding = {
+    generation: args.message.generation,
+    recordingId: args.message.recordingId,
+    streamInstanceId: args.message.streamInstanceId,
+  };
+  const transitionId = createSecureRandomUuid(
+    'Secure starting viewport verification generation is unavailable'
+  );
+  requireAppliedOutputState(await setViewportOutputFrozen(binding, true, transitionId), 'freeze');
+  let verificationError: unknown = null;
+  let verified: { height: number; width: number } | null = null;
+  try {
+    verified = await verifyExactViewportOutput({
+      binding: { ...binding, tabId: args.tabId },
+      transitionId,
+      viewport: args.liveViewport,
+    });
+  } catch (error) {
+    verificationError = error;
+  }
+  let resumeError: unknown = null;
+  try {
+    requireAppliedOutputState(
+      await setViewportOutputFrozen(binding, false, transitionId),
+      'resume'
+    );
+  } catch (error) {
+    resumeError = error;
+  }
+  if (verificationError && resumeError) {
+    throw new AggregateError(
+      [verificationError, resumeError],
+      'Starting viewport verification failed and its output could not resume'
+    );
+  }
+  if (verificationError) throw verificationError;
+  if (resumeError) throw resumeError;
+  if (!verified) throw new Error('Starting viewport verification produced no dimensions');
+  return verified;
+}
+
 async function resolveAcceptedSourceSize(
   message: RuntimeOffscreenSourceReadyMessage,
   waiter: SourceReadyWaiter,
@@ -138,10 +185,14 @@ async function resolveAcceptedSourceSize(
   if (!isCurrentSourceAdmission(message, waiter, session)) {
     throw new Error('Recording source admission is no longer current');
   }
-  if (captureViewportsEqual(waiter.expectedViewport, liveViewport)) return initialSize;
-  if (waiter.viewportMismatchPolicy !== 'remap') {
+  const viewportMatches = captureViewportsEqual(waiter.expectedViewport, liveViewport);
+  if (!viewportMatches && waiter.viewportMismatchPolicy !== 'remap') {
     throw new Error('The tab viewport changed while the recording source was opening');
   }
+  if (session.applied?.target === 'viewport') {
+    return verifyStartingViewportSource({ liveViewport, message, tabId: waiter.tabId });
+  }
+  if (viewportMatches) return initialSize;
   return remapStartingCropSource({ liveViewport, message });
 }
 

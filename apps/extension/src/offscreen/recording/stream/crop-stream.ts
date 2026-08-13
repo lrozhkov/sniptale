@@ -9,6 +9,7 @@ import {
 import { resolveContainedFrame } from '../geometry/contain-frame';
 import { createCanvasVideoOutput } from './canvas-video-output';
 import { resolveFixedVideoFrameRate } from './frame-pump';
+import { createViewportFrameVerifier } from './viewport-frame-verifier';
 
 export type {
   CropRect,
@@ -27,6 +28,8 @@ export type GatedCropStream = {
 type CropStreamOptions = {
   frameRate?: number;
   initiallySuspended?: boolean;
+  onSourceInvalidated?: (error: Error) => void;
+  requiresFrameVerification?: boolean;
 };
 
 function requirePositiveInteger(value: number, label: string): number {
@@ -143,6 +146,13 @@ export async function createGatedCropStream(
           },
           drawCurrentFrame: drawSourceFrame,
           initiallySuspended: options.initiallySuspended === true,
+          ...(options.onSourceInvalidated
+            ? { onSourceInvalidated: options.onSourceInvalidated }
+            : {}),
+          requiresFrameVerification: options.requiresFrameVerification === true,
+          ...(options.requiresFrameVerification
+            ? { verifyFrame: createViewportFrameVerifier(video) }
+            : {}),
           video,
         });
         return { drawHeldFrame, drawLiveFrame: drawSourceFrame };

@@ -28,6 +28,7 @@ import {
 } from '../recording/stream/video-source';
 import {
   remapTabOutputGeometry,
+  remapTabOutputGeometryFromObservedViewport,
   revalidateTabOutputGeometry,
 } from '../recording/stream/tab-output';
 import type { OutputSize } from '../recording/stream/crop-stream';
@@ -380,6 +381,38 @@ async function refreshFrozenTabOutput(
   if (!controls || !geometry) throw new Error('Frozen tab output geometry is unavailable');
   if (!message.transitionId) {
     throw new Error('Viewport source revalidation transition ID is unavailable');
+  }
+  if (message.verification) {
+    const verification = await controls.verifyFrozenSourceFrame(
+      message.transitionId,
+      message.verification
+    );
+    if (verification.result !== 'applied' || !verification.frame) {
+      throw new Error('Viewport frame verification was superseded');
+    }
+    const { sourceSize } = verification.frame;
+    assertCurrentRecordingSource(message, stream);
+    if (message.verification.phase === 'clean') return sourceSize;
+    if (!message.viewport) {
+      throw new Error('Verified viewport remapping requires current viewport geometry');
+    }
+    const remappedGeometry = remapTabOutputGeometryFromObservedViewport(
+      geometry,
+      sourceSize,
+      verification.frame.viewportRect,
+      {
+        width: message.viewport.width,
+        height: message.viewport.height,
+        devicePixelRatio: message.viewport.devicePixelRatio,
+      }
+    );
+    if (controls.applyFrozenSourceGeometry(message.transitionId, remappedGeometry) !== 'applied') {
+      throw new Error('Viewport source revalidation was superseded');
+    }
+    recordingContext.sourceVideoHeight = sourceSize.height;
+    recordingContext.sourceVideoWidth = sourceSize.width;
+    recordingContext.tabOutputGeometry = remappedGeometry;
+    return sourceSize;
   }
   const sourceSize = controls.readFrozenSourceSize(message.transitionId);
   assertCurrentRecordingSource(message, stream);

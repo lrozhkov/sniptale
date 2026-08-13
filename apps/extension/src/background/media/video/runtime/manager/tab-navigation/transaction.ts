@@ -304,7 +304,8 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
         await revalidateTabSource(
           transaction.binding,
           null,
-          transaction.outputTransitionId ?? undefined
+          transaction.outputTransitionId ?? undefined,
+          transaction.documentId
         );
       } catch (error) {
         if (transaction.requiresExactOutputRecovery) throw error;

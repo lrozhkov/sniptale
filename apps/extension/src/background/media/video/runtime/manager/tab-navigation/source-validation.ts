@@ -3,14 +3,16 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { getCaptureSurfaceService } from '../../../../../capture-surface';
 import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 import { getVideoSurfaceSession } from '../../../capture-surface';
-import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, type ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { readTabCaptureViewport } from '../../../capture-viewport';
+import { verifyExactViewportOutput } from '../../../capture-surface/exact-output-verification';
 
 type TabSourceValidationBinding = {
   generation: number;
   recordingId: string;
   streamInstanceId: string;
   tabId: number;
+  captureMode?: CaptureMode.TAB | CaptureMode.TAB_CROP;
 };
 
 export async function reassertViewportSurface(binding: TabSourceValidationBinding): Promise<void> {
@@ -26,11 +28,30 @@ export async function reassertViewportSurface(binding: TabSourceValidationBindin
 export async function revalidateTabSource(
   binding: TabSourceValidationBinding,
   liveViewport: ViewportInfo | null,
-  transitionId?: string
+  transitionId?: string,
+  documentId?: string | null
 ): Promise<void> {
   const session = getVideoSurfaceSession(binding.recordingId);
   if (!session) throw new Error('Video surface session is unavailable after navigation');
   const verifiedViewport = liveViewport ?? (await readTabCaptureViewport(binding.tabId));
+  if (
+    binding.captureMode === CaptureMode.TAB &&
+    session.applied?.target === 'viewport' &&
+    transitionId
+  ) {
+    const result = await verifyExactViewportOutput({
+      binding,
+      ...(documentId === undefined ? {} : { documentId }),
+      transitionId,
+      viewport: verifiedViewport,
+    });
+    if (getVideoSurfaceSession(binding.recordingId) !== session) {
+      throw new Error('Video surface session changed during source revalidation');
+    }
+    session.sourceVideoWidth = result.width;
+    session.sourceVideoHeight = result.height;
+    return;
+  }
   const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
       type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE,

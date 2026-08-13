@@ -36,6 +36,8 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   MessageType.VERIFY_FULL_PAGE_TILE,
   MessageType.RESTORE_FULL_PAGE_CAPTURE,
   VideoMessageType.GET_VIEWPORT_COORDS,
+  VideoMessageType.SHOW_VIEWPORT_CALIBRATION,
+  VideoMessageType.HIDE_VIEWPORT_CALIBRATION,
   VideoMessageType.SHOW_COUNTDOWN,
   VideoMessageType.HIDE_COUNTDOWN,
   VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,

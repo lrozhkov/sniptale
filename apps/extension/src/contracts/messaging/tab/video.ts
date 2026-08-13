@@ -7,6 +7,7 @@ import type {
 } from '../contracts/response-types';
 import type { ViewportCursorProjectionAuthority } from '@sniptale/runtime-contracts/video/types/messages.content';
 import type { VideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { ViewportCalibrationPattern } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 export type TabVideoRequestByType = {
   [VideoMessageType.RECORDING_STATE_SYNC]: RuntimeRequestByType[typeof VideoMessageType.RECORDING_STATE_SYNC];
@@ -38,6 +39,19 @@ export type TabVideoRequestByType = {
   };
   [VideoMessageType.HIDE_COUNTDOWN]: { type: typeof VideoMessageType.HIDE_COUNTDOWN };
   [VideoMessageType.GET_VIEWPORT_COORDS]: { type: typeof VideoMessageType.GET_VIEWPORT_COORDS };
+  [VideoMessageType.SHOW_VIEWPORT_CALIBRATION]: {
+    type: typeof VideoMessageType.SHOW_VIEWPORT_CALIBRATION;
+    generation: number;
+    pattern: ViewportCalibrationPattern;
+    recordingId: string;
+    transitionId: string;
+  };
+  [VideoMessageType.HIDE_VIEWPORT_CALIBRATION]: {
+    type: typeof VideoMessageType.HIDE_VIEWPORT_CALIBRATION;
+    generation: number;
+    recordingId: string;
+    transitionId: string;
+  };
   [VideoMessageType.SHOW_REGION_SELECTOR]: {
     type: typeof VideoMessageType.SHOW_REGION_SELECTOR;
     regionSelectionCapabilityToken: string;
@@ -88,6 +102,12 @@ export type TabVideoResponseByType = {
   [VideoMessageType.SHOW_COUNTDOWN]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.HIDE_COUNTDOWN]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.GET_VIEWPORT_COORDS]: ViewportCoordsResponse;
+  [VideoMessageType.SHOW_VIEWPORT_CALIBRATION]: RuntimeMessageResponse<{
+    result?: 'applied' | 'stale';
+  }>;
+  [VideoMessageType.HIDE_VIEWPORT_CALIBRATION]: RuntimeMessageResponse<{
+    result?: 'applied' | 'stale';
+  }>;
   [VideoMessageType.SHOW_REGION_SELECTOR]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.HIDE_REGION_SELECTOR]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.REGION_SELECTED]: RuntimeMessageResponse<Record<string, never>>;

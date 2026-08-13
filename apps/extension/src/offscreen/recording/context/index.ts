@@ -12,6 +12,12 @@ const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
 type RecordingLifecycleState = 'idle' | 'starting' | 'recording' | 'stopping';
 
+type RecordingSourceBinding = {
+  generation: number;
+  recordingId: string;
+  streamInstanceId: string;
+};
+
 export type RecordingStopOutcome =
   | { result: 'stopped' }
   | { error: string; result: 'terminal-failure' };
@@ -59,6 +65,11 @@ class OffscreenRecordingContext {
   });
 
   #lifecycleState: RecordingLifecycleState = 'idle';
+  #sourceFailure: { binding: RecordingSourceBinding; error: Error } | null = null;
+  #sourceFailureHandler: {
+    binding: RecordingSourceBinding;
+    handler: (error: Error) => void;
+  } | null = null;
   #startingRecorderCancellation: (() => void) | null = null;
 
   get lifecycleState(): RecordingLifecycleState {
@@ -101,6 +112,30 @@ class OffscreenRecordingContext {
       this.generation === binding.generation &&
       this.streamInstanceId === binding.streamInstanceId
     );
+  }
+
+  reportSourceInvalidation(binding: RecordingSourceBinding, error: Error): 'applied' | 'stale' {
+    if (!this.matchesSourceBinding(binding) || this.lifecycleState === 'idle') return 'stale';
+    if (this.#sourceFailure) return 'applied';
+    this.#sourceFailure = { binding: { ...binding }, error };
+    const registered = this.#sourceFailureHandler;
+    if (registered && this.#bindingsEqual(registered.binding, binding)) {
+      registered.handler(error);
+    }
+    return 'applied';
+  }
+
+  registerSourceFailureHandler(
+    binding: RecordingSourceBinding,
+    handler: (error: Error) => void
+  ): Error | null {
+    if (!this.matchesSourceBinding(binding) || this.lifecycleState !== 'starting') {
+      throw new Error('Recording session cannot register a stale source failure handler');
+    }
+    this.#sourceFailureHandler = { binding: { ...binding }, handler };
+    return this.#sourceFailure && this.#bindingsEqual(this.#sourceFailure.binding, binding)
+      ? this.#sourceFailure.error
+      : null;
   }
 
   bindStagingCoordinator(coordinator: RecordingStagingCoordinator): void {
@@ -192,7 +227,17 @@ class OffscreenRecordingContext {
     this.stopRecordingResolve = null;
     this.stopRecordingReject = null;
     this.#startingRecorderCancellation = null;
+    this.#sourceFailure = null;
+    this.#sourceFailureHandler = null;
     this.#setLifecycleState('idle', 'resetRecordingSession');
+  }
+
+  #bindingsEqual(left: RecordingSourceBinding, right: RecordingSourceBinding): boolean {
+    return (
+      left.recordingId === right.recordingId &&
+      left.generation === right.generation &&
+      left.streamInstanceId === right.streamInstanceId
+    );
   }
 
   #setLifecycleState(nextState: RecordingLifecycleState, owner: string): void {

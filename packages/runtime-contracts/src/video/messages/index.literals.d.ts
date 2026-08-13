@@ -72,6 +72,10 @@ declare module './index' {
       typeof import('./index').VideoMessageType.OFFSCREEN_RECORDING_RESUMED;
     type OFFSCREEN_ERROR = typeof import('./index').VideoMessageType.OFFSCREEN_ERROR;
     type GET_VIEWPORT_COORDS = typeof import('./index').VideoMessageType.GET_VIEWPORT_COORDS;
+    type SHOW_VIEWPORT_CALIBRATION =
+      typeof import('./index').VideoMessageType.SHOW_VIEWPORT_CALIBRATION;
+    type HIDE_VIEWPORT_CALIBRATION =
+      typeof import('./index').VideoMessageType.HIDE_VIEWPORT_CALIBRATION;
     type GET_RECORDING_TAB_ID = typeof import('./index').VideoMessageType.GET_RECORDING_TAB_ID;
     type ENABLE_VIEWPORT_CURSOR_PROJECTION =
       typeof import('./index').VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;

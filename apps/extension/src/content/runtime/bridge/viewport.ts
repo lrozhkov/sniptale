@@ -19,6 +19,7 @@ import {
   type ViewportMessage,
 } from './types';
 import type { RegionSelectorController } from '../../selection/region-selector/types';
+import { hideViewportCalibration, showViewportCalibration } from '../../overlay/calibration';
 
 function acknowledgeViewportMessage(sendResponse: ResponseSender): false {
   sendResponse({ success: true });
@@ -80,6 +81,29 @@ function handleKnownViewportMessage(
         viewport: getViewportInfo(),
       });
       return true;
+    case VideoMessageType.SHOW_VIEWPORT_CALIBRATION:
+      sendResponse({
+        result: showViewportCalibration(
+          {
+            generation: message.generation,
+            recordingId: message.recordingId,
+            transitionId: message.transitionId,
+          },
+          message.pattern
+        ),
+        success: true,
+      });
+      return false;
+    case VideoMessageType.HIDE_VIEWPORT_CALIBRATION:
+      sendResponse({
+        result: hideViewportCalibration({
+          generation: message.generation,
+          recordingId: message.recordingId,
+          transitionId: message.transitionId,
+        }),
+        success: true,
+      });
+      return false;
     case VideoMessageType.SHOW_COUNTDOWN:
       showVideoCountdown(message.seconds || 3, message.sessionId);
       return acknowledgeViewportMessage(sendResponse);

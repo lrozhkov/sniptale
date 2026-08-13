@@ -19,6 +19,7 @@ import {
   type ContentRuntimeServices,
 } from '../application/runtime-services/services';
 import { createFullPageCaptureAgent } from '../application/full-page-capture';
+import { disposeViewportCalibration } from '../overlay/calibration';
 
 type ViewportInfoReader = () => ViewportInfo;
 export type ContentRuntimeCleanup = () => void;
@@ -148,6 +149,7 @@ export function initializeTopLevelContentRuntime(
       { resource: 'video countdown', run: hideVideoCountdown },
       { resource: 'video telemetry', run: disableVideoTelemetry },
       { resource: 'viewport cursor projection', run: disposeViewportCursorProjection },
+      { resource: 'viewport calibration', run: disposeViewportCalibration },
       { resource: 'region selector controller', run: () => regionSelectorController.dispose() },
     ];
 

@@ -15,6 +15,7 @@ import {
   isViewportRegion,
 } from '../../validators/index';
 import { isVideoRecordingSurfaceSnapshotMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import { isViewportCalibrationPattern } from '@sniptale/runtime-contracts/video/types/viewport-calibration';
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 const regionSelectionBindingGuard = {
@@ -26,6 +27,16 @@ const viewportCursorProjectionAuthorityGuard = {
   generation: (value: unknown) => isNumber(value) && Number.isInteger(value) && value > 0,
   recordingId: isString,
 };
+const viewportCalibrationAuthorityGuard = {
+  generation: (value: unknown) => isNumber(value) && Number.isInteger(value) && value > 0,
+  recordingId: isString,
+  transitionId: isString,
+};
+const viewportCalibrationResponseGuard = createRuntimeResponseGuard<
+  TabResponseByType[typeof VideoMessageType.SHOW_VIEWPORT_CALIBRATION]
+>({
+  optional: { result: (value) => value === 'applied' || value === 'stale' },
+});
 
 export const tabVideoMessageContracts = {
   [VideoMessageType.RECORDING_STATE_SYNC]: {
@@ -106,6 +117,35 @@ export const tabVideoMessageContracts = {
       createRuntimeResponseGuard({
         optional: { coords: isViewportRegion, viewport: isViewportInfo },
       })
+    ),
+  },
+  [VideoMessageType.SHOW_VIEWPORT_CALIBRATION]: {
+    parseRequest: createGuardParser(
+      'tab SHOW_VIEWPORT_CALIBRATION message',
+      createMessageGuard({
+        type: VideoMessageType.SHOW_VIEWPORT_CALIBRATION,
+        required: {
+          ...viewportCalibrationAuthorityGuard,
+          pattern: isViewportCalibrationPattern,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'tab SHOW_VIEWPORT_CALIBRATION response',
+      viewportCalibrationResponseGuard
+    ),
+  },
+  [VideoMessageType.HIDE_VIEWPORT_CALIBRATION]: {
+    parseRequest: createGuardParser(
+      'tab HIDE_VIEWPORT_CALIBRATION message',
+      createMessageGuard({
+        type: VideoMessageType.HIDE_VIEWPORT_CALIBRATION,
+        required: viewportCalibrationAuthorityGuard,
+      })
+    ),
+    parseResponse: createGuardParser(
+      'tab HIDE_VIEWPORT_CALIBRATION response',
+      viewportCalibrationResponseGuard
     ),
   },
   [VideoMessageType.SHOW_REGION_SELECTOR]: {

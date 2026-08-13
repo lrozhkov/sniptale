@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   readViewport: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   setViewportOutputFrozen: vi.fn(),
+  verifyExactViewportOutput: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/security/secure-random-id', async (importOriginal) => ({
@@ -30,6 +31,9 @@ vi.mock('./session-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./session-registry')>()),
   getVideoSurfaceSession: mocks.getSession,
 }));
+vi.mock('./exact-output-verification', () => ({
+  verifyExactViewportOutput: mocks.verifyExactViewportOutput,
+}));
 
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -48,7 +52,7 @@ const selectedViewport = {
 };
 const settledViewport = { ...selectedViewport, height: 985, width: 1904 };
 const session = {
-  applied: null,
+  applied: null as null | { target: 'viewport' },
   generation: 1,
   recordingId: 'recording-window-crop',
   sourceReady: false,
@@ -86,6 +90,7 @@ beforeEach(() => {
   session.sourceVideoHeight = null;
   session.sourceVideoWidth = null;
   session.streamInstanceId = null;
+  session.applied = null;
   mocks.createTransitionId.mockReturnValue('starting-crop-1');
   mocks.getSession.mockReturnValue(session);
   mocks.readViewport.mockResolvedValue(settledViewport);
@@ -96,6 +101,31 @@ beforeEach(() => {
     videoWidth: 1280,
   });
   mocks.setViewportOutputFrozen.mockResolvedValue('applied');
+  mocks.verifyExactViewportOutput.mockResolvedValue({ height: 720, width: 1280 });
+});
+
+it('frame-verifies a viewport preset during initial admission even when CSS metrics match', async () => {
+  session.applied = { target: 'viewport' };
+  mocks.readViewport.mockResolvedValueOnce(selectedViewport);
+  const ready = waitForCropSourceReady();
+
+  await expect(acceptVideoSourceReady(readyMessage())).resolves.toBe('ALLOW');
+  await expect(ready).resolves.toBe('stream-instance-1');
+
+  expect(mocks.setViewportOutputFrozen.mock.calls.map(([, frozen]) => frozen)).toEqual([
+    true,
+    false,
+  ]);
+  expect(mocks.verifyExactViewportOutput).toHaveBeenCalledWith({
+    binding: {
+      generation: 1,
+      recordingId: 'recording-window-crop',
+      streamInstanceId: 'stream-instance-1',
+      tabId: 7,
+    },
+    transitionId: 'starting-crop-1',
+    viewport: selectedViewport,
+  });
 });
 
 it('atomically remaps a crop source when a window preset settles after selection', async () => {
