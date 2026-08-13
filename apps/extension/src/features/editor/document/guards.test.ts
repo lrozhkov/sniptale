@@ -27,6 +27,7 @@ function createEditorDocumentFixture() {
       paddingBottom: 0,
       paddingLeft: 0,
       backgroundMode: 'color' as const,
+      backgroundBlurAmount: 0,
       backgroundColor: '#ffffff',
       backgroundGradientFrom: '#ffffff',
       backgroundGradientTo: '#000000',
@@ -88,6 +89,21 @@ function registerBasicAcceptedDocumentTests() {
         })
       ).toBe(true);
     });
+  });
+
+  it('accepts legacy documents without blur and rejects explicitly invalid blur values', () => {
+    const legacy = createEditorDocumentFixture();
+    Reflect.deleteProperty(legacy.frame, 'backgroundBlurAmount');
+    expect(isEditorDocument(legacy)).toBe(true);
+
+    for (const backgroundBlurAmount of [-1, 26, Number.NaN, Number.POSITIVE_INFINITY, '4']) {
+      expect(
+        isEditorDocument({
+          ...createEditorDocumentFixture(),
+          frame: { ...createEditorDocumentFixture().frame, backgroundBlurAmount },
+        })
+      ).toBe(false);
+    }
   });
 
   it('rejects the unsupported alpha document version explicitly', () => {

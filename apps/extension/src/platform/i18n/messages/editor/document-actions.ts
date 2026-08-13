@@ -89,6 +89,38 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'Сохранить в папку',
     en: 'Save to folder',
   },
+  saveDialogTitle: {
+    ru: 'Сохранить изображение',
+    en: 'Save image',
+  },
+  saveDialogSubtitle: {
+    ru: 'Выберите готовую папку или укажите другую через системный диалог.',
+    en: 'Choose a preset folder or select another one in the system dialog.',
+  },
+  saveDialogFilename: {
+    ru: 'Имя файла',
+    en: 'Filename',
+  },
+  saveDialogFilenamePlaceholder: {
+    ru: 'изображение.png',
+    en: 'image.png',
+  },
+  saveDialogPresets: {
+    ru: 'Готовые папки',
+    en: 'Preset folders',
+  },
+  saveDialogSystemFolder: {
+    ru: 'Выбрать другую папку',
+    en: 'Choose another folder',
+  },
+  saveDialogSystemFolderHint: {
+    ru: 'Открыть системный диалог сохранения',
+    en: 'Open the system save dialog',
+  },
+  saveDialogError: {
+    ru: 'Не удалось сохранить файл. Проверьте доступ к папке и повторите попытку.',
+    en: 'Could not save the file. Check folder access and try again.',
+  },
   saveToFolderDescription: {
     ru: 'Быстрые шаблоны сохранения в Downloads без системного диалога.',
     en: 'Quick Downloads presets without opening the system dialog.',

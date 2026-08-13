@@ -4,6 +4,7 @@ import { resetFrameBackgroundDraft } from './draft';
 
 it('resets only frame background draft fields to editor defaults', () => {
   expect(resetFrameBackgroundDraft()).toEqual({
+    backgroundBlurAmount: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundBlurAmount,
     backgroundColor: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundColor,
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,

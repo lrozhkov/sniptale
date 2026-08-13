@@ -8,6 +8,7 @@ export const DEFAULT_SCENE_BACKGROUND_PRESET_SETTINGS: EditorSceneBackgroundSett
   paddingLeft: 128,
   layoutMode: 'expand-canvas',
   backgroundMode: 'gradient',
+  backgroundBlurAmount: 0,
   backgroundColor: 'transparent',
   backgroundGradientFrom: '#7c2d12',
   backgroundGradientTo: '#f59e0b',

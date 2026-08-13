@@ -1,4 +1,4 @@
-import type { Paint, PaintStopIdFactory } from '@sniptale/foundation/paint';
+import type { GradientType, Paint, PaintStopIdFactory } from '@sniptale/foundation/paint';
 
 export interface PaintSelectorTransactionOptions {
   createId: PaintStopIdFactory;
@@ -14,9 +14,11 @@ export interface CompactPaintSelectorProps extends Omit<
 > {
   className?: string;
   disabled?: boolean;
+  allowedModes?: readonly ('solid' | GradientType)[];
   label: string;
   onOpenChange?: (open: boolean) => void;
   palette?: readonly string[];
   recentColors?: readonly string[];
+  showGradientAdvancedControls?: boolean;
   title: string;
 }

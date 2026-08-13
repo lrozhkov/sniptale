@@ -91,7 +91,7 @@ function renderDocumentBar(controller: EditorFloatingDocumentController) {
       <EditorFloatingDocumentBar
         documentController={controller}
         hasImage
-        history={{ canRedo: false, canUndo: false }}
+        history={{ canRedo: false, canUndo: false, index: 0, size: 1 }}
         onBeforeSelectionAwareAction={vi.fn()}
       />
     );

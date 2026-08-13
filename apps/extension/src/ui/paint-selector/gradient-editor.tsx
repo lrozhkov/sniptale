@@ -264,6 +264,7 @@ export function GradientEditor(props: {
   selectedStopId: string | null;
   onChange: (gradient: Gradient) => void;
   onSelectStop: (id: string) => void;
+  showAdvancedControls?: boolean;
 }) {
   const selected =
     props.gradient.stops.find((stop) => stop.id === props.selectedStopId) ??
@@ -288,11 +289,13 @@ export function GradientEditor(props: {
         onSelectStop={props.onSelectStop}
       />
       <GradientGeometryControls gradient={props.gradient} onChange={props.onChange} />
-      <GradientAdvancedControls
-        gradient={props.gradient}
-        selected={selected}
-        onChange={props.onChange}
-      />
+      {props.showAdvancedControls !== false ? (
+        <GradientAdvancedControls
+          gradient={props.gradient}
+          selected={selected}
+          onChange={props.onChange}
+        />
+      ) : null}
     </div>
   );
 }

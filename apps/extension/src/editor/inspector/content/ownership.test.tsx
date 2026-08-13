@@ -98,7 +98,8 @@ describe('inspector content panels', () => {
         .filter((button) => button.textContent?.includes(translate('editor.compact.apply')))
         .forEach((button) => button.click());
     });
-    expect(controller.resizeCanvas).toHaveBeenCalledWith(1280, 720);
+    expect(controller.resizeCanvas).not.toHaveBeenCalled();
+    expect(controller.resizeImage).toHaveBeenCalledTimes(1);
 
     cleanupDom();
     controller.resizeCanvas.mockClear();

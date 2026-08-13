@@ -7,6 +7,7 @@ import {
   isString,
 } from '@sniptale/runtime-contracts/validation/primitives';
 import { isEditorRichShapeDocumentObjectArray } from './rich-shape';
+import { MAX_EDITOR_BACKGROUND_BLUR_AMOUNT } from './constants';
 
 const isNullableString = isNullable(isString);
 const BACKGROUND_IMAGE_FITS = new Set([
@@ -17,6 +18,12 @@ const BACKGROUND_IMAGE_FITS = new Set([
   'fit-width',
   'fit-height',
 ]);
+function isOptionalBackgroundBlurAmount(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isNumber(value) && value >= 0 && value <= MAX_EDITOR_BACKGROUND_BLUR_AMOUNT)
+  );
+}
 
 function isOptionalStringArray(value: unknown): boolean {
   return value === undefined || (Array.isArray(value) && value.every(isString));
@@ -47,6 +54,7 @@ function isEditorFrameSettings(value: unknown): boolean {
     (value['backgroundMode'] === 'color' ||
       value['backgroundMode'] === 'gradient' ||
       value['backgroundMode'] === 'image') &&
+    isOptionalBackgroundBlurAmount(value['backgroundBlurAmount']) &&
     isString(value['backgroundColor']) &&
     isString(value['backgroundGradientFrom']) &&
     isString(value['backgroundGradientTo']) &&

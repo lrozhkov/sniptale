@@ -1,14 +1,18 @@
 import type { FabricObject } from 'fabric';
-import type { DrawingToolDefaults } from '../../../../features/drawing/public';
+import {
+  createDrawingId,
+  type DrawingTextObject,
+  type DrawingToolDefaults,
+} from '../../../../features/drawing/public';
 import { getCurrentLocale } from '../../../../platform/i18n';
-
-import { createMetaStamp } from '../../../objects/meta-stamp/factory';
+import { createEditorDrawingFabricObject } from '../../../drawing/object/vector';
+import { synchronizeEditorDrawingObjectFromFabric } from '../../../drawing/object/metadata';
 
 import type { SourceState } from '../../../document/model/source-state';
 import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../technical-data';
 import { buildTechnicalDataText } from './content';
 import { clampTechnicalDataTextPosition } from './positioning';
-import { resizeTechnicalDataTextObject } from './sizing';
+import { getTechnicalDataTextWidth } from './sizing';
 
 export function createTechnicalDataTextObject(options: {
   kinds: readonly EditorTechnicalDataKind[];
@@ -29,16 +33,24 @@ export function createTechnicalDataTextObject(options: {
     sourceTitle: options.sourceTitle,
     sourceUrl: options.sourceUrl,
   });
-  const text = createMetaStamp(
-    'browser',
-    technicalDataText,
-    options.source.left + 20,
-    options.source.top + 20,
-    options.nextLabelIndex,
-    options.textSettings
-  );
-  resizeTechnicalDataTextObject(text, technicalDataText, layout, options.textSettings);
+  const drawing: DrawingTextObject = {
+    id: createDrawingId(),
+    kind: 'text',
+    bounds: {
+      x: options.source.left + 20,
+      y: options.source.top + 20,
+      width: getTechnicalDataTextWidth(technicalDataText, layout, options.textSettings),
+      height: 1,
+    },
+    text: technicalDataText,
+    color: options.textSettings.color,
+    backgroundColor: options.textSettings.backgroundColor,
+    fontFamily: options.textSettings.fontFamily,
+    fontSize: options.textSettings.fontSize,
+  };
+  const text = createEditorDrawingFabricObject(drawing, options.nextLabelIndex);
   clampTechnicalDataTextPosition(text, options.source);
+  synchronizeEditorDrawingObjectFromFabric(text);
   options.prepareObject(text);
   return text;
 }

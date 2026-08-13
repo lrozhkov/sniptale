@@ -83,6 +83,7 @@ function createCanvas() {
     remove: vi.fn(),
     requestRenderAll: vi.fn(),
     setActiveObject: vi.fn(),
+    upperCanvasEl: document.createElement('canvas'),
   };
 }
 
@@ -236,6 +237,32 @@ describe('shared drawing event orchestration', () => {
       expect.objectContaining({ sniptaleId: 'replacement' })
     );
     expect(path.bindings.setDrawSession).toHaveBeenCalled();
+  });
+
+  it('continues and completes a drawing when the pointer leaves the Fabric canvas', () => {
+    const path = createBindings('marker');
+    const pathObject = { id: 'path-object' };
+    path.bindings.getDrawSession.mockReturnValue({
+      object: pathObject,
+      start: { x: 1, y: 2 },
+      tool: 'marker',
+    });
+    const current = { id: 'marker-1', kind: 'marker' };
+    const next = { id: 'marker-1', kind: 'marker' };
+    mocks.readDrawing.mockReturnValue(current);
+    mocks.updateDrawing.mockReturnValue(next);
+    mocks.updatePath.mockReturnValue(true);
+
+    const outside = document.createElement('div');
+    const move = new MouseEvent('mousemove', { bubbles: true });
+    Object.defineProperty(move, 'target', { value: outside });
+    path.handlers.handleWindowMouseMove(move);
+
+    expect(mocks.updateDrawing).toHaveBeenCalled();
+    expect(mocks.updatePath).toHaveBeenCalledWith(pathObject, next, { preview: true });
+
+    path.handlers.handleWindowMouseUp();
+    expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
   });
 
   it('edits an existing text on click, but completes drawing after a drag or ordinary mouse-up', () => {

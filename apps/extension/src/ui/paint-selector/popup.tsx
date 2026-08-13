@@ -54,6 +54,7 @@ const COLOR_SECTION_CLASS_NAME = [
 ].join(' ');
 
 type PaintSelectorPopupProps = {
+  allowedModes?: readonly ('solid' | GradientType)[];
   apply: () => void;
   cancel: () => void;
   createId: PaintStopIdFactory;
@@ -65,6 +66,7 @@ type PaintSelectorPopupProps = {
   palette: readonly string[];
   preview: (paint: Paint) => void;
   recentColors: readonly string[];
+  showGradientAdvancedControls?: boolean;
   selectedStopId: string | null;
   selectStop: (id: string | null) => void;
   title: string;
@@ -134,7 +136,11 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
           </span>
           <strong className="min-w-0 truncate text-sm">{props.title}</strong>
         </div>
-        <PaintModeSelector mode={mode} onChange={props.onModeChange} />
+        <PaintModeSelector
+          {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
+          mode={mode}
+          onChange={props.onModeChange}
+        />
       </div>
       <div
         className={
@@ -148,6 +154,7 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
             <GradientEditor
               createId={props.createId}
               gradient={props.draft.gradient}
+              showAdvancedControls={props.showGradientAdvancedControls !== false}
               selectedStopId={props.selectedStopId}
               onSelectStop={props.selectStop}
               onChange={(gradient) => props.preview({ kind: 'gradient', gradient })}

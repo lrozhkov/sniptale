@@ -85,7 +85,7 @@ it('renders the expanded sidebar through the page-owned controller and wires hid
 
   const applyCropButton = getApplyCropButton();
   expect(applyCropButton).toBeDefined();
-  expect(applyCropButton?.disabled).toBe(true);
+  expect(applyCropButton?.disabled).toBe(false);
 
   await clickLayerVisibilityActions();
 

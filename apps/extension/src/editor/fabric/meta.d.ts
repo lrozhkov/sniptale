@@ -25,6 +25,7 @@ declare module 'fabric' {
       | 'stamp'
       | 'crop-guide';
     sniptaleBackgroundMode?: EditorFrameSettings['backgroundMode'];
+    sniptaleBackgroundBlurAmount?: number;
     sniptaleBackgroundFit?: EditorFrameSettings['backgroundImageFit'];
     sniptaleBackgroundImageData?: string | null;
     sniptaleBackgroundColor?: string;

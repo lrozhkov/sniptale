@@ -68,12 +68,19 @@ describe('drawing completion history', () => {
     const object = createEditorDrawingFabricObject(text, 1);
     expect(object).toBeInstanceOf(Textbox);
     const commitHistory = vi.fn();
+    const surface = canvas();
     createCompletedDrawWorkflowState(
-      canvas(),
+      surface,
       { kind: 'complete', completedTool: 'text', drawSession: null, object },
       commitHistory,
       vi.fn()
     );
     expect(commitHistory).not.toHaveBeenCalled();
+    const textbox = object as Textbox;
+    expect(textbox.isEditing).toBe(true);
+    expect(textbox.selectionStart).toBe(0);
+    expect(textbox.selectionEnd).toBe(0);
+    textbox.exitEditing();
+    surface.dispose();
   });
 });

@@ -28,6 +28,12 @@ function getButtonWithText(text: string) {
   );
 }
 
+function getDisabledButtonWithText(text: string) {
+  return Array.from(document.querySelectorAll('button')).find(
+    (button) => button.disabled && button.textContent?.includes(text)
+  );
+}
+
 async function clickOptionalButton(button: HTMLButtonElement | undefined) {
   await act(async () => {
     button?.click();
@@ -37,9 +43,9 @@ async function clickOptionalButton(button: HTMLButtonElement | undefined) {
 async function expectImageSizeInspectorUsesController(
   controller: ReturnType<typeof createControllerMock>
 ) {
-  await renderSidebarForInspector(controller, { inspector: 'image-size' });
+  await renderSidebarForInspector(controller, { cropReady: false, inspector: 'image-size' });
 
-  const applyImageSizeButton = getButtonWithText(translate('editor.compact.apply'));
+  const applyImageSizeButton = getDisabledButtonWithText(translate('editor.compact.apply'));
   await clickOptionalButton(applyImageSizeButton);
 
   expect(document.body.textContent).toContain(translate('editor.compact.canvas'));
@@ -52,9 +58,9 @@ async function expectCanvasSizeInspectorUsesController(
   controller: ReturnType<typeof createControllerMock>
 ) {
   cleanupDom();
-  await renderSidebarForInspector(controller, { inspector: 'canvas-size' });
+  await renderSidebarForInspector(controller, { cropReady: false, inspector: 'canvas-size' });
 
-  const applyCanvasSizeButton = getButtonWithText(translate('editor.compact.apply'));
+  const applyCanvasSizeButton = getDisabledButtonWithText(translate('editor.compact.apply'));
   await clickOptionalButton(applyCanvasSizeButton);
 
   expect(applyCanvasSizeButton?.hasAttribute('disabled')).toBe(true);
@@ -70,16 +76,18 @@ async function expectMetaInspectorUsesController(
   const technicalDataCheckboxes = Array.from(
     document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
   );
-  const addTechnicalDataButton = getButtonWithText(translate('common.actions.add'));
+  const insertTechnicalDataButton = getButtonWithText(
+    translate('editor.compact.technicalDataInsert')
+  );
 
-  expect(addTechnicalDataButton?.className).toContain('border-none');
-  expect(addTechnicalDataButton?.className).toContain('text-[12px]');
+  expect(insertTechnicalDataButton?.className).toContain('border-none');
+  expect(insertTechnicalDataButton?.className).toContain('text-[12px]');
 
   await act(async () => {
     technicalDataCheckboxes[2]?.click();
     technicalDataCheckboxes[1]?.click();
     technicalDataCheckboxes[0]?.click();
-    addTechnicalDataButton?.click();
+    insertTechnicalDataButton?.click();
   });
 
   expect(controller.insertTechnicalData).toHaveBeenCalledWith(['url', 'date', 'browser'], 'column');

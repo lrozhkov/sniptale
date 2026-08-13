@@ -82,13 +82,16 @@ function renderResizeTool(
     canvasSize?: { height: number; width: number };
     cropReady?: boolean;
     cropSelection?: { height: number; width: number } | null;
+    imageSizeDraft?: { height: number; width: number };
   } = {}
 ) {
   const Harness = () => {
     const [canvasSizeDraft, setCanvasSizeDraft] = useState(
       options.canvasSizeDraft ?? { height: 900, width: 1200 }
     );
-    const [imageSizeDraft, setImageSizeDraft] = useState({ height: 1000, width: 1000 });
+    const [imageSizeDraft, setImageSizeDraft] = useState(
+      options.imageSizeDraft ?? { height: 1000, width: 1000 }
+    );
     const [canvasSizeLocked, setCanvasSizeLocked] = useState(false);
     const [imageSizeLocked, setImageSizeLocked] = useState(true);
 
@@ -106,6 +109,7 @@ function renderResizeTool(
         imageSizeDraft={imageSizeDraft}
         imageSizeLocked={imageSizeLocked}
         imageSizeText="1000 x 1000"
+        initialMode="canvas"
         setCanvasSizeDraft={setCanvasSizeDraft}
         setCanvasSizeLocked={setCanvasSizeLocked}
         setImageSizeDraft={setImageSizeDraft}
@@ -131,7 +135,7 @@ afterEach(() => {
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {
   const controller = createController();
-  renderResizeTool(controller);
+  renderResizeTool(controller, { imageSizeDraft: { height: 900, width: 900 } });
 
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
   expect(controller.setCropSelectionMouseEnabled).toHaveBeenLastCalledWith(true);
@@ -148,8 +152,25 @@ it('keeps image resize free of mouse selection preview and applies a flattened i
     getButton(translate('editor.compact.apply')).click();
   });
 
-  expect(controller.resizeImage).toHaveBeenCalledWith(1000, 1000);
+  expect(controller.resizeImage).toHaveBeenCalledWith(900, 900);
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
+});
+
+it('keeps apply disabled when the selected image size is unchanged', () => {
+  const controller = createController();
+  renderResizeTool(controller);
+
+  act(() => {
+    getButton(translate('editor.compact.image')).click();
+  });
+
+  const applyButton = getButton(translate('editor.compact.apply'));
+  expect(applyButton.disabled).toBe(true);
+
+  act(() => {
+    applyButton.click();
+  });
+  expect(controller.resizeImage).not.toHaveBeenCalled();
 });
 
 it('previews canvas size only after the user changes dimensions', () => {

@@ -1,3 +1,5 @@
+import { beginEditorTextboxEditing } from '../document/objects/textbox-lifecycle';
+
 type EditableTextTarget = import('fabric').FabricObject & {
   enterEditing?: () => void;
   exitEditing?: () => void;
@@ -36,6 +38,7 @@ export function activateTextTarget(
   if (canvas.getActiveObject() !== target) {
     canvas.setActiveObject(target, options.event);
   }
+  beginEditorTextboxEditing(target as import('fabric').Textbox);
   if (!target.isEditing) {
     target.enterEditing?.();
     if (options.selectAll ?? true) {

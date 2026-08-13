@@ -52,7 +52,7 @@ describe('editor toolbar section ownership seam', () => {
       queryButtonByTitle(translate('editor.toolbar.browserFrame')).click();
       queryButtonByTitle(translate('editor.toolbar.meta')).click();
       queryButtonByTitle(translate('editor.toolbar.resize')).click();
-      queryButtonByTitle(translate('editor.toolbar.crop'), 1).click();
+      queryButtonByTitle(translate('editor.toolbar.crop')).click();
       queryButtonByTitle(translate('editor.toolbar.workspace')).click();
       queryButtonByTitle(translate('editor.toolbar.gridMode')).click();
       queryButtonByTitle(translate('editor.toolbar.magnetMode')).click();

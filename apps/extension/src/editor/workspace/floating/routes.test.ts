@@ -15,7 +15,7 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'tool',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: null });
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
   expect(
     resolveFloatingSurfaceRoute({
       activeTool: 'select',
@@ -23,7 +23,7 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'workspace',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: 'workspace' });
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
   expect(
     resolveFloatingSurfaceRoute({
       activeTool: 'select',
@@ -31,7 +31,7 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'tool',
       selection: { ...emptySelection, hasSelection: true, selectedObjectCount: 2 },
     })
-  ).toEqual({ canvasSelectionToolbar: true, leftDrawer: null, rightUtility: null });
+  ).toEqual({ canvasSelectionToolbar: true, leftDrawer: null });
 });
 
 it('suppresses drawers and selection toolbar for dismissed, empty, crop, and frame annotation states', () => {
@@ -72,7 +72,7 @@ it('suppresses drawers and selection toolbar for dismissed, empty, crop, and fra
       inspector: 'tool',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null, rightUtility: null });
+  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
 });
 
 it('keeps the generic lock toolbar away from single and multi drawing selections', () => {

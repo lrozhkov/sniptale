@@ -1,33 +1,20 @@
-import { Menu } from 'lucide-react';
+import { Images } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import {
-  FloatingChromeDivider,
-  FloatingChromePanel,
-  FloatingChromeToolbar,
-  floatingChromeClassNames,
-} from '@sniptale/ui/floating-chrome';
+import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorStore } from '../../state/useEditorStore';
-import { EditorInspectorDocumentActions } from '../../inspector/document-actions';
-import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
-import {
-  commitImagePresentation,
-  promoteImageAggregate,
-  saveImageAggregateCopyFromDocument,
-  StaleImageWorkspaceError,
-} from '../../../composition/persistence/image-aggregates';
+import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
 import type { LibraryStorageClass } from '../../../contracts/settings/library-lifecycle';
 import { useEditorController } from '../../application/controller-context';
-import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
-import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
-import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
-import { replaceEditorPageAggregateId } from '../../document/page-session';
+import { useEditorEmbedContext } from '../../application/embed-context/context';
+import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
+import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
@@ -41,15 +28,26 @@ const DOCUMENT_TITLE_CLASS_NAME = [
 ].join(' ');
 
 const DOCUMENT_STATUS_CLASS_NAME = [
-  'mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold uppercase leading-none',
+  'mt-0.5 flex min-h-3 items-center gap-1.5 text-[11px] leading-none',
   'text-[var(--sniptale-color-text-muted)]',
 ].join(' ');
 
-const DOCUMENT_MENU_CLASS_NAME = floatingChromeClassNames(
-  'absolute left-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(42rem,calc(100vh-5rem))]',
-  'w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto p-3',
-  '[scrollbar-gutter:stable_both-edges]'
-);
+type InFlightDocumentOperation = {
+  aggregateId: string;
+  kind: 'copy' | 'promote';
+  promise: Promise<void>;
+  token: symbol;
+};
+
+type DocumentOperationFeedback = {
+  aggregateId: string | null;
+  state: 'idle' | 'saving' | 'error';
+};
+
+type ActiveDocumentGeneration = {
+  aggregateId: string | null;
+  generation: number;
+};
 
 function useDocumentBarState() {
   return useEditorStore(
@@ -62,92 +60,196 @@ function useDocumentBarState() {
   );
 }
 
-function useDocumentStorageClass(aggregateId: string | null, pageTitle: string) {
+function updateActiveDocumentGeneration(
+  activeDocumentRef: { current: ActiveDocumentGeneration },
+  aggregateId: string | null,
+  enabled: boolean
+) {
+  const activeAggregateId = enabled ? aggregateId : null;
+  if (activeDocumentRef.current.aggregateId !== activeAggregateId) {
+    activeDocumentRef.current = {
+      aggregateId: activeAggregateId,
+      generation: activeDocumentRef.current.generation + 1,
+    };
+  }
+}
+
+function useDocumentLibraryStatus(aggregateId: string | null, enabled: boolean) {
+  const [storageClass, setStorageClass] = useState<LibraryStorageClass | null>(null);
+  const [promotionButtonVisible, setPromotionButtonVisible] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !aggregateId) {
+      setStorageClass(null);
+      setPromotionButtonVisible(false);
+      return;
+    }
+    let cancelled = false;
+    void getMediaLibraryEntry(aggregateId)
+      .then((entry) => {
+        if (cancelled) return;
+        const next = entry?.lifecycle?.storageClass ?? 'temporary';
+        setStorageClass(next);
+        setPromotionButtonVisible(next === 'temporary');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStorageClass('temporary');
+        setPromotionButtonVisible(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [aggregateId, enabled]);
+
+  useEffect(() => {
+    if (storageClass !== 'library' || !promotionButtonVisible) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setPromotionButtonVisible(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setPromotionButtonVisible(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [promotionButtonVisible, storageClass]);
+
+  return { promotionButtonVisible, setStorageClass, storageClass };
+}
+
+function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, enabled: boolean) {
   const editorController = useEditorController();
-  const [storageClass, setStorageClass] = useState<LibraryStorageClass>('temporary');
-  const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const { promotionButtonVisible, setStorageClass, storageClass } = useDocumentLibraryStatus(
+    aggregateId,
+    enabled
+  );
+  const [operationFeedback, setOperationFeedback] = useState<DocumentOperationFeedback>({
+    aggregateId: null,
+    state: 'idle',
+  });
+  const inFlightOperationsRef = useRef(new Map<string, InFlightDocumentOperation>());
+  const activeDocumentRef = useRef<ActiveDocumentGeneration>({
+    aggregateId: enabled ? aggregateId : null,
+    generation: 0,
+  });
+  updateActiveDocumentGeneration(activeDocumentRef, aggregateId, enabled);
+
+  const promote = useCallback((): Promise<void> => {
+    const autosaveService = editorController.autosaveService;
+    if (!aggregateId || !autosaveService) {
+      return Promise.reject(new Error('Image autosave is unavailable.'));
+    }
+    const current = inFlightOperationsRef.current.get(aggregateId);
+    if (current?.kind === 'promote') {
+      return current.promise;
+    }
+    if (current) {
+      return Promise.reject(new Error('Another image operation is already in progress.'));
+    }
+    if (activeDocumentRef.current.aggregateId !== aggregateId) {
+      return Promise.reject(new Error('The active image changed before promotion started.'));
+    }
+    const token = Symbol(`promote:${aggregateId}`);
+    const promise = (async () => {
+      setOperationFeedback({ aggregateId, state: 'saving' });
+      try {
+        await promoteEditorImageToLibrary({
+          aggregateId,
+          port: {
+            flushAutosave: (serialize) => autosaveService.flushAutosave(serialize),
+            getDurableRevision: () => autosaveService.getDurableRevision(),
+            renderPresentation: () =>
+              editorController.renderForExport({ format: 'png', quality: 1 }),
+            serializeDocument: () => editorController.exportDocument(),
+          },
+        });
+        if (activeDocumentRef.current.aggregateId !== aggregateId) return;
+        setStorageClass('library');
+        setOperationFeedback({ aggregateId, state: 'idle' });
+      } catch (error) {
+        if (activeDocumentRef.current.aggregateId === aggregateId) {
+          setOperationFeedback({ aggregateId, state: 'error' });
+        }
+        throw error;
+      } finally {
+        if (inFlightOperationsRef.current.get(aggregateId)?.token === token) {
+          inFlightOperationsRef.current.delete(aggregateId);
+        }
+      }
+    })();
+    inFlightOperationsRef.current.set(aggregateId, {
+      aggregateId,
+      kind: 'promote',
+      promise,
+      token,
+    });
+    return promise;
+  }, [aggregateId, editorController, setStorageClass]);
+
+  const saveConflictCopy = useCallback((): Promise<void> => {
+    const sourceAggregateId = activeDocumentRef.current.aggregateId;
+    const sourceGeneration = activeDocumentRef.current.generation;
+    const autosaveService = editorController.autosaveService;
+    if (!sourceAggregateId || !autosaveService) {
+      return Promise.reject(new Error('Image autosave is unavailable.'));
+    }
+    if (inFlightOperationsRef.current.has(sourceAggregateId)) {
+      return Promise.reject(new Error('Another image operation is already in progress.'));
+    }
+    const token = Symbol(`copy:${sourceAggregateId}`);
+    const promise = (async () => {
+      setOperationFeedback({ aggregateId: sourceAggregateId, state: 'saving' });
+      try {
+        const result = await saveStaleEditorImageCopy({
+          autosaveService,
+          controller: editorController,
+          isSourceActive: () =>
+            activeDocumentRef.current.aggregateId === sourceAggregateId &&
+            activeDocumentRef.current.generation === sourceGeneration,
+          pageTitle,
+          sourceAggregateId,
+        });
+        if (result === 'stale') return;
+        setStorageClass('library');
+        setOperationFeedback({ aggregateId: sourceAggregateId, state: 'idle' });
+      } catch (error) {
+        if (activeDocumentRef.current.aggregateId === sourceAggregateId) {
+          setOperationFeedback({ aggregateId: sourceAggregateId, state: 'error' });
+        }
+        throw error;
+      } finally {
+        if (inFlightOperationsRef.current.get(sourceAggregateId)?.token === token) {
+          inFlightOperationsRef.current.delete(sourceAggregateId);
+        }
+      }
+    })();
+    inFlightOperationsRef.current.set(sourceAggregateId, {
+      aggregateId: sourceAggregateId,
+      kind: 'copy',
+      promise,
+      token,
+    });
+    return promise;
+  }, [editorController, pageTitle, setStorageClass]);
 
   useEffect(() => {
-    void (aggregateId ? getMediaLibraryEntry(aggregateId) : null)?.then((entry) =>
-      setStorageClass(entry?.lifecycle?.storageClass ?? 'temporary')
-    );
-  }, [aggregateId]);
-
-  const promote = useCallback(async () => {
-    if (!aggregateId || !editorController.autosaveService) return;
-    setPromotionState('saving');
-    try {
-      await editorController.autosaveService.flushAutosave(() => editorController.exportDocument());
-      const revision = editorController.autosaveService.getDurableRevision();
-      if (revision === null) throw new Error('Image workspace revision is unavailable.');
-      const previewBlob = await dataUrlToBlob(
-        await editorController.renderForExport({ format: 'png', quality: 1 })
-      );
-      await commitImagePresentation({
-        aggregateId,
-        expectedWorkspaceRevision: revision,
-        previewBlob,
-        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
-      });
-      await promoteImageAggregate(aggregateId, revision);
-      setStorageClass('library');
-      setPromotionState('idle');
-    } catch (error) {
-      setPromotionState('error');
-      throw error;
-    }
-  }, [aggregateId, editorController]);
-
-  const saveConflictCopy = useCallback(async () => {
-    if (!editorController.autosaveService) return;
-    setPromotionState('saving');
-    try {
-      const document = editorController.exportDocument();
-      const previewBlob = await dataUrlToBlob(
-        await editorController.renderForExport({ format: 'png', quality: 1 })
-      );
-      const targetAggregateId = createSecureRandomUuid(
-        'Secure random image copy IDs are unavailable.'
-      );
-      await saveImageAggregateCopyFromDocument({
-        document,
-        previewBlob,
-        sourceTitle: pageTitle,
-        targetAggregateId,
-        thumbnailBlob: await createImageThumbnailBlob(previewBlob),
-      });
-      replaceEditorPageAggregateId(targetAggregateId);
-      editorController.autosaveService.activate({
-        aggregateId: targetAggregateId,
-        durableRevision: 1,
-        renderPresentation: () => editorController.renderForExport({ format: 'png', quality: 1 }),
-        sourceTitle: pageTitle,
-        sourceUrl: null,
-      });
-      useEditorStore.getState().setSaveErrorMessage(null);
-      useEditorStore.getState().setSaveState('saved');
-      setStorageClass('library');
-      setPromotionState('idle');
-    } catch (error) {
-      setPromotionState('error');
-      throw error;
-    }
-  }, [editorController, pageTitle]);
-
-  useEffect(() => {
-    if (!aggregateId) return;
+    if (!enabled || !aggregateId) return;
     const presence = connectAggregateEditorPresence({
       aggregate: { id: aggregateId, kind: 'image' },
       promote,
     });
     return () => presence.dispose();
-  }, [aggregateId, promote]);
+  }, [aggregateId, enabled, promote]);
 
   return {
     hasStaleConflict:
       editorController.autosaveService?.getLastWriteError() instanceof StaleImageWorkspaceError,
     promote,
-    promotionState,
+    promotionState:
+      enabled && aggregateId && inFlightOperationsRef.current.has(aggregateId)
+        ? 'saving'
+        : operationFeedback.aggregateId === aggregateId
+          ? operationFeedback.state
+          : 'idle',
+    promotionButtonVisible,
     saveConflictCopy,
     storageClass,
   };
@@ -162,175 +264,94 @@ function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
   return hasImage ? translate('editor.page.documentTitle') : translate('editor.page.title');
 }
 
-function resolveDocumentStatus(state: ReturnType<typeof useDocumentBarState>) {
-  if (state.saveState === 'saving') {
-    return translate('common.states.saving');
-  }
-  if (state.saveState === 'saved') {
-    return translate('common.states.saved');
-  }
-
-  if (state.saveState === 'error') {
-    return state.saveErrorMessage ?? translate('common.states.error');
-  }
-
-  return translate('common.states.saved');
-}
-
-function useDismissableMenu(open: boolean, onClose: () => void) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && rootRef.current?.contains(target)) {
-        return;
-      }
-
-      onClose();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose, open]);
-
-  return rootRef;
-}
-
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
+  standalone: boolean;
 }) {
   const storage = useDocumentStorageClass(
     props.documentState.sessionId,
-    props.documentState.pageTitle
+    props.documentState.pageTitle,
+    props.standalone
   );
   return (
-    <div className={DOCUMENT_TITLE_CLASS_NAME}>
-      <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
-        {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
-      </div>
-      <div data-state={props.documentState.saveState} className={DOCUMENT_STATUS_CLASS_NAME}>
-        <span className="h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
-        <span className="truncate">{resolveDocumentStatus(props.documentState)}</span>
-      </div>
-      <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--sniptale-color-text-muted)]">
-        <span>
-          {translate(
-            storage.storageClass === 'library'
-              ? 'editor.documentActions.inLibrary'
-              : 'editor.documentActions.draft'
-          )}
-        </span>
-        {storage.storageClass === 'temporary' ? (
-          <button
-            type="button"
-            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
-            disabled={storage.promotionState === 'saving'}
-            onClick={() => void storage.promote().catch(() => undefined)}
-          >
-            {translate('editor.documentActions.saveToLibrary')}
-          </button>
-        ) : null}
-        {storage.promotionState === 'error' ? (
-          <span role="alert">{translate('editor.documentActions.saveToLibraryError')}</span>
-        ) : null}
-      </div>
-      {storage.hasStaleConflict ? (
-        <div className="mt-1 flex items-center gap-2 text-[11px]">
-          <button
-            type="button"
-            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
-            onClick={() => window.location.reload()}
-          >
-            {translate('editor.documentActions.reloadLatest')}
-          </button>
-          <button
-            type="button"
-            className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
-            disabled={storage.promotionState === 'saving'}
-            onClick={() => void storage.saveConflictCopy().catch(() => undefined)}
-          >
-            {translate('editor.documentActions.saveCopy')}
-          </button>
-        </div>
+    <>
+      {storage.promotionButtonVisible ? (
+        <ContentToolbarButton
+          title={translate('editor.documentActions.saveToLibrary')}
+          disabled={storage.promotionState === 'saving'}
+          className={[
+            'relative motion-safe:transition-[opacity,transform] motion-safe:duration-150',
+            storage.storageClass === 'library' ? 'scale-90 opacity-0' : 'scale-100 opacity-100',
+          ].join(' ')}
+          onClick={() => void storage.promote().catch(() => undefined)}
+          dataUi="editor.floating.document-bar.promote-button"
+        >
+          <Images size={18} strokeWidth={2} />
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
+        </ContentToolbarButton>
       ) : null}
-    </div>
-  );
-}
-
-function EditorFloatingDocumentMenu({
-  documentController,
-}: Pick<EditorFloatingDocumentBarProps, 'documentController'>) {
-  return (
-    <FloatingChromePanel
-      dataUi="editor.floating.document-bar.file-menu"
-      className={DOCUMENT_MENU_CLASS_NAME}
-    >
-      <EditorInspectorDocumentActions
-        canvasSize={documentController.canvasSize}
-        copyRenderedImageDisabledReason={documentController.copyRenderedImageDisabledReason}
-        defaultImagePresetId={documentController.defaultImagePresetId}
-        savePresets={documentController.savePresets}
-        onCloseDocument={documentController.onCloseDocument}
-        onCopyRenderedImage={documentController.onCopyRenderedImage}
-        onExportSession={documentController.onExportSession}
-        onImportSession={documentController.onImportSession}
-        onOpenImage={documentController.onOpenImage}
-        onSaveImage={documentController.onSaveImage}
-        onSaveImageAs={documentController.onSaveImageAs}
-        onSaveToPreset={documentController.saveToPreset}
-      />
-    </FloatingChromePanel>
+      <div className={DOCUMENT_TITLE_CLASS_NAME}>
+        <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
+          {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
+        </div>
+        <div className={DOCUMENT_STATUS_CLASS_NAME}>
+          <span className="truncate">
+            {translate(
+              storage.storageClass === 'library'
+                ? 'editor.documentActions.inLibrary'
+                : 'editor.documentActions.draft'
+            )}
+          </span>
+        </div>
+        {storage.promotionState === 'error' ? (
+          <div role="alert" className="mt-1 text-[11px] text-[var(--sniptale-color-danger)]">
+            {translate('editor.documentActions.saveToLibraryError')}
+          </div>
+        ) : null}
+        {storage.hasStaleConflict ? (
+          <div className="mt-1 flex items-center gap-2 text-[11px]">
+            <button
+              type="button"
+              className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+              onClick={() => window.location.reload()}
+            >
+              {translate('editor.documentActions.reloadLatest')}
+            </button>
+            <button
+              type="button"
+              className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
+              disabled={storage.promotionState === 'saving'}
+              onClick={() => void storage.saveConflictCopy().catch(() => undefined)}
+            >
+              {translate('editor.documentActions.saveCopy')}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
 
 export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const rootRef = useDismissableMenu(menuOpen, () => setMenuOpen(false));
   const documentState = useDocumentBarState();
-  const fileMenuTitle = getDocumentRequiredTitle(
-    translate('editor.documentActions.fileSection'),
-    props.hasImage
-  );
+  const embed = useEditorEmbedContext();
+  const standalone = embed.mode !== 'scenario';
 
   return (
-    <div ref={rootRef} data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
+    <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
-        <ContentToolbarButton
-          title={fileMenuTitle}
-          active={menuOpen}
-          disabled={!props.hasImage}
-          onClick={() => setMenuOpen((open) => !open)}
-          dataUi="editor.floating.document-bar.file-menu-button"
-        >
-          <Menu size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-        <EditorFloatingDocumentSummary documentState={documentState} hasImage={props.hasImage} />
-        <FloatingChromeDivider className="max-[720px]:hidden" />
+        <EditorFloatingDocumentSummary
+          documentState={documentState}
+          hasImage={props.hasImage}
+          standalone={standalone}
+        />
         <EditorFloatingDocumentQuickActions
           documentController={props.documentController}
           hasImage={props.hasImage}
           onBeforeSelectionAwareAction={props.onBeforeSelectionAwareAction}
         />
       </FloatingChromeToolbar>
-      {menuOpen ? (
-        <EditorFloatingDocumentMenu documentController={props.documentController} />
-      ) : null}
     </div>
   );
 }

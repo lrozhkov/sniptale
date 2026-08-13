@@ -11,7 +11,6 @@ import { EditorFloatingRightStack } from './right-stack';
 import { resolveFloatingSurfaceRoute } from './routes';
 import { EditorFloatingToolRail } from './tool-rail';
 import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
-import { EditorFloatingUtilityPanel } from './utility-panel';
 import { EditorFloatingViewControls } from './view-controls';
 import { getFloatingWorkspaceEdgeInsetStyle, useFloatingWorkspaceEdgeInsets } from './edge-insets';
 import { useFloatingLayersPreferenceState } from './preferences';
@@ -85,7 +84,6 @@ function EditorFloatingLoadedSurfaces({
         hasImage={hasImage}
         setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
         surfaceRoute={surfaceRoute}
-        toolbarProps={toolbarProps}
       />
       <EditorFloatingDockedPanels
         documentController={documentController}
@@ -185,10 +183,9 @@ function EditorFloatingRoutedPanels({
   hasImage,
   setDismissedLeftDrawerTool,
   surfaceRoute,
-  toolbarProps,
 }: Pick<
   Parameters<typeof EditorFloatingLoadedSurfaces>[0],
-  'documentController' | 'hasImage' | 'setDismissedLeftDrawerTool' | 'surfaceRoute' | 'toolbarProps'
+  'documentController' | 'hasImage' | 'setDismissedLeftDrawerTool' | 'surfaceRoute'
 >) {
   return (
     <>
@@ -201,14 +198,6 @@ function EditorFloatingRoutedPanels({
             setDismissedLeftDrawerTool(surfaceRoute.leftDrawer);
             documentController.setInspector('tool');
           }}
-        />
-      ) : null}
-      {surfaceRoute.rightUtility && surfaceRoute.rightUtility !== 'layer-effects' ? (
-        <EditorFloatingUtilityPanel
-          documentController={documentController}
-          hasImage={hasImage}
-          inspectorMeta={toolbarProps.inspectorMeta}
-          mode={surfaceRoute.rightUtility}
         />
       ) : null}
     </>

@@ -52,6 +52,7 @@ beforeEach(() => {
 it('creates fresh image documents without scene padding on open', async () => {
   const frame: EditorFrameSettings = {
     backgroundColor: 'transparent',
+    backgroundBlurAmount: 0,
     backgroundGradientAngle: 145,
     backgroundGradientFrom: '#7c2d12',
     backgroundGradientTo: '#f59e0b',

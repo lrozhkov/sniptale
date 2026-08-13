@@ -94,6 +94,32 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
   host.remove();
 });
 
+it('limits modes and advanced gradient controls for legacy-backed consumers', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        allowedModes={['solid', 'linear']}
+        showGradientAdvancedControls={false}
+        label="Background"
+        title="Background"
+        value={createSolidPaint('#f00')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  expect(popup.querySelector('[aria-label="highlighter.paintPicker.radial"]')).toBeNull();
+  expect(popup.querySelector('[aria-label="highlighter.paintPicker.conic"]')).toBeNull();
+  act(() => selectPaintMode(popup, 'linear'));
+  expect(popup.querySelector('summary')).toBeNull();
+  act(() => root.unmount());
+  host.remove();
+});
+
 it('uses a compact solid-color layout and shows the palette in the same dialog', () => {
   const host = document.createElement('div');
   document.body.append(host);

@@ -3,8 +3,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  drawingHandlers: { handlePathCreated: vi.fn() },
-  panHandlers: { handleViewportWheel: vi.fn() },
+  drawingHandlers: {
+    handlePathCreated: vi.fn(),
+    handleWindowMouseMove: vi.fn(),
+    handleWindowMouseUp: vi.fn(),
+  },
+  panHandlers: {
+    handleViewportWheel: vi.fn(),
+    handleWindowMouseMove: vi.fn(),
+    handleWindowMouseUp: vi.fn(),
+  },
   runtimeHandlers: { handleSelectionChange: vi.fn() },
 }));
 
@@ -23,11 +31,20 @@ import {
 beforeEach(() => vi.clearAllMocks());
 
 it('combines runtime, drawing, and pan event owners', () => {
-  expect(Reflect.apply(createEditorControllerEventHandlers, null, [{}])).toEqual({
+  const handlers = Reflect.apply(createEditorControllerEventHandlers, null, [{}]);
+  expect(handlers).toMatchObject({
     ...mocks.runtimeHandlers,
-    ...mocks.drawingHandlers,
-    ...mocks.panHandlers,
+    handlePathCreated: mocks.drawingHandlers.handlePathCreated,
+    handleSelectionChange: mocks.runtimeHandlers.handleSelectionChange,
+    handleViewportWheel: mocks.panHandlers.handleViewportWheel,
   });
+  const event = new MouseEvent('mousemove');
+  handlers.handleWindowMouseMove(event);
+  handlers.handleWindowMouseUp();
+  expect(mocks.drawingHandlers.handleWindowMouseMove).toHaveBeenCalledWith(event);
+  expect(mocks.panHandlers.handleWindowMouseMove).toHaveBeenCalledWith(event);
+  expect(mocks.drawingHandlers.handleWindowMouseUp).toHaveBeenCalledOnce();
+  expect(mocks.panHandlers.handleWindowMouseUp).toHaveBeenCalledOnce();
 });
 
 it('attaches and detaches every canvas, window, viewport, and resize observer listener', () => {

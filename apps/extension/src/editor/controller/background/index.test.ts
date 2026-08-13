@@ -79,6 +79,7 @@ it('resets frame draft fields and converts duplicate backgrounds to annotations'
   convertBackgroundDuplicateToAnnotation(duplicate);
 
   expect(resetFrameBackgroundDraft()).toEqual({
+    backgroundBlurAmount: 0,
     backgroundColor: 'transparent',
     backgroundGradientAngle: 145,
     backgroundGradientColorStops: [

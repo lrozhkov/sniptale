@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -5,6 +9,7 @@ type FloatingToolRailProps = {
   activeTool?: string;
   leftDrawerOpen?: boolean;
   onActivateTool: (tool: string) => void;
+  onToggleActiveToolOptions?: (tool: string) => void;
 };
 
 type FloatingLeftDrawerProps = {
@@ -29,6 +34,10 @@ const mocks = vi.hoisted(() => ({
   toolProperties: vi.fn(() => <div data-ui="mock.tool-properties" />),
   toolRail: vi.fn((_props: FloatingToolRailProps) => <div data-ui="mock.tool-rail" />),
   layersPreference: { collapsed: false, error: null as string | null },
+  routeOverride: null as null | {
+    canvasSelectionToolbar: boolean;
+    leftDrawer: 'shape' | null;
+  },
   useInspectorController: vi.fn(() => ({
     id: 'document-controller',
     inspector: 'tool',
@@ -36,9 +45,17 @@ const mocks = vi.hoisted(() => ({
     setInspector: vi.fn(),
   })),
   useToolbarController: vi.fn(),
-  utilityPanel: vi.fn(() => <div data-ui="mock.utility-panel" />),
   viewControls: vi.fn(() => <div data-ui="mock.view-controls" />),
 }));
+
+vi.mock('./routes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./routes')>();
+  return {
+    ...actual,
+    resolveFloatingSurfaceRoute: (args: Parameters<typeof actual.resolveFloatingSurfaceRoute>[0]) =>
+      mocks.routeOverride ?? actual.resolveFloatingSurfaceRoute(args),
+  };
+});
 
 vi.mock('../toolbar/use-controller', () => ({
   useEditorToolbarController: mocks.useToolbarController,
@@ -64,9 +81,6 @@ vi.mock('./overlays', () => ({
 }));
 vi.mock('./right-stack', () => ({
   EditorFloatingRightStack: mocks.rightStack,
-}));
-vi.mock('./utility-panel', () => ({
-  EditorFloatingUtilityPanel: mocks.utilityPanel,
 }));
 vi.mock('./tool-rail', () => ({
   EditorFloatingToolRail: mocks.toolRail,
@@ -107,7 +121,40 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.layersPreference.collapsed = false;
   mocks.layersPreference.error = null;
+  mocks.routeOverride = null;
   mocks.useToolbarController.mockReturnValue(createToolbarProps());
+});
+
+it('restores dismissed drawer and drawing-option state across active tool changes', async () => {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  mocks.routeOverride = { canvasSelectionToolbar: false, leftDrawer: 'shape' };
+  mocks.useToolbarController.mockReturnValue({
+    ...createToolbarProps(),
+    activeTool: 'shape',
+  });
+
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+  const drawerProps = mocks.leftDrawer.mock.lastCall?.[0];
+  const railProps = mocks.toolRail.mock.lastCall?.[0];
+  assertDefined(drawerProps);
+  assertDefined(railProps);
+
+  await act(async () => {
+    drawerProps.onClose();
+    railProps.onToggleActiveToolOptions?.('pencil');
+  });
+
+  mocks.routeOverride = { canvasSelectionToolbar: false, leftDrawer: null };
+  mocks.useToolbarController.mockReturnValue({
+    ...createToolbarProps(),
+    activeTool: 'select',
+  });
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+
+  await act(async () => root.unmount());
+  container.remove();
 });
 
 it('renders document bar, tool rail, view controls, overlays, and right stack for loaded images', () => {
@@ -214,7 +261,7 @@ it('shows the selected layer toolbar without activating the suspended shape draw
   );
 });
 
-it('renders compact utility panels as a separate surface next to the rail', () => {
+it('keeps settings inspectors inside the right-stack layers surface', () => {
   mocks.useInspectorController.mockReturnValue({
     id: 'document-controller',
     inspector: 'frame',
@@ -223,10 +270,9 @@ it('renders compact utility panels as a separate surface next to the rail', () =
   });
   const markup = renderToStaticMarkup(<EditorFloatingWorkspace hasImage />);
 
-  expect(markup).toContain('mock.utility-panel');
-  expect(mocks.utilityPanel).toHaveBeenCalledWith(
+  expect(markup).toContain('mock.right-stack');
+  expect(mocks.rightStack).toHaveBeenCalledWith(
     expect.objectContaining({
-      mode: 'frame',
       documentController: expect.objectContaining({ id: 'document-controller' }),
     }),
     undefined

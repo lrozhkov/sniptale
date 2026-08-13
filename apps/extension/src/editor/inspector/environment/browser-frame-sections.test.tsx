@@ -137,3 +137,35 @@ it('routes insert or update through the async action boundary', async () => {
   expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
   expect(container?.textContent).toContain('editor.compact.apply');
 });
+
+it('keeps disabled apply inert and exposes a localized async failure', async () => {
+  const insertOrUpdateBrowserFrame = vi.fn(async () => {
+    throw new Error('Frame failed');
+  });
+
+  act(() => {
+    root?.render(
+      <BrowserFrameInsertSection disabled insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
+    );
+  });
+
+  expect(container?.querySelector('button')?.disabled).toBe(true);
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+
+  act(() => {
+    root?.render(
+      <BrowserFrameInsertSection insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
+    );
+  });
+
+  await act(async () => {
+    container?.querySelector('button')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'editor.compact.browserFrameApplyFailed'
+  );
+  expect(container?.querySelector('button')?.disabled).toBe(false);
+});

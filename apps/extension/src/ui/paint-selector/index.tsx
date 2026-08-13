@@ -57,6 +57,7 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
         open={state.open}
       />
       <PaintSelectorPortal
+        {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}
         apply={state.apply}
         cancel={state.cancel}
         createId={createId}
@@ -71,6 +72,9 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
         palette={props.palette ?? []}
         preview={state.preview}
         recentColors={props.recentColors ?? []}
+        {...(props.showGradientAdvancedControls === undefined
+          ? {}
+          : { showGradientAdvancedControls: props.showGradientAdvancedControls })}
         rootRef={rootRef}
         selectedStopId={state.selectedStopId}
         selectStop={state.setSelectedStopId}

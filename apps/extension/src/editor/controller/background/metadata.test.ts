@@ -12,6 +12,7 @@ import {
 function createFrame(patch: Partial<EditorFrameSettings> = {}): EditorFrameSettings {
   return {
     ...DEFAULT_EDITOR_FRAME_SETTINGS,
+    backgroundBlurAmount: 8,
     backgroundColor: '#112233',
     backgroundGradientAngle: 22,
     backgroundMode: 'gradient',
@@ -26,6 +27,7 @@ it('assigns frame metadata to managed background objects', () => {
 
   expect(background).toMatchObject({
     sniptaleBackgroundColor: '#112233',
+    sniptaleBackgroundBlurAmount: 8,
     sniptaleBackgroundGradientAngle: 22,
     sniptaleBackgroundMode: 'gradient',
     sniptaleRole: 'background',
@@ -69,6 +71,7 @@ it('converts duplicate backgrounds into annotations without background metadata'
   duplicate.sniptaleRole = 'background';
   duplicate.sniptaleType = 'background';
   duplicate.sniptaleBackgroundMode = 'color';
+  duplicate.sniptaleBackgroundBlurAmount = 4;
   duplicate.sniptaleBackgroundColor = '#112233';
 
   convertBackgroundDuplicateToAnnotation(duplicate);
@@ -76,5 +79,6 @@ it('converts duplicate backgrounds into annotations without background metadata'
   expect(duplicate.sniptaleRole).toBe('annotation');
   expect(duplicate.sniptaleType).toBe('shape');
   expect(duplicate.sniptaleBackgroundMode).toBeUndefined();
+  expect(duplicate.sniptaleBackgroundBlurAmount).toBeUndefined();
   expect(duplicate.sniptaleBackgroundColor).toBeUndefined();
 });

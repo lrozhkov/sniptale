@@ -7,6 +7,7 @@ export const CUSTOM_JSON_PROPS = [
   'sniptaleFrameAnnotationRevision',
   'sniptaleFrameAnnotationJson',
   'sniptaleBackgroundMode',
+  'sniptaleBackgroundBlurAmount',
   'sniptaleBackgroundFit',
   'sniptaleBackgroundImageData',
   'sniptaleBackgroundColor',

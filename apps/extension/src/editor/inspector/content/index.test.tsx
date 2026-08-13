@@ -74,9 +74,9 @@ function createProps(
   overrides: Partial<ComponentProps<typeof EditorInspectorContent>> = {}
 ): ComponentProps<typeof EditorInspectorContent> {
   return {
-    ...(createContentProps() as ComponentProps<typeof EditorInspectorContent>),
+    ...createContentProps(),
     ...overrides,
-  };
+  } as ComponentProps<typeof EditorInspectorContent>;
 }
 
 function registerDocumentActionsBranchTest() {

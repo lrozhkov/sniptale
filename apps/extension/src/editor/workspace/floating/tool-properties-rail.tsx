@@ -5,32 +5,18 @@ import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
 import { EditorDrawingOptions } from '../../drawing/options';
-import { resolveToolPropertiesStyle } from './tool-properties-geometry';
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { ToolPropertiesButton } from './tool-properties-button';
-import { FrameAnnotationCreationControls } from '../../../composition/frame-annotation-controls/creation-controls';
-import {
-  initializeFrameAnnotationCreationDefaults,
-  setFrameAnnotationCreationDefaults,
-  useFrameAnnotationCreationDefaults,
-} from '../../frame-annotation/creation-defaults';
-import { loadHighlighterSettings } from '../../../composition/persistence/highlighter';
 
 const TOOL_PROPERTIES_CLASS_NAME = floatingChromeClassNames(
-  [
-    'absolute left-[4.75rem] top-[var(--editor-tool-properties-top)] z-40 flex',
-    'max-h-[calc(100vh-8.5rem)] -translate-y-1/2',
-  ].join(' '),
+  ['absolute left-1/2 top-[4.5rem] z-40 flex -translate-x-1/2', 'max-h-[calc(100vh-8.5rem)]'].join(
+    ' '
+  ),
   'flex-col overflow-visible',
   'max-[720px]:bottom-[4.75rem] max-[720px]:left-3 max-[720px]:right-3 max-[720px]:top-auto',
-  'max-[720px]:max-h-none max-[720px]:translate-y-0 max-[720px]:flex-row'
-);
-
-const TOOL_PROPERTIES_SHIFTED_CLASS_NAME = floatingChromeClassNames(
-  TOOL_PROPERTIES_CLASS_NAME,
-  'min-[721px]:left-[25.25rem]'
+  'max-[720px]:max-h-none max-[720px]:translate-x-0 max-[720px]:flex-row'
 );
 
 const TOOLS_WITH_PROPERTIES = new Set<EditorTool>(['step']);
@@ -132,17 +118,10 @@ export function EditorFloatingToolPropertiesRail({
   collapsedDrawingOptionsTool,
   documentController,
   hasImage,
-  leftDrawerOpen,
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
   const controller = useEditorController();
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-  const frameAnnotationDefaults = useFrameAnnotationCreationDefaults();
-  useEffect(() => {
-    if (activeTool === 'frame-annotation') {
-      void initializeFrameAnnotationCreationDefaults(loadHighlighterSettings);
-    }
-  }, [activeTool]);
   const groups = useToolPropertyGroups(documentController.compactCommandGroups);
   const standardPropertiesEnabled = isToolPropertiesEnabled({
     activeTool,
@@ -151,11 +130,6 @@ export function EditorFloatingToolPropertiesRail({
     inspector: documentController.inspector,
     selection,
   });
-  const frameAnnotationPropertiesEnabled =
-    hasImage &&
-    documentController.inspector === 'tool' &&
-    !selection.hasSelection &&
-    activeTool === 'frame-annotation';
   const selectedDrawingTool =
     selection.selectedObjectType === 'pencil' ||
     selection.selectedObjectType === 'marker' ||
@@ -188,12 +162,8 @@ export function EditorFloatingToolPropertiesRail({
       selection.selectedObjectsAreDrawing ||
       collapsedDrawingOptionsTool !== activeDrawingTool
     );
-  const enabled =
-    standardPropertiesEnabled || frameAnnotationPropertiesEnabled || drawingPropertiesEnabled;
+  const enabled = standardPropertiesEnabled || drawingPropertiesEnabled;
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
-  const className = leftDrawerOpen
-    ? TOOL_PROPERTIES_SHIFTED_CLASS_NAME
-    : TOOL_PROPERTIES_CLASS_NAME;
 
   useEffect(() => {
     if (!enabled) {
@@ -209,8 +179,7 @@ export function EditorFloatingToolPropertiesRail({
     <div ref={rootRef} className="contents">
       <FloatingChromeToolbar
         dataUi="editor.floating.tool-properties"
-        className={className}
-        style={resolveToolPropertiesStyle(activeTool)}
+        className={TOOL_PROPERTIES_CLASS_NAME}
       >
         {drawingOptionsTool ? (
           <EditorDrawingOptions
@@ -219,12 +188,6 @@ export function EditorFloatingToolPropertiesRail({
             onDeleteSelection={() => controller.deleteSelection()}
             selectedType={selection.selectedObjectType}
             tool={drawingOptionsTool}
-          />
-        ) : frameAnnotationPropertiesEnabled ? (
-          <FrameAnnotationCreationControls
-            dataUi="editor.frame-annotation.creation-controls"
-            onChange={setFrameAnnotationCreationDefaults}
-            settings={frameAnnotationDefaults}
           />
         ) : (
           <ToolPropertiesButtons

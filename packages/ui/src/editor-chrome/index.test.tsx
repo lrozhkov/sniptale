@@ -47,7 +47,13 @@ it('renders an interactive icon button with active state metadata', () => {
   const onMouseDown = vi.fn();
 
   render(
-    <EditorIconButton title="Open project" active onMouseDown={onMouseDown} onClick={onClick}>
+    <EditorIconButton
+      title="Open project"
+      active
+      aria-pressed="true"
+      onMouseDown={onMouseDown}
+      onClick={onClick}
+    >
       <span>+</span>
     </EditorIconButton>
   );
@@ -55,6 +61,7 @@ it('renders an interactive icon button with active state metadata', () => {
   const button = container?.querySelector('button');
   expect(button?.getAttribute('aria-label')).toBe('Open project');
   expect(button?.getAttribute('data-active')).toBe('true');
+  expect(button?.getAttribute('aria-pressed')).toBe('true');
   expect(button?.className).toContain('h-9 w-9');
   expect(button?.className).toContain('cursor-pointer');
   expect(button?.className).toContain('rounded-[8px]');

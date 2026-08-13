@@ -90,7 +90,7 @@ function renderControls(
           },
           gridEnabled: false,
           hasImage,
-          history: { canRedo: false, canUndo: false },
+          history: { canRedo: false, canUndo: false, index: 0, size: 1 },
           inspectorMeta: { subtitle: '', title: '' },
           onBeforeSelectionAwareAction: vi.fn(),
           zoomPercent: 125,

@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Layers3 } from 'lucide-react';
-import {
-  FloatingChromePanel,
-  FloatingChromeToolbar,
-  floatingChromeClassNames,
-} from '@sniptale/ui/floating-chrome';
-import { translate } from '../../../platform/i18n';
+import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
-import { LayerInsertImageControl } from '../../inspector/layers/file-input';
-import { createEditorInspectorLayersPanelProps } from '../../inspector/sidebar-expanded-content/helpers';
-import { EditorIconButton } from '../../chrome/ui';
+import { EditorInspectorContent } from '../../inspector/content';
+import {
+  createEditorInspectorContentPanelProps,
+  createEditorInspectorLayersPanelProps,
+} from '../../inspector/sidebar-expanded-content/helpers';
+import { useEditorController } from '../../application/controller-context';
+import { createEditorToolbarActions } from '../toolbar/actions';
 import type { EditorFloatingDocumentController } from './document-bar';
+import {
+  EditorFloatingLayersNavigation,
+  resolveEditorLayersPanelMode,
+  type EditorLayersPanelMode,
+} from './layers-panel-navigation';
 
 const LAYERS_PANEL_DEFAULT_HEIGHT = 320;
 const LAYERS_PANEL_MIN_HEIGHT = 248;
@@ -38,7 +41,8 @@ const LAYERS_PANEL_COLLAPSED_CLASS_NAME = floatingChromeClassNames(
     'absolute bottom-[calc(0.75rem+var(--editor-floating-edge-bottom,0px))]',
     'right-[calc(0.75rem+var(--editor-floating-edge-right,0px))] z-40',
     'max-[720px]:bottom-[calc(4.75rem+var(--editor-floating-edge-bottom,0px))]',
-  ].join(' ')
+  ].join(' '),
+  'pointer-events-auto max-w-[calc(100vw-1.5rem)] overflow-x-auto'
 );
 
 const LAYERS_RESIZE_HANDLE_CLASS_NAME = [
@@ -148,38 +152,76 @@ function FloatingLayersPreferenceError({ message }: { message: string | null }) 
 }
 
 function EditorFloatingLayersCollapsedToolbar({
+  activeMode,
+  onSelectMode,
   onExpand,
   preferenceError,
 }: {
+  activeMode: EditorLayersPanelMode;
+  onSelectMode: (mode: EditorLayersPanelMode) => void;
   onExpand: () => void;
   preferenceError: string | null;
 }) {
   return (
     <div className={LAYERS_PANEL_COLLAPSED_CLASS_NAME}>
       <FloatingLayersPreferenceError message={preferenceError} />
-      <FloatingChromeToolbar dataUi="editor.floating.layers-collapsed-toolbar" className="relative">
-        <EditorIconButton
-          title={translate('editor.toolbar.layersTitle')}
-          onClick={onExpand}
-          data-ui="editor.floating.layers.expand-button"
-        >
-          <Layers3 size={17} strokeWidth={2} />
-        </EditorIconButton>
-        <LayerInsertImageControl />
-      </FloatingChromeToolbar>
+      <div data-ui="editor.floating.layers-collapsed-toolbar">
+        <EditorFloatingLayersNavigation
+          activeMode={activeMode}
+          collapsed
+          onSelectMode={(mode) => {
+            onSelectMode(mode);
+            onExpand();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function EditorFloatingLayersPanelBody(props: {
+  activeMode: EditorLayersPanelMode;
+  documentController: EditorFloatingDocumentController;
+  hasImage: boolean;
+}) {
+  if (props.activeMode === 'layers') {
+    const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
+    return (
+      <EditorInspectorLayersPanel
+        {...layersPanelProps}
+        expanded
+        fillContainer
+        maxExpandedHeightRatio={1}
+      />
+    );
+  }
+
+  const contentProps = createEditorInspectorContentPanelProps(
+    props.hasImage,
+    props.documentController
+  );
+  return (
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]">
+      <EditorInspectorContent
+        {...contentProps}
+        inspector={props.activeMode}
+        showDocumentActions={false}
+        confirmDialog={null}
+      />
     </div>
   );
 }
 
 function EditorFloatingExpandedLayersPanel(props: {
+  activeMode: EditorLayersPanelMode;
   documentController: EditorFloatingDocumentController;
+  hasImage: boolean;
   height: number;
   onCollapse: () => void;
+  onSelectMode: (mode: EditorLayersPanelMode) => void;
   preferenceError: string | null;
   startResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
-  const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
-
   return (
     <FloatingChromePanel
       dataUi="editor.floating.layers-panel"
@@ -192,12 +234,15 @@ function EditorFloatingExpandedLayersPanel(props: {
         data-ui="editor.floating.layers.resize-handle"
         onPointerDown={props.startResize}
       />
-      <EditorInspectorLayersPanel
-        {...layersPanelProps}
-        expanded
-        fillContainer
-        maxExpandedHeightRatio={1}
-        onCollapsePanel={props.onCollapse}
+      <EditorFloatingLayersNavigation
+        activeMode={props.activeMode}
+        onCollapse={props.onCollapse}
+        onSelectMode={props.onSelectMode}
+      />
+      <EditorFloatingLayersPanelBody
+        activeMode={props.activeMode}
+        documentController={props.documentController}
+        hasImage={props.hasImage}
       />
       <FloatingLayersPreferenceError message={props.preferenceError} />
     </FloatingChromePanel>
@@ -207,6 +252,7 @@ function EditorFloatingExpandedLayersPanel(props: {
 export function EditorFloatingLayersPanel({
   collapsed,
   documentController,
+  hasImage,
   heightRatio,
   preferenceError,
   onCollapse,
@@ -215,6 +261,7 @@ export function EditorFloatingLayersPanel({
 }: {
   collapsed: boolean;
   documentController: EditorFloatingDocumentController;
+  hasImage: boolean;
   heightRatio: number | null;
   preferenceError: string | null;
   onCollapse: () => void;
@@ -225,18 +272,43 @@ export function EditorFloatingLayersPanel({
     heightRatio,
     onHeightRatioChange,
   });
+  const editorController = useEditorController();
+  const activeMode = resolveEditorLayersPanelMode(documentController.inspector);
+  const toolbarActions = createEditorToolbarActions({
+    controller: editorController,
+    hasImage,
+    inspector: documentController.inspector,
+    setActiveTool: documentController.setActiveTool,
+    setInspector: documentController.setInspector,
+  });
+  const handleSelectMode = (mode: EditorLayersPanelMode) => {
+    if (mode === activeMode) return;
+    if (mode === 'layers') {
+      toolbarActions.activateTool('select');
+      return;
+    }
+    toolbarActions.toggleInspector(mode);
+  };
 
   if (collapsed) {
     return (
-      <EditorFloatingLayersCollapsedToolbar onExpand={onExpand} preferenceError={preferenceError} />
+      <EditorFloatingLayersCollapsedToolbar
+        activeMode={activeMode}
+        onExpand={onExpand}
+        onSelectMode={handleSelectMode}
+        preferenceError={preferenceError}
+      />
     );
   }
 
   return (
     <EditorFloatingExpandedLayersPanel
+      activeMode={activeMode}
       documentController={documentController}
+      hasImage={hasImage}
       height={height}
       onCollapse={onCollapse}
+      onSelectMode={handleSelectMode}
       preferenceError={preferenceError}
       startResize={startResize}
     />

@@ -99,6 +99,7 @@ function expectBuiltEditorDocument(document: ReturnType<typeof buildEditorCanvas
     canvasHeight: 100,
     canvasWidth: 200,
     frame: expect.objectContaining({
+      backgroundBlurAmount: 0,
       backgroundGradientAngle: 145,
       backgroundGradientFrom: '#7c2d12',
       backgroundGradientTo: '#f59e0b',

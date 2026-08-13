@@ -8,6 +8,7 @@ export function assignBackgroundMetadata(object: FabricObject, frame: EditorFram
   object.sniptaleRole = 'background';
   object.sniptaleType = 'background';
   object.sniptaleBackgroundMode = frame.backgroundMode;
+  object.sniptaleBackgroundBlurAmount = frame.backgroundBlurAmount;
   object.sniptaleBackgroundFit = frame.backgroundImageFit;
   object.sniptaleBackgroundImageData = frame.backgroundImageData;
   object.sniptaleBackgroundColor = frame.backgroundColor;
@@ -36,6 +37,7 @@ export function convertBackgroundDuplicateToAnnotation(object: FabricObject): vo
   object.sniptaleRole = 'annotation';
   object.sniptaleType = object instanceof FabricImage ? 'image' : 'shape';
   Reflect.deleteProperty(object, 'sniptaleBackgroundMode');
+  Reflect.deleteProperty(object, 'sniptaleBackgroundBlurAmount');
   Reflect.deleteProperty(object, 'sniptaleBackgroundFit');
   Reflect.deleteProperty(object, 'sniptaleBackgroundImageData');
   Reflect.deleteProperty(object, 'sniptaleBackgroundColor');

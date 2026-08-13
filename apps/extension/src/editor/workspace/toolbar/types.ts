@@ -1,4 +1,4 @@
-import type { EditorTool } from '../../../features/editor/document/types';
+import type { EditorHistoryState, EditorTool } from '../../../features/editor/document/types';
 import type {
   EditorToolbarInspectorMeta,
   ToolbarInspector,
@@ -9,16 +9,11 @@ export type {
   ToolbarInspector,
 } from '../../inspector/toolbar-derived-state';
 
-interface EditorToolbarHistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
 export interface EditorToolbarContentProps {
   activeTool: EditorTool;
   gridEnabled: boolean;
   hasImage: boolean;
-  history: EditorToolbarHistoryState;
+  history: EditorHistoryState;
   inspector: ToolbarInspector | 'tool';
   inspectorCollapsed: boolean;
   inspectorMeta: EditorToolbarInspectorMeta;

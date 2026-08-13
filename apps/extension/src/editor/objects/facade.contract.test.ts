@@ -27,7 +27,6 @@ const OWNER_FACTORY_EXPORTS = {
   shape: ['applyShapeSettings', 'normalizeScaledRectangleTarget'],
   step: ['createStepGroup', 'resolveStepGroupGeometry', 'updateStepGroup'],
   text: [
-    'createMetaStamp',
     'createTextObject',
     'DEFAULT_EDITOR_TEXTBOX_WIDTH',
     'applyTextCalloutRendering',

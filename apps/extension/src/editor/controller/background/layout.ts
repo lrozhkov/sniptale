@@ -46,6 +46,13 @@ export function syncManagedBackgroundLayerLayout(options: {
   }
 
   if (
+    frame.backgroundBlurAmount > 0 ||
+    (background.sniptaleBackgroundBlurAmount ?? 0) !== frame.backgroundBlurAmount
+  ) {
+    return;
+  }
+
+  if (
     frame.backgroundMode === 'image' &&
     (background.sniptaleBackgroundFit !== frame.backgroundImageFit ||
       background.sniptaleBackgroundImageData !== frame.backgroundImageData)

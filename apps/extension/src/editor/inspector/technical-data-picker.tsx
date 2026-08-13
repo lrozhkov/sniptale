@@ -170,6 +170,54 @@ function TechnicalDataOptionList({
   );
 }
 
+function TechnicalDataPreview(props: {
+  kinds: readonly EditorTechnicalDataKind[];
+  layout: EditorTechnicalDataLayout;
+}) {
+  const labels = props.kinds.map((kind) => {
+    const option = technicalDataOptions.find((candidate) => candidate.kind === kind);
+    return option ? translate(option.labelKey) : kind;
+  });
+
+  return (
+    <section
+      aria-label={translate('editor.compact.technicalDataPreview')}
+      aria-live="polite"
+      className={cx(
+        'rounded-[10px] border border-[color:var(--sniptale-color-border-soft)] p-2.5',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_72%,transparent)]'
+      )}
+    >
+      <div className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
+        {translate('editor.compact.technicalDataPreview')}
+      </div>
+      {labels.length === 0 ? (
+        <p className="mt-1.5 text-xs text-[color:var(--sniptale-color-text-secondary)]">
+          {translate('editor.compact.technicalDataPreviewEmpty')}
+        </p>
+      ) : (
+        <div
+          className={cx(
+            'mt-2 text-xs text-[color:var(--sniptale-color-text-primary)]',
+            props.layout === 'row' ? 'flex flex-wrap items-center gap-x-2 gap-y-1' : 'space-y-1'
+          )}
+        >
+          {labels.map((label, index) => (
+            <React.Fragment key={props.kinds[index]}>
+              {props.layout === 'row' && index > 0 ? (
+                <span aria-hidden="true" className="text-[color:var(--sniptale-color-text-muted)]">
+                  ·
+                </span>
+              ) : null}
+              <span>{label}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps> = ({
   onInsert,
   variant = 'expanded',
@@ -198,6 +246,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
         setSelectedKinds={setSelectedKinds}
         variant={variant}
       />
+      <TechnicalDataPreview kinds={orderedKinds} layout={layout} />
       <button
         type="button"
         disabled={!canInsert}
@@ -208,7 +257,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
           pickerButtonClassName[variant]
         )}
       >
-        {translate('common.actions.add')}
+        {translate('editor.compact.technicalDataInsert')}
       </button>
     </div>
   );

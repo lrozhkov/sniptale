@@ -1,1 +1,0 @@
-export { EditorInspectorFrameBackgroundGradientEditor } from './view';

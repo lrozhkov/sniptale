@@ -22,6 +22,7 @@ export const DEFAULT_EDITOR_FRAME_SETTINGS: EditorFrameSettings = {
   paddingBottom: 128,
   paddingLeft: 128,
   backgroundMode: 'gradient',
+  backgroundBlurAmount: 0,
   backgroundColor: 'transparent',
   backgroundGradientFrom: '#7c2d12',
   backgroundGradientTo: '#f59e0b',
@@ -38,6 +39,15 @@ export const DEFAULT_EDITOR_FRAME_SETTINGS: EditorFrameSettings = {
   browserTitle: '',
   browserUrl: '',
 };
+
+export const MAX_EDITOR_BACKGROUND_BLUR_AMOUNT = 25;
+
+function normalizeEditorBackgroundBlurAmount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_EDITOR_FRAME_SETTINGS.backgroundBlurAmount;
+  }
+  return Math.min(MAX_EDITOR_BACKGROUND_BLUR_AMOUNT, Math.max(0, value));
+}
 
 export const DEFAULT_BROWSER_FRAME_STATE = {
   title: '',
@@ -92,6 +102,7 @@ export function normalizeEditorFrameSettings(
     paddingBottom: frame?.paddingBottom ?? DEFAULT_EDITOR_FRAME_SETTINGS.paddingBottom,
     paddingLeft: frame?.paddingLeft ?? DEFAULT_EDITOR_FRAME_SETTINGS.paddingLeft,
     backgroundMode: frame?.backgroundMode ?? DEFAULT_EDITOR_FRAME_SETTINGS.backgroundMode,
+    backgroundBlurAmount: normalizeEditorBackgroundBlurAmount(frame?.backgroundBlurAmount),
     backgroundColor: frame?.backgroundColor ?? DEFAULT_EDITOR_FRAME_SETTINGS.backgroundColor,
     backgroundGradientFrom,
     backgroundGradientTo,

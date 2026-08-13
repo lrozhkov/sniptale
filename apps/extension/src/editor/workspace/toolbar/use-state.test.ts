@@ -16,7 +16,7 @@ describe('editor-toolbar.use-state', () => {
   it('selects the layer-effects category together with toolbar state', () => {
     const state = {
       activeTool: 'select',
-      history: { canRedo: false, canUndo: true },
+      history: { canRedo: false, canUndo: true, index: 1, size: 2 },
       inspector: 'layer-effects',
       inspectorCollapsed: false,
       layerEffectsCategory: 'filters',

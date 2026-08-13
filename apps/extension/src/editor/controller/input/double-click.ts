@@ -1,5 +1,6 @@
 import type { Canvas, FabricObject, TPointerEvent } from 'fabric';
 import { isTextbox } from '../core/helpers';
+import { activateTextTarget } from '../events/text-target';
 
 export function handleEditorDoubleClick(options: {
   canvas: Canvas | null;
@@ -11,8 +12,9 @@ export function handleEditorDoubleClick(options: {
 }): void {
   const { canvas, target, event, activeTool, commitHistory, syncRuntimeState } = options;
   if (target && isTextbox(target) && activeTool === 'select') {
-    target.enterEditing();
-    target.selectAll();
+    if (canvas) {
+      activateTextTarget(canvas, target, syncRuntimeState, { event, selectAll: false });
+    }
     return;
   }
 

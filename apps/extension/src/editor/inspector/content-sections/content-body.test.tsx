@@ -23,8 +23,7 @@ it('routes legacy size branches through the combined resize owner', async () => 
       createContentProps({
         inspector: 'image-size',
         cropReady: false,
-        canvasSize: { height: 720, width: 1280 },
-        canvasSizeDraft: { height: 600, width: 900 },
+        imageSizeDraft: { height: 600, width: 900 },
       }) as never,
       controller as never
     ),
@@ -37,7 +36,8 @@ it('routes legacy size branches through the combined resize owner', async () => 
   });
   expect(document.body.textContent).toContain('editor.compact.canvas');
   expect(document.body.textContent).toContain('editor.compact.image');
-  expect(controller.resizeCanvas).toHaveBeenCalledWith(900, 600);
+  expect(controller.resizeImage).toHaveBeenCalledWith(900, 600);
+  expect(controller.resizeCanvas).not.toHaveBeenCalled();
 
   cleanupDom();
   renderWithController(

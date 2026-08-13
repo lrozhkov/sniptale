@@ -6,14 +6,30 @@ import type { EditorControllerEventBindings, EditorControllerEventHandlers } fro
 
 export type { EditorControllerEventHandlers } from './types';
 
+function composeEditorControllerEventHandlers(
+  bindings: EditorControllerEventBindings
+): EditorControllerEventHandlers {
+  const drawing = createEditorDrawingEventHandlers(bindings);
+  const pan = createPanEventHandlers(bindings);
+  return {
+    ...createRuntimeEventHandlers(bindings),
+    ...drawing,
+    ...pan,
+    handleWindowMouseMove: (event) => {
+      drawing.handleWindowMouseMove(event);
+      pan.handleWindowMouseMove(event);
+    },
+    handleWindowMouseUp: () => {
+      drawing.handleWindowMouseUp();
+      pan.handleWindowMouseUp();
+    },
+  };
+}
+
 export function createEditorControllerEventHandlers(
   bindings: EditorControllerEventBindings
 ): EditorControllerEventHandlers {
-  return {
-    ...createRuntimeEventHandlers(bindings),
-    ...createEditorDrawingEventHandlers(bindings),
-    ...createPanEventHandlers(bindings),
-  };
+  return composeEditorControllerEventHandlers(bindings);
 }
 
 export function attachEditorControllerEventHandlers(options: {

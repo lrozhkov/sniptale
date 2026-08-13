@@ -17,6 +17,7 @@ import {
 } from './drafts-scene';
 
 const BASE_SETTINGS: EditorSceneBackgroundSettings = {
+  backgroundBlurAmount: 0,
   paddingTop: 12,
   paddingRight: 16,
   paddingBottom: 20,

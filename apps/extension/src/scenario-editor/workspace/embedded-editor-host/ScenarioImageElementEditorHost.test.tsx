@@ -195,6 +195,7 @@ function createEditorDocument(): EditorDocument {
     canvasJson: '{}',
     canvasWidth: 1,
     frame: {
+      backgroundBlurAmount: 0,
       backgroundColor: '#fff',
       backgroundGradientAngle: 90,
       backgroundGradientFrom: '#fff',

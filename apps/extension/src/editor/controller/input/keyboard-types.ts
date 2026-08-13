@@ -8,6 +8,7 @@ export type EditorKeyboardAction =
   | 'redo'
   | 'duplicate-selection'
   | 'exit-text-edit'
+  | 'cancel-text-edit'
   | 'cancel-transient'
   | 'delete-selection'
   | 'apply-crop'
@@ -25,10 +26,12 @@ export interface EditorKeyboardResolverOptions {
   metaKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
+  isComposing?: boolean;
   hasSelection: boolean;
   hasCropGuide: boolean;
   hasDrawSession?: boolean;
   isEditingTextboxSelection: boolean;
+  isEditingTextboxInput: boolean;
   hasSelectedTextTarget?: boolean;
   activeTool: string;
 }

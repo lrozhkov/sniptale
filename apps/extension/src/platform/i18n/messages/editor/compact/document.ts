@@ -65,6 +65,10 @@ export const editorCompactDocumentMessages = defineMessageSource({
     ru: 'Что изменить',
     en: 'Resize target',
   },
+  invalidImageDimensions: {
+    ru: 'Ширина и высота должны быть целыми числами больше нуля.',
+    en: 'Width and height must be positive whole numbers.',
+  },
   sizePreset: {
     ru: 'Шаблон',
     en: 'Preset',

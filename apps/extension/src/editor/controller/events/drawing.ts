@@ -199,6 +199,8 @@ export function createEditorDrawingEventHandlers(
   | 'handleMouseDown'
   | 'handleMouseMove'
   | 'handleMouseUp'
+  | 'handleWindowMouseMove'
+  | 'handleWindowMouseUp'
 > {
   let textTargetCandidate: {
     point: import('fabric').Point;
@@ -266,6 +268,25 @@ export function createEditorDrawingEventHandlers(
         return;
       }
       completeDrawWorkflowFromBindings(bindings);
+    },
+    handleWindowMouseMove: (event) => {
+      const canvas = bindings.getCanvas();
+      const target = event.target;
+      if (
+        !canvas ||
+        !bindings.getDrawSession() ||
+        (typeof Node !== 'undefined' &&
+          target instanceof Node &&
+          canvas.upperCanvasEl.contains(target))
+      ) {
+        return;
+      }
+      updateDraft(bindings, { e: event });
+    },
+    handleWindowMouseUp: () => {
+      if (bindings.getDrawSession()) {
+        completeDrawWorkflowFromBindings(bindings);
+      }
     },
   };
 }

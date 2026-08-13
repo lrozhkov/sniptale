@@ -46,6 +46,7 @@ function renderLayersPanel(args: EditorFloatingRightStackProps) {
     <EditorFloatingLayersPanel
       collapsed={args.layersCollapsed}
       documentController={args.documentController}
+      hasImage={args.hasImage}
       heightRatio={args.layersHeightRatio}
       preferenceError={args.layersPreferenceError}
       onCollapse={args.onCollapseLayers}

@@ -31,6 +31,13 @@ describe('editor keyboard editing resolvers', () => {
     expect(
       resolveEditorEnterKeyboardAction({ ...base, isEditingTextboxSelection: true, shiftKey: true })
     ).toBeNull();
+    expect(
+      resolveEditorEnterKeyboardAction({
+        ...base,
+        isComposing: true,
+        isEditingTextboxSelection: true,
+      })
+    ).toBeNull();
     expect(resolveEditorEnterKeyboardAction({ ...base, hasSelectedTextTarget: true })).toBe(
       'enter-text-edit'
     );
@@ -44,7 +51,7 @@ describe('editor keyboard editing resolvers', () => {
         isEditingTextboxSelection: true,
         key: 'Escape',
       })
-    ).toBe('exit-text-edit');
+    ).toBe('cancel-text-edit');
     expect(
       resolveEditorFallbackKeyboardAction({
         code: 'Escape',

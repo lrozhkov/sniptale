@@ -123,4 +123,16 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
       'After insertion, it can be edited like a normal text layer.'
     ),
   },
+  technicalDataPreview: {
+    ru: 'Предпросмотр',
+    en: 'Preview',
+  },
+  technicalDataPreviewEmpty: {
+    ru: 'Выберите данные, которые нужно добавить.',
+    en: 'Choose the details you want to add.',
+  },
+  technicalDataInsert: {
+    ru: 'Добавить текст',
+    en: 'Add text',
+  },
 });

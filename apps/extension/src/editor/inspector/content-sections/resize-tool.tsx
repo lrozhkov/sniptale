@@ -48,6 +48,7 @@ type ResizeToolSectionProps = {
   imageSizeDraft: SizeDraft;
   imageSizeLocked: boolean;
   imageSizeText: string;
+  initialMode: ResizeToolMode;
   setCanvasSizeDraft: React.Dispatch<React.SetStateAction<SizeDraft>>;
   setCanvasSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setImageSizeDraft: React.Dispatch<React.SetStateAction<SizeDraft>>;
@@ -74,13 +75,39 @@ function isSameSize(left: SizeDraft, right: SizeDraft | null): boolean {
   return Boolean(right && left.width === right.width && left.height === right.height);
 }
 
+function isValidSize(size: SizeDraft): boolean {
+  return (
+    Number.isInteger(size.width) &&
+    Number.isInteger(size.height) &&
+    size.width > 0 &&
+    size.height > 0
+  );
+}
+
+function parseSizeText(value: string): SizeDraft | null {
+  const match = value.match(/^\s*(\d+)\s*[×x]\s*(\d+)\s*$/u);
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) {
-  const [mode, setMode] = useState<ResizeToolMode>('canvas');
+  const [mode, setMode] = useState<ResizeToolMode>(props.initialMode);
   const isCanvasMode = mode === 'canvas';
   const active = selectActiveResizeState(props, mode);
   const canvasSizeMatchesDraft = isSameSize(props.canvasSizeDraft, props.canvasSize);
+  const imageSizeMatchesDraft = isSameSize(
+    props.imageSizeDraft,
+    parseSizeText(props.imageSizeText)
+  );
   const cropSelectionMatchesDraft = isSameSize(props.canvasSizeDraft, props.cropSelection ?? null);
-  const applyDisabled = mode === 'canvas' && canvasSizeMatchesDraft;
+  const activeSizeIsValid = isValidSize(active.draft);
+  const applyDisabled =
+    !activeSizeIsValid ||
+    (mode === 'canvas' ? canvasSizeMatchesDraft && !props.cropReady : imageSizeMatchesDraft);
+
+  useEffect(() => {
+    setMode(props.initialMode);
+  }, [props.initialMode]);
 
   useCanvasResizePreview({
     canvasSizeDraft: props.canvasSizeDraft,
@@ -99,6 +126,11 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
         isCanvasMode={isCanvasMode}
         updateLockedDraft={props.updateLockedDraft}
       />
+      {!activeSizeIsValid ? (
+        <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
+          {translate('editor.compact.invalidImageDimensions')}
+        </p>
+      ) : null}
       <button
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}

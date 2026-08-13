@@ -24,12 +24,18 @@ type ToolbarActionArgs = {
   setInspector: (inspector: ToolbarInspector | 'tool') => void;
 };
 
-function prepareToolAction(args: ToolbarActionArgs, options?: { preserveSelection?: boolean }) {
+function prepareToolAction(
+  args: ToolbarActionArgs,
+  options?: { preserveCropMode?: boolean; preserveSelection?: boolean }
+) {
   if (!args.hasImage) {
     return false;
   }
 
   closeLayerEffectsBeforeToolbarAction(args);
+  if (args.inspector === 'canvas-size' && !options?.preserveCropMode) {
+    args.controller.cancelCropMode();
+  }
   if (!options?.preserveSelection) {
     args.controller.clearSelection();
   }
@@ -45,17 +51,25 @@ function activateSelectInspector(
   args.setInspector(nextInspector);
 }
 
-function toggleResizeInspector(args: ToolbarActionArgs) {
-  if (args.inspector === 'canvas-size' || args.inspector === 'image-size') {
+function toggleResizeInspector(
+  args: ToolbarActionArgs,
+  nextInspector: Extract<ToolbarInspector, 'canvas-size' | 'image-size'>
+) {
+  if (args.inspector === nextInspector) {
     args.controller.cancelCropMode();
     args.setActiveTool('select');
     args.setInspector('tool');
     return;
   }
 
-  args.setActiveTool('crop');
-  args.controller.setActiveTool('crop');
-  args.setInspector('canvas-size');
+  if (args.inspector === 'canvas-size' || args.inspector === 'image-size') {
+    args.controller.cancelCropMode();
+  }
+
+  const nextTool = nextInspector === 'canvas-size' ? 'crop' : 'select';
+  args.setActiveTool(nextTool);
+  args.controller.setActiveTool(nextTool);
+  args.setInspector(nextInspector);
 }
 
 function toggleFileInspector(args: ToolbarActionArgs) {
@@ -84,7 +98,8 @@ export function createEditorToolbarActions(args: ToolbarActionArgs) {
     },
 
     toggleInspector(value: ToolbarInspector) {
-      if (!prepareToolAction(args)) {
+      const resizeInspector = value === 'canvas-size' || value === 'image-size';
+      if (!prepareToolAction(args, { preserveCropMode: resizeInspector })) {
         return;
       }
 
@@ -93,8 +108,8 @@ export function createEditorToolbarActions(args: ToolbarActionArgs) {
         return;
       }
 
-      if (value === 'canvas-size' || value === 'image-size') {
-        toggleResizeInspector(args);
+      if (resizeInspector) {
+        toggleResizeInspector(args, value);
         return;
       }
 

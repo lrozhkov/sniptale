@@ -89,6 +89,10 @@ vi.mock('./background', () => ({
   },
 }));
 
+vi.mock('./background/blur', () => ({
+  EditorInspectorBackgroundBlurControl: () => <div data-testid="background-blur-section" />,
+}));
+
 vi.mock('./preview/card', () => ({
   EditorInspectorFramePreviewCard: (props: { backgroundPreviewStyle: Record<string, unknown> }) => (
     <div data-testid="frame-preview">
@@ -220,6 +224,7 @@ function expectPanelSectionOrder() {
     'background-section',
     'frame-preview',
     'background-fill-section',
+    'background-blur-section',
     'placement-section',
     'padding-section',
     'apply-button',
@@ -232,6 +237,7 @@ function expectFramePanelSections() {
   expect(container?.querySelector('[data-testid="background-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="frame-preview"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="background-blur-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
   expect(container?.textContent).not.toContain('Основное изображение');

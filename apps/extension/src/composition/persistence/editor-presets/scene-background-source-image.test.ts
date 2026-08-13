@@ -21,3 +21,20 @@ it('falls back scene source image and omitted optional scene fields to defaults'
     })
   );
 });
+
+it('defaults legacy blur and rejects explicitly invalid blur values', () => {
+  const base = {
+    backgroundColor: '#ffffff',
+    backgroundGradientAngle: 90,
+    backgroundGradientFrom: '#000000',
+    backgroundGradientTo: '#ffffff',
+    backgroundMode: 'color',
+  };
+  expect(parseSceneBackgroundSettings(base)).toMatchObject({ backgroundBlurAmount: 0 });
+  expect(parseSceneBackgroundSettings({ ...base, backgroundBlurAmount: 25 })).toMatchObject({
+    backgroundBlurAmount: 25,
+  });
+  for (const backgroundBlurAmount of [-1, 26, Number.NaN, '4']) {
+    expect(parseSceneBackgroundSettings({ ...base, backgroundBlurAmount })).toBeNull();
+  }
+});

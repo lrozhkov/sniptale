@@ -7,6 +7,7 @@ import { applyEditorDrawingInteractionControls } from '../../drawing/object/cont
 import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
 import type { completeEditorDrawSession } from '../transient';
 import type { DrawWorkflowState } from './completion-types';
+import { beginEditorTextboxEditing } from '../document/objects/textbox-lifecycle';
 
 export function createCompletedDrawWorkflowState(
   canvas: Canvas,
@@ -29,8 +30,8 @@ export function createCompletedDrawWorkflowState(
     canvas.setActiveObject(completion.object);
   }
   if (completion.completedTool === 'text' && isTextbox(completion.object)) {
+    beginEditorTextboxEditing(completion.object);
     completion.object.enterEditing();
-    completion.object.selectAll();
   }
   canvas.requestRenderAll();
   if (completion.completedTool !== 'text') {

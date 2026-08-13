@@ -134,8 +134,8 @@ export const editorCompactSceneMessages = defineMessageSource({
     en: 'Page title',
   },
   urlMockup: {
-    ru: 'URL mockup',
-    en: 'URL mockup',
+    ru: 'Адрес страницы',
+    en: 'Page address',
   },
   urlPlaceholder: {
     ru: 'https://example.com',
@@ -144,6 +144,22 @@ export const editorCompactSceneMessages = defineMessageSource({
   pageUrl: {
     ru: 'URL страницы',
     en: 'Page URL',
+  },
+  browserFrameSettings: {
+    ru: 'Содержимое окна',
+    en: 'Window content',
+  },
+  browserFrameLayout: {
+    ru: 'Размещение изображения',
+    en: 'Image placement',
+  },
+  browserFrameUrlTooLong: {
+    ru: 'Адрес страницы не должен превышать 2048 символов.',
+    en: 'The page address must be 2,048 characters or fewer.',
+  },
+  browserFrameApplyFailed: {
+    ru: 'Не удалось применить окно браузера. Проверьте настройки и повторите попытку.',
+    en: 'Could not apply the browser window. Check the settings and try again.',
   },
   dateTime: {
     ru: 'Дата и время',

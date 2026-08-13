@@ -31,6 +31,7 @@ function pickComparableSceneBackgroundSettings(frame: ComparableSceneBackgroundS
     paddingBottom: normalizedFrame.paddingBottom,
     paddingLeft: normalizedFrame.paddingLeft,
     backgroundMode: normalizedFrame.backgroundMode,
+    backgroundBlurAmount: normalizedFrame.backgroundBlurAmount,
     backgroundColor: normalizedFrame.backgroundColor,
     backgroundGradientFrom: normalizedFrame.backgroundGradientFrom,
     backgroundGradientTo: normalizedFrame.backgroundGradientTo,

@@ -140,6 +140,9 @@ it('builds frame-surface commands with explicit icons and routes background acti
   const backgroundEditorProps = (
     (commands[0]?.content as any).props.children.props.children[1] as any
   ).props;
+  const backgroundBlurProps = (
+    (commands[0]?.content as any).props.children.props.children[2] as any
+  ).props;
   const paddingFieldsProps = ((commands[1]?.content as any).props.children as any).props;
 
   expect(commands.map((command) => command.icon)).toEqual(['color', 'size', undefined]);
@@ -151,6 +154,9 @@ it('builds frame-surface commands with explicit icons and routes background acti
   (backgroundEditorProps.applyFramePatch as (patch: unknown) => void)({ padding: 24 });
   (backgroundEditorProps.onPickBackgroundImage as () => void)();
   (backgroundEditorProps.onClearBackgroundImage as () => void)();
+  (backgroundBlurProps.applyFramePatch as (patch: unknown) => void)({
+    backgroundBlurAmount: 12,
+  });
   (paddingFieldsProps.setFrameDraft as typeof params.setFrameDraft)(
     (state: typeof params.frameDraft) => ({
       ...state,
@@ -160,7 +166,7 @@ it('builds frame-surface commands with explicit icons and routes background acti
   commands[2]?.onClick?.();
 
   expect(params.applyGradientPreset).toHaveBeenCalledWith({ angle: 180 });
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(3);
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(4);
   expect(params.onPickBackgroundImage).toHaveBeenCalledTimes(1);
   expect(params.clearBackgroundImage).toHaveBeenCalledTimes(1);
   expect(params.onApplyFrame).toHaveBeenCalledTimes(1);

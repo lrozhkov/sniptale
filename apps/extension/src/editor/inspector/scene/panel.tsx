@@ -6,6 +6,7 @@ import { FramePaddingSection } from './padding';
 import { FrameApplyButton } from './apply-button';
 import { EditorInspectorFramePreviewCard } from './preview/card';
 import type { EditorInspectorFramePanelProps } from './types';
+import { EditorInspectorBackgroundBlurControl } from './background/blur';
 
 function createFramePanelControls(props: EditorInspectorFramePanelProps) {
   return [
@@ -32,6 +33,11 @@ function createFramePanelControls(props: EditorInspectorFramePanelProps) {
       previewFramePatch={props.previewFramePatch}
       recentColors={props.recentColors}
       toNumber={props.toNumber}
+    />,
+    <EditorInspectorBackgroundBlurControl
+      key="background-blur"
+      frameDraft={props.frameDraft}
+      applyFramePatch={props.applyFramePatch}
     />,
     <EditorInspectorFramePlacementSection
       key="placement"

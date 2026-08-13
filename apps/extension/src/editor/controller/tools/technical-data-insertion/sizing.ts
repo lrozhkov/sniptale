@@ -1,4 +1,3 @@
-import type { Textbox } from 'fabric';
 import {
   resolveDrawingTextFontFamily,
   type DrawingToolDefaults,
@@ -23,7 +22,7 @@ function measureTechnicalDataRowTextWidth(
   return Math.ceil(context.measureText(text).width) + 2;
 }
 
-function getTechnicalDataTextWidth(
+export function getTechnicalDataTextWidth(
   text: string,
   layout: EditorTechnicalDataLayout,
   textSettings: DrawingToolDefaults['text']
@@ -34,14 +33,4 @@ function getTechnicalDataTextWidth(
   const measuredWidth = measureTechnicalDataRowTextWidth(text, textSettings);
   const fallbackWidth = Math.ceil(text.length * Math.max(10, textSettings.fontSize * 0.72));
   return Math.max(360, measuredWidth ?? fallbackWidth);
-}
-
-export function resizeTechnicalDataTextObject(
-  text: Textbox,
-  content: string,
-  layout: EditorTechnicalDataLayout,
-  textSettings: DrawingToolDefaults['text']
-): void {
-  const width = getTechnicalDataTextWidth(content, layout, textSettings);
-  text.set({ width });
 }

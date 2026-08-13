@@ -16,6 +16,7 @@ function createKeyboardOptions(
     hasRasterSelection: false,
     hasSelection: false,
     isEditingTextboxSelection: false,
+    isEditingTextboxInput: false,
     key: 'z',
     metaKey: false,
     shiftKey: false,
@@ -40,6 +41,86 @@ function runEditorControllerKeyboardGuardSuite() {
         })
       )
     ).toBe('ignore');
+    expect(
+      resolveEditorKeyboardAction(
+        createKeyboardOptions({
+          code: 'Enter',
+          isEditingTextboxInput: true,
+          isEditingTextboxSelection: true,
+          key: 'Enter',
+          targetIsInteractive: true,
+        })
+      )
+    ).toBe('exit-text-edit');
+  });
+
+  it('leaves native typing keys with Fabric while a textbox is editing', () => {
+    const base = {
+      isEditingTextboxInput: true,
+      isEditingTextboxSelection: true,
+      targetIsInteractive: true,
+    };
+    const cases = [
+      { code: 'Space', key: ' ' },
+      { code: 'Backspace', hasSelection: true, key: 'Backspace' },
+      { code: 'Delete', hasSelection: true, key: 'Delete' },
+      { code: 'KeyZ', ctrlKey: true, key: 'z' },
+      { code: 'KeyD', ctrlKey: true, hasSelection: true, key: 'd' },
+    ];
+
+    cases.forEach((overrides) => {
+      expect(resolveEditorKeyboardAction(createKeyboardOptions({ ...base, ...overrides }))).toBe(
+        'ignore'
+      );
+    });
+  });
+
+  it('commits only plain Enter while textbox editing owns the keyboard', () => {
+    const base = {
+      code: 'Enter',
+      isEditingTextboxSelection: true,
+      isEditingTextboxInput: true,
+      key: 'Enter',
+      targetIsInteractive: true,
+    };
+    expect(resolveEditorKeyboardAction(createKeyboardOptions(base))).toBe('exit-text-edit');
+
+    const ignored = [
+      { shiftKey: true },
+      { isComposing: true },
+      { ctrlKey: true },
+      { metaKey: true },
+      { altKey: true },
+      { hasDrawSession: true, shiftKey: true },
+    ];
+    ignored.forEach((overrides) => {
+      expect(resolveEditorKeyboardAction(createKeyboardOptions({ ...base, ...overrides }))).toBe(
+        'ignore'
+      );
+    });
+
+    expect(
+      resolveEditorKeyboardAction(createKeyboardOptions({ ...base, hasDrawSession: true }))
+    ).toBe('exit-text-edit');
+  });
+
+  it('ignores stale textbox editing state when the event is not from its hidden textarea', () => {
+    const base = {
+      isEditingTextboxInput: false,
+      isEditingTextboxSelection: true,
+      targetIsInteractive: false,
+    };
+    const cases = [
+      { code: 'Enter', key: 'Enter' },
+      { code: 'Escape', key: 'Escape' },
+      { code: 'KeyB', ctrlKey: true, key: 'b' },
+    ];
+
+    cases.forEach((overrides) => {
+      expect(resolveEditorKeyboardAction(createKeyboardOptions({ ...base, ...overrides }))).toBe(
+        'ignore'
+      );
+    });
   });
 }
 
@@ -62,6 +143,7 @@ it('resolves and guards text style shortcuts', () => {
       {
         code: 'KeyB',
         ctrlKey: true,
+        isEditingTextboxInput: true,
         isEditingTextboxSelection: true,
         key: 'b',
         targetIsInteractive: true,
@@ -84,7 +166,12 @@ it('resolves and guards text style shortcuts', () => {
   ).toBe('ignore');
   expect(
     resolveEditorKeyboardAction(
-      createKeyboardOptions({ altKey: true, ctrlKey: true, isEditingTextboxSelection: true })
+      createKeyboardOptions({
+        altKey: true,
+        ctrlKey: true,
+        isEditingTextboxInput: true,
+        isEditingTextboxSelection: true,
+      })
     )
   ).toBe('ignore');
   expect(
@@ -108,9 +195,14 @@ function registerSelectionShortcutTest() {
     ).toBe('duplicate-selection');
     expect(
       resolveEditorKeyboardAction(
-        createKeyboardOptions({ code: 'Escape', isEditingTextboxSelection: true, key: 'Escape' })
+        createKeyboardOptions({
+          code: 'Escape',
+          isEditingTextboxInput: true,
+          isEditingTextboxSelection: true,
+          key: 'Escape',
+        })
       )
-    ).toBe('exit-text-edit');
+    ).toBe('cancel-text-edit');
     expect(
       resolveEditorKeyboardAction(createKeyboardOptions({ code: 'Escape', key: 'Escape' }))
     ).toBe('cancel-transient');

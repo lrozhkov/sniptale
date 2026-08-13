@@ -55,7 +55,7 @@ function getCheckboxes() {
 
 function getAddButton() {
   return Array.from(container?.querySelectorAll('button') ?? []).find(
-    (button) => button.textContent === 'common.actions.add'
+    (button) => button.textContent === 'editor.compact.technicalDataInsert'
   );
 }
 
@@ -84,12 +84,16 @@ describe('meta panel content', () => {
     expect(container?.textContent).not.toContain('editor.compact.technicalDataDescription');
     expect(getExactTextNodeCount('editor.compact.technicalData')).toBe(0);
     expect(container?.textContent).toContain('editor.compact.technicalDataLayoutColumn');
+    expect(container?.textContent).toContain('editor.compact.technicalDataPreviewEmpty');
     expect(addButton?.hasAttribute('disabled')).toBe(true);
     expectTechnicalDataRowsToBeFlat(checkboxes);
 
     selectTechnicalDataInColumnOrder(checkboxes);
 
     expect(addButton?.hasAttribute('disabled')).toBe(false);
+    expect(container?.textContent).toContain('editor.compact.pageUrl');
+    expect(container?.textContent).toContain('editor.compact.dateTime');
+    expect(container?.textContent).toContain('editor.compact.browser');
 
     addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -107,10 +111,15 @@ describe('meta panel content', () => {
       layoutToggle?.click();
       checkboxes[0]?.click();
       checkboxes[2]?.click();
-      addButton?.click();
     });
 
     expect(container?.textContent).toContain('editor.compact.technicalDataLayoutRow');
+    expect(container?.textContent).toContain('·');
+
+    act(() => {
+      addButton?.click();
+    });
+
     expect(insertMetaStampMock).toHaveBeenCalledWith(['url', 'browser'], 'row');
   });
 });

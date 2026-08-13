@@ -1,5 +1,7 @@
-import { Check, ClipboardCopy, Download, FileCheck2, Save, X } from 'lucide-react';
+import { Check, ClipboardCopy, Download, FileCheck2, FolderInput, Save, X } from 'lucide-react';
+import { useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
@@ -11,6 +13,8 @@ import type {
   EditorFloatingDocumentBarProps,
   EditorFloatingDocumentController,
 } from './document-bar-types';
+import { EditorSaveToFolderDialog } from './save-to-folder-dialog';
+import { useEditorStore } from '../../state/useEditorStore';
 
 const QUICK_ACTION_BUTTON_CLASS_NAME = 'max-[720px]:!hidden';
 const COPY_FEEDBACK_BUTTON_CLASS_NAME = [
@@ -37,7 +41,7 @@ function useQuickActionState(
     hasImage &&
     !documentController.copyRenderedImageDisabledReason &&
     exportSettings.isClipboardCopySupported;
-  return { canCopy, copyStatus, runActionFeedback };
+  return { canCopy, copyStatus, imageFormat: exportSettings.imageFormat, runActionFeedback };
 }
 
 export function EditorFloatingDocumentQuickActions({
@@ -51,6 +55,10 @@ export function EditorFloatingDocumentQuickActions({
   const controller = useEditorController();
   const embed = useEditorEmbedContext();
   const actionState = useQuickActionState(documentController, hasImage);
+  const pageTitle = useEditorStore((state) => state.pageTitle);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const standalone = embed.mode !== 'scenario';
+  const defaultFilename = `${pageTitle.trim() || 'edited'}.${actionState.imageFormat}`;
 
   return (
     <>
@@ -59,12 +67,43 @@ export function EditorFloatingDocumentQuickActions({
         documentController={documentController}
         hasImage={hasImage}
       />
+      {standalone && documentController.savePresets.length > 0 ? (
+        <ContentToolbarButton
+          title={translate('editor.documentActions.saveToFolder')}
+          disabled={!hasImage}
+          className={QUICK_ACTION_BUTTON_CLASS_NAME}
+          onClick={() => setSaveDialogOpen(true)}
+          dataUi="editor.floating.document-bar.save-to-folder-button"
+        >
+          <FolderInput size={18} strokeWidth={2} />
+        </ContentToolbarButton>
+      ) : null}
+      {standalone ? (
+        <>
+          <FloatingChromeDivider vertical className={QUICK_ACTION_BUTTON_CLASS_NAME} />
+          <ContentToolbarButton
+            title={translate('editor.documentActions.closeFile')}
+            disabled={!hasImage}
+            onClick={documentController.onCloseDocument}
+            dataUi="editor.floating.document-bar.close-file-button"
+          >
+            <X size={18} strokeWidth={2} />
+          </ContentToolbarButton>
+        </>
+      ) : null}
       <ScenarioQuickActions
         controller={controller}
         embed={embed}
         hasImage={hasImage}
         onBeforeSelectionAwareAction={onBeforeSelectionAwareAction}
       />
+      {saveDialogOpen ? (
+        <EditorSaveToFolderDialog
+          controller={documentController}
+          defaultFilename={defaultFilename}
+          onClose={() => setSaveDialogOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -159,7 +198,7 @@ function ScenarioQuickActions(props: {
       ) : null}
       {embed.mode === 'scenario' && embed.onClose ? (
         <ContentToolbarButton
-          title={translate('common.actions.close')}
+          title={translate('editor.documentActions.returnToScenario')}
           onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
           dataUi="editor.floating.document-bar.close-scenario-button"
         >
