@@ -132,8 +132,11 @@ it('does not let a large title font impose the input default character width on 
   expect(title?.style.minWidth).toBe('0');
   expect(titleShell?.style.fontSize).toBe('72px');
   expect(titleShell?.style.textTransform).toBe('uppercase');
-  expect(props.containerRef.current?.style.filter).toBe('drop-shadow(0 2px 3px #000)');
-  expect(props.containerRef.current?.style.boxShadow).toBe('inset 0 1px 0 #ffffff59');
+  expect(props.containerRef.current?.style.filter).toBe('');
+  expect(props.containerRef.current?.style.boxShadow).toBe('');
+  expect(
+    document.querySelector<HTMLElement>('[data-ui="content.callout.surface-effects"]')?.style.filter
+  ).toBe('drop-shadow(0 2px 3px #000)');
   expect(props.contentEditableRef.current?.style.letterSpacing).toBe('1px');
   const titleMeasure = document.querySelector<HTMLElement>('[data-sniptale-callout-title-measure]');
   expect(titleMeasure?.textContent).toBe('MARKWide heading');
@@ -144,18 +147,6 @@ it('does not let a large title font impose the input default character width on 
     titleMeasure?.querySelector('[data-sniptale-callout-badge-measure="true"]')?.textContent
   ).toBe('MARK');
   expect(document.querySelectorAll('[data-ui="content.callout.badge"]')).toHaveLength(1);
-
-  act(() =>
-    root.render(
-      <CalloutBody
-        {...props}
-        cloudStyle={{ boxShadow: '0 4px 12px #00000080, inset 0 1px 0 #ffffff59' }}
-      />
-    )
-  );
-  expect(props.containerRef.current?.style.boxShadow).toBe(
-    '0 4px 12px #00000080, inset 0 1px 0 #ffffff59'
-  );
 
   const wedge = getDynamicTailState({
     bubbleRect: { x: 20, y: 20, width: 240, height: 120 },
@@ -172,18 +163,16 @@ it('does not let a large title font impose the input default character width on 
     )
   );
   expect(props.containerRef.current?.style.backgroundColor).toBe('transparent');
-  expect(props.containerRef.current?.style.backgroundImage).toBe('none');
-  expect(props.containerRef.current?.style.backdropFilter).toBe('none');
+  expect(props.containerRef.current?.style.backgroundImage).toBe('');
+  expect(props.containerRef.current?.style.backdropFilter).toBeUndefined();
   expect(props.containerRef.current?.style.borderColor).toBe('transparent');
-  expect(props.containerRef.current?.style.boxShadow).toBe('none');
-  expect(props.containerRef.current?.style.filter).toBe('none');
-  expect(props.wrapperRef.current?.style.filter).toBe('drop-shadow(0 2px 3px #000)');
-  const unifiedSurface = document.querySelector<HTMLElement>(
-    '[data-ui="content.callout.unified-surface"]'
-  );
-  expect(unifiedSurface?.style.background).not.toBe('');
-  expect(unifiedSurface?.style.backgroundColor).not.toBe('transparent');
-  expect(unifiedSurface?.style.boxShadow).toBe('inset 0 1px 0 #ffffff59');
+  expect(props.containerRef.current?.style.boxShadow).toBe('');
+  expect(props.containerRef.current?.style.filter).toBe('');
+  expect(props.wrapperRef.current?.style.filter).toBe('');
+  expect(document.querySelector('[data-ui="content.callout.surface-compositor"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.surface-paint"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.surface-contour"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.unified-surface"]')).toBeNull();
 
   act(() =>
     root.render(

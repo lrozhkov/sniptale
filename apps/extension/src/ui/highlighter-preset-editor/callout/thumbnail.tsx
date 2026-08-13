@@ -1,5 +1,4 @@
-import { useId, type CSSProperties, type ReactNode } from 'react';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { useId, type ReactNode } from 'react';
 import type {
   CalloutPreset,
   CalloutConnectorMarker,
@@ -13,7 +12,12 @@ import {
   resolveCalloutCustomCss,
   type ResolvedCalloutCustomCss,
 } from '../../../features/highlighter/callout-custom-css';
-import { projectCalloutCardStyle } from '../../../features/highlighter/surface-style/card-projection';
+import { resolveCalloutSurfaceProjection } from '../../../features/highlighter/surface-style/card-projection';
+import {
+  CalloutSurfaceCompositor,
+  type CalloutSurfaceGeometry,
+} from '../../../features/highlighter/frame-annotation/callout/surface-compositor';
+import { resolveFrameCalloutFontFamily } from '../../../features/highlighter/frame-annotation/callout/font-family';
 
 const TARGET_COLOR = 'var(--sniptale-color-text-tertiary, #94a3b8)';
 
@@ -98,18 +102,7 @@ function CalloutPreviewConnector(props: {
 }) {
   const { style } = props;
   const connector = style.connector;
-  if (connector.kind === 'none') return null;
-
-  if (connector.kind === 'wedge') {
-    return (
-      <path
-        d="M 50 19 L 50 28 L 29 35 Z"
-        data-ui="shared.callout-preview.connector"
-        fill={getRepresentativeColor(style.surface.fillPaint)}
-        style={props.customStyles.connector}
-      />
-    );
-  }
+  if (connector.kind === 'none' || connector.kind === 'wedge') return null;
 
   const path =
     connector.routing === 'elbow'
@@ -160,13 +153,34 @@ function CalloutPreviewConnector(props: {
 
 function getWedgeOutlinePath(radius: number) {
   return [
-    'M 50 19 L 29 35 L 50 28',
-    `L 50 ${33 - radius} Q 50 33 ${50 + radius} 33`,
-    `L ${93 - radius} 33 Q 93 33 93 ${33 - radius}`,
-    `L 93 ${4 + radius} Q 93 4 ${93 - radius} 4`,
-    `L ${50 + radius} 4 Q 50 4 50 ${4 + radius}`,
-    'L 50 19 Z',
+    'M 21 15 L 0 31 L 21 24',
+    `L 21 ${29 - radius} Q 21 29 ${21 + radius} 29`,
+    `L ${64 - radius} 29 Q 64 29 64 ${29 - radius}`,
+    `L 64 ${radius} Q 64 0 ${64 - radius} 0`,
+    `L ${21 + radius} 0 Q 21 0 21 ${radius}`,
+    'L 21 15 Z',
   ].join(' ');
+}
+
+function getPreviewSurfaceGeometry(hasWedge: boolean, radius: number): CalloutSurfaceGeometry {
+  if (hasWedge) {
+    const outlinePath = getWedgeOutlinePath(radius);
+    return {
+      bounds: { x: 29, y: 4, width: 64, height: 31 },
+      clipPath: `path("${outlinePath}")`,
+      contentRect: { x: 21, y: 0, width: 43, height: 29 },
+      kind: 'wedge',
+      outlinePath,
+      radius,
+    };
+  }
+  return {
+    bounds: { x: 50, y: 4, width: 43, height: 29 },
+    clipPath: `inset(0 round ${radius}px)`,
+    contentRect: { x: 0, y: 0, width: 43, height: 29 },
+    kind: 'rect',
+    radius,
+  };
 }
 
 function CalloutPreviewAccent(props: {
@@ -212,33 +226,50 @@ function CalloutPreviewCard(props: {
   const { style } = props;
   const surface = style.surface;
   const radius = Math.min(Math.max(surface.radius / 3, 1), 9);
-  const previewBorderWidth = Math.min(surface.borderWidth, 2);
-  const hasWedgeOutline = style.connector.kind === 'wedge' && previewBorderWidth > 0;
+  const hasWedge = style.connector.kind === 'wedge';
   const badge = style.badge;
   const badgeSize = Math.min(7, Math.max(4, badge.size * 0.28));
-  const cardStyle = projectCalloutCardStyle(style);
+  const projection = resolveCalloutSurfaceProjection(style);
+  const geometry = getPreviewSurfaceGeometry(hasWedge, radius);
   return (
     <>
       <foreignObject
-        height="29"
-        width="43"
-        x="50"
-        y="4"
+        height="52"
+        width="96"
+        x="0"
+        y="0"
         data-ui="shared.callout-preview.surface-html"
       >
+        <div style={{ height: 52, position: 'relative', width: 96 }}>
+          <CalloutSurfaceCompositor
+            connector={null}
+            cssContext={{
+              color: projection.contentStyle.color,
+              fontFamily: resolveFrameCalloutFontFamily(style.typography.fontFamily),
+              fontSize: style.typography.fontSize,
+              fontStyle: style.typography.fontStyle,
+              fontWeight: style.typography.fontWeight,
+              letterSpacing: style.typography.letterSpacing,
+              lineHeight: style.typography.lineHeight,
+            }}
+            dimensions={{ width: 43, height: 29 }}
+            geometry={geometry}
+            projection={projection}
+            visualScale={1 / 3}
+          />
+        </div>
+      </foreignObject>
+      <foreignObject height="29" width="43" x="50" y="4">
         <div
-          style={
-            {
-              ...cardStyle,
-              borderRadius: radius,
-              borderWidth: hasWedgeOutline ? 0 : previewBorderWidth,
-              boxSizing: 'border-box',
-              height: '29px',
-              overflow: 'hidden',
-              padding: '4px 6px',
-              width: '43px',
-            } as CSSProperties
-          }
+          style={{
+            boxSizing: 'border-box',
+            color: projection.contentStyle.color,
+            height: '29px',
+            overflow: 'hidden',
+            padding: '4px 6px',
+            textShadow: projection.contentStyle.textShadow,
+            width: '43px',
+          }}
         >
           {style.title.enabled ? (
             <div
@@ -277,7 +308,7 @@ function CalloutPreviewCard(props: {
           ) : null}
           <div
             style={{
-              color: surface.textColor,
+              color: projection.contentStyle.color,
               fontSize: 4,
               lineHeight: '5px',
               opacity: 0.76,
@@ -301,17 +332,6 @@ function CalloutPreviewCard(props: {
           </div>
         </div>
       </foreignObject>
-      {hasWedgeOutline ? (
-        <path
-          d={getWedgeOutlinePath(radius)}
-          data-ui="shared.callout-preview.outline"
-          fill="none"
-          stroke={surface.borderColor}
-          strokeDasharray={getCalloutStrokeDasharray(surface.borderStyle, previewBorderWidth)}
-          strokeLinejoin="round"
-          strokeWidth={previewBorderWidth}
-        />
-      ) : null}
       <CalloutPreviewAccent
         clipPathId={`${props.clipPathId}-accent`}
         customStyles={props.customStyles}

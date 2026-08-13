@@ -30,6 +30,6 @@ it('collapses a wedge that would turn back into an overlapping bubble', () => {
 
   expect(layout.calloutPos).toEqual({ x: 173, y: 136 });
   expect(layout.dynamicTail).toBeNull();
-  expect(layout.cloudStyle.background).toBe('#2b3038ff');
-  expect(layout.cloudStyle.border).toBe('4px solid #3388ff');
+  expect(layout.cloudStyle.background).toBe('transparent');
+  expect(layout.cloudStyle.border).toBe('4px solid transparent');
 });

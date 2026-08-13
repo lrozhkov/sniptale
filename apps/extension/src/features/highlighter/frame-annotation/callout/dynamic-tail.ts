@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { getCalloutTailMetrics } from './tail';
 import { CALLOUT_GAP } from './constants';
 import {
@@ -483,12 +482,14 @@ export function getDynamicTailState(args: {
     tipPoint: Point;
     tipVertex: Point;
   };
+  geometry: {
+    bounds: Rect;
+    contentRect: Rect;
+  };
   kind: 'wedge';
   outlinePath: string;
   path: string;
   side: ConnectorSide;
-  style: CSSProperties;
-  viewBox: string;
 } {
   const side = resolveConnectorSide(
     args.frameRect,
@@ -516,6 +517,20 @@ export function getDynamicTailState(args: {
       tipPoint: points.tipPoint,
       tipVertex: points.tipVertex,
     },
+    geometry: {
+      bounds: {
+        x: geometry.left - args.bubbleRect.x,
+        y: geometry.top - args.bubbleRect.y,
+        width,
+        height,
+      },
+      contentRect: {
+        x: args.bubbleRect.x - geometry.left,
+        y: args.bubbleRect.y - geometry.top,
+        width: args.bubbleRect.width,
+        height: args.bubbleRect.height,
+      },
+    },
     outlinePath: [
       `M ${geometry.localBaseEdgeA.x} ${geometry.localBaseEdgeA.y}`,
       `L ${geometry.localTipA.x} ${geometry.localTipA.y}`,
@@ -540,16 +555,5 @@ export function getDynamicTailState(args: {
     ].join(' '),
     kind: 'wedge' as const,
     side,
-    style: {
-      position: 'absolute',
-      left: geometry.left - args.bubbleRect.x,
-      top: geometry.top - args.bubbleRect.y,
-      width,
-      height,
-      overflow: 'visible',
-      pointerEvents: 'none',
-      zIndex: 0,
-    },
-    viewBox: `0 0 ${width} ${height}`,
   };
 }

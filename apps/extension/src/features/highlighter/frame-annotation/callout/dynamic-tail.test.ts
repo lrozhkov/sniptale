@@ -49,6 +49,14 @@ describe('getDynamicTailState', () => {
         (state.outlinePath.match(/ A /g)?.length ?? 0)
     ).toBe(5);
     expect(state.outlinePath.endsWith('Z')).toBe(true);
+    expect(state.geometry.contentRect).toEqual({
+      x: -state.geometry.bounds.x,
+      y: -state.geometry.bounds.y,
+      width: 160,
+      height: 48,
+    });
+    expect(state.geometry.bounds.width).toBeGreaterThanOrEqual(160);
+    expect(state.geometry.bounds.height).toBeGreaterThan(48);
   });
 
   it.each([

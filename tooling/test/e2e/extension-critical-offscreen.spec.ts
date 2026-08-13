@@ -121,7 +121,8 @@ function createFrameRasterSnapshotFixture() {
   callout.style.surface.textColor = '#ef4444';
   callout.style.surface.fillPaint = { kind: 'solid', color: '#0f172acc' };
   callout.style.customCss = '[card]\nbackdrop-filter: blur(16px) saturate(1.2) brightness(1.04);';
-  callout.style.surface.shadow = 0;
+  callout.style.surface.shadow = 12;
+  callout.style.surface.shadowColor = '#00000066';
   callout.style.surface.borderColor = '#f97316';
   callout.style.surface.borderWidth = 1;
   callout.style.surface.paddingX = 12;
