@@ -240,6 +240,18 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Показывать форматы копирования названия страницы и ссылки.',
     en: 'Show title and page link copy formats.',
   },
+  contextMenuWindowResizeLabel: {
+    ru: 'Размер окна',
+    en: 'Window size',
+  },
+  contextMenuWindowResizeMenuLabel: {
+    ru: 'Изменить размер окна',
+    en: 'Resize window',
+  },
+  contextMenuWindowResizeDescription: {
+    ru: 'Менять размер окна браузера по включённым оконным шаблонам.',
+    en: 'Resize the browser window using enabled window presets.',
+  },
   contextMenuSettingsLabel: {
     ru: 'Настройки',
     en: 'Settings',

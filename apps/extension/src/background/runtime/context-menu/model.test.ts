@@ -10,6 +10,9 @@ import {
   CONTEXT_MENU_VIDEO_ID,
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  CONTEXT_MENU_WINDOW_RESIZE_ID,
+  buildContextMenuWindowResizePresetId,
+  parseContextMenuWindowResizePresetId,
 } from './constants';
 import {
   CONTEXT_MENU_PAGE_LINK_ID,
@@ -37,9 +40,47 @@ function createContextMenuSettings(
     showVideoEditor: true,
     showGallery: true,
     showPageLinkCopy: true,
+    showWindowResize: true,
     showSettings: true,
     ...overrides,
   };
+}
+
+const viewportPresets = [
+  {
+    kind: 'user' as const,
+    enabled: true,
+    height: 720,
+    id: 'window-hd',
+    name: 'Window HD',
+    order: 0,
+    target: 'window' as const,
+    width: 1280,
+  },
+  {
+    kind: 'user' as const,
+    enabled: false,
+    height: 900,
+    id: 'disabled-window',
+    name: 'Disabled window',
+    order: 1,
+    target: 'window' as const,
+    width: 1440,
+  },
+  {
+    kind: 'user' as const,
+    enabled: true,
+    height: 720,
+    id: 'viewport-hd',
+    name: 'Viewport HD',
+    order: 0,
+    target: 'viewport' as const,
+    width: 1280,
+  },
+];
+
+function buildDescriptors(settings = createContextMenuSettings()) {
+  return buildContextMenuDescriptors({ quickActions: [], settings, viewportPresets });
 }
 
 function createQuickAction(id: string, status = true): QuickAction {
@@ -60,13 +101,9 @@ function createTab(url: string): chrome.tabs.Tab {
 }
 
 function verifySettingsSeparatorPlacement() {
-  const withSettings = buildContextMenuDescriptors({
-    quickActions: [],
-    settings: createContextMenuSettings(),
-  });
-  const settingsOnly = buildContextMenuDescriptors({
-    quickActions: [],
-    settings: createContextMenuSettings({
+  const withSettings = buildDescriptors();
+  const settingsOnly = buildDescriptors(
+    createContextMenuSettings({
       showExport: false,
       showGallery: false,
       showPageLinkCopy: false,
@@ -74,8 +111,9 @@ function verifySettingsSeparatorPlacement() {
       showScreenshots: false,
       showVideo: false,
       showVideoEditor: false,
-    }),
-  });
+      showWindowResize: false,
+    })
+  );
 
   expect(withSettings.some((item) => item.id === CONTEXT_MENU_SETTINGS_SEPARATOR_ID)).toBe(true);
   expect(settingsOnly.some((item) => item.id === CONTEXT_MENU_SETTINGS_SEPARATOR_ID)).toBe(false);
@@ -86,6 +124,7 @@ function verifyQuickActionSubmenuFiltering() {
   const descriptors = buildContextMenuDescriptors({
     quickActions: [createQuickAction('enabled'), createQuickAction('disabled', false)],
     settings: createContextMenuSettings(),
+    viewportPresets,
   });
 
   expect(descriptors.some((item) => item.id === 'sniptale.screenshots.quick-actions')).toBe(false);
@@ -101,14 +140,10 @@ function verifyQuickActionSubmenuFiltering() {
 }
 
 function verifyPageLinkCopyDescriptors() {
-  const descriptors = buildContextMenuDescriptors({
-    quickActions: [],
-    settings: createContextMenuSettings(),
-  });
-  const disabledDescriptors = buildContextMenuDescriptors({
-    quickActions: [],
-    settings: createContextMenuSettings({ showPageLinkCopy: false }),
-  });
+  const descriptors = buildDescriptors();
+  const disabledDescriptors = buildDescriptors(
+    createContextMenuSettings({ showPageLinkCopy: false })
+  );
 
   expect(descriptors).toEqual(
     expect.arrayContaining([
@@ -137,6 +172,7 @@ function verifyDescriptorsOmitUndefinedFields() {
   const descriptors = buildContextMenuDescriptors({
     quickActions: [createQuickAction('enabled')],
     settings: createContextMenuSettings(),
+    viewportPresets,
   });
   const rootDescriptor = descriptors.find((item) => item.id === CONTEXT_MENU_ROOT_ID);
   const exportSeparatorDescriptor = descriptors.find(
@@ -206,9 +242,32 @@ function verifyVisibleItemDetection() {
         showSettings: false,
         showVideo: false,
         showVideoEditor: false,
+        showWindowResize: false,
       }),
+      viewportPresets,
     })
   ).toBe(false);
+}
+
+function verifyWindowResizeDescriptors() {
+  const descriptors = buildDescriptors();
+  const disabledDescriptors = buildDescriptors(
+    createContextMenuSettings({ showWindowResize: false })
+  );
+
+  expect(descriptors).toContainEqual({
+    id: CONTEXT_MENU_WINDOW_RESIZE_ID,
+    parentId: CONTEXT_MENU_ROOT_ID,
+    title: 'Изменить размер окна',
+  });
+  expect(descriptors).toContainEqual({
+    id: buildContextMenuWindowResizePresetId('window-hd'),
+    parentId: CONTEXT_MENU_WINDOW_RESIZE_ID,
+    title: 'Window HD · 1280 × 720',
+  });
+  expect(descriptors.some((item) => item.id.includes('viewport-hd'))).toBe(false);
+  expect(descriptors.some((item) => item.id.includes('disabled-window'))).toBe(false);
+  expect(disabledDescriptors.some((item) => item.id === CONTEXT_MENU_WINDOW_RESIZE_ID)).toBe(false);
 }
 
 describe('context menu model', () => {
@@ -221,6 +280,10 @@ describe('context menu model', () => {
     verifyQuickActionSubmenuFiltering
   );
   it('adds fixed page-link copy format descriptors when enabled', verifyPageLinkCopyDescriptors);
+  it(
+    'adds only enabled browser-window presets to the window-size submenu',
+    verifyWindowResizeDescriptors
+  );
   it(
     'omits undefined descriptor fields from root and separator entries',
     verifyDescriptorsOmitUndefinedFields
@@ -237,6 +300,14 @@ describe('context menu model', () => {
     'returns the shared menu contexts and only enabled quick actions',
     verifyContextMenuContextsAndQuickActionFiltering
   );
+  it('round-trips escaped window preset ids and rejects malformed ids', () => {
+    expect(
+      parseContextMenuWindowResizePresetId(buildContextMenuWindowResizePresetId('custom / size'))
+    ).toBe('custom / size');
+    expect(
+      parseContextMenuWindowResizePresetId('sniptale.window-resize.preset.%E0%A4%A')
+    ).toBeNull();
+  });
   it(
     'reports when there are no visible context menu items beyond the root',
     verifyVisibleItemDetection

@@ -98,6 +98,7 @@ function createSettings() {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     defaultExportPresetId: null,

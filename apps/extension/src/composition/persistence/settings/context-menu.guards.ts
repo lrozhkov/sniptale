@@ -13,6 +13,7 @@ const CONTEXT_MENU_BOOLEAN_FIELDS = [
   'showVideoEditor',
   'showGallery',
   'showPageLinkCopy',
+  'showWindowResize',
   'showSettings',
 ] as const;
 

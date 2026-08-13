@@ -33,6 +33,7 @@ describe('settings guards valid payload coverage', () => {
           showVideoEditor: false,
           showGallery: true,
           showPageLinkCopy: true,
+          showWindowResize: false,
           showSettings: false,
         },
         rawDiagnosticsEnabled: true,
@@ -57,6 +58,7 @@ describe('settings guards valid payload coverage', () => {
           showVideoEditor: false,
           showGallery: true,
           showPageLinkCopy: true,
+          showWindowResize: false,
           showSettings: false,
         },
         rawDiagnosticsEnabled: true,
@@ -84,6 +86,7 @@ describe('settings guards invalid payload coverage', () => {
         contextMenu: {
           enabled: 'yes',
           showScreenshots: true,
+          showWindowResize: 'sometimes',
         },
       })
     ).toMatchObject({

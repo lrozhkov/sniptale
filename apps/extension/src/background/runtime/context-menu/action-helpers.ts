@@ -32,6 +32,7 @@ import {
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  parseContextMenuWindowResizePresetId,
 } from './constants';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 import { isPageLinkContextMenuItem } from './page-link/constants';
@@ -217,6 +218,7 @@ export function isTabBoundContextMenuAction(menuId: string): boolean {
     menuId === CONTEXT_MENU_EXPORT_START_ID ||
     menuId === CONTEXT_MENU_EXPORT_COPY_JSON_ID ||
     menuId === CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID ||
+    parseContextMenuWindowResizePresetId(menuId) !== null ||
     isPageLinkContextMenuItem(menuId)
   );
 }

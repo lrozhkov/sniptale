@@ -72,6 +72,7 @@ function createSettings(): Settings {
       showGallery: true,
       showImageEditor: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showScreenshots: true,
       showSettings: true,
       showVideo: true,

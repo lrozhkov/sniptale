@@ -20,6 +20,7 @@ import {
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  parseContextMenuWindowResizePresetId,
 } from './constants';
 import { copyContextMenuPageLink } from './page-link/actions';
 import { parsePageLinkCopyFormat } from './page-link/constants';
@@ -34,6 +35,7 @@ import {
 } from './action-helpers';
 import { handleQuickAction } from '../../capture/routes';
 import type { ViewportOwnerState } from '../../routing-contracts/tab-mode-state';
+import { resizeBrowserWindowFromContextMenu } from './window-resize';
 
 const logger = createLogger({ namespace: 'BackgroundContextMenuActions' });
 
@@ -113,6 +115,12 @@ async function handlePageLinkContextMenuAction(
 async function handleTabBoundContextMenuAction(
   args: TabBoundContextMenuActionArgs
 ): Promise<boolean> {
+  const windowResizePresetId = parseContextMenuWindowResizePresetId(args.menuId);
+  if (windowResizePresetId) {
+    await resizeBrowserWindowFromContextMenu(args.tab.windowId, windowResizePresetId);
+    return true;
+  }
+
   if (await handlePageLinkContextMenuAction(args)) {
     return true;
   }

@@ -135,7 +135,11 @@ afterEach(() => {
 it('builds all context menu item options and persists context menu updates', async () => {
   await renderHarness();
 
-  expect(latestState?.contextMenuOptions).toHaveLength(8);
+  expect(latestState?.contextMenuOptions).toHaveLength(9);
+  expect(latestState?.contextMenuOptions).toContainEqual({
+    key: 'showWindowResize',
+    label: 'Размер окна',
+  });
 
   await act(async () => {
     await latestState?.updateContextMenu({ showSettings: false });

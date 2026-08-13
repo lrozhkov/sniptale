@@ -15,10 +15,12 @@ export const CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID = 'sniptale.export.copy-markdo
 export const CONTEXT_MENU_IMAGE_EDITOR_ID = 'sniptale.image-editor';
 export const CONTEXT_MENU_VIDEO_EDITOR_ID = 'sniptale.video-editor';
 export const CONTEXT_MENU_GALLERY_ID = 'sniptale.gallery';
+export const CONTEXT_MENU_WINDOW_RESIZE_ID = 'sniptale.window-resize';
 export const CONTEXT_MENU_SETTINGS_SEPARATOR_ID = 'sniptale.settings.separator';
 export const CONTEXT_MENU_SETTINGS_ID = 'sniptale.settings';
 
 const CONTEXT_MENU_QUICK_ACTION_PREFIX = 'sniptale.screenshots.quick-action.';
+const CONTEXT_MENU_WINDOW_RESIZE_PRESET_PREFIX = 'sniptale.window-resize.preset.';
 
 export function buildContextMenuQuickActionId(actionId: string): string {
   return `${CONTEXT_MENU_QUICK_ACTION_PREFIX}${actionId}`;
@@ -30,4 +32,23 @@ export function parseContextMenuQuickActionId(menuId: string): string | null {
   }
 
   return menuId.slice(CONTEXT_MENU_QUICK_ACTION_PREFIX.length) || null;
+}
+
+export function buildContextMenuWindowResizePresetId(presetId: string): string {
+  return `${CONTEXT_MENU_WINDOW_RESIZE_PRESET_PREFIX}${encodeURIComponent(presetId)}`;
+}
+
+export function parseContextMenuWindowResizePresetId(menuId: string): string | null {
+  if (!menuId.startsWith(CONTEXT_MENU_WINDOW_RESIZE_PRESET_PREFIX)) {
+    return null;
+  }
+
+  const encodedPresetId = menuId.slice(CONTEXT_MENU_WINDOW_RESIZE_PRESET_PREFIX.length);
+  if (!encodedPresetId) return null;
+
+  try {
+    return decodeURIComponent(encodedPresetId) || null;
+  } catch {
+    return null;
+  }
 }

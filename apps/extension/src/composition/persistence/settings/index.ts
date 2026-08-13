@@ -35,6 +35,7 @@ const DEFAULT_CONTEXT_MENU_SETTINGS: ContextMenuSettings = {
   showVideoEditor: true,
   showGallery: true,
   showPageLinkCopy: true,
+  showWindowResize: true,
   showSettings: true,
 };
 

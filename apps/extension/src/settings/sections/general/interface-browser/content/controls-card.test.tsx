@@ -59,6 +59,7 @@ function createState(overrides: Partial<AppearanceSectionState> = {}): Appearanc
       showGallery: true,
       showImageEditor: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showScreenshots: true,
       showSettings: true,
       showVideo: true,

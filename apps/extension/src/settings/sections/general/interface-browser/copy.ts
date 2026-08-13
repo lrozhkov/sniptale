@@ -85,6 +85,10 @@ export function buildAppearanceContextMenuOptions(locale: AppLocale): Array<{
       label: translate('settings.appearance.contextMenuPageLinkCopyLabel', locale),
     },
     {
+      key: 'showWindowResize',
+      label: translate('settings.appearance.contextMenuWindowResizeLabel', locale),
+    },
+    {
       key: 'showSettings',
       label: translate('settings.appearance.contextMenuSettingsLabel', locale),
     },

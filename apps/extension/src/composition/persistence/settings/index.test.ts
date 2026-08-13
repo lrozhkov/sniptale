@@ -51,6 +51,7 @@ const DEFAULT_CONTEXT_MENU = {
   showVideoEditor: true,
   showGallery: true,
   showPageLinkCopy: true,
+  showWindowResize: true,
   showSettings: true,
 };
 const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
@@ -105,6 +106,7 @@ async function verifySaveAndClearContracts() {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: false,
     },
     saveCapturesToGallery: true,
@@ -190,6 +192,7 @@ async function verifyStoredSettings() {
       showVideoEditor: true,
       showGallery: false,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     saveCapturesToGallery: false,
@@ -279,6 +282,7 @@ const expectedInvalidStoredSettingsResult = {
     showVideoEditor: true,
     showGallery: true,
     showPageLinkCopy: true,
+    showWindowResize: true,
     showSettings: false,
   },
   saveCapturesToGallery: true,

@@ -56,6 +56,7 @@ async function runBackgroundContextMenuRebuild(): Promise<void> {
     !hasVisibleContextMenuItems({
       quickActions,
       settings: contextMenuSettings,
+      viewportPresets: settings.viewportPresets,
     })
   ) {
     return;
@@ -64,6 +65,7 @@ async function runBackgroundContextMenuRebuild(): Promise<void> {
   const descriptors = buildContextMenuDescriptors({
     quickActions,
     settings: contextMenuSettings,
+    viewportPresets: settings.viewportPresets,
   });
   const contexts = getContextMenuContexts();
 

@@ -1,9 +1,15 @@
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import { translate } from '../../../platform/i18n';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
-import { type ContextMenuSettings, type QuickAction } from '../../../contracts/settings';
+import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
+import {
+  type ContextMenuSettings,
+  type QuickAction,
+  type ViewportPreset,
+} from '../../../contracts/settings';
 import {
   buildContextMenuQuickActionId,
+  buildContextMenuWindowResizePresetId,
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
   CONTEXT_MENU_EXPORT_ID,
@@ -23,6 +29,7 @@ import {
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  CONTEXT_MENU_WINDOW_RESIZE_ID,
 } from './constants';
 import { buildPageLinkCopyDescriptors } from './page-link/descriptors';
 import type { ContextMenuDescriptor } from './types';
@@ -171,6 +178,28 @@ function buildRootLeafDescriptors(settings: ContextMenuSettings): ContextMenuDes
   return descriptors;
 }
 
+function buildWindowResizeDescriptors(presets: readonly ViewportPreset[]): ContextMenuDescriptor[] {
+  const windowPresets = presets
+    .filter((preset) => preset.enabled && preset.target === 'window')
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  if (windowPresets.length === 0) return [];
+
+  return [
+    createDescriptor(
+      CONTEXT_MENU_WINDOW_RESIZE_ID,
+      translate('settings.appearance.contextMenuWindowResizeMenuLabel'),
+      CONTEXT_MENU_ROOT_ID
+    ),
+    ...windowPresets.map((preset) =>
+      createDescriptor(
+        buildContextMenuWindowResizePresetId(preset.id),
+        `${getViewportPresetDisplayName(preset)} · ${preset.width} × ${preset.height}`,
+        CONTEXT_MENU_WINDOW_RESIZE_ID
+      )
+    ),
+  ];
+}
+
 function buildSettingsDescriptors(hasPrimaryItems: boolean): ContextMenuDescriptor[] {
   const descriptors: ContextMenuDescriptor[] = [];
 
@@ -199,6 +228,7 @@ function buildSettingsDescriptors(hasPrimaryItems: boolean): ContextMenuDescript
 export function buildContextMenuDescriptors(args: {
   quickActions: QuickAction[];
   settings: ContextMenuSettings;
+  viewportPresets: readonly ViewportPreset[];
 }): ContextMenuDescriptor[] {
   const descriptors = [createDescriptor(CONTEXT_MENU_ROOT_ID, PRODUCT_BRAND_NAME)];
   const primaryDescriptors: ContextMenuDescriptor[] = [];
@@ -219,6 +249,10 @@ export function buildContextMenuDescriptors(args: {
 
   if (args.settings.showPageLinkCopy) {
     primaryDescriptors.push(...buildPageLinkCopyDescriptors());
+  }
+
+  if (args.settings.showWindowResize) {
+    primaryDescriptors.push(...buildWindowResizeDescriptors(args.viewportPresets));
   }
 
   descriptors.push(...primaryDescriptors);

@@ -32,6 +32,7 @@ const {
   loadVideoSettingsMock,
   loadVideoUiStateMock,
   openSettingsPageMock,
+  resizeBrowserWindowFromContextMenuMock,
   runtimeGetUrlMock,
   sendTabMessageMock,
   startRecordingMock,
@@ -45,6 +46,7 @@ const {
   loadVideoSettingsMock: vi.fn(),
   loadVideoUiStateMock: vi.fn(),
   openSettingsPageMock: vi.fn(),
+  resizeBrowserWindowFromContextMenuMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendTabMessageMock: vi.fn(),
   startRecordingMock: vi.fn(),
@@ -120,6 +122,10 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
   loadVideoUiState: loadVideoUiStateMock,
 }));
 
+vi.mock('./window-resize', () => ({
+  resizeBrowserWindowFromContextMenu: resizeBrowserWindowFromContextMenuMock,
+}));
+
 function createDeps() {
   return {
     captureGuardState: { isCapturing: false },
@@ -133,7 +139,7 @@ function createDeps() {
 }
 
 function createTab(url = 'https://example.test', id = 11): chrome.tabs.Tab {
-  return { id, title: 'Tab title', url } as chrome.tabs.Tab;
+  return { id, title: 'Tab title', url, windowId: 4 } as chrome.tabs.Tab;
 }
 
 function seedContextMenuActionMocks() {
@@ -309,6 +315,17 @@ async function verifyQuickActionRouting() {
   );
 }
 
+async function verifyWindowResizeRouting() {
+  await handleBackgroundContextMenuAction({
+    deps: createDeps(),
+    menuId: 'sniptale.window-resize.preset.window-hd',
+    tab: createTab(),
+  });
+
+  expect(resizeBrowserWindowFromContextMenuMock).toHaveBeenCalledWith(4, 'window-hd');
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+}
+
 describe('context menu actions', () => {
   beforeEach(seedContextMenuActionMocks);
 
@@ -331,4 +348,5 @@ describe('context menu actions', () => {
     'routes quick action menu items through the existing quick action handler',
     verifyQuickActionRouting
   );
+  it('routes window-size items without injecting a page runtime', verifyWindowResizeRouting);
 });

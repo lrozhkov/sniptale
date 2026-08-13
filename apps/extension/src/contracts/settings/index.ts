@@ -37,6 +37,7 @@ export interface ContextMenuSettings {
   showVideoEditor: boolean;
   showGallery: boolean;
   showPageLinkCopy: boolean;
+  showWindowResize: boolean;
   showSettings: boolean;
 }
 

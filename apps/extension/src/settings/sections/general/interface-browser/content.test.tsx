@@ -22,6 +22,7 @@ function createState(
       showExport: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showImageEditor: true,
       showScreenshots: true,
       showSettings: true,
