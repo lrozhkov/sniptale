@@ -37,7 +37,7 @@ export function PaintModeSelector(props: {
           <ProductGlassChip
             active={props.mode === mode}
             aria-label={label}
-            className="min-w-0 gap-1 px-1.5"
+            className="min-w-0 gap-1.5 px-2 py-1.5"
             key={mode}
             onClick={() => props.onChange(mode)}
             title={label}
@@ -45,7 +45,7 @@ export function PaintModeSelector(props: {
             <ProductGlassChipIcon className="shrink-0">
               <Icon aria-hidden="true" size={14} />
             </ProductGlassChipIcon>
-            <span className="truncate text-[10px]">{label}</span>
+            <span className="truncate text-[11px] font-medium">{label}</span>
           </ProductGlassChip>
         );
       })}

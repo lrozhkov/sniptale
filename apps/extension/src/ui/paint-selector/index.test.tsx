@@ -24,6 +24,36 @@ function changeInput(input: HTMLInputElement, value: string) {
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+it('renders the shared selector trigger with a labeled value and transparency preview', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#00000000')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.paint-selector.trigger"]'
+  )!;
+  const preview = trigger.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.paint-selector.preview"]'
+  )!;
+  expect(trigger.textContent).toContain('Fill');
+  expect(trigger.textContent).toContain('#00000000');
+  expect(preview.style.backgroundSize).toBe('100% 100%, 8px 8px');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  act(() => root.unmount());
+  host.remove();
+});
+
 it('uses one popup owner, switches modes, applies, and never nests a color popup', () => {
   const host = document.createElement('div');
   document.body.append(host);

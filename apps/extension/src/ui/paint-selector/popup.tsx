@@ -24,11 +24,33 @@ import { ColorSelectorSwatchSection } from '../color-selector/swatch-section';
 import { GradientEditor } from './gradient-editor';
 import { resolvePaintSelectorLayerStyle } from './lifecycle';
 import { PaintModeSelector } from './mode-selector';
+import { Palette } from 'lucide-react';
 
 const POPUP_CLASS_NAME = [
-  'rounded-[14px] border border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] p-3',
-  'text-[var(--sniptale-color-text-primary)] shadow-2xl',
+  'overflow-hidden rounded-[16px] border',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_58%,transparent)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_98%,transparent)] p-3',
+  'text-[var(--sniptale-color-text-primary)]',
+  'shadow-[0_20px_48px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_18%,transparent)]',
+].join(' ');
+const POPUP_HEADER_CLASS_NAME = [
+  'mb-3 grid gap-3 border-b pb-3',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
+].join(' ');
+const POPUP_ICON_CLASS_NAME = [
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
+  'text-[var(--sniptale-color-accent)]',
+].join(' ');
+const EDITOR_SECTION_CLASS_NAME = [
+  'min-w-0 rounded-[12px] border p-3',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_58%,transparent)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-muted)_54%,transparent)]',
+].join(' ');
+const COLOR_SECTION_CLASS_NAME = [
+  'min-w-0 space-y-3 rounded-[12px] border p-3',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_58%,transparent)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-muted)_38%,transparent)]',
 ].join(' ');
 
 type PaintSelectorPopupProps = {
@@ -105,8 +127,13 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
       className={POPUP_CLASS_NAME}
       data-ui="shared.ui.paint-selector.popup"
     >
-      <div className="mb-3 grid gap-2.5">
-        <strong className="text-sm">{props.title}</strong>
+      <div className={POPUP_HEADER_CLASS_NAME}>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className={POPUP_ICON_CLASS_NAME}>
+            <Palette aria-hidden="true" size={16} />
+          </span>
+          <strong className="min-w-0 truncate text-sm">{props.title}</strong>
+        </div>
         <PaintModeSelector mode={mode} onChange={props.onModeChange} />
       </div>
       <div
@@ -117,7 +144,7 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
         }
       >
         {props.draft.kind === 'gradient' ? (
-          <div className="min-w-0">
+          <div className={EDITOR_SECTION_CLASS_NAME}>
             <GradientEditor
               createId={props.createId}
               gradient={props.draft.gradient}
@@ -127,7 +154,7 @@ function PaintSelectorPopup(props: PaintSelectorPopupProps) {
             />
           </div>
         ) : null}
-        <div className="min-w-0 space-y-3">
+        <div className={COLOR_SECTION_CLASS_NAME}>
           {props.draft.kind === 'solid' && palette.length > 0 ? (
             <ColorSelectorSwatchSection
               colors={palette}

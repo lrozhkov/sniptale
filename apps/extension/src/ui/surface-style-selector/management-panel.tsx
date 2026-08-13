@@ -12,13 +12,15 @@ export function SurfaceStyleManagementPanel(props: {
   const { controller, selector } = props;
   return (
     <>
-      <SurfaceStylePresetGrid
-        actions={selector.actions}
-        draft={controller.state.draft}
-        name={controller.state.name}
-        onDraftChange={controller.actions.setDraft}
-        presets={selector.presets}
-      />
+      <div className="max-h-56 overflow-y-auto pr-0.5">
+        <SurfaceStylePresetGrid
+          actions={selector.actions}
+          draft={controller.state.draft}
+          name={controller.state.name}
+          onDraftChange={controller.actions.setDraft}
+          presets={selector.presets}
+        />
+      </div>
       <SurfaceStyleEditorPanel
         actions={selector.actions}
         canonicalCss={controller.state.canonicalCss}

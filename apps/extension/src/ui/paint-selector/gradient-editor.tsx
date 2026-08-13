@@ -26,8 +26,20 @@ const withRadius = (gradient: Gradient, axis: 'x' | 'y', value: number): Gradien
     : gradient;
 const withStartAngle = (gradient: Gradient, startAngle: number): Gradient =>
   gradient.type === 'conic' ? { ...gradient, startAngle } : gradient;
-const FIELD_CLASS_NAME =
-  'h-8 rounded-[7px] border border-[var(--sniptale-color-border-soft)] bg-transparent px-2 text-xs';
+const FIELD_CLASS_NAME = [
+  'h-8 rounded-[8px] border px-2 text-xs outline-none transition',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_72%,transparent)]',
+  'text-[var(--sniptale-color-text-primary)]',
+  'focus:ring-2',
+  'focus:border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft))]',
+  'focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
+].join(' ');
+const SECTION_CLASS_NAME = [
+  'rounded-[10px] border p-2.5',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_62%,transparent)]',
+].join(' ');
 
 interface GradientControlsProps {
   gradient: Gradient;
@@ -50,7 +62,7 @@ function GradientPrimaryControls({
     if (nextSelected) onSelectStop(nextSelected.id);
   };
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+    <div className={`${SECTION_CLASS_NAME} grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2`}>
       <label className="min-w-0 text-[11px]">
         {translate('highlighter.paintPicker.position')}
         <input
@@ -99,7 +111,7 @@ function GradientPrimaryControls({
 function GradientGeometryControls({ gradient, onChange }: GradientControlsProps) {
   if (gradient.type === 'linear') {
     return (
-      <div className="rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-2.5">
+      <div className={SECTION_CLASS_NAME}>
         <label className="flex items-center justify-between gap-3 text-[11px]">
           {translate('highlighter.paintPicker.angle')}
           <input
@@ -114,12 +126,7 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
   }
 
   return (
-    <div
-      className={[
-        'grid grid-cols-2 gap-2 rounded-[9px] border p-2.5 text-[11px]',
-        'border-[var(--sniptale-color-border-soft)]',
-      ].join(' ')}
-    >
+    <div className={[`${SECTION_CLASS_NAME} grid grid-cols-2 gap-2 text-[11px]`].join(' ')}>
       {(['x', 'y'] as const).map((axis) => (
         <label key={axis}>
           {translate(
@@ -175,7 +182,7 @@ function GradientAdvancedControls({
   onChange,
 }: GradientControlsProps & { selected: Gradient['stops'][number] }) {
   return (
-    <details className="rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-2 text-xs">
+    <details className={`${SECTION_CLASS_NAME} text-xs`}>
       <summary className="cursor-pointer font-semibold">
         {translate('highlighter.paintPicker.advanced')}
       </summary>
@@ -263,7 +270,7 @@ export function GradientEditor(props: {
     props.gradient.stops[0]!;
   return (
     <div className="min-w-0 space-y-3">
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="font-semibold">
             {translate('highlighter.paintPicker.gradientStops')}
