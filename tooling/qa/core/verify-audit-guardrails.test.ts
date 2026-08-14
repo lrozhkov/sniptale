@@ -55,17 +55,17 @@ it('rejects ad hoc popup URL authority predicates and accepts canonical predicat
   expect(collectRuntimeProtocolContractViolations([good])).toEqual([]);
 });
 
-it('keeps raw runtime response payload fields behind explicit transfer/debug gates', () => {
+it('keeps raw runtime response payload fields behind explicit transfer gates', () => {
   const root = createTempRoot('audit-response-privacy-');
   const bad = writeFile(
     root,
     'apps/extension/src/contracts/messaging/contracts/runtime-message/result-response.ts',
-    'export interface ResultResponse { success: true; rawDiagnostics: string; }\n'
+    'export interface ResultResponse { success: true; previewDataUrl: string; }\n'
   );
   const good = writeFile(
     root,
-    'apps/extension/src/contracts/messaging/contracts/runtime-message/debug-response.ts',
-    'export interface DebugResponse { capabilityToken: string; rawDiagnosticsEnabled: true; rawDiagnostics: string; }\n'
+    'apps/extension/src/contracts/messaging/contracts/runtime-message/download-response.ts',
+    'export interface DownloadResponse { capabilityToken: string; download: true; previewDataUrl: string; }\n'
   );
 
   expect(rules(collectRuntimeResponsePrivacyViolations([bad]))).toContain(

@@ -3,7 +3,7 @@ import { chromium, expect, type Page } from '@playwright/test';
 import {
   buildDeviceMetricsOverrideParams,
   buildViewportCompositorScale,
-} from '../../../apps/extension/src/background/debugger/workspace/helpers';
+} from './support/cdp-viewport';
 import { test } from './support/extension-fixture';
 
 const HARNESS_PATH = '/tooling/test/harness/full-page-capture.html';

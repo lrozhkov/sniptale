@@ -23,14 +23,14 @@ it('replaces an existing copied-format timeout before scheduling a new reset', (
     createRequestId: vi.fn(),
     getActiveTabId: vi.fn(),
     requestPreview: vi.fn(),
-    saveArchiveBlob: vi.fn(),
+    requestAllUrlsPermission: vi.fn(),
     scheduleTimeout: vi.fn((callback) => {
       scheduledCallback = callback;
       return 9;
     }),
-    sendBuildPackageMessage: vi.fn(),
-    sendCancelMessage: vi.fn(),
-    sendStartMessage: vi.fn(),
+    sendCancelJobMessage: vi.fn(),
+    sendGetJobStatusMessage: vi.fn(),
+    sendStartJobMessage: vi.fn(),
     writeClipboardText: vi.fn(),
   });
 

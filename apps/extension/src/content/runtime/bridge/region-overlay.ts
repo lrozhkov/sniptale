@@ -70,6 +70,7 @@ function handleKnownRegionOverlayMessage(
       deps.hideRecordingOverlay();
       return acknowledgeOverlayRequest(sendResponse);
   }
+  return false;
 }
 
 export function createRegionOverlayBridgeDeps(

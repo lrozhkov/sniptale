@@ -8,7 +8,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -17,15 +17,11 @@ function createExportOptions() {
 
 function createRuntime() {
   return {
-    emitMessage: vi.fn(),
     exportRunner: {
-      buildPackage: vi.fn(),
+      buildPackage: vi.fn().mockResolvedValue({}),
       cancel: vi.fn(),
-      export: vi.fn(),
-      onProgress: vi.fn(),
     },
     parseTree: vi.fn(),
-    persistArchive: vi.fn(),
     state: {
       activeExportRequestId: null,
       isExportRunning: false,
@@ -33,9 +29,7 @@ function createRuntime() {
   };
 }
 
-it('does not load content-only web snapshot capture code for ordinary export routes', async () => {
-  const handlePopupExportStartRuntime = vi.fn(() => true);
-  vi.doMock('../start/runtime', () => ({ handlePopupExportStartRuntime }));
+it('does not load content-only web snapshot capture code for package routes', async () => {
   vi.doMock('../web-snapshot-runtime', () => {
     throw new Error('content-only snapshot branch loaded');
   });
@@ -49,11 +43,11 @@ it('does not load content-only web snapshot capture code for ordinary export rou
       ...runtime,
       request: {
         options: createExportOptions(),
-        requestId: 'req-1',
-        type: MessageType.EXPORT_POPUP_START,
+        batchRequestId: 'req-1',
+        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       },
       sendResponse,
     })
   ).toBe(true);
-  expect(handlePopupExportStartRuntime).toHaveBeenCalledOnce();
+  expect(runtime.exportRunner.buildPackage).toHaveBeenCalledOnce();
 });

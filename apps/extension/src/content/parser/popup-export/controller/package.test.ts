@@ -9,7 +9,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -73,7 +73,6 @@ it('returns the built page package and clears the running flag after completion'
       } as never,
       request: {
         batchRequestId: 'batch-success',
-        contentIntentGrant: { grantToken: 'grant-package' },
         type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         options: createExportOptions(),
       },
@@ -91,12 +90,7 @@ it('returns the built page package and clears the running flag after completion'
       archiveBaseName: 'page_2026-04-09_12-00-00',
     }),
   });
-  expect(buildPackage).toHaveBeenCalledWith(createExportOptions(), {
-    contentIntentSource: {
-      grantToken: 'grant-package',
-      kind: 'background-auto-start',
-    },
-  });
+  expect(buildPackage).toHaveBeenCalledWith(createExportOptions());
   expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });
 

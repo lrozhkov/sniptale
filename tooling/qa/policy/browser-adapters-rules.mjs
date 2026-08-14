@@ -92,15 +92,6 @@ const BROWSER_EVENT_RULES = [
     target: 'chrome.webNavigation',
     segments: [['onBeforeNavigate'], ['addListener', 'removeListener']],
   }),
-  createNestedMethodRule({
-    rule: 'browser-debugger-listener',
-    message: 'Use @sniptale/platform/browser/debugger for debugger listener subscriptions.',
-    target: 'chrome.debugger',
-    segments: [
-      ['onEvent', 'onDetach'],
-      ['addListener', 'removeListener'],
-    ],
-  }),
 ];
 
 const BROWSER_GLOBAL_RULES = [
@@ -207,12 +198,6 @@ export const BROWSER_ADAPTER_RULES = [
     message: 'Use @sniptale/platform/browser/downloads for download listener subscriptions.',
     target: 'chrome.downloads.onChanged',
     methods: ['addListener', 'removeListener'],
-  }),
-  createMethodRule({
-    rule: 'browser-debugger-direct',
-    message: 'Use @sniptale/platform/browser/debugger for chrome.debugger access.',
-    target: 'chrome.debugger',
-    methods: ['attach', 'detach', 'getTargets', 'sendCommand'],
   }),
   {
     rule: 'browser-offscreen-direct',

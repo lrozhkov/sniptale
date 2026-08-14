@@ -16,9 +16,11 @@ import type { Settings } from '../../../contracts/settings';
 import type { ViewportPresetAvailability } from '../../../features/viewport-presets/contracts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
-import { issueFullPageExportContentIntentGrant } from '../../routing-contracts/capabilities/content-action/grants';
+import { startPopupExportJob } from '../../capture/popup-export/job';
 import {
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
@@ -45,7 +47,7 @@ function buildContextMenuExportOptions() {
     includeCssDiagnostics: preferences.includeCssDiagnostics,
     includeFiles: preferences.includeFiles,
     includeFullPageScreenshot: preferences.includeFullPageScreenshot,
-    includeHarDomLogs: preferences.includeHarDomLogs,
+    includePageDiagnostics: preferences.includePageDiagnostics,
     includeImages: preferences.includeImages,
     includeJson: preferences.includeJson,
     includeMarkdown: preferences.includeMarkdown,
@@ -127,21 +129,21 @@ export async function startContextMenuVideoRecording(
 
 export async function startContextMenuExport(tabId: number): Promise<void> {
   const options = await buildContextMenuExportOptions();
-  const requestId = crypto.randomUUID();
-  const response = await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
-    ...(options.includeFullPageScreenshot
-      ? {
-          contentIntentGrant: issueFullPageExportContentIntentGrant(tabId),
-        }
-      : {}),
-    type: MessageType.EXPORT_POPUP_START,
-    options,
-    requestId,
-  });
-
-  if (!response?.success) {
-    throw new Error(response?.error || translate('popup.export.startExportError'));
+  const warnings: string[] = [];
+  if (options.includeFullPageScreenshot) {
+    const granted = await browserPermissions.request({ origins: ['<all_urls>'] });
+    if (!granted) {
+      options.includeFullPageScreenshot = false;
+      warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+    }
   }
+  const tab = await browserTabs.get(tabId);
+  await startPopupExportJob({
+    jobId: crypto.randomUUID(),
+    orderedTabs: [{ tabId, title: tab.title ?? tab.url ?? `Tab ${tabId}` }],
+    options,
+    warnings,
+  });
 
   await showContextMenuToast(tabId, {
     message: translate('popup.export.startProgressMessage'),

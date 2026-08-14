@@ -119,8 +119,6 @@ ${formatMetaLine(translate('videoEditor.diagnostics.endedLabel'), meta?.meta?.re
 - ${translate('videoEditor.diagnostics.totalEventsLabel')}: ${stats.total}
 - ${translate('videoEditor.diagnostics.errorsLabel')}: ${stats.errors}
 - ${translate('videoEditor.diagnostics.warningsLabel')}: ${stats.warns}
-- ${translate('videoEditor.diagnostics.networkLabel')}: ${stats.network}
-- ${translate('videoEditor.diagnostics.consoleLabel')}: ${stats.console}
 - ${translate('videoEditor.diagnostics.actionsLabel')}: ${stats.actions}
 
 ## ${translate('videoEditor.diagnostics.reportErrorsTitle')}

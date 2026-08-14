@@ -77,7 +77,7 @@ function createVideoSettings(overrides: Record<string, unknown> = {}) {
   return {
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: 'missing-device',
     microphoneEnabled: true,
     webcamDeviceId: 'missing-camera',

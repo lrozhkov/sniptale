@@ -7,7 +7,7 @@
       "classification": "accepted-architecture",
       "owner": "background-runtime-composition",
       "risk": "New cross-owner imports could silently widen a privileged background dependency cycle.",
-      "reason": "The exact cycle records canonical action-kernel assembly, video lifecycle ownership, and application privacy-erasure orchestration.",
+      "reason": "The exact cycle records canonical action-kernel assembly, popup-export job state ownership, video lifecycle ownership, and application privacy-erasure orchestration.",
       "removalCondition": "Remove the entry when those composition edges are replaced by a one-directional owner port.",
       "reviewBy": "2027-08-12",
       "source": {
@@ -15,10 +15,11 @@
         "key": "background-runtime-media-composition"
       },
       "scope": {
-        "edgeDigest": "e697e629f57689429cf0878d38a10b16bb72badaffe84490ae0057fae6d2c32b",
+        "edgeDigest": "b274c1a4fb65feab556ec343195148f2346365e3fb027f3580309fb6d8ee390c",
         "id": "background-runtime-media-composition",
         "owners": [
           "apps/extension/src/background/application",
+          "apps/extension/src/background/capture",
           "apps/extension/src/background/media",
           "apps/extension/src/background/runtime"
         ]
@@ -1313,7 +1314,6 @@
         "apps/extension/src/background/capture/full-page/budgets.ts",
         "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
-        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
         "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
@@ -1359,10 +1359,17 @@
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
         "apps/extension/src/background/capture/page-state/index.ts",
-        "apps/extension/src/background/capture/popup-export/archive-route.ts",
-        "apps/extension/src/background/capture/popup-export/route-descriptors.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archives.ts",
+        "apps/extension/src/background/capture/popup-export/job/archive.ts",
+        "apps/extension/src/background/capture/popup-export/job/execute.ts",
+        "apps/extension/src/background/capture/popup-export/job/index.ts",
+        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
+        "apps/extension/src/background/capture/popup-export/job/route-descriptors.ts",
+        "apps/extension/src/background/capture/popup-export/job/route.ts",
+        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
+        "apps/extension/src/background/capture/popup-export/job/storage.ts",
+        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -1409,43 +1416,6 @@
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
-        "apps/extension/src/background/debugger/diagnostics.ts",
-        "apps/extension/src/background/debugger/infra.ts",
-        "apps/extension/src/background/debugger/privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/activation.ts",
-        "apps/extension/src/background/debugger/session/attach-request.ts",
-        "apps/extension/src/background/debugger/session/attach.ts",
-        "apps/extension/src/background/debugger/session/detach-core.ts",
-        "apps/extension/src/background/debugger/session/detach.privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/detach.ts",
-        "apps/extension/src/background/debugger/session/index.ts",
-        "apps/extension/src/background/debugger/session/state-core.ts",
-        "apps/extension/src/background/debugger/session/status.ts",
-        "apps/extension/src/background/debugger/session/store.ts",
-        "apps/extension/src/background/debugger/session/targets.ts",
-        "apps/extension/src/background/debugger/workspace/commands.ts",
-        "apps/extension/src/background/debugger/workspace/helpers.ts",
-        "apps/extension/src/background/debugger/workspace/index.ts",
-        "apps/extension/src/background/debugger/workspace/metrics.ts",
-        "apps/extension/src/background/diagnostics/cdp-record-guards.ts",
-        "apps/extension/src/background/diagnostics/cdp.dispatch.ts",
-        "apps/extension/src/background/diagnostics/cdp.event-appenders.ts",
-        "apps/extension/src/background/diagnostics/cdp.helpers.ts",
-        "apps/extension/src/background/diagnostics/cdp.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/authorization/preauthorization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/browser-info.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/debugger-events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/helpers.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/index.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/privacy-erasure.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/sanitization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-expiry-orchestrator.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-factory.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-lifecycle.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-state.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/start-capability.ts",
         "apps/extension/src/background/diagnostics/handlers.ts",
         "apps/extension/src/background/diagnostics/helpers.ts",
         "apps/extension/src/background/diagnostics/index.ts",
@@ -1454,11 +1424,9 @@
         "apps/extension/src/background/diagnostics/logger.ts",
         "apps/extension/src/background/diagnostics/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/diagnostics/public/event-sink.ts",
-        "apps/extension/src/background/diagnostics/public/har-export.ts",
         "apps/extension/src/background/diagnostics/public/session.ts",
         "apps/extension/src/background/diagnostics/recovery.ts",
         "apps/extension/src/background/diagnostics/route-descriptors.ts",
-        "apps/extension/src/background/diagnostics/routes.ts",
         "apps/extension/src/background/diagnostics/runtime.privacy-erasure.ts",
         "apps/extension/src/background/diagnostics/runtime.ts",
         "apps/extension/src/background/diagnostics/session.ts",
@@ -1612,7 +1580,6 @@
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-requests.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.ts",
-        "apps/extension/src/background/routing-contracts/capabilities/content-action/grants.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/proof-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts",
@@ -1756,7 +1723,6 @@
         "apps/extension/src/background/runtime/routing/message-guards/guards/shared.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/tab.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/video-runtime.ts",
-        "apps/extension/src/background/runtime/routing/runtime-wiring/debugger.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/initialize.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/install.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/navigation.ts",
@@ -1985,7 +1951,6 @@
         "apps/extension/src/background/capture/full-page/budgets.ts",
         "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
-        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
         "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
@@ -2031,10 +1996,17 @@
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
         "apps/extension/src/background/capture/page-state/index.ts",
-        "apps/extension/src/background/capture/popup-export/archive-route.ts",
-        "apps/extension/src/background/capture/popup-export/route-descriptors.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archives.ts",
+        "apps/extension/src/background/capture/popup-export/job/archive.ts",
+        "apps/extension/src/background/capture/popup-export/job/execute.ts",
+        "apps/extension/src/background/capture/popup-export/job/index.ts",
+        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
+        "apps/extension/src/background/capture/popup-export/job/route-descriptors.ts",
+        "apps/extension/src/background/capture/popup-export/job/route.ts",
+        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
+        "apps/extension/src/background/capture/popup-export/job/storage.ts",
+        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -2081,43 +2053,6 @@
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
-        "apps/extension/src/background/debugger/diagnostics.ts",
-        "apps/extension/src/background/debugger/infra.ts",
-        "apps/extension/src/background/debugger/privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/activation.ts",
-        "apps/extension/src/background/debugger/session/attach-request.ts",
-        "apps/extension/src/background/debugger/session/attach.ts",
-        "apps/extension/src/background/debugger/session/detach-core.ts",
-        "apps/extension/src/background/debugger/session/detach.privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/detach.ts",
-        "apps/extension/src/background/debugger/session/index.ts",
-        "apps/extension/src/background/debugger/session/state-core.ts",
-        "apps/extension/src/background/debugger/session/status.ts",
-        "apps/extension/src/background/debugger/session/store.ts",
-        "apps/extension/src/background/debugger/session/targets.ts",
-        "apps/extension/src/background/debugger/workspace/commands.ts",
-        "apps/extension/src/background/debugger/workspace/helpers.ts",
-        "apps/extension/src/background/debugger/workspace/index.ts",
-        "apps/extension/src/background/debugger/workspace/metrics.ts",
-        "apps/extension/src/background/diagnostics/cdp-record-guards.ts",
-        "apps/extension/src/background/diagnostics/cdp.dispatch.ts",
-        "apps/extension/src/background/diagnostics/cdp.event-appenders.ts",
-        "apps/extension/src/background/diagnostics/cdp.helpers.ts",
-        "apps/extension/src/background/diagnostics/cdp.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/authorization/preauthorization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/browser-info.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/debugger-events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/helpers.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/index.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/privacy-erasure.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/sanitization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-expiry-orchestrator.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-factory.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-lifecycle.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-state.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/start-capability.ts",
         "apps/extension/src/background/diagnostics/handlers.ts",
         "apps/extension/src/background/diagnostics/helpers.ts",
         "apps/extension/src/background/diagnostics/index.ts",
@@ -2126,11 +2061,9 @@
         "apps/extension/src/background/diagnostics/logger.ts",
         "apps/extension/src/background/diagnostics/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/diagnostics/public/event-sink.ts",
-        "apps/extension/src/background/diagnostics/public/har-export.ts",
         "apps/extension/src/background/diagnostics/public/session.ts",
         "apps/extension/src/background/diagnostics/recovery.ts",
         "apps/extension/src/background/diagnostics/route-descriptors.ts",
-        "apps/extension/src/background/diagnostics/routes.ts",
         "apps/extension/src/background/diagnostics/runtime.privacy-erasure.ts",
         "apps/extension/src/background/diagnostics/runtime.ts",
         "apps/extension/src/background/diagnostics/session.ts",
@@ -2284,7 +2217,6 @@
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-requests.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.ts",
-        "apps/extension/src/background/routing-contracts/capabilities/content-action/grants.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/proof-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts",
@@ -2428,7 +2360,6 @@
         "apps/extension/src/background/runtime/routing/message-guards/guards/shared.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/tab.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/video-runtime.ts",
-        "apps/extension/src/background/runtime/routing/runtime-wiring/debugger.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/initialize.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/install.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/navigation.ts",
@@ -4233,12 +4164,6 @@
         "apps/extension/src/content/parser/export-manager/archive/readme.ts",
         "apps/extension/src/content/parser/export-manager/archive/transfer.ts",
         "apps/extension/src/content/parser/export-manager/archive/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/capture.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/controller.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/index.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/state.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/window-capture.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.assets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.field-diagnostics.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.json.ts",
@@ -4253,10 +4178,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/screenshot-transport.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/transport.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -4271,7 +4194,6 @@
         "apps/extension/src/content/parser/export-manager/index.ts",
         "apps/extension/src/content/parser/export-manager/service/annotations.ts",
         "apps/extension/src/content/parser/export-manager/service/assets.ts",
-        "apps/extension/src/content/parser/export-manager/service/diagnostics-session.ts",
         "apps/extension/src/content/parser/export-manager/service/index.ts",
         "apps/extension/src/content/parser/export-manager/service/pipeline.ts",
         "apps/extension/src/content/parser/export-manager/service/runtime.ts",
@@ -4405,17 +4327,11 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
         "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
@@ -4928,12 +4844,6 @@
         "apps/extension/src/content/parser/export-manager/archive/readme.ts",
         "apps/extension/src/content/parser/export-manager/archive/transfer.ts",
         "apps/extension/src/content/parser/export-manager/archive/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/capture.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/controller.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/index.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/state.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/window-capture.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.assets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.field-diagnostics.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.json.ts",
@@ -4948,10 +4858,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/screenshot-transport.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/transport.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -4966,7 +4874,6 @@
         "apps/extension/src/content/parser/export-manager/index.ts",
         "apps/extension/src/content/parser/export-manager/service/annotations.ts",
         "apps/extension/src/content/parser/export-manager/service/assets.ts",
-        "apps/extension/src/content/parser/export-manager/service/diagnostics-session.ts",
         "apps/extension/src/content/parser/export-manager/service/index.ts",
         "apps/extension/src/content/parser/export-manager/service/pipeline.ts",
         "apps/extension/src/content/parser/export-manager/service/runtime.ts",
@@ -5066,17 +4973,11 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
         "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
@@ -9738,18 +9639,10 @@
         "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-archive.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-layout.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-package-boundary.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-requests.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-save.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
         "apps/extension/src/popup/shell/export/runtime/start/progress.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/request.ts",
         "apps/extension/src/popup/shell/export/runtime/state.ts",
         "apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts",
         "apps/extension/src/popup/shell/export/runtime/types.ts",
@@ -9979,18 +9872,10 @@
         "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-archive.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-layout.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-package-boundary.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-requests.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-save.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
         "apps/extension/src/popup/shell/export/runtime/start/progress.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/request.ts",
         "apps/extension/src/popup/shell/export/runtime/state.ts",
         "apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts",
         "apps/extension/src/popup/shell/export/runtime/types.ts",
@@ -12691,7 +12576,6 @@
         "packages/platform/src/browser/clipboard.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
-        "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
         "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
@@ -12738,7 +12622,6 @@
         "packages/platform/src/observability/logger/types.ts",
         "packages/platform/src/observability/message-tracer/console.ts",
         "packages/platform/src/observability/message-tracer/events.ts",
-        "packages/platform/src/observability/message-tracer/har-payload.ts",
         "packages/platform/src/observability/message-tracer/index.ts",
         "packages/platform/src/observability/message-tracer/llm-payload.ts",
         "packages/platform/src/observability/message-tracer/messaging.ts",
@@ -12777,7 +12660,6 @@
         "packages/platform/src/browser/clipboard.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
-        "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
         "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
@@ -12824,7 +12706,6 @@
         "packages/platform/src/observability/logger/types.ts",
         "packages/platform/src/observability/message-tracer/console.ts",
         "packages/platform/src/observability/message-tracer/events.ts",
-        "packages/platform/src/observability/message-tracer/har-payload.ts",
         "packages/platform/src/observability/message-tracer/index.ts",
         "packages/platform/src/observability/message-tracer/llm-payload.ts",
         "packages/platform/src/observability/message-tracer/messaging.ts",
@@ -13355,7 +13236,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "811159dde64234fdec10becdfa027bc1344c20cf90cbd78848b9d5a757ac81a8"
+        "contentHash": "7d1738e2ac27524bdf66cc2064c77e41beffcbe13e253d2eb4201fe51a34ddde"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -13748,7 +13629,7 @@
       "remediation": "Keep exceptions file-exact and prefer FakeRuntimeMessagingTransport.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging.mjs",
-        "contentHash": "5fa7194390ad78a72a1c1ffeba94e7aaad039cc6e229684c81b0dd1383710b17"
+        "contentHash": "3cf48013d935c148a8b56cacd18a863011505f3fe9a99c0d46c5f058090114a5"
       },
       "surfaces": [
         "binding:ALLOWED_CHROME_STUB_FILES",
@@ -13774,7 +13655,7 @@
       "remediation": "Burn the exact import population down when owner adapters replace default sends; never add a broad path.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging-default-baseline.mjs",
-        "contentHash": "32b6819c19ea050716d432a15330d6d31f3cde573ed8ce09f0cd4ae251408ff1"
+        "contentHash": "40cd0f0aaa75bce4e0ce37298f2d15b5d9114b3f8baa5f323c5ee41ab68f7e26"
       },
       "consumers": [
         "tooling/qa/policy/messaging-default-baseline.mjs",
@@ -14028,7 +13909,7 @@
       "remediation": "Keep prefixes limited to authoritative persistence owners and remove obsolete owner paths.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.data.mjs",
-        "contentHash": "2dd8d6523f5b0017e167974750f150d73e3a4b6e05db99cddffe239dcfd67e90"
+        "contentHash": "4d325f11119d0cc0770518610c59d4d9f155f0c032a682e840b64e60eac7b65c"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.data.mjs",
@@ -14552,7 +14433,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/archive.mjs",
-        "contentHash": "6ec8b4e70a0b11a8bdfe81a13954439de50a4f4c22188054d376bac1af413117"
+        "contentHash": "65e4d473d81ac9fe390c26ae72f7c935e3e416c16a2f9cca6d5d6eb9361743d4"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/archive.mjs",
@@ -14566,8 +14447,7 @@
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]"
+        "property:testFiles[6]"
       ]
     },
     {
@@ -14765,7 +14645,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/audit-guardrail-runtime.mjs",
-        "contentHash": "9fe46436ce3340663bcdcf7f19fa5e773712eb0a25d74f81859c8ece697fd1b3"
+        "contentHash": "0e949d26a470d10ea5c5526199ba9da3fc830d9cc6f44e25751c57fe0d6e7a51"
       },
       "consumers": [
         "tooling/qa/core/audit-guardrail-core.mjs",
@@ -14910,7 +14790,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/audit.mjs",
-        "contentHash": "8000ec6a6e4d6c14d6a6b29eacf4522035fc9608f329a674c097c67aa0ec8ac0"
+        "contentHash": "518bfb6e9dcab63e1371edb78f8a1c5a158b05aad93e1b9f8430d98f582db54c"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/audit.mjs",
@@ -14923,6 +14803,13 @@
         "property:testFiles[10]",
         "property:testFiles[11]",
         "property:testFiles[12]",
+        "property:testFiles[13]",
+        "property:testFiles[14]",
+        "property:testFiles[15]",
+        "property:testFiles[16]",
+        "property:testFiles[17]",
+        "property:testFiles[18]",
+        "property:testFiles[19]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -15004,7 +14891,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "efcab5ce46b6d3b7ac98f8188891dd7e6bd276ed099afc4762539b306106168a"
+        "contentHash": "a6c29e5fb66b7a43fb8dc252a9e092fbb7a01603e304ac4b44a9b12935fc8810"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -15034,7 +14921,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
-        "contentHash": "8c06d43cff2b9021cb8ff5b06c2655b116415653b346e3dfcd6b2a0200c8d07c"
+        "contentHash": "6c0da4c9446dfa1f2bd7da890154e8d6e5fa5d9b7a4e99ba13b3ea335f957171"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
@@ -15099,7 +14986,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-rules.mjs",
-        "contentHash": "d29f123f58133326435831d61a7fd70003227b3d93ce951896b9ad64df1e85ce"
+        "contentHash": "13de314205d6e1ffd37d510ffe3f8239d0d7f854d56e4cb648a4129d93967b66"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-rules.mjs",
@@ -15124,7 +15011,6 @@
         "property:METHOD",
         "property:methods",
         "property:methods[1]",
-        "property:methods[10]",
         "property:methods[2]",
         "property:methods[3]",
         "property:methods[4]",
@@ -15137,7 +15023,6 @@
         "property:segments[1]",
         "property:segments[2]",
         "property:segments[3]",
-        "property:segments[4]",
         "property:TARGET"
       ]
     },
@@ -15358,7 +15243,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
-        "contentHash": "f40e887d32cb01cbba23be458966ac7e95aefb7d43a0413bef1f492d01ebb4ae"
+        "contentHash": "f0ddda41cae5db6d3e917033cc6eccd20d00c0ad845b06bf1ed7c72a4eb32d10"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
@@ -15371,8 +15256,7 @@
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]"
+        "property:testFiles[5]"
       ]
     },
     {
@@ -17198,36 +17082,6 @@
       ]
     },
     {
-      "id": "policy.source.har-export-mjs.d78d18443f",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/focused-coverage/maps/har-export.mjs",
-        "contentHash": "fb57beb73ade7a171e1e3bf4eddc443bbe08c6622f40260e87cfb07f61256f85"
-      },
-      "consumers": [
-        "tooling/qa/core/focused-coverage/maps/har-export.mjs",
-        "tooling/qa/core/focused-coverage/maps/platform-backup.mjs"
-      ],
-      "surfaces": [
-        "binding:HAR_EXPORT_OWNER_MAPPINGS",
-        "property:testFiles",
-        "property:testFiles[1]",
-        "property:testFiles[10]",
-        "property:testFiles[2]",
-        "property:testFiles[3]",
-        "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]",
-        "property:testFiles[8]",
-        "property:testFiles[9]"
-      ]
-    },
-    {
       "id": "policy.source.helpers-tsx.2a99b7c314",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18090,7 +17944,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/messaging.mjs",
-        "contentHash": "e24e62e2fe38c38b201ffff3f7fa71a0b9ab250d8842b5883ca1543a813f1bff"
+        "contentHash": "6567f9bebedadbe4f87e1de4658ca30ea5975f1800597468f5242154acd986d6"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18308,7 +18162,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/owner-classifier.mjs",
-        "contentHash": "15416428d42c0ce04d561c8d82b67e15c1ddcc2c8239bae2a7a5a547c7399865"
+        "contentHash": "c5a51e6da13f3a1cb3dac95fa2af746bbcec0b4183d476025f878176e6654345"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -18452,7 +18306,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
-        "contentHash": "99a30458d93e61c0284654284c6b01a53603cc7c0a293b011595648d0d3f031d"
+        "contentHash": "2ef95784c37d4aadeca032abca3cbdf9320bd9879874956adee6ec033a186c51"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18786,7 +18640,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure.mjs",
-        "contentHash": "702262adbefa865a452be5287655df7732deee59633345f5c9711c54d4c9de03"
+        "contentHash": "66cccef4e1b342271223effe9f9f1449fa000b2554e3a6b7f49f19103cab511b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -18814,7 +18668,6 @@
         "property:testFiles[23]",
         "property:testFiles[24]",
         "property:testFiles[25]",
-        "property:testFiles[26]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -18833,7 +18686,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
-        "contentHash": "ea8530ec96f798714029776e55a6484acd75898b438f61d8ec4a254e43bcb136"
+        "contentHash": "c1bcb42998ef3db1e10b1e63e5a315b4ef6a394c34f21c95a3ba5349d60c9336"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
@@ -18897,7 +18750,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "cfe8c299332d075c14d5c2cc66c9830006a359461b17eb03b064289e86d3aaef"
+        "contentHash": "136bf8a89fe8a06cbdd8272053c6b144b97523ca780a7141296faa10964e7680"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -20934,7 +20787,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-browser-adapters.mjs",
-        "contentHash": "d7677ef536d0cdc56a8b0a4a8dbba3c61de2e9ecdf0fc31328d578fe41a86abe"
+        "contentHash": "f845b91a2c77d17695afdd7240638bb6af9b5d48a208196fee553f545c0b55cb"
       },
       "consumers": [
         "tooling/qa/core/architecture-inventory.mjs",
@@ -20945,6 +20798,7 @@
         "tooling/qa/core/verify-focused.code-steps.mjs"
       ],
       "surfaces": [
+        "binding:RETIRED_PROTOCOL_PATTERNS",
         "property:collectBrowserAdapterViolations/groupIds",
         "property:runBrowserAdapterCheck/violations"
       ]
@@ -22898,7 +22752,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-runtime-routing.mjs",
-        "contentHash": "5bd7674bee57089a0420a48dbbf393cbe5200715c9cacde11fb2db187a453515"
+        "contentHash": "6c6b70ce41b3c891270351bd35ebfd93ce8f7e27bb5c0190a8ee3bf0e03e5330"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/video-recording.mjs",

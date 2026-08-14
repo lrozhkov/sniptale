@@ -25,7 +25,7 @@ export type ExportProgressStepKey =
   | 'files'
   | 'images'
   | 'basicLogs'
-  | 'harDomLogs'
+  | 'pageDiagnostics'
   | 'cssDiagnostics'
   | 'fullPageScreenshot'
   | 'webSnapshotPreview'
@@ -53,7 +53,7 @@ export interface ExportOptions {
   includeFiles: boolean; // включить файлы
   includeImages: boolean; // обрабатывать изображения из Froala/preview popup
   includeBasicLogs: boolean; // включить базовый bundle логов сайта
-  includeHarDomLogs: boolean; // включить HAR/DOM bundle
+  includePageDiagnostics: boolean;
   includeCssDiagnostics: boolean; // включить stylesheets/computed-styles bundle
   includeFullPageScreenshot: boolean; // включить full-page screenshot в корень архива
 }
@@ -166,3 +166,29 @@ export interface PopupExportResult {
   snapshotIds?: string[];
   warnings?: string[];
 }
+
+export type PopupExportJobPhase =
+  | 'running'
+  | 'cancelling'
+  | 'cancelled'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+export type PopupExportJobTab = {
+  tabId: number;
+  title: string;
+};
+
+export type PopupExportJobStatus = {
+  jobId: string;
+  revision: number;
+  phase: PopupExportJobPhase;
+  orderedTabs: PopupExportJobTab[];
+  effectiveOptions: ExportOptions;
+  progress: ExportProgress;
+  warnings: string[];
+  originalActiveTabs: Array<{ windowId: number; tabId: number }>;
+  activatedTabIds: number[];
+  result?: PopupExportResult;
+};

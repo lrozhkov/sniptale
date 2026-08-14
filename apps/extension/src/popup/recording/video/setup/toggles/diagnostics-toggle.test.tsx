@@ -24,7 +24,7 @@ function createSettings(
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
@@ -67,7 +67,7 @@ describe('video diagnostics toggle', () => {
     expect(VideoDiagnosticsToggle).toBeTypeOf('function');
   });
 
-  it('shows browser activity diagnostics disclosure before enabling diagnostics', () => {
+  it('shows interaction diagnostics disclosure before enabling diagnostics', () => {
     const onSettingsChange = vi.fn();
     renderToggle({ onSettingsChange });
 
@@ -80,13 +80,13 @@ describe('video diagnostics toggle', () => {
     });
     expect(onSettingsChange).not.toHaveBeenCalled();
     expect(button?.getAttribute('title')?.toLocaleLowerCase('ru')).toContain(
-      'расширенную диагностику'
+      'диагностику взаимодействий'
     );
 
     const confirmation = container?.querySelector(
       '[data-ui="popup.video.diagnostics-confirmation"]'
     );
-    expect(confirmation?.textContent).toContain('расширенную диагностику');
+    expect(confirmation?.textContent).toContain('диагностику взаимодействий');
     expect(confirmation?.textContent).toContain('IndexedDB');
     expect(confirmation?.textContent).toContain('JSON/ZIP');
     expect(confirmation?.textContent).toContain('Включить');
@@ -97,7 +97,7 @@ describe('video diagnostics toggle', () => {
         ?.click();
     });
 
-    expect(onSettingsChange).toHaveBeenCalledWith({ diagnosticsEnabled: true });
+    expect(onSettingsChange).toHaveBeenCalledWith({ interactionDiagnosticsEnabled: true });
   });
 
   it('discloses that diagnostics are disabled for unsupported capture modes', () => {

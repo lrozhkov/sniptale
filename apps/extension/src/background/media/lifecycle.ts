@@ -6,7 +6,6 @@ export { recoverVideoCaptureSurfaceOnStartup } from './video/capture-surface';
 export { startRecording } from './video/manager';
 export { handleRegionSelectionNavigationStart } from './video/ui/region-selection';
 export {
-  handleTabRecordingDebuggerDetach,
   handleTabRecordingNavigationCommitted,
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,

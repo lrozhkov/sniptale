@@ -45,9 +45,12 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).toContain('sniptale.video-editor.command-palette');
   expect(plan.localPrefixes).toContain('sniptale_video_editor_track_panel_prefs:');
   expect(plan.session).toContain('diagnostics-active-sessions');
+  expect(plan.session).toContain('interaction-diagnostics-active-sessions');
   expect(plan.session).toContain('video-project-export-capabilities');
   expect(plan.session).toContain('sniptale_page_access_active_tabs');
   expect(plan.session).toContain('sniptale_popup_export_tab_selection_session');
+  expect(plan.session).toContain('sniptale_popup_export_job');
+  expect(plan.session).toContain('sniptale_native_full_page_capture_lease');
   expect(plan.session).toContain(AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY);
   expect(plan.session).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);
   expect(plan.sessionPrefixes).toContain('scenarioPresentationSession:');

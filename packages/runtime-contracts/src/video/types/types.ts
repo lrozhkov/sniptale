@@ -168,7 +168,7 @@ export interface VideoRecordingSettings {
   qualityProfiles: VideoRecordingProfile[];
   countdownSeconds: number;
   autoFadeDelay: number;
-  diagnosticsEnabled: boolean;
+  interactionDiagnosticsEnabled: boolean;
   controlledCursorCaptureEnabled?: boolean;
   recordingSurface?: VideoRecordingSurfaceSettings;
   webcamPresentation?: WebcamPresentationSettings;

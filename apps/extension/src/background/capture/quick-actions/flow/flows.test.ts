@@ -92,7 +92,6 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     viewportPresets,
   };
 }
@@ -281,7 +280,7 @@ it('binds library destination authority only for the explicit save-to-library ac
   });
 });
 
-it('skips debugger setup for native selection flows and keeps viewport null', async () => {
+it('keeps native selection flows on the active page with viewport null', async () => {
   const args = createSelectionArgs();
 
   await runSelectionFlow(args);
@@ -297,7 +296,7 @@ it('skips debugger setup for native selection flows and keeps viewport null', as
   );
 });
 
-it('routes owned viewer selection flows through the viewer port without debugger setup', async () => {
+it('routes owned viewer selection flows through the viewer port', async () => {
   const args = {
     ...createSelectionArgs(),
     pageCapability: TabRuntimeCapability.OwnedSnapshotViewer,

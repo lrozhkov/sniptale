@@ -45,7 +45,7 @@ function renderComponent(
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -54,7 +54,7 @@ function renderComponent(
     setIncludeCssDiagnostics: createToggleSetter(),
     setIncludeFiles: createToggleSetter(),
     setIncludeFullPageScreenshot: createToggleSetter(),
-    setIncludeHarDomLogs: createToggleSetter(),
+    setIncludePageDiagnostics: createToggleSetter(),
     setIncludeImages: createToggleSetter(),
     setIncludeJson: createToggleSetter(),
     setIncludeMarkdown: createToggleSetter(),
@@ -105,7 +105,7 @@ describe('ExportOptionToggles', () => {
     });
 
     expect(props.setIncludeJson).toHaveBeenCalledTimes(1);
-    expect(props.setIncludeHarDomLogs).toHaveBeenCalledTimes(1);
+    expect(props.setIncludePageDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledTimes(1);
   });
 

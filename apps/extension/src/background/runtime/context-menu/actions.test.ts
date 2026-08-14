@@ -35,6 +35,9 @@ const {
   resizeBrowserWindowFromContextMenuMock,
   runtimeGetUrlMock,
   sendTabMessageMock,
+  startPopupExportJobMock,
+  permissionsRequestMock,
+  tabsGetMock,
   startRecordingMock,
 } = vi.hoisted(() => ({
   browserScriptingExecuteScriptMock: vi.fn(),
@@ -49,7 +52,23 @@ const {
   resizeBrowserWindowFromContextMenuMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendTabMessageMock: vi.fn(),
+  startPopupExportJobMock: vi.fn(),
+  permissionsRequestMock: vi.fn(),
+  tabsGetMock: vi.fn(),
   startRecordingMock: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { request: permissionsRequestMock },
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: tabsGetMock },
+}));
+
+vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
+  startPopupExportJob: startPopupExportJobMock,
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -188,6 +207,9 @@ function seedContextMenuActionMocks() {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   browserScriptingExecuteScriptMock.mockResolvedValue([{ frameId: 0, result: 'Meta title' }]);
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  permissionsRequestMock.mockResolvedValue(true);
+  tabsGetMock.mockResolvedValue(createTab());
+  startPopupExportJobMock.mockResolvedValue({ success: true });
 }
 
 async function verifyPresetRecordingRouting() {
@@ -213,11 +235,16 @@ async function verifyExportStartRouting() {
     tab: createTab(),
   });
 
-  expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 11, {
+  expect(startPopupExportJobMock).toHaveBeenCalledWith({
+    jobId: expect.any(String),
     options: contextMenuPopupExportPreferencesFixture,
-    requestId: expect.any(String),
-    type: MessageType.EXPORT_POPUP_START,
+    orderedTabs: [{ tabId: 11, title: 'Tab title' }],
+    warnings: [],
   });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    11,
+    expect.objectContaining({ type: MessageType.SHOW_TOAST })
+  );
 }
 
 async function verifyJsonCopyRouting() {

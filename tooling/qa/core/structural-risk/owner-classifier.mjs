@@ -138,7 +138,7 @@ function hasPersistenceEffect(text) {
 const EFFECT_FAMILIES = [
   [
     'browser-privilege',
-    /\b(?:chrome|browser)\.(?:tabs|downloads|scripting|debugger|permissions|identity|management|contextMenus)\b/u,
+    /\b(?:chrome|browser)\.(?:tabs|downloads|scripting|permissions|identity|management|contextMenus)\b/u,
   ],
   ['messaging', /\b(?:sendMessage|postMessage|onMessage|runtime\.connect|BroadcastChannel)\b/u],
   ['persistence', hasPersistenceEffect],

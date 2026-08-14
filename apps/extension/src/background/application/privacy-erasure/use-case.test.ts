@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { acquireDiagnosticsMutationPermit } from '../../diagnostics/lifecycle-gate';
 import { acquireMediaMutationPermit } from '../../mutation-exclusion/media-activity';
 import { acquireNativeIngestionPermit } from '../../capture/native-app/lifecycle-gate';
+import { acquirePopupExportMutationPermit } from '../../capture/popup-export/job/lifecycle-gate';
 import { PrivacyErasureUseCase } from './use-case';
 import {
   createErasureRequest,
@@ -155,9 +156,11 @@ it('drains all mutation owners and rejects late writers through storage', async 
   const releaseExistingStart = acquireMediaMutationPermit();
   const releaseDiagnosticsWriter = acquireDiagnosticsMutationPermit();
   const releaseNativeWriter = acquireNativeIngestionPermit();
+  const releasePopupExport = acquirePopupExportMutationPermit();
   expect(releaseExistingStart).not.toBeNull();
   expect(releaseDiagnosticsWriter).not.toBeNull();
   expect(releaseNativeWriter).not.toBeNull();
+  expect(releasePopupExport).not.toBeNull();
   let releaseStorage!: () => void;
   const storageGate = new Promise<void>((resolve) => {
     releaseStorage = resolve;
@@ -179,22 +182,29 @@ it('drains all mutation owners and rejects late writers through storage', async 
   await Promise.resolve();
   expect(ports.media.cleanup).not.toHaveBeenCalled();
   releaseNativeWriter?.();
+  await Promise.resolve();
+  expect(ports.media.cleanup).not.toHaveBeenCalled();
+  releasePopupExport?.();
   await vi.waitFor(() => expect(ports.storage.cleanup).toHaveBeenCalledOnce());
   expect(acquireMediaMutationPermit()).toBeNull();
   expect(acquireDiagnosticsMutationPermit()).toBeNull();
   expect(acquireNativeIngestionPermit()).toBeNull();
+  expect(acquirePopupExportMutationPermit()).toBeNull();
 
   releaseStorage();
   await expect(execution).resolves.toEqual(expect.objectContaining({ success: true }));
   const nextStart = acquireMediaMutationPermit();
   const nextDiagnosticsWriter = acquireDiagnosticsMutationPermit();
   const nextNativeWriter = acquireNativeIngestionPermit();
+  const nextPopupExport = acquirePopupExportMutationPermit();
   expect(nextStart).not.toBeNull();
   expect(nextDiagnosticsWriter).not.toBeNull();
   expect(nextNativeWriter).not.toBeNull();
+  expect(nextPopupExport).not.toBeNull();
   nextStart?.();
   nextDiagnosticsWriter?.();
   nextNativeWriter?.();
+  nextPopupExport?.();
 });
 
 it('keeps start admission closed while a second application request is queued', async () => {

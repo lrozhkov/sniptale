@@ -27,8 +27,6 @@ import type {
 const backgroundInternalSignalTypes = [
   VideoMessageType.COUNTDOWN_COMPLETE,
   'KEEP_ALIVE',
-  MessageType.EXPORT_POPUP_PROGRESS,
-  MessageType.EXPORT_POPUP_RESULT,
 ] as const satisfies ReadonlyArray<BackgroundInternalSignalMessage['type']>;
 
 const captureMessageTypes = [
@@ -42,11 +40,7 @@ const captureMessageTypes = [
   CaptureMessageType.CAPTURE_FULL,
   CaptureMessageType.RENEW_SCREENSHOT_SURFACE_SESSION,
   MessageType.EXECUTE_SAVE,
-  MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY,
-  MessageType.EXPORT_START_HAR,
-  MessageType.EXPORT_STOP_HAR,
   MessageType.EXPORT_CAPTURE_FULL_PAGE,
-  MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
   MessageType.OPEN_EDITOR_WITH_IMAGE,
   MessageType.SAVE_SCREENSHOT_TO_GALLERY,
   MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY,
@@ -78,7 +72,6 @@ const tabModeMessageTypes = [
 
 const popupExportViewerMessageTypes = [
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,

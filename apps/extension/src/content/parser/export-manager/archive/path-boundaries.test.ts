@@ -13,7 +13,7 @@ function createArchiveOptions(): ExportOptions {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: false,
     includeMarkdown: false,

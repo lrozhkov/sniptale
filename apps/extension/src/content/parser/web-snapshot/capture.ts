@@ -1,4 +1,8 @@
-import { captureFullPageScreenshotAsset } from '../export-manager/diagnostics';
+import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
+import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { getContentRuntimeServices } from '../../platform/runtime-services/services';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { translate } from '../../../platform/i18n';
 import type { ContentPrivilegedActionIntentSource } from '../../platform/privileged-action-intent/client';
 import type { FullPageExportCaptureIdentity } from '../../../contracts/full-page-capture';
 
@@ -12,14 +16,37 @@ export async function captureWebSnapshotScreenshot(
 
 export async function captureWebSnapshotScreenshotWithWarnings(
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined,
-  captureIdentity?: FullPageExportCaptureIdentity | undefined
+  captureIdentity: FullPageExportCaptureIdentity = {
+    action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    exportRunId: crypto.randomUUID(),
+  }
 ): Promise<{ blob: Blob; warnings: string[] }> {
-  const asset = await captureFullPageScreenshotAsset(contentIntentSource, captureIdentity);
+  const services = getContentRuntimeServices();
+  const response = await services.messaging.sendRuntimeMessage(
+    await services.contentActionIntent.attachContentActionIntent(
+      {
+        type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+        exportRunId: captureIdentity.exportRunId,
+      },
+      contentIntentSource,
+      captureIdentity.exportRunId
+    )
+  );
+  if (!response.success || !response.dataUrl) {
+    const message = sanitizeDiagnosticMessage(
+      response.error ?? translate('content.runtime.captureFullPageScreenshotFailed')
+    );
+    throw new Error(message || translate('content.runtime.captureFullPageScreenshotFailed'));
+  }
   return {
-    blob:
-      asset.content instanceof Blob
-        ? asset.content
-        : new Blob([asset.content], { type: 'image/png' }),
-    warnings: asset.captureWarnings,
+    blob: await dataUrlToBlob(response.dataUrl),
+    warnings: [
+      ...(response.downscaled
+        ? [translate('content.runtime.captureFullPageDownscaledWarning')]
+        : []),
+      ...(response.frozenExtentWarning
+        ? [translate('content.runtime.captureFullPageFrozenExtentWarning')]
+        : []),
+    ],
   };
 }

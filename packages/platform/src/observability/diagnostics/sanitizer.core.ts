@@ -172,7 +172,7 @@ function sanitizeDiagnosticUrlFields(
 }
 
 /**
- * Sanitizes diagnostic export payloads, including nested HAR/resource URL fields.
+ * Sanitizes diagnostic export payloads, including nested resource URL fields.
  */
 export function sanitizeDiagnosticExportData(value: unknown): unknown {
   return sanitizeDiagnosticUrlFields(sanitizeDiagnosticData(value), sanitizeDiagnosticUrl);

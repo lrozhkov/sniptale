@@ -4,7 +4,7 @@ export const PRIVACY_ERASURE_RUNTIME_OWNER_MAPPINGS = [
     owner: 'local-data-erasure-media-strict-viewport-owner',
     productionFile:
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.ts',
-    reason: 'Privacy stop awaits strict viewport clear/detach and verifies debugger ownership.',
+    reason: 'Privacy stop awaits strict recording-surface cleanup before state erasure.',
     testFiles: [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',

@@ -35,15 +35,14 @@ declare module './' {
     type CONSUME_POPUP_EXPORT_LAUNCH_INTENT =
       typeof import('./').MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT;
     type EXPORT_POPUP_PREVIEW = typeof import('./').MessageType.EXPORT_POPUP_PREVIEW;
-    type EXPORT_POPUP_START = typeof import('./').MessageType.EXPORT_POPUP_START;
     type EXPORT_POPUP_BUILD_PACKAGE = typeof import('./').MessageType.EXPORT_POPUP_BUILD_PACKAGE;
     type EXPORT_POPUP_SAVE_WEB_SNAPSHOT =
       typeof import('./').MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT;
-    type STAGE_POPUP_EXPORT_ARCHIVE_CHUNK =
-      typeof import('./').MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK;
-    type EXPORT_POPUP_SAVE_ARCHIVE = typeof import('./').MessageType.EXPORT_POPUP_SAVE_ARCHIVE;
-    type RELEASE_POPUP_EXPORT_ARCHIVE =
-      typeof import('./').MessageType.RELEASE_POPUP_EXPORT_ARCHIVE;
+    type START_POPUP_EXPORT_JOB = typeof import('./').MessageType.START_POPUP_EXPORT_JOB;
+    type GET_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.GET_POPUP_EXPORT_JOB_STATUS;
+    type CANCEL_POPUP_EXPORT_JOB = typeof import('./').MessageType.CANCEL_POPUP_EXPORT_JOB;
+    type POPUP_EXPORT_JOB_STATUS_UPDATED =
+      typeof import('./').MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
     type EXPORT_POPUP_CANCEL = typeof import('./').MessageType.EXPORT_POPUP_CANCEL;
     type RELEASE_WEB_SNAPSHOT_STAGED_BLOBS =
       typeof import('./').MessageType.RELEASE_WEB_SNAPSHOT_STAGED_BLOBS;
@@ -64,15 +63,7 @@ declare module './' {
       typeof import('./').MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME;
     type OFFSCREEN_CANCEL_DESKTOP_FRAME =
       typeof import('./').MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME;
-    type EXPORT_POPUP_PROGRESS = typeof import('./').MessageType.EXPORT_POPUP_PROGRESS;
-    type EXPORT_POPUP_RESULT = typeof import('./').MessageType.EXPORT_POPUP_RESULT;
-    type REQUEST_EXPORT_HAR_START_CAPABILITY =
-      typeof import('./').MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY;
-    type EXPORT_START_HAR = typeof import('./').MessageType.EXPORT_START_HAR;
-    type EXPORT_STOP_HAR = typeof import('./').MessageType.EXPORT_STOP_HAR;
     type EXPORT_CAPTURE_FULL_PAGE = typeof import('./').MessageType.EXPORT_CAPTURE_FULL_PAGE;
-    type EXPORT_CAPTURE_FULL_PAGE_UNATTENDED =
-      typeof import('./').MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
     type PREPARE_FULL_PAGE_CAPTURE = typeof import('./').MessageType.PREPARE_FULL_PAGE_CAPTURE;
     type HEARTBEAT_FULL_PAGE_CAPTURE = typeof import('./').MessageType.HEARTBEAT_FULL_PAGE_CAPTURE;
     type PREPARE_FULL_PAGE_TILE = typeof import('./').MessageType.PREPARE_FULL_PAGE_TILE;

@@ -62,6 +62,10 @@ export function isBoundedBase64(value: unknown, maxDecodedBytes: number): value 
 }
 
 export function estimateUtf8Bytes(value: string, maxBytes = Number.POSITIVE_INFINITY): number {
+  if (value.length > maxBytes) {
+    return maxBytes + 1;
+  }
+
   let bytes = 0;
 
   for (let index = 0; index < value.length; index += 1) {

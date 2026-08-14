@@ -249,7 +249,6 @@ describe('window-only capture-surface lifecycle', () => {
     await other.apply(request());
     await expect(other.terminateClosedTab(7, ['video'])).resolves.toBeUndefined();
     expect(other.getApplied(7)).not.toBeNull();
-    await expect(other.handleDebuggerDetach(7)).resolves.toEqual([]);
   });
 
   it('fails closed while terminating a manually changed closed-tab window', async () => {

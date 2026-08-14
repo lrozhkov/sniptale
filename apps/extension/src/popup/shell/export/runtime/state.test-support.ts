@@ -40,7 +40,7 @@ function createRuntimeToggleState(): Pick<
   | 'includeCssDiagnostics'
   | 'includeFiles'
   | 'includeFullPageScreenshot'
-  | 'includeHarDomLogs'
+  | 'includePageDiagnostics'
   | 'includeImages'
   | 'includeJson'
   | 'includeMarkdown'
@@ -49,7 +49,7 @@ function createRuntimeToggleState(): Pick<
   | 'setIncludeCssDiagnostics'
   | 'setIncludeFiles'
   | 'setIncludeFullPageScreenshot'
-  | 'setIncludeHarDomLogs'
+  | 'setIncludePageDiagnostics'
   | 'setIncludeImages'
   | 'setIncludeJson'
   | 'setIncludeMarkdown'
@@ -61,7 +61,7 @@ function createRuntimeToggleState(): Pick<
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -70,7 +70,7 @@ function createRuntimeToggleState(): Pick<
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),

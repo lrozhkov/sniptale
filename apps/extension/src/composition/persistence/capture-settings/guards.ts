@@ -249,7 +249,7 @@ const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['qualityProfiles', parseOptionalVideoQualityProfiles],
   ['countdownSeconds', parseOptionalNumber],
   ['autoFadeDelay', parseOptionalVideoAutoFadeDelay],
-  ['diagnosticsEnabled', parseOptionalBoolean],
+  ['interactionDiagnosticsEnabled', parseOptionalBoolean],
   ['controlledCursorCaptureEnabled', parseOptionalBoolean],
   ['recordingSurface', parseOptionalRecordingSurface],
   ['webcamPresentation', parseOptionalWebcamPresentation],

@@ -42,12 +42,12 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
     createRequestId: vi.fn(),
     getActiveTabId: vi.fn(),
     requestPreview: vi.fn(),
-    saveArchiveBlob: vi.fn(),
+    requestAllUrlsPermission: vi.fn(),
     scheduleTimeout: vi.fn(),
-    sendBuildPackageMessage: vi.fn(),
-    sendCancelMessage: vi.fn(),
+    sendCancelJobMessage: vi.fn(),
+    sendGetJobStatusMessage: vi.fn(),
     sendSaveWebSnapshotMessage: vi.fn(),
-    sendStartMessage: vi.fn(),
+    sendStartJobMessage: vi.fn(),
     writeClipboardText: vi.fn(),
   };
 

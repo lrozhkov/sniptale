@@ -1,88 +1,81 @@
 import { expect, it, vi } from 'vitest';
-
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { applyPopupExportRuntimeMessage, parsePopupExportRuntimeMessage } from './message-listener';
 
-function createPopupExportResult(success: boolean, errors: string[]) {
-  return {
-    success,
-    errors,
-    stats: {
-      sectionsCount: 0,
-      rowsCount: 0,
-      filesCount: 0,
-      filesFailed: 0,
-    },
-  };
-}
+const status = {
+  activatedTabIds: [7],
+  effectiveOptions: {
+    includeBasicLogs: false,
+    includeCssDiagnostics: false,
+    includeFiles: false,
+    includeFullPageScreenshot: true,
+    includePageDiagnostics: false,
+    includeImages: false,
+    includeJson: true,
+    includeMarkdown: false,
+  },
+  jobId: 'job-1',
+  orderedTabs: [{ tabId: 7, title: 'Page' }],
+  originalActiveTabs: [{ tabId: 6, windowId: 1 }],
+  phase: 'running' as const,
+  progress: { current: 1, errors: [], message: 'Capturing', phase: 'scanning' as const, total: 2 },
+  revision: 2,
+  warnings: ['warning'],
+};
 
-it('parses popup export progress/runtime messages and rejects unrelated payloads', () => {
-  expect(
-    parsePopupExportRuntimeMessage({
-      type: MessageType.EXPORT_POPUP_PROGRESS,
-      requestId: 'req-1',
-      progress: {
-        phase: 'scanning',
-        message: 'Scanning',
-        current: 1,
-        total: 2,
-        errors: [],
-      },
-    })
-  ).toEqual(
-    expect.objectContaining({
-      type: MessageType.EXPORT_POPUP_PROGRESS,
-      requestId: 'req-1',
-    })
-  );
-
+it('parses only revisioned popup-export job status updates', () => {
+  const message = { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED };
+  expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
   expect(parsePopupExportRuntimeMessage({ type: MessageType.ENABLE_SCREENSHOT_MODE })).toBeNull();
 });
 
-it('applies result messages only for the active request id', () => {
+it('applies a matching job status and merges warnings into progress errors', () => {
   const setProgress = vi.fn();
   const setResult = vi.fn();
-  const clearRequestId = vi.fn();
+  const setLatestStatus = vi.fn();
 
   expect(
     applyPopupExportRuntimeMessage({
-      message: {
-        type: MessageType.EXPORT_POPUP_RESULT,
-        requestId: 'req-1',
-        result: createPopupExportResult(true, []),
-      },
-      requestId: 'req-2',
+      clearRequestId: vi.fn(),
+      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      requestId: 'job-1',
+      latestStatus: null,
+      setLatestStatus,
       setProgress,
       setResult,
-      clearRequestId,
-    })
-  ).toBe(false);
-
-  expect(setProgress).not.toHaveBeenCalled();
-  expect(setResult).not.toHaveBeenCalled();
-  expect(clearRequestId).not.toHaveBeenCalled();
-});
-
-it('applies the active result message and clears the request id', () => {
-  const setProgress = vi.fn();
-  const setResult = vi.fn();
-  const clearRequestId = vi.fn();
-
-  expect(
-    applyPopupExportRuntimeMessage({
-      message: {
-        type: MessageType.EXPORT_POPUP_RESULT,
-        requestId: 'req-1',
-        result: createPopupExportResult(false, ['failure']),
-      },
-      requestId: 'req-1',
-      setProgress,
-      setResult,
-      clearRequestId,
     })
   ).toBe(true);
+  expect(setProgress).toHaveBeenCalledWith(expect.objectContaining({ errors: ['warning'] }));
+  expect(setLatestStatus).toHaveBeenCalledWith({ jobId: 'job-1', revision: 2 });
+});
 
-  expect(setResult).toHaveBeenCalledWith(createPopupExportResult(false, ['failure']));
-  expect(setProgress).toHaveBeenCalled();
-  expect(clearRequestId).toHaveBeenCalled();
+it('ignores status updates for another active job', () => {
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId: vi.fn(),
+      latestStatus: null,
+      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      requestId: 'job-2',
+      setLatestStatus: vi.fn(),
+      setProgress: vi.fn(),
+      setResult: vi.fn(),
+    })
+  ).toBe(false);
+});
+
+it('rejects stale and duplicate revisions for the same job', () => {
+  const setProgress = vi.fn();
+
+  expect(
+    applyPopupExportRuntimeMessage({
+      clearRequestId: vi.fn(),
+      latestStatus: { jobId: 'job-1', revision: 3 },
+      message: { status, type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED },
+      requestId: 'job-1',
+      setLatestStatus: vi.fn(),
+      setProgress,
+      setResult: vi.fn(),
+    })
+  ).toBe(false);
+  expect(setProgress).not.toHaveBeenCalled();
 });

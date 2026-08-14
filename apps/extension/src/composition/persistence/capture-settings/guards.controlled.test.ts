@@ -60,7 +60,7 @@ it('keeps valid string and numeric settings while counting invalid field variant
       autoFadeDelay: 30,
       countdownSeconds: '3',
       controlledCursorCaptureEnabled: false,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
     })
   ).toEqual({
@@ -70,7 +70,7 @@ it('keeps valid string and numeric settings while counting invalid field variant
       ...CURRENT_VIDEO_SETTINGS_CONTRACT,
       autoFadeDelay: 30,
       controlledCursorCaptureEnabled: false,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
     },
   });

@@ -12,7 +12,6 @@
     "./browser/clipboard": "./src/browser/clipboard.ts",
     "./browser/content-runtime-shim": "./src/browser/content-runtime-shim.ts",
     "./browser/context-menus": "./src/browser/context-menus.ts",
-    "./browser/debugger": "./src/browser/debugger.ts",
     "./browser/desktop-capture": "./src/browser/desktop-capture.ts",
     "./browser/displays": "./src/browser/displays.ts",
     "./browser/downloads": "./src/browser/downloads.ts",

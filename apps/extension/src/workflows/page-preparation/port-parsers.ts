@@ -87,12 +87,7 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
       : null;
   }
 
-  const requestId = request['requestId'];
-  if (request['type'] !== MessageType.EXPORT_POPUP_START || !isString(requestId)) {
-    return null;
-  }
-
-  return { type: MessageType.EXPORT_POPUP_START, options, requestId };
+  return null;
 }
 
 export function parseViewerExportPortRequest(message: unknown): ViewerExportPortRequest | null {

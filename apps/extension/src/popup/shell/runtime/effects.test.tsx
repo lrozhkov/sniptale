@@ -127,7 +127,7 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 3,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: true,
       outputProfile: {
@@ -211,7 +211,7 @@ async function verifyPersistenceFailures() {
     <EffectsHarness
       state={{
         ...initial,
-        videoSettings: { ...initial.videoSettings, diagnosticsEnabled: true },
+        videoSettings: { ...initial.videoSettings, interactionDiagnosticsEnabled: true },
       }}
     />
   );
@@ -297,7 +297,7 @@ async function verifyReadyHydrationBecomesPersistenceBaseline() {
   const initial = createEffectsState({ isReady: false });
   const hydrated = createEffectsState({
     isReady: true,
-    videoSettings: { ...initial.videoSettings, diagnosticsEnabled: true },
+    videoSettings: { ...initial.videoSettings, interactionDiagnosticsEnabled: true },
   });
 
   await renderHarness(<EffectsHarness state={initial} />);
@@ -382,7 +382,7 @@ async function verifyQueuedSettingsPreserveExternalFields() {
   expect(persistVideoSettingsMock).toHaveBeenNthCalledWith(1, {
     outputProfile: firstLocalSettings.outputProfile,
   });
-  const firstAuthoritative = { ...firstLocalSettings, diagnosticsEnabled: true };
+  const firstAuthoritative = { ...firstLocalSettings, interactionDiagnosticsEnabled: true };
   first.resolve(firstAuthoritative);
   await flushMicrotasks();
 

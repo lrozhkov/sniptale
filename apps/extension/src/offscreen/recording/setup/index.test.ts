@@ -53,7 +53,7 @@ const settings = {
   ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 0,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   systemAudioEnabled: false,

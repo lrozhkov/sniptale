@@ -4,10 +4,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { cleanupScreenshotModeAfterNavigation } from '../../tab-mode-router-screenshot';
 import { restorePinnedToolbarAfterNavigation } from '../../page-access/pinned-toolbar-restore';
 import { invalidatePinnedToolbarOperations } from '../../page-access/pinned-toolbar-operation';
-import {
-  handleExportHarNavigationStart,
-  handleTabNavigation,
-} from '../../../diagnostics/lifecycle';
+import { handleTabNavigation } from '../../../diagnostics/lifecycle';
 import { clearBackgroundRuntimeTabEditingState } from '../../../application/runtime-state';
 import {
   ensureActiveVideoRecordingLeaseHydrated,
@@ -72,9 +69,6 @@ export function registerNavigationListeners(state: BackgroundModeState): void {
     runWithVideoLeaseHydrationFallback('process recording navigation', () =>
       handleTabRecordingNavigationStart(navigation.tabId)
     );
-    void handleExportHarNavigationStart(navigation.tabId).catch((error) => {
-      logger.warn('Failed to clean HAR export after navigation', error);
-    });
   });
 
   browserWebNavigation.subscribeToCommitted((details: unknown) => {

@@ -3,7 +3,6 @@ export {
   getPreauthorizedContentActionRouteMessage,
   markPreauthorizedContentActionRouteMessage,
 } from './routing/authorization/content-action';
-export { routePopupExportArchiveMessage } from './popup-export/archive-route';
 export {
   authorizeWebSnapshotCaptureRequest,
   cancelWebSnapshotCaptureRequest,

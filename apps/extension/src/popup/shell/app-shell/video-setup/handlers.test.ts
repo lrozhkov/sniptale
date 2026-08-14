@@ -118,7 +118,7 @@ it('keeps saved recording preferences unchanged when camera mode is selected', (
     videoSettings: {
       ...DEFAULT_VIDEO_SETTINGS,
       controlledCursorCaptureEnabled: true,
-      diagnosticsEnabled: true,
+      interactionDiagnosticsEnabled: true,
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,

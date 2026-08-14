@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getDefaultPopupExportRuntimeDeps } from './default-deps';
 import { logPopupExportCancelFailure } from './logging';
 import type { PopupExportRuntimeDeps } from './types';
@@ -12,7 +13,7 @@ type PopupExportCancellationState = Pick<
   | 'selectedTabIdsInOrder'
   | 'setProgress'
 >;
-type PopupExportCancellationDeps = Pick<PopupExportRuntimeDeps, 'sendCancelMessage'>;
+type PopupExportCancellationDeps = Pick<PopupExportRuntimeDeps, 'sendCancelJobMessage'>;
 
 export async function cancelPopupExport(
   state: PopupExportCancellationState,
@@ -34,19 +35,15 @@ export async function cancelPopupExport(
     }
     state.requestIdRef.current = null;
     state.cancelRetryRef.current = cancellation;
-    const results = await Promise.allSettled(
-      cancellation.tabIds.map((tabId) => deps.sendCancelMessage(tabId, cancellation.exportRunId))
-    );
-    const failures: unknown[] = [];
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        failures.push(result.reason);
-      } else if (result.value?.success !== true) {
-        failures.push(new Error(result.value?.error || 'Popup export cancellation was rejected'));
-      }
+    if (!deps.sendCancelJobMessage) {
+      throw new Error('Popup export job cancellation transport is unavailable');
     }
-    if (failures.length > 0) {
-      for (const failure of failures) logPopupExportCancelFailure(failure);
+    const response = await deps.sendCancelJobMessage({
+      type: MessageType.CANCEL_POPUP_EXPORT_JOB,
+      jobId: cancellation.exportRunId,
+    });
+    if (response?.success !== true) {
+      logPopupExportCancelFailure(response?.error || 'Popup export cancellation was rejected');
       const message = translate('content.runtime.exportCancelFailed');
       state.setProgress({
         activeStepKey: null,

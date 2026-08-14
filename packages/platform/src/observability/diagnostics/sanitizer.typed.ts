@@ -3,11 +3,7 @@ import {
   sanitizeDiagnosticMessage,
   sanitizeDiagnosticUrl,
 } from './sanitizer.core.ts';
-import type { DiagnosticEvent, DiagnosticMeta, NetworkRequestData } from './types';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import type { DiagnosticEvent, DiagnosticMeta } from './types';
 
 export function sanitizeDiagnosticsMeta(meta: DiagnosticMeta): DiagnosticMeta {
   const sanitizedMeta: DiagnosticMeta = {
@@ -28,55 +24,6 @@ export function sanitizeDiagnosticsMeta(meta: DiagnosticMeta): DiagnosticMeta {
   return sanitizedMeta;
 }
 
-function isNetworkRequestData(value: unknown): value is NetworkRequestData {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value['requestId'] === 'string' &&
-    typeof value['url'] === 'string' &&
-    typeof value['method'] === 'string' &&
-    typeof value['requestTime'] === 'number'
-  );
-}
-
-export function sanitizeNetworkRequestData(request: NetworkRequestData): NetworkRequestData {
-  const sanitizedRequest: NetworkRequestData = {
-    requestId: request.requestId,
-    url: sanitizeDiagnosticUrl(request.url) ?? request.url,
-    method: sanitizeDiagnosticMessage(request.method),
-    requestTime: request.requestTime,
-  };
-
-  if (request.status !== undefined) {
-    sanitizedRequest.status = request.status;
-  }
-  if (request.statusText !== undefined) {
-    sanitizedRequest.statusText = sanitizeDiagnosticMessage(request.statusText);
-  }
-  if (request.responseTime !== undefined) {
-    sanitizedRequest.responseTime = request.responseTime;
-  }
-  if (request.error !== undefined) {
-    sanitizedRequest.error = sanitizeDiagnosticMessage(request.error);
-  }
-  if (request.mimeType !== undefined) {
-    sanitizedRequest.mimeType = sanitizeDiagnosticMessage(request.mimeType);
-  }
-  if (request.resourceType !== undefined) {
-    sanitizedRequest.resourceType = sanitizeDiagnosticMessage(request.resourceType);
-  }
-
-  return sanitizedRequest;
-}
-
-function sanitizeDiagnosticEventData(data: unknown): unknown {
-  return isNetworkRequestData(data)
-    ? sanitizeNetworkRequestData(data)
-    : sanitizeDiagnosticData(data);
-}
-
 function sanitizeDiagnosticsEvent(event: DiagnosticEvent): DiagnosticEvent {
   const sanitizedEvent: DiagnosticEvent = {
     id: event.id,
@@ -90,7 +37,7 @@ function sanitizeDiagnosticsEvent(event: DiagnosticEvent): DiagnosticEvent {
     sanitizedEvent.level = event.level;
   }
   if (event.data !== undefined) {
-    sanitizedEvent.data = sanitizeDiagnosticEventData(event.data);
+    sanitizedEvent.data = sanitizeDiagnosticData(event.data);
   }
 
   return sanitizedEvent;

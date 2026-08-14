@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectBrowserAdapterViolations,
+  collectRetiredBrowserProtocolViolations,
   runBrowserAdapterCheck,
 } from './verify-browser-adapters.mjs';
 import { filterAstGrepAuditFiles } from '../audits/ast-grep.mjs';
@@ -109,6 +110,38 @@ describe('collectBrowserAdapterViolations baseline allowances', () => {
     expect(collectBrowserAdapterViolations([file], { root })).toEqual([
       expect.objectContaining({ rule: 'browser-tabs-direct' }),
     ]);
+  });
+});
+
+describe('retired browser protocol guard', () => {
+  it('rejects product API, message, artifact, and policy remnants', () => {
+    const root = createTempRoot();
+    const source = writeFile(
+      root,
+      'apps/extension/src/background/capture/legacy.ts',
+      'chrome.debugger.attach({ tabId: 1 });\n'
+    );
+    const policy = writeFile(
+      root,
+      'tooling/configs/qa/legacy.json',
+      '{"message":"EXPORT_START_HAR","artifact":"session.har"}\n'
+    );
+
+    expect(collectRetiredBrowserProtocolViolations([source, policy], { root })).toEqual([
+      expect.objectContaining({ file: 'apps/extension/src/background/capture/legacy.ts' }),
+      expect.objectContaining({ file: 'tooling/configs/qa/legacy.json' }),
+    ]);
+  });
+
+  it('allows browser-control protocol use only in Playwright tooling', () => {
+    const root = createTempRoot();
+    const e2e = writeFile(
+      root,
+      'tooling/test/e2e/browser-control.ts',
+      "client.send('Page.captureScreenshot');\n"
+    );
+
+    expect(collectRetiredBrowserProtocolViolations([e2e], { root })).toEqual([]);
   });
 });
 

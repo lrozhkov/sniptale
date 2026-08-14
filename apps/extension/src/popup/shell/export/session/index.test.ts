@@ -8,7 +8,7 @@ const baseArgs = {
   includeCssDiagnostics: false,
   includeFiles: false,
   includeFullPageScreenshot: false,
-  includeHarDomLogs: false,
+  includePageDiagnostics: false,
   includeImages: false,
   includeJson: false,
   includeMarkdown: false,
@@ -29,11 +29,11 @@ it('allows export with only basic logs enabled', () => {
   ).toBe(true);
 });
 
-it('allows export with only HAR + DOM enabled', () => {
+it('allows export with only page diagnostics enabled', () => {
   expect(
     getCanExport({
       ...baseArgs,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
     })
   ).toBe(true);
 });

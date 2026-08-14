@@ -18,8 +18,8 @@ const annotationForkSessionContract =
   runtimeActionCoreMessageContracts[MessageType.ANNOTATION_FORK_SESSION];
 const offscreenPageStorageContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE];
-const unattendedFullPageContract =
-  runtimeActionCoreMessageContracts[MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED];
+const nativeFullPageContract =
+  runtimeActionCoreMessageContracts[MessageType.EXPORT_CAPTURE_FULL_PAGE];
 const frameAnnotationRasterContract =
   runtimeActionCoreMessageContracts[MessageType.FRAME_ANNOTATION_RASTERIZE];
 const offscreenFrameAnnotationRasterContract =
@@ -533,21 +533,21 @@ it('strictly parses the offscreen page-storage privacy command and result', () =
   ).toThrow();
 });
 
-it('requires an explicit export identity for unattended full-page capture', () => {
+it('requires an explicit export identity for native full-page capture', () => {
   expect(
-    unattendedFullPageContract.parseRequest({
+    nativeFullPageContract.parseRequest({
       contentIntent: { requestId: 'batch-1', token: 'token-1' },
       exportRunId: 'batch-1',
-      type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     })
   ).toEqual({
     contentIntent: { requestId: 'batch-1', token: 'token-1' },
     exportRunId: 'batch-1',
-    type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+    type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
   });
   expect(() =>
-    unattendedFullPageContract.parseRequest({
-      type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+    nativeFullPageContract.parseRequest({
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     })
   ).toThrow();
 });

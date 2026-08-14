@@ -18,7 +18,7 @@ type ExportStepDefinition = {
     | 'popup.export.includeFilesLabel'
     | 'popup.export.includeImagesLabel'
     | 'popup.export.includeBasicLogsLabel'
-    | 'popup.export.includeHarDomLogsLabel'
+    | 'popup.export.includePageDiagnosticsLabel'
     | 'popup.export.includeCssDiagnosticsLabel'
     | 'popup.export.includeFullPageScreenshotLabel'
     | 'popup.export.webSnapshotPreviewStep'
@@ -34,7 +34,7 @@ type ExportStepSelection = {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
-  includeHarDomLogs: boolean;
+  includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
@@ -54,7 +54,7 @@ const EXPORT_STEP_DEFINITIONS: ExportStepDefinition[] = [
   { key: 'files', labelKey: 'popup.export.includeFilesLabel' },
   { key: 'images', labelKey: 'popup.export.includeImagesLabel' },
   { key: 'basicLogs', labelKey: 'popup.export.includeBasicLogsLabel' },
-  { key: 'harDomLogs', labelKey: 'popup.export.includeHarDomLogsLabel' },
+  { key: 'pageDiagnostics', labelKey: 'popup.export.includePageDiagnosticsLabel' },
   { key: 'cssDiagnostics', labelKey: 'popup.export.includeCssDiagnosticsLabel' },
   { key: 'fullPageScreenshot', labelKey: 'popup.export.includeFullPageScreenshotLabel' },
 ];
@@ -75,7 +75,7 @@ const SCANNING_KEYS: ExportStepKey[] = ['annotations', 'json', 'markdown'];
 const DOWNLOADING_KEYS: ExportStepKey[] = ['files', 'images'];
 const ZIPPING_KEYS: ExportStepKey[] = [
   'basicLogs',
-  'harDomLogs',
+  'pageDiagnostics',
   'cssDiagnostics',
   'fullPageScreenshot',
 ];
@@ -94,8 +94,8 @@ function isStepSelected(key: ExportStepKey, selection: ExportStepSelection) {
       return selection.includeImages;
     case 'basicLogs':
       return selection.includeBasicLogs;
-    case 'harDomLogs':
-      return selection.includeHarDomLogs;
+    case 'pageDiagnostics':
+      return selection.includePageDiagnostics;
     case 'cssDiagnostics':
       return selection.includeCssDiagnostics;
     case 'fullPageScreenshot':

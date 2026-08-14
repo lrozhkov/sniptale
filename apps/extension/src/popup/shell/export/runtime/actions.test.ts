@@ -26,7 +26,7 @@ type PopupExportPreferenceFixture = Pick<
   | 'includeCssDiagnostics'
   | 'includeFiles'
   | 'includeFullPageScreenshot'
-  | 'includeHarDomLogs'
+  | 'includePageDiagnostics'
   | 'includeImages'
   | 'includeJson'
   | 'includeMarkdown'
@@ -35,7 +35,7 @@ type PopupExportPreferenceFixture = Pick<
   | 'setIncludeCssDiagnostics'
   | 'setIncludeFiles'
   | 'setIncludeFullPageScreenshot'
-  | 'setIncludeHarDomLogs'
+  | 'setIncludePageDiagnostics'
   | 'setIncludeImages'
   | 'setIncludeJson'
   | 'setIncludeMarkdown'
@@ -77,7 +77,7 @@ function createPreferenceState(): PopupExportPreferenceFixture {
     includeCssDiagnostics: true,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -86,7 +86,7 @@ function createPreferenceState(): PopupExportPreferenceFixture {
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
@@ -151,14 +151,34 @@ function createRuntimeDeps(
       sectionsCount: 0,
       title: 'Preview',
     }),
-    saveArchiveBlob: vi.fn().mockResolvedValue(undefined),
     scheduleTimeout: vi.fn((callback) => {
       callback();
       return 7;
     }),
-    sendBuildPackageMessage: vi.fn(),
-    sendCancelMessage: vi.fn(),
-    sendStartMessage: vi.fn().mockResolvedValue({ success: true }),
+    sendStartJobMessage: vi.fn().mockResolvedValue({
+      success: true,
+      status: {
+        jobId: 'req-1',
+        revision: 1,
+        phase: 'running',
+        orderedTabs: [{ tabId: 12, title: 'Current tab' }],
+        effectiveOptions: {
+          includeAnnotations: false,
+          includeBasicLogs: false,
+          includeCssDiagnostics: true,
+          includeFiles: false,
+          includeFullPageScreenshot: false,
+          includeImages: false,
+          includeJson: true,
+          includeMarkdown: false,
+          includePageDiagnostics: false,
+        },
+        progress: { current: 0, total: 1, errors: [], message: 'Preparing', phase: 'scanning' },
+        warnings: [],
+        originalActiveTabs: [],
+        activatedTabIds: [],
+      },
+    }),
     writeClipboardText: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -202,11 +222,11 @@ it('starts single-tab export through injected runtime deps', async () => {
   expect(state.requestIdRef.current).toBe('req-1');
   expect(state.setResult).toHaveBeenCalledWith(null);
   expect(state.setProgress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'scanning' }));
-  expect(deps.sendStartMessage).toHaveBeenCalledWith(
-    12,
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      type: MessageType.EXPORT_POPUP_START,
-      requestId: 'req-1',
+      type: MessageType.START_POPUP_EXPORT_JOB,
+      jobId: 'req-1',
+      orderedTabs: [{ tabId: 12, title: 'Current tab' }],
       options: expect.objectContaining({
         includeCssDiagnostics: true,
         includeJson: true,
@@ -223,7 +243,7 @@ it('returns early when export is blocked', async () => {
 
   await startPopupExport(state, deps);
 
-  expect(deps.sendStartMessage).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).not.toHaveBeenCalled();
   expect(state.setProgress).not.toHaveBeenCalled();
 });
 
@@ -236,13 +256,13 @@ it('returns early when export cannot start yet', async () => {
   await startPopupExport(state, deps);
 
   expect(state.setProgress).not.toHaveBeenCalled();
-  expect(deps.sendStartMessage).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).not.toHaveBeenCalled();
 });
 
 it('reports a start export error when the runtime response fails', async () => {
   const state = createMockPopupExportRuntimeContract();
   const deps = createRuntimeDeps({
-    sendStartMessage: vi.fn().mockResolvedValue({
+    sendStartJobMessage: vi.fn().mockResolvedValue({
       error: 'Start failed',
       success: false,
     }),
@@ -255,6 +275,25 @@ it('reports a start export error when the runtime response fails', async () => {
     expect.objectContaining({
       message: 'Start failed',
       phase: 'error',
+    })
+  );
+});
+
+it('keeps the saved screenshot preference and starts without captures when host access is denied', async () => {
+  const state = createMockPopupExportRuntimeContract({ includeFullPageScreenshot: true });
+  const deps = createRuntimeDeps({
+    requestAllUrlsPermission: vi.fn().mockResolvedValue(false),
+  });
+
+  await startPopupExport(state, deps);
+
+  expect(state.setIncludeFullPageScreenshot).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({ includeFullPageScreenshot: false }),
+      warnings: [
+        'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
+      ],
     })
   );
 });

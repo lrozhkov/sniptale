@@ -12,7 +12,6 @@
     "unlimitedStorage",
     "tabs",
     "webNavigation",
-    "debugger",
     "system.display",
     "activeTab",
     "scripting",

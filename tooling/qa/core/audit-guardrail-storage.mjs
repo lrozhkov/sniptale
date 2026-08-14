@@ -125,7 +125,7 @@ export function collectPrivacyFeatureSettingsViolations(files) {
     return [];
   }
   const source = targetFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
-  return ['authenticatedSnapshotAssetsEnabled', 'rawDiagnosticsEnabled'].flatMap((feature) => {
+  return ['authenticatedSnapshotAssetsEnabled'].flatMap((feature) => {
     if (!source.includes(feature)) {
       return [];
     }

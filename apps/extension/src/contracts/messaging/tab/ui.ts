@@ -13,11 +13,6 @@ import type { WebSnapshotSaveResult } from '@sniptale/runtime-contracts/web-snap
 import type { ShowToastPayload } from '../contracts/types';
 import type { FullPageExportCaptureAction } from '../../full-page-capture';
 
-type PopupExportContentActionGrant = {
-  contentIntentGrant?: ContentIntentTypes.ContentPrivilegedActionAutoStartGrant;
-  fullPageCaptureAction?: FullPageExportCaptureAction;
-};
-
 export type TabUiRequestByType = {
   [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeRequestByType[typeof MessageType.ENABLE_SCREENSHOT_MODE];
   [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeRequestByType[typeof MessageType.DISABLE_SCREENSHOT_MODE];
@@ -56,16 +51,11 @@ export type TabUiRequestByType = {
   };
   [MessageType.DESTROY_UI_TOOLBAR]: { type: typeof MessageType.DESTROY_UI_TOOLBAR };
   [MessageType.EXPORT_POPUP_PREVIEW]: { type: typeof MessageType.EXPORT_POPUP_PREVIEW };
-  [MessageType.EXPORT_POPUP_START]: {
-    type: typeof MessageType.EXPORT_POPUP_START;
-    requestId: string;
-    options: ExportOptions;
-  } & PopupExportContentActionGrant;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
     batchRequestId: string;
     type: typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE;
     options: ExportOptions;
-  } & PopupExportContentActionGrant;
+  };
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: {
     type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT;
     allowAnonymousCrossOriginAssets: boolean;
@@ -101,7 +91,6 @@ export type TabUiResponseByType = {
   [MessageType.COPY_TEXT_TO_CLIPBOARD]: RuntimeMessageResponse<Record<string, never>>;
   [MessageType.DESTROY_UI_TOOLBAR]: RuntimeMessageResponse<Record<string, never>>;
   [MessageType.EXPORT_POPUP_PREVIEW]: PopupExportPreviewResponse;
-  [MessageType.EXPORT_POPUP_START]: PopupExportStartResponse;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;
   [MessageType.EXPORT_POPUP_CANCEL]: PopupExportStartResponse;

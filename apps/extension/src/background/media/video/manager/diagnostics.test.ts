@@ -31,7 +31,7 @@ const settings: VideoRecordingSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 0,
   countdownSeconds: 3,
-  diagnosticsEnabled: true,
+  interactionDiagnosticsEnabled: true,
   microphoneEnabled: false,
   microphoneDeviceId: null,
   outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
@@ -104,7 +104,7 @@ async function verifyUnsupportedDiagnosticsSkip(): Promise<void> {
 }
 
 async function verifyDiagnosticsStartupFailure(): Promise<void> {
-  startDiagnostics.mockRejectedValueOnce(new Error('cdp failed'));
+  startDiagnostics.mockRejectedValueOnce(new Error('diagnostics failed'));
 
   await expect(
     attemptDiagnosticsStart({

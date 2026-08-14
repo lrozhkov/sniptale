@@ -29,7 +29,7 @@ async function saveInterruptedSnapshot(snapshot: SessionSnapshot): Promise<numbe
   await saveDiagnostics(
     {
       recordingId: snapshot.recordingId,
-      schemaVersion: 1,
+      schemaVersion: 2,
       meta: sanitizedMeta,
       createdAt: new Date().toISOString(),
     },

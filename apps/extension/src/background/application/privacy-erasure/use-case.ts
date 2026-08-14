@@ -33,15 +33,18 @@ export class PrivacyErasureUseCase {
     const mediaExclusion = this.ports.media.reserveErasureExclusion();
     const diagnosticsExclusion = this.ports.diagnostics.reserveErasureExclusion();
     const nativeIngestionExclusion = this.ports.nativeIngestion.reserveErasureExclusion();
+    const popupExportExclusion = this.ports.popupExport.reserveErasureExclusion();
     const execution = this.executionQueue.then(async () => {
       try {
         await Promise.all([
           mediaExclusion.waitForActiveMutations(),
           diagnosticsExclusion.waitForActiveMutations(),
           nativeIngestionExclusion.waitForActiveMutations(),
+          popupExportExclusion.waitForActiveMutations(),
         ]);
         return await this.executeWithMutationsExcluded(request);
       } finally {
+        popupExportExclusion.release();
         nativeIngestionExclusion.release();
         diagnosticsExclusion.release();
         mediaExclusion.release();

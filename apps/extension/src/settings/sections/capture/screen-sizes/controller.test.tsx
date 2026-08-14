@@ -81,7 +81,6 @@ function createSettings(): Settings {
     defaultViewportPresetId: 'viewport-1',
     imageFormat: 'png',
     imageQuality: 90,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     skipWebSnapshotSaveDisclosure: false,
     viewportPresets: [viewportPreset, customizedSystemPreset, windowPreset],

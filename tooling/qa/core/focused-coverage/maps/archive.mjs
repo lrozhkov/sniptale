@@ -6,15 +6,6 @@ export const ARCHIVE_PACKAGE_OWNER_MAPPINGS = [
     testFiles: ['packages/platform/src/security/provenance-url.test.ts'],
   },
   {
-    owner: 'popup-batch-export-package-boundary',
-    productionPrefix: 'apps/extension/src/popup/shell/export/runtime/start/batch-',
-    reason: 'Popup batch export package boundaries are covered by request and archive hardfails.',
-    testFiles: [
-      'apps/extension/src/popup/shell/export/runtime/start/batch-archive.test.ts',
-      'apps/extension/src/popup/shell/export/runtime/start/batch-requests.test.ts',
-    ],
-  },
-  {
     owner: 'background-web-snapshot-package-boundary',
     productionFile: 'apps/extension/src/background/media-hub/web-snapshot.ts',
     reason: 'Web snapshot package save boundaries are covered by the focused media-hub tests.',

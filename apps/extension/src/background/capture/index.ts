@@ -38,7 +38,7 @@ export async function captureAndDownloadFullPage(
 export async function captureFullPageForArchive(
   tabId: number,
   context: {
-    backendKind: 'native' | 'unattended-cdp';
+    backendKind: 'native';
     documentId: string;
     abortSignal?: AbortSignal;
     exportRunId?: string;

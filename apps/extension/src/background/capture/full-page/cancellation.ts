@@ -4,17 +4,18 @@ const activeExportRuns = new Map<string, AbortController>();
 
 export function registerFullPageExportRun(exportRunId: string | undefined): {
   release(): void;
-  signal?: AbortSignal;
+  signal: AbortSignal;
 } {
-  if (exportRunId === undefined) return { release: () => undefined };
-  if (activeExportRuns.has(exportRunId)) {
+  if (exportRunId !== undefined && activeExportRuns.has(exportRunId)) {
     throw new Error('A full-page capture already owns this export run');
   }
   const controller = new AbortController();
-  activeExportRuns.set(exportRunId, controller);
+  if (exportRunId !== undefined) activeExportRuns.set(exportRunId, controller);
   return {
     release() {
-      if (activeExportRuns.get(exportRunId) === controller) activeExportRuns.delete(exportRunId);
+      if (exportRunId !== undefined && activeExportRuns.get(exportRunId) === controller) {
+        activeExportRuns.delete(exportRunId);
+      }
     },
     signal: controller.signal,
   };

@@ -105,10 +105,6 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Размер страницы изменился после прогрева; снимок использует зафиксированную область',
     en: 'The page grew after warm-up; the screenshot uses the frozen capture extent',
   },
-  captureFullPageScreenshotRetryHint: {
-    ru: 'Не удалось снять скриншот. Попробуйте закрыть режим разработчика или обновить страницу',
-    en: 'Failed to capture the screenshot. Try closing DevTools or refreshing the page',
-  },
   screenshotCaptureTimedOut: {
     ru: 'Скриншот не был завершён. Попробуйте снова.',
     en: 'Screenshot did not finish. Try again.',
@@ -180,14 +176,6 @@ export const contentRuntimeMessages = defineMessageSource({
   exportModuleLoadFailed: {
     ru: 'Не удалось загрузить модуль экспорта',
     en: 'Failed to load export module',
-  },
-  harUnavailable: {
-    ru: 'Сбор HAR недоступен',
-    en: 'HAR collection is unavailable',
-  },
-  harFinalizeFailed: {
-    ru: 'Не удалось завершить сбор HAR',
-    en: 'Failed to finalize HAR collection',
   },
   templateNotFound: {
     ru: 'Шаблон не найден',

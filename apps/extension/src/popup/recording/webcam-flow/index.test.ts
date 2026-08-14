@@ -27,7 +27,7 @@ const defaultSettings = {
   quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
 };
 
 function setupPopupWebcamFlowMocks() {

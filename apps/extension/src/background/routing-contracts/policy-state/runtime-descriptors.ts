@@ -5,6 +5,40 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'popup-export-job',
+    failClosedOnRestart: false,
+    id: 'popup-export-jobs',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/capture/popup-export/job/index.ts',
+    proofModules: ['apps/extension/src/background/capture/popup-export/job/index.test.ts'],
+    requiresTtl: false,
+    restartBehavior:
+      'Metadata survives the browser session; a worker restart marks unfinished memory-only work interrupted.',
+    restartClass: 'reconstructible',
+    stateClass: 'job-state',
+    storageClass: 'browser-session-storage',
+  },
+  {
+    authorityFamily: 'popup-export-erasure-authority',
+    failClosedOnRestart: false,
+    id: 'popup-export-erasure-exclusion',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts',
+    proofModules: [
+      'apps/extension/src/background/capture/popup-export/job/index.test.ts',
+      'apps/extension/src/background/capture/popup-export/job/storage.test.ts',
+      'apps/extension/src/background/application/privacy-erasure/use-case.test.ts',
+    ],
+    requiresTtl: false,
+    restartBehavior: [
+      'Worker restart discards the in-memory popup-export mutation exclusion;',
+      'startup reconciliation marks unfinished memory-only export work interrupted before new mutations are admitted.',
+    ].join(' '),
+    restartClass: 'reconstructible',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'aggregate-promotion-authority',
     failClosedOnRestart: false,
     id: 'aggregate-editor-presence',
@@ -165,7 +199,7 @@ export const runtimePolicyStateDescriptors = [
     requiresTtl: false,
     restartBehavior: [
       'Diagnostics runtime mutations are discarded with the worker;',
-      'recovery reconciles persistent debugger sessions before new mutations are admitted.',
+      'recovery restores sanitized interaction sessions before new mutations are admitted.',
     ].join(' '),
     restartClass: 'reconstructible',
     stateClass: 'runtime-state',
@@ -381,7 +415,7 @@ export const runtimePolicyStateDescriptors = [
     ownerModule: 'apps/extension/src/background/media/video/capture-surface/session-registry.ts',
     proofModules: [
       'apps/extension/src/background/media/video/capture-surface.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.test.ts',
     ],
     requiresTtl: false,
     restartBehavior: [

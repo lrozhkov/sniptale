@@ -40,7 +40,7 @@ it('resets controlled cursor state when a new recording preparation begins', () 
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 3,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: 'mic-1',
       microphoneEnabled: true,
       outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },

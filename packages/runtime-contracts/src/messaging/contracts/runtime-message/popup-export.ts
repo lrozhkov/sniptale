@@ -3,12 +3,13 @@ import type {
   ExportOptions,
   PopupExportPackageResponse,
   PopupExportPreviewResponse,
+  PopupExportJobStatus,
+  PopupExportJobTab,
 } from '../../../export';
 import type { WebSnapshotSaveResult } from '../../../web-snapshot';
 
 export type PopupTabRouteOperation =
   | typeof MessageType.EXPORT_POPUP_PREVIEW
-  | typeof MessageType.EXPORT_POPUP_START
   | typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | typeof MessageType.EXPORT_POPUP_CANCEL
@@ -20,15 +21,28 @@ export type PopupTabRouteCapabilityPayload = {
 };
 
 export type RuntimePopupExportRequestByType = {
+  [MessageType.START_POPUP_EXPORT_JOB]: {
+    type: typeof MessageType.START_POPUP_EXPORT_JOB;
+    jobId: string;
+    orderedTabs: PopupExportJobTab[];
+    options: ExportOptions;
+    warnings: string[];
+  };
+  [MessageType.GET_POPUP_EXPORT_JOB_STATUS]: {
+    type: typeof MessageType.GET_POPUP_EXPORT_JOB_STATUS;
+    jobId?: string;
+  };
+  [MessageType.CANCEL_POPUP_EXPORT_JOB]: {
+    type: typeof MessageType.CANCEL_POPUP_EXPORT_JOB;
+    jobId: string;
+  };
+  [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: {
+    type: typeof MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
+    status: PopupExportJobStatus;
+  };
   [MessageType.EXPORT_POPUP_PREVIEW]: {
     type: typeof MessageType.EXPORT_POPUP_PREVIEW;
     tabId: number;
-  } & PopupTabRouteCapabilityPayload;
-  [MessageType.EXPORT_POPUP_START]: {
-    type: typeof MessageType.EXPORT_POPUP_START;
-    tabId: number;
-    requestId: string;
-    options: ExportOptions;
   } & PopupTabRouteCapabilityPayload;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
     batchRequestId: string;
@@ -53,8 +67,17 @@ export type RuntimePopupExportRequestByType = {
 };
 
 export type RuntimePopupExportResponseByType = {
+  [MessageType.START_POPUP_EXPORT_JOB]: import('../response').RuntimeMessageResponse<{
+    status: PopupExportJobStatus;
+  }>;
+  [MessageType.GET_POPUP_EXPORT_JOB_STATUS]: import('../response').RuntimeMessageResponse<{
+    status: PopupExportJobStatus | null;
+  }>;
+  [MessageType.CANCEL_POPUP_EXPORT_JOB]: import('../response').RuntimeMessageResponse<{
+    status: PopupExportJobStatus;
+  }>;
+  [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: import('../response').RuntimeAckResponse;
   [MessageType.EXPORT_POPUP_PREVIEW]: PopupExportPreviewResponse;
-  [MessageType.EXPORT_POPUP_START]: import('../response').RuntimeAckResponse;
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]: WebSnapshotSaveResult;
   [MessageType.EXPORT_POPUP_CANCEL]: import('../response').RuntimeAckResponse;

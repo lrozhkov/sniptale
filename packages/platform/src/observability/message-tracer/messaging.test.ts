@@ -265,40 +265,4 @@ describe('message tracer messaging helpers', () => {
 
     harness.dispose();
   });
-
-  it('redacts raw HAR query secrets before emitting response trace events', () => {
-    const harness = installSanitizingObserver();
-
-    const tracker = beginSendTrace(
-      { type: 'EXPORT_STOP_HAR' },
-      { type: 'EXPORT_STOP_HAR', sessionId: 'session-1' },
-      'bg'
-    );
-    recordMessageResponse(
-      {
-        success: true,
-        har: {
-          queryString: [
-            { name: 'password', value: 'password-secret' },
-            { name: 'passphrase', value: 'passphrase-secret' },
-            { name: 'session_id', value: 'session-secret' },
-            { name: 'otp', value: 'otp-secret' },
-            { name: 'q', value: 'public' },
-          ],
-          url: 'https://example.test/api?password=password-secret&q=public#frag',
-        },
-      },
-      tracker
-    );
-
-    const serialized = JSON.stringify(harness.events);
-    expect(serialized).not.toContain('password-secret');
-    expect(serialized).not.toContain('passphrase-secret');
-    expect(serialized).not.toContain('session-secret');
-    expect(serialized).not.toContain('otp-secret');
-    expect(serialized).not.toContain('#frag');
-    expect(serialized).toContain('public');
-
-    harness.dispose();
-  });
 });

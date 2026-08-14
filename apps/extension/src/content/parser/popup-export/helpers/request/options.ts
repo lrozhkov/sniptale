@@ -20,7 +20,7 @@ export function isPopupExportOptions(value: unknown): value is ExportOptions {
     typeof value['includeFiles'] === 'boolean' &&
     typeof value['includeImages'] === 'boolean' &&
     typeof value['includeBasicLogs'] === 'boolean' &&
-    typeof value['includeHarDomLogs'] === 'boolean' &&
+    typeof value['includePageDiagnostics'] === 'boolean' &&
     typeof value['includeCssDiagnostics'] === 'boolean' &&
     typeof value['includeFullPageScreenshot'] === 'boolean'
   );

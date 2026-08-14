@@ -26,7 +26,7 @@ Threats include malicious pages and frames, replayed or unauthorized senders, ho
 | Zone | Inputs | Sensitive sinks |
 | --- | --- | --- |
 | PAGE / CONTENT | Hostile DOM in page and isolated worlds | Runtime messages, injected UI |
-| EXTENSION / BACKGROUND | Extension pages and typed routes | Storage, tabs, debugger, capture, downloads, native messaging |
+| EXTENSION / BACKGROUND | Extension pages and typed routes | Storage, tabs, capture, downloads, native messaging |
 | OFFSCREEN / SANDBOX | Media and renderer payloads | Media processing and isolated evaluation |
 | EXTERNAL / AI / NATIVE | Providers, native host, portable archives | Network egress, external process, import/export |
 | LOCAL / SESSION / SYNC / IDB | Extension state | Persistent, ephemeral, replicated, and structured storage |

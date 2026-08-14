@@ -1,19 +1,35 @@
 import { defineMessageSource } from '../source';
 import { popupExportWebSnapshotMessages } from './export-web-snapshot';
 
-const INCLUDE_HAR_DOM_LOGS_DESCRIPTION_RU = [
-  'DOM, HAR и console details;',
-  'credentials и чувствительные URL-параметры редактируются',
-].join(' ');
-const INCLUDE_HAR_DOM_LOGS_DESCRIPTION_EN = [
-  'DOM, HAR, and console details;',
-  'credentials and sensitive URL parameters are redacted',
-].join(' ');
+const INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_RU =
+  'DOM, virtual DOM и очищенные Resource Timing данные текущей страницы';
+const INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_EN =
+  'DOM, virtual DOM, and sanitized Resource Timing data for the current page';
 
 export const popupExportMessages = defineMessageSource({
   preparingPreview: {
     ru: 'Подготовка экспорта...',
     en: 'Preparing export...',
+  },
+  screenshotPermissionDeniedWarning: {
+    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
+    en: 'All-sites access was not granted; export continued without full-page screenshots.',
+  },
+  manualTabConflictWarning: {
+    ru: 'Скриншоты больше не снимаются: активная вкладка была переключена вручную.',
+    en: 'Screenshot capture stopped because the active tab was changed manually.',
+  },
+  tabUnavailableWarningPrefix: {
+    ru: 'Вкладка недоступна',
+    en: 'Tab is unavailable',
+  },
+  restoreOriginalTabWarningPrefix: {
+    ru: 'Не удалось восстановить исходную вкладку',
+    en: 'Could not restore the original tab',
+  },
+  jobInterruptedMessage: {
+    ru: 'Экспорт прерван перезапуском фонового процесса',
+    en: 'Export interrupted by background restart',
   },
   collectingTitle: {
     ru: 'Собираем материалы',
@@ -176,24 +192,24 @@ export const popupExportMessages = defineMessageSource({
     en: 'Basic logs',
   },
   includeBasicLogsDescription: {
-    ru: 'Сведения о странице, ходе сбора и сообщениях консоли',
-    en: 'Page details, collection notes, and page console messages',
+    ru: 'Сведения о странице, ходе сбора и предупреждениях экспорта',
+    en: 'Page details, collection notes, and export warnings',
   },
-  includeHarDomLogsLabel: {
+  includePageDiagnosticsLabel: {
     ru: 'Подробные логи',
     en: 'Detailed logs',
   },
-  includeHarDomLogsDescription: {
-    ru: INCLUDE_HAR_DOM_LOGS_DESCRIPTION_RU,
-    en: INCLUDE_HAR_DOM_LOGS_DESCRIPTION_EN,
+  includePageDiagnosticsDescription: {
+    ru: INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_RU,
+    en: INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_EN,
   },
   includeCssDiagnosticsLabel: {
     ru: 'Стили страницы',
     en: 'Page styles',
   },
   includeCssDiagnosticsDescription: {
-    ru: 'Оформление, параметры элементов и сообщения консоли',
-    en: 'Page styling, element parameters, and page console messages',
+    ru: 'Оформление страницы, стили и параметры элементов',
+    en: 'Page styling, stylesheets, and element parameters',
   },
   includeFullPageScreenshotLabel: {
     ru: 'Скриншот',

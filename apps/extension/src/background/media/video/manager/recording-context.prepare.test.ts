@@ -71,7 +71,7 @@ function createSettings() {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 1500,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     quality: VideoQuality.HIGH,

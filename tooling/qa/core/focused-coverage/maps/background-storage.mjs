@@ -16,13 +16,11 @@ export const BACKGROUND_STORAGE_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'background-storage-diagnostics-active-sessions',
+    owner: 'background-storage-interaction-diagnostics-active-sessions',
     productionPrefix: 'apps/extension/src/background/storage/diagnostics/',
     reason: 'Diagnostics session storage is covered by guard, write, and sanitization suites.',
     testFiles: [
-      'apps/extension/src/background/storage/diagnostics/active-sessions.sanitization.test.ts',
       'apps/extension/src/background/storage/diagnostics/active-sessions.test.ts',
-      'apps/extension/src/background/storage/diagnostics/active-sessions.write.test.ts',
       'apps/extension/src/background/storage/diagnostics/guards.test.ts',
     ],
   },

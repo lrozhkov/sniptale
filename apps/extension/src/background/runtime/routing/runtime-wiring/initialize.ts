@@ -13,7 +13,6 @@ import {
 } from '../../../application/privacy-erasure/composition';
 import { configureDownloadPort } from '../../../routing-contracts/download-port';
 import { executeDownloadBlob } from '../../../capture/download/download-router';
-import { registerDebuggerListeners } from './debugger';
 import { registerInstallListener } from './install';
 import { registerNavigationListeners } from './navigation';
 import { runStartupMaintenance } from './startup';
@@ -34,7 +33,6 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);
   registerTabLifecycleListeners(state, logger);
-  registerDebuggerListeners(logger, state);
   registerNavigationListeners(state);
   registerWindowBoundsListener();
   registerVoiceInputPorts();

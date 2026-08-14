@@ -61,8 +61,6 @@ vi.mock('../../../voice-input/telemetry-port', async (importOriginal) => ({
 
 import {
   createModeState,
-  debuggerDetachListenerRef,
-  debuggerEventListenerRef,
   initializeBackgroundContextMenus,
   nativeAppConnect,
   navigationListenerRef,
@@ -79,8 +77,6 @@ it('registers all background listeners through the runtime-wiring owner', () => 
 
   expect(removedListenerRef.current).toEqual(expect.any(Function));
   expect(updatedListenerRef.current).toEqual(expect.any(Function));
-  expect(debuggerEventListenerRef.current).toEqual(expect.any(Function));
-  expect(debuggerDetachListenerRef.current).toEqual(expect.any(Function));
   expect(navigationListenerRef.current).toEqual(expect.any(Function));
   expect(configureNativeIngestionPrivacyErasureCleanupPort).toHaveBeenCalledWith(
     nativeIngestionCleanupAdapter

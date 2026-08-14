@@ -9,7 +9,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
   const [includeFiles, setIncludeFiles] = useState(true);
   const [includeImages, setIncludeImages] = useState(true);
   const [includeBasicLogs, setIncludeBasicLogs] = useState(false);
-  const [includeHarDomLogs, setIncludeHarDomLogs] = useState(false);
+  const [includePageDiagnostics, setIncludePageDiagnostics] = useState(false);
   const [includeCssDiagnostics, setIncludeCssDiagnostics] = useState(false);
   const [includeFullPageScreenshot, setIncludeFullPageScreenshot] = useState(false);
 
@@ -20,7 +20,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
       setIncludeCssDiagnostics,
       setIncludeFiles,
       setIncludeFullPageScreenshot,
-      setIncludeHarDomLogs,
+      setIncludePageDiagnostics,
       setIncludeImages,
       setIncludeJson,
       setIncludeMarkdown,
@@ -31,7 +31,7 @@ export function usePopupExportPreferenceState(): PopupExportPreferenceState {
       includeCssDiagnostics,
       includeFiles,
       includeFullPageScreenshot,
-      includeHarDomLogs,
+      includePageDiagnostics,
       includeImages,
       includeJson,
       includeMarkdown,
@@ -48,7 +48,7 @@ export function usePopupExportPreferenceSetters(
     setIncludeCssDiagnostics,
     setIncludeFiles,
     setIncludeFullPageScreenshot,
-    setIncludeHarDomLogs,
+    setIncludePageDiagnostics,
     setIncludeImages,
     setIncludeJson,
     setIncludeMarkdown,
@@ -61,7 +61,7 @@ export function usePopupExportPreferenceSetters(
       setIncludeCssDiagnostics,
       setIncludeFiles,
       setIncludeFullPageScreenshot,
-      setIncludeHarDomLogs,
+      setIncludePageDiagnostics,
       setIncludeImages,
       setIncludeJson,
       setIncludeMarkdown,
@@ -72,7 +72,7 @@ export function usePopupExportPreferenceSetters(
       setIncludeCssDiagnostics,
       setIncludeFiles,
       setIncludeFullPageScreenshot,
-      setIncludeHarDomLogs,
+      setIncludePageDiagnostics,
       setIncludeImages,
       setIncludeJson,
       setIncludeMarkdown,

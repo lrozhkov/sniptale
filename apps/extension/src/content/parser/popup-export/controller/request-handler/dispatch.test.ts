@@ -5,16 +5,11 @@ import { dispatchPopupExportRequest } from './dispatch';
 
 const respondWithPopupPreviewMock = vi.hoisted(() => vi.fn());
 const handlePopupExportBuildPackageRuntimeMock = vi.hoisted(() => vi.fn());
-const handlePopupExportStartRuntimeMock = vi.hoisted(() => vi.fn());
 const handlePopupExportCancelRuntimeMock = vi.hoisted(() => vi.fn());
 const handlePopupWebSnapshotRuntimeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../preview', () => ({
   respondWithPopupPreview: respondWithPopupPreviewMock,
-}));
-
-vi.mock('../start/runtime', () => ({
-  handlePopupExportStartRuntime: handlePopupExportStartRuntimeMock,
 }));
 
 vi.mock('../package', () => ({
@@ -31,15 +26,11 @@ vi.mock('./cancel', () => ({
 
 function createRuntime() {
   return {
-    emitMessage: vi.fn(),
     exportRunner: {
       buildPackage: vi.fn(),
       cancel: vi.fn(),
-      export: vi.fn(),
-      onProgress: vi.fn(),
     },
     parseTree: vi.fn(),
-    persistArchive: vi.fn(),
     state: {
       activeExportRequestId: null as string | null,
       isExportRunning: false,
@@ -53,7 +44,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -73,33 +64,6 @@ it('routes preview requests to the preview responder', () => {
   ).toBe(true);
   expect(respondWithPopupPreviewMock).toHaveBeenCalledWith({
     parseTree: runtime.parseTree,
-    sendResponse,
-  });
-});
-
-it('routes start requests to the start handler', () => {
-  const runtime = createRuntime();
-  const sendResponse = vi.fn();
-  handlePopupExportStartRuntimeMock.mockReturnValue(true);
-
-  expect(
-    dispatchPopupExportRequest({
-      ...runtime,
-      request: {
-        type: MessageType.EXPORT_POPUP_START,
-        options: createExportOptions(),
-        requestId: 'req-1',
-      },
-      sendResponse,
-    })
-  ).toBe(true);
-  expect(handlePopupExportStartRuntimeMock).toHaveBeenCalledWith({
-    ...runtime,
-    request: {
-      options: createExportOptions(),
-      requestId: 'req-1',
-      type: MessageType.EXPORT_POPUP_START,
-    },
     sendResponse,
   });
 });

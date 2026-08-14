@@ -93,7 +93,7 @@ function createStartMessage() {
       quality: VideoQuality.HIGH,
       countdownSeconds: 3,
       autoFadeDelay: 1500,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
     },
     tabId: 17,
   };

@@ -66,17 +66,6 @@ export type ScenarioSessionResponse = RuntimeMessageResponse<
   }
 >;
 
-export type HarCaptureResponse = RuntimeMessageResponse<{
-  har?: Record<string, unknown>;
-  rawDiagnosticsEnabled?: boolean;
-}>;
-
-export type HarStartResponse = RuntimeMessageResponse<{
-  capabilityToken?: string;
-  expiresAtEpochMs?: number;
-  result?: string;
-}>;
-
 export type PopupTabRouteCapabilityResponse = RuntimeMessageResponse<{
   capabilityToken?: string;
 }>;

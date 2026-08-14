@@ -128,7 +128,7 @@ it('ignores malformed viewer preparation port payloads', () => {
     viewport: { height: 720, width: '1280' },
   });
   portMessageListener?.({
-    request: { type: MessageType.EXPORT_POPUP_START },
+    request: { type: 'RETIRED_EXPORT_MESSAGE' },
     requestId: 'port-req-1',
     type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
     viewerPortGeneration: 'viewer-generation-1',

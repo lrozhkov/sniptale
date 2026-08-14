@@ -44,7 +44,7 @@ export function createPopupBootstrapVideoSettings(overrides: Record<string, unkn
   return {
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: 'missing-device',
     microphoneEnabled: true,
     quality: VideoQuality.HIGH,

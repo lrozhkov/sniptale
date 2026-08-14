@@ -21,7 +21,7 @@ function createSettings(): VideoRecordingSettings {
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
     controlledCursorCaptureEnabled: false,
   };
 }

@@ -58,15 +58,14 @@ export const BACKGROUND_ACTION_ROUTE_CONTRACTS = {
     sideEffects: 'page-access activation and session-storage authority writes',
     transitiveStateOwner: 'background page-access owner',
   },
-  'popup-export-archive-download': {
-    acceptedSenderClass: 'popup export runtime with staged archive session authority',
-    errorShape: 'popup archive route error response',
-    freshnessReplayPolicy:
-      'archive session id, staged blob id, chunk order, and byte caps must match',
-    requiredAuthority: 'popup export archive staged transfer authority',
-    responseShape: 'popup archive staging/save/release response',
-    sideEffects: 'staged archive chunk persistence, download creation, and staged cleanup',
-    transitiveStateOwner: 'background popup-export archive owner',
+  'popup-export-job': {
+    acceptedSenderClass: 'popup export runtime',
+    errorShape: 'popup export job route error response',
+    freshnessReplayPolicy: 'job id and monotonic status revisions reject stale updates',
+    requiredAuthority: 'popup export job owner policy',
+    responseShape: 'popup export job status response',
+    sideEffects: 'page package collection, visible native capture, archive creation, and download',
+    transitiveStateOwner: 'background popup-export job owner',
   },
   'popup-tab-route-capability-issuance': {
     acceptedSenderClass: 'popup runtime requesting scoped tab-route authority',

@@ -75,7 +75,7 @@ function createSettings(): VideoRecordingSettings {
     autoFadeDelay: 3,
     autoGainControl: true,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     echoCancellation: true,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,

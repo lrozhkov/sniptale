@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { ActiveDiagnosticsSession } from '@sniptale/platform/observability/diagnostics/types';
 
 const { browserStorage, diagnosticsLogger } = vi.hoisted(() => ({
   browserStorage: {
@@ -23,136 +24,55 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 
 import {
   clearDiagnosticsSessionFromStorage,
+  clearRetiredDiagnosticSnapshots,
   clearStoredDiagnosticSnapshots,
   readStoredDiagnosticSnapshots,
+  replaceStoredDiagnosticSnapshots,
   restoreStoredDiagnosticsSession,
   saveActiveDiagnosticsSessionsToStorage,
 } from './active-sessions';
 
-function createSession(recordingId: string, tabId: number) {
+const STORAGE_KEY = 'interaction-diagnostics-active-sessions';
+
+function createSession(recordingId = 'recording-1', tabId = 7): ActiveDiagnosticsSession {
   return {
     recordingId,
     tabId,
     startedAt: 100,
     meta: {
-      url: 'https://example.com',
-      userAgent: 'Sniptale Test UA',
+      url: 'https://example.com/app?token=secret#fragment',
+      userAgent: 'Sniptale Test UA token=secret',
       viewportWidth: 1280,
       viewportHeight: 720,
       recordingStartedAt: '2026-03-21T12:00:00.000Z',
     },
     events: [
       {
-        id: `${recordingId}-event-1`,
+        id: `${recordingId}-action`,
         recordingId,
         tsMs: 10,
-        kind: 'network' as const,
-        message: 'request',
+        kind: 'action',
+        message: 'Clicked token=secret',
+        data: { authorization: 'Bearer secret' },
+      },
+      {
+        id: `${recordingId}-error`,
+        recordingId,
+        tsMs: 20,
+        kind: 'error',
+        level: 'error',
+        message: 'Failed token=secret',
+      },
+      {
+        id: `${recordingId}-meta`,
+        recordingId,
+        tsMs: 30,
+        kind: 'meta',
+        message: 'Recording marker',
       },
     ],
-    pendingNetworkRequests: new Map([
-      [
-        'request-1',
-        {
-          requestId: 'request-1',
-          url: 'https://example.com/api',
-          method: 'GET',
-          requestTime: 10,
-        },
-      ],
-    ]),
     isPaused: false,
   };
-}
-
-function createStoredSnapshot(recordingId: string, tabId: number, isPaused = false) {
-  return {
-    recordingId,
-    tabId,
-    startedAt: 100,
-    meta: {
-      url: 'https://example.com',
-      userAgent: 'Sniptale Test UA',
-      viewportWidth: 1280,
-      viewportHeight: 720,
-      recordingStartedAt: '2026-03-21T12:00:00.000Z',
-    },
-    events: [],
-    pendingNetworkRequests: [],
-    isPaused,
-  };
-}
-
-function createMalformedDiagnosticsStoragePayload() {
-  return {
-    'diagnostics-active-sessions': [
-      'invalid-root-entry',
-      {
-        recordingId: 'recording-valid',
-        tabId: 10,
-        startedAt: 250,
-        meta: {
-          url: 'https://example.com',
-          userAgent: 'Sniptale Test UA',
-          viewportWidth: 1280,
-          viewportHeight: 720,
-          recordingStartedAt: '2026-03-21T12:00:00.000Z',
-        },
-        events: [
-          {
-            id: 'event-1',
-            recordingId: 'recording-valid',
-            tsMs: 10,
-            kind: 'action',
-            message: 'clicked',
-          },
-          {
-            id: 'event-invalid',
-            tsMs: 20,
-          },
-        ],
-        pendingNetworkRequests: [
-          {
-            requestId: 'request-valid',
-            url: 'https://example.com/resource',
-            method: 'POST',
-            requestTime: 15,
-          },
-          {
-            requestId: 123,
-          },
-        ],
-        isPaused: false,
-      },
-      {
-        recordingId: 'recording-invalid',
-        tabId: 'bad-tab',
-      },
-    ],
-  };
-}
-
-function expectFilteredDiagnosticsSnapshots(
-  snapshots: Awaited<ReturnType<typeof readStoredDiagnosticSnapshots>>,
-  restored: Awaited<ReturnType<typeof restoreStoredDiagnosticsSession>>
-) {
-  expect(snapshots).toEqual([
-    expect.objectContaining({
-      recordingId: 'recording-valid',
-      events: [
-        expect.objectContaining({
-          id: 'event-1',
-        }),
-      ],
-      pendingNetworkRequests: [
-        expect.objectContaining({
-          requestId: 'request-valid',
-        }),
-      ],
-    }),
-  ]);
-  expect(restored?.pendingNetworkRequests.has('request-valid')).toBe(true);
-  expect(restored?.pendingNetworkRequests.size).toBe(1);
 }
 
 beforeEach(() => {
@@ -162,21 +82,21 @@ beforeEach(() => {
   browserStorage.session.remove.mockResolvedValue(undefined);
 });
 
-it('serializes active diagnostics sessions into storage snapshots', async () => {
-  const session = createSession('recording-1', 7);
-
-  await saveActiveDiagnosticsSessionsToStorage([session]);
+it('stores only sanitized interaction diagnostics under the v2 session key', async () => {
+  await saveActiveDiagnosticsSessionsToStorage([createSession()]);
 
   expect(browserStorage.session.set).toHaveBeenCalledWith({
-    'diagnostics-active-sessions': [
+    [STORAGE_KEY]: [
       expect.objectContaining({
         recordingId: 'recording-1',
-        tabId: 7,
-        events: session.events,
-        pendingNetworkRequests: [
-          expect.objectContaining({
-            requestId: 'request-1',
-          }),
+        meta: expect.objectContaining({
+          url: 'https://example.com/app',
+          userAgent: 'Sniptale Test UA token=***',
+        }),
+        events: [
+          expect.objectContaining({ kind: 'action', data: { authorization: '***' } }),
+          expect.objectContaining({ kind: 'error' }),
+          expect.objectContaining({ kind: 'meta' }),
         ],
       }),
     ],
@@ -187,90 +107,50 @@ it('serializes active diagnostics sessions into storage snapshots', async () => 
   );
 });
 
-it('removes the storage key when there are no active diagnostics sessions', async () => {
-  await saveActiveDiagnosticsSessionsToStorage([]);
-
-  expect(browserStorage.session.remove).toHaveBeenCalledWith('diagnostics-active-sessions');
-  expect(browserStorage.session.set).not.toHaveBeenCalled();
-});
-
-it('restores hydrated sessions and exposes raw stored snapshots', async () => {
+it('restores valid v2 snapshots and drops malformed or retired event kinds', async () => {
+  const snapshot = createSession('recording-valid', 9);
   browserStorage.session.get.mockResolvedValue({
-    'diagnostics-active-sessions': [
+    [STORAGE_KEY]: [
       {
-        recordingId: 'recording-2',
-        tabId: 9,
-        startedAt: 200,
-        meta: {
-          url: 'https://example.com',
-          userAgent: 'Sniptale Test UA',
-          viewportWidth: 1280,
-          viewportHeight: 720,
-          recordingStartedAt: '2026-03-21T12:00:00.000Z',
-        },
-        events: [],
-        pendingNetworkRequests: [
+        ...snapshot,
+        events: [
+          ...snapshot.events,
           {
-            requestId: 'request-2',
-            url: 'https://example.com/resource',
-            method: 'POST',
-            requestTime: 15,
+            id: 'retired-event',
+            recordingId: 'recording-valid',
+            tsMs: 40,
+            kind: 'network',
+            message: 'retired',
           },
         ],
-        isPaused: true,
       },
+      { recordingId: 'malformed', tabId: 'not-a-number' },
     ],
   });
-
-  const restored = await restoreStoredDiagnosticsSession('recording-2');
-  const snapshots = await readStoredDiagnosticSnapshots();
-
-  expect(restored).toMatchObject({
-    recordingId: 'recording-2',
-    tabId: 9,
-    isPaused: true,
-  });
-  expect(restored?.pendingNetworkRequests.get('request-2')).toEqual(
-    expect.objectContaining({
-      requestId: 'request-2',
-    })
-  );
-  expect(snapshots).toHaveLength(1);
-  await expect(restoreStoredDiagnosticsSession('missing-recording')).resolves.toBeNull();
-});
-
-it('drops malformed diagnostics snapshots instead of crashing recovery paths', async () => {
-  browserStorage.session.get.mockResolvedValue(createMalformedDiagnosticsStoragePayload());
 
   const snapshots = await readStoredDiagnosticSnapshots();
   const restored = await restoreStoredDiagnosticsSession('recording-valid');
 
-  expectFilteredDiagnosticsSnapshots(snapshots, restored);
+  expect(snapshots).toHaveLength(1);
+  expect(restored?.events.map((event) => event.kind)).toEqual(['action', 'error', 'meta']);
+  await expect(restoreStoredDiagnosticsSession('missing')).resolves.toBeNull();
 });
 
-it('clears individual sessions and the whole snapshot key through the browser seam', async () => {
-  browserStorage.session.get.mockResolvedValue({
-    'diagnostics-active-sessions': [
-      createStoredSnapshot('recording-1', 7),
-      createStoredSnapshot('recording-2', 8),
-    ],
-  });
+it('replaces, removes, and clears v2 snapshots without reading legacy state', async () => {
+  const first = createSession('recording-1', 7);
+  const second = createSession('recording-2', 8);
+  browserStorage.session.get.mockResolvedValue({ [STORAGE_KEY]: [first, second] });
 
   await clearDiagnosticsSessionFromStorage('recording-1');
   expect(browserStorage.session.set).toHaveBeenCalledWith({
-    'diagnostics-active-sessions': [
-      expect.objectContaining({
-        recordingId: 'recording-2',
-      }),
-    ],
+    [STORAGE_KEY]: [expect.objectContaining({ recordingId: 'recording-2' })],
   });
 
+  await replaceStoredDiagnosticSnapshots([]);
   await clearStoredDiagnosticSnapshots();
-  expect(browserStorage.session.remove).toHaveBeenCalledWith('diagnostics-active-sessions');
-});
+  await clearRetiredDiagnosticSnapshots();
 
-it('clears all stored diagnostics snapshots directly through the storage seam', async () => {
-  await clearStoredDiagnosticSnapshots();
-
+  expect(browserStorage.session.remove).toHaveBeenCalledWith(STORAGE_KEY);
   expect(browserStorage.session.remove).toHaveBeenCalledWith('diagnostics-active-sessions');
+  expect(browserStorage.session.get).not.toHaveBeenCalledWith('diagnostics-active-sessions');
 });

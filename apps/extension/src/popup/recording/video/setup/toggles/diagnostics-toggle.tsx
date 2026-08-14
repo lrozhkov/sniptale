@@ -44,7 +44,7 @@ export function VideoDiagnosticsToggle({
     ? translate('popup.video.diagnosticsUnavailableDescription')
     : translate('popup.video.diagnosticsDescription');
   const label = getDiagnosticsLabel(diagnosticsDisabled);
-  const active = !diagnosticsDisabled && settings.diagnosticsEnabled;
+  const active = !diagnosticsDisabled && settings.interactionDiagnosticsEnabled;
 
   function handleToggle() {
     handleDiagnosticsToggle({ active, onSettingsChange, setConfirmationOpen });
@@ -70,7 +70,7 @@ export function VideoDiagnosticsToggle({
           onCancel={() => setConfirmationOpen(false)}
           onConfirm={() => {
             setConfirmationOpen(false);
-            onSettingsChange({ diagnosticsEnabled: true });
+            onSettingsChange({ interactionDiagnosticsEnabled: true });
           }}
         />
       ) : null}
@@ -95,7 +95,7 @@ function handleDiagnosticsToggle({
 }) {
   if (active) {
     setConfirmationOpen(false);
-    onSettingsChange({ diagnosticsEnabled: false });
+    onSettingsChange({ interactionDiagnosticsEnabled: false });
     return;
   }
 

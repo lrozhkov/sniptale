@@ -46,15 +46,6 @@ vi.mock('../../jobs/state-machine', async (importOriginal) => ({
   transitionCaptureJob,
 }));
 
-vi.mock('../../../debugger/session/detach', () => ({
-  detachDebugger: vi.fn(),
-}));
-
-vi.mock('../../../debugger/workspace', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../debugger/workspace')>()),
-  clearViewport: vi.fn(),
-}));
-
 beforeEach(() => {
   vi.clearAllMocks();
   createRenderedCaptureJob.mockResolvedValue('capture-job-created');
@@ -114,7 +105,6 @@ function createCaptureResult(jobId?: string | undefined) {
     dataUrl: 'data:image/png;base64,capture',
     filename: 'capture.png',
     ...(jobId === undefined ? {} : { jobId }),
-    needsDebugger: false,
   };
 }
 
@@ -150,7 +140,6 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     defaultViewportPresetId: null,
     viewportPresets: [],

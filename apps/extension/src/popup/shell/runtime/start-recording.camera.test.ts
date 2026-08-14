@@ -30,7 +30,7 @@ const defaultSettings = {
   autoFadeDelay: 3,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,
-  diagnosticsEnabled: true,
+  interactionDiagnosticsEnabled: true,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   sourceCount: 3,
@@ -84,7 +84,7 @@ describe('startRecordingHandler camera mode', () => {
         viewportPresetId: null,
         settings: expect.objectContaining({
           controlledCursorCaptureEnabled: false,
-          diagnosticsEnabled: false,
+          interactionDiagnosticsEnabled: false,
           sourceCount: 1,
           systemAudioEnabled: false,
           webcamDeviceId: 'cam-1',

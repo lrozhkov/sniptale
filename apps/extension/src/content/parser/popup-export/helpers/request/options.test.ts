@@ -10,7 +10,7 @@ it('accepts only complete popup export option records with boolean flags', () =>
       includeFiles: false,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -23,7 +23,7 @@ it('accepts only complete popup export option records with boolean flags', () =>
       includeFiles: false,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -36,7 +36,7 @@ it('accepts only complete popup export option records with boolean flags', () =>
       includeFiles: false,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -48,7 +48,7 @@ it('accepts only complete popup export option records with boolean flags', () =>
       includeFiles: false,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeCssDiagnostics: 'no',
       includeFullPageScreenshot: true,
     })

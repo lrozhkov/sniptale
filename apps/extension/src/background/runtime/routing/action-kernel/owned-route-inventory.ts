@@ -9,7 +9,7 @@ import {
   aiSettingsMutationRouteDescriptor,
   aiSettingsQueryRouteDescriptor,
 } from '../../../ai/settings/route-descriptors';
-import { popupExportArchiveRouteDescriptor } from '../../../capture/popup-export/route-descriptors';
+import { popupExportJobRouteDescriptor } from '../../../capture/popup-export/job/route-descriptors';
 import { localDataErasureRouteDescriptor } from '../../../application/privacy-erasure/route-descriptors';
 import { nativeAppRouteDescriptor } from '../../native-app/route-descriptors';
 import { contentActionRouteDescriptor } from '../../../routing-contracts/capabilities/content-action/route-descriptors';
@@ -35,7 +35,7 @@ export const backgroundOwnedRouteInventory = [
   pageAccessRouteDescriptor,
   contentRuntimeWakeupRouteDescriptor,
   localDataErasureRouteDescriptor,
-  popupExportArchiveRouteDescriptor,
+  popupExportJobRouteDescriptor,
   llmContentProcessingRouteDescriptor,
   llmScenarioEditorProcessingRouteDescriptor,
   popupTabRouteCapabilityIssuanceDescriptor,

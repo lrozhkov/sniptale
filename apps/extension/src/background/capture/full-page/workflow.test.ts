@@ -4,11 +4,9 @@ const mocks = vi.hoisted(() => ({
   acquireLease: vi.fn(),
   captureTiles: vi.fn(),
   createAgent: vi.fn(),
-  createCdp: vi.fn(),
   createJob: vi.fn(),
   createNative: vi.fn(),
   cleanupStoredLease: vi.fn(),
-  hasOwnedCdp: vi.fn(),
   loadSettings: vi.fn(),
   releaseLease: vi.fn(),
   renewLease: vi.fn(),
@@ -39,11 +37,6 @@ vi.mock('./lifecycle', async (importOriginal) => ({
   cleanupStoredFullPageCaptureLease: mocks.cleanupStoredLease,
 }));
 vi.mock('./native-backend', () => ({ createNativeFullPageRasterBackend: mocks.createNative }));
-vi.mock('./cdp-backend', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./cdp-backend')>()),
-  createCdpFullPageRasterBackend: mocks.createCdp,
-  hasOwnedCdpLease: mocks.hasOwnedCdp,
-}));
 vi.mock('./page-agent-transport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./page-agent-transport')>()),
   createFullPagePageAgentTransport: mocks.createAgent,
@@ -88,12 +81,7 @@ beforeEach(() => {
   });
   mocks.acquireLease.mockResolvedValue(undefined);
   mocks.cleanupStoredLease.mockResolvedValue(undefined);
-  mocks.hasOwnedCdp.mockReturnValue(false);
   mocks.createNative.mockResolvedValue({
-    captureFrame: vi.fn(),
-    release: vi.fn().mockResolvedValue(undefined),
-  });
-  mocks.createCdp.mockResolvedValue({
     captureFrame: vi.fn(),
     release: vi.fn().mockResolvedValue(undefined),
   });
@@ -143,7 +131,6 @@ it('runs native scroll-and-stitch behind the shared visible-capture coordinator 
   );
 
   expect(mocks.runNativeExclusive).toHaveBeenCalledTimes(1);
-  expect(mocks.createCdp).not.toHaveBeenCalled();
   expect(mocks.captureTiles).toHaveBeenCalledWith(
     expect.objectContaining({ agent, raster, layoutGeneration: 'layout-1' })
   );
@@ -152,32 +139,6 @@ it('runs native scroll-and-stitch behind the shared visible-capture coordinator 
   );
   expect(raster.release).toHaveBeenCalledTimes(1);
   expect(mocks.releaseLease).toHaveBeenCalledTimes(1);
-});
-
-it('uses the unattended CDP adapter only for the explicitly selected backend', async () => {
-  const agent = {
-    heartbeat: vi.fn().mockResolvedValue(undefined),
-    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
-    restore: vi.fn().mockResolvedValue(undefined),
-  };
-  const raster = { captureFrame: vi.fn(), release: vi.fn().mockResolvedValue(undefined) };
-  mocks.createAgent.mockReturnValue(agent);
-  mocks.createCdp.mockResolvedValue(raster);
-  mocks.captureTiles.mockResolvedValue({ dataUrl: 'data:image/png;base64,cdp', metadata: {} });
-
-  await captureFullPageTransaction(42, undefined, {
-    backendKind: 'unattended-cdp',
-    documentId: 'document-2',
-    exportRunId: 'batch-1',
-  });
-
-  expect(mocks.createCdp).toHaveBeenCalledWith(
-    expect.objectContaining({ tabId: 42, ownerToken: expect.any(String) })
-  );
-  expect(mocks.runNativeExclusive).not.toHaveBeenCalled();
-  expect(mocks.acquireLease).toHaveBeenCalledWith(
-    expect.objectContaining({ exportRunId: 'batch-1', documentId: 'document-2' })
-  );
 });
 
 it('releases the storage lease and marks the job failed when page preparation rejects', async () => {
@@ -248,7 +209,7 @@ it('registers export cancellation before a queued capture starts', async () => {
   });
 
   const capture = captureFullPageTransaction(44, undefined, {
-    backendKind: 'unattended-cdp',
+    backendKind: 'native',
     documentId: 'document-4',
     exportRunId: 'batch-cancelled',
   });
@@ -274,7 +235,7 @@ it('registers export cancellation before asynchronous job creation', async () =>
   );
 
   const capture = captureFullPageTransaction(144, undefined, {
-    backendKind: 'unattended-cdp',
+    backendKind: 'native',
     documentId: 'document-144',
     exportRunId: 'batch-create-job-cancelled',
   });
@@ -341,31 +302,6 @@ it('preserves both capture and storage-lease cleanup failures', async () => {
   });
 });
 
-it('retains the durable lease and both failures when owned CDP detach needs retry', async () => {
-  const captureFailure = new Error('tile failed');
-  const detachFailure = new Error('detach failed');
-  mocks.createAgent.mockReturnValue({
-    heartbeat: vi.fn().mockResolvedValue(undefined),
-    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
-    restore: vi.fn().mockResolvedValue(undefined),
-  });
-  mocks.captureTiles.mockRejectedValueOnce(captureFailure);
-  mocks.createCdp.mockResolvedValueOnce({
-    captureFrame: vi.fn(),
-    release: vi.fn().mockRejectedValue(detachFailure),
-  });
-  mocks.hasOwnedCdp.mockReturnValue(true);
-
-  await expect(
-    captureFullPageTransaction(146, undefined, {
-      backendKind: 'unattended-cdp',
-      documentId: 'document-146',
-      exportRunId: 'batch-146',
-    })
-  ).rejects.toMatchObject({ errors: [captureFailure, detachFailure] });
-  expect(mocks.releaseLease).not.toHaveBeenCalled();
-});
-
 it('surfaces storage-lease cleanup failure after an otherwise successful capture', async () => {
   mocks.createAgent.mockReturnValue({
     heartbeat: vi.fn().mockResolvedValue(undefined),
@@ -415,7 +351,7 @@ it('rejects cancellation that arrives during the final rendering transition', as
   });
 
   const capture = captureFullPageTransaction(148, undefined, {
-    backendKind: 'unattended-cdp',
+    backendKind: 'native',
     documentId: 'document-148',
     exportRunId: 'batch-rendering-cancelled',
   });

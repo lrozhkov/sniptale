@@ -91,7 +91,7 @@ function createVideoSettings() {
   return {
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     quality: 'HIGH',

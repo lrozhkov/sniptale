@@ -4,10 +4,8 @@ import { createPopupExportRequestHandler } from '../request-handler/runtime';
 import type { PopupExportRunner, PopupExportState } from '../types';
 
 type PopupExportControllerRuntimeProps = {
-  emitMessage: typeof import('../../helpers/messaging').emitPopupExportMessage;
   exportRunner: PopupExportRunner;
   parseTree: (contextLabel: string) => Promise<ParsedDOMTree>;
-  persistArchive: typeof import('../../helpers/archive/persist').persistPopupExportArchive;
 };
 
 type PopupExportControllerRuntime = PopupExportControllerRuntimeProps & {
@@ -21,10 +19,8 @@ export function createPopupExportControllerRuntime(
 ): PopupExportControllerRuntime {
   const state = createPopupExportState();
   const handleRequest = createPopupExportRequestHandler({
-    emitMessage: props.emitMessage,
     exportRunner: props.exportRunner,
     parseTree: props.parseTree,
-    persistArchive: props.persistArchive,
     state,
   });
 

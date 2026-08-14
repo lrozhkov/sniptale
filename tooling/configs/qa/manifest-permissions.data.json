@@ -57,17 +57,6 @@
       "userFacingDisclosure": "settings.permissions.requiredWebNavigationDescription"
     },
     {
-      "name": "debugger",
-      "owner": "packages/platform/src/browser/debugger.ts",
-      "feature": "Full-page capture, exact page-viewport sizing, and HAR diagnostics",
-      "runtimeRoute": "shared debugger adapter consumed by background capture and HAR owners",
-      "capabilityPolicy": "Attach/detach requires the owning background route, resolved tab, and feature session.",
-      "failureBehavior": "Attach denial or missing permission aborts the feature flow before debugger side effects.",
-      "justification": "Supports debugger-backed capture/export diagnostics and HAR-style inspection flows.",
-      "reviewNote": "Keep attach/detach and event handling behind the shared debugger adapter.",
-      "userFacingDisclosure": "settings.permissions.requiredDebuggerDescription"
-    },
-    {
       "name": "system.display",
       "owner": "packages/platform/src/browser/displays.ts",
       "feature": "Browser-window preset fit and work-area selection",
@@ -175,9 +164,9 @@
       "feature": "Optional persistent page tooling and native visible capture authority for shim-restored HTTP/HTTPS pages",
       "runtimeRoute": "PAGE_ACCESS background-owned route with dynamic top-frame content runtime shim registration, lazy full-runtime injection, and native visible capture routes",
       "capabilityPolicy": "Optional all-sites access is requested only from extension UI; dynamic content script matches remain owner-registered, HTTP/HTTPS-only, and top-frame only.",
-      "failureBehavior": "Denied or revoked grants leave page tooling inactive; unsupported pages fail closed; visible capture routes use native tabs.captureVisibleTab and do not fall back to debugger for missing activeTab.",
+      "failureBehavior": "Denied or revoked grants leave page tooling inactive; unsupported pages and unavailable visible capture authority fail closed.",
       "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins.",
-      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/runtime/page-access and capture routes; do not add required host_permissions, source manifest content_scripts, or debugger fallback for normal visible capture.",
+      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/runtime/page-access and capture routes; do not add required host_permissions or source manifest content_scripts.",
       "userFacingDisclosure": "settings.permissions.sitesDescription"
     }
   ],

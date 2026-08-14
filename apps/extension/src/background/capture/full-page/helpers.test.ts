@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCaptureScreenshotResult, resolveCaptureBlobOptions } from './helpers';
+import { resolveCaptureBlobOptions } from './helpers';
 
 describe('capture-full-page result helpers', () => {
   it('resolves final blob options from settings defaults', () => {
@@ -29,14 +29,5 @@ describe('capture-full-page result helpers', () => {
       quality: 0.9,
       type: 'image/png',
     });
-  });
-
-  it('parses screenshot payloads and rejects invalid debugger responses', () => {
-    expect(parseCaptureScreenshotResult({ data: 'abc123' })).toEqual({
-      data: 'abc123',
-    });
-    expect(() => parseCaptureScreenshotResult({ data: 123 })).toThrow(
-      'Page.captureScreenshot returned an invalid response.'
-    );
   });
 });

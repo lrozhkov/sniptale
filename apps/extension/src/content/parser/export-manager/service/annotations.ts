@@ -26,7 +26,7 @@ export function hasOnlyBrowserAnnotations(options: ExportOptions): boolean {
     !options.includeFiles &&
     !options.includeImages &&
     !options.includeBasicLogs &&
-    !options.includeHarDomLogs &&
+    !options.includePageDiagnostics &&
     !options.includeCssDiagnostics &&
     !options.includeFullPageScreenshot
   );

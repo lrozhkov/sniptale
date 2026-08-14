@@ -118,7 +118,7 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
       quality: VideoQuality.MEDIUM,

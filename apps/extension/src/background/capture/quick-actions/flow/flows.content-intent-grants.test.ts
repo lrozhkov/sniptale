@@ -75,7 +75,6 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     viewportPresets,
   };
 }

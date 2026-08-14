@@ -6,12 +6,6 @@ import {
   type RouteCaptureMessage,
 } from '../../../capture/routes';
 import {
-  consumeExportHarStartCapability,
-  isExportHarStopCapabilityAuthorized,
-  markPreauthorizedHarStartRouteMessage,
-  markPreauthorizedHarStopRouteMessage,
-} from '../../../diagnostics/routes';
-import {
   AUTHORIZED,
   reject,
   type IpcAuthorizationResult,
@@ -33,42 +27,6 @@ export type PrivilegedTabRouteAuthorizationRequest = {
   sender: chrome.runtime.MessageSender | undefined;
 };
 
-function authorizeHarStartRoute(
-  message: Extract<RouteCaptureMessage, { type: typeof MessageType.EXPORT_START_HAR }>,
-  resolvedTabId: number,
-  sender: chrome.runtime.MessageSender | undefined
-): IpcAuthorizationResult {
-  if (!message.sessionId) return reject('Missing HAR session id');
-  if (!message.capabilityToken) return reject('Missing HAR start capability token');
-  try {
-    const preauthorization = consumeExportHarStartCapability({
-      capabilityToken: message.capabilityToken,
-      senderUrl: sender?.url,
-      sessionId: message.sessionId,
-      tabId: resolvedTabId,
-    });
-    markPreauthorizedHarStartRouteMessage(message, preauthorization);
-    return AUTHORIZED;
-  } catch (error) {
-    return reject(error instanceof Error ? error.message : 'Unauthorized HAR start capability');
-  }
-}
-
-function authorizeHarStopRoute(
-  message: Extract<RouteCaptureMessage, { type: typeof MessageType.EXPORT_STOP_HAR }>,
-  resolvedTabId: number
-): IpcAuthorizationResult {
-  if (!message.sessionId) return reject('Missing HAR session id');
-  if (!message.capabilityToken) return reject('Missing HAR capability token');
-  if (
-    !isExportHarStopCapabilityAuthorized(message.sessionId, resolvedTabId, message.capabilityToken)
-  ) {
-    return reject('Unauthorized HAR capability');
-  }
-  markPreauthorizedHarStopRouteMessage(message);
-  return AUTHORIZED;
-}
-
 function authorizePrivilegedTabCapabilityRoute(
   message: RouteCaptureMessage | TabModeMessage | VideoRecordingSurfaceMessage,
   resolvedTabId: number,
@@ -81,8 +39,7 @@ function authorizePrivilegedTabCapabilityRoute(
   };
   if (shouldRequireContentPrivilegedActionCapability(contentActionCapabilityRequest)) {
     if (
-      (message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
-        message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED) &&
+      message.type === MessageType.EXPORT_CAPTURE_FULL_PAGE &&
       message.contentIntent?.requestId !== message.exportRunId
     ) {
       return reject('Full-page export capability identity mismatch');
@@ -97,12 +54,6 @@ function authorizePrivilegedTabCapabilityRoute(
       return reject('Unauthorized content action capability');
     }
     markPreauthorizedContentActionRouteMessage(message, senderBinding);
-  }
-  if (message.type === MessageType.EXPORT_START_HAR) {
-    return authorizeHarStartRoute(message, resolvedTabId, sender);
-  }
-  if (message.type === MessageType.EXPORT_STOP_HAR) {
-    return authorizeHarStopRoute(message, resolvedTabId);
   }
   return AUTHORIZED;
 }

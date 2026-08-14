@@ -120,7 +120,7 @@ describe('collectOwnershipViolationsFromSources runtime state', () => {
           mutableConstObjectSource
         ),
         createEntry(
-          'apps/extension/src/background/debugger/session/store.ts',
+          'apps/extension/src/offscreen/recording/start/session.ts',
           mutableConstMapSource
         ),
       ])
@@ -131,7 +131,7 @@ describe('collectOwnershipViolationsFromSources runtime state', () => {
       }),
       expect.objectContaining({
         rule: 'module-global-runtime-state',
-        file: 'apps/extension/src/background/debugger/session/store.ts',
+        file: 'apps/extension/src/offscreen/recording/start/session.ts',
       }),
     ]);
   });
@@ -234,10 +234,7 @@ describe('ownership registry coverage', () => {
       )
     ).toBe(true);
     expect(
-      OWNERSHIP_STATE_FILES.has('apps/extension/src/background/debugger/session/state-core.ts')
-    ).toBe(true);
-    expect(
-      OWNERSHIP_STATE_FILES.has('apps/extension/src/background/debugger/session/store.ts')
+      OWNERSHIP_STATE_FILES.has('apps/extension/src/offscreen/recording/start/session.ts')
     ).toBe(true);
     expect(
       OWNERSHIP_STATE_FILES.has('apps/extension/src/scenario-editor/useScenarioEditorController.ts')

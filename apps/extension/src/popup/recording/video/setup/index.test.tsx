@@ -125,7 +125,7 @@ function createVideoSettings(): VideoRecordingSettings {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
     microphoneDeviceId: null,
     microphoneEnabled: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },

@@ -2,7 +2,6 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { translate } from '../../../../../platform/i18n';
 import { respondWithPopupPreview } from '../preview';
 import { handlePopupExportBuildPackageRuntime } from '../package';
-import { handlePopupExportStartRuntime } from '../start/runtime';
 import { handlePopupExportCancelRuntime } from './cancel';
 import type { PopupSendResponse } from '../../helpers/messaging';
 import type { PopupExportRequest } from '../../helpers/request/types';
@@ -77,13 +76,6 @@ export function dispatchPopupExportRequest(props: PopupExportRequestHandlerProps
         sendResponse: props.sendResponse,
       });
       return true;
-
-    case MessageType.EXPORT_POPUP_START:
-      return handlePopupExportStartRuntime({
-        ...props,
-        request: props.request,
-        sendResponse: props.sendResponse,
-      });
 
     case MessageType.EXPORT_POPUP_BUILD_PACKAGE:
       return handlePopupExportBuildPackageRuntime({

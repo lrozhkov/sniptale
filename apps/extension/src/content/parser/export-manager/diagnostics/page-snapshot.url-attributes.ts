@@ -6,7 +6,14 @@ const URL_ATTRIBUTE_NAMES = [
   'background',
   'cite',
   'data',
+  'data-background-url',
+  'data-href',
+  'data-iframe-src',
+  'data-origin',
+  'data-original',
+  'data-original-src',
   'data-src',
+  'data-url',
   'formaction',
   'href',
   'imagesrcset',
@@ -20,37 +27,24 @@ const SRCSET_ATTRIBUTE_NAMES = ['data-srcset', 'imagesrcset', 'srcset'] as const
 const REMOVED_CONTENT_ATTRIBUTES = ['srcdoc', 'style'] as const;
 const URL_ATTRIBUTE_NAME_SET = new Set<string>(URL_ATTRIBUTE_NAMES);
 const SRCSET_ATTRIBUTE_NAME_SET = new Set<string>(SRCSET_ATTRIBUTE_NAMES);
-const DATA_URL_ATTRIBUTE_NAMES = new Set(['data-original']);
-const DATA_URL_ATTRIBUTE_SUFFIXES = new Set(['href', 'src', 'url']);
+const DATA_SRCSET_ATTRIBUTE_NAMES = new Set(['data-image-srcset']);
 
 function normalizeAttributeName(attributeName: string): string {
   return attributeName.toLowerCase().replace(/_/g, '-');
 }
 
-function getLastAttributeNameSegment(attributeName: string): string {
-  const segments = attributeName.split('-');
-  return segments[segments.length - 1] ?? '';
-}
-
-function isDataUrlAttributeName(attributeName: string): boolean {
-  const normalized = normalizeAttributeName(attributeName);
-  if (!normalized.startsWith('data-')) {
-    return false;
-  }
-
-  const lastSegment = getLastAttributeNameSegment(normalized);
-  return DATA_URL_ATTRIBUTE_NAMES.has(normalized) || DATA_URL_ATTRIBUTE_SUFFIXES.has(lastSegment);
-}
-
 function isUrlAttributeName(attributeName: string): boolean {
   const normalized = normalizeAttributeName(attributeName);
-  return URL_ATTRIBUTE_NAME_SET.has(normalized) || isDataUrlAttributeName(normalized);
+  return URL_ATTRIBUTE_NAME_SET.has(normalized);
 }
 
 function isSrcsetAttributeName(attributeName: string): boolean {
   const normalized = normalizeAttributeName(attributeName);
-  const lastSegment = getLastAttributeNameSegment(normalized);
-  return SRCSET_ATTRIBUTE_NAME_SET.has(normalized) || lastSegment === 'srcset';
+  return SRCSET_ATTRIBUTE_NAME_SET.has(normalized) || DATA_SRCSET_ATTRIBUTE_NAMES.has(normalized);
+}
+
+export function isRetainedUrlAttributeName(attributeName: string): boolean {
+  return isUrlAttributeName(attributeName) || isSrcsetAttributeName(attributeName);
 }
 
 export function sanitizeUrlAttributes(element: HTMLElement): void {

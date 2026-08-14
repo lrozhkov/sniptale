@@ -40,7 +40,6 @@ export function createDiagnosticsSession(
     startedAt: performance.now(),
     meta,
     events: [],
-    pendingNetworkRequests: new Map(),
     isPaused: false,
   };
 }
@@ -74,7 +73,7 @@ export async function persistDiagnosticsSession(
     await saveDiagnostics(
       {
         recordingId,
-        schemaVersion: 1,
+        schemaVersion: 2,
         meta: sanitizedMeta,
         createdAt: new Date().toISOString(),
       },

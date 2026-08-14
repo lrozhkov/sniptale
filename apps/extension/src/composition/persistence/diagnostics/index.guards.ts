@@ -37,16 +37,8 @@ function isIsoDateString(value: unknown): value is string {
   return isString(value) && Number.isFinite(Date.parse(value));
 }
 
-function isDiagnosticKind(
-  value: unknown
-): value is 'action' | 'console' | 'error' | 'meta' | 'network' {
-  return (
-    value === 'action' ||
-    value === 'console' ||
-    value === 'error' ||
-    value === 'meta' ||
-    value === 'network'
-  );
+function isDiagnosticKind(value: unknown): value is 'action' | 'error' | 'meta' {
+  return value === 'action' || value === 'error' || value === 'meta';
 }
 
 function isDiagnosticLevel(value: unknown): value is 'error' | 'info' | 'log' | 'warn' {
@@ -111,7 +103,7 @@ export function parseDiagnosticsMeta(value: unknown): DiagnosticsEntry | null {
   }
   const meta = value['meta'];
   if (
-    value['schemaVersion'] !== 1 ||
+    value['schemaVersion'] !== 2 ||
     !isString(value['recordingId']) ||
     !isNonNegativeInteger(value['totalEvents']) ||
     value['totalEvents'] > MAX_DIAGNOSTICS_EVENTS ||
@@ -134,7 +126,7 @@ export function parseDiagnosticsMeta(value: unknown): DiagnosticsEntry | null {
 
   return {
     recordingId: value['recordingId'],
-    schemaVersion: 1,
+    schemaVersion: 2,
     totalEvents: value['totalEvents'],
     chunksCount: value['chunksCount'],
     createdAt: value['createdAt'],

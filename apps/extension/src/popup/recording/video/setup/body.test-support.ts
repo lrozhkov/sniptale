@@ -43,7 +43,7 @@ export function createBodySettings(): VideoRecordingSettings {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 2,
     countdownSeconds: 3,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },

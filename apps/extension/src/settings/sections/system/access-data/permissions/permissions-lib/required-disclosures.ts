@@ -4,7 +4,6 @@ import {
   Code2,
   Database,
   Download,
-  Eye,
   HardDrive,
   MonitorUp,
   MousePointerClick,
@@ -61,13 +60,6 @@ export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDi
     id: 'webNavigation',
     kind: 'permission',
     nameKey: 'settings.permissions.requiredWebNavigationName',
-  },
-  {
-    descriptionKey: 'settings.permissions.requiredDebuggerDescription',
-    icon: Eye,
-    id: 'debugger',
-    kind: 'permission',
-    nameKey: 'settings.permissions.requiredDebuggerName',
   },
   {
     descriptionKey: 'settings.permissions.requiredSystemDisplayDescription',

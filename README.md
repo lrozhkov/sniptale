@@ -134,7 +134,7 @@ Privacy controls can delete retained product data while preserving selected UI p
 
 Sniptale can parse a page into an internal structured document and project it into several export forms. A user can quickly copy the current page as cleaned JSON or Markdown, or run a batch export across selected open tabs.
 
-Exportable data classes include structured page data, cleaned text and tables, attachments, images and previews, basic diagnostics, detailed sanitized diagnostics such as DOM, HAR, and console information, page styling and element diagnostics, and a full-page screenshot. Selected outputs can be combined into a ZIP archive, with progress, cancellation, per-tab failures, and retry support.
+Exportable data classes include structured page data, cleaned text and tables, attachments, images and previews, basic diagnostics, detailed sanitized page diagnostics such as DOM, virtual DOM, and Resource Timing data, page styling and element diagnostics, and a full-page screenshot. Selected outputs can be combined into a ZIP archive, with progress, cancellation, per-tab failures, and retry support.
 
 This is intended for documentation, research, support, QA, handoff, and AI-ready data extraction. The parser and projectors are still evolving, so output schemas are not yet stable public contracts.
 
@@ -196,7 +196,7 @@ A separate authoring SDK is planned for publishing independently so custom compo
 
 ### Capture diagnostic context for reproducing defects
 
-An experimental diagnostic mode can retain sanitized recording context such as session metadata, lifecycle state, selected user actions, safe key events, warnings, errors, console signals, and network failures. The goal is to let a developer replay a recording alongside enough bounded evidence to understand how a defect was reproduced.
+An experimental diagnostic mode can retain sanitized recording context such as session metadata, lifecycle state, selected user actions, safe key events, warnings, errors, and service meta-events. The goal is to let a developer replay a recording alongside enough bounded evidence to understand how a defect was reproduced.
 
 Typed text, credentials, authorization values, cookies, and unrestricted request bodies are not intended to be retained. Diagnostic data is stored locally and can be exported as JSON or a support ZIP after disclosure. This remains a sensitive feature and should be treated as experimental until its privacy, sanitization, compatibility, and failure behavior have received broader adversarial testing.
 

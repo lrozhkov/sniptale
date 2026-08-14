@@ -52,7 +52,7 @@ beforeEach(() => {
 });
 
 describe('toolbar viewport change action', () => {
-  it('updates viewport on success and shows targeted conflict errors', async () => {
+  it('updates viewport on success', async () => {
     const setCurrentViewport = vi.fn();
 
     viewportChangeMocks.sendRuntimeMessage
@@ -69,19 +69,7 @@ describe('toolbar viewport change action', () => {
     );
     expect(setCurrentViewport).toHaveBeenCalledWith({ width: 800, height: 600 });
 
-    viewportChangeMocks.sendRuntimeMessage.mockResolvedValueOnce({
-      success: false,
-      error: 'background.runtime.debuggerConflictKeywordExtension',
-    });
-    await handleToolbarViewportChange(
-      { height: 700, presetId: 'viewport-900', target: 'window', width: 900 },
-      setCurrentViewport
-    );
-    expect(viewportChangeMocks.showToast).toHaveBeenCalledWith(
-      'content.toolbar.viewportConflictError',
-      'error',
-      5000
-    );
+    expect(viewportChangeMocks.showToast).not.toHaveBeenCalled();
   });
 
   it('shows generic viewport errors for failed responses and thrown exceptions', async () => {

@@ -2,7 +2,7 @@
 
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { CONTENT_ROOT_ID, PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
+import { CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 
 const runtimeMocks = vi.hoisted(() => ({
   getManifest: vi.fn(() => ({ version: '9.9.9-test' })),
@@ -26,7 +26,7 @@ import {
   buildDomSnapshotHtml,
   buildPageSummaryFile,
   buildVirtualDomSnapshotHtml,
-  createHarLikeSnapshot,
+  createResourceTimingSnapshot,
 } from './page-snapshot';
 
 function appendElement(
@@ -58,7 +58,7 @@ function resetDocumentTree() {
 
 function createVirtualBody() {
   const body = document.createElement('body');
-  body.dataset['virtual'] = 'true';
+  body.dataset['virtualIframe'] = 'true';
   appendElement(body, 'main', { id: 'virtual-main', textContent: 'Virtual Body' });
   appendElement(body, 'div', { id: CONTENT_ROOT_ID, textContent: 'Extension Root' });
   appendElement(body, 'input', { type: 'password', value: 'virtual-secret' });
@@ -133,47 +133,16 @@ function createSummaryExpectation() {
   };
 }
 
-function createExpectedHarEntry() {
+function createExpectedResourceTimingEntry() {
   return {
-    _from: 'performance-resource-timing',
-    _initiatorType: 'other',
-    cache: {},
-    pageref: 'resource_timing_page',
-    request: {
-      bodySize: -1,
-      cookies: [],
-      headers: [],
-      headersSize: -1,
-      httpVersion: '',
-      method: 'GET',
-      queryString: [],
-      url: 'https://example.test/fallback',
-    },
-    response: {
-      bodySize: -1,
-      content: {
-        mimeType: '',
-        size: 0,
-      },
-      cookies: [],
-      headers: [],
-      headersSize: -1,
-      httpVersion: '',
-      redirectURL: '',
-      status: 0,
-      statusText: '',
-    },
-    startedDateTime: new Date(performance.timeOrigin + 25).toISOString(),
-    time: -2,
-    timings: {
-      blocked: -1,
-      connect: -1,
-      dns: -1,
-      receive: 0,
-      send: 0,
-      ssl: -1,
-      wait: 0,
-    },
+    decodedBodySize: 0,
+    duration: -2,
+    encodedBodySize: 0,
+    initiatorType: 'other',
+    name: 'https://example.test/fallback',
+    nextHopProtocol: '',
+    startTime: 25,
+    transferSize: 0,
   };
 }
 
@@ -203,7 +172,7 @@ it('redacts DOM snapshots and keeps the stable facade path', () => {
   expect(snapshot).toContain('[text:15]');
   expect(snapshot).not.toContain(`id="${CONTENT_ROOT_ID}"`);
   expect(snapshot).toContain('type="password"');
-  expect(snapshot).toContain('value=""');
+  expect(snapshot).not.toContain('value=');
   expect(snapshot).not.toContain('onclick=');
   expect(snapshot).not.toContain('onerror=');
   expect(snapshot).not.toContain('top-secret');
@@ -223,10 +192,11 @@ it('replaces or appends virtual body snapshots and redacts the replacement conte
 
   const snapshot = buildVirtualDomSnapshotHtml();
 
-  expect(snapshot).toContain('virtual-main');
+  expect(snapshot).not.toContain('virtual-main');
   expect(snapshot).not.toContain('original-main');
+  expect(snapshot).toContain('id="[present]"');
   expect(snapshot).not.toContain(`id="${CONTENT_ROOT_ID}"`);
-  expect(snapshot).toContain('value=""');
+  expect(snapshot).not.toContain('value=');
   expect(snapshot).not.toContain('Virtual Body');
   expect(snapshot).toContain('[text:12]');
 
@@ -236,8 +206,87 @@ it('replaces or appends virtual body snapshots and redacts the replacement conte
   vi.spyOn(document.documentElement, 'cloneNode').mockReturnValue(htmlWithoutBody);
   const appendedSnapshot = buildVirtualDomSnapshotHtml();
 
-  expect(appendedSnapshot).toContain('virtual-main');
-  expect(appendedSnapshot).toContain('data-virtual="true"');
+  expect(appendedSnapshot).not.toContain('virtual-main');
+  expect(appendedSnapshot).toContain('data-virtual-iframe="true"');
+});
+
+function appendPrivacyAttributeFixture(parent: ParentNode): HTMLElement {
+  return appendElement(parent, 'button', {
+    'aria-description': 'Account owner private@example.test',
+    'aria-expanded': 'true',
+    'aria-label': 'Private account',
+    class: 'account owner-card',
+    'data-account': 'raw-account-secret',
+    'data-application-code': 'tenant-private-app',
+    'data-auth-token': 'auth-token-secret',
+    'data-email': 'private@example.test',
+    disabled: 'disabled',
+    href: '/accounts/account-48291?token=query-secret#private',
+    id: 'private@example.test',
+    name: 'private-account-name',
+    onclick: 'send(authToken)',
+    role: 'button',
+    title: 'Private title',
+  });
+}
+
+function expectPrivacyAttributesSanitized(snapshot: string): void {
+  expect(snapshot).not.toContain('auth-token-secret');
+  expect(snapshot).not.toContain('private@example.test');
+  expect(snapshot).not.toContain('raw-account-secret');
+  expect(snapshot).not.toContain('tenant-private-app');
+  expect(snapshot).not.toContain('private-account-name');
+  expect(snapshot).not.toContain('onclick=');
+  expect(snapshot).not.toContain('data-account=');
+  expect(snapshot).not.toContain('data-application-code=');
+  expect(snapshot).not.toContain('data-auth-token=');
+  expect(snapshot).not.toContain('data-email=');
+  expect(snapshot).toContain('href="/accounts/account-48291"');
+  expect(snapshot).toContain('aria-description=""');
+  expect(snapshot).toContain('aria-label=""');
+  expect(snapshot).toContain('aria-expanded="true"');
+  expect(snapshot).toContain('class="[tokens:2]"');
+  expect(snapshot).toContain('disabled=""');
+  expect(snapshot).toContain('id="[present]"');
+  expect(snapshot).toContain('name="[present]"');
+  expect(snapshot).toContain('role="button"');
+  expect(snapshot).toContain('title=""');
+}
+
+it('retains only minimized structural attributes in DOM snapshots', () => {
+  resetDocumentTree();
+  appendPrivacyAttributeFixture(document.body);
+
+  expectPrivacyAttributesSanitized(buildDomSnapshotHtml());
+});
+
+it('keeps only bounded language and numeric structural attribute values', () => {
+  resetDocumentTree();
+  appendElement(document.body, 'section', { lang: 'EN-us2' });
+  appendElement(document.body, 'section', { lang: '' });
+  appendElement(document.body, 'section', { lang: 'e1' });
+  appendElement(document.body, 'section', { lang: 'en-u' });
+  appendElement(document.body, 'section', { lang: 'en-us-posix-extra' });
+  appendElement(document.body, 'td', { colspan: '-123.45' });
+  appendElement(document.body, 'td', { colspan: '1234567' });
+  appendElement(document.body, 'td', { colspan: '1.2.3' });
+  appendElement(document.body, 'td', { colspan: '12x' });
+
+  const snapshot = buildDomSnapshotHtml();
+
+  expect(snapshot).toContain('lang="EN-us2"');
+  expect(snapshot).toContain('colspan="-123.45"');
+  expect(snapshot.match(/lang=""/g)).toHaveLength(4);
+  expect(snapshot.match(/colspan=""/g)).toHaveLength(3);
+});
+
+it('applies the same structural attribute policy to virtual DOM snapshots', () => {
+  resetDocumentTree();
+  const virtualBody = document.createElement('body');
+  appendPrivacyAttributeFixture(virtualBody);
+  traversalMocks.buildVirtualDomSnapshot.mockReturnValue({ root: virtualBody });
+
+  expectPrivacyAttributesSanitized(buildVirtualDomSnapshotHtml());
 });
 
 it('summarizes resource timing rollups with stable fallback labels', () => {
@@ -261,8 +310,7 @@ it('summarizes resource timing rollups with stable fallback labels', () => {
   expect(buildPageSummaryFile({ pageTitle: 'Snapshot Page' })).toEqual(createSummaryExpectation());
 });
 
-it('creates HAR-like snapshots from resource timing entries', () => {
-  runtimeMocks.getManifest.mockReturnValue({ version: '1.2.3-test' });
+it('creates simple sanitized Resource Timing snapshots', () => {
   document.title = 'Snapshot Page';
   vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
     createResourceEntry({
@@ -274,17 +322,13 @@ it('creates HAR-like snapshots from resource timing entries', () => {
     }),
   ]);
 
-  const snapshot = createHarLikeSnapshot({
+  const snapshot = createResourceTimingSnapshot({
     pageTitle: 'Snapshot Page',
-    pageUrl: 'https://example.test/snapshot-page',
+    pageUrl: 'https://example.test/snapshot-page?token=secret#fragment',
   });
 
-  expect(snapshot.log.browser.name).toBe(navigator.userAgent);
-  expect(snapshot.log.creator).toEqual({
-    name: `${PRODUCT_BRAND_NAME} resource-timing snapshot`,
-    version: '1.2.3-test',
-  });
-  expect(snapshot.log.pages[0]?.id).toBe('resource_timing_page');
-  expect(snapshot.log.pages[0]?.title).toBe('Snapshot Page');
-  expect(snapshot.log.entries).toEqual([createExpectedHarEntry()]);
+  expect(snapshot.pageTitle).toBe('Snapshot Page');
+  expect(snapshot.pageUrl).toBe('https://example.test/snapshot-page');
+  expect(snapshot.timeOrigin).toBe(performance.timeOrigin);
+  expect(snapshot.entries).toEqual([createExpectedResourceTimingEntry()]);
 });

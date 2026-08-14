@@ -6,12 +6,12 @@ import { browserStorage } from '../../../composition/persistence/infrastructure/
 import {
   sanitizeDiagnosticsEvents,
   sanitizeDiagnosticsMeta,
-  sanitizeNetworkRequestData,
 } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredDiagnosticSnapshots } from './guards';
 
-const SESSION_STORAGE_KEY = 'diagnostics-active-sessions';
+const SESSION_STORAGE_KEY = 'interaction-diagnostics-active-sessions';
+const RETIRED_SESSION_STORAGE_KEY = 'diagnostics-active-sessions';
 const logger = createLogger({ namespace: 'BackgroundDiagnosticsStorage' });
 
 function createDiagnosticsSnapshot(session: ActiveDiagnosticsSession): SessionSnapshot {
@@ -21,7 +21,6 @@ function createDiagnosticsSnapshot(session: ActiveDiagnosticsSession): SessionSn
     startedAt: session.startedAt,
     meta: session.meta,
     events: session.events,
-    pendingNetworkRequests: Array.from(session.pendingNetworkRequests.values()),
     isPaused: session.isPaused,
   };
 }
@@ -33,18 +32,12 @@ function sanitizeDiagnosticsSnapshot(snapshot: SessionSnapshot): SessionSnapshot
     startedAt: snapshot.startedAt,
     meta: sanitizeDiagnosticsMeta(snapshot.meta),
     events: sanitizeDiagnosticsEvents(snapshot.events),
-    pendingNetworkRequests: snapshot.pendingNetworkRequests.map(sanitizeNetworkRequestData),
     isPaused: snapshot.isPaused,
   };
 }
 
 function hydrateDiagnosticsSession(snapshot: SessionSnapshot): ActiveDiagnosticsSession {
-  return {
-    ...snapshot,
-    pendingNetworkRequests: new Map(
-      snapshot.pendingNetworkRequests.map((request) => [request.requestId, request])
-    ),
-  };
+  return { ...snapshot };
 }
 
 async function readDiagnosticSnapshotsFromStorage(): Promise<SessionSnapshot[]> {
@@ -94,6 +87,10 @@ export async function readStoredDiagnosticSnapshots(): Promise<SessionSnapshot[]
 
 export async function clearStoredDiagnosticSnapshots(): Promise<void> {
   await browserStorage.session.remove(SESSION_STORAGE_KEY);
+}
+
+export async function clearRetiredDiagnosticSnapshots(): Promise<void> {
+  await browserStorage.session.remove(RETIRED_SESSION_STORAGE_KEY);
 }
 
 export async function replaceStoredDiagnosticSnapshots(

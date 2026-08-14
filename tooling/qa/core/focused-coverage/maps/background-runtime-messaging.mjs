@@ -98,7 +98,7 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.test.ts',
     ],
   },
   {

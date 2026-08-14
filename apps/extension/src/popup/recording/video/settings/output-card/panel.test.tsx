@@ -58,7 +58,7 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
           ...DEFAULT_VIDEO_SETTINGS,
           autoFadeDelay: 2,
           countdownSeconds: 3,
-          diagnosticsEnabled: false,
+          interactionDiagnosticsEnabled: false,
           microphoneDeviceId: null,
           microphoneEnabled: false,
           outputProfile: {

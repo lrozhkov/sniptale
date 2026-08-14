@@ -23,31 +23,6 @@ export const runtimeAuthorityRestartSemantics = [
     restartClass: 'reconstructible',
   },
   {
-    authority: 'Debugger activation proofs',
-    ownerModule: 'apps/extension/src/background/debugger/session/activation.ts',
-    proofModule: 'apps/extension/src/background/debugger/session/attach.test.ts',
-    restartBehavior: 'One-shot debugger activation proofs fail closed before attach side effects.',
-    restartClass: 'disposable-fail-closed',
-  },
-  {
-    authority: 'HAR active sessions and timers',
-    ownerModule: 'apps/extension/src/background/diagnostics/export-har-collector/session-state.ts',
-    proofModule:
-      'apps/extension/src/background/diagnostics/export-har-collector/session-state.test.ts',
-    restartBehavior: 'Active debugger-backed HAR sessions are transaction-bound to the worker.',
-    restartClass: 'transaction-bound',
-  },
-  {
-    authority: 'HAR start capabilities',
-    ownerModule:
-      'apps/extension/src/background/diagnostics/export-har-collector/start-capability.ts',
-    proofModule:
-      'apps/extension/src/background/diagnostics/export-har-collector/session-start-capability.test.ts',
-    restartBehavior:
-      'Disposable HAR start capabilities fail closed and callers request a fresh token.',
-    restartClass: 'disposable-fail-closed',
-  },
-  {
     authority: 'LLM session tokens',
     ownerModule: 'apps/extension/src/background/ai/llm/session-tokens.ts',
     proofModule: 'apps/extension/src/background/ai/llm/session-tokens.test.ts',
@@ -102,11 +77,11 @@ export const runtimeAuthorityRestartSemantics = [
     restartClass: 'transaction-bound',
   },
   {
-    authority: 'Popup export staged archives',
-    ownerModule: 'apps/extension/src/background/capture/popup-export/staged-archives.ts',
-    proofModule: 'apps/extension/src/background/capture/popup-export/staged-archives.test.ts',
-    restartBehavior: 'In-flight archive chunks are transaction-bound and final save fails closed.',
-    restartClass: 'transaction-bound',
+    authority: 'Popup export job',
+    ownerModule: 'apps/extension/src/background/capture/popup-export/job/index.ts',
+    proofModule: 'apps/extension/src/background/capture/popup-export/job/index.test.ts',
+    restartBehavior: 'Unfinished memory-only work becomes interrupted after worker restart.',
+    restartClass: 'reconstructible',
   },
   {
     authority: 'Video recording control lease',

@@ -74,16 +74,16 @@ export const contentExportReadmeMessages = defineMessageSource({
     en: 'How diagnostic data is prepared',
   },
   diagnosticsCaptureNote: {
-    ru: 'В архив попадают только выбранные материалы текущего сканирования страницы: метаданные и трассировка парсера, очищенная консоль, выбранные DOM/HAR-данные, CSS-диагностика и предупреждения экспорта. Полная история браузера не снимается.',
-    en: 'The archive contains only selected data from the current page scan: parser metadata and traces, sanitized console data, selected DOM/HAR data, CSS diagnostics, and export warnings. The complete browser history is not captured.',
+    ru: 'В архив попадают только выбранные материалы текущего сканирования страницы: метаданные и трассировка парсера, DOM и Resource Timing данные, CSS-диагностика и предупреждения экспорта. Полная история браузера не снимается.',
+    en: 'The archive contains only selected data from the current page scan: parser metadata and traces, DOM and Resource Timing data, CSS diagnostics, and export warnings. The complete browser history is not captured.',
   },
   diagnosticsRedactionNote: {
     ru: 'Значения полей, похожих на секреты, идентификаторы сессий, текст, value и HTML, а также credentials и подписи заменяются маской `***`; чрезмерно глубокие структуры обрезаются.',
     en: 'Values in fields associated with secrets, session identifiers, text, value, and HTML, plus credentials and signatures, are replaced with `***`; excessively deep structures are truncated.',
   },
   diagnosticsUrlNote: {
-    ru: 'В обычной диагностике из URL удаляются query и fragment. В raw-логах безопасные query-параметры могут сохраняться, но credentials и чувствительные параметры авторизации, кода, email, ключей и токенов маскируются, а fragment удаляется.',
-    en: 'Regular diagnostic URLs have query strings and fragments removed. Raw logs may retain safe query parameters, but credentials and sensitive authorization, code, email, key, and token parameters are redacted, and fragments are removed.',
+    ru: 'В диагностике из URL удаляются query и fragment; credentials и чувствительные параметры авторизации, кода, email, ключей и токенов маскируются.',
+    en: 'Diagnostic URLs have query strings and fragments removed; credentials and sensitive authorization, code, email, key, and token parameters are redacted.',
   },
   additionalDescription: {
     ru: 'дополнительный материал экспорта',

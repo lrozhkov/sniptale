@@ -21,7 +21,6 @@ vi.mock('../../../annotation-fork-session/route', async (importOriginal) => ({
 import {
   cleanupScreenshotModeAfterNavigation,
   handleTabNavigation,
-  handleExportHarNavigationStart,
   ensureActiveVideoRecordingLeaseHydrated,
   handleRegionSelectionNavigationStart,
   handleTabRecordingNavigationCommitted,
@@ -74,7 +73,6 @@ it('hydrates the persisted recording lease before routing tab and navigation eve
     state.webSnapshotViewerPorts
   );
   expect(handleRegionSelectionNavigationStart).toHaveBeenCalledWith(7);
-  expect(handleExportHarNavigationStart).toHaveBeenCalledWith(7);
   expect(handleTabRecordingNavigationStart).toHaveBeenCalledWith(7);
 
   parseTopLevelDocumentNavigation.mockReturnValue({

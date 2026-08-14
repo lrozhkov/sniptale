@@ -17,9 +17,8 @@ it('renders diagnostics filters through shared toggle action buttons', () => {
       setFilter={() => undefined}
       stats={{
         actions: 0,
-        console: 4,
         errors: 2,
-        network: 3,
+        meta: 7,
         total: 10,
         warns: 1,
       }}
@@ -30,5 +29,6 @@ it('renders diagnostics filters through shared toggle action buttons', () => {
   expect(markup).toContain('aria-pressed="true"');
   expect(markup).toContain('inline-flex h-10 min-h-10');
   expect(markup).toContain('videoEditor.diagnostics.filterWarnings');
-  expect(markup).toContain('videoEditor.diagnostics.filterConsole');
+  expect(markup).toContain('videoEditor.diagnostics.filterActions');
+  expect(markup).toContain('videoEditor.diagnostics.filterMeta');
 });

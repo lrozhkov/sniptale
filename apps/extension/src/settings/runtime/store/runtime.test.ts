@@ -57,7 +57,6 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
   },
   loadSettings: mockLoadSettings,
   patchSettings: mockPatchSettings,
@@ -89,7 +88,6 @@ function createSettingsFixture() {
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
   };
 }
 
@@ -192,7 +190,6 @@ function runSettingsRuntimeReadSuite() {
       authenticatedSnapshotAssetsEnabled: false,
       anonymousCrossOriginSnapshotAssetsEnabled: false,
       skipWebSnapshotSaveDisclosure: false,
-      rawDiagnosticsEnabled: false,
     });
 
     const settings = await loadSettingsRuntimeState();

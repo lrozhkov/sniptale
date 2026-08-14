@@ -26,7 +26,6 @@ export function createSettings(overrides: Partial<Settings> = {}): Settings {
     presets: [],
     viewportPresets: [],
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     ...overrides,
   };

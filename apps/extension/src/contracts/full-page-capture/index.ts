@@ -6,10 +6,8 @@ export interface FullPageCapturePreferences {
   preloadLazyContent: boolean;
 }
 
-export type FullPageCaptureBackendKind = 'native' | 'unattended-cdp';
-export type FullPageExportCaptureAction =
-  | 'EXPORT_CAPTURE_FULL_PAGE'
-  | 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED';
+export type FullPageCaptureBackendKind = 'native';
+export type FullPageExportCaptureAction = 'EXPORT_CAPTURE_FULL_PAGE';
 
 export interface FullPageExportCaptureIdentity {
   action: FullPageExportCaptureAction;

@@ -1,14 +1,9 @@
 /** User-activated aggregate export commands owned by Design Review. */
 import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard';
-import {
-  isBrowserAnnotationsExportText,
-  type ExportOptions,
-} from '@sniptale/runtime-contracts/export';
+import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isClipboardTextWithinLimit } from '@sniptale/runtime-contracts/validation/text';
 import { captureBrowserAnnotationsExportText } from '../../../parser/page-preparation/annotations/format';
-import { createExportManagerService } from '../../../parser/export-manager/service';
-import { persistPopupExportArchive } from '../../../parser/popup-export/helpers/archive/persist';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import {
   attachContentActionIntent,
@@ -20,18 +15,6 @@ export type ToolbarAnnotationExportAction =
   | 'copy'
   | 'download'
   | 'export-page';
-
-const FULL_PAGE_EXPORT_OPTIONS: ExportOptions = {
-  includeAnnotations: true,
-  includeBasicLogs: true,
-  includeCssDiagnostics: true,
-  includeFiles: true,
-  includeFullPageScreenshot: true,
-  includeHarDomLogs: true,
-  includeImages: true,
-  includeJson: true,
-  includeMarkdown: true,
-};
 
 async function copyBrowserAnnotations(
   contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
@@ -77,26 +60,6 @@ async function openPopupExport(
   }
 }
 
-async function exportFullPageArchive(
-  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
-): Promise<void> {
-  if (contentIntentSource?.kind !== 'trusted-content-event') {
-    throw new Error('A trusted user event is required to export the page archive.');
-  }
-
-  const result = await createExportManagerService().export(FULL_PAGE_EXPORT_OPTIONS, {
-    contentIntentSource,
-  });
-  if (!result.success) {
-    throw new Error(result.errors[0] || 'Page archive export failed.');
-  }
-
-  const persistErrors = await persistPopupExportArchive(result);
-  if (persistErrors.length > 0) {
-    throw new Error(persistErrors[0]);
-  }
-}
-
 export function executeToolbarAnnotationExportAction(
   action: ToolbarAnnotationExportAction,
   contentIntentSource?: ContentPrivilegedActionIntentSource | null
@@ -108,7 +71,7 @@ export function executeToolbarAnnotationExportAction(
     return downloadBrowserAnnotations(contentIntentSource);
   }
   if (action === 'export-page') {
-    return exportFullPageArchive(contentIntentSource);
+    return openPopupExport(contentIntentSource);
   }
   return openPopupExport(contentIntentSource);
 }

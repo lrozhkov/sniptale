@@ -17,7 +17,6 @@ type UiRuntimeBridgeMessageType =
   | MessageType.COPY_IMAGE_TO_CLIPBOARD
   | MessageType.COPY_TEXT_TO_CLIPBOARD
   | MessageType.EXPORT_POPUP_PREVIEW
-  | MessageType.EXPORT_POPUP_START
   | MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | MessageType.EXPORT_POPUP_CANCEL
@@ -65,7 +64,6 @@ const uiRuntimeBridgeMessageTypes = new Set<UiRuntimeBridgeMessageType>([
   MessageType.COPY_IMAGE_TO_CLIPBOARD,
   MessageType.COPY_TEXT_TO_CLIPBOARD,
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,

@@ -5,9 +5,7 @@ import * as contentIntent from '@sniptale/runtime-contracts/protocol/content-pri
 import { parsePopupExportControlRequest } from '../../../../../contracts/messaging/parsers/popup-export-control';
 
 const isContentGrant = contentIntent.isContentPrivilegedActionAutoStartGrant;
-const isFullPageCaptureAction = (value: unknown) =>
-  value === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
-  value === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
+const isFullPageCaptureAction = (value: unknown) => value === MessageType.EXPORT_CAPTURE_FULL_PAGE;
 
 function isPopupExportType(
   value: unknown
@@ -15,13 +13,11 @@ function isPopupExportType(
   | MessageType.EXPORT_POPUP_PREVIEW
   | MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
-  | MessageType.EXPORT_POPUP_START
   | MessageType.EXPORT_POPUP_CANCEL {
   return (
     value === MessageType.EXPORT_POPUP_PREVIEW ||
     value === MessageType.EXPORT_POPUP_BUILD_PACKAGE ||
     value === MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT ||
-    value === MessageType.EXPORT_POPUP_START ||
     value === MessageType.EXPORT_POPUP_CANCEL
   );
 }
@@ -59,31 +55,10 @@ export function parsePopupExportRequest(request: unknown): PopupExportRequest | 
       batchRequestId: request['batchRequestId'],
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       options,
-      ...(isContentGrant(request['contentIntentGrant'])
-        ? { contentIntentGrant: request['contentIntentGrant'] }
-        : {}),
-      ...(isFullPageCaptureAction(request['fullPageCaptureAction'])
-        ? { fullPageCaptureAction: request['fullPageCaptureAction'] }
-        : {}),
     };
   }
 
-  const requestId = request['requestId'];
-  if (typeof requestId !== 'string') {
-    return null;
-  }
-
-  return {
-    type: MessageType.EXPORT_POPUP_START,
-    options,
-    requestId,
-    ...(isContentGrant(request['contentIntentGrant'])
-      ? { contentIntentGrant: request['contentIntentGrant'] }
-      : {}),
-    ...(isFullPageCaptureAction(request['fullPageCaptureAction'])
-      ? { fullPageCaptureAction: request['fullPageCaptureAction'] }
-      : {}),
-  };
+  return null;
 }
 
 function parseWebSnapshotExportRequest(

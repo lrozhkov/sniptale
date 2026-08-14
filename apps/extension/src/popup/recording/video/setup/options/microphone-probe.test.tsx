@@ -42,7 +42,7 @@ function createSettings(
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
     microphoneGain: 1,

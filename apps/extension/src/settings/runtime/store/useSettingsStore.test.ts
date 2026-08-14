@@ -26,7 +26,6 @@ const settingsFixture = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
-  rawDiagnosticsEnabled: false,
 };
 
 const {

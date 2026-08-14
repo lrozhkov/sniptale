@@ -83,7 +83,6 @@ export interface CaptureSurfaceService {
   getAppliedBindingForSession(sessionId: string): AppliedCaptureSurfaceBinding | null;
   getAppliedForSession(sessionId: string): AppliedCaptureSurface | null;
   hasSessionLease(sessionId: string): boolean;
-  handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]>;
   hasOwnerLease(owner: CaptureSurfaceOwner): boolean;
   getAvailability(args: {
     tabId: number;

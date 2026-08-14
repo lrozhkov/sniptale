@@ -82,7 +82,6 @@ export interface Settings {
   authenticatedSnapshotAssetsEnabled: boolean;
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
   skipWebSnapshotSaveDisclosure: boolean;
-  rawDiagnosticsEnabled: boolean;
   fullPageCapture?: FullPageCapturePreferences;
   voiceInput?: VoiceInputPreferences;
 }

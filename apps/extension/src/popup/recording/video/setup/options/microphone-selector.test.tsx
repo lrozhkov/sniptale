@@ -36,7 +36,7 @@ function createSettings(enabled = true) {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: enabled,
     quality: VideoQuality.MEDIUM,

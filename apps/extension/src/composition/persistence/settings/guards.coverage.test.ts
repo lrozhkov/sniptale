@@ -36,7 +36,6 @@ describe('settings guards valid payload coverage', () => {
           showWindowResize: false,
           showSettings: false,
         },
-        rawDiagnosticsEnabled: true,
         fullPageCapture: {
           floatingElements: 'hide',
           freezeMotion: false,
@@ -61,7 +60,6 @@ describe('settings guards valid payload coverage', () => {
           showWindowResize: false,
           showSettings: false,
         },
-        rawDiagnosticsEnabled: true,
         fullPageCapture: {
           floatingElements: 'hide',
           freezeMotion: false,

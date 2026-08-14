@@ -80,6 +80,8 @@ function addDataUrlFixtureElements(): void {
     'data-original-src': '/original-src?token=known-secret#frag',
     'data-background-url': '/background?signature=known-secret#frag',
     'data-image-srcset': '/image-small?X-Amz-Signature=known-secret#frag 1x',
+    'data-private-account-url': '/private-account?token=known-secret#frag',
+    'data-private-srcset': '/private.png?token=known-secret#frag 1x',
   });
 }
 
@@ -148,6 +150,8 @@ function expectDataUrlAttributesSanitized(snapshot: string): void {
   expect(snapshot).toContain('data-original-src="/original-src"');
   expect(snapshot).toContain('data-background-url="/background"');
   expect(snapshot).toContain('data-image-srcset="/image-small 1x"');
+  expect(snapshot).not.toContain('data-private-account-url=');
+  expect(snapshot).not.toContain('data-private-srcset=');
 }
 
 function expectDataSrcsetAttributesSanitized(snapshot: string): void {

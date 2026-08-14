@@ -109,6 +109,7 @@ async function verifiesArchiveCaptureOptions() {
     captureFullPageForArchive(11, { backendKind: 'native', documentId: 'document-11' })
   ).resolves.toBe(transaction);
   expect(captureFullPageTransactionMock).toHaveBeenCalledWith(11, undefined, {
+    abortSignal: expect.any(AbortSignal),
     backendKind: 'native',
     documentId: 'document-11',
     format: 'png',
@@ -132,7 +133,7 @@ async function verifiesArchiveCancellationDuringCompletedTransition() {
   );
 
   const capture = captureFullPageForArchive(12, {
-    backendKind: 'unattended-cdp',
+    backendKind: 'native',
     documentId: 'document-12',
     exportRunId: 'archive-completed-cancelled',
   });

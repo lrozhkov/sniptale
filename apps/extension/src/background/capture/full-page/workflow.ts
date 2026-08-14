@@ -2,7 +2,6 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES } from '../../../contracts/full-page-capture';
 import type {
-  FullPageCaptureBackendKind,
   FullPageCapturePreferences,
   FullPageCaptureSessionIdentity,
 } from '../../../contracts/full-page-capture';
@@ -13,7 +12,6 @@ import {
 } from '../jobs/state-machine';
 import { runNativeVisibleCaptureExclusive } from '../visible/coordinator';
 import { captureAndStitchFullPageTiles } from './capture-parts';
-import { createCdpFullPageRasterBackend, hasOwnedCdpLease } from './cdp-backend';
 import { createNativeFullPageRasterBackend } from './native-backend';
 import { createFullPagePageAgentTransport } from './page-agent-transport';
 import { createFullPageTilePlan } from './planner';
@@ -32,22 +30,13 @@ import { cleanupStoredFullPageCaptureLease } from './lifecycle';
 const logger = createLogger({ namespace: 'BackgroundFullPageCapture' });
 
 async function runWithRasterBackend<T>(args: {
-  backendKind: FullPageCaptureBackendKind;
-  ownerToken: string;
   tabId: number;
   work(raster: FullPageRasterBackend): Promise<T>;
 }): Promise<T> {
-  if (args.backendKind === 'native') {
-    return runNativeVisibleCaptureExclusive(async (lease) => {
-      const raster = await createNativeFullPageRasterBackend({ lease, tabId: args.tabId });
-      return runRasterWorkAndRelease(raster, args.work);
-    });
-  }
-  const raster = await createCdpFullPageRasterBackend({
-    ownerToken: args.ownerToken,
-    tabId: args.tabId,
+  return runNativeVisibleCaptureExclusive(async (lease) => {
+    const raster = await createNativeFullPageRasterBackend({ lease, tabId: args.tabId });
+    return runRasterWorkAndRelease(raster, args.work);
   });
-  return runRasterWorkAndRelease(raster, args.work);
 }
 
 async function runRasterWorkAndRelease<T>(
@@ -84,13 +73,9 @@ async function settleFullPageCaptureLease(args: {
   ownerToken: string;
   pageRestorePending: boolean;
   result: Omit<FullPageCaptureTransaction, 'jobId'> | null;
-  tabId: number;
 }): Promise<Omit<FullPageCaptureTransaction, 'jobId'>> {
   let cleanupFailure: unknown = null;
-  const canRelease =
-    args.leaseAcquired &&
-    !args.pageRestorePending &&
-    !hasOwnedCdpLease(args.tabId, args.ownerToken);
+  const canRelease = args.leaseAcquired && !args.pageRestorePending;
   if (canRelease) {
     try {
       await releaseFullPageCaptureLease(args.ownerToken);
@@ -119,7 +104,6 @@ async function runFullPageCapture(args: {
   options: FullPageCaptureOptions;
   tabId: number;
 }): Promise<Omit<FullPageCaptureTransaction, 'jobId'>> {
-  const backendKind = args.options.backendKind ?? 'native';
   const documentId = args.options.documentId;
   if (!documentId) throw new Error('Full-page capture document binding is unavailable');
   const ownerToken = crypto.randomUUID();
@@ -140,7 +124,7 @@ async function runFullPageCapture(args: {
   try {
     await cleanupStoredFullPageCaptureLease();
     await acquireFullPageCaptureLease({
-      backendKind,
+      backendKind: 'native',
       documentId,
       ...(args.options.exportRunId === undefined ? {} : { exportRunId: args.options.exportRunId }),
       ...identity,
@@ -149,8 +133,6 @@ async function runFullPageCapture(args: {
     leaseAcquired = true;
     throwIfFullPageCaptureAborted(args.abortSignal);
     result = await runWithRasterBackend({
-      backendKind,
-      ownerToken,
       tabId: args.tabId,
       work: (raster) =>
         runPreparedPageCapture({
@@ -180,7 +162,6 @@ async function runFullPageCapture(args: {
     ownerToken,
     pageRestorePending,
     result,
-    tabId: args.tabId,
   });
 }
 

@@ -1,6 +1,4 @@
 import type {
-  RuntimePopupExportProgressMessage,
-  RuntimePopupExportResultMessage,
   ScenarioCreateProjectMessage,
   ScenarioDeleteStepMessage,
   ScenarioGetRestoreSnapshotMessage,
@@ -37,9 +35,7 @@ import type { RouteCaptureMessage } from '../../../../capture/routes';
 
 export type BackgroundInternalSignalMessage =
   | { type: 'KEEP_ALIVE'; tabId?: number }
-  | { type: VideoMessageType.COUNTDOWN_COMPLETE; tabId?: number }
-  | RuntimePopupExportProgressMessage
-  | RuntimePopupExportResultMessage;
+  | { type: VideoMessageType.COUNTDOWN_COMPLETE; tabId?: number };
 
 export type ScenarioMessage =
   | ScenarioCreateProjectMessage
@@ -77,7 +73,6 @@ export type VideoRecordingSurfaceMessage =
 
 export type PopupExportViewerMessage =
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
-  | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_START]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT]
   | RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]

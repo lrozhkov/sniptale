@@ -2,7 +2,8 @@ import { browserStorage } from '../../../composition/persistence/infrastructure/
 // policyStateId: full-page-capture-leases - durable session record for interrupted DOM restoration.
 import type { FullPageCaptureBackendKind } from '../../../contracts/full-page-capture';
 
-const FULL_PAGE_CAPTURE_LEASE_KEY = 'sniptale_full_page_capture_lease';
+const FULL_PAGE_CAPTURE_LEASE_KEY = 'sniptale_native_full_page_capture_lease';
+const RETIRED_FULL_PAGE_CAPTURE_LEASE_KEY = 'sniptale_full_page_capture_lease';
 
 export type StoredFullPageCaptureLease = {
   backendKind: FullPageCaptureBackendKind;
@@ -19,7 +20,7 @@ function isStoredFullPageCaptureLease(value: unknown): value is StoredFullPageCa
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
-    (record['backendKind'] === 'native' || record['backendKind'] === 'unattended-cdp') &&
+    record['backendKind'] === 'native' &&
     typeof record['documentId'] === 'string' &&
     typeof record['expiresAtEpochMs'] === 'number' &&
     Number.isFinite(record['expiresAtEpochMs']) &&
@@ -56,4 +57,9 @@ export async function clearStoredFullPageCaptureLease(ownerToken?: string): Prom
     if (!current || current.ownerToken !== ownerToken) return;
   }
   await browserStorage.session.remove(FULL_PAGE_CAPTURE_LEASE_KEY);
+}
+
+export async function clearRetiredFullPageCaptureLease(): Promise<void> {
+  if (!browserStorage.session.isAvailable()) return;
+  await browserStorage.session.remove(RETIRED_FULL_PAGE_CAPTURE_LEASE_KEY);
 }

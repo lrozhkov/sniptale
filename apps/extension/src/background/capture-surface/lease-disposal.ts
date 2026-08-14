@@ -22,10 +22,6 @@ export class CaptureSurfaceLeaseDisposal {
     }
   }
 
-  async handleDebuggerDetach(_tabId: number): Promise<readonly CaptureSurfaceOwner[]> {
-    return [];
-  }
-
   private async terminateWindowState(state: CaptureSurfaceLeaseState): Promise<void> {
     state.entry.phase = 'releasing';
     state.entry.updatedAt = this.registry.nextTimestamp();

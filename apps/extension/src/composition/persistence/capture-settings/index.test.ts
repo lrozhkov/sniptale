@@ -40,13 +40,13 @@ function resetVideoStorageMocks() {
 
 async function verifyVideoSettingsContracts() {
   browserStorageLocalGetMock.mockResolvedValueOnce({});
-  await patchVideoSettings({ diagnosticsEnabled: true });
+  await patchVideoSettings({ interactionDiagnosticsEnabled: true });
 
   expect(browserStorageLocalSetMock).toHaveBeenCalledWith(
     {
       sniptale_video_settings: {
         ...DEFAULT_VIDEO_SETTINGS,
-        diagnosticsEnabled: true,
+        interactionDiagnosticsEnabled: true,
       },
     },
     expect.any(Object)
@@ -67,7 +67,7 @@ async function verifyVideoSettingsContracts() {
         qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
         countdownSeconds: 'bad',
         autoFadeDelay: 8,
-        diagnosticsEnabled: true,
+        interactionDiagnosticsEnabled: true,
       },
     })
     .mockResolvedValueOnce({
@@ -84,7 +84,7 @@ async function verifyVideoSettingsContracts() {
       ...DEFAULT_VIDEO_SETTINGS.outputProfile,
       quality: VideoQuality.MEDIUM,
     },
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
   });
 
   await expect(loadVideoSettings()).resolves.toEqual(DEFAULT_VIDEO_SETTINGS);
@@ -239,14 +239,14 @@ describe('video', () => {
     };
 
     await Promise.all([
-      patchVideoSettings({ diagnosticsEnabled: true }),
+      patchVideoSettings({ interactionDiagnosticsEnabled: true }),
       mutateVideoSettings((current) => ({
         ...current,
         qualityProfiles: [...current.qualityProfiles, profile],
       })),
     ]);
 
-    expect(stored.diagnosticsEnabled).toBe(true);
+    expect(stored.interactionDiagnosticsEnabled).toBe(true);
     expect(stored.qualityProfiles).toEqual([profile]);
   });
 });

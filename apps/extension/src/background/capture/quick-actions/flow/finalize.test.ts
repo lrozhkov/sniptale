@@ -76,7 +76,6 @@ describe('capture quick action finalize copy flow', () => {
       captureResult: {
         dataUrl: 'data:image/png;base64,copy',
         filename: 'capture.png',
-        needsDebugger: false,
       },
       settings: createSettings(),
       tabId: 7,
@@ -109,7 +108,6 @@ async function runQuickActionCapture(
     captureResult: {
       dataUrl,
       filename: 'capture.png',
-      needsDebugger: false,
     },
     settings: createSettings(
       afterCapture === 'download_default' ? { defaultImagePresetId: 'default-preset' } : undefined
@@ -153,7 +151,6 @@ describe('capture quick action finalize edit flow', () => {
       captureResult: {
         dataUrl: 'data:image/png;base64,edit',
         filename: 'capture.png',
-        needsDebugger: false,
       },
       settings: createSettings(),
       tabId: 11,
@@ -179,7 +176,6 @@ describe('capture quick action finalize edit flow', () => {
       captureResult: {
         dataUrl: 'data:image/png;base64,edit',
         filename: 'capture.png',
-        needsDebugger: false,
       },
       settings: createSettings(),
       tabId: 12,
@@ -201,7 +197,6 @@ describe('capture quick action finalize edit flow', () => {
       captureResult: {
         dataUrl: 'data:image/png;base64,edit',
         filename: 'capture.png',
-        needsDebugger: false,
       },
       settings: createSettings(),
       tabId: 16,
@@ -226,7 +221,6 @@ describe('capture quick action finalize warning paths', () => {
       captureResult: {
         dataUrl: 'data:image/png;base64,dialog',
         filename: 'capture.png',
-        needsDebugger: false,
       },
       settings: createSettings(),
       tabId: 13,
@@ -251,7 +245,6 @@ describe('capture quick action finalize warning paths', () => {
         captureResult: {
           dataUrl: 'data:image/png;base64,download',
           filename: 'capture.png',
-          needsDebugger: true,
         },
         settings: createSettings(),
         tabId: 15,
@@ -297,7 +290,6 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     defaultViewportPresetId: null,
     viewportPresets: [],

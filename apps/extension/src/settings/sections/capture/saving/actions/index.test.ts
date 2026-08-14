@@ -53,7 +53,6 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     ...overrides,
   };
 }

@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../../platform/i18n';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { type ExportResult } from '@sniptale/runtime-contracts/export';
+import { type ExportPagePackage } from '@sniptale/runtime-contracts/export';
 import { createPopupExportController } from './index/create';
 
 type DeferredValue<T> = {
@@ -25,7 +25,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -64,35 +64,24 @@ it('returns translated preview failure copy when popup preview parsing rejects w
   });
 });
 
-it('cancels the owned export when dispose runs mid-flight', () => {
-  const exportDeferred = createDeferred<ExportResult>();
-  const exportResult: ExportResult = {
-    errors: [],
-    filename: 'popup-export.zip',
-    stats: { filesCount: 0, filesFailed: 0, rowsCount: 0, sectionsCount: 0 },
-    success: true,
-  };
+it('cancels the owned package build when dispose runs mid-flight', () => {
+  const exportDeferred = createDeferred<ExportPagePackage>();
   const exportRunner = {
-    buildPackage: vi.fn(),
+    buildPackage: vi.fn(() => exportDeferred.promise),
     cancel: vi.fn(),
-    export: vi.fn(() => exportDeferred.promise),
-    onProgress: vi.fn(),
   };
-  const controller = createPopupExportController({
-    exportRunner,
-    persistArchive: vi.fn().mockResolvedValue([]),
-  });
+  const controller = createPopupExportController({ exportRunner });
 
   controller.handleRequest(
     {
       options: createExportOptions(),
-      requestId: 'req-1',
-      type: MessageType.EXPORT_POPUP_START,
+      batchRequestId: 'req-1',
+      type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
     },
     vi.fn()
   );
   controller.dispose();
-  exportDeferred.resolve(exportResult);
+  exportDeferred.resolve({} as ExportPagePackage);
 
   expect(exportRunner.cancel).toHaveBeenCalledTimes(1);
 });

@@ -1,6 +1,5 @@
 import type { ExportOptions, ExportProgress } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { startHarCaptureIfNeeded, stopHarCaptureIfNeeded } from '../service/runtime';
 import {
   collectExportFiles,
   downloadExportFiles,
@@ -21,16 +20,11 @@ type ExportManagerTransferControl = {
 type ExportManagerTransferTools = {
   collectFiles: typeof collectExportFiles;
   downloadFiles: typeof downloadExportFiles;
-  startHarCapture: typeof startHarCaptureIfNeeded;
-  stopHarCapture: typeof stopHarCaptureIfNeeded;
 };
-type SessionHarCaptureResult = Awaited<ReturnType<ExportManagerTransferTools['stopHarCapture']>>;
 
 const DEFAULT_TRANSFER_TOOLS: ExportManagerTransferTools = {
   collectFiles: collectExportFiles,
   downloadFiles: downloadExportFiles,
-  startHarCapture: startHarCaptureIfNeeded,
-  stopHarCapture: stopHarCaptureIfNeeded,
 };
 
 function throwIfExportCancelled(control: ExportManagerTransferControl): void {
@@ -83,30 +77,18 @@ async function downloadExportManagerFiles(
 }
 
 /**
- * Collects export file candidates, downloads them, and keeps HAR capture ownership in one seam.
+ * Collects and downloads export file candidates in one seam.
  */
-export async function collectFilesWithHarForExportManager(
+export async function collectFilesForExportManager(
   treeData: ParsedDOMTree,
   options: ExportOptions,
   warnings: string[],
   control: ExportManagerTransferControl,
   tools: ExportManagerTransferTools = DEFAULT_TRANSFER_TOOLS
 ) {
-  const harSessionId = options.includeHarDomLogs ? crypto.randomUUID() : null;
-  const harHandle = await tools.startHarCapture(harSessionId, warnings);
-  let collectedFiles: Awaited<ReturnType<typeof collectExportFiles>>;
-  let downloadResult: Awaited<ReturnType<typeof downloadExportFiles>>;
-  let sessionHar: SessionHarCaptureResult = null;
+  const collectedFiles = await collectExportManagerFiles(treeData, options, control, tools);
+  const downloadResult = await downloadExportManagerFiles(collectedFiles.files, control, tools);
+  warnings.push(...downloadResult.errors);
 
-  try {
-    collectedFiles = await collectExportManagerFiles(treeData, options, control, tools);
-    downloadResult = await downloadExportManagerFiles(collectedFiles.files, control, tools);
-    warnings.push(...downloadResult.errors);
-  } finally {
-    if (harHandle) {
-      sessionHar = await tools.stopHarCapture(harHandle, warnings);
-    }
-  }
-
-  return { collectedFiles, downloadResult, sessionHar };
+  return { collectedFiles, downloadResult };
 }

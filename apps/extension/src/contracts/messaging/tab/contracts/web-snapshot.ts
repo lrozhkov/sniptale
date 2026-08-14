@@ -13,9 +13,7 @@ import { isWebSnapshotManifest } from '../../../../features/web-snapshot/manifes
 import type { TabRequestByType, TabResponseByType } from '../index';
 import * as contentIntent from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 
-const isFullPageCaptureAction = (value: unknown) =>
-  value === MessageType.EXPORT_CAPTURE_FULL_PAGE ||
-  value === MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED;
+const isFullPageCaptureAction = (value: unknown) => value === MessageType.EXPORT_CAPTURE_FULL_PAGE;
 
 type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabResponseByType>>;
 

@@ -1,22 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const {
-  executeDownloadMock,
-  createRenderedCaptureJobMock,
-  isExportHarStartPreauthorizedMock,
-  isExportHarStopPreauthorizedMock,
-  startPreauthorizedExportHarSessionMock,
-  stopPreauthorizedExportHarSessionMock,
-  transitionCaptureJobMock,
-} = vi.hoisted(() => ({
-  executeDownloadMock: vi.fn(),
-  createRenderedCaptureJobMock: vi.fn(),
-  isExportHarStartPreauthorizedMock: vi.fn(),
-  isExportHarStopPreauthorizedMock: vi.fn(),
-  startPreauthorizedExportHarSessionMock: vi.fn(),
-  stopPreauthorizedExportHarSessionMock: vi.fn(),
-  transitionCaptureJobMock: vi.fn(),
-}));
+const { executeDownloadMock, createRenderedCaptureJobMock, transitionCaptureJobMock } = vi.hoisted(
+  () => ({
+    executeDownloadMock: vi.fn(),
+    createRenderedCaptureJobMock: vi.fn(),
+    transitionCaptureJobMock: vi.fn(),
+  })
+);
 
 vi.mock('../download/download-router/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../download/download-router/index')>()),
@@ -32,32 +22,13 @@ vi.mock('../jobs/state-machine', async (importOriginal) => ({
   transitionCaptureJob: transitionCaptureJobMock,
 }));
 
-vi.mock('../../diagnostics/public/har-export', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../diagnostics/public/har-export')>()),
-  isExportHarStartPreauthorized: isExportHarStartPreauthorizedMock,
-  isExportHarStopPreauthorized: isExportHarStopPreauthorizedMock,
-  startPreauthorizedExportHarSession: startPreauthorizedExportHarSessionMock,
-  stopPreauthorizedExportHarSession: stopPreauthorizedExportHarSessionMock,
-}));
-
 import { handleExecuteSave } from './actions.download';
-import { handleExportStartHar, handleExportStopHar } from './actions.export';
 
 beforeEach(() => {
   vi.clearAllMocks();
   executeDownloadMock.mockResolvedValue(undefined);
   createRenderedCaptureJobMock.mockResolvedValue('capture-job-route');
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  isExportHarStartPreauthorizedMock.mockReturnValue(true);
-  isExportHarStopPreauthorizedMock.mockReturnValue(true);
-  startPreauthorizedExportHarSessionMock.mockResolvedValue({
-    capabilityToken: 'har-token',
-    expiresAtEpochMs: 123,
-  });
-  stopPreauthorizedExportHarSessionMock.mockResolvedValue({
-    har: { id: 'har-1' },
-    rawDiagnosticsEnabled: false,
-  });
 });
 
 async function flushPromises(): Promise<void> {
@@ -89,29 +60,5 @@ it('executes save downloads', async () => {
     'download_default',
     undefined,
     'capture-job-route'
-  );
-});
-
-it('validates HAR start and stop authority', () => {
-  const sendResponse = vi.fn();
-
-  expect(handleExportStartHar({}, 42, sendResponse)).toBe(true);
-  expect(sendResponse).toHaveBeenCalled();
-
-  isExportHarStopPreauthorizedMock.mockReturnValueOnce(false);
-  expect(handleExportStopHar({ sessionId: 'har-1' }, 42, sendResponse)).toBe(true);
-  expect(sendResponse).toHaveBeenLastCalledWith({
-    error: 'Missing HAR capability token',
-    success: false,
-  });
-
-  expect(
-    handleExportStopHar({ capabilityToken: 'har-token', sessionId: 'har-1' }, 42, sendResponse)
-  ).toBe(true);
-  expect(stopPreauthorizedExportHarSessionMock).toHaveBeenCalledWith(
-    { capabilityToken: 'har-token', sessionId: 'har-1' },
-    'har-1',
-    42,
-    'har-token'
   );
 });

@@ -15,7 +15,6 @@ const SEND_RUNTIME_MESSAGE_BASELINE_FILES = [
 ];
 
 const SEND_TAB_MESSAGE_BASELINE_FILES = [
-  'apps/extension/src/background/debugger/session/targets.ts',
   'apps/extension/src/background/diagnostics/runtime.ts',
   'apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts',
 ];

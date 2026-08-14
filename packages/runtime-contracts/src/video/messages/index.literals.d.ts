@@ -86,8 +86,6 @@ declare module './index' {
       typeof import('./index').VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER;
     type DISABLE_DIAGNOSTIC_LOGGER =
       typeof import('./index').VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
-    type DEBUGGER_FORCEFULLY_DETACHED =
-      typeof import('./index').VideoMessageType.DEBUGGER_FORCEFULLY_DETACHED;
     type SHOW_REGION_SELECTOR = typeof import('./index').VideoMessageType.SHOW_REGION_SELECTOR;
     type HIDE_REGION_SELECTOR = typeof import('./index').VideoMessageType.HIDE_REGION_SELECTOR;
     type REGION_SELECTED = typeof import('./index').VideoMessageType.REGION_SELECTED;

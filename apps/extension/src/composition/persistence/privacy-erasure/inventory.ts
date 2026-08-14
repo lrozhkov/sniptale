@@ -100,6 +100,7 @@ const localSensitiveKeys = [
 
 const sessionSensitiveKeys = [
   'diagnostics-active-sessions',
+  'interaction-diagnostics-active-sessions',
   'scenario-tab-sessions',
   'video-active-recording-lease',
   'video-camera-recorder-grant',
@@ -107,6 +108,9 @@ const sessionSensitiveKeys = [
   'video-project-export-capabilities',
   'sniptale_page_access_active_tabs',
   'sniptale_popup_export_tab_selection_session',
+  'sniptale_popup_export_job',
+  'sniptale_full_page_capture_lease',
+  'sniptale_native_full_page_capture_lease',
   'sniptale_project_export_active_job',
   AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY,
   AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY,

@@ -71,15 +71,12 @@ function createSensitiveDiagnosticsSession() {
     id: 'event-2',
     recordingId: 'recording-2',
     tsMs: 15,
-    kind: 'network',
+    kind: 'error',
     level: 'error',
-    message: 'GET https://example.com/app?token=123',
+    message: 'Interaction failed token=123',
     data: {
-      requestId: 'request-1',
       url: 'https://example.com/app?token=123',
-      method: 'GET',
-      requestTime: 15,
-      statusText: 'Failed token=123',
+      detail: 'Failed token=123',
       error: 'Bearer abcdefgh',
     },
   });
@@ -91,7 +88,7 @@ function expectSanitizedDiagnosticsSaved() {
   expect(saveDiagnostics).toHaveBeenCalledWith(
     expect.objectContaining({
       recordingId: 'recording-2',
-      schemaVersion: 1,
+      schemaVersion: 2,
       meta: expect.objectContaining({
         url: 'https://example.com/app',
         userAgent: 'Sniptale Test UA token=***',
@@ -99,10 +96,11 @@ function expectSanitizedDiagnosticsSaved() {
     }),
     [
       expect.objectContaining({
-        message: 'GET https://example.com/app?token=***',
+        kind: 'error',
+        message: 'Interaction failed token=***',
         data: expect.objectContaining({
-          url: 'https://example.com/app',
-          statusText: 'Failed token=***',
+          url: 'https://example.com/app?token=***',
+          detail: 'Failed token=***',
           error: 'Bearer ***',
         }),
       }),
@@ -140,7 +138,6 @@ it('creates and finalizes a diagnostics session with a meta event', () => {
     events: [],
     isPaused: false,
   });
-  expect(session.pendingNetworkRequests.size).toBe(0);
 
   finalizeSessionMeta(session);
 

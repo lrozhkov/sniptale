@@ -110,7 +110,7 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     isNumber(value['countdownSeconds']) &&
     isNumber(value['autoFadeDelay']) &&
     videoAutoFadeDelaySet.has(value['autoFadeDelay']) &&
-    isBoolean(value['diagnosticsEnabled']) &&
+    isBoolean(value['interactionDiagnosticsEnabled']) &&
     hasOptionalField(value, 'controlledCursorCaptureEnabled', isBoolean) &&
     hasOptionalField(value, 'recordingSurface', isVideoRecordingSurfaceSettings) &&
     hasOptionalField(value, 'webcamPresentation', isWebcamPresentationSettings)

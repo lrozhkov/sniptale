@@ -8,7 +8,7 @@ const {
   collectAdvancedLogAssetsMock,
   collectCoreLogAssetsMock,
   collectCssDiagnosticAssetsMock,
-  collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManagerMock,
   buildExportPagePackageMock,
   createExportArchiveBlobMock,
   createExportStatsMock,
@@ -20,7 +20,7 @@ const {
   collectAdvancedLogAssetsMock: vi.fn(),
   collectCoreLogAssetsMock: vi.fn(),
   collectCssDiagnosticAssetsMock: vi.fn(),
-  collectFilesWithHarForExportManagerMock: vi.fn(),
+  collectFilesForExportManagerMock: vi.fn(),
   buildExportPagePackageMock: vi.fn(),
   createExportArchiveBlobMock: vi.fn(),
   createExportStatsMock: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock('./runtime', async (importOriginal) => ({
 }));
 
 vi.mock('../archive/transfer', () => ({
-  collectFilesWithHarForExportManager: collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManager: collectFilesForExportManagerMock,
 }));
 
 import { createExportManagerService } from '.';
@@ -82,7 +82,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -96,7 +96,7 @@ function createAnnotationsOnlyOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: false,
     includeMarkdown: false,
@@ -131,7 +131,6 @@ function createTransferResult(previewId: string, fileId: string, filename: strin
       errors: [],
       urlUuidToFilename: new Map([[fileId, filename]]),
     },
-    sessionHar: null,
   };
 }
 
@@ -216,7 +215,7 @@ describe('export-manager service source ownership', () => {
   it('uses the owned snapshot source for package builds', async () => {
     const { snapshotDocument, snapshotSource } = createSnapshotSource();
     const service = createExportManagerService({ snapshotSource });
-    collectFilesWithHarForExportManagerMock.mockResolvedValue(
+    collectFilesForExportManagerMock.mockResolvedValue(
       createTransferResult('preview-a', 'uuid-a', 'file-a.txt')
     );
 
@@ -244,7 +243,7 @@ describe('export-manager service ownership isolation', () => {
     firstService.onProgress(firstProgress);
     secondService.onProgress(secondProgress);
 
-    collectFilesWithHarForExportManagerMock
+    collectFilesForExportManagerMock
       .mockImplementationOnce(mockTransferCollection('preview-a', 'uuid-a', 'file-a.txt'))
       .mockImplementationOnce(mockTransferCollection('preview-b', 'uuid-b', 'file-b.txt'));
 
@@ -279,12 +278,11 @@ describe('export-manager service ownership cancellation', () => {
         files: Map<string, Blob>;
         urlUuidToFilename: Map<string, string>;
       };
-      sessionHar: null;
     }>();
 
     service.onProgress(progressSpy);
 
-    collectFilesWithHarForExportManagerMock.mockImplementation(async () => {
+    collectFilesForExportManagerMock.mockImplementation(async () => {
       return transferDeferred.promise;
     });
 
@@ -299,7 +297,6 @@ describe('export-manager service ownership cancellation', () => {
         files: new Map(),
         urlUuidToFilename: new Map(),
       },
-      sessionHar: null,
     });
 
     await expect(exportPromise).resolves.toMatchObject({
@@ -388,7 +385,7 @@ describe('export-manager browser annotations delivery', () => {
     const service = createExportManagerService({ prepareAnnotationsText });
     const progressSpy = vi.fn();
     service.onProgress(progressSpy);
-    collectFilesWithHarForExportManagerMock.mockResolvedValue(
+    collectFilesForExportManagerMock.mockResolvedValue(
       createTransferResult('preview-a', 'uuid-a', 'file-a.txt')
     );
 

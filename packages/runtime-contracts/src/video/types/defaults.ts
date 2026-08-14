@@ -25,7 +25,7 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   qualityProfiles: [],
   countdownSeconds: 3,
   autoFadeDelay: 0,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   controlledCursorCaptureEnabled: false,
   recordingSurface: {
     toolbarEnabled: false,

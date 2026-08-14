@@ -80,7 +80,7 @@ const defaultSettings: VideoRecordingSettings = {
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
@@ -106,7 +106,7 @@ it('finalizes a camera recording with a launch token and control capability', as
   const cameraSettings = {
     ...defaultSettings,
     controlledCursorCaptureEnabled: false,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     sourceCount: 1,
     systemAudioEnabled: false,
     webcamEnabled: true,

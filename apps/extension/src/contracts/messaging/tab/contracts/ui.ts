@@ -24,42 +24,42 @@ type PartialTabRegistry = Partial<MessageContractRegistry<TabRequestByType, TabR
 
 export const tabUiMessageContracts = {
   [MessageType.ENABLE_SCREENSHOT_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.ENABLE_SCREENSHOT_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.ENABLE_SCREENSHOT_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab ENABLE_SCREENSHOT_MODE response',
       createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
     ),
   },
   [MessageType.DISABLE_SCREENSHOT_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.DISABLE_SCREENSHOT_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.DISABLE_SCREENSHOT_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab DISABLE_SCREENSHOT_MODE response',
       createRuntimeResponseGuard()
     ),
   },
   [MessageType.ENABLE_HIGHLIGHTER_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.ENABLE_HIGHLIGHTER_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.ENABLE_HIGHLIGHTER_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab ENABLE_HIGHLIGHTER_MODE response',
       createRuntimeResponseGuard()
     ),
   },
   [MessageType.DISABLE_HIGHLIGHTER_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.DISABLE_HIGHLIGHTER_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.DISABLE_HIGHLIGHTER_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab DISABLE_HIGHLIGHTER_MODE response',
       createRuntimeResponseGuard()
     ),
   },
   [MessageType.ENABLE_QUICK_EDIT_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.ENABLE_QUICK_EDIT_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.ENABLE_QUICK_EDIT_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab ENABLE_QUICK_EDIT_MODE response',
       createRuntimeResponseGuard()
     ),
   },
   [MessageType.DISABLE_QUICK_EDIT_MODE]: {
-    parseRequest: runtimeMessageContracts[MessageType.DISABLE_QUICK_EDIT_MODE].parseRequest,
+    parseRequest: runtimeMessageContracts[MessageType.DISABLE_QUICK_EDIT_MODE]!.parseRequest,
     parseResponse: createGuardParser(
       'tab DISABLE_QUICK_EDIT_MODE response',
       createRuntimeResponseGuard()

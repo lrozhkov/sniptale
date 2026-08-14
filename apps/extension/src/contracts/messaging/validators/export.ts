@@ -6,6 +6,9 @@ import type {
   PopupExportPackageResponse,
   PopupExportPreviewResponse,
   PopupExportResult,
+  PopupExportJobStatus,
+  PopupExportJobPhase,
+  PopupExportJobTab,
 } from '@sniptale/runtime-contracts/export';
 import { hasOptionalField, isBoolean, isNumber, isRecord, isString } from './index';
 
@@ -15,14 +18,44 @@ const exportProgressStepKeys = new Set<ExportProgressStepKey>([
   'cssDiagnostics',
   'files',
   'fullPageScreenshot',
-  'harDomLogs',
+  'pageDiagnostics',
   'images',
   'json',
   'markdown',
 ]);
 
+const exportProgressPhases = new Set<ExportProgress['phase']>([
+  'idle',
+  'scanning',
+  'downloading',
+  'zipping',
+  'done',
+  'error',
+]);
+
+const popupExportJobPhases = new Set<PopupExportJobPhase>([
+  'running',
+  'cancelling',
+  'cancelled',
+  'completed',
+  'failed',
+  'interrupted',
+]);
+
 function isExportProgressStepKey(value: unknown): value is ExportProgressStepKey {
   return isString(value) && exportProgressStepKeys.has(value as ExportProgressStepKey);
+}
+
+function isExportProgressPhase(value: unknown): value is ExportProgress['phase'] {
+  return isString(value) && exportProgressPhases.has(value as ExportProgress['phase']);
+}
+
+function isPopupExportJobPhase(value: unknown): value is PopupExportJobPhase {
+  return isString(value) && popupExportJobPhases.has(value as PopupExportJobPhase);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isExportPagePackageEntry(value: unknown): value is ExportPagePackageEntry {
@@ -50,7 +83,7 @@ export function isExportOptions(value: unknown): value is ExportOptions {
     isBoolean(value['includeFiles']) &&
     isBoolean(value['includeImages']) &&
     isBoolean(value['includeBasicLogs']) &&
-    isBoolean(value['includeHarDomLogs']) &&
+    isBoolean(value['includePageDiagnostics']) &&
     isBoolean(value['includeCssDiagnostics']) &&
     isBoolean(value['includeFullPageScreenshot'])
   );
@@ -64,10 +97,10 @@ export function isExportProgress(value: unknown): value is ExportProgress {
       'activeStepKey',
       (entry) => entry === null || isExportProgressStepKey(entry)
     ) &&
-    isString(value['phase']) &&
+    isExportProgressPhase(value['phase']) &&
     isString(value['message']) &&
-    isNumber(value['current']) &&
-    isNumber(value['total']) &&
+    isNonNegativeInteger(value['current']) &&
+    isNonNegativeInteger(value['total']) &&
     Array.isArray(value['errors']) &&
     value['errors'].every(isString)
   );
@@ -85,6 +118,33 @@ export function isPopupExportResult(value: unknown): value is PopupExportResult 
     isNumber(value['stats']['rowsCount']) &&
     isNumber(value['stats']['filesCount']) &&
     isNumber(value['stats']['filesFailed'])
+  );
+}
+
+export function isPopupExportJobTab(value: unknown): value is PopupExportJobTab {
+  return isRecord(value) && isNumber(value['tabId']) && isString(value['title']);
+}
+
+export function isPopupExportJobStatus(value: unknown): value is PopupExportJobStatus {
+  return (
+    isRecord(value) &&
+    isString(value['jobId']) &&
+    isNonNegativeInteger(value['revision']) &&
+    value['revision'] > 0 &&
+    isPopupExportJobPhase(value['phase']) &&
+    Array.isArray(value['orderedTabs']) &&
+    value['orderedTabs'].every(isPopupExportJobTab) &&
+    isExportOptions(value['effectiveOptions']) &&
+    isExportProgress(value['progress']) &&
+    Array.isArray(value['warnings']) &&
+    value['warnings'].every(isString) &&
+    Array.isArray(value['originalActiveTabs']) &&
+    value['originalActiveTabs'].every(
+      (entry) => isRecord(entry) && isNumber(entry['windowId']) && isNumber(entry['tabId'])
+    ) &&
+    Array.isArray(value['activatedTabIds']) &&
+    value['activatedTabIds'].every(isNumber) &&
+    hasOptionalField(value, 'result', isPopupExportResult)
   );
 }
 

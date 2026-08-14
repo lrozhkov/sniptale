@@ -16,14 +16,13 @@ import {
   persistDiagnosticsSession,
 } from './session';
 import {
-  enableDiagnosticsForSession,
   notifyDiagnosticLogger,
   resolveTabUrl,
   restoreOrGetSession,
   shutDownDiagnosticsSession,
 } from './runtime';
 
-export { handleDebuggerEvent, handleForcedDetach, handleTabNavigation } from './handlers';
+export { handleTabNavigation } from './handlers';
 export { recoverInterruptedSessions } from './recovery';
 export { resetDiagnosticsStateForLocalDataErasure } from './state';
 
@@ -65,7 +64,6 @@ async function startDiagnosticsWithPermit(
   const session = createDiagnosticsSession(recordingId, tabId, meta);
 
   registerDiagnosticsSession(session);
-  await enableDiagnosticsForSession(tabId, recordingId);
   startDiagnosticsFlushLoop();
   await notifyDiagnosticLogger(tabId, VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER, recordingId);
 

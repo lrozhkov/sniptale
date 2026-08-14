@@ -21,7 +21,6 @@ export const contextMenuSettingsFixture = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
-  rawDiagnosticsEnabled: false,
   presets: [],
   saveCapturesToGallery: false,
   viewportPresets: [
@@ -51,7 +50,7 @@ export const contextMenuSettingsFixture = {
 export const contextMenuVideoSettingsFixture = {
   autoFadeDelay: 3,
   countdownSeconds: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   quality: 'HIGH',
@@ -63,7 +62,7 @@ export const contextMenuPopupExportPreferencesFixture = {
   includeCssDiagnostics: false,
   includeFiles: true,
   includeFullPageScreenshot: false,
-  includeHarDomLogs: false,
+  includePageDiagnostics: false,
   includeImages: true,
   includeJson: true,
   includeMarkdown: true,

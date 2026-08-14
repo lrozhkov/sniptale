@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { backgroundRuntimeTypes } from '../../../../contracts/messaging/parsers/supported-types.data.ts';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { actionRouteMetadata } from './routes';
@@ -15,8 +14,6 @@ const nonActionBackgroundRuntimeMessageTypes = new Map<
 >([
   ['AREA_SELECTED', 'content-runtime-event'],
   ['KEEP_ALIVE', 'internal-signal'],
-  [MessageType.EXPORT_POPUP_PROGRESS, 'internal-signal'],
-  [MessageType.EXPORT_POPUP_RESULT, 'internal-signal'],
   [VideoMessageType.COUNTDOWN_COMPLETE, 'internal-signal'],
   [VideoMessageType.DISPOSE_DESKTOP_MEDIA, 'outbound-offscreen-command'],
   [VideoMessageType.REGION_SELECTED, 'content-runtime-event'],

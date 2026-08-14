@@ -42,7 +42,6 @@ const popupTabRouteCapabilities = createPrivilegedCapabilityStore<PopupTabRouteC
 });
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,

@@ -29,7 +29,7 @@ export function sanitizeRecordingSettings(
     ...(captureMode === CaptureMode.CAMERA
       ? {
           controlledCursorCaptureEnabled: false,
-          diagnosticsEnabled: false,
+          interactionDiagnosticsEnabled: false,
           sourceCount: 1,
           systemAudioEnabled: false,
           webcamEnabled: true,

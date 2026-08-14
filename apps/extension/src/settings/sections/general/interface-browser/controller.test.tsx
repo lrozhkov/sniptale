@@ -91,7 +91,6 @@ function resetAppearanceSectionMocks(): void {
     settings: {
       authenticatedSnapshotAssetsEnabled: true,
       anonymousCrossOriginSnapshotAssetsEnabled: false,
-      rawDiagnosticsEnabled: false,
       contextMenu: {
         enabled: true,
         showExport: true,

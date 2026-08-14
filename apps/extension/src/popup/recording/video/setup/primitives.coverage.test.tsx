@@ -94,7 +94,7 @@ describe('popup video setup shared controls', () => {
     render(
       <>
         <VideoDiagnosticsToggle
-          settings={{ diagnosticsEnabled: true } as never}
+          settings={{ interactionDiagnosticsEnabled: true } as never}
           diagnosticsDisabled={false}
           onSettingsChange={onSettingsChange}
         />
@@ -119,7 +119,7 @@ describe('popup video setup shared controls', () => {
         label: 'popup.video.systemAudioDisabledLabel',
       })
     );
-    expect(onSettingsChange).toHaveBeenCalledWith({ diagnosticsEnabled: false });
+    expect(onSettingsChange).toHaveBeenCalledWith({ interactionDiagnosticsEnabled: false });
   });
 
   it('forwards an explicit disabled state through the shared mode button helper', () => {

@@ -1,7 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  browserDebuggerSendCommandMock,
   browserTabsCaptureVisibleTabMock,
   browserTabsGetMock,
   browserTabsQueryMock,
@@ -12,7 +11,6 @@ const {
   transitionCaptureJobMock,
   withHiddenFixedElementsMock,
 } = vi.hoisted(() => ({
-  browserDebuggerSendCommandMock: vi.fn(),
   browserTabsCaptureVisibleTabMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   browserTabsQueryMock: vi.fn(),
@@ -22,11 +20,6 @@ const {
   resolveVisibleCaptureApiFormatMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
   withHiddenFixedElementsMock: vi.fn(),
-}));
-
-vi.mock('@sniptale/platform/browser/debugger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/debugger')>()),
-  browserDebugger: { sendCommand: browserDebuggerSendCommandMock },
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -89,7 +82,7 @@ it('marks non-error visible capture failures with the route fallback message', a
   );
 });
 
-it('does not start debugger fallback for missing native visible capture authority', async () => {
+it('surfaces missing native visible capture authority', async () => {
   const captureError = new Error("Either the '<all_urls>' or 'activeTab' permission is required.");
   browserTabsGetMock.mockResolvedValue({ id: 42, windowId: 4 });
   browserTabsQueryMock.mockResolvedValue([{ id: 42, windowId: 4 }]);
@@ -97,7 +90,6 @@ it('does not start debugger fallback for missing native visible capture authorit
 
   await expect(captureVisibleTabTransaction(42)).rejects.toBe(captureError);
 
-  expect(browserDebuggerSendCommandMock).not.toHaveBeenCalled();
   expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'failed', {
     error: "Either the '<all_urls>' or 'activeTab' permission is required.",
   });
@@ -112,7 +104,6 @@ it('fails closed before native capture when the authorized tab is no longer acti
   );
 
   expect(browserTabsCaptureVisibleTabMock).not.toHaveBeenCalled();
-  expect(browserDebuggerSendCommandMock).not.toHaveBeenCalled();
   expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'failed', {
     error: 'Visible capture target is not the active tab.',
   });

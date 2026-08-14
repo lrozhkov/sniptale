@@ -1,13 +1,12 @@
-// Diagnostic Types for CDP-based recording diagnostics
-// Used by: background/diagnostic-collector, video-editor, content-script
+// Recording interaction diagnostics shared by background, content, and video editor.
 
 /**
  * Kind of diagnostic event
  */
-type DiagnosticEventKind = 'console' | 'network' | 'error' | 'action' | 'meta';
+type DiagnosticEventKind = 'error' | 'action' | 'meta';
 
 /**
- * Log level for console and error events
+ * Log level for error and action events
  */
 export type DiagnosticLevel = 'error' | 'warn' | 'info' | 'log';
 
@@ -19,7 +18,7 @@ export interface DiagnosticEvent {
   recordingId: string; // Link to recording
   tsMs: number; // Milliseconds from recording start
   kind: DiagnosticEventKind;
-  level?: DiagnosticLevel; // For console/error events
+  level?: DiagnosticLevel; // For error/action severity
   message: string;
   data?: unknown; // Sanitized structured clone friendly payload
 }
@@ -38,22 +37,6 @@ export interface DiagnosticMeta {
 }
 
 /**
- * Network request data for network events
- */
-export interface NetworkRequestData {
-  requestId: string;
-  url: string;
-  method: string;
-  status?: number;
-  statusText?: string;
-  requestTime: number; // ms from recording start
-  responseTime?: number; // ms from recording start
-  mimeType?: string;
-  error?: string;
-  resourceType?: string; // Document, Script, Stylesheet, XHR, Fetch, etc.
-}
-
-/**
  * Chunk of events for IndexedDB storage (to avoid large single records)
  * Each chunk contains ~1000 events
  */
@@ -69,7 +52,7 @@ export interface DiagnosticEventChunk {
  */
 export interface DiagnosticsEntry {
   recordingId: string; // Primary key
-  schemaVersion: 1;
+  schemaVersion: 2;
   meta: DiagnosticMeta;
   totalEvents: number;
   chunksCount: number;
@@ -85,7 +68,6 @@ export interface ActiveDiagnosticsSession {
   startedAt: number; // performance.now() for relative timing
   meta: DiagnosticMeta;
   events: DiagnosticEvent[];
-  pendingNetworkRequests: Map<string, NetworkRequestData>;
   isPaused: boolean; // True when recording stopped but not yet finalized
 }
 
@@ -98,7 +80,6 @@ export interface SessionSnapshot {
   startedAt: number;
   meta: DiagnosticMeta;
   events: DiagnosticEvent[];
-  pendingNetworkRequests: NetworkRequestData[];
   isPaused: boolean;
 }
 

@@ -3,7 +3,6 @@ import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers
 import {
   createMessageGuard,
   createRuntimeResponseGuard,
-  isBoolean,
   isNullable,
   isNumber,
   isString,
@@ -11,16 +10,15 @@ import {
 import { isWebSnapshotManifest } from '../../../../../features/web-snapshot/manifest';
 import {
   isExportOptions,
-  isExportProgress,
   isPopupExportPackageResponse,
   isPopupExportPreviewResponse,
-  isPopupExportResult,
+  isPopupExportJobStatus,
+  isPopupExportJobTab,
 } from '../../../validators/export';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,
@@ -39,16 +37,71 @@ function isPopupExportLaunchPage(value: unknown): value is 'export' {
   return value === 'export';
 }
 
-function isHarCapturePayload(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 const popupTabRouteCapabilityFields = {
   tabRouteCapabilityToken: isString,
   tabRouteRequestId: isString,
 };
 
 export const runtimeActionExportMessageContracts = {
+  [MessageType.START_POPUP_EXPORT_JOB]: {
+    parseRequest: createGuardParser(
+      'runtime START_POPUP_EXPORT_JOB message',
+      createMessageGuard({
+        type: MessageType.START_POPUP_EXPORT_JOB,
+        required: {
+          jobId: isString,
+          orderedTabs: (value) => Array.isArray(value) && value.every(isPopupExportJobTab),
+          options: isExportOptions,
+          warnings: isStringArray,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime START_POPUP_EXPORT_JOB response',
+      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
+    ),
+  },
+  [MessageType.GET_POPUP_EXPORT_JOB_STATUS]: {
+    parseRequest: createGuardParser(
+      'runtime GET_POPUP_EXPORT_JOB_STATUS message',
+      createMessageGuard({
+        type: MessageType.GET_POPUP_EXPORT_JOB_STATUS,
+        optional: { jobId: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime GET_POPUP_EXPORT_JOB_STATUS response',
+      createRuntimeResponseGuard({
+        optional: { status: isNullable(isPopupExportJobStatus) },
+      })
+    ),
+  },
+  [MessageType.CANCEL_POPUP_EXPORT_JOB]: {
+    parseRequest: createGuardParser(
+      'runtime CANCEL_POPUP_EXPORT_JOB message',
+      createMessageGuard({
+        type: MessageType.CANCEL_POPUP_EXPORT_JOB,
+        required: { jobId: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime CANCEL_POPUP_EXPORT_JOB response',
+      createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
+    ),
+  },
+  [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: {
+    parseRequest: createGuardParser(
+      'runtime POPUP_EXPORT_JOB_STATUS_UPDATED message',
+      createMessageGuard({
+        type: MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED,
+        required: { status: isPopupExportJobStatus },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime POPUP_EXPORT_JOB_STATUS_UPDATED response',
+      createRuntimeResponseGuard({ allowUndefined: true })
+    ),
+  },
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: {
     parseRequest: createGuardParser(
       'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT message',
@@ -62,50 +115,6 @@ export const runtimeActionExportMessageContracts = {
       createRuntimeResponseGuard({ required: { page: isNullable(isPopupExportLaunchPage) } })
     ),
   },
-  [MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY]: {
-    parseRequest: createGuardParser(
-      'runtime REQUEST_EXPORT_HAR_START_CAPABILITY message',
-      createMessageGuard({
-        type: MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY,
-        required: { sessionId: isString },
-        optional: { rawDiagnosticsEnabled: isBoolean },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime REQUEST_EXPORT_HAR_START_CAPABILITY response',
-      createRuntimeResponseGuard({ optional: { capabilityToken: isString } })
-    ),
-  },
-  [MessageType.EXPORT_START_HAR]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_START_HAR message',
-      createMessageGuard({
-        type: MessageType.EXPORT_START_HAR,
-        required: { capabilityToken: isString, sessionId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_START_HAR response',
-      createRuntimeResponseGuard({
-        optional: { capabilityToken: isString, expiresAtEpochMs: isNumber, result: isString },
-      })
-    ),
-  },
-  [MessageType.EXPORT_STOP_HAR]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_STOP_HAR message',
-      createMessageGuard({
-        type: MessageType.EXPORT_STOP_HAR,
-        required: { capabilityToken: isString, sessionId: isString },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_STOP_HAR response',
-      createRuntimeResponseGuard({
-        optional: { har: isHarCapturePayload, rawDiagnosticsEnabled: isBoolean },
-      })
-    ),
-  },
   [MessageType.EXPORT_POPUP_PREVIEW]: {
     parseRequest: createGuardParser(
       'runtime EXPORT_POPUP_PREVIEW message',
@@ -117,24 +126,6 @@ export const runtimeActionExportMessageContracts = {
     parseResponse: createGuardParser(
       'runtime EXPORT_POPUP_PREVIEW response',
       isPopupExportPreviewResponse
-    ),
-  },
-  [MessageType.EXPORT_POPUP_START]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_POPUP_START message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_START,
-        required: {
-          tabId: isNumber,
-          requestId: isString,
-          options: isExportOptions,
-          ...popupTabRouteCapabilityFields,
-        },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_POPUP_START response',
-      createRuntimeResponseGuard()
     ),
   },
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: {
@@ -189,32 +180,6 @@ export const runtimeActionExportMessageContracts = {
     parseResponse: createGuardParser(
       'runtime EXPORT_POPUP_CANCEL response',
       createRuntimeResponseGuard()
-    ),
-  },
-  [MessageType.EXPORT_POPUP_PROGRESS]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_POPUP_PROGRESS message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_PROGRESS,
-        required: { requestId: isString, progress: isExportProgress },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_POPUP_PROGRESS response',
-      createRuntimeResponseGuard({ allowUndefined: true })
-    ),
-  },
-  [MessageType.EXPORT_POPUP_RESULT]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_POPUP_RESULT message',
-      createMessageGuard({
-        type: MessageType.EXPORT_POPUP_RESULT,
-        required: { requestId: isString, result: isPopupExportResult },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_POPUP_RESULT response',
-      createRuntimeResponseGuard({ allowUndefined: true })
     ),
   },
   [MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY]: {

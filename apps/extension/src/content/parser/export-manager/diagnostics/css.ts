@@ -4,7 +4,7 @@ import { buildStylesheetDiagnosticAssets } from './css.stylesheets';
 import type { ExportDiagnosticsSource } from './source';
 
 /**
- * Builds stylesheet and computed-style diagnostics that complement DOM/HAR exports when
+ * Builds stylesheet and computed-style diagnostics that complement page diagnostics when
  * visual regressions need rule-level evidence.
  */
 export function buildCssDiagnosticAssets(source?: ExportDiagnosticsSource): ArchiveAsset[] {

@@ -75,10 +75,7 @@ describe('AppearanceSectionContent', () => {
     'toggles the targeted context menu item through the provided handler',
     verifyContextMenuToggle
   );
-  it(
-    'does not expose persistent raw HAR diagnostics as a settings toggle',
-    verifyRawDiagnosticsHidden
-  );
+  it('does not expose retired raw diagnostics as a settings toggle', verifyRawDiagnosticsHidden);
 });
 
 function setupAppearanceContentTest(): void {

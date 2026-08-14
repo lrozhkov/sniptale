@@ -68,13 +68,6 @@ export function handleTabRecordingNavigationError(
   return completeTabNavigationDocument(tabId, documentId, pageAccessVerifier);
 }
 
-export function handleTabRecordingDebuggerDetach(
-  _tabId: number,
-  _pageAccessVerifier: TabNavigationPageAccessVerifier = unavailablePageAccessVerifier
-): boolean {
-  return false;
-}
-
 export function handleTabRecordingWindowBoundsChanged(_windowId: number): boolean {
   return false;
 }

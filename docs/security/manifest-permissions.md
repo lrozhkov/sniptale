@@ -1,6 +1,6 @@
 # Manifest permissions
 
-Updated: 2026-07-27
+Updated: 2026-08-14
 
 This document explains high-impact grants and manifest topology. `tooling/configs/qa/manifest-permissions.data.json` is the complete hard-fail inventory for permissions, host permissions, content scripts, web-accessible resources, owners, routes, failure behavior, and review notes.
 
@@ -11,7 +11,6 @@ This document explains high-impact grants and manifest topology. `tooling/config
 | Current-tab capture and page tooling | `activeTab`, `scripting` | capture editor, page-access service, browser scripting adapter | Current-tab authority only; inject the full content runtime through page access. |
 | Persistent page tooling and visible capture | optional `<all_urls>` plus dynamic HTTP/HTTPS registration | page-access service, visible capture | User-approved optional access; compact shim registration only, full runtime remains lazy. |
 | Extension pages | no host permission | extension page entrypoints | Settings, gallery, editors, popup, and snapshot viewer remain usable without host access. |
-| Debugger-backed unattended capture and diagnostics | `debugger` | debugger adapter, inactive/bulk archive capture, HAR collector | Interactive and active-tab full-page capture uses native visible-tab pixels without debugger; debugger is reserved for unattended inactive/bulk export and diagnostics, with explicit denial handling. |
 | Browser-window size presets | `system.display` | display adapter and capture-surface owner | Read display bounds and work areas only; presets that do not fit are disabled, and display settings are never changed. |
 | Tab recording | `tabCapture` | tab-capture adapter, capture mode | Required for tab and tab-crop recording modes. |
 | Screen/window recording and one-shot screenshots | `desktopCapture` | desktop-capture adapter and source picker | Background policy filters browser-selected sources. Screenshot quick actions expose only `window` and `screen`, prepare offscreen before selection, and consume the one-shot stream ID immediately. |
@@ -31,7 +30,7 @@ This document explains high-impact grants and manifest topology. `tooling/config
 1. Do not reintroduce required `<all_urls>` or a static all-frame source content script.
 2. Dynamic registration follows optional host state; denial prevents registration and revocation removes owner-created registrations.
 3. Capability gates live at the owning browser/runtime seam before any permission becomes optional.
-4. Optionalize `downloads` only after all sinks have request and failure behavior; then evaluate `desktopCapture`, `tabCapture`, and debugger families independently.
+4. Optionalize `downloads` only after all sinks have request and failure behavior; then evaluate `desktopCapture` and `tabCapture` independently.
 5. Keep web-accessible resources exact. Never use `assets/*`, `fonts/*`, or expose injected runtime bundles.
 
 ## Review rule

@@ -33,16 +33,6 @@ const ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN = [
   'Anonymously load HTTPS assets from other sites through the extension background.',
   'When disabled, external assets are skipped; this reduces private-network and DNS-rebinding leak risk.',
 ].join(' ');
-const RAW_DIAGNOSTICS_DESCRIPTION_RU = [
-  'Для HAR расширенный режим выдаётся только на время конкретного экспорта.',
-  'Логи экспорта могут содержать сетевые детали,',
-  'но cookies, authorization headers и чувствительные URL-параметры всегда редактируются.',
-].join(' ');
-const RAW_DIAGNOSTICS_DESCRIPTION_EN = [
-  'Extended HAR mode is scoped to the current export only.',
-  'Export logs may include network details,',
-  'but cookies, authorization headers, and sensitive URL parameters are always redacted.',
-].join(' ');
 
 export const settingsAppearanceMessages = defineMessageSource({
   badge: {
@@ -155,14 +145,6 @@ export const settingsAppearanceMessages = defineMessageSource({
   anonymousCrossOriginSnapshotAssetsDescription: {
     ru: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_RU,
     en: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN,
-  },
-  rawDiagnosticsLabel: {
-    ru: 'Сохранять расширенную диагностику',
-    en: 'Save extended diagnostics',
-  },
-  rawDiagnosticsDescription: {
-    ru: RAW_DIAGNOSTICS_DESCRIPTION_RU,
-    en: RAW_DIAGNOSTICS_DESCRIPTION_EN,
   },
   contextMenuTitle: {
     ru: 'Контекстное меню браузера',

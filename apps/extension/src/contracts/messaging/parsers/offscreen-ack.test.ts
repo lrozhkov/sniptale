@@ -13,7 +13,7 @@ function createRecordingSettings() {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 30,
     countdownSeconds: 0,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
   };
 }
 

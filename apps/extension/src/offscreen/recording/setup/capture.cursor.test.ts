@@ -56,7 +56,7 @@ function createControlledTabSettings(): VideoRecordingSettings {
     autoFadeDelay: 0,
     countdownSeconds: 3,
     controlledCursorCaptureEnabled: true,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },

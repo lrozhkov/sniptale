@@ -161,15 +161,15 @@ it('rejects forged trusted-content-event requests without a background proof', (
   expect(sendResponse).not.toHaveBeenCalled();
 });
 
-it('does not expose unattended full-page export through trusted content activation', () => {
+it('issues a native full-page export token through trusted content activation', () => {
   const sender = contentSender();
   const sendResponse = vi.fn();
 
   routeContentPrivilegedActionRuntimeTokenRequest(
     {
       activationProof: issueContentActionActivationKeyForTest(sender),
-      actionType: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
-      requestId: 'unattended-request-1',
+      actionType: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      requestId: 'background-export-request-1',
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
     },
     sender,
@@ -177,10 +177,8 @@ it('does not expose unattended full-page export through trusted content activati
     resolveContentSenderBindingForTest(sender)
   );
 
-  expect(sendResponse.mock.calls[0]?.[0]).toMatchObject({
-    error: 'Unauthorized content action activation proof',
-    success: false,
-  });
+  expect(sendResponse.mock.calls[0]?.[0]).toMatchObject({ success: true });
+  expect(sendResponse.mock.calls[0]?.[0]).toHaveProperty('runtimeToken');
 });
 
 it('requires a fresh one-shot trusted-event proof for capability issuance', () => {
