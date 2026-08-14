@@ -38,6 +38,9 @@ export type PopupExportRuntimeDeps = {
   sendCancelJobMessage?: (
     message: RuntimeRequestByType[typeof MessageType.CANCEL_POPUP_EXPORT_JOB]
   ) => Promise<RuntimeResponseByType[typeof MessageType.CANCEL_POPUP_EXPORT_JOB]>;
+  sendAckJobStatusMessage?: (
+    message: RuntimeRequestByType[typeof MessageType.ACK_POPUP_EXPORT_JOB_STATUS]
+  ) => Promise<RuntimeResponseByType[typeof MessageType.ACK_POPUP_EXPORT_JOB_STATUS]>;
   writeClipboardText: (text: string) => Promise<void>;
 };
 

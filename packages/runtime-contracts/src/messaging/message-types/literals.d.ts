@@ -41,6 +41,7 @@ declare module './' {
     type START_POPUP_EXPORT_JOB = typeof import('./').MessageType.START_POPUP_EXPORT_JOB;
     type GET_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.GET_POPUP_EXPORT_JOB_STATUS;
     type CANCEL_POPUP_EXPORT_JOB = typeof import('./').MessageType.CANCEL_POPUP_EXPORT_JOB;
+    type ACK_POPUP_EXPORT_JOB_STATUS = typeof import('./').MessageType.ACK_POPUP_EXPORT_JOB_STATUS;
     type POPUP_EXPORT_JOB_STATUS_UPDATED =
       typeof import('./').MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
     type EXPORT_POPUP_CANCEL = typeof import('./').MessageType.EXPORT_POPUP_CANCEL;

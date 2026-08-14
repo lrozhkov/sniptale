@@ -78,6 +78,7 @@ vi.mock('./storage', async (importOriginal) => ({
 }));
 
 import {
+  acknowledgePopupExportJobStatus,
   cancelPopupExportJob,
   erasePopupExportJobState,
   getPopupExportJobStatus,
@@ -115,6 +116,31 @@ async function waitForPhase(phase: PopupExportJobStatus['phase']) {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
   throw new Error(`Popup export job did not reach ${phase}`);
+}
+
+function createStoredStatus(
+  phase: PopupExportJobStatus['phase'],
+  overrides: Partial<PopupExportJobStatus> = {}
+): PopupExportJobStatus {
+  return {
+    activatedTabIds: [],
+    effectiveOptions: options,
+    jobId: 'job-1',
+    orderedTabs: [{ tabId: 11, title: 'One' }],
+    originalActiveTabs: [],
+    phase,
+    progress: {
+      activeStepKey: null,
+      current: phase === 'completed' ? 1 : 0,
+      errors: [],
+      message: phase,
+      phase: phase === 'completed' ? 'done' : 'scanning',
+      total: 1,
+    },
+    revision: 1,
+    warnings: [],
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
@@ -183,6 +209,42 @@ it('captures a single already-active tab through the native backend', async () =
   );
   expect(status.activatedTabIds).toEqual([11]);
   expect(mocks.download).toHaveBeenCalledOnce();
+});
+
+it('acknowledges only matching terminal stored job metadata', async () => {
+  mocks.readStatus.mockResolvedValue(createStoredStatus('completed', { jobId: 'job-done' }));
+
+  await acknowledgePopupExportJobStatus('job-other');
+  expect(mocks.clearStatus).not.toHaveBeenCalled();
+
+  await acknowledgePopupExportJobStatus('job-done');
+  expect(mocks.clearStatus).toHaveBeenCalledOnce();
+});
+
+it('does not acknowledge active or unfinished job metadata', async () => {
+  mocks.getTab.mockResolvedValue({ id: 11, title: 'One', windowId: 1 });
+  mocks.activeByWindow.set(1, 11);
+  mocks.requestPackage.mockResolvedValue(packageResponse('one'));
+
+  await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
+    jobId: 'job-1',
+    options,
+    orderedTabs: [{ tabId: 11, title: 'One' }],
+    warnings: [],
+  });
+
+  await acknowledgePopupExportJobStatus('job-1');
+  expect(mocks.clearStatus).not.toHaveBeenCalled();
+
+  await waitForPhase('completed');
+  mocks.readStatus.mockResolvedValue(createStoredStatus('running', { jobId: 'job-running' }));
+
+  await acknowledgePopupExportJobStatus('job-running');
+  expect(mocks.clearStatus).not.toHaveBeenCalled();
 });
 
 it('captures an ordered batch across windows and restores each original tab', async () => {

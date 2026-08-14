@@ -75,9 +75,10 @@ it('proxies the native popup-export job API and optional host permission', async
   });
   await deps.sendGetJobStatusMessage?.({ type: MessageType.GET_POPUP_EXPORT_JOB_STATUS });
   await deps.sendCancelJobMessage?.({ jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB });
+  await deps.sendAckJobStatusMessage?.({ type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS });
 
   expect(mocks.requestPermission).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(3);
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledTimes(4);
 });
 
 it('proxies popup-owned tab operations and schedules callbacks', async () => {

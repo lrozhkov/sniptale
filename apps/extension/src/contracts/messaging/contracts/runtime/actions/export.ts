@@ -89,6 +89,21 @@ export const runtimeActionExportMessageContracts = {
       createRuntimeResponseGuard({ optional: { status: isPopupExportJobStatus } })
     ),
   },
+  [MessageType.ACK_POPUP_EXPORT_JOB_STATUS]: {
+    parseRequest: createGuardParser(
+      'runtime ACK_POPUP_EXPORT_JOB_STATUS message',
+      createMessageGuard({
+        type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
+        optional: { jobId: isString },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime ACK_POPUP_EXPORT_JOB_STATUS response',
+      createRuntimeResponseGuard({
+        required: { status: isNullable(isPopupExportJobStatus) },
+      })
+    ),
+  },
   [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: {
     parseRequest: createGuardParser(
       'runtime POPUP_EXPORT_JOB_STATUS_UPDATED message',

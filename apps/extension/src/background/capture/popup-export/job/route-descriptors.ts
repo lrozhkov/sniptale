@@ -6,6 +6,7 @@ export const popupExportJobRouteDescriptor = {
     MessageType.START_POPUP_EXPORT_JOB,
     MessageType.GET_POPUP_EXPORT_JOB_STATUS,
     MessageType.CANCEL_POPUP_EXPORT_JOB,
+    MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
   ],
   ownerModule: 'apps/extension/src/background/capture/popup-export/job/route.ts',
   policyAuthorityFamily: 'popup-export-job',

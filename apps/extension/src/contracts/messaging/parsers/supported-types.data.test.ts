@@ -41,6 +41,9 @@ it('keeps background runtime ownership for capture command messages', () => {
     true
   );
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.CANCEL_POPUP_EXPORT_JOB)).toBe(true);
+  expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ACK_POPUP_EXPORT_JOB_STATUS)).toBe(
+    true
+  );
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.AI_SECRET_UNLOCK)).toBe(true);
   expect(hasBoundaryType(backgroundRuntimeTypes, MessageType.ERASE_LOCAL_EXTENSION_DATA)).toBe(
     true

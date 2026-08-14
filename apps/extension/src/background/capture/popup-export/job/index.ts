@@ -117,6 +117,19 @@ export async function cancelPopupExportJob(jobId: string): Promise<PopupExportJo
   return clonePopupExportJobStatus(job.status);
 }
 
+export async function acknowledgePopupExportJobStatus(
+  jobId?: string
+): Promise<PopupExportJobStatus | null> {
+  if (activeJob) return clonePopupExportJobStatus(activeJob.status);
+  const status = await readPopupExportJobStatus();
+  if (!status || (jobId !== undefined && status.jobId !== jobId)) return status;
+  if (status.phase === 'running' || status.phase === 'cancelling') {
+    return clonePopupExportJobStatus(status);
+  }
+  await clearPopupExportJobStatus();
+  return null;
+}
+
 export async function erasePopupExportJobState(): Promise<void> {
   const job = activeJob;
   if (job) {

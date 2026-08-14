@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 const mocks = vi.hoisted(() => ({
+  ack: vi.fn(),
   cancel: vi.fn(),
   getStatus: vi.fn(),
   start: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./index')>()),
+  acknowledgePopupExportJobStatus: mocks.ack,
   cancelPopupExportJob: mocks.cancel,
   getPopupExportJobStatus: mocks.getStatus,
   startPopupExportJob: mocks.start,
@@ -35,12 +37,13 @@ const options = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.ack.mockResolvedValue(null);
   mocks.cancel.mockResolvedValue({ phase: 'cancelling' });
   mocks.getStatus.mockResolvedValue(null);
   mocks.start.mockResolvedValue({ phase: 'running' });
 });
 
-it('routes start, status, and cancellation through the job owner', async () => {
+it('routes start, status, cancellation, and acknowledgement through the job owner', async () => {
   const sendResponse = vi.fn();
   expect(
     routePopupExportJobMessage(
@@ -67,10 +70,16 @@ it('routes start, status, and cancellation through the job owner', async () => {
     sendResponse,
     contentPort
   );
-  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledTimes(3));
+  routePopupExportJobMessage(
+    { jobId: 'job-1', type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS },
+    sendResponse,
+    contentPort
+  );
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledTimes(4));
 
   expect(mocks.getStatus).toHaveBeenCalledWith('job-1');
   expect(mocks.cancel).toHaveBeenCalledWith('job-1');
+  expect(mocks.ack).toHaveBeenCalledWith('job-1');
 });
 
 it('rejects unrelated messages and surfaces owner failures', async () => {

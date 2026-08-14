@@ -8,7 +8,6 @@ import {
 import { ExportFooterActions } from '../footer/actions';
 import { ExportPageContent } from './content';
 import { type PopupExportController, usePopupExportController } from '../controller';
-import { IDLE_PROGRESS } from '../selection/utils';
 import { WebSnapshotConfirmationDialog, type WebSnapshotDisclosure } from './snapshot-confirmation';
 import { useWebSnapshotConfirmationState } from './snapshot-confirmation-state';
 
@@ -57,8 +56,7 @@ function getExportFooterCallbacks(args: {
     },
     ...getWebSnapshotResultAction(args.controller),
     onResetExportView: () => {
-      args.controller.state.session.actions.setProgress(IDLE_PROGRESS);
-      args.controller.state.session.actions.setResult(null);
+      void args.controller.actions.handleResetExportView();
     },
     onSaveWebSnapshot: () => {
       if (args.webSnapshotDisclosure.requiresConfirmation) {

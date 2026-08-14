@@ -32,6 +32,7 @@ export const backgroundOwnedMessageTypes = [
   MessageType.START_POPUP_EXPORT_JOB,
   MessageType.GET_POPUP_EXPORT_JOB_STATUS,
   MessageType.CANCEL_POPUP_EXPORT_JOB,
+  MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
 ] as const;
 
 const backgroundOwnedMessageTypeSet = new Set<string>(backgroundOwnedMessageTypes);

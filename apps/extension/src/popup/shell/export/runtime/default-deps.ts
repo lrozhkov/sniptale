@@ -22,6 +22,7 @@ export function getDefaultPopupExportRuntimeDeps(): PopupExportRuntimeDeps {
     sendStartJobMessage: (message) => sendRuntimeMessage(message),
     sendGetJobStatusMessage: (message) => sendRuntimeMessage(message),
     sendCancelJobMessage: (message) => sendRuntimeMessage(message),
+    sendAckJobStatusMessage: (message) => sendRuntimeMessage(message),
     writeClipboardText: (text: string) => globalThis.navigator.clipboard.writeText(text),
   };
 }

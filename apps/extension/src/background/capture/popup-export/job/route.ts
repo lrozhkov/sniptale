@@ -2,7 +2,12 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { runtimeActionExportMessageContracts } from '../../../../contracts/messaging/contracts/runtime/actions/export';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
-import { cancelPopupExportJob, getPopupExportJobStatus, startPopupExportJob } from './index';
+import {
+  acknowledgePopupExportJobStatus,
+  cancelPopupExportJob,
+  getPopupExportJobStatus,
+  startPopupExportJob,
+} from './index';
 import type { PopupExportJobContentPort } from './runtime-state';
 
 export function routePopupExportJobMessage(
@@ -39,6 +44,17 @@ export function routePopupExportJobMessage(
           message
         );
       work = cancelPopupExportJob(parsed.jobId).then((status) => ({
+        success: true,
+        status,
+      }));
+      break;
+    }
+    case MessageType.ACK_POPUP_EXPORT_JOB_STATUS: {
+      const parsed =
+        runtimeActionExportMessageContracts[MessageType.ACK_POPUP_EXPORT_JOB_STATUS].parseRequest(
+          message
+        );
+      work = acknowledgePopupExportJobStatus(parsed.jobId).then((status) => ({
         success: true,
         status,
       }));

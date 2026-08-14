@@ -36,6 +36,10 @@ export type RuntimePopupExportRequestByType = {
     type: typeof MessageType.CANCEL_POPUP_EXPORT_JOB;
     jobId: string;
   };
+  [MessageType.ACK_POPUP_EXPORT_JOB_STATUS]: {
+    type: typeof MessageType.ACK_POPUP_EXPORT_JOB_STATUS;
+    jobId?: string;
+  };
   [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: {
     type: typeof MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED;
     status: PopupExportJobStatus;
@@ -75,6 +79,9 @@ export type RuntimePopupExportResponseByType = {
   }>;
   [MessageType.CANCEL_POPUP_EXPORT_JOB]: import('../response').RuntimeMessageResponse<{
     status: PopupExportJobStatus;
+  }>;
+  [MessageType.ACK_POPUP_EXPORT_JOB_STATUS]: import('../response').RuntimeMessageResponse<{
+    status: PopupExportJobStatus | null;
   }>;
   [MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED]: import('../response').RuntimeAckResponse;
   [MessageType.EXPORT_POPUP_PREVIEW]: PopupExportPreviewResponse;

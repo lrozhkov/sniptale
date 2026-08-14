@@ -5,6 +5,7 @@ import { cancelPopupExport } from './cancel';
 import { copyPopupExportPreview } from './copy';
 import { startPopupExport } from './start/execute';
 import { saveWebSnapshotFromPopup } from './snapshot';
+import { resetPopupExportView } from './reset';
 
 export function createPopupExportRuntimeActions(
   state: PopupExportRuntimeContract,
@@ -16,5 +17,6 @@ export function createPopupExportRuntimeActions(
     handleStartExport: () => startPopupExport(state, deps),
     handleSaveWebSnapshot: () => saveWebSnapshotFromPopup(state, deps),
     handleCancelExport: () => cancelPopupExport(state, deps),
+    handleResetExportView: () => resetPopupExportView(state, deps),
   };
 }

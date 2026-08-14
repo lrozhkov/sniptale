@@ -18,6 +18,7 @@ it('parses the native popup export job lifecycle contracts', () => {
   const start = runtimeActionExportMessageContracts[MessageType.START_POPUP_EXPORT_JOB];
   const getStatus = runtimeActionExportMessageContracts[MessageType.GET_POPUP_EXPORT_JOB_STATUS];
   const cancel = runtimeActionExportMessageContracts[MessageType.CANCEL_POPUP_EXPORT_JOB];
+  const ack = runtimeActionExportMessageContracts[MessageType.ACK_POPUP_EXPORT_JOB_STATUS];
   const request = {
     jobId: 'job-1',
     options,
@@ -33,6 +34,12 @@ it('parses the native popup export job lifecycle contracts', () => {
   expect(
     cancel.parseRequest({ jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB })
   ).toEqual({ jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB });
+  expect(
+    ack.parseRequest({ jobId: 'job-1', type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS })
+  ).toEqual({ jobId: 'job-1', type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS });
+  expect(ack.parseRequest({ type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS })).toEqual({
+    type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
+  });
   expect(() => start.parseRequest({ ...request, orderedTabs: [{ title: 'Page' }] })).toThrow();
   expect(() => start.parseRequest({ ...request, orderedTabs: null })).toThrow();
   expect(() => start.parseRequest({ ...request, warnings: null })).toThrow();

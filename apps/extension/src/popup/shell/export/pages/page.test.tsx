@@ -145,10 +145,11 @@ async function verifyContentAndFooterWiring() {
   expect(controller.actions.handleCancelExport).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyJson).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyMarkdown).toHaveBeenCalledTimes(1);
+  expect(controller.actions.handleResetExportView).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleStartExport).toHaveBeenCalledTimes(1);
-  expect(controller.state.session.actions.setProgress).toHaveBeenCalledTimes(1);
-  expect(controller.state.session.actions.setResult).toHaveBeenCalledTimes(1);
+  expect(controller.state.session.actions.setProgress).not.toHaveBeenCalled();
+  expect(controller.state.session.actions.setResult).not.toHaveBeenCalled();
 }
 
 async function verifyRuntimeDisabledReason() {

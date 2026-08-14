@@ -18,6 +18,7 @@ describe('shared message contracts', () => {
     expect(MessageType.START_POPUP_EXPORT_JOB).toBe('START_POPUP_EXPORT_JOB');
     expect(MessageType.GET_POPUP_EXPORT_JOB_STATUS).toBe('GET_POPUP_EXPORT_JOB_STATUS');
     expect(MessageType.CANCEL_POPUP_EXPORT_JOB).toBe('CANCEL_POPUP_EXPORT_JOB');
+    expect(MessageType.ACK_POPUP_EXPORT_JOB_STATUS).toBe('ACK_POPUP_EXPORT_JOB_STATUS');
 
     const messageValues = Object.values(MessageType);
     expect(new Set(messageValues).size).toBe(messageValues.length);

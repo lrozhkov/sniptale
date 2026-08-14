@@ -20,6 +20,7 @@ function createDefaultActions(): PopupExportController['actions'] {
     handleCancelExport: vi.fn(async () => undefined),
     handleCopyJson: vi.fn(async () => undefined),
     handleCopyMarkdown: vi.fn(async () => undefined),
+    handleResetExportView: vi.fn(async () => undefined),
     handleSaveWebSnapshot: vi.fn(async () => undefined),
     handleStartExport: vi.fn(async () => undefined),
   };
