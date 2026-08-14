@@ -97,8 +97,8 @@ vi.mock('../../capture/routes', async (importOriginal) => ({
   handleQuickAction: handleQuickActionMock,
 }));
 
-vi.mock('../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../page-access/service')>()),
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 
@@ -236,6 +236,10 @@ async function verifyExportStartRouting() {
   });
 
   expect(startPopupExportJobMock).toHaveBeenCalledWith({
+    contentPort: expect.objectContaining({
+      cancelPagePackage: expect.any(Function),
+      requestPagePackage: expect.any(Function),
+    }),
     jobId: expect.any(String),
     options: contextMenuPopupExportPreferencesFixture,
     orderedTabs: [{ tabId: 11, title: 'Tab title' }],

@@ -1,7 +1,6 @@
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import { translate } from '../../../../platform/i18n';
 import { isPopupExportPackageResponse } from '../../../../contracts/messaging/validators/export';
-import { requestPopupExportPagePackage } from '../../../runtime/routing/boundary/popup-export-routing';
 import type { PopupExportCollectedPackage } from './archive';
 import {
   addPopupExportPackageResourceUsage,
@@ -43,7 +42,7 @@ export async function collectPopupExportPagePackages(
       },
     });
     try {
-      const response = await requestPopupExportPagePackage({
+      const response = await job.contentPort.requestPagePackage({
         batchRequestId: job.status.jobId,
         options: packageOptions,
         tabId: selected.tabId,

@@ -6,7 +6,7 @@ import { translate } from '../../../../platform/i18n';
 import {
   ensureActivePageAccessRuntime,
   ensureNativeVisibleCaptureAuthority,
-} from '../../../runtime/page-access/service';
+} from '../../../page-access/service';
 import { captureFullPageForArchive } from '../../index';
 import type { PopupExportCollectedPackage } from './archive';
 import {

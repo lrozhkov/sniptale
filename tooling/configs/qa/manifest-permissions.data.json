@@ -160,13 +160,13 @@
   "optionalHostPermissions": [
     {
       "name": "<all_urls>",
-      "owner": "apps/extension/src/background/runtime/page-access/service.ts",
+      "owner": "apps/extension/src/background/page-access/service.ts",
       "feature": "Optional persistent page tooling and native visible capture authority for shim-restored HTTP/HTTPS pages",
       "runtimeRoute": "PAGE_ACCESS background-owned route with dynamic top-frame content runtime shim registration, lazy full-runtime injection, and native visible capture routes",
       "capabilityPolicy": "Optional all-sites access is requested only from extension UI; dynamic content script matches remain owner-registered, HTTP/HTTPS-only, and top-frame only.",
       "failureBehavior": "Denied or revoked grants leave page tooling inactive; unsupported pages and unavailable visible capture authority fail closed.",
       "justification": "Shim-restored hotkeys and scenario captures run outside Chrome activeTab user-invocation events, and Chrome tabs.captureVisibleTab checks for literal <all_urls> or activeTab. The all-sites permission therefore has to be the optional literal grant rather than split HTTP/HTTPS origins.",
-      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/runtime/page-access and capture routes; do not add required host_permissions or source manifest content_scripts.",
+      "reviewNote": "Keep optional host access usage centralized in apps/extension/src/background/page-access and capture routes; do not add required host_permissions or source manifest content_scripts.",
       "userFacingDisclosure": "settings.permissions.sitesDescription"
     }
   ],

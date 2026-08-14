@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/runtime-messaging/mock';
+import { installBackgroundRuntimeMessagingMock } from '../routing-contracts/runtime-messaging/mock';
 import { browserScriptingExecuteScriptMock, sendTabMessageMock } from './service.test-support';
 import {
   injectContentRuntimeAndAwaitReady,

@@ -50,6 +50,10 @@ function createJob(): ActivePopupExportJob {
     abortController: new AbortController(),
     affectedWindowIds: new Set(),
     cancelled: false,
+    contentPort: {
+      cancelPagePackage: vi.fn(),
+      requestPagePackage: vi.fn(),
+    },
     completion: null,
     expectedActivation: null,
     lastActivatedByWindow: new Map(),

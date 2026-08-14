@@ -3,7 +3,7 @@ import { browserWebNavigation } from '@sniptale/platform/browser/web-navigation'
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { cleanupScreenshotModeAfterNavigation } from '../../tab-mode-router-screenshot';
 import { restorePinnedToolbarAfterNavigation } from '../../page-access/pinned-toolbar-restore';
-import { invalidatePinnedToolbarOperations } from '../../page-access/pinned-toolbar-operation';
+import { invalidatePinnedToolbarOperations } from '../../../page-access/pinned-toolbar-operation';
 import { handleTabNavigation } from '../../../diagnostics/lifecycle';
 import { clearBackgroundRuntimeTabEditingState } from '../../../application/runtime-state';
 import {
@@ -16,7 +16,7 @@ import {
 } from '../../../media/lifecycle';
 import { parseTopLevelDocumentNavigation, parseTopLevelNavigation } from './parsers';
 import type { BackgroundModeState } from './shared';
-import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { bindAnnotationForkSessionDocument } from '../../../annotation-fork-session/route';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeNavigationWiring' });

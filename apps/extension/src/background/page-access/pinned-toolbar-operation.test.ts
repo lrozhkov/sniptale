@@ -67,6 +67,22 @@ it('invalidates pending work on navigation and tab cleanup', () => {
   expect(closingTabOperation.isCurrent()).toBe(false);
 });
 
+it('ignores invalidation and cleanup for tabs without operation state', () => {
+  expect(() => invalidatePinnedToolbarOperations(909)).not.toThrow();
+  expect(() => clearPinnedToolbarOperationState(909)).not.toThrow();
+});
+
+it('rejects an operation that is started twice', async () => {
+  const operation = beginPinnedToolbarOperation(15);
+
+  await expect(operation.runExclusive(async () => undefined)).resolves.toBeUndefined();
+  await expect(operation.runExclusive(async () => undefined)).rejects.toThrow(
+    'Pinned toolbar operation already started'
+  );
+
+  clearPinnedToolbarOperationState(15);
+});
+
 it('keeps an accepted durable mutation current across navigation invalidation', async () => {
   const durableMutation = beginPinnedToolbarDurableOperation(13);
 

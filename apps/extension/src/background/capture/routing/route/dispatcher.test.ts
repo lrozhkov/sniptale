@@ -38,8 +38,8 @@ const {
   waitForContentToolbarReadyMock: vi.fn(),
 }));
 
-vi.mock('../../../runtime/page-access/readiness', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime/page-access/readiness')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   waitForContentToolbarReady: waitForContentToolbarReadyMock,
 }));
 

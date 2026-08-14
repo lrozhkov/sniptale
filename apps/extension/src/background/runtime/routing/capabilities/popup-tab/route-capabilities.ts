@@ -14,7 +14,7 @@ import {
   type CapabilityContext,
 } from '@sniptale/platform/security/capability-context';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
-import { hasActivePageAccess } from '../../../page-access/service';
+import { hasActivePageAccess } from '../../../../page-access/service';
 import { hasPreauthorizedPopupTabRouteCapabilityRequestMessage } from './preauthorization';
 import { createPrivilegedCapabilityStore } from '../../../../routing-contracts/capabilities/privileged-authority/state';
 

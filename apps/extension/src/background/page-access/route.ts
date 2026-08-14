@@ -3,8 +3,8 @@ import type {
   PageAccessResponse,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
-import { pageAccessRuntimeContracts } from '../../../contracts/messaging/contracts/runtime/actions/page-access';
-import { respondAsyncRoute } from '../../routing-contracts/response';
+import { pageAccessRuntimeContracts } from '../../contracts/messaging/contracts/runtime/actions/page-access';
+import { respondAsyncRoute } from '../routing-contracts/response';
 import { handlePageAccessMessage } from './service';
 
 function parsePageAccessMessage(message: unknown): PageAccessMessage | null {

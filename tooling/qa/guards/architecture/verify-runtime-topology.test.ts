@@ -115,7 +115,7 @@ it('flags unapproved content runtime bundle references', async () => {
   );
   writeFile(
     root,
-    'apps/extension/src/background/runtime/page-access/registration.ts',
+    'apps/extension/src/background/page-access/service.ts',
     "export const CONTENT_RUNTIME_FILE = 'assets/contentRuntime.js';\n"
   );
   writeFile(

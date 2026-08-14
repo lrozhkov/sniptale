@@ -3,10 +3,20 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { writePopupExportJobStatus } from './storage';
 
+export type PopupExportJobContentPort = {
+  cancelPagePackage: (args: { exportRunId: string; tabId: number }) => Promise<void>;
+  requestPagePackage: (args: {
+    batchRequestId: string;
+    options: import('@sniptale/runtime-contracts/export').ExportOptions;
+    tabId: number;
+  }) => Promise<unknown>;
+};
+
 export type ActivePopupExportJob = {
   abortController: AbortController;
   affectedWindowIds: Set<number>;
   cancelled: boolean;
+  contentPort: PopupExportJobContentPort;
   expectedActivation: { tabId: number; windowId: number } | null;
   lastActivatedByWindow: Map<number, number>;
   manualActivationConflict: boolean;

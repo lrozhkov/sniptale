@@ -8,10 +8,7 @@ import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { translate } from '../../../platform/i18n';
 import { loadPopupExportPreferences } from '../../../composition/persistence/popup-export-preferences';
 import { loadSettings } from '../../../composition/persistence/settings';
-import {
-  loadVideoSettings,
-  loadVideoUiState,
-} from '../../../composition/persistence/capture-settings';
+import { loadVideoSettings } from '../../../composition/persistence/capture-settings';
 import type { Settings } from '../../../contracts/settings';
 import type { ViewportPresetAvailability } from '../../../features/viewport-presets/contracts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -21,6 +18,10 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
 import { startPopupExportJob } from '../../capture/popup-export/job';
+import {
+  cancelPopupExportPagePackage,
+  requestPopupExportPagePackage,
+} from '../routing/boundary/popup-export-routing';
 import {
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
@@ -38,6 +39,7 @@ import {
 } from './constants';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 import { isPageLinkContextMenuItem } from './page-link/constants';
+import { resolveVideoRecordingViewportPreset } from '../../media/video/content-surface/preset';
 
 type ContextMenuToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -80,16 +82,7 @@ export async function showContextMenuToast(
 }
 
 export function resolveContextMenuVideoPreset(settings: Settings): Promise<string | null> {
-  return loadVideoUiState().then((videoUiState) => {
-    const presets = settings.viewportPresets ?? [];
-    const preferredPresetId = videoUiState.viewportPresetId;
-    const resolvedPresetId = presets.some(
-      (preset) => preset.id === preferredPresetId && preset.enabled
-    )
-      ? preferredPresetId
-      : null;
-    return presets.find((entry) => entry.id === resolvedPresetId)?.id ?? null;
-  });
+  return resolveVideoRecordingViewportPreset(settings);
 }
 
 export async function getContextMenuVideoPresetAvailability(
@@ -139,6 +132,10 @@ export async function startContextMenuExport(tabId: number): Promise<void> {
   }
   const tab = await browserTabs.get(tabId);
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: cancelPopupExportPagePackage,
+      requestPagePackage: requestPopupExportPagePackage,
+    },
     jobId: crypto.randomUUID(),
     orderedTabs: [{ tabId, title: tab.title ?? tab.url ?? `Tab ${tabId}` }],
     options,

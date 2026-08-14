@@ -293,8 +293,8 @@ export const runtimePolicyStateDescriptors = [
     ownerModule: 'apps/extension/src/background/storage/page-access/tab-activation.ts',
     proofModules: [
       'apps/extension/src/background/storage/page-access/tab-activation.test.ts',
-      'apps/extension/src/background/runtime/page-access/service.test.ts',
-      'apps/extension/src/background/runtime/page-access/lifecycle.test.ts',
+      'apps/extension/src/background/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/tab-activation.test.ts',
     ],
     requiresTtl: false,
     restartBehavior: 'Session-storage activation records are authoritative across worker restart.',

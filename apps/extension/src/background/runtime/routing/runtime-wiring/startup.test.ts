@@ -46,8 +46,8 @@ vi.mock('../../../../composition/persistence/step-badge-presets', async (importO
   migrateStepBadgeSystemPresetCatalog,
 }));
 
-vi.mock('../../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime,
 }));
 

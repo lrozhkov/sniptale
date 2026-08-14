@@ -7,7 +7,7 @@ const { handlePageAccessMessageMock, respondAsyncRouteMock } = vi.hoisted(() => 
   respondAsyncRouteMock: vi.fn(),
 }));
 
-vi.mock('../../routing-contracts/response', () => ({
+vi.mock('../routing-contracts/response', () => ({
   createRouteErrorResponse: vi.fn(),
   respondAsyncRoute: respondAsyncRouteMock,
   respondAsyncRouteEffect: vi.fn(),

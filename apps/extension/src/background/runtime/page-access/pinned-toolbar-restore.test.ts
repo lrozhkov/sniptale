@@ -19,8 +19,8 @@ vi.mock('../../../composition/persistence/content-pin-session/index', async (imp
     restoreMocks.readPinToTabToolbarVisibilitySessionStorageState,
 }));
 
-vi.mock('./service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./service')>()),
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime: restoreMocks.ensureActivePageAccessRuntime,
   hasActivePageAccess: restoreMocks.hasActivePageAccess,
   hasPinnedToolbarAllSitesAccess: restoreMocks.hasPinnedToolbarAllSitesAccess,
@@ -31,8 +31,8 @@ vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
   enableScreenshotModeGuarded: restoreMocks.enableScreenshotModeGuarded,
 }));
 
-vi.mock('./readiness', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./readiness')>()),
+vi.mock('../../page-access/readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/readiness')>()),
   waitForContentToolbarReady: restoreMocks.waitForContentToolbarReady,
 }));
 
@@ -40,7 +40,7 @@ import { restorePinnedToolbarAfterNavigation } from './pinned-toolbar-restore';
 import {
   invalidatePinnedToolbarOperations,
   runPinnedToolbarPermissionCleanup,
-} from './pinned-toolbar-operation';
+} from '../../page-access/pinned-toolbar-operation';
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;

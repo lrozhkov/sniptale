@@ -8,8 +8,8 @@ vi.mock('../../page-access/pinned-toolbar-restore', () => ({
   restorePinnedToolbarAfterNavigation,
 }));
 
-vi.mock('../../page-access/pinned-toolbar-operation', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../page-access/pinned-toolbar-operation')>()),
+vi.mock('../../../page-access/pinned-toolbar-operation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/pinned-toolbar-operation')>()),
   invalidatePinnedToolbarOperations,
 }));
 

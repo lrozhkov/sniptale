@@ -5,7 +5,7 @@ const CONTENT_RUNTIME_FILE = 'assets/contentRuntime.js';
 const CONTENT_RUNTIME_REFERENCE_ALLOWLIST = new Set([
   'apps/extension/build/layout.data.json',
   'apps/extension/build/injected-build.ts',
-  'apps/extension/src/background/runtime/page-access/registration.ts',
+  'apps/extension/src/background/page-access/registration.ts',
   'tooling/qa/guards/architecture/content-runtime-topology.mjs',
 ]);
 const SKIPPED_SCAN_DIRS = new Set(['.git', '.tmp', 'coverage', 'dist', 'node_modules', 'public']);

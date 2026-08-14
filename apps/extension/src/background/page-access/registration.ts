@@ -14,6 +14,8 @@ import {
   type SupportedPageTarget,
 } from './target';
 
+// policyStateId: page-access-tab-activation - registration operations serialize
+// dynamic content-runtime authority changes for the page-access owner.
 // Current-tab activation uses dynamic injection. Site/all-sites grants use persistent
 // chrome.scripting registration. Manifest content_scripts are intentionally forbidden.
 const CONTENT_RUNTIME_FILE = 'assets/contentRuntime.js';

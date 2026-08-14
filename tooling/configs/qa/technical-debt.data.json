@@ -3,30 +3,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "id": "accepted.scc.background-runtime-media-composition.20260812",
-      "classification": "accepted-architecture",
-      "owner": "background-runtime-composition",
-      "risk": "New cross-owner imports could silently widen a privileged background dependency cycle.",
-      "reason": "The exact cycle records canonical action-kernel assembly, popup-export job state ownership, video lifecycle ownership, and application privacy-erasure orchestration.",
-      "removalCondition": "Remove the entry when those composition edges are replaced by a one-directional owner port.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "scc",
-        "key": "background-runtime-media-composition"
-      },
-      "scope": {
-        "edgeDigest": "b274c1a4fb65feab556ec343195148f2346365e3fb027f3580309fb6d8ee390c",
-        "id": "background-runtime-media-composition",
-        "owners": [
-          "apps/extension/src/background/application",
-          "apps/extension/src/background/capture",
-          "apps/extension/src/background/media",
-          "apps/extension/src/background/runtime"
-        ]
-      },
-      "targetAction": "Keep the registered owner and edge set exact; reject any unreviewed expansion."
-    },
-    {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
       "classification": "accepted-architecture",
       "owner": "ai-secret-unlock-tests",
@@ -1462,6 +1438,7 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
         "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/preset.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
         "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
@@ -1575,6 +1552,18 @@
         "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/offscreen-document/startup-id.ts",
         "apps/extension/src/background/offscreen-document/state.ts",
+        "apps/extension/src/background/page-access/lifecycle.ts",
+        "apps/extension/src/background/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/page-access/readiness.ts",
+        "apps/extension/src/background/page-access/registration.ts",
+        "apps/extension/src/background/page-access/route-descriptors.ts",
+        "apps/extension/src/background/page-access/route.ts",
+        "apps/extension/src/background/page-access/service-actions.ts",
+        "apps/extension/src/background/page-access/service-factory.ts",
+        "apps/extension/src/background/page-access/service.ts",
+        "apps/extension/src/background/page-access/status.ts",
+        "apps/extension/src/background/page-access/tab-activation.ts",
+        "apps/extension/src/background/page-access/target.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
@@ -1655,19 +1644,7 @@
         "apps/extension/src/background/runtime/native-app/tray-action-registry.ts",
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
-        "apps/extension/src/background/runtime/page-access/lifecycle.ts",
-        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
         "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
-        "apps/extension/src/background/runtime/page-access/readiness.ts",
-        "apps/extension/src/background/runtime/page-access/registration.ts",
-        "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
-        "apps/extension/src/background/runtime/page-access/route.ts",
-        "apps/extension/src/background/runtime/page-access/service-actions.ts",
-        "apps/extension/src/background/runtime/page-access/service-factory.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
-        "apps/extension/src/background/runtime/page-access/status.ts",
-        "apps/extension/src/background/runtime/page-access/tab-activation.ts",
-        "apps/extension/src/background/runtime/page-access/target.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route-descriptors.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route.ts",
         "apps/extension/src/background/runtime/routing/action-kernel/context.ts",
@@ -2099,6 +2076,7 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
         "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/preset.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
         "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
@@ -2212,6 +2190,18 @@
         "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/offscreen-document/startup-id.ts",
         "apps/extension/src/background/offscreen-document/state.ts",
+        "apps/extension/src/background/page-access/lifecycle.ts",
+        "apps/extension/src/background/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/page-access/readiness.ts",
+        "apps/extension/src/background/page-access/registration.ts",
+        "apps/extension/src/background/page-access/route-descriptors.ts",
+        "apps/extension/src/background/page-access/route.ts",
+        "apps/extension/src/background/page-access/service-actions.ts",
+        "apps/extension/src/background/page-access/service-factory.ts",
+        "apps/extension/src/background/page-access/service.ts",
+        "apps/extension/src/background/page-access/status.ts",
+        "apps/extension/src/background/page-access/tab-activation.ts",
+        "apps/extension/src/background/page-access/target.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
@@ -2292,19 +2282,7 @@
         "apps/extension/src/background/runtime/native-app/tray-action-registry.ts",
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
-        "apps/extension/src/background/runtime/page-access/lifecycle.ts",
-        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
         "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
-        "apps/extension/src/background/runtime/page-access/readiness.ts",
-        "apps/extension/src/background/runtime/page-access/registration.ts",
-        "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
-        "apps/extension/src/background/runtime/page-access/route.ts",
-        "apps/extension/src/background/runtime/page-access/service-actions.ts",
-        "apps/extension/src/background/runtime/page-access/service-factory.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
-        "apps/extension/src/background/runtime/page-access/status.ts",
-        "apps/extension/src/background/runtime/page-access/tab-activation.ts",
-        "apps/extension/src/background/runtime/page-access/target.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route-descriptors.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route.ts",
         "apps/extension/src/background/runtime/routing/action-kernel/context.ts",
@@ -13299,7 +13277,7 @@
       "remediation": "Remove the reference or route it through the canonical content-runtime owner.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/content-runtime-topology.mjs",
-        "contentHash": "949323dce888508e37f730052dee23d1e4263f7f882a01a7c2e846691955217f"
+        "contentHash": "6a4642d4b8b05cc61a16637f6e6618fdb5e4c6fe83cea87d2d19d20a217e77d6"
       },
       "consumers": [
         "tooling/qa/guards/architecture/content-runtime-topology.mjs",
@@ -14891,7 +14869,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "a6c29e5fb66b7a43fb8dc252a9e092fbb7a01603e304ac4b44a9b12935fc8810"
+        "contentHash": "051915b4f48a92c47ecc967a8384e4c8ec604744f22d119144a43ec92ddd33a2"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -14921,7 +14899,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
-        "contentHash": "6c0da4c9446dfa1f2bd7da890154e8d6e5fa5d9b7a4e99ba13b3ea335f957171"
+        "contentHash": "36f885dad93d4d50f19e2e12c1cf485e32cb6c4e1c9d3ce1c5c752f04727fac3"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
@@ -18236,7 +18214,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/page-access.mjs",
-        "contentHash": "f0ccfe3fad19de85120246112e293aded1fd239a4ff4c5a3656899d3c5193111"
+        "contentHash": "c2372bca772700c15b3e53003609d80757c9288db239137a85712943cf832960"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -21765,7 +21743,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "95ee4a1bf92aecc30be57ec32560dc31090ead150fc34379837769ce9b9c0efc"
+        "contentHash": "7d1a89ad3114f0af94139c0dd12ba6e156bacc79a925139a7d2bdf2892b40eb2"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",

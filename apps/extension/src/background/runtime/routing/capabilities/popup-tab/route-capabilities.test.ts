@@ -39,8 +39,8 @@ vi.mock('@sniptale/platform/browser/tabs', () => ({
   },
 }));
 
-vi.mock('../../../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../page-access/service')>()),
+vi.mock('../../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../page-access/service')>()),
   hasActivePageAccess: (...args: unknown[]) => hasActivePageAccessMock(...args),
 }));
 

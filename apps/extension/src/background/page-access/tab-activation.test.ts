@@ -7,7 +7,7 @@ const { browserStorageSessionGetMock, browserStorageSessionSetMock, sessionStora
     sessionStorageState: {} as Record<string, unknown>,
   }));
 
-vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
+vi.mock('../../composition/persistence/infrastructure/browser-storage', () => ({
   browserStorage: {
     session: {
       get: browserStorageSessionGetMock,

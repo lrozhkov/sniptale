@@ -66,8 +66,8 @@ vi.mock('../../../../features/media-hub/storage-capacity', async (importOriginal
   ...(await importOriginal<typeof import('../../../../features/media-hub/storage-capacity')>()),
   ensureMediaHubStorageHeadroom: mocks.ensureHeadroom,
 }));
-vi.mock('../../../runtime/page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime/page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime: mocks.ensurePageAccess,
 }));
 vi.mock('../manager', () => ({ startRecording: mocks.startRecording }));
@@ -79,9 +79,9 @@ vi.mock('../runtime/manager/controls', async (importOriginal) => ({
   stopRecording: mocks.stopRecording,
   updateRecordingSettings: mocks.updateRecordingSettings,
 }));
-vi.mock('../../../runtime/context-menu/action-helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime/context-menu/action-helpers')>()),
-  resolveContextMenuVideoPreset: mocks.resolvePreset,
+vi.mock('./preset', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./preset')>()),
+  resolveVideoRecordingViewportPreset: mocks.resolvePreset,
 }));
 vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
   ...(await importOriginal<

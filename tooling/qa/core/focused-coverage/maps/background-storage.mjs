@@ -11,8 +11,8 @@ export const BACKGROUND_STORAGE_OWNER_MAPPINGS = [
     reason:
       'Temporary tab activation storage is covered by activation mutation and service suites.',
     testFiles: [
-      'apps/extension/src/background/runtime/page-access/tab-activation.test.ts',
-      'apps/extension/src/background/runtime/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/tab-activation.test.ts',
     ],
   },
   {

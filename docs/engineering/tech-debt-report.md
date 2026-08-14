@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=32, tool-noise=28.
-- Enforced source: jscpd=58, license=1, scc=1.
+- Classification: accepted-architecture=31, tool-noise=28.
+- Enforced source: jscpd=58, license=1.
 
 ## Active structural debt
 

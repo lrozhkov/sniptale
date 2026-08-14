@@ -7,7 +7,7 @@ import {
   routeScenarioEditorLlmMessage,
 } from '../../../ai/routes';
 import { routeAiSettingsNavigationMessage } from '../../../ai/settings/navigation-route';
-import { routePageAccessMessage } from '../../page-access/route';
+import { routePageAccessMessage } from '../../../page-access/route';
 import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
 import { routePopupExportJobMessage } from '../../../capture/popup-export/job/route';
@@ -28,6 +28,10 @@ import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
 import { routeAnnotationForkSessionMessage } from '../../../annotation-fork-session/route';
 import { routeAggregatePromotionMessage } from '../../../application/aggregate-promotion/route';
+import {
+  cancelPopupExportPagePackage,
+  requestPopupExportPagePackage,
+} from '../boundary/popup-export-routing';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -105,7 +109,12 @@ function getBackgroundOwnedRouteHandler(
 }
 
 function routePopupExportJobAction(action: BackgroundOwnedAction): ActionResult | null {
-  return keepOpen(routePopupExportJobMessage(action.message, action.context.sendResponse));
+  return keepOpen(
+    routePopupExportJobMessage(action.message, action.context.sendResponse, {
+      cancelPagePackage: cancelPopupExportPagePackage,
+      requestPagePackage: requestPopupExportPagePackage,
+    })
+  );
 }
 
 function routeAggregatePromotionAction(action: BackgroundOwnedAction): ActionResult | null {

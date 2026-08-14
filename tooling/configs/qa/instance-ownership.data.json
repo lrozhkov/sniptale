@@ -107,7 +107,7 @@
         "apps/extension/src/background/media/video/runtime/session-state/index.ts",
         "apps/extension/src/background/media/video/runtime/session-state/service/index.ts",
         "apps/extension/src/background/media/video/runtime/session-state/service/runtime-state-service.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
+        "apps/extension/src/background/page-access/service.ts",
         "apps/extension/src/background/media/video/session-state/index.ts"
       ],
       "rule": "facade-default-owner"

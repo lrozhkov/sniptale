@@ -61,7 +61,7 @@ export const CORE_RUNTIME_STATE_AUTHORITY_FLOWS = [
     advisoryState: ['runtime activation response status'],
     authorityClass: 'durable-persistence',
     authoritativeState: ['page-access tab activation session-storage record'],
-    cleanupOwnerModule: 'apps/extension/src/background/runtime/page-access/lifecycle.ts',
+    cleanupOwnerModule: 'apps/extension/src/background/page-access/service.ts',
     correlationKeys: ['tabId', 'origin'],
     disposableState: ['in-memory activation fallback after session-storage write failure'],
     flowId: 'page-access-activation',
@@ -70,8 +70,8 @@ export const CORE_RUNTIME_STATE_AUTHORITY_FLOWS = [
     ownerModule: 'apps/extension/src/background/storage/page-access/tab-activation.ts',
     proofModules: [
       'apps/extension/src/background/storage/page-access/tab-activation.test.ts',
-      'apps/extension/src/background/runtime/page-access/service.test.ts',
-      'apps/extension/src/background/runtime/page-access/lifecycle.test.ts',
+      'apps/extension/src/background/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/tab-activation.test.ts',
     ],
     restartBehavior: 'session-storage activation records are authoritative across worker restart',
     writeFailurePolicy:

@@ -24,7 +24,7 @@ import {
   resetVideoRecordingRuntimeState,
 } from '../../../media/lifecycle';
 import { type BackgroundModeState, type RuntimeWiringLogger } from './shared';
-import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { recoverPendingVideoRecordingCameraPeerCleanup } from '../../../media/video/content-surface/camera-peer';
 
 export function runStartupMaintenance(

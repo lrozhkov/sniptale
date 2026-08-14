@@ -56,6 +56,10 @@ it('starts a screenshot-free job with one warning when all-sites access is denie
 
   expect(mocks.requestPermission).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
   expect(mocks.startPopupExportJob).toHaveBeenCalledWith({
+    contentPort: expect.objectContaining({
+      cancelPagePackage: expect.any(Function),
+      requestPagePackage: expect.any(Function),
+    }),
     jobId: expect.any(String),
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: expect.objectContaining({ includeFullPageScreenshot: false }),

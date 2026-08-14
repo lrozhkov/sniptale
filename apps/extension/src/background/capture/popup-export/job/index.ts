@@ -4,13 +4,13 @@ import type {
   PopupExportJobTab,
 } from '@sniptale/runtime-contracts/export';
 import { translate } from '../../../../platform/i18n';
-import { cancelPopupExportPagePackage } from '../../../runtime/routing/boundary/popup-export-routing';
 import { executePopupExportJob } from './execute';
 import {
   clonePopupExportJobStatus,
   publishPopupExportJobStatus,
   updatePopupExportJobStatus,
   type ActivePopupExportJob,
+  type PopupExportJobContentPort,
 } from './runtime-state';
 import { clearPopupExportJobStatus, readPopupExportJobStatus } from './storage';
 import { acquirePopupExportMutationPermit } from './lifecycle-gate';
@@ -18,6 +18,7 @@ import { acquirePopupExportMutationPermit } from './lifecycle-gate';
 let activeJob: ActivePopupExportJob | null = null;
 
 function createPopupExportJob(args: {
+  contentPort: PopupExportJobContentPort;
   jobId: string;
   options: ExportOptions;
   orderedTabs: PopupExportJobTab[];
@@ -27,6 +28,7 @@ function createPopupExportJob(args: {
     abortController: new AbortController(),
     affectedWindowIds: new Set(),
     cancelled: false,
+    contentPort: args.contentPort,
     completion: null,
     expectedActivation: null,
     lastActivatedByWindow: new Map(),
@@ -54,6 +56,7 @@ function createPopupExportJob(args: {
 }
 
 export async function startPopupExportJob(args: {
+  contentPort: PopupExportJobContentPort;
   jobId: string;
   options: ExportOptions;
   orderedTabs: PopupExportJobTab[];
@@ -102,15 +105,16 @@ export async function cancelPopupExportJob(jobId: string): Promise<PopupExportJo
   if (!activeJob || activeJob.status.jobId !== jobId) {
     throw new Error('Popup export job is not active');
   }
-  activeJob.cancelled = true;
-  activeJob.abortController.abort();
-  await updatePopupExportJobStatus(activeJob, { phase: 'cancelling' });
+  const job = activeJob;
+  job.cancelled = true;
+  job.abortController.abort();
+  await updatePopupExportJobStatus(job, { phase: 'cancelling' });
   await Promise.allSettled(
-    activeJob.status.orderedTabs.map((tab) =>
-      cancelPopupExportPagePackage({ exportRunId: jobId, tabId: tab.tabId })
+    job.status.orderedTabs.map((tab) =>
+      job.contentPort.cancelPagePackage({ exportRunId: jobId, tabId: tab.tabId })
     )
   );
-  return clonePopupExportJobStatus(activeJob.status);
+  return clonePopupExportJobStatus(job.status);
 }
 
 export async function erasePopupExportJobState(): Promise<void> {
@@ -120,7 +124,7 @@ export async function erasePopupExportJobState(): Promise<void> {
     job.abortController.abort();
     await Promise.allSettled(
       job.status.orderedTabs.map((tab) =>
-        cancelPopupExportPagePackage({ exportRunId: job.status.jobId, tabId: tab.tabId })
+        job.contentPort.cancelPagePackage({ exportRunId: job.status.jobId, tabId: tab.tabId })
       )
     );
     await job.completion;

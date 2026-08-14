@@ -53,17 +53,10 @@ vi.mock('../../../routing-contracts/runtime-messaging/services', async (importOr
   >()),
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.sendRuntimeMessage }),
 }));
-vi.mock('../../../runtime/page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime/page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime: mocks.ensureAccess,
   ensureNativeVisibleCaptureAuthority: mocks.ensureAuthority,
-}));
-vi.mock('../../../runtime/routing/boundary/popup-export-routing', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../runtime/routing/boundary/popup-export-routing')
-  >()),
-  cancelPopupExportPagePackage: mocks.cancelPackage,
-  requestPopupExportPagePackage: mocks.requestPackage,
 }));
 vi.mock('../../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../index')>()),
@@ -173,6 +166,10 @@ it('captures a single already-active tab through the native backend', async () =
   mocks.requestPackage.mockResolvedValue(packageResponse('one'));
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -203,6 +200,10 @@ it('captures an ordered batch across windows and restores each original tab', as
     .mockResolvedValueOnce(packageResponse('two'));
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [
@@ -241,6 +242,10 @@ it('stops remaining screenshots after a manual tab switch without losing page pa
   });
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [
@@ -268,6 +273,10 @@ it('cancels without starting capture and reports partial package failures', asyn
   );
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -298,6 +307,10 @@ it('restores the original tab when cancellation lands during native capture', as
   );
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -322,6 +335,10 @@ it('continues to download successful packages when another tab fails', async () 
     .mockRejectedValueOnce(new Error('package unavailable'));
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options: { ...options, includeFullPageScreenshot: false },
     orderedTabs: [
@@ -346,6 +363,10 @@ it('performs zero activation and capture attempts when screenshot permission was
   mocks.requestPackage.mockResolvedValue(packageResponse('one'));
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options: { ...options, includeFullPageScreenshot: false },
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -370,6 +391,10 @@ it('rejects a duplicate start while the first job owns the queue', async () => {
   );
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -378,6 +403,10 @@ it('rejects a duplicate start while the first job owns the queue', async () => {
 
   await expect(
     startPopupExportJob({
+      contentPort: {
+        cancelPagePackage: mocks.cancelPackage,
+        requestPagePackage: mocks.requestPackage,
+      },
       jobId: 'job-2',
       options,
       orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -399,6 +428,10 @@ it('rejects starts reserved out by privacy erasure and clears metadata after adm
     })
   );
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options: { ...options, includeFullPageScreenshot: false },
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -413,6 +446,10 @@ it('rejects starts reserved out by privacy erasure and clears metadata after adm
     });
     await expect(
       startPopupExportJob({
+        contentPort: {
+          cancelPagePackage: mocks.cancelPackage,
+          requestPagePackage: mocks.requestPackage,
+        },
         jobId: 'job-during-erasure',
         options,
         orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -435,6 +472,10 @@ it('clears active ownership when initial metadata publication fails and permits 
   mocks.writeStatus.mockRejectedValueOnce(new Error('session storage unavailable'));
   await expect(
     startPopupExportJob({
+      contentPort: {
+        cancelPagePackage: mocks.cancelPackage,
+        requestPagePackage: mocks.requestPackage,
+      },
       jobId: 'job-initial-failure',
       options,
       orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -447,6 +488,10 @@ it('clears active ownership when initial metadata publication fails and permits 
   mocks.requestPackage.mockResolvedValue(packageResponse('one'));
   await expect(
     startPopupExportJob({
+      contentPort: {
+        cancelPagePackage: mocks.cancelPackage,
+        requestPagePackage: mocks.requestPackage,
+      },
       jobId: 'job-retry',
       options: { ...options, includeFullPageScreenshot: false },
       orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -460,6 +505,10 @@ it('keeps terminal status reads pure and repeatable', async () => {
   mocks.activeByWindow.set(1, 11);
   mocks.requestPackage.mockResolvedValue(packageResponse('one'));
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options: { ...options, includeFullPageScreenshot: false },
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -494,6 +543,10 @@ it('observes a manual activation during original-tab publication and never resto
   });
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [{ tabId: 11, title: 'One' }],
@@ -531,6 +584,10 @@ it('keeps a successful download when another target closed and reports restore f
   });
 
   await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: mocks.cancelPackage,
+      requestPagePackage: mocks.requestPackage,
+    },
     jobId: 'job-1',
     options,
     orderedTabs: [

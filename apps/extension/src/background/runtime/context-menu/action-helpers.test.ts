@@ -284,6 +284,10 @@ it('starts export with the full persisted popup export selection', async () => {
   await startContextMenuExport(15);
 
   expect(startPopupExportJobMock).toHaveBeenCalledWith({
+    contentPort: expect.objectContaining({
+      cancelPagePackage: expect.any(Function),
+      requestPagePackage: expect.any(Function),
+    }),
     jobId: expect.any(String),
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: {

@@ -75,7 +75,7 @@ vi.mock('../../../ai/llm/session-route', () => ({
   routeLlmSessionMessage: routeLlmSessionMessageMock,
 }));
 
-vi.mock('../../page-access/route', () => ({
+vi.mock('../../../page-access/route', () => ({
   routePageAccessMessage: routePageAccessMessageMock,
 }));
 

@@ -2,7 +2,7 @@ import { beforeEach, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { PageAccessOperation } from '@sniptale/runtime-contracts/messaging/page-access';
-import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/runtime-messaging/mock';
+import { installBackgroundRuntimeMessagingMock } from '../routing-contracts/runtime-messaging/mock';
 
 const mocks = vi.hoisted(() => ({
   browserPermissionsContainsMock: vi.fn<(query: { origins?: string[] }) => Promise<boolean>>(),
@@ -73,7 +73,7 @@ vi.mock('@sniptale/platform/browser/scripting', async (importOriginal) => ({
   },
 }));
 
-vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
+vi.mock('../../composition/persistence/infrastructure/browser-storage', () => ({
   browserStorage: {
     session: {
       get: mocks.browserStorageSessionGetMock,

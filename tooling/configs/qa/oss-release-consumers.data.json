@@ -49,7 +49,7 @@
     {
       "category": "bundled-font",
       "path": "tooling/configs/qa/manifest-permissions.data.json",
-      "sha256": "4566480bea073e486c83e11e628d2a8afbe1ad7b5c8a2829faf16039947c363d"
+      "sha256": "525440605e49f08ed7644058b22a39dfcb438964a1acb1f15c8ffaec99d7f0a7"
     },
     {
       "category": "archive-integration",

@@ -1,9 +1,9 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
+import { getBackgroundRuntimeMessaging } from '../routing-contracts/runtime-messaging/services';
 export {
   waitForContentScreenshotMode,
   waitForContentToolbarReady,
-} from '../../routing-contracts/runtime-messaging/content-toolbar-readiness';
+} from '../routing-contracts/runtime-messaging/content-toolbar-readiness';
 import { injectContentRuntime } from './registration';
 import type { SupportedPageTarget } from './target';
 

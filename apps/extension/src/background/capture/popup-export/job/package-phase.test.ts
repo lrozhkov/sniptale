@@ -2,12 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), update: vi.fn() }));
 
-vi.mock('../../../runtime/routing/boundary/popup-export-routing', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../runtime/routing/boundary/popup-export-routing')
-  >()),
-  requestPopupExportPagePackage: mocks.request,
-}));
 vi.mock('./runtime-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./runtime-state')>()),
   updatePopupExportJobStatus: mocks.update,
@@ -21,6 +15,10 @@ function createJob(): ActivePopupExportJob {
     abortController: new AbortController(),
     affectedWindowIds: new Set(),
     cancelled: false,
+    contentPort: {
+      cancelPagePackage: vi.fn(),
+      requestPagePackage: mocks.request,
+    },
     completion: null,
     expectedActivation: null,
     lastActivatedByWindow: new Map(),

@@ -4,7 +4,7 @@ import {
   createWebSnapshotViewerPorts,
   registerWebSnapshotViewerPorts,
 } from '../../../capture/lifecycle';
-import { initializePageAccessLifecycle } from '../../page-access/lifecycle';
+import { initializePageAccessLifecycle } from '../../../page-access/lifecycle';
 import { nativeIngestionPrivacyErasureCleanupAdapter } from '../../native-app/privacy-erasure';
 import { getNativeAppRuntimeService } from '../../native-app/service-singleton';
 import {

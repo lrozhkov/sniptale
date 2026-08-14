@@ -10,7 +10,7 @@ import { enableScreenshotMode } from '../tab-mode-router-screenshot';
 import {
   ensureActivePageAccessRuntime,
   ensureNativeVisibleCaptureAuthority,
-} from '../page-access/service';
+} from '../../page-access/service';
 import {
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,

@@ -14,6 +14,12 @@ const OWNERSHIP_RULES = new Set(['facade-default-owner', 'no-top-level-mutable-r
 const WAVE_KEYS = ['files', 'id', 'rule'];
 const REVIEWED_CROSS_OWNER_PATH_REPLACEMENTS = [
   {
+    from: 'apps/extension/src/background/runtime/page-access/service.ts',
+    to: 'apps/extension/src/background/page-access/service.ts',
+    rule: 'facade-default-owner',
+    waveId: 'background-runtime-facades',
+  },
+  {
     from: 'apps/extension/src/background/media/video/runtime/offscreen-manager.ts',
     to: 'apps/extension/src/background/offscreen-document/service.ts',
     rule: 'facade-default-owner',

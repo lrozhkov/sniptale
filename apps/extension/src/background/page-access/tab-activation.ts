@@ -1,8 +1,8 @@
-import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
+import { browserStorage } from '../../composition/persistence/infrastructure/browser-storage';
 import {
   createTemporaryTabActivationStore,
   type TemporaryTabActivationStore,
-} from '../../storage/page-access/tab-activation';
+} from '../storage/page-access/tab-activation';
 import type { SupportedPageTarget } from './target';
 
 export type { TemporaryTabActivationStore };

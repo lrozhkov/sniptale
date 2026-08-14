@@ -36,7 +36,7 @@ const ownerRouteDescriptorFiles = [
   'apps/extension/src/background/media/video/content-surface/route-descriptors.ts',
   'apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts',
   'apps/extension/src/background/runtime/native-app/route-descriptors.ts',
-  'apps/extension/src/background/runtime/page-access/route-descriptors.ts',
+  'apps/extension/src/background/page-access/route-descriptors.ts',
   'apps/extension/src/background/runtime/page-access/wakeup-route-descriptors.ts',
   'apps/extension/src/background/runtime/routing/boundary/popup-export-route-descriptors.ts',
   'apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-descriptors.ts',

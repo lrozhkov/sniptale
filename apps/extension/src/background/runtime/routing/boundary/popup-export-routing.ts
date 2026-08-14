@@ -13,7 +13,7 @@ import {
   createWebSnapshotViewerPorts,
   sendViewerPopupExportMessage,
 } from '../../../capture/lifecycle';
-import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { respondAsyncRouteWithLogger } from '../../../routing-contracts/response';
 import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 import * as contentActionRoute from '../../../routing-contracts/capabilities/content-action/route';

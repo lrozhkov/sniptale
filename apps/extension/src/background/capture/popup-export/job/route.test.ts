@@ -17,6 +17,11 @@ vi.mock('./index', async (importOriginal) => ({
 
 import { routePopupExportJobMessage } from './route';
 
+const contentPort = {
+  cancelPagePackage: vi.fn(),
+  requestPagePackage: vi.fn(),
+};
+
 const options = {
   includeBasicLogs: false,
   includeCssDiagnostics: false,
@@ -46,18 +51,21 @@ it('routes start, status, and cancellation through the job owner', async () => {
         type: MessageType.START_POPUP_EXPORT_JOB,
         warnings: [],
       },
-      sendResponse
+      sendResponse,
+      contentPort
     )
   ).toBe(true);
   await vi.waitFor(() => expect(mocks.start).toHaveBeenCalled());
 
   routePopupExportJobMessage(
     { jobId: 'job-1', type: MessageType.GET_POPUP_EXPORT_JOB_STATUS },
-    sendResponse
+    sendResponse,
+    contentPort
   );
   routePopupExportJobMessage(
     { jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB },
-    sendResponse
+    sendResponse,
+    contentPort
   );
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledTimes(3));
 
@@ -67,14 +75,15 @@ it('routes start, status, and cancellation through the job owner', async () => {
 
 it('rejects unrelated messages and surfaces owner failures', async () => {
   const sendResponse = vi.fn();
-  expect(routePopupExportJobMessage(null, sendResponse)).toBe(false);
-  expect(routePopupExportJobMessage({ type: 'UNKNOWN' }, sendResponse)).toBe(false);
+  expect(routePopupExportJobMessage(null, sendResponse, contentPort)).toBe(false);
+  expect(routePopupExportJobMessage({ type: 'UNKNOWN' }, sendResponse, contentPort)).toBe(false);
 
   mocks.cancel.mockRejectedValueOnce(new Error('cancel failed'));
   expect(
     routePopupExportJobMessage(
       { jobId: 'job-1', type: MessageType.CANCEL_POPUP_EXPORT_JOB },
-      sendResponse
+      sendResponse,
+      contentPort
     )
   ).toBe(true);
   await vi.waitFor(() =>
