@@ -1,16 +1,9 @@
-﻿import { renderPageShell } from '../ui/page-bootstrap';
-import { PopupApp } from './shell/app';
-import {
-  finishPopupPerfSpanOnNextFrame,
-  startPopupPerfSpan,
-} from './diagnostics/performance/index';
+performance.mark('sniptale-popup-entry-evaluated');
 
-const popupStartupSpan = startPopupPerfSpan('popup.startup');
+const loadPopupApplication = () => void import('./shell/app/entrypoint');
 
-renderPageShell({
-  element: <PopupApp />,
-  namespace: 'PopupEntrypoint',
-  onRendered: () => {
-    finishPopupPerfSpanOnNextFrame(popupStartupSpan);
-  },
+window.requestAnimationFrame(() => {
+  window.requestAnimationFrame(loadPopupApplication);
 });
+
+export {};

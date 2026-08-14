@@ -48,17 +48,45 @@ function usePopupDeferredViewPreload(isReady: boolean) {
   }, [isReady]);
 }
 
-function PopupStartupShell() {
+function PopupStartupShell({ isExiting }: { isExiting: boolean }) {
   return (
-    <div className="popup-startup-shell" aria-hidden="true" data-ui="popup.app.startup-shell">
-      <div className="popup-startup-shell__tabs" />
-      <div className="popup-startup-shell__card">
-        <span className="popup-startup-shell__line" style={{ width: 96, height: 14 }} />
-        <span className="popup-startup-shell__line" style={{ width: '100%', height: 48 }} />
-        <span className="popup-startup-shell__line" style={{ width: '84%', height: 12 }} />
-        <span className="popup-startup-shell__line" style={{ width: '68%', height: 12 }} />
+    <div
+      className="popup-startup-shell"
+      aria-hidden="true"
+      data-state={isExiting ? 'exiting' : 'loading'}
+      data-ui="popup.app.startup-shell"
+    >
+      <div className="popup-startup-shell__tabs">
+        <span className="popup-startup-shell__tab" />
+        <span className="popup-startup-shell__tab" />
+        <span className="popup-startup-shell__tab" />
       </div>
-      <div className="popup-startup-shell__footer" />
+      <div className="popup-startup-shell__card">
+        <div className="popup-startup-shell__actions">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="popup-startup-shell__rows">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+      <div className="popup-startup-shell__footer">
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
     </div>
   );
 }
@@ -101,9 +129,8 @@ export function PopupApp() {
           commandPaletteOpen={commandPaletteOpen}
           onCloseCommandPalette={() => setCommandPaletteOpen(false)}
         />
-      ) : (
-        <PopupStartupShell />
-      )}
+      ) : null}
+      <PopupStartupShell isExiting={runtime.navigation.isReady} />
     </div>
   );
 }

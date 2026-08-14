@@ -23,6 +23,21 @@ describe('popup-performance spans', () => {
   );
 
   it('logs rounded success and failure payloads when the flag is enabled', verifyRoundedSpanLogs);
+  it('can measure from navigation start before the module graph evaluates', async () => {
+    window.localStorage.setItem('sniptale.popup.perf', '1');
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    vi.spyOn(performance, 'now').mockReturnValueOnce(245.26);
+    const module = await importPopupPerformanceModule();
+
+    module.startPopupPerfSpan('popup.navigation-to-shell', 0)?.end({ phase: 'shell' });
+
+    expect(debugSpy).toHaveBeenCalledWith('[PopupPerf]', {
+      durationMs: 245.3,
+      label: 'popup.navigation-to-shell',
+      phase: 'shell',
+      status: 'ok',
+    });
+  });
 });
 
 async function verifyDisabledSpans(): Promise<void> {

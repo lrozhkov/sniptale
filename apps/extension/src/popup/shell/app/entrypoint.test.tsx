@@ -1,50 +1,40 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 const popupIndexMocks = vi.hoisted(() => ({
-  finishPopupPerfSpanOnNextFrameMock: vi.fn(),
-  PageBootstrapErrorBoundaryMock: vi.fn(),
-  popupSpan: { end: vi.fn(), fail: vi.fn() },
-  renderPageShellMock: vi.fn(),
-  startPopupPerfSpanMock: vi.fn(),
-  trackPopupPerfAsyncMock: vi.fn(),
+  entrypointLoadedMock: vi.fn(),
+  performanceMarkMock: vi.fn(),
+  requestAnimationFrameCallbacks: [] as FrameRequestCallback[],
 }));
 
-vi.mock('../../../ui/page-bootstrap', () => ({
-  PageBootstrapErrorBoundary: popupIndexMocks.PageBootstrapErrorBoundaryMock,
-  renderPageShell: popupIndexMocks.renderPageShellMock,
-}));
+vi.mock('./entrypoint', () => {
+  popupIndexMocks.entrypointLoadedMock();
+  return {};
+});
 
-vi.mock('./index', () => ({
-  PopupApp: () => null,
-}));
-
-vi.mock('../../diagnostics/performance', () => ({
-  finishPopupPerfSpanOnNextFrame: popupIndexMocks.finishPopupPerfSpanOnNextFrameMock,
-  startPopupPerfSpan: popupIndexMocks.startPopupPerfSpanMock,
-  trackPopupPerfAsync: popupIndexMocks.trackPopupPerfAsyncMock,
-}));
-
-describe('popup index entrypoint', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-    popupIndexMocks.startPopupPerfSpanMock.mockReturnValue(popupIndexMocks.popupSpan);
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.resetModules();
+  popupIndexMocks.requestAnimationFrameCallbacks.length = 0;
+  vi.spyOn(performance, 'mark').mockImplementation(popupIndexMocks.performanceMarkMock);
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    popupIndexMocks.requestAnimationFrameCallbacks.push(callback);
+    return popupIndexMocks.requestAnimationFrameCallbacks.length;
   });
+});
 
-  it('renders the popup through the shared shell and preserves the perf callback', async () => {
-    await import('../..');
+it('marks the minimal popup entry before loading the React application graph', async () => {
+  await import('../..');
 
-    expect(popupIndexMocks.renderPageShellMock).toHaveBeenCalledTimes(1);
-    const options = popupIndexMocks.renderPageShellMock.mock.calls[0]?.[0] as
-      | { onRendered?: () => void; namespace: string }
-      | undefined;
+  expect(popupIndexMocks.performanceMarkMock).toHaveBeenCalledWith(
+    'sniptale-popup-entry-evaluated'
+  );
+  expect(popupIndexMocks.entrypointLoadedMock).not.toHaveBeenCalled();
 
-    expect(options?.namespace).toBe('PopupEntrypoint');
-    options?.onRendered?.();
-    expect(popupIndexMocks.finishPopupPerfSpanOnNextFrameMock).toHaveBeenCalledWith(
-      popupIndexMocks.popupSpan
-    );
-  });
+  popupIndexMocks.requestAnimationFrameCallbacks.shift()?.(16);
+  expect(popupIndexMocks.entrypointLoadedMock).not.toHaveBeenCalled();
+
+  popupIndexMocks.requestAnimationFrameCallbacks.shift()?.(32);
+  await vi.waitFor(() => expect(popupIndexMocks.entrypointLoadedMock).toHaveBeenCalledTimes(1));
 });

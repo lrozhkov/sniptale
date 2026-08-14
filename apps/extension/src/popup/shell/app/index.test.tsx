@@ -81,6 +81,20 @@ describe('PopupApp', () => {
     expect(container?.querySelector('[data-testid="popup-app-shell"]')).toBeNull();
     expect(popupAppMocks.popupAppShellMock).not.toHaveBeenCalled();
   });
+
+  it('reveals the ready route beneath a theme-matched fading startup layer', async () => {
+    popupAppMocks.usePopupRuntimeMock.mockReturnValue({
+      navigation: { isReady: true, page: 'home' },
+    });
+    const { PopupApp } = await import('./index');
+
+    render(<PopupApp />);
+
+    expect(container?.querySelector('[data-testid="popup-app-shell"]')).not.toBeNull();
+    expect(
+      container?.querySelector('[data-ui="popup.app.startup-shell"][data-state="exiting"]')
+    ).not.toBeNull();
+  });
 });
 
 function resetPopupAppTest(): void {
