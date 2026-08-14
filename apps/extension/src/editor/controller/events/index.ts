@@ -49,7 +49,6 @@ export function attachEditorControllerEventHandlers(options: {
   canvas.on('path:created', handlers.handlePathCreated);
   canvas.on('mouse:down:before', handlers.handleMouseDownBefore);
   canvas.on('mouse:down', handlers.handleMouseDown);
-  canvas.on('mouse:move:before', handlers.handleMouseMoveBefore);
   canvas.on('mouse:move', handlers.handleMouseMove);
   canvas.on('mouse:up', handlers.handleMouseUp);
   canvas.on('mouse:dblclick', handlers.handleDoubleClick);
@@ -86,7 +85,6 @@ export function detachEditorControllerEventHandlers(options: {
   canvas.off('path:created', handlers.handlePathCreated);
   canvas.off('mouse:down:before', handlers.handleMouseDownBefore);
   canvas.off('mouse:down', handlers.handleMouseDown);
-  canvas.off('mouse:move:before', handlers.handleMouseMoveBefore);
   canvas.off('mouse:move', handlers.handleMouseMove);
   canvas.off('mouse:up', handlers.handleMouseUp);
   canvas.off('mouse:dblclick', handlers.handleDoubleClick);

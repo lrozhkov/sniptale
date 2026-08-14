@@ -79,6 +79,7 @@ async function expectAppliedRunWithFavicon(): Promise<void> {
     sourceName: 'capture.png',
   });
 
+  expect(mocks.resolveEditorOpenImageContextMock).toHaveBeenCalledWith({}, 'capture.png');
   expect(mocks.resolveBrowserFrameFaviconDataUrlMock).toHaveBeenCalledWith(
     'https://opened.example/favicon.ico'
   );

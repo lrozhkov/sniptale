@@ -55,8 +55,8 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Crop canvas',
   },
   collapseLayers: {
-    ru: 'Свернуть панель слоёв',
-    en: 'Collapse layers panel',
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   undo: {
     ru: 'Отменить',

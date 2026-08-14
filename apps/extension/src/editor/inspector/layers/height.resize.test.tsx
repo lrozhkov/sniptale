@@ -214,6 +214,7 @@ it('recomputes on resize while active and only clamps to the cap after delete fr
 
 it('does not subscribe to resize measurement for full-height floating panels', () => {
   renderExpandedPanel(['a', 'b', 'c'], { fillContainer: true });
+  expect(mocks.headerMock).toHaveBeenLastCalledWith(expect.objectContaining({ streamlined: true }));
 
   expect(resizeObserverCallback).toBeNull();
   expect(getPanelFrame()?.style.height).toBe('');

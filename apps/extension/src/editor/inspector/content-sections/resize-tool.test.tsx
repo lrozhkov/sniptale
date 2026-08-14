@@ -66,6 +66,7 @@ let root: Root | null = null;
 function createController() {
   return {
     applyCropSelection: vi.fn(async () => undefined),
+    cancelCropMode: vi.fn(),
     clearCanvasSizePreview: vi.fn(),
     clearCropSelection: vi.fn(),
     previewCanvasSize: vi.fn(),
@@ -83,6 +84,7 @@ function renderResizeTool(
     cropReady?: boolean;
     cropSelection?: { height: number; width: number } | null;
     imageSizeDraft?: { height: number; width: number };
+    mode?: 'canvas' | 'image';
   } = {}
 ) {
   const Harness = () => {
@@ -109,7 +111,7 @@ function renderResizeTool(
         imageSizeDraft={imageSizeDraft}
         imageSizeLocked={imageSizeLocked}
         imageSizeText="1000 x 1000"
-        initialMode="canvas"
+        mode={options.mode ?? 'canvas'}
         setCanvasSizeDraft={setCanvasSizeDraft}
         setCanvasSizeLocked={setCanvasSizeLocked}
         setImageSizeDraft={setImageSizeDraft}
@@ -135,21 +137,17 @@ afterEach(() => {
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {
   const controller = createController();
-  renderResizeTool(controller, { imageSizeDraft: { height: 900, width: 900 } });
+  renderResizeTool(controller, { imageSizeDraft: { height: 900, width: 900 }, mode: 'image' });
 
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
-  expect(controller.setCropSelectionMouseEnabled).toHaveBeenLastCalledWith(true);
-
-  act(() => {
-    getButton(translate('editor.compact.image')).click();
-  });
+  expect(controller.setCropSelectionMouseEnabled).toHaveBeenLastCalledWith(false);
 
   expect(controller.clearCanvasSizePreview).toHaveBeenCalledOnce();
   expect(controller.clearCropSelection).toHaveBeenCalledOnce();
   expect(controller.setCropSelectionMouseEnabled).toHaveBeenLastCalledWith(false);
 
   act(() => {
-    getButton(translate('editor.compact.apply')).click();
+    getButton(translate('editor.compact.applyImageSize')).click();
   });
 
   expect(controller.resizeImage).toHaveBeenCalledWith(900, 900);
@@ -158,13 +156,9 @@ it('keeps image resize free of mouse selection preview and applies a flattened i
 
 it('keeps apply disabled when the selected image size is unchanged', () => {
   const controller = createController();
-  renderResizeTool(controller);
+  renderResizeTool(controller, { mode: 'image' });
 
-  act(() => {
-    getButton(translate('editor.compact.image')).click();
-  });
-
-  const applyButton = getButton(translate('editor.compact.apply'));
+  const applyButton = getButton(translate('editor.compact.applyImageSize'));
   expect(applyButton.disabled).toBe(true);
 
   act(() => {
@@ -173,29 +167,43 @@ it('keeps apply disabled when the selected image size is unchanged', () => {
   expect(controller.resizeImage).not.toHaveBeenCalled();
 });
 
-it('previews canvas size only after the user changes dimensions', () => {
+it('previews a crop area after the user changes its aspect ratio', () => {
   const controller = createController();
   renderResizeTool(controller);
 
-  const applyButton = getButton(translate('editor.compact.apply'));
+  const applyButton = getButton(translate('editor.compact.applyCropCanvas'));
   expect(applyButton.disabled).toBe(true);
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 
   act(() => {
-    getSelect(translate('editor.compact.sizePreset')).value = '1920x1080';
-    getSelect(translate('editor.compact.sizePreset')).dispatchEvent(
+    getSelect(translate('editor.compact.aspectRatioPreset')).value = '16:9';
+    getSelect(translate('editor.compact.aspectRatioPreset')).dispatchEvent(
       new Event('change', { bubbles: true })
     );
   });
+  act(() => {
+    getButton(translate('editor.compact.fitAspectByLongSide')).click();
+  });
 
-  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(1920, 1080);
+  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(1200, 675);
   expect(applyButton.disabled).toBe(false);
 
   act(() => {
     applyButton.click();
   });
 
-  expect(controller.resizeCanvas).toHaveBeenCalledWith(1920, 1080);
+  expect(controller.resizeCanvas).toHaveBeenCalledWith(1200, 675);
+});
+
+it('leaves crop mode from the secondary cancel action', () => {
+  const controller = createController();
+  renderResizeTool(controller);
+
+  act(() => {
+    getButton(translate('common.actions.cancel')).click();
+  });
+
+  expect(controller.cancelCropMode).toHaveBeenCalledOnce();
 });
 
 it('applies selected aspect ratio by larger or smaller side from the current draft', () => {

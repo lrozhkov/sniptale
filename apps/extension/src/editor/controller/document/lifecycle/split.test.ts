@@ -207,10 +207,10 @@ function expectOpenAndLoadState(
   expect(scheduleZoomToFit).toHaveBeenCalledTimes(2);
   expect(storeState.setInspector).toHaveBeenCalledWith('file');
   expect(storeState.setImageData).toHaveBeenCalledWith('loaded-data');
-  expect(storeState.setPageTitle).toHaveBeenCalledWith('');
+  expect(storeState.setPageTitle).toHaveBeenCalledWith('Source');
   expect(storeState.setBrowserFrame).toHaveBeenCalledWith({
     faviconDataUrl: null,
-    title: '',
+    title: 'Source',
     url: 'https://stored.example',
   });
 }

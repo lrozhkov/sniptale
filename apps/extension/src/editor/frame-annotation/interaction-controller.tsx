@@ -29,6 +29,7 @@ type DragState = {
   mode: 'create' | 'move' | 'resize';
   object: FabricObject | null;
   origin: { x: number; y: number };
+  pointerId: number;
   start: FrameAnnotationSnapshotV1;
   resizeDirection?: ResizeDirection;
   calloutCenter?: { x: number; y: number } | null;
@@ -54,7 +55,17 @@ export function useFrameAnnotationInteraction(props: {
     setDraft(value);
   }, []);
   const entries = collectFrameAnnotationProxies(props.controller.canvas?.getObjects?.() ?? []);
-  const projection = buildProjection(entries, draft, props, selectedId);
+  const projection = buildProjection(entries, draft, props);
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const selectedEntry = entries.find((entry) => entry.snapshot.id === selectedId);
+    const canonicalSelectionExists = (props.layers ?? []).some(
+      (layer) => layer.id === selectedId && layer.selected
+    );
+    if (selectedEntry?.object?.sniptaleLocked === true || !canonicalSelectionExists) {
+      setSelectedId(null);
+    }
+  }, [entries, props.layers, selectedId]);
   const finishDrag = useFinishDrag({
     controller: props.controller,
     dragRef,
@@ -64,6 +75,10 @@ export function useFrameAnnotationInteraction(props: {
     setSelectedId,
     updateDraft,
   });
+  const interactionPropsRef = React.useRef(props);
+  const finishDragRef = React.useRef(finishDrag);
+  interactionPropsRef.current = props;
+  finishDragRef.current = finishDrag;
   const commitPendingHistory = React.useCallback(() => {
     if (!pendingHistoryRef.current) return;
     const object = pendingPreviewObjectRef.current;
@@ -94,16 +109,17 @@ export function useFrameAnnotationInteraction(props: {
 
   React.useEffect(() => {
     const handlePointerMove = (event: PointerEvent) =>
-      updateDrag(event, dragRef, updateDraft, props);
+      updateDrag(event, dragRef, updateDraft, interactionPropsRef.current);
+    const handlePointerFinish = (event: PointerEvent) => finishDragRef.current(event);
     window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', finishDrag);
-    window.addEventListener('pointercancel', finishDrag);
+    window.addEventListener('pointerup', handlePointerFinish);
+    window.addEventListener('pointercancel', handlePointerFinish);
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', finishDrag);
-      window.removeEventListener('pointercancel', finishDrag);
+      window.removeEventListener('pointerup', handlePointerFinish);
+      window.removeEventListener('pointercancel', handlePointerFinish);
     };
-  }, [finishDrag, props, updateDraft]);
+  }, [updateDraft]);
   React.useEffect(
     () =>
       registerFrameAnnotationDraftFlusher(() => {
@@ -150,14 +166,17 @@ function createPlaneEvents(input: {
       );
       if (!point) return;
       const start = createDefaultSnapshot(point, input.entries.length);
-      input.dragRef.current = { mode: 'create', object: null, origin: point, start };
+      input.dragRef.current = {
+        mode: 'create',
+        object: null,
+        origin: point,
+        pointerId: event.pointerId,
+        start,
+      };
+      captureDragPointer(event);
       input.setSelectedId(start.id);
       input.updateDraft(start);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.preventDefault();
     },
-    pointerMove: (event: React.PointerEvent) =>
-      updateDrag(event, input.dragRef, input.updateDraft, input.props),
   };
 }
 
@@ -325,45 +344,49 @@ function useFinishDrag(input: {
 }) {
   const { controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft } =
     input;
-  return React.useCallback(() => {
-    const drag = dragRef.current;
-    const draft = draftRef.current;
-    if (!drag || !draft) return;
-    controller.clearFrameAnnotationSnap?.();
-    dragRef.current = null;
-    if (drag.object && !canMutateFrameAnnotationProxy(drag.object)) {
+  return React.useCallback(
+    (event?: Pick<PointerEvent, 'pointerId'>) => {
+      const drag = dragRef.current;
+      const draft = draftRef.current;
+      if (!drag || !draft) return;
+      if (event && event.pointerId !== drag.pointerId) return;
+      controller.clearFrameAnnotationSnap?.();
+      dragRef.current = null;
+      if (drag.object && !canMutateFrameAnnotationProxy(drag.object)) {
+        updateDraft(null);
+        forceRender();
+        return;
+      }
+      if (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE) {
+        updateDraft(null);
+        forceRender();
+        return;
+      }
+      const object =
+        drag.object ??
+        createFrameAnnotationProxy({
+          frame: draft,
+          ordering: entryCount,
+          label: createFrameAnnotationLayerLabel(entryCount + 1),
+        });
+      if (!drag.object) {
+        controller.prepareObject(object);
+        object.set({ selectable: false, evented: false, hasBorders: false, hasControls: false });
+        controller.canvas?.add(object);
+      } else {
+        commitFrameAnnotationProxy(object, draft);
+      }
+      synchronizeFrameAnnotationAutoStepBadges(controller.canvas?.getObjects?.() ?? []);
+      controller.canvas?.requestRenderAll();
+      controller.commitHistory();
+      controller.syncRuntimeState();
+      controller.selectLayer?.(draft.id, { focusViewport: false });
+      setSelectedId(draft.id);
       updateDraft(null);
       forceRender();
-      return;
-    }
-    if (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE) {
-      updateDraft(null);
-      forceRender();
-      return;
-    }
-    const object =
-      drag.object ??
-      createFrameAnnotationProxy({
-        frame: draft,
-        ordering: entryCount,
-        label: createFrameAnnotationLayerLabel(entryCount + 1),
-      });
-    if (!drag.object) {
-      controller.prepareObject(object);
-      object.set({ selectable: false, evented: false, hasBorders: false, hasControls: false });
-      controller.canvas?.add(object);
-    } else {
-      commitFrameAnnotationProxy(object, draft);
-    }
-    synchronizeFrameAnnotationAutoStepBadges(controller.canvas?.getObjects?.() ?? []);
-    controller.canvas?.requestRenderAll();
-    controller.commitHistory();
-    controller.syncRuntimeState();
-    controller.selectLayer?.(draft.id, { focusViewport: false });
-    setSelectedId(draft.id);
-    updateDraft(null);
-    forceRender();
-  }, [controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft]);
+    },
+    [controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft]
+  );
 }
 
 function buildProjection(
@@ -372,8 +395,7 @@ function buildProjection(
   props: Pick<
     Parameters<typeof useFrameAnnotationInteraction>[0],
     'activeTool' | 'canvasRef' | 'controller' | 'layers'
-  >,
-  selectedId: string | null
+  >
 ) {
   const projected: Array<{ object: FabricObject | null; snapshot: FrameAnnotationSnapshotV1 }> =
     entries.map((entry) =>
@@ -396,7 +418,7 @@ function buildProjection(
     projected,
     effectiveSelectedId:
       props.activeTool === 'frame-annotation' || props.activeTool === 'select'
-        ? (draft?.id ?? canonicalSelectedId ?? selectedId)
+        ? (draft?.id ?? canonicalSelectedId)
         : null,
     scale: getProjectionScale(props.canvasRef.current, props.controller.canvasDocumentSize),
     focusFrames,
@@ -434,13 +456,13 @@ function createDefaultSnapshot(
 }
 
 function updateDrag(
-  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  event: Pick<PointerEvent, 'clientX' | 'clientY' | 'pointerId'>,
   dragRef: React.RefObject<DragState | null>,
   updateDraft: (draft: FrameAnnotationSnapshotV1) => void,
   props: Parameters<typeof useFrameAnnotationInteraction>[0]
 ) {
   const drag = dragRef.current;
-  if (!drag) return;
+  if (!drag || event.pointerId !== drag.pointerId) return;
   const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
   if (!point) return;
   const dx = point.x - drag.origin.x;
@@ -514,17 +536,28 @@ function startExistingDrag(
 ) {
   const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
   if (!point) return;
-  props.controller.selectLayer?.(snapshot.id, { focusViewport: false });
-  setSelectedId(snapshot.id);
-  updateDraft(snapshot);
   dragRef.current = {
     mode,
     object,
     origin: point,
+    pointerId: event.pointerId,
     start: snapshot,
     ...(resizeDirection ? { resizeDirection } : {}),
     ...(calloutCenter === undefined ? {} : { calloutCenter }),
   };
+  captureDragPointer(event);
+  props.controller.selectLayer?.(snapshot.id, { focusViewport: false });
+  setSelectedId(snapshot.id);
+  updateDraft(snapshot);
+}
+
+function captureDragPointer(event: React.PointerEvent): void {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // The pointer may have ended between dispatch and capture.
+  }
+  event.preventDefault();
   event.stopPropagation();
 }
 

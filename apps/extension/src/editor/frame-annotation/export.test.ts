@@ -86,6 +86,35 @@ it('renders the Fabric base without proxies and restores proxy visibility after 
   );
 });
 
+it('serializes concurrent exports for the same canvas before preparing another raster job', async () => {
+  const { canvas } = createCanvas();
+  const rasterOutput = {
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: false, outputHeight: 100, outputScale: 1, outputWidth: 200 },
+  };
+  let finishFirstRaster: (value: typeof rasterOutput) => void = () => undefined;
+  const firstRaster = new Promise<typeof rasterOutput>((resolve) => {
+    finishFirstRaster = resolve;
+  });
+  mocks.rasterize.mockImplementationOnce(() => firstRaster).mockResolvedValueOnce(rasterOutput);
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 200, height: 100 },
+    renderOptions: { format: 'png' as const, quality: 100 },
+  };
+
+  const first = renderEditorWithFrameAnnotations(options);
+  await vi.waitFor(() => expect(mocks.rasterize).toHaveBeenCalledTimes(1));
+  const second = renderEditorWithFrameAnnotations(options);
+  await Promise.resolve();
+  expect(mocks.rasterize).toHaveBeenCalledTimes(1);
+
+  finishFirstRaster(rasterOutput);
+  await expect(first).resolves.toBe('data:image/png;base64,final');
+  await expect(second).resolves.toBe('data:image/png;base64,final');
+  expect(mocks.rasterize).toHaveBeenCalledTimes(2);
+});
+
 it('rejects a stale frame projection even if the raster adapter returns it', async () => {
   const { canvas, proxy } = createCanvas();
   mocks.rasterize.mockImplementationOnce(async (options) => {

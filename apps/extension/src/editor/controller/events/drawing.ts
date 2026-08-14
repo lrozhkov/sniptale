@@ -158,6 +158,20 @@ function updateDraft(bindings: EditorControllerEventBindings, event: { e: TPoint
   if (!canvas || !session?.object) return;
   const point = canvas.getScenePoint(event.e);
   session.lastPoint = point;
+  if (session.tool === 'crop') {
+    const bounds = createDrawingBounds(session.start, point);
+    session.object.set({
+      left: bounds.x,
+      top: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    session.object.setCoords();
+    canvas.requestRenderAll();
+    return;
+  }
   const drawing = readEditorDrawingObject(session.object);
   if (!drawing) return;
   const next = updateCreatedDrawingObject({
@@ -207,6 +221,12 @@ export function createEditorDrawingEventHandlers(
     target: FabricObject;
   } | null = null;
   let selectionModifierGesture: EditorSelectionModifierGesture | null = null;
+  let lastHandledMoveEvent: TPointerEvent | null = null;
+  const updateDraftOnce = (event: { e: TPointerEvent }) => {
+    if (lastHandledMoveEvent === event.e) return;
+    lastHandledMoveEvent = event.e;
+    updateDraft(bindings, event);
+  };
 
   return {
     handlePathCreated: () => undefined,
@@ -221,6 +241,7 @@ export function createEditorDrawingEventHandlers(
       });
     },
     handleMouseDown: (event) => {
+      lastHandledMoveEvent = null;
       const canvas = bindings.getCanvas();
       if (canvas) {
         selectionModifierGesture = finishEditorSelectionModifierMouseDown(
@@ -250,9 +271,10 @@ export function createEditorDrawingEventHandlers(
           textTargetCandidate = null;
         }
       }
-      updateDraft(bindings, event);
+      updateDraftOnce(event);
     },
     handleMouseUp: () => {
+      lastHandledMoveEvent = null;
       const canvas = bindings.getCanvas();
       if (canvas && finishEditorSelectionModifierGesture(canvas, selectionModifierGesture)) {
         selectionModifierGesture = null;
@@ -271,19 +293,13 @@ export function createEditorDrawingEventHandlers(
     },
     handleWindowMouseMove: (event) => {
       const canvas = bindings.getCanvas();
-      const target = event.target;
-      if (
-        !canvas ||
-        !bindings.getDrawSession() ||
-        (typeof Node !== 'undefined' &&
-          target instanceof Node &&
-          canvas.upperCanvasEl.contains(target))
-      ) {
+      if (!canvas || !bindings.getDrawSession()) {
         return;
       }
-      updateDraft(bindings, { e: event });
+      updateDraftOnce({ e: event });
     },
     handleWindowMouseUp: () => {
+      lastHandledMoveEvent = null;
       if (bindings.getDrawSession()) {
         completeDrawWorkflowFromBindings(bindings);
       }

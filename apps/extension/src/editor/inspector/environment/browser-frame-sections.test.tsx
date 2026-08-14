@@ -99,7 +99,7 @@ it('routes canvas and scene behavior changes through the async action boundary',
 
   expect(syncBrowserFrame).toHaveBeenCalledWith({ canvasMode: 'keep-size' });
   expect(syncBrowserFrame).toHaveBeenCalledWith({ contentMode: 'fit-content' });
-  expect(container?.querySelector('[data-testid^="select-field-"]')).not.toBeNull();
+  expect(container?.querySelector('[aria-pressed="true"]')).not.toBeNull();
 });
 
 it('renders alternate labels for keep-size and fit-content browser behavior', () => {

@@ -152,14 +152,15 @@ it('moves collapsed layers to the bottom-right toolbar with insert image action'
   expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(6);
 });
 
-it('routes settings inside the panel and expands a selected collapsed mode', () => {
+it('keeps collapsed modes visually inactive while preserving selection for expansion', () => {
   renderPanel({ collapsed: true, inspector: 'frame' });
 
   expect(
     container
       ?.querySelector('[data-ui="editor.floating.layers.mode.frame"]')
       ?.getAttribute('aria-pressed')
-  ).toBe('true');
+  ).toBe('false');
+  expect(container?.querySelector('[aria-pressed="true"]')).toBeNull();
 
   act(() => {
     container

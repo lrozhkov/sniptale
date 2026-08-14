@@ -45,11 +45,13 @@ async function expectImageSizeInspectorUsesController(
 ) {
   await renderSidebarForInspector(controller, { cropReady: false, inspector: 'image-size' });
 
-  const applyImageSizeButton = getDisabledButtonWithText(translate('editor.compact.apply'));
+  const applyImageSizeButton = getDisabledButtonWithText(
+    translate('editor.compact.applyImageSize')
+  );
   await clickOptionalButton(applyImageSizeButton);
 
-  expect(document.body.textContent).toContain(translate('editor.compact.canvas'));
-  expect(document.body.textContent).toContain(translate('editor.compact.image'));
+  expect(document.body.textContent).toContain(translate('editor.compact.imageSize'));
+  expect(document.body.textContent).not.toContain(translate('editor.compact.cropCanvas'));
   expect(applyImageSizeButton?.hasAttribute('disabled')).toBe(true);
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 }
@@ -60,10 +62,14 @@ async function expectCanvasSizeInspectorUsesController(
   cleanupDom();
   await renderSidebarForInspector(controller, { cropReady: false, inspector: 'canvas-size' });
 
-  const applyCanvasSizeButton = getDisabledButtonWithText(translate('editor.compact.apply'));
+  const applyCanvasSizeButton = getDisabledButtonWithText(
+    translate('editor.compact.applyCropCanvas')
+  );
   await clickOptionalButton(applyCanvasSizeButton);
 
   expect(applyCanvasSizeButton?.hasAttribute('disabled')).toBe(true);
+  expect(document.body.textContent).toContain(translate('editor.compact.cropCanvas'));
+  expect(document.body.textContent).not.toContain(translate('editor.compact.imageSize'));
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 }
 
@@ -73,8 +79,8 @@ async function expectMetaInspectorUsesController(
   cleanupDom();
   await renderSidebarForInspector(controller, { activeTool: 'select', inspector: 'meta' });
 
-  const technicalDataCheckboxes = Array.from(
-    document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+  const technicalDataOptions = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.sniptale-glass-option-grid button')
   );
   const insertTechnicalDataButton = getButtonWithText(
     translate('editor.compact.technicalDataInsert')
@@ -84,9 +90,11 @@ async function expectMetaInspectorUsesController(
   expect(insertTechnicalDataButton?.className).toContain('text-[12px]');
 
   await act(async () => {
-    technicalDataCheckboxes[2]?.click();
-    technicalDataCheckboxes[1]?.click();
-    technicalDataCheckboxes[0]?.click();
+    technicalDataOptions[2]?.click();
+    technicalDataOptions[1]?.click();
+    technicalDataOptions[0]?.click();
+  });
+  await act(async () => {
     insertTechnicalDataButton?.click();
   });
 

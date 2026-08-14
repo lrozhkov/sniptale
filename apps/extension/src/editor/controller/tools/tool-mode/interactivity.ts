@@ -16,7 +16,7 @@ export function setCanvasObjectInteractivity(canvas: Canvas, mode: CanvasInterac
       return;
     }
 
-    const selectableBase = true;
+    const selectableBase = object.sniptaleLocked !== true;
     const isSelected =
       activeObjects.some((activeObject) => activeObject === object) ||
       (typeof object.sniptaleId === 'string' && activeObjectIds.has(object.sniptaleId));
@@ -25,7 +25,7 @@ export function setCanvasObjectInteractivity(canvas: Canvas, mode: CanvasInterac
       mode === 'all'
         ? selectableBase
         : mode === 'text'
-          ? object.sniptaleType === 'text'
+          ? selectableBase && object.sniptaleType === 'text'
           : mode === 'selection'
             ? selectableBase && isSelected
             : false;

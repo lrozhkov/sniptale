@@ -2,11 +2,14 @@ import { resolveEditorViewportScaleCompensation } from './scale';
 
 const EDITOR_FIT_AREA_EDGE_GAP = 24;
 const EDITOR_FIT_AREA_SURFACE_GAP = 16;
-const FIT_AREA_TOP_SURFACES = [
-  'editor.floating.document-bar',
-  'editor.floating.view-controls',
+const FIT_AREA_TOP_SURFACE_SELECTORS = [
+  '[data-ui="editor.floating.document-bar"]',
+  '[data-ui="editor.floating.view-controls"]',
+  '[data-ui="editor.floating.tool-rail.stack"]',
+  '[data-ui="editor.floating.tool-properties"]',
 ] as const;
-const FIT_AREA_LEFT_SURFACES = ['editor.floating.tool-rail.stack'] as const;
+const FIT_AREA_LEFT_SURFACE_SELECTORS = ['[data-ui^="editor.floating.left-drawer."]'] as const;
+const FIT_AREA_RIGHT_SURFACE_SELECTORS = ['[data-ui="editor.floating.right-stack"]'] as const;
 
 interface EditorViewportFitArea {
   centerX: number;
@@ -35,8 +38,8 @@ function getViewportClientRect(viewportElement: HTMLElement): DOMRect {
   } as DOMRect;
 }
 
-function getVisibleSurfaceRect(dataUi: string): DOMRect | null {
-  const element = document.querySelector<HTMLElement>(`[data-ui="${dataUi}"]`);
+function getVisibleSurfaceRect(selector: string): DOMRect | null {
+  const element = document.querySelector<HTMLElement>(selector);
 
   if (!element) {
     return null;
@@ -66,19 +69,27 @@ export function getEditorViewportFitArea(
   let right = viewportRect.width - EDITOR_FIT_AREA_EDGE_GAP;
   let bottom = viewportRect.height - EDITOR_FIT_AREA_EDGE_GAP;
 
-  for (const dataUi of FIT_AREA_TOP_SURFACES) {
-    const rect = getVisibleSurfaceRect(dataUi);
+  for (const selector of FIT_AREA_TOP_SURFACE_SELECTORS) {
+    const rect = getVisibleSurfaceRect(selector);
 
     if (rect && intersectsViewportHorizontally(rect, viewportRect)) {
       top = Math.max(top, rect.bottom - viewportRect.top + EDITOR_FIT_AREA_SURFACE_GAP);
     }
   }
 
-  for (const dataUi of FIT_AREA_LEFT_SURFACES) {
-    const rect = getVisibleSurfaceRect(dataUi);
+  for (const selector of FIT_AREA_LEFT_SURFACE_SELECTORS) {
+    const rect = getVisibleSurfaceRect(selector);
 
     if (rect && intersectsViewportVertically(rect, viewportRect)) {
       left = Math.max(left, rect.right - viewportRect.left + EDITOR_FIT_AREA_SURFACE_GAP);
+    }
+  }
+
+  for (const selector of FIT_AREA_RIGHT_SURFACE_SELECTORS) {
+    const rect = getVisibleSurfaceRect(selector);
+
+    if (rect && intersectsViewportVertically(rect, viewportRect)) {
+      right = Math.min(right, rect.left - viewportRect.left - EDITOR_FIT_AREA_SURFACE_GAP);
     }
   }
 

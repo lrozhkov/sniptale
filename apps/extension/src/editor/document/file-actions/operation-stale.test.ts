@@ -124,6 +124,78 @@ it('ignores older image-open file reads after a newer image selection starts', a
   expect(setImageData).toHaveBeenCalledWith('data:image/png;base64,second');
 });
 
+it('publishes lifecycle completion only for the latest competing image open', async () => {
+  const firstRead = createDeferred<string>();
+  const secondRead = createDeferred<string>();
+  const controller = {
+    canvas: {} as HTMLCanvasElement,
+    loadDocument: vi.fn(),
+    openImage: vi.fn().mockResolvedValue(undefined),
+  };
+  const firstOpened = vi.fn();
+  const secondOpened = vi.fn();
+  fileReaderMocks.readFileAsDataUrl
+    .mockReturnValueOnce(firstRead.promise)
+    .mockReturnValueOnce(secondRead.promise);
+
+  const firstOpen = editorFileActions.openEditorImageFromFile(
+    controller,
+    new File(['first'], 'first.png', { type: 'image/png' }),
+    vi.fn(),
+    { onOpened: firstOpened }
+  );
+  const secondOpen = editorFileActions.openEditorImageFromFile(
+    controller,
+    new File(['second'], 'second.png', { type: 'image/png' }),
+    vi.fn(),
+    { onOpened: secondOpened }
+  );
+
+  secondRead.resolve('data:image/png;base64,second');
+  await secondOpen;
+  firstRead.resolve('data:image/png;base64,first');
+  await firstOpen;
+
+  expect(secondOpened).toHaveBeenCalledOnce();
+  expect(firstOpened).not.toHaveBeenCalled();
+});
+
+it('does not publish an older lifecycle after a newer open starts during decode', async () => {
+  const firstDecode = createDeferred<void>();
+  const controller = {
+    canvas: {} as HTMLCanvasElement,
+    loadDocument: vi.fn(),
+    openImage: vi.fn((dataUrl: string) =>
+      dataUrl.endsWith('first') ? firstDecode.promise : Promise.resolve()
+    ),
+  };
+  const firstOpened = vi.fn();
+  const secondOpened = vi.fn();
+  fileReaderMocks.readFileAsDataUrl
+    .mockResolvedValueOnce('data:image/png;base64,first')
+    .mockResolvedValueOnce('data:image/png;base64,second');
+
+  const firstOpen = editorFileActions.openEditorImageFromFile(
+    controller,
+    new File(['first'], 'first.png', { type: 'image/png' }),
+    vi.fn(),
+    { onOpened: firstOpened }
+  );
+  await vi.waitFor(() => expect(controller.openImage).toHaveBeenCalledTimes(1));
+  const secondOpen = editorFileActions.openEditorImageFromFile(
+    controller,
+    new File(['second'], 'second.png', { type: 'image/png' }),
+    vi.fn(),
+    { onOpened: secondOpened }
+  );
+  await secondOpen;
+  firstDecode.resolve();
+  await firstOpen;
+
+  expect(secondOpened).toHaveBeenCalledOnce();
+  expect(firstOpened).not.toHaveBeenCalled();
+});
+
 it('ignores older session-import file reads after a newer import starts', async () => {
   const firstRead = createDeferred<string>();
   const secondRead = createDeferred<string>();

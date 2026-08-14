@@ -35,7 +35,8 @@ describe('canvas wrapper ownership seam', () => {
     expect(openEditorImageFromFileMock).toHaveBeenCalledWith(
       controller,
       expect.objectContaining({ name: 'canvas.png' }),
-      expect.any(Function)
+      expect.any(Function),
+      expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
     );
 
     cleanupDom();

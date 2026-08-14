@@ -25,7 +25,6 @@ export interface EditorControllerEventHandlers {
     target?: FabricObject;
     transform?: Pick<Transform, 'target'> | null;
   }) => void;
-  handleMouseMoveBefore: (event: { e: TPointerEvent; target?: FabricObject }) => void;
   handleMouseMove: (event: { e: TPointerEvent }) => void;
   handleMouseUp: () => void;
   handleDoubleClick: (event: { target?: FabricObject; e: TPointerEvent }) => void;

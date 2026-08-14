@@ -35,7 +35,7 @@ afterEach(async () => {
   root = null;
 });
 
-it('renders frame modes through the compact select field', async () => {
+it('renders frame modes as directly selectable chips', async () => {
   const onChange = vi.fn();
 
   await renderUi(
@@ -50,17 +50,13 @@ it('renders frame modes through the compact select field', async () => {
     />
   );
 
-  expect(
-    container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
-  ).not.toBeNull();
-  expect(container?.querySelector('button')?.getAttribute('title')).toBeNull();
+  expect(container?.querySelector('[role="group"]')?.getAttribute('aria-label')).toBe('Placement');
+  expect(container?.querySelectorAll('button')).toHaveLength(2);
+  expect(container?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
 
   await act(async () => {
-    container?.querySelector('button')?.click();
-  });
-  await act(async () => {
     (
-      Array.from(document.body.querySelectorAll('button')).find(
+      Array.from(container?.querySelectorAll('button') ?? []).find(
         (button) => button.textContent === 'Expand canvas'
       ) as HTMLButtonElement | undefined
     )?.click();
@@ -69,7 +65,7 @@ it('renders frame modes through the compact select field', async () => {
   expect(onChange).toHaveBeenCalledWith('expand-canvas');
 });
 
-it('keeps long three-option mode labels in the same select shell', async () => {
+it('keeps long three-option mode labels in one option grid', async () => {
   await renderUi(
     <EditorInspectorFrameModeButtons
       ariaLabel="Background mode"
@@ -83,13 +79,15 @@ it('keeps long three-option mode labels in the same select shell', async () => {
     />
   );
 
+  expect(container?.querySelectorAll('button')).toHaveLength(3);
   expect(
-    container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
-  ).not.toBeNull();
-  expect(container?.querySelector('button')?.getAttribute('title')).toBeNull();
+    Array.from(container?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent === 'Custom')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
 });
 
-it('falls back to an empty compact select label for unlabeled legacy callers', async () => {
+it('keeps the option grid accessible for unlabeled legacy callers', async () => {
   await renderUi(
     <EditorInspectorFrameModeButtons
       options={[
@@ -101,7 +99,6 @@ it('falls back to an empty compact select label for unlabeled legacy callers', a
     />
   );
 
-  expect(
-    container?.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')
-  ).not.toBeNull();
+  expect(container?.querySelector('[role="group"]')).not.toBeNull();
+  expect(container?.querySelectorAll('button')).toHaveLength(2);
 });

@@ -2,14 +2,9 @@ import type { EditorFrameSettings } from '../../../features/editor/document/type
 import type { EditorImageSettings } from '../../../features/editor/document/image-types';
 import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
 import { translate } from '../../../platform/i18n';
-import {
-  ColorField,
-  NumericRow,
-  SelectField,
-  type CompactSelectOption,
-  type NumericRowProps,
-} from '../../chrome/ui';
-import { CollapsibleSection, PanelSection } from '../tools/sections';
+import { ColorField, SelectField, type CompactSelectOption } from '../../chrome/ui';
+import { PanelSection } from '../tools/sections';
+import { EditorInspectorRangeField } from './shared';
 
 const DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS = [
   { label: translate('editor.compact.lineStyleSolid'), value: 'solid' },
@@ -48,20 +43,14 @@ function SourceImageRangeControl(props: {
   const step = percent ? Math.round((props.step ?? 0.05) * 100) : props.step;
 
   return (
-    <NumericRow
+    <EditorInspectorRangeField
       label={props.label}
       value={value}
       unit={resolveSourceImageNumericUnit(props.valueText)}
       min={percent ? Math.round(min * 100) : min}
       max={percent ? Math.round(props.max * 100) : props.max}
-      step={step}
-      onPreviewValue={(nextValue) => props.onChange(percent ? nextValue / 100 : nextValue)}
-      onCommitValue={(nextValue) => props.onChange(percent ? nextValue / 100 : nextValue)}
-      scrub={{
-        min: percent ? Math.round(min * 100) : min,
-        max: percent ? Math.round(props.max * 100) : props.max,
-        step,
-      }}
+      {...(step === undefined ? {} : { step })}
+      onChange={(nextValue) => props.onChange(percent ? nextValue / 100 : nextValue)}
     />
   );
 }
@@ -70,7 +59,7 @@ function SourceImageRangeSection(props: Parameters<typeof SourceImageRangeContro
   return <SourceImageRangeControl {...props} />;
 }
 
-function resolveSourceImageNumericUnit(valueText: string): NumericRowProps['unit'] {
+function resolveSourceImageNumericUnit(valueText: string): '' | '%' | 'deg' | 'px' {
   if (valueText.endsWith('%')) {
     return '%';
   }
@@ -92,8 +81,8 @@ export function EditorInspectorFrameSourceImageSection(
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
 
   return (
-    <CollapsibleSection label={translate('editor.runtime.sourceImage')} defaultOpen={false}>
-      <div className="space-y-3 pt-3">
+    <PanelSection label={translate('editor.runtime.sourceImage')}>
+      <div className="space-y-3">
         <SourceImageRangeSection
           label={translate('editor.compact.opacity')}
           max={1}
@@ -109,10 +98,23 @@ export function EditorInspectorFrameSourceImageSection(
           valueText={`${settings.radius}px`}
           onChange={(radius) => patchSourceImage(props, { radius })}
         />
-        <SourceImageShadowSection props={props} settings={settings} />
-        <SourceImageBorderSection props={props} settings={settings} />
+        <details className="group border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
+          <summary
+            className={[
+              'cursor-pointer select-none text-[11px] font-semibold',
+              'text-[var(--sniptale-color-text-secondary)]',
+              'hover:text-[var(--sniptale-color-text-primary)]',
+            ].join(' ')}
+          >
+            {translate('content.callout.additionalSettings')}
+          </summary>
+          <div className="mt-3 space-y-4">
+            <SourceImageShadowSection props={props} settings={settings} />
+            <SourceImageBorderSection props={props} settings={settings} />
+          </div>
+        </details>
       </div>
-    </CollapsibleSection>
+    </PanelSection>
   );
 }
 
@@ -122,7 +124,10 @@ function SourceImageShadowSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <PanelSection label={translate('highlighter.editor.shadowLabel')}>
+    <div className="space-y-3">
+      <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate('highlighter.editor.shadowLabel')}
+      </div>
       <div className="space-y-3">
         <SourceImageRangeControl
           label={translate('editor.compact.shadowSize')}
@@ -143,7 +148,7 @@ function SourceImageShadowSection(args: {
         />
         <SourceImageShadowGeometry props={props} settings={settings} />
       </div>
-    </PanelSection>
+    </div>
   );
 }
 
@@ -185,7 +190,10 @@ function SourceImageBorderSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <PanelSection label={translate('editor.compact.blurBorder')}>
+    <div className="space-y-3 border-t border-[color:var(--sniptale-color-border-soft)] pt-3">
+      <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate('editor.compact.blurBorder')}
+      </div>
       <div className="space-y-3">
         <SelectField
           label={translate('highlighter.editor.styleLabel')}
@@ -204,7 +212,7 @@ function SourceImageBorderSection(args: {
         />
         <SourceImageBorderColor props={props} settings={settings} />
       </div>
-    </PanelSection>
+    </div>
   );
 }
 

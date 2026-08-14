@@ -1,6 +1,7 @@
 import { detachEditorControllerEventHandlers } from '../../../events';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
+import { detachEditorCanvasPointerCapture } from './pointer-capture';
 
 export function disposeEditorController(controller: EditorControllerInstance): void {
   ensureEditorCanvasReadyHandoff(controller).tearDown();
@@ -18,6 +19,7 @@ export function disposeEditorController(controller: EditorControllerInstance): v
   controller.magnetManager?.dispose();
   controller.magnetManager = null;
   controller.viewportResizeObserver = null;
+  detachEditorCanvasPointerCapture(controller.canvas);
   if (controller.viewportSyncFrame !== 0) {
     cancelAnimationFrame(controller.viewportSyncFrame);
     controller.viewportSyncFrame = 0;

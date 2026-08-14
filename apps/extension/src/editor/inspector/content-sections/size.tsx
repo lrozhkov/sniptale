@@ -77,6 +77,7 @@ interface RenderFrameSectionParams {
   onPickBackgroundImage: () => void;
   clearBackgroundImage: () => void;
   onApplyFrame: () => void;
+  resetFrameDraft?: (() => void) | undefined;
 }
 
 export function renderEditorInspectorFrameSection(props: RenderFrameSectionParams) {
@@ -114,6 +115,7 @@ export function renderEditorInspectorFrameSection(props: RenderFrameSectionParam
       onPickBackgroundImage={props.onPickBackgroundImage}
       onClearBackgroundImage={props.clearBackgroundImage}
       onApplyFrame={props.onApplyFrame}
+      {...(props.resetFrameDraft === undefined ? {} : { onCancelFrame: props.resetFrameDraft })}
     />
   );
 }

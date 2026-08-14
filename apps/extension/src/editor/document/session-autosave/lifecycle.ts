@@ -61,6 +61,9 @@ export async function discardAutosaveDraft(
 ): Promise<void> {
   clearPendingAutosaveTimer(state);
   state.pendingDocument = null;
+  state.lastWriteError = null;
+  state.activeContext = null;
+  useEditorStore.getState().setSessionId(null);
   setEditorSaveState('idle');
 }
 

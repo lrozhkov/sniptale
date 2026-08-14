@@ -26,7 +26,6 @@ type FloatingRightStackProps = {
 };
 
 const mocks = vi.hoisted(() => ({
-  canvasToolbar: vi.fn(() => <div data-ui="mock.canvas-toolbar" />),
   documentBar: vi.fn(() => <div data-ui="mock.document-bar" />),
   leftDrawer: vi.fn((_props: FloatingLeftDrawerProps) => <div data-ui="mock.left-drawer" />),
   overlays: vi.fn(() => <div data-ui="mock.overlays" />),
@@ -35,7 +34,6 @@ const mocks = vi.hoisted(() => ({
   toolRail: vi.fn((_props: FloatingToolRailProps) => <div data-ui="mock.tool-rail" />),
   layersPreference: { collapsed: false, error: null as string | null },
   routeOverride: null as null | {
-    canvasSelectionToolbar: boolean;
     leftDrawer: 'shape' | null;
   },
   useInspectorController: vi.fn(() => ({
@@ -68,9 +66,6 @@ vi.mock('./document-bar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./document-bar')>()),
   EditorFloatingDocumentBar: mocks.documentBar,
   EditorFloatingDocumentController: undefined,
-}));
-vi.mock('./canvas-selection-toolbar', () => ({
-  EditorCanvasSelectionToolbar: mocks.canvasToolbar,
 }));
 vi.mock('./left-drawer', () => ({
   EditorFloatingLeftDrawer: mocks.leftDrawer,
@@ -129,7 +124,7 @@ it('restores dismissed drawer and drawing-option state across active tool change
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  mocks.routeOverride = { canvasSelectionToolbar: false, leftDrawer: 'shape' };
+  mocks.routeOverride = { leftDrawer: 'shape' };
   mocks.useToolbarController.mockReturnValue({
     ...createToolbarProps(),
     activeTool: 'shape',
@@ -146,7 +141,7 @@ it('restores dismissed drawer and drawing-option state across active tool change
     railProps.onToggleActiveToolOptions?.('pencil');
   });
 
-  mocks.routeOverride = { canvasSelectionToolbar: false, leftDrawer: null };
+  mocks.routeOverride = { leftDrawer: null };
   mocks.useToolbarController.mockReturnValue({
     ...createToolbarProps(),
     activeTool: 'select',
@@ -198,6 +193,25 @@ it('renders document bar, tool rail, view controls, overlays, and right stack fo
   );
 });
 
+it('contains wheel gestures inside floating chrome instead of forwarding them to the canvas viewport', async () => {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const documentWheel = vi.fn();
+  document.addEventListener('wheel', documentWheel);
+
+  await act(async () => root.render(<EditorFloatingWorkspace hasImage />));
+  const documentBar = container.querySelector<HTMLElement>('[data-ui="mock.document-bar"]');
+  expect(documentBar).not.toBeNull();
+
+  documentBar?.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 120 }));
+
+  expect(documentWheel).not.toHaveBeenCalled();
+  document.removeEventListener('wheel', documentWheel);
+  await act(async () => root.unmount());
+  container.remove();
+});
+
 it('passes floating layers preference errors to the right stack inline surface', () => {
   mocks.layersPreference.error = 'Could not save the layers panel state.';
 
@@ -238,7 +252,7 @@ it('keeps the retained shape catalog drawer suspended for the shared shape tool'
   );
 });
 
-it('shows the selected layer toolbar without activating the suspended shape drawer', () => {
+it('does not mount a canvas toolbar for a selected image layer', () => {
   mocks.useToolbarController.mockReturnValue({
     ...createToolbarProps(),
     activeTool: 'shape',
@@ -253,12 +267,8 @@ it('shows the selected layer toolbar without activating the suspended shape draw
   const markup = renderToStaticMarkup(<EditorFloatingWorkspace hasImage />);
 
   expect(markup).not.toContain('mock.left-drawer');
-  expect(markup).toContain('mock.canvas-toolbar');
+  expect(markup).not.toContain('mock.canvas-toolbar');
   expect(mocks.leftDrawer).not.toHaveBeenCalled();
-  expect(mocks.canvasToolbar).toHaveBeenCalledWith(
-    expect.objectContaining({ enabled: true }),
-    undefined
-  );
 });
 
 it('keeps settings inspectors inside the right-stack layers surface', () => {

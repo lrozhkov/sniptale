@@ -1,18 +1,13 @@
 import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import { CanvasToolButtons, type CanvasToolAction } from '@sniptale/ui/canvas-tools';
 import {
   createCanvasToolAction,
   type CanvasToolDescriptorKind,
 } from '@sniptale/ui/canvas-tools/descriptors';
-import {
-  FloatingChromeDivider,
-  FloatingChromeToolbar,
-  floatingChromeClassNames,
-} from '@sniptale/ui/floating-chrome';
-import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
@@ -27,6 +22,7 @@ import { loadHighlighterSettings } from '../../../composition/persistence/highli
 import { getRedoButtonTitle, getUndoButtonTitle } from '../toolbar/history-titles';
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import type { EditorToolbarContentProps } from '../toolbar/types';
+import { EditorAnchoredConfirmPopover } from './anchored-feedback';
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-start gap-3',
@@ -74,6 +70,7 @@ type EditorFloatingToolRailProps = EditorToolbarContentProps & {
 
 export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   const annotationDefaults = useFrameAnnotationCreationDefaults();
+  const frameAnnotationActive = props.isToolButtonActive('frame-annotation');
   useEffect(() => {
     void initializeFrameAnnotationCreationDefaults(loadHighlighterSettings);
   }, []);
@@ -103,22 +100,26 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
         dataUi="editor.floating.tool-rail"
       >
         <CanvasToolButtons actions={selectActions} dataUi="editor.floating.tool-rail" />
-        <FloatingChromeDivider vertical className="max-[720px]:hidden" />
+        <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
         <div
           className="contents"
           onPointerDown={() => {
-            if (!props.isToolButtonActive('frame-annotation')) {
+            if (props.hasImage && !frameAnnotationActive) {
               props.onActivateTool('frame-annotation');
             }
           }}
         >
           <FrameAnnotationCreationControls
             context="content"
+            disabled={!props.hasImage}
+            frameActive={frameAnnotationActive}
             onChange={setFrameAnnotationCreationDefaults}
             settings={annotationDefaults}
+            showCallout={frameAnnotationActive}
+            showStepBadge={frameAnnotationActive}
           />
         </div>
-        <FloatingChromeDivider vertical className="max-[720px]:hidden" />
+        <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.after-frame" />
         <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
       </FloatingChromeToolbar>
       <EditorFloatingToolHistoryControls
@@ -191,6 +192,7 @@ function EditorFloatingToolHistoryControls(props: {
 }) {
   const controller = useEditorController();
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const resetButtonRef = useRef<HTMLButtonElement>(null);
   const resetAvailable = props.hasImage && props.history.index > 0;
   const runSelectionAwareAction = (label: string, action: () => Promise<void> | void) =>
     fireAndReportEditorAction(label, async () => {
@@ -231,23 +233,30 @@ function EditorFloatingToolHistoryControls(props: {
           <Redo2 size={18} strokeWidth={2} />
         </ContentToolbarButton>
         <ContentToolbarButton
+          ref={resetButtonRef}
           title={translate('editor.toolbar.resetOriginalTooltip')}
           disabled={!resetAvailable}
-          onClick={() => setResetConfirmOpen(true)}
+          active={resetConfirmOpen}
+          aria-expanded={resetConfirmOpen}
+          aria-haspopup="dialog"
+          onClick={() => setResetConfirmOpen((open) => !open)}
           dataUi="editor.floating.tool-rail.history.reset"
         >
           <RotateCcw size={18} strokeWidth={2} />
         </ContentToolbarButton>
       </FloatingChromeToolbar>
-      <ProductConfirmDialog
-        isOpen={resetConfirmOpen}
-        title={translate('editor.toolbar.resetOriginalTitle')}
-        message={translate('editor.toolbar.resetOriginalMessage')}
-        confirmText={translate('editor.toolbar.resetOriginal')}
-        cancelText={translate('common.actions.cancel')}
-        onCancel={() => setResetConfirmOpen(false)}
-        onConfirm={confirmReset}
-      />
+      {resetConfirmOpen ? (
+        <EditorAnchoredConfirmPopover
+          anchorEl={resetButtonRef.current}
+          title={translate('editor.toolbar.resetOriginalTitle')}
+          message={translate('editor.toolbar.resetOriginalMessage')}
+          confirmText={translate('editor.toolbar.resetOriginal')}
+          cancelText={translate('common.actions.cancel')}
+          dataUi="editor.floating.tool-rail.history.reset-confirm"
+          onCancel={() => setResetConfirmOpen(false)}
+          onConfirm={confirmReset}
+        />
+      ) : null}
     </>
   );
 }

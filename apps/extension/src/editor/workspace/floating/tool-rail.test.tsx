@@ -98,8 +98,6 @@ it('renders the exact centered tool order with two vertical dividers', () => {
   expect(actionIds).toEqual([
     'editor.floating.tool-rail.select',
     'content.toolbar.future-frame-style',
-    'content.toolbar.future-frame-callout',
-    'content.toolbar.future-frame-step-badge',
     'editor.floating.tool-rail.pencil',
     'editor.floating.tool-rail.marker',
     'editor.floating.tool-rail.text',
@@ -111,10 +109,17 @@ it('renders the exact centered tool order with two vertical dividers', () => {
   expect(queryUi('editor.floating.tool-rail.frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.browser-frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.meta')).toBeNull();
-  const dividers = [...(queryUi('editor.floating.tool-rail')?.children ?? [])].filter(
-    (element) => element.classList.contains('h-8') && element.classList.contains('w-px')
-  );
+  const dividers = [
+    queryUi('editor.floating.tool-rail.divider.before-frame'),
+    queryUi('editor.floating.tool-rail.divider.after-frame'),
+  ];
   expect(dividers).toHaveLength(2);
+  for (const divider of dividers) {
+    expect(divider?.classList.contains('sniptale-glass-toolbar-divider')).toBe(true);
+    expect(divider?.classList.contains('sniptale-divider')).toBe(true);
+  }
+  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
 
   act(() => getToolButton('text').click());
   expect(props.onActivateTool).toHaveBeenCalledWith('text');
@@ -158,6 +163,31 @@ it('uses the content frame controls with the same enable and popover behavior', 
   });
   expect(numbering.getAttribute('aria-pressed')).toBe('true');
   expect(props.onActivateTool).not.toHaveBeenCalled();
+
+  rerenderToolRail(createProps());
+  expect(getContentFrameButton('future-frame-style').getAttribute('aria-pressed')).toBe('false');
+  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
+
+  const restoredProps = createProps({
+    activeTool: 'frame-annotation',
+    isToolButtonActive: (tool) => tool === 'frame-annotation',
+  });
+  rerenderToolRail(restoredProps);
+  expect(getContentFrameButton('future-frame-callout').getAttribute('aria-pressed')).toBe('true');
+  expect(getContentFrameButton('future-frame-step-badge').getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+});
+
+it('activates the frame group from its persistent frame button', () => {
+  const props = createProps();
+  renderToolRail(props);
+
+  const frame = getContentFrameButton('future-frame-style');
+  act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+
+  expect(props.onActivateTool).toHaveBeenCalledWith('frame-annotation');
 });
 
 it('describes drawing modifiers and toggles options on a repeated active-tool click', () => {
@@ -205,11 +235,12 @@ it('wraps the mobile rail instead of clipping hidden tools beyond the viewport',
   renderToolRail(createProps());
 
   const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-rail"]');
-  const divider = rail?.querySelector<HTMLElement>('.max-\\[720px\\]\\:hidden');
+  const divider = queryUi('editor.floating.tool-rail.divider.before-frame');
 
   expect(rail?.className).toContain('max-[720px]:flex-wrap');
   expect(rail?.className).toContain('overflow-visible');
   expect(divider).not.toBeNull();
+  expect(divider?.className).not.toContain('max-[720px]:hidden');
 });
 
 it('stays centered when the left drawer opens', () => {
@@ -280,9 +311,14 @@ it('disables reset at the original history index and keeps the warning tooltip a
 });
 
 it('keeps document-required controls disabled before an image is loaded', () => {
-  renderToolRail(createProps({ hasImage: false }));
+  const props = createProps({ hasImage: false });
+  renderToolRail(props);
 
   expect(getToolButton('text').disabled).toBe(true);
+  const frame = getContentFrameButton('future-frame-style');
+  expect(frame.disabled).toBe(true);
+  act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(props.onActivateTool).not.toHaveBeenCalled();
 });
 
 function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
@@ -291,6 +327,17 @@ function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
   );
   expect(button).not.toBeNull();
   return button as HTMLButtonElement;
+}
+
+function rerenderToolRail(
+  props: EditorToolbarContentProps & {
+    leftDrawerOpen?: boolean;
+    onToggleActiveToolOptions?: (tool: EditorTool) => void;
+  }
+) {
+  act(() => {
+    root?.render(<EditorFloatingToolRail {...props} />);
+  });
 }
 
 function queryUi(dataUi: string) {

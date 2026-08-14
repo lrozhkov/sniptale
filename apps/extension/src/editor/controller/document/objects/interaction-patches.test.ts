@@ -47,7 +47,13 @@ it('applies base editor interaction controls with step and blur patches', () => 
     locked: true,
   });
   expect(blur.set).toHaveBeenCalledWith(
-    expect.objectContaining({ hasControls: false, lockScalingX: true, lockScalingY: true })
+    expect.objectContaining({
+      evented: false,
+      hasControls: false,
+      lockScalingX: true,
+      lockScalingY: true,
+      selectable: false,
+    })
   );
 });
 

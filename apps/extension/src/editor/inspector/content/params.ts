@@ -94,6 +94,7 @@ function selectEditorInspectorContentUtilityActions(props: EditorInspectorConten
     clearBackgroundImage: props.clearBackgroundImage,
     onPickBackgroundImage: props.onPickBackgroundImage,
     onApplyFrame: props.onApplyFrame,
+    ...(props.resetFrameDraft === undefined ? {} : { resetFrameDraft: props.resetFrameDraft }),
     onResizeLayer: props.onResizeLayer,
     layers: props.layers,
   };

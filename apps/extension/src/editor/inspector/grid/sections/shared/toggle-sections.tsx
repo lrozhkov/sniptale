@@ -1,6 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-
-import { HeaderValueToggleSection } from '../../../environment/shared';
+import { ProductGlassSwitch, ProductGlassToggleRow } from '@sniptale/ui/product-glass-controls';
 import type { GridPanelBodyProps } from '../../types';
 
 type GridToggleSectionsProps = Pick<
@@ -41,25 +40,18 @@ function buildGridToggleConfigs(
   ];
 }
 
-function getGridToggleValue(active: boolean): string {
-  return active
-    ? translate('editor.compact.enabledShort')
-    : translate('editor.compact.disabledShort');
-}
-
-function getNextGridToggleValue(active: boolean): 'enabled' | 'disabled' {
-  return active ? 'disabled' : 'enabled';
-}
-
 function GridToggleSection(props: GridToggleConfig) {
   return (
-    <HeaderValueToggleSection
-      active={props.active}
-      ariaLabel={props.active ? props.activeLabel : props.inactiveLabel}
-      label={props.label}
-      nextValue={getNextGridToggleValue(props.active)}
-      value={getGridToggleValue(props.active)}
-      onChange={props.onToggle}
+    <ProductGlassToggleRow
+      title={props.label}
+      control={
+        <ProductGlassSwitch
+          on={props.active}
+          aria-label={props.active ? props.activeLabel : props.inactiveLabel}
+          aria-pressed={props.active}
+          onClick={props.onToggle}
+        />
+      }
     />
   );
 }

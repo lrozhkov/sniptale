@@ -25,7 +25,11 @@ describe('layer action lock state owner', () => {
 
   it('toggles lock state and reapplies object preparation', () => {
     const object = { sniptaleLocked: false };
-    const canvas = { requestRenderAll: vi.fn() };
+    const canvas = {
+      discardActiveObject: vi.fn(),
+      getActiveObjects: vi.fn(() => [object]),
+      requestRenderAll: vi.fn(),
+    };
     const prepareObject = vi.fn();
     mocks.findObjectByIdMock.mockReturnValue(object);
 
@@ -33,6 +37,7 @@ describe('layer action lock state owner', () => {
 
     expect(object.sniptaleLocked).toBe(true);
     expect(prepareObject).toHaveBeenCalledWith(object);
+    expect(canvas.discardActiveObject).toHaveBeenCalledOnce();
     expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
   });
 
@@ -40,6 +45,12 @@ describe('layer action lock state owner', () => {
     mocks.findObjectByIdMock.mockReturnValue({});
     mocks.isUserObjectMock.mockReturnValue(false);
 
-    expect(toggleLayerLock({ requestRenderAll: vi.fn() } as never, 'frame', vi.fn())).toBeNull();
+    expect(
+      toggleLayerLock(
+        { getActiveObjects: vi.fn(() => []), requestRenderAll: vi.fn() } as never,
+        'frame',
+        vi.fn()
+      )
+    ).toBeNull();
   });
 });

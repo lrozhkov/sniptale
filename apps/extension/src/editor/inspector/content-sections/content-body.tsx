@@ -42,11 +42,13 @@ export interface EditorInspectorContentBodyProps extends EditorInspectorContentS
   clearBackgroundImage: () => void;
   onPickBackgroundImage: () => void;
   onApplyFrame: () => void;
+  resetFrameDraft?: (() => void) | undefined;
 }
 
 type ResizeToolController = Pick<
   ImageEditorController,
   | 'applyCropSelection'
+  | 'cancelCropMode'
   | 'clearCanvasSizePreview'
   | 'clearCropSelection'
   | 'previewCanvasSize'
@@ -96,7 +98,7 @@ function renderEditorInspectorResizeToolSection(
       imageSizeDraft={props.imageSizeDraft}
       imageSizeLocked={props.imageSizeLocked}
       imageSizeText={props.imageSizeText}
-      initialMode={props.inspector === 'image-size' ? 'image' : 'canvas'}
+      mode={props.inspector === 'image-size' ? 'image' : 'canvas'}
       setCanvasSizeDraft={props.setCanvasSizeDraft}
       setCanvasSizeLocked={props.setCanvasSizeLocked}
       setImageSizeDraft={props.setImageSizeDraft}

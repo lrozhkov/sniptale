@@ -3,14 +3,8 @@ import type {
   EditorFrameSettings,
   EditorSelectionState,
 } from '../../../features/editor/document/types';
+import { normalizeEditorFrameSettings } from '../../../features/editor/document/constants';
 import type { EditorPresetStorageState } from '../../../features/editor/document/presets';
-import {
-  createFrameDraftSceneSignature,
-  createSceneBackgroundSettingsSignature,
-  mergeSceneBackgroundDraft,
-  resolveDefaultSceneBackgroundSettings,
-  syncAuthoritativeFrameMetadata,
-} from './drafts-scene';
 
 function createSizeDraft(width: number | null | undefined, height: number | null | undefined) {
   return {
@@ -167,56 +161,24 @@ function useLayerDraftState(args: {
   };
 }
 
-function useFrameDraftState(args: {
-  frame: EditorFrameSettings;
-  sceneBackgroundPresets: EditorPresetStorageState['sceneBackground'];
-}) {
-  const defaultSceneBackgroundSettings = resolveDefaultSceneBackgroundSettings(
-    args.sceneBackgroundPresets
-  );
-  const [frameDraft, setFrameDraft] = useState(() =>
-    mergeSceneBackgroundDraft(args.frame, defaultSceneBackgroundSettings)
-  );
-  const [defaultSceneSignature, setDefaultSceneSignature] = useState(() =>
-    createSceneBackgroundSettingsSignature(defaultSceneBackgroundSettings)
-  );
+function useFrameDraftState(args: { frame: EditorFrameSettings }) {
+  const [frameDraft, setFrameDraft] = useState(() => normalizeEditorFrameSettings(args.frame));
 
   useEffect(() => {
-    setFrameDraft((state) => syncAuthoritativeFrameMetadata(state, args.frame));
+    setFrameDraft(normalizeEditorFrameSettings(args.frame));
   }, [args.frame]);
 
-  useEffect(() => {
-    const nextDefaultSceneSignature = createSceneBackgroundSettingsSignature(
-      defaultSceneBackgroundSettings
-    );
+  const resetFrameDraft = () => setFrameDraft(normalizeEditorFrameSettings(args.frame));
 
-    setFrameDraft((state) => {
-      if (
-        defaultSceneSignature === nextDefaultSceneSignature ||
-        defaultSceneBackgroundSettings === null
-      ) {
-        return state;
-      }
-
-      return createFrameDraftSceneSignature(state) === defaultSceneSignature
-        ? syncAuthoritativeFrameMetadata(
-            mergeSceneBackgroundDraft(state, defaultSceneBackgroundSettings),
-            args.frame
-          )
-        : state;
-    });
-    setDefaultSceneSignature(nextDefaultSceneSignature);
-  }, [args.frame, defaultSceneBackgroundSettings, defaultSceneSignature]);
-
-  return { frameDraft, setFrameDraft };
+  return { frameDraft, resetFrameDraft, setFrameDraft };
 }
 
 export function useInspectorSidebarDraftState(args: {
   canvasHeight: number;
   canvasWidth: number;
   frame: EditorFrameSettings;
+  sceneBackgroundPresets?: EditorPresetStorageState['sceneBackground'];
   inspector: string;
-  sceneBackgroundPresets: EditorPresetStorageState['sceneBackground'];
   isResizableLayerSelection: boolean;
   selection: EditorSelectionState;
   sourceHeight: number;
@@ -228,7 +190,6 @@ export function useInspectorSidebarDraftState(args: {
   const layerDrafts = useLayerDraftState(args);
   const frameDraftState = useFrameDraftState({
     frame: args.frame,
-    sceneBackgroundPresets: args.sceneBackgroundPresets,
   });
 
   return {

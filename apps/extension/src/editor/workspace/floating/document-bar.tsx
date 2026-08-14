@@ -15,6 +15,7 @@ import { connectAggregateEditorPresence } from '../../../workflows/aggregate-edi
 import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
 import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
+import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
@@ -31,6 +32,13 @@ const DOCUMENT_STATUS_CLASS_NAME = [
   'mt-0.5 flex min-h-3 items-center gap-1.5 text-[11px] leading-none',
   'text-[var(--sniptale-color-text-muted)]',
 ].join(' ');
+
+const AUTOSAVE_TONE_CLASS_NAME = {
+  error: 'text-[var(--sniptale-color-danger)]',
+  idle: 'text-[var(--sniptale-color-text-muted)]',
+  saved: 'text-[var(--sniptale-color-success)]',
+  saving: 'text-[var(--sniptale-color-accent-emphasis)]',
+} as const;
 
 type InFlightDocumentOperation = {
   aggregateId: string;
@@ -264,6 +272,18 @@ function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
   return hasImage ? translate('editor.page.documentTitle') : translate('editor.page.title');
 }
 
+function resolveAutosaveStatus(saveState: ReturnType<typeof useDocumentBarState>['saveState']) {
+  return translate(
+    saveState === 'saved'
+      ? 'common.states.saved'
+      : saveState === 'saving'
+        ? 'common.states.saving'
+        : saveState === 'error'
+          ? 'common.states.error'
+          : 'common.states.dirty'
+  );
+}
+
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
@@ -272,41 +292,31 @@ function EditorFloatingDocumentSummary(props: {
   const storage = useDocumentStorageClass(
     props.documentState.sessionId,
     props.documentState.pageTitle,
-    props.standalone
+    props.standalone && props.hasImage
   );
+  const promotionButtonRef = useRef<HTMLButtonElement>(null);
   return (
     <>
-      {storage.promotionButtonVisible ? (
-        <ContentToolbarButton
-          title={translate('editor.documentActions.saveToLibrary')}
-          disabled={storage.promotionState === 'saving'}
-          className={[
-            'relative motion-safe:transition-[opacity,transform] motion-safe:duration-150',
-            storage.storageClass === 'library' ? 'scale-90 opacity-0' : 'scale-100 opacity-100',
-          ].join(' ')}
-          onClick={() => void storage.promote().catch(() => undefined)}
-          dataUi="editor.floating.document-bar.promote-button"
-        >
-          <Images size={18} strokeWidth={2} />
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
-        </ContentToolbarButton>
-      ) : null}
       <div className={DOCUMENT_TITLE_CLASS_NAME}>
         <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
           {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
         </div>
-        <div className={DOCUMENT_STATUS_CLASS_NAME}>
-          <span className="truncate">
-            {translate(
-              storage.storageClass === 'library'
-                ? 'editor.documentActions.inLibrary'
-                : 'editor.documentActions.draft'
-            )}
-          </span>
-        </div>
-        {storage.promotionState === 'error' ? (
-          <div role="alert" className="mt-1 text-[11px] text-[var(--sniptale-color-danger)]">
-            {translate('editor.documentActions.saveToLibraryError')}
+        {props.hasImage ? (
+          <div className={DOCUMENT_STATUS_CLASS_NAME}>
+            <span className="truncate">
+              {translate(
+                storage.storageClass === 'library'
+                  ? 'editor.documentActions.inLibrary'
+                  : 'editor.documentActions.draft'
+              )}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span
+              className={AUTOSAVE_TONE_CLASS_NAME[props.documentState.saveState]}
+              data-state={props.documentState.saveState}
+            >
+              {resolveAutosaveStatus(props.documentState.saveState)}
+            </span>
           </div>
         ) : null}
         {storage.hasStaleConflict ? (
@@ -329,6 +339,30 @@ function EditorFloatingDocumentSummary(props: {
           </div>
         ) : null}
       </div>
+      {storage.promotionButtonVisible ? (
+        <ContentToolbarButton
+          ref={promotionButtonRef}
+          title={translate('editor.documentActions.saveToLibrary')}
+          disabled={storage.promotionState === 'saving'}
+          className={[
+            'relative motion-safe:transition-[opacity,transform] motion-safe:duration-150',
+            storage.storageClass === 'library' ? 'scale-90 opacity-0' : 'scale-100 opacity-100',
+          ].join(' ')}
+          onClick={() => void storage.promote().catch(() => undefined)}
+          dataUi="editor.floating.document-bar.promote-button"
+        >
+          <Images size={18} strokeWidth={2} />
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
+        </ContentToolbarButton>
+      ) : null}
+      {storage.promotionState === 'error' ? (
+        <EditorAnchoredAlert
+          anchorEl={promotionButtonRef.current}
+          dataUi="editor.floating.document-bar.promotion-error"
+        >
+          {translate('editor.documentActions.saveToLibraryError')}
+        </EditorAnchoredAlert>
+      ) : null}
     </>
   );
 }

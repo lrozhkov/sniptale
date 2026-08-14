@@ -19,7 +19,10 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
         value={params.backgroundSummary}
       >
         <div className="space-y-3">
-          <EditorInspectorFramePreviewCard backgroundPreviewStyle={params.backgroundPreviewStyle} />
+          <EditorInspectorFramePreviewCard
+            backgroundPreviewStyle={params.backgroundPreviewStyle}
+            frameDraft={params.frameDraft}
+          />
           <EditorInspectorFrameBackgroundFillEditor
             frameDraft={params.frameDraft}
             gradientPresets={params.frameGradientPresets}

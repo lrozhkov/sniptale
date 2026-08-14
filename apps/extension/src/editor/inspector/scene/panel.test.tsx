@@ -44,6 +44,7 @@ vi.mock('./placement/modes', () => ({
 
 vi.mock('./placement', () => ({
   EditorInspectorFramePlacementSection: (props: {
+    children?: React.ReactNode;
     frameLayoutModeOptions: Array<{ value: string; label: string }>;
     setLayoutMode: (value: string) => void;
   }) => {
@@ -57,6 +58,7 @@ vi.mock('./placement', () => ({
         <button type="button" onClick={() => props.setLayoutMode(firstOption.value)}>
           set-layout
         </button>
+        {props.children}
       </div>
     );
   },
@@ -64,6 +66,7 @@ vi.mock('./placement', () => ({
 
 vi.mock('./placement/background', () => ({
   EditorInspectorFrameBackgroundSection: (props: {
+    children?: React.ReactNode;
     frameBackgroundModeOptions: Array<{ value: string; label: string }>;
     setBackgroundMode: (value: string) => void;
   }) => {
@@ -77,6 +80,7 @@ vi.mock('./placement/background', () => ({
         <button type="button" onClick={() => props.setBackgroundMode(firstOption.value)}>
           set-background
         </button>
+        {props.children}
       </div>
     );
   },
@@ -93,18 +97,13 @@ vi.mock('./background/blur', () => ({
   EditorInspectorBackgroundBlurControl: () => <div data-testid="background-blur-section" />,
 }));
 
-vi.mock('./preview/card', () => ({
-  EditorInspectorFramePreviewCard: (props: { backgroundPreviewStyle: Record<string, unknown> }) => (
-    <div data-testid="frame-preview">
-      {String(props.backgroundPreviewStyle['backgroundColor'] ?? '')}
-    </div>
-  ),
+vi.mock('./source-image', () => ({
+  EditorInspectorFrameSourceImageSection: () => <div data-testid="source-image-section" />,
 }));
 
 vi.mock('./padding', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./padding')>()),
-  FramePaddingSection: (props: {
-    framePaddingSummary: string;
+  FramePaddingFields: (props: {
     setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
   }) => {
     paddingSection(props);
@@ -127,12 +126,19 @@ vi.mock('./padding', async (importOriginal) => ({
 }));
 
 vi.mock('./apply-button', () => ({
-  FrameApplyButton: (props: { onApplyFrame: () => void }) => {
+  FrameApplyButton: (props: { onApplyFrame: () => void; onCancelFrame?: () => void }) => {
     applyButton(props);
     return (
-      <button type="button" data-testid="apply-button" onClick={props.onApplyFrame}>
-        apply-frame
-      </button>
+      <div data-testid="apply-button">
+        {props.onCancelFrame ? (
+          <button type="button" data-testid="cancel-frame" onClick={props.onCancelFrame}>
+            cancel-frame
+          </button>
+        ) : null}
+        <button type="button" data-testid="apply-frame" onClick={props.onApplyFrame}>
+          apply-frame
+        </button>
+      </div>
     );
   },
 }));
@@ -151,12 +157,14 @@ function createPanelProps() {
   const setBackgroundMode = vi.fn();
   const setFrameDraft = vi.fn();
   const onApplyFrame = vi.fn();
+  const onCancelFrame = vi.fn();
 
   return {
     setLayoutMode,
     setBackgroundMode,
     setFrameDraft,
     onApplyFrame,
+    onCancelFrame,
     props: {
       scenePresetHeader: { value: 'scene-default' } as never,
       frameDraft: FRAME,
@@ -178,6 +186,7 @@ function createPanelProps() {
       onPickBackgroundImage: vi.fn(),
       onClearBackgroundImage: vi.fn(),
       onApplyFrame,
+      onCancelFrame,
     },
   };
 }
@@ -215,32 +224,24 @@ afterEach(async () => {
 });
 
 function expectPanelSectionOrder() {
-  const presetHeaderElement = container?.querySelector('[data-testid="preset-header"]');
+  const presetHeaderElement = container?.querySelector('.space-y-3');
   expect(
     Array.from(presetHeaderElement?.children ?? []).map((element) =>
       element.getAttribute('data-testid')
     )
-  ).toEqual([
-    'background-section',
-    'frame-preview',
-    'background-fill-section',
-    'background-blur-section',
-    'placement-section',
-    'padding-section',
-    'apply-button',
-  ]);
+  ).toEqual(['background-section', 'placement-section', 'source-image-section', 'apply-button']);
 }
 
 function expectFramePanelSections() {
-  expect(container?.querySelector('[data-testid="preset-header"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="preset-header"]')).toBeNull();
   expect(container?.querySelector('[data-testid="placement-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="background-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="frame-preview"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="frame-preview"]')).toBeNull();
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="background-blur-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
-  expect(container?.textContent).not.toContain('Основное изображение');
   expectPanelSectionOrder();
 }
 
@@ -252,6 +253,10 @@ async function clickFramePanelActions() {
     clickPanelButton('[data-testid="padding-section"] button');
     container
       ?.querySelector('[data-testid="apply-button"]')
+      ?.querySelector('[data-testid="apply-frame"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    container
+      ?.querySelector('[data-testid="cancel-frame"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
@@ -261,7 +266,7 @@ function clickPanelButton(selector: string) {
 }
 
 it('wires the inspector scene panel sections and actions', async () => {
-  const { onApplyFrame, props, setBackgroundMode, setFrameDraft, setLayoutMode } =
+  const { onApplyFrame, onCancelFrame, props, setBackgroundMode, setFrameDraft, setLayoutMode } =
     createPanelProps();
 
   await renderUi(<EditorInspectorFramePanel {...props} />);
@@ -272,15 +277,12 @@ it('wires the inspector scene panel sections and actions', async () => {
   expect(previewSection).toHaveBeenCalled();
   expect(paddingSection).toHaveBeenCalled();
   expect(applyButton).toHaveBeenCalled();
-  expect(presetHeader).toHaveBeenCalledWith(
-    expect.objectContaining({
-      state: { value: 'scene-default' },
-    })
-  );
+  expect(presetHeader).not.toHaveBeenCalled();
   expect(setLayoutMode).toHaveBeenCalledWith('fit-image');
   expect(setBackgroundMode).toHaveBeenCalledWith('color');
   expect(setFrameDraft).toHaveBeenCalledTimes(1);
   expect(onApplyFrame).toHaveBeenCalledTimes(1);
+  expect(onCancelFrame).toHaveBeenCalledTimes(1);
 });
 
 it('renders scene controls without the template wrapper when no state is provided', async () => {

@@ -269,7 +269,7 @@ function registerStoredBrowserFrameGuardTest() {
     expectOpenedDocumentFrame();
     expect(storeState.setBrowserFrame).toHaveBeenCalledWith({
       faviconDataUrl: null,
-      title: '',
+      title: 'Source',
       url: 'https://stored.example',
     });
   });

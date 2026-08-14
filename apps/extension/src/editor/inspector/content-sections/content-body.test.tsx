@@ -15,7 +15,7 @@ import {
 import { createContentProps } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';
 import { renderEditorInspectorContentBody } from './content-body';
 
-it('routes legacy size branches through the combined resize owner', async () => {
+it('routes image size and canvas crop through separate fixed modes', async () => {
   const controller = createControllerMock();
 
   renderWithController(
@@ -31,11 +31,11 @@ it('routes legacy size branches through the combined resize owner', async () => 
   );
   await act(async () => {
     Array.from(document.querySelectorAll('button'))
-      .filter((button) => button.textContent?.includes('editor.compact.apply'))
+      .filter((button) => button.textContent?.includes('editor.compact.applyImageSize'))
       .forEach((button) => button.click());
   });
-  expect(document.body.textContent).toContain('editor.compact.canvas');
-  expect(document.body.textContent).toContain('editor.compact.image');
+  expect(document.body.textContent).toContain('editor.compact.imageSize');
+  expect(document.body.textContent).not.toContain('editor.compact.cropCanvas');
   expect(controller.resizeImage).toHaveBeenCalledWith(900, 600);
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 
@@ -54,15 +54,15 @@ it('routes legacy size branches through the combined resize owner', async () => 
   );
   await act(async () => {
     Array.from(document.querySelectorAll('button'))
-      .filter((button) => button.textContent?.includes('editor.compact.apply'))
+      .filter((button) => button.textContent?.includes('editor.compact.applyCropCanvas'))
       .forEach((button) => button.click());
   });
-  expect(document.body.textContent).toContain('editor.compact.canvas');
-  expect(document.body.textContent).toContain('editor.compact.image');
+  expect(document.body.textContent).toContain('editor.compact.cropCanvas');
+  expect(document.body.textContent).not.toContain('editor.compact.imageSize');
   expect(controller.resizeCanvas).toHaveBeenCalledWith(900, 600);
 });
 
-it('renders the combined canvas and image resize tool branch', async () => {
+it('renders the crop branch without an image-size mode switch', async () => {
   const controller = createControllerMock();
 
   renderWithController(
@@ -73,13 +73,13 @@ it('renders the combined canvas and image resize tool branch', async () => {
     controller
   );
 
-  expect(document.body.textContent).toContain('editor.compact.canvas');
-  expect(document.body.textContent).toContain('editor.compact.image');
+  expect(document.body.textContent).toContain('editor.compact.cropCanvas');
+  expect(document.body.textContent).not.toContain('editor.compact.imageSize');
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 
   await act(async () => {
     Array.from(document.querySelectorAll('button'))
-      .filter((button) => button.textContent?.includes('editor.compact.apply'))
+      .filter((button) => button.textContent?.includes('editor.compact.applyCropCanvas'))
       .forEach((button) => button.click());
   });
 
@@ -104,7 +104,7 @@ it('applies the active crop selection from the floating canvas-size inspector', 
 
   await act(async () => {
     Array.from(document.querySelectorAll('button'))
-      .filter((button) => button.textContent?.includes('editor.compact.apply'))
+      .filter((button) => button.textContent?.includes('editor.compact.applyCropCanvas'))
       .forEach((button) => button.click());
   });
 

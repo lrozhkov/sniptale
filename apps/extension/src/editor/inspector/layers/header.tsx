@@ -50,12 +50,14 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
   );
 }
 
-function EditorInspectorLayersHeaderTitle(props: { layerCount: number }) {
+function EditorInspectorLayersHeaderTitle(props: { layerCount: number; streamlined: boolean }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3 px-2 text-left">
-      <span className={cx(PANEL_ICON_CLASS_NAME, PANEL_ICON_SURFACE_CLASS_NAME)}>
-        <Layers3 size={17} strokeWidth={2} />
-      </span>
+      {props.streamlined ? null : (
+        <span className={cx(PANEL_ICON_CLASS_NAME, PANEL_ICON_SURFACE_CLASS_NAME)}>
+          <Layers3 size={17} strokeWidth={2} />
+        </span>
+      )}
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-[color:var(--sniptale-color-text-primary)]">
           {translate('editor.toolbar.layersTitle')}
@@ -71,6 +73,7 @@ function EditorInspectorLayersHeaderTitle(props: { layerCount: number }) {
 function EditorInspectorLayersHeaderActions(props: {
   autoNavigateSelectedLayer: boolean;
   expanded: boolean;
+  streamlined: boolean;
   onCollapsePanel?: () => void;
   onToggle: () => void;
   onToggleAutoNavigateSelectedLayer: () => void;
@@ -96,22 +99,26 @@ function EditorInspectorLayersHeaderActions(props: {
       >
         <SquareMousePointer size={16} className="text-current" />
       </button>
-      <LayerInsertImageControl />
-      <button
-        type="button"
-        title={translate('editor.toolbar.layersTitle')}
-        aria-label={translate('editor.toolbar.layersTitle')}
-        onClick={handleClick}
-        className={HEADER_TOGGLE_BUTTON_CLASS_NAME}
-      >
-        {props.onCollapsePanel ? (
-          <Minus size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
-        ) : props.expanded ? (
-          <ChevronDown size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
-        ) : (
-          <ChevronUp size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
-        )}
-      </button>
+      {props.streamlined ? null : (
+        <>
+          <LayerInsertImageControl />
+          <button
+            type="button"
+            title={translate('editor.toolbar.layersTitle')}
+            aria-label={translate('editor.toolbar.layersTitle')}
+            onClick={handleClick}
+            className={HEADER_TOGGLE_BUTTON_CLASS_NAME}
+          >
+            {props.onCollapsePanel ? (
+              <Minus size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
+            ) : props.expanded ? (
+              <ChevronDown size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
+            ) : (
+              <ChevronUp size={16} className="text-[color:var(--sniptale-color-text-muted)]" />
+            )}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -123,6 +130,7 @@ export function EditorInspectorLayersHeader({
   onCollapsePanel,
   onToggle,
   onToggleAutoNavigateSelectedLayer = () => undefined,
+  streamlined = false,
 }: {
   autoNavigateSelectedLayer?: boolean;
   expanded: boolean;
@@ -130,13 +138,15 @@ export function EditorInspectorLayersHeader({
   onCollapsePanel?: () => void;
   onToggle: () => void;
   onToggleAutoNavigateSelectedLayer?: () => void;
+  streamlined?: boolean;
 }) {
   return (
     <div className={HEADER_FRAME_CLASS_NAME}>
-      <EditorInspectorLayersHeaderTitle layerCount={layerCount} />
+      <EditorInspectorLayersHeaderTitle layerCount={layerCount} streamlined={streamlined} />
       <EditorInspectorLayersHeaderActions
         autoNavigateSelectedLayer={autoNavigateSelectedLayer}
         expanded={expanded}
+        streamlined={streamlined}
         {...(onCollapsePanel === undefined ? {} : { onCollapsePanel })}
         onToggle={onToggle}
         onToggleAutoNavigateSelectedLayer={onToggleAutoNavigateSelectedLayer}

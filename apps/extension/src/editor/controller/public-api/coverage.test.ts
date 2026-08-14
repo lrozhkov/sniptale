@@ -283,16 +283,18 @@ it('forwards scene actions through the scene public api wrappers', async () => {
     outputSize: { height: 80, width: 120 },
     quality: 1,
   });
-  expect(controller.applyDocument).toHaveBeenCalledWith(
-    expect.objectContaining({
-      canvasHeight: 80,
-      canvasWidth: 120,
-      sourceHeight: 80,
-      sourceImageData: 'data-url',
-      sourceName: 'capture.png',
-      sourceWidth: 120,
-    }),
-    {}
+  await vi.waitFor(() =>
+    expect(controller.applyDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canvasHeight: 80,
+        canvasWidth: 120,
+        sourceHeight: 80,
+        sourceImageData: 'data-url',
+        sourceName: 'capture.png',
+        sourceWidth: 120,
+      }),
+      {}
+    )
   );
   expect(mocks.applyFrameMock).toHaveBeenCalled();
   expect(mocks.applyBrowserFrameMock).toHaveBeenCalled();

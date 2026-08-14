@@ -34,4 +34,5 @@ export interface EditorInspectorFramePanelProps {
   onPickBackgroundImage: () => void;
   onClearBackgroundImage: () => void;
   onApplyFrame: () => void;
+  onCancelFrame?: (() => void) | undefined;
 }

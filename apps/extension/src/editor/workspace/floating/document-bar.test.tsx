@@ -10,6 +10,7 @@ import type { EditorToolbarContentProps } from '../toolbar/types';
 import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
 
 const mocks = vi.hoisted(() => ({
+  autosaveDiscard: vi.fn(async () => undefined),
   clearSelection: vi.fn(),
   embed: {
     mode: null as null | 'scenario',
@@ -77,11 +78,13 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
   useEditorController: () => ({
     autosaveService: {
       activate: mocks.autosaveActivate,
+      discardDraft: mocks.autosaveDiscard,
       flushAutosave: vi.fn(async () => undefined),
       getDurableRevision: vi.fn(() => 1),
       getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
     },
     clearSelection: mocks.clearSelection,
+    closeDocument: vi.fn(),
     exportDocument: vi.fn(),
     renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
   }),
@@ -117,6 +120,7 @@ function createController(
     onSaveImage: vi.fn(),
     onSaveImageAs: vi.fn(),
     savePresets: [{ id: 'default', name: 'Downloads', path: 'Downloads' }],
+    setSavePresetPickerOpen: vi.fn(),
     saveToPreset: vi.fn(),
     ...overrides,
   } as unknown as EditorFloatingDocumentController;
@@ -198,15 +202,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders a stable draft subtitle without autosave status and routes quick actions', async () => {
+it('renders storage and autosave status with a compact separator and routes quick actions', async () => {
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
 
   expect(container?.textContent).toContain('Captured page');
   await act(async () => Promise.resolve());
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-  expect(container?.textContent).not.toContain(translate('common.states.saved'));
-  expect(container?.querySelector('[data-state="saved"]')).toBeNull();
+  expect(container?.textContent).toContain(`·${translate('common.states.saved')}`);
+  expect(container?.querySelector('[data-state="saved"]')).not.toBeNull();
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.file-menu-button"]')
   ).toBeNull();
@@ -231,7 +235,25 @@ it('renders a stable draft subtitle without autosave status and routes quick act
   expect(getButton('editor.floating.document-bar.close-file-button')).not.toBeNull();
 });
 
+it('keeps library state and promotion unavailable before a file is opened', async () => {
+  mocks.getMediaLibraryEntry.mockResolvedValue({
+    lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+  });
+  renderDocumentBar(createProps({ hasImage: false }));
+  await act(async () => Promise.resolve());
+
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.draft'));
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
+  ).toBeNull();
+  expect(getButton('editor.floating.document-bar.close-file-button').disabled).toBe(true);
+  expect(mocks.getMediaLibraryEntry).not.toHaveBeenCalled();
+});
+
 it('keeps the standalone quick-action order and opens the shared save dialog', async () => {
+  storeState.value.pageTitle = 'capture.png';
+  mocks.exportSettings.imageFormat = 'webp';
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
   await act(async () => Promise.resolve());
@@ -250,8 +272,28 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
 
   act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(container?.textContent).toContain('capture.png');
+  expect(document.querySelector<HTMLInputElement>('#save-dialog-filename')?.value).toBe(
+    'capture.webp'
+  );
+  expect(
+    getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')
+  ).toBe('true');
+  act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(
+    getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')
+  ).toBe('false');
   act(() => getButton('editor.floating.document-bar.close-file-button').click());
-  expect(controller.onCloseDocument).toHaveBeenCalledOnce();
+  expect(
+    document.querySelector('[data-ui="editor.floating.document-bar.close-confirm"]')
+  ).not.toBeNull();
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('[data-confirm-action="true"]')?.click();
+    await Promise.resolve();
+  });
+  expect(controller.onCloseDocument).not.toHaveBeenCalled();
+  expect(mocks.autosaveDiscard).toHaveBeenCalledOnce();
 });
 
 it('omits save-to-folder when no enabled preset is available', async () => {
@@ -272,6 +314,7 @@ it('shows storage state separately and promotes a linked draft without changing 
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.title).toBe(translate('editor.documentActions.saveToLibrary'));
+  expect(promote.previousElementSibling?.className).toContain('flex-col');
   await act(async () => promote.click());
 
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
@@ -286,7 +329,7 @@ it('keeps a failed promotion retryable and preserves the draft until success', a
 
   await act(async () => getButton('editor.floating.document-bar.promote-button').click());
 
-  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
     translate('editor.documentActions.saveToLibraryError')
   );
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
@@ -334,7 +377,7 @@ it('shares the actual promotion result with duplicate cross-runtime callers', as
 
   await rejected;
   expect(mocks.commitImagePresentation).toHaveBeenCalledOnce();
-  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
 });
 
 it('preserves operation identity and cleanup isolation across an A to B to A switch', async () => {
@@ -588,14 +631,14 @@ it('moves scenario apply and close actions into the top document bar after copy'
   expect(onClose).toHaveBeenCalledOnce();
 });
 
-it('keeps the storage subtitle stable across autosave states', async () => {
-  const renderStatus = async (state: typeof storeState.value) => {
+it('keeps storage identity stable while reflecting autosave states', async () => {
+  const renderStatus = async (state: typeof storeState.value, expectedLabel: string) => {
     storeState.value = state;
     renderDocumentBar();
     await act(async () => Promise.resolve());
     expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-    expect(container?.textContent).not.toContain(translate('common.states.saved'));
-    expect(container?.textContent).not.toContain(translate('common.states.saving'));
+    expect(container?.textContent).toContain(`·${expectedLabel}`);
+    expect(container?.querySelector(`[data-state="${state.saveState}"]`)).not.toBeNull();
     expect(container?.textContent).not.toContain('Disk error');
     act(() => root?.unmount());
     root = null;
@@ -603,28 +646,35 @@ it('keeps the storage subtitle stable across autosave states', async () => {
     container = null;
   };
 
-  await renderStatus({
-    pageTitle: 'Captured page',
-    saveErrorMessage: null,
-    saveState: 'saved',
-    sessionId: 'asset-1',
-  });
-  await renderStatus({
-    pageTitle: 'Captured page',
-    saveErrorMessage: null,
-    saveState: 'saving',
-    sessionId: 'asset-1',
-  });
-  await renderStatus({
-    pageTitle: 'Captured page',
-    saveErrorMessage: 'Disk error',
-    saveState: 'error',
-    sessionId: 'asset-1',
-  });
-  await renderStatus({
-    pageTitle: 'Captured page',
-    saveErrorMessage: null,
-    saveState: 'idle',
-    sessionId: 'asset-1',
-  });
+  await renderStatus(
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: null,
+      saveState: 'saved',
+      sessionId: 'asset-1',
+    },
+    translate('common.states.saved')
+  );
+  await renderStatus(
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: null,
+      saveState: 'saving',
+      sessionId: 'asset-1',
+    },
+    translate('common.states.saving')
+  );
+  await renderStatus(
+    {
+      pageTitle: 'Captured page',
+      saveErrorMessage: 'Disk error',
+      saveState: 'error',
+      sessionId: 'asset-1',
+    },
+    translate('common.states.error')
+  );
+  await renderStatus(
+    { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle', sessionId: 'asset-1' },
+    translate('common.states.dirty')
+  );
 });

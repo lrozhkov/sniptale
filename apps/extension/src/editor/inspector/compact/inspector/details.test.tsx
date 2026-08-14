@@ -189,7 +189,7 @@ it('builds workspace color commands with a separate save-default action', () => 
     .props.children as any[];
   const workspaceControl = workspaceColorContent[0]?.props;
   const workspaceColorDefaultAction = workspaceColorContent[1]?.props;
-  const workspacePaletteButtons = workspacePresetContent[0]?.props.children as any[];
+  const workspacePalette = workspacePresetContent[0]?.props;
   const workspacePresetDefaultAction = workspacePresetContent[1]?.props;
 
   expect(workspaceCommands.map((command) => command.id)).toEqual([
@@ -199,8 +199,8 @@ it('builds workspace color commands with a separate save-default action', () => 
   expect(workspaceControl.onPreviewChange).toEqual(expect.any(Function));
 
   workspaceColorDefaultAction.onSaveAsDefault();
-  workspacePaletteButtons[0]?.props.onClick();
-  workspacePaletteButtons[1]?.props.onClick();
+  workspacePalette.onSelect('#ffffff');
+  workspacePalette.onSelect('#000000');
   (workspaceControl.onPreviewChange as (value: string) => void)('#223344');
   (workspaceControl.onPreviewReset as (value: string) => void)('#112233');
   (workspaceControl.onChange as (value: string) => void)('#112233');
@@ -272,20 +272,20 @@ it('builds meta compact commands and leaves selection actions empty', () => {
     root.render(commands[0]?.content as React.ReactNode);
   });
 
-  const checkboxes = Array.from(
-    container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+  const optionButtons = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.sniptale-glass-option-grid button')
   );
   const addButton = Array.from(container.querySelectorAll('button')).find((button) =>
     button.hasAttribute('disabled')
   );
 
-  expect(checkboxes).toHaveLength(3);
+  expect(optionButtons).toHaveLength(3);
   expect(container.textContent).not.toContain('editor.compact.technicalDataDescription');
   expect(addButton?.hasAttribute('disabled')).toBe(true);
 
   act(() => {
-    checkboxes[2]?.click();
-    checkboxes[0]?.click();
+    optionButtons[2]?.click();
+    optionButtons[0]?.click();
   });
 
   expect(addButton?.hasAttribute('disabled')).toBe(false);

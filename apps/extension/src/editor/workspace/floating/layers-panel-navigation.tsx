@@ -1,4 +1,4 @@
-import { AppWindow, Crop, Info, Layers3, Minimize2, Scaling, Wallpaper } from 'lucide-react';
+import { AppWindow, ChevronDown, Crop, Info, Layers3, Scaling, Wallpaper } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
@@ -66,14 +66,18 @@ const [layersMode, ...settingsModes] = modes;
 
 function renderModeButton(
   mode: (typeof modes)[number],
-  props: Pick<Parameters<typeof EditorFloatingLayersNavigation>[0], 'activeMode' | 'onSelectMode'>
+  props: Pick<
+    Parameters<typeof EditorFloatingLayersNavigation>[0],
+    'activeMode' | 'collapsed' | 'onSelectMode'
+  >
 ) {
+  const active = !props.collapsed && props.activeMode === mode.id;
   return (
     <EditorIconButton
       key={mode.id}
       title={mode.label()}
-      aria-pressed={props.activeMode === mode.id}
-      active={props.activeMode === mode.id}
+      aria-pressed={active}
+      active={active}
       className="h-8 w-8 shrink-0"
       data-ui={`editor.floating.layers.mode.${mode.id}`}
       onClick={() => props.onSelectMode(mode.id)}
@@ -110,7 +114,7 @@ export function EditorFloatingLayersNavigation(props: {
           data-ui="editor.floating.layers.collapse-button"
           onClick={props.onCollapse}
         >
-          <Minimize2 size={16} strokeWidth={2} />
+          <ChevronDown size={16} strokeWidth={2} />
         </EditorIconButton>
       )}
     </div>

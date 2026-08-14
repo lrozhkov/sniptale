@@ -1,16 +1,16 @@
 # Implementation Rules
 
-Updated: 2026-07-22
+Updated: 2026-08-14
 
 This document owns Sniptale implementation decisions: topology, boundaries, state, security, code shape, and proof shape. Workflow order belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), quality policy in [code-quality.md](../tooling/code-quality.md), and wrapper behavior in [wrapper-summary.md](../tooling/wrapper-summary.md).
 
 ## Preflight Shape
 
-Before editing a non-trivial task, identify the owner seam and runtime boundary, target files/folders, likely next `2-3` related expansions, authoritative/advisory/disposable state, public consumers, and required failure/rollback/stale-result proof. Account for mixed ownership, low cohesion, effect and state-authority concentration, changed-line width, import-depth fallout, dead exports, cycles, i18n/design-system fallout, and test-support growth.
+Before editing a non-trivial task, identify the owner seam and runtime boundary, target files/folders, authoritative/advisory/disposable state, public consumers, and the reachable failure, rollback, or stale-result scenarios that current acceptance or material invariants actually require. Use known accepted adjacent changes only to reject an immediately brittle placement; hypothetical future work does not justify current abstractions or behavior. Account for mixed ownership, low cohesion, effect and state-authority concentration, changed-line width, import-depth fallout, dead exports, cycles, i18n/design-system fallout, and test-support growth caused by the accepted change.
 
-Freeze the original acceptance criteria, explicit non-goals, and bounded manifest before implementation. Do not add stronger manifest guarantees merely because a broader redesign is possible. Classify later findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening; only the first three categories belong in the current correction, while pre-existing hardening is recorded as follow-up debt.
+Freeze the original acceptance criteria, explicit non-goals, and bounded manifest before implementation. Do not add stronger manifest guarantees merely because a broader redesign is possible. Classify later findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening; only the first three categories belong in the current correction. Report pre-existing hardening only when it is evidenced and materially relevant to the decision, or when the user explicitly requested a broader inventory; otherwise omit it.
 
-If the task would extend a broad public surface, flat sibling scatter, repeated-prefix family, root-facade implementation owner, structurally pressured owner, or owner with several independent growth vectors, refactor the shape first in the same change set unless the user explicitly chooses a narrower tradeoff. Metrics inform that decision but do not define the architecture.
+If the accepted task would cross or worsen a broad public surface, flat sibling scatter, repeated-prefix family, root-facade implementation owner, structurally pressured owner, or owner with several current independent change reasons, refactor the shape first in the same change set unless the user explicitly chooses a narrower tradeoff. Existing pressure, a nearby cleanup opportunity, or a hypothetical extension is not sufficient. Metrics inform that decision but do not define the architecture.
 
 If a correction begins to change new runtime contracts, every persistence writer, or dozens of owners outside the manifest, return to preflight and find the minimal correction class inside the original seam. Expand the manifest only with evidence that the frozen acceptance criteria cannot be met otherwise.
 
@@ -46,9 +46,9 @@ Content parsing follows `PageProfile -> PageSnapshot -> ParserPipeline -> Parsed
 
 Every seam distinguishes authoritative state, rebuildable advisory/cache state, and disposable derived state. Do not create dual authority such as parallel local/browser storage, persisted/UI snapshots, or live-DOM/parser truth unless one side is an explicit degraded fallback or cache.
 
-Read paths stay read-only. Repair, reconciliation, healing, and migrations use explicit write/maintenance owners. Persistence and cross-runtime mutation paths define rollback, compensation, typed failure, or documented fail-soft degradation; user-visible committed data is not silently best-effort.
+Read paths stay read-only. Repair, reconciliation, healing, and migrations use explicit write/maintenance owners. A persistence or cross-runtime mutation path defines rollback or compensation only when a reachable non-atomic sequence can partially commit; otherwise use the narrowest typed failure or documented fail-soft behavior required by its current semantics. User-visible committed data is not silently best-effort.
 
-Avoid blind read-modify-write and whole-object overwrites where concurrent fields can be lost. Async reads, refreshes, replies, and deferred effects guard against stale results. History/order uses an owned revision token rather than timestamps. Grouped transaction owners own both commit and cancellation/cleanup.
+Avoid blind read-modify-write and whole-object overwrites where concurrent fields can be lost. Add stale-result protection only when the current flow permits competing async results and ordering changes the accepted outcome. History/order uses an owned revision token rather than timestamps when order is authoritative. Grouped transaction owners own both commit and cancellation/cleanup when the transaction actually acquires resources or can partially apply effects.
 
 ## UI, i18n, And Design Reuse
 
@@ -82,7 +82,7 @@ Every task considers unsafe sinks, retention, secret handling, diagnostics, perm
 
 ## Proof Shape
 
-Proof follows affected risk and consumers rather than edited filenames. Shared/public interface changes prove transitive consumers. Persistence changes prove relevant create/load/update/delete, duplicate/clone, project-delete cleanup, bootstrap/fallback, owner-local mocks, failure, rollback, and concurrent update behavior. Parser/snapshot/traversal changes prove builders, facades, projectors, and direct orchestrators. UI lifecycle, messaging, parser, and persistence changes prove applicable failure, duplicate, replay, stale-result, rollback, and restore cases.
+Proof follows affected risk and consumers rather than edited filenames. Tests prove admitted scenarios; do not invent product behavior merely to make a failure matrix symmetric. Shared/public interface changes prove transitive consumers. Persistence changes prove only reachable affected operations among create/load/update/delete, duplicate/clone, project-delete cleanup, bootstrap/fallback, owner-local mocks, failure, rollback, and concurrent update behavior. Parser/snapshot/traversal changes prove builders, facades, projectors, and direct orchestrators that consume the changed semantics. UI lifecycle, messaging, parser, and persistence changes prove failure, duplicate, replay, stale-result, rollback, or restore only when the current control flow exposes that distinct state and its impact is material to acceptance or an invariant.
 
 Test-profile cost does not redefine risk. Exact owner-direct execution is valid only when deterministic owner mappings are complete and the diff stays below the machine-owned small-change limits. A deleted production consolidation may also use exact owner-direct proof when its complete HEAD consumer frontier and current redirect closure are graph-closed inside one owner and every surviving changed production file has deterministic tests. Public/shared, runtime, persistence, messaging, parser/export, ambiguous, uncovered, cross-owner, or over-budget changes otherwise retain transitive affected-test discovery.
 

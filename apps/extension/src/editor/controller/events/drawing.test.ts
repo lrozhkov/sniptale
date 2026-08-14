@@ -111,14 +111,16 @@ function pointerEvent(patch: Record<string, unknown> = {}): {
   return { e: { button: 0, ctrlKey: false, shiftKey: false, timeStamp: 10, ...patch } };
 }
 
+function resetDrawingMocks() {
+  vi.clearAllMocks();
+  mocks.cropDown.mockReturnValue(false);
+  mocks.isTextTarget.mockReturnValue(false);
+  mocks.isDrawingSelection.mockReturnValue(false);
+  mocks.updatePath.mockReturnValue(false);
+}
+
 describe('shared drawing event orchestration', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.cropDown.mockReturnValue(false);
-    mocks.isTextTarget.mockReturnValue(false);
-    mocks.isDrawingSelection.mockReturnValue(false);
-    mocks.updatePath.mockReturnValue(false);
-  });
+  beforeEach(resetDrawingMocks);
 
   it('routes drawing starts and ignores non-drawing pointer paths', () => {
     const ignored = createBindings('select');
@@ -239,6 +241,33 @@ describe('shared drawing event orchestration', () => {
     expect(path.bindings.setDrawSession).toHaveBeenCalled();
   });
 
+  it('expands a crop guide from its pointer origin without shared drawing metadata', () => {
+    const cropObject = { set: vi.fn(), setCoords: vi.fn() };
+    const crop = createBindings('crop');
+    crop.bindings.getDrawSession.mockReturnValue({
+      object: cropObject,
+      start: { x: 1, y: 2 },
+      tool: 'crop',
+    });
+    mocks.createBounds.mockReturnValueOnce({ x: 1, y: 2, width: 30, height: 40 });
+
+    crop.handlers.handleWindowMouseMove(
+      new MouseEvent('mousemove', { bubbles: true, clientX: 31, clientY: 42 })
+    );
+
+    expect(mocks.readDrawing).not.toHaveBeenCalled();
+    expect(cropObject.set).toHaveBeenCalledWith({
+      height: 40,
+      left: 1,
+      scaleX: 1,
+      scaleY: 1,
+      top: 2,
+      width: 30,
+    });
+    expect(cropObject.setCoords).toHaveBeenCalledOnce();
+    expect(crop.canvas.requestRenderAll).toHaveBeenCalledOnce();
+  });
+
   it('continues and completes a drawing when the pointer leaves the Fabric canvas', () => {
     const path = createBindings('marker');
     const pathObject = { id: 'path-object' };
@@ -264,6 +293,74 @@ describe('shared drawing event orchestration', () => {
     path.handlers.handleWindowMouseUp();
     expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
   });
+});
+
+describe('drawing pointer continuity', () => {
+  beforeEach(resetDrawingMocks);
+
+  it('keeps drawing from the window move fallback when Fabric drops an in-canvas move', () => {
+    const path = createBindings('pencil');
+    const pathObject = { id: 'path-object' };
+    path.bindings.getDrawSession.mockReturnValue({
+      object: pathObject,
+      start: { x: 1, y: 2 },
+      tool: 'pencil',
+    });
+    mocks.readDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
+    mocks.updateDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
+    mocks.updatePath.mockReturnValue(true);
+    const move = new MouseEvent('mousemove', { bubbles: true });
+    path.canvas.upperCanvasEl.dispatchEvent(move);
+
+    path.handlers.handleWindowMouseMove(move);
+
+    expect(mocks.updateDrawing).toHaveBeenCalledOnce();
+    expect(mocks.updatePath).toHaveBeenCalledOnce();
+  });
+
+  it('deduplicates a move handled by both Fabric and the window fallback', () => {
+    const path = createBindings('marker');
+    const pathObject = { id: 'path-object' };
+    path.bindings.getDrawSession.mockReturnValue({
+      object: pathObject,
+      start: { x: 1, y: 2 },
+      tool: 'marker',
+    });
+    mocks.readDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
+    mocks.updateDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
+    mocks.updatePath.mockReturnValue(true);
+    const move = new MouseEvent('mousemove', { bubbles: true });
+
+    path.handlers.handleMouseMove({ e: move });
+    path.handlers.handleWindowMouseMove(move);
+
+    expect(mocks.updateDrawing).toHaveBeenCalledOnce();
+    expect(mocks.updatePath).toHaveBeenCalledOnce();
+  });
+
+  it('starts resizing a geometric draft on the first window move without a hold delay', () => {
+    const shape = createBindings('shape');
+    const shapeObject = { id: 'shape-object' };
+    shape.bindings.getDrawSession.mockReturnValue({
+      object: shapeObject,
+      start: { x: 1, y: 2 },
+      tool: 'shape',
+    });
+    mocks.readDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
+    mocks.updateDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
+    const move = new MouseEvent('mousemove', { bubbles: true });
+
+    shape.handlers.handleWindowMouseMove(move);
+
+    expect(shape.canvas.remove).toHaveBeenCalledWith(shapeObject);
+    expect(shape.canvas.add).toHaveBeenCalledWith(
+      expect.objectContaining({ sniptaleId: 'replacement' })
+    );
+  });
+});
+
+describe('drawing selection interactions', () => {
+  beforeEach(resetDrawingMocks);
 
   it('edits an existing text on click, but completes drawing after a drag or ordinary mouse-up', () => {
     const target = { isEditing: false };

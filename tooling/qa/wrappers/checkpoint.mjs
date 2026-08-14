@@ -157,6 +157,7 @@ function mergePrerequisiteSteps(formatStep, harnessFreshnessStep, verificationSt
 async function collectCheckpointPrerequisites({
   contextCollector,
   formatStepCollector,
+  harnessInventoryViolationCollector,
   harnessStateAsserter,
 }) {
   const initialContext = createScopedQaContext(contextCollector(), { suite: PRODUCT_QA_SUITE });
@@ -164,7 +165,12 @@ async function collectCheckpointPrerequisites({
   const context = createCheckpointContext(contextCollector);
   if (formatStep.status === 'failed') return { context, blockedSteps: [formatStep] };
 
-  const harnessFreshnessStep = collectHarnessFreshnessStep(context, harnessStateAsserter);
+  const harnessFreshnessStep = collectHarnessFreshnessStep(
+    context,
+    harnessStateAsserter,
+    'qa:checkpoint',
+    harnessInventoryViolationCollector
+  );
   if (harnessFreshnessStep?.status === 'failed') {
     return { context, blockedSteps: [formatStep, harnessFreshnessStep] };
   }
@@ -195,6 +201,7 @@ export async function runCheckpoint({
   producerRunId,
   contextCollector = collectCurrentDiffContext,
   formatStepCollector = collectFormatStep,
+  harnessInventoryViolationCollector,
   harnessStateAsserter = assertFreshHarnessState,
   advisoryStepCollector = collectAdvisoryStep,
   focusedStepCollector = collectFocusedStepResults,
@@ -205,6 +212,7 @@ export async function runCheckpoint({
   const prerequisites = await collectCheckpointPrerequisites({
     contextCollector,
     formatStepCollector,
+    harnessInventoryViolationCollector,
     harnessStateAsserter,
   });
   const prerequisiteResult = createCheckpointPrerequisiteResult(

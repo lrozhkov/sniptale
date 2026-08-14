@@ -50,8 +50,8 @@ export const editorCompactSceneMessages = defineMessageSource({
     en: 'Apply background',
   },
   browserFrame: {
-    ru: 'Интерфейс веб-браузера',
-    en: 'Browser chrome',
+    ru: 'Окно браузера',
+    en: 'Browser window',
   },
   browserHeaderDetails: {
     ru: 'Детали шапки',

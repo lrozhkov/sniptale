@@ -3,7 +3,6 @@ import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { useEditorInspectorSidebarController } from '../../inspector/sidebar-controller';
 import { useEditorToolbarController } from '../toolbar/use-controller';
-import { EditorCanvasSelectionToolbar } from './canvas-selection-toolbar';
 import { EditorFloatingDocumentBar } from './document-bar';
 import { EditorFloatingLeftDrawer } from './left-drawer';
 import { EditorFloatingWorkspaceOverlays } from './overlays';
@@ -169,11 +168,6 @@ function EditorFloatingSelectionSurfaces({
         leftDrawerOpen={surfaceRoute.leftDrawer !== null}
         selection={documentController.selection}
       />
-      <EditorCanvasSelectionToolbar
-        documentController={documentController}
-        enabled={surfaceRoute.canvasSelectionToolbar}
-        selection={documentController.selection}
-      />
     </>
   );
 }
@@ -245,6 +239,7 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
   return (
     <FloatingChromeRoot
       dataUi="editor.floating-workspace"
+      onWheel={(event) => event.stopPropagation()}
       style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
     >
       <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />

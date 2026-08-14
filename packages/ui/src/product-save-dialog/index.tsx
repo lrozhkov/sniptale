@@ -46,9 +46,9 @@ function ProductSaveDialogContent(props: ProductSaveDialogProps) {
   );
 }
 
-function ProductSaveDialogFrame(props: ProductSaveDialogProps) {
+export function ProductSaveDialogSurface(props: ProductSaveDialogProps) {
   return (
-    <>
+    <div className="flex min-h-0 flex-col" data-ui="shared.ui.product-save-dialog.surface">
       <ProductSaveDialogHeader
         title={props.title}
         subtitle={props.subtitle}
@@ -63,7 +63,7 @@ function ProductSaveDialogFrame(props: ProductSaveDialogProps) {
           {props.footer}
         </ProductModalFooter>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -94,7 +94,7 @@ export function ProductSaveDialog({
       labelledBy="save-dialog-title"
       dialogClassName="sniptale-save-dialog"
     >
-      <ProductSaveDialogFrame
+      <ProductSaveDialogSurface
         title={title}
         subtitle={subtitle}
         closeLabel={closeLabel}

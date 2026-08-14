@@ -8,7 +8,7 @@ Compact workflow contract for Sniptale.
 - Freeze the task's acceptance criteria and explicit non-goals before implementation. Do not strengthen manifest promises or convert nearby hardening into current-wave acceptance without evidence that the original criteria require it.
 - Do not start broad QA or required review until the coherent candidate and its deterministic negative proof are complete.
 - Collect all review findings before editing. Confirm each finding against acceptance criteria, source evidence, and invariants, then make one consolidated correction. Repeat only proof invalidated by a changed behavior, owner, public contract, or security seam.
-- Classify findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening. Only the first three categories block closeout; record pre-existing hardening as debt/follow-up, and tell reviewers that unrelated pre-existing defects are not `Request changes`.
+- Classify findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening. Only the first three categories block closeout. Report pre-existing hardening only when it is evidenced, materially relevant to the reviewed decision, and useful to the user, or when the user explicitly requested a broader inventory; otherwise omit it. Unrelated pre-existing defects are not `Request changes`.
 - Canonical proof is `qa:release-harness` when the diff has harness/shared-control targets, `qa:checkpoint`, an artifact build when its closure changes, and the affected runtime or E2E smoke.
 - Canonical order: `implementation → qa:checkpoint → required review → qa:closeout`.
 
@@ -17,7 +17,17 @@ Compact workflow contract for Sniptale.
 - Do not assume urgency unless the user explicitly says so.
 - Quality, correctness, maintainability, security, and explicit ownership are the default priorities.
 - Do not justify topology debt, temporary hacks, weaker proof, smaller diffs, or deferred cleanup by presumed time pressure.
-- If the correct implementation inside the fixed acceptance scope requires a refactor, ownership split, or topology cleanup first, do that work in the same change set unless the user explicitly chooses a narrower tradeoff.
+- If the accepted behavior cannot be implemented coherently inside the selected owner without a refactor, ownership split, or topology cleanup, do that prerequisite work in the same change set unless the user explicitly chooses a narrower tradeoff. Existing structural pressure or a nearby cleanup opportunity alone does not expand the task.
+
+## Scope Discipline
+
+- Frozen acceptance criteria and explicit non-goals define the required behavior. An unmentioned edge case is not current scope merely because it is imaginable.
+- Add a branch, state, retry, fallback, compatibility path, rollback, replay guard, stale-result guard, or recovery mode only when its triggering scenario is supported by evidence: explicit acceptance, an observed defect, an existing product invariant, reachable behavior in a supported platform flow, or a material trust-boundary, security, privacy, authorization, or irreversible data-loss risk.
+- `Could happen` is not evidence. Before adding defensive logic, identify the concrete trigger, how it is reachable in the current flow, its user or system impact, and why existing platform or owner behavior does not already contain it.
+- Rare but material hostile-input, trust-boundary, security, privacy, authorization, and irreversible data-loss risks remain mandatory. Rare low-impact or recoverable scenarios stay outside current behavior until an observed trigger or accepted requirement promotes them.
+- Do not enumerate the universe of hypothetical exclusions. When a non-trivial case was actively proposed or materially constrains the chosen design, record only its current ceiling and the concrete trigger that would promote it; do not add scaffolding for it.
+- Known accepted adjacent changes may test whether an owner placement is immediately brittle, but hypothetical future changes must not cause speculative interfaces, configuration, state, compatibility layers, or behavior to be implemented now.
+- The default budget for new dependencies, public contracts, persisted authorities, configuration modes, compatibility layers, and fallback modes is zero. Each addition requires direct acceptance or invariant evidence.
 
 ## Preflight
 
@@ -41,9 +51,9 @@ Read deeper docs only when the task touches their area:
 
 Run `npm run qa:preflight` when scope is unclear or non-trivial. Use `npm run qa:preflight -- --files <paths...>` for pre-edit planning before a diff exists.
 
-Record the owner seam, runtime boundary, target topology, likely next `2-3` seam expansions, state authorities, risk families, structural pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and structurally pressured files/functions.
+Record the owner seam, runtime boundary, target topology, known accepted adjacent changes that materially constrain placement, state authorities, evidence-backed risk families, structural pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and structurally pressured files/functions.
 
-If preflight shows mixed ownership, low cohesion, a broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior. Metrics are signals, not architecture boundaries. Token counts are not a quality signal, and a mechanical or distributed split is not a fix when the same broad owner contract remains.
+If preflight shows mixed ownership, low cohesion, a broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior only when the planned change would cross or worsen that boundary or the accepted behavior cannot fit coherently inside it. Existing pressure alone is not permission to widen the task. Metrics are signals, not architecture boundaries. Token counts are not a quality signal, and a mechanical or distributed split is not a fix when the same broad owner contract remains.
 
 Return to preflight and the minimal correction class when a proposed fix starts changing new runtime contracts, all persistence writers, or dozens of additional owners beyond the accepted manifest. Expand the task only when those changes are proved necessary for the frozen acceptance criteria.
 
@@ -73,9 +83,9 @@ Run `$security-code-review` only when the current diff actually changes a trust 
 
 Required closeout review runs only after the complete candidate, deterministic negative proof, applicable green harness proof, and green `qa:checkpoint` exist. Spawn a new independent read-only reviewer with `fork_turns: "none"`; do not reuse an agent that saw implementation context. The initial review task must supply the explicit bounded manifest/completion matrix, exact current diff scope, preflight shape, and QA results; do not pass intended conclusions.
 
-Collect all findings, classify them with the four finding categories, confirm blockers against evidence and the frozen acceptance criteria, and apply one consolidated correction. A reviewer may not turn an unrelated test wish or stronger guarantee into a blocker. Do not repeat review after mechanical cleanup unless the correction changed the reviewed behavior, owner, public contract, dependency direction, parser semantics, or security seam. Rerun only proof invalidated by the correction.
+Collect all findings, classify them with the four finding categories, confirm blockers against evidence and the frozen acceptance criteria, and apply one consolidated correction. A finding that asks for new behavior, state, recovery, compatibility, or proof must identify its concrete reachable trigger and connection to frozen acceptance or a material invariant; without that evidence it is not a current finding and should be omitted unless the user explicitly requested a speculative-hardening inventory. A reviewer may not turn an unrelated test wish, hypothetical future scenario, or stronger guarantee into a blocker. Do not repeat review after mechanical cleanup unless the correction changed the reviewed behavior, owner, public contract, dependency direction, parser semantics, or security seam. Rerun only proof invalidated by the correction.
 
-Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, stale async results, missing rollback/failure surfacing, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, distributed god-objects, dead exports/cycles, i18n/design-system bypasses, and success-only proof for failure-prone seams.
+Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, reachable stale-result races, missing recovery or failure surfacing at evidenced partial-failure points, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, distributed god-objects, dead exports/cycles, i18n/design-system bypasses, and success-only proof for evidenced failure-prone seams.
 
 ## Closeout
 

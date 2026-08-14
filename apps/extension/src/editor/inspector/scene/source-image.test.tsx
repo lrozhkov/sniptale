@@ -9,21 +9,6 @@ import { EditorInspectorFrameSourceImageSection } from './source-image';
 
 vi.mock('../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../chrome/ui')>()),
-  NumericRow: (props: {
-    label: string;
-    value: number;
-    onPreviewValue: (value: number) => void;
-  }) => (
-    <button
-      type="button"
-      data-testid="range"
-      aria-label={props.label}
-      data-value={String(props.value)}
-      onClick={() => props.onPreviewValue(50)}
-    >
-      range
-    </button>
-  ),
   SelectField: (props: { value: string; onChange: (value: string) => void }) => (
     <button
       type="button"
@@ -42,6 +27,25 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
       onClick={() => props.onChange('#abcdef')}
     >
       color
+    </button>
+  ),
+}));
+
+vi.mock('./shared', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shared')>()),
+  EditorInspectorRangeField: (props: {
+    label: string;
+    value: number;
+    onChange: (value: number) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="range"
+      aria-label={props.label}
+      data-value={String(props.value)}
+      onClick={() => props.onChange(50)}
+    >
+      range
     </button>
   ),
 }));
@@ -74,7 +78,7 @@ afterEach(async () => {
   root = null;
 });
 
-it('keeps source image controls collapsed by default and patches frame source image settings', async () => {
+it('keeps core source image geometry visible and expands advanced settings on demand', async () => {
   const applyFramePatch = vi.fn();
 
   await renderUi(
@@ -87,11 +91,12 @@ it('keeps source image controls collapsed by default and patches frame source im
     />
   );
 
-  expect(container?.querySelector('[aria-expanded="false"]')).not.toBeNull();
-  expect(container?.querySelectorAll('[data-testid="range"]')).toHaveLength(0);
+  expect(container?.querySelector('details')?.open).toBe(false);
+  expect(container?.querySelectorAll('[data-testid="range"]').length).toBeGreaterThanOrEqual(2);
 
   await act(async () => {
-    (container?.querySelector('[aria-expanded]') as HTMLButtonElement | undefined)?.click();
+    const details = container?.querySelector('details');
+    if (details) details.open = true;
   });
   await act(async () => {
     container
@@ -103,7 +108,7 @@ it('keeps source image controls collapsed by default and patches frame source im
       .forEach((element) => (element as HTMLButtonElement).click());
   });
 
-  expect(container?.querySelector('[aria-expanded="true"]')).not.toBeNull();
+  expect(container?.querySelector('details')?.open).toBe(true);
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({ sourceImage: expect.objectContaining({ opacity: 0.5 }) })
   );

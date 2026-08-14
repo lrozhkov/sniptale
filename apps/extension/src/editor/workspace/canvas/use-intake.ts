@@ -2,7 +2,8 @@ import type { Dispatch, DragEvent, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import type { useEditorController } from '../../application/controller-context';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
-import { insertEditorImageFromFile, openEditorImageFromFile } from '../../document/file-actions';
+import { insertEditorImageFromFile } from '../../document/file-actions';
+import { openLocalImageAsEditorDraft } from '../../workflows/open-local-image-draft';
 import {
   getImageFileFromClipboardEvent,
   getImageFileFromDataTransfer,
@@ -38,7 +39,7 @@ function runImageFileAction(
   }
 
   fireAndReportEditorAction(`canvas-open-image-${source}`, () =>
-    openEditorImageFromFile(props.controller, file, props.setImageData)
+    openLocalImageAsEditorDraft(props.controller, file, props.setImageData)
   );
 }
 

@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
+import {
+  ProductGlassChip,
+  ProductGlassRow,
+  ProductGlassSectionLabel,
+} from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
-import { SelectField, type CompactSelectOption, cx } from '../../chrome/ui';
-import { panelButtonClassName } from './shared';
+import type { CompactSelectOption } from '../../chrome/ui';
+import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
 
 interface BrowserFrameState {
   canvasMode: 'resize' | 'keep-size';
@@ -17,21 +22,20 @@ export const BrowserFrameBehaviorSections: React.FC<{
 }> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => (
   <fieldset className="space-y-3">
     <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
-    <SelectField
+    <BrowserFrameChoiceRow
       label={translate('editor.compact.canvasBehavior')}
-      value={browserFrame.canvasMode}
       options={browserCanvasModeOptions}
+      value={browserFrame.canvasMode}
       onChange={(value) =>
         fireAndReportEditorAction('browser-frame-canvas-mode', () =>
           syncBrowserFrame({ canvasMode: value })
         )
       }
     />
-
-    <SelectField
+    <BrowserFrameChoiceRow
       label={translate('editor.compact.sceneBehavior')}
-      value={browserFrame.contentMode}
       options={browserContentModeOptions}
+      value={browserFrame.contentMode}
       onChange={(value) =>
         fireAndReportEditorAction('browser-frame-content-mode', () =>
           syncBrowserFrame({ contentMode: value })
@@ -40,6 +44,31 @@ export const BrowserFrameBehaviorSections: React.FC<{
     />
   </fieldset>
 );
+
+function BrowserFrameChoiceRow<T extends string>(props: {
+  label: string;
+  onChange: (value: T) => void;
+  options: CompactSelectOption<T>[];
+  value: T;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <ProductGlassSectionLabel>{props.label}</ProductGlassSectionLabel>
+      <ProductGlassRow>
+        {props.options.map((option) => (
+          <ProductGlassChip
+            key={option.value}
+            active={option.value === props.value}
+            aria-pressed={option.value === props.value}
+            onClick={() => props.onChange(option.value)}
+          >
+            {option.label}
+          </ProductGlassChip>
+        ))}
+      </ProductGlassRow>
+    </div>
+  );
+}
 
 export const BrowserFrameInsertSection: React.FC<{
   disabled?: boolean;
@@ -74,15 +103,7 @@ export const BrowserFrameInsertSection: React.FC<{
       ) : null}
       <button
         type="button"
-        className={cx(
-          panelButtonClassName,
-          'w-full border-[color:var(--sniptale-color-border-accent-strong)]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_76%,transparent)]',
-          'text-[color:var(--sniptale-color-accent-emphasis)]',
-          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,var(--sniptale-color-surface-panel))]',
-          'hover:text-[color:var(--sniptale-color-accent-strong)]',
-          'disabled:cursor-not-allowed disabled:opacity-50'
-        )}
+        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         disabled={disabled || pending}
         aria-busy={pending}
         onClick={() => void handleApply()}

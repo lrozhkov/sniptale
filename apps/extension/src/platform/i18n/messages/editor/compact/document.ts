@@ -61,6 +61,14 @@ export const editorCompactDocumentMessages = defineMessageSource({
     ru: 'Холст',
     en: 'Canvas',
   },
+  cropCanvas: {
+    ru: 'Обрезать холст',
+    en: 'Crop canvas',
+  },
+  applyCropCanvas: {
+    ru: 'Применить обрезку',
+    en: 'Apply crop',
+  },
   resizeTarget: {
     ru: 'Что изменить',
     en: 'Resize target',

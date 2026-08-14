@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { translate } from '../../../platform/i18n';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { ProductGlassChip, ProductGlassRow } from '@sniptale/ui/product-glass-controls';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import type { ImageEditorController } from '../../controller';
 import { SelectField } from '../../chrome/ui';
@@ -17,6 +17,7 @@ import {
 import { useCanvasResizePreview } from './resize-tool-preview';
 import {
   INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
+  INSPECTOR_SECONDARY_BUTTON_CLASS_NAME,
   INSPECTOR_SECTION_LABEL_CLASS_NAME,
   INSPECTOR_SECTION_SURFACE_CLASS_NAME,
 } from '../chrome';
@@ -35,6 +36,7 @@ type ResizeToolSectionProps = {
   controller: Pick<
     ImageEditorController,
     | 'applyCropSelection'
+    | 'cancelCropMode'
     | 'clearCanvasSizePreview'
     | 'clearCropSelection'
     | 'previewCanvasSize'
@@ -48,7 +50,7 @@ type ResizeToolSectionProps = {
   imageSizeDraft: SizeDraft;
   imageSizeLocked: boolean;
   imageSizeText: string;
-  initialMode: ResizeToolMode;
+  mode: ResizeToolMode;
   setCanvasSizeDraft: React.Dispatch<React.SetStateAction<SizeDraft>>;
   setCanvasSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setImageSizeDraft: React.Dispatch<React.SetStateAction<SizeDraft>>;
@@ -91,7 +93,7 @@ function parseSizeText(value: string): SizeDraft | null {
 }
 
 export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) {
-  const [mode, setMode] = useState<ResizeToolMode>(props.initialMode);
+  const mode = props.mode;
   const isCanvasMode = mode === 'canvas';
   const active = selectActiveResizeState(props, mode);
   const canvasSizeMatchesDraft = isSameSize(props.canvasSizeDraft, props.canvasSize);
@@ -105,10 +107,6 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
     !activeSizeIsValid ||
     (mode === 'canvas' ? canvasSizeMatchesDraft && !props.cropReady : imageSizeMatchesDraft);
 
-  useEffect(() => {
-    setMode(props.initialMode);
-  }, [props.initialMode]);
-
   useCanvasResizePreview({
     canvasSizeDraft: props.canvasSizeDraft,
     canvasSizeMatchesDraft,
@@ -120,7 +118,33 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
 
   return (
     <div className="space-y-4">
-      <ResizeToolModeSwitch mode={mode} onModeChange={setMode} />
+      {isCanvasMode ? (
+        <div
+          aria-live="polite"
+          className={[
+            'rounded-[10px] px-3 py-2.5',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_32%,transparent)]',
+          ].join(' ')}
+        >
+          <div
+            className={[
+              'text-[11px] font-semibold',
+              'text-[color:var(--sniptale-color-text-primary)]',
+            ].join(' ')}
+          >
+            {translate(
+              props.cropReady ? 'editor.compact.cropAreaReady' : 'editor.compact.cropAreaWaiting'
+            )}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]">
+            {translate(
+              props.cropReady
+                ? 'editor.compact.cropReadyDescription'
+                : 'editor.compact.cropWaitingDescription'
+            )}
+          </p>
+        </div>
+      ) : null}
       <ResizeToolSizePanel
         active={active}
         isCanvasMode={isCanvasMode}
@@ -131,14 +155,27 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
           {translate('editor.compact.invalidImageDimensions')}
         </p>
       ) : null}
-      <button
-        type="button"
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
-        disabled={applyDisabled}
-        onClick={() => applyResizeToolMode(props, mode)}
-      >
-        {translate('editor.compact.apply')}
-      </button>
+      <div className={isCanvasMode ? 'grid grid-cols-2 gap-2' : undefined}>
+        {isCanvasMode ? (
+          <button
+            type="button"
+            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
+            onClick={() => props.controller.cancelCropMode()}
+          >
+            {translate('common.actions.cancel')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
+          disabled={applyDisabled}
+          onClick={() => applyResizeToolMode(props, mode)}
+        >
+          {translate(
+            mode === 'image' ? 'editor.compact.applyImageSize' : 'editor.compact.applyCropCanvas'
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -168,31 +205,13 @@ function selectActiveResizeState(
   };
 }
 
-function ResizeToolModeSwitch(props: {
-  mode: ResizeToolMode;
-  onModeChange: (mode: ResizeToolMode) => void;
-}) {
-  return (
-    <SegmentedSwitch
-      activeId={props.mode}
-      ariaLabel={translate('editor.compact.resizeTarget')}
-      options={[
-        { id: 'canvas', label: translate('editor.compact.canvas') },
-        { id: 'image', label: translate('editor.compact.image') },
-      ]}
-      onChange={props.onModeChange}
-      dataAttribute={{ 'data-resize-tool-mode': props.mode }}
-    />
-  );
-}
-
 function ResizeToolSizePanel(props: {
   active: ActiveResizeState;
   isCanvasMode: boolean;
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
   const label = props.isCanvasMode
-    ? translate('editor.compact.canvasSize')
+    ? translate('editor.compact.cropCanvas')
     : translate('editor.compact.imageSize');
 
   return (
@@ -200,7 +219,7 @@ function ResizeToolSizePanel(props: {
       <SizeControlsHeader label={label} valueText={props.active.sizeText} />
       <div className="space-y-3">
         <ResizeToolDimensionRow active={props.active} updateLockedDraft={props.updateLockedDraft} />
-        <ResizeToolSizePresetField active={props.active} />
+        {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
         <ResizeToolAspectRatioField active={props.active} />
       </div>
     </section>
@@ -281,24 +300,22 @@ function ResizeToolAspectRatioField(props: { active: ActiveResizeState }) {
 
 function ResizeToolAspectRatioButtons(props: { active: ActiveResizeState; currentValue: string }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <button
+    <ProductGlassRow>
+      <ProductGlassChip
         type="button"
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         onClick={() => applyCurrentAspectRatio(props.active.setDraft, props.currentValue, 'long')}
         disabled={props.currentValue === 'custom'}
       >
         {translate('editor.compact.fitAspectByLongSide')}
-      </button>
-      <button
+      </ProductGlassChip>
+      <ProductGlassChip
         type="button"
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         onClick={() => applyCurrentAspectRatio(props.active.setDraft, props.currentValue, 'short')}
         disabled={props.currentValue === 'custom'}
       >
         {translate('editor.compact.fitAspectByShortSide')}
-      </button>
-    </div>
+      </ProductGlassChip>
+    </ProductGlassRow>
   );
 }
 

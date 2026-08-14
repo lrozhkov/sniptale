@@ -10,11 +10,13 @@ import { refreshEditorViewportPresentation } from '../../../viewport/actions';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { createViewportPresentationContext } from '../viewport-context';
+import { attachEditorCanvasPointerCapture } from './pointer-capture';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   const canvas = new Canvas(canvasElement, {
     altActionKey: 'ctrlKey',
     centeredKey: 'ctrlKey',
+    enablePointerEvents: true,
     preserveObjectStacking: true,
     selection: true,
     selectionKey: 'ctrlKey',
@@ -24,6 +26,7 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   canvas.backgroundColor = 'transparent';
   canvas.setDimensions({ width: 0, height: 0 });
   canvas.setZoom(1);
+  attachEditorCanvasPointerCapture(canvas);
   return canvas;
 }
 

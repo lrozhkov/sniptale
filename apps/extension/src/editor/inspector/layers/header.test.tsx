@@ -68,3 +68,22 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   expect(rows).toContain('[scrollbar-gutter:stable_both-edges]');
   expect(empty).toContain('editor.toolbar.noLayers');
 });
+
+it('keeps only title, count, and selected-layer navigation in the integrated layers header', () => {
+  const markup = renderToStaticMarkup(
+    <EditorInspectorLayersHeader
+      expanded
+      layerCount={4}
+      onCollapsePanel={vi.fn()}
+      onToggle={vi.fn()}
+      streamlined
+    />
+  );
+
+  expect(markup).toContain('editor.toolbar.layersTitle');
+  expect(markup).toContain('editor.layers.auto-navigate');
+  expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
+  expect(markup).not.toContain('mock.insert');
+  expect(markup).not.toContain('lucide-layers-3');
+  expect(markup.match(/<button/g)).toHaveLength(1);
+});

@@ -4,6 +4,7 @@ import {
   EditorFloatingLayersNavigation,
   resolveEditorLayersPanelMode,
 } from './layers-panel-navigation';
+import { translate } from '../../../platform/i18n';
 
 vi.mock('../../inspector/layers/file-input', () => ({
   LayerInsertImageControl: () => (
@@ -36,7 +37,8 @@ it('keeps every mode and immediate image action available when collapsed', () =>
   expect(markup).toContain('editor.floating.layers.mode.meta');
   expect(markup).toContain('editor.floating.layers.mode.image-size');
   expect(markup).toContain('editor.floating.layers.mode.canvas-size');
-  expect(markup).toContain('aria-pressed="true"');
+  expect(markup).not.toContain('aria-pressed="true"');
+  expect(markup.match(/aria-pressed="false"/g)).toHaveLength(6);
   expect(markup).toContain('insert');
   expect(markup).toContain('pointer-events-auto flex shrink-0 items-center');
   expect(markup).toContain('flex-row rounded-[14px]');
@@ -55,6 +57,8 @@ it('keeps the canonical header order when expanded', () => {
 
   expectToolbarOrder(markup, true);
   expect(markup).toContain('editor.floating.layers.collapse-button');
+  expect(markup).toContain(`title="${translate('editor.toolbar.collapseLayers')}"`);
+  expect(markup).toContain('lucide-chevron-down');
 });
 
 function expectToolbarOrder(markup: string, includeCollapse: boolean) {

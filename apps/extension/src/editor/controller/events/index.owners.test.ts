@@ -71,13 +71,13 @@ it('attaches and detaches every canvas, window, viewport, and resize observer li
   const observer = Reflect.apply(attachEditorControllerEventHandlers, null, [
     { canvas, handlers, onViewportResize, viewportElement },
   ]);
-  expect(canvas.on).toHaveBeenCalledTimes(16);
+  expect(canvas.on).toHaveBeenCalledTimes(15);
   expect(observe).toHaveBeenCalledWith(viewportElement);
 
   Reflect.apply(detachEditorControllerEventHandlers, null, [
     { canvas, handlers, viewportElement, viewportResizeObserver: observer },
   ]);
-  expect(canvas.off).toHaveBeenCalledTimes(16);
+  expect(canvas.off).toHaveBeenCalledTimes(15);
   expect(disconnect).toHaveBeenCalledOnce();
   expect(viewportElement.removeEventListener).toHaveBeenCalledTimes(3);
 });

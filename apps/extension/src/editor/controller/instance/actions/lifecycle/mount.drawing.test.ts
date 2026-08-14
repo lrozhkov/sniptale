@@ -10,6 +10,7 @@ it('configures canonical drawing selection and transform modifiers', () => {
   expect(canvas.uniformScaling).toBe(false);
   expect(canvas.uniScaleKey).toBe('shiftKey');
   expect(canvas.centeredKey).toBe('ctrlKey');
+  expect(canvas.enablePointerEvents).toBe(true);
 
   canvas.dispose();
 });

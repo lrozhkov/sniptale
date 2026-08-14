@@ -1,6 +1,7 @@
 import React from 'react';
+import { ProductGlassChip, ProductGlassOptionGrid } from '@sniptale/ui/product-glass-controls';
 
-import { SelectField, type CompactSelectOption } from '../../../chrome/ui';
+import type { CompactSelectOption } from '../../../chrome/ui';
 
 export function EditorInspectorFrameModeButtons<T extends string>(props: {
   ariaLabel?: string;
@@ -9,11 +10,18 @@ export function EditorInspectorFrameModeButtons<T extends string>(props: {
   onChange: (next: T) => void;
 }): React.ReactElement {
   return (
-    <SelectField
-      label={props.ariaLabel ?? ''}
-      onChange={props.onChange}
-      options={props.options}
-      value={props.value}
-    />
+    <ProductGlassOptionGrid aria-label={props.ariaLabel} role="group">
+      {props.options.map((option) => (
+        <ProductGlassChip
+          active={option.value === props.value}
+          aria-pressed={option.value === props.value}
+          key={option.value}
+          onClick={() => props.onChange(option.value)}
+          type="button"
+        >
+          {option.label}
+        </ProductGlassChip>
+      ))}
+    </ProductGlassOptionGrid>
   );
 }

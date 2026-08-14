@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import {
@@ -24,8 +24,10 @@ export function FrameAnnotationCreationControls(props: {
   activeMenu?: FrameAnnotationCreationMenu | null;
   context?: 'content' | 'editor';
   dataUi?: string;
+  disabled?: boolean;
   enableCallout?: () => CalloutSettings;
   enableStepBadge?: () => StepBadgeSettings;
+  frameActive?: boolean;
   onChange: (settings: FrameAnnotationCreationSettings) => void;
   onMenuChange?: (menu: FrameAnnotationCreationMenu | null) => void;
   portalTarget?: HTMLElement | DocumentFragment | ShadowRoot;
@@ -36,10 +38,11 @@ export function FrameAnnotationCreationControls(props: {
   calloutTemplateSourceControl?: TemplateSourceControl;
   stepBadgeTemplateSourceControl?: TemplateSourceControl;
 }) {
+  const { activeMenu: controlledActiveMenu, frameActive = true, onMenuChange } = props;
   const [internalActiveMenu, setInternalActiveMenu] = useState<FrameAnnotationCreationMenu | null>(
     null
   );
-  const activeMenu = props.activeMenu === undefined ? internalActiveMenu : props.activeMenu;
+  const activeMenu = controlledActiveMenu === undefined ? internalActiveMenu : controlledActiveMenu;
   const frameRef = useRef<HTMLButtonElement>(null);
   const calloutRef = useRef<HTMLButtonElement>(null);
   const stepBadgeRef = useRef<HTMLButtonElement>(null);
@@ -48,10 +51,15 @@ export function FrameAnnotationCreationControls(props: {
     props.onChange({ ...props.settings, ...patch });
   const setActiveMenu = (menu: FrameAnnotationCreationMenu | null) => {
     if (props.activeMenu === undefined) setInternalActiveMenu(menu);
-    props.onMenuChange?.(menu);
+    onMenuChange?.(menu);
   };
   const toggle = (menu: FrameAnnotationCreationMenu) =>
     setActiveMenu(activeMenu === menu ? null : menu);
+  useEffect(() => {
+    if (frameActive || activeMenu === null) return;
+    if (controlledActiveMenu === undefined) setInternalActiveMenu(null);
+    onMenuChange?.(null);
+  }, [activeMenu, controlledActiveMenu, frameActive, onMenuChange]);
   const contentContext = props.context === 'content';
   const showCallout = props.showCallout ?? true;
   const showStepBadge = props.showStepBadge ?? true;
@@ -70,8 +78,10 @@ export function FrameAnnotationCreationControls(props: {
       <FrameStyleCreationButton
         activeMenu={activeMenu}
         contentContext={contentContext}
+        disabled={props.disabled ?? false}
         {...(props.dataUi ? { dataUi: props.dataUi } : {})}
         frameRef={frameRef}
+        frameActive={frameActive}
         settings={props.settings}
         toggle={toggle}
       />
@@ -79,6 +89,7 @@ export function FrameAnnotationCreationControls(props: {
         activeMenu={activeMenu}
         calloutRef={calloutRef}
         contentContext={contentContext}
+        disabled={props.disabled ?? false}
         enableCallout={enableCallout}
         enableStepBadge={enableStepBadge}
         settings={props.settings}

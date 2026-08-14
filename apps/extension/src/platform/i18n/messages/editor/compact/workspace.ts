@@ -10,12 +10,12 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     en: 'Workspace color',
   },
   workspaceBacking: {
-    ru: 'Подложка',
-    en: 'Backing',
+    ru: 'Фон рабочей зоны',
+    en: 'Workspace background',
   },
   neutralPresets: {
-    ru: 'Нейтральные шаблоны',
-    en: 'Neutral presets',
+    ru: 'Палитра',
+    en: 'Palette',
   },
   workspaceDefaultHint: {
     ru: 'Изменение действует только в текущей сессии редактора.',
@@ -104,6 +104,10 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
   technicalDataLayout: {
     ru: 'Расположение',
     en: 'Layout',
+  },
+  technicalDataFields: {
+    ru: 'Данные страницы',
+    en: 'Page details',
   },
   technicalDataLayoutColumn: {
     ru: 'Столбец',

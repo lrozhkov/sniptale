@@ -35,8 +35,8 @@ type DrawingSettingsUpdate = <Tool extends ConfigurableTool>(
 type DrawingColorContext = {
   colors: readonly string[];
   floatingBoundaryRef: RefObject<HTMLElement | null>;
-  floatingPlacement: 'side';
-  vertical: true;
+  floatingPlacement: 'auto';
+  vertical: false;
 };
 
 function useDrawingPalette() {
@@ -64,18 +64,18 @@ function PencilOptions(props: {
 }) {
   return (
     <>
-      <DrawingWidthOptions
-        tool="pencil"
-        value={props.settings.width}
-        values={DRAWING_PENCIL_WIDTHS}
-        onChange={(width) => props.update('pencil', { width })}
-      />
-      <DrawingOptionsDivider vertical />
       <DrawingColorOptions
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('pencil', { color })}
+      />
+      <DrawingOptionsDivider vertical={false} />
+      <DrawingWidthOptions
+        tool="pencil"
+        value={props.settings.width}
+        values={DRAWING_PENCIL_WIDTHS}
+        onChange={(width) => props.update('pencil', { width })}
       />
     </>
   );
@@ -88,23 +88,23 @@ function MarkerOptions(props: {
 }) {
   return (
     <>
+      <DrawingColorOptions
+        {...props.common}
+        label={translate('content.toolbar.drawingColor')}
+        value={props.settings.color}
+        onSelect={(color) => props.update('marker', { color })}
+      />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
         tool="marker"
         value={props.settings.width}
         values={DRAWING_MARKER_WIDTHS}
         onChange={(width) => props.update('marker', { width })}
       />
-      <DrawingOptionsDivider vertical />
+      <DrawingOptionsDivider vertical={false} />
       <MarkerOpacityOptions
         value={props.settings.opacity}
         onChange={(opacity) => props.update('marker', { opacity })}
-      />
-      <DrawingOptionsDivider vertical />
-      <DrawingColorOptions
-        {...props.common}
-        label={translate('content.toolbar.drawingColor')}
-        value={props.settings.color}
-        onSelect={(color) => props.update('marker', { color })}
       />
     </>
   );
@@ -121,21 +121,21 @@ function ShapeOptions(props: {
         value={props.settings.kind}
         onChange={(kind) => props.update('shape', { kind })}
       />
-      <DrawingOptionsDivider vertical />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
         tool="shape"
         value={props.settings.width}
         values={DRAWING_OUTLINE_WIDTHS}
         onChange={(width) => props.update('shape', { width })}
       />
-      <DrawingOptionsDivider vertical />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingColorOptions
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('shape', { color })}
       />
-      <DrawingOptionsDivider vertical />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingShapeFillOptions
         {...props.common}
         value={props.settings.fillColor}
@@ -152,24 +152,24 @@ function ArrowOptions(props: {
 }) {
   return (
     <>
-      <ArrowWidthModeOptions
-        design={props.settings.design}
-        dynamic={props.settings.dynamicWidth}
-        onChange={(patch) => props.update('arrow', patch)}
+      <DrawingColorOptions
+        {...props.common}
+        label={translate('content.toolbar.drawingColor')}
+        value={props.settings.color}
+        onSelect={(color) => props.update('arrow', { color })}
       />
-      <DrawingOptionsDivider vertical />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
         tool="arrow"
         value={props.settings.width}
         values={DRAWING_ARROW_WIDTHS}
         onChange={(width) => props.update('arrow', { width })}
       />
-      <DrawingOptionsDivider vertical />
-      <DrawingColorOptions
-        {...props.common}
-        label={translate('content.toolbar.drawingColor')}
-        value={props.settings.color}
-        onSelect={(color) => props.update('arrow', { color })}
+      <DrawingOptionsDivider vertical={false} />
+      <ArrowWidthModeOptions
+        design={props.settings.design}
+        dynamic={props.settings.dynamicWidth}
+        onChange={(patch) => props.update('arrow', patch)}
       />
     </>
   );
@@ -255,21 +255,21 @@ export function EditorDrawingOptions(props: {
   const common = {
     colors,
     floatingBoundaryRef: panelRef,
-    floatingPlacement: 'side' as const,
-    vertical: true as const,
+    floatingPlacement: 'auto' as const,
+    vertical: false as const,
   };
 
   return (
     <div
       ref={panelRef}
       data-ui="editor.drawing.options"
-      className="flex flex-col items-center gap-2 p-2"
+      className="flex flex-row items-center gap-2 overflow-x-auto p-2"
     >
       <ToolOptions common={common} settings={values} tool={props.tool} update={update} />
       {selected ? (
         <>
           {props.tool === 'blur' || props.tool === 'selection' ? null : (
-            <DrawingOptionsDivider vertical />
+            <DrawingOptionsDivider vertical={false} />
           )}
           <DrawingDeselectOption onClick={props.onClearSelection} />
           <DrawingDeleteOption onClick={props.onDeleteSelection} />

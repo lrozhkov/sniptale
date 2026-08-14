@@ -16,6 +16,7 @@ import type { useEditorInspectorSidebarActions } from './actions';
 import type { useEditorInspectorSidebarDerived } from './derived';
 import type { useEditorInspectorSidebarLocalState } from './local-state';
 import type { EditorInspectorRichShapeState } from '../types';
+import { closeEditorPageDocument } from '../../workflows/close-page-document';
 
 type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
 type EditorInspectorDerivedState = ReturnType<typeof useEditorInspectorSidebarDerived>;
@@ -258,28 +259,26 @@ export function createCloseDocumentHandler(args: {
   requestConfirm: EditorInspectorLocalState['requestConfirm'];
   setSavePresetPickerOpen: EditorInspectorLocalState['setSavePresetPickerOpen'];
 }) {
-  const closeDocument = () => {
-    args.setSavePresetPickerOpen(false);
-    args.controller.closeDocument();
-  };
+  const closeDocument = () =>
+    closeEditorPageDocument({
+      controller: args.controller,
+      closeSavePicker: () => args.setSavePresetPickerOpen(false),
+    });
 
-  return () => {
+  return async () => {
     if (!args.hasImage) {
-      closeDocument();
+      await closeDocument();
       return;
     }
 
-    void args
-      .requestConfirm({
-        title: translate('editor.documentActions.closeFile'),
-        message: translate('editor.documentActions.confirmCloseDocument'),
-        confirmText: translate('common.actions.close'),
-        cancelText: translate('common.actions.cancel'),
-      })
-      .then((confirmed) => {
-        if (confirmed) {
-          closeDocument();
-        }
-      });
+    const confirmed = await args.requestConfirm({
+      title: translate('editor.documentActions.closeFile'),
+      message: translate('editor.documentActions.confirmCloseDocument'),
+      confirmText: translate('common.actions.close'),
+      cancelText: translate('common.actions.cancel'),
+    });
+    if (confirmed) {
+      await closeDocument();
+    }
   };
 }

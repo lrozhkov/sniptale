@@ -24,15 +24,15 @@ it('previews selected data in canonical order and inserts it as a row', () => {
   const onInsert = vi.fn();
   act(() => root.render(<EditorTechnicalDataPicker onInsert={onInsert} />));
 
-  const checkboxes = Array.from(container.querySelectorAll<HTMLInputElement>('input'));
-  const layout = Array.from(container.querySelectorAll('button')).find(
-    (button) => button.getAttribute('aria-label') === 'editor.compact.technicalDataLayout'
+  const buttons = Array.from(container.querySelectorAll('button'));
+  const layout = buttons.find(
+    (button) => button.textContent === 'editor.compact.technicalDataLayoutRow'
   );
 
   act(() => {
     layout?.click();
-    checkboxes[2]?.click();
-    checkboxes[0]?.click();
+    buttons.find((button) => button.textContent === 'editor.compact.browser')?.click();
+    buttons.find((button) => button.textContent === 'editor.compact.pageUrl')?.click();
   });
 
   const preview = container.querySelector('[aria-label="editor.compact.technicalDataPreview"]');

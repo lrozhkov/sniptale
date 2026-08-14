@@ -9,14 +9,21 @@ import { EditorSaveToFolderDialog } from './save-to-folder-dialog';
 let dialogProps: ProductSaveDialogProps | null = null;
 
 vi.mock('@sniptale/ui/product-save-dialog', () => ({
-  ProductSaveDialog: (props: ProductSaveDialogProps) => {
+  ProductSaveDialogSurface: (props: ProductSaveDialogProps) => {
     dialogProps = props;
-    return <div data-ui="mock.save-dialog">{props.footer}</div>;
+    return (
+      <div data-ui="mock.save-dialog">
+        <input aria-label="Filename" />
+        <button type="button">Save</button>
+        {props.footer}
+      </div>
+    );
   },
 }));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let anchor: HTMLButtonElement | null = null;
 
 function createController(overrides: Record<string, unknown> = {}) {
   return {
@@ -29,11 +36,23 @@ function createController(overrides: Record<string, unknown> = {}) {
 
 function renderDialog(controller: ReturnType<typeof createController>, onClose = vi.fn()) {
   container = document.createElement('div');
-  document.body.appendChild(container);
+  anchor = document.createElement('button');
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    bottom: 48,
+    height: 36,
+    left: 700,
+    right: 736,
+    top: 12,
+    width: 36,
+    x: 700,
+    y: 12,
+    toJSON: () => ({}),
+  });
+  document.body.append(container, anchor);
   root = createRoot(container);
   const element = Reflect.apply(createElement, null, [
     EditorSaveToFolderDialog,
-    { controller, defaultFilename: 'capture.png', onClose },
+    { anchorEl: anchor, controller, defaultFilename: 'capture.png', onClose },
   ]);
   act(() => root?.render(element));
   return { controller, onClose };
@@ -49,7 +68,9 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   container?.remove();
+  anchor?.remove();
   container = null;
+  anchor = null;
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -68,7 +89,7 @@ it('maps presets, editable filename, saving success, and delayed close', async (
   });
 
   expect(controller.saveToPreset).toHaveBeenCalledWith('docs', { filename: 'named.png' });
-  expect(container?.querySelector('[role="status"]')).not.toBeNull();
+  expect(document.querySelector('[role="status"]')).not.toBeNull();
   act(() => vi.advanceTimersByTime(450));
   expect(onClose).toHaveBeenCalledOnce();
 });
@@ -81,10 +102,10 @@ it('surfaces save errors and clears them after the filename changes', async () =
     if (dialogProps) Reflect.apply(dialogProps.onChoosePreset, null, ['docs', {}]);
     await Promise.resolve();
   });
-  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
 
   act(() => dialogProps?.onFilenameChange('retry.png'));
-  expect(container?.querySelector('[role="alert"]')).toBeNull();
+  expect(document.querySelector('[role="alert"]')).toBeNull();
 });
 
 it('routes system-folder saves and ignores another action while saving', async () => {
@@ -102,7 +123,7 @@ it('routes system-folder saves and ignores another action while saving', async (
   });
   expect(controller.onSaveImageAs).toHaveBeenCalledOnce();
   expect(dialogProps?.disabled).toBe(true);
-  expect(container?.querySelector('[role="status"]')).not.toBeNull();
+  expect(document.querySelector('[role="status"]')).not.toBeNull();
 
   await act(async () => resolveSave());
   expect(controller.onSaveImageAs).toHaveBeenCalledWith({ filename: 'capture.png' });
@@ -125,4 +146,29 @@ it('does not publish async state or delayed close after unmount', async () => {
   act(() => vi.advanceTimersByTime(450));
 
   expect(onClose).not.toHaveBeenCalled();
+});
+
+it('anchors below its trigger and dismisses on Escape or an outside pointer', () => {
+  const { onClose } = renderDialog(createController());
+  const positioner = document.querySelector<HTMLElement>('.sniptale-content-popover-positioner');
+
+  expect(positioner?.style.position).toBe('fixed');
+  expect(positioner?.style.top).toBe('56px');
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Filename');
+
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(onClose).toHaveBeenCalledOnce();
+
+  act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(onClose).toHaveBeenCalledTimes(2);
+});
+
+it('restores focus to the save trigger when the dialog unmounts', () => {
+  renderDialog(createController());
+  expect(document.activeElement).not.toBe(anchor);
+
+  act(() => root?.render(null));
+
+  expect(document.activeElement).toBe(anchor);
 });

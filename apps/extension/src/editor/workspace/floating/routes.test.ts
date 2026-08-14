@@ -15,7 +15,7 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'tool',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
+  ).toEqual({ leftDrawer: null });
   expect(
     resolveFloatingSurfaceRoute({
       activeTool: 'select',
@@ -23,7 +23,7 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'workspace',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
+  ).toEqual({ leftDrawer: null });
   expect(
     resolveFloatingSurfaceRoute({
       activeTool: 'select',
@@ -31,10 +31,10 @@ it('keeps the suspended shape catalog closed while routing utility inspectors an
       inspector: 'tool',
       selection: { ...emptySelection, hasSelection: true, selectedObjectCount: 2 },
     })
-  ).toEqual({ canvasSelectionToolbar: true, leftDrawer: null });
+  ).toEqual({ leftDrawer: null });
 });
 
-it('suppresses drawers and selection toolbar for dismissed, empty, crop, and frame annotation states', () => {
+it('keeps the suspended drawer closed across editor interaction states', () => {
   expect(
     resolveFloatingSurfaceRoute({
       activeTool: 'shape',
@@ -46,36 +46,15 @@ it('suppresses drawers and selection toolbar for dismissed, empty, crop, and fra
   ).toBeNull();
   expect(
     resolveFloatingSurfaceRoute({
-      activeTool: 'crop',
-      hasImage: true,
-      inspector: 'tool',
-      selection: { ...emptySelection, hasSelection: true },
-    }).canvasSelectionToolbar
-  ).toBe(false);
-  expect(
-    resolveFloatingSurfaceRoute({
-      activeTool: 'select',
-      hasImage: true,
-      inspector: 'tool',
-      selection: {
-        ...emptySelection,
-        hasSelection: true,
-        selectedObjectCount: 1,
-        selectedObjectType: 'frame-annotation',
-      },
-    }).canvasSelectionToolbar
-  ).toBe(false);
-  expect(
-    resolveFloatingSurfaceRoute({
       activeTool: 'shape',
       hasImage: false,
       inspector: 'tool',
       selection: emptySelection,
     })
-  ).toEqual({ canvasSelectionToolbar: false, leftDrawer: null });
+  ).toEqual({ leftDrawer: null });
 });
 
-it('keeps the generic lock toolbar away from single and multi drawing selections', () => {
+it('does not add a canvas toolbar route for drawing selections', () => {
   for (const selection of [
     {
       ...emptySelection,
@@ -98,7 +77,7 @@ it('keeps the generic lock toolbar away from single and multi drawing selections
         hasImage: true,
         inspector: 'tool',
         selection,
-      }).canvasSelectionToolbar
-    ).toBe(false);
+      })
+    ).toEqual({ leftDrawer: null });
   }
 });

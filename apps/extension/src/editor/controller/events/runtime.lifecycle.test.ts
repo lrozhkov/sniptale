@@ -61,7 +61,6 @@ vi.mock('../tools/annotation-resize', async (importOriginal) => ({
   normalizeScaledAnnotationTarget: mocks.normalizeScaledAnnotationTarget,
 }));
 
-import { createMouseMoveBeforeHandler } from './runtime.hover';
 import { createObjectModifiedHandler } from './runtime.object-modified';
 import { createObjectScalingHandler } from './runtime.object-scaling';
 import { createSelectionChangeHandler } from './runtime.selection';
@@ -77,16 +76,7 @@ beforeEach(() => {
   mocks.canonicalizeModifiedEditorDrawingSelection.mockReturnValue(null);
 });
 
-it('resets hover cursor and syncs selection changes', () => {
-  const canvas = { defaultCursor: 'crosshair' };
-  Reflect.apply(createMouseMoveBeforeHandler, null, [{ getCanvas: () => null }])({
-    e: new MouseEvent('mousemove'),
-  });
-  Reflect.apply(createMouseMoveBeforeHandler, null, [{ getCanvas: () => canvas }])({
-    e: new MouseEvent('mousemove'),
-  });
-  expect(canvas.defaultCursor).toBe('default');
-
+it('syncs selection changes without overriding the active tool cursor', () => {
   const syncRuntimeState = vi.fn();
   createSelectionChangeHandler({ getCanvas: () => null, syncRuntimeState })();
   expect(syncRuntimeState).toHaveBeenCalledOnce();

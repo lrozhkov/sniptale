@@ -11,15 +11,30 @@ import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotat
 import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
 
 const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
+const frameAnnotationExportQueues = new WeakMap<Canvas, Promise<void>>();
 
 export async function renderEditorWithFrameAnnotations(options: {
   canvas: Canvas | null;
   canvasDocumentSize: { width: number; height: number };
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
-  flushActiveFrameAnnotationDraft();
   const canvas = options.canvas;
-  if (!canvas) return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
+  if (!canvas) {
+    flushActiveFrameAnnotationDraft();
+    return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
+  }
+  return enqueueFrameAnnotationExport(canvas, () =>
+    renderEditorWithFrameAnnotationsInTurn({ ...options, canvas })
+  );
+}
+
+async function renderEditorWithFrameAnnotationsInTurn(options: {
+  canvas: Canvas;
+  canvasDocumentSize: { width: number; height: number };
+  renderOptions: EditorRenderToDataUrlOptions;
+}): Promise<string> {
+  flushActiveFrameAnnotationDraft();
+  const { canvas } = options;
   const entries = collectFrameAnnotationProxies(canvas.getObjects());
   if (entries.length === 0) return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
 
@@ -51,6 +66,21 @@ export async function renderEditorWithFrameAnnotations(options: {
     showToast(translate('highlighter.exportOptimizedSize'), 'warning');
   }
   return result;
+}
+
+function enqueueFrameAnnotationExport<T>(canvas: Canvas, operation: () => Promise<T>): Promise<T> {
+  const predecessor = frameAnnotationExportQueues.get(canvas) ?? Promise.resolve();
+  const work = predecessor.then(operation);
+  const settled = work.then(
+    () => undefined,
+    () => undefined
+  );
+  frameAnnotationExportQueues.set(canvas, settled);
+  return work.finally(() => {
+    if (frameAnnotationExportQueues.get(canvas) === settled) {
+      frameAnnotationExportQueues.delete(canvas);
+    }
+  });
 }
 
 async function renderBaseImage(canvas: Canvas, proxies: FabricObject[]): Promise<Blob> {

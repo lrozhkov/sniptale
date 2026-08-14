@@ -27,7 +27,7 @@ Conventional roles are:
 - `styles/` for owner-local token-driven styles.
 - `test-support/` or `*.test-support.ts(x)` for owner-local fixtures and mocks.
 
-Create an owner folder when behavior spans multiple files, combines state with effects, exposes contracts plus adapters, or has likely independent extensions. Do not add placeholder folders. Split an existing owner by independent change reason and dependency direction, not solely by line count. The resulting owners must remain stable under the likely next changes; moving the same broad state/effect contract into neighboring files creates a distributed god-object rather than a real split.
+Create an owner folder when current behavior spans multiple files, combines state with effects, exposes contracts plus adapters, or already has independent change reasons. Do not add placeholder folders or ownership seams for hypothetical extensions. Split an existing owner by current independent change reason and dependency direction, not solely by line count. Known accepted adjacent changes may test whether the result is immediately brittle, but must not cause speculative structure; moving the same broad state/effect contract into neighboring files creates a distributed god-object rather than a real split.
 
 Evaluate topology as an owner/change-reason cluster and choose `Split`, `Consolidate`, or `Keep`. The target is the fewest navigation transitions needed to understand an operation while preserving explicit architectural boundaries, not the fewest files. Consolidate only within one owner and one shared reason to change. Forwarding-only modules, getter/setter/ref/sync proxy families, facade or re-export ladders, single-consumer files without an independent contract, groups of tiny files implementing one operation, and tests that only prove delegation are consolidation signals; corroborate at least two signal families and retain a proven existing merge target.
 
@@ -35,7 +35,7 @@ A forwarding-only module with exactly one production consumer is direct edge-lev
 
 A workflow may be an explicit orchestration owner when it coordinates one cohesive domain transaction through narrow adapters, owns recovery, avoids UI effects, and keeps branching bounded. Adapter owners may combine a platform effect with logging or error translation; a stateful adapter is narrow only when all mutations resolve to one normalized receiver root. UI owners are stricter: browser privilege, persistence, transport, and unrelated workflow authority stay behind application/workflow seams.
 
-Every topology change proves the negative shape as well as the positive contract: no new cycles, dual state authorities, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, or UI mixed with privileged, persistence, or transport effects. Preserve business ordering, failure, rollback, and cleanup evidence. A cohesive transaction owner with narrow adapters is a valid `Keep` even when its effects, state, or recovery are concentrated.
+Every topology change proves the negative shape as well as the positive contract: no new cycles, dual state authorities, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, or UI mixed with privileged, persistence, or transport effects. Preserve business ordering and the reachable failure, rollback, and cleanup behavior already required by acceptance or material invariants. A cohesive transaction owner with narrow adapters is a valid `Keep` even when its effects, state, or recovery are concentrated.
 
 ## Public surfaces
 
@@ -53,4 +53,4 @@ Local React or page state is disposable until an explicit persistence mutation c
 
 ## Tests
 
-Keep tests beside their owner. Add boundary, lifecycle, stale-result, rollback, failure, and fixture-heavy cases to focused owner-local test files instead of extending a mixed hotspot. A helper may support tests but must not become a second public API.
+Keep tests beside their owner. When the changed control flow actually exposes boundary, lifecycle, stale-result, rollback, or failure states, add their acceptance-shaped proof to focused owner-local test files instead of extending a mixed hotspot. Do not add states or fixtures solely to complete a theoretical matrix. A helper may support tests but must not become a second public API.
