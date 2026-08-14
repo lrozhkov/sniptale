@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { ExportPagesDrawerList, ExportPagesHeader } from './drawer';
 import { getSelectedTabs, getShouldShowClearAll, useScrollCurrentRowIntoView } from './helpers';
 import { ExportPagesSummary } from './summary';

@@ -7,13 +7,13 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 import {
-  createPopupAppShellRuntime,
-  type PopupRuntimeStateOverrides,
+  createPopupVideoSetupRuntime,
+  type PopupVideoSetupRuntimeOverrides,
 } from '../test-support/runtime';
 import { createPopupVideoSetupHandlers } from './handlers';
 
-function createRuntime(overrides: PopupRuntimeStateOverrides = {}): PopupVideoSetupRuntime {
-  return createPopupAppShellRuntime({
+function createRuntime(overrides: PopupVideoSetupRuntimeOverrides = {}): PopupVideoSetupRuntime {
+  return createPopupVideoSetupRuntime({
     galleryStatus: null,
     selectedPresetId: null,
     ...overrides,
@@ -49,6 +49,18 @@ it('preserves an active window preset when capture changes to TAB_CROP', () => {
 
   expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.TAB_CROP);
   expect(runtime.recording.setSelectedPresetId).not.toHaveBeenCalled();
+});
+
+it('clears a stale preset when the capture mode changes', () => {
+  const runtime = createRuntime({
+    selectedPresetId: 'missing',
+    videoCaptureMode: CaptureMode.TAB,
+  });
+
+  createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.CAMERA);
+
+  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
+  expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.CAMERA);
 });
 
 it('preserves a window preset when capture changes to TAB_CROP', () => {

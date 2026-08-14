@@ -8,7 +8,7 @@ import type {
   PageAccessStatus,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { PageAccessOperation as PageAccessOperationValue } from '@sniptale/runtime-contracts/messaging/page-access';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import {
   createRuntimeMessagingTransport,
   getErrorMessage,

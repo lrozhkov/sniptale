@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 export const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 export const sourceRoot = path.join(repoRoot, 'docs/agent-tooling');
 
-const PAYLOAD_ROOTS = ['AGENTS.md', '.agents'];
+const PAYLOAD_ROOTS = ['AGENTS.md', 'DESIGN.md', '.agents'];
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/');

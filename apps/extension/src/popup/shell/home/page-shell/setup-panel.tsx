@@ -1,7 +1,7 @@
 import { Camera } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import {
   AfterCaptureField,

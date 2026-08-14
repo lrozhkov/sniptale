@@ -1,4 +1,4 @@
-import type { PopupRuntimeStateSlice } from './state';
+import type { PopupVideoRuntimeStateSlice } from './types/internal-state';
 import type { PopupRuntimeActionHandlers } from './types/action-handlers';
 import { useToggleMicrophoneHandler } from './microphone';
 import { useToggleWebcamHandler } from './webcam';
@@ -7,7 +7,9 @@ import { usePauseResumeHandler } from './transport/pause';
 import { useStopHandler } from './transport/stop';
 import { useUpdateRecordingSettingsHandler } from './transport/settings';
 
-export function usePopupRuntimeHandlers(state: PopupRuntimeStateSlice): PopupRuntimeActionHandlers {
+export function usePopupRuntimeHandlers(
+  state: PopupVideoRuntimeStateSlice
+): PopupRuntimeActionHandlers {
   const setRecordingError = (error: string | null) => {
     state.recording.setRecordingState((current) => ({
       ...current,

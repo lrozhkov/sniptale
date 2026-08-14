@@ -8,7 +8,7 @@ const { loadWebcamDevicesMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
   resolveWebcamDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
 }));
 
-vi.mock('../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => key,
 }));
 

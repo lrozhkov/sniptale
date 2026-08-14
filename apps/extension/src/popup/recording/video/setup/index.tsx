@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { VideoSetupFooter } from '../footer';
 import {
   acknowledgeVideoPostRecordResult,
@@ -63,9 +63,12 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
 
 function useVideoPostRecordState(props: VideoSetupPageProps) {
   const postRecordVerificationTokenRef = useRef(0);
-  const state = usePostRecordLocalState();
-  const displayProps = createPostRecordDisplayProps(props, state);
   const verificationKey = createPostRecordVerificationKey(props);
+  const state = usePostRecordLocalState(
+    props.initialPostRecordResult ?? null,
+    props.initialPostRecordVerified === true ? verificationKey : null
+  );
+  const displayProps = createPostRecordDisplayProps(props, state);
   const hasVerificationError = state.failedVerificationKey === verificationKey;
   const isVerificationPending =
     state.verifiedRecordingKey !== verificationKey && !hasVerificationError;
@@ -120,13 +123,20 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
   };
 }
 
-function usePostRecordLocalState() {
+function usePostRecordLocalState(
+  initialPostRecordResult: VideoPostRecordResult | null,
+  initialVerifiedRecordingKey: string | null
+) {
   const [isCancellingStart, setIsCancellingStart] = useState(false);
   const [isDiscardingRecording, setIsDiscardingRecording] = useState(false);
   const [failedVerificationKey, setFailedVerificationKey] = useState<string | null>(null);
-  const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(null);
+  const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(
+    initialPostRecordResult
+  );
   const [verificationAttempt, setVerificationAttempt] = useState(0);
-  const [verifiedRecordingKey, setVerifiedRecordingKey] = useState<string | null>(null);
+  const [verifiedRecordingKey, setVerifiedRecordingKey] = useState<string | null>(
+    initialVerifiedRecordingKey
+  );
 
   return {
     failedVerificationKey,

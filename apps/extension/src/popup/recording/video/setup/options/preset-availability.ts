@@ -4,7 +4,7 @@ import type { ViewportPreset } from '../../../../../contracts/settings';
 import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { getPopupRuntimeServices } from '../../../../runtime-services';
 import { getViewportPresetErrorMessage } from '../../../../../features/viewport-presets/error-message';
 import { createViewportPresetAvailabilityMap } from '../../../../../features/viewport-presets/availability';

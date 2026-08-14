@@ -31,9 +31,7 @@ function parseRecordingRuntimeMessage(message: unknown): RecordingRuntimeMessage
 export function subscribeToRecordingMessages(handlers: RecordingMessageHandlers): () => void {
   const listener = (message: unknown) => {
     const typedMessage = parseRecordingRuntimeMessage(message);
-    if (!typedMessage) {
-      return;
-    }
+    if (!typedMessage) return;
 
     if (typedMessage.type === VideoMessageType.RECORDING_STATE_SYNC && typedMessage.state) {
       handlers.onRecordingState(typedMessage.state);

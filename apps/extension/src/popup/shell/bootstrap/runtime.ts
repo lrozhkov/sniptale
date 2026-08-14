@@ -1,8 +1,3 @@
-import {
-  createRuntimeMessagingTransport,
-  type RuntimeMessagingTransport,
-} from '../../../platform/runtime-messaging';
-
-export type { RuntimeMessagingTransport };
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 
 export const popupBootstrapTransport = createRuntimeMessagingTransport();

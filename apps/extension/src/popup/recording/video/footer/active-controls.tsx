@@ -1,6 +1,6 @@
 import { Pause, Play, Square, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import {
   actionFooterSurfaceClassName,

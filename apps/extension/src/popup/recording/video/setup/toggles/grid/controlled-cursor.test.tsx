@@ -2,8 +2,8 @@ import { Activity } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
-vi.mock('../../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../../platform/i18n')>()),
+vi.mock('../../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 

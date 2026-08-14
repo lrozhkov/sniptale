@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getDefaultPopupExportRuntimeDeps } from './default-deps';
 import { logPopupExportCancelFailure } from './logging';

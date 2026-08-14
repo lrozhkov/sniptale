@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-
-import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
+import type { ViewportPreset } from '../../../../contracts/settings';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../../features/media-hub/storage-capacity';
 import type {
@@ -12,49 +11,19 @@ import type { MicrophoneOption } from '../../../recording/microphone';
 import type { RefreshMicrophoneDevicesOptions } from '../../../recording/microphone-flow';
 import type { WebcamOption } from '../../../recording/webcam';
 import type { RefreshWebcamDevicesOptions } from '../../../recording/webcam-flow';
-import type { PopupPage } from '../../navigation/actions';
 import type { RecordingControlCapability } from '../recording-control-capability';
-import type {
-  ScreenshotSetupMode,
-  ScreenshotSetupState,
-} from '../../../../composition/persistence/capture-settings';
-import type { PopupNavigationResult, PopupNavigationSource } from './navigation';
 
-interface PopupRuntimeSessionState {
-  homeError: string | null;
-  isReady: boolean;
-  page: PopupPage;
-  pendingPage: PopupPage | null;
-  navigateToPage: (
-    page: PopupPage,
-    source?: PopupNavigationSource
-  ) => Promise<PopupNavigationResult>;
-  preloadPage: (page: PopupPage) => Promise<void>;
-  setHomeError: Dispatch<SetStateAction<string | null>>;
-  setIsReady: Dispatch<SetStateAction<boolean>>;
-  setPage: Dispatch<SetStateAction<PopupPage>>;
-}
-
-interface PopupRuntimePresetState {
-  quickActions: QuickAction[];
-  quickActionsReady: boolean;
+interface PopupVideoPresetState {
   viewportPresets: ViewportPreset[];
   videoCaptureMode: CaptureMode;
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
-  screenshotStartupMode: ScreenshotSetupMode | null;
-  initialScreenshotSetupState: ScreenshotSetupState;
-  clearScreenshotStartupMode: () => void;
-  setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
-  setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
   setViewportPresets: Dispatch<SetStateAction<ViewportPreset[]>>;
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
-  setScreenshotStartupMode: Dispatch<SetStateAction<ScreenshotSetupMode | null>>;
-  setInitialScreenshotSetupState: Dispatch<SetStateAction<ScreenshotSetupState>>;
 }
 
-interface PopupRuntimeRecordingState {
+interface PopupVideoRecordingState {
   recordingControlCapability: RecordingControlCapability | null;
   videoSettings: VideoRecordingSettings;
   recordingState: VideoRecordingRuntimeState;
@@ -69,7 +38,7 @@ interface PopupRuntimeRecordingState {
   clearStartError: () => void;
 }
 
-interface PopupRuntimeMediaDeviceState {
+interface PopupVideoMediaDeviceState {
   microphoneDevices: MicrophoneOption[];
   isLoadingMicrophones: boolean;
   webcamDevices: WebcamOption[];
@@ -80,7 +49,7 @@ interface PopupRuntimeMediaDeviceState {
   setIsLoadingWebcams: Dispatch<SetStateAction<boolean>>;
 }
 
-interface PopupRuntimeEnvironmentState {
+interface PopupVideoEnvironmentState {
   activeTabCapabilities: ActiveTabCapabilities;
   galleryStatus: { text: string; pressure: StoragePressureLevel } | null;
   setActiveTabCapabilities: Dispatch<SetStateAction<ActiveTabCapabilities>>;
@@ -89,31 +58,13 @@ interface PopupRuntimeEnvironmentState {
   >;
 }
 
-export interface PopupRuntimeDerivedState {
-  showFooter: boolean;
-}
-
-export interface PopupRuntimeRefreshActions {
-  refreshMicrophones: (options?: RefreshMicrophoneDevicesOptions) => Promise<MicrophoneOption[]>;
-  refreshWebcams: (options?: RefreshWebcamDevicesOptions) => Promise<WebcamOption[]>;
-  refreshGalleryStatus: () => Promise<void>;
-  refreshActiveTabCapabilities: () => Promise<void>;
-}
-
-export interface PopupRuntimeCoreState {
-  session: PopupRuntimeSessionState;
-  presets: Omit<PopupRuntimePresetState, 'selectedPreset'>;
-  recording: Omit<PopupRuntimeRecordingState, 'recordingActive'>;
-  devices: PopupRuntimeMediaDeviceState;
-  environment: PopupRuntimeEnvironmentState;
-}
-
-export interface PopupRuntimeStateSlice {
-  session: PopupRuntimeSessionState;
-  presets: PopupRuntimePresetState;
-  recording: PopupRuntimeRecordingState;
-  devices: PopupRuntimeMediaDeviceState;
-  environment: PopupRuntimeEnvironmentState;
-  actions: PopupRuntimeRefreshActions;
-  derived: PopupRuntimeDerivedState;
+export interface PopupVideoRuntimeStateSlice {
+  actions: {
+    refreshMicrophones: (options?: RefreshMicrophoneDevicesOptions) => Promise<MicrophoneOption[]>;
+    refreshWebcams: (options?: RefreshWebcamDevicesOptions) => Promise<WebcamOption[]>;
+  };
+  devices: PopupVideoMediaDeviceState;
+  environment: PopupVideoEnvironmentState;
+  presets: PopupVideoPresetState;
+  recording: PopupVideoRecordingState;
 }

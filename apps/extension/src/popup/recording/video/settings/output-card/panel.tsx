@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
 import {
   resolveVideoOutputProfile,

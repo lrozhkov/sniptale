@@ -55,7 +55,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

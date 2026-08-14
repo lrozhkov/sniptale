@@ -11,6 +11,7 @@ function createKit() {
   const sourceDirectory = path.join(root, 'docs/agent-tooling');
   const files = new Map([
     ['AGENTS.md', '# Agent rules\n'],
+    ['DESIGN.md', '# Product design rules\n'],
     ['.agents/README.md', '# Skills\n'],
     ['.agents/skills/review/SKILL.md', '# Review\n'],
   ]);

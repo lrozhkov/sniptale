@@ -16,7 +16,7 @@ vi.mock('../post-record/result-runtime', () => ({
   loadPendingVideoPostRecordResult: mocks.loadPostRecordResult,
 }));
 
-vi.mock('../../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -240,6 +240,26 @@ it(
   'builds a startable view model with independent viewport preset selection',
   verifiesStartableViewModel
 );
+it('uses an already verified startup post-record snapshot without another state request', async () => {
+  const result = {
+    primaryRecordingId: 'recording-1',
+    projectId: null,
+    recordingId: 'recording-1',
+  };
+  await renderNode(
+    <VideoSetupPage
+      {...createProps({
+        initialPostRecordResult: result,
+        initialPostRecordVerified: true,
+      })}
+    />
+  );
+  await act(async () => Promise.resolve());
+  expect(mocks.loadPostRecordResult).not.toHaveBeenCalled();
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ postRecordResult: result })
+  );
+});
 it('disables start when the current mode is unavailable or pending', verifiesDisabledStartState);
 
 it('shows saving state and clears the visible timer while discarding an active recording', async () => {

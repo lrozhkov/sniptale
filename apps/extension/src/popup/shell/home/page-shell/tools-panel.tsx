@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
-import { translate, type TranslationKey } from '../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 
 const tools: ReadonlyArray<{

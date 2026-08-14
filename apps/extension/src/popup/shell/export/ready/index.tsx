@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { ExportDataTypeSection } from '../data-type/section';
 import { ExportPagesSection } from '../pages/section';
 import type { PopupExportTabItem } from '../selection/tabs/types';

@@ -7,6 +7,7 @@ import {
   expectFloatingPreviewContained,
   expectThemeSurfaceToggle,
 } from './extension-smoke.helpers';
+import { verifyPopupStartupLifecycle } from './extension-smoke.popup-startup';
 
 const SETTINGS_AI_LABEL = translate('settings.navigation.ai', 'ru');
 const SETTINGS_AI_NAV_LABEL = translate('settings.navigation.aiConnections', 'ru');
@@ -282,113 +283,12 @@ test('built popup restores the correct first tab and never empties content on co
   await page.close();
 });
 
-test('built popup paints the themed startup shell before loading application styles', async ({
+test('built popup paints the saved-theme canvas without a startup loader', async ({
   context,
   extensionId,
 }, testInfo) => {
-  const frozenFirstPaintPage = await context.newPage();
-  await frozenFirstPaintPage.emulateMedia({
-    colorScheme: 'light',
-    reducedMotion: 'no-preference',
-  });
-  await frozenFirstPaintPage.addInitScript(() => {
-    window.requestAnimationFrame = () => 1;
-  });
-  await frozenFirstPaintPage.goto(
-    `chrome-extension://${extensionId}/apps/extension/src/popup/index.html`,
-    { waitUntil: 'domcontentloaded' }
-  );
-  const frozenStartup = frozenFirstPaintPage.locator('[data-ui="popup.app.startup-shell"]');
-  await expect(frozenStartup).toBeVisible();
-  await expect(frozenStartup).toHaveCSS('background-color', 'rgb(246, 242, 237)');
-  await mkdir(testInfo.outputDir, { recursive: true });
-  await frozenFirstPaintPage.screenshot({
-    path: testInfo.outputPath('popup-startup-light.png'),
-  });
-
-  await frozenFirstPaintPage.emulateMedia({
-    colorScheme: 'dark',
-    reducedMotion: 'no-preference',
-  });
-  await expect(frozenStartup).toHaveCSS('background-color', 'rgb(9, 9, 11)');
-  await frozenFirstPaintPage.screenshot({
-    path: testInfo.outputPath('popup-startup-dark.png'),
-  });
-  await frozenFirstPaintPage.close();
-
-  const page = await context.newPage();
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
-  await page.addInitScript(() => {
-    const probe = { phases: [] as string[] };
-    Object.assign(window, { __sniptalePopupPaintProbe: probe });
-    const sample = () => {
-      if (
-        document.querySelector('[data-ui="popup.app.startup-shell"]') &&
-        !probe.phases.includes('startup')
-      ) {
-        probe.phases.push('startup');
-      }
-      if (document.querySelector('[data-ui="popup.app.root"]') && !probe.phases.includes('react')) {
-        probe.phases.push('react');
-      }
-    };
-    new MutationObserver(sample).observe(document, { childList: true, subtree: true });
-  });
-
-  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
-  await expect(page.locator('[data-ui="popup.app.startup-shell"]')).toHaveCSS('opacity', '0');
-
-  const proof = await page.evaluate(() => {
-    const startup = document.querySelector<HTMLElement>('[data-ui="popup.app.startup-shell"]');
-    const root = document.querySelector<HTMLElement>('[data-ui="popup.app.root"]');
-    const firstPaint = performance
-      .getEntriesByType('paint')
-      .find((entry) => entry.name === 'first-paint');
-    const entryMark = performance.getEntriesByName('sniptale-popup-entry-evaluated').at(-1);
-
-    return {
-      entryMarkAt: entryMark?.startTime ?? null,
-      entryMarkCount: performance.getEntriesByName('sniptale-popup-entry-evaluated').length,
-      firstPaintAt: firstPaint?.startTime ?? null,
-      phases: (
-        window as typeof window & {
-          __sniptalePopupPaintProbe: { phases: string[] };
-        }
-      ).__sniptalePopupPaintProbe.phases,
-      rootBackground: root ? getComputedStyle(root).backgroundColor : null,
-      startupBackground: startup ? getComputedStyle(startup).backgroundColor : null,
-      startupOpacity: startup ? getComputedStyle(startup).opacity : null,
-      startupState: startup?.dataset['state'] ?? null,
-      styleSheetHrefs: Array.from(document.styleSheets, (styleSheet) => styleSheet.href),
-      transitionDuration: startup ? getComputedStyle(startup).transitionDuration : null,
-    };
-  });
-
-  expect(proof.phases.slice(0, 2)).toEqual(['startup', 'react']);
-  expect(proof.entryMarkCount).toBe(1);
-  expect(proof.firstPaintAt).not.toBeNull();
-  expect(proof.entryMarkAt).not.toBeNull();
-  expect(proof.firstPaintAt ?? 0).toBeGreaterThanOrEqual(proof.entryMarkAt ?? 0);
-  expect(proof.styleSheetHrefs).toHaveLength(4);
-  expect(proof.styleSheetHrefs[0]).toContain('/assets/index.css');
-  expect(proof.startupState).toBe('exiting');
-  expect(proof.startupOpacity).toBe('0');
-  expect(proof.startupBackground).toBe(proof.rootBackground);
-  expect(proof.transitionDuration).toContain('0.14s');
-
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
-  await expect(page.locator('[data-ui="popup.app.startup-shell"]')).toHaveCSS(
-    'transition-duration',
-    '0s'
-  );
-  await page.close();
+  await verifyPopupStartupLifecycle(context, extensionId, testInfo);
 });
-
 for (const extensionPage of extensionPages) {
   test(`${extensionPage.name} page renders and captures screenshot`, async ({
     page,

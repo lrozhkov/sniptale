@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { Mic, Play, Square } from 'lucide-react';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 
 const TEST_RECORDING_MAX_MS = 30_000;
 const BUTTON_CLASS_NAME = [

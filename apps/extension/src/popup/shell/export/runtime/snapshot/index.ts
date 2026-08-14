@@ -2,7 +2,7 @@ import type { PopupExportRuntimeDeps, PopupExportRuntimeContract } from '../type
 import { createSnapshotResult, requestSaveWebSnapshot } from './request';
 import { getWebSnapshotUnavailableError, setWebSnapshotError } from './state';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 
 function getSelectedSnapshotTabIds(state: PopupExportRuntimeContract): number[] {
   return state.selectedTabIdsInOrder.length > 0

@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "debtId": "accepted.scc.popup-shell-recording-route-composition",
+    "id": "popup-shell-recording-route-composition",
+    "owner": "apps/extension/src/popup/shell",
+    "reason": "Allowed composition: the popup shell dynamically selects the Video route, while that route composes recording UI with shell-owned bootstrap and runtime state.",
+    "owners": ["apps/extension/src/popup/recording", "apps/extension/src/popup/shell"],
+    "edges": [
+      ["apps/extension/src/popup/recording", "apps/extension/src/popup/shell"],
+      ["apps/extension/src/popup/shell", "apps/extension/src/popup/recording"]
+    ]
+  }
+]

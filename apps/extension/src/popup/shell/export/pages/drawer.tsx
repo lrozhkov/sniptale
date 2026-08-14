@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import type { MutableRefObject } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { cx } from '../selection/utils';
 import type { PopupExportTabItem } from '../selection/tabs/types';
 

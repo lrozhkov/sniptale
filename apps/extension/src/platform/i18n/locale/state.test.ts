@@ -26,12 +26,18 @@ vi.mock('../../../composition/persistence/infrastructure/browser-storage', () =>
 }));
 
 const LOCALE_STORAGE_KEY = 'sniptale-locale-preference';
+let browserStorageValues: Record<string, unknown> = {};
+let browserStorageChangeListener:
+  | ((changes: Record<string, { newValue?: unknown }>, areaName: chrome.storage.AreaName) => void)
+  | null = null;
 
 function resetLocaleMocks() {
   browserStorageMocks.get.mockReset();
   browserStorageMocks.isAvailable.mockReset();
   browserStorageMocks.set.mockReset();
   browserStorageMocks.subscribeToChanges.mockReset();
+  browserStorageValues = {};
+  browserStorageChangeListener = null;
   window.localStorage.clear();
 }
 
@@ -47,10 +53,15 @@ async function flushEffects() {
 
 beforeEach(() => {
   resetLocaleMocks();
-  browserStorageMocks.get.mockResolvedValue({});
+  browserStorageMocks.get.mockImplementation(async () => ({ ...browserStorageValues }));
   browserStorageMocks.isAvailable.mockReturnValue(false);
-  browserStorageMocks.set.mockResolvedValue(undefined);
-  browserStorageMocks.subscribeToChanges.mockReturnValue(() => undefined);
+  browserStorageMocks.set.mockImplementation(async (values: Record<string, unknown>) => {
+    Object.assign(browserStorageValues, values);
+  });
+  browserStorageMocks.subscribeToChanges.mockImplementation((listener) => {
+    browserStorageChangeListener = listener;
+    return () => undefined;
+  });
 });
 
 afterEach(() => {
@@ -74,6 +85,27 @@ describe('locale-state local storage access', () => {
 });
 
 describe('locale-state hydration', () => {
+  it('seeds the pre-hydration locale from the paint hint and reconciles it to browser storage', async () => {
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    browserStorageMocks.get.mockResolvedValue({
+      [LOCALE_STORAGE_KEY]: 'en',
+    });
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, DEFAULT_LOCALE);
+    const localeState = await importLocaleStateModule();
+    const localeListener = vi.fn();
+
+    expect(localeState.getCurrentLocale()).toBe(DEFAULT_LOCALE);
+
+    const dispose = localeState.subscribeToLocaleChanges(localeListener);
+    await vi.waitFor(() => {
+      expect(localeState.getCurrentLocale()).toBe('en');
+      expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
+      expect(localeListener).toHaveBeenCalledWith('en');
+    });
+
+    dispose();
+  });
+
   it('hydrates from browser storage and registers the shared storage listener once', async () => {
     browserStorageMocks.isAvailable.mockReturnValue(true);
     browserStorageMocks.get.mockResolvedValue({
@@ -90,11 +122,32 @@ describe('locale-state hydration', () => {
     expect(browserStorageMocks.subscribeToChanges).toHaveBeenCalledTimes(1);
     expect(localeState.getCurrentLocale()).toBe('en');
     expect(localeState.getStoredLocalePreference()).toBe('en');
-    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
-    expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
+    await vi.waitFor(() => {
+      expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+    });
 
     disposeFirst();
     disposeSecond();
+  });
+
+  it('removes the advisory paint hint when browser-storage authority is erased', async () => {
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    browserStorageValues[LOCALE_STORAGE_KEY] = 'en';
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'en');
+    const localeState = await importLocaleStateModule();
+    const dispose = localeState.subscribeToLocaleChanges(vi.fn());
+    await vi.waitFor(() => expect(localeState.getCurrentLocale()).toBe('en'));
+
+    delete browserStorageValues[LOCALE_STORAGE_KEY];
+    browserStorageChangeListener?.({ [LOCALE_STORAGE_KEY]: { newValue: undefined } }, 'local');
+
+    await vi.waitFor(() => {
+      expect(localeState.getCurrentLocale()).toBe(DEFAULT_LOCALE);
+      expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+    });
+
+    dispose();
   });
 });
 
@@ -109,11 +162,13 @@ async function verifySetLocalePreferenceFlow() {
 
   expect(localeState.getCurrentLocale()).toBe('en');
   expect(localeState.getStoredLocalePreference()).toBe('en');
-  expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+  expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en');
   expect(browserStorageMocks.set).toHaveBeenCalledWith({
     [LOCALE_STORAGE_KEY]: 'en',
   });
-  expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+  await vi.waitFor(() => {
+    expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+  });
 
   dispose();
 }
@@ -133,6 +188,9 @@ async function verifyCrossTabStorageFlow() {
   );
 
   expect(localeState.getCurrentLocale()).toBe('en');
+  await vi.waitFor(() => {
+    expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+  });
 
   window.localStorage.setItem(LOCALE_STORAGE_KEY, DEFAULT_LOCALE);
   window.dispatchEvent(
@@ -142,8 +200,10 @@ async function verifyCrossTabStorageFlow() {
   );
 
   expect(localeState.getCurrentLocale()).toBe(DEFAULT_LOCALE);
-  expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
-  expect(localeListener.mock.calls.map(([locale]) => locale)).toContain(DEFAULT_LOCALE);
+  await vi.waitFor(() => {
+    expect(localeListener.mock.calls.map(([locale]) => locale)).toContain('en');
+    expect(localeListener.mock.calls.map(([locale]) => locale)).toContain(DEFAULT_LOCALE);
+  });
 
   window.dispatchEvent(
     new CustomEvent(LOCALE_CHANGE_EVENT, {
@@ -173,7 +233,7 @@ describe('locale-state persistence and events', () => {
     const localeState = await importLocaleStateModule();
     const localeListener = vi.fn();
     const dispose = localeState.subscribeToLocaleChanges(localeListener);
-    await flushEffects();
+    await vi.waitFor(() => expect(localeListener).toHaveBeenCalled());
     localeListener.mockClear();
 
     await expect(localeState.setLocalePreference('en')).rejects.toThrow('persist failed');

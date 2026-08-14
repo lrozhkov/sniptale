@@ -1,7 +1,7 @@
 import { Download, Film, Images, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import {
   deleteVideoPostRecordResult,
   downloadSavedRecordingTracks,

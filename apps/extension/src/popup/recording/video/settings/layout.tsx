@@ -1,4 +1,4 @@
-import { getCurrentLocale, translate } from '../../../../platform/i18n';
+import { getCurrentLocale, translate } from '../../../../platform/i18n/popup';
 import {
   CaptureMode,
   normalizeVideoSourceCount,

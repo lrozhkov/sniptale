@@ -2,39 +2,38 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const popupIndexMocks = vi.hoisted(() => ({
-  entrypointLoadedMock: vi.fn(),
-  performanceMarkMock: vi.fn(),
-  requestAnimationFrameCallbacks: [] as FrameRequestCallback[],
+const mocks = vi.hoisted(() => ({
+  mark: vi.fn(),
+  renderPageShell: vi.fn(),
 }));
 
-vi.mock('./entrypoint', () => {
-  popupIndexMocks.entrypointLoadedMock();
-  return {};
-});
+vi.mock('../../../ui/page-bootstrap/page-bootstrap', () => ({
+  renderPageShell: mocks.renderPageShell,
+}));
+
+vi.mock('./index', () => ({ PopupApp: () => null }));
 
 beforeEach(() => {
-  vi.clearAllMocks();
   vi.resetModules();
-  popupIndexMocks.requestAnimationFrameCallbacks.length = 0;
-  vi.spyOn(performance, 'mark').mockImplementation(popupIndexMocks.performanceMarkMock);
-  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-    popupIndexMocks.requestAnimationFrameCallbacks.push(callback);
-    return popupIndexMocks.requestAnimationFrameCallbacks.length;
+  vi.clearAllMocks();
+  document.body.innerHTML = '<div id="root"></div>';
+  vi.spyOn(performance, 'mark').mockImplementation(mocks.mark);
+});
+
+it('renders the real React shell synchronously from the entry module', async () => {
+  await import('../..');
+
+  expect(mocks.mark).toHaveBeenCalledWith('sniptale-popup-entry-evaluated');
+  expect(mocks.renderPageShell).toHaveBeenCalledWith({
+    element: expect.anything(),
+    initializeTheme: false,
+    namespace: 'popup',
   });
 });
 
-it('marks the minimal popup entry before loading the React application graph', async () => {
+it('does not wait for synchronous theme initialization before rendering', async () => {
   await import('../..');
 
-  expect(popupIndexMocks.performanceMarkMock).toHaveBeenCalledWith(
-    'sniptale-popup-entry-evaluated'
-  );
-  expect(popupIndexMocks.entrypointLoadedMock).not.toHaveBeenCalled();
-
-  popupIndexMocks.requestAnimationFrameCallbacks.shift()?.(16);
-  expect(popupIndexMocks.entrypointLoadedMock).not.toHaveBeenCalled();
-
-  popupIndexMocks.requestAnimationFrameCallbacks.shift()?.(32);
-  await vi.waitFor(() => expect(popupIndexMocks.entrypointLoadedMock).toHaveBeenCalledTimes(1));
+  expect(mocks.renderPageShell).toHaveBeenCalledOnce();
+  expect(mocks.renderPageShell.mock.calls[0]?.[0]).toMatchObject({ initializeTheme: false });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MediaStreamVideo } from '../../../../../features/video/recording/media-stream-video';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import type {
   WebcamActualSettings,
   WebcamQualitySettings,

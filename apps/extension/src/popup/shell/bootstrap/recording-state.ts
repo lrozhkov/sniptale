@@ -3,7 +3,7 @@ import {
   type RecordingStateHealth,
   type RecordingStateResponse,
 } from '../../../contracts/messaging/contracts/response-types';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';

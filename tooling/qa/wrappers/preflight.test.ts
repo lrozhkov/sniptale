@@ -310,7 +310,7 @@ it('routes UI work to the root design contract', async () => {
     });
   });
 
-  expect(result.relevantDocs).toContain('DESIGN.md');
+  expect(result.relevantDocs).toContain('docs/agent-tooling/DESIGN.md');
   expect(result.relevantDocs).not.toContain(
     ['docs/design', 'ux-ui-concept', 'design-concept.md'].join('/')
   );

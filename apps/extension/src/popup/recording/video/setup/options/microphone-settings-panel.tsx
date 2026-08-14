@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { translate, type TranslationKey } from '../../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../../platform/i18n/popup';
 import {
   getMicrophoneConstraintStatus,
   MICROPHONE_CONSTRAINT_KEYS,

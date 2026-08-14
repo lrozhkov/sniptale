@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { type VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMediaDeviceSelector } from './media-device-selector';
 import { MicrophoneSettingsPanel } from './microphone-settings-panel';

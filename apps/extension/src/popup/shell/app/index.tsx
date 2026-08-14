@@ -1,136 +1,97 @@
-import { useEffect, useRef, useState } from 'react';
-import { usePageLocaleMetadata } from '../../../platform/i18n';
-import '@sniptale/ui/styles';
-import '@sniptale/ui/styles/ai-modal';
-import '@sniptale/ui/styles/glass';
-import '@sniptale/ui/styles/toolbar';
-import '@sniptale/ui/styles/overlays';
-import { usePopupRuntime } from '../runtime';
-import { usePopupCommandPaletteHotkey } from '../command-palette/hotkey';
-import { preloadPopupDeferredViews } from '../lazy-chunks';
-import { initializePopupTracer } from '../../diagnostics/tracing';
-import { PopupAppShell } from '../app-shell';
-import { finishPopupPerfSpanOnNextFrame, startPopupPerfSpan } from '../../diagnostics/performance';
+import { useEffect, useState, type ComponentType } from 'react';
+import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
+import { commonMessages } from '../../../platform/i18n/messages/common';
+import type { AppLocale } from '../../../platform/i18n/types';
+import type { PopupPage } from '../navigation/actions';
+import { usePopupRouteController } from '../startup/use-route-controller';
+import { usePopupStartupReconciliation } from './use-startup-reconciliation';
 
-const POPUP_ROOT_CLASS_NAME =
-  'sc-popup-shell sniptale-extension-surface relative h-[560px] w-[392px] overflow-hidden';
-const POPUP_ROOT_SURFACE_CLASS_NAME =
-  'bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]';
-const POPUP_BACKGROUND_ORBS_CLASS_NAME = 'pointer-events-none absolute inset-0';
-const POPUP_BACKGROUND_ORBS_SURFACE_CLASS_NAME = [
-  'bg-[radial-gradient(circle_at_top,',
-  'color-mix(in_srgb,var(--sniptale-color-accent-soft)_82%,transparent),transparent_36%),',
-  'radial-gradient(circle_at_bottom,',
-  'color-mix(in_srgb,var(--sniptale-color-info)_18%,transparent),transparent_38%),',
-  'radial-gradient(circle_at_75%_20%,',
-  'color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent),transparent_30%)]',
-].join('');
-function usePopupDeferredViewPreload(isReady: boolean) {
-  useEffect(() => {
-    initializePopupTracer();
-    if (!isReady) return undefined;
+const pages: PopupPage[] = ['home', 'video', 'export'];
 
-    let idleId: number | null = null;
-    const frameId = window.requestAnimationFrame(() => {
-      if (typeof window.requestIdleCallback === 'function') {
-        idleId = window.requestIdleCallback(() => void preloadPopupDeferredViews());
-      } else {
-        idleId = window.setTimeout(() => void preloadPopupDeferredViews(), 0);
-      }
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (idleId === null) return;
-      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
-      else window.clearTimeout(idleId);
-    };
-  }, [isReady]);
+function readInitialLocale(): AppLocale {
+  return document.documentElement.dataset['locale'] === 'en' ? 'en' : 'ru';
 }
 
-function PopupStartupShell({ isExiting }: { isExiting: boolean }) {
+export function PopupApp() {
+  const route = usePopupRouteController();
+  const Route = route.Route;
+  const [locale, setLocale] = useState<AppLocale>(readInitialLocale);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [Palette, setPalette] = useState<ComponentType<{
+    page: PopupPage | null;
+    onClose: () => void;
+    onNavigate: (page: PopupPage) => void;
+  }> | null>(null);
+  usePopupStartupReconciliation(setLocale);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        !event.defaultPrevented &&
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'k'
+      ) {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+        if (!Palette) {
+          void import('../command-palette/route-first').then((module) =>
+            setPalette(() => module.RouteFirstPopupCommandPalette)
+          );
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [Palette]);
+
   return (
-    <div
-      className="popup-startup-shell"
-      aria-hidden="true"
-      data-state={isExiting ? 'exiting' : 'loading'}
-      data-ui="popup.app.startup-shell"
-    >
-      <div className="popup-startup-shell__tabs">
-        <span className="popup-startup-shell__tab" />
-        <span className="popup-startup-shell__tab" />
-        <span className="popup-startup-shell__tab" />
-      </div>
-      <div className="popup-startup-shell__card">
-        <div className="popup-startup-shell__actions">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="popup-startup-shell__rows">
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-      </div>
-      <div className="popup-startup-shell__footer">
-        <span />
-        <span />
-        <span />
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
+    <div className="popup-react-shell" data-ui="popup.app.root">
+      <nav className="popup-react-shell__tabs" data-ui="popup.app.tabs">
+        {pages.map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            data-active={route.page === candidate ? 'true' : 'false'}
+            aria-busy={route.pendingPage === candidate || undefined}
+            onFocus={() => preload(candidate)}
+            onPointerEnter={() => preload(candidate)}
+            onPointerDown={() => preload(candidate)}
+            onClick={() => void route.navigate(candidate)}
+          >
+            {popupTabsMessages[candidate][locale]}
+          </button>
+        ))}
+      </nav>
+      {route.routeLoadError ? (
+        <section
+          className="popup-react-shell__route-error"
+          data-ui="popup.app.route-error"
+          role="alert"
+        >
+          <span>{commonMessages.bootstrap.errorTitle[locale]}</span>
+          <button type="button" onClick={route.retryRouteLoad}>
+            {commonMessages.actions.retry[locale]}
+          </button>
+        </section>
+      ) : null}
+      <main className="popup-react-shell__content" data-ui="popup.app.content">
+        {Route && route.startup ? <Route startup={route.startup} /> : null}
+      </main>
+      {paletteOpen && Palette ? (
+        <Palette
+          page={route.page}
+          onClose={() => setPaletteOpen(false)}
+          onNavigate={(target) => void route.navigate(target)}
+        />
+      ) : null}
     </div>
   );
 }
 
-export function PopupApp() {
-  usePageLocaleMetadata('popup.common.documentTitle');
-  const runtime = usePopupRuntime();
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const correctRouteSpanRef = useRef<ReturnType<typeof startPopupPerfSpan> | undefined>(undefined);
-  if (correctRouteSpanRef.current === undefined) {
-    correctRouteSpanRef.current = startPopupPerfSpan('popup.startup.correct-route-frame');
-  }
-  usePopupDeferredViewPreload(runtime.navigation.isReady);
-  useEffect(() => {
-    if (!runtime.navigation.isReady || !correctRouteSpanRef.current) return;
-    finishPopupPerfSpanOnNextFrame(correctRouteSpanRef.current, {
-      target: runtime.navigation.page,
-    });
-    correctRouteSpanRef.current = null;
-  }, [runtime.navigation.isReady, runtime.navigation.page]);
-  usePopupCommandPaletteHotkey({
-    isOpen: commandPaletteOpen,
-    onOpen: () => setCommandPaletteOpen(true),
-    onClose: () => setCommandPaletteOpen(false),
-  });
-  return (
-    <div
-      data-ui="popup.app.root"
-      className={[POPUP_ROOT_CLASS_NAME, POPUP_ROOT_SURFACE_CLASS_NAME].join(' ')}
-    >
-      <div
-        className={[
-          POPUP_BACKGROUND_ORBS_CLASS_NAME,
-          POPUP_BACKGROUND_ORBS_SURFACE_CLASS_NAME,
-        ].join(' ')}
-      />
-      {runtime.navigation.isReady ? (
-        <PopupAppShell
-          runtime={runtime}
-          commandPaletteOpen={commandPaletteOpen}
-          onCloseCommandPalette={() => setCommandPaletteOpen(false)}
-        />
-      ) : null}
-      <PopupStartupShell isExiting={runtime.navigation.isReady} />
-    </div>
+function preload(page: PopupPage): void {
+  void import('../startup/resource').then(({ preloadPopupPage }) =>
+    preloadPopupPage(page).catch(() => undefined)
   );
 }

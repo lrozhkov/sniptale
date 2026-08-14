@@ -53,4 +53,5 @@ test-results/
 
 # Optional local agent tooling
 /AGENTS.md
+/DESIGN.md
 /.agents/

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 
 const METER_CLASS_NAME = 'h-2 overflow-hidden rounded-full bg-[var(--sniptale-color-border-soft)]';
 

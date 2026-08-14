@@ -1,6 +1,6 @@
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { CaptureActionType, ViewportPreset } from '../../../../contracts/settings';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../platform/navigation/extension-pages';
 import { InlineCurtainSelect } from '../../../../ui/popup-shell/inline-curtain/select';
 import type { InlineCurtainOption } from '../../../../ui/popup-shell/inline-curtain/options';

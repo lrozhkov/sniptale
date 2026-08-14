@@ -7,7 +7,7 @@ import {
   type ScreenshotSetupState,
   type ScreenshotSetupMode,
 } from '../../../../composition/persistence/capture-settings';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 
 export function useScreenshotSetupState(
   startupMode: ScreenshotSetupMode | null = null,

@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { RuntimeResponseByType } from '../../../contracts/messaging/contracts/runtime-message';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { openCameraRecorderPage } from '../../../platform/navigation/extension-pages';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   CaptureMode,

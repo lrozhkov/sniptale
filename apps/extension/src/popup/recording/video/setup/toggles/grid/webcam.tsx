@@ -1,5 +1,5 @@
 import { Camera } from 'lucide-react';
-import { translate } from '../../../../../../platform/i18n';
+import { translate } from '../../../../../../platform/i18n/popup';
 import { PopupIconStateButton } from '../../../../../../ui/popup-shell/icon-state-button';
 
 export function VideoWebcamToggle({

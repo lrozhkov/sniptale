@@ -1,6 +1,6 @@
 import { PanelTop, PanelTopOpen, PanelsTopLeft, Zap } from 'lucide-react';
 import { PopupIconStateButton } from '../../../../ui/popup-shell/icon-state-button';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
 
 const ACCENT = 'text-[var(--sniptale-color-accent)]';

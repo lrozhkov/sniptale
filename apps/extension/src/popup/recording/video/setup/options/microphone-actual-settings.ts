@@ -1,4 +1,4 @@
-import { translate, type TranslationKey } from '../../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../../platform/i18n/popup';
 import type { MicrophoneActualSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 export function formatActualMicrophoneSettings(settings: MicrophoneActualSettings | null): string {

@@ -5,7 +5,7 @@ import { reportStartExportFailure } from './failure';
 import { getPopupExportSelection } from '../../session/selectors';
 import { buildPopupExportOptions } from '../options';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 
 export async function startPopupExport(
   state: PopupExportRuntimeContract,

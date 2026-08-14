@@ -6,26 +6,22 @@ import type {
 } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import type { PopupRuntimeState } from '../../runtime/types/state';
+import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
-import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
-type PopupRuntimeFlatOverrides = Partial<
-  PopupRuntimeState['navigation'] &
-    PopupRuntimeState['home'] &
-    PopupRuntimeState['environment'] &
-    PopupRuntimeState['recording']
->;
+type PopupVideoSetupFlatOverrides = Partial<
+  PopupVideoSetupRuntime['environment'] & PopupVideoSetupRuntime['recording']
+> & {
+  viewportPresets?: PopupVideoSetupRuntime['viewportPresets'];
+};
 
-export type PopupRuntimeStateOverrides = PopupRuntimeFlatOverrides & {
-  navigation?: Partial<PopupRuntimeState['navigation']>;
-  home?: Partial<PopupRuntimeState['home']>;
-  environment?: Partial<PopupRuntimeState['environment']>;
-  recording?: Partial<PopupRuntimeState['recording']>;
+export type PopupVideoSetupRuntimeOverrides = PopupVideoSetupFlatOverrides & {
+  environment?: Partial<PopupVideoSetupRuntime['environment']>;
+  recording?: Partial<PopupVideoSetupRuntime['recording']>;
   pageAccess?: PopupPageAccessRuntime;
 };
 
-export function createPopupAppShellActiveTabCapabilities(
+function createPopupAppShellActiveTabCapabilities(
   overrides: Partial<ActiveTabCapabilities> = {}
 ): ActiveTabCapabilities {
   const supported = createSupportedCapability();
@@ -48,38 +44,12 @@ export function createPopupAppShellActiveTabCapabilities(
   };
 }
 
-export function createPopupAppShellRuntime(
-  overrides: PopupRuntimeStateOverrides = {}
-): PopupRuntimeState {
+export function createPopupVideoSetupRuntime(
+  overrides: PopupVideoSetupRuntimeOverrides = {}
+): PopupVideoSetupRuntime {
   return {
-    navigation: createRuntimeNavigation(overrides),
-    home: createRuntimeHome(overrides),
     environment: createRuntimeEnvironment(overrides),
     recording: createRuntimeRecording(overrides),
-  };
-}
-
-function createRuntimeNavigation(overrides: PopupRuntimeStateOverrides) {
-  return {
-    isReady: overrides.isReady ?? true,
-    page: overrides.page ?? 'home',
-    pendingPage: overrides.pendingPage ?? null,
-    navigateToPage: overrides.navigateToPage ?? vi.fn(async () => 'committed' as const),
-    preloadPage: overrides.preloadPage ?? vi.fn(async () => undefined),
-    showFooter: overrides.showFooter ?? true,
-    ...overrides.navigation,
-  };
-}
-
-function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
-  return {
-    homeError: overrides.homeError ?? null,
-    quickActions: overrides.quickActions ?? [],
-    quickActionsReady: overrides.quickActionsReady ?? true,
-    screenshotStartupMode: overrides.screenshotStartupMode ?? null,
-    initialScreenshotSetupState:
-      overrides.initialScreenshotSetupState ?? DEFAULT_SCREENSHOT_SETUP_STATE,
-    clearScreenshotStartupMode: overrides.clearScreenshotStartupMode ?? vi.fn(),
     viewportPresets: overrides.viewportPresets ?? [
       {
         kind: 'user',
@@ -92,11 +62,10 @@ function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
         order: 0,
       },
     ],
-    ...overrides.home,
   };
 }
 
-function createRuntimeEnvironment(overrides: PopupRuntimeStateOverrides) {
+function createRuntimeEnvironment(overrides: PopupVideoSetupRuntimeOverrides) {
   return {
     activeTabCapabilities:
       overrides.activeTabCapabilities ?? createPopupAppShellActiveTabCapabilities(),
@@ -106,7 +75,7 @@ function createRuntimeEnvironment(overrides: PopupRuntimeStateOverrides) {
   };
 }
 
-function createRuntimeRecording(overrides: PopupRuntimeStateOverrides) {
+function createRuntimeRecording(overrides: PopupVideoSetupRuntimeOverrides) {
   return {
     recordingControlCapability: overrides.recordingControlCapability ?? null,
     clearStartError: overrides.clearStartError ?? vi.fn(),

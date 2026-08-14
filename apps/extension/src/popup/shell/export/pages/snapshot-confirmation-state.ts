@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { patchSettings } from '../../../../composition/persistence/settings';
 import type { PopupExportController } from '../controller';
 import { createWebSnapshotDisclosure, useWebSnapshotDisclosureState } from './snapshot-disclosure';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { initializeAppTheme } from '../theme/index';
+import { initializeExtensionPageTheme } from '../theme/index';
 import { PageBootstrapErrorBoundary } from './page-bootstrap-error-boundary';
 
 interface RenderPageShellOptions {
@@ -49,7 +49,7 @@ export function renderPageShell(options: RenderPageShellOptions): Root | null {
   const logger = createLogger({ namespace: options.namespace });
 
   if (options.initializeTheme ?? true) {
-    initializeAppTheme();
+    initializeExtensionPageTheme();
   }
 
   const container = resolveRootContainer();

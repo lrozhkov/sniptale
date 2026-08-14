@@ -7,7 +7,7 @@ import {
   ProductModalHeader,
 } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 
 export type WebSnapshotDisclosure = {
   body: string;

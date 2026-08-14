@@ -72,7 +72,7 @@ function collectArchitectureDocs(targetFiles) {
     docs.push('docs/architecture/parser-architecture.md');
   }
   if (hasAny(targetFiles, (file) => isUiFile(file) && /\.(?:tsx|css)$/u.test(file))) {
-    docs.push('DESIGN.md');
+    docs.push('docs/agent-tooling/DESIGN.md');
   }
   return docs;
 }

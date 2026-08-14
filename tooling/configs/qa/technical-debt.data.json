@@ -1185,6 +1185,28 @@
         "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.scc.popup-shell-recording-route-composition",
+      "classification": "accepted-architecture",
+      "owner": "popup-runtime-architecture",
+      "risk": "An unreviewed edge can broaden the popup shell and recording owner cycle.",
+      "reason": "The reviewed Video route composition is intentionally limited to the popup shell and recording owners.",
+      "removalCondition": "Remove when Video route composition no longer imports shell-owned bootstrap and runtime state.",
+      "reviewBy": "2027-08-14",
+      "source": {
+        "kind": "scc",
+        "key": "popup-shell-recording-route-composition"
+      },
+      "scope": {
+        "edgeDigest": "47b66d39971198c7714a896b608ddab6591fce43b1c611e8a4bd6addb76f36f5",
+        "id": "popup-shell-recording-route-composition",
+        "owners": [
+          "apps/extension/src/popup/recording",
+          "apps/extension/src/popup/shell"
+        ]
+      },
+      "targetAction": "Keep the exact two-owner composition cycle stable and reject additional edges or owners."
     }
   ],
   "coverageOwners": [
@@ -9506,6 +9528,8 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
+        "apps/extension/src/popup/recording/video/route.tsx",
+        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -9548,26 +9572,15 @@
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
         "apps/extension/src/popup/runtime-services/index.ts",
-        "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/view.tsx",
-        "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/index.tsx",
-        "apps/extension/src/popup/shell/app-shell/route-loading-fallback.tsx",
-        "apps/extension/src/popup/shell/app-shell/tabs-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/test-support/runtime.ts",
         "apps/extension/src/popup/shell/app-shell/video-setup/handlers.ts",
-        "apps/extension/src/popup/shell/app-shell/video-setup/index.tsx",
         "apps/extension/src/popup/shell/app-shell/video-setup/props.ts",
-        "apps/extension/src/popup/shell/app/entrypoint.tsx",
         "apps/extension/src/popup/shell/app/index.tsx",
-        "apps/extension/src/popup/shell/bootstrap/home.ts",
-        "apps/extension/src/popup/shell/bootstrap/index.ts",
+        "apps/extension/src/popup/shell/app/use-startup-reconciliation.ts",
         "apps/extension/src/popup/shell/bootstrap/recording-state.ts",
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
-        "apps/extension/src/popup/shell/command-palette/actions.tsx",
-        "apps/extension/src/popup/shell/command-palette/hotkey.ts",
-        "apps/extension/src/popup/shell/command-palette/index.tsx",
+        "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -9598,6 +9611,7 @@
         "apps/extension/src/popup/shell/export/progress/view.tsx",
         "apps/extension/src/popup/shell/export/ready/controls/index.tsx",
         "apps/extension/src/popup/shell/export/ready/index.tsx",
+        "apps/extension/src/popup/shell/export/route.tsx",
         "apps/extension/src/popup/shell/export/runtime/action-factory.ts",
         "apps/extension/src/popup/shell/export/runtime/actions.ts",
         "apps/extension/src/popup/shell/export/runtime/cancel.ts",
@@ -9663,51 +9677,37 @@
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lazy-chunks/route-resource.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
-        "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
-        "apps/extension/src/popup/shell/lifecycle/contracts.ts",
-        "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
-        "apps/extension/src/popup/shell/lifecycle/setup.ts",
-        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
+        "apps/extension/src/popup/shell/home/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
-        "apps/extension/src/popup/shell/runtime/index.ts",
-        "apps/extension/src/popup/shell/runtime/lifecycle.ts",
         "apps/extension/src/popup/shell/runtime/media-device-effects.ts",
         "apps/extension/src/popup/shell/runtime/microphone.ts",
         "apps/extension/src/popup/shell/runtime/model.ts",
-        "apps/extension/src/popup/shell/runtime/navigation.ts",
         "apps/extension/src/popup/shell/runtime/page-access-grants.ts",
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
-        "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
-        "apps/extension/src/popup/shell/runtime/state.ts",
-        "apps/extension/src/popup/shell/runtime/test-support/state.ts",
         "apps/extension/src/popup/shell/runtime/transport/message.ts",
         "apps/extension/src/popup/shell/runtime/transport/pause.ts",
         "apps/extension/src/popup/shell/runtime/transport/settings.ts",
         "apps/extension/src/popup/shell/runtime/transport/stop.ts",
         "apps/extension/src/popup/shell/runtime/types/action-handlers.ts",
-        "apps/extension/src/popup/shell/runtime/types/command-palette.ts",
-        "apps/extension/src/popup/shell/runtime/types/home.ts",
         "apps/extension/src/popup/shell/runtime/types/internal-state.ts",
-        "apps/extension/src/popup/shell/runtime/types/navigation.ts",
         "apps/extension/src/popup/shell/runtime/types/recording-controls.ts",
         "apps/extension/src/popup/shell/runtime/types/state.ts",
-        "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
+        "apps/extension/src/popup/shell/runtime/video-persistence-effects.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts",
-        "apps/extension/src/popup/shell/tabs/index.tsx"
+        "apps/extension/src/popup/shell/startup/coordinator.ts",
+        "apps/extension/src/popup/shell/startup/descriptor.ts",
+        "apps/extension/src/popup/shell/startup/resource.ts",
+        "apps/extension/src/popup/shell/startup/use-route-controller.ts",
+        "apps/extension/src/popup/shell/tab-access/capabilities.ts",
+        "apps/extension/src/popup/shell/tab-access/index.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/popup/diagnostics/performance/index.ts",
@@ -9743,6 +9743,8 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
+        "apps/extension/src/popup/recording/video/route.tsx",
+        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -9785,26 +9787,15 @@
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
         "apps/extension/src/popup/runtime-services/index.ts",
-        "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/view.tsx",
-        "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/index.tsx",
-        "apps/extension/src/popup/shell/app-shell/route-loading-fallback.tsx",
-        "apps/extension/src/popup/shell/app-shell/tabs-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/test-support/runtime.ts",
         "apps/extension/src/popup/shell/app-shell/video-setup/handlers.ts",
-        "apps/extension/src/popup/shell/app-shell/video-setup/index.tsx",
         "apps/extension/src/popup/shell/app-shell/video-setup/props.ts",
-        "apps/extension/src/popup/shell/app/entrypoint.tsx",
         "apps/extension/src/popup/shell/app/index.tsx",
-        "apps/extension/src/popup/shell/bootstrap/home.ts",
-        "apps/extension/src/popup/shell/bootstrap/index.ts",
+        "apps/extension/src/popup/shell/app/use-startup-reconciliation.ts",
         "apps/extension/src/popup/shell/bootstrap/recording-state.ts",
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
-        "apps/extension/src/popup/shell/command-palette/actions.tsx",
-        "apps/extension/src/popup/shell/command-palette/hotkey.ts",
-        "apps/extension/src/popup/shell/command-palette/index.tsx",
+        "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -9835,6 +9826,7 @@
         "apps/extension/src/popup/shell/export/progress/view.tsx",
         "apps/extension/src/popup/shell/export/ready/controls/index.tsx",
         "apps/extension/src/popup/shell/export/ready/index.tsx",
+        "apps/extension/src/popup/shell/export/route.tsx",
         "apps/extension/src/popup/shell/export/runtime/action-factory.ts",
         "apps/extension/src/popup/shell/export/runtime/actions.ts",
         "apps/extension/src/popup/shell/export/runtime/cancel.ts",
@@ -9900,51 +9892,37 @@
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lazy-chunks/route-resource.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
-        "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
-        "apps/extension/src/popup/shell/lifecycle/contracts.ts",
-        "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
-        "apps/extension/src/popup/shell/lifecycle/setup.ts",
-        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
+        "apps/extension/src/popup/shell/home/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
-        "apps/extension/src/popup/shell/runtime/index.ts",
-        "apps/extension/src/popup/shell/runtime/lifecycle.ts",
         "apps/extension/src/popup/shell/runtime/media-device-effects.ts",
         "apps/extension/src/popup/shell/runtime/microphone.ts",
         "apps/extension/src/popup/shell/runtime/model.ts",
-        "apps/extension/src/popup/shell/runtime/navigation.ts",
         "apps/extension/src/popup/shell/runtime/page-access-grants.ts",
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
-        "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
-        "apps/extension/src/popup/shell/runtime/state.ts",
-        "apps/extension/src/popup/shell/runtime/test-support/state.ts",
         "apps/extension/src/popup/shell/runtime/transport/message.ts",
         "apps/extension/src/popup/shell/runtime/transport/pause.ts",
         "apps/extension/src/popup/shell/runtime/transport/settings.ts",
         "apps/extension/src/popup/shell/runtime/transport/stop.ts",
         "apps/extension/src/popup/shell/runtime/types/action-handlers.ts",
-        "apps/extension/src/popup/shell/runtime/types/command-palette.ts",
-        "apps/extension/src/popup/shell/runtime/types/home.ts",
         "apps/extension/src/popup/shell/runtime/types/internal-state.ts",
-        "apps/extension/src/popup/shell/runtime/types/navigation.ts",
         "apps/extension/src/popup/shell/runtime/types/recording-controls.ts",
         "apps/extension/src/popup/shell/runtime/types/state.ts",
-        "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
+        "apps/extension/src/popup/shell/runtime/video-persistence-effects.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts",
-        "apps/extension/src/popup/shell/tabs/index.tsx"
+        "apps/extension/src/popup/shell/startup/coordinator.ts",
+        "apps/extension/src/popup/shell/startup/descriptor.ts",
+        "apps/extension/src/popup/shell/startup/resource.ts",
+        "apps/extension/src/popup/shell/startup/use-route-controller.ts",
+        "apps/extension/src/popup/shell/tab-access/capabilities.ts",
+        "apps/extension/src/popup/shell/tab-access/index.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -11642,6 +11620,7 @@
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
       "productionFiles": [
         "apps/extension/src/ui/theme/index.ts",
+        "apps/extension/src/ui/theme/paint-hint.ts",
         "apps/extension/src/ui/theme/preference-service.ts",
         "apps/extension/src/ui/theme/runtime.ts"
       ],
@@ -14200,7 +14179,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/agent-tooling/agent-tooling.mjs",
-        "contentHash": "499279b70fe691e39f2aaa630650246d6f5dd8434caa1cc67600623049f08009"
+        "contentHash": "0b536487304a024434b1cf8f68501f49cf956ea13597c2d355aace12d1881b48"
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.mjs",
@@ -16605,6 +16584,25 @@
       ]
     },
     {
+      "id": "policy.source.extension-smoke-popup-startup-ts.fdec2d7096",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/e2e/extension-smoke.popup-startup.ts",
+        "contentHash": "e656c09461fa40f78be9b0cdb4cea19d9d8c146e718c5655b6e304f8807e32be"
+      },
+      "consumers": [
+        "tooling/test/e2e/extension-smoke.popup-startup.ts",
+        "tooling/test/e2e/extension-smoke.spec.ts"
+      ],
+      "surfaces": [
+        "property:installFirstFrameThemeProbe/anonymous-99/backgrounds"
+      ]
+    },
+    {
       "id": "policy.source.extension-ui-entrypoints-mjs.6ffba6965d",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17617,7 +17615,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "b33ceea34c003fde42b6040392eba05ba8f187e09e590951ab8ab0f6403049b1"
+        "contentHash": "9170796bd62a4a0e239e284b4b23fc15068cab5f76f57d035ff74887847a9f56"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -17680,9 +17678,7 @@
         "property:testFiles[56]",
         "property:testFiles[57]",
         "property:testFiles[58]",
-        "property:testFiles[59]",
         "property:testFiles[6]",
-        "property:testFiles[60]",
         "property:testFiles[7]",
         "property:testFiles[8]",
         "property:testFiles[9]"
@@ -18437,7 +18433,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-page-access.mjs",
-        "contentHash": "d42e8655f2469ff927bdee6974364fb175b365b21d8ffcc6f20deb0a996c9ff2"
+        "contentHash": "a141f3083426dce580941bf675c297a50eb4a77708e8fa7711699d2309ae829f"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/page-access.mjs",
@@ -18447,15 +18443,9 @@
         "binding:POPUP_PAGE_ACCESS_OWNER_MAPPINGS",
         "property:testFiles",
         "property:testFiles[1]",
-        "property:testFiles[10]",
         "property:testFiles[2]",
         "property:testFiles[3]",
-        "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]",
-        "property:testFiles[8]",
-        "property:testFiles[9]"
+        "property:testFiles[4]"
       ]
     },
     {
@@ -18467,7 +18457,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "fcaf98d44c0fe040b1bca84d7be280c7fb150ae028459e83dbfbb9bed7ddad3e"
+        "contentHash": "7e06a04721b61f2ff6ed09de6864ce8ee86d3ed69cb6c078bd4f9237b487762d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
@@ -18482,7 +18472,8 @@
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
-        "property:testFiles[7]"
+        "property:testFiles[7]",
+        "property:testFiles[8]"
       ]
     },
     {
@@ -18556,7 +18547,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight-docs.mjs",
-        "contentHash": "c68283edb83ad3e24302a79abe24359911c87c40d71df33ee3f55c74f485c9ac"
+        "contentHash": "ac9e53f25beb10fa465ecfe09d8bcbcbc74b776b7d4618cec0a26f64ac3c9c70"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-docs.mjs",
@@ -19486,7 +19477,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/shared-facade.mjs",
-        "contentHash": "130dd03894789f2c39a1ea29a7879c97c47fa52ece970b97dc615b48250f037a"
+        "contentHash": "303f97eee71926e10b42d0f5c52678a2b4e18053f43959f8cfad056bbd52c84a"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -19507,6 +19498,8 @@
         "property:testFiles[18]",
         "property:testFiles[19]",
         "property:testFiles[2]",
+        "property:testFiles[20]",
+        "property:testFiles[21]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -21337,7 +21330,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.config.mjs",
-        "contentHash": "bed4af45d6ab0375065c4a6e59cba6c542e531f3ae5b10edcf347973dc50e52f"
+        "contentHash": "4b790e1031db8fb3ce4242c31006eca1db6a8aac5f4e7858e5af58744086b91b"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -22168,7 +22161,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/verify-runtime-topology.mjs",
-        "contentHash": "4dac70a3fa5b98cb127d26386dc58079ce07c76ec4d397e74006ec0125187f78"
+        "contentHash": "d94eee135ddb3bd8417dbb9cfef1524c1704f73892b3825774fea992cfc447d8"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",

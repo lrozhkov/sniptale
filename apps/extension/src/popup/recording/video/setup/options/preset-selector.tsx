@@ -4,7 +4,7 @@ import {
   useAppLocale,
   type AppLocale,
   type TranslationKey,
-} from '../../../../../platform/i18n';
+} from '../../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
 import type { ViewportPreset } from '../../../../../contracts/settings';
 import { getViewportPresetDisplayName } from '../../../../../features/viewport-presets/display-name';

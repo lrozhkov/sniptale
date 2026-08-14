@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { Crop, PanelTop, PanelsTopLeft, Video } from 'lucide-react';
-import { translate, type TranslationKey } from '../../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../../platform/i18n/popup';
 import type {
   ActiveTabCapabilities,
   CapabilityState,

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 
-vi.mock('../../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 

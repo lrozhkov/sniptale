@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { type AppLocale, type TranslationKey } from './types';
 import { useAppLocale } from './locale/hook';
-import { readTranslation, resolveTranslationDictionary } from './translation-reader';
+import { readSourceTranslation } from './translation-reader';
 
 interface PageLocaleMetadata {
   locale: AppLocale;
@@ -19,7 +19,7 @@ export function usePageLocaleMetadata(titleKey: TranslationKey): AppLocale {
   useEffect(() => {
     applyPageLocaleMetadata({
       locale,
-      title: readTranslation(resolveTranslationDictionary(locale), titleKey),
+      title: readSourceTranslation(locale, titleKey),
     });
   }, [locale, titleKey]);
 

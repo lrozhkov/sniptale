@@ -53,9 +53,6 @@ export const SHARED_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[]
           'apps/extension/src/editor/workspace/canvas/index.tsx',
         ]
       ),
-      usage('popup.loading-view', 'Popup > Loading view', 'Popup > Loading view', [
-        'apps/extension/src/popup/shell/tabs/index.tsx',
-      ]),
       usage(
         'settings.loading-sections',
         'Настройки > Loading sections',

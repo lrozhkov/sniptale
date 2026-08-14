@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import {
   getStoredThemePreference,
   resolveAppTheme,

@@ -135,7 +135,7 @@ function expectFocusedTriggerPaths() {
     path.join(repoRoot, 'tooling/qa/core/verify-focused.config.mjs'),
     'utf8'
   );
-  expect(focusedConfig).toContain('DESIGN.md');
+  expect(focusedConfig).toContain('docs/agent-tooling/DESIGN.md');
   expect(focusedConfig).toContain(
     'apps/extension/src/background/offscreen-document/create-options.ts'
   );

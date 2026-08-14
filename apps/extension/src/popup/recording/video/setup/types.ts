@@ -3,6 +3,7 @@ import type { StoragePressureLevel } from '../../../../features/media-hub/storag
 import type { ViewportPreset } from '../../../../contracts/settings';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  type VideoPostRecordResult,
   type VideoOutputDimensions,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
@@ -14,6 +15,8 @@ interface GalleryStatus {
 }
 
 export interface VideoSetupPageProps {
+  initialPostRecordResult?: VideoPostRecordResult | null;
+  initialPostRecordVerified?: boolean;
   settings: VideoRecordingSettings;
   captureMode: CaptureMode;
   selectedPresetId: string | null;

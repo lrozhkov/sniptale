@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportPagesSection } from './section';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal()),
   translate: (key: string) => `t:${key}`,
 }));

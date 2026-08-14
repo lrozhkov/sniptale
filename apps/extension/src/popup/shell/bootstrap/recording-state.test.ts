@@ -6,7 +6,7 @@ import {
   resolvePopupBootstrapRecordingState,
 } from './recording-state';
 
-vi.mock('../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => key,
 }));
 

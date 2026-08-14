@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useMemo, useState } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { renderDataTypeSummaryItems } from './summary';
 import {
   getExportOptionActive,

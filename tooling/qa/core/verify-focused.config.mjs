@@ -19,7 +19,7 @@ export const SRC_SOURCE_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src
 export const RUNTIME_TOPOLOGY_TRIGGER_FILES = new Set([
   'docs/agent-tooling/AGENTS.md',
   '.dependency-cruiser.cjs',
-  'DESIGN.md',
+  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',

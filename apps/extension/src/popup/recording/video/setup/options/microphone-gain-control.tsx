@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { resolveMicrophoneGain } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 

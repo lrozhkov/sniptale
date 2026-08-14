@@ -1,5 +1,5 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 
 /**
  * Resolves the current active tab id for popup-driven browser actions.

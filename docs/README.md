@@ -26,7 +26,7 @@ Active documentation is organized by ownership. This tree contains current autho
 - [Shared topology](architecture/shared-topology.md) explains package and app-core residency.
 - [Storage state authority](architecture/storage-state-authority.md) owns persistence invariants.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md), [video editor layering](architecture/video-editor-layering.md), and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
-- [DESIGN.md](../DESIGN.md) owns UX, accessibility, theme, and interaction requirements.
+- [DESIGN.md](agent-tooling/DESIGN.md) owns UX, accessibility, theme, and interaction requirements.
 
 ## Implementation, operation, and release
 
