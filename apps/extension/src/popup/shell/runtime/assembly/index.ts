@@ -57,8 +57,10 @@ function assemblePopupViewState(
     navigation: {
       isReady: state.session.isReady,
       page: state.session.page,
+      pendingPage: state.session.pendingPage,
       showFooter: state.derived.showFooter,
-      setPage: state.session.setPage,
+      navigateToPage: state.session.navigateToPage,
+      preloadPage: state.session.preloadPage,
     },
     home: {
       quickActions: state.presets.quickActions,
@@ -66,6 +68,7 @@ function assemblePopupViewState(
       viewportPresets: state.presets.viewportPresets,
       homeError: state.session.homeError,
       screenshotStartupMode: state.presets.screenshotStartupMode,
+      initialScreenshotSetupState: state.presets.initialScreenshotSetupState,
       clearScreenshotStartupMode: state.presets.clearScreenshotStartupMode,
     },
     environment: {

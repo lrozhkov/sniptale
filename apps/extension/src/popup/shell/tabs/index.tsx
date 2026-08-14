@@ -14,17 +14,25 @@ function PopupTabButton({
   disabled,
   label,
   onClick,
+  onPreload,
+  pending,
 }: {
   active: boolean;
   disabled: boolean;
   label: string;
   onClick: () => void;
+  onPreload: () => void;
+  pending: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
+      aria-busy={pending || undefined}
       onClick={onClick}
+      onFocus={onPreload}
+      onPointerDown={onPreload}
+      onPointerEnter={onPreload}
       data-active={active ? 'true' : 'false'}
       className={[
         'relative min-w-0 rounded-[14px] px-3 py-2.5 text-[12px] font-medium transition-colors',
@@ -56,11 +64,15 @@ export function PopupTabs({
   pageAccess,
   page,
   onChange,
+  onPreload = () => undefined,
+  pendingPage = null,
 }: {
   page: PopupPage;
   activeTabCapabilities: ActiveTabCapabilities;
   pageAccess?: PopupPageAccessRuntime;
   onChange: (page: PopupPage) => void;
+  onPreload?: (page: PopupPage) => void;
+  pendingPage?: PopupPage | null;
 }) {
   const locale = useAppLocale();
   const pageAccessRequired =
@@ -83,6 +95,10 @@ export function PopupTabs({
               active={page === value}
               disabled={disabled}
               label={translate(labelKey, locale)}
+              pending={pendingPage === value}
+              onPreload={() => {
+                if (!disabled) onPreload(value);
+              }}
               onClick={() => {
                 if (!disabled) {
                   onChange(value);

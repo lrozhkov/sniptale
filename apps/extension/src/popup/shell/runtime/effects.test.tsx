@@ -11,6 +11,7 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupPage } from '../navigation/actions';
+import type { PopupNavigationResult, PopupNavigationSource } from './types/navigation';
 import { usePopupRuntimeEffects } from './effects';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
@@ -70,6 +71,9 @@ vi.mock('../../recording/persistence', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let setIsStartPendingMock: ReturnType<typeof vi.fn<(value: SetStateAction<boolean>) => void>>;
+let navigateToPageMock: ReturnType<
+  typeof vi.fn<(page: PopupPage, source?: PopupNavigationSource) => Promise<PopupNavigationResult>>
+>;
 let setPageMock: ReturnType<typeof vi.fn<(value: SetStateAction<PopupPage>) => void>>;
 let setRecordingControlCapabilityMock: ReturnType<
   typeof vi.fn<
@@ -103,6 +107,7 @@ function createEffectsState(overrides: Partial<Parameters<typeof usePopupRuntime
     microphoneDevices: [],
     webcamDevices: [],
     page: 'home',
+    navigateToPage: navigateToPageMock,
     recordingState: {
       captureMode: null,
       captureSource: null,
@@ -164,6 +169,7 @@ async function flushMicrotasks() {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   setIsStartPendingMock = vi.fn();
+  navigateToPageMock = vi.fn(async () => 'committed' as const);
   setPageMock = vi.fn();
   setRecordingControlCapabilityMock = vi.fn();
   setSelectedPresetIdMock = vi.fn();
@@ -240,8 +246,34 @@ async function verifyRecordingActivationNavigation() {
 
   expect(setIsStartPendingMock).toHaveBeenCalledWith(false);
   expect(setStartErrorMock).toHaveBeenCalledWith(null);
-  expect(setPageMock).toHaveBeenCalledWith('video');
+  expect(navigateToPageMock).toHaveBeenCalledWith('video', 'recording');
 }
+
+it('retries recording auto-navigation after a route load failure', async () => {
+  navigateToPageMock.mockResolvedValueOnce('failed').mockResolvedValueOnce('committed');
+
+  await renderHarness(
+    <EffectsHarness
+      state={createEffectsState({
+        recordingState: createRecordingState(VideoRecordingStatus.PREPARING),
+      })}
+    />
+  );
+  await flushMicrotasks();
+
+  await renderHarness(
+    <EffectsHarness
+      state={createEffectsState({
+        recordingState: createRecordingState(VideoRecordingStatus.RECORDING),
+      })}
+    />
+  );
+  await flushMicrotasks();
+
+  expect(navigateToPageMock).toHaveBeenCalledTimes(2);
+  expect(navigateToPageMock).toHaveBeenNthCalledWith(1, 'video', 'recording');
+  expect(navigateToPageMock).toHaveBeenNthCalledWith(2, 'video', 'recording');
+});
 
 async function verifyManualTabSelectionIsPreserved() {
   await renderHarness(

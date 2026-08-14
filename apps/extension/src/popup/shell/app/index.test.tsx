@@ -22,11 +22,15 @@ vi.mock('../command-palette/hotkey', () => ({
 }));
 
 vi.mock('../lazy-chunks', () => ({
+  getResolvedExportPage: () => null,
+  getResolvedVideoSetupPage: () => null,
+  isPopupPagePreloaded: () => false,
   LazyExportPage: () => null,
   LazyPopupCommandPalette: () => null,
   LazyVideoActivePage: () => null,
   LazyVideoSetupPage: () => null,
   preloadPopupDeferredViews: popupAppMocks.preloadPopupDeferredViewsMock,
+  preloadPopupPage: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../diagnostics/tracing', () => ({
@@ -65,13 +69,27 @@ describe('PopupApp', () => {
   afterEach(cleanupPopupAppTest);
 
   it('renders the popup root with the shared extension font contract', verifyPopupRootRendering);
+  it('keeps the startup skeleton mounted until the selected route is ready', async () => {
+    popupAppMocks.usePopupRuntimeMock.mockReturnValue({
+      navigation: { isReady: false, page: 'home' },
+    });
+    const { PopupApp } = await import('./index');
+
+    render(<PopupApp />);
+
+    expect(container?.querySelector('[data-ui="popup.app.startup-shell"]')).not.toBeNull();
+    expect(container?.querySelector('[data-testid="popup-app-shell"]')).toBeNull();
+    expect(popupAppMocks.popupAppShellMock).not.toHaveBeenCalled();
+  });
 });
 
 function resetPopupAppTest(): void {
   vi.clearAllMocks();
   vi.resetModules();
   vi.useFakeTimers();
-  popupAppMocks.usePopupRuntimeMock.mockReturnValue({ page: 'home' });
+  popupAppMocks.usePopupRuntimeMock.mockReturnValue({
+    navigation: { isReady: true, page: 'home' },
+  });
 }
 
 function cleanupPopupAppTest(): void {
@@ -93,7 +111,7 @@ async function verifyPopupRootRendering(): Promise<void> {
   expectPopupShellProps();
 
   act(() => {
-    vi.advanceTimersByTime(150);
+    vi.runAllTimers();
   });
 
   expect(popupAppMocks.initializePopupTracerMock).toHaveBeenCalledTimes(1);
@@ -114,7 +132,7 @@ function expectPopupShellProps(): void {
   expect(popupAppMocks.popupAppShellMock).toHaveBeenCalledWith(
     expect.objectContaining({
       commandPaletteOpen: false,
-      runtime: { page: 'home' },
+      runtime: { navigation: { isReady: true, page: 'home' } },
     })
   );
   expect(popupAppMocks.usePopupCommandPaletteHotkeyMock).toHaveBeenCalledWith(

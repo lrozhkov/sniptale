@@ -35,14 +35,17 @@ vi.mock('../../../features/media-hub/events', (_importOriginal) => ({
 vi.mock('../bootstrap', (_importOriginal) => ({
   bootstrapPopupState: vi.fn(async () => ({
     captureMode: 'visible',
-    microphones: [],
+    screenshotSetupState: {
+      selectedMode: 'quick-actions',
+      tab: {},
+      desktop: {},
+    },
     quickActions: [],
     recordingControlCapability: null,
     recordingState: { status: 'idle' },
     selectedPresetId: null,
     videoSettings: {},
     viewportPresets: [],
-    webcams: [],
   })),
 }));
 
@@ -68,9 +71,9 @@ function createParams(): PopupLifecycleParams {
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
       setHomeError: vi.fn(),
-      setPage: vi.fn(),
+      navigateToPage: vi.fn(async () => 'unchanged' as const),
       setIsReady: vi.fn(),
-      setMicrophoneDevices: vi.fn(),
+      setInitialScreenshotSetupState: vi.fn(),
       setQuickActions: vi.fn(),
       setQuickActionsReady: vi.fn(),
       setRecordingControlCapability: vi.fn(),
@@ -81,7 +84,6 @@ function createParams(): PopupLifecycleParams {
       setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
-      setWebcamDevices: vi.fn(),
     },
     browser: {
       refreshActiveTabCapabilities,

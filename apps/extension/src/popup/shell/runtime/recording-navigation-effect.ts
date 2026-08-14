@@ -5,13 +5,17 @@ import {
   type VideoRecordingRuntimeState,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupPage } from '../navigation/actions';
+import type { PopupNavigationResult, PopupNavigationSource } from './types/navigation';
 import type { RecordingControlCapability } from './recording-control-capability';
 
 export function usePopupRecordingNavigationEffect(state: {
   page: PopupPage;
   recordingState: VideoRecordingRuntimeState;
   setIsStartPending: Dispatch<SetStateAction<boolean>>;
-  setPage: Dispatch<SetStateAction<PopupPage>>;
+  navigateToPage: (
+    page: PopupPage,
+    source?: PopupNavigationSource
+  ) => Promise<PopupNavigationResult>;
   setRecordingControlCapability: Dispatch<SetStateAction<RecordingControlCapability | null>>;
   setStartError: Dispatch<SetStateAction<string | null>>;
 }) {
@@ -19,7 +23,7 @@ export function usePopupRecordingNavigationEffect(state: {
   const page = state.page;
   const recordingStatus = state.recordingState.status;
   const setIsStartPending = state.setIsStartPending;
-  const setPage = state.setPage;
+  const navigateToPage = state.navigateToPage;
   const setRecordingControlCapability = state.setRecordingControlCapability;
   const setStartError = state.setStartError;
 
@@ -37,16 +41,19 @@ export function usePopupRecordingNavigationEffect(state: {
       return;
     }
 
-    didAutoOpenVideoRef.current = true;
-
-    if (page !== 'video') {
-      setPage('video');
+    if (page === 'video') {
+      didAutoOpenVideoRef.current = true;
+      return;
     }
+
+    void navigateToPage('video', 'recording').then((result) => {
+      didAutoOpenVideoRef.current = result === 'committed' || result === 'unchanged';
+    });
   }, [
     page,
     recordingStatus,
     setIsStartPending,
-    setPage,
+    navigateToPage,
     setRecordingControlCapability,
     setStartError,
   ]);

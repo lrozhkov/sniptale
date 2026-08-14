@@ -16,11 +16,11 @@ beforeEach(() => {
   mocks.usePopupLifecycleEffect.mockReset();
 });
 
-it('projects the single popup page setter into lifecycle bootstrap ownership', () => {
+it('projects preload-aware navigation into lifecycle bootstrap ownership', () => {
   const state = createPopupRuntimeStateSlice();
 
   usePopupLifecycleSync(state);
   const getParams = mocks.usePopupLifecycleEffect.mock.calls[0]?.[0];
 
-  expect(getParams?.().bootstrap.setPage).toBe(state.session.setPage);
+  expect(getParams?.().bootstrap.navigateToPage).toBe(state.session.navigateToPage);
 });

@@ -7,6 +7,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { MicrophoneOption } from '../../recording/microphone';
 import type { WebcamOption } from '../../recording/webcam';
 import { usePopupMediaDeviceEffects } from './media-device-effects';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import type { PopupPage } from '../navigation/actions';
 
 const { resolveMicrophoneDeviceIdMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
   resolveMicrophoneDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
@@ -27,13 +29,17 @@ let root: Root | null = null;
 function EffectsHarness({
   refreshMicrophones,
   refreshWebcams,
+  page = 'video',
 }: {
   refreshMicrophones: () => Promise<MicrophoneOption[]>;
   refreshWebcams: () => Promise<WebcamOption[]>;
+  page?: PopupPage;
 }) {
   usePopupMediaDeviceEffects({
+    page,
     refreshMicrophones,
     refreshWebcams,
+    videoSettings: DEFAULT_VIDEO_SETTINGS,
   });
   return null;
 }
@@ -80,6 +86,22 @@ it('skips devicechange listeners when media device events are unavailable', asyn
 
   expect(refreshMicrophones).not.toHaveBeenCalled();
   expect(refreshWebcams).not.toHaveBeenCalled();
+});
+
+it('does not enumerate or subscribe outside the Video page', async () => {
+  const addEventListener = vi.fn();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { addEventListener, removeEventListener: vi.fn() },
+  });
+  const refreshMicrophones = vi.fn(async () => []);
+  const refreshWebcams = vi.fn(async () => []);
+
+  await renderHarness({ page: 'home', refreshMicrophones, refreshWebcams });
+
+  expect(refreshMicrophones).not.toHaveBeenCalled();
+  expect(refreshWebcams).not.toHaveBeenCalled();
+  expect(addEventListener).not.toHaveBeenCalled();
 });
 
 it('refreshes microphones and webcams on mount and device changes', async () => {

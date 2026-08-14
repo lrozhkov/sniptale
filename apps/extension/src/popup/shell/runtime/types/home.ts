@@ -1,5 +1,8 @@
 import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
-import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
+import type {
+  ScreenshotSetupMode,
+  ScreenshotSetupState,
+} from '../../../../composition/persistence/capture-settings';
 
 export interface PopupRuntimeHomeView {
   quickActions: QuickAction[];
@@ -7,5 +10,6 @@ export interface PopupRuntimeHomeView {
   viewportPresets: ViewportPreset[];
   homeError: string | null;
   screenshotStartupMode: ScreenshotSetupMode | null;
+  initialScreenshotSetupState: ScreenshotSetupState;
   clearScreenshotStartupMode: () => void;
 }

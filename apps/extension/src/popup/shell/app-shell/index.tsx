@@ -17,7 +17,7 @@ export function PopupAppShell({
     <>
       <div className="relative flex h-full flex-col px-3 py-3">
         <TabsLayer runtime={runtime} />
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1" data-ui="popup.app.content">
           <PopupAppContent runtime={runtime} />
         </div>
         {runtime.navigation.showFooter ? (

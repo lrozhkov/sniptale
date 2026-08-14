@@ -3,7 +3,10 @@ import { getTabCapabilities } from '../../../features/tab-capabilities/capabilit
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { type StoragePressureLevel } from '../../../features/media-hub/storage-capacity';
 import type { QuickAction, ViewportPreset } from '../../../contracts/settings';
-import type { ScreenshotSetupMode } from '../../../composition/persistence/capture-settings';
+import {
+  DEFAULT_SCREENSHOT_SETUP_STATE,
+  type ScreenshotSetupMode,
+} from '../../../composition/persistence/capture-settings';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -17,6 +20,7 @@ import { isRecordingActive, resolveSelectedPreset, shouldShowFooter } from './mo
 import { usePopupRuntimeActions } from './actions';
 import { usePopupRuntimeEffects } from './effects';
 import type { RecordingControlCapability } from './recording-control-capability';
+import { usePopupNavigationState } from './navigation';
 import type {
   PopupRuntimeCoreState,
   PopupRuntimeDerivedState,
@@ -87,6 +91,7 @@ function createPopupRuntimeEffectState(
     setIsStartPending: state.recording.setIsStartPending,
     setStartError: state.recording.setStartError,
     setPage: state.session.setPage,
+    navigateToPage: state.session.navigateToPage,
     microphoneDevices: state.devices.microphoneDevices,
     webcamDevices: state.devices.webcamDevices,
     setSelectedPresetId: state.presets.setSelectedPresetId,
@@ -146,11 +151,13 @@ function usePopupSessionState() {
   const [homeError, setHomeError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [page, setPage] = useState<PopupPage>('home');
+  const navigation = usePopupNavigationState(page, setPage);
 
   return {
     homeError,
     isReady,
     page,
+    ...navigation,
     setHomeError,
     setIsReady,
     setPage,
@@ -165,6 +172,9 @@ function usePopupCapturePresetState() {
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [screenshotStartupMode, setScreenshotStartupMode] = useState<ScreenshotSetupMode | null>(
     null
+  );
+  const [initialScreenshotSetupState, setInitialScreenshotSetupState] = useState(
+    DEFAULT_SCREENSHOT_SETUP_STATE
   );
   const screenshotStartupSupersededRef = useRef(false);
   const publishScreenshotStartupMode = useCallback<
@@ -183,11 +193,13 @@ function usePopupCapturePresetState() {
     quickActionsReady,
     selectedPresetId,
     screenshotStartupMode,
+    initialScreenshotSetupState,
     clearScreenshotStartupMode,
     setQuickActions,
     setQuickActionsReady,
     setSelectedPresetId,
     setScreenshotStartupMode: publishScreenshotStartupMode,
+    setInitialScreenshotSetupState,
     setVideoCaptureMode,
     setViewportPresets,
     videoCaptureMode,

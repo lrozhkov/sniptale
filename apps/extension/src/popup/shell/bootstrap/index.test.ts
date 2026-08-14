@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupBootstrapResult } from './index';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../composition/persistence/capture-settings';
 import {
   createPopupBootstrapRecordingState,
   createPopupBootstrapSettings,
@@ -11,7 +12,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getQuickActionsMock: vi.fn(),
-  loadMicrophoneDevicesMock: vi.fn(),
+  loadScreenshotSetupStateMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
   loadVideoUiStateMock: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
   ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
   loadVideoSettings: mocks.loadVideoSettingsMock,
   loadVideoUiState: mocks.loadVideoUiStateMock,
+  loadScreenshotSetupState: mocks.loadScreenshotSetupStateMock,
 }));
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
@@ -40,10 +42,6 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-vi.mock('../../recording/microphone', (_importOriginal) => ({
-  loadMicrophoneDevices: mocks.loadMicrophoneDevicesMock,
-}));
-
 vi.mock('../../diagnostics/performance', (_importOriginal) => ({
   startPopupPerfSpan: mocks.startPopupPerfSpanMock,
   trackPopupPerfAsync: mocks.trackPopupPerfAsyncMock,
@@ -73,17 +71,11 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
   expect(mocks.runtimeTransportMock.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'GET_RECORDING_STATE',
   });
-  expect(mocks.loadMicrophoneDevicesMock).toHaveBeenNthCalledWith(1);
-  expect(mocks.loadMicrophoneDevicesMock).toHaveBeenNthCalledWith(2, {
-    hydrateLabels: 'if-permission-granted',
-    knownDevices: [{ deviceId: 'mic-known', label: 'Known Mic' }],
-    preferredDeviceId: 'missing-device',
-  });
   expect(result).toEqual({
     captureMode: CaptureMode.TAB,
     hasPostRecordResult: false,
     homeError: null,
-    microphones: [{ deviceId: 'mic-2', label: 'Hydrated Mic' }],
+    screenshotSetupState: DEFAULT_SCREENSHOT_SETUP_STATE,
     quickActions: [
       expect.objectContaining({
         id: 'enabled',
@@ -99,7 +91,6 @@ function expectHydratedBootstrapResult(result: PopupBootstrapResult) {
     selectedPresetId: null,
     videoSettings: expect.objectContaining({ microphoneDeviceId: 'missing-device' }),
     viewportPresets: createPopupBootstrapSettings().viewportPresets,
-    webcams: [],
   });
 }
 
@@ -125,10 +116,6 @@ function configureFailedRecordingBootstrapResponse() {
     state: null,
     success: false,
   });
-  mocks.loadMicrophoneDevicesMock.mockReset();
-  mocks.loadMicrophoneDevicesMock.mockResolvedValue([
-    { deviceId: 'mic-passive', label: 'Passive Mic' },
-  ]);
 }
 
 async function verifiesFailedRecordingBootstrapFallback() {
@@ -137,7 +124,6 @@ async function verifiesFailedRecordingBootstrapFallback() {
   const module = await importPopupBootstrapModule();
   const result = await module.bootstrapPopupState();
 
-  expect(mocks.loadMicrophoneDevicesMock).toHaveBeenCalledTimes(1);
   expect(result.recordingState.status).toBe(VideoRecordingStatus.IDLE);
   expect(result.recordingStatusError).toBe('background.runtime.recordingUnavailable');
   expect(result.captureMode).toBe(CaptureMode.TAB);
@@ -174,6 +160,7 @@ beforeEach(() => {
   mocks.loadSettingsMock.mockResolvedValue(createPopupBootstrapSettings());
   mocks.loadVideoSettingsMock.mockResolvedValue(createPopupBootstrapVideoSettings());
   mocks.loadVideoUiStateMock.mockResolvedValue(createPopupBootstrapVideoUiState());
+  mocks.loadScreenshotSetupStateMock.mockResolvedValue(DEFAULT_SCREENSHOT_SETUP_STATE);
   mocks.runtimeTransportMock.sendRuntimeMessage.mockResolvedValue({
     controlToken: 'control-token-1',
     recordingHealth: 'healthy',
@@ -181,9 +168,6 @@ beforeEach(() => {
     state: createPopupBootstrapRecordingState(),
     success: true,
   });
-  mocks.loadMicrophoneDevicesMock
-    .mockResolvedValueOnce([{ deviceId: 'mic-known', label: 'Known Mic' }])
-    .mockResolvedValueOnce([{ deviceId: 'mic-2', label: 'Hydrated Mic' }]);
 });
 
 describe('popup-bootstrap hydration', () => {
@@ -198,43 +182,4 @@ describe('popup-bootstrap fallbacks', () => {
     'falls back to idle recording state without replacing the stored microphone preference',
     verifiesFailedRecordingBootstrapFallback
   );
-});
-
-describe('popup-bootstrap microphone failures', () => {
-  it('returns an empty microphone list when bootstrap microphone loading fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const perfSpan = createPerfSpan();
-    mocks.startPopupPerfSpanMock
-      .mockReturnValueOnce(perfSpan)
-      .mockReturnValueOnce(createPerfSpan());
-    mocks.loadVideoSettingsMock.mockResolvedValue(
-      createPopupBootstrapVideoSettings({
-        microphoneEnabled: false,
-      })
-    );
-    mocks.loadMicrophoneDevicesMock.mockReset();
-    mocks.loadMicrophoneDevicesMock.mockRejectedValue(new Error('mic failure'));
-
-    const module = await importPopupBootstrapModule();
-    const result = await module.bootstrapPopupStateWithTransport({
-      sendRuntimeMessage: vi.fn().mockResolvedValue({
-        recordingHealth: 'healthy',
-        state: createPopupBootstrapRecordingState(),
-        success: true,
-      }),
-      sendTabMessage: vi.fn(),
-    });
-
-    expect(result.microphones).toEqual([]);
-    expect(perfSpan.end).toHaveBeenCalledWith({
-      microphoneCount: 0,
-      quickActionCount: 1,
-      viewportPresetCount: 2,
-    });
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[PopupBootstrap]',
-      'Failed to bootstrap microphones',
-      expect.any(Error)
-    );
-  });
 });

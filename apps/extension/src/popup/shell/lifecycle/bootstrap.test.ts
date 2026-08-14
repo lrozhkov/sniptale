@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { PopupStartupState } from '../../../composition/persistence/capture-settings/popup-startup';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../composition/persistence/capture-settings';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import type { PopupLifecycleBootstrapParams } from './contracts';
 
 const mocks = vi.hoisted(() => ({
   bootstrapPopupStateMock: vi.fn(),
@@ -61,10 +64,9 @@ function createParams() {
     refreshActiveTabCapabilities: vi.fn(async () => undefined),
     refreshGalleryStatus: vi.fn(async () => undefined),
     setHomeError: vi.fn(),
-    setPage: vi.fn(),
+    navigateToPage: vi.fn<PopupLifecycleBootstrapParams['navigateToPage']>(async () => 'unchanged'),
     setIsReady: vi.fn(),
-    setMicrophoneDevices: vi.fn(),
-    setWebcamDevices: vi.fn(),
+    setInitialScreenshotSetupState: vi.fn(),
     setQuickActions: vi.fn(),
     setQuickActionsReady: vi.fn(),
     setRecordingControlCapability: vi.fn(),
@@ -94,12 +96,11 @@ function createBootstrapState() {
   return {
     captureMode: 'visible' as const,
     hasPostRecordResult: false,
-    microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
-    webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
+    screenshotSetupState: DEFAULT_SCREENSHOT_SETUP_STATE,
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
     recordingControlCapability: null,
     recordingStatusError: 'recording state unavailable',
-    recordingState: { status: 'idle' } as const,
+    recordingState: { status: VideoRecordingStatus.IDLE } as const,
     selectedPresetId: 'preset-1',
     videoSettings: { microphoneId: 'mic-1' },
     viewportPresets: [
@@ -138,8 +139,7 @@ function expectBootstrappedStateApplied(
   );
   expect(params.setRecordingState).toHaveBeenCalledWith(state.recordingState);
   expect(params.setStartError).toHaveBeenCalledWith(state.recordingStatusError);
-  expect(params.setMicrophoneDevices).toHaveBeenCalledWith(state.microphones);
-  expect(params.setWebcamDevices).toHaveBeenCalledWith(state.webcams);
+  expect(params.setInitialScreenshotSetupState).toHaveBeenCalledWith(state.screenshotSetupState);
   expect(params.setIsReady).toHaveBeenCalledWith(true);
   expect(params.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
   expect(params.refreshGalleryStatus).toHaveBeenCalledTimes(1);
@@ -201,7 +201,7 @@ it('logs but does not surface a bootstrap failure after cancellation', async () 
   expect(params.setIsReady).not.toHaveBeenCalled();
 });
 
-it('logs secondary refresh failures without blocking ready state', async () => {
+it('logs capability refresh failures without blocking ready state', async () => {
   const params = createParams();
   const state = createBootstrapState();
   mocks.bootstrapPopupStateMock.mockResolvedValue(state);
@@ -264,6 +264,23 @@ it('waits for secondary refresh before marking the popup ready', async () => {
   expect(params.setIsReady).toHaveBeenCalledWith(true);
 });
 
+it('keeps the startup skeleton when the selected route cannot commit', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue({
+    ...createBootstrapState(),
+    hasPostRecordResult: true,
+  });
+  vi.mocked(params.navigateToPage).mockResolvedValueOnce('failed');
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.navigateToPage).toHaveBeenCalledWith('video', 'startup');
+  expect(params.setStartError).toHaveBeenCalledWith('translated:popup.video.loadingPopupError');
+  expect(params.refreshActiveTabCapabilities).not.toHaveBeenCalled();
+  expect(params.refreshGalleryStatus).not.toHaveBeenCalled();
+  expect(params.setIsReady).not.toHaveBeenCalled();
+});
+
 it('applies a consumed export launch intent before popup readiness', async () => {
   const params = createParams();
   mocks.bootstrapPopupStateMock.mockResolvedValue(createBootstrapState());
@@ -274,11 +291,11 @@ it('applies a consumed export launch intent before popup readiness', async () =>
     getParams: () => params,
   });
 
-  expect(params.setPage).toHaveBeenCalledWith('export');
+  expect(params.navigateToPage).toHaveBeenCalledWith('export', 'startup');
   expect(mocks.stagePopupExportLaunchSelectionMock).toHaveBeenCalledWith({
     includeAnnotations: true,
   });
-  expect(params.setPage.mock.invocationCallOrder[0]).toBeLessThan(
+  expect(params.navigateToPage.mock.invocationCallOrder[0]).toBeLessThan(
     params.setIsReady.mock.invocationCallOrder[0]!
   );
 });
@@ -292,8 +309,23 @@ it('opens the video tab when bootstrap already contains a post-record result', a
 
   await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
 
-  expect(params.setPage).toHaveBeenCalledTimes(1);
-  expect(params.setPage).toHaveBeenCalledWith('video');
+  expect(params.navigateToPage).toHaveBeenCalledTimes(1);
+  expect(params.navigateToPage).toHaveBeenCalledWith('video', 'startup');
+});
+
+it('keeps an active recording above toolbar export and startup routing', async () => {
+  const params = createParams();
+  mocks.bootstrapPopupStateMock.mockResolvedValue({
+    ...createBootstrapState(),
+    recordingState: { status: VideoRecordingStatus.RECORDING },
+  });
+  mocks.consumePopupExportLaunchIntentMock.mockResolvedValueOnce('export');
+
+  await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
+
+  expect(params.navigateToPage).toHaveBeenCalledTimes(1);
+  expect(params.navigateToPage).toHaveBeenCalledWith('video', 'startup');
+  expect(mocks.stagePopupExportLaunchSelectionMock).not.toHaveBeenCalled();
 });
 
 it('publishes an asynchronously loaded screenshot startup mode before popup readiness', async () => {
@@ -307,7 +339,7 @@ it('publishes an asynchronously loaded screenshot startup mode before popup read
   await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
 
   expect(params.setScreenshotStartupMode).toHaveBeenCalledWith('desktop');
-  expect(params.setPage).toHaveBeenCalledWith('home');
+  expect(params.navigateToPage).toHaveBeenCalledWith('home', 'startup');
   expect(params.setScreenshotStartupMode.mock.invocationCallOrder[0]).toBeLessThan(
     params.setIsReady.mock.invocationCallOrder[0]!
   );
@@ -324,8 +356,8 @@ it('keeps the toolbar export intent above a fixed startup destination', async ()
 
   await bootstrapPopupLifecycle({ cancelledRef: () => false, getParams: () => params });
 
-  expect(params.setPage).toHaveBeenCalledTimes(1);
-  expect(params.setPage).toHaveBeenCalledWith('export');
+  expect(params.navigateToPage).toHaveBeenCalledTimes(1);
+  expect(params.navigateToPage).toHaveBeenCalledWith('export', 'startup');
   expect(params.setVideoCaptureMode).toHaveBeenCalledTimes(1);
   expect(mocks.stagePopupExportLaunchSelectionMock).toHaveBeenCalledWith({
     includeAnnotations: true,
@@ -342,7 +374,7 @@ it('keeps ordinary popup navigation when launch-intent delivery fails', async ()
     getParams: () => params,
   });
 
-  expect(params.setPage).toHaveBeenCalledWith('home');
+  expect(params.navigateToPage).toHaveBeenCalledWith('home', 'startup');
   expect(params.setIsReady).toHaveBeenCalledWith(true);
   expect(mocks.errorMock).toHaveBeenCalledWith(
     'Failed to consume popup export launch intent',

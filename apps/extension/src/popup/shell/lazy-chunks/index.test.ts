@@ -31,21 +31,34 @@ describe('popup lazy chunks', () => {
     vi.resetModules();
   });
 
-  it('memoizes deferred popup view preloads and records every chunk loader', async () => {
-    const { preloadPopupDeferredViews } = await import('./index');
+  it('warms only the Video setup and Export route resources', async () => {
+    const {
+      getResolvedExportPage,
+      getResolvedVideoSetupPage,
+      isPopupPagePreloaded,
+      preloadPopupDeferredViews,
+    } = await import('./index');
+
+    expect(isPopupPagePreloaded('home')).toBe(true);
+    expect(isPopupPagePreloaded('video')).toBe(false);
+    expect(isPopupPagePreloaded('export')).toBe(false);
+    expect(getResolvedVideoSetupPage()).toBeNull();
+    expect(getResolvedExportPage()).toBeNull();
 
     const firstPromise = preloadPopupDeferredViews();
     const secondPromise = preloadPopupDeferredViews();
 
     await firstPromise;
 
-    expect(secondPromise).toBe(firstPromise);
-    expect(trackPopupPerfAsyncMock).toHaveBeenCalledTimes(4);
+    await secondPromise;
+    expect(isPopupPagePreloaded('video')).toBe(true);
+    expect(isPopupPagePreloaded('export')).toBe(true);
+    expect(getResolvedVideoSetupPage()).not.toBeNull();
+    expect(getResolvedExportPage()).not.toBeNull();
+    expect(trackPopupPerfAsyncMock).toHaveBeenCalledTimes(2);
     expect(trackPopupPerfAsyncMock.mock.calls.map(([name]) => name)).toEqual([
-      'popup.chunk.video-active',
-      'popup.chunk.video-setup',
-      'popup.chunk.export',
-      'popup.chunk.command-palette',
+      'popup.route.preload.video',
+      'popup.route.preload.export',
     ]);
   });
 
@@ -63,6 +76,6 @@ describe('popup lazy chunks', () => {
     );
 
     await expect(preloadPopupDeferredViews()).resolves.toBeUndefined();
-    expect(trackPopupPerfAsyncMock.mock.calls.length).toBeGreaterThan(4);
+    expect(trackPopupPerfAsyncMock).toHaveBeenCalledTimes(3);
   });
 });

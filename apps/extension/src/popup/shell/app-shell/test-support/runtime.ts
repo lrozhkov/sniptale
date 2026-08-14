@@ -8,6 +8,7 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupRuntimeState } from '../../runtime/types/state';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
 type PopupRuntimeFlatOverrides = Partial<
   PopupRuntimeState['navigation'] &
@@ -62,7 +63,9 @@ function createRuntimeNavigation(overrides: PopupRuntimeStateOverrides) {
   return {
     isReady: overrides.isReady ?? true,
     page: overrides.page ?? 'home',
-    setPage: overrides.setPage ?? vi.fn(),
+    pendingPage: overrides.pendingPage ?? null,
+    navigateToPage: overrides.navigateToPage ?? vi.fn(async () => 'committed' as const),
+    preloadPage: overrides.preloadPage ?? vi.fn(async () => undefined),
     showFooter: overrides.showFooter ?? true,
     ...overrides.navigation,
   };
@@ -74,6 +77,8 @@ function createRuntimeHome(overrides: PopupRuntimeStateOverrides) {
     quickActions: overrides.quickActions ?? [],
     quickActionsReady: overrides.quickActionsReady ?? true,
     screenshotStartupMode: overrides.screenshotStartupMode ?? null,
+    initialScreenshotSetupState:
+      overrides.initialScreenshotSetupState ?? DEFAULT_SCREENSHOT_SETUP_STATE,
     clearScreenshotStartupMode: overrides.clearScreenshotStartupMode ?? vi.fn(),
     viewportPresets: overrides.viewportPresets ?? [
       {

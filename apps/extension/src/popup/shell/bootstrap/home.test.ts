@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../composition/persistence/capture-settings';
 
 const mocks = vi.hoisted(() => ({
   getQuickActionsMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  loadScreenshotSetupStateMock: vi.fn(),
   trackPopupPerfAsyncMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
   getQuickActions: mocks.getQuickActionsMock,
+}));
+vi.mock('../../../composition/persistence/capture-settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
+  loadScreenshotSetupState: mocks.loadScreenshotSetupStateMock,
 }));
 
 vi.mock('../../../platform/i18n', () => ({
@@ -55,6 +61,7 @@ beforeEach(() => {
     async (_label: string, task: () => Promise<unknown>) => task()
   );
   mocks.getQuickActionsMock.mockResolvedValue([{ id: 'action-1', status: true }]);
+  mocks.loadScreenshotSetupStateMock.mockResolvedValue(DEFAULT_SCREENSHOT_SETUP_STATE);
 });
 
 describe('popup home bootstrap owner', () => {
@@ -64,10 +71,23 @@ describe('popup home bootstrap owner', () => {
     expect(result).toEqual({
       actions: [{ id: 'action-1', status: true }],
       homeError: null,
+      screenshotSetupState: DEFAULT_SCREENSHOT_SETUP_STATE,
     });
     expect(mocks.trackPopupPerfAsyncMock).toHaveBeenCalledWith(
       'popup.bootstrap.quick-actions',
       mocks.getQuickActionsMock
+    );
+    expect(mocks.trackPopupPerfAsyncMock).toHaveBeenCalledWith(
+      'popup.bootstrap.screenshot-setup',
+      mocks.loadScreenshotSetupStateMock
+    );
+  });
+
+  it('treats the initial screenshot snapshot as required bootstrap data', async () => {
+    mocks.loadScreenshotSetupStateMock.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(loadPopupHomeBootstrapData(createPopupHomeBootstrapPromises())).rejects.toThrow(
+      'storage unavailable'
     );
   });
 
@@ -79,6 +99,7 @@ describe('popup home bootstrap owner', () => {
     expect(result).toEqual({
       actions: [],
       homeError: 'popup.home.quickActionsLoadError',
+      screenshotSetupState: DEFAULT_SCREENSHOT_SETUP_STATE,
     });
     expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
       'Failed to bootstrap quick actions',

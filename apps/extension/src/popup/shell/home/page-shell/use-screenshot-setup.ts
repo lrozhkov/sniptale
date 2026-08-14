@@ -11,13 +11,17 @@ import { translate } from '../../../../platform/i18n';
 
 export function useScreenshotSetupState(
   startupMode: ScreenshotSetupMode | null = null,
-  onStartupModeCleared?: () => void
+  onStartupModeCleared?: () => void,
+  initialState: ScreenshotSetupState = DEFAULT_SCREENSHOT_SETUP_STATE
 ) {
-  const [state, setState] = useState(DEFAULT_SCREENSHOT_SETUP_STATE);
-  const [ready, setReady] = useState(false);
+  const operationalInitialState = startupMode
+    ? { ...initialState, selectedMode: startupMode }
+    : initialState;
+  const [state, setState] = useState(operationalInitialState);
+  const [ready] = useState(true);
   const [savePending, setSavePending] = useState(false);
-  const committedRef = useRef(DEFAULT_SCREENSHOT_SETUP_STATE);
-  const desiredRef = useRef(DEFAULT_SCREENSHOT_SETUP_STATE);
+  const committedRef = useRef(initialState);
+  const desiredRef = useRef(operationalInitialState);
   const revisionRef = useRef(0);
   const failedPatchRef = useRef<Partial<ScreenshotSetupState>>({});
   const saveErrorRef = useRef<unknown>(null);
@@ -46,10 +50,7 @@ export function useScreenshotSetupState(
         desiredRef.current = operational;
         setState(operational);
       })
-      .catch(() => toast.error(translate('common.states.error')))
-      .finally(() => {
-        if (active) setReady(true);
-      });
+      .catch(() => toast.error(translate('common.states.error')));
     return () => {
       active = false;
     };

@@ -80,7 +80,7 @@ function buildPopupNavigationActions(runtime: PopupCommandPaletteRuntime): Comma
       section,
       icon: commandPaletteIcon(Camera),
       active: currentPage === 'home',
-      onSelect: () => runtime.navigation.setPage('home'),
+      onSelect: () => void runtime.navigation.navigateToPage('home', 'command-palette'),
     }),
     createCommandPaletteNavigationAction({
       id: 'popup-page-video',
@@ -88,7 +88,7 @@ function buildPopupNavigationActions(runtime: PopupCommandPaletteRuntime): Comma
       section,
       icon: commandPaletteIcon(Video),
       active: currentPage === 'video',
-      onSelect: () => runtime.navigation.setPage('video'),
+      onSelect: () => void runtime.navigation.navigateToPage('video', 'command-palette'),
     }),
     createCommandPaletteNavigationAction({
       id: 'popup-page-export',
@@ -100,7 +100,7 @@ function buildPopupNavigationActions(runtime: PopupCommandPaletteRuntime): Comma
       disabledReason: pageAccessDisabledReason,
       onSelect: () => {
         if (!pageAccessDisabledReason) {
-          runtime.navigation.setPage('export');
+          void runtime.navigation.navigateToPage('export', 'command-palette');
         }
       },
     }),

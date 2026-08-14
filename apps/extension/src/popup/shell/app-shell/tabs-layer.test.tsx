@@ -63,7 +63,9 @@ it('forwards page access state to popup tabs', () => {
     navigation: {
       isReady: true,
       page: 'home',
-      setPage: vi.fn(),
+      pendingPage: null,
+      navigateToPage: vi.fn(async () => 'committed' as const),
+      preloadPage: vi.fn(async () => undefined),
       showFooter: true,
     },
   };
@@ -79,5 +81,13 @@ it('forwards page access state to popup tabs', () => {
       pageAccess,
     })
   );
+  const tabProps = popupTabsMock.mock.calls[0]?.[0] as {
+    onChange: (page: 'video') => void;
+    onPreload: (page: 'export') => void;
+  };
+  tabProps.onPreload('export');
+  tabProps.onChange('video');
+  expect(runtime.navigation.preloadPage).toHaveBeenCalledWith('export');
+  expect(runtime.navigation.navigateToPage).toHaveBeenCalledWith('video', 'tab');
   act(() => root.unmount());
 });

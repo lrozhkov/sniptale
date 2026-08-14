@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getQuickActionsMock: vi.fn(),
   loadMicrophoneDevicesMock: vi.fn(),
+  loadScreenshotSetupStateMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
   loadVideoUiStateMock: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
   ...(await importOriginal<typeof import('../../../composition/persistence/capture-settings')>()),
   loadVideoSettings: mocks.loadVideoSettingsMock,
   loadVideoUiState: mocks.loadVideoUiStateMock,
+  loadScreenshotSetupState: mocks.loadScreenshotSetupStateMock,
 }));
 
 vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
@@ -120,6 +122,11 @@ beforeEach(() => {
   mocks.loadSettingsMock.mockResolvedValue(createSettings());
   mocks.loadVideoSettingsMock.mockResolvedValue(createVideoSettings());
   mocks.loadVideoUiStateMock.mockResolvedValue(createVideoUiState());
+  mocks.loadScreenshotSetupStateMock.mockResolvedValue({
+    selectedMode: 'quick-actions',
+    tab: {},
+    desktop: {},
+  });
   mocks.runtimeTransportMock.sendRuntimeMessage.mockResolvedValue({
     recordingHealth: 'healthy',
     state: {

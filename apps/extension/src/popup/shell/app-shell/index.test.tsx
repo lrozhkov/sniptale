@@ -26,7 +26,7 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 }));
 vi.mock('../lazy-chunks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lazy-chunks')>()),
-  LazyExportPage: (props: unknown) => {
+  getResolvedExportPage: () => (props: unknown) => {
     popupAppShellMocks.exportPageMock(props);
     return <div data-testid="export-page">export</div>;
   },
@@ -34,7 +34,7 @@ vi.mock('../lazy-chunks', async (importOriginal) => ({
     popupAppShellMocks.commandPaletteMock(props);
     return <div data-testid="command-palette">palette</div>;
   },
-  LazyVideoSetupPage: (props: unknown) => {
+  getResolvedVideoSetupPage: () => (props: unknown) => {
     popupAppShellMocks.videoSetupPageMock(props);
     return <div data-testid="video-setup">setup</div>;
   },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
@@ -10,6 +10,7 @@ import { usePopupCommandPaletteHotkey } from '../command-palette/hotkey';
 import { preloadPopupDeferredViews } from '../lazy-chunks';
 import { initializePopupTracer } from '../../diagnostics/tracing';
 import { PopupAppShell } from '../app-shell';
+import { finishPopupPerfSpanOnNextFrame, startPopupPerfSpan } from '../../diagnostics/performance';
 
 const POPUP_ROOT_CLASS_NAME =
   'sc-popup-shell sniptale-extension-surface relative h-[560px] w-[392px] overflow-hidden';
@@ -24,25 +25,60 @@ const POPUP_BACKGROUND_ORBS_SURFACE_CLASS_NAME = [
   'radial-gradient(circle_at_75%_20%,',
   'color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent),transparent_30%)]',
 ].join('');
-function usePopupDeferredViewPreload() {
+function usePopupDeferredViewPreload(isReady: boolean) {
   useEffect(() => {
     initializePopupTracer();
+    if (!isReady) return undefined;
 
-    const preloadTimeoutId = window.setTimeout(() => {
-      void preloadPopupDeferredViews();
-    }, 150);
+    let idleId: number | null = null;
+    const frameId = window.requestAnimationFrame(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(() => void preloadPopupDeferredViews());
+      } else {
+        idleId = window.setTimeout(() => void preloadPopupDeferredViews(), 0);
+      }
+    });
 
     return () => {
-      window.clearTimeout(preloadTimeoutId);
+      window.cancelAnimationFrame(frameId);
+      if (idleId === null) return;
+      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
     };
-  }, []);
+  }, [isReady]);
+}
+
+function PopupStartupShell() {
+  return (
+    <div className="popup-startup-shell" aria-hidden="true" data-ui="popup.app.startup-shell">
+      <div className="popup-startup-shell__tabs" />
+      <div className="popup-startup-shell__card">
+        <span className="popup-startup-shell__line" style={{ width: 96, height: 14 }} />
+        <span className="popup-startup-shell__line" style={{ width: '100%', height: 48 }} />
+        <span className="popup-startup-shell__line" style={{ width: '84%', height: 12 }} />
+        <span className="popup-startup-shell__line" style={{ width: '68%', height: 12 }} />
+      </div>
+      <div className="popup-startup-shell__footer" />
+    </div>
+  );
 }
 
 export function PopupApp() {
   usePageLocaleMetadata('popup.common.documentTitle');
   const runtime = usePopupRuntime();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  usePopupDeferredViewPreload();
+  const correctRouteSpanRef = useRef<ReturnType<typeof startPopupPerfSpan> | undefined>(undefined);
+  if (correctRouteSpanRef.current === undefined) {
+    correctRouteSpanRef.current = startPopupPerfSpan('popup.startup.correct-route-frame');
+  }
+  usePopupDeferredViewPreload(runtime.navigation.isReady);
+  useEffect(() => {
+    if (!runtime.navigation.isReady || !correctRouteSpanRef.current) return;
+    finishPopupPerfSpanOnNextFrame(correctRouteSpanRef.current, {
+      target: runtime.navigation.page,
+    });
+    correctRouteSpanRef.current = null;
+  }, [runtime.navigation.isReady, runtime.navigation.page]);
   usePopupCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
     onOpen: () => setCommandPaletteOpen(true),
@@ -59,11 +95,15 @@ export function PopupApp() {
           POPUP_BACKGROUND_ORBS_SURFACE_CLASS_NAME,
         ].join(' ')}
       />
-      <PopupAppShell
-        runtime={runtime}
-        commandPaletteOpen={commandPaletteOpen}
-        onCloseCommandPalette={() => setCommandPaletteOpen(false)}
-      />
+      {runtime.navigation.isReady ? (
+        <PopupAppShell
+          runtime={runtime}
+          commandPaletteOpen={commandPaletteOpen}
+          onCloseCommandPalette={() => setCommandPaletteOpen(false)}
+        />
+      ) : (
+        <PopupStartupShell />
+      )}
     </div>
   );
 }

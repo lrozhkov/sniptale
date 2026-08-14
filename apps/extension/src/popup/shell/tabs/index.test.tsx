@@ -80,12 +80,14 @@ afterEach(() => {
 describe('PopupShellViews', () => {
   it('renders popup tabs and changes the active page on click', () => {
     const onChange = vi.fn();
+    const onPreload = vi.fn();
 
     renderNode(
       <PopupTabs
         page="video"
         activeTabCapabilities={createActiveTabCapabilities()}
         onChange={onChange}
+        onPreload={onPreload}
       />
     );
 
@@ -103,6 +105,16 @@ describe('PopupShellViews', () => {
     });
 
     expect(onChange).toHaveBeenCalledWith('export');
+    expect(onPreload).not.toHaveBeenCalled();
+
+    act(() => {
+      buttons[1]?.dispatchEvent(new Event('pointerover', { bubbles: true }));
+      buttons[1]?.focus();
+      buttons[1]?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    });
+
+    expect(onPreload).toHaveBeenCalledWith('video');
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it('rebuilds popup tab labels when the active locale changes', () => {

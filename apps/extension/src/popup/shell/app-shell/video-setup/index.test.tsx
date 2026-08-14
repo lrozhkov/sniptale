@@ -6,20 +6,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   lazyMock: vi.fn(),
-  suspendLazyPage: false,
-  suspendedRoutePromise: new Promise<never>(() => undefined),
+  routeResolved: true,
 }));
 
 vi.mock('../../lazy-chunks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lazy-chunks')>()),
-  LazyVideoSetupPage: (props: unknown) => {
-    if (mocks.suspendLazyPage) {
-      throw mocks.suspendedRoutePromise;
-    }
-
-    mocks.lazyMock(props);
-    return <div data-testid="video-setup-page" />;
-  },
+  getResolvedVideoSetupPage: () =>
+    mocks.routeResolved
+      ? (props: unknown) => {
+          mocks.lazyMock(props);
+          return <div data-testid="video-setup-page" />;
+        }
+      : null,
 }));
 
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
@@ -64,7 +62,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
   mocks.lazyMock.mockReset();
-  mocks.suspendLazyPage = false;
+  mocks.routeResolved = true;
 });
 
 afterEach(() => {
@@ -99,16 +97,10 @@ it('passes derived props to the lazy video setup page', async () => {
   );
 });
 
-it('delays the route loading fallback for a slow lazy video route', async () => {
-  mocks.suspendLazyPage = true;
+it('shows an immediate guard fallback if a video route is committed before resolution', async () => {
+  mocks.routeResolved = false;
 
   await renderPopupVideoSetup();
-
-  expect(container?.querySelector('[data-ui="popup.app.route-loading"]')).toBeNull();
-
-  await act(async () => {
-    vi.advanceTimersByTime(350);
-  });
 
   expect(container?.querySelector('[data-ui="popup.app.route-loading"]')).not.toBeNull();
   expect(mocks.lazyMock).not.toHaveBeenCalled();

@@ -12,6 +12,7 @@ import {
   VideoQuality,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
 export type PopupRuntimeStateSliceOverrides = Partial<
   PopupRuntimeStateSlice['actions'] &
@@ -121,11 +122,14 @@ function createRuntimePresets(
     selectedPreset: overrides.selectedPreset ?? null,
     selectedPresetId: overrides.selectedPresetId ?? null,
     screenshotStartupMode: overrides.screenshotStartupMode ?? null,
+    initialScreenshotSetupState:
+      overrides.initialScreenshotSetupState ?? DEFAULT_SCREENSHOT_SETUP_STATE,
     clearScreenshotStartupMode: overrides.clearScreenshotStartupMode ?? vi.fn(),
     setQuickActions: overrides.setQuickActions ?? vi.fn(),
     setQuickActionsReady: overrides.setQuickActionsReady ?? vi.fn(),
     setSelectedPresetId: overrides.setSelectedPresetId ?? vi.fn(),
     setScreenshotStartupMode: overrides.setScreenshotStartupMode ?? vi.fn(),
+    setInitialScreenshotSetupState: overrides.setInitialScreenshotSetupState ?? vi.fn(),
     setVideoCaptureMode: overrides.setVideoCaptureMode ?? vi.fn(),
     setViewportPresets: overrides.setViewportPresets ?? vi.fn(),
     videoCaptureMode: overrides.videoCaptureMode ?? CaptureMode.TAB,
@@ -156,6 +160,9 @@ function createRuntimeSession(overrides: PopupRuntimeStateSliceOverrides) {
     homeError: overrides.homeError ?? null,
     isReady: overrides.isReady ?? true,
     page: overrides.page ?? 'home',
+    pendingPage: overrides.pendingPage ?? null,
+    navigateToPage: overrides.navigateToPage ?? vi.fn(async () => 'committed' as const),
+    preloadPage: overrides.preloadPage ?? vi.fn(async () => undefined),
     setHomeError: overrides.setHomeError ?? vi.fn(),
     setIsReady: overrides.setIsReady ?? vi.fn(),
     setPage: overrides.setPage ?? vi.fn(),

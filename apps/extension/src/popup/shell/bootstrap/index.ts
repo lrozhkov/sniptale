@@ -6,8 +6,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingStateResponse } from '../../../contracts/messaging/contracts/response-types';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { type MicrophoneOption } from '../../recording/microphone';
-import { type WebcamOption } from '../../recording/webcam';
+import type { ScreenshotSetupState } from '../../../composition/persistence/capture-settings';
 import { startPopupPerfSpan, trackPopupPerfAsync } from '../../diagnostics/performance';
 import { popupBootstrapTransport, type RuntimeMessagingTransport } from './runtime';
 import { createPopupHomeBootstrapPromises, loadPopupHomeBootstrapData } from './home';
@@ -28,8 +27,7 @@ export type PopupBootstrapResult = {
   recordingState: VideoRecordingRuntimeState;
   homeError?: string | null;
   recordingStatusError?: string | null;
-  microphones: MicrophoneOption[];
-  webcams: WebcamOption[];
+  screenshotSetupState: ScreenshotSetupState;
   selectedPresetId: string | null;
   captureMode: CaptureMode;
 };
@@ -37,8 +35,7 @@ export type PopupBootstrapResult = {
 type PopupBootstrapData = {
   actions: QuickAction[];
   homeError: string | null;
-  microphones: MicrophoneOption[];
-  webcams: WebcamOption[];
+  screenshotSetupState: ScreenshotSetupState;
   recordingResponse: RecordingStateResponse;
   selectedPresetId: string | null;
   captureMode: CaptureMode;
@@ -64,7 +61,6 @@ export async function bootstrapPopupStateWithTransport(
     const result = buildPopupBootstrapResult(bootstrapData);
 
     bootstrapSpan?.end({
-      microphoneCount: result.microphones.length,
       quickActionCount: result.quickActions.length,
       viewportPresetCount: result.viewportPresets.length,
     });
@@ -108,8 +104,7 @@ async function loadPopupBootstrapData(
     captureMode: videoData.captureMode,
     homeError: homeData.homeError,
     actions: homeData.actions,
-    microphones: videoData.microphones,
-    webcams: videoData.webcams,
+    screenshotSetupState: homeData.screenshotSetupState,
     recordingResponse,
     selectedPresetId: videoData.selectedPresetId,
     videoSettings: videoData.videoSettings,
@@ -125,8 +120,7 @@ function buildPopupBootstrapResult(data: PopupBootstrapData): PopupBootstrapResu
     captureMode: data.captureMode,
     homeError: data.homeError,
     hasPostRecordResult: data.recordingResponse.postRecordResult !== undefined,
-    microphones: data.microphones,
-    webcams: data.webcams,
+    screenshotSetupState: data.screenshotSetupState,
     quickActions: data.actions.filter((action) => action.status),
     recordingControlCapability:
       typeof data.recordingResponse.controlToken === 'string' &&

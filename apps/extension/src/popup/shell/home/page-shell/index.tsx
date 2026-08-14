@@ -16,7 +16,11 @@ import { ScreenshotSetupPanel } from './setup-panel';
 import { useScreenshotSetupState } from './use-screenshot-setup';
 import { ScreenshotToolsPanel } from './tools-panel';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
+import {
+  DEFAULT_SCREENSHOT_SETUP_STATE,
+  type ScreenshotSetupMode,
+  type ScreenshotSetupState,
+} from '../../../../composition/persistence/capture-settings';
 
 interface PopupHomePageProps {
   quickActions: QuickAction[];
@@ -26,6 +30,7 @@ interface PopupHomePageProps {
   homeError?: string | null;
   pageAccess?: PopupPageAccessRuntime;
   startupMode?: ScreenshotSetupMode | null;
+  initialSetupState?: ScreenshotSetupState;
   onStartupModeCleared?: () => void;
 }
 
@@ -180,6 +185,7 @@ export function PopupHomePage({
   homeError,
   pageAccess = defaultPageAccessRuntime,
   startupMode = null,
+  initialSetupState,
   onStartupModeCleared,
 }: PopupHomePageProps) {
   const capabilityState = getPopupHomeCapabilityState(
@@ -188,7 +194,11 @@ export function PopupHomePage({
     pageAccess.disabledReason,
     pageAccess.status
   );
-  const setup = useScreenshotSetupState(startupMode, onStartupModeCleared);
+  const setup = useScreenshotSetupState(
+    startupMode,
+    onStartupModeCleared,
+    initialSetupState ?? DEFAULT_SCREENSHOT_SETUP_STATE
+  );
   const {
     actionError,
     capturePending,

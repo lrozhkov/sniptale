@@ -9,6 +9,7 @@ import type {
 import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
 import { stagePopupExportLaunchSelection } from '../export/selection/launch-selection';
 import { applyPopupStartupSelection, loadPopupStartupSelection } from './startup-routing';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 const logger = createLogger({ namespace: 'PopupLifecycle' });
 
@@ -32,21 +33,19 @@ function applyBootstrapSuccess(params: PopupLifecycleBootstrapParams, state: Pop
   params.setRecordingControlCapability(state.recordingControlCapability);
   params.setRecordingState(state.recordingState);
   params.setStartError(state.recordingStatusError ?? null);
-  params.setMicrophoneDevices(state.microphones);
-  params.setWebcamDevices(state.webcams);
+  params.setInitialScreenshotSetupState(state.screenshotSetupState);
 }
 
-async function refreshPopupSecondaryState(args: {
+async function refreshPopupCriticalEnvironment(args: {
   cancelledRef: () => boolean;
   refreshActiveTabCapabilities: () => Promise<void>;
-  refreshGalleryStatus: () => Promise<void>;
 }) {
   if (args.cancelledRef()) {
     return;
   }
 
   try {
-    await Promise.all([args.refreshActiveTabCapabilities(), args.refreshGalleryStatus()]);
+    await args.refreshActiveTabCapabilities();
   } catch (error) {
     logger.error('Failed to refresh popup secondary state', error);
   }
@@ -89,18 +88,29 @@ export async function bootstrapPopupLifecycle({
     }
 
     applyBootstrapSuccess(getParams(), bootstrapState);
-    if (bootstrapState.hasPostRecordResult) {
-      getParams().setPage('video');
+    let navigationResult;
+    if (
+      bootstrapState.hasPostRecordResult ||
+      bootstrapState.recordingState.status !== VideoRecordingStatus.IDLE
+    ) {
+      navigationResult = await getParams().navigateToPage('video', 'startup');
     } else if (launchPage) {
       stagePopupExportLaunchSelection({ includeAnnotations: true });
-      getParams().setPage(launchPage);
+      navigationResult = await getParams().navigateToPage(launchPage, 'startup');
     } else {
-      await applyPopupStartupSelection(getParams(), startupState.selection, startupState.lastPage);
+      navigationResult = await applyPopupStartupSelection(
+        getParams(),
+        startupState.selection,
+        startupState.lastPage
+      );
     }
-    await refreshPopupSecondaryState({
+    if (navigationResult === 'failed' || navigationResult === 'superseded') {
+      setStartError(translate('popup.video.loadingPopupError'));
+      return;
+    }
+    await refreshPopupCriticalEnvironment({
       cancelledRef,
       refreshActiveTabCapabilities,
-      refreshGalleryStatus,
     });
 
     if (cancelledRef()) {
@@ -108,6 +118,9 @@ export async function bootstrapPopupLifecycle({
     }
 
     setIsReady(true);
+    void refreshGalleryStatus().catch((error) => {
+      logger.error('Failed to refresh popup gallery state', error);
+    });
   } catch (error) {
     handlePopupBootstrapError(error, cancelledRef, setStartError, setIsReady);
   }

@@ -14,12 +14,22 @@ import type { WebcamOption } from '../../../recording/webcam';
 import type { RefreshWebcamDevicesOptions } from '../../../recording/webcam-flow';
 import type { PopupPage } from '../../navigation/actions';
 import type { RecordingControlCapability } from '../recording-control-capability';
-import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
+import type {
+  ScreenshotSetupMode,
+  ScreenshotSetupState,
+} from '../../../../composition/persistence/capture-settings';
+import type { PopupNavigationResult, PopupNavigationSource } from './navigation';
 
 interface PopupRuntimeSessionState {
   homeError: string | null;
   isReady: boolean;
   page: PopupPage;
+  pendingPage: PopupPage | null;
+  navigateToPage: (
+    page: PopupPage,
+    source?: PopupNavigationSource
+  ) => Promise<PopupNavigationResult>;
+  preloadPage: (page: PopupPage) => Promise<void>;
   setHomeError: Dispatch<SetStateAction<string | null>>;
   setIsReady: Dispatch<SetStateAction<boolean>>;
   setPage: Dispatch<SetStateAction<PopupPage>>;
@@ -33,6 +43,7 @@ interface PopupRuntimePresetState {
   selectedPresetId: string | null;
   selectedPreset: ViewportPreset | null;
   screenshotStartupMode: ScreenshotSetupMode | null;
+  initialScreenshotSetupState: ScreenshotSetupState;
   clearScreenshotStartupMode: () => void;
   setQuickActions: Dispatch<SetStateAction<QuickAction[]>>;
   setQuickActionsReady: Dispatch<SetStateAction<boolean>>;
@@ -40,6 +51,7 @@ interface PopupRuntimePresetState {
   setVideoCaptureMode: Dispatch<SetStateAction<CaptureMode>>;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
   setScreenshotStartupMode: Dispatch<SetStateAction<ScreenshotSetupMode | null>>;
+  setInitialScreenshotSetupState: Dispatch<SetStateAction<ScreenshotSetupState>>;
 }
 
 interface PopupRuntimeRecordingState {

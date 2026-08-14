@@ -60,6 +60,7 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
 }));
 
 import { PopupHomePage } from './index';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
 function getQuickActionsProxyProps() {
   return popupHomeQuickActionsSpy.mock.calls[0]?.[0] as {
@@ -218,5 +219,43 @@ it('forwards the quick-actions readiness state to the section owner', async () =
     expect.objectContaining({
       quickActionsReady: false,
     })
+  );
+});
+
+it('uses the authoritative bootstrap screenshot snapshot on the first home frame', async () => {
+  const handleScreenshotCapture = vi.fn();
+  usePopupHomeActionsSpy.mockReturnValue({
+    actionError: null,
+    capturePending: false,
+    handleOpenScreenshotMode: vi.fn(),
+    handleQuickAction: vi.fn(),
+    handleScreenshotCapture,
+  });
+  await renderNode(
+    <PopupHomePage
+      quickActions={[]}
+      quickActionsReady
+      viewportPresets={[]}
+      activeTabCapabilities={createActiveTabCapabilities()}
+      initialSetupState={{ ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'desktop' }}
+    />
+  );
+
+  expect(
+    getContainer()?.querySelector('button[title^="popup.home.captureWindowLabel"]')?.className
+  ).toContain('bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_32%,transparent)]');
+
+  await act(async () => {
+    (
+      getContainer()?.querySelector(
+        'button[title="popup.home.captureButtonTitle"]'
+      ) as HTMLButtonElement
+    ).click();
+    await Promise.resolve();
+  });
+
+  expect(handleScreenshotCapture).toHaveBeenCalledWith(
+    DEFAULT_SCREENSHOT_SETUP_STATE.desktop,
+    null
   );
 });

@@ -8,6 +8,7 @@ import {
   type CaptureMode as VideoCaptureMode,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupLifecycleBootstrapParams } from './contracts';
+import type { PopupNavigationResult } from '../runtime/types/navigation';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 const logger = createLogger({ namespace: 'PopupStartupRouting' });
@@ -38,31 +39,30 @@ export async function loadPopupStartupSelection() {
 export async function applyPopupStartupSelection(
   params: Pick<
     PopupLifecycleBootstrapParams,
-    'setPage' | 'setScreenshotStartupMode' | 'setVideoCaptureMode'
+    'navigateToPage' | 'setScreenshotStartupMode' | 'setVideoCaptureMode'
   >,
   selection: PopupStartupSelection,
   lastPage: 'home' | 'video' | 'export'
-): Promise<void> {
+): Promise<PopupNavigationResult> {
   if (selection === 'remember-last') {
-    params.setPage(lastPage);
-    return;
+    return params.navigateToPage(lastPage, 'startup');
   }
 
   if (selection === 'export') {
-    params.setPage('export');
-    return;
+    return params.navigateToPage('export', 'startup');
   }
 
   const videoMode = VIDEO_MODES[selection];
   if (videoMode) {
     params.setVideoCaptureMode(videoMode);
-    params.setPage('video');
-    return;
+    return params.navigateToPage('video', 'startup');
   }
 
   const screenshotMode = SCREENSHOT_MODES[selection as keyof typeof SCREENSHOT_MODES];
   if (screenshotMode) {
     params.setScreenshotStartupMode(screenshotMode);
-    params.setPage('home');
+    return params.navigateToPage('home', 'startup');
   }
+
+  return 'unchanged';
 }

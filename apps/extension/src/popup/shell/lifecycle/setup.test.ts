@@ -3,6 +3,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PopupLifecycleParams } from './contracts';
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../composition/persistence/capture-settings';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
   activatedListener: undefined as (() => void) | undefined,
@@ -72,11 +74,10 @@ import { setupPopupLifecycle } from './setup';
 function createBootstrapState() {
   return {
     captureMode: 'visible' as const,
-    microphones: [{ deviceId: 'mic-1', label: 'Mic 1' }],
-    webcams: [{ deviceId: 'cam-1', label: 'Cam 1' }],
+    screenshotSetupState: DEFAULT_SCREENSHOT_SETUP_STATE,
     quickActions: [{ id: 'copy', enabled: true, type: 'copy-to-clipboard' as const }],
     recordingControlCapability: null,
-    recordingState: { status: 'idle' } as const,
+    recordingState: { status: VideoRecordingStatus.IDLE } as const,
     selectedPresetId: 'preset-1',
     videoSettings: { microphoneId: 'mic-1' },
     viewportPresets: [
@@ -105,9 +106,9 @@ function createParams(): PopupLifecycleParams {
       refreshActiveTabCapabilities,
       refreshGalleryStatus,
       setHomeError: vi.fn(),
-      setPage: vi.fn(),
+      navigateToPage: vi.fn(async () => 'unchanged' as const),
       setIsReady: vi.fn(),
-      setMicrophoneDevices: vi.fn(),
+      setInitialScreenshotSetupState: vi.fn(),
       setQuickActions: vi.fn(),
       setQuickActionsReady: vi.fn(),
       setRecordingControlCapability: vi.fn(),
@@ -118,7 +119,6 @@ function createParams(): PopupLifecycleParams {
       setScreenshotStartupMode: vi.fn(),
       setVideoSettings: vi.fn(),
       setViewportPresets: vi.fn(),
-      setWebcamDevices: vi.fn(),
     },
     browser: {
       refreshActiveTabCapabilities,
@@ -167,7 +167,9 @@ function expectBootstrappedStateApplied(
     state.recordingControlCapability
   );
   expect(params.bootstrap.setRecordingState).toHaveBeenCalledWith(state.recordingState);
-  expect(params.bootstrap.setMicrophoneDevices).toHaveBeenCalledWith(state.microphones);
+  expect(params.bootstrap.setInitialScreenshotSetupState).toHaveBeenCalledWith(
+    state.screenshotSetupState
+  );
   expect(params.bootstrap.setIsReady).toHaveBeenCalledWith(true);
   expect(params.bootstrap.refreshActiveTabCapabilities).toHaveBeenCalledTimes(1);
   expect(params.bootstrap.refreshGalleryStatus).toHaveBeenCalledTimes(1);
@@ -337,7 +339,7 @@ describe('setupPopupLifecycle error handling', () => {
 
     expect(errorSpy).toHaveBeenCalledWith(
       '[PopupLifecycle]',
-      'Failed to refresh popup secondary state',
+      'Failed to refresh popup gallery state',
       expect.any(Error)
     );
   });

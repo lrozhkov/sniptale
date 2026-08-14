@@ -22,6 +22,7 @@ import { savePopupLastPage } from '../../../composition/persistence/capture-sett
 import { usePopupMediaDeviceEffects } from './media-device-effects';
 import type { RecordingControlCapability } from './recording-control-capability';
 import { usePopupRecordingNavigationEffect } from './recording-navigation-effect';
+import type { PopupNavigationResult, PopupNavigationSource } from './types/navigation';
 const logger = createLogger({ namespace: 'PopupRuntimeEffects' });
 type VideoUiStateSnapshot = {
   selectedPresetId: string | null;
@@ -38,6 +39,10 @@ export function usePopupRuntimeEffects(state: {
   setIsStartPending: Dispatch<SetStateAction<boolean>>;
   setStartError: Dispatch<SetStateAction<string | null>>;
   setPage: Dispatch<SetStateAction<PopupPage>>;
+  navigateToPage: (
+    page: PopupPage,
+    source?: PopupNavigationSource
+  ) => Promise<PopupNavigationResult>;
   microphoneDevices: MicrophoneOption[];
   webcamDevices: WebcamOption[];
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
@@ -47,8 +52,10 @@ export function usePopupRuntimeEffects(state: {
   refreshWebcams: (options?: RefreshWebcamDevicesOptions) => Promise<WebcamOption[]>;
 }) {
   usePopupMediaDeviceEffects({
+    page: state.page,
     refreshMicrophones: state.refreshMicrophones,
     refreshWebcams: state.refreshWebcams,
+    videoSettings: state.videoSettings,
   });
   usePopupPersistenceEffects(state);
   usePopupRecordingNavigationEffect(state);
