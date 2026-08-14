@@ -28,7 +28,9 @@ export async function startPopupExport(
     const selectedIds = new Set(state.selectedTabIdsInOrder);
     const orderedTabs = state.selectedTabIdsInOrder.flatMap((tabId) => {
       const tab = state.availableTabs.find((candidate) => candidate.tabId === tabId);
-      return tab && selectedIds.has(tabId) ? [{ tabId, title: tab.title }] : [];
+      return tab && tab.disabledReason === null && selectedIds.has(tabId)
+        ? [{ tabId, title: tab.title }]
+        : [];
     });
     if (orderedTabs.length === 0) return;
 

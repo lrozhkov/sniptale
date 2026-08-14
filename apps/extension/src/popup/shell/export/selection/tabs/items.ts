@@ -62,7 +62,12 @@ export function getSelectedTabIdsInOrder(
   selectedTabIds: number[]
 ) {
   return availableTabs
-    .filter((tab) => typeof tab.tabId === 'number' && selectedTabIds.includes(tab.tabId))
+    .filter(
+      (tab) =>
+        tab.disabledReason === null &&
+        typeof tab.tabId === 'number' &&
+        selectedTabIds.includes(tab.tabId)
+    )
     .map((tab) => tab.tabId as number);
 }
 

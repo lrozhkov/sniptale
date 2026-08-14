@@ -192,6 +192,40 @@ it('rejects stale site grants before requesting an origin permission', async () 
   expect(latestRuntime?.error).toBe('popup.home.pageAccessFailed');
 });
 
+it('hides the previous tab status during active-tab transitions', async () => {
+  let resolveNextStatus: ((value: unknown) => void) | null = null;
+  runtimeSendMessageMock.mockResolvedValueOnce({
+    status: { ...inactiveStatus, currentTabActive: true },
+    success: true,
+  });
+  runtimeSendMessageMock.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveNextStatus = resolve;
+    })
+  );
+
+  await renderHarness();
+  await flushAsync();
+
+  expect(latestRuntime?.status?.currentTabActive).toBe(true);
+
+  await act(async () => {
+    root?.render(<Harness capabilities={createCapabilities({ tabId: 8 })} />);
+  });
+
+  expect(latestRuntime?.status).toBeNull();
+  expect(latestRuntime?.disabledReason).toBe('popup.home.pageAccessChecking');
+
+  await act(async () => {
+    resolveNextStatus?.({
+      status: { ...inactiveStatus, currentTabId: 8 },
+      success: true,
+    });
+  });
+
+  expect(latestRuntime?.disabledReason).toBe('popup.home.pageAccessRequired');
+});
+
 it('rolls back a just-granted site permission when background registration fails', async () => {
   runtimeSendMessageMock
     .mockResolvedValueOnce({ status: inactiveStatus, success: true })

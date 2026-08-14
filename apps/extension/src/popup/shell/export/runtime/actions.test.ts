@@ -259,6 +259,28 @@ it('returns early when export cannot start yet', async () => {
   expect(deps.sendStartJobMessage).not.toHaveBeenCalled();
 });
 
+it('does not start export for a restored disabled selected tab', async () => {
+  const state = createMockPopupExportRuntimeContract({
+    availableTabs: [
+      {
+        disabledReason: 'popup.home.pageAccessRequired',
+        isCurrent: true,
+        tabId: 12,
+        title: 'Current tab',
+        url: 'https://example.test/current',
+      },
+    ],
+    selectedTabIds: [12],
+    selectedTabIdsInOrder: [12],
+  });
+  const deps = createRuntimeDeps();
+
+  await startPopupExport(state, deps);
+
+  expect(state.setProgress).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).not.toHaveBeenCalled();
+});
+
 it('reports a start export error when the runtime response fails', async () => {
   const state = createMockPopupExportRuntimeContract();
   const deps = createRuntimeDeps({
