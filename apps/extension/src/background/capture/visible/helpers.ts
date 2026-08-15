@@ -1,22 +1,6 @@
 import type { Settings } from '../../../contracts/settings';
-import { delay } from '@sniptale/foundation/utils/delay';
-import { hideFixedElements, restoreFixedElements } from '../page-state/index';
 
 type VisibleCaptureSettings = Pick<Settings, 'imageFormat' | 'imageQuality'>;
-
-interface FixedElementMaskingAdapter {
-  hideFixedElements(tabId: number): Promise<number>;
-  restoreFixedElements(tabId: number): Promise<void>;
-  waitForDomSettle(ms: number): Promise<void>;
-}
-
-const FIXED_ELEMENT_CAPTURE_DELAY_MS = 300;
-
-const defaultFixedElementMaskingAdapter: FixedElementMaskingAdapter = {
-  hideFixedElements,
-  restoreFixedElements,
-  waitForDomSettle: delay,
-};
 
 /**
  * Chrome's visible capture APIs cannot emit WebP directly, so WebP requests first capture PNG
@@ -41,24 +25,4 @@ export async function finalizeCapturedDataUrl(props: {
   }
 
   return props.convertPngToWebp(props.dataUrl, props.settings.imageQuality);
-}
-
-/**
- * Runs a capture with fixed-position page elements hidden long enough for the DOM to settle, then
- * always restores the page state.
- */
-export async function withHiddenFixedElements<T>(
-  tabId: number,
-  runCapture: () => Promise<T>,
-  adapter: FixedElementMaskingAdapter = defaultFixedElementMaskingAdapter
-): Promise<{ hiddenCount: number; result: T }> {
-  const hiddenCount = await adapter.hideFixedElements(tabId);
-  await adapter.waitForDomSettle(FIXED_ELEMENT_CAPTURE_DELAY_MS);
-
-  try {
-    const result = await runCapture();
-    return { hiddenCount, result };
-  } finally {
-    await adapter.restoreFixedElements(tabId);
-  }
 }

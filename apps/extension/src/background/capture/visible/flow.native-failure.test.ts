@@ -9,7 +9,6 @@ const {
   loggerWarnMock,
   resolveVisibleCaptureApiFormatMock,
   transitionCaptureJobMock,
-  withHiddenFixedElementsMock,
 } = vi.hoisted(() => ({
   browserTabsCaptureVisibleTabMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
@@ -19,7 +18,6 @@ const {
   loggerWarnMock: vi.fn(),
   resolveVisibleCaptureApiFormatMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  withHiddenFixedElementsMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -48,7 +46,6 @@ vi.mock('../jobs/state-machine', async (importOriginal) => ({
 vi.mock('./helpers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./helpers')>()),
   resolveVisibleCaptureApiFormat: resolveVisibleCaptureApiFormatMock,
-  withHiddenFixedElements: withHiddenFixedElementsMock,
 }));
 
 import { captureVisibleTabTransaction } from './flow';
@@ -59,10 +56,6 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
   resolveVisibleCaptureApiFormatMock.mockReturnValue('png');
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  withHiddenFixedElementsMock.mockImplementation(async (_tabId, runCapture) => ({
-    hiddenCount: 0,
-    result: await runCapture(),
-  }));
 });
 
 it('marks non-error visible capture failures with the route fallback message', async () => {

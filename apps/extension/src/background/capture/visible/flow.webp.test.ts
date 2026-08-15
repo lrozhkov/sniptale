@@ -9,7 +9,6 @@ const {
   loadSettingsMock,
   resolveVisibleCaptureApiFormatMock,
   transitionCaptureJobMock,
-  withHiddenFixedElementsMock,
 } = vi.hoisted(() => ({
   browserTabsCaptureVisibleTabMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
@@ -19,7 +18,6 @@ const {
   loadSettingsMock: vi.fn(),
   resolveVisibleCaptureApiFormatMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  withHiddenFixedElementsMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -51,7 +49,6 @@ vi.mock('./helpers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./helpers')>()),
   finalizeCapturedDataUrl: finalizeCapturedDataUrlMock,
   resolveVisibleCaptureApiFormat: resolveVisibleCaptureApiFormatMock,
-  withHiddenFixedElements: withHiddenFixedElementsMock,
 }));
 
 import { captureVisibleTabTransaction } from './flow';
@@ -60,10 +57,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   createCaptureJobMock.mockResolvedValue({ jobId: 'capture-job-webp' });
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  withHiddenFixedElementsMock.mockImplementation(async (_tabId, runCapture) => ({
-    hiddenCount: 0,
-    result: await runCapture(),
-  }));
 });
 
 afterEach(() => {

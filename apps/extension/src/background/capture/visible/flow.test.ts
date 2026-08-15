@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  browserScriptingExecuteScriptMock,
   browserTabsCaptureVisibleTabMock,
   browserTabsGetMock,
   browserTabsQueryMock,
@@ -12,8 +13,8 @@ const {
   resolveVisibleCaptureApiFormatMock,
   createCaptureJobMock,
   transitionCaptureJobMock,
-  withHiddenFixedElementsMock,
 } = vi.hoisted(() => ({
+  browserScriptingExecuteScriptMock: vi.fn(),
   browserTabsCaptureVisibleTabMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   browserTabsQueryMock: vi.fn(),
@@ -25,7 +26,10 @@ const {
   resolveVisibleCaptureApiFormatMock: vi.fn(),
   createCaptureJobMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  withHiddenFixedElementsMock: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/scripting', () => ({
+  browserScripting: { executeScript: browserScriptingExecuteScriptMock },
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -59,7 +63,6 @@ vi.mock('../jobs/state-machine', async (importOriginal) => ({
 vi.mock('./helpers', () => ({
   finalizeCapturedDataUrl: finalizeCapturedDataUrlMock,
   resolveVisibleCaptureApiFormat: resolveVisibleCaptureApiFormatMock,
-  withHiddenFixedElements: withHiddenFixedElementsMock,
 }));
 
 import { captureVisibleTab, captureVisibleTabForCrop, captureVisibleTabTransaction } from './flow';
@@ -67,10 +70,6 @@ import { resetNativeVisibleCaptureCoordinatorForTests } from './coordinator';
 
 function resetVisibleFlowMocks() {
   vi.clearAllMocks();
-  withHiddenFixedElementsMock.mockImplementation(async (_tabId, runCapture) => ({
-    hiddenCount: 2,
-    result: await runCapture(),
-  }));
   createCaptureJobMock.mockResolvedValue({ jobId: 'capture-job-1' });
   transitionCaptureJobMock.mockResolvedValue(undefined);
 }
@@ -90,7 +89,7 @@ function useVisibleFlowTestScope() {
 describe('capture-visible-flow native visible capture', () => {
   useVisibleFlowTestScope();
 
-  it('captures the visible tab through the tabs adapter and masking wrapper', async () => {
+  it('captures the visible tab without masking fixed page elements', async () => {
     loadSettingsMock.mockResolvedValue({ imageFormat: 'jpeg', imageQuality: 82 });
     resolveVisibleCaptureApiFormatMock.mockReturnValue('jpeg');
     browserTabsGetMock.mockResolvedValue({ id: 11, windowId: 5 });
@@ -106,7 +105,7 @@ describe('capture-visible-flow native visible capture', () => {
     expect(transitionCaptureJobMock).toHaveBeenNthCalledWith(3, 'capture-job-1', 'completed');
     expect(browserTabsGetMock).toHaveBeenCalledWith(11);
     expect(browserTabsQueryMock).toHaveBeenCalledWith({ active: true, windowId: 5 });
-    expect(withHiddenFixedElementsMock).toHaveBeenCalledWith(11, expect.any(Function));
+    expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
     expect(finalizeCapturedDataUrlMock).toHaveBeenCalledWith({
       dataUrl: 'data:image/jpeg;base64,raw',
       settings: { imageFormat: 'jpeg', imageQuality: 82 },
@@ -168,6 +167,11 @@ describe('capture-visible-flow transactions', () => {
 
     await expect(captureVisibleTabForCrop(19)).resolves.toBe('data:image/png;base64,crop');
 
+    expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+    expect(browserTabsCaptureVisibleTabMock).toHaveBeenCalledWith(6, {
+      format: 'png',
+      quality: 90,
+    });
     expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'completed');
   });
 });
