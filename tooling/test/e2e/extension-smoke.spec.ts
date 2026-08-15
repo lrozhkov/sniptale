@@ -9,7 +9,6 @@ import {
 } from './extension-smoke.helpers';
 import { verifyPopupStartupLifecycle } from './extension-smoke.popup-startup';
 
-const SETTINGS_AI_LABEL = translate('settings.navigation.ai', 'ru');
 const SETTINGS_AI_NAV_LABEL = translate('settings.navigation.aiConnections', 'ru');
 const SETTINGS_AI_PROMPTS_NAV_LABEL = translate('settings.navigation.aiPrompts', 'ru');
 const SETTINGS_AI_PROVIDERS_TITLE = translate('settings.aiProviders.providersTitle', 'ru');
@@ -321,7 +320,7 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   await page.getByRole('button', { name: SETTINGS_AI_NAV_LABEL, exact: true }).click();
 
   const settingsContent = page.locator('[data-ui="settings.page.content"]');
-  await expect(settingsContent.getByText(SETTINGS_AI_LABEL, { exact: true })).toBeVisible();
+  await expect(settingsContent.getByText(SETTINGS_AI_NAV_LABEL, { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: SETTINGS_AI_PROVIDERS_TITLE, exact: true })
   ).toBeVisible();
