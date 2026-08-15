@@ -132,15 +132,13 @@ function mapLogicalCropToSource(
 
 function matchSourceRectToOutputAspect(
   sourceRect: RecordingSampleRect,
-  outputSize: RecordingPixelSize,
-  maximumEdgeCrop: number
+  outputSize: RecordingPixelSize
 ): RecordingSampleRect {
   const sourceAspect = sourceRect.width / sourceRect.height;
   const outputAspect = outputSize.width / outputSize.height;
   if (sourceAspect === outputAspect) return sourceRect;
   if (sourceAspect > outputAspect) {
     const width = sourceRect.height * outputAspect;
-    if (sourceRect.width - width > maximumEdgeCrop) return sourceRect;
     return Object.freeze({
       ...sourceRect,
       width,
@@ -148,7 +146,6 @@ function matchSourceRectToOutputAspect(
     });
   }
   const height = sourceRect.width / outputAspect;
-  if (sourceRect.height - height > maximumEdgeCrop) return sourceRect;
   return Object.freeze({
     ...sourceRect,
     height,
@@ -156,8 +153,9 @@ function matchSourceRectToOutputAspect(
   });
 }
 
-function insetSourceRectForCanvasSampling(sourceRect: RecordingSampleRect): RecordingSampleRect {
-  const edgeInset = 1;
+function insetSourceRectForI420Sampling(sourceRect: RecordingSampleRect): RecordingSampleRect {
+  // Chromium aligns tab-capture content on two-pixel I420 chroma boundaries.
+  const edgeInset = 2;
   if (sourceRect.width <= edgeInset * 2) return sourceRect;
   const width = sourceRect.width - edgeInset * 2;
   const height = sourceRect.height * (width / sourceRect.width);
@@ -174,20 +172,18 @@ function normalizeFullSourcePlan(
   plan: RecordingGeometryPlan,
   resolution: VideoResolutionPreset,
   tracksFullViewport: boolean,
-  devicePixelRatio: number
+  tracksOutputBasis: boolean
 ): RecordingGeometryPlan {
-  if (!tracksFullViewport || resolution !== VideoResolutionPreset.SOURCE) return plan;
-  const matchedSourceRect = matchSourceRectToOutputAspect(
-    plan.sourceRect,
-    plan.outputSize,
-    Math.max(1, devicePixelRatio)
-  );
+  if (!tracksFullViewport || !tracksOutputBasis || resolution !== VideoResolutionPreset.SOURCE) {
+    return plan;
+  }
+  const matchedSourceRect = matchSourceRectToOutputAspect(plan.sourceRect, plan.outputSize);
   const sourceRect = sourceRectFillsOutput(
     { ...plan, sourceRect: matchedSourceRect },
     resolution,
     true
   )
-    ? insetSourceRectForCanvasSampling(matchedSourceRect)
+    ? insetSourceRectForI420Sampling(matchedSourceRect)
     : matchedSourceRect;
   return remapRecordingGeometryPlan(plan, sourceRect);
 }
@@ -230,7 +226,8 @@ function buildRemappedGeometry(params: {
     remapRecordingGeometryPlan(params.geometry, params.sourceRect),
     params.geometry.resolution,
     params.geometry.tracksFullViewport,
-    params.coordinateSpace.devicePixelRatio
+    params.requestedCrop.width === params.geometry.outputBasis.width &&
+      params.requestedCrop.height === params.geometry.outputBasis.height
   );
   return Object.freeze({
     ...remapped,
@@ -267,7 +264,7 @@ export function resolveTabOutputGeometry(
     }),
     options.resolution,
     options.tracksFullViewport === true,
-    cssViewport.devicePixelRatio
+    true
   );
 
   return Object.freeze({

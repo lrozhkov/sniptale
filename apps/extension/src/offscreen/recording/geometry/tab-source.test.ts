@@ -26,10 +26,10 @@ describe('tab recording geometry', () => {
       outputBasis: { width: 1904, height: 985 },
       outputSize: { width: 1904, height: 984 },
       sourceRect: {
-        x: 1,
-        y: expect.closeTo(59.00420168067228),
-        width: 2558,
-        height: expect.closeTo(1321.9915966386554),
+        x: 2,
+        y: expect.closeTo(59.52100840336129),
+        width: 2556,
+        height: expect.closeTo(1320.957983193277),
       },
       sourceSize: { width: 2560, height: 1440 },
     });
@@ -37,11 +37,11 @@ describe('tab recording geometry', () => {
       geometry.outputSize.width / geometry.outputSize.height,
       12
     );
-    expect(geometry.sourceRect.y - 58).toBeLessThanOrEqual(1.1);
-    expect(1382 - (geometry.sourceRect.y + geometry.sourceRect.height)).toBeLessThanOrEqual(1.1);
+    expect(geometry.sourceRect.y - 58).toBeLessThanOrEqual(1.6);
+    expect(1382 - (geometry.sourceRect.y + geometry.sourceRect.height)).toBeLessThanOrEqual(1.6);
   });
 
-  it('removes one physical sampling edge after density-scaled odd-edge normalization', () => {
+  it('removes the physical I420 sampling edge after density-scaled odd-edge normalization', () => {
     const geometry = resolveTabOutputGeometry(
       { x: 0, y: 0, width: 1904, height: 985 },
       { width: 3808, height: 1970 },
@@ -56,10 +56,10 @@ describe('tab recording geometry', () => {
     expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
     expect(geometry.fillsOutput).toBe(true);
     expect(geometry.sourceRect).toEqual({
-      x: 1,
-      y: expect.closeTo(1.5168067226891253),
-      width: 3806,
-      height: expect.closeTo(1966.9663865546217),
+      x: 2,
+      y: expect.closeTo(2.033613445378251),
+      width: 3804,
+      height: expect.closeTo(1965.9327731092435),
     });
   });
 

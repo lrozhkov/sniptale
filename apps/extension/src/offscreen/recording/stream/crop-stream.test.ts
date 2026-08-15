@@ -46,7 +46,7 @@ function installCanvasOutput(width: number, height: number) {
 function installSolidPixelCanvasOutput(width: number, height: number, sourceWidth: number) {
   const output = createStream(width, height);
   const pixels = new Uint8ClampedArray(width * height * 4);
-  // Chromium may expose one encoder-alignment column outside the continuously colored tab frame.
+  // Chromium's I420 capture region is aligned on two-pixel chroma boundaries.
   const writePixel = (x: number, y: number, color: readonly [number, number, number, number]) => {
     const offset = (y * width + x) * 4;
     pixels.set(color, offset);
@@ -81,7 +81,7 @@ function installSolidPixelCanvasOutput(width: number, height: number, sourceWidt
           ) {
             const sampledX = sourceX + ((centerX - destination[0]) / destination[2]) * sampledWidth;
             const color =
-              sampledX >= 1 && sampledX < sourceWidth - 1
+              sampledX >= 2 && sampledX < sourceWidth - 2
                 ? ([17, 113, 201, 255] as const)
                 : ([0, 0, 0, 255] as const);
             writePixel(x, y, color);
@@ -123,9 +123,10 @@ afterEach(() => {
 describe('crop stream', () => {
   it.each([
     { devicePixelRatio: 1, raw: { width: 2560, height: 1440 } },
+    { devicePixelRatio: 1, raw: { width: 1920, height: 1080 } },
     { devicePixelRatio: 2, raw: { width: 3808, height: 1970 } },
   ])(
-    'fills every TAB + SOURCE canvas edge at devicePixelRatio $devicePixelRatio',
+    'fills every TAB + SOURCE canvas edge for raw $raw.width×$raw.height at devicePixelRatio $devicePixelRatio',
     async ({ devicePixelRatio, raw }) => {
       const { context, output, pixels } = installSolidPixelCanvasOutput(1904, 984, raw.width);
       const video = { videoHeight: raw.height, videoWidth: raw.width };

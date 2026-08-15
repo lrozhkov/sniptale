@@ -37,10 +37,10 @@ it('passes the canonical contain plan to the gated canvas without a sampling byp
     outputBasis: { width: 1904, height: 985 },
     outputSize: { width: 1904, height: 984 },
     sourceRect: {
-      x: 1,
-      y: expect.closeTo(59.00420168067228),
-      width: 2558,
-      height: expect.closeTo(1321.9915966386554),
+      x: 2,
+      y: expect.closeTo(59.52100840336141),
+      width: 2556,
+      height: expect.closeTo(1320.9579831932772),
     },
   });
 });
