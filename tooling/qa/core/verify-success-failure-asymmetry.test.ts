@@ -6,7 +6,9 @@ import { afterEach, expect, it } from 'vitest';
 
 import {
   collectSuccessFailureAsymmetryViolations,
+  filterAllowedSuccessFailureAsymmetryViolations,
   runSuccessFailureAsymmetryCheck,
+  SUCCESS_FAILURE_ASYMMETRY_ALLOWED_FINDINGS,
 } from './verify-success-failure-asymmetry.mjs';
 
 const tempDirs: string[] = [];
@@ -70,6 +72,29 @@ it('allows flows with explicit rollback or failure handling', () => {
   );
 
   expect(collectSuccessFailureAsymmetryViolations([file])).toEqual([]);
+});
+
+it('allows only the two documented isolated Playwright storage-mirror callbacks', () => {
+  const exactFile = 'tooling/test/e2e/extension-smoke.popup-startup.ts';
+  const violation = (file: string, line: number) => ({
+    file,
+    line,
+    message: 'test finding',
+    rule: 'success-failure-asymmetry',
+  });
+
+  expect(SUCCESS_FAILURE_ASYMMETRY_ALLOWED_FINDINGS).toEqual([
+    expect.objectContaining({ file: exactFile, line: 42, rationale: expect.any(String) }),
+    expect.objectContaining({ file: exactFile, line: 89, rationale: expect.any(String) }),
+  ]);
+  expect(
+    filterAllowedSuccessFailureAsymmetryViolations([
+      violation(exactFile, 42),
+      violation(exactFile, 89),
+      violation(exactFile, 90),
+      violation(`spoof/${exactFile}`, 42),
+    ])
+  ).toEqual([violation(exactFile, 90), violation(`spoof/${exactFile}`, 42)]);
 });
 
 it('supports repo-wide mode without skipping when no explicit files are provided', () => {

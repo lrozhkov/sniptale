@@ -22265,7 +22265,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-success-failure-asymmetry.mjs",
-        "contentHash": "0a1998284de9ea90490051846ce30e81e201b020a68f04582cde89cb2355f03a"
+        "contentHash": "03fc796d783ebeb6ebf186f8ae78195c56aa0a03382fa99ae26f4ebb0e3d091d"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.lifecycle.mjs",
@@ -22274,6 +22274,8 @@
         "tooling/qa/core/verify-success-failure-asymmetry.test.ts"
       ],
       "surfaces": [
+        "binding:ALLOWED_FINDING_KEYS",
+        "binding:SUCCESS_FAILURE_ASYMMETRY_ALLOWED_FINDINGS",
         "property:labels"
       ]
     },

@@ -19,7 +19,7 @@ async function runPopupExportJobStage<T>(stage: string, work: () => Promise<T>):
   try {
     return await work();
   } catch (error) {
-    throw new Error(`${stage}: ${popupExportJobErrorText(error)}`);
+    throw new Error(`${stage}: ${popupExportJobErrorText(error)}`, { cause: error });
   }
 }
 

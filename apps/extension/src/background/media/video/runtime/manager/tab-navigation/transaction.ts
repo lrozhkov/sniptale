@@ -87,7 +87,7 @@ async function performRequiredCropStop(
   abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   let attempt = 0;
   while (isCurrentTransaction(transaction)) {
-    let failure: unknown = null;
+    let failure: unknown;
     try {
       const result = await stopRecording(false);
       if (result.result !== 'failed' && result.result !== 'already-stopping') {
