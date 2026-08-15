@@ -43,18 +43,23 @@ function replaceDraft(
   canvas.requestRenderAll();
 }
 
+function createDraftBoundsUpdate(start: { x: number; y: number }, point: { x: number; y: number }) {
+  const bounds = createDrawingBounds(start, point);
+  return {
+    bounds,
+    properties: { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height },
+  };
+}
+
 function updateCropDraft(
   canvas: Canvas,
   object: FabricObject,
   start: { x: number; y: number },
   point: { x: number; y: number }
 ): void {
-  const bounds = createDrawingBounds(start, point);
+  const { properties } = createDraftBoundsUpdate(start, point);
   object.set({
-    left: bounds.x,
-    top: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
+    ...properties,
     scaleX: 1,
     scaleY: 1,
   });
@@ -69,8 +74,8 @@ function updateBlurPreview(
   start: { x: number; y: number },
   point: { x: number; y: number }
 ): void {
-  const bounds = createDrawingBounds(start, point);
-  object.set({ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height });
+  const { bounds, properties } = createDraftBoundsUpdate(start, point);
+  object.set(properties);
   writeEditorDrawingObject(object, { ...drawing, bounds });
   object.setCoords();
   canvas.requestRenderAll();

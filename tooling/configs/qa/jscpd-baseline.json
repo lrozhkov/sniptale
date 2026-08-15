@@ -5,15 +5,15 @@
   "families": [
     {
       "family": "apps/extension/src/settings/sections/styles",
-      "count": 9,
-      "lines": 157,
-      "sampleFingerprint": "3ea4a5d66567c1cf7e7b0860d3f0d6af5b004a208405894a654415d10a39c35a",
+      "count": 17,
+      "lines": 349,
+      "sampleFingerprint": "589894b8bf0c95f3c33f1d9bdd5efa64b2ccffadea7c54d5c01dda3884ec20f7",
       "debtId": "accepted.jscpd.settings-sections-styles.3ea4a5d66567"
     },
     {
       "family": "apps/extension/src/features/highlighter/frame-annotation",
-      "count": 7,
-      "lines": 79,
+      "count": 6,
+      "lines": 54,
       "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa",
       "debtId": "accepted.jscpd.features-highlighter-frame-annotation.42dc97543f07"
     },
@@ -55,8 +55,8 @@
     {
       "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
       "count": 3,
-      "lines": 29,
-      "sampleFingerprint": "bc2c20338af1a8e924c0ed69c2063e42a733193046995dfffda1e322bb4fd3af",
+      "lines": 26,
+      "sampleFingerprint": "26f2f07d3ea597408fcb935c65bf3e837d21a509adc9da4e8973681904577b5f",
       "debtId": "accepted.jscpd.composition-persistence-gradient-presets-apps-extension-src-composition-persistence-surface-styl.bc2c20338af1"
     },
     {
@@ -111,7 +111,7 @@
     {
       "family": "apps/extension/src/content/overlay/toolbar",
       "count": 1,
-      "lines": 120,
+      "lines": 128,
       "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef",
       "debtId": "noise.jscpd.content-overlay-toolbar.e114d9ebc15d"
     },
@@ -186,13 +186,6 @@
       "debtId": "accepted.jscpd.composition-persistence-callout-presets-apps-extension-src-composition-persistence-highlighter.13549feb0b14"
     },
     {
-      "family": "apps/extension/src/editor/controller/magnet",
-      "count": 1,
-      "lines": 15,
-      "sampleFingerprint": "89d39fbbaec37fb9893b0711819f994f03ae03da968bde6f9764a7f95cd43171",
-      "debtId": "noise.jscpd.editor-controller-magnet.89d39fbbaec3"
-    },
-    {
       "family": "packages/foundation/src",
       "count": 1,
       "lines": 15,
@@ -200,10 +193,10 @@
       "debtId": "noise.jscpd.package-foundation-src.9d198a6afa62"
     },
     {
-      "family": "apps/extension/src/background/runtime/page-access",
+      "family": "apps/extension/src/background/page-access",
       "count": 1,
       "lines": 14,
-      "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8",
+      "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6",
       "debtId": "accepted.jscpd.background-page-access-actions.fee50b3f97f5"
     },
     {
@@ -277,17 +270,10 @@
       "debtId": "noise.jscpd.src-features-media-hub.c7ffa0eb4285"
     },
     {
-      "family": "apps/extension/src/background/capture-surface",
+      "family": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
       "count": 1,
       "lines": 11,
-      "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456",
-      "debtId": "noise.jscpd.background-capture-surface.86ace87041eb"
-    },
-    {
-      "family": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access",
-      "count": 1,
-      "lines": 11,
-      "sampleFingerprint": "693f682864bee26de66516f7cd30343d7af6b22fe9bcce7b04cf9bd8d0784319",
+      "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b",
       "debtId": "accepted.jscpd.background-routing-contracts-runtime-messaging-apps-extension-src-background-runtime-page-access.693f682864be"
     },
     {

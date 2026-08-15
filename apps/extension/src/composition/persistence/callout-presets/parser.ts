@@ -8,6 +8,7 @@ import {
   type CalloutVisualStyle,
   type SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { parseAnnotationSessionDefaults } from '../infrastructure/guards/annotation-session-defaults';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseCalloutVisualStyle } from './visual-style-parser';
 import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
@@ -56,13 +57,6 @@ export interface StoredCalloutPresetCatalog {
   systemCatalogRevision?: number;
   systemOverrides?: StoredSystemCalloutPresetOverride[];
   userPresets?: StoredUserCalloutPreset[];
-}
-
-function parseSessionDefaults(value: unknown): AnnotationSessionDefaults | null {
-  if (!isPlainRecord(value) || !isBoolean(value['enabled'])) return null;
-  const templateSource = value['templateSource'];
-  if (templateSource !== 'frame-default' && templateSource !== 'forced') return null;
-  return { enabled: value['enabled'], templateSource };
 }
 
 interface ParsedStoredCalloutPresetCatalog {
@@ -297,7 +291,7 @@ export function parseStoredCalloutPresetCatalog(value: unknown): ParsedStoredCal
     else invalidFieldCount++;
   }
   if (value['newSessionDefaults'] !== undefined) {
-    const defaults = parseSessionDefaults(value['newSessionDefaults']);
+    const defaults = parseAnnotationSessionDefaults(value['newSessionDefaults']);
     if (defaults) parsed.newSessionDefaults = defaults;
     else invalidFieldCount++;
   }

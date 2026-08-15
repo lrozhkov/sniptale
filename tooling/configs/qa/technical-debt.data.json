@@ -32,13 +32,13 @@
       "reviewBy": "2027-07-14",
       "source": {
         "kind": "jscpd",
-        "key": "apps/extension/src/background/runtime/page-access"
+        "key": "apps/extension/src/background/page-access"
       },
       "scope": {
-        "family": "apps/extension/src/background/runtime/page-access",
+        "family": "apps/extension/src/background/page-access",
         "count": 1,
         "lines": 14,
-        "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8"
+        "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6"
       },
       "targetAction": "keep small service-action descriptor repetition local"
     },
@@ -387,26 +387,6 @@
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
     {
-      "id": "noise.jscpd.background-capture-surface.86ace87041eb",
-      "classification": "tool-noise",
-      "owner": "background-capture-surface",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/background/capture-surface"
-      },
-      "scope": {
-        "family": "apps/extension/src/background/capture-surface",
-        "count": 1,
-        "lines": 11,
-        "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
       "id": "noise.jscpd.runtime.976c2c57fd5f",
       "classification": "tool-noise",
       "owner": "qa-runtime",
@@ -459,10 +439,10 @@
         "key": "apps/extension/src/settings/sections/styles"
       },
       "scope": {
-        "count": 9,
+        "count": 17,
         "family": "apps/extension/src/settings/sections/styles",
-        "lines": 157,
-        "sampleFingerprint": "3ea4a5d66567c1cf7e7b0860d3f0d6af5b004a208405894a654415d10a39c35a"
+        "lines": 349,
+        "sampleFingerprint": "589894b8bf0c95f3c33f1d9bdd5efa64b2ccffadea7c54d5c01dda3884ec20f7"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -479,9 +459,9 @@
         "key": "apps/extension/src/features/highlighter/frame-annotation"
       },
       "scope": {
-        "count": 7,
+        "count": 6,
         "family": "apps/extension/src/features/highlighter/frame-annotation",
-        "lines": 79,
+        "lines": 54,
         "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
@@ -581,8 +561,8 @@
       "scope": {
         "count": 3,
         "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
-        "lines": 29,
-        "sampleFingerprint": "bc2c20338af1a8e924c0ed69c2063e42a733193046995dfffda1e322bb4fd3af"
+        "lines": 26,
+        "sampleFingerprint": "26f2f07d3ea597408fcb935c65bf3e837d21a509adc9da4e8973681904577b5f"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -741,7 +721,7 @@
       "scope": {
         "count": 1,
         "family": "apps/extension/src/content/overlay/toolbar",
-        "lines": 120,
+        "lines": 128,
         "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
@@ -825,26 +805,6 @@
         "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
-    },
-    {
-      "id": "noise.jscpd.editor-controller-magnet.89d39fbbaec3",
-      "classification": "tool-noise",
-      "owner": "editor-controller-magnet",
-      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
-      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
-      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/editor/controller/magnet"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/editor/controller/magnet",
-        "lines": 15,
-        "sampleFingerprint": "89d39fbbaec37fb9893b0711819f994f03ae03da968bde6f9764a7f95cd43171"
-      },
-      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
     },
     {
       "id": "noise.jscpd.package-foundation-src.9d198a6afa62",
@@ -956,13 +916,13 @@
       "reviewBy": "2027-08-12",
       "source": {
         "kind": "jscpd",
-        "key": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access"
+        "key": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging"
       },
       "scope": {
         "count": 1,
-        "family": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access",
+        "family": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
         "lines": 11,
-        "sampleFingerprint": "693f682864bee26de66516f7cd30343d7af6b22fe9bcce7b04cf9bd8d0784319"
+        "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -3039,6 +2999,7 @@
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/area-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/privacy-erasure.ts",
+        "apps/extension/src/composition/persistence/infrastructure/guards/annotation-session-defaults.ts",
         "apps/extension/src/composition/persistence/infrastructure/guards/primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts",
@@ -3074,6 +3035,7 @@
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/area-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/privacy-erasure.ts",
+        "apps/extension/src/composition/persistence/infrastructure/guards/annotation-session-defaults.ts",
         "apps/extension/src/composition/persistence/infrastructure/guards/primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts",
@@ -5701,6 +5663,8 @@
         "apps/extension/src/editor/controller/draw-workflow/index.ts",
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
+        "apps/extension/src/editor/controller/events/drawing-draft.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -5726,6 +5690,7 @@
         "apps/extension/src/editor/controller/input/canvas-actions/draw-session.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/index.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/object-add.ts",
+        "apps/extension/src/editor/controller/input/canvas-actions/transform.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/transient.ts",
         "apps/extension/src/editor/controller/input/double-click.ts",
         "apps/extension/src/editor/controller/input/index.ts",
@@ -6475,6 +6440,7 @@
         "apps/extension/src/editor/workspace/floating/layers-panel.tsx",
         "apps/extension/src/editor/workspace/floating/left-drawer.tsx",
         "apps/extension/src/editor/workspace/floating/overlays.tsx",
+        "apps/extension/src/editor/workspace/floating/position-refresh.ts",
         "apps/extension/src/editor/workspace/floating/preferences.ts",
         "apps/extension/src/editor/workspace/floating/right-stack.tsx",
         "apps/extension/src/editor/workspace/floating/routes.ts",
@@ -6644,6 +6610,8 @@
         "apps/extension/src/editor/controller/draw-workflow/index.ts",
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
+        "apps/extension/src/editor/controller/events/drawing-draft.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -6669,6 +6637,7 @@
         "apps/extension/src/editor/controller/input/canvas-actions/draw-session.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/index.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/object-add.ts",
+        "apps/extension/src/editor/controller/input/canvas-actions/transform.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/transient.ts",
         "apps/extension/src/editor/controller/input/double-click.ts",
         "apps/extension/src/editor/controller/input/index.ts",
@@ -7369,6 +7338,7 @@
         "apps/extension/src/editor/workspace/floating/layers-panel.tsx",
         "apps/extension/src/editor/workspace/floating/left-drawer.tsx",
         "apps/extension/src/editor/workspace/floating/overlays.tsx",
+        "apps/extension/src/editor/workspace/floating/position-refresh.ts",
         "apps/extension/src/editor/workspace/floating/preferences.ts",
         "apps/extension/src/editor/workspace/floating/right-stack.tsx",
         "apps/extension/src/editor/workspace/floating/routes.ts",
@@ -13244,7 +13214,7 @@
       "remediation": "Keep prefixes limited to canonical adapters and test infrastructure; review every added prefix.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-paths.mjs",
-        "contentHash": "3d1c0489dd96e232d09f842682ef474dc5dec3b1bb56edd045899c2f49c110b6"
+        "contentHash": "0df4610dab6a310b90c8ccdfb236c153f1f1e6a97cef076109f80d2e3e9aae8b"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-paths.mjs",
@@ -13252,6 +13222,7 @@
         "tooling/qa/policy/browser-adapters.mjs"
       ],
       "surfaces": [
+        "binding:BROWSER_ADAPTER_ALLOWED_FILES",
         "binding:BROWSER_ADAPTER_ALLOWED_PREFIXES"
       ]
     },
@@ -14179,7 +14150,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/agent-tooling/agent-tooling.mjs",
-        "contentHash": "0b536487304a024434b1cf8f68501f49cf956ea13597c2d355aace12d1881b48"
+        "contentHash": "8cfc6982678e676e58d21225fed1224cc7c6f6b5c853440593d2b906bf683946"
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.mjs",
@@ -17240,24 +17211,6 @@
       ]
     },
     {
-      "id": "policy.source.install-mjs.56d19aa8fe",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/agent-tooling/install.mjs",
-        "contentHash": "1700d7651eba396fb4a33340a568729b406462d2beab04faa0b15c7ee6c64c09"
-      },
-      "consumers": [
-        "tooling/agent-tooling/install.mjs"
-      ],
-      "surfaces": [
-        "binding:args"
-      ]
-    },
-    {
       "id": "policy.source.jscpd-baseline-contract-mjs.e36597a230",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -18858,24 +18811,6 @@
       ],
       "surfaces": [
         "property:resolveAuditProfile/controls"
-      ]
-    },
-    {
-      "id": "policy.source.remove-mjs.399bc46d04",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/agent-tooling/remove.mjs",
-        "contentHash": "340032a656000eec7b5c722a7eb5528f108b60e0e00e492c1c5eb0c9b94d1756"
-      },
-      "consumers": [
-        "tooling/agent-tooling/remove.mjs"
-      ],
-      "surfaces": [
-        "binding:args"
       ]
     },
     {

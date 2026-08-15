@@ -204,6 +204,16 @@ function runExtendedRuntimeAuditParitySuite() {
       'apps/extension/src/content/browser-adapter-runtime.test.ts',
       'chrome.runtime.getManifest().version;\n'
     );
+    const popupStartupE2eFile = writeFile(
+      root,
+      'tooling/test/e2e/extension-smoke.popup-startup.ts',
+      'chrome.storage.local.set({ theme: "dark" });\n'
+    );
+    const popupStartupSuffixSpoof = writeFile(
+      root,
+      'spoof/tooling/test/e2e/extension-smoke.popup-startup.ts',
+      'chrome.storage.local.set({ theme: "dark" });\n'
+    );
 
     expect(
       filterAstGrepAuditFiles(
@@ -216,11 +226,13 @@ function runExtendedRuntimeAuditParitySuite() {
           historyFile,
           localStorageFile,
           testFile,
+          popupStartupE2eFile,
+          popupStartupSuffixSpoof,
         ],
         undefined,
         { root }
       )
-    ).toEqual([channelFile, historyFile, localStorageFile]);
+    ).toEqual([channelFile, historyFile, localStorageFile, popupStartupSuffixSpoof]);
   });
 
   it('flags stale allowlisted owner targets before browser adapter scanning', () => {

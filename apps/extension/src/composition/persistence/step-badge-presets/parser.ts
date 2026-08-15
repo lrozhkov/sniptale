@@ -5,6 +5,7 @@ import {
   type SystemStepBadgePresetKey,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { validateStepBadgeCustomCss } from '../../../features/highlighter/step-badge-custom-css';
+import { parseAnnotationSessionDefaults } from '../infrastructure/guards/annotation-session-defaults';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
 import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
@@ -43,13 +44,6 @@ export interface StoredStepBadgePresetCatalog {
   systemCatalogRevision?: number;
   systemOverrides?: StoredSystemOverride[];
   userPresets?: StoredUserPreset[];
-}
-
-function parseSessionDefaults(value: unknown): AnnotationSessionDefaults | null {
-  if (!isPlainRecord(value) || !isBoolean(value['enabled'])) return null;
-  const templateSource = value['templateSource'];
-  if (templateSource !== 'frame-default' && templateSource !== 'forced') return null;
-  return { enabled: value['enabled'], templateSource };
 }
 
 interface ParsedStoredStepBadgePresetCatalog {
@@ -287,7 +281,7 @@ export function parseStoredStepBadgePresetCatalog(
   if (isBoolean(value['catalogCustomized'])) parsed.catalogCustomized = value['catalogCustomized'];
   else if (value['catalogCustomized'] !== undefined) invalid.count += 1;
   if (value['newSessionDefaults'] !== undefined) {
-    const defaults = parseSessionDefaults(value['newSessionDefaults']);
+    const defaults = parseAnnotationSessionDefaults(value['newSessionDefaults']);
     if (defaults) parsed.newSessionDefaults = defaults;
     else invalid.count += 1;
   }

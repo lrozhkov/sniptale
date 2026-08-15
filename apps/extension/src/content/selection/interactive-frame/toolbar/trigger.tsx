@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
-import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import type { FrameData } from '../../../../features/highlighter/contracts';
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import { isHighlighterEnabled } from '../../highlighter';
 import {
@@ -15,6 +15,7 @@ import {
   FrameQuickActionButtons,
   frameTriggerControlStyle,
   frameTriggerIconStyle,
+  type FrameQuickActionContext,
 } from './trigger-actions';
 import {
   canFitFrameQuickActions,
@@ -32,24 +33,12 @@ import {
   type FrameTriggerPlacementSession,
 } from './trigger-placement-session';
 
-type InteractiveFrameToolbarTriggerProps = {
-  frame: FrameData;
+type InteractiveFrameToolbarTriggerProps = FrameQuickActionContext & {
   captureVisibility: FrameCaptureVisibilityState;
   isVisible: boolean;
-  closePopover: () => void;
-  clearSelection?: () => void;
-  handleStartEditing: () => void;
   hoverFrame: (frameId: string) => void;
-  popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   scheduleHoverFrameHide: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
-  setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
-  setActiveCalloutIndex?: React.Dispatch<React.SetStateAction<number>>;
-  setTempFrame?: React.Dispatch<React.SetStateAction<FrameData>>;
-  stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
-  setState: React.Dispatch<React.SetStateAction<FrameState>>;
-  onUpdate: (frame: FrameData) => void;
-  canAddCallout?: boolean;
 };
 
 function useTriggerPositionRefresh(isVisible: boolean) {

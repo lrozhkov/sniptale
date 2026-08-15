@@ -17,7 +17,11 @@ import {
   FrameAnnotationFocusSurface,
 } from './effect-surface';
 import { FrameAnnotationExportSurface } from './export-surface';
-import { FrameAnnotationFloatingToolbar } from './floating-toolbar';
+import {
+  FrameAnnotationFloatingToolbar,
+  FrameAnnotationToolbarActionButtons,
+  FrameAnnotationToolbarAddCalloutButton,
+} from './floating-toolbar';
 import { createFrameAnnotationSnapshot, normalizeFrameAnnotationSnapshot } from './model';
 import { resolveFrameAnnotationVisualScene } from './render-scene';
 import { getStepBadgeVisualMetrics } from './step-badge-metrics';
@@ -383,6 +387,175 @@ it('dispatches shared floating-toolbar commands without leaking pointer events',
   expect(calloutSettings).toHaveBeenCalled();
   expect(onCommand).toHaveBeenCalledWith('step-badge');
   expect(onCommand).toHaveBeenCalledWith('callout');
+  await act(async () => root.unmount());
+  host.remove();
+});
+
+it('preserves every floating-toolbar command and optional action branch', async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const onCommand = vi.fn();
+  const labels = new Map(getFrameAnnotationCommandSchema().map((item) => [item.id, item.label]));
+  const button = (command: Parameters<typeof labels.get>[0]) => {
+    const title = labels.get(command);
+    const match = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.title === title
+    );
+    expect(match, `button for ${command}`).toBeDefined();
+    return match!;
+  };
+  const click = async (target: HTMLButtonElement) => {
+    await act(async () => target.click());
+  };
+  const effectOption = (command: 'effect-border' | 'effect-blur' | 'effect-focus') => {
+    const title = labels.get(command);
+    const match = [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .filter((candidate) => candidate.title === title)
+      .at(-1);
+    expect(match, `effect option for ${command}`).toBeDefined();
+    return match!;
+  };
+
+  await act(async () =>
+    root.render(
+      <FrameAnnotationFloatingToolbar
+        calloutEnabled={false}
+        canDecrease
+        effectMode="border"
+        onCommand={onCommand}
+        stepBadgeEnabled={false}
+        trailingSlot={<span data-testid="trailing-slot" />}
+      />
+    )
+  );
+  expect(host.querySelector('[data-testid="trailing-slot"]')).not.toBeNull();
+  host
+    .querySelector('.sniptale-glass-toolbar')
+    ?.dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }));
+  button('step-badge').dispatchEvent(
+    new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+  );
+  await click(button('step-badge'));
+  await click(button('callout'));
+  for (const command of ['increase', 'decrease', 'edit', 'delete', 'close'] as const) {
+    await click(button(command));
+  }
+  for (const command of ['effect-border', 'effect-blur', 'effect-focus'] as const) {
+    await click(button('effect-border'));
+    await click(effectOption(command));
+  }
+  await click(button('effect-border'));
+  await click(button('effect-border'));
+  expect(onCommand.mock.calls.map(([command]) => command)).toEqual(
+    expect.arrayContaining([
+      'step-badge',
+      'callout',
+      'increase',
+      'decrease',
+      'edit',
+      'delete',
+      'close',
+      'effect-border',
+      'effect-blur',
+      'effect-focus',
+    ])
+  );
+
+  const effectSettings = vi.fn();
+  const stepSettings = vi.fn();
+  const calloutSettings = vi.fn();
+  await act(async () =>
+    root.render(
+      <FrameAnnotationFloatingToolbar
+        calloutEnabled
+        canDecrease={false}
+        effectMode="focus"
+        onCalloutSettingsClick={calloutSettings}
+        onCommand={onCommand}
+        onEffectSettingsClick={effectSettings}
+        onStepSettingsClick={stepSettings}
+        showEdit={false}
+        stepBadgeEnabled
+      />
+    )
+  );
+  const commandCount = onCommand.mock.calls.length;
+  await click(button('effect-focus'));
+  await click(button('step-badge'));
+  await click(button('callout'));
+  expect(effectSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
+  expect(stepSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
+  expect(calloutSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
+  expect(onCommand).toHaveBeenCalledTimes(commandCount);
+  expect(button('decrease').disabled).toBe(true);
+  expect(host.querySelector('.lucide-pencil')).toBeNull();
+
+  const onMouseDown = vi.fn();
+  const onClick = vi.fn();
+  const onCaptureVisibilityChange = vi.fn();
+  await act(async () =>
+    root.render(
+      <>
+        <FrameAnnotationToolbarAddCalloutButton
+          onClick={onClick}
+          onMouseDown={onMouseDown}
+          title="Add callout"
+        />
+        <FrameAnnotationToolbarActionButtons
+          canDecrease
+          captureHidden={false}
+          captureVisibilityTitle="Hide from capture"
+          onCaptureVisibilityChange={onCaptureVisibilityChange}
+          onClose={onClick}
+          onDecrease={onClick}
+          onDelete={onClick}
+          onEdit={onClick}
+          onIncrease={onClick}
+          onMouseDown={onMouseDown}
+          showEdit={false}
+        />
+      </>
+    )
+  );
+  const addCallout = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.interactive-frame.add-callout"]'
+  );
+  const captureVisibility = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.interactive-frame.capture-visibility"]'
+  );
+  expect(addCallout).not.toBeNull();
+  expect(captureVisibility?.querySelector('.lucide-eye')).not.toBeNull();
+  addCallout?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  await click(addCallout!);
+  await click(captureVisibility!);
+  expect(onMouseDown).toHaveBeenCalled();
+  expect(onClick).toHaveBeenCalled();
+  expect(onCaptureVisibilityChange).toHaveBeenCalled();
+
+  await act(async () =>
+    root.render(
+      <FrameAnnotationToolbarActionButtons
+        canDecrease
+        captureHidden
+        captureVisibilityTitle="Show in capture"
+        onCaptureVisibilityChange={onCaptureVisibilityChange}
+        onClose={onClick}
+        onDecrease={onClick}
+        onDelete={onClick}
+        onEdit={onClick}
+        onIncrease={onClick}
+        onMouseDown={onMouseDown}
+      />
+    )
+  );
+  expect(host.querySelector('.lucide-eye-off')).not.toBeNull();
+  expect(
+    host
+      .querySelector('[data-ui="content.interactive-frame.capture-visibility"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+
   await act(async () => root.unmount());
   host.remove();
 });

@@ -44,7 +44,7 @@ export const frameTriggerControlStyle: React.CSSProperties = {
 
 export const frameTriggerIconStyle = { display: 'block' } as const;
 
-export function createFrameQuickActions(props: {
+export type FrameQuickActionContext = {
   closePopover: () => void;
   frame: FrameData;
   handleStartEditing: () => void;
@@ -55,11 +55,16 @@ export function createFrameQuickActions(props: {
   stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   setState: React.Dispatch<React.SetStateAction<FrameState>>;
   clearSelection?: () => void;
-  toggleQuickPopover: FrameUIState['toggleQuickPopover'];
   onUpdate: (frame: FrameData) => void;
-  captureVisibility?: { hiddenDuringCapture: boolean; toggle: () => void };
   canAddCallout?: boolean;
-}): FrameQuickAction[] {
+};
+
+export function createFrameQuickActions(
+  props: FrameQuickActionContext & {
+    captureVisibility?: { hiddenDuringCapture: boolean; toggle: () => void };
+    toggleQuickPopover: FrameUIState['toggleQuickPopover'];
+  }
+): FrameQuickAction[] {
   const hiddenDuringCapture =
     props.captureVisibility?.hiddenDuringCapture ?? isFrameHiddenDuringCapture(props.frame);
   const canAddCallout = props.canAddCallout ?? canAppendFrameCallout(props.frame);

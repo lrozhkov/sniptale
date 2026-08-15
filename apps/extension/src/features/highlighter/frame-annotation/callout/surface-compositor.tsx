@@ -191,17 +191,17 @@ function ConicPaint(props: {
   );
 }
 
-function PaintLayer(props: {
+function SurfaceSvgLayer(props: {
+  children: ReactNode;
   clipPathId: string;
+  definitions?: ReactNode;
   geometry: SurfaceGeometry;
-  paint: Paint;
-  paintId: string;
+  ui: string;
 }) {
-  const gradient = props.paint.kind === 'gradient' ? props.paint.gradient : null;
   return (
     <svg
       aria-hidden="true"
-      data-ui="content.callout.surface-paint"
+      data-ui={props.ui}
       height={props.geometry.bounds.height}
       style={{ inset: 0, overflow: 'visible', position: 'absolute' }}
       viewBox={`0 0 ${props.geometry.bounds.width} ${props.geometry.bounds.height}`}
@@ -211,14 +211,35 @@ function PaintLayer(props: {
         <clipPath id={props.clipPathId} clipPathUnits="userSpaceOnUse">
           <Shape geometry={props.geometry} />
         </clipPath>
-        {gradient ? (
+        {props.definitions}
+      </defs>
+      {props.children}
+    </svg>
+  );
+}
+
+function PaintLayer(props: {
+  clipPathId: string;
+  geometry: SurfaceGeometry;
+  paint: Paint;
+  paintId: string;
+}) {
+  const gradient = props.paint.kind === 'gradient' ? props.paint.gradient : null;
+  return (
+    <SurfaceSvgLayer
+      clipPathId={props.clipPathId}
+      definitions={
+        gradient ? (
           <GradientDefinition
             gradient={gradient}
             id={props.paintId}
             paintBox={props.geometry.contentRect}
           />
-        ) : null}
-      </defs>
+        ) : null
+      }
+      geometry={props.geometry}
+      ui="content.callout.surface-paint"
+    >
       {gradient?.type === 'conic' ? (
         <ConicPaint clipPathId={props.clipPathId} geometry={props.geometry} gradient={gradient} />
       ) : (
@@ -233,7 +254,7 @@ function PaintLayer(props: {
           }
         />
       )}
-    </svg>
+    </SurfaceSvgLayer>
   );
 }
 
@@ -464,27 +485,23 @@ function ContourLayer(props: {
     width: outlineWidth,
   });
   return (
-    <svg
-      aria-hidden="true"
-      data-ui="content.callout.surface-contour"
-      height={props.geometry.bounds.height}
-      style={{ inset: 0, overflow: 'visible', position: 'absolute' }}
-      viewBox={`0 0 ${props.geometry.bounds.width} ${props.geometry.bounds.height}`}
-      width={props.geometry.bounds.width}
+    <SurfaceSvgLayer
+      clipPathId={props.clipPathId}
+      definitions={
+        <>
+          <linearGradient id={insetGradientId} x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stopColor={darkColor} />
+            <stop offset="1" stopColor={lightColor} />
+          </linearGradient>
+          <linearGradient id={outsetGradientId} x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stopColor={lightColor} />
+            <stop offset="1" stopColor={darkColor} />
+          </linearGradient>
+        </>
+      }
+      geometry={props.geometry}
+      ui="content.callout.surface-contour"
     >
-      <defs>
-        <clipPath id={props.clipPathId} clipPathUnits="userSpaceOnUse">
-          <Shape geometry={props.geometry} />
-        </clipPath>
-        <linearGradient id={insetGradientId} x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0" stopColor={darkColor} />
-          <stop offset="1" stopColor={lightColor} />
-        </linearGradient>
-        <linearGradient id={outsetGradientId} x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0" stopColor={lightColor} />
-          <stop offset="1" stopColor={darkColor} />
-        </linearGradient>
-      </defs>
       {outlineBands.map((band, index) => (
         <OutlineBandShape
           key={index}
@@ -510,7 +527,7 @@ function ContourLayer(props: {
           strokeWidth={borderWidth}
         />
       ) : null}
-    </svg>
+    </SurfaceSvgLayer>
   );
 }
 

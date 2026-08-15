@@ -3,7 +3,11 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { installAgentTooling, removeAgentTooling } from './agent-tooling.mjs';
+import {
+  installAgentTooling,
+  parseAgentToolingCliOptions,
+  removeAgentTooling,
+} from './agent-tooling.mjs';
 import { createTempRoot } from '../qa/core/test-helpers';
 
 function createKit() {
@@ -24,6 +28,14 @@ function createKit() {
 }
 
 describe('optional agent tooling', () => {
+  it('accepts only the explicit force CLI option', () => {
+    expect(parseAgentToolingCliOptions([])).toEqual({ force: false });
+    expect(parseAgentToolingCliOptions(['--force'])).toEqual({ force: true });
+    expect(() => parseAgentToolingCliOptions(['--unexpected'])).toThrow(
+      'Unsupported argument: --unexpected'
+    );
+  });
+
   it('installs and removes exactly the tracked kit payload', () => {
     const { files, root, sourceDirectory } = createKit();
     const destinationRoot = path.join(root, 'worktree');

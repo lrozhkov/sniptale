@@ -16,6 +16,13 @@ export const sourceRoot = path.join(repoRoot, 'docs/agent-tooling');
 
 const PAYLOAD_ROOTS = ['AGENTS.md', 'DESIGN.md', '.agents'];
 
+export function parseAgentToolingCliOptions(argv) {
+  const args = new Set(argv);
+  const unsupported = [...args].filter((argument) => argument !== '--force');
+  if (unsupported.length > 0) throw new Error(`Unsupported argument: ${unsupported[0]}`);
+  return { force: args.has('--force') };
+}
+
 function toPosixPath(value) {
   return value.split(path.sep).join('/');
 }

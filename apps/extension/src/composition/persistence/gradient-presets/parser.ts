@@ -61,6 +61,21 @@ function parseSurfaceMap<T>(args: {
   return result;
 }
 
+function parseFavoriteIdsBySurface(
+  value: unknown,
+  ids: ReadonlySet<string>
+): Partial<Record<GradientPresetSurface, string[]>> | null {
+  return parseSurfaceMap<string[]>({
+    fallback: () => undefined,
+    ids,
+    raw: value,
+    validate: (raw, knownIds) =>
+      Array.isArray(raw) && raw.every((id) => typeof id === 'string')
+        ? [...new Set(raw as string[])].filter((id) => knownIds.has(id))
+        : undefined,
+  });
+}
+
 function normalizeLegacyCatalog(value: Record<string, unknown>): GradientPresetCatalog | null {
   if (
     !Array.isArray(value['presets']) ||
@@ -74,15 +89,7 @@ function normalizeLegacyCatalog(value: Record<string, unknown>): GradientPresetC
   const presets = [...systems, ...users].map((preset, order) => ({ ...preset, order }));
   const ids = new Set(presets.map((preset) => preset.id));
   if (ids.size !== presets.length || users.length > 100) return null;
-  const favoriteIdsBySurface = parseSurfaceMap<string[]>({
-    fallback: () => undefined,
-    ids,
-    raw: value['favoriteIdsBySurface'],
-    validate: (raw, knownIds) =>
-      Array.isArray(raw) && raw.every((id) => typeof id === 'string')
-        ? [...new Set(raw as string[])].filter((id) => knownIds.has(id))
-        : undefined,
-  });
+  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], ids);
   if (!favoriteIdsBySurface) return null;
   return {
     defaultPresetIdBySurface: {
@@ -125,15 +132,7 @@ function parseCurrentCatalog(value: Record<string, unknown>): GradientPresetCata
     presets.filter((preset) => preset.origin === 'user').length > 100
   )
     return null;
-  const favoriteIdsBySurface = parseSurfaceMap<string[]>({
-    fallback: () => undefined,
-    ids,
-    raw: value['favoriteIdsBySurface'],
-    validate: (raw, knownIds) =>
-      Array.isArray(raw) && raw.every((id) => typeof id === 'string')
-        ? [...new Set(raw as string[])].filter((id) => knownIds.has(id))
-        : undefined,
-  });
+  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], ids);
   const defaultPresetIdBySurface = parseSurfaceMap<string>({
     fallback: () => undefined,
     ids,

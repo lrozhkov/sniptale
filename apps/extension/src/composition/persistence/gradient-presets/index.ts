@@ -3,6 +3,7 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
+import { createStorageWriteQueue } from '../infrastructure/write-queue';
 import {
   GRADIENT_PRESET_STORAGE_KEY,
   type GradientPresetCatalog,
@@ -26,15 +27,7 @@ import { readGradientPresetCatalog, writeGradientPresetCatalog } from './storage
 
 export * from './contracts';
 let snapshot: GradientPresetCatalog | null = null;
-let queue: Promise<void> = Promise.resolve();
-const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
-  const run = queue.catch(() => undefined).then(operation);
-  queue = run.then(
-    () => undefined,
-    () => undefined
-  );
-  return run;
-};
+const enqueue = createStorageWriteQueue();
 const cache = (catalog: GradientPresetCatalog) => (
   (snapshot = cloneGradientPresetCatalog(catalog)),
   cloneGradientPresetCatalog(snapshot)

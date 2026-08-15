@@ -1,12 +1,11 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
+import { useFloatingPositionRefresh } from './position-refresh';
 
 function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number): CSSProperties {
-  const [, refresh] = useReducer((value) => value + 1, 0);
-  useLayoutEffect(() => bindFloatingInteractionPositionListeners(anchorEl, refresh), [anchorEl]);
+  useFloatingPositionRefresh(anchorEl);
   if (!anchorEl) {
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }

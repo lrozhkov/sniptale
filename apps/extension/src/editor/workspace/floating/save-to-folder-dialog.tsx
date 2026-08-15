@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
-import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
 import { ProductSaveDialogSurface } from '@sniptale/ui/product-save-dialog';
 import { translate } from '../../../platform/i18n';
 import type { EditorFloatingDocumentController } from './document-bar-types';
 import { useAnchoredDialogLifecycle } from './anchored-feedback';
+import { useFloatingPositionRefresh } from './position-refresh';
 
 type SaveState = 'idle' | 'saving' | 'success' | 'error';
 
@@ -122,8 +122,7 @@ export function EditorSaveToFolderDialog(props: {
 }
 
 function useSaveToFolderPopoverPosition(anchorEl: HTMLElement | null): CSSProperties {
-  const [, refresh] = useReducer((value) => value + 1, 0);
-  useLayoutEffect(() => bindFloatingInteractionPositionListeners(anchorEl, refresh), [anchorEl]);
+  useFloatingPositionRefresh(anchorEl);
   if (!anchorEl) {
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
