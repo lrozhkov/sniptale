@@ -43,16 +43,27 @@ function installCanvasOutput(width: number, height: number) {
   return { context, output };
 }
 
-function installSolidPixelCanvasOutput(width: number, height: number) {
+function installSolidPixelCanvasOutput(width: number, height: number, sourceWidth: number) {
   const output = createStream(width, height);
   const pixels = new Uint8ClampedArray(width * height * 4);
+  // Chromium may expose one encoder-alignment column outside the continuously colored tab frame.
   const writePixel = (x: number, y: number, color: readonly [number, number, number, number]) => {
     const offset = (y * width + x) * 4;
     pixels.set(color, offset);
   };
   const context = {
     drawImage: vi.fn((...args: unknown[]) => {
-      const [destinationX, destinationY, destinationWidth, destinationHeight] = args.slice(5) as [
+      const [
+        sourceX,
+        ,
+        sampledWidth,
+        ,
+        destinationX,
+        destinationY,
+        destinationWidth,
+        destinationHeight,
+      ] = args.slice(1) as [number, number, number, number, number, number, number, number];
+      const destination = [destinationX, destinationY, destinationWidth, destinationHeight] as [
         number,
         number,
         number,
@@ -63,12 +74,17 @@ function installSolidPixelCanvasOutput(width: number, height: number) {
           const centerX = x + 0.5;
           const centerY = y + 0.5;
           if (
-            centerX >= destinationX &&
-            centerX < destinationX + destinationWidth &&
-            centerY >= destinationY &&
-            centerY < destinationY + destinationHeight
+            centerX >= destination[0] &&
+            centerX < destination[0] + destination[2] &&
+            centerY >= destination[1] &&
+            centerY < destination[1] + destination[3]
           ) {
-            writePixel(x, y, [17, 113, 201, 255]);
+            const sampledX = sourceX + ((centerX - destination[0]) / destination[2]) * sampledWidth;
+            const color =
+              sampledX >= 1 && sampledX < sourceWidth - 1
+                ? ([17, 113, 201, 255] as const)
+                : ([0, 0, 0, 255] as const);
+            writePixel(x, y, color);
           }
         }
       }
@@ -111,7 +127,7 @@ describe('crop stream', () => {
   ])(
     'fills every TAB + SOURCE canvas edge at devicePixelRatio $devicePixelRatio',
     async ({ devicePixelRatio, raw }) => {
-      const { context, output, pixels } = installSolidPixelCanvasOutput(1904, 984);
+      const { context, output, pixels } = installSolidPixelCanvasOutput(1904, 984, raw.width);
       const video = { videoHeight: raw.height, videoWidth: raw.width };
       mocks.createSourceVideo.mockReturnValue(video);
       const geometry = resolveTabOutputGeometry(

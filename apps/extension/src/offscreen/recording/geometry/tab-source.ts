@@ -156,6 +156,20 @@ function matchSourceRectToOutputAspect(
   });
 }
 
+function insetSourceRectForCanvasSampling(sourceRect: RecordingSampleRect): RecordingSampleRect {
+  const edgeInset = 1;
+  if (sourceRect.width <= edgeInset * 2) return sourceRect;
+  const width = sourceRect.width - edgeInset * 2;
+  const height = sourceRect.height * (width / sourceRect.width);
+  return Object.freeze({
+    ...sourceRect,
+    height,
+    width,
+    x: sourceRect.x + edgeInset,
+    y: sourceRect.y + (sourceRect.height - height) / 2,
+  });
+}
+
 function normalizeFullSourcePlan(
   plan: RecordingGeometryPlan,
   resolution: VideoResolutionPreset,
@@ -163,10 +177,19 @@ function normalizeFullSourcePlan(
   devicePixelRatio: number
 ): RecordingGeometryPlan {
   if (!tracksFullViewport || resolution !== VideoResolutionPreset.SOURCE) return plan;
-  return remapRecordingGeometryPlan(
-    plan,
-    matchSourceRectToOutputAspect(plan.sourceRect, plan.outputSize, Math.max(1, devicePixelRatio))
+  const matchedSourceRect = matchSourceRectToOutputAspect(
+    plan.sourceRect,
+    plan.outputSize,
+    Math.max(1, devicePixelRatio)
   );
+  const sourceRect = sourceRectFillsOutput(
+    { ...plan, sourceRect: matchedSourceRect },
+    resolution,
+    true
+  )
+    ? insetSourceRectForCanvasSampling(matchedSourceRect)
+    : matchedSourceRect;
+  return remapRecordingGeometryPlan(plan, sourceRect);
 }
 
 function sourceRectFillsOutput(

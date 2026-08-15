@@ -26,10 +26,10 @@ describe('tab recording geometry', () => {
       outputBasis: { width: 1904, height: 985 },
       outputSize: { width: 1904, height: 984 },
       sourceRect: {
-        x: 0,
-        y: expect.closeTo(58.48739495798327),
-        width: 2560,
-        height: expect.closeTo(1323.0252100840335),
+        x: 1,
+        y: expect.closeTo(59.00420168067228),
+        width: 2558,
+        height: expect.closeTo(1321.9915966386554),
       },
       sourceSize: { width: 2560, height: 1440 },
     });
@@ -37,10 +37,11 @@ describe('tab recording geometry', () => {
       geometry.outputSize.width / geometry.outputSize.height,
       12
     );
-    expect(1324 - geometry.sourceRect.height).toBeLessThanOrEqual(1);
+    expect(geometry.sourceRect.y - 58).toBeLessThanOrEqual(1.1);
+    expect(1382 - (geometry.sourceRect.y + geometry.sourceRect.height)).toBeLessThanOrEqual(1.1);
   });
 
-  it('removes only the density-scaled odd edge at devicePixelRatio 2', () => {
+  it('removes one physical sampling edge after density-scaled odd-edge normalization', () => {
     const geometry = resolveTabOutputGeometry(
       { x: 0, y: 0, width: 1904, height: 985 },
       { width: 3808, height: 1970 },
@@ -54,7 +55,12 @@ describe('tab recording geometry', () => {
 
     expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
     expect(geometry.fillsOutput).toBe(true);
-    expect(geometry.sourceRect).toEqual({ x: 0, y: 1, width: 3808, height: 1968 });
+    expect(geometry.sourceRect).toEqual({
+      x: 1,
+      y: expect.closeTo(1.5168067226891253),
+      width: 3806,
+      height: expect.closeTo(1966.9663865546217),
+    });
   });
 
   it.each([
