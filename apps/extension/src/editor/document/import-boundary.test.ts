@@ -63,6 +63,38 @@ describe('editor drawing import boundary', () => {
     );
   });
 
+  it('accepts pointer timestamps beyond the coordinate ceiling', () => {
+    const pencil = objects[0]!;
+    if (pencil.kind !== 'pencil') throw new Error('Expected pencil fixture');
+    const elapsedPencil = {
+      ...pencil,
+      samples: [
+        { x: 1, y: 2, t: 131_073 },
+        { x: 4, y: 6, t: 180_000.5 },
+      ],
+    } satisfies DrawingObject;
+
+    expect(parseEditorDrawingMetadata(fabricObject(elapsedPencil).sniptaleDrawingJson)).toEqual(
+      elapsedPencil
+    );
+    expect(() =>
+      assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: [fabricObject(elapsedPencil)] }))
+    ).not.toThrow();
+  });
+
+  it.each([-1, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid drawing timestamp %s',
+    (timestamp) => {
+      const pencil = objects[0]!;
+      if (pencil.kind !== 'pencil') throw new Error('Expected pencil fixture');
+      expect(
+        parseEditorDrawingMetadata(
+          fabricObject({ ...pencil, samples: [{ x: 1, y: 2, t: timestamp }] }).sniptaleDrawingJson
+        )
+      ).toBeNull();
+    }
+  );
+
   it.each(['highlighter', 'line', 'callout', 'brush', 'eraser', 'fill'])(
     'rejects removed %s objects before Fabric hydration',
     (sniptaleType) => {

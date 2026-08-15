@@ -20,6 +20,7 @@ vi.mock('fabric', () => ({
   Canvas: class TestCanvas {
     backgroundColor = '';
     dispose = vi.fn();
+    findTarget = vi.fn(() => ({ target: undefined }));
     requestRenderAll = vi.fn();
     upperCanvasEl: HTMLCanvasElement;
 

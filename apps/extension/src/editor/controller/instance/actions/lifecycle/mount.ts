@@ -23,6 +23,10 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
     uniformScaling: false,
     uniScaleKey: 'shiftKey',
   });
+  // Fabric marks the upper canvas as a native drag source for selected-text DnD. That browser
+  // gesture can take over an already-started object transform, so the editor keeps canvas
+  // interaction exclusively on the pointer-event path.
+  canvas.upperCanvasEl.draggable = false;
   canvas.backgroundColor = 'transparent';
   canvas.setDimensions({ width: 0, height: 0 });
   canvas.setZoom(1);
@@ -67,7 +71,8 @@ export function mountEditorController(
     attachEditorCanvasPointerCapture(
       canvas,
       controller.eventHandlers.handlePointerCancel,
-      controller.eventHandlers.handlePointerDownBeforeFabric
+      controller.eventHandlers.handlePointerDownBeforeFabric,
+      (event) => !canvas.findTarget(event).target
     );
     applyEditorViewportZoom(
       canvas,

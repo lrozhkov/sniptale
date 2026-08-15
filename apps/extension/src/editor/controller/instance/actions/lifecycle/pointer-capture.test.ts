@@ -60,7 +60,23 @@ it('ignores non-primary mouse buttons', () => {
   detachEditorCanvasPointerCapture(canvas);
 });
 
-it('terminates the active gesture when pointer capture is cancelled or unexpectedly lost', () => {
+it('leaves an existing Fabric target under Fabric document-level pointer ownership', () => {
+  const element = document.createElement('canvas');
+  element.setPointerCapture = vi.fn();
+  element.hasPointerCapture = vi.fn(() => false);
+  element.releasePointerCapture = vi.fn();
+  const canvas = { upperCanvasEl: element };
+  const beforeFabric = vi.fn();
+
+  attachEditorCanvasPointerCapture(canvas, vi.fn(), beforeFabric, () => false);
+  element.dispatchEvent(pointerEvent('pointerdown', 6));
+
+  expect(beforeFabric).toHaveBeenCalledOnce();
+  expect(element.setPointerCapture).not.toHaveBeenCalled();
+  detachEditorCanvasPointerCapture(canvas);
+});
+
+it('keeps the Fabric transform alive after capture loss and terminates it on pointer cancellation', () => {
   const element = document.createElement('canvas');
   const captured = new Set<number>();
   element.setPointerCapture = vi.fn((pointerId) => captured.add(pointerId));
@@ -72,12 +88,12 @@ it('terminates the active gesture when pointer capture is cancelled or unexpecte
   attachEditorCanvasPointerCapture(canvas, terminate);
   element.dispatchEvent(pointerEvent('pointerdown', 4));
   element.dispatchEvent(pointerEvent('lostpointercapture', 4));
-  expect(terminate).toHaveBeenCalledWith(expect.objectContaining({ pointerId: 4 }));
+  expect(terminate).not.toHaveBeenCalled();
 
   element.dispatchEvent(pointerEvent('pointerdown', 5));
   element.dispatchEvent(pointerEvent('pointercancel', 5));
   expect(terminate).toHaveBeenCalledWith(expect.objectContaining({ pointerId: 5 }));
-  expect(terminate).toHaveBeenCalledTimes(2);
+  expect(terminate).toHaveBeenCalledOnce();
 
   detachEditorCanvasPointerCapture(canvas);
 });
