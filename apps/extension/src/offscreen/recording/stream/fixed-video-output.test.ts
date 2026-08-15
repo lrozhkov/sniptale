@@ -13,7 +13,10 @@ vi.mock('./video-source', async (importOriginal) => ({
   waitForSourceMetadata: waitForSourceMetadataMock,
 }));
 
-import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  resolveVideoOutputDimensions,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   createAudioStream,
@@ -108,37 +111,35 @@ it('preserves primary source-audio ownership only when explicitly requested', as
   expect(sourceStream.track.stop).not.toHaveBeenCalled();
 });
 
-it('uses exact preset height and proportional even width', async () => {
-  const canvasStream = createStream(2346, 1080);
-  const sourceStream = createTrackedStream({ height: 500, width: 1086 });
-  const { canvas, ctx } = installCanvasFixture(canvasStream);
-  const video = {
-    pause: vi.fn(),
-    srcObject: sourceStream,
-    videoHeight: 500,
-    videoWidth: 1086,
-  };
-  createSourceVideoMock.mockReturnValue(video);
+it.each(Object.values(VideoResolutionPreset))(
+  'fills every stable fixed-output canvas edge for %s',
+  async (resolution) => {
+    const outputSize = resolveVideoOutputDimensions(1086, 500, resolution);
+    const canvasStream = createStream(outputSize.width, outputSize.height);
+    const sourceStream = createTrackedStream({ height: 500, width: 1086 });
+    const { canvas, ctx } = installCanvasFixture(canvasStream);
+    const video = {
+      pause: vi.fn(),
+      srcObject: sourceStream,
+      videoHeight: 500,
+      videoWidth: 1086,
+    };
+    createSourceVideoMock.mockReturnValue(video);
 
-  const result = await createFixedVideoOutputStream(
-    sourceStream,
-    createSettings(VideoResolutionPreset.P1080)
-  );
+    const result = await createFixedVideoOutputStream(sourceStream, createSettings(resolution));
 
-  expect(result.dimensions).toEqual({ height: 1080, width: 2346 });
-  expect(canvas).toEqual(expect.objectContaining({ height: 1080, width: 2346 }));
-  expect(ctx.drawImage.mock.calls[0]?.slice(1)).toEqual([
-    0,
-    0,
-    1086,
-    500,
-    expect.closeTo((2346 - (1086 * 1080) / 500) / 2),
-    0,
-    expect.closeTo((1086 * 1080) / 500),
-    1080,
-  ]);
-  canvasStream.getVideoTracks()[0]?.stop();
-});
+    expect(result.dimensions).toEqual(outputSize);
+    expect(canvas).toEqual(expect.objectContaining(outputSize));
+    const draw = ctx.drawImage.mock.calls[0]?.slice(1) as number[];
+    expect(draw?.slice(4)).toEqual([0, 0, outputSize.width, outputSize.height]);
+    expect(draw[2]! / draw[3]!).toBeCloseTo(outputSize.width / outputSize.height, 12);
+    expect(draw[0]).toBeGreaterThanOrEqual(0);
+    expect(draw[1]).toBeGreaterThanOrEqual(0);
+    expect(draw[0]! + draw[2]!).toBeLessThanOrEqual(1086);
+    expect(draw[1]! + draw[3]!).toBeLessThanOrEqual(500);
+    canvasStream.getVideoTracks()[0]?.stop();
+  }
+);
 
 it('caps an adapter cadence at the selected profile frame rate', async () => {
   const canvasStream = createTrackedStream({ frameRate: 30, height: 720, width: 1280 });

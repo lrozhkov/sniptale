@@ -5,7 +5,7 @@ import {
 import { createRecordingGeometryPlan } from '../geometry/plan';
 import { createCanvasVideoOutput } from './canvas-video-output';
 import { resolveFixedVideoFrameRate } from './frame-pump';
-import { resolveContainedFrame } from '../geometry/contain-frame';
+import { resolveAspectMatchedSourceFrame, resolveContainedFrame } from '../geometry/contain-frame';
 import { createSourceVideo, waitForSourceMetadata } from './video-source';
 
 type FixedVideoOutputStream = {
@@ -39,12 +39,13 @@ function createFrameDrawer(params: {
       width: params.video.videoWidth,
     };
     if (currentSource.width <= 0 || currentSource.height <= 0) return false;
-    const source =
+    const usesStableSource =
       currentSource.width === params.outputBasis.width &&
-      currentSource.height === params.outputBasis.height
-        ? params.sourceRect
-        : { x: 0, y: 0, ...currentSource };
-    const destination = resolveContainedFrame(source, params.canvas);
+      currentSource.height === params.outputBasis.height;
+    const source = usesStableSource ? params.sourceRect : { x: 0, y: 0, ...currentSource };
+    const destination = usesStableSource
+      ? { x: 0, y: 0, width: params.canvas.width, height: params.canvas.height }
+      : resolveContainedFrame(source, params.canvas);
     const scaled = source.width !== destination.width || source.height !== destination.height;
     params.ctx.imageSmoothingEnabled = scaled;
     if (scaled) params.ctx.imageSmoothingQuality = 'high';
@@ -102,6 +103,7 @@ export async function createFixedVideoOutputStream(
       resolution: outputProfile.resolution,
       sourceRect: { x: 0, y: 0, height: video.videoHeight, width: video.videoWidth },
     });
+    const sourceRect = resolveAspectMatchedSourceFrame(geometry.sourceRect, geometry.outputSize);
     const normalizedStream = createCanvasVideoOutput({
       ...(options.includeSourceAudio ? { audioTracks: sourceStream.getAudioTracks() } : {}),
       contentHint: options.contentHint ?? 'detail',
@@ -112,7 +114,7 @@ export async function createFixedVideoOutputStream(
           canvas,
           ctx: context,
           outputBasis: geometry.outputBasis,
-          sourceRect: geometry.sourceRect,
+          sourceRect,
           video,
         }),
       }),

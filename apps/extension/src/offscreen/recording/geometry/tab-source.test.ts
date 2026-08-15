@@ -17,6 +17,8 @@ function resolveFullTab(resolution: VideoResolutionPreset = VideoResolutionPrese
   );
 }
 
+const ALL_VIDEO_RESOLUTIONS = Object.values(VideoResolutionPreset);
+
 describe('tab recording geometry', () => {
   it('uses the logical viewport for SOURCE and the physical track only for sampling', () => {
     const geometry = resolveFullTab();
@@ -63,14 +65,21 @@ describe('tab recording geometry', () => {
     });
   });
 
-  it.each([
-    [VideoResolutionPreset.P480, { width: 928, height: 480 }],
-    [VideoResolutionPreset.P1440, { width: 2784, height: 1440 }],
-  ])('uses preset height and logical viewport aspect for %s', (resolution, outputSize) => {
-    const geometry = resolveFullTab(resolution);
-    expect(geometry.outputSize).toEqual(outputSize);
-    expect(geometry.fillsOutput).toBe(false);
-  });
+  it.each(ALL_VIDEO_RESOLUTIONS)(
+    'fills the stable full-tab canvas without changing aspect for %s',
+    (resolution) => {
+      const geometry = resolveFullTab(resolution);
+      expect(geometry.outputSize.width).toBeGreaterThan(0);
+      expect(geometry.outputSize.height).toBeGreaterThan(0);
+      expect(geometry.outputSize.width % 2).toBe(0);
+      expect(geometry.outputSize.height % 2).toBe(0);
+      expect(geometry.fillsOutput).toBe(true);
+      expect(geometry.sourceRect.width / geometry.sourceRect.height).toBeCloseTo(
+        geometry.outputSize.width / geometry.outputSize.height,
+        12
+      );
+    }
+  );
 
   it('uses the logical TAB_CROP selection as output basis', () => {
     const geometry = resolveTabOutputGeometry(
@@ -81,12 +90,32 @@ describe('tab recording geometry', () => {
     );
 
     expect(geometry).toMatchObject({
-      fillsOutput: false,
+      fillsOutput: true,
       outputBasis: { width: 300, height: 301 },
       outputSize: { width: 300, height: 300 },
-      sourceRect: { x: 200, y: 160, width: 600, height: 602 },
+      sourceRect: { x: 200, y: 161, width: 600, height: 600 },
     });
   });
+
+  it.each(ALL_VIDEO_RESOLUTIONS)(
+    'fills the stable TAB_CROP canvas without changing aspect for %s',
+    (resolution) => {
+      const geometry = resolveTabOutputGeometry(
+        { x: 100, y: 80, width: 301, height: 299 },
+        { width: 2560, height: 1440 },
+        { width: 1280, height: 720, devicePixelRatio: 2 },
+        { frameRateCap: 30, resolution }
+      );
+
+      expect(geometry.fillsOutput).toBe(true);
+      expect(geometry.outputSize.width % 2).toBe(0);
+      expect(geometry.outputSize.height % 2).toBe(0);
+      expect(geometry.sourceRect.width / geometry.sourceRect.height).toBeCloseTo(
+        geometry.outputSize.width / geometry.outputSize.height,
+        12
+      );
+    }
+  );
 
   it('remaps a resized full TAB into the immutable encoder canvas', () => {
     const initial = resolveFullTab();

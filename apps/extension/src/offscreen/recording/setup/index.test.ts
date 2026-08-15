@@ -118,8 +118,7 @@ beforeEach(() => {
     ) => ({
       ...geometry,
       coordinateSpace,
-      fillsOutput:
-        options.tracksFullViewport === true && options.resolution === VideoResolutionPreset.SOURCE,
+      fillsOutput: true,
       frameRateCap: options.frameRateCap,
       outputBasis: { height: requestedCrop.height, width: requestedCrop.width },
       outputSize: resolveVideoOutputDimensions(

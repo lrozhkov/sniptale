@@ -122,13 +122,34 @@ afterEach(() => {
 
 describe('crop stream', () => {
   it.each([
-    { devicePixelRatio: 1, raw: { width: 2560, height: 1440 } },
-    { devicePixelRatio: 1, raw: { width: 1920, height: 1080 } },
-    { devicePixelRatio: 2, raw: { width: 3808, height: 1970 } },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.SOURCE,
+    },
+    {
+      devicePixelRatio: 2,
+      raw: { width: 3808, height: 1970 },
+      resolution: VideoResolutionPreset.SOURCE,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P720,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P1080,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P1440,
+    },
   ])(
-    'fills every TAB + SOURCE canvas edge for raw $raw.width×$raw.height at devicePixelRatio $devicePixelRatio',
-    async ({ devicePixelRatio, raw }) => {
-      const { context, output, pixels } = installSolidPixelCanvasOutput(1904, 984, raw.width);
+    'fills every stable TAB canvas edge for $resolution at devicePixelRatio $devicePixelRatio',
+    async ({ devicePixelRatio, raw, resolution }) => {
       const video = { videoHeight: raw.height, videoWidth: raw.width };
       mocks.createSourceVideo.mockReturnValue(video);
       const geometry = resolveTabOutputGeometry(
@@ -137,17 +158,26 @@ describe('crop stream', () => {
         { width: 1904, height: 985, devicePixelRatio },
         {
           frameRateCap: 30,
-          resolution: VideoResolutionPreset.SOURCE,
+          resolution,
           tracksFullViewport: true,
         }
+      );
+      const { context, output, pixels } = installSolidPixelCanvasOutput(
+        geometry.outputSize.width,
+        geometry.outputSize.height,
+        raw.width
       );
 
       await createCropStream(createStream(raw.width, raw.height), geometry);
 
-      expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
       expect(geometry.outputSize.width % 2).toBe(0);
       expect(geometry.outputSize.height % 2).toBe(0);
-      expect(context.fillRect).toHaveBeenCalledWith(0, 0, 1904, 984);
+      expect(context.fillRect).toHaveBeenCalledWith(
+        0,
+        0,
+        geometry.outputSize.width,
+        geometry.outputSize.height
+      );
       expect(context.drawImage).toHaveBeenCalledWith(
         video,
         geometry.sourceRect.x,
@@ -156,16 +186,64 @@ describe('crop stream', () => {
         geometry.sourceRect.height,
         0,
         0,
-        1904,
-        984
+        geometry.outputSize.width,
+        geometry.outputSize.height
       );
-      const edgePixelOffsets = [0, (1904 - 1) * 4, (984 - 1) * 1904 * 4, (984 * 1904 - 1) * 4];
+      const { height, width } = geometry.outputSize;
+      const edgePixelOffsets = [
+        0,
+        (width - 1) * 4,
+        (height - 1) * width * 4,
+        (height * width - 1) * 4,
+      ];
       for (const offset of edgePixelOffsets) {
         expect([...pixels.slice(offset, offset + 4)]).toEqual([17, 113, 201, 255]);
       }
       output.getVideoTracks()[0]?.stop();
     }
   );
+
+  it('fills every stable TAB_CROP canvas edge', async () => {
+    const raw = { width: 2560, height: 1440 };
+    const geometry = resolveTabOutputGeometry(
+      { x: 100, y: 80, width: 300, height: 301 },
+      raw,
+      { width: 1280, height: 720, devicePixelRatio: 2 },
+      { frameRateCap: 30, resolution: VideoResolutionPreset.SOURCE }
+    );
+    const { context, output, pixels } = installSolidPixelCanvasOutput(
+      geometry.outputSize.width,
+      geometry.outputSize.height,
+      raw.width
+    );
+    const video = { videoHeight: raw.height, videoWidth: raw.width };
+    mocks.createSourceVideo.mockReturnValue(video);
+
+    await createCropStream(createStream(raw.width, raw.height), geometry);
+
+    expect(context.drawImage).toHaveBeenCalledWith(
+      video,
+      geometry.sourceRect.x,
+      geometry.sourceRect.y,
+      geometry.sourceRect.width,
+      geometry.sourceRect.height,
+      0,
+      0,
+      geometry.outputSize.width,
+      geometry.outputSize.height
+    );
+    const { height, width } = geometry.outputSize;
+    const edgePixelOffsets = [
+      0,
+      (width - 1) * 4,
+      (height - 1) * width * 4,
+      (height * width - 1) * 4,
+    ];
+    for (const offset of edgePixelOffsets) {
+      expect([...pixels.slice(offset, offset + 4)]).toEqual([17, 113, 201, 255]);
+    }
+    output.getVideoTracks()[0]?.stop();
+  });
 
   it('caps the crop cadence once at the source track rate reported on start', async () => {
     const { output } = installCanvasOutput(1280, 720);
