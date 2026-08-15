@@ -64,7 +64,11 @@ export function mountEditorController(
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;
     controller.viewportDevicePixelRatioBaseline = getEditorViewportDevicePixelRatioBaseline();
-    attachEditorCanvasPointerCapture(canvas, controller.eventHandlers.handlePointerCancel);
+    attachEditorCanvasPointerCapture(
+      canvas,
+      controller.eventHandlers.handlePointerCancel,
+      controller.eventHandlers.handlePointerDownBeforeFabric
+    );
     applyEditorViewportZoom(
       canvas,
       controller.canvasDocumentSize,

@@ -54,7 +54,6 @@ export function useFrameAnnotationInteraction(props: {
   const [draft, setDraft] = React.useState<FrameAnnotationSnapshotV1 | null>(null);
   const draftRef = React.useRef<FrameAnnotationSnapshotV1 | null>(null);
   const dragRef = React.useRef<DragState | null>(null);
-  const pendingDragEventRef = React.useRef<PointerEvent | null>(null);
   const dragFrameRef = React.useRef(0);
   const pendingHistoryRef = React.useRef(false);
   const pendingPreviewObjectRef = React.useRef<FabricObject | null>(null);
@@ -87,15 +86,20 @@ export function useFrameAnnotationInteraction(props: {
   const finishDragRef = React.useRef(finishDrag);
   interactionPropsRef.current = props;
   finishDragRef.current = finishDrag;
-  const flushDragPreview = React.useCallback(() => {
+  const cancelScheduledDragRender = React.useCallback(() => {
     if (dragFrameRef.current !== 0) {
       cancelAnimationFrame(dragFrameRef.current);
       dragFrameRef.current = 0;
     }
-    const event = pendingDragEventRef.current;
-    pendingDragEventRef.current = null;
-    if (event) updateDrag(event, dragRef, updateDraft, interactionPropsRef.current);
-  }, [updateDraft]);
+  }, []);
+  const stageDragDraft = React.useCallback((value: FrameAnnotationSnapshotV1) => {
+    draftRef.current = value;
+    if (dragFrameRef.current !== 0) return;
+    dragFrameRef.current = requestAnimationFrame(() => {
+      dragFrameRef.current = 0;
+      setDraft(draftRef.current);
+    });
+  }, []);
   const commitPendingHistory = React.useCallback(() => {
     if (!pendingHistoryRef.current) return;
     const object = pendingPreviewObjectRef.current;
@@ -128,38 +132,32 @@ export function useFrameAnnotationInteraction(props: {
     const handlePointerMove = (event: PointerEvent) => {
       const drag = dragRef.current;
       if (!drag || event.pointerId !== drag.pointerId) return;
-      pendingDragEventRef.current = event;
-      if (dragFrameRef.current !== 0) return;
-      dragFrameRef.current = requestAnimationFrame(() => {
-        dragFrameRef.current = 0;
-        flushDragPreview();
-      });
+      updateDrag(event, dragRef, stageDragDraft, interactionPropsRef.current);
     };
     const handlePointerFinish = (event: PointerEvent) => {
       if (event.pointerId !== dragRef.current?.pointerId) return;
-      flushDragPreview();
+      updateDrag(event, dragRef, stageDragDraft, interactionPropsRef.current);
+      cancelScheduledDragRender();
       finishDragRef.current(event);
     };
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerFinish);
     window.addEventListener('pointercancel', handlePointerFinish);
     return () => {
-      if (dragFrameRef.current !== 0) cancelAnimationFrame(dragFrameRef.current);
-      dragFrameRef.current = 0;
-      pendingDragEventRef.current = null;
+      cancelScheduledDragRender();
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerFinish);
       window.removeEventListener('pointercancel', handlePointerFinish);
     };
-  }, [flushDragPreview]);
+  }, [cancelScheduledDragRender, stageDragDraft]);
   React.useEffect(
     () =>
       registerFrameAnnotationDraftFlusher(() => {
-        flushDragPreview();
+        cancelScheduledDragRender();
         finishDrag();
         commitPendingHistory();
       }),
-    [commitPendingHistory, finishDrag, flushDragPreview]
+    [cancelScheduledDragRender, commitPendingHistory, finishDrag]
   );
 
   const shared = {

@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
       },
     },
   },
+  stageDrawing: vi.fn(),
   stepDown: vi.fn(),
   updateDrawing: vi.fn(),
   updatePath: vi.fn(() => false),
@@ -61,7 +62,7 @@ vi.mock('../../drawing/object/metadata', () => ({
   syncEditorDrawingTextObject: vi.fn(),
   translateEditorDrawingObject: vi.fn(),
   writeEditorDrawingObject: mocks.writeDrawing,
-  stageEditorDrawingObject: vi.fn(),
+  stageEditorDrawingObject: mocks.stageDrawing,
 }));
 vi.mock('../../drawing/object/vector', () => ({
   applyEditorDrawingTextVisuals: vi.fn(),
@@ -81,7 +82,7 @@ vi.mock('../../drawing/object/blur', () => ({
 import { createEditorDrawingEventHandlers } from './drawing';
 
 function createCanvas() {
-  return {
+  const canvas = {
     _currentTransform: null as null | Record<string, unknown>,
     add: vi.fn(),
     discardActiveObject: vi.fn(),
@@ -94,23 +95,44 @@ function createCanvas() {
     requestRenderAll: vi.fn(),
     setCursor: vi.fn(),
     setActiveObject: vi.fn(),
+    skipTargetFind: false,
     upperCanvasEl: document.createElement('canvas'),
   };
+  canvas.endCurrentTransform.mockImplementation(() => {
+    canvas._currentTransform = null;
+  });
+  return canvas;
 }
 
 function createBindings(tool = 'pencil') {
   const canvas = createCanvas();
+  let drawSession: null | Record<string, unknown> = null;
   const bindings = {
     commitHistory: vi.fn(),
-    cancelTransientInteraction: vi.fn(() => false),
+    cancelTransientInteraction: vi.fn(() => {
+      if (!drawSession) return false;
+      drawSession = null;
+      return true;
+    }),
     getActiveTool: vi.fn(() => tool),
     getCanvas: vi.fn(() => canvas),
-    getDrawSession: vi.fn(() => null as null | Record<string, unknown>),
+    getDrawSession: vi.fn(() => drawSession),
     getSource: vi.fn(() => ({ id: 'source-1' })),
     nextLabelIndex: vi.fn(() => 1),
     prepareObject: vi.fn(),
-    setDrawSession: vi.fn(),
-    startDrawSession: vi.fn(),
+    setDrawSession: vi.fn((session: null | Record<string, unknown>) => {
+      drawSession = session;
+    }),
+    startDrawSession: vi.fn(
+      (
+        sessionTool: string,
+        start: Record<string, unknown>,
+        object: Record<string, unknown>,
+        pointerId: number | null = null
+      ) => {
+        drawSession = { object, pointerId, start, tool: sessionTool };
+      }
+    ),
     syncRuntimeState: vi.fn(),
   };
   return { bindings, canvas, handlers: createEditorDrawingEventHandlers(bindings as never) };
@@ -183,8 +205,10 @@ describe('shared drawing event orchestration', () => {
     expect(pencil.bindings.startDrawSession).toHaveBeenCalledWith(
       'pencil',
       { x: 10, y: 20 },
-      expect.any(Object)
+      expect.any(Object),
+      null
     );
+    expect(pencil.canvas.skipTargetFind).toBe(true);
 
     const shapeDrawing = {
       id: 'shape-1',
@@ -214,7 +238,8 @@ describe('shared drawing event orchestration', () => {
     expect(blur.bindings.startDrawSession).toHaveBeenCalledWith(
       'blur',
       { x: 10, y: 20 },
-      expect.any(Object)
+      expect.any(Object),
+      null
     );
   });
 
@@ -249,17 +274,13 @@ describe('shared drawing event orchestration', () => {
     mocks.updateDrawing.mockReturnValue(next);
     mocks.updatePath.mockReturnValueOnce(true);
     path.handlers.handleMouseMove(pointerEvent() as never);
-    expect(mocks.updatePath).toHaveBeenCalledWith(pathObject, expect.objectContaining(next), {
-      preview: true,
-    });
+    expect(mocks.stageDrawing).toHaveBeenCalledWith(pathObject, expect.objectContaining(next));
+    expect(mocks.updatePath).not.toHaveBeenCalled();
 
-    mocks.updatePath.mockReturnValueOnce(false);
+    mocks.stageDrawing.mockClear();
     path.handlers.handleMouseMove(pointerEvent() as never);
-    expect(path.canvas.remove).toHaveBeenCalledWith(pathObject);
-    expect(path.canvas.add).toHaveBeenCalledWith(
-      expect.objectContaining({ sniptaleId: 'replacement' })
-    );
-    expect(path.bindings.setDrawSession).toHaveBeenCalled();
+    expect(mocks.stageDrawing).toHaveBeenCalledOnce();
+    expect(path.canvas.remove).not.toHaveBeenCalled();
   });
 
   it('expands a crop guide from its pointer origin without shared drawing metadata', () => {
@@ -309,9 +330,7 @@ describe('shared drawing event orchestration', () => {
     path.handlers.handleMouseMove({ e: move });
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
-    expect(mocks.updatePath).toHaveBeenCalledWith(pathObject, expect.objectContaining(next), {
-      preview: true,
-    });
+    expect(mocks.stageDrawing).toHaveBeenCalledWith(pathObject, expect.objectContaining(next));
 
     path.handlers.handleMouseUp();
     expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
@@ -342,7 +361,7 @@ describe('drawing pointer continuity', () => {
     path.handlers.handleMouseMove({ e: move });
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
-    expect(mocks.updatePath).toHaveBeenCalledOnce();
+    expect(mocks.stageDrawing).toHaveBeenCalledOnce();
   });
 
   it('deduplicates a move handled by both Fabric and the window fallback', () => {
@@ -362,7 +381,7 @@ describe('drawing pointer continuity', () => {
     path.handlers.handleMouseMove({ e: move });
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
-    expect(mocks.updatePath).toHaveBeenCalledOnce();
+    expect(mocks.stageDrawing).toHaveBeenCalledOnce();
   });
 
   it('starts resizing a geometric draft on the first window move without a hold delay', () => {
@@ -387,16 +406,8 @@ describe('drawing pointer continuity', () => {
     expect(shape.canvas.add).not.toHaveBeenCalled();
   });
 
-  it('coalesces Fabric and window pointer moves into one preview frame', () => {
-    const queuedFrame: { callback: FrameRequestCallback | null } = { callback: null };
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        queuedFrame.callback = callback;
-        return 12;
-      })
-    );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  it('ingests a pointer move immediately while deduplicating Fabric and window delivery', () => {
+    const requestFrame = vi.spyOn(globalThis, 'requestAnimationFrame');
     const path = createBindings('pencil');
     const pathObject = { id: 'path-object' };
     path.bindings.getDrawSession.mockReturnValue({
@@ -417,12 +428,9 @@ describe('drawing pointer continuity', () => {
     path.handlers.handleMouseMove({ e: move });
     path.handlers.handleWindowPointerMove(move);
 
-    expect(mocks.updatePath).not.toHaveBeenCalled();
-    expect(queuedFrame.callback).not.toBeNull();
-    if (!queuedFrame.callback) throw new Error('Expected a queued drawing frame');
-    queuedFrame.callback(20);
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
-    expect(mocks.updatePath).toHaveBeenCalledOnce();
+    expect(mocks.stageDrawing).toHaveBeenCalledOnce();
+    expect(requestFrame).not.toHaveBeenCalled();
   });
 
   it('cancels queued drawing work and the Fabric transform on pointer cancellation', () => {
@@ -482,13 +490,53 @@ describe('drawing pointer continuity', () => {
     expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
   });
 
-  it('terminates a stale drawing session before Fabric resolves a rapid transform', () => {
+  it('terminates a stale drawing session before Fabric caches a rapid transform target', () => {
     const shape = createBindings('shape');
     shape.bindings.getDrawSession.mockReturnValue({ tool: 'shape' });
+    const down = new Event('pointerdown') as PointerEvent;
+    Object.defineProperties(down, {
+      button: { value: 0 },
+      isPrimary: { value: true },
+      pointerId: { value: 7 },
+    });
 
-    shape.handlers.handleMouseDownBefore({ e: new MouseEvent('mousedown', { button: 0 }) });
+    shape.handlers.handlePointerDownBeforeFabric(down);
 
     expect(shape.bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
+  });
+
+  it('recovers from a stale first-point session and lets the next pointer draw immediately', () => {
+    const path = createBindings('pencil');
+    mocks.createDrawing.mockReturnValue({
+      id: 'pencil-1',
+      kind: 'pencil',
+      samples: [{ x: 10, y: 20, t: 10 }],
+    });
+    path.handlers.handleMouseDown(fabricPointerEvent(7));
+
+    const replacementDown = new Event('pointerdown') as PointerEvent;
+    Object.defineProperties(replacementDown, {
+      button: { value: 0 },
+      isPrimary: { value: true },
+      pointerId: { value: 8 },
+    });
+    path.handlers.handlePointerDownBeforeFabric(replacementDown);
+    path.handlers.handleMouseDown(fabricPointerEvent(8));
+
+    mocks.readDrawing.mockReturnValue({ id: 'pencil-2', kind: 'pencil', samples: [] });
+    const move = new Event('pointermove') as PointerEvent;
+    Object.defineProperties(move, {
+      ctrlKey: { value: false },
+      pointerId: { value: 8 },
+      shiftKey: { value: false },
+      timeStamp: { value: 20 },
+    });
+    path.handlers.handleWindowPointerMove(move);
+
+    expect(path.bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
+    expect(path.bindings.startDrawSession).toHaveBeenCalledTimes(2);
+    expect(mocks.appendSamples).toHaveBeenCalledOnce();
+    expect(mocks.stageDrawing).toHaveBeenCalledOnce();
   });
 });
 

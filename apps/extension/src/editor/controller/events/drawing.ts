@@ -21,7 +21,11 @@ import {
   type EditorSelectionModifierGesture,
 } from './selection-modifiers';
 import { updateEditorDrawingDraft } from './drawing-draft';
-import { createEditorDrawingPointerGesture } from './drawing-pointer-gesture';
+import {
+  isEditorDrawingSessionPointer,
+  readEditorDrawingPointerId,
+} from './drawing-pointer-session';
+import { endEditorCanvasTransform } from '../input/canvas-actions';
 
 function clearSelection(canvas: Canvas, bindings: EditorControllerEventBindings): void {
   if (canvas.getActiveObjects().length === 0) return;
@@ -41,15 +45,21 @@ function getDrawingObjectType(drawing: Exclude<DrawingObject, { kind: 'blur' }>)
 function addDrawingDraft(
   bindings: EditorControllerEventBindings,
   drawing: Exclude<DrawingObject, { kind: 'blur' }>,
-  point: import('fabric').Point
+  point: import('fabric').Point,
+  pointerId: number | null
 ): void {
   const type = getDrawingObjectType(drawing);
   const object = createEditorDrawingFabricObject(drawing, bindings.nextLabelIndex(type));
+  if (drawing.kind === 'pencil' || drawing.kind === 'marker') object.visible = false;
   bindings.prepareObject(object);
-  bindings.startDrawSession(type, point, object);
+  bindings.startDrawSession(type, point, object, pointerId);
 }
 
-function startText(bindings: EditorControllerEventBindings, point: import('fabric').Point): void {
+function startText(
+  bindings: EditorControllerEventBindings,
+  point: import('fabric').Point,
+  pointerId: number | null
+): void {
   const defaults = useEditorStore.getState().toolSettings.text;
   const source = bindings.getSource();
   if (!source) return;
@@ -71,10 +81,14 @@ function startText(bindings: EditorControllerEventBindings, point: import('fabri
   object.sniptaleDrawingTextAutoWidth = true;
   object.sniptaleDrawingTextMaxWidth = maxWidth;
   bindings.prepareObject(object);
-  bindings.startDrawSession('text', point, object);
+  bindings.startDrawSession('text', point, object, pointerId);
 }
 
-function startBlur(bindings: EditorControllerEventBindings, point: import('fabric').Point): void {
+function startBlur(
+  bindings: EditorControllerEventBindings,
+  point: import('fabric').Point,
+  pointerId: number | null
+): void {
   const source = bindings.getSource();
   if (!source) return;
   const drawing: Extract<DrawingObject, { kind: 'blur' }> = {
@@ -88,7 +102,7 @@ function startBlur(bindings: EditorControllerEventBindings, point: import('fabri
     source,
   });
   bindings.prepareObject(object);
-  bindings.startDrawSession('blur', point, object);
+  bindings.startDrawSession('blur', point, object, pointerId);
 }
 
 function startDrawing(
@@ -101,6 +115,7 @@ function startDrawing(
   if (event.transform && isEditorDrawingSelection(event.transform.target)) return false;
   if (cropDown(bindings, canvas, tool, event)) return true;
   const point = canvas.getScenePoint(event.e);
+  const pointerId = readEditorDrawingPointerId(event.e);
   if (tool === 'step') {
     handleStepMouseDown(bindings, point);
     bindings.commitHistory();
@@ -110,11 +125,11 @@ function startDrawing(
   if (tool === 'frame-annotation') return false;
   clearSelection(canvas, bindings);
   if (tool === 'text') {
-    startText(bindings, point);
+    startText(bindings, point, pointerId);
     return true;
   }
   if (tool === 'blur') {
-    startBlur(bindings, point);
+    startBlur(bindings, point, pointerId);
     return true;
   }
   if (tool !== 'pencil' && tool !== 'marker' && tool !== 'shape' && tool !== 'arrow') {
@@ -127,7 +142,7 @@ function startDrawing(
     useEditorStore.getState().toolSettings
   );
   if (!drawing || drawing.kind === 'blur') return false;
-  addDrawingDraft(bindings, drawing, point);
+  addDrawingDraft(bindings, drawing, point, pointerId);
   return true;
 }
 
@@ -140,6 +155,7 @@ export function createEditorDrawingEventHandlers(
   | 'handleMouseDown'
   | 'handleMouseMove'
   | 'handleMouseUp'
+  | 'handlePointerDownBeforeFabric'
   | 'handlePointerCancel'
   | 'handleWindowPointerMove'
   | 'handleWindowPointerUp'
@@ -149,18 +165,21 @@ export function createEditorDrawingEventHandlers(
     target: FabricObject;
   } | null = null;
   let selectionModifierGesture: EditorSelectionModifierGesture | null = null;
-  const pointerGesture = createEditorDrawingPointerGesture(
-    bindings,
-    (events) => updateEditorDrawingDraft(bindings, events),
-    () => bindings.getDrawSession() !== null
-  );
+  let lastHandledMoveEvent: TPointerEvent | null = null;
+  const updateDraftOnce = (event: TPointerEvent) => {
+    const session = bindings.getDrawSession();
+    if (!session || !isEditorDrawingSessionPointer(session, event)) return false;
+    if (lastHandledMoveEvent === event) return true;
+    lastHandledMoveEvent = event;
+    updateEditorDrawingDraft(bindings, [event]);
+    return true;
+  };
 
   return {
     handlePathCreated: () => undefined,
     handleMouseDownBefore: (event) => {
       const canvas = bindings.getCanvas();
       if (!canvas) return;
-      if (bindings.getDrawSession()) bindings.cancelTransientInteraction();
       selectionModifierGesture = beginEditorSelectionModifierGesture({
         activeTool: bindings.getActiveTool(),
         canvas,
@@ -168,7 +187,17 @@ export function createEditorDrawingEventHandlers(
         ...(event.target ? { target: event.target } : {}),
       });
     },
+    handlePointerDownBeforeFabric: (event) => {
+      if (event.button !== 0 || event.isPrimary === false) return;
+      const canvas = bindings.getCanvas();
+      lastHandledMoveEvent = null;
+      textTargetCandidate = null;
+      selectionModifierGesture = null;
+      endEditorCanvasTransform(canvas, event);
+      if (bindings.getDrawSession()) bindings.cancelTransientInteraction();
+    },
     handleMouseDown: (event) => {
+      lastHandledMoveEvent = null;
       const canvas = bindings.getCanvas();
       if (canvas) {
         selectionModifierGesture = finishEditorSelectionModifierMouseDown(
@@ -186,7 +215,6 @@ export function createEditorDrawingEventHandlers(
       }
       textTargetCandidate = null;
       if (startDrawing(bindings, canvas, event)) {
-        pointerGesture.start(event.e);
         canvas.skipTargetFind = true;
         canvas.setCursor('crosshair');
       }
@@ -202,13 +230,17 @@ export function createEditorDrawingEventHandlers(
           textTargetCandidate = null;
         }
       }
-      pointerGesture.queue(event.e);
+      updateDraftOnce(event.e);
     },
     handleMouseUp: (event) => {
-      if (event) {
-        if (!pointerGesture.finish(event.e)) return;
-      } else {
-        pointerGesture.finish();
+      const drawSession = bindings.getDrawSession();
+      if (drawSession) {
+        if (event && !isEditorDrawingSessionPointer(drawSession, event.e)) return;
+        lastHandledMoveEvent = null;
+        textTargetCandidate = null;
+        selectionModifierGesture = null;
+        completeDrawWorkflowFromBindings(bindings);
+        return;
       }
       const canvas = bindings.getCanvas();
       if (canvas && finishEditorSelectionModifierGesture(canvas, selectionModifierGesture)) {
@@ -227,22 +259,23 @@ export function createEditorDrawingEventHandlers(
       completeDrawWorkflowFromBindings(bindings);
     },
     handleWindowPointerMove: (event) => {
-      const canvas = bindings.getCanvas();
-      if (!canvas || !bindings.getDrawSession()) {
-        return;
-      }
-      pointerGesture.queue(event);
+      if (!bindings.getCanvas()) return;
+      updateDraftOnce(event);
     },
     handleWindowPointerUp: (event) => {
-      if (!pointerGesture.finish(event)) return;
-      if (bindings.getDrawSession()) {
-        completeDrawWorkflowFromBindings(bindings);
-      }
+      const drawSession = bindings.getDrawSession();
+      if (!drawSession || !isEditorDrawingSessionPointer(drawSession, event)) return;
+      lastHandledMoveEvent = null;
+      completeDrawWorkflowFromBindings(bindings);
     },
     handlePointerCancel: (event) => {
       textTargetCandidate = null;
       selectionModifierGesture = null;
-      pointerGesture.cancel(event);
+      lastHandledMoveEvent = null;
+      const drawSession = bindings.getDrawSession();
+      if (drawSession && !isEditorDrawingSessionPointer(drawSession, event)) return;
+      endEditorCanvasTransform(bindings.getCanvas(), event);
+      if (drawSession) bindings.cancelTransientInteraction();
     },
   };
 }

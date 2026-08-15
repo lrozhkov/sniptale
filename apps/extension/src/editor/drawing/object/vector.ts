@@ -110,13 +110,13 @@ function createShapeObject(
 ): FabricObject {
   const options = {
     fill: drawing.fillColor ?? 'transparent',
-    left: drawing.bounds.x,
+    left: drawing.bounds.x - drawing.width / 2,
     originX: 'left' as const,
     originY: 'top' as const,
     stroke: drawing.color,
     strokeUniform: true,
     strokeWidth: drawing.width,
-    top: drawing.bounds.y,
+    top: drawing.bounds.y - drawing.width / 2,
   };
   if (drawing.kind === 'rectangle') {
     return new Rect({ ...options, height: drawing.bounds.height, width: drawing.bounds.width });

@@ -118,6 +118,7 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
       <FrameAnnotationDistortionFilter scale={4} />
       <FrameAnnotationFocusSurface
         blurAmount={9}
+        edgeOverscan={0.5}
         frames={[{ ...borderless, effectMode: 'focus' }]}
         height={200}
         opacity={-1}
@@ -131,6 +132,8 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   expect(effects).toContain('sniptale-distortion-filter');
   expect(effects).toContain('blur(7px)');
   expect(effects).toContain('blur(9px)');
+  expect(effects).toContain('width:300.5px');
+  expect(effects).toContain('height:200.5px');
   const badge = createDefaultFrameStepBadge();
   const { style, ...plainBadge } = structuredClone(badge);
   expect(style).toBeDefined();

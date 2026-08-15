@@ -16,7 +16,7 @@ export function createCompletedDrawWorkflowState(
   syncRuntimeState: () => void
 ): DrawWorkflowState {
   const drawing = readEditorDrawingObject(completion.object);
-  if (drawing?.kind === 'pencil' || drawing?.kind === 'marker' || drawing?.kind === 'arrow') {
+  if (drawing?.kind === 'arrow') {
     updateEditorDrawingPathDraft(completion.object, drawing, { preview: false });
   }
   if (

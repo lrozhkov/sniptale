@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
-import { createEditorDrawingPointerGesture } from '../../../events/drawing-pointer-gesture';
 import {
   attachEditorCanvasPointerCapture,
   detachEditorCanvasPointerCapture,
@@ -20,15 +19,23 @@ function pointerEvent(type: string, pointerId: number, button = 0, bubbles = fal
 it('captures a primary drag until pointer release and removes lifecycle listeners', () => {
   const element = document.createElement('canvas');
   const captured = new Set<number>();
+  const dispatchOrder: string[] = [];
   element.setPointerCapture = vi.fn((pointerId) => captured.add(pointerId));
   element.hasPointerCapture = vi.fn((pointerId) => captured.has(pointerId));
   element.releasePointerCapture = vi.fn((pointerId) => captured.delete(pointerId));
   const canvas = { upperCanvasEl: element };
 
   const terminate = vi.fn();
-  attachEditorCanvasPointerCapture(canvas, terminate);
-  element.dispatchEvent(pointerEvent('pointerdown', 7));
+  const beforeFabric = vi.fn(() => dispatchOrder.push('editor-preflight'));
+  attachEditorCanvasPointerCapture(canvas, terminate, beforeFabric);
+  element.addEventListener('pointerdown', () => dispatchOrder.push('fabric-target-resolution'));
+  element.dispatchEvent(pointerEvent('pointerdown', 7, 0, true));
+  expect(beforeFabric).toHaveBeenCalledWith(expect.objectContaining({ pointerId: 7 }));
+  expect(beforeFabric.mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(element.setPointerCapture).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
   expect(element.setPointerCapture).toHaveBeenCalledWith(7);
+  expect(dispatchOrder).toEqual(['editor-preflight', 'fabric-target-resolution']);
   element.dispatchEvent(pointerEvent('pointerup', 7));
   expect(element.releasePointerCapture).toHaveBeenCalledWith(7);
   element.dispatchEvent(pointerEvent('lostpointercapture', 7));
@@ -83,17 +90,16 @@ it('cancels a drawing gesture once when pointercancel bubbles to the window owne
   element.hasPointerCapture = vi.fn((pointerId) => captured.has(pointerId));
   element.releasePointerCapture = vi.fn((pointerId) => captured.delete(pointerId));
   const canvas = { upperCanvasEl: element };
-  const cancelTransientInteraction = vi.fn(() => true);
-  const gesture = createEditorDrawingPointerGesture(
-    { cancelTransientInteraction, getCanvas: () => null },
-    vi.fn(),
-    () => true
-  );
-  const cancel = (event: PointerEvent) => gesture.cancel(event);
+  const cancelTransientInteraction = vi.fn();
+  let activePointerId: number | null = 9;
+  const cancel = (event: PointerEvent) => {
+    if (activePointerId !== event.pointerId) return;
+    activePointerId = null;
+    cancelTransientInteraction();
+  };
   attachEditorCanvasPointerCapture(canvas, cancel);
   window.addEventListener('pointercancel', cancel);
   const down = pointerEvent('pointerdown', 9);
-  gesture.start(down);
   element.dispatchEvent(down);
 
   element.dispatchEvent(pointerEvent('pointercancel', 9, 0, true));

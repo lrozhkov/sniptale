@@ -7,7 +7,11 @@ import {
   type DrawingObject,
   type DrawingSample,
 } from '../../../features/drawing/public';
-import { readEditorDrawingObject, writeEditorDrawingObject } from '../../drawing/object/metadata';
+import {
+  readEditorDrawingObject,
+  stageEditorDrawingObject,
+  writeEditorDrawingObject,
+} from '../../drawing/object/metadata';
 import {
   replaceEditorDrawingFabricGeometry,
   updateEditorDrawingPathDraft,
@@ -85,9 +89,13 @@ function updateVectorPreview(
   object: FabricObject,
   drawing: Exclude<DrawingObject, { kind: 'blur' }>
 ): boolean {
+  if (drawing.kind === 'pencil' || drawing.kind === 'marker') {
+    stageEditorDrawingObject(object, drawing);
+    object.visible = false;
+    return true;
+  }
   return (
-    (drawing.kind === 'pencil' || drawing.kind === 'marker' || drawing.kind === 'arrow') &&
-    updateEditorDrawingPathDraft(object, drawing, { preview: true })
+    drawing.kind === 'arrow' && updateEditorDrawingPathDraft(object, drawing, { preview: true })
   );
 }
 

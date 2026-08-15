@@ -145,14 +145,14 @@ it('captures a fast frame move and ignores movement from another pointer', () =>
     window.dispatchEvent(pointerEvent('pointermove', 25, 35, 7));
     window.dispatchEvent(pointerEvent('pointermove', 30, 40, 7));
     window.dispatchEvent(pointerEvent('pointermove', 200, 210, 8));
-    expect(controller.snapFrameAnnotationRect).not.toHaveBeenCalled();
+    expect(controller.snapFrameAnnotationRect).toHaveBeenCalledTimes(2);
     animationFrames.shift()?.(0);
     window.dispatchEvent(pointerEvent('pointerup', 30, 40, 7));
   });
 
   expect(moveButton.setPointerCapture).toHaveBeenCalledWith(7);
   expect(down.defaultPrevented).toBe(true);
-  expect(controller.snapFrameAnnotationRect).toHaveBeenCalledOnce();
+  expect(controller.snapFrameAnnotationRect).toHaveBeenCalledTimes(3);
   expect(readFrameAnnotationSnapshot(object)).toMatchObject({ x: 20, y: 30 });
   expect(controller.commitHistory).toHaveBeenCalledOnce();
 });

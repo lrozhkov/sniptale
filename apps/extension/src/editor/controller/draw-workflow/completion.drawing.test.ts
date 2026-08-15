@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { Canvas, Textbox } from 'fabric';
+import { Canvas, Point, Textbox } from 'fabric';
 import {
   createEditorDrawingFabricObject,
   updateEditorDrawingShapeDraft,
@@ -9,6 +9,8 @@ import {
 import type { DrawingObject } from '../../../features/drawing/public';
 import { createCompletedDrawWorkflowState } from './completion-complete';
 import { parseEditorDrawingMetadata } from '../../document/import-boundary';
+import { stageEditorDrawingObject } from '../../drawing/object/metadata';
+import { completeEditorDrawWorkflow } from './completion';
 
 function canvas() {
   const surface = new Canvas(document.createElement('canvas'));
@@ -21,6 +23,19 @@ function canvas() {
 }
 
 describe('drawing completion history', () => {
+  it('does nothing without a mounted canvas or active object', () => {
+    expect(
+      completeEditorDrawWorkflow({
+        canvas: null,
+        canvasDocumentSize: { height: 100, width: 200 },
+        commitHistory: vi.fn(),
+        drawSession: null,
+        minDrawSize: 8,
+        syncRuntimeState: vi.fn(),
+      })
+    ).toBeNull();
+  });
+
   it('commits a completed vector object exactly once', () => {
     const drawing: DrawingObject = {
       id: 'shape-1',
@@ -116,6 +131,81 @@ describe('drawing completion history', () => {
     expect(textbox.selectionStart).toBe(0);
     expect(textbox.selectionEnd).toBe(0);
     textbox.exitEditing();
+    surface.dispose();
+  });
+
+  it('materializes one exact Fabric path when a live pencil preview commits', () => {
+    const initial: DrawingObject = {
+      color: '#111111',
+      id: 'pencil-1',
+      kind: 'pencil',
+      samples: [{ t: 0, x: 10, y: 10 }],
+      width: 4,
+    };
+    const final: DrawingObject = {
+      ...initial,
+      samples: [...initial.samples, { t: 10, x: 30, y: 20 }, { t: 20, x: 60, y: 40 }],
+    };
+    const object = createEditorDrawingFabricObject(initial, 1);
+    object.visible = false;
+    stageEditorDrawingObject(object, final);
+    const surface = canvas();
+    surface.add(object);
+
+    const result = completeEditorDrawWorkflow({
+      canvas: surface,
+      canvasDocumentSize: { height: 100, width: 200 },
+      commitHistory: vi.fn(),
+      drawSession: {
+        object,
+        objectId: final.id,
+        pointerId: 7,
+        start: new Point(10, 10),
+        tool: 'pencil',
+      },
+      minDrawSize: 8,
+      syncRuntimeState: vi.fn(),
+    });
+
+    expect(result?.drawSession).toBeNull();
+    expect(object.visible).toBe(true);
+    expect(parseEditorDrawingMetadata(object.sniptaleDrawingJson)).toEqual(final);
+    surface.dispose();
+  });
+
+  it.each([
+    { kind: 'visible', visible: true },
+    { kind: 'hidden non-freehand', visible: false },
+  ])('leaves a $kind object outside freehand preview materialization', ({ visible }) => {
+    const drawing: DrawingObject = {
+      bounds: { height: 20, width: 40, x: 10, y: 10 },
+      color: '#111111',
+      fillColor: null,
+      id: `shape-${visible ? 'visible' : 'hidden'}`,
+      kind: 'rectangle',
+      width: 4,
+    };
+    const object = createEditorDrawingFabricObject(drawing, 1);
+    object.visible = visible;
+    const surface = canvas();
+    surface.add(object);
+
+    completeEditorDrawWorkflow({
+      canvas: surface,
+      canvasDocumentSize: { height: 100, width: 200 },
+      commitHistory: vi.fn(),
+      drawSession: {
+        object,
+        objectId: drawing.id,
+        pointerId: 7,
+        start: new Point(10, 10),
+        tool: 'shape',
+      },
+      minDrawSize: 8,
+      syncRuntimeState: vi.fn(),
+    });
+
+    expect(object.visible).toBe(visible);
     surface.dispose();
   });
 });

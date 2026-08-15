@@ -3,9 +3,25 @@ import type {
   EditorControllerEventStateBindings,
 } from './types';
 import { EDITOR_CANVAS_CROP_OVERLAY } from '../../color/palette/constants';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { renderEditorFreehandPreview } from '../../drawing/preview';
+
+function renderActiveDrawingPreview(
+  bindings: Pick<EditorControllerEventStateBindings, 'getDrawSession'>,
+  context: CanvasRenderingContext2D
+): void {
+  const object = bindings.getDrawSession()?.object;
+  if (!object || object.visible) return;
+  const drawing = readEditorDrawingObject(object);
+  if (drawing?.kind !== 'pencil' && drawing?.kind !== 'marker') return;
+  renderEditorFreehandPreview(context, drawing);
+}
 
 export function createAfterRenderHandler(
-  bindings: EditorControllerEventStateBindings &
+  bindings: Pick<
+    EditorControllerEventStateBindings,
+    'getCanvas' | 'getCanvasDocumentSize' | 'getDrawSession'
+  > &
     Pick<EditorControllerEventObjectBindings, 'getActiveCropRect'>
 ) {
   return () => {
@@ -14,24 +30,26 @@ export function createAfterRenderHandler(
       return;
     }
 
-    const activeCropRect = bindings.getActiveCropRect();
-    if (!activeCropRect) {
-      return;
-    }
-
-    const cropBounds = activeCropRect.getBoundingRect();
     const ctx = canvas.getSelectionContext();
     if (!ctx || !canvas.viewportTransform) {
       return;
     }
 
+    ctx.save();
+    ctx.transform(...canvas.viewportTransform);
+    renderActiveDrawingPreview(bindings, ctx);
+
+    const activeCropRect = bindings.getActiveCropRect();
+    if (!activeCropRect) {
+      ctx.restore();
+      return;
+    }
+
+    const cropBounds = activeCropRect.getBoundingRect();
     const canvasWidth = bindings.getCanvasDocumentSize().width;
     const canvasHeight = bindings.getCanvasDocumentSize().height;
     const cropRight = cropBounds.left + cropBounds.width;
     const cropBottom = cropBounds.top + cropBounds.height;
-
-    ctx.save();
-    ctx.transform(...canvas.viewportTransform);
     ctx.fillStyle = EDITOR_CANVAS_CROP_OVERLAY;
     ctx.fillRect(0, 0, canvasWidth, cropBounds.top);
     ctx.fillRect(0, cropBottom, canvasWidth, Math.max(0, canvasHeight - cropBottom));

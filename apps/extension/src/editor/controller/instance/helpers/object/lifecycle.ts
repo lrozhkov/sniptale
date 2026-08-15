@@ -27,13 +27,15 @@ export function startDrawSessionForController(
   controller: EditorControllerInstance,
   tool: DrawSession['tool'],
   start: Point,
-  object: FabricObject
+  object: FabricObject,
+  pointerId: number | null = null
 ): void {
   const nextState = startEditorControllerDrawSession({
     canvas: controller.canvas,
     tool,
     start,
     object,
+    pointerId,
     cropGuide: controller.cropGuide,
     prepareObject: (item) => controller.prepareObject(item),
   });

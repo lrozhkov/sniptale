@@ -15,7 +15,8 @@ export function cropDown(
 
   if (!isCropGuideTarget(bindings, event.target)) {
     const point = canvas.getScenePoint(event.e);
-    bindings.startDrawSession('crop', point, createCropGuideRect(point));
+    const pointerId = 'pointerId' in event.e ? event.e.pointerId : null;
+    bindings.startDrawSession('crop', point, createCropGuideRect(point), pointerId);
   }
   return true;
 }

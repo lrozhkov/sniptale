@@ -87,6 +87,8 @@ export function completeEditorDrawSession(options: {
 
   if (
     options.drawSession.tool !== 'crop' &&
+    options.drawSession.tool !== 'pencil' &&
+    options.drawSession.tool !== 'marker' &&
     Math.max(object.getScaledWidth(), object.getScaledHeight()) < options.minDrawSize
   ) {
     return {

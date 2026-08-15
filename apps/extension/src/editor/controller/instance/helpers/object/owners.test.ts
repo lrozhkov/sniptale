@@ -1,4 +1,4 @@
-import { FabricObject } from 'fabric';
+import { FabricObject, Point } from 'fabric';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -66,26 +66,33 @@ beforeEach(() => {
 
 it('adapts transient and draw session state back onto the controller instance', () => {
   const controller = createController();
-  mocks.cancelInteractionMock.mockReturnValue({ changed: true, drawSession: { id: 'next' } });
-  mocks.startDrawSessionMock.mockReturnValue({
-    cropGuide: { id: 'next-guide' },
-    cropSelection: { id: 'next-selection' },
-    drawSession: { id: 'next-draw' },
+  mocks.cancelInteractionMock.mockImplementation((options) => {
+    options.clearCropSelection();
+    options.switchToSelectTool();
+    options.syncRuntimeState();
+    return { changed: true, drawSession: { id: 'next' } };
+  });
+  mocks.startDrawSessionMock.mockImplementation((options) => {
+    options.prepareObject({ id: 'prepared' });
+    return {
+      cropGuide: { id: 'next-guide' },
+      cropSelection: { id: 'next-selection' },
+      drawSession: { id: 'next-draw' },
+    };
   });
 
   expect(cancelTransientInteractionForController(controller)).toBe(true);
-  startDrawSessionForController(
-    controller,
-    'shape',
-    { x: 1, y: 2 } as never,
-    {
-      id: 'object',
-    } as never
-  );
+  startDrawSessionForController(controller, 'shape', new Point(1, 2), new FabricObject(), 7);
 
   expect(controller.drawSession).toEqual({ id: 'next-draw' });
   expect(controller.cropGuide).toEqual({ id: 'next-guide' });
   expect(controller.cropSelection).toEqual({ id: 'next-selection' });
+  expect(mocks.startDrawSessionMock).toHaveBeenCalledWith(
+    expect.objectContaining({ pointerId: 7 })
+  );
+
+  mocks.startDrawSessionMock.mockReturnValueOnce(null);
+  startDrawSessionForController(controller, 'shape', new Point(0, 0), new FabricObject());
 });
 
 it('adapts object initialization callbacks to controller commands', () => {

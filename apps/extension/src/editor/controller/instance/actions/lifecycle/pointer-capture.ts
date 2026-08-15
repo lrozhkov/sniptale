@@ -7,13 +7,15 @@ const pointerCaptureCleanup = new WeakMap<EditorPointerCaptureCanvas, () => void
 /** Keeps a fast object transform bound to the Fabric canvas until pointer release. */
 export function attachEditorCanvasPointerCapture(
   canvas: EditorPointerCaptureCanvas,
-  onUnexpectedLoss: (event: PointerEvent) => void
+  onUnexpectedLoss: (event: PointerEvent) => void,
+  onPointerDownBeforeFabric: (event: PointerEvent) => void = () => undefined
 ): void {
   detachEditorCanvasPointerCapture(canvas);
   const element = canvas.upperCanvasEl;
   const expectedLosses = new Set<number>();
   const capture = (event: PointerEvent) => {
     if (event.button !== 0 || event.isPrimary === false) return;
+    onPointerDownBeforeFabric(event);
     try {
       element.setPointerCapture(event.pointerId);
     } catch {
@@ -39,12 +41,12 @@ export function attachEditorCanvasPointerCapture(
     if (expectedLosses.delete(event.pointerId)) return;
     onUnexpectedLoss(event);
   };
-  element.addEventListener('pointerdown', capture);
+  element.addEventListener('pointerdown', capture, true);
   element.addEventListener('pointerup', finish);
   element.addEventListener('pointercancel', cancel);
   element.addEventListener('lostpointercapture', lost);
   pointerCaptureCleanup.set(canvas, () => {
-    element.removeEventListener('pointerdown', capture);
+    element.removeEventListener('pointerdown', capture, true);
     element.removeEventListener('pointerup', finish);
     element.removeEventListener('pointercancel', cancel);
     element.removeEventListener('lostpointercapture', lost);

@@ -25,8 +25,13 @@ export abstract class ImageEditorControllerInteractionHelperActions extends Imag
     return cancelTransientInteractionForController(this.instance);
   }
 
-  startDrawSession(tool: DrawSession['tool'], start: Point, object: FabricObject): void {
-    startDrawSessionForController(this.instance, tool, start, object);
+  startDrawSession(
+    tool: DrawSession['tool'],
+    start: Point,
+    object: FabricObject,
+    pointerId: number | null = null
+  ): void {
+    startDrawSessionForController(this.instance, tool, start, object, pointerId);
   }
 
   getActiveCropRect() {

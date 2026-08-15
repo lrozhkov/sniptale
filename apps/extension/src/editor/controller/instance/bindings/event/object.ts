@@ -12,8 +12,12 @@ export function createEditorControllerEventObjectBindings(controller: EditorCont
     applyGridSnap: (object: FabricObject) => controller.applyGridSnap(object),
     nextLabelIndex: (type: EditorObjectType) => controller.nextLabelIndex(type),
     prepareObject: (object: FabricObject) => controller.prepareObject(object),
-    startDrawSession: (tool: DrawSession['tool'], start: Point, object: FabricObject) =>
-      controller.startDrawSession(tool, start, object),
+    startDrawSession: (
+      tool: DrawSession['tool'],
+      start: Point,
+      object: FabricObject,
+      pointerId: number | null = null
+    ) => controller.startDrawSession(tool, start, object, pointerId),
     addObject: (object: FabricObject) => controller.addObject(object),
     switchToSelectTool: () => controller.switchToSelectTool(),
     advanceStepValue: () => controller.advanceStepValue(),

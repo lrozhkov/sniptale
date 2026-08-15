@@ -27,6 +27,7 @@ export interface EditorControllerEventHandlers {
   }) => void;
   handleMouseMove: (event: { e: TPointerEvent }) => void;
   handleMouseUp: (event?: { e: TPointerEvent }) => void;
+  handlePointerDownBeforeFabric: (event: PointerEvent) => void;
   handlePointerCancel: (event?: TPointerEvent) => void;
   handleDoubleClick: (event: { target?: FabricObject; e: TPointerEvent }) => void;
   handleWindowKeyDown: (event: KeyboardEvent) => void;
@@ -72,7 +73,12 @@ export interface EditorControllerEventObjectBindings {
   applyGridSnap: (object: FabricObject) => void;
   nextLabelIndex: (type: EditorObjectType) => number;
   prepareObject: (object: FabricObject) => void;
-  startDrawSession: (tool: DrawSession['tool'], start: Point, object: FabricObject) => void;
+  startDrawSession: (
+    tool: DrawSession['tool'],
+    start: Point,
+    object: FabricObject,
+    pointerId?: number | null
+  ) => void;
   addObject: (object: FabricObject) => void;
   switchToSelectTool: () => void;
   advanceStepValue: () => void;

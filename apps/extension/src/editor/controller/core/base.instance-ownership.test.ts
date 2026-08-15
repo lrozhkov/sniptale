@@ -208,7 +208,7 @@ describe('ImageEditorControllerBase', () => {
     controller.syncViewportState();
     controller.scheduleViewportStateSync();
     controller.cancelTransientInteraction();
-    controller.startDrawSession('arrow', point, object);
+    controller.startDrawSession('arrow', point, object, 7);
     controller.getActiveCropRect();
     controller.addObject(object);
     controller.moveSelection(1);
@@ -242,7 +242,8 @@ describe('ImageEditorControllerBase', () => {
       controller,
       'arrow',
       point,
-      object
+      object,
+      7
     );
     expect(helperMocks.applyDocumentForController).toHaveBeenCalledWith(controller, document, {});
     expect(helperMocks.refreshActiveToolSettingsPreviewForController).toHaveBeenCalledWith(
