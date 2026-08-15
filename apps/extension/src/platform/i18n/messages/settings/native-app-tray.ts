@@ -134,8 +134,8 @@ export const settingsNativeAppTrayMessages = defineMessageSource({
     en: 'Stop the current recording and save the video',
   },
   trayOpenGallery: {
-    ru: 'Открыть галерею',
-    en: 'Open Gallery',
+    ru: 'Открыть библиотеку',
+    en: 'Open Library',
   },
   trayOpenGalleryDescription: {
     ru: 'Открывает сохраненные снимки и видео',

@@ -13,9 +13,10 @@ import { popupMessages } from './messages/popup';
 import { settingsQuickActionsMessages } from './messages/settings/quick-actions';
 import { sharedUiMessages } from './messages/shared/ui';
 import { viewportPresetsMessages } from './messages/viewport-presets';
+import { imageSettingsMessages } from './messages/image-settings';
 import { defineMessageSource } from './messages/source';
 import { useAppLocale } from './locale/hook';
-import { getCurrentLocale } from './locale/state';
+import { getCurrentLocale, setLocalePreference } from './locale/state';
 import type { Translate, TranslationKey } from './types';
 
 const popupTranslationMessages = defineMessageSource({
@@ -26,6 +27,7 @@ const popupTranslationMessages = defineMessageSource({
     toolbar: contentToolbarMessages,
   }),
   exportModal: exportModalMessages,
+  imageSettings: imageSettingsMessages,
   popup: popupMessages,
   settings: defineMessageSource({ quickActions: settingsQuickActionsMessages }),
   shared: defineMessageSource({ ui: sharedUiMessages }),
@@ -57,5 +59,5 @@ export function translate(key: TranslationKey, locale?: AppLocale): string {
   return createTranslator(locale ?? getCurrentLocale())(key);
 }
 
-export { getCurrentLocale, useAppLocale, SUPPORTED_LOCALES };
+export { getCurrentLocale, setLocalePreference, useAppLocale, SUPPORTED_LOCALES };
 export type { AppLocale, TranslationKey };

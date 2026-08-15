@@ -92,7 +92,15 @@ describe('popup video settings grid', () => {
     const onChange = vi.fn();
 
     render(
-      <CounterCard label="Countdown" value={0} min={0} max={1} suffix="s" onChange={onChange} />
+      <CounterCard
+        label="Countdown"
+        description="Delay recording"
+        value={0}
+        min={0}
+        max={1}
+        suffix="s"
+        onChange={onChange}
+      />
     );
 
     clickButtonContaining('Countdown');

@@ -11,7 +11,7 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-import { PageAccessControls } from './page-access-controls';
+import { PageAccessControls } from '../../page-access/controls';
 
 const inactiveStatus = {
   allSitesGranted: false,
@@ -68,4 +68,34 @@ it('renders no controls for an active tab without an error', async () => {
   );
 
   expect(getContainer()?.innerHTML).toBe('');
+});
+
+it('renders a standalone status error when page access is unavailable', async () => {
+  await renderNode(
+    <PageAccessControls
+      disabled={false}
+      error="Status unavailable"
+      onRequest={vi.fn()}
+      pendingOperation={null}
+      status={null}
+    />
+  );
+
+  expect(getContainer()?.querySelector('[role="alert"]')?.textContent).toBe('Status unavailable');
+  expect(getContainer()?.querySelector('button')).toBeNull();
+});
+
+it('renders the normal action labels when no request is pending', async () => {
+  await renderNode(
+    <PageAccessControls
+      disabled={false}
+      error={null}
+      onRequest={vi.fn()}
+      pendingOperation={null}
+      status={inactiveStatus}
+    />
+  );
+
+  expect(getContainer()?.textContent).toContain('popup.home.enableForTab');
+  expect(getContainer()?.textContent).not.toContain('popup.home.pageAccessWorking');
 });

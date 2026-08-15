@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   WebcamFrameRatePreset,
+  WebcamPresentationMode,
+  WebcamPresentationShape,
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createPopupPreviewStream } from './webcam-preview.test-support';
@@ -85,4 +87,29 @@ it('stays idle without a selected camera', async () => {
 
   expect(container?.textContent).toContain('idle');
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+});
+
+it('previews the embedded shape and crop offsets used by the page camera', async () => {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  const stream = createPopupPreviewStream();
+
+  act(() =>
+    root?.render(
+      <WebcamPreview
+        presentation={{
+          cropOffset: { x: 0.5, y: -0.5 },
+          mode: WebcamPresentationMode.EMBEDDED,
+          shape: WebcamPresentationShape.CIRCLE,
+        }}
+        state={{ capabilities: null, settings: {}, status: 'ready', stream }}
+      />
+    )
+  );
+
+  expect(
+    container.querySelector('[data-ui="popup.video.webcam-preview-mask"]')?.className
+  ).toContain('rounded-full');
+  expect(container.querySelector('video')?.style.objectPosition).toBe('75% 25%');
 });

@@ -2,6 +2,7 @@ import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import { useEffect, useRef } from 'react';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../platform/i18n/popup';
 import type {
   PopupRecordingSnapshot,
@@ -19,10 +20,15 @@ import {
 import { usePopupRuntimeHandlers } from '../../shell/runtime/handlers';
 import { assemblePopupVideoRuntimeState } from '../../shell/runtime/assembly';
 import type { PopupVideoRuntimeStateSlice } from '../../shell/runtime/types/internal-state';
-import { usePopupPageAccessRuntime } from '../../shell/runtime/page-access';
+import {
+  usePopupPageAccessRuntime,
+  type PopupPageAccessRuntime,
+} from '../../shell/runtime/page-access';
+import { PageAccessControls } from '../../shell/page-access/controls';
 import { useActiveTabCapabilities } from '../../shell/tab-access/capabilities';
 import { getPopupVideoSetupProps } from '../../shell/app-shell/video-setup/props';
 import VideoSetupPage from './setup';
+import type { VideoSetupPageProps } from './setup/types';
 import { useVideoRouteRuntime } from './runtime';
 
 export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
@@ -37,6 +43,32 @@ export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
   const handlers = usePopupRuntimeHandlers(state);
   const pageAccess = usePopupPageAccessRuntime(capabilities);
   const runtime = assemblePopupVideoRuntimeState(state, handlers, pageAccess);
+  useVideoRouteBootstrap(initialStartup, capabilities, state);
+  useVideoRecordingReconciliation(startup, state.recording);
+
+  const postRecordProps =
+    initialStartup.page === 'video' && initialStartup.postRecordSnapshot
+      ? {
+          initialPostRecordResult: initialStartup.postRecordSnapshot.result,
+          initialPostRecordVerified: true,
+        }
+      : {};
+
+  return (
+    <VideoRouteView
+      captureMode={state.presets.videoCaptureMode}
+      pageAccess={pageAccess}
+      postRecordProps={postRecordProps}
+      runtime={runtime}
+    />
+  );
+}
+
+function useVideoRouteBootstrap(
+  initialStartup: PopupStartupDescriptor,
+  capabilities: ReturnType<typeof useActiveTabCapabilities>,
+  state: ReturnType<typeof useVideoRouteRuntime>
+): void {
   const { setRecordingControlCapability, setRecordingState, setStartError, setVideoSettings } =
     state.recording;
   const { setSelectedPresetId, setVideoCaptureMode, setViewportPresets } = state.presets;
@@ -77,6 +109,7 @@ export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
       active = false;
     };
   }, [
+    initialStartup,
     setIsReady,
     setRecordingControlCapability,
     setRecordingState,
@@ -85,19 +118,52 @@ export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
     setVideoCaptureMode,
     setVideoSettings,
     setViewportPresets,
-    initialStartup,
   ]);
-  useVideoRecordingReconciliation(startup, state.recording);
+}
 
-  const postRecordProps =
-    initialStartup.page === 'video' && initialStartup.postRecordSnapshot
-      ? {
-          initialPostRecordResult: initialStartup.postRecordSnapshot.result,
-          initialPostRecordVerified: true,
-        }
-      : {};
+function VideoRouteView({
+  captureMode,
+  pageAccess,
+  postRecordProps,
+  runtime,
+}: {
+  captureMode: CaptureMode;
+  pageAccess: PopupPageAccessRuntime;
+  postRecordProps: Partial<
+    Pick<VideoSetupPageProps, 'initialPostRecordResult' | 'initialPostRecordVerified'>
+  >;
+  runtime: Parameters<typeof getPopupVideoSetupProps>[0];
+}) {
+  const pageAccessControls = shouldShowVideoPageAccess(captureMode, pageAccess) ? (
+    <PageAccessControls
+      disabled={pageAccess.pendingOperation !== null}
+      error={pageAccess.error}
+      onRequest={(operation) => void pageAccess.handleRequest(operation)}
+      pendingOperation={pageAccess.pendingOperation}
+      status={pageAccess.status}
+    />
+  ) : null;
 
-  return <VideoSetupPage {...getPopupVideoSetupProps(runtime)} {...postRecordProps} />;
+  return (
+    <VideoSetupPage
+      {...getPopupVideoSetupProps(runtime)}
+      {...postRecordProps}
+      {...(pageAccessControls ? { pageAccessControls } : {})}
+    />
+  );
+}
+
+function shouldShowVideoPageAccess(
+  captureMode: CaptureMode,
+  pageAccess: PopupPageAccessRuntime
+): boolean {
+  const modeNeedsPageAccess =
+    captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
+  return (
+    modeNeedsPageAccess &&
+    ((pageAccess.status?.supported === true && !pageAccess.status.currentTabActive) ||
+      Boolean(pageAccess.error))
+  );
 }
 
 function useVideoRecordingReconciliation(

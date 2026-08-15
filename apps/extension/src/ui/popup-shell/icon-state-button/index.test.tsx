@@ -145,4 +145,47 @@ it('supports square geometry for compact tool rows', () => {
   );
 
   expect(container?.querySelector('button')?.className).toContain('aspect-square');
+  expect(container?.querySelector('button')?.className).toContain('hover:bg-transparent');
+});
+
+it('renders the compact underline contract for popup mode tabs', () => {
+  renderButton(
+    <PopupIconStateButton
+      icon={TestIcon}
+      label="Tab"
+      active
+      accentClassName="text-[var(--sniptale-color-accent)]"
+      layout="tab"
+      onClick={() => undefined}
+    />
+  );
+
+  expect(container?.querySelector('button')?.className).toContain('min-h-[50px]');
+  expect(container?.querySelector('button')?.className).not.toContain('rounded-[14px]');
+  expect(
+    container?.querySelector('[data-ui="popup.icon-state-button.active-marker"]')?.className
+  ).toContain('opacity-100');
+  expect(container?.textContent).toContain('Tab');
+});
+
+it('brightens idle tab icons and labels on hover', () => {
+  renderButton(
+    <PopupIconStateButton
+      icon={TestIcon}
+      label="Video"
+      active={false}
+      accentClassName="text-accent"
+      layout="tab"
+      onClick={() => undefined}
+    />
+  );
+
+  expect(container?.querySelector('svg')?.className.baseVal).toContain(
+    'group-hover:text-[var(--sniptale-color-text-primary)]'
+  );
+  expect(container?.textContent).toContain('Video');
+  const label = [...(container?.querySelectorAll('span') ?? [])].find(
+    (node) => node.textContent === 'Video'
+  );
+  expect(label?.className).toContain('group-hover:text-[var(--sniptale-color-text-primary)]');
 });

@@ -69,11 +69,14 @@ export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor
       ? { page: 'video', recordingSnapshot, postRecordSnapshot }
       : { page: startup.lastPage };
   }
+  if (startup.selection === 'menu') return { page: 'menu' };
+  if (startup.selection === 'tools') return { page: 'tools' };
   if (startup.selection === 'export') return { page: 'export' };
   const videoMode = videoModes[startup.selection];
   if (videoMode) {
     return { page: 'video', videoMode, recordingSnapshot, postRecordSnapshot };
   }
   const screenshotMode = screenshotModes[startup.selection as keyof typeof screenshotModes];
-  return screenshotMode ? { page: 'home', screenshotMode } : { page: 'home' };
+  if (screenshotMode === 'tools') return { page: 'tools' };
+  return screenshotMode ? { page: 'screenshots', screenshotMode } : { page: 'menu' };
 }

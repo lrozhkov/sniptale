@@ -170,15 +170,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders actual microphone settings, level meter, and capability statuses', async () => {
+it('renders the selected microphone, level meter, and capability controls without the technical summary', async () => {
   await renderPanel();
 
-  expect(container?.textContent).toContain('popup.video.microphoneSettingsTitle');
   expect(container?.textContent).toContain('Studio mic');
   expect(container?.textContent).toContain('popup.video.microphoneStatusUnsupported');
   expect(container?.textContent).toContain('popup.video.microphoneStatusUnknown');
-  expect(container?.textContent).toContain('Now: 48 kHz, 1 channel');
-  expect(container?.textContent).not.toContain('sampleRate');
+  expect(container?.textContent).not.toContain('Now: 48 kHz, 1 channel');
 });
 
 it('does not commit settings when applyConstraints fails', async () => {

@@ -16,8 +16,8 @@ describe('popup view model', () => {
   it('detects active recording state and footer visibility', () => {
     expect(isRecordingActive({ status: 'IDLE' } as never)).toBe(false);
     expect(isRecordingActive({ status: 'RECORDING' } as never)).toBe(true);
-    expect(shouldShowFooter('home' as never, { status: 'IDLE' } as never)).toBe(true);
-    expect(shouldShowFooter('home' as never, { status: 'PAUSED' } as never)).toBe(false);
+    expect(shouldShowFooter('menu', { status: 'IDLE' } as never)).toBe(true);
+    expect(shouldShowFooter('menu', { status: 'PAUSED' } as never)).toBe(false);
     expect(shouldShowFooter('settings' as never, { status: 'IDLE' } as never)).toBe(false);
   });
 });

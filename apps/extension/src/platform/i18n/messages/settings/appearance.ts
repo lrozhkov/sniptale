@@ -100,6 +100,7 @@ export const settingsAppearanceMessages = defineMessageSource({
       ru: 'Продолжить с последнего места',
       en: 'Continue where I left off',
     },
+    menu: { ru: 'Меню', en: 'Menu' },
     'screenshots:quick-actions': { ru: 'Снимки — Действия', en: 'Screenshots — Shortcuts' },
     'screenshots:tab': { ru: 'Снимки — Вкладка', en: 'Screenshots — Tab' },
     'screenshots:desktop': { ru: 'Снимки — Окно', en: 'Screenshots — Window' },
@@ -108,6 +109,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     'video:area': { ru: 'Видео — Область', en: 'Video — Area' },
     'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
     'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
+    tools: { ru: 'Инструменты', en: 'Tools' },
     export: { ru: 'Экспорт', en: 'Export' },
   },
   themeModeLabel: {
@@ -207,8 +209,8 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Open the standalone video editor page.',
   },
   contextMenuGalleryLabel: {
-    ru: 'Галерея',
-    en: 'Gallery',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   contextMenuGalleryDescription: {
     ru: 'Открывать библиотеку сохранённых файлов и проектов.',

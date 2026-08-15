@@ -1,11 +1,6 @@
 import { defineMessageSource } from '../source';
 import { popupExportWebSnapshotMessages } from './export-web-snapshot';
 
-const INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_RU =
-  'DOM, virtual DOM и очищенные Resource Timing данные текущей страницы';
-const INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_EN =
-  'DOM, virtual DOM, and sanitized Resource Timing data for the current page';
-
 export const popupExportMessages = defineMessageSource({
   preparingPreview: {
     ru: 'Подготовка экспорта...',
@@ -64,8 +59,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Export finished with errors',
   },
   dataTypesSectionLabel: {
-    ru: 'Тип данных',
-    en: 'Data type',
+    ru: 'Состав экспорта',
+    en: 'Export contents',
   },
   contentGroupLabel: {
     ru: 'Содержимое',
@@ -76,8 +71,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Diagnostics',
   },
   tabsSectionLabel: {
-    ru: 'Страницы для экспорта',
-    en: 'Pages to export',
+    ru: 'Страницы',
+    en: 'Pages',
   },
   editButton: {
     ru: 'Изменить',
@@ -161,7 +156,7 @@ export const popupExportMessages = defineMessageSource({
   },
   includeJsonDescription: {
     ru: 'Структура и данные страницы',
-    en: 'Page structure',
+    en: 'Page structure and data',
   },
   includeMarkdownLabel: {
     ru: 'Markdown',
@@ -169,7 +164,7 @@ export const popupExportMessages = defineMessageSource({
   },
   includeMarkdownDescription: {
     ru: 'Текст и таблицы',
-    en: 'Tables and text',
+    en: 'Text and tables',
   },
   includeFilesLabel: {
     ru: 'Файлы',
@@ -177,47 +172,47 @@ export const popupExportMessages = defineMessageSource({
   },
   includeFilesDescription: {
     ru: 'Документы и вложения со страницы',
-    en: 'Download attachments',
+    en: 'Documents and attachments from the page',
   },
   includeImagesLabel: {
     ru: 'Изображения',
     en: 'Images',
   },
   includeImagesDescription: {
-    ru: 'Картинки и превью со страницы',
+    ru: 'Изображения и превью со страницы',
     en: 'Images and previews from the page',
   },
   includeBasicLogsLabel: {
-    ru: 'Базовые логи',
-    en: 'Basic logs',
+    ru: 'Журнал экспорта',
+    en: 'Export log',
   },
   includeBasicLogsDescription: {
     ru: 'Сведения о странице, ходе сбора и предупреждениях экспорта',
     en: 'Page details, collection notes, and export warnings',
   },
   includePageDiagnosticsLabel: {
-    ru: 'Подробные логи',
-    en: 'Detailed logs',
+    ru: 'Данные страницы для анализа',
+    en: 'Page analysis data',
   },
   includePageDiagnosticsDescription: {
-    ru: INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_RU,
-    en: INCLUDE_PAGE_DIAGNOSTICS_DESCRIPTION_EN,
+    ru: 'Структура страницы, элементы интерфейса и сведения о загрузке ресурсов',
+    en: 'Page structure, interface elements, and resource loading details',
   },
   includeCssDiagnosticsLabel: {
-    ru: 'Стили страницы',
-    en: 'Page styles',
+    ru: 'Оформление и стили',
+    en: 'Design and styles',
   },
   includeCssDiagnosticsDescription: {
-    ru: 'Оформление страницы, стили и параметры элементов',
-    en: 'Page styling, stylesheets, and element parameters',
+    ru: 'Цвета, шрифты, CSS-стили и параметры элементов',
+    en: 'Colors, fonts, CSS styles, and element properties',
   },
   includeFullPageScreenshotLabel: {
     ru: 'Скриншот',
     en: 'Screenshot',
   },
   includeFullPageScreenshotDescription: {
-    ru: 'Снимок всей страницы',
-    en: 'Full page',
+    ru: 'Снимок всей страницы целиком',
+    en: 'Capture of the entire page',
   },
   copyButton: {
     ru: 'Копировать',

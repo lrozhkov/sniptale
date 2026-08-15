@@ -3,14 +3,22 @@ import type { ComponentType } from 'react';
 import type { PopupPage } from '../navigation/actions';
 import type { PopupStartupDescriptor } from './descriptor';
 
-type PopupRoute = ComponentType<{ startup: PopupStartupDescriptor }>;
+export type PopupRouteProps = {
+  startup: PopupStartupDescriptor;
+  navigateToDescriptor(descriptor: PopupStartupDescriptor): void;
+};
+
+type PopupRoute = ComponentType<PopupRouteProps>;
 const resolved = new Map<PopupPage, PopupRoute>();
 const pending = new Map<PopupPage, Promise<PopupRoute>>();
 
 function loader(page: PopupPage): Promise<PopupRoute> {
-  if (page === 'home') return import('../home/route').then((module) => module.HomeRoute);
+  if (page === 'screenshots')
+    return import('../home/route').then((module) => module.ScreenshotsRoute);
   if (page === 'video')
     return import('../../recording/video/route').then((module) => module.VideoRoute);
+  if (page === 'menu') return import('../menu/route').then((module) => module.MenuRoute);
+  if (page === 'tools') return import('../tools/route').then((module) => module.ToolsRoute);
   return import('../export/route').then((module) => module.ExportRoute);
 }
 

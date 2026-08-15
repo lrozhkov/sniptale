@@ -97,7 +97,7 @@ it('does not enumerate or subscribe outside the Video page', async () => {
   const refreshMicrophones = vi.fn(async () => []);
   const refreshWebcams = vi.fn(async () => []);
 
-  await renderHarness({ page: 'home', refreshMicrophones, refreshWebcams });
+  await renderHarness({ page: 'menu', refreshMicrophones, refreshWebcams });
 
   expect(refreshMicrophones).not.toHaveBeenCalled();
   expect(refreshWebcams).not.toHaveBeenCalled();

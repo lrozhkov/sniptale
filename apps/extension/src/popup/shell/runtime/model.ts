@@ -17,5 +17,5 @@ export function shouldShowFooter(
   page: PopupPage,
   recordingState: VideoRecordingRuntimeState
 ): boolean {
-  return page === 'home' && !isRecordingActive(recordingState);
+  return page === 'menu' && !isRecordingActive(recordingState);
 }

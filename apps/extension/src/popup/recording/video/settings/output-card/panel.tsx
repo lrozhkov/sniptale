@@ -60,9 +60,6 @@ export function OutputSettingsPanel(props: {
 
   return (
     <div className="grid gap-3">
-      <div className="pr-8 text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('popup.video.outputSettingsTitle')}
-      </div>
       <OutputOptionGroup
         activeValue={outputProfile.quality}
         label={translate('popup.video.qualityLabel')}

@@ -32,7 +32,17 @@ it('keeps independently valid fields from stored state', async () => {
   });
   await expect(loadPopupStartupState()).resolves.toEqual({
     selection: 'video:screen',
-    lastPage: 'home',
+    lastPage: 'menu',
+  });
+});
+
+it('loads the new top-level menu and tools destinations from the existing selection field', async () => {
+  getMock.mockResolvedValue({
+    sniptale_popup_startup: { selection: 'tools', lastPage: 'menu' },
+  });
+  await expect(loadPopupStartupState()).resolves.toEqual({
+    selection: 'tools',
+    lastPage: 'menu',
   });
 });
 

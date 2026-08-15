@@ -21,7 +21,14 @@ export function PopupActionButtonIcon({
   disabled,
 }: PopupActionButtonIconProps) {
   return (
-    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
+    <span
+      className={[
+        'inline-flex h-5 w-5 shrink-0 items-center justify-center',
+        'transition-transform duration-200 ease-out',
+        'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
+        'group-disabled:translate-y-0 motion-reduce:transition-none',
+      ].join(' ')}
+    >
       <Icon
         className={cx(
           'h-[18px] w-[18px] transition-colors',
@@ -60,7 +67,13 @@ export function PopupActionButtonDefaultContent({
 }) {
   return (
     <>
-      <span className="min-w-0 text-left">
+      <span
+        className={[
+          'min-w-0 text-left transition-transform duration-200 ease-out',
+          'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
+          'group-disabled:translate-y-0 motion-reduce:transition-none',
+        ].join(' ')}
+      >
         <span className="block whitespace-normal leading-[1.05]">{label}</span>
         {subtitle ? (
           <span className={POPUP_ACTION_BUTTON_SUBTITLE_CLASS_NAME}>{subtitle}</span>

@@ -1,12 +1,11 @@
 import { Globe2, MousePointer2, Pin } from 'lucide-react';
 
-import { translate } from '../../../../platform/i18n/popup';
+import { translate } from '../../../platform/i18n/popup';
 import type {
   PageAccessOperation,
   PageAccessStatus,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { PageAccessOperation as PageAccessOperationValue } from '@sniptale/runtime-contracts/messaging/page-access';
-import { PopupHomeErrorMessage } from './sections';
 
 const pageAccessSectionClassName = [
   'rounded-[8px] border p-3',
@@ -22,6 +21,22 @@ const pageAccessButtonClassName = [
   'disabled:cursor-not-allowed disabled:opacity-50',
   'disabled:hover:border-[var(--sniptale-color-border-soft)] disabled:hover:bg-transparent',
 ].join(' ');
+
+function PageAccessErrorMessage({ message }: { message: string }) {
+  return (
+    <div
+      className={[
+        'rounded-[12px] border px-3 py-2 text-xs',
+        'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,var(--sniptale-color-border-soft)_86%)]',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_5%,var(--sniptale-color-surface-hover)_95%)]',
+        'text-[var(--sniptale-color-text-primary-strong)]',
+      ].join(' ')}
+      role="alert"
+    >
+      {message}
+    </div>
+  );
+}
 
 function PageAccessActionButton(props: {
   children: string;
@@ -52,13 +67,13 @@ export function PageAccessControls(props: {
   status: PageAccessStatus | null;
 }) {
   if (!props.status?.supported || props.status.currentTabActive) {
-    return props.error ? <PopupHomeErrorMessage message={props.error} /> : null;
+    return props.error ? <PageAccessErrorMessage message={props.error} /> : null;
   }
 
   const isPending = (operation: PageAccessOperation) => props.pendingOperation === operation;
 
   return (
-    <section className={pageAccessSectionClassName}>
+    <section className={pageAccessSectionClassName} data-ui="popup.page-access.controls">
       <div className="grid gap-2">
         <PageAccessActionButton
           disabled={props.disabled}
@@ -87,7 +102,7 @@ export function PageAccessControls(props: {
       </div>
       {props.error ? (
         <div className="mt-2">
-          <PopupHomeErrorMessage message={props.error} />
+          <PageAccessErrorMessage message={props.error} />
         </div>
       ) : null}
     </section>

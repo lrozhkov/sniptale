@@ -17,7 +17,9 @@ export type PopupPostRecordSnapshot = {
 };
 
 export type PopupStartupDescriptor =
-  | { page: 'home'; screenshotMode?: ScreenshotSetupMode }
+  | { page: 'screenshots'; screenshotMode?: ScreenshotSetupMode }
+  | { page: 'menu' }
+  | { page: 'tools' }
   | {
       page: 'video';
       videoMode?: CaptureMode;

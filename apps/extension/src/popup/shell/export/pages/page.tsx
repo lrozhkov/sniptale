@@ -116,7 +116,7 @@ const exportPageContentSectionClassName = [
   [
     'bg-[color:color-mix(',
     'in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',
-    ' p-3 pr-2',
+    ' p-3',
   ].join(''),
 ].join(' ');
 
@@ -145,9 +145,10 @@ function ExportPageLayout({
     <div className="flex h-full flex-col gap-3">
       <section className={exportPageContentSectionClassName}>
         <ExportPageContent controller={controller} />
+        <div className="mt-auto shrink-0 pt-3" data-ui="popup.export.actions">
+          <ExportFooterActions {...footerProps} />
+        </div>
       </section>
-
-      <ExportFooterActions {...footerProps} />
       {webSnapshotConfirmation ? (
         <WebSnapshotConfirmationDialog
           disclosure={webSnapshotConfirmation}

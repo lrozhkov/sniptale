@@ -54,8 +54,15 @@ describe('ExportSelectionSectionShell', () => {
     const props = await renderShell({ bodyClassName: 'drawer-body', className: 'owner-shell' });
     const button = container?.querySelector('button') as HTMLButtonElement;
     const drawer = container?.querySelector('[aria-label="Export options"]');
+    const heading = container?.querySelector<HTMLElement>(
+      '[data-ui="popup.export.selection-heading"]'
+    );
 
     expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(heading?.className).toContain('text-[10px]');
+    expect(heading?.className).toContain('font-semibold');
+    expect(heading?.className).toContain('tracking-[0.08em]');
+    expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
     expect(drawer?.className).toContain('drawer-body');
     expect(container?.querySelector('section')?.className).toContain('owner-shell');
 

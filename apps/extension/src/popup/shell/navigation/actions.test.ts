@@ -61,7 +61,7 @@ vi.mock('../tab-access', () => ({
 
 import {
   openDesignSystem,
-  openGallery,
+  openLibrary,
   openGithubRepository,
   openImageEditor,
   openScenarioEditor,
@@ -241,7 +241,7 @@ async function verifiesDesktopFrameFailureCancelsPreparation() {
 function verifiesExtensionPageNavigation() {
   openImageEditor();
   openScenarioEditor();
-  openGallery();
+  openLibrary();
   openDesignSystem();
   openVideoEditor();
   openSettings();

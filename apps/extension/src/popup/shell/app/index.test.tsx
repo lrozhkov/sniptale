@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../startup/coordinator', () => ({ resolvePopupStartupRoute: mocks.coordinator }));
-vi.mock('../startup/resource', () => ({
+vi.mock('../startup/resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../startup/resource')>()),
   loadPopupRoute: mocks.loadRoute,
   preloadPopupPage: mocks.preload,
 }));
@@ -77,7 +78,7 @@ it('keeps current content until a cold navigation commits and only then persists
   const Home = () => <div data-testid="home-route" />;
   const Video = () => <div data-testid="video-route" />;
   let resolveVideo!: (component: React.ComponentType) => void;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute
     .mockResolvedValueOnce(Home)
     .mockReturnValueOnce(new Promise((resolve) => (resolveVideo = resolve)));
@@ -86,6 +87,14 @@ it('keeps current content until a cold navigation commits and only then persists
   await vi.waitFor(() =>
     expect(container.querySelector('[data-testid="home-route"]')).not.toBeNull()
   );
+  const menuButton = container.querySelector<HTMLButtonElement>('button[data-page="menu"]');
+  expect(menuButton?.textContent).toBe('');
+  expect(menuButton?.getAttribute('aria-label')).toBeTruthy();
+  expect(
+    [...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.app.tabs"] button')].every(
+      (button) => button.textContent === '' && Boolean(button.getAttribute('aria-label'))
+    )
+  ).toBe(true);
   const buttons = container.querySelectorAll<HTMLButtonElement>(
     '[data-ui="popup.app.tabs"] button'
   );
@@ -96,6 +105,9 @@ it('keeps current content until a cold navigation commits and only then persists
   expect(mocks.saveLastPage).not.toHaveBeenCalled();
   await act(async () => resolveVideo(Video));
   expect(container.querySelector('[data-testid="video-route"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="popup.app.tabs"]')?.getAttribute('data-animate')).toBe(
+    'true'
+  );
   await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledWith('video'));
 });
 
@@ -114,7 +126,7 @@ it('loads the command palette only after the actual hotkey', async () => {
 it('keeps the committed route when a cold target fails to load', async () => {
   const Home = () => <div data-testid="home-route" />;
   const Video = () => <div data-testid="video-route" />;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute
     .mockResolvedValueOnce(Home)
     .mockRejectedValueOnce(new Error('chunk failed'))
@@ -140,7 +152,7 @@ it('keeps the committed route when a cold target fails to load', async () => {
 
 it('surfaces and retries an initial selected-route module failure', async () => {
   const Home = () => <div data-testid="home-route" />;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute.mockRejectedValueOnce(new Error('chunk failed')).mockResolvedValueOnce(Home);
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
@@ -158,7 +170,7 @@ it('surfaces and retries an initial selected-route module failure', async () => 
 
 it('does not preload non-selected routes after startup settles', async () => {
   const Home = () => <div data-testid="home-route" />;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute.mockResolvedValueOnce(Home);
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
@@ -171,7 +183,7 @@ it('does not preload non-selected routes after startup settles', async () => {
 it('restores the last persisted route when saving a committed navigation fails', async () => {
   const Home = () => <div data-testid="home-route" />;
   const Video = () => <div data-testid="video-route" />;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute.mockResolvedValueOnce(Home).mockResolvedValueOnce(Video);
   mocks.saveLastPage.mockRejectedValueOnce(new Error('storage failed'));
   const { PopupApp } = await import('./index');
@@ -189,7 +201,7 @@ it('restores the last persisted route when saving a committed navigation fails',
 it('routes a cross-page recording message to Video', async () => {
   const Home = () => <div data-testid="home-route" />;
   const Video = () => <div data-testid="video-route" />;
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute.mockResolvedValueOnce(Home).mockResolvedValueOnce(Video);
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
@@ -217,7 +229,7 @@ it('ignores a stale cold-route result when a newer navigation wins', async () =>
   let resolveExport!: (component: React.ComponentType) => void;
   const videoPromise = new Promise<React.ComponentType>((resolve) => (resolveVideo = resolve));
   const exportPromise = new Promise<React.ComponentType>((resolve) => (resolveExport = resolve));
-  mocks.coordinator.mockResolvedValue({ page: 'home' });
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
   mocks.loadRoute
     .mockResolvedValueOnce(Home)
     .mockImplementation((descriptor: { page: string }) =>
@@ -231,7 +243,7 @@ it('ignores a stale cold-route result when a newer navigation wins', async () =>
   const buttons = container.querySelectorAll<HTMLButtonElement>('button');
   act(() => buttons[1]?.click());
   await vi.waitFor(() => expect(mocks.loadRoute).toHaveBeenCalledTimes(2));
-  act(() => container.querySelectorAll<HTMLButtonElement>('button')[2]?.click());
+  act(() => container.querySelectorAll<HTMLButtonElement>('button')[4]?.click());
   await vi.waitFor(() => expect(mocks.loadRoute).toHaveBeenCalledTimes(3));
   await act(async () => resolveVideo(Video));
   expect(container.querySelector('[data-testid="video-route"]')).toBeNull();
@@ -253,8 +265,10 @@ it('keeps the real shell visible while startup and the selected route are pendin
   act(() => root.render(<PopupApp />));
 
   expect(container.querySelector('[data-ui="popup.app.root"]')).not.toBeNull();
-  expect(container.querySelector('[data-ui="popup.app.tabs"]')?.children).toHaveLength(3);
+  expect(container.querySelectorAll('[data-ui="popup.app.tabs"] > button')).toHaveLength(5);
+  expect(container.querySelector('[data-ui="popup.app.tabs"] > [data-page="none"]')).not.toBeNull();
   expect(container.querySelector('[data-ui="popup.app.content"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="popup.app.route-skeleton"]')).not.toBeNull();
   await vi.waitFor(() => expect(mocks.initializeTheme).toHaveBeenCalledOnce());
 });
 

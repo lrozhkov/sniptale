@@ -134,6 +134,10 @@ async function verifyContentAndFooterWiring() {
   expect(mocks.exportPageContentMock).toHaveBeenCalledWith(expect.objectContaining({ controller }));
   expect(section?.className).toContain('rounded-[16px]');
   expect(section?.className).toContain('p-3');
+  const actions = section?.querySelector<HTMLElement>('[data-ui="popup.export.actions"]');
+  expect(actions?.querySelector('[data-testid="export-footer-actions"]')).not.toBeNull();
+  expect(actions?.className).toContain('mt-auto');
+  expect(actions?.className).toContain('pt-3');
   expect(container?.firstElementChild?.className).toContain('gap-3');
 
   triggerFooterActions(footerProps);

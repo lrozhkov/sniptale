@@ -68,8 +68,10 @@ afterEach(() => {
 it('renders camera settings and emits quality changes', async () => {
   const onSettingsChange = await renderPanel();
 
-  expect(container?.textContent).toContain('popup.video.webcamQualityTitle');
   expect(container?.textContent).not.toContain('popup.video.webcamQualityBrowserNotice');
+  expect(
+    container?.querySelector('[data-ui="popup.video.webcam-preview-mask"]')?.className
+  ).toContain('rounded-full');
 
   await act(async () => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])

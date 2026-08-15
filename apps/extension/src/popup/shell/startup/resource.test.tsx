@@ -1,8 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ home: vi.fn(), video: vi.fn(), export: vi.fn() }));
+const mocks = vi.hoisted(() => ({ screenshots: vi.fn(), video: vi.fn(), export: vi.fn() }));
 
-vi.mock('../home/route', () => ({ HomeRoute: mocks.home }));
+vi.mock('../home/route', () => ({ ScreenshotsRoute: mocks.screenshots }));
+vi.mock('../menu/route', () => ({ MenuRoute: vi.fn() }));
+vi.mock('../tools/route', () => ({ ToolsRoute: vi.fn() }));
 vi.mock('../../recording/video/route', () => ({ VideoRoute: mocks.video }));
 vi.mock('../export/route', () => ({ ExportRoute: mocks.export }));
 
@@ -22,6 +24,6 @@ it('memoizes parallel preload and navigation for one route', async () => {
 it('loads only the selected route module', async () => {
   const resource = await import('./resource');
   expect(await resource.loadPopupRoute({ page: 'export' })).toBe(mocks.export);
-  expect(mocks.home).not.toHaveBeenCalled();
+  expect(mocks.screenshots).not.toHaveBeenCalled();
   expect(mocks.video).not.toHaveBeenCalled();
 });

@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { PopupIconStateButton } from '../../../../ui/popup-shell/icon-state-button';
+import { PopupExpandingModeButton } from '../../../../ui/popup-shell/expanding-mode-button';
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
 }
@@ -11,6 +11,7 @@ export function ModeIconButton({
   label,
   hint,
   active,
+  animate,
   disabled,
   onClick,
   accentClassName,
@@ -19,19 +20,20 @@ export function ModeIconButton({
   label: string;
   hint: string;
   active: boolean;
+  animate?: boolean;
   disabled?: boolean;
   onClick: () => void;
   accentClassName: string;
 }) {
   return (
-    <PopupIconStateButton
+    <PopupExpandingModeButton
       icon={Icon}
       label={label}
       description={hint}
       active={active}
+      {...(animate === undefined ? {} : { animate })}
       onClick={onClick}
       accentClassName={accentClassName}
-      layout="stacked"
       {...(disabled === undefined ? {} : { disabled })}
     />
   );

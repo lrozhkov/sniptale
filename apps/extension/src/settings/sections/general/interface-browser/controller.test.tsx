@@ -163,14 +163,26 @@ it('loads and persists the popup startup destination', async () => {
   await renderHarness();
 
   expect(latestState?.popupStartup.selection).toBe('video:screen');
-  expect(latestState?.popupStartup.options).toHaveLength(10);
+  expect(latestState?.popupStartup.options.map((option) => option.value)).toEqual([
+    'remember-last',
+    'menu',
+    'screenshots:quick-actions',
+    'screenshots:tab',
+    'screenshots:desktop',
+    'video:tab',
+    'video:area',
+    'video:camera',
+    'video:screen',
+    'tools',
+    'export',
+  ]);
 
   await act(async () => {
-    await latestState?.popupStartup.updateSelection('screenshots:tools');
+    await latestState?.popupStartup.updateSelection('tools');
   });
 
-  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('screenshots:tools');
-  expect(latestState?.popupStartup.selection).toBe('screenshots:tools');
+  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('tools');
+  expect(latestState?.popupStartup.selection).toBe('tools');
 });
 
 it('keeps the default startup destination when preference loading fails', async () => {

@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useId, useRef } from 'react';
+import { Pencil } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
 import { cx } from './utils';
@@ -21,10 +22,16 @@ const shellClassName = 'flex min-h-0 flex-col overflow-hidden';
 const headerClassName = 'flex items-center justify-between gap-3 pb-1';
 
 const actionButtonClassName = [
-  'shrink-0 rounded-[9px] px-1.5 py-0.5 text-[11px] font-medium',
+  'group inline-flex shrink-0 items-center gap-1 rounded-[9px] px-1.5 py-0.5',
+  'text-[11px] font-medium',
   'text-[var(--sniptale-color-text-primary)] transition-colors',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'outline-none focus-visible:outline-none',
+].join(' ');
+const actionContentClassName = [
+  'transition-transform duration-200 ease-out',
+  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
+  'motion-reduce:transition-none',
 ].join(' ');
 
 function useInlineDrawerDismiss(
@@ -79,7 +86,13 @@ export function ExportSelectionSectionShell({
     <section ref={rootRef} className={cx(shellClassName, isExpanded && 'flex-1', className)}>
       <div className={headerClassName}>
         <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--sniptale-color-text-dim)]">
+          <div
+            className={[
+              'text-[10px] font-semibold uppercase tracking-[0.08em]',
+              'text-[var(--sniptale-color-text-muted-strong)]',
+            ].join(' ')}
+            data-ui="popup.export.selection-heading"
+          >
             {title}
           </div>
         </div>
@@ -90,7 +103,10 @@ export function ExportSelectionSectionShell({
           className={actionButtonClassName}
           onClick={isOpen ? onClose : onOpen}
         >
-          {isOpen ? translate('popup.export.doneButton') : translate('popup.export.editButton')}
+          <Pencil className={`h-3 w-3 ${actionContentClassName}`} />
+          <span className={actionContentClassName}>
+            {isOpen ? translate('popup.export.doneButton') : translate('popup.export.editButton')}
+          </span>
         </button>
       </div>
       <div

@@ -87,7 +87,7 @@ it('saves a web snapshot and ignores stale results', async () => {
   });
   expect(state.setResult).toHaveBeenCalledWith(
     expect.objectContaining({
-      filename: 'Веб-снимок сохранён в Галерею с предупреждениями',
+      filename: 'Веб-снимок сохранён в Библиотеку с предупреждениями',
       kind: 'webSnapshot',
       warnings: ['missing asset'],
     })

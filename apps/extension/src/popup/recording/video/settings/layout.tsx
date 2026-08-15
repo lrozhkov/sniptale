@@ -58,9 +58,21 @@ export function VideoSettingsGrid({
         settings={settings}
         onSettingsChange={onSettingsChange}
       />
+      <CounterCard
+        label={translate('popup.video.countdownLabel')}
+        description={translate('popup.video.countdownDescription')}
+        value={settings.countdownSeconds}
+        min={0}
+        max={10}
+        suffix={translate('popup.video.secondsSuffix')}
+        formatValue={formatCountdownOption}
+        formatSelectedValue={formatCountdownOption}
+        onChange={(value) => onSettingsChange({ countdownSeconds: value })}
+      />
       {showSourceCount ? (
         <CounterCard
           label={translate('popup.video.sourceCountLabel')}
+          description={translate('popup.video.sourceCountDescription')}
           value={normalizeVideoSourceCount(settings.sourceCount)}
           min={VIDEO_SOURCE_COUNT_MIN}
           max={VIDEO_SOURCE_COUNT_MAX}
@@ -70,16 +82,6 @@ export function VideoSettingsGrid({
           onChange={(value) => onSettingsChange({ sourceCount: value })}
         />
       ) : null}
-      <CounterCard
-        label={translate('popup.video.countdownLabel')}
-        value={settings.countdownSeconds}
-        min={0}
-        max={10}
-        suffix={translate('popup.video.secondsSuffix')}
-        formatValue={formatCountdownOption}
-        formatSelectedValue={formatCountdownOption}
-        onChange={(value) => onSettingsChange({ countdownSeconds: value })}
-      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { translate } from '../../../platform/i18n';
 import {
   InlineCurtainCustomPanel,
-  InlineCurtainPanelCloseButton,
+  InlineCurtainPanelHeader,
   type InlineCurtainSecondaryAction,
 } from './trigger';
 
@@ -18,11 +18,14 @@ export function renderSecondaryCurtainPanel({
 }) {
   return openPanel === 'secondary' && secondaryAction ? (
     <InlineCurtainCustomPanel id={panelId}>
-      <InlineCurtainPanelCloseButton
-        ariaLabel={translate('common.actions.close')}
-        onClick={() => setOpenPanel(null)}
+      <InlineCurtainPanelHeader
+        action="close"
+        actionAriaLabel={translate('common.actions.close')}
+        description={secondaryAction.panelDescription}
+        onAction={() => setOpenPanel(null)}
+        title={secondaryAction.panelTitle}
       />
-      <div className="pt-1">{secondaryAction.panel}</div>
+      <div>{secondaryAction.panel}</div>
     </InlineCurtainCustomPanel>
   ) : null;
 }

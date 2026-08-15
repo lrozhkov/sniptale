@@ -8,14 +8,14 @@ import type { PopupPageAccessRuntime } from '../../runtime/page-access';
 import type { QuickAction, ViewportPreset } from '../../../../contracts/settings';
 import { PopupHomeErrorMessage, PopupHomeQuickActions } from './sections';
 import { usePopupHomeActions } from './actions';
-import { PageAccessControls } from './page-access-controls';
-import { isDesktopQuickAction } from '../../../../features/quick-actions-presets/policy';
-import { normalizeScreenshotCaptureConfigPolicy } from '../../../../features/quick-actions-presets/policy';
+import { PageAccessControls } from '../../page-access/controls';
+import {
+  isDesktopQuickAction,
+  normalizeScreenshotCaptureConfigPolicy,
+} from '../../../../features/quick-actions-presets/policy';
 import { ScreenshotModeSelector } from './mode-selector';
 import { ScreenshotSetupPanel } from './setup-panel';
 import { useScreenshotSetupState } from './use-screenshot-setup';
-import { ScreenshotToolsPanel } from './tools-panel';
-import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   DEFAULT_SCREENSHOT_SETUP_STATE,
   type ScreenshotSetupMode,
@@ -43,18 +43,16 @@ const defaultPageAccessRuntime: PopupPageAccessRuntime = {
   status: null,
 };
 
-function isPageAccessChoiceActive(status: PageAccessStatus | null): boolean {
-  return status?.supported === true && !status.currentTabActive;
-}
-
 function getPopupHomeCapabilityState(
   activeTabCapabilities: ActiveTabCapabilities,
   quickActions: QuickAction[],
-  pageAccessDisabledReason: string | null,
-  pageAccessStatus: PageAccessStatus | null
+  pageAccessStatus: PageAccessStatus | null,
+  pageAccessDisabledReason: string | null
 ) {
   const shouldShowQuickActions =
-    !isPageAccessChoiceActive(pageAccessStatus) || quickActions.some(isDesktopQuickAction);
+    pageAccessStatus?.supported !== true ||
+    pageAccessStatus.currentTabActive ||
+    quickActions.some(isDesktopQuickAction);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
@@ -77,7 +75,6 @@ type PopupHomeCapabilityState = ReturnType<typeof getPopupHomeCapabilityState>;
 
 interface PopupHomePageContentProps {
   capabilityState: PopupHomeCapabilityState;
-  onOpenScreenshotMode(mode?: ToolbarWorkingMode): void;
   onPageAccessRequest(operation: PageAccessOperation): void;
   onQuickAction(actionId: string): void;
   pageAccessError: string | null;
@@ -95,7 +92,6 @@ interface PopupHomePageContentProps {
 
 function PopupHomePageContent({
   capabilityState,
-  onOpenScreenshotMode,
   onPageAccessRequest,
   onQuickAction,
   pageAccessError,
@@ -110,27 +106,45 @@ function PopupHomePageContent({
   showHomeError,
   viewportPresets,
 }: PopupHomePageContentProps) {
-  const mode = setup.state.selectedMode;
+  const mode =
+    setup.state.selectedMode === 'quick-actions'
+      ? 'quick-actions'
+      : setup.state.selectedMode === 'desktop'
+        ? 'desktop'
+        : 'tab';
   const activeConfig = mode === 'desktop' ? setup.state.desktop : setup.state.tab;
   const tabDisabledReason = capabilityState.screenshotDisabledReason;
+  const showPageAccess =
+    mode !== 'desktop' &&
+    ((pageAccessStatus?.supported === true && !pageAccessStatus.currentTabActive) ||
+      Boolean(pageAccessError));
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <section
         className={[
-          'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border px-3 py-2 pr-2',
+          'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border p-3',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas))]',
         ].join(' ')}
       >
-        <div className="mr-1 shrink-0 pb-1">
+        <div className="shrink-0 pb-1">
           <ScreenshotModeSelector
             mode={mode}
             tabDisabledReason={tabDisabledReason}
-            toolsDisabledReason={tabDisabledReason}
             onModeChange={(selectedMode) => setup.update({ selectedMode })}
           />
         </div>
-        {mode === 'quick-actions' ? (
+        {showPageAccess ? (
+          <div className="min-h-0 flex-1 pt-3">
+            <PageAccessControls
+              disabled={pageAccessPendingOperation !== null}
+              error={pageAccessError}
+              onRequest={onPageAccessRequest}
+              pendingOperation={pageAccessPendingOperation}
+              status={pageAccessStatus}
+            />
+          </div>
+        ) : mode === 'quick-actions' ? (
           <PopupHomeQuickActions
             shouldShowQuickActions={capabilityState.shouldShowQuickActions}
             quickActionsReady={quickActionsReady}
@@ -140,8 +154,6 @@ function PopupHomePageContent({
             quickActionsDisabledTitle={capabilityState.quickActionsDisabledTitle}
             onTriggerAction={onQuickAction}
           />
-        ) : mode === 'tools' ? (
-          <ScreenshotToolsPanel disabledReason={tabDisabledReason} onOpen={onOpenScreenshotMode} />
         ) : (
           <ScreenshotSetupPanel
             config={activeConfig}
@@ -156,19 +168,6 @@ function PopupHomePageContent({
             onCapture={onCapture}
           />
         )}
-        {mode !== 'desktop' &&
-        ((pageAccessStatus?.supported === true && !pageAccessStatus.currentTabActive) ||
-          pageAccessError) ? (
-          <div className="mt-3 shrink-0">
-            <PageAccessControls
-              disabled={pageAccessPendingOperation !== null}
-              error={pageAccessError}
-              onRequest={onPageAccessRequest}
-              pendingOperation={pageAccessPendingOperation}
-              status={pageAccessStatus}
-            />
-          </div>
-        ) : null}
       </section>
       {showHomeError && resolvedHomeError ? (
         <PopupHomeErrorMessage message={resolvedHomeError} />
@@ -191,33 +190,25 @@ export function PopupHomePage({
   const capabilityState = getPopupHomeCapabilityState(
     activeTabCapabilities,
     quickActions,
-    pageAccess.disabledReason,
-    pageAccess.status
+    pageAccess.status,
+    pageAccess.disabledReason
   );
   const setup = useScreenshotSetupState(
     startupMode,
     onStartupModeCleared,
     initialSetupState ?? DEFAULT_SCREENSHOT_SETUP_STATE
   );
-  const {
-    actionError,
-    capturePending,
-    handleOpenScreenshotMode,
-    handleQuickAction,
-    handleScreenshotCapture,
-  } = usePopupHomeActions({
-    screenshotDisabledReason: capabilityState.screenshotDisabledReason,
-    quickActionsDisabledReason: capabilityState.quickActionsDisabledReason,
-    quickActions,
-  });
+  const { actionError, capturePending, handleQuickAction, handleScreenshotCapture } =
+    usePopupHomeActions({
+      screenshotDisabledReason: capabilityState.screenshotDisabledReason,
+      quickActionsDisabledReason: capabilityState.quickActionsDisabledReason,
+      quickActions,
+    });
   const resolvedHomeError = actionError ?? homeError ?? null;
 
   return (
     <PopupHomePageContent
       capabilityState={capabilityState}
-      onOpenScreenshotMode={(workingMode) => {
-        void handleOpenScreenshotMode(workingMode);
-      }}
       onPageAccessRequest={(operation) => {
         void pageAccess.handleRequest(operation);
       }}
@@ -236,8 +227,8 @@ export function PopupHomePage({
         void setup
           .flush()
           .then((committed) => {
-            const mode = committed.selectedMode;
-            if (mode === 'quick-actions') return;
+            if (committed.selectedMode === 'quick-actions') return;
+            const mode = committed.selectedMode === 'desktop' ? 'desktop' : 'tab';
             void handleScreenshotCapture(
               mode === 'desktop' ? committed.desktop : committed.tab,
               mode === 'tab' ? capabilityState.screenshotDisabledReason : null

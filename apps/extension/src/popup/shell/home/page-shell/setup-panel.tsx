@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react';
+import { Camera, Image, Images } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n/popup';
@@ -10,6 +10,8 @@ import {
   TabCaptureCountdownField,
   TabCaptureSizeField,
 } from './setup-fields';
+import { openImageEditor, openLibrary } from '../../navigation/actions';
+import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;
@@ -40,17 +42,38 @@ export function ScreenshotSetupPanel(props: {
           {desktop ? null : <TabCaptureCountdownField config={props.config} patch={patch} />}
         </div>
       </div>
-      <div className="mt-3 grid w-full grid-cols-1">
-        <PopupActionButton
-          icon={Camera}
-          label={translate('popup.home.captureButtonLabel')}
-          iconClassName="text-[var(--sniptale-color-accent)]"
-          tone="primary"
-          centered
-          disabled={props.pending || Boolean(props.disabledReason)}
-          title={props.disabledReason ?? translate('popup.home.captureButtonTitle')}
-          onClick={props.onCapture}
-        />
+      <div className={`mt-3 ${actionFooterSurfaceClassName}`}>
+        <div className="grid grid-cols-[minmax(0,1fr)_48px_48px] gap-1.5">
+          <PopupActionButton
+            icon={Camera}
+            label={translate('popup.home.captureButtonLabel')}
+            iconClassName={[
+              'text-[var(--sniptale-color-text-secondary)]',
+              'group-hover:text-[var(--sniptale-color-accent)]',
+              'group-focus-visible:text-[var(--sniptale-color-accent)]',
+            ].join(' ')}
+            tone="primary"
+            disabled={props.pending || Boolean(props.disabledReason)}
+            title={props.disabledReason ?? translate('popup.home.captureButtonTitle')}
+            onClick={props.onCapture}
+          />
+          <PopupActionButton
+            icon={Image}
+            label={translate('popup.home.imageEditorLabel')}
+            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            compact
+            title={translate('popup.home.imageEditorTitle')}
+            onClick={openImageEditor}
+          />
+          <PopupActionButton
+            icon={Images}
+            label={translate('popup.home.libraryLabel')}
+            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            compact
+            title={translate('popup.home.libraryTitle')}
+            onClick={() => openLibrary('screenshot')}
+          />
+        </div>
       </div>
     </div>
   );

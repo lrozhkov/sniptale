@@ -75,7 +75,7 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
   const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
-  expect(captureButton?.className).toContain('justify-center');
+  expect(captureButton?.className).toContain('justify-start');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });
@@ -179,11 +179,11 @@ it('renders tab settings, applies field changes, and disables a pending capture'
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ afterCapture: 'edit' }));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ imageFormat: 'webp' }));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ imageQuality: 80 }));
-  const buttons = getContainer()?.querySelectorAll('button');
-  expect((buttons?.[buttons.length - 1] as HTMLButtonElement).disabled).toBe(true);
-  expect((buttons?.[buttons.length - 1] as HTMLButtonElement).parentElement?.className).toContain(
-    'w-full'
+  const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
+  expect(captureButton?.disabled).toBe(true);
+  expect(captureButton?.parentElement?.className).toContain('grid-cols-');
 });
 
 it('omits quality until an explicit lossy format makes it selectable', async () => {

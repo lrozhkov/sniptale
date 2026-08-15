@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./toggles/grid', () => ({
-  VideoToggleGrid: () => <div />,
+  VideoToggleGrid: () => <div data-testid="video-toggle-grid" />,
 }));
 
 vi.mock('../settings', () => ({
@@ -32,6 +32,7 @@ vi.mock('./options', () => ({
   },
   VideoMicrophoneSelector: () => <div />,
   VideoPresetSelector: () => <div />,
+  VideoRecordingAreaSelector: () => <div />,
   VideoWebcamSelector: (props: unknown) => {
     mocks.webcamSelectorMock(props);
     return <div />;
@@ -142,6 +143,27 @@ it('shows the saving panel while recording stop or discard is in progress', asyn
   expect(mocks.captureModeSelectorMock).not.toHaveBeenCalled();
 });
 
+it('pins idle actions to the bottom inset of the setup surface', async () => {
+  await renderBody({ ...createProps(), idleActions: <div>idle actions</div> });
+
+  const section = container?.querySelector('section');
+  const actions = section?.querySelector<HTMLElement>('[data-ui="popup.video-setup.idle-actions"]');
+  expect(section?.className).toContain('p-3');
+  expect(actions?.className).toContain('mt-auto');
+  expect(actions?.className).toContain('pt-3');
+});
+
+it('keeps the mode selector but replaces page-dependent settings with access controls', async () => {
+  await renderBody({
+    ...createProps(),
+    pageAccessControls: <div data-testid="page-access-controls">access</div>,
+  });
+
+  expect(container?.querySelector('[data-testid="capture-mode-selector"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="page-access-controls"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="video-toggle-grid"]')).toBeNull();
+});
+
 it('shows the saving panel for the authoritative stopping phase', async () => {
   const props = createProps();
   await renderBody({
@@ -232,4 +254,10 @@ it('marks the webcam selector as required only for camera capture', async () => 
   expect(mocks.webcamSelectorMock).toHaveBeenCalledWith(
     expect.objectContaining({ required: true })
   );
+});
+
+it('keeps idle actions inside the setup surface', async () => {
+  await renderBody({ ...createProps(), idleActions: <div data-testid="idle-actions" /> });
+
+  expect(container?.querySelector('section [data-testid="idle-actions"]')).not.toBeNull();
 });

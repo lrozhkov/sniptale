@@ -99,7 +99,7 @@ export function useVideoRouteRuntime(options: {
   };
 
   usePopupMediaDeviceEffects({
-    page: isReady ? 'video' : 'home',
+    page: isReady ? 'video' : 'menu',
     refreshMicrophones: actions.refreshMicrophones,
     refreshWebcams: actions.refreshWebcams,
     videoSettings,

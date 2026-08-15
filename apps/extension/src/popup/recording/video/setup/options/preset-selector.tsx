@@ -142,6 +142,7 @@ export function VideoPresetSelector({
       value={selectedPresetId ?? ''}
       label={translate('popup.video.presetRowLabel')}
       ariaLabel={translate('popup.video.presetRowAria')}
+      description={translate('popup.video.presetRowDescription')}
       options={options}
       {...(notice === undefined ? {} : { notice })}
       onOpenChange={setOptionsOpen}

@@ -104,6 +104,9 @@ describe('video settings layout', () => {
     });
 
     expect(container.textContent).toContain('popup.video.countdownZeroOption');
+    expect(container.textContent.indexOf('popup.video.countdownLabel')).toBeLessThan(
+      container.textContent.indexOf('popup.video.sourceCountLabel')
+    );
     clickButtonContaining('popup.video.sourceCountLabel');
     clickButtonContaining('popup.video.sourceCountOne');
 

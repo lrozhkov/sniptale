@@ -3,6 +3,7 @@ import { InlineCurtainSelect } from '../../../../ui/popup-shell/inline-curtain/s
 export function CounterCard({
   formatValue,
   formatSelectedValue,
+  description,
   label,
   notice,
   value,
@@ -13,6 +14,7 @@ export function CounterCard({
 }: {
   formatValue?: (value: number) => string;
   formatSelectedValue?: (value: number) => string;
+  description: string;
   label: string;
   notice?: string;
   value: number;
@@ -33,6 +35,7 @@ export function CounterCard({
   return (
     <InlineCurtainSelect
       ariaLabel={label}
+      description={description}
       label={label}
       {...(notice === undefined ? {} : { notice })}
       onChange={(nextValue) => onChange(Number(nextValue))}

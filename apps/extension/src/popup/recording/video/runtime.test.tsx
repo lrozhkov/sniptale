@@ -45,7 +45,7 @@ it('owns only Video state and starts device work after route bootstrap', async (
 
   expect(latest).not.toHaveProperty('session');
   expect(latest.presets.videoCaptureMode).toBe(CaptureMode.CAMERA);
-  expect(mocks.mediaEffects).toHaveBeenLastCalledWith(expect.objectContaining({ page: 'home' }));
+  expect(mocks.mediaEffects).toHaveBeenLastCalledWith(expect.objectContaining({ page: 'menu' }));
 
   act(() => latest.setIsReady(true));
   expect(mocks.mediaEffects).toHaveBeenLastCalledWith(expect.objectContaining({ page: 'video' }));

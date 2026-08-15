@@ -4,6 +4,7 @@ import {
   getMicrophoneConstraintStatus,
   MICROPHONE_CONSTRAINT_KEYS,
   resolveMicrophoneBooleanSetting,
+  resolveMicrophoneGain,
   type MicrophoneConstraintKey,
   type MicrophoneConstraintStatus,
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
@@ -12,7 +13,6 @@ import type { MicrophoneActualSettings } from '@sniptale/runtime-contracts/video
 import { MicrophoneLevelMeter } from './microphone-level-meter';
 import { useMicrophoneProbe } from './microphone-probe';
 import { MicrophoneTestRecorder } from './microphone-test-recorder';
-import { formatActualMicrophoneSettings } from './microphone-actual-settings';
 import { MicrophoneGainControl } from './microphone-gain-control';
 
 type MicrophoneSettingsPanelProps = {
@@ -50,12 +50,17 @@ export function MicrophoneSettingsPanel({
 
   return (
     <div className="grid gap-3">
-      <MicrophoneSettingsHeader currentDeviceLabel={currentDeviceLabel} />
+      <MicrophoneDeviceLabel currentDeviceLabel={currentDeviceLabel} />
       <MicrophoneProbeStatus probeStatus={probe.status} />
-      <MicrophoneLevelMeter stream={readyProbe?.stream ?? null} />
-      <div className="text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
-        {formatActualMicrophoneSettings(readyProbe?.settings ?? null)}
-      </div>
+      <MicrophoneLevelMeter
+        gain={resolveMicrophoneGain(settings)}
+        stream={readyProbe?.stream ?? null}
+      />
+      <MicrophoneGainControl settings={settings} onSettingsChange={onSettingsChange} />
+      <MicrophoneTestRecorder stream={readyProbe?.stream ?? null} />
+      {errorKey ? (
+        <div className="text-[11px] text-[var(--sniptale-color-danger)]">{translate(errorKey)}</div>
+      ) : null}
       <MicrophoneProcessingList
         onError={() => setErrorKey('popup.video.microphoneStatusError')}
         onSettingsChange={onSettingsChange}
@@ -66,11 +71,6 @@ export function MicrophoneSettingsPanel({
         settings={settings}
         statusOverrides={statusOverrides}
       />
-      <MicrophoneGainControl settings={settings} onSettingsChange={onSettingsChange} />
-      <MicrophoneTestRecorder stream={readyProbe?.stream ?? null} />
-      {errorKey ? (
-        <div className="text-[11px] text-[var(--sniptale-color-danger)]">{translate(errorKey)}</div>
-      ) : null}
     </div>
   );
 }
@@ -125,15 +125,10 @@ function MicrophoneProcessingList({
   );
 }
 
-function MicrophoneSettingsHeader({ currentDeviceLabel }: { currentDeviceLabel: string | null }) {
+function MicrophoneDeviceLabel({ currentDeviceLabel }: { currentDeviceLabel: string | null }) {
   return (
-    <div>
-      <div className="pr-8 text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('popup.video.microphoneSettingsTitle')}
-      </div>
-      <div className="mt-0.5 truncate text-[10px] text-[var(--sniptale-color-text-muted-strong)]">
-        {currentDeviceLabel ?? translate('popup.video.microphoneSettingsNoDevice')}
-      </div>
+    <div className="truncate text-[10px] text-[var(--sniptale-color-text-muted-strong)]">
+      {currentDeviceLabel ?? translate('popup.video.microphoneSettingsNoDevice')}
     </div>
   );
 }

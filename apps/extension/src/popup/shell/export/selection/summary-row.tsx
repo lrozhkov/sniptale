@@ -21,7 +21,7 @@ export function SelectionSummaryRow(props: {
         <div className="shrink-0">{props.icon}</div>
         <span
           title={props.title ?? props.label}
-          className="truncate text-[13px] leading-5 text-[var(--sniptale-color-text-primary)]"
+          className="truncate text-[11px] font-medium leading-4 text-[var(--sniptale-color-text-primary)]"
         >
           {props.label}
         </span>

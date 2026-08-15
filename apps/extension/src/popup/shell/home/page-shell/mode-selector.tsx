@@ -1,26 +1,26 @@
-import { PanelTop, PanelTopOpen, PanelsTopLeft, Zap } from 'lucide-react';
-import { PopupIconStateButton } from '../../../../ui/popup-shell/icon-state-button';
+import { ListChecks, PanelTop, PanelsTopLeft } from 'lucide-react';
+import { useState } from 'react';
+import { PopupExpandingModeButton } from '../../../../ui/popup-shell/expanding-mode-button';
 import { translate } from '../../../../platform/i18n/popup';
-import type { ScreenshotSetupMode } from '../../../../composition/persistence/capture-settings';
-
 const ACCENT = 'text-[var(--sniptale-color-accent)]';
 const MODE_HINT_KEYS = {
   'quick-actions': 'popup.home.quickActionsModeHint',
   tab: 'popup.home.captureTabHint',
   desktop: 'popup.home.captureWindowHint',
-  tools: 'popup.home.toolsTitle',
 } as const;
 
+type ScreenshotPageMode = keyof typeof MODE_HINT_KEYS;
+
 export function ScreenshotModeSelector(props: {
-  mode: ScreenshotSetupMode;
+  mode: ScreenshotPageMode;
   tabDisabledReason: string | null;
-  toolsDisabledReason: string | null;
-  onModeChange(mode: ScreenshotSetupMode): void;
+  onModeChange(mode: ScreenshotPageMode): void;
 }) {
+  const [animate, setAnimate] = useState(false);
   const options = [
     {
       mode: 'quick-actions' as const,
-      icon: Zap,
+      icon: ListChecks,
       label: translate('popup.home.shortcutsModeLabel'),
     },
     { mode: 'tab' as const, icon: PanelTop, label: translate('popup.home.captureTabLabel') },
@@ -29,28 +29,25 @@ export function ScreenshotModeSelector(props: {
       icon: PanelsTopLeft,
       label: translate('popup.home.captureWindowLabel'),
     },
-    { mode: 'tools' as const, icon: PanelTopOpen, label: translate('popup.home.toolsLabel') },
   ];
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="flex gap-1.5">
       {options.map((option) => {
-        const disabledReason =
-          option.mode === 'tab'
-            ? props.tabDisabledReason
-            : option.mode === 'tools'
-              ? props.toolsDisabledReason
-              : null;
+        const disabledReason = option.mode === 'tab' ? props.tabDisabledReason : null;
         return (
-          <PopupIconStateButton
+          <PopupExpandingModeButton
             key={option.mode}
             icon={option.icon}
             label={option.label}
             description={disabledReason ?? translate(MODE_HINT_KEYS[option.mode])}
             active={props.mode === option.mode}
+            animate={animate}
             disabled={Boolean(disabledReason)}
             accentClassName={ACCENT}
-            layout="stacked"
-            onClick={() => props.onModeChange(option.mode)}
+            onClick={() => {
+              setAnimate(true);
+              props.onModeChange(option.mode);
+            }}
           />
         );
       })}

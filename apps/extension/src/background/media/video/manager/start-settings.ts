@@ -14,6 +14,7 @@ export function sanitizeRecordingSettings(
     captureMode === CaptureMode.SCREEN ? normalizeVideoSourceCount(settings.sourceCount) : 1;
   return {
     ...settings,
+    interactionDiagnosticsEnabled: false,
     sourceCount,
     ...(sourceCount > 1
       ? { controlledCursorCaptureEnabled: false, systemAudioEnabled: false }

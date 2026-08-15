@@ -9,9 +9,10 @@ import {
 } from 'react';
 import type { PopupPage } from '../navigation/actions';
 import type { PopupStartupDescriptor } from './descriptor';
+import type { PopupRouteProps } from './resource';
 import { loadPopupRoute } from './resource';
 
-type PopupRouteComponent = ComponentType<{ startup: PopupStartupDescriptor }>;
+type PopupRouteComponent = ComponentType<PopupRouteProps>;
 type CommittedRoute = {
   page: PopupPage;
   Route: PopupRouteComponent;
@@ -25,6 +26,7 @@ export function usePopupRouteController() {
   const [startup, setStartup] = useState<PopupStartupDescriptor | null>(null);
   const [pendingPage, setPendingPage] = useState<PopupPage | null>(null);
   const [routeLoadError, setRouteLoadError] = useState<RouteLoadError | null>(null);
+  const [hasCommittedNavigation, setHasCommittedNavigation] = useState(false);
   const [startupAttempt, setStartupAttempt] = useState(0);
   const navigationIntent = useRef(0);
   const persistenceRevision = useRef(0);
@@ -62,6 +64,7 @@ export function usePopupRouteController() {
       setStartup(descriptor);
       setRoute(() => component);
       setPage(target);
+      setHasCommittedNavigation(true);
       setPendingPage(null);
       setRouteLoadError(null);
       window.requestAnimationFrame(() => {
@@ -137,6 +140,8 @@ export function usePopupRouteController() {
   return {
     navigate: (target: PopupPage) =>
       navigateToDescriptor({ page: target } as PopupStartupDescriptor),
+    navigateToDescriptor,
+    hasCommittedNavigation,
     page,
     pendingPage,
     routeLoadError,

@@ -77,13 +77,15 @@ describe('popup export option metadata', () => {
     ]);
   });
 
-  it('describes page diagnostics as DOM and Resource Timing data', () => {
+  it('describes page analysis data without browser-internal terminology', () => {
     const pageDiagnostics = getDiagnosticsOptionConfigs().find(
       (option) => option.key === 'pageDiagnostics'
     );
 
-    expect(pageDiagnostics?.description).toContain('DOM');
-    expect(pageDiagnostics?.description).toContain('Resource Timing');
+    expect(pageDiagnostics?.label).toBe('Данные страницы для анализа');
+    expect(pageDiagnostics?.description).toContain('сведения о загрузке ресурсов');
+    expect(pageDiagnostics?.description).not.toContain('DOM');
+    expect(pageDiagnostics?.description).not.toContain('Resource Timing');
   });
 });
 

@@ -91,14 +91,13 @@ it('derives a startable setup view model when the preset and mode are available'
       startButtonLabel: 't:popup.video.startButton',
       startDisabledReason: null,
       systemAudioDisabled: false,
-      diagnosticsDisabled: false,
     })
   );
 });
 
-it('keeps diagnostics disabled outside regular tab capture', () => {
+it('disables system audio for screen capture', () => {
   expect(getVideoSetupViewModel(createProps({ captureMode: CaptureMode.SCREEN }))).toEqual(
-    expect.objectContaining({ diagnosticsDisabled: true })
+    expect.objectContaining({ systemAudioDisabled: true })
   );
 });
 
@@ -177,7 +176,6 @@ it('keeps camera mode startable while disabling incompatible setup options', () 
     expect.objectContaining({
       canStart: true,
       controlledCursorDisabled: true,
-      diagnosticsDisabled: true,
       systemAudioDisabled: true,
     })
   );

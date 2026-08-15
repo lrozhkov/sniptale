@@ -10,17 +10,8 @@ import type { PopupStartupDescriptor } from '../startup/descriptor';
 import { usePopupPageAccessRuntime } from '../runtime/page-access';
 import { useActiveTabCapabilities } from '../tab-access/capabilities';
 import { PopupHomePage } from './page-shell';
-import PopupFooter from '../footer';
-import {
-  openGallery,
-  openGithubRepository,
-  openImageEditor,
-  openScenarioEditor,
-  openSettings,
-  openVideoEditor,
-} from '../navigation/actions';
 
-export function HomeRoute({ startup }: { startup: PopupStartupDescriptor }) {
+export function ScreenshotsRoute({ startup }: { startup: PopupStartupDescriptor }) {
   const capabilities = useActiveTabCapabilities();
   const pageAccess = usePopupPageAccessRuntime(capabilities);
   const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
@@ -49,28 +40,14 @@ export function HomeRoute({ startup }: { startup: PopupStartupDescriptor }) {
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="min-h-0 flex-1">
-        <PopupHomePage
-          quickActions={quickActions}
-          quickActionsReady={quickActionsReady}
-          viewportPresets={viewportPresets}
-          activeTabCapabilities={capabilities}
-          homeError={homeError}
-          pageAccess={pageAccess}
-          startupMode={startup.page === 'home' ? (startup.screenshotMode ?? null) : null}
-        />
-      </div>
-      <PopupFooter
-        onOpenGallery={openGallery}
-        onOpenGithub={openGithubRepository}
-        onOpenImageEditor={openImageEditor}
-        onOpenScenarioEditor={openScenarioEditor}
-        onOpenSettings={openSettings}
-        onOpenVideoEditor={openVideoEditor}
-        showRestrictionIndicator={false}
-        restrictionIndicatorTitle={null}
-      />
-    </div>
+    <PopupHomePage
+      quickActions={quickActions}
+      quickActionsReady={quickActionsReady}
+      viewportPresets={viewportPresets}
+      activeTabCapabilities={capabilities}
+      homeError={homeError}
+      pageAccess={pageAccess}
+      startupMode={startup.page === 'screenshots' ? (startup.screenshotMode ?? null) : null}
+    />
   );
 }

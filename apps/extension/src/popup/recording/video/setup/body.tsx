@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
@@ -19,6 +20,7 @@ import {
   CaptureModeSelector,
   VideoMicrophoneSelector,
   VideoPresetSelector,
+  VideoRecordingAreaSelector,
   VideoWebcamSelector,
 } from './options';
 import type { VideoSetupViewModel } from './types';
@@ -52,6 +54,7 @@ interface VideoSetupBodyProps {
   isLoadingWebcams: boolean;
   startError: string | null;
   pageAccessDisabledReason?: string | null;
+  pageAccessControls?: ReactNode;
   activeTabCapabilities: ActiveTabCapabilities;
   recordingState: VideoRecordingRuntimeState;
   onCaptureModeChange: (mode: CaptureMode) => void;
@@ -66,6 +69,7 @@ interface VideoSetupBodyProps {
   postRecordResult?: VideoPostRecordResult | null;
   onAcknowledgePostRecord?: () => Promise<void>;
   viewModel: VideoSetupViewModel;
+  idleActions?: ReactNode;
 }
 
 export function VideoSetupBody(props: VideoSetupBodyProps) {
@@ -92,7 +96,7 @@ const VIDEO_SETUP_SECTION_CLASS_NAME = [
   'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',
-  'px-3 py-2 pr-2',
+  'p-3',
 ].join(' ');
 
 function VideoActiveRecordingSection(props: VideoSetupBodyProps) {
@@ -147,7 +151,35 @@ function VideoSavingSection() {
 function VideoIdleSetupSection(props: VideoSetupBodyProps) {
   return (
     <section className={`relative ${VIDEO_SETUP_SECTION_CLASS_NAME}`}>
-      <VideoSetupModeSections {...props} />
+      <VideoCaptureModeSelector {...props} />
+      {props.pageAccessControls ? (
+        <div className="min-h-0 flex-1 pt-3">{props.pageAccessControls}</div>
+      ) : (
+        <VideoIdleSettings {...props} />
+      )}
+      {props.idleActions ? (
+        <div className="mt-auto shrink-0 pt-3" data-ui="popup.video-setup.idle-actions">
+          {props.idleActions}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function VideoIdleSettings(props: VideoSetupBodyProps) {
+  return (
+    <>
+      <VideoToggleGrid
+        captureMode={props.captureMode}
+        settings={props.settings}
+        webcamLocked={props.captureMode === CaptureMode.CAMERA}
+        controlledCursorDisabled={props.viewModel.controlledCursorDisabled}
+        controlledCursorDisabledReason={props.viewModel.controlledCursorDisabledReason}
+        systemAudioDisabled={props.viewModel.systemAudioDisabled}
+        onToggleMicrophone={props.onToggleMicrophone}
+        onToggleWebcam={props.onToggleWebcam}
+        onSettingsChange={props.onSettingsChange}
+      />
       <VideoMicrophoneSelector
         settings={props.settings}
         microphoneDevices={props.microphoneDevices}
@@ -178,39 +210,30 @@ function VideoIdleSetupSection(props: VideoSetupBodyProps) {
         settings={props.settings}
         onSettingsChange={props.onSettingsChange}
       />
+      {props.captureMode === CaptureMode.TAB || props.captureMode === CaptureMode.TAB_CROP ? (
+        <VideoRecordingAreaSelector
+          captureMode={props.captureMode}
+          modeCapabilities={
+            props.viewModel.modeCapabilities ?? props.activeTabCapabilities.videoByMode
+          }
+          onCaptureModeChange={props.onCaptureModeChange}
+        />
+      ) : null}
       <VideoSetupWarnings startError={props.startError} />
-    </section>
+    </>
   );
 }
 
-function VideoSetupModeSections({
+function VideoCaptureModeSelector({
   captureMode,
   onCaptureModeChange,
-  settings,
-  onToggleMicrophone,
-  onToggleWebcam,
-  onSettingsChange,
   viewModel,
 }: VideoSetupBodyProps) {
   return (
-    <>
-      <CaptureModeSelector
-        captureMode={captureMode}
-        {...(viewModel.modeCapabilities ? { modeCapabilities: viewModel.modeCapabilities } : {})}
-        onCaptureModeChange={onCaptureModeChange}
-      />
-      <VideoToggleGrid
-        captureMode={captureMode}
-        settings={settings}
-        webcamLocked={captureMode === CaptureMode.CAMERA}
-        controlledCursorDisabled={viewModel.controlledCursorDisabled}
-        controlledCursorDisabledReason={viewModel.controlledCursorDisabledReason}
-        systemAudioDisabled={viewModel.systemAudioDisabled}
-        diagnosticsDisabled={viewModel.diagnosticsDisabled}
-        onToggleMicrophone={onToggleMicrophone}
-        onToggleWebcam={onToggleWebcam}
-        onSettingsChange={onSettingsChange}
-      />
-    </>
+    <CaptureModeSelector
+      captureMode={captureMode}
+      {...(viewModel.modeCapabilities ? { modeCapabilities: viewModel.modeCapabilities } : {})}
+      onCaptureModeChange={onCaptureModeChange}
+    />
   );
 }

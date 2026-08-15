@@ -8,14 +8,15 @@ export function buildPopupStartupOptions(locale: AppLocale): Array<{
 }> {
   const values: PopupStartupSelection[] = [
     'remember-last',
+    'menu',
     'screenshots:quick-actions',
     'screenshots:tab',
     'screenshots:desktop',
-    'screenshots:tools',
     'video:tab',
     'video:area',
     'video:camera',
     'video:screen',
+    'tools',
     'export',
   ];
   return values.map((value) => ({

@@ -4,7 +4,7 @@ import { createTranslator, translate } from './popup';
 it('resolves every popup-owned message domain without loading unrelated dictionaries', () => {
   const translateEn = createTranslator('en');
 
-  expect(translateEn('popup.tabs.home')).toBe('Screenshots');
+  expect(translateEn('popup.tabs.screenshots')).toBe('Screenshots');
   expect(translateEn('common.states.error')).toBe('Error');
   expect(translateEn('settings.quickActions.delayNone')).toBe('No delay');
   expect(translateEn('viewportPresets.section.nativeOption')).toBe('Current size');
@@ -12,6 +12,7 @@ it('resolves every popup-owned message domain without loading unrelated dictiona
   expect(translateEn('content.runtime.exportCancelled')).not.toContain('.');
   expect(translateEn('background.runtime.recordingUnavailable')).not.toContain('.');
   expect(translateEn('exportModal.phaseScanning')).toBe('Scanning...');
+  expect(translateEn('imageSettings.section.title')).toBe('Image settings');
   expect(translate('popup.tabs.export', 'ru')).toBe('Экспорт');
 });
 

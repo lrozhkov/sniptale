@@ -1,23 +1,22 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getQuickActions: vi.fn(),
   loadSettings: vi.fn(),
   homePage: vi.fn(),
-  footer: vi.fn(),
 }));
 
-vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
-  getQuickActions: mocks.getQuickActions,
-}));
 vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
   loadSettings: mocks.loadSettings,
+}));
+vi.mock('../../../composition/persistence/quick-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/quick-actions')>()),
+  getQuickActions: mocks.getQuickActions,
 }));
 vi.mock('../tab-access/capabilities', () => ({
   useActiveTabCapabilities: () => ({ tabId: 1 }),
@@ -29,95 +28,55 @@ vi.mock('../runtime/page-access', async (importOriginal) => ({
 vi.mock('./page-shell', () => ({
   PopupHomePage: (props: unknown) => {
     mocks.homePage(props);
-    return <div data-testid="home-page" />;
+    return <div data-testid="screenshots-page" />;
   },
-}));
-vi.mock('../footer', () => ({
-  default: (props: unknown) => {
-    mocks.footer(props);
-    return <div data-testid="footer" />;
-  },
-}));
-vi.mock('../navigation/actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../navigation/actions')>()),
-  openGallery: vi.fn(),
-  openGithubRepository: vi.fn(),
-  openImageEditor: vi.fn(),
-  openScenarioEditor: vi.fn(),
-  openSettings: vi.fn(),
-  openVideoEditor: vi.fn(),
-}));
-vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n/popup')>()),
-  translate: (key: string) => key,
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getQuickActions.mockResolvedValue([
-    { id: 'enabled', status: true },
-    { id: 'disabled', status: false },
-  ]);
+  mocks.getQuickActions.mockResolvedValue([]);
+});
+
+it('loads screenshot settings and shortcuts while forwarding the fixed screenshot mode', async () => {
+  mocks.getQuickActions.mockResolvedValue([{ id: 'shortcut', status: true }]);
   mocks.loadSettings.mockResolvedValue({ viewportPresets: [{ id: 'preset' }] });
-});
+  const { ScreenshotsRoute } = await import('./route');
+  const container = document.createElement('div');
+  const root = createRoot(container);
 
-let container: HTMLDivElement;
-let root: Root;
+  act(() =>
+    root.render(<ScreenshotsRoute startup={{ page: 'screenshots', screenshotMode: 'tab' }} />)
+  );
 
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-});
-
-afterEach(() => {
-  act(() => root.unmount());
-  container.remove();
-});
-
-function renderRoute(node: ReactNode) {
-  act(() => root.render(node));
-}
-
-it('renders defaults immediately and hydrates Home sections independently', async () => {
-  const { HomeRoute } = await import('./route');
-  renderRoute(<HomeRoute startup={{ page: 'home', screenshotMode: 'tools' }} />);
   expect(mocks.homePage).toHaveBeenCalledWith(
-    expect.objectContaining({ quickActionsReady: false, startupMode: 'tools' })
+    expect.objectContaining({
+      startupMode: 'tab',
+      viewportPresets: [],
+      quickActions: [],
+      quickActionsReady: false,
+    })
   );
   await vi.waitFor(() =>
     expect(mocks.homePage).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        quickActions: [expect.objectContaining({ id: 'enabled' })],
-        quickActionsReady: true,
+        startupMode: 'tab',
         viewportPresets: [expect.objectContaining({ id: 'preset' })],
-      })
-    )
-  );
-  expect(mocks.footer).toHaveBeenCalled();
-});
-
-it('publishes the localized quick-action error without blocking the page', async () => {
-  mocks.getQuickActions.mockRejectedValue(new Error('failed'));
-  const { HomeRoute } = await import('./route');
-  renderRoute(<HomeRoute startup={{ page: 'home' }} />);
-  await vi.waitFor(() =>
-    expect(mocks.homePage).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        homeError: 'popup.home.quickActionsLoadError',
+        quickActions: [expect.objectContaining({ id: 'shortcut' })],
         quickActionsReady: true,
       })
     )
   );
+  act(() => root.unmount());
 });
 
-it('uses empty viewport defaults and ignores a screenshot override for another route', async () => {
+it('ignores a screenshot override supplied to another route descriptor', async () => {
   mocks.loadSettings.mockResolvedValue({});
-  const { HomeRoute } = await import('./route');
-  renderRoute(<HomeRoute startup={{ page: 'export' }} />);
-  await vi.waitFor(() =>
-    expect(mocks.homePage).toHaveBeenLastCalledWith(
-      expect.objectContaining({ startupMode: null, viewportPresets: [] })
-    )
-  );
+  const { ScreenshotsRoute } = await import('./route');
+  const container = document.createElement('div');
+  const root = createRoot(container);
+
+  act(() => root.render(<ScreenshotsRoute startup={{ page: 'menu' }} />));
+
+  expect(mocks.homePage).toHaveBeenCalledWith(expect.objectContaining({ startupMode: null }));
+  act(() => root.unmount());
 });

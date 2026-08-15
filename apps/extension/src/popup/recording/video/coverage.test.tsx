@@ -13,8 +13,8 @@ const { buttonMock } = vi.hoisted(() => ({
   buttonMock: vi.fn(),
 }));
 
-vi.mock('../../../ui/popup-shell/icon-state-button', () => ({
-  PopupIconStateButton: (props: any) => {
+vi.mock('../../../ui/popup-shell/expanding-mode-button', () => ({
+  PopupExpandingModeButton: (props: any) => {
     buttonMock(props);
     return <button type="button">{props.label}</button>;
   },

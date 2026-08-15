@@ -2,12 +2,12 @@ import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
   title: {
-    ru: 'Галерея',
-    en: 'Gallery',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   documentTitle: {
-    ru: 'Sniptale — Галерея',
-    en: 'Sniptale — Gallery',
+    ru: 'Sniptale — Библиотека',
+    en: 'Sniptale — Library',
   },
   description: {
     ru: 'Все сохранённые скриншоты, видеозаписи и экспорты в одном месте.',
@@ -166,8 +166,8 @@ export const galleryAppMessages = defineMessageSource({
     en: 'Nothing found',
   },
   emptyDescription: {
-    ru: 'Измените фильтры, поисковую строку или настройки сохранения в Галерею.',
-    en: 'Adjust filters, the search query, or gallery save settings.',
+    ru: 'Измените фильтры, поисковую строку или настройки сохранения в Библиотеку.',
+    en: 'Adjust filters, the search query, or library save settings.',
   },
   emptyScenarioTitle: {
     ru: 'Сценарии не найдены',
@@ -218,8 +218,8 @@ export const galleryAppMessages = defineMessageSource({
     en: 'Delete',
   },
   deleteManySuffix: {
-    ru: 'файлов из Галереи? Это действие необратимо.',
-    en: 'files from Gallery? This action cannot be undone.',
+    ru: 'файлов из Библиотеки? Это действие необратимо.',
+    en: 'files from Library? This action cannot be undone.',
   },
   storageCleanupDeletePrefix: {
     ru: 'удалить',

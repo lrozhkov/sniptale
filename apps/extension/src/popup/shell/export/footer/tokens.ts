@@ -6,7 +6,7 @@ export const footerActionGridClassName =
   'grid grid-cols-[minmax(0,1fr)_48px_48px_48px] items-stretch gap-1.5';
 
 export const footerCopyButtonBaseClassName = [
-  'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]',
+  'group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]',
   'transition-all',
   'outline-none focus-visible:outline-none',
 ].join(' ');

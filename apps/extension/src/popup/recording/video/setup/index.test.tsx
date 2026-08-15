@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -26,9 +26,9 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 }));
 
 vi.mock('./body', (_importOriginal) => ({
-  VideoSetupBody: (props: unknown) => {
+  VideoSetupBody: (props: { idleActions?: ReactNode }) => {
     mocks.bodyMock(props);
-    return <div data-testid="video-setup-body" />;
+    return <div data-testid="video-setup-body">{props.idleActions}</div>;
   },
 }));
 
@@ -203,6 +203,9 @@ async function verifiesStartableViewModel() {
       startButtonLabel: 't:popup.video.startButton',
     })
   );
+  expect(
+    container?.querySelector('[data-testid="video-setup-body"] [data-testid="footer"]')
+  ).not.toBeNull();
 }
 
 async function verifiesDisabledStartState() {

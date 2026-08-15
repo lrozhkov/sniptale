@@ -23,6 +23,7 @@ export function VideoMicrophoneSelector({
   return (
     <VideoMediaDeviceSelector
       label={translate('popup.video.microphoneRowLabel')}
+      description={translate('popup.video.microphoneRowDescription')}
       ariaLabel={translate('popup.video.microphoneRowAria')}
       currentDeviceId={settings.microphoneDeviceId}
       devices={microphoneDevices}
@@ -35,6 +36,8 @@ export function VideoMicrophoneSelector({
         ariaLabel: translate('popup.video.microphoneSettingsActionAria'),
         disabled: !settings.microphoneDeviceId,
         label: translate('popup.video.microphoneSettingsAction'),
+        panelDescription: translate('popup.video.microphoneSettingsDescription'),
+        panelTitle: translate('popup.video.microphoneSettingsTitle'),
         panel: (
           <MicrophoneSettingsPanel
             currentDeviceId={settings.microphoneDeviceId}

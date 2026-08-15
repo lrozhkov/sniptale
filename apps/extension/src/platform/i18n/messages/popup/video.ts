@@ -19,6 +19,34 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Запись выбранной области внутри текущей вкладки',
     en: 'Record the selected area inside the current tab',
   },
+  recordingAreaLabel: {
+    ru: 'Область записи',
+    en: 'Recording area',
+  },
+  recordingAreaAria: {
+    ru: 'Выбор области записи вкладки',
+    en: 'Tab recording area selector',
+  },
+  recordingAreaDescription: {
+    ru: 'Записывайте вкладку целиком или выберите нужную область перед началом.',
+    en: 'Record the full tab or select a specific area before recording starts.',
+  },
+  recordingAreaFullTab: {
+    ru: 'Вся вкладка',
+    en: 'Full tab',
+  },
+  recordingAreaFullTabDescription: {
+    ru: 'Записать всё содержимое активной вкладки',
+    en: 'Record all content in the active tab',
+  },
+  recordingAreaManual: {
+    ru: 'Выбрать вручную',
+    en: 'Select manually',
+  },
+  recordingAreaManualDescription: {
+    ru: 'Перед записью выделить область на странице',
+    en: 'Select an area on the page before recording',
+  },
   modeCameraLabel: {
     ru: 'Камера',
     en: 'Camera',
@@ -54,6 +82,10 @@ export const popupVideoMessages = defineMessageSource({
   presetRowAria: {
     ru: 'Выбор размера для записи',
     en: 'Recording size selector',
+  },
+  presetRowDescription: {
+    ru: 'Задаёт размер страницы или окна, который будет использован во время записи.',
+    en: 'Set the page or window size used while recording.',
   },
   presetPlaceholder: {
     ru: 'Выберите шаблон',
@@ -157,6 +189,10 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Качество видео',
     en: 'Video quality',
   },
+  qualityDescription: {
+    ru: 'Балансирует детализацию видео, нагрузку на устройство и размер файла.',
+    en: 'Balance video detail, device load, and output file size.',
+  },
   profileCompact: {
     ru: 'Экономное',
     en: 'Compact',
@@ -190,7 +226,7 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Video output format',
   },
   outputSettingsAction: {
-    ru: 'Настроить',
+    ru: 'Настройка',
     en: 'Settings',
   },
   outputSettingsActionAria: {
@@ -200,6 +236,10 @@ export const popupVideoMessages = defineMessageSource({
   outputSettingsTitle: {
     ru: 'Параметры итогового видео',
     en: 'Video output settings',
+  },
+  outputSettingsDescription: {
+    ru: 'Настройте формат, кодек, разрешение и частоту кадров итогового видео.',
+    en: 'Configure the final video format, codec, resolution, and frame rate.',
   },
   outputCodecLabel: {
     ru: 'Кодек',
@@ -229,6 +269,10 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Отсчёт',
     en: 'Countdown',
   },
+  countdownDescription: {
+    ru: 'Добавляет паузу перед началом записи, чтобы вы успели подготовить экран.',
+    en: 'Add a delay before recording so you have time to prepare the screen.',
+  },
   autoHideLabel: {
     ru: 'Скрыть',
     en: 'Hide',
@@ -236,6 +280,10 @@ export const popupVideoMessages = defineMessageSource({
   sourceCountLabel: {
     ru: 'Источники',
     en: 'Sources',
+  },
+  sourceCountDescription: {
+    ru: 'Определяет, сколько окон или экранов можно выбрать для одной записи.',
+    en: 'Choose how many windows or screens can be included in one recording.',
   },
   sourceCountSuffix: {
     ru: 'окн.',
@@ -270,12 +318,12 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Video editor',
   },
   galleryLabel: {
-    ru: 'Галерея',
-    en: 'Gallery',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   galleryTitle: {
-    ru: 'Галерея',
-    en: 'Gallery',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   loadingPopupError: {
     ru: 'Не удалось загрузить popup',

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -32,9 +32,9 @@ vi.mock('../../../../contracts/messaging/parsers/boundary', async (importOrigina
 }));
 
 vi.mock('./body', () => ({
-  VideoSetupBody: (props: unknown) => {
+  VideoSetupBody: (props: { idleActions?: ReactNode }) => {
     mocks.bodyMock(props);
-    return <div data-testid="video-setup-body" />;
+    return <div data-testid="video-setup-body">{props.idleActions}</div>;
   },
 }));
 

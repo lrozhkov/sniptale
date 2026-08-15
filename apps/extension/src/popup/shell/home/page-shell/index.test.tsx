@@ -2,210 +2,42 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
+import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 import {
   cleanupRenderedNode,
   createActiveTabCapabilities,
-  createQuickAction,
   getContainer,
   renderNode,
 } from './popup-home.test.helpers';
 
-const {
-  popupHomeActionRowSpy,
-  popupHomeErrorMessageSpy,
-  popupHomeQuickActionsSpy,
-  runtimeSendMessageSpy,
-  usePopupHomeActionsSpy,
-} = vi.hoisted(() => ({
-  popupHomeActionRowSpy: vi.fn(),
-  popupHomeErrorMessageSpy: vi.fn(),
-  popupHomeQuickActionsSpy: vi.fn(),
-  runtimeSendMessageSpy: vi.fn(),
-  usePopupHomeActionsSpy: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  handleScreenshotCapture: vi.fn(),
+  usePopupHomeActions: vi.fn(),
 }));
 
 vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
-
-vi.mock('./sections', () => ({
-  GalleryStatus: undefined,
-  PopupHomeActionRow: (props: unknown) => {
-    popupHomeActionRowSpy(props);
-    return <button data-testid="action-row-proxy">action-row</button>;
-  },
-  PopupHomeErrorMessage: (props: { message: string }) => {
-    popupHomeErrorMessageSpy(props);
-    return <div data-testid="error-proxy">{props.message}</div>;
-  },
-  PopupHomeQuickActions: (props: unknown) => {
-    popupHomeQuickActionsSpy(props);
-    return <button data-testid="quick-actions-proxy">quick-actions</button>;
-  },
-}));
-
 vi.mock('./actions', () => ({
-  usePopupHomeActions: (args: unknown) => usePopupHomeActionsSpy(args),
-}));
-
-vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/runtime-messaging')>()),
-  createRuntimeMessagingTransport: () => ({
-    sendRuntimeMessage: runtimeSendMessageSpy,
-  }),
-  getErrorMessage: (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : fallback,
+  usePopupHomeActions: (args: unknown) => mocks.usePopupHomeActions(args),
 }));
 
 import { PopupHomePage } from './index';
-import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
-
-function getQuickActionsProxyProps() {
-  return popupHomeQuickActionsSpy.mock.calls[0]?.[0] as {
-    onTriggerAction: (actionId: string) => void;
-  };
-}
-
-function expectRestrictedHomeSections(quickAction: ReturnType<typeof createQuickAction>) {
-  expect(usePopupHomeActionsSpy).toHaveBeenCalledWith({
-    quickActions: [quickAction],
-    quickActionsDisabledReason: 'Quick actions blocked',
-    screenshotDisabledReason: 'Screenshots blocked',
-  });
-  expect(popupHomeQuickActionsSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      hasQuickActions: true,
-      quickActions: [quickAction],
-      quickActionsReady: true,
-      quickActionsDisabledTitle: 'popup.common.restrictedPageFeatures',
-      shouldShowQuickActions: true,
-    })
-  );
-  expect(popupHomeActionRowSpy).not.toHaveBeenCalled();
-  expect(getContainer()?.querySelector('[data-testid="error-proxy"]')?.textContent).toBe(
-    'Quick action failed'
-  );
-}
-
-async function renderRestrictedHomePage(quickAction: ReturnType<typeof createQuickAction>) {
-  await renderNode(
-    <PopupHomePage
-      quickActions={[quickAction]}
-      quickActionsReady
-      viewportPresets={[]}
-      activeTabCapabilities={createActiveTabCapabilities({
-        isRestrictedPage: true,
-        quickActions: { reason: 'Quick actions blocked', supported: false },
-        screenshotMode: { reason: 'Screenshots blocked', supported: false },
-      })}
-    />
-  );
-}
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  popupHomeActionRowSpy.mockReset();
-  popupHomeErrorMessageSpy.mockReset();
-  popupHomeQuickActionsSpy.mockReset();
-  runtimeSendMessageSpy.mockReset();
-  runtimeSendMessageSpy.mockResolvedValue({
-    status: {
-      allSitesGranted: false,
-      currentTabActive: true,
-      currentTabId: 1,
-      currentTabOrigin: 'https://example.com',
-      siteGranted: false,
-      supported: true,
-    },
-    success: true,
-  });
-  usePopupHomeActionsSpy.mockReset();
-  usePopupHomeActionsSpy.mockReturnValue({
+  mocks.handleScreenshotCapture.mockReset();
+  mocks.usePopupHomeActions.mockReturnValue({
     actionError: null,
     capturePending: false,
-    handleOpenScreenshotMode: vi.fn(),
     handleQuickAction: vi.fn(),
-    handleScreenshotCapture: vi.fn(),
+    handleScreenshotCapture: mocks.handleScreenshotCapture,
   });
 });
 
-afterEach(() => {
-  cleanupRenderedNode();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
+afterEach(cleanupRenderedNode);
 
-it('maps capability state into home sections and suppresses errors on restricted pages', async () => {
-  const handleOpenScreenshotMode = vi.fn();
-  const handleQuickAction = vi.fn();
-
-  usePopupHomeActionsSpy.mockReturnValue({
-    actionError: 'Quick action failed',
-    capturePending: false,
-    handleOpenScreenshotMode,
-    handleQuickAction,
-    handleScreenshotCapture: vi.fn(),
-  });
-
-  const quickAction = createQuickAction({ id: 'quick-action-1' });
-
-  await renderRestrictedHomePage(quickAction);
-  expectRestrictedHomeSections(quickAction);
-
-  await act(async () => {
-    getQuickActionsProxyProps().onTriggerAction('quick-action-1');
-    (
-      getContainer()?.querySelector('[aria-label="popup.home.toolsLabel"]') as HTMLButtonElement
-    ).click();
-    await Promise.resolve();
-  });
-
-  expect(handleQuickAction).toHaveBeenCalledWith('quick-action-1');
-  expect(handleOpenScreenshotMode).not.toHaveBeenCalled();
-});
-
-it('renders the home error surface on unrestricted pages', async () => {
-  usePopupHomeActionsSpy.mockReturnValue({
-    actionError: 'Open screenshot mode failed',
-    handleOpenScreenshotMode: vi.fn(),
-    handleQuickAction: vi.fn(),
-  });
-
-  await renderNode(
-    <PopupHomePage
-      quickActions={[]}
-      quickActionsReady
-      viewportPresets={[]}
-      activeTabCapabilities={createActiveTabCapabilities()}
-    />
-  );
-
-  expect(getContainer()?.textContent).toContain('Open screenshot mode failed');
-  expect(popupHomeErrorMessageSpy).toHaveBeenCalledWith({
-    message: 'Open screenshot mode failed',
-  });
-});
-
-it('renders bootstrap home errors even when no action handler error is present', async () => {
-  await renderNode(
-    <PopupHomePage
-      quickActions={[]}
-      quickActionsReady
-      viewportPresets={[]}
-      activeTabCapabilities={createActiveTabCapabilities()}
-      homeError="Failed to load quick actions"
-    />
-  );
-
-  expect(getContainer()?.textContent).toContain('Failed to load quick actions');
-  expect(popupHomeErrorMessageSpy).toHaveBeenCalledWith({
-    message: 'Failed to load quick actions',
-  });
-});
-
-it('forwards the quick-actions readiness state to the section owner', async () => {
+it('renders shortcuts alongside the two screenshot setup modes', async () => {
   await renderNode(
     <PopupHomePage
       quickActions={[]}
@@ -215,22 +47,18 @@ it('forwards the quick-actions readiness state to the section owner', async () =
     />
   );
 
-  expect(popupHomeQuickActionsSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      quickActionsReady: false,
-    })
-  );
+  expect(getContainer()?.textContent).toContain('popup.home.captureTabLabel');
+  expect(getContainer()?.textContent).toContain('popup.home.captureWindowLabel');
+  expect(getContainer()?.textContent).toContain('popup.home.shortcutsModeLabel');
+  expect(getContainer()?.textContent).not.toContain('popup.home.toolsLabel');
+  expect(mocks.usePopupHomeActions).toHaveBeenCalledWith({
+    quickActions: [],
+    quickActionsDisabledReason: null,
+    screenshotDisabledReason: null,
+  });
 });
 
-it('uses the authoritative bootstrap screenshot snapshot on the first home frame', async () => {
-  const handleScreenshotCapture = vi.fn();
-  usePopupHomeActionsSpy.mockReturnValue({
-    actionError: null,
-    capturePending: false,
-    handleOpenScreenshotMode: vi.fn(),
-    handleQuickAction: vi.fn(),
-    handleScreenshotCapture,
-  });
+it('uses the authoritative desktop snapshot for the first screenshot frame', async () => {
   await renderNode(
     <PopupHomePage
       quickActions={[]}
@@ -241,21 +69,33 @@ it('uses the authoritative bootstrap screenshot snapshot on the first home frame
     />
   );
 
-  expect(
-    getContainer()?.querySelector('button[title^="popup.home.captureWindowLabel"]')?.className
-  ).toContain('bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_32%,transparent)]');
-
   await act(async () => {
-    (
-      getContainer()?.querySelector(
-        'button[title="popup.home.captureButtonTitle"]'
-      ) as HTMLButtonElement
-    ).click();
+    getContainer()
+      ?.querySelector<HTMLButtonElement>('button[title="popup.home.captureButtonTitle"]')
+      ?.click();
     await Promise.resolve();
   });
 
-  expect(handleScreenshotCapture).toHaveBeenCalledWith(
+  expect(mocks.handleScreenshotCapture).toHaveBeenCalledWith(
     DEFAULT_SCREENSHOT_SETUP_STATE.desktop,
     null
   );
+});
+
+it('shows an owner-local action error', async () => {
+  mocks.usePopupHomeActions.mockReturnValue({
+    actionError: 'Capture failed',
+    capturePending: false,
+    handleQuickAction: vi.fn(),
+    handleScreenshotCapture: mocks.handleScreenshotCapture,
+  });
+  await renderNode(
+    <PopupHomePage
+      quickActions={[]}
+      quickActionsReady
+      viewportPresets={[]}
+      activeTabCapabilities={createActiveTabCapabilities()}
+    />
+  );
+  expect(getContainer()?.textContent).toContain('Capture failed');
 });

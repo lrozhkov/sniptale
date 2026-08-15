@@ -18,7 +18,7 @@ vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
 }));
 vi.mock('../navigation/actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../navigation/actions')>()),
-  openGallery: vi.fn(),
+  openLibrary: vi.fn(),
   openGithubRepository: vi.fn(),
   openImageEditor: vi.fn(),
   openScenarioEditor: vi.fn(),
@@ -31,13 +31,17 @@ it('builds navigation and utility actions only when the palette is opened', asyn
   const root = createRoot(document.createElement('div'));
   act(() =>
     root.render(
-      <RouteFirstPopupCommandPalette page="home" onClose={vi.fn()} onNavigate={mocks.navigate} />
+      <RouteFirstPopupCommandPalette
+        page="screenshots"
+        onClose={vi.fn()}
+        onNavigate={mocks.navigate}
+      />
     )
   );
   const props = mocks.commandPalette.mock.calls[0]?.[0] as {
     actions: Array<{ id: string; onSelect(): void; subtitle: string }>;
   };
-  expect(props.actions).toHaveLength(9);
+  expect(props.actions).toHaveLength(11);
   expect(props.actions[0]?.subtitle).toBe('shared.ui.commandPaletteCurrentPageHint');
   props.actions.find((action) => action.id === 'popup-page-video')?.onSelect();
   expect(mocks.navigate).toHaveBeenCalledWith('video');

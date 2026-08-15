@@ -147,7 +147,7 @@ describe('media-hub-store web snapshot save flow', () => {
     });
 
     expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenCalledWith(
-      'сохранение Веб-снимка в Галерею',
+      'сохранение Веб-снимка в Библиотеку',
       expect.any(Function)
     );
     expect(mediaHubStoreMocks.saveWebSnapshotMediaAssetMock).toHaveBeenCalledWith(input);

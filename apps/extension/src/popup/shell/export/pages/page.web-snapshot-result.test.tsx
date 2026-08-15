@@ -132,6 +132,6 @@ it('adds a result action that opens the web snapshots gallery for multiple saved
   footerProps.onOpenWebSnapshotResult();
 
   expect(footerProps.openWebSnapshotResultMode).toBe('gallery');
-  expect(footerProps.openWebSnapshotResultTitle).toBe('Открыть Веб-снимки в Галерее');
+  expect(footerProps.openWebSnapshotResultTitle).toBe('Открыть Веб-снимки в Библиотеке');
   expect(mocks.openGalleryWebSnapshotsPageMock).toHaveBeenCalledTimes(1);
 });

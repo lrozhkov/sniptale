@@ -18,7 +18,7 @@ function openVideoEditor() {
 }
 
 function openGallery() {
-  void openGalleryPage();
+  void openGalleryPage({ folder: 'recording' });
   window.close();
 }
 

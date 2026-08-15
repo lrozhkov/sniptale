@@ -14,8 +14,8 @@ export const popupVideoMediaMessages = defineMessageSource({
     en: 'Camera',
   },
   webcamToggleDescription: {
-    ru: 'Отдельная видеодорожка',
-    en: 'Separate video track',
+    ru: 'Веб-камера в записи',
+    en: 'Webcam in the recording',
   },
   microphoneRowLabel: {
     ru: 'Микрофон',
@@ -24,6 +24,10 @@ export const popupVideoMediaMessages = defineMessageSource({
   microphoneRowAria: {
     ru: 'Строка выбора микрофона',
     en: 'Microphone device row',
+  },
+  microphoneRowDescription: {
+    ru: 'Выберите микрофон, с которого будет записываться ваш голос.',
+    en: 'Choose the microphone used to record your voice.',
   },
   microphoneLoading: {
     ru: 'Читаю список микрофонов...',
@@ -52,6 +56,10 @@ export const popupVideoMediaMessages = defineMessageSource({
   microphoneSettingsTitle: {
     ru: 'Настройка микрофона',
     en: 'Microphone settings',
+  },
+  microphoneSettingsDescription: {
+    ru: 'Проверьте звук и настройте обработку и громкость выбранного микрофона.',
+    en: 'Test the selected microphone and adjust its processing and volume.',
   },
   microphoneSettingsNoDevice: {
     ru: 'Выберите микрофон, чтобы проверить звук и применить настройки.',
@@ -169,6 +177,10 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Строка выбора камеры',
     en: 'Camera device row',
   },
+  webcamRowDescription: {
+    ru: 'Выберите камеру, изображение с которой попадёт в запись.',
+    en: 'Choose the camera whose picture will be included in the recording.',
+  },
   webcamLoading: {
     ru: 'Читаю список камер...',
     en: 'Loading cameras...',
@@ -196,6 +208,10 @@ export const popupVideoMediaMessages = defineMessageSource({
   webcamQualityTitle: {
     ru: 'Настройка камеры',
     en: 'Camera settings',
+  },
+  webcamSettingsDescription: {
+    ru: 'Настройте размещение, кадрирование и качество изображения с камеры.',
+    en: 'Adjust webcam placement, cropping, and image quality.',
   },
   webcamPresentationModeLabel: {
     ru: 'Размещение',

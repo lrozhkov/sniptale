@@ -31,7 +31,8 @@ vi.mock('./coordinator', () => ({
   resolvePopupStartupRoute: () => new Promise(() => undefined),
 }));
 
-vi.mock('./resource', () => ({
+vi.mock('./resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./resource')>()),
   loadPopupRoute: vi.fn(),
   preloadPopupPage: vi.fn(),
 }));

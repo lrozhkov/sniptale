@@ -17,6 +17,7 @@ function renderSelect(onChange = vi.fn(), value = 'b') {
     root?.render(
       <InlineCurtainSelect
         ariaLabel="Device"
+        description="Choose the input used for recording"
         label="Mic"
         onChange={onChange}
         options={[
@@ -42,6 +43,7 @@ function renderSelectWithSecondaryAction() {
     root?.render(
       <InlineCurtainSelect
         ariaLabel="Device"
+        description="Choose the camera used for recording"
         label="Cam"
         onChange={vi.fn()}
         options={[{ value: 'camera-1', label: 'Camera 1' }]}
@@ -49,6 +51,8 @@ function renderSelectWithSecondaryAction() {
           ariaLabel: 'Open settings',
           label: 'Settings',
           panel: <div>Camera settings panel</div>,
+          panelDescription: 'Adjust camera quality and placement',
+          panelTitle: 'Camera settings',
         }}
         value="camera-1"
       />
@@ -65,6 +69,7 @@ function renderSelectWithCustomOptionsPanel(onFormatChange = vi.fn()) {
     root?.render(
       <InlineCurtainSelect
         ariaLabel="Quality"
+        description="Choose image format and quality"
         label="Quality"
         onChange={vi.fn()}
         options={[]}
@@ -94,6 +99,14 @@ it('keeps the option list top-aligned with manual scrolling and no automatic off
   expect(list).toBeNull();
 });
 
+it('keeps parameter labels in the shared fixed-width column', () => {
+  renderSelect();
+
+  const label = container?.querySelector<HTMLElement>('[title="Mic"]');
+  expect(label?.className).toContain('w-[88px]');
+  expect(label?.className).toContain('truncate');
+});
+
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
@@ -102,7 +115,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('opens a full-height top-aligned curtain, titles truncated text, and closes outside', () => {
+it('opens over a theme-aware blurred backdrop and dismisses from the covered area', () => {
   renderSelect();
 
   act(() => {
@@ -110,13 +123,31 @@ it('opens a full-height top-aligned curtain, titles truncated text, and closes o
   });
 
   const panel = container?.querySelector<HTMLElement>('[id]');
+  const backdrop = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="popup.inline-curtain.backdrop"]'
+  );
   expect(panel?.scrollTop).toBe(0);
   expect(panel?.className).toContain('absolute inset-y-0');
+  expect(panel?.textContent).toContain('Mic');
+  expect(panel?.textContent).toContain('Choose the input used for recording');
+  expect(panel?.querySelector('[data-ui="popup.inline-curtain.back"]')).not.toBeNull();
+  expect(backdrop?.className).toContain('var(--sniptale-color-surface-canvas)');
+  expect(backdrop?.className).toContain('backdrop-blur-[4px]');
   expect(container?.querySelector('[title="Studio microphone with a long name"]')).not.toBeNull();
   expect(container?.querySelector('[title="Full device path"]')).not.toBeNull();
   expect(container?.querySelector('[aria-current="true"]')?.className).toContain(
     'var(--sniptale-color-accent)'
   );
+
+  act(() => backdrop?.click());
+
+  expect(container?.querySelector('[id]')).toBeNull();
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.backdrop"]')).toBeNull();
+});
+
+it('preserves document-level outside-pointer dismissal', () => {
+  renderSelect();
+  act(() => container?.querySelector<HTMLButtonElement>('button')?.click());
 
   act(() => {
     document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
@@ -135,6 +166,9 @@ it('opens the secondary curtain panel and closes it from the panel close button'
   });
 
   expect(container?.textContent).toContain('Camera settings panel');
+  expect(container?.textContent).toContain('Camera settings');
+  expect(container?.textContent).toContain('Adjust camera quality and placement');
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.back"]')).toBeNull();
 
   act(() => {
     container?.querySelector<HTMLButtonElement>('[aria-label="Закрыть"]')?.click();
@@ -167,7 +201,7 @@ it('closes on Escape and restores focus to the trigger', async () => {
   act(() => trigger?.click());
   await act(async () => Promise.resolve());
   expect(container?.querySelector('[role="listbox"]')).not.toBeNull();
-  expect(document.activeElement?.getAttribute('role')).toBe('option');
+  expect(document.activeElement?.getAttribute('data-ui')).toBe('popup.inline-curtain.back');
 
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(container?.querySelector('[role="listbox"]')).toBeNull();

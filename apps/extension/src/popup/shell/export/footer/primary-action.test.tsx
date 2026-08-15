@@ -21,7 +21,13 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     label: string;
     onClick: () => void;
   }) => {
-    popupActionButtonMock({ dataUi, disabled, iconClassName, label, onClick });
+    popupActionButtonMock({
+      dataUi,
+      disabled,
+      iconClassName,
+      label,
+      onClick,
+    });
     return (
       <button type="button" data-ui={dataUi} disabled={disabled} onClick={onClick}>
         {label}

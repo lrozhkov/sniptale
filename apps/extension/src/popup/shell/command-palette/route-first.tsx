@@ -4,7 +4,7 @@ import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import { translate } from '../../../platform/i18n/popup';
 import type { PopupPage } from '../navigation/actions';
 import {
-  openGallery,
+  openLibrary,
   openGithubRepository,
   openImageEditor,
   openScenarioEditor,
@@ -12,7 +12,7 @@ import {
   openVideoEditor,
 } from '../navigation/actions';
 
-const pages: PopupPage[] = ['home', 'video', 'export'];
+const pages: PopupPage[] = ['screenshots', 'video', 'menu', 'tools', 'export'];
 
 export function RouteFirstPopupCommandPalette({
   page,
@@ -26,8 +26,10 @@ export function RouteFirstPopupCommandPalette({
   const navigationSection = translate('shared.ui.commandPaletteNavigationSection');
   const utilitySection = translate('shared.ui.commandPaletteUtilitySection');
   const labels: Record<PopupPage, string> = {
-    home: translate('popup.tabs.home'),
+    screenshots: translate('popup.tabs.screenshots'),
     video: translate('popup.tabs.video'),
+    menu: translate('popup.tabs.menu'),
+    tools: translate('popup.tabs.tools'),
     export: translate('popup.tabs.export'),
   };
   const actions: CommandPaletteAction[] = [
@@ -45,7 +47,7 @@ export function RouteFirstPopupCommandPalette({
       ['image-editor', translate('popup.home.imageEditorLabel'), openImageEditor],
       ['scenario-editor', translate('popup.home.scenarioEditorLabel'), openScenarioEditor],
       ['video-editor', translate('popup.video.videoEditorLabel'), openVideoEditor],
-      ['gallery', translate('popup.home.galleryLabel'), openGallery],
+      ['library', translate('popup.home.libraryLabel'), openLibrary],
       ['settings', translate('popup.common.footerSettings'), openSettings],
       ['github', translate('popup.common.footerGithub'), openGithubRepository],
     ].map(([id, title, onSelect]) => ({

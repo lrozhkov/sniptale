@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../../features/media-hub/storage-capacity';
 import type { ViewportPreset } from '../../../../contracts/settings';
@@ -28,6 +29,7 @@ export interface VideoSetupPageProps {
   startError: string | null;
   isStartPending: boolean;
   pageAccessDisabledReason?: string | null;
+  pageAccessControls?: ReactNode;
   activeTabCapabilities: ActiveTabCapabilities;
   onCaptureModeChange: (mode: CaptureMode) => void;
   onPresetChange: (presetId: string | null) => Promise<void> | void;
@@ -53,7 +55,6 @@ export interface VideoSetupViewModel {
   startDisabledReason: string | null;
   canStart: boolean;
   systemAudioDisabled: boolean;
-  diagnosticsDisabled: boolean;
   controlledCursorDisabled: boolean;
   controlledCursorDisabledReason: string | null;
   startButtonLabel: string;
