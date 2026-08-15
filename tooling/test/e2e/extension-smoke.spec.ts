@@ -13,7 +13,6 @@ const SETTINGS_AI_NAV_LABEL = translate('settings.navigation.aiConnections', 'ru
 const SETTINGS_AI_PROMPTS_NAV_LABEL = translate('settings.navigation.aiPrompts', 'ru');
 const SETTINGS_AI_PROVIDERS_TITLE = translate('settings.aiProviders.providersTitle', 'ru');
 const SETTINGS_AI_MODELS_TITLE = translate('settings.aiProviders.modelsTitle', 'ru');
-const SETTINGS_AI_PROMPTS_TITLE = translate('settings.navigation.templates', 'ru');
 const SETTINGS_AI_SAVED_PROMPTS_LABEL = translate('templates.section.savedLabel', 'ru');
 const POPUP_HARNESS_PATH = '/tooling/test/harness/popup.html';
 const POPUP_HOME_TAB_LABEL = translate('popup.tabs.home', 'ru');
@@ -329,9 +328,11 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   ).toBeVisible();
 
   await page.getByRole('button', { name: SETTINGS_AI_PROMPTS_NAV_LABEL, exact: true }).click();
-  await expect(settingsContent.getByText(SETTINGS_AI_PROMPTS_TITLE, { exact: true })).toBeVisible();
   await expect(
-    settingsContent.getByText(SETTINGS_AI_SAVED_PROMPTS_LABEL, { exact: true })
+    settingsContent.getByText(SETTINGS_AI_PROMPTS_NAV_LABEL, { exact: true })
+  ).toBeVisible();
+  await expect(
+    settingsContent.getByRole('region', { name: SETTINGS_AI_SAVED_PROMPTS_LABEL, exact: true })
   ).toBeVisible();
 });
 
