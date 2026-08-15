@@ -309,7 +309,8 @@ function renderOuterShadows(
               result="offset"
             />
             <feFlood floodColor={shadow.color} result="color" />
-            <feComposite in="color" in2="offset" operator="in" />
+            <feComposite in="color" in2="offset" operator="in" result="colored-shadow" />
+            <feComposite in="colored-shadow" in2="SourceAlpha" operator="out" />
           </filter>
         </defs>
         <Shape geometry={geometry} fill="#000" filter={`url(#callout-shadow-${id}-${index})`} />
@@ -626,6 +627,17 @@ type CalloutSurfaceCompositorProps = {
   visualScale: number;
 };
 
+function composeResolvedSurfaceShadows(
+  nativeShadows: ProjectedSurfaceShadow[],
+  resolvedBoxShadow: string
+): ProjectedSurfaceShadow[] {
+  const customShadows = parseResolvedCalloutBoxShadow(resolvedBoxShadow);
+  if (customShadows === null) return [];
+  return customShadows.length > 0 && customShadows.every((shadow) => shadow.inset)
+    ? [...nativeShadows, ...customShadows]
+    : customShadows;
+}
+
 function useResolvedSurfaceEffects(
   projection: CalloutSurfaceProjection,
   cssContext: CalloutSurfaceCssContext
@@ -652,7 +664,7 @@ function useResolvedSurfaceEffects(
       },
       shadows:
         customBoxShadow !== undefined
-          ? (parseResolvedCalloutBoxShadow(computed.boxShadow) ?? [])
+          ? composeResolvedSurfaceShadows(projection.shadows, computed.boxShadow)
           : projection.shadows,
     });
   }, [customBoxShadow, customOutline, projection.outline, projection.shadows, resolutionKey]);

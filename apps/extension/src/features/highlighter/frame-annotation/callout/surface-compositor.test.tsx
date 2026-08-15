@@ -298,6 +298,18 @@ describe('CalloutSurfaceCompositor Paint', () => {
 });
 
 describe('CalloutSurfaceCompositor effects', () => {
+  it('clips outer shadow alpha out of the comment interior', () => {
+    const style = createDefaultCalloutSettings().style;
+    style.surface.fillPaint = { kind: 'solid', color: '#ffffff00' };
+    style.surface.shadow = 12;
+    const markup = renderWedge(style);
+
+    expect(markup).toContain('result="colored-shadow"');
+    expect(markup).toContain(
+      '<feComposite in="colored-shadow" in2="SourceAlpha" operator="out"></feComposite>'
+    );
+  });
+
   it('keeps unsupported-but-valid CSS shadow syntax exclusive until CSSOM resolves it', () => {
     const style = createDefaultCalloutSettings().style;
     style.surface.shadow = 12;
@@ -446,6 +458,8 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
 
   it('resolves CSS effects in the card color and typography context', async () => {
     const style = createDefaultCalloutSettings().style;
+    style.surface.shadow = 12;
+    style.surface.shadowColor = '#ff0000';
     style.customCss = '[card]\nbox-shadow: 0 0.5em 1em currentColor;';
     const computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
       boxShadow: 'rgb(31, 41, 55) 0px 8px 16px 0px',
@@ -471,6 +485,7 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
     expect(probe?.style.fontSize).toBe('16px');
     expect(probe?.style.fontStyle).toBe('italic');
     expect(host.innerHTML).toContain('flood-color="rgb(31, 41, 55)"');
+    expect(host.innerHTML).not.toContain('flood-color="#ff0000"');
 
     await act(async () => root.unmount());
     computedStyleSpy.mockRestore();
@@ -520,10 +535,12 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
     expect(markup).toContain('stroke-width="8"');
   });
 
-  it('does not retain native elevation when the browser resolves an inset shadow', async () => {
-    const style = createDefaultCalloutSettings().style;
+  it('combines Clear Tint inset highlight with the configured outer shadow', async () => {
+    const clearTint = getSystemSurfaceStylePresets().find(
+      (preset) => preset.id === 'system-surface-clear-tint'
+    )!;
+    const style = applySurfaceStyleToCallout(createDefaultCalloutSettings().style, clearTint.style);
     style.surface.shadow = 12;
-    style.customCss = '[card]\nbox-shadow: inset 0 1px 0 #ffffff59;';
     const computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
       boxShadow: 'inset rgb(255, 255, 255) 0px 1px 0px 0px',
     } as CSSStyleDeclaration);
@@ -542,7 +559,7 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
       );
     });
 
-    expect(host.innerHTML).not.toContain('content.callout.surface-elevation');
+    expect(host.innerHTML).toContain('content.callout.surface-elevation');
     expect(host.innerHTML).toContain('stroke="rgb(255, 255, 255)"');
 
     await act(async () => root.unmount());

@@ -189,7 +189,7 @@ export function resolveCalloutSurfaceProjection(
     ...(customBoxShadow === undefined ? {} : { customBoxShadow }),
     ...(Object.keys(customOutline).length === 0 ? {} : { customOutline }),
     fillPaint: resolved.surface.fillPaint,
-    shadows: customBoxShadow === undefined ? nativeShadows : [],
+    shadows: nativeShadows,
     outline: {
       color: custom?.['outlineColor'],
       offset: parsePixels(custom?.['outlineOffset']) ?? 0,
