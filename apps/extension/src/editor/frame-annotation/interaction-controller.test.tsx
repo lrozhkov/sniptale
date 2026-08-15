@@ -87,6 +87,12 @@ it('continues resizing when the pointer moves outside the annotation plane', () 
 });
 
 it('captures a fast frame move and ignores movement from another pointer', () => {
+  const animationFrames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
   const object = createFrameAnnotationProxy({
     frame: { id: 'frame-1', x: 10, y: 20, width: 100, height: 60 },
     label: 'Frame annotation 1',
@@ -101,6 +107,7 @@ it('captures a fast frame move and ignores movement from another pointer', () =>
     commitHistory: vi.fn(),
     prepareObject: vi.fn(),
     selectLayer: vi.fn(),
+    snapFrameAnnotationRect: vi.fn(({ rect }) => rect),
     syncRuntimeState: vi.fn(),
   };
 
@@ -136,13 +143,17 @@ it('captures a fast frame move and ignores movement from another pointer', () =>
   act(() => {
     moveButton.dispatchEvent(down);
     window.dispatchEvent(pointerEvent('pointermove', 25, 35, 7));
+    window.dispatchEvent(pointerEvent('pointermove', 30, 40, 7));
     window.dispatchEvent(pointerEvent('pointermove', 200, 210, 8));
-    window.dispatchEvent(pointerEvent('pointerup', 25, 35, 7));
+    expect(controller.snapFrameAnnotationRect).not.toHaveBeenCalled();
+    animationFrames.shift()?.(0);
+    window.dispatchEvent(pointerEvent('pointerup', 30, 40, 7));
   });
 
   expect(moveButton.setPointerCapture).toHaveBeenCalledWith(7);
   expect(down.defaultPrevented).toBe(true);
-  expect(readFrameAnnotationSnapshot(object)).toMatchObject({ x: 15, y: 25 });
+  expect(controller.snapFrameAnnotationRect).toHaveBeenCalledOnce();
+  expect(readFrameAnnotationSnapshot(object)).toMatchObject({ x: 20, y: 30 });
   expect(controller.commitHistory).toHaveBeenCalledOnce();
 });
 

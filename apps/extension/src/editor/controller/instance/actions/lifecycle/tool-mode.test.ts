@@ -63,3 +63,19 @@ it('finishes active text editing before changing to another tool', () => {
   expect(text.exitEditing).toHaveBeenCalledOnce();
   expect(controller.activeTool).toBe('pencil');
 });
+
+it('cancels an active drawing before changing tools', () => {
+  const controller = {
+    activeTool: 'pencil',
+    cancelTransientInteraction: vi.fn(() => true),
+    canvas: { getActiveObject: () => undefined },
+    drawSession: { object: { sniptaleId: 'draft-1' }, tool: 'pencil' },
+    syncRuntimeState: vi.fn(),
+    toolModeEnabled: true,
+  };
+
+  Reflect.apply(setActiveToolForController, null, [controller, 'marker']);
+
+  expect(controller.cancelTransientInteraction).toHaveBeenCalledOnce();
+  expect(controller.activeTool).toBe('marker');
+});

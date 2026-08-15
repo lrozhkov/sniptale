@@ -172,7 +172,7 @@ export function flushEditorAutosaveIfNeeded(
   services: EditorPageServices,
   hasImage: () => boolean
 ): void {
-  if (!hasImage()) {
+  if (!hasImage() || !services.controller.isDocumentReadyForExport()) {
     return;
   }
 

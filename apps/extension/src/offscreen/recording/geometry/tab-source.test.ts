@@ -19,20 +19,51 @@ function resolveFullTab(resolution: VideoResolutionPreset = VideoResolutionPrese
 
 describe('tab recording geometry', () => {
   it('uses the logical viewport for SOURCE and the physical track only for sampling', () => {
-    expect(resolveFullTab()).toMatchObject({
+    const geometry = resolveFullTab();
+    expect(geometry).toMatchObject({
+      fillsOutput: true,
       fit: 'contain',
       outputBasis: { width: 1904, height: 985 },
       outputSize: { width: 1904, height: 984 },
-      sourceRect: { x: 0, y: 58, width: 2560, height: 1324 },
+      sourceRect: {
+        x: 0,
+        y: expect.closeTo(58.48739495798327),
+        width: 2560,
+        height: expect.closeTo(1323.0252100840335),
+      },
       sourceSize: { width: 2560, height: 1440 },
     });
+    expect(geometry.sourceRect.width / geometry.sourceRect.height).toBeCloseTo(
+      geometry.outputSize.width / geometry.outputSize.height,
+      12
+    );
+    expect(1324 - geometry.sourceRect.height).toBeLessThanOrEqual(1);
+  });
+
+  it('removes only the density-scaled odd edge at devicePixelRatio 2', () => {
+    const geometry = resolveTabOutputGeometry(
+      { x: 0, y: 0, width: 1904, height: 985 },
+      { width: 3808, height: 1970 },
+      { width: 1904, height: 985, devicePixelRatio: 2 },
+      {
+        frameRateCap: 30,
+        resolution: VideoResolutionPreset.SOURCE,
+        tracksFullViewport: true,
+      }
+    );
+
+    expect(geometry.outputSize).toEqual({ width: 1904, height: 984 });
+    expect(geometry.fillsOutput).toBe(true);
+    expect(geometry.sourceRect).toEqual({ x: 0, y: 1, width: 3808, height: 1968 });
   });
 
   it.each([
     [VideoResolutionPreset.P480, { width: 928, height: 480 }],
     [VideoResolutionPreset.P1440, { width: 2784, height: 1440 }],
   ])('uses preset height and logical viewport aspect for %s', (resolution, outputSize) => {
-    expect(resolveFullTab(resolution).outputSize).toEqual(outputSize);
+    const geometry = resolveFullTab(resolution);
+    expect(geometry.outputSize).toEqual(outputSize);
+    expect(geometry.fillsOutput).toBe(false);
   });
 
   it('uses the logical TAB_CROP selection as output basis', () => {
@@ -44,6 +75,7 @@ describe('tab recording geometry', () => {
     );
 
     expect(geometry).toMatchObject({
+      fillsOutput: false,
       outputBasis: { width: 300, height: 301 },
       outputSize: { width: 300, height: 300 },
       sourceRect: { x: 200, y: 160, width: 600, height: 602 },
@@ -61,6 +93,7 @@ describe('tab recording geometry', () => {
 
     expect(outcome.kind).toBe('mapped');
     expect(resized).toMatchObject({
+      fillsOutput: false,
       fit: 'contain',
       outputBasis: { width: 1904, height: 985 },
       outputSize: { width: 1904, height: 984 },

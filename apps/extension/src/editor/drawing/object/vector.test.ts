@@ -11,6 +11,7 @@ import {
   replaceEditorDrawingFabricGeometry,
   synchronizeEditorDrawingTextLayout,
   updateEditorDrawingPathDraft,
+  updateEditorDrawingShapeDraft,
 } from './vector';
 
 describe('Fabric drawing adapter', () => {
@@ -139,5 +140,23 @@ describe('Fabric drawing adapter', () => {
     const next = { ...first, samples: [...first.samples, { x: 20, y: 5, t: 2 }] };
     expect(updateEditorDrawingPathDraft(object, next, { preview: true })).toBe(true);
     expect(readEditorDrawingObject(object)).toEqual(next);
+  });
+
+  it('updates geometric drafts without replacing their Fabric identity', () => {
+    const first: DrawingObject = {
+      id: 'ellipse-1',
+      kind: 'ellipse',
+      bounds: { x: 5, y: 6, width: 2, height: 2 },
+      color: '#f00',
+      fillColor: null,
+      width: 4,
+    };
+    const object = createEditorDrawingFabricObject(first, 1);
+    const next = { ...first, bounds: { x: 5, y: 6, width: 80, height: 40 } };
+
+    expect(updateEditorDrawingShapeDraft(object, next)).toBe(true);
+    expect(readEditorDrawingObject(object)).toEqual(next);
+    expect(object.width).toBeCloseTo(80);
+    expect(object.height).toBeCloseTo(40);
   });
 });

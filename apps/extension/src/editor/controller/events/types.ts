@@ -26,7 +26,8 @@ export interface EditorControllerEventHandlers {
     transform?: Pick<Transform, 'target'> | null;
   }) => void;
   handleMouseMove: (event: { e: TPointerEvent }) => void;
-  handleMouseUp: () => void;
+  handleMouseUp: (event?: { e: TPointerEvent }) => void;
+  handlePointerCancel: (event?: TPointerEvent) => void;
   handleDoubleClick: (event: { target?: FabricObject; e: TPointerEvent }) => void;
   handleWindowKeyDown: (event: KeyboardEvent) => void;
   handleWindowKeyUp: (event: KeyboardEvent) => void;
@@ -36,6 +37,8 @@ export interface EditorControllerEventHandlers {
   handleViewportScroll: () => void;
   handleWindowMouseMove: (event: MouseEvent) => void;
   handleWindowMouseUp: () => void;
+  handleWindowPointerMove: (event: PointerEvent) => void;
+  handleWindowPointerUp: (event: PointerEvent) => void;
 }
 
 export interface EditorControllerEventStateBindings {

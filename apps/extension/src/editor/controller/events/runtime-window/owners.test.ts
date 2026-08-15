@@ -35,6 +35,7 @@ import { createRuntimeDoubleClickHandler } from './double-click';
 import { createRuntimeWindowKeyDownHandler, createRuntimeWindowKeyUpHandler } from './keyboard';
 
 function createBindings() {
+  const canvas = { _currentTransform: {}, endCurrentTransform: vi.fn(), id: 'canvas' };
   return {
     applyCropSelection: vi.fn(),
     applyTextSelectionStyle: vi.fn(() => true),
@@ -47,7 +48,7 @@ function createBindings() {
     duplicateSelection: vi.fn(),
     finalizeSelectionNudge: vi.fn(),
     getActiveTool: vi.fn(() => 'select'),
-    getCanvas: vi.fn(() => ({ id: 'canvas' })),
+    getCanvas: vi.fn(() => canvas),
     getCropGuide: vi.fn(() => null),
     getDrawSession: vi.fn(() => ({ object: { id: 'draft' } })),
     getRasterToolSession: vi.fn(() => ({ selection: { id: 'selection' } })),
@@ -127,11 +128,22 @@ it('keeps keyup and blur cleanup owned by window adapters', () => {
 
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(false);
   expect(mocks.handleEditorWindowBlur).toHaveBeenCalledWith({
+    cancelTransientInteraction: bindings.cancelTransientInteraction,
+    endCurrentTransform: expect.any(Function),
     finalizeSelectionNudge: expect.any(Function),
   });
-  const [{ finalizeSelectionNudge }] = mocks.handleEditorWindowBlur.mock.calls[0] as [
-    { finalizeSelectionNudge: () => void },
+  const [{ cancelTransientInteraction, endCurrentTransform, finalizeSelectionNudge }] = mocks
+    .handleEditorWindowBlur.mock.calls[0] as [
+    {
+      cancelTransientInteraction: () => void;
+      endCurrentTransform: () => void;
+      finalizeSelectionNudge: () => void;
+    },
   ];
+  endCurrentTransform();
+  cancelTransientInteraction();
   finalizeSelectionNudge();
+  expect(bindings.getCanvas().endCurrentTransform).toHaveBeenCalledOnce();
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
   expect(bindings.finalizeSelectionNudge).toHaveBeenCalledOnce();
 });

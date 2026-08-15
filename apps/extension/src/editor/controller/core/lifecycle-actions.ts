@@ -47,6 +47,11 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
     return this.getDocumentCommandService().exportDocument(this.getControllerInstance());
   }
 
+  isDocumentReadyForExport() {
+    const controller = this.getControllerInstance();
+    return controller.canvas !== null && controller.source !== null;
+  }
+
   renderToDataUrl(options: EditorRenderToDataUrlOptions) {
     return this.getDocumentCommandService().renderToDataUrl(this.getControllerInstance(), options);
   }

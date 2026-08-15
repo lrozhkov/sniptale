@@ -1,6 +1,6 @@
-import type {
-  VideoFrameRate,
+import {
   VideoResolutionPreset,
+  type VideoFrameRate,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { resolveContainedFrame } from './contain-frame';
 import {
@@ -29,8 +29,10 @@ const RECOVERABLE_TAB_CROP_RESIZE_WARNING =
 export type TabOutputGeometry = RecordingGeometryPlan &
   Readonly<{
     coordinateSpace: TabOutputCoordinateSpace;
+    fillsOutput: boolean;
     logicalContentRect: RecordingSampleRect;
     requestedCrop: TabLogicalRect;
+    resolution: VideoResolutionPreset;
     sourceSize: RecordingPixelSize;
     tracksFullViewport: boolean;
   }>;
@@ -128,6 +130,57 @@ function mapLogicalCropToSource(
   };
 }
 
+function matchSourceRectToOutputAspect(
+  sourceRect: RecordingSampleRect,
+  outputSize: RecordingPixelSize,
+  maximumEdgeCrop: number
+): RecordingSampleRect {
+  const sourceAspect = sourceRect.width / sourceRect.height;
+  const outputAspect = outputSize.width / outputSize.height;
+  if (sourceAspect === outputAspect) return sourceRect;
+  if (sourceAspect > outputAspect) {
+    const width = sourceRect.height * outputAspect;
+    if (sourceRect.width - width > maximumEdgeCrop) return sourceRect;
+    return Object.freeze({
+      ...sourceRect,
+      width,
+      x: sourceRect.x + (sourceRect.width - width) / 2,
+    });
+  }
+  const height = sourceRect.width / outputAspect;
+  if (sourceRect.height - height > maximumEdgeCrop) return sourceRect;
+  return Object.freeze({
+    ...sourceRect,
+    height,
+    y: sourceRect.y + (sourceRect.height - height) / 2,
+  });
+}
+
+function normalizeFullSourcePlan(
+  plan: RecordingGeometryPlan,
+  resolution: VideoResolutionPreset,
+  tracksFullViewport: boolean,
+  devicePixelRatio: number
+): RecordingGeometryPlan {
+  if (!tracksFullViewport || resolution !== VideoResolutionPreset.SOURCE) return plan;
+  return remapRecordingGeometryPlan(
+    plan,
+    matchSourceRectToOutputAspect(plan.sourceRect, plan.outputSize, Math.max(1, devicePixelRatio))
+  );
+}
+
+function sourceRectFillsOutput(
+  plan: RecordingGeometryPlan,
+  resolution: VideoResolutionPreset,
+  tracksFullViewport: boolean
+): boolean {
+  if (!tracksFullViewport || resolution !== VideoResolutionPreset.SOURCE) return false;
+  const sourceAspect = plan.sourceRect.width / plan.sourceRect.height;
+  const outputAspect = plan.outputSize.width / plan.outputSize.height;
+  const tolerance = Number.EPSILON * Math.max(sourceAspect, outputAspect) * 8;
+  return Math.abs(sourceAspect - outputAspect) <= tolerance;
+}
+
 function isRequestedCropInsideCoordinateSpace(
   crop: TabLogicalRect,
   coordinateSpace: TabOutputCoordinateSpace
@@ -150,12 +203,23 @@ function buildRemappedGeometry(params: {
   sourceRect: RecordingSampleRect;
   sourceSize: RecordingPixelSize;
 }): TabOutputGeometry {
-  const remapped = remapRecordingGeometryPlan(params.geometry, params.sourceRect);
+  const remapped = normalizeFullSourcePlan(
+    remapRecordingGeometryPlan(params.geometry, params.sourceRect),
+    params.geometry.resolution,
+    params.geometry.tracksFullViewport,
+    params.coordinateSpace.devicePixelRatio
+  );
   return Object.freeze({
     ...remapped,
     coordinateSpace: params.coordinateSpace,
+    fillsOutput: sourceRectFillsOutput(
+      remapped,
+      params.geometry.resolution,
+      params.geometry.tracksFullViewport
+    ),
     logicalContentRect: params.logicalContentRect,
     requestedCrop: params.requestedCrop,
+    resolution: params.geometry.resolution,
     sourceSize: params.sourceSize,
     tracksFullViewport: params.geometry.tracksFullViewport,
   });
@@ -171,18 +235,29 @@ export function resolveTabOutputGeometry(
   const cssViewport = requireCoordinateSpace(coordinateSpace);
   const requested = requireRequestedCrop(requestedCrop, cssViewport);
   const mapping = mapLogicalCropToSource(requested, source, cssViewport);
-  const plan = createRecordingGeometryPlan({
-    frameRateCap: options.frameRateCap,
-    outputBasis: { height: requested.height, width: requested.width },
-    resolution: options.resolution,
-    sourceRect: mapping.sourceRect,
-  });
+  const plan = normalizeFullSourcePlan(
+    createRecordingGeometryPlan({
+      frameRateCap: options.frameRateCap,
+      outputBasis: { height: requested.height, width: requested.width },
+      resolution: options.resolution,
+      sourceRect: mapping.sourceRect,
+    }),
+    options.resolution,
+    options.tracksFullViewport === true,
+    cssViewport.devicePixelRatio
+  );
 
   return Object.freeze({
     ...plan,
     coordinateSpace: cssViewport,
+    fillsOutput: sourceRectFillsOutput(
+      plan,
+      options.resolution,
+      options.tracksFullViewport === true
+    ),
     logicalContentRect: mapping.logicalContentRect,
     requestedCrop: requested,
+    resolution: options.resolution,
     sourceSize: source,
     tracksFullViewport: options.tracksFullViewport === true,
   });
@@ -296,9 +371,11 @@ export function isSameTabOutputGeometry(
     left.coordinateSpace.devicePixelRatio === right.coordinateSpace.devicePixelRatio &&
     left.fit === right.fit &&
     left.frameRateCap === right.frameRateCap &&
+    left.fillsOutput === right.fillsOutput &&
     areRectsEqual(left.logicalContentRect, right.logicalContentRect) &&
     areSizesEqual(left.outputBasis, right.outputBasis) &&
     areRectsEqual(left.requestedCrop, right.requestedCrop) &&
+    left.resolution === right.resolution &&
     areSizesEqual(left.sourceSize, right.sourceSize) &&
     areRectsEqual(left.sourceRect, right.sourceRect) &&
     areSizesEqual(left.outputSize, right.outputSize) &&

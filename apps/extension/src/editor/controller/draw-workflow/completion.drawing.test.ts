@@ -2,9 +2,13 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { Canvas, Textbox } from 'fabric';
-import { createEditorDrawingFabricObject } from '../../drawing/object/vector';
+import {
+  createEditorDrawingFabricObject,
+  updateEditorDrawingShapeDraft,
+} from '../../drawing/object/vector';
 import type { DrawingObject } from '../../../features/drawing/public';
 import { createCompletedDrawWorkflowState } from './completion-complete';
+import { parseEditorDrawingMetadata } from '../../document/import-boundary';
 
 function canvas() {
   const surface = new Canvas(document.createElement('canvas'));
@@ -52,6 +56,37 @@ describe('drawing completion history', () => {
       'ml',
       'mtr',
     ]);
+  });
+
+  it('commits final geometric draft bounds into serialized metadata before history', () => {
+    const initial: DrawingObject = {
+      id: 'shape-2',
+      kind: 'ellipse',
+      bounds: { x: 5, y: 6, width: 2, height: 2 },
+      color: '#f97316',
+      fillColor: null,
+      width: 4,
+    };
+    const final = { ...initial, bounds: { x: 5, y: 6, width: 80, height: 40 } };
+    const object = createEditorDrawingFabricObject(initial, 1);
+    expect(updateEditorDrawingShapeDraft(object, final)).toBe(true);
+    const surface = canvas();
+
+    createCompletedDrawWorkflowState(
+      surface,
+      { kind: 'complete', completedTool: 'shape', drawSession: null, object },
+      vi.fn(),
+      vi.fn()
+    );
+
+    const persisted = parseEditorDrawingMetadata(object.sniptaleDrawingJson);
+    expect(persisted).toEqual(final);
+    if (!persisted || persisted.kind === 'blur') {
+      throw new Error('Expected completed vector shape metadata');
+    }
+    const restored = createEditorDrawingFabricObject(persisted, 1);
+    expect(restored.width).toBeCloseTo(80);
+    expect(restored.height).toBeCloseTo(40);
   });
 
   it('defers text history until the editing lifecycle commits content', () => {

@@ -29,6 +29,12 @@ interface EditorMagnetManagerOptions {
 }
 
 class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorMagnetManager {
+  private readonly externalSnapTarget = new Rect({
+    originX: 'left',
+    originY: 'top',
+    strokeWidth: 0,
+  });
+
   constructor(private readonly managerOptions: EditorMagnetManagerOptions) {
     super(managerOptions.canvas, {
       ...DEFAULT_EDITOR_MAGNET_OPTIONS,
@@ -89,17 +95,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
     excludeId?: string;
     rect: { x: number; y: number; width: number; height: number };
   }) {
-    const target = new Rect({
-      left: input.rect.x,
-      top: input.rect.y,
-      width: input.rect.width,
-      height: input.rect.height,
-      originX: 'left',
-      originY: 'top',
-      strokeWidth: 0,
-    });
-    if (input.excludeId !== undefined) target.sniptaleId = input.excludeId;
-    target.canvas = this.canvas;
+    const target = this.configureExternalSnapTarget(input);
     this.moving({ target } as unknown as EditorMagnetTransformEvent);
     this.canvas.requestRenderAll();
     return {
@@ -116,17 +112,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
     minimumSize: number;
     rect: { x: number; y: number; width: number; height: number };
   }) {
-    const target = new Rect({
-      left: input.rect.x,
-      top: input.rect.y,
-      width: input.rect.width,
-      height: input.rect.height,
-      originX: 'left',
-      originY: 'top',
-      strokeWidth: 0,
-    });
-    if (input.excludeId !== undefined) target.sniptaleId = input.excludeId;
-    target.canvas = this.canvas;
+    const target = this.configureExternalSnapTarget(input);
     const corner = RESIZE_CORNER_BY_DIRECTION[input.direction];
     const uniformKey = this.canvas.uniScaleKey ?? 'shiftKey';
     const event = {
@@ -155,6 +141,26 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       this.managerOptions.getCropGuide() === null &&
       isMagnetTarget(target)
     );
+  }
+
+  private configureExternalSnapTarget(input: {
+    excludeId?: string;
+    rect: { x: number; y: number; width: number; height: number };
+  }): Rect {
+    const target = this.externalSnapTarget;
+    target.set({
+      height: input.rect.height,
+      left: input.rect.x,
+      scaleX: 1,
+      scaleY: 1,
+      top: input.rect.y,
+      width: input.rect.width,
+    });
+    if (input.excludeId === undefined) delete target.sniptaleId;
+    else target.sniptaleId = input.excludeId;
+    target.canvas = this.canvas;
+    target.setCoords();
+    return target;
   }
 
   clearGuides(): void {

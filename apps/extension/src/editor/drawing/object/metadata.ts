@@ -8,6 +8,7 @@ import {
 import { parseEditorDrawingMetadata } from '../../document/import-boundary';
 
 const DRAWING_OBJECT_METADATA_VERSION = 1;
+const transientDrawingObjects = new WeakMap<FabricObject, DrawingObject>();
 
 interface EditorDrawingMetadata {
   version: typeof DRAWING_OBJECT_METADATA_VERSION;
@@ -15,14 +16,21 @@ interface EditorDrawingMetadata {
 }
 
 export function writeEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
+  transientDrawingObjects.delete(target);
   target.sniptaleDrawingJson = JSON.stringify({
     version: DRAWING_OBJECT_METADATA_VERSION,
     object,
   } satisfies EditorDrawingMetadata);
 }
 
+export function stageEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
+  transientDrawingObjects.set(target, object);
+}
+
 export function readEditorDrawingObject(target: FabricObject): DrawingObject | null {
-  return parseEditorDrawingMetadata(target.sniptaleDrawingJson);
+  return (
+    transientDrawingObjects.get(target) ?? parseEditorDrawingMetadata(target.sniptaleDrawingJson)
+  );
 }
 
 export function isEditorDrawingSelection(target: FabricObject): boolean {

@@ -26,6 +26,7 @@ import { useFrameAnnotationKeyboard } from './keyboard';
 import { createFrameAnnotationLayerLabel } from './layer-label';
 
 type DragState = {
+  coordinateSpace: FrameDragCoordinateSpace;
   mode: 'create' | 'move' | 'resize';
   object: FabricObject | null;
   origin: { x: number; y: number };
@@ -33,6 +34,11 @@ type DragState = {
   start: FrameAnnotationSnapshotV1;
   resizeDirection?: ResizeDirection;
   calloutCenter?: { x: number; y: number } | null;
+};
+
+type FrameDragCoordinateSpace = {
+  canvasRect: DOMRect;
+  documentSize: { width: number; height: number };
 };
 
 export const MIN_FRAME_SIZE = 8;
@@ -48,6 +54,8 @@ export function useFrameAnnotationInteraction(props: {
   const [draft, setDraft] = React.useState<FrameAnnotationSnapshotV1 | null>(null);
   const draftRef = React.useRef<FrameAnnotationSnapshotV1 | null>(null);
   const dragRef = React.useRef<DragState | null>(null);
+  const pendingDragEventRef = React.useRef<PointerEvent | null>(null);
+  const dragFrameRef = React.useRef(0);
   const pendingHistoryRef = React.useRef(false);
   const pendingPreviewObjectRef = React.useRef<FabricObject | null>(null);
   const updateDraft = React.useCallback((value: FrameAnnotationSnapshotV1 | null) => {
@@ -79,6 +87,15 @@ export function useFrameAnnotationInteraction(props: {
   const finishDragRef = React.useRef(finishDrag);
   interactionPropsRef.current = props;
   finishDragRef.current = finishDrag;
+  const flushDragPreview = React.useCallback(() => {
+    if (dragFrameRef.current !== 0) {
+      cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = 0;
+    }
+    const event = pendingDragEventRef.current;
+    pendingDragEventRef.current = null;
+    if (event) updateDrag(event, dragRef, updateDraft, interactionPropsRef.current);
+  }, [updateDraft]);
   const commitPendingHistory = React.useCallback(() => {
     if (!pendingHistoryRef.current) return;
     const object = pendingPreviewObjectRef.current;
@@ -108,25 +125,41 @@ export function useFrameAnnotationInteraction(props: {
   });
 
   React.useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) =>
-      updateDrag(event, dragRef, updateDraft, interactionPropsRef.current);
-    const handlePointerFinish = (event: PointerEvent) => finishDragRef.current(event);
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      pendingDragEventRef.current = event;
+      if (dragFrameRef.current !== 0) return;
+      dragFrameRef.current = requestAnimationFrame(() => {
+        dragFrameRef.current = 0;
+        flushDragPreview();
+      });
+    };
+    const handlePointerFinish = (event: PointerEvent) => {
+      if (event.pointerId !== dragRef.current?.pointerId) return;
+      flushDragPreview();
+      finishDragRef.current(event);
+    };
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerFinish);
     window.addEventListener('pointercancel', handlePointerFinish);
     return () => {
+      if (dragFrameRef.current !== 0) cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = 0;
+      pendingDragEventRef.current = null;
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerFinish);
       window.removeEventListener('pointercancel', handlePointerFinish);
     };
-  }, [updateDraft]);
+  }, [flushDragPreview]);
   React.useEffect(
     () =>
       registerFrameAnnotationDraftFlusher(() => {
+        flushDragPreview();
         finishDrag();
         commitPendingHistory();
       }),
-    [commitPendingHistory, finishDrag]
+    [commitPendingHistory, finishDrag, flushDragPreview]
   );
 
   const shared = {
@@ -159,14 +192,16 @@ function createPlaneEvents(input: {
     pointerDown: (event: React.PointerEvent) => {
       if (input.props.activeTool !== 'frame-annotation' || event.button !== 0) return;
       input.commitPendingHistory();
-      const point = toLogicalPoint(
-        event,
+      const coordinateSpace = resolveFrameDragCoordinateSpace(
         input.props.canvasRef.current,
         input.props.controller.canvasDocumentSize
       );
+      if (!coordinateSpace) return;
+      const point = toLogicalPoint(event, coordinateSpace);
       if (!point) return;
       const start = createDefaultSnapshot(point, input.entries.length);
       input.dragRef.current = {
+        coordinateSpace,
         mode: 'create',
         object: null,
         origin: point,
@@ -463,7 +498,7 @@ function updateDrag(
 ) {
   const drag = dragRef.current;
   if (!drag || event.pointerId !== drag.pointerId) return;
-  const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
+  const point = toLogicalPoint(event, drag.coordinateSpace);
   if (!point) return;
   const dx = point.x - drag.origin.x;
   const dy = point.y - drag.origin.y;
@@ -534,9 +569,15 @@ function startExistingDrag(
   resizeDirection?: ResizeDirection,
   calloutCenter?: { x: number; y: number } | null
 ) {
-  const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
+  const coordinateSpace = resolveFrameDragCoordinateSpace(
+    props.canvasRef.current,
+    props.controller.canvasDocumentSize
+  );
+  if (!coordinateSpace) return;
+  const point = toLogicalPoint(event, coordinateSpace);
   if (!point) return;
   dragRef.current = {
+    coordinateSpace,
     mode,
     object,
     origin: point,
@@ -600,13 +641,21 @@ function getProjectionScale(canvas: HTMLCanvasElement | null, size?: { width: nu
   return rect && size && size.width > 0 ? rect.width / size.width : 1;
 }
 
-function toLogicalPoint(
-  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+function resolveFrameDragCoordinateSpace(
   canvas: HTMLCanvasElement | null,
   size?: { width: number; height: number }
+): FrameDragCoordinateSpace | null {
+  const canvasRect = canvas?.getBoundingClientRect();
+  if (!canvasRect || !size || canvasRect.width <= 0 || canvasRect.height <= 0) return null;
+  return { canvasRect, documentSize: { ...size } };
+}
+
+function toLogicalPoint(
+  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  coordinateSpace: FrameDragCoordinateSpace | null
 ): { x: number; y: number } | null {
-  const rect = canvas?.getBoundingClientRect();
-  if (!rect || !size || rect.width <= 0 || rect.height <= 0) return null;
+  if (!coordinateSpace) return null;
+  const { canvasRect: rect, documentSize: size } = coordinateSpace;
   return {
     x: ((event.clientX - rect.left) / rect.width) * size.width,
     y: ((event.clientY - rect.top) / rect.height) * size.height,

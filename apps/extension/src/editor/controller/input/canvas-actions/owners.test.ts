@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { startEditorControllerDrawSession } from './draw-session';
 import { addEditorCanvasObject } from './object-add';
 import { cancelEditorTransientInteraction } from './transient';
+import { endEditorCanvasTransform } from './transform';
 
 it('keeps no-canvas draw-session starts inside the draw-session owner', () => {
   expect(
@@ -94,5 +95,15 @@ it('cancels selection before switching an active drawing tool to select', () => 
   expect(cancelEditorTransientInteraction(options)).toMatchObject({ changed: true });
   expect(switchToSelectTool).toHaveBeenCalledOnce();
   expect(syncRuntimeState).toHaveBeenCalledTimes(2);
+  canvas.dispose();
+});
+
+it('does not enter Fabric transform finalization while the real canvas is idle', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const endCurrentTransform = vi.spyOn(canvas, 'endCurrentTransform');
+
+  expect(endEditorCanvasTransform(canvas)).toBe(false);
+  expect(endCurrentTransform).not.toHaveBeenCalled();
+
   canvas.dispose();
 });

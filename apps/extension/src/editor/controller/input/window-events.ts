@@ -29,7 +29,13 @@ function ownsFabricTextboxInput(
   return Boolean(textbox?.isEditing && Object.is(textbox.hiddenTextarea, target));
 }
 
-export function handleEditorWindowBlur(options: { finalizeSelectionNudge?: () => void }): void {
+export function handleEditorWindowBlur(options: {
+  cancelTransientInteraction?: () => boolean;
+  endCurrentTransform?: () => void;
+  finalizeSelectionNudge?: () => void;
+}): void {
+  options.endCurrentTransform?.();
+  options.cancelTransientInteraction?.();
   options.finalizeSelectionNudge?.();
 }
 

@@ -16,11 +16,9 @@ function composeEditorControllerEventHandlers(
     ...drawing,
     ...pan,
     handleWindowMouseMove: (event) => {
-      drawing.handleWindowMouseMove(event);
       pan.handleWindowMouseMove(event);
     },
     handleWindowMouseUp: () => {
-      drawing.handleWindowMouseUp();
       pan.handleWindowMouseUp();
     },
   };
@@ -59,6 +57,9 @@ export function attachEditorControllerEventHandlers(options: {
   window.addEventListener('blur', handlers.handleWindowBlur);
   window.addEventListener('mousemove', handlers.handleWindowMouseMove);
   window.addEventListener('mouseup', handlers.handleWindowMouseUp);
+  window.addEventListener('pointermove', handlers.handleWindowPointerMove);
+  window.addEventListener('pointerup', handlers.handleWindowPointerUp);
+  window.addEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement.addEventListener('mousedown', handlers.handleViewportMouseDown, true);
   viewportElement.addEventListener('wheel', handlers.handleViewportWheel, { passive: false });
   viewportElement.addEventListener('scroll', handlers.handleViewportScroll, { passive: true });
@@ -95,6 +96,9 @@ export function detachEditorControllerEventHandlers(options: {
   window.removeEventListener('blur', handlers.handleWindowBlur);
   window.removeEventListener('mousemove', handlers.handleWindowMouseMove);
   window.removeEventListener('mouseup', handlers.handleWindowMouseUp);
+  window.removeEventListener('pointermove', handlers.handleWindowPointerMove);
+  window.removeEventListener('pointerup', handlers.handleWindowPointerUp);
+  window.removeEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement?.removeEventListener('mousedown', handlers.handleViewportMouseDown, true);
   viewportElement?.removeEventListener('wheel', handlers.handleViewportWheel);
   viewportElement?.removeEventListener('scroll', handlers.handleViewportScroll);

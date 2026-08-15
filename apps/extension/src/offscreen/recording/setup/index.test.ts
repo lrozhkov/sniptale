@@ -61,11 +61,13 @@ const settings = {
 
 const geometry = {
   coordinateSpace: { width: 1280, height: 720, devicePixelRatio: 2 },
+  fillsOutput: false,
   fit: 'contain' as const,
   frameRateCap: 30 as const,
   logicalContentRect: { x: 0, y: 0, width: 2560, height: 1440 },
   outputBasis: { width: 1280, height: 720 },
   requestedCrop: { x: 0, y: 0, width: 1280, height: 720 },
+  resolution: VideoResolutionPreset.P1080,
   sourceSize: { width: 2560, height: 1440 },
   sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
   outputSize: { width: 1280, height: 720 },
@@ -116,6 +118,8 @@ beforeEach(() => {
     ) => ({
       ...geometry,
       coordinateSpace,
+      fillsOutput:
+        options.tracksFullViewport === true && options.resolution === VideoResolutionPreset.SOURCE,
       frameRateCap: options.frameRateCap,
       outputBasis: { height: requestedCrop.height, width: requestedCrop.width },
       outputSize: resolveVideoOutputDimensions(
@@ -124,6 +128,7 @@ beforeEach(() => {
         options.resolution
       ),
       requestedCrop,
+      resolution: options.resolution,
       sourceSize,
       tracksFullViewport: options.tracksFullViewport === true,
     })

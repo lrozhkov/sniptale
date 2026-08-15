@@ -4,9 +4,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   drawingHandlers: {
+    handlePointerCancel: vi.fn(),
     handlePathCreated: vi.fn(),
-    handleWindowMouseMove: vi.fn(),
-    handleWindowMouseUp: vi.fn(),
+    handleWindowPointerMove: vi.fn(),
+    handleWindowPointerUp: vi.fn(),
   },
   panHandlers: {
     handleViewportWheel: vi.fn(),
@@ -41,10 +42,11 @@ it('combines runtime, drawing, and pan event owners', () => {
   const event = new MouseEvent('mousemove');
   handlers.handleWindowMouseMove(event);
   handlers.handleWindowMouseUp();
-  expect(mocks.drawingHandlers.handleWindowMouseMove).toHaveBeenCalledWith(event);
   expect(mocks.panHandlers.handleWindowMouseMove).toHaveBeenCalledWith(event);
-  expect(mocks.drawingHandlers.handleWindowMouseUp).toHaveBeenCalledOnce();
   expect(mocks.panHandlers.handleWindowMouseUp).toHaveBeenCalledOnce();
+  const pointer = new Event('pointermove') as PointerEvent;
+  handlers.handleWindowPointerMove(pointer);
+  expect(mocks.drawingHandlers.handleWindowPointerMove).toHaveBeenCalledWith(pointer);
 });
 
 it('attaches and detaches every canvas, window, viewport, and resize observer listener', () => {

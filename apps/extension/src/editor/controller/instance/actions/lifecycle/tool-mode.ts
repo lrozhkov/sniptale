@@ -25,6 +25,9 @@ export function setActiveToolForController(
   controller: EditorControllerInstance,
   tool: EditorTool
 ): void {
+  if (controller.activeTool !== tool && controller.drawSession) {
+    controller.cancelTransientInteraction();
+  }
   const activeObject = controller.canvas?.getActiveObject();
   if (
     controller.activeTool !== tool &&

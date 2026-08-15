@@ -6,13 +6,13 @@ import { createMockController } from '../../bindings/test-fixtures';
 const mocks = vi.hoisted(() => ({
   applyViewportZoom: vi.fn(),
   attachEvents: vi.fn(() => ({ disconnect: vi.fn() })),
+  createMagnet: vi.fn(() => ({ dispose: vi.fn() })),
   detachEvents: vi.fn(),
   handoff: {
     beginMount: vi.fn(() => 4),
     markReady: vi.fn(),
     tearDown: vi.fn(),
   },
-  magnetDispose: vi.fn(),
   refreshViewport: vi.fn(),
 }));
 
@@ -42,7 +42,7 @@ vi.mock('../../../events', () => ({
 
 vi.mock('../../../magnet', () => ({
   EditorMagnetManager: undefined,
-  createEditorMagnetManager: vi.fn(() => ({ dispose: mocks.magnetDispose })),
+  createEditorMagnetManager: mocks.createMagnet,
 }));
 
 vi.mock('../../../viewport', () => ({
@@ -106,6 +106,9 @@ it('mounts pointer capture with the canvas lifecycle and detaches it on dispose'
   expect(controller.viewportElement).toBe(viewportElement);
   expect(controller.stageElement).toBe(stageElement);
   expect(mocks.attachEvents).toHaveBeenCalledOnce();
+  expect(mocks.createMagnet.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.attachEvents.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+  );
   expect(mocks.handoff.markReady).toHaveBeenCalledWith(4);
 
   controller.viewportSyncFrame = 27;
@@ -117,7 +120,7 @@ it('mounts pointer capture with the canvas lifecycle and detaches it on dispose'
 
   expect(canvasElement.setPointerCapture).not.toHaveBeenCalledWith(10);
   expect(mocks.detachEvents).toHaveBeenCalledOnce();
-  expect(mocks.magnetDispose).toHaveBeenCalledOnce();
+  expect(mocks.createMagnet.mock.results[0]?.value.dispose).toHaveBeenCalledOnce();
   expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(27);
   expect(controller.canvas).toBeNull();
   expect(controller.isSpacePressed).toBe(false);

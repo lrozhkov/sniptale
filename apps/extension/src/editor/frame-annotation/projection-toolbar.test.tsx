@@ -105,7 +105,8 @@ it('enables numbering and opens its shared settings menu in one interaction', ()
 
   expect(document.querySelector('[data-ui="step-settings-open"]')).not.toBeNull();
   expect(document.querySelector('[data-frame-control="resize-handle"]')).toBeNull();
-  expect(controlsRoot.querySelector(`button[title="${stepLabel}"]`)).toBeNull();
+  expect(controlsRoot.querySelector(`button[title="${stepLabel}"]`)).toBe(stepButton);
+  expect(stepButton?.isConnected).toBe(true);
   act(() => root.unmount());
 });
 

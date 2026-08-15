@@ -73,8 +73,8 @@ export function FrameProjection(props: {
       setCalloutBounds(null);
     if (!getFrameCallout(props.snapshot, activeCalloutIndex)) setActiveCalloutIndex(0);
   }, [activeCalloutIndex, props.snapshot]);
-  const editingSelected =
-    props.selected && props.object?.sniptaleLocked !== true && props.settingsMenu === null;
+  const toolbarSelected = props.selected && props.object?.sniptaleLocked !== true;
+  const editingSelected = toolbarSelected && props.settingsMenu === null;
   const scene = resolveFrameAnnotationVisualScene({
     frame: props.snapshot,
     state: editingSelected ? 'editing' : 'idle',
@@ -104,7 +104,7 @@ export function FrameProjection(props: {
           setActiveCalloutIndex={setActiveCalloutIndex}
         />
       ) : null}
-      {editingSelected && props.controlsRoot ? (
+      {toolbarSelected && props.controlsRoot ? (
         <FrameProjectionToolbar
           coordinateSpace={props.coordinateSpace}
           calloutBounds={calloutBounds}

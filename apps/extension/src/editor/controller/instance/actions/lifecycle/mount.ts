@@ -26,7 +26,6 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   canvas.backgroundColor = 'transparent';
   canvas.setDimensions({ width: 0, height: 0 });
   canvas.setZoom(1);
-  attachEditorCanvasPointerCapture(canvas);
   return canvas;
 }
 
@@ -65,6 +64,7 @@ export function mountEditorController(
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;
     controller.viewportDevicePixelRatioBaseline = getEditorViewportDevicePixelRatioBaseline();
+    attachEditorCanvasPointerCapture(canvas, controller.eventHandlers.handlePointerCancel);
     applyEditorViewportZoom(
       canvas,
       controller.canvasDocumentSize,
@@ -72,7 +72,6 @@ export function mountEditorController(
       controller.viewportDevicePixelRatioBaseline
     );
 
-    controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.magnetManager = createEditorMagnetManager({
       canvas,
       getActiveTool: () => controller.activeTool,
@@ -80,6 +79,7 @@ export function mountEditorController(
       getCropGuide: () => controller.cropGuide,
       getWorkspace: () => useEditorStore.getState().workspace,
     });
+    controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.selectionNudgeSession = null;
     controller.syncRuntimeState();
     canvasReadyHandoff.markReady(mountGeneration);

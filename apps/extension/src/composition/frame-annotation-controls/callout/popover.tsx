@@ -15,7 +15,7 @@ import {
 } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createCalloutSaveSection } from './save-section';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { usePopoverDistanceClose, usePopoverEscapeClose } from '../popover/hooks';
+import { usePopoverEscapeClose } from '../popover/hooks';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
@@ -67,11 +67,6 @@ export function FutureCalloutSettingsPopover(props: {
     if (props.isOpen) setLocalSettings(props.settings);
     else setNestedLayerOpen(false);
   }, [props.isOpen, props.settings]);
-  usePopoverDistanceClose({
-    isOpen: props.isOpen && !nestedLayerOpen,
-    onClose: props.onClose,
-    popoverRef,
-  });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
     isOpen: props.isOpen && !nestedLayerOpen,
