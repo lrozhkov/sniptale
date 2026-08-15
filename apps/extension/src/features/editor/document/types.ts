@@ -63,6 +63,7 @@ export interface EditorFrameSettings {
   paddingBottom: number;
   paddingLeft: number;
   backgroundMode: EditorBackgroundMode;
+  backgroundBlurAmount: number;
   backgroundColor: string;
   backgroundGradientFrom: string;
   backgroundGradientTo: string;

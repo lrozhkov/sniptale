@@ -23,6 +23,8 @@ function actions(): StepBadgePresetCatalogController['actions'] {
     moveBefore: vi.fn(),
     reset: vi.fn(async () => undefined),
     save: vi.fn(async () => undefined),
+    setNewSessionEnabled: vi.fn(async () => undefined),
+    setNewSessionTemplateSource: vi.fn(async () => undefined),
     setDefault: vi.fn(async () => undefined),
     toggle: vi.fn(async () => undefined),
   };
@@ -49,7 +51,9 @@ it('renders catalog, loading, error, reset, and user delete states', () => {
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
     'settings.collection.defaultBadge'
   );
-  expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).not.toContain('<h2');
+  expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).toContain(
+    'highlighter.stepBadgePresets.newSession.sectionTitle'
+  );
   expect(renderToStaticMarkup(<StepBadgePresetsPanel controller={base} />)).not.toContain(
     'highlighter.stepBadgePresets.description'
   );
@@ -89,6 +93,7 @@ it('routes enabled row and add interactions through controller actions', async (
     if (!button.disabled) await act(async () => button.click());
   }
   expect(value.actions.add).toHaveBeenCalled();
+  expect(value.actions.setNewSessionEnabled).toHaveBeenCalledWith(true);
   expect(value.actions.edit).toHaveBeenCalled();
   expect(value.actions.toggle).toHaveBeenCalled();
   expect(value.actions.delete).toHaveBeenCalledWith(user);

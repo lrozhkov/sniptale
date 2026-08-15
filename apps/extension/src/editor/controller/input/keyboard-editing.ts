@@ -17,6 +17,7 @@ export function resolveEditorEnterKeyboardAction(
     | 'hasDrawSession'
     | 'hasSelectedTextTarget'
     | 'isEditingTextboxSelection'
+    | 'isComposing'
     | 'key'
     | 'shiftKey'
   >
@@ -27,6 +28,8 @@ export function resolveEditorEnterKeyboardAction(
   if (options.key !== 'Enter') {
     return null;
   }
+
+  if (options.isComposing) return null;
 
   if (options.hasDrawSession) {
     return 'complete-draw';
@@ -54,7 +57,7 @@ export function resolveEditorFallbackKeyboardAction(
   }
 
   if (options.key === 'Escape') {
-    return options.isEditingTextboxSelection ? 'exit-text-edit' : 'cancel-transient';
+    return options.isEditingTextboxSelection ? 'cancel-text-edit' : 'cancel-transient';
   }
 
   const deleteAction = resolveEditorDeleteKeyboardAction(options);

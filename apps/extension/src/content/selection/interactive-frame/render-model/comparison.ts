@@ -77,6 +77,7 @@ function hasStepBadgeChange(prevProps: InteractiveFrameProps, nextProps: Interac
       prev?.anchor !== next?.anchor ||
       prev?.manualPlacement?.position !== next?.manualPlacement?.position ||
       prev?.manualPlacement?.side !== next?.manualPlacement?.side ||
+      prev?.manualPlacement?.normalOffset !== next?.manualPlacement?.normalOffset ||
       prev?.sizeLevel !== next?.sizeLevel ||
       JSON.stringify(prev?.style ?? null) !== JSON.stringify(next?.style ?? null) ||
       prevOff.length !== nextOff.length ||

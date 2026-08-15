@@ -25,6 +25,7 @@ vi.mock(
 );
 
 import {
+  clearRetiredFullPageCaptureLease,
   clearStoredFullPageCaptureLease,
   readStoredFullPageCaptureLease,
   writeStoredFullPageCaptureLease,
@@ -51,9 +52,9 @@ beforeEach(() => {
 
 it('parses only the exact storage-backed full-page lease shape', async () => {
   mocks.get
-    .mockResolvedValueOnce({ sniptale_full_page_capture_lease: lease })
+    .mockResolvedValueOnce({ sniptale_native_full_page_capture_lease: lease })
     .mockResolvedValueOnce({
-      sniptale_full_page_capture_lease: { ...lease, tabId: '7' },
+      sniptale_native_full_page_capture_lease: { ...lease, tabId: '7' },
     });
 
   await expect(readStoredFullPageCaptureLease()).resolves.toEqual(lease);
@@ -64,16 +65,23 @@ it('writes the canonical session key and removes only the matching owner lease',
   await writeStoredFullPageCaptureLease(lease);
   mocks.get
     .mockResolvedValueOnce({
-      sniptale_full_page_capture_lease: { ...lease, ownerToken: 'other-owner' },
+      sniptale_native_full_page_capture_lease: { ...lease, ownerToken: 'other-owner' },
     })
-    .mockResolvedValueOnce({ sniptale_full_page_capture_lease: lease });
+    .mockResolvedValueOnce({ sniptale_native_full_page_capture_lease: lease });
 
   await clearStoredFullPageCaptureLease('owner-1');
   await clearStoredFullPageCaptureLease('owner-1');
 
-  expect(mocks.set).toHaveBeenCalledWith({ sniptale_full_page_capture_lease: lease });
+  expect(mocks.set).toHaveBeenCalledWith({ sniptale_native_full_page_capture_lease: lease });
   expect(mocks.remove).toHaveBeenCalledOnce();
+  expect(mocks.remove).toHaveBeenCalledWith('sniptale_native_full_page_capture_lease');
+});
+
+it('removes the retired lease without reading or interpreting it', async () => {
+  await clearRetiredFullPageCaptureLease();
+
   expect(mocks.remove).toHaveBeenCalledWith('sniptale_full_page_capture_lease');
+  expect(mocks.get).not.toHaveBeenCalled();
 });
 
 it('fails closed for writes and no-ops reads when session storage is unavailable', async () => {

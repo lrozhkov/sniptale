@@ -49,7 +49,10 @@ const presets = [
     name: 'Plain',
     origin: 'system' as const,
     order: 0,
+    customized: false,
+    enabled: true,
     favorite: false,
+    isDefault: true,
     style: style('#fff'),
   },
   {
@@ -57,7 +60,10 @@ const presets = [
     name: 'Glass',
     origin: 'user' as const,
     order: 0,
+    customized: false,
+    enabled: true,
     favorite: true,
+    isDefault: false,
     style: style('#ffffff80', 'backdrop-filter: blur(16px);'),
   },
 ];
@@ -74,6 +80,36 @@ const actions = {
 beforeEach(() => {
   vi.clearAllMocks();
   document.body.innerHTML = '<div id="root"></div>';
+});
+
+it('previews the complete surface and exposes the selected preset state', async () => {
+  const root = createRoot(document.querySelector('#root')!);
+  await act(async () =>
+    root.render(
+      <SurfaceStyleSelector
+        actions={actions}
+        presentation="selection"
+        presets={presets}
+        value={style('#ffffff80', 'backdrop-filter: blur(16px);')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const trigger = document.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.surface-style-selector.trigger"]'
+  )!;
+  const preview = trigger.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.surface-style-selector.preview"]'
+  )!;
+  expect(trigger.textContent).toContain('Glass');
+  expect(preview.style.backdropFilter).toBe('blur(16px)');
+  await act(async () => trigger.click());
+  const selected = [...document.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]')].find(
+    (button) => button.textContent?.includes('Glass')
+  );
+  expect(selected).not.toBeUndefined();
+  expect(selected?.className).toContain('focus-visible:ring-2');
+  await act(async () => root.unmount());
 });
 
 it('matches semantically, drafts a preset, and applies only on Apply', async () => {

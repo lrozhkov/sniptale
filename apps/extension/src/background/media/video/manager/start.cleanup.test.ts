@@ -96,7 +96,7 @@ const multiSourceSettings: VideoRecordingSettings = {
   autoFadeDelay: 1500,
   controlledCursorCaptureEnabled: true,
   countdownSeconds: 0,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },

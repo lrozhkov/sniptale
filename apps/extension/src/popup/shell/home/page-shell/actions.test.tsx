@@ -12,7 +12,7 @@ const { openScreenshotModeSpy, triggerQuickActionSpy, triggerScreenshotCaptureSp
   })
 );
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal()),
   translate: (key: string) => `t:${key}`,
 }));

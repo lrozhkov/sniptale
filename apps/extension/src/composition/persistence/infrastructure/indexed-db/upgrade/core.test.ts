@@ -122,9 +122,25 @@ it('creates the job-scoped project export input handoff during the v21 upgrade',
 it('skips store creation when existing stores already cover the upgrade', () => {
   const existingDb = createMockDb(COMPLETE_STORES);
 
-  handleDatabaseUpgrade(existingDb, 24);
+  handleDatabaseUpgrade(existingDb, 25);
 
   expect(existingDb.createObjectStore).not.toHaveBeenCalled();
+});
+
+it('recreates only interaction diagnostics stores during the v25 upgrade', () => {
+  const existingDb = createMockDb(COMPLETE_STORES);
+
+  handleDatabaseUpgrade(existingDb, 24);
+
+  expect(existingDb.deleteObjectStore.mock.calls).toEqual([
+    ['diagnostics_events'],
+    ['diagnostics_meta'],
+  ]);
+  expect(existingDb.createObjectStore.mock.calls).toEqual([
+    ['diagnostics_meta', { keyPath: 'recordingId' }],
+    ['diagnostics_events', { keyPath: ['recordingId', 'chunkIndex'] }],
+  ]);
+  expect(existingDb.objectStoreNames).toEqual(expect.arrayContaining(COMPLETE_STORES));
 });
 
 it('replaces editor sessions with aggregate-owned image stores during the v24 upgrade', () => {

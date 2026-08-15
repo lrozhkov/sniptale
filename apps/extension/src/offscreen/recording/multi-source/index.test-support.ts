@@ -68,7 +68,7 @@ export function createSettings(): VideoRecordingSettings {
     autoFadeDelay: 3,
     controlledCursorCaptureEnabled: false,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
     outputProfile: DEFAULT_VIDEO_OUTPUT_PROFILE,

@@ -1,6 +1,6 @@
 import { useEffect, type MutableRefObject } from 'react';
 
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { savePopupExportPreferences } from '../../../../../composition/persistence/popup-export-preferences';
@@ -73,7 +73,7 @@ export function usePopupExportPersistence(
     includeCssDiagnostics,
     includeFiles,
     includeFullPageScreenshot,
-    includeHarDomLogs,
+    includePageDiagnostics,
     includeImages,
     includeJson,
     includeMarkdown,
@@ -99,7 +99,7 @@ export function usePopupExportPersistence(
       includeCssDiagnostics,
       includeFiles,
       includeFullPageScreenshot,
-      includeHarDomLogs,
+      includePageDiagnostics,
       includeImages,
       includeJson,
       includeMarkdown,

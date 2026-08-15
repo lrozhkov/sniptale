@@ -35,6 +35,7 @@ const DEFAULT_CONTEXT_MENU_SETTINGS: ContextMenuSettings = {
   showVideoEditor: true,
   showGallery: true,
   showPageLinkCopy: true,
+  showWindowResize: true,
   showSettings: true,
 };
 
@@ -67,7 +68,6 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   authenticatedSnapshotAssetsEnabled: false,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
-  rawDiagnosticsEnabled: false,
   fullPageCapture: DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   voiceInput: DEFAULT_VOICE_INPUT_SETTINGS,
 };
@@ -276,5 +276,22 @@ export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
     const nextSettings = createDefaultSettings();
     await saveSettings(nextSettings);
     return nextSettings;
+  });
+}
+
+/** Removes only the retired diagnostics field while preserving every other stored property. */
+export async function removeRetiredDiagnosticsSetting(): Promise<void> {
+  await queueSettingsMutation(async () => {
+    const stored = await browserStorage.sync.get([STORAGE_KEY]);
+    const raw = stored[STORAGE_KEY];
+    const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !(retiredField in raw)) {
+      return loadSettings();
+    }
+
+    const nextRaw = { ...(raw as Record<string, unknown>) };
+    delete nextRaw[retiredField];
+    await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
+    return loadSettings();
   });
 }

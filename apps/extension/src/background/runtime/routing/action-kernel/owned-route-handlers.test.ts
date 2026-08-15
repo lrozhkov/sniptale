@@ -19,7 +19,6 @@ const {
   routeLlmSessionMessageMock,
   routeLocalDataErasureMessageMock,
   routePageAccessMessageMock,
-  routePopupExportArchiveMessageMock,
   routePopupTabRouteCapabilityRequestMock,
   routeScenarioEditorLlmMessageMock,
 } = vi.hoisted(() => ({
@@ -37,7 +36,6 @@ const {
   routeLlmSessionMessageMock: vi.fn(),
   routeLocalDataErasureMessageMock: vi.fn(),
   routePageAccessMessageMock: vi.fn(),
-  routePopupExportArchiveMessageMock: vi.fn(),
   routePopupTabRouteCapabilityRequestMock: vi.fn(),
   routeScenarioEditorLlmMessageMock: vi.fn(),
 }));
@@ -77,7 +75,7 @@ vi.mock('../../../ai/llm/session-route', () => ({
   routeLlmSessionMessage: routeLlmSessionMessageMock,
 }));
 
-vi.mock('../../page-access/route', () => ({
+vi.mock('../../../page-access/route', () => ({
   routePageAccessMessage: routePageAccessMessageMock,
 }));
 
@@ -87,10 +85,6 @@ vi.mock('../../page-access/wakeup-route', () => ({
 
 vi.mock('../../../application/privacy-erasure/route', () => ({
   routeLocalDataErasureMessage: routeLocalDataErasureMessageMock,
-}));
-
-vi.mock('../../../capture/popup-export/archive-route', () => ({
-  routePopupExportArchiveMessage: routePopupExportArchiveMessageMock,
 }));
 
 vi.mock('../capabilities/popup-tab/route-capabilities', async (importOriginal) => ({
@@ -237,23 +231,6 @@ function expectContextAwareRouteAdaptersCalled() {
     senderBinding: contentRuntimeWakeupSenderBinding,
   });
 }
-
-it('routes popup archive message families through one owner adapter', () => {
-  routePopupExportArchiveMessageMock.mockReturnValue(true);
-
-  expect(
-    dispatchBackgroundOwnedRoute(action(MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK), null)
-  ).toEqual({ handled: true, keepChannelOpen: true });
-  expect(dispatchBackgroundOwnedRoute(action(MessageType.EXPORT_POPUP_SAVE_ARCHIVE), null)).toEqual(
-    {
-      handled: true,
-      keepChannelOpen: true,
-    }
-  );
-  expect(
-    dispatchBackgroundOwnedRoute(action(MessageType.RELEASE_POPUP_EXPORT_ARCHIVE), null)
-  ).toEqual({ handled: true, keepChannelOpen: true });
-});
 
 it('routes content capability issuance to the first matching content adapter', () => {
   routeContentActivationKeyRequestMock.mockReturnValueOnce(true);

@@ -100,9 +100,21 @@ export const EditorIconButton = React.forwardRef<
     disabled?: boolean;
     className?: string;
     'data-ui'?: string;
+    'aria-pressed'?: React.AriaAttributes['aria-pressed'];
   }
 >(function EditorIconButton(
-  { title, onClick, onMouseDown, children, active, danger, disabled, className, 'data-ui': dataUi },
+  {
+    title,
+    onClick,
+    onMouseDown,
+    children,
+    active,
+    danger,
+    disabled,
+    className,
+    'data-ui': dataUi,
+    'aria-pressed': ariaPressed,
+  },
   ref
 ) {
   const buttonClassName = getEditorIconButtonClassName({
@@ -118,6 +130,7 @@ export const EditorIconButton = React.forwardRef<
       type="button"
       title={title}
       aria-label={title}
+      aria-pressed={ariaPressed}
       onMouseDown={onMouseDown}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}

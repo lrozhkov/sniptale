@@ -37,8 +37,8 @@ vi.mock('../../../../composition/persistence/settings', async (importOriginal) =
   loadSettings: loadSettingsMock,
 }));
 
-vi.mock('../../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 

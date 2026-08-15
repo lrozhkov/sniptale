@@ -15,12 +15,12 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
   },
   webSnapshotDisclosureBody: {
     ru: [
-      'Sniptale сохранит локальную копию страницы в Галерее:',
+      'Sniptale сохранит локальную копию страницы в Библиотеке:',
       'изображение, очищенную разметку и стили, адрес, название страницы, предупреждения',
       'и безопасные диагностические данные. Скрипты, cookies и данные входа не сохраняются.',
     ].join(' '),
     en: [
-      'Sniptale will save a local page copy in Gallery: image, cleaned markup and styles,',
+      'Sniptale will save a local page copy in Library: image, cleaned markup and styles,',
       'page address, title, warnings, and safe diagnostics. Scripts, cookies,',
       'and sign-in data are not saved.',
     ].join(' '),
@@ -96,28 +96,28 @@ export const popupExportWebSnapshotMessages = defineMessageSource({
     en: 'Could not save this choice. Check settings access and try again.',
   },
   webSnapshotSaved: {
-    ru: 'Веб-снимок сохранён в Галерею',
-    en: 'Web snapshot saved to Gallery',
+    ru: 'Веб-снимок сохранён в Библиотеку',
+    en: 'Web snapshot saved to Library',
   },
   webSnapshotSavedWithWarnings: {
-    ru: 'Веб-снимок сохранён в Галерею с предупреждениями',
-    en: 'Web snapshot saved to Gallery with warnings',
+    ru: 'Веб-снимок сохранён в Библиотеку с предупреждениями',
+    en: 'Web snapshot saved to Library with warnings',
   },
   webSnapshotsSaved: {
-    ru: `${sharedWebSnapshotPluralNameMessage.ru} сохранены в Галерею`,
-    en: `${sharedWebSnapshotPluralNameMessage.en} saved to Gallery`,
+    ru: `${sharedWebSnapshotPluralNameMessage.ru} сохранены в Библиотеку`,
+    en: `${sharedWebSnapshotPluralNameMessage.en} saved to Library`,
   },
   webSnapshotsSavedWithWarnings: {
-    ru: `${sharedWebSnapshotPluralNameMessage.ru} сохранены в Галерею с предупреждениями`,
-    en: `${sharedWebSnapshotPluralNameMessage.en} saved to Gallery with warnings`,
+    ru: `${sharedWebSnapshotPluralNameMessage.ru} сохранены в Библиотеку с предупреждениями`,
+    en: `${sharedWebSnapshotPluralNameMessage.en} saved to Library with warnings`,
   },
   openWebSnapshot: {
     ru: `Открыть ${sharedWebSnapshotSingularNameMessage.ru}`,
     en: `Open ${sharedWebSnapshotSingularNameMessage.en}`,
   },
   openWebSnapshotsGallery: {
-    ru: `Открыть ${sharedWebSnapshotPluralNameMessage.ru} в Галерее`,
-    en: `Open ${sharedWebSnapshotPluralNameMessage.en} in Gallery`,
+    ru: `Открыть ${sharedWebSnapshotPluralNameMessage.ru} в Библиотеке`,
+    en: `Open ${sharedWebSnapshotPluralNameMessage.en} in Library`,
   },
   webSnapshotSaving: {
     ru: 'Сохраняем веб-снимок...',

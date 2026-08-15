@@ -11,7 +11,6 @@ export const BACKGROUND_OWNED_POLICY_STATE_IDS = [
   'content-action-trusted-event-proofs',
   'llm-session-tokens',
   'page-access-tab-activation',
-  'popup-export-staged-archives',
   'popup-tab-route-capabilities',
 ] as const satisfies readonly PolicyStateId[];
 

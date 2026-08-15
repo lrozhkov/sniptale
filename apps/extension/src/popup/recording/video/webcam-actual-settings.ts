@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import type { WebcamActualSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 export function formatKnownWebcamActualSettings(

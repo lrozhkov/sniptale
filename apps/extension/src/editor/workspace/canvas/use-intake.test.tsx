@@ -63,7 +63,7 @@ function createPasteEvent(file: File) {
 
 function registerImageDropOpenTest() {
   it('opens dropped files through the shared editor file action while empty', () => {
-    const { controller, setImageData } = renderHook();
+    const { setImageData } = renderHook();
     const file = createImageFile('drop.png');
     const event = createReactFileDragEvent({ files: [file] });
 
@@ -71,7 +71,12 @@ function registerImageDropOpenTest() {
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(mocks.fireAction).toHaveBeenCalledWith('canvas-open-image-drop', expect.any(Function));
-    expect(mocks.openFile).toHaveBeenCalledWith(controller, file, setImageData);
+    expect(mocks.openFile).toHaveBeenCalledWith(
+      expect.any(Object),
+      file,
+      setImageData,
+      expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
+    );
   });
 }
 
@@ -94,13 +99,18 @@ function registerPasteInsertTest() {
 
 function registerEmptyPasteOpenTest() {
   it('listens for image paste while the editor is empty', () => {
-    const { controller, setImageData } = renderHook();
+    const { setImageData } = renderHook();
     const file = createImageFile('paste.png');
 
     window.dispatchEvent(createPasteEvent(file));
 
     expect(mocks.fireAction).toHaveBeenCalledWith('canvas-open-image-paste', expect.any(Function));
-    expect(mocks.openFile).toHaveBeenCalledWith(controller, file, setImageData);
+    expect(mocks.openFile).toHaveBeenCalledWith(
+      expect.any(Object),
+      file,
+      setImageData,
+      expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
+    );
   });
 }
 

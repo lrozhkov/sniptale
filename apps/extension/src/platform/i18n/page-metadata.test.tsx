@@ -47,7 +47,7 @@ it('syncs document title and html lang with the active locale', async () => {
     root?.render(<Harness titleKey="gallery.app.documentTitle" />);
   });
 
-  expect(document.title).toBe('Sniptale — Галерея');
+  expect(document.title).toBe('Sniptale — Библиотека');
   expect(document.documentElement.lang).toBe('ru');
 
   useAppLocaleMock.mockReturnValue('en');
@@ -56,6 +56,6 @@ it('syncs document title and html lang with the active locale', async () => {
     root?.render(<Harness titleKey="gallery.app.documentTitle" />);
   });
 
-  expect(document.title).toBe('Sniptale — Gallery');
+  expect(document.title).toBe('Sniptale — Library');
   expect(document.documentElement.lang).toBe('en');
 });

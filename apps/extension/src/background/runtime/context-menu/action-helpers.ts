@@ -8,17 +8,20 @@ import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { translate } from '../../../platform/i18n';
 import { loadPopupExportPreferences } from '../../../composition/persistence/popup-export-preferences';
 import { loadSettings } from '../../../composition/persistence/settings';
-import {
-  loadVideoSettings,
-  loadVideoUiState,
-} from '../../../composition/persistence/capture-settings';
+import { loadVideoSettings } from '../../../composition/persistence/capture-settings';
 import type { Settings } from '../../../contracts/settings';
 import type { ViewportPresetAvailability } from '../../../features/viewport-presets/contracts';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
-import { issueFullPageExportContentIntentGrant } from '../../routing-contracts/capabilities/content-action/grants';
+import { startPopupExportJob } from '../../capture/popup-export/job';
+import {
+  cancelPopupExportPagePackage,
+  requestPopupExportPagePackage,
+} from '../routing/boundary/popup-export-routing';
 import {
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
@@ -32,9 +35,11 @@ import {
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  parseContextMenuWindowResizePresetId,
 } from './constants';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 import { isPageLinkContextMenuItem } from './page-link/constants';
+import { resolveVideoRecordingViewportPreset } from '../../media/video/content-surface/preset';
 
 type ContextMenuToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -44,7 +49,7 @@ function buildContextMenuExportOptions() {
     includeCssDiagnostics: preferences.includeCssDiagnostics,
     includeFiles: preferences.includeFiles,
     includeFullPageScreenshot: preferences.includeFullPageScreenshot,
-    includeHarDomLogs: preferences.includeHarDomLogs,
+    includePageDiagnostics: preferences.includePageDiagnostics,
     includeImages: preferences.includeImages,
     includeJson: preferences.includeJson,
     includeMarkdown: preferences.includeMarkdown,
@@ -77,16 +82,7 @@ export async function showContextMenuToast(
 }
 
 export function resolveContextMenuVideoPreset(settings: Settings): Promise<string | null> {
-  return loadVideoUiState().then((videoUiState) => {
-    const presets = settings.viewportPresets ?? [];
-    const preferredPresetId = videoUiState.viewportPresetId;
-    const resolvedPresetId = presets.some(
-      (preset) => preset.id === preferredPresetId && preset.enabled
-    )
-      ? preferredPresetId
-      : null;
-    return presets.find((entry) => entry.id === resolvedPresetId)?.id ?? null;
-  });
+  return resolveVideoRecordingViewportPreset(settings);
 }
 
 export async function getContextMenuVideoPresetAvailability(
@@ -126,21 +122,25 @@ export async function startContextMenuVideoRecording(
 
 export async function startContextMenuExport(tabId: number): Promise<void> {
   const options = await buildContextMenuExportOptions();
-  const requestId = crypto.randomUUID();
-  const response = await getBackgroundRuntimeMessaging().sendTabMessage(tabId, {
-    ...(options.includeFullPageScreenshot
-      ? {
-          contentIntentGrant: issueFullPageExportContentIntentGrant(tabId),
-        }
-      : {}),
-    type: MessageType.EXPORT_POPUP_START,
-    options,
-    requestId,
-  });
-
-  if (!response?.success) {
-    throw new Error(response?.error || translate('popup.export.startExportError'));
+  const warnings: string[] = [];
+  if (options.includeFullPageScreenshot) {
+    const granted = await browserPermissions.request({ origins: ['<all_urls>'] });
+    if (!granted) {
+      options.includeFullPageScreenshot = false;
+      warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+    }
   }
+  const tab = await browserTabs.get(tabId);
+  await startPopupExportJob({
+    contentPort: {
+      cancelPagePackage: cancelPopupExportPagePackage,
+      requestPagePackage: requestPopupExportPagePackage,
+    },
+    jobId: crypto.randomUUID(),
+    orderedTabs: [{ tabId, title: tab.title ?? tab.url ?? `Tab ${tabId}` }],
+    options,
+    warnings,
+  });
 
   await showContextMenuToast(tabId, {
     message: translate('popup.export.startProgressMessage'),
@@ -217,6 +217,7 @@ export function isTabBoundContextMenuAction(menuId: string): boolean {
     menuId === CONTEXT_MENU_EXPORT_START_ID ||
     menuId === CONTEXT_MENU_EXPORT_COPY_JSON_ID ||
     menuId === CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID ||
+    parseContextMenuWindowResizePresetId(menuId) !== null ||
     isPageLinkContextMenuItem(menuId)
   );
 }

@@ -45,6 +45,10 @@ export function getFrameCallouts(frame: FrameAnnotationVisualState): CalloutSett
   );
 }
 
+export function canAppendFrameCallout(frame: FrameAnnotationVisualState): boolean {
+  return frame.callout?.enabled === true && getFrameCallouts(frame).length < MAX_FRAME_CALLOUTS;
+}
+
 export function getFrameCallout(
   frame: FrameAnnotationVisualState,
   calloutIndex: number

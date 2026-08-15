@@ -4,6 +4,7 @@ import { act, createRef, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createSystemCalloutPresetCatalog } from '../../callout-presets/catalog';
+import { getDynamicTailState } from './dynamic-tail';
 import { CalloutBody } from './surface';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -94,6 +95,7 @@ it('does not let a large title font impose the input default character width on 
         customCss: [
           '[card]',
           'filter: drop-shadow(0 2px 3px #000);',
+          'box-shadow: inset 0 1px 0 #ffffff59;',
           '[title]',
           'text-transform: uppercase;',
           '[body]',
@@ -130,7 +132,11 @@ it('does not let a large title font impose the input default character width on 
   expect(title?.style.minWidth).toBe('0');
   expect(titleShell?.style.fontSize).toBe('72px');
   expect(titleShell?.style.textTransform).toBe('uppercase');
-  expect(props.containerRef.current?.style.filter).toBe('drop-shadow(0 2px 3px #000)');
+  expect(props.containerRef.current?.style.filter).toBe('');
+  expect(props.containerRef.current?.style.boxShadow).toBe('');
+  expect(
+    document.querySelector<HTMLElement>('[data-ui="content.callout.surface-effects"]')?.style.filter
+  ).toBe('drop-shadow(0 2px 3px #000)');
   expect(props.contentEditableRef.current?.style.letterSpacing).toBe('1px');
   const titleMeasure = document.querySelector<HTMLElement>('[data-sniptale-callout-title-measure]');
   expect(titleMeasure?.textContent).toBe('MARKWide heading');
@@ -141,6 +147,32 @@ it('does not let a large title font impose the input default character width on 
     titleMeasure?.querySelector('[data-sniptale-callout-badge-measure="true"]')?.textContent
   ).toBe('MARK');
   expect(document.querySelectorAll('[data-ui="content.callout.badge"]')).toHaveLength(1);
+
+  const wedge = getDynamicTailState({
+    bubbleRect: { x: 20, y: 20, width: 240, height: 120 },
+    frameRect: { x: 100, y: 200, width: 120, height: 80 },
+    tailSize: 8,
+  });
+  act(() =>
+    root.render(
+      <CalloutBody
+        {...props}
+        cloudStyle={{ background: '#ffffff80', boxShadow: '0 4px 12px #00000080' }}
+        dynamicTail={wedge}
+      />
+    )
+  );
+  expect(props.containerRef.current?.style.backgroundColor).toBe('transparent');
+  expect(props.containerRef.current?.style.backgroundImage).toBe('');
+  expect(props.containerRef.current?.style.backdropFilter).toBeUndefined();
+  expect(props.containerRef.current?.style.borderColor).toBe('transparent');
+  expect(props.containerRef.current?.style.boxShadow).toBe('');
+  expect(props.containerRef.current?.style.filter).toBe('');
+  expect(props.wrapperRef.current?.style.filter).toBe('');
+  expect(document.querySelector('[data-ui="content.callout.surface-compositor"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.surface-paint"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.surface-contour"]')).not.toBeNull();
+  expect(document.querySelector('[data-ui="content.callout.unified-surface"]')).toBeNull();
 
   act(() =>
     root.render(

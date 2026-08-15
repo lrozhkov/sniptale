@@ -14,7 +14,7 @@ export const DEFAULT_POPUP_EXPORT_PREFERENCES: PopupExportPreferences = {
   includeCssDiagnostics: false,
   includeFiles: true,
   includeFullPageScreenshot: false,
-  includeHarDomLogs: false,
+  includePageDiagnostics: false,
   includeImages: true,
   includeJson: true,
   includeMarkdown: true,

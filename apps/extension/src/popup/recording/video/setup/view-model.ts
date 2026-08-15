@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { supportsCursorTrackTelemetry } from '../copy';
 import {
@@ -147,7 +147,6 @@ export function getVideoSetupViewModel({
     startDisabledReason,
     canStart,
     systemAudioDisabled: recordingOptionState.systemAudioDisabled,
-    diagnosticsDisabled: recordingOptionState.diagnosticsDisabled,
     controlledCursorDisabled,
     controlledCursorDisabledReason,
     startButtonLabel: getStartButtonLabel({ canStart, isStartPending, startDisabledReason }),
@@ -159,8 +158,6 @@ function getRecordingOptionState(params: { captureMode: CaptureMode }) {
   return {
     systemAudioDisabled:
       params.captureMode === CaptureMode.SCREEN || params.captureMode === CaptureMode.CAMERA,
-    diagnosticsDisabled:
-      params.captureMode === CaptureMode.CAMERA || params.captureMode !== CaptureMode.TAB,
   };
 }
 

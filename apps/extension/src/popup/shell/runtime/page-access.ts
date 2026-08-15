@@ -8,7 +8,7 @@ import type {
   PageAccessStatus,
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { PageAccessOperation as PageAccessOperationValue } from '@sniptale/runtime-contracts/messaging/page-access';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import {
   createRuntimeMessagingTransport,
   getErrorMessage,
@@ -23,6 +23,11 @@ type RuntimeTransport = ReturnType<typeof createRuntimeMessagingTransport>;
 type PageAccessStatusSetter = (status: PageAccessStatus | null) => void;
 type PageAccessErrorSetter = (error: string | null) => void;
 type PageAccessLoadingSetter = (loading: boolean) => void;
+
+type ScopedPageAccessStatus = {
+  status: PageAccessStatus | null;
+  tabId: number | null;
+};
 
 export interface PopupPageAccessRuntime {
   disabledReason: string | null;
@@ -194,11 +199,39 @@ export function usePopupPageAccessRuntime(
   activeTabCapabilities: ActiveTabCapabilities
 ): PopupPageAccessRuntime {
   const runtimeTransport = useMemo(() => createRuntimeMessagingTransport(), []);
-  const [status, setStatus] = useState<PageAccessStatus | null>(null);
+  const [scopedStatus, setScopedStatus] = useState<ScopedPageAccessStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingOperation, setPendingOperation] = useState<PageAccessOperation | null>(null);
   const shouldLoadPageAccess = shouldLoadPageAccessStatus(activeTabCapabilities);
+  const status =
+    scopedStatus?.tabId === activeTabCapabilities.tabId &&
+    (scopedStatus.status?.currentTabId == null ||
+      scopedStatus.status.currentTabId === activeTabCapabilities.tabId)
+      ? scopedStatus.status
+      : null;
+  const setStatus = useCallback<PageAccessStatusSetter>(
+    (nextStatus) => {
+      setScopedStatus((currentStatus) => {
+        if (!currentStatus && nextStatus === null) {
+          return currentStatus;
+        }
+
+        if (
+          currentStatus?.tabId === activeTabCapabilities.tabId &&
+          currentStatus.status === nextStatus
+        ) {
+          return currentStatus;
+        }
+
+        return {
+          status: nextStatus,
+          tabId: activeTabCapabilities.tabId,
+        };
+      });
+    },
+    [activeTabCapabilities.tabId]
+  );
 
   usePageAccessStatusLoader({
     runtimeTransport,

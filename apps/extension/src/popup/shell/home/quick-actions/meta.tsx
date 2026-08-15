@@ -28,7 +28,7 @@ import {
   Target,
   Zap,
 } from 'lucide-react';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { hotkeyToKeyString } from '../../../../features/keyboard-shortcuts/hotkeys';
 import {
   SCREENSHOT_MODE_COLORS,

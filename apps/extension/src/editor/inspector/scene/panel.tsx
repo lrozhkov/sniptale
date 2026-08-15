@@ -1,11 +1,11 @@
-import { EditorInspectorPresetHeader } from '../presets';
 import { EditorInspectorFrameBackgroundFillEditor } from './background';
 import { EditorInspectorFrameBackgroundSection } from './placement/background';
 import { EditorInspectorFramePlacementSection } from './placement';
-import { FramePaddingSection } from './padding';
+import { FramePaddingFields } from './padding';
 import { FrameApplyButton } from './apply-button';
-import { EditorInspectorFramePreviewCard } from './preview/card';
 import type { EditorInspectorFramePanelProps } from './types';
+import { EditorInspectorBackgroundBlurControl } from './background/blur';
+import { EditorInspectorFrameSourceImageSection } from './source-image';
 
 function createFramePanelControls(props: EditorInspectorFramePanelProps) {
   return [
@@ -14,53 +14,53 @@ function createFramePanelControls(props: EditorInspectorFramePanelProps) {
       frameBackgroundModeOptions={props.frameBackgroundModeOptions}
       frameDraft={props.frameDraft}
       setBackgroundMode={props.setBackgroundMode}
-    />,
-    <EditorInspectorFramePreviewCard
-      key="preview"
-      backgroundPreviewStyle={props.backgroundPreviewStyle}
-    />,
-    <EditorInspectorFrameBackgroundFillEditor
-      key="background-fill"
-      applyFramePatch={props.applyFramePatch}
-      applyGradientPreset={props.applyGradientPreset}
-      frameBackgroundImageFitOptions={props.frameBackgroundImageFitOptions}
-      frameBackgroundPalette={props.frameBackgroundPalette}
-      frameDraft={props.frameDraft}
-      gradientPresets={props.gradientPresets}
-      onClearBackgroundImage={props.onClearBackgroundImage}
-      onPickBackgroundImage={props.onPickBackgroundImage}
-      previewFramePatch={props.previewFramePatch}
-      recentColors={props.recentColors}
-      toNumber={props.toNumber}
-    />,
+    >
+      <EditorInspectorFrameBackgroundFillEditor
+        applyFramePatch={props.applyFramePatch}
+        applyGradientPreset={props.applyGradientPreset}
+        frameBackgroundImageFitOptions={props.frameBackgroundImageFitOptions}
+        frameBackgroundPalette={props.frameBackgroundPalette}
+        frameDraft={props.frameDraft}
+        gradientPresets={props.gradientPresets}
+        onClearBackgroundImage={props.onClearBackgroundImage}
+        onPickBackgroundImage={props.onPickBackgroundImage}
+        previewFramePatch={props.previewFramePatch}
+        recentColors={props.recentColors}
+        toNumber={props.toNumber}
+      />
+      <EditorInspectorBackgroundBlurControl
+        frameDraft={props.frameDraft}
+        applyFramePatch={props.applyFramePatch}
+      />
+    </EditorInspectorFrameBackgroundSection>,
     <EditorInspectorFramePlacementSection
       key="placement"
       frameDraft={props.frameDraft}
       frameLayoutModeOptions={props.frameLayoutModeOptions}
       setLayoutMode={props.setLayoutMode}
-    />,
-    <FramePaddingSection
-      key="padding"
+    >
+      <FramePaddingFields frameDraft={props.frameDraft} setFrameDraft={props.setFrameDraft} />
+    </EditorInspectorFramePlacementSection>,
+    <EditorInspectorFrameSourceImageSection
+      key="source-image"
+      applyFramePatch={props.applyFramePatch}
       frameDraft={props.frameDraft}
-      framePaddingSummary={props.framePaddingSummary}
-      setFrameDraft={props.setFrameDraft}
+      {...(props.lineStyleOptions === undefined
+        ? {}
+        : { lineStyleOptions: props.lineStyleOptions })}
+      recentColors={props.recentColors}
+      {...(props.shapeStrokePalette === undefined
+        ? {}
+        : { shapeStrokePalette: props.shapeStrokePalette })}
     />,
-    <FrameApplyButton key="apply" onApplyFrame={props.onApplyFrame} />,
+    <FrameApplyButton
+      key="apply"
+      onApplyFrame={props.onApplyFrame}
+      {...(props.onCancelFrame === undefined ? {} : { onCancelFrame: props.onCancelFrame })}
+    />,
   ];
 }
 
 export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps) {
-  const controls = createFramePanelControls(props);
-
-  return (
-    <div className="space-y-3">
-      {props.scenePresetHeader ? (
-        <EditorInspectorPresetHeader state={props.scenePresetHeader}>
-          {controls}
-        </EditorInspectorPresetHeader>
-      ) : (
-        controls
-      )}
-    </div>
-  );
+  return <div className="space-y-3">{createFramePanelControls(props)}</div>;
 }

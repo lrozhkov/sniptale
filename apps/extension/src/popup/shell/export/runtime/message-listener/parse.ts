@@ -5,10 +5,7 @@ import type { PopupExportRuntimeMessage } from '../types';
 export function parsePopupExportRuntimeMessage(message: unknown): PopupExportRuntimeMessage | null {
   try {
     const parsedMessage = parsePopupRuntimeMessage(message);
-    if (
-      parsedMessage.type === MessageType.EXPORT_POPUP_PROGRESS ||
-      parsedMessage.type === MessageType.EXPORT_POPUP_RESULT
-    ) {
+    if (parsedMessage.type === MessageType.POPUP_EXPORT_JOB_STATUS_UPDATED) {
       return parsedMessage;
     }
   } catch {

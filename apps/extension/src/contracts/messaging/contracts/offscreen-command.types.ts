@@ -33,7 +33,7 @@ export type RuntimeOffscreenStartRecordingMessage = RuntimeOffscreenCommandCapab
   streamInstanceId: string;
   surface?: {
     presetId: string;
-    target: 'viewport' | 'window';
+    target: 'window';
     width: number;
     height: number;
   };
@@ -52,24 +52,6 @@ export type RuntimeOffscreenBeginRecordingMessage = RuntimeOffscreenCommandCapab
   recordingId: string;
   generation: number;
   streamInstanceId: string;
-};
-
-export type RuntimeOffscreenRevalidateSourceMessage = RuntimeOffscreenCommandCapability & {
-  type: VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId?: string;
-  viewport?: ViewportInfo;
-};
-
-export type RuntimeOffscreenSetViewportDrawStateMessage = RuntimeOffscreenCommandCapability & {
-  type: VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
-  frozen: boolean;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId: string;
 };
 
 export type RuntimeOffscreenUpdateSettingsMessage = RuntimeOffscreenCommandCapability & {

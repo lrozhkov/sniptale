@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { translate } from '../../../../../platform/i18n';
+import { useEffect, useRef, useState } from 'react';
+import { translate } from '../../../../../platform/i18n/popup';
 
 const METER_CLASS_NAME = 'h-2 overflow-hidden rounded-full bg-[var(--sniptale-color-border-soft)]';
 
@@ -16,9 +16,11 @@ function calculateRms(samples: Float32Array): number {
 }
 
 function startLevelMeter({
+  getGain,
   onLevel,
   stream,
 }: {
+  getGain: () => number;
   onLevel: (level: number) => void;
   stream: MediaStream;
 }): () => void {
@@ -30,10 +32,14 @@ function startLevelMeter({
   source.connect(analyser);
   const samples = new Float32Array(analyser.fftSize);
   let frame = 0;
+  let smoothedLevel = 0;
 
   const tick = () => {
     analyser.getFloatTimeDomainData(samples);
-    onLevel(calculateRms(samples));
+    const measuredLevel = Math.min(1, calculateRms(samples) * getGain());
+    const smoothing = measuredLevel > smoothedLevel ? 0.42 : 0.16;
+    smoothedLevel += (measuredLevel - smoothedLevel) * smoothing;
+    onLevel(smoothedLevel);
     frame = requestAnimationFrame(tick);
   };
 
@@ -46,8 +52,16 @@ function startLevelMeter({
   };
 }
 
-export function MicrophoneLevelMeter({ stream }: { stream: MediaStream | null }) {
+export function MicrophoneLevelMeter({
+  gain,
+  stream,
+}: {
+  gain: number;
+  stream: MediaStream | null;
+}) {
   const [level, setLevel] = useState(0);
+  const gainRef = useRef(gain);
+  gainRef.current = gain;
 
   useEffect(() => {
     if (!stream) {
@@ -55,7 +69,7 @@ export function MicrophoneLevelMeter({ stream }: { stream: MediaStream | null })
       return undefined;
     }
 
-    return startLevelMeter({ stream, onLevel: setLevel });
+    return startLevelMeter({ getGain: () => gainRef.current, stream, onLevel: setLevel });
   }, [stream]);
 
   return (
@@ -65,9 +79,10 @@ export function MicrophoneLevelMeter({ stream }: { stream: MediaStream | null })
       </div>
       <div className={METER_CLASS_NAME}>
         <div
-          className={['h-full transition-[width,background-color]', resolveLevelColor(level)].join(
-            ' '
-          )}
+          className={[
+            'h-full transition-[width,background-color] duration-100 ease-out',
+            resolveLevelColor(level),
+          ].join(' ')}
           style={{ width: `${Math.round(level * 100)}%` }}
         />
       </div>

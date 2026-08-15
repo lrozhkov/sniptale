@@ -30,6 +30,7 @@ let root: Root;
 function createTriggerProps() {
   return {
     captureVisibility: { hiddenDuringCapture: false, toggle: vi.fn() },
+    clearSelection: vi.fn(),
     closePopover: vi.fn(),
     handleStartEditing: vi.fn(),
     hoverFrame: vi.fn(),
@@ -38,6 +39,8 @@ function createTriggerProps() {
     scheduleHoverFrameHide: vi.fn(),
     selectFrame: vi.fn(),
     setIsCalloutEditing: vi.fn(),
+    setActiveCalloutIndex: vi.fn(),
+    setTempFrame: vi.fn(),
     setState: vi.fn(),
   };
 }
@@ -72,6 +75,12 @@ describe('InteractiveFrameToolbarTrigger', () => {
     const surface = positioner?.querySelector('.sniptale-frame-toolbar-bridge');
     expect(positioner?.classList).toContain('sniptale-content-ui-positioner');
     expect(surface?.classList).toContain('sniptale-content-ui-zoom-surface');
+    expect((positioner as HTMLElement | null)?.style.pointerEvents).toBe('none');
+    expect(
+      Array.from(positioner?.querySelectorAll<HTMLButtonElement>('button') ?? []).every(
+        (button) => button.style.pointerEvents === 'auto'
+      )
+    ).toBe(true);
   });
 
   it('renders a localized native button and keeps the hover corridor owned by its frame', () => {
@@ -162,6 +171,26 @@ describe('InteractiveFrameToolbarTrigger', () => {
     cleanupStepBadgeListener();
   });
 
+  it('centers every mini icon as a block inside its circular frame control', () => {
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{ effectMode: 'border', height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
+          isVisible
+          {...createTriggerProps()}
+        />
+      );
+    });
+
+    const icons = Array.from(
+      document.querySelectorAll<SVGElement>(
+        '.sniptale-frame-quick-action > svg, .sniptale-frame-toolbar-trigger > svg'
+      )
+    );
+    expect(icons).toHaveLength(6);
+    expect(icons.every((icon) => icon.style.display === 'block')).toBe(true);
+  });
+
   it.each([
     ['border', 'lucide-square'],
     ['blur', 'lucide-droplet'],
@@ -210,8 +239,11 @@ describe('InteractiveFrameToolbarTrigger', () => {
       HTMLButtonElement
     );
   });
+});
 
-  it('does not duplicate add actions for annotations that already exist', () => {
+describe('InteractiveFrameToolbarTrigger additional comments', () => {
+  it('replaces the primary add action with an additional-comment action', () => {
+    const handlers = createTriggerProps();
     act(() => {
       root.render(
         <InteractiveFrameToolbarTrigger
@@ -226,21 +258,133 @@ describe('InteractiveFrameToolbarTrigger', () => {
             y: 100,
           }}
           isVisible
+          {...handlers}
+        />
+      );
+    });
+
+    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(4);
+    expect(document.querySelector('[data-quick-action="settings"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
+    expect(document.querySelector('[data-quick-action="callout"]')).toBeNull();
+    const addButton = document.querySelector<HTMLButtonElement>(
+      '[data-quick-action="add-callout"]'
+    );
+    expect(addButton).toBeInstanceOf(HTMLButtonElement);
+    expect(addButton?.disabled).toBe(false);
+    expect(document.querySelector('[data-quick-action="edit"]')).toBeInstanceOf(HTMLButtonElement);
+    expect(document.querySelector('[data-quick-action="capture-visibility"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
+
+    act(() =>
+      addButton?.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true })
+      )
+    );
+    expect(handlers.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        additionalCallouts: [expect.objectContaining({ enabled: true })],
+      })
+    );
+    expect(handlers.setActiveCalloutIndex).toHaveBeenCalledWith(1);
+    expect(handlers.setIsCalloutEditing).toHaveBeenCalledWith(true);
+  });
+
+  it('requests a fifth comment without hiding the mini action before the frame update is accepted', () => {
+    const handlers = createTriggerProps();
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{
+            additionalCallouts: Array.from({ length: 3 }, () => createCalloutSettingsFixture()),
+            callout: createCalloutSettingsFixture(),
+            effectMode: 'border',
+            height: 80,
+            id: 'frame-1',
+            width: 240,
+            x: 100,
+            y: 100,
+          }}
+          isVisible
+          {...handlers}
+        />
+      );
+    });
+
+    const addButton = document.querySelector<HTMLButtonElement>(
+      '[data-quick-action="add-callout"]'
+    );
+    expect(addButton).toBeInstanceOf(HTMLButtonElement);
+    expect(addButton?.disabled).toBe(false);
+    act(() => {
+      addButton?.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true })
+      );
+      addButton?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })
+      );
+    });
+    expect(handlers.onUpdate).toHaveBeenCalledOnce();
+    expect(handlers.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ additionalCallouts: expect.arrayContaining([expect.any(Object)]) })
+    );
+    expect(handlers.onUpdate.mock.calls.at(-1)?.[0]?.additionalCallouts).toHaveLength(4);
+    expect(document.querySelector('[data-quick-action="add-callout"]')).toBeInstanceOf(
+      HTMLButtonElement
+    );
+  });
+
+  it('hides the additional-comment mini action at the toolbar limit', () => {
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{
+            additionalCallouts: Array.from({ length: 4 }, () => createCalloutSettingsFixture()),
+            callout: createCalloutSettingsFixture(),
+            effectMode: 'border',
+            height: 80,
+            id: 'frame-1',
+            width: 240,
+            x: 100,
+            y: 100,
+          }}
+          isVisible
           {...createTriggerProps()}
         />
       );
     });
 
-    expect(document.querySelectorAll('.sniptale-frame-quick-action')).toHaveLength(3);
-    expect(document.querySelector('[data-quick-action="settings"]')).toBeInstanceOf(
-      HTMLButtonElement
-    );
-    expect(document.querySelector('[data-quick-action="edit"]')).toBeInstanceOf(HTMLButtonElement);
-    expect(document.querySelector('[data-quick-action="capture-visibility"]')).toBeInstanceOf(
-      HTMLButtonElement
-    );
+    expect(document.querySelector('[data-quick-action="add-callout"]')).toBeNull();
   });
 
+  it('hides the mini action when either state authority reports the limit', () => {
+    act(() => {
+      root.render(
+        <InteractiveFrameToolbarTrigger
+          frame={{
+            additionalCallouts: Array.from({ length: 3 }, () => createCalloutSettingsFixture()),
+            callout: createCalloutSettingsFixture(),
+            effectMode: 'border',
+            height: 80,
+            id: 'frame-1',
+            width: 240,
+            x: 100,
+            y: 100,
+          }}
+          isVisible
+          canAddCallout={false}
+          {...createTriggerProps()}
+        />
+      );
+    });
+
+    expect(document.querySelector('[data-quick-action="add-callout"]')).toBeNull();
+  });
+});
+
+describe('InteractiveFrameToolbarTrigger capture visibility', () => {
   it('toggles capture-only frame visibility without changing live frame geometry', () => {
     const handlers = createTriggerProps();
     const frame = {

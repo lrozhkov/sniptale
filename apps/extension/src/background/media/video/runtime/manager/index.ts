@@ -15,7 +15,6 @@ export {
   stopRecordingForPrivacyErasure,
 } from './controls';
 export {
-  handleTabRecordingDebuggerDetach,
   handleTabRecordingNavigationCommitted,
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,

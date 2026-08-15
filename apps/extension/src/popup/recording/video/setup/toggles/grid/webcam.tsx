@@ -1,5 +1,5 @@
-import { Camera } from 'lucide-react';
-import { translate } from '../../../../../../platform/i18n';
+import { Video } from 'lucide-react';
+import { translate } from '../../../../../../platform/i18n/popup';
 import { PopupIconStateButton } from '../../../../../../ui/popup-shell/icon-state-button';
 
 export function VideoWebcamToggle({
@@ -13,7 +13,7 @@ export function VideoWebcamToggle({
 }) {
   return (
     <PopupIconStateButton
-      icon={Camera}
+      icon={Video}
       label={translate('popup.video.webcamToggleLabel')}
       description={translate('popup.video.webcamToggleDescription')}
       active={active}

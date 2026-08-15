@@ -28,7 +28,7 @@ export const MESSAGING_OWNER_MAPPINGS = [
       'Runtime message core contract changes are high-risk and need explicit parser/response proof.',
     testFiles: [
       'apps/extension/src/contracts/messaging/contracts/runtime-message.actions-capture.test.ts',
-      'apps/extension/src/contracts/messaging/contracts/runtime/actions/export.test.ts',
+      'apps/extension/src/contracts/messaging/contracts/runtime/actions/export.job.test.ts',
     ],
   },
   {
@@ -38,6 +38,8 @@ export const MESSAGING_OWNER_MAPPINGS = [
       'packages/runtime-contracts/src/messaging/contracts/runtime-message/popup-export.ts',
     reason:
       'Popup export runtime contract changes cross popup/background routing and need owner tests.',
-    testFiles: ['apps/extension/src/contracts/messaging/contracts/runtime/actions/export.test.ts'],
+    testFiles: [
+      'apps/extension/src/contracts/messaging/contracts/runtime/actions/export.job.test.ts',
+    ],
   },
 ];

@@ -16,12 +16,26 @@ type EditorWindowKeyDownOptions = EditorKeyboardCommandCallbacks & {
   metaKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
+  isComposing: boolean;
   activeTool: string;
   hasCropGuide: boolean;
   hasDrawSession?: boolean;
 };
 
-export function handleEditorWindowBlur(options: { finalizeSelectionNudge?: () => void }): void {
+function ownsFabricTextboxInput(
+  textbox: import('fabric').Textbox | null,
+  target: EventTarget | null
+) {
+  return Boolean(textbox?.isEditing && Object.is(textbox.hiddenTextarea, target));
+}
+
+export function handleEditorWindowBlur(options: {
+  cancelTransientInteraction?: () => boolean;
+  endCurrentTransform?: () => void;
+  finalizeSelectionNudge?: () => void;
+}): void {
+  options.endCurrentTransform?.();
+  options.cancelTransientInteraction?.();
   options.finalizeSelectionNudge?.();
 }
 
@@ -30,6 +44,9 @@ export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): 
   nextSpacePressed?: boolean;
 } {
   const activeObject = options.canvas?.getActiveObject();
+  const activeTextbox = activeObject && isTextbox(activeObject) ? activeObject : null;
+  const isEditingTextboxSelection = Boolean(activeTextbox?.isEditing);
+  const isEditingTextboxInput = ownsFabricTextboxInput(activeTextbox, options.target);
   const action = resolveEditorKeyboardAction({
     hasCanvas: Boolean(options.canvas),
     targetIsInteractive: isInteractiveShortcutTarget(options.target),
@@ -39,13 +56,13 @@ export function handleEditorWindowKeyDown(options: EditorWindowKeyDownOptions): 
     metaKey: options.metaKey,
     altKey: options.altKey,
     shiftKey: options.shiftKey,
+    isComposing: options.isComposing,
     hasSelection: Boolean(options.canvas?.getActiveObjects().filter(isEditableObject).length),
     hasCropGuide: options.hasCropGuide,
     ...(options.hasDrawSession === undefined ? {} : { hasDrawSession: options.hasDrawSession }),
     activeTool: options.activeTool,
-    isEditingTextboxSelection: Boolean(
-      activeObject && isTextbox(activeObject) && activeObject.isEditing
-    ),
+    isEditingTextboxSelection,
+    isEditingTextboxInput,
     hasSelectedTextTarget: Boolean(activeObject && isTextTarget(activeObject)),
   });
 

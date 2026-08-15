@@ -75,6 +75,7 @@ export interface EditorInspectorFrameMutationActions {
   applyGradientPreset: (preset: BackgroundGradientPreset) => void;
   clearBackgroundImage: () => void;
   onPickBackgroundImage: () => void;
+  resetFrameDraft?: (() => void) | undefined;
 }
 
 export interface EditorInspectorDocumentActions {

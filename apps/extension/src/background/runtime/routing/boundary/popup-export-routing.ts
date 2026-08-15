@@ -13,7 +13,7 @@ import {
   createWebSnapshotViewerPorts,
   sendViewerPopupExportMessage,
 } from '../../../capture/lifecycle';
-import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { respondAsyncRouteWithLogger } from '../../../routing-contracts/response';
 import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 import * as contentActionRoute from '../../../routing-contracts/capabilities/content-action/route';
@@ -89,27 +89,8 @@ function issueFullPageExportContentIntentGrant(tabId: number, action: FullPageEx
   });
 }
 
-function resolveFullPageCaptureAction(
-  message: NonSavePopupExportMessage,
-  target: PopupExportTarget
-): FullPageExportCaptureAction {
-  return message.type === MessageType.EXPORT_POPUP_BUILD_PACKAGE || target.tab.active !== true
-    ? MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
-    : MessageType.EXPORT_CAPTURE_FULL_PAGE;
-}
-
-function shouldGrantFullPageExportIntent(message: NonSavePopupExportMessage): boolean {
-  return (
-    (message.type === MessageType.EXPORT_POPUP_START ||
-      message.type === MessageType.EXPORT_POPUP_BUILD_PACKAGE) &&
-    message.options.includeFullPageScreenshot
-  );
-}
-
 function createContentPopupExportMessage(
-  message: NonSavePopupExportMessage,
-  resolvedTabId: number,
-  target: PopupExportTarget
+  message: NonSavePopupExportMessage
 ): Exclude<
   ViewerPortPopupExportMessage,
   { type: typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT }
@@ -117,32 +98,8 @@ function createContentPopupExportMessage(
   switch (message.type) {
     case MessageType.EXPORT_POPUP_PREVIEW:
       return { type: message.type };
-    case MessageType.EXPORT_POPUP_START: {
-      const startAction = resolveFullPageCaptureAction(message, target);
-      return {
-        ...(shouldGrantFullPageExportIntent(message)
-          ? {
-              contentIntentGrant: issueFullPageExportContentIntentGrant(resolvedTabId, startAction),
-              fullPageCaptureAction: startAction,
-            }
-          : {}),
-        options: message.options,
-        requestId: message.requestId,
-        type: message.type,
-      };
-    }
     case MessageType.EXPORT_POPUP_BUILD_PACKAGE: {
-      const packageAction = resolveFullPageCaptureAction(message, target);
       return {
-        ...(shouldGrantFullPageExportIntent(message)
-          ? {
-              contentIntentGrant: issueFullPageExportContentIntentGrant(
-                resolvedTabId,
-                packageAction
-              ),
-              fullPageCaptureAction: packageAction,
-            }
-          : {}),
         batchRequestId: message.batchRequestId,
         options: message.options,
         type: message.type,
@@ -151,6 +108,7 @@ function createContentPopupExportMessage(
     case MessageType.EXPORT_POPUP_CANCEL:
       return { type: message.type, exportRunId: message.exportRunId };
   }
+  throw new Error('Unsupported popup export message');
 }
 
 function toWebSnapshotRouteResponse(response: unknown): WebSnapshotRouteResponse {
@@ -178,14 +136,8 @@ async function resolvePopupExportTarget(resolvedTabId: number): Promise<PopupExp
   return { isOwnedSnapshotViewer: false, tab };
 }
 
-function sendPopupExportToContent(
-  args: NonSavePopupExportRouteArgs,
-  target: PopupExportTarget
-): Promise<unknown> {
-  return sendTabMessage(
-    args.resolvedTabId,
-    createContentPopupExportMessage(args.message, args.resolvedTabId, target)
-  );
+function sendPopupExportToContent(args: NonSavePopupExportRouteArgs): Promise<unknown> {
+  return sendTabMessage(args.resolvedTabId, createContentPopupExportMessage(args.message));
 }
 
 async function routeWebSnapshotSave(
@@ -212,14 +164,9 @@ async function routeWebSnapshotSave(
         allowAuthenticatedSameOriginAssets: settings.authenticatedSnapshotAssetsEnabled,
         contentIntentGrant: issueFullPageExportContentIntentGrant(
           args.resolvedTabId,
-          args.target.tab.active === true
-            ? MessageType.EXPORT_CAPTURE_FULL_PAGE
-            : MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
+          MessageType.EXPORT_CAPTURE_FULL_PAGE
         ),
-        fullPageCaptureAction:
-          args.target.tab.active === true
-            ? MessageType.EXPORT_CAPTURE_FULL_PAGE
-            : MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
+        fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
         requestId: args.message.requestId,
         resolvedTabId: args.resolvedTabId,
       })
@@ -265,7 +212,7 @@ async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<
       const cancelArgs: NonSavePopupExportRouteArgs = { ...args, message: args.message };
       forwardingResult = target.isOwnedSnapshotViewer
         ? await sendPopupExportToViewer(cancelArgs)
-        : await sendPopupExportToContent(cancelArgs, target);
+        : await sendPopupExportToContent(cancelArgs);
     } catch (error) {
       forwardingFailure = error;
     }
@@ -288,7 +235,7 @@ async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<
   const nonSaveArgs: NonSavePopupExportRouteArgs = { ...args, message: args.message };
   return target.isOwnedSnapshotViewer
     ? sendPopupExportToViewer(nonSaveArgs)
-    : sendPopupExportToContent(nonSaveArgs, target);
+    : sendPopupExportToContent(nonSaveArgs);
 }
 
 export function routePopupExportMessage(args: PopupExportRouteArgs): void {
@@ -299,4 +246,36 @@ export function routePopupExportMessage(args: PopupExportRouteArgs): void {
     sendResponse: args.sendResponse,
     work: routePopupExportMessageWork(args),
   });
+}
+
+export async function requestPopupExportPagePackage(args: {
+  batchRequestId: string;
+  options: import('@sniptale/runtime-contracts/export').ExportOptions;
+  tabId: number;
+}): Promise<unknown> {
+  const target = await resolvePopupExportTarget(args.tabId);
+  const message = {
+    batchRequestId: args.batchRequestId,
+    options: args.options,
+    type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
+  } as const;
+  return target.isOwnedSnapshotViewer
+    ? sendViewerPopupExportMessage(createWebSnapshotViewerPorts(), args.tabId, message)
+    : sendTabMessage(args.tabId, message);
+}
+
+export async function cancelPopupExportPagePackage(args: {
+  exportRunId: string;
+  tabId: number;
+}): Promise<void> {
+  const target = await resolvePopupExportTarget(args.tabId);
+  const message = {
+    exportRunId: args.exportRunId,
+    type: MessageType.EXPORT_POPUP_CANCEL,
+  } as const;
+  if (target.isOwnedSnapshotViewer) {
+    await sendViewerPopupExportMessage(createWebSnapshotViewerPorts(), args.tabId, message);
+    return;
+  }
+  await sendTabMessage(args.tabId, message);
 }

@@ -13,9 +13,7 @@ function isResourceLifecycleTarget(relativePath) {
   const isRuntimeOwner =
     relativePath.startsWith('apps/extension/src/background/') ||
     relativePath.startsWith('apps/extension/src/offscreen/');
-  return (
-    isRuntimeOwner && /(?:recording|export|debugger|media|video|capture).*\.ts$/u.test(relativePath)
-  );
+  return isRuntimeOwner && /(?:recording|export|media|video|capture).*\.ts$/u.test(relativePath);
 }
 
 function isHotLoopTarget(relativePath) {
@@ -82,18 +80,6 @@ export function collectResourceLifecyclePairViolations(files) {
           relativePath,
           lines.findIndex((line) => line.includes('URL.createObjectURL')) + 1,
           'Object URLs must have an owned revoke path in the same lifecycle owner.'
-        )
-      );
-    }
-    const attachesDebugger =
-      /chrome\.debugger\.attach|browserDebugger\.attach|debugger\.attach/u.test(source);
-    if (attachesDebugger && !/\bdetach\b/u.test(source)) {
-      violations.push(
-        createViolation(
-          'resource-lifecycle-debugger-detach',
-          relativePath,
-          1,
-          'Debugger attach owners must have detach on abort/failure cleanup paths.'
         )
       );
     }

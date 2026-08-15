@@ -181,6 +181,9 @@ export function createEditorInspectorContentActions(controller: SidebarExpandedC
     onCopyRenderedImage: controller.onCopyRenderedImage,
     onExportSession: controller.onExportSession,
     onApplyFrame: controller.onApplyFrame,
+    ...(controller.resetFrameDraft === undefined
+      ? {}
+      : { resetFrameDraft: controller.resetFrameDraft }),
     ...(controller.copyRenderedImageDisabledReason === undefined
       ? {}
       : { copyRenderedImageDisabledReason: controller.copyRenderedImageDisabledReason }),

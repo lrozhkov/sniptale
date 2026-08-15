@@ -37,11 +37,11 @@
 
 #sniptale-content-app-root:has(.sniptale-toolbar[data-menu-open='true'])
   ~ #sniptale-content-overlay-root
-  > :not(.sniptale-main-toolbar-popover):not(:has(> .sniptale-main-toolbar-popover)):not(
-    .sniptale-modal
-  ):not(.sniptale-modal-backdrop):not(.sniptale-blur-overlay):not(.sniptale-focus-overlay):not(
-    :has(.sniptale-modal)
-  ) {
+  > :not(#sniptale-resize-handles-portal):not(#sniptale-frame-size-panel-portal):not(
+    .sniptale-main-toolbar-popover
+  ):not(:has(> .sniptale-main-toolbar-popover)):not(.sniptale-modal):not(
+    .sniptale-modal-backdrop
+  ):not(.sniptale-blur-overlay):not(.sniptale-focus-overlay):not(:has(.sniptale-modal)) {
   z-index: 2147483645 !important;
   pointer-events: none !important;
 }

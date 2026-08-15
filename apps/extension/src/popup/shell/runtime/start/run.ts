@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import type { PopupRuntimeStateSlice } from '../state';
+import type { PopupVideoRuntimeStateSlice } from '../types/internal-state';
 import { startRecordingHandler } from '../start-recording';
 
-export function useStartRecordingHandler(state: PopupRuntimeStateSlice) {
+export function useStartRecordingHandler(state: PopupVideoRuntimeStateSlice) {
   return useCallback(async () => {
     if (
       state.recording.isStartPending ||

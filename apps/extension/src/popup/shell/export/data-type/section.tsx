@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useMemo, useState } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { renderDataTypeSummaryItems } from './summary';
 import {
   getExportOptionActive,
@@ -93,7 +93,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     includeCssDiagnostics: props.includeCssDiagnostics,
     includeFiles: props.includeFiles,
     includeFullPageScreenshot: props.includeFullPageScreenshot,
-    includeHarDomLogs: props.includeHarDomLogs,
+    includePageDiagnostics: props.includePageDiagnostics,
     includeImages: props.includeImages,
     includeJson: props.includeJson,
     includeMarkdown: props.includeMarkdown,
@@ -102,7 +102,7 @@ function createSelectionProps(props: DataTypeSectionProps): ExportOptionTogglePr
     setIncludeCssDiagnostics: bindSetter(props.setIncludeCssDiagnostics),
     setIncludeFiles: bindSetter(props.setIncludeFiles),
     setIncludeFullPageScreenshot: bindSetter(props.setIncludeFullPageScreenshot),
-    setIncludeHarDomLogs: bindSetter(props.setIncludeHarDomLogs),
+    setIncludePageDiagnostics: bindSetter(props.setIncludePageDiagnostics),
     setIncludeImages: bindSetter(props.setIncludeImages),
     setIncludeJson: bindSetter(props.setIncludeJson),
     setIncludeMarkdown: bindSetter(props.setIncludeMarkdown),

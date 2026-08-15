@@ -9,6 +9,7 @@ function createSetupFixture() {
   const order: string[] = [];
   const handlers = {
     handleClick: vi.fn(),
+    handleDragStart: vi.fn(),
     handleKeyDown: vi.fn(),
     handleMouseDown: vi.fn(),
     handleMouseLeave: vi.fn(),

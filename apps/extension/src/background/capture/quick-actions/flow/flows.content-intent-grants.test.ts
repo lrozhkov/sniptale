@@ -65,6 +65,7 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     saveCapturesToGallery: false,
@@ -74,7 +75,6 @@ function createSettings(viewportPresets: ViewportPreset[]): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     viewportPresets,
   };
 }
@@ -105,7 +105,7 @@ function createCaptureArgs(captureMode: 'visible' | 'full') {
         kind: 'user',
         id: 'preset-1',
         name: 'Preset 1',
-        target: 'viewport' as const,
+        target: 'window' as const,
         width: 1440,
         height: 900,
         enabled: true,
@@ -115,8 +115,8 @@ function createCaptureArgs(captureMode: 'visible' | 'full') {
     tabId: 21,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-    >([[21, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]),
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+    >([[21, { presetId: 'test:viewport', target: 'window' as const, width: 1440, height: 900 }]]),
   };
 }
 
@@ -136,7 +136,7 @@ beforeEach(() => {
     async (args: ReturnType<typeof createCaptureArgs>) => {
       args.viewportState.set(args.tabId, {
         presetId: 'preset-1',
-        target: 'viewport' as const,
+        target: 'window' as const,
         width: 1440,
         height: 900,
       });

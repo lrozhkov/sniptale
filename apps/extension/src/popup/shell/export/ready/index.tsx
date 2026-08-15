@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { ExportDataTypeSection } from '../data-type/section';
 import { ExportPagesSection } from '../pages/section';
 import type { PopupExportTabItem } from '../selection/tabs/types';
@@ -17,7 +17,7 @@ type ExportReadySectionProps = {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
-  includeHarDomLogs: boolean;
+  includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
@@ -30,7 +30,7 @@ type ExportReadySectionProps = {
   setFilterQuery: (value: string) => void;
   setIncludeFiles: Dispatch<SetStateAction<boolean>>;
   setIncludeFullPageScreenshot: Dispatch<SetStateAction<boolean>>;
-  setIncludeHarDomLogs: Dispatch<SetStateAction<boolean>>;
+  setIncludePageDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeImages: Dispatch<SetStateAction<boolean>>;
   setIncludeJson: Dispatch<SetStateAction<boolean>>;
   setIncludeMarkdown: Dispatch<SetStateAction<boolean>>;
@@ -66,7 +66,7 @@ function renderDataTypeSection(
       includeCssDiagnostics={props.includeCssDiagnostics}
       includeFiles={props.includeFiles}
       includeFullPageScreenshot={props.includeFullPageScreenshot}
-      includeHarDomLogs={props.includeHarDomLogs}
+      includePageDiagnostics={props.includePageDiagnostics}
       includeImages={props.includeImages}
       includeJson={props.includeJson}
       includeMarkdown={props.includeMarkdown}
@@ -79,7 +79,7 @@ function renderDataTypeSection(
       setIncludeCssDiagnostics={props.setIncludeCssDiagnostics}
       setIncludeFiles={props.setIncludeFiles}
       setIncludeFullPageScreenshot={props.setIncludeFullPageScreenshot}
-      setIncludeHarDomLogs={props.setIncludeHarDomLogs}
+      setIncludePageDiagnostics={props.setIncludePageDiagnostics}
       setIncludeImages={props.setIncludeImages}
       setIncludeJson={props.setIncludeJson}
       setIncludeMarkdown={props.setIncludeMarkdown}

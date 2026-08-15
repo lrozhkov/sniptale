@@ -120,7 +120,7 @@ it('returns safe defaults when viewport context is incomplete', () => {
   );
 });
 
-it('resolves a floating-toolbar aware fit area without using stage pan padding', () => {
+it('fits into the free rectangle below top toolbars and left of the expanded right panel', () => {
   const viewportElement = createViewportElement();
   Object.defineProperty(viewportElement, 'clientWidth', { configurable: true, value: 1200 });
   Object.defineProperty(viewportElement, 'clientHeight', { configurable: true, value: 800 });
@@ -136,27 +136,54 @@ it('resolves a floating-toolbar aware fit area without using stage pan padding',
   const documentBar = document.createElement('div');
   const viewControls = document.createElement('div');
   const toolRail = document.createElement('div');
+  const rightStack = document.createElement('div');
   documentBar.setAttribute('data-ui', 'editor.floating.document-bar');
   viewControls.setAttribute('data-ui', 'editor.floating.view-controls');
   toolRail.setAttribute('data-ui', 'editor.floating.tool-rail.stack');
-  document.body.append(documentBar, viewControls, toolRail);
+  rightStack.setAttribute('data-ui', 'editor.floating.right-stack');
+  document.body.append(documentBar, viewControls, toolRail, rightStack);
   documentBar.getBoundingClientRect = () =>
     ({ bottom: 50, height: 42, left: 8, right: 420, top: 8, width: 412 }) as DOMRect;
   viewControls.getBoundingClientRect = () =>
     ({ bottom: 54, height: 42, left: 980, right: 1188, top: 12, width: 208 }) as DOMRect;
   toolRail.getBoundingClientRect = () =>
-    ({ bottom: 650, height: 500, left: 12, right: 58, top: 150, width: 46 }) as DOMRect;
+    ({ bottom: 56, height: 44, left: 360, right: 840, top: 12, width: 480 }) as DOMRect;
+  rightStack.getBoundingClientRect = () =>
+    ({ bottom: 788, height: 596, left: 848, right: 1188, top: 192, width: 340 }) as DOMRect;
 
   expect(getEditorViewportFitArea(viewportElement)).toEqual({
-    centerX: 625,
-    centerY: 423,
-    height: 706,
-    width: 1102,
+    centerX: 428,
+    centerY: 424,
+    height: 704,
+    width: 808,
   });
 
   documentBar.remove();
   viewControls.remove();
   toolRail.remove();
+  rightStack.remove();
+});
+
+it('reserves the left drawer only while it is visible', () => {
+  const viewportElement = createViewportElement();
+  Object.defineProperty(viewportElement, 'clientWidth', { configurable: true, value: 1200 });
+  Object.defineProperty(viewportElement, 'clientHeight', { configurable: true, value: 800 });
+  viewportElement.getBoundingClientRect = () =>
+    ({ bottom: 850, height: 800, left: 100, right: 1300, top: 50, width: 1200 }) as DOMRect;
+  const leftDrawer = document.createElement('div');
+  leftDrawer.setAttribute('data-ui', 'editor.floating.left-drawer.shape');
+  document.body.append(leftDrawer);
+  leftDrawer.getBoundingClientRect = () =>
+    ({ bottom: 838, height: 724, left: 112, right: 464, top: 114, width: 352 }) as DOMRect;
+
+  expect(getEditorViewportFitArea(viewportElement)).toEqual({
+    centerX: 778,
+    centerY: 400,
+    height: 752,
+    width: 796,
+  });
+
+  leftDrawer.remove();
 });
 
 it('captures and restores viewport anchor', () => {

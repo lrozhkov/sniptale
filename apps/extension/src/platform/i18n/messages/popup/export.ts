@@ -1,19 +1,30 @@
 import { defineMessageSource } from '../source';
 import { popupExportWebSnapshotMessages } from './export-web-snapshot';
 
-const INCLUDE_HAR_DOM_LOGS_DESCRIPTION_RU = [
-  'DOM, HAR и console details;',
-  'credentials и чувствительные URL-параметры редактируются',
-].join(' ');
-const INCLUDE_HAR_DOM_LOGS_DESCRIPTION_EN = [
-  'DOM, HAR, and console details;',
-  'credentials and sensitive URL parameters are redacted',
-].join(' ');
-
 export const popupExportMessages = defineMessageSource({
   preparingPreview: {
     ru: 'Подготовка экспорта...',
     en: 'Preparing export...',
+  },
+  screenshotPermissionDeniedWarning: {
+    ru: 'Доступ ко всем страницам не выдан: экспорт продолжен без полноразмерных скриншотов.',
+    en: 'All-sites access was not granted; export continued without full-page screenshots.',
+  },
+  manualTabConflictWarning: {
+    ru: 'Скриншоты больше не снимаются: активная вкладка была переключена вручную.',
+    en: 'Screenshot capture stopped because the active tab was changed manually.',
+  },
+  tabUnavailableWarningPrefix: {
+    ru: 'Вкладка недоступна',
+    en: 'Tab is unavailable',
+  },
+  restoreOriginalTabWarningPrefix: {
+    ru: 'Не удалось восстановить исходную вкладку',
+    en: 'Could not restore the original tab',
+  },
+  jobInterruptedMessage: {
+    ru: 'Экспорт прерван перезапуском фонового процесса',
+    en: 'Export interrupted by background restart',
   },
   collectingTitle: {
     ru: 'Собираем материалы',
@@ -48,8 +59,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Export finished with errors',
   },
   dataTypesSectionLabel: {
-    ru: 'Тип данных',
-    en: 'Data type',
+    ru: 'Состав экспорта',
+    en: 'Export contents',
   },
   contentGroupLabel: {
     ru: 'Содержимое',
@@ -60,8 +71,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Diagnostics',
   },
   tabsSectionLabel: {
-    ru: 'Страницы для экспорта',
-    en: 'Pages to export',
+    ru: 'Страницы',
+    en: 'Pages',
   },
   editButton: {
     ru: 'Изменить',
@@ -145,7 +156,7 @@ export const popupExportMessages = defineMessageSource({
   },
   includeJsonDescription: {
     ru: 'Структура и данные страницы',
-    en: 'Page structure',
+    en: 'Page structure and data',
   },
   includeMarkdownLabel: {
     ru: 'Markdown',
@@ -153,7 +164,7 @@ export const popupExportMessages = defineMessageSource({
   },
   includeMarkdownDescription: {
     ru: 'Текст и таблицы',
-    en: 'Tables and text',
+    en: 'Text and tables',
   },
   includeFilesLabel: {
     ru: 'Файлы',
@@ -161,47 +172,47 @@ export const popupExportMessages = defineMessageSource({
   },
   includeFilesDescription: {
     ru: 'Документы и вложения со страницы',
-    en: 'Download attachments',
+    en: 'Documents and attachments from the page',
   },
   includeImagesLabel: {
     ru: 'Изображения',
     en: 'Images',
   },
   includeImagesDescription: {
-    ru: 'Картинки и превью со страницы',
+    ru: 'Изображения и превью со страницы',
     en: 'Images and previews from the page',
   },
   includeBasicLogsLabel: {
-    ru: 'Базовые логи',
-    en: 'Basic logs',
+    ru: 'Журнал экспорта',
+    en: 'Export log',
   },
   includeBasicLogsDescription: {
-    ru: 'Сведения о странице, ходе сбора и сообщениях консоли',
-    en: 'Page details, collection notes, and page console messages',
+    ru: 'Сведения о странице, ходе сбора и предупреждениях экспорта',
+    en: 'Page details, collection notes, and export warnings',
   },
-  includeHarDomLogsLabel: {
-    ru: 'Подробные логи',
-    en: 'Detailed logs',
+  includePageDiagnosticsLabel: {
+    ru: 'Данные страницы для анализа',
+    en: 'Page analysis data',
   },
-  includeHarDomLogsDescription: {
-    ru: INCLUDE_HAR_DOM_LOGS_DESCRIPTION_RU,
-    en: INCLUDE_HAR_DOM_LOGS_DESCRIPTION_EN,
+  includePageDiagnosticsDescription: {
+    ru: 'Структура страницы, элементы интерфейса и сведения о загрузке ресурсов',
+    en: 'Page structure, interface elements, and resource loading details',
   },
   includeCssDiagnosticsLabel: {
-    ru: 'Стили страницы',
-    en: 'Page styles',
+    ru: 'Оформление и стили',
+    en: 'Design and styles',
   },
   includeCssDiagnosticsDescription: {
-    ru: 'Оформление, параметры элементов и сообщения консоли',
-    en: 'Page styling, element parameters, and page console messages',
+    ru: 'Цвета, шрифты, CSS-стили и параметры элементов',
+    en: 'Colors, fonts, CSS styles, and element properties',
   },
   includeFullPageScreenshotLabel: {
     ru: 'Скриншот',
     en: 'Screenshot',
   },
   includeFullPageScreenshotDescription: {
-    ru: 'Снимок всей страницы',
-    en: 'Full page',
+    ru: 'Снимок всей страницы целиком',
+    en: 'Capture of the entire page',
   },
   copyButton: {
     ru: 'Копировать',

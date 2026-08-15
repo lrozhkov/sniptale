@@ -1,42 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createTemplateSourceAction } from './template-source';
 
 const copy = {
-  forcedDescription: 'Always use the selected template',
-  forcedLabel: 'Selected',
-  frameDescription: 'Use the template linked to the frame',
-  frameLabel: 'From frame',
+  forcedDescription: 'Switch to default',
+  forcedLabel: 'Use default',
+  frameDescription: 'Switch to frame',
+  frameLabel: 'Use frame',
 };
 
-describe('createTemplateSourceAction', () => {
-  it('describes the frame-linked mode and switches to the forced template', () => {
-    const onChange = vi.fn();
+it('labels the template source button with the action it will perform', () => {
+  const onChange = vi.fn();
 
-    const action = createTemplateSourceAction({ onChange, value: 'frame-default' }, copy);
+  const useFrame = createTemplateSourceAction({ onChange, value: 'forced' }, copy);
+  expect(useFrame).toMatchObject({ description: 'Switch to frame', label: 'Use frame' });
+  useFrame.onClick();
+  expect(onChange).toHaveBeenLastCalledWith('frame-default');
 
-    expect(action).toMatchObject({
-      description: copy.frameDescription,
-      label: copy.frameLabel,
-    });
-
-    action.onClick();
-
-    expect(onChange).toHaveBeenCalledWith('forced');
-  });
-
-  it('describes the forced mode and switches back to the frame default', () => {
-    const onChange = vi.fn();
-
-    const action = createTemplateSourceAction({ onChange, value: 'forced' }, copy);
-
-    expect(action).toMatchObject({
-      description: copy.forcedDescription,
-      label: copy.forcedLabel,
-    });
-
-    action.onClick();
-
-    expect(onChange).toHaveBeenCalledWith('frame-default');
-  });
+  const useDefault = createTemplateSourceAction({ onChange, value: 'frame-default' }, copy);
+  expect(useDefault).toMatchObject({ description: 'Switch to default', label: 'Use default' });
+  useDefault.onClick();
+  expect(onChange).toHaveBeenLastCalledWith('forced');
 });

@@ -17,7 +17,7 @@ const MANIFEST_PATH = 'apps/extension/manifest.json';
 const RUNTIME_CONTEXTS_DOC_PATH = 'docs/architecture/runtime-contexts.md';
 const ACTIVE_TOPOLOGY_FILES = [
   'docs/agent-tooling/AGENTS.md',
-  'DESIGN.md',
+  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',

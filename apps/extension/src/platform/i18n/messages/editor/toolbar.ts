@@ -23,12 +23,12 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Background',
   },
   browserFrame: {
-    ru: 'Интерфейс веб-браузера',
-    en: 'Browser chrome',
+    ru: 'Окно браузера',
+    en: 'Browser window',
   },
   meta: {
-    ru: 'Техданные',
-    en: 'Technical data',
+    ru: 'Данные страницы',
+    en: 'Page details',
   },
   textInsertMenu: {
     ru: 'Выбрать режим текста',
@@ -43,16 +43,20 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Image size',
   },
   crop: {
-    ru: 'Размер холста и изображения',
-    en: 'Canvas and image size',
+    ru: 'Обрезать холст',
+    en: 'Crop canvas',
   },
   resize: {
     ru: 'Размер холста и изображения',
     en: 'Canvas and image size',
   },
   canvasSize: {
-    ru: 'Размер холста',
-    en: 'Canvas size',
+    ru: 'Обрезать холст',
+    en: 'Crop canvas',
+  },
+  collapseLayers: {
+    ru: 'Свернуть',
+    en: 'Collapse',
   },
   undo: {
     ru: 'Отменить',
@@ -65,6 +69,30 @@ export const editorToolbarMessages = defineMessageSource({
   resetOriginal: {
     ru: 'Сбросить к исходному',
     en: 'Reset to original',
+  },
+  resetOriginalTitle: {
+    ru: 'Сбросить все изменения?',
+    en: 'Reset all changes?',
+  },
+  resetOriginalMessage: {
+    ru: 'Документ вернётся к исходному состоянию. Эту операцию нельзя отменить.',
+    en: 'The document will return to its original state. This action cannot be undone.',
+  },
+  resetOriginalTooltip: {
+    ru: 'Вернуть документ к исходному состоянию. Операцию нельзя отменить.',
+    en: 'Return the document to its original state. This action cannot be undone.',
+  },
+  annotationFrame: {
+    ru: 'Рамка',
+    en: 'Frame',
+  },
+  annotationComments: {
+    ru: 'Комментарии',
+    en: 'Comments',
+  },
+  annotationNumbering: {
+    ru: 'Нумерация',
+    en: 'Numbering',
   },
   workspace: {
     ru: 'Рабочая зона',

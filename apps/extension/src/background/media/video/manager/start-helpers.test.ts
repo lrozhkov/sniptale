@@ -23,7 +23,7 @@ const settings = {
   systemAudioEnabled: true,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
 };
 
 function createTransport() {
@@ -40,7 +40,7 @@ it('forwards the exact surface contract without preset-derived constraints', asy
   const transport = createTransport();
   const surface = {
     presetId: 'wide',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1920,
     height: 1080,
     sessionId: 'recording-1',
@@ -69,7 +69,7 @@ it('forwards the exact surface contract without preset-derived constraints', asy
       generation: 4,
       recordingId: 'recording-1',
       tabId: 321,
-      surface: { presetId: 'wide', target: 'viewport', width: 1920, height: 1080 },
+      surface: { presetId: 'wide', target: 'window', width: 1920, height: 1080 },
     })
   );
   expect(transport.runtimeRequests[0]).not.toHaveProperty('targetResolution');

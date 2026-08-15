@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   captureFullPageMock,
   captureFullPageTransactionMock,
-  captureViewportWithClipTransactionMock,
   captureVisibleTabForCropTransactionMock,
   executeDownloadMock,
   generateFilenameMock,
@@ -17,7 +16,6 @@ const {
 } = vi.hoisted(() => ({
   captureFullPageMock: vi.fn(),
   captureFullPageTransactionMock: vi.fn(),
-  captureViewportWithClipTransactionMock: vi.fn(),
   captureVisibleTabForCropTransactionMock: vi.fn(),
   executeDownloadMock: vi.fn(),
   generateFilenameMock: vi.fn(),
@@ -56,7 +54,6 @@ vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPage: captureFullPageMock,
   captureFullPageTransaction: captureFullPageTransactionMock,
-  captureViewportWithClipTransaction: captureViewportWithClipTransactionMock,
   captureVisibleTabForCropTransaction: captureVisibleTabForCropTransactionMock,
 }));
 
@@ -97,9 +94,9 @@ function createSendResponse() {
 function createContext(): CaptureRouteContext {
   const viewportState: Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+    { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
   > = new Map([
-    [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+    [42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }],
   ]);
 
   return {
@@ -127,7 +124,7 @@ async function verifiesVisibleCaptureDownloadFlow() {
     defaultImagePresetId: 'preset-1',
   });
   generateFilenameMock.mockReturnValue('visible.png');
-  captureViewportWithClipTransactionMock.mockResolvedValue({
+  captureVisibleTabForCropTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,1',
     jobId: 'capture-job-visible',
   });
@@ -139,12 +136,7 @@ async function verifiesVisibleCaptureDownloadFlow() {
   await flushCaptureHandlerPromises();
 
   expect(loggerLogMock).toHaveBeenCalledWith('Handling visible capture request', { tabId: 42 });
-  expect(captureViewportWithClipTransactionMock).toHaveBeenCalledWith(42, {
-    presetId: 'test:viewport',
-    target: 'viewport',
-    width: 1280,
-    height: 720,
-  });
+  expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42);
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
     'data:image/png;base64,1',
     'visible.png',
@@ -182,7 +174,7 @@ async function verifiesVisibleCaptureCopyAndEditFlows() {
       saveCapturesToGallery: false,
     });
   generateFilenameMock.mockReturnValueOnce('copy.png').mockReturnValueOnce('full.jpeg');
-  captureViewportWithClipTransactionMock.mockResolvedValue({
+  captureVisibleTabForCropTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,2',
     jobId: 'capture-job-copy',
   });
@@ -237,7 +229,7 @@ async function verifiesScenarioPayloadIsForwardedOnlyForScenarioCaptures() {
     saveCapturesToGallery: false,
   });
   generateFilenameMock.mockReturnValue('visible.png');
-  captureViewportWithClipTransactionMock.mockResolvedValue({
+  captureVisibleTabForCropTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,6',
     jobId: 'capture-job-scenario',
   });

@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { collectFilesWithHarForExportManager } from './transfer';
+import { collectFilesForExportManager } from './transfer';
 
 const treeData: ParsedDOMTree = { context: '', title: 'Demo', structure: [] };
 
@@ -11,7 +11,7 @@ function createExportOptions(): ExportOptions {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: true,
+    includePageDiagnostics: true,
     includeImages: false,
     includeJson: true,
     includeMarkdown: true,
@@ -34,7 +34,6 @@ it('does not commit partial download maps when cancellation lands after download
   const control = createTransferControl();
   let isCancelled = false;
   control.isCancelled.mockImplementation(() => isCancelled);
-  const harHandle = { capabilityToken: 'har-token', expiresAtEpochMs: 123, sessionId: 'har-1' };
   const tools = {
     collectFiles: vi.fn(async () => ({
       files: [
@@ -50,16 +49,13 @@ it('does not commit partial download maps when cancellation lands after download
         urlUuidToFilename: new Map([['uuid-1', 'partial.png']]),
       };
     }),
-    startHarCapture: vi.fn(async () => harHandle),
-    stopHarCapture: vi.fn(async () => ({ har: { closed: true }, rawDiagnosticsEnabled: false })),
   };
 
   await expect(
-    collectFilesWithHarForExportManager(treeData, createExportOptions(), warnings, control, tools)
+    collectFilesForExportManager(treeData, createExportOptions(), warnings, control, tools)
   ).rejects.toThrow('cancelled');
 
   expect(control.setPreviewToDownloadMap).toHaveBeenCalledOnce();
   expect(control.setUrlUuidToFilename).not.toHaveBeenCalled();
   expect(warnings).toEqual([]);
-  expect(tools.stopHarCapture).toHaveBeenCalledWith(harHandle, warnings);
 });

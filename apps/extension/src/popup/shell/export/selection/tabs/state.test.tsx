@@ -38,8 +38,8 @@ vi.mock('@sniptale/platform/browser/permissions', async (importOriginal) => ({
   },
 }));
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 
@@ -210,6 +210,30 @@ it('leaves selection empty when the current tab is not exportable', async () => 
   await flushEffects();
 
   expect(latestValue?.selectedTabIds).toEqual([]);
+});
+
+it('excludes disabled restored tab ids from ordered export targets', async () => {
+  mocks.browserTabsQuery.mockResolvedValue([
+    { id: 7, title: 'Current tab', url: 'https://example.test/current' },
+    { id: 9, title: 'Other page', url: 'https://example.test/other' },
+  ]);
+  mocks.getTabCapabilities.mockImplementation((tab: { id?: number }) => ({
+    export: {
+      reason: tab.id === 7 ? 'blocked' : null,
+      supported: tab.id !== 7,
+    },
+    isRestrictedPage: false,
+  }));
+
+  await renderHarness();
+  await flushEffects();
+
+  await act(async () => {
+    latestValue?.toggleTabSelection(7);
+  });
+
+  expect(latestValue?.selectedTabIds).toEqual([7]);
+  expect(latestValue?.selectedTabIdsInOrder).toEqual([]);
 });
 
 it('keeps fallback empty when tab query fails before page access is known', async () => {

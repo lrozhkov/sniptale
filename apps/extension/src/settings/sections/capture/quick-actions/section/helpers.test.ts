@@ -20,7 +20,7 @@ function verifyEmulationAndDelayLabels() {
           kind: 'user',
           id: 'preset-1',
           name: 'Desktop',
-          target: 'viewport',
+          target: 'window',
           width: 1440,
           height: 900,
           enabled: true,

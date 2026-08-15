@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import type { Dispatch, SetStateAction } from 'react';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';

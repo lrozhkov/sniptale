@@ -3,6 +3,7 @@ import { createDefaultFrameCallout } from '../defaults';
 import type { FrameAnnotationVisualState } from '../model';
 import {
   appendFrameCallout,
+  canAppendFrameCallout,
   getFrameCallout,
   getFrameCallouts,
   MAX_FRAME_CALLOUTS,
@@ -24,6 +25,7 @@ function frame(): FrameAnnotationVisualState {
 describe('frame callout collection', () => {
   it('appends independent empty callouts on unoccupied anchors and caps the collection at five', () => {
     let current = frame();
+    expect(canAppendFrameCallout(current)).toBe(true);
     for (let index = 1; index < MAX_FRAME_CALLOUTS; index += 1) {
       const appended = appendFrameCallout(current, createDefaultFrameCallout());
       expect(appended?.calloutIndex).toBe(index);
@@ -39,6 +41,7 @@ describe('frame callout collection', () => {
     expect(new Set(callouts.slice(1).map((callout) => callout.instanceId)).size).toBe(4);
     expect(callouts[1]?.placement).toMatchObject({ anchor: 'bottom-center', side: 'auto' });
     expect(appendFrameCallout(current, createDefaultFrameCallout())).toBeNull();
+    expect(canAppendFrameCallout(current)).toBe(false);
   });
 
   it('updates and removes only the addressed additional callout', () => {

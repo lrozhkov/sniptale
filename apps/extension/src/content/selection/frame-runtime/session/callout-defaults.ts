@@ -13,6 +13,9 @@ import {
   cloneCalloutStyle,
   createDefaultCalloutSettings,
 } from '../../../../features/highlighter/frame-annotation/callout/model';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { initializeAnnotationTemplateSource } from './annotation-template-source';
+import { initializeFutureFrameCallout } from './future-callout';
 
 const logger = createLogger({ namespace: 'ContentCalloutDefaults' });
 
@@ -34,8 +37,9 @@ export function createCalloutPresetSessionSync(
   let lastDefaultStyleKey: string | null = null;
   let active = true;
   let catalogGeneration = 0;
+  let sessionDefaultsApplied = false;
 
-  const applyCatalog = (catalog: CalloutPresetCatalog) => {
+  const applyCatalog = (catalog: CalloutPresetCatalog, applySessionDefaults = true) => {
     if (!active) return;
     const preset = getDefaultPreset(catalog);
     if (!preset) return;
@@ -45,7 +49,20 @@ export function createCalloutPresetSessionSync(
         styleKey(sessionCalloutStyleRef.current) === lastDefaultStyleKey);
     if (canReplace) sessionCalloutStyleRef.current = cloneCalloutStyle(preset.style);
     lastDefaultStyleKey = styleKey(preset.style);
+    if (applySessionDefaults && !sessionDefaultsApplied) {
+      sessionDefaultsApplied = true;
+      const defaults = catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS;
+      initializeAnnotationTemplateSource('callout', defaults.templateSource);
+      initializeFutureFrameCallout(
+        defaults.enabled
+          ? createDefaultCalloutSettings(preset.style, preset.id, preset.placement, preset.content)
+          : null
+      );
+    }
   };
+
+  const snapshot = getLoadedCalloutPresetCatalogSnapshot();
+  if (snapshot) applyCatalog(snapshot, false);
 
   const loadGeneration = catalogGeneration + 1;
   catalogGeneration = loadGeneration;

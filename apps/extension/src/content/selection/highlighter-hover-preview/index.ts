@@ -23,6 +23,8 @@ export interface HoverController {
     frameCache: () => void;
   };
   input: {
+    dragStart: (event: DragEvent, iframe?: HTMLIFrameElement) => void;
+    mouseDown: (event: MouseEvent) => void;
     mouseMove: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
     mouseLeave: () => void;
     click: (event: MouseEvent, iframe?: HTMLIFrameElement) => void;
@@ -91,6 +93,8 @@ export function createHighlighterHoverController(
       frameCache: () => invalidateHoverFrameCache(session),
     },
     input: {
+      dragStart: drawing.handleDragStart,
+      mouseDown: drawing.handleMouseDown,
       mouseMove: interactions.handleMouseMove,
       mouseLeave: interactions.handleMouseLeave,
       click: interactions.handleClick,

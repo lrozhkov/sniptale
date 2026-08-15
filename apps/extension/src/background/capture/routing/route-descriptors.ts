@@ -53,13 +53,7 @@ export const captureExportRouteDescriptor = {
   authorityFamily: 'capture-privileged-tab-route',
   handlerAdapter: 'routeTabAction',
   keepChannelBehaviorSource: 'tab-routing-adapter',
-  messageTypes: [
-    MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY,
-    MessageType.EXPORT_START_HAR,
-    MessageType.EXPORT_STOP_HAR,
-    MessageType.EXPORT_CAPTURE_FULL_PAGE,
-    MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
-  ],
+  messageTypes: [MessageType.EXPORT_CAPTURE_FULL_PAGE],
   ownerModule: 'apps/extension/src/background/capture/routing/actions.export.ts',
 } as const;
 

@@ -1,4 +1,5 @@
 import type { AnnotationTemplateTagId } from './annotation-template-tags';
+import type { AnnotationSessionDefaults } from './border-preset';
 
 export type StepBadgeType = 'number' | 'letter' | 'manual';
 export type StepBadgeAlphabet = 'cyrillic' | 'latin';
@@ -32,11 +33,14 @@ export type StepBadgeAnchor =
 
 export type StepBadgeOffsetDirection = 'up' | 'down' | 'left' | 'right';
 export type StepBadgeBoundarySide = 'top' | 'right' | 'bottom' | 'left';
+export const STEP_BADGE_NORMAL_OFFSET_LIMIT = 48;
 
 export interface StepBadgeManualPlacement {
   side: StepBadgeBoundarySide;
   /** Normalized position along the selected frame side, from 0 to 1. */
   position: number;
+  /** Signed CSS-pixel distance from the side: positive outward, negative inward. */
+  normalOffset?: number;
 }
 export type StepBadgeSizeLevel =
   | 0
@@ -119,6 +123,7 @@ export interface StepBadgePreset {
 
 export interface StepBadgePresetCatalog {
   defaultPresetId: string;
+  newSessionDefaults?: AnnotationSessionDefaults;
   presets: StepBadgePreset[];
   systemCatalogRevision: number;
   catalogCustomized?: boolean;

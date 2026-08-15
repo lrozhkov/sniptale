@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   getContentEventTargetElementMock,
   handleSelectionModeClickMock,
+  handleSelectionModeDragStartMock,
   handleSelectionModeKeyDownMock,
   handleSelectionModeMouseDownMock,
   handleSelectionModeMouseLeaveMock,
@@ -15,6 +16,7 @@ const {
 } = vi.hoisted(() => ({
   getContentEventTargetElementMock: vi.fn(),
   handleSelectionModeClickMock: vi.fn(),
+  handleSelectionModeDragStartMock: vi.fn(),
   handleSelectionModeKeyDownMock: vi.fn(),
   handleSelectionModeMouseDownMock: vi.fn(),
   handleSelectionModeMouseLeaveMock: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock('../commands', () => ({
 }));
 
 vi.mock('../pointer-handlers', () => ({
+  handleSelectionModeDragStart: handleSelectionModeDragStartMock,
   handleSelectionModeMouseDown: handleSelectionModeMouseDownMock,
   handleSelectionModeMouseLeave: handleSelectionModeMouseLeaveMock,
   handleSelectionModeMouseMove: handleSelectionModeMouseMoveMock,
@@ -123,9 +126,11 @@ function expectPointerHandlerLifecycle() {
   getContentEventTargetElementMock.mockReturnValue(nextTarget);
   resolveIframeEventTargetMock.mockReturnValue(document.createElement('article'));
   const moveEvent = new MouseEvent('mousemove');
+  const dragStartEvent = new MouseEvent('dragstart') as DragEvent;
   const downEvent = new MouseEvent('mousedown');
   const upEvent = new MouseEvent('mouseup');
 
+  handlers.handleDragStart(dragStartEvent);
   handlers.handleMouseMove(moveEvent);
   handlers.handleMouseDown(downEvent);
   handlers.handleMouseUp(upEvent);
@@ -142,6 +147,11 @@ function expectPointerHandlerLifecycle() {
   expect(logSelectionModeRuntimeMock).toHaveBeenCalledWith('MouseUp received', {
     currentState: 'hover',
   });
+  expect(handleSelectionModeDragStartMock).toHaveBeenCalledWith(
+    dragStartEvent,
+    state,
+    selectionModeEvents
+  );
   expect(handleSelectionModeMouseMoveMock).toHaveBeenCalledWith(
     moveEvent,
     state,

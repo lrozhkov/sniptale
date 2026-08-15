@@ -4,6 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EditorTool } from '../../../features/editor/document/types';
+import {
+  getFrameAnnotationCreationDefaults,
+  setFrameAnnotationCreationDefaults,
+} from '../../frame-annotation/creation-defaults';
 import { translate } from '../../../platform/i18n';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorFloatingToolRail } from './tool-rail';
@@ -22,6 +26,7 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+const originalAnnotationDefaults = getFrameAnnotationCreationDefaults();
 
 function createProps(
   overrides: Partial<EditorToolbarContentProps> = {}
@@ -30,7 +35,7 @@ function createProps(
     activeTool: 'select',
     gridEnabled: false,
     hasImage: true,
-    history: { canRedo: false, canUndo: false },
+    history: { canRedo: false, canUndo: false, index: 0, size: 1 },
     inspector: 'tool',
     inspectorCollapsed: false,
     inspectorMeta: {
@@ -66,12 +71,6 @@ function renderToolRail(
   });
 }
 
-function getButton(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[aria-label="${title}"]`);
-  expect(button).not.toBeNull();
-  return button as HTMLButtonElement;
-}
-
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
@@ -84,25 +83,111 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  setFrameAnnotationCreationDefaults(originalAnnotationDefaults);
   vi.unstubAllGlobals();
 });
 
-it('routes primary drawing and retained inspector actions from the floating rail', () => {
+it('renders the exact centered tool order with two vertical dividers', () => {
   const props = createProps();
   renderToolRail(props);
 
-  expect(queryUi('editor.floating.tool-rail.text')).not.toBeNull();
-  expect(queryUi('editor.floating.tool-rail.eraser')).toBeNull();
-  act(() => {
-    getToolButton('text').click();
-    getButton(translate('editor.toolbar.resize')).click();
-    getButton(translate('editor.toolbar.frame')).click();
-  });
+  const actionIds = [
+    ...(queryUi('editor.floating.tool-rail')?.querySelectorAll('button') ?? []),
+  ].map((element) => element.getAttribute('data-ui'));
 
+  expect(actionIds).toEqual([
+    'editor.floating.tool-rail.select',
+    'content.toolbar.future-frame-style',
+    'editor.floating.tool-rail.pencil',
+    'editor.floating.tool-rail.marker',
+    'editor.floating.tool-rail.text',
+    'editor.floating.tool-rail.shape',
+    'editor.floating.tool-rail.arrow',
+    'editor.floating.tool-rail.blur',
+  ]);
+  expect(queryUi('editor.floating.tool-rail.crop')).toBeNull();
+  expect(queryUi('editor.floating.tool-rail.frame')).toBeNull();
+  expect(queryUi('editor.floating.tool-rail.browser-frame')).toBeNull();
+  expect(queryUi('editor.floating.tool-rail.meta')).toBeNull();
+  const dividers = [
+    queryUi('editor.floating.tool-rail.divider.before-frame'),
+    queryUi('editor.floating.tool-rail.divider.after-frame'),
+  ];
+  expect(dividers).toHaveLength(2);
+  for (const divider of dividers) {
+    expect(divider?.classList.contains('sniptale-glass-toolbar-divider')).toBe(true);
+    expect(divider?.classList.contains('sniptale-divider')).toBe(true);
+  }
+  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
+
+  act(() => getToolButton('text').click());
   expect(props.onActivateTool).toHaveBeenCalledWith('text');
-  expect(props.onActivateTool).not.toHaveBeenCalledWith('crop');
-  expect(props.onToggleInspector).toHaveBeenCalledWith('canvas-size');
-  expect(props.onToggleInspector).toHaveBeenCalledWith('frame');
+  expect(props.onToggleInspector).not.toHaveBeenCalled();
+});
+
+it('uses the content frame controls with the same enable and popover behavior', async () => {
+  const props = createProps({
+    activeTool: 'frame-annotation',
+    isToolButtonActive: (tool) => tool === 'frame-annotation',
+  });
+  renderToolRail(props);
+
+  const frame = getContentFrameButton('future-frame-style');
+  const comments = getContentFrameButton('future-frame-callout');
+  const numbering = getContentFrameButton('future-frame-step-badge');
+  expect(frame.getAttribute('aria-pressed')).toBe('true');
+
+  await act(async () => {
+    comments.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    comments.click();
+    await Promise.resolve();
+  });
+  expect(getFrameAnnotationCreationDefaults()).toMatchObject({
+    callout: { enabled: true },
+    stepBadge: null,
+  });
+  expect(comments.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    document.querySelector('[data-ui="content.toolbar.future-callout-popover"]')
+  ).not.toBeNull();
+
+  await act(async () => {
+    numbering.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    numbering.click();
+    await Promise.resolve();
+  });
+  expect(getFrameAnnotationCreationDefaults()).toMatchObject({
+    callout: { enabled: true },
+    stepBadge: { enabled: true },
+  });
+  expect(numbering.getAttribute('aria-pressed')).toBe('true');
+  expect(props.onActivateTool).not.toHaveBeenCalled();
+
+  rerenderToolRail(createProps());
+  expect(getContentFrameButton('future-frame-style').getAttribute('aria-pressed')).toBe('false');
+  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
+
+  const restoredProps = createProps({
+    activeTool: 'frame-annotation',
+    isToolButtonActive: (tool) => tool === 'frame-annotation',
+  });
+  rerenderToolRail(restoredProps);
+  expect(getContentFrameButton('future-frame-callout').getAttribute('aria-pressed')).toBe('true');
+  expect(getContentFrameButton('future-frame-step-badge').getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+});
+
+it('activates the frame group from its persistent frame button', () => {
+  const props = createProps();
+  renderToolRail(props);
+
+  const frame = getContentFrameButton('future-frame-style');
+  act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+
+  expect(props.onActivateTool).toHaveBeenCalledWith('frame-annotation');
 });
 
 it('describes drawing modifiers and toggles options on a repeated active-tool click', () => {
@@ -125,7 +210,7 @@ it('describes drawing modifiers and toggles options on a repeated active-tool cl
   expect(onToggleActiveToolOptions).toHaveBeenCalledWith('shape');
 });
 
-it('uses a centered compact rail instead of a full-height column', () => {
+it('uses a top-centered horizontal rail and a separate horizontal history panel', () => {
   renderToolRail(createProps());
 
   const stack = container?.querySelector<HTMLElement>(
@@ -133,39 +218,48 @@ it('uses a centered compact rail instead of a full-height column', () => {
   );
   const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-rail"]');
 
-  expect(stack?.className).toContain('top-1/2');
-  expect(stack?.className).toContain('-translate-y-1/2');
-  expect(rail?.className).toContain('max-h-[calc(100vh-13rem)]');
-  expect(rail?.className).not.toContain('bottom-[5.25rem]');
+  expect(stack?.className).toContain('left-1/2');
+  expect(stack?.className).toContain('top-3');
+  expect(stack?.className).toContain('-translate-x-1/2');
+  expect(rail?.className).toContain('flex-row');
+  expect(rail?.getAttribute('aria-label')).toBe(translate('shared.ui.commandPaletteToolsSection'));
+  const history = queryUi('editor.floating.tool-rail.history');
+  expect(history?.className).toContain('flex-row');
+  expect(history?.className).toContain('min-[721px]:absolute');
+  expect(history?.className).toContain('min-[721px]:left-[calc(100%+0.75rem)]');
+  expect(stack?.firstElementChild).toBe(rail);
+  expect(history?.parentElement).toBe(stack);
 });
 
 it('wraps the mobile rail instead of clipping hidden tools beyond the viewport', () => {
   renderToolRail(createProps());
 
   const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-rail"]');
-  const divider = rail?.querySelector<HTMLElement>('.max-\\[720px\\]\\:hidden');
+  const divider = queryUi('editor.floating.tool-rail.divider.before-frame');
 
   expect(rail?.className).toContain('max-[720px]:flex-wrap');
-  expect(rail?.className).toContain('max-[720px]:overflow-visible');
+  expect(rail?.className).toContain('overflow-visible');
   expect(divider).not.toBeNull();
+  expect(divider?.className).not.toContain('max-[720px]:hidden');
 });
 
-it('shifts right when the left drawer is open on desktop', () => {
+it('stays centered when the left drawer opens', () => {
   renderToolRail({ ...createProps(), leftDrawerOpen: true });
 
   const stack = container?.querySelector<HTMLElement>(
     '[data-ui="editor.floating.tool-rail.stack"]'
   );
 
-  expect(stack?.className).toContain('min-[721px]:left-[23.75rem]');
+  expect(stack?.className).toContain('left-1/2');
+  expect(stack?.className).not.toContain('left-[23.75rem]');
 });
 
-it('renders undo, redo, and reset under the left tool rail and routes actions', async () => {
+it('routes undo and redo, then confirms irreversible reset before clearing history', async () => {
   const onBeforeSelectionAwareAction = vi.fn();
   renderToolRail(
     createProps({
       hasImage: true,
-      history: { canRedo: true, canUndo: true },
+      history: { canRedo: true, canUndo: true, index: 2, size: 3 },
       onBeforeSelectionAwareAction,
     })
   );
@@ -174,8 +268,7 @@ it('renders undo, redo, and reset under the left tool rail and routes actions', 
     '[data-ui="editor.floating.tool-rail.history"]'
   );
   expect(history).not.toBeNull();
-  expect(history?.className).toContain('flex-col');
-  expect(history?.className).toContain('max-[720px]:!hidden');
+  expect(history?.className).toContain('flex-row');
 
   await act(async () => {
     getHistoryButton('undo').click();
@@ -183,17 +276,49 @@ it('renders undo, redo, and reset under the left tool rail and routes actions', 
     getHistoryButton('reset').click();
   });
 
+  expect(controller.resetToOriginal).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+  expect(document.body.textContent).toContain(translate('editor.toolbar.resetOriginalMessage'));
+
+  await act(async () => getDialogButton(translate('editor.toolbar.resetOriginal')).click());
+
   expect(onBeforeSelectionAwareAction).toHaveBeenCalledTimes(3);
   expect(controller.clearSelection).toHaveBeenCalledTimes(3);
   expect(controller.undo).toHaveBeenCalledOnce();
   expect(controller.redo).toHaveBeenCalledOnce();
   expect(controller.resetToOriginal).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+it('cancels reset without mutating the document', () => {
+  renderToolRail(createProps({ history: { canRedo: false, canUndo: true, index: 1, size: 2 } }));
+
+  act(() => getHistoryButton('reset').click());
+  act(() => getDialogButton(translate('common.actions.cancel')).click());
+
+  expect(controller.clearSelection).not.toHaveBeenCalled();
+  expect(controller.resetToOriginal).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+it('disables reset at the original history index and keeps the warning tooltip available', () => {
+  renderToolRail(createProps({ history: { canRedo: true, canUndo: false, index: 0, size: 2 } }));
+
+  const reset = getHistoryButton('reset');
+  expect(reset.disabled).toBe(true);
+  expect(reset.title).toBe(translate('editor.toolbar.resetOriginalTooltip'));
+  expect(reset.getAttribute('aria-label')).toBe(translate('editor.toolbar.resetOriginalTooltip'));
 });
 
 it('keeps document-required controls disabled before an image is loaded', () => {
-  renderToolRail(createProps({ hasImage: false }));
+  const props = createProps({ hasImage: false });
+  renderToolRail(props);
 
   expect(getToolButton('text').disabled).toBe(true);
+  const frame = getContentFrameButton('future-frame-style');
+  expect(frame.disabled).toBe(true);
+  act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(props.onActivateTool).not.toHaveBeenCalled();
 });
 
 function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
@@ -204,6 +329,17 @@ function getHistoryButton(action: 'undo' | 'redo' | 'reset') {
   return button as HTMLButtonElement;
 }
 
+function rerenderToolRail(
+  props: EditorToolbarContentProps & {
+    leftDrawerOpen?: boolean;
+    onToggleActiveToolOptions?: (tool: EditorTool) => void;
+  }
+) {
+  act(() => {
+    root?.render(<EditorFloatingToolRail {...props} />);
+  });
+}
+
 function queryUi(dataUi: string) {
   return container?.querySelector(`[data-ui="${dataUi}"]`) ?? null;
 }
@@ -211,5 +347,19 @@ function queryUi(dataUi: string) {
 function getToolButton(tool: string): HTMLButtonElement {
   const button = queryUi(`editor.floating.tool-rail.${tool}`);
   expect(button).not.toBeNull();
+  return button as HTMLButtonElement;
+}
+
+function getContentFrameButton(id: string): HTMLButtonElement {
+  const button = container?.querySelector<HTMLButtonElement>(`[data-ui="content.toolbar.${id}"]`);
+  expect(button).not.toBeNull();
+  return button as HTMLButtonElement;
+}
+
+function getDialogButton(label: string): HTMLButtonElement {
+  const button = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+  ].find((candidate) => candidate.textContent === label);
+  expect(button).toBeDefined();
   return button as HTMLButtonElement;
 }

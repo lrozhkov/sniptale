@@ -20,6 +20,7 @@ export function createMockDocument() {
       paddingBottom: 0,
       paddingLeft: 0,
       backgroundMode: 'color' as const,
+      backgroundBlurAmount: 0,
       backgroundColor: '#fff',
       backgroundGradientFrom: '#fff',
       backgroundGradientTo: '#000',

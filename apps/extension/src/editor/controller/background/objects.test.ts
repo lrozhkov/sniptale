@@ -4,6 +4,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   fromURL: vi.fn(),
+  rasterize: vi.fn(() => ({ kind: 'blurred-background' })),
+}));
+
+vi.mock('./raster', () => ({
+  rasterizeBlurredBackground: mocks.rasterize,
+  resolveBackgroundRasterSize: (size: unknown) => size,
 }));
 
 vi.mock('fabric', () => ({
@@ -98,4 +104,21 @@ it('creates image backgrounds for stretch and tile fits', async () => {
     strokeWidth: 0,
   });
   vi.unstubAllGlobals();
+});
+
+it('keeps the fast path at zero and rasterizes the full backing above zero', async () => {
+  const fast = await createBackgroundLayer(
+    { width: 320, height: 180 },
+    createFrame({ backgroundBlurAmount: 0, backgroundMode: 'color' })
+  );
+  const blurred = await createBackgroundLayer(
+    { width: 320, height: 180 },
+    createFrame({ backgroundBlurAmount: 12, backgroundMode: 'gradient' })
+  );
+
+  expect(fast).toMatchObject({ fill: '#112233' });
+  expect(mocks.rasterize).toHaveBeenCalledWith(
+    expect.objectContaining({ amount: 12, targetSize: { width: 320, height: 180 } })
+  );
+  expect(blurred).toEqual({ kind: 'blurred-background' });
 });

@@ -109,7 +109,7 @@ it('wires edit mode through the modal, form, and footer role contracts', () => {
   expect(mocks.header).toHaveBeenCalledWith(
     expect.objectContaining({ disabled: false, title: 'Preset title' })
   );
-  expect(mocks.content).toHaveBeenCalledWith(expect.objectContaining({ target: 'window' }));
+  expect(mocks.content).toHaveBeenCalledWith(expect.objectContaining({ width: 1280, height: 720 }));
   expect(mocks.footer).toHaveBeenCalledWith(expect.objectContaining({ preset }));
 });
 

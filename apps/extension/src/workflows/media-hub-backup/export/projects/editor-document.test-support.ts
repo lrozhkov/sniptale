@@ -6,6 +6,7 @@ export function createEditorDocument(): EditorDocument {
     canvasJson: '{"version":"7.2.0","objects":[]}',
     canvasWidth: 1,
     frame: {
+      backgroundBlurAmount: 0,
       backgroundColor: '#fff',
       backgroundGradientAngle: 90,
       backgroundGradientFrom: '#fff',

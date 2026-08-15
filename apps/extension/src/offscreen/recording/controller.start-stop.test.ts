@@ -56,10 +56,8 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 }));
 
 import {
-  activateViewportOutput,
   pauseRecording,
   resumeRecording,
-  setViewportDrawState,
   startRecording,
   stopRecording,
   updateRecordingSettings,
@@ -105,7 +103,7 @@ function createStartParams(): Parameters<typeof startRecording>[0] {
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
       outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
@@ -620,48 +618,6 @@ it('rejects delayed pause, resume, and settings commands from another recording 
   expect(() => updateRecordingSettings(stale, { microphoneEnabled: false })).toThrow(
     'Stale recording source binding'
   );
-
-  completeStart();
-  await start;
-});
-
-it('changes viewport drawing only for the active recording source binding', async () => {
-  let completeStart!: () => void;
-  startRecordingImplMock.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        completeStart = resolve;
-      })
-  );
-  const activate = vi.fn();
-  const setFrozen = vi.fn(() => 'applied' as const);
-  recordingContext.tabOutputControls = {
-    activate,
-    applyFrozenSourceGeometry: vi.fn(() => 'applied' as const),
-    readFrozenSourceSize: vi.fn(),
-    setFrozen,
-  };
-  const start = startRecording(createStartParams());
-
-  activateViewportOutput(sourceBinding);
-  expect(activate).toHaveBeenCalledOnce();
-  expect(setViewportDrawState(sourceBinding, true, 'navigation-1')).toBe('applied');
-  expect(setViewportDrawState(sourceBinding, false, 'navigation-1')).toBe('applied');
-  expect(setFrozen).toHaveBeenNthCalledWith(1, 'navigation-1', true);
-  expect(setFrozen).toHaveBeenNthCalledWith(2, 'navigation-1', false);
-
-  expect(() =>
-    setViewportDrawState(
-      {
-        generation: 0,
-        recordingId: 'recording-stale',
-        streamInstanceId: 'stream-instance-stale',
-      },
-      true,
-      'navigation-stale'
-    )
-  ).toThrow('Stale recording source binding');
-  expect(setFrozen).toHaveBeenCalledTimes(2);
 
   completeStart();
   await start;

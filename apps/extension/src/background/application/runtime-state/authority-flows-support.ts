@@ -7,14 +7,14 @@ export const SUPPORT_RUNTIME_STATE_AUTHORITY_FLOWS = [
     authoritativeState: ['diagnostics active session state', 'sanitized recovery snapshot'],
     cleanupOwnerModule: 'apps/extension/src/background/diagnostics/session.ts',
     correlationKeys: ['diagnosticsSessionId', 'tabId'],
-    disposableState: ['active CDP listener handles', 'timer handles'],
+    disposableState: ['timer handles'],
     flowId: 'diagnostics-session',
     freshnessReplayPolicy: 'session ids and tab lifecycle close active diagnostic sessions',
     name: 'diagnostics session',
     ownerModule: 'apps/extension/src/background/diagnostics/state.ts',
     proofModules: ['apps/extension/src/background/diagnostics/session.test.ts'],
     restartBehavior:
-      'sanitized recovery snapshots are storage-backed; active listeners are transaction-bound',
+      'sanitized recovery snapshots are storage-backed; active content logging is transaction-bound',
     writeFailurePolicy:
       'diagnostic persistence sanitizes before retention and fails without session authority',
   },

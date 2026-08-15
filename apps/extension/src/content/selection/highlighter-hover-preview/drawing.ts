@@ -45,7 +45,7 @@ type FreeFrameDrawingProps = {
 
 type FreeDrawGesture = NonNullable<HoverSession['freeDraw']['gesture']>;
 
-function consumePointerEvent(event: FreeFramePointerEvent) {
+function consumePointerEvent(event: Event) {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -270,6 +270,12 @@ function handlePointerDown(
   };
 }
 
+function handleMouseDown(props: FreeFrameDrawingProps, event: MouseEvent) {
+  const gesture = props.session.freeDraw.gesture;
+  if (!gesture || !gesture.sourceElement.closest('a[href]')) return;
+  consumePointerEvent(event);
+}
+
 function enterDrawingState(props: FreeFrameDrawingProps, gesture: FreeDrawGesture) {
   gesture.isDrawing = true;
   const frameUi = useFrameUIStore.getState();
@@ -312,6 +318,30 @@ function handlePointerMove(
   renderPreview(
     props.session,
     normalizeMinimumDrawRect(gesture.startX, gesture.startY, endX, endY, gesture.viewportBounds)
+  );
+}
+
+function handleDragStart(
+  props: FreeFrameDrawingProps,
+  event: DragEvent,
+  iframe?: HTMLIFrameElement
+) {
+  const gesture = props.session.freeDraw.gesture;
+  if (!gesture) return;
+  consumePointerEvent(event);
+  const ownerDocument = resolveEventDocument(event, iframe) ?? gesture.ownerDocument;
+  const point = getTopViewportPoint(ownerDocument, event.clientX, event.clientY);
+  if (!point) return;
+  if (!gesture.isDrawing) enterDrawingState(props, gesture);
+  renderPreview(
+    props.session,
+    normalizeMinimumDrawRect(
+      gesture.startX,
+      gesture.startY,
+      point.x,
+      point.y,
+      gesture.viewportBounds
+    )
   );
 }
 
@@ -385,6 +415,9 @@ function consumeSuppressedClick(props: FreeFrameDrawingProps, event?: MouseEvent
 
 export function createFreeFrameDrawingHandlers(props: FreeFrameDrawingProps) {
   return {
+    handleDragStart: (event: DragEvent, iframe?: HTMLIFrameElement) =>
+      handleDragStart(props, event, iframe),
+    handleMouseDown: (event: MouseEvent) => handleMouseDown(props, event),
     handlePointerDown: (event: FreeFramePointerEvent, iframe?: HTMLIFrameElement) =>
       handlePointerDown(props, event, iframe),
     handlePointerMove: (event: FreeFramePointerEvent, iframe?: HTMLIFrameElement) =>

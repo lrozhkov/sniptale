@@ -16,13 +16,32 @@ export function resolveEditorKeyboardAction(
     return 'ignore';
   }
 
-  const textStyleAction = resolveTextStyleKeyboardAction(options);
+  if (options.targetIsInteractive && !options.isEditingTextboxInput) {
+    return 'ignore';
+  }
+  if (options.isEditingTextboxSelection && !options.isEditingTextboxInput) {
+    return 'ignore';
+  }
+
+  const textStyleAction = resolveTextStyleKeyboardAction({
+    ...options,
+    isEditingTextboxSelection: options.isEditingTextboxInput,
+  });
   if (textStyleAction) {
     return textStyleAction;
   }
 
-  if (options.targetIsInteractive) {
-    return 'ignore';
+  if (options.isEditingTextboxInput) {
+    if (options.key === 'Enter') {
+      const modified =
+        options.shiftKey ||
+        options.isComposing ||
+        options.ctrlKey ||
+        options.metaKey ||
+        options.altKey;
+      return modified ? 'ignore' : 'exit-text-edit';
+    }
+    return options.key === 'Escape' ? resolveEditorFallbackKeyboardAction(options) : 'ignore';
   }
 
   const nudge = resolveEditorKeyboardNudge(options);

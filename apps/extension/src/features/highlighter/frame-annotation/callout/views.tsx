@@ -4,7 +4,6 @@ import { translate } from '../../../../platform/i18n';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import { ProductGlassToolbar, ProductGlassToolbarButton } from '@sniptale/ui/product-glass-toolbar';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
 import type { getDynamicTailState } from './dynamic-tail';
 import type { getLineConnectorState } from './line-connector';
 import type {
@@ -150,14 +149,24 @@ export function renderDynamicCalloutTail(
       </svg>
     );
   }
+  const bounds = tail.geometry.bounds;
   return (
     <svg
       className="sniptale-callout-dynamic-tail"
       aria-hidden="true"
       focusable="false"
       preserveAspectRatio="xMinYMin meet"
-      style={tail.style}
-      viewBox={tail.viewBox}
+      style={{
+        position: 'absolute',
+        left: bounds.x,
+        top: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        overflow: 'visible',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+      viewBox={`0 0 ${bounds.width} ${bounds.height}`}
     >
       <path
         d={tail.path}
@@ -166,30 +175,6 @@ export function renderDynamicCalloutTail(
         stroke="transparent"
         strokeWidth={18 * visualScale}
       />
-      {style.surface.borderWidth > 0 ? (
-        <path
-          data-ui="content.callout.tail-outline"
-          d={tail.outlinePath}
-          fill={getRepresentativeColor(style.surface.fillPaint)}
-          pointerEvents="none"
-          stroke={style.surface.borderColor}
-          strokeDasharray={getCalloutStrokeDasharray(
-            style.surface.borderStyle,
-            style.surface.borderWidth
-          )}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={style.surface.borderWidth * visualScale}
-          style={customStyles?.connector}
-        />
-      ) : (
-        <path
-          d={tail.path}
-          fill={getRepresentativeColor(style.surface.fillPaint)}
-          pointerEvents="none"
-          style={customStyles?.connector}
-        />
-      )}
     </svg>
   );
 }

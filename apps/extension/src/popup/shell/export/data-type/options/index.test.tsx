@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const buttonPropsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -45,7 +46,7 @@ function renderComponent(
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -54,7 +55,7 @@ function renderComponent(
     setIncludeCssDiagnostics: createToggleSetter(),
     setIncludeFiles: createToggleSetter(),
     setIncludeFullPageScreenshot: createToggleSetter(),
-    setIncludeHarDomLogs: createToggleSetter(),
+    setIncludePageDiagnostics: createToggleSetter(),
     setIncludeImages: createToggleSetter(),
     setIncludeJson: createToggleSetter(),
     setIncludeMarkdown: createToggleSetter(),
@@ -105,7 +106,7 @@ describe('ExportOptionToggles', () => {
     });
 
     expect(props.setIncludeJson).toHaveBeenCalledTimes(1);
-    expect(props.setIncludeHarDomLogs).toHaveBeenCalledTimes(1);
+    expect(props.setIncludePageDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledTimes(1);
   });
 

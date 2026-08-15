@@ -1,16 +1,8 @@
-import { browserDebugger } from '@sniptale/platform/browser/debugger';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { parseCaptureScreenshotResult } from '../full-page/helpers';
 import { createCaptureJob, transitionCaptureJob } from '../jobs/state-machine';
-import {
-  buildViewportCaptureScreenshotOptions,
-  createDebuggerCaptureDataUrl,
-  finalizeCapturedDataUrl,
-  resolveVisibleCaptureApiFormat,
-  withHiddenFixedElements,
-} from './helpers';
+import { finalizeCapturedDataUrl, resolveVisibleCaptureApiFormat } from './helpers';
 import { runNativeVisibleCaptureExclusive } from './coordinator';
 
 const logger = createLogger({ namespace: 'BackgroundVisibleCapture' });
@@ -73,28 +65,25 @@ async function captureVisibleTabNative(tabId: number): Promise<string> {
   }
   logger.log('Starting visible-tab capture', { format: settings.imageFormat, tabId });
 
-  const { hiddenCount, result } = await runNativeVisibleCaptureExclusive(async (lease) =>
-    withHiddenFixedElements(tabId, async () => {
-      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
-      const capturedDataUrl = await lease.capture(
-        tab.windowId,
-        {
-          format: apiFormat,
-          quality: settings.imageQuality,
-        },
-        () => assertVisibleCaptureTargetIsActive(tabId, tab.windowId)
-      );
-      await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
+  const result = await runNativeVisibleCaptureExclusive(async (lease) => {
+    await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
+    const capturedDataUrl = await lease.capture(
+      tab.windowId,
+      {
+        format: apiFormat,
+        quality: settings.imageQuality,
+      },
+      () => assertVisibleCaptureTargetIsActive(tabId, tab.windowId)
+    );
+    await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
 
-      return finalizeCapturedDataUrl({
-        dataUrl: capturedDataUrl,
-        settings,
-        convertPngToWebp,
-      });
-    })
-  );
+    return finalizeCapturedDataUrl({
+      dataUrl: capturedDataUrl,
+      settings,
+      convertPngToWebp,
+    });
+  });
 
-  logger.debug('Visible-tab capture masked fixed elements', { hiddenCount, tabId });
   logger.log('Completed visible-tab capture', { format: settings.imageFormat, tabId });
   return result;
 }
@@ -132,77 +121,4 @@ export async function captureVisibleTabForCropTransaction(
   tabId: number
 ): Promise<VisibleCaptureTransaction> {
   return captureVisibleTabTransaction(tabId);
-}
-
-async function captureViewportWithClipNative(
-  tabId: number,
-  viewport: { width: number; height: number }
-): Promise<string> {
-  const settings = await loadSettings();
-  logger.log('Starting viewport capture', { tabId, viewport });
-
-  const { hiddenCount, result } = await withHiddenFixedElements(tabId, async () => {
-    const rawResult = await browserDebugger.sendCommand<unknown>(
-      { tabId },
-      'Page.captureScreenshot',
-      buildViewportCaptureScreenshotOptions(viewport, settings)
-    );
-    const parsedResult = parseCaptureScreenshotResult(rawResult);
-    const capturedDataUrl = createDebuggerCaptureDataUrl(parsedResult.data, settings.imageFormat);
-
-    const finalized = await finalizeCapturedDataUrl({
-      dataUrl: capturedDataUrl,
-      settings,
-      convertPngToWebp,
-    });
-    await assertExactCaptureDimensions(finalized, viewport);
-    return finalized;
-  });
-
-  logger.debug('Viewport capture masked fixed elements', {
-    hiddenCount,
-    tabId,
-    viewport,
-  });
-  logger.log('Completed viewport capture', { format: settings.imageFormat, tabId, viewport });
-  return result;
-}
-
-async function assertExactCaptureDimensions(
-  dataUrl: string,
-  expected: { width: number; height: number }
-): Promise<void> {
-  const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
-  try {
-    if (bitmap.width !== expected.width || bitmap.height !== expected.height) {
-      throw new Error(
-        [
-          `Viewport capture verification failed: expected ${expected.width}x${expected.height},`,
-          `received ${bitmap.width}x${bitmap.height}`,
-        ].join(' ')
-      );
-    }
-  } finally {
-    bitmap.close();
-  }
-}
-
-export async function captureViewportWithClip(
-  tabId: number,
-  viewport: { width: number; height: number }
-): Promise<string> {
-  const transaction = await captureViewportWithClipTransaction(tabId, viewport);
-  await transitionCaptureJob(transaction.jobId, 'completed');
-  return transaction.dataUrl;
-}
-
-export async function captureViewportWithClipTransaction(
-  tabId: number,
-  viewport: { width: number; height: number }
-): Promise<VisibleCaptureTransaction> {
-  return runVisibleCaptureTransaction(
-    tabId,
-    () => captureViewportWithClipNative(tabId, viewport),
-    'Viewport capture failed'
-  );
 }

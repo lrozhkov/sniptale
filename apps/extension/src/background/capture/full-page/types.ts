@@ -4,10 +4,6 @@ import type {
   FullPageCapturePreferences,
 } from '../../../contracts/full-page-capture';
 
-export interface CaptureScreenshotResult {
-  data: string;
-}
-
 export type FullPageCaptureOptions = {
   abortSignal?: AbortSignal;
   backendKind?: FullPageCaptureBackendKind;

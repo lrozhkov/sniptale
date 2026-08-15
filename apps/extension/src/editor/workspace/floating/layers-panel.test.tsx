@@ -6,12 +6,27 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditorFloatingLayersPanel } from './layers-panel';
 
 const mocks = vi.hoisted(() => ({
+  editorController: {
+    cancelCropMode: vi.fn(),
+    clearSelection: vi.fn(),
+    setActiveTool: vi.fn(),
+    suspendToolMode: vi.fn(),
+  },
+  setActiveTool: vi.fn(),
+  setInspector: vi.fn(),
   insertImage: vi.fn(() => <button data-ui="mock.insert-image" type="button" />),
+  content: vi.fn(() => <div data-ui="mock.settings-content" />),
   layers: vi.fn(() => <div data-ui="mock.layers" />),
   layersProps: vi.fn(() => ({ layers: [] })),
+  onExpand: vi.fn(),
+}));
+
+vi.mock('../../application/controller-context', () => ({
+  useEditorController: () => mocks.editorController,
 }));
 
 vi.mock('../../inspector/layers', () => ({ EditorInspectorLayersPanel: mocks.layers }));
+vi.mock('../../inspector/content', () => ({ EditorInspectorContent: mocks.content }));
 vi.mock('../../inspector/layers/file-input', () => ({
   LayerInsertImageControl: mocks.insertImage,
 }));
@@ -30,6 +45,7 @@ function renderPanel(
     collapsed?: boolean;
     heightRatio?: number | null;
     preferenceError?: string | null;
+    inspector?: string;
   } = {}
 ) {
   container = document.createElement('div');
@@ -39,11 +55,18 @@ function renderPanel(
     root?.render(
       <EditorFloatingLayersPanel
         collapsed={options.collapsed ?? false}
-        documentController={{} as never}
+        documentController={
+          {
+            inspector: options.inspector ?? 'tool',
+            setActiveTool: mocks.setActiveTool,
+            setInspector: mocks.setInspector,
+          } as never
+        }
+        hasImage
         heightRatio={options.heightRatio ?? null}
         preferenceError={options.preferenceError ?? null}
         onCollapse={vi.fn()}
-        onExpand={vi.fn()}
+        onExpand={mocks.onExpand}
         onHeightRatioChange={onHeightRatioChangeMock}
       />
     );
@@ -119,10 +142,76 @@ it('restores the expanded layers panel from a relative viewport height', () => {
 it('moves collapsed layers to the bottom-right toolbar with insert image action', () => {
   renderPanel({ collapsed: true });
 
-  expect(
-    container?.querySelector('[data-ui="editor.floating.layers-collapsed-toolbar"]')
-  ).not.toBeNull();
+  const toolbar = container?.querySelector<HTMLElement>(
+    '[data-ui="editor.floating.layers-collapsed-toolbar"]'
+  );
+  expect(toolbar).not.toBeNull();
+  expect(toolbar?.parentElement?.className).toContain('pointer-events-auto');
+  expect(toolbar?.querySelector('[role="toolbar"]')?.className).toContain('flex-row');
   expect(container?.querySelector('[data-ui="mock.insert-image"]')).not.toBeNull();
+  expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(6);
+});
+
+it('keeps collapsed modes visually inactive while preserving selection for expansion', () => {
+  renderPanel({ collapsed: true, inspector: 'frame' });
+
+  expect(
+    container
+      ?.querySelector('[data-ui="editor.floating.layers.mode.frame"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('false');
+  expect(container?.querySelector('[aria-pressed="true"]')).toBeNull();
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.meta"]')
+      ?.click();
+  });
+
+  expect(mocks.editorController.setActiveTool).toHaveBeenCalledWith('select');
+  expect(mocks.setInspector).toHaveBeenCalledWith('meta');
+  expect(mocks.onExpand).toHaveBeenCalledOnce();
+});
+
+it('expands when the already selected collapsed mode is clicked', () => {
+  renderPanel({ collapsed: true, inspector: 'frame' });
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.frame"]')
+      ?.click();
+  });
+
+  expect(mocks.setInspector).not.toHaveBeenCalled();
+  expect(mocks.onExpand).toHaveBeenCalledOnce();
+});
+
+it('renders only the selected settings body instead of the layers list', () => {
+  renderPanel({ inspector: 'browser-frame' });
+
+  expect(container?.querySelector('[data-ui="mock.settings-content"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="mock.layers"]')).toBeNull();
+  expect(mocks.content).toHaveBeenCalledWith(
+    expect.objectContaining({
+      confirmDialog: null,
+      inspector: 'browser-frame',
+      showDocumentActions: false,
+    }),
+    undefined
+  );
+});
+
+it('cancels an active crop session before returning to layers', () => {
+  renderPanel({ inspector: 'canvas-size' });
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.layers"]')
+      ?.click();
+  });
+
+  expect(mocks.editorController.cancelCropMode).toHaveBeenCalledOnce();
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
 });
 
 it('renders preference save errors inline for expanded layers controls', () => {

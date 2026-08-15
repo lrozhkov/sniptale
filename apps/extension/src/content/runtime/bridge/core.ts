@@ -42,4 +42,5 @@ function handleKnownCoreModeMessage(message: CoreModeMessage): false {
       disableQuickEditMode();
       return false;
   }
+  return false;
 }

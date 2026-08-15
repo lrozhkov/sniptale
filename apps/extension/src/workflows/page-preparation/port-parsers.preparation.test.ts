@@ -62,7 +62,7 @@ it('rejects malformed preparation request and response envelopes', () => {
         type: PREPARATION_SURFACE_RESIZE,
         viewport: {
           presetId: 'test:viewport',
-          target: 'viewport',
+          target: 'window',
           height: 720,
           width: '1280',
         },

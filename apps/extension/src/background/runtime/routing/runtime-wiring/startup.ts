@@ -1,6 +1,9 @@
 import { ensurePersistentStorage } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { cleanupDrafts } from '../../../../composition/persistence/library-lifecycle';
-import { loadSettings } from '../../../../composition/persistence/settings';
+import {
+  loadSettings,
+  removeRetiredDiagnosticsSetting,
+} from '../../../../composition/persistence/settings';
 import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
 import { migrateCalloutSystemPresetCatalog } from '../../../../composition/persistence/callout-presets';
@@ -12,13 +15,16 @@ import {
   reconcileCaptureJobsOnStartup,
 } from '../../../capture/lifecycle';
 import { recoverInterruptedSessions } from '../../../diagnostics/lifecycle';
+import { clearRetiredFullPageCaptureLease } from '../../../storage/full-page-capture';
+import { clearRetiredDiagnosticSnapshots } from '../../../storage/diagnostics/active-sessions';
+import { interruptStoredPopupExportJob } from '../../../capture/popup-export/job/storage';
 import { reconcileBackgroundRuntimeStartupState } from '../../../application/runtime-state';
 import {
   recoverVideoCaptureSurfaceOnStartup,
   resetVideoRecordingRuntimeState,
 } from '../../../media/lifecycle';
 import { type BackgroundModeState, type RuntimeWiringLogger } from './shared';
-import { ensureActivePageAccessRuntime } from '../../page-access/service';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { recoverPendingVideoRecordingCameraPeerCleanup } from '../../../media/video/content-surface/camera-peer';
 
 export function runStartupMaintenance(
@@ -26,6 +32,18 @@ export function runStartupMaintenance(
   logger: RuntimeWiringLogger
 ): void {
   reconcileBackgroundRuntimeStartupState(state);
+
+  Promise.all([clearRetiredFullPageCaptureLease(), clearRetiredDiagnosticSnapshots()]).catch(
+    (error) => {
+      logger.warn('Retired diagnostics state cleanup failed (non-critical)', error);
+    }
+  );
+  removeRetiredDiagnosticsSetting().catch((error) => {
+    logger.warn('Retired diagnostics setting cleanup failed (non-critical)', error);
+  });
+  interruptStoredPopupExportJob().catch((error) => {
+    logger.warn('Popup export restart reconciliation failed (non-critical)', error);
+  });
 
   ensurePersistentStorage().catch((error) => {
     logger.warn('Failed to request persistent storage', error);

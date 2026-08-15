@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Calendar, Link, Monitor } from 'lucide-react';
+import {
+  ProductGlassChip,
+  ProductGlassChipIcon,
+  ProductGlassOptionGrid,
+  ProductGlassRow,
+  ProductGlassSectionLabel,
+} from '@sniptale/ui/product-glass-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   orderTechnicalDataKinds,
   type EditorTechnicalDataLayout,
   type EditorTechnicalDataKind,
 } from '../controller/tools/technical-data';
-import {
-  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
-  INSPECTOR_SECTION_LABEL_CLASS_NAME,
-  INSPECTOR_SECTION_VALUE_CLASS_NAME,
-} from './chrome';
+import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME, INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
 import { cx } from '../chrome/ui';
 
 type TechnicalDataPickerVariant = 'compact' | 'expanded';
@@ -38,11 +41,6 @@ const technicalDataOptions: readonly TechnicalDataOption[] = [
     labelKey: 'editor.compact.browser',
   },
 ];
-
-const pickerCardClassName = {
-  compact: 'rounded-[10px] px-2.5 py-2',
-  expanded: 'rounded-[12px] px-3 py-2.5',
-} as const;
 
 const pickerButtonClassName = {
   compact: 'px-3.5',
@@ -84,33 +82,27 @@ function getTechnicalDataLayoutLabel(layout: EditorTechnicalDataLayout): string 
   );
 }
 
-function getNextTechnicalDataLayout(layout: EditorTechnicalDataLayout): EditorTechnicalDataLayout {
-  return layout === 'column' ? 'row' : 'column';
-}
-
 function TechnicalDataLayoutToggle(props: {
   layout: EditorTechnicalDataLayout;
   setLayout: React.Dispatch<React.SetStateAction<EditorTechnicalDataLayout>>;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 px-0.5">
-      <span className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
+    <div className="space-y-1.5">
+      <ProductGlassSectionLabel>
         {translate('editor.compact.technicalDataLayout')}
-      </span>
-      <button
-        type="button"
-        aria-label={translate('editor.compact.technicalDataLayout')}
-        className={cx(
-          INSPECTOR_SECTION_VALUE_CLASS_NAME,
-          'rounded-[6px] px-1.5 py-0.5 transition',
-          'hover:bg-[color:var(--sniptale-color-surface-hover)]',
-          'hover:text-[color:var(--sniptale-color-accent-emphasis)]',
-          'focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_22%,transparent)]'
-        )}
-        onClick={() => props.setLayout((layout) => getNextTechnicalDataLayout(layout))}
-      >
-        {getTechnicalDataLayoutLabel(props.layout)}
-      </button>
+      </ProductGlassSectionLabel>
+      <ProductGlassRow>
+        {(['column', 'row'] as const).map((layout) => (
+          <ProductGlassChip
+            key={layout}
+            active={props.layout === layout}
+            aria-pressed={props.layout === layout}
+            onClick={() => props.setLayout(layout)}
+          >
+            {getTechnicalDataLayoutLabel(layout)}
+          </ProductGlassChip>
+        ))}
+      </ProductGlassRow>
     </div>
   );
 }
@@ -122,25 +114,15 @@ function TechnicalDataOptionRow({
   variant,
 }: TechnicalDataOptionRowProps) {
   return (
-    <label
-      className={cx(
-        'flex cursor-pointer items-center gap-3 transition',
-        'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
-        checked && 'bg-[color:var(--sniptale-color-accent-soft)]',
-        pickerCardClassName[variant]
-      )}
+    <ProductGlassChip
+      active={checked}
+      aria-pressed={checked}
+      className={variant === 'expanded' ? 'min-h-9' : ''}
+      onClick={onToggle}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onToggle}
-        className="h-4 w-4 rounded border-[color:var(--sniptale-color-border-strong)]"
-      />
-      <span className="text-[color:var(--sniptale-color-text-secondary)]">{option.icon}</span>
-      <span className="text-sm font-medium text-[color:var(--sniptale-color-text-primary)]">
-        {translate(option.labelKey)}
-      </span>
-    </label>
+      <ProductGlassChipIcon>{option.icon}</ProductGlassChipIcon>
+      {translate(option.labelKey)}
+    </ProductGlassChip>
   );
 }
 
@@ -150,7 +132,7 @@ function TechnicalDataOptionList({
   variant,
 }: TechnicalDataOptionListProps) {
   return (
-    <div className="grid grid-cols-1 gap-2">
+    <ProductGlassOptionGrid aria-label={translate('editor.compact.technicalDataFields')}>
       {technicalDataOptions.map((option) => {
         const checked = selectedKinds.includes(option.kind);
 
@@ -166,7 +148,52 @@ function TechnicalDataOptionList({
           />
         );
       })}
-    </div>
+    </ProductGlassOptionGrid>
+  );
+}
+
+function TechnicalDataPreview(props: {
+  kinds: readonly EditorTechnicalDataKind[];
+  layout: EditorTechnicalDataLayout;
+}) {
+  const labels = props.kinds.map((kind) => {
+    const option = technicalDataOptions.find((candidate) => candidate.kind === kind);
+    return option ? translate(option.labelKey) : kind;
+  });
+
+  return (
+    <section
+      aria-label={translate('editor.compact.technicalDataPreview')}
+      aria-live="polite"
+      className="space-y-1.5 border-t border-[color:var(--sniptale-color-border-soft)] pt-2.5"
+    >
+      <div className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
+        {translate('editor.compact.technicalDataPreview')}
+      </div>
+      {labels.length === 0 ? (
+        <p className="mt-1.5 text-xs text-[color:var(--sniptale-color-text-secondary)]">
+          {translate('editor.compact.technicalDataPreviewEmpty')}
+        </p>
+      ) : (
+        <div
+          className={cx(
+            'mt-2 text-xs text-[color:var(--sniptale-color-text-primary)]',
+            props.layout === 'row' ? 'flex flex-wrap items-center gap-x-2 gap-y-1' : 'space-y-1'
+          )}
+        >
+          {labels.map((label, index) => (
+            <React.Fragment key={props.kinds[index]}>
+              {props.layout === 'row' && index > 0 ? (
+                <span aria-hidden="true" className="text-[color:var(--sniptale-color-text-muted)]">
+                  ·
+                </span>
+              ) : null}
+              <span>{label}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -192,12 +219,16 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
 
   return (
     <div className="space-y-3">
-      <TechnicalDataLayoutToggle layout={layout} setLayout={setLayout} />
+      <ProductGlassSectionLabel>
+        {translate('editor.compact.technicalDataFields')}
+      </ProductGlassSectionLabel>
       <TechnicalDataOptionList
         selectedKinds={selectedKinds}
         setSelectedKinds={setSelectedKinds}
         variant={variant}
       />
+      <TechnicalDataLayoutToggle layout={layout} setLayout={setLayout} />
+      <TechnicalDataPreview kinds={orderedKinds} layout={layout} />
       <button
         type="button"
         disabled={!canInsert}
@@ -208,7 +239,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
           pickerButtonClassName[variant]
         )}
       >
-        {translate('common.actions.add')}
+        {translate('editor.compact.technicalDataInsert')}
       </button>
     </div>
   );

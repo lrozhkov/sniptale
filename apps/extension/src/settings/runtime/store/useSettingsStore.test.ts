@@ -11,6 +11,7 @@ const settingsFixture = {
     showVideoEditor: true,
     showGallery: true,
     showPageLinkCopy: true,
+    showWindowResize: true,
     showSettings: true,
   },
   saveCapturesToGallery: false,
@@ -25,7 +26,6 @@ const settingsFixture = {
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: false,
   skipWebSnapshotSaveDisclosure: false,
-  rawDiagnosticsEnabled: false,
 };
 
 const {

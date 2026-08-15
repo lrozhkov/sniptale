@@ -10,7 +10,7 @@ const validViewportPresets = normalizeViewportPresetOrder([
     kind: 'user' as const,
     id: 'tablet',
     name: 'Tablet',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 768,
     height: 1024,
     enabled: true,
@@ -33,9 +33,9 @@ describe('settings guards valid payload coverage', () => {
           showVideoEditor: false,
           showGallery: true,
           showPageLinkCopy: true,
+          showWindowResize: false,
           showSettings: false,
         },
-        rawDiagnosticsEnabled: true,
         fullPageCapture: {
           floatingElements: 'hide',
           freezeMotion: false,
@@ -57,9 +57,9 @@ describe('settings guards valid payload coverage', () => {
           showVideoEditor: false,
           showGallery: true,
           showPageLinkCopy: true,
+          showWindowResize: false,
           showSettings: false,
         },
-        rawDiagnosticsEnabled: true,
         fullPageCapture: {
           floatingElements: 'hide',
           freezeMotion: false,
@@ -84,6 +84,7 @@ describe('settings guards invalid payload coverage', () => {
         contextMenu: {
           enabled: 'yes',
           showScreenshots: true,
+          showWindowResize: 'sometimes',
         },
       })
     ).toMatchObject({

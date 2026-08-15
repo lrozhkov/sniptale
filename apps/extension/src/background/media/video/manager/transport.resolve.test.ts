@@ -6,7 +6,6 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import {
   prepareContentSurfaceOrAbort,
-  enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
   resolveCaptureSourceForMode,
 } from './transport.resolve';
@@ -21,7 +20,7 @@ function createVideoSettings(): VideoRecordingSettings {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
@@ -156,31 +155,4 @@ it('returns the annotation viewport when setup succeeds without cancellation', a
       prepareContentSurfaceIfNeeded: prepareContentSurface,
     })
   ).resolves.toBe(viewport);
-});
-
-it('enables viewport cursor projection before observing start cancellation', async () => {
-  const enableViewportCursorProjection = vi.fn(async () => undefined);
-  const abortStart = vi.fn(() => false);
-
-  await expect(
-    enableViewportCursorProjectionOrAbort(
-      12,
-      CaptureMode.TAB_CROP,
-      { generation: 1, recordingId: 'recording-1' },
-      {
-        abortStart,
-        enableViewportCursorProjection,
-      }
-    )
-  ).resolves.toBe(true);
-
-  expect(enableViewportCursorProjection).toHaveBeenCalledWith(12, {
-    generation: 1,
-    recordingId: 'recording-1',
-  });
-  expect(abortStart).toHaveBeenCalledWith(
-    12,
-    CaptureMode.TAB_CROP,
-    'viewport cursor projection setup'
-  );
 });

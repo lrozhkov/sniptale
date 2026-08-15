@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { browserContextMenus } from '@sniptale/platform/browser/context-menus';
-import { browserDebugger } from '@sniptale/platform/browser/debugger';
 import { browserDownloads } from '@sniptale/platform/browser/downloads';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
@@ -160,24 +159,7 @@ describe('browser permissions adapters', () => {
     );
   });
 });
-describe('browser debugger/runtime adapters', () => {
-  it('normalizes debugger attach callbacks and listener unsubscribe', async () => {
-    const chromeStub = createChromeStub();
-    chromeStub.debugger.attach.mockImplementation(
-      (_target: unknown, _version: string, callback: () => void) => callback()
-    );
-    vi.stubGlobal('chrome', chromeStub);
-
-    const listener = vi.fn();
-    const unsubscribe = browserDebugger.subscribeToEvent(listener);
-
-    await expect(browserDebugger.attach({ tabId: 1 }, '1.3')).resolves.toBeUndefined();
-
-    unsubscribe();
-    expect(chromeStub.debugger.onEvent.addListener).toHaveBeenCalledWith(listener);
-    expect(chromeStub.debugger.onEvent.removeListener).toHaveBeenCalledWith(listener);
-  });
-
+describe('browser runtime adapters', () => {
   it('returns deterministic unsubscribe for runtime message listeners', () => {
     const chromeStub = createChromeStub();
     vi.stubGlobal('chrome', chromeStub);

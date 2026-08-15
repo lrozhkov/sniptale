@@ -26,7 +26,7 @@ const preset = {
   kind: 'user' as const,
   id: 'viewport-1',
   name: 'Viewport',
-  target: 'viewport' as const,
+  target: 'window' as const,
   width: 1280,
   height: 720,
   enabled: true,

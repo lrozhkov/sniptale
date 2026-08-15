@@ -1,6 +1,9 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { isOwnedSnapshotViewerPage } from '../../../../../features/tab-capabilities/url';
-import { ensureActivePageAccessRuntime, hasActivePageAccess } from '../../../page-access/service';
+import {
+  ensureActivePageAccessRuntime,
+  hasActivePageAccess,
+} from '../../../../page-access/service';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import type { ResolvedTabRouteArgs } from './types';
 

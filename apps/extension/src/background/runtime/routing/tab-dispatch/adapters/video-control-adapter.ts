@@ -3,7 +3,7 @@ import { routeVideoControlMessage } from '../../../../media/routes';
 import {
   ensureActivePageAccessRuntime,
   ensureNativeVisibleCaptureAuthority,
-} from '../../../page-access/service';
+} from '../../../../page-access/service';
 import { rejectUnauthorizedRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';
 

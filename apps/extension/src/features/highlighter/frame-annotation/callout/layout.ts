@@ -7,8 +7,6 @@ import { getDynamicTailState, type ConnectorSide } from './dynamic-tail';
 import { getLineConnectorState } from './line-connector';
 import { projectCalloutPerimeterPosition, resolveCalloutAttachmentPosition } from './tail-drag';
 import { FRAME_ANNOTATION_Z_INDEX } from '../interaction/z-index';
-import { projectCalloutCardStyle } from '../../surface-style/card-projection';
-import { resolveCalloutColorBindings } from '../../callout-color-bindings';
 
 type RegionRect = { x: number; y: number; width: number; height: number };
 const MIN_CALLOUT_CONTENT_WIDTH = '1ch';
@@ -103,14 +101,8 @@ export function getCalloutLayoutState(args: {
     dynamicTail,
     calloutPos,
     calloutDimensions: positionDimensions,
-    wrapperStyle: getCalloutWrapperStyle(
-      args.settings,
-      calloutPos,
-      effectiveZIndex,
-      dynamicTail,
-      visualScale
-    ),
-    cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing, dynamicTail),
+    wrapperStyle: getCalloutWrapperStyle(calloutPos, effectiveZIndex),
+    cloudStyle: getCalloutCloudStyle(args.settings, args.isEditing),
     editableStyle: getCalloutEditableStyle(args.settings),
   };
 }
@@ -287,48 +279,22 @@ function getManualCalloutPosition(
 }
 
 function getCalloutWrapperStyle(
-  settings: CalloutSettings,
   calloutPos: { x: number; y: number },
-  effectiveZIndex: number,
-  connector:
-    | ReturnType<typeof getDynamicTailState>
-    | ReturnType<typeof getLineConnectorState>
-    | null,
-  visualScale: number
+  effectiveZIndex: number
 ): CSSProperties {
-  const surface = resolveCalloutColorBindings(settings.style, {}).surface;
-  const shadowOffset = Math.max(1, surface.shadow / 3) * visualScale;
-  const shadowBlur = surface.shadow * visualScale;
-  const unifiedShadow =
-    connector?.kind === 'wedge' && surface.shadow > 0
-      ? `drop-shadow(0 ${shadowOffset}px ${shadowBlur}px ${surface.shadowColor})`
-      : undefined;
   return {
     position: 'fixed',
     left: calloutPos.x,
     top: calloutPos.y,
     zIndex: effectiveZIndex,
     pointerEvents: 'auto',
-    ...(unifiedShadow ? { filter: unifiedShadow } : {}),
   };
 }
 
-function getCalloutCloudStyle(
-  settings: CalloutSettings,
-  isEditing: boolean,
-  connector:
-    | ReturnType<typeof getDynamicTailState>
-    | ReturnType<typeof getLineConnectorState>
-    | null
-): CSSProperties {
+function getCalloutCloudStyle(settings: CalloutSettings, isEditing: boolean): CSSProperties {
   const { surface, typography } = settings.style;
-  const hasWedgeOutline = connector?.kind === 'wedge' && surface.borderWidth > 0;
-  const projectedCard = projectCalloutCardStyle(settings.style, {
-    suppressNativeFill: hasWedgeOutline,
-  });
   return {
-    ...projectedCard,
-    ...(connector?.kind === 'wedge' ? { boxShadow: 'none' } : {}),
+    background: 'transparent',
     position: 'relative',
     // The surface cannot depend on runtime-global resets: maxWidth owns the complete bubble.
     boxSizing: 'border-box',
@@ -336,9 +302,7 @@ function getCalloutCloudStyle(
     width: 'max-content',
     maxWidth: typography.maxWidth,
     color: surface.textColor,
-    border: `${surface.borderWidth}px ${surface.borderStyle} ${
-      hasWedgeOutline ? 'transparent' : surface.borderColor
-    }`,
+    border: `${surface.borderWidth}px ${surface.borderStyle} transparent`,
     borderRadius: surface.radius,
     padding: `${surface.paddingY}px ${surface.paddingX}px`,
     fontFamily: resolveFrameCalloutFontFamily(typography.fontFamily),

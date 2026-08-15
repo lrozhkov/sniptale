@@ -10,6 +10,8 @@ export function FrameStyleCreationButton(props: {
   activeMenu: FrameAnnotationCreationMenu | null;
   contentContext: boolean;
   dataUi?: string;
+  disabled?: boolean;
+  frameActive: boolean;
   frameRef: RefObject<HTMLButtonElement | null>;
   settings: FrameAnnotationCreationSettings;
   toggle: (menu: FrameAnnotationCreationMenu) => void;
@@ -25,9 +27,10 @@ export function FrameStyleCreationButton(props: {
     >
       <ContentToolbarButton
         ref={props.frameRef}
-        active
+        active={props.frameActive}
+        disabled={props.disabled}
         aria-expanded={props.activeMenu === 'frame'}
-        aria-pressed
+        aria-pressed={props.frameActive}
         dataUi={
           props.contentContext
             ? 'content.toolbar.future-frame-style'
@@ -50,6 +53,7 @@ export function AnnotationCreationButtons(props: {
   activeMenu: FrameAnnotationCreationMenu | null;
   calloutRef: RefObject<HTMLButtonElement | null>;
   contentContext: boolean;
+  disabled?: boolean;
   enableCallout: () => void;
   enableStepBadge: () => void;
   settings: FrameAnnotationCreationSettings;
@@ -71,6 +75,7 @@ export function AnnotationCreationButtons(props: {
         <ContentToolbarButton
           ref={props.calloutRef}
           active={props.settings.callout != null}
+          disabled={props.disabled}
           aria-expanded={props.activeMenu === 'callout'}
           aria-pressed={props.settings.callout != null}
           dataUi={
@@ -93,6 +98,7 @@ export function AnnotationCreationButtons(props: {
         <ContentToolbarButton
           ref={props.stepBadgeRef}
           active={props.settings.stepBadge != null}
+          disabled={props.disabled}
           aria-expanded={props.activeMenu === 'step-badge'}
           aria-pressed={props.settings.stepBadge != null}
           dataUi={

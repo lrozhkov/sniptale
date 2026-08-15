@@ -1,7 +1,7 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { clearPinToTabSessionStorageState } from '../../../../composition/persistence/content-pin-session/index';
 import { clearAnnotationForkSessionForTab } from '../../../annotation-fork-session/route';
-import { clearPinnedToolbarOperationState } from '../../page-access/pinned-toolbar-operation';
+import { clearPinnedToolbarOperationState } from '../../../page-access/pinned-toolbar-operation';
 import { clearBackgroundRuntimeTabState } from '../../../application/runtime-state';
 import { handleTabClose } from '../../../media/lifecycle';
 import { cleanupScreenshotModeAfterTabClose } from '../../tab-mode-router-screenshot';

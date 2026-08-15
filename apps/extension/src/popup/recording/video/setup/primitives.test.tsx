@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   stateButton: vi.fn(),
 }));
 
-vi.mock('../../../../ui/popup-shell/icon-state-button', () => ({
-  PopupIconStateButton: (props: {
+vi.mock('../../../../ui/popup-shell/expanding-mode-button', () => ({
+  PopupExpandingModeButton: (props: {
     active: boolean;
     description: string;
     disabled?: boolean;
@@ -68,7 +68,6 @@ it('renders and routes an enabled mode button without an explicit disabled prop'
       active: true,
       description: 'Choose a window',
       label: 'Window',
-      layout: 'stacked',
     })
   );
   expect(mocks.stateButton.mock.calls[0]?.[0]).not.toHaveProperty('disabled');

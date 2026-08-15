@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   getRichShapeTextCapability: vi.fn(() => false),
   handleEditorDoubleClick: vi.fn(),
   handleEditorWindowBlur: vi.fn(),
-  handleEditorWindowKeyDown: vi.fn(() => ({ nextSpacePressed: true, preventDefault: true })),
+  handleEditorWindowKeyDown: vi.fn(() => ({
+    nextSpacePressed: true as boolean | undefined,
+    preventDefault: true,
+  })),
   handleEditorWindowKeyUp: vi.fn(() => ({ nextSpacePressed: false })),
 }));
 
@@ -32,6 +35,7 @@ import { createRuntimeDoubleClickHandler } from './double-click';
 import { createRuntimeWindowKeyDownHandler, createRuntimeWindowKeyUpHandler } from './keyboard';
 
 function createBindings() {
+  const canvas = { _currentTransform: {}, endCurrentTransform: vi.fn(), id: 'canvas' };
   return {
     applyCropSelection: vi.fn(),
     applyTextSelectionStyle: vi.fn(() => true),
@@ -44,7 +48,7 @@ function createBindings() {
     duplicateSelection: vi.fn(),
     finalizeSelectionNudge: vi.fn(),
     getActiveTool: vi.fn(() => 'select'),
-    getCanvas: vi.fn(() => ({ id: 'canvas' })),
+    getCanvas: vi.fn(() => canvas),
     getCropGuide: vi.fn(() => null),
     getDrawSession: vi.fn(() => ({ object: { id: 'draft' } })),
     getRasterToolSession: vi.fn(() => ({ selection: { id: 'selection' } })),
@@ -80,13 +84,40 @@ it('adapts keydown results into window state and default prevention', () => {
   const event = new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' });
   const preventDefault = vi.spyOn(event, 'preventDefault');
 
-  createRuntimeWindowKeyDownHandler(bindings as never)(event);
+  Reflect.apply(createRuntimeWindowKeyDownHandler, null, [bindings])(event);
 
   expect(mocks.handleEditorWindowKeyDown).toHaveBeenCalledWith(
     expect.objectContaining({ completeDrawSession: expect.any(Function), hasDrawSession: true })
   );
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(true);
   expect(preventDefault).toHaveBeenCalledOnce();
+});
+
+it('forwards IME composition state to text keyboard ownership', () => {
+  const bindings = createBindings();
+  const event = new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' });
+  Object.defineProperty(event, 'isComposing', { value: true });
+
+  Reflect.apply(createRuntimeWindowKeyDownHandler, null, [bindings])(event);
+
+  expect(mocks.handleEditorWindowKeyDown).toHaveBeenCalledWith(
+    expect.objectContaining({ isComposing: true })
+  );
+});
+
+it('leaves window state and browser defaults unchanged for ignored keys', () => {
+  const bindings = createBindings();
+  mocks.handleEditorWindowKeyDown.mockImplementationOnce(() => ({
+    nextSpacePressed: undefined,
+    preventDefault: false,
+  }));
+  const event = new KeyboardEvent('keydown', { code: 'KeyQ', key: 'q' });
+  const preventDefault = vi.spyOn(event, 'preventDefault');
+
+  Reflect.apply(createRuntimeWindowKeyDownHandler, null, [bindings])(event);
+
+  expect(bindings.setIsSpacePressed).not.toHaveBeenCalled();
+  expect(preventDefault).not.toHaveBeenCalled();
 });
 
 it('keeps keyup and blur cleanup owned by window adapters', () => {
@@ -97,11 +128,22 @@ it('keeps keyup and blur cleanup owned by window adapters', () => {
 
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(false);
   expect(mocks.handleEditorWindowBlur).toHaveBeenCalledWith({
+    cancelTransientInteraction: bindings.cancelTransientInteraction,
+    endCurrentTransform: expect.any(Function),
     finalizeSelectionNudge: expect.any(Function),
   });
-  const [{ finalizeSelectionNudge }] = mocks.handleEditorWindowBlur.mock.calls[0] as [
-    { finalizeSelectionNudge: () => void },
+  const [{ cancelTransientInteraction, endCurrentTransform, finalizeSelectionNudge }] = mocks
+    .handleEditorWindowBlur.mock.calls[0] as [
+    {
+      cancelTransientInteraction: () => void;
+      endCurrentTransform: () => void;
+      finalizeSelectionNudge: () => void;
+    },
   ];
+  endCurrentTransform();
+  cancelTransientInteraction();
   finalizeSelectionNudge();
+  expect(bindings.getCanvas().endCurrentTransform).toHaveBeenCalledOnce();
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
   expect(bindings.finalizeSelectionNudge).toHaveBeenCalledOnce();
 });

@@ -65,6 +65,7 @@ export function startEditorDrawSession(options: {
   tool: DrawSession['tool'];
   start: Point;
   object: FabricObject;
+  pointerId?: number | null;
   cropGuide: RectInstance | null;
 }): {
   drawSession: DrawSession;
@@ -87,6 +88,7 @@ export function startEditorDrawSession(options: {
   return {
     drawSession: {
       tool: options.tool,
+      pointerId: options.pointerId ?? null,
       start: options.start,
       lastPoint: options.start,
       objectId: options.object.sniptaleId ?? crypto.randomUUID(),

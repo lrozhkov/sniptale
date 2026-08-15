@@ -12,14 +12,22 @@ function isPopupStartupSelection(value: unknown): value is PopupStartupSelection
   return value === 'remember-last' || (typeof value === 'string' && TARGETS.has(value));
 }
 
-function isPopupPage(value: unknown): value is PopupStartupState['lastPage'] {
-  return value === 'home' || value === 'video' || value === 'export';
+function parsePopupPage(value: unknown): PopupStartupState['lastPage'] | null {
+  if (value === 'home') return 'screenshots';
+  return value === 'screenshots' ||
+    value === 'video' ||
+    value === 'menu' ||
+    value === 'tools' ||
+    value === 'export'
+    ? value
+    : null;
 }
 
 export function parseStoredPopupStartupState(value: unknown): Partial<PopupStartupState> {
   if (!isRecord(value)) return {};
   const parsed: Partial<PopupStartupState> = {};
   if (isPopupStartupSelection(value['selection'])) parsed.selection = value['selection'];
-  if (isPopupPage(value['lastPage'])) parsed.lastPage = value['lastPage'];
+  const lastPage = parsePopupPage(value['lastPage']);
+  if (lastPage) parsed.lastPage = lastPage;
   return parsed;
 }

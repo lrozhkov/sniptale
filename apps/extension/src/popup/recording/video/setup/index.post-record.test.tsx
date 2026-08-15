@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -32,9 +32,9 @@ vi.mock('../../../../contracts/messaging/parsers/boundary', async (importOrigina
 }));
 
 vi.mock('./body', () => ({
-  VideoSetupBody: (props: unknown) => {
+  VideoSetupBody: (props: { idleActions?: ReactNode }) => {
     mocks.bodyMock(props);
-    return <div data-testid="video-setup-body" />;
+    return <div data-testid="video-setup-body">{props.idleActions}</div>;
   },
 }));
 
@@ -55,7 +55,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -118,7 +118,7 @@ function createProps(overrides: Partial<React.ComponentProps<typeof VideoSetupPa
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
       quality: VideoQuality.MEDIUM,

@@ -81,6 +81,7 @@ function createController() {
     autosaveService: null,
     dispose: vi.fn(),
     exportDocument: vi.fn(() => ({ version: 1 })),
+    isDocumentReadyForExport: vi.fn(() => true),
     loadDocument: vi.fn(async () => undefined),
     openImage: vi.fn(async () => undefined),
   };
@@ -235,6 +236,12 @@ async function verifiesConditionalAutosaveFlush() {
   flushEditorAutosaveIfNeeded(services, () => false);
 
   expect(autosaveService.flushAutosave).toHaveBeenCalledTimes(1);
+
+  controller.isDocumentReadyForExport.mockReturnValue(false);
+  flushEditorAutosaveIfNeeded(services, () => true);
+
+  expect(autosaveService.flushAutosave).toHaveBeenCalledTimes(1);
+  expect(controller.exportDocument).toHaveBeenCalledTimes(1);
 }
 
 describe('editor-page.runtime', () => {

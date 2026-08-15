@@ -22,6 +22,32 @@ type SelectionModeMouseMoveOptions = Pick<
   | 'updateDragSelection'
 >;
 
+export function handleSelectionModeDragStart(
+  event: DragEvent,
+  state: SelectionModeInteractionState,
+  options: Pick<SelectionModeEventOptions, 'startDragSelection' | 'updateDragSelection'>
+): void {
+  if (!state.isActive) {
+    return;
+  }
+
+  if (state.currentState === 'drag') {
+    stopSelectionModeEvent(event);
+    state.hasMovedEnough = true;
+    options.updateDragSelection(event.clientX, event.clientY);
+    return;
+  }
+
+  if ((state.currentState !== 'idle' && state.currentState !== 'hover') || !state.mouseDownPoint) {
+    return;
+  }
+
+  stopSelectionModeEvent(event);
+  state.hasMovedEnough = true;
+  options.startDragSelection(state.mouseDownPoint.x, state.mouseDownPoint.y);
+  options.updateDragSelection(event.clientX, event.clientY);
+}
+
 export function handleSelectionModeMouseDown(
   event: MouseEvent,
   state: SelectionModeInteractionState,
@@ -38,7 +64,7 @@ export function handleSelectionModeMouseDown(
   }
 
   if (state.currentState === 'idle' || state.currentState === 'hover') {
-    handleSelectionModeIdleMouseDown(event, state, options.isExtensionUIElement, target);
+    handleSelectionModeIdleMouseDown(event, state, options, target);
     return;
   }
 
@@ -78,22 +104,6 @@ function handleHoverStateMove(
   options.showHoverFrame(target, iframe);
 }
 
-function handlePendingDragCandidateMove(
-  event: MouseEvent,
-  state: SelectionModeInteractionState,
-  options: SelectionModeMouseMoveOptions
-): boolean {
-  if (!state.mouseDownPoint || state.hasMovedEnough) return false;
-  stopSelectionModeEvent(event);
-  const dx = event.clientX - state.mouseDownPoint.x;
-  const dy = event.clientY - state.mouseDownPoint.y;
-  if (Math.abs(dx) > state.dragThreshold || Math.abs(dy) > state.dragThreshold) {
-    state.hasMovedEnough = true;
-    options.startDragSelection(state.mouseDownPoint.x, state.mouseDownPoint.y);
-  }
-  return true;
-}
-
 function handleConfirmedStateMove(
   event: MouseEvent,
   state: SelectionModeInteractionState,
@@ -111,6 +121,42 @@ function handleConfirmedStateMove(
   }
 }
 
+function handlePendingAreaSelectionMove(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  options: Pick<SelectionModeEventOptions, 'startDragSelection' | 'updateDragSelection'>
+): boolean {
+  if (!state.mouseDownPoint || state.hasMovedEnough) return false;
+  stopSelectionModeEvent(event);
+  const dx = event.clientX - state.mouseDownPoint.x;
+  const dy = event.clientY - state.mouseDownPoint.y;
+  if (Math.abs(dx) <= state.dragThreshold && Math.abs(dy) <= state.dragThreshold) return true;
+  state.hasMovedEnough = true;
+  options.startDragSelection(state.mouseDownPoint.x, state.mouseDownPoint.y);
+  options.updateDragSelection(event.clientX, event.clientY);
+  return true;
+}
+
+function handleAreaSelectionMove(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  updateDragSelection: SelectionModeEventOptions['updateDragSelection']
+): void {
+  stopSelectionModeEvent(event);
+  if (!state.mouseDownPoint) return;
+  const dx = event.clientX - state.mouseDownPoint.x;
+  const dy = event.clientY - state.mouseDownPoint.y;
+  if (
+    !state.hasMovedEnough &&
+    Math.abs(dx) <= state.dragThreshold &&
+    Math.abs(dy) <= state.dragThreshold
+  ) {
+    return;
+  }
+  state.hasMovedEnough = true;
+  updateDragSelection(event.clientX, event.clientY);
+}
+
 export function handleSelectionModeMouseMove(
   event: MouseEvent,
   state: SelectionModeInteractionState,
@@ -122,8 +168,7 @@ export function handleSelectionModeMouseMove(
   }
 
   if (state.currentState === 'drag') {
-    stopSelectionModeEvent(event);
-    options.updateDragSelection(event.clientX, event.clientY);
+    handleAreaSelectionMove(event, state, options.updateDragSelection);
     return;
   }
 
@@ -134,7 +179,7 @@ export function handleSelectionModeMouseMove(
 
   if (
     (state.currentState === 'idle' || state.currentState === 'hover') &&
-    handlePendingDragCandidateMove(event, state, options)
+    handlePendingAreaSelectionMove(event, state, options)
   ) {
     return;
   }
@@ -182,14 +227,27 @@ export function handleSelectionModeMouseUp(
     'finalizeDragSelection' | 'flushFinalFrameUpdate' | 'startDragSelection' | 'updateDragSelection'
   >
 ): void {
-  if (!state.isActive) {
-    return;
-  }
+  handleSelectionModeMouseUpOwned(event, state, options);
+}
+
+function handleSelectionModeMouseUpOwned(
+  event: MouseEvent,
+  state: SelectionModeInteractionState,
+  options: Pick<
+    SelectionModeEventOptions,
+    'finalizeDragSelection' | 'flushFinalFrameUpdate' | 'startDragSelection' | 'updateDragSelection'
+  >
+): void {
+  if (!state.isActive) return;
 
   if (state.currentState === 'drag') {
     stopSelectionModeEvent(event);
     logSelectionModeDragFinalize(state);
+    if (state.hasMovedEnough) {
+      options.updateDragSelection(event.clientX, event.clientY);
+    }
     options.finalizeDragSelection();
+    state.skipNextClick = state.hasMovedEnough;
     state.mouseDownPoint = null;
     state.hasMovedEnough = false;
     return;

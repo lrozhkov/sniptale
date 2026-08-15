@@ -26,6 +26,6 @@
 
 ## QA Loopholes
 
-For each loophole, record how it can be bypassed; whether it is changed-scope-only, full-only, advisory-only, manual-only, skip-capable, or undocumented; the risk; and the proposed hard-fail, advisory, policy, wrapper, or documentation correction.
+For each loophole, record the concrete supported or hostile path that can bypass it; whether it is changed-scope-only, full-only, advisory-only, manual-only, skip-capable, or undocumented; the material risk; and the narrowest proposed hard-fail, advisory, policy, wrapper, or documentation correction. Omit a theoretical bypass outside the current threat model or supported workflow unless the user explicitly requested speculative-hardening research.
 
-Every finding needs an evidence path, affected owner, impact, correction, and disposition as immediate or backlog work. Do not report generic concerns.
+Every finding needs an evidence path, reachable trigger, affected owner, impact, correction, and disposition as immediate or backlog work. Repository-wide controls require repeated observed defects or another low-noise generalizable signature; a one-off or hypothetical scenario does not justify them. Do not report generic concerns.

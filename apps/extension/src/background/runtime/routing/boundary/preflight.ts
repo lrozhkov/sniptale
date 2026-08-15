@@ -19,9 +19,6 @@ export const backgroundOwnedMessageTypes = [
   MessageType.PAGE_ACCESS,
   MessageType.ERASE_LOCAL_EXTENSION_DATA,
   MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
-  MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK,
-  MessageType.EXPORT_POPUP_SAVE_ARCHIVE,
-  MessageType.RELEASE_POPUP_EXPORT_ARCHIVE,
   MessageType.PROCESS_WITH_LLM,
   MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
   MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY,
@@ -32,6 +29,10 @@ export const backgroundOwnedMessageTypes = [
   MessageType.CONTENT_RUNTIME_WAKEUP,
   MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
   MessageType.FRAME_ANNOTATION_RASTERIZE,
+  MessageType.START_POPUP_EXPORT_JOB,
+  MessageType.GET_POPUP_EXPORT_JOB_STATUS,
+  MessageType.CANCEL_POPUP_EXPORT_JOB,
+  MessageType.ACK_POPUP_EXPORT_JOB_STATUS,
 ] as const;
 
 const backgroundOwnedMessageTypeSet = new Set<string>(backgroundOwnedMessageTypes);
@@ -46,11 +47,12 @@ export type RuntimeMessagePreflightRoute =
 export function classifyRuntimeMessageRoute(
   message: RuntimeMessageEnvelope
 ): RuntimeMessagePreflightRoute {
+  const messageType = message.type;
   if (isBackgroundInternalSignalMessage(message)) {
     return { kind: 'internal-signal' };
   }
 
-  if (backgroundOwnedMessageTypeSet.has(message.type)) {
+  if (backgroundOwnedMessageTypeSet.has(messageType)) {
     return { kind: 'background-owned' };
   }
 

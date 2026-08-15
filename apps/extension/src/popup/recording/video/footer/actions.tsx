@@ -1,5 +1,5 @@
 import { Circle, Film, Images } from 'lucide-react';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import {
   openGalleryPage,
   openVideoEditorPage,
@@ -18,7 +18,7 @@ function openVideoEditor() {
 }
 
 function openGallery() {
-  void openGalleryPage();
+  void openGalleryPage({ folder: 'recording' });
   window.close();
 }
 

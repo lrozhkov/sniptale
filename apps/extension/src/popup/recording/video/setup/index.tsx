@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { VideoSetupFooter } from '../footer';
 import {
   acknowledgeVideoPostRecordResult,
@@ -28,6 +28,23 @@ type PostRecordEffectArgs = {
 export default function VideoSetupPage(props: VideoSetupPageProps) {
   const postRecord = useVideoPostRecordState(props);
   const viewModel = getVideoSetupViewModel(postRecord.displayProps);
+  const footer =
+    postRecord.postRecordResult ||
+    postRecord.isVerificationPending ||
+    postRecord.hasVerificationError ? null : (
+      <VideoSetupFooter
+        canStart={viewModel.canStart}
+        startButtonLabel={viewModel.startButtonLabel}
+        startDisabledReason={viewModel.startDisabledReason}
+        onStart={props.onStart}
+        onPauseResume={props.onPauseResume}
+        onStop={props.onStop}
+        onCancel={postRecord.handleCancel}
+        recordingState={postRecord.displayProps.recordingState}
+        galleryTitle={viewModel.galleryTitle}
+      />
+    );
+  const isIdle = postRecord.displayProps.recordingState.status === VideoRecordingStatus.IDLE;
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -40,32 +57,22 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
           onAcknowledgePostRecord={postRecord.acknowledgePostRecord}
           showSavingState={postRecord.showSavingState}
           viewModel={viewModel}
+          idleActions={isIdle ? footer : null}
         />
       )}
-      {postRecord.postRecordResult ||
-      postRecord.isVerificationPending ||
-      postRecord.hasVerificationError ? null : (
-        <VideoSetupFooter
-          canStart={viewModel.canStart}
-          startButtonLabel={viewModel.startButtonLabel}
-          startDisabledReason={viewModel.startDisabledReason}
-          onStart={props.onStart}
-          onPauseResume={props.onPauseResume}
-          onStop={props.onStop}
-          onCancel={postRecord.handleCancel}
-          recordingState={postRecord.displayProps.recordingState}
-          galleryTitle={viewModel.galleryTitle}
-        />
-      )}
+      {isIdle ? null : footer}
     </div>
   );
 }
 
 function useVideoPostRecordState(props: VideoSetupPageProps) {
   const postRecordVerificationTokenRef = useRef(0);
-  const state = usePostRecordLocalState();
-  const displayProps = createPostRecordDisplayProps(props, state);
   const verificationKey = createPostRecordVerificationKey(props);
+  const state = usePostRecordLocalState(
+    props.initialPostRecordResult ?? null,
+    props.initialPostRecordVerified === true ? verificationKey : null
+  );
+  const displayProps = createPostRecordDisplayProps(props, state);
   const hasVerificationError = state.failedVerificationKey === verificationKey;
   const isVerificationPending =
     state.verifiedRecordingKey !== verificationKey && !hasVerificationError;
@@ -120,13 +127,20 @@ function useVideoPostRecordState(props: VideoSetupPageProps) {
   };
 }
 
-function usePostRecordLocalState() {
+function usePostRecordLocalState(
+  initialPostRecordResult: VideoPostRecordResult | null,
+  initialVerifiedRecordingKey: string | null
+) {
   const [isCancellingStart, setIsCancellingStart] = useState(false);
   const [isDiscardingRecording, setIsDiscardingRecording] = useState(false);
   const [failedVerificationKey, setFailedVerificationKey] = useState<string | null>(null);
-  const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(null);
+  const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(
+    initialPostRecordResult
+  );
   const [verificationAttempt, setVerificationAttempt] = useState(0);
-  const [verifiedRecordingKey, setVerifiedRecordingKey] = useState<string | null>(null);
+  const [verifiedRecordingKey, setVerifiedRecordingKey] = useState<string | null>(
+    initialVerifiedRecordingKey
+  );
 
   return {
     failedVerificationKey,

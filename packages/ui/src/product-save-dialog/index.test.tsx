@@ -167,4 +167,18 @@ describe('ProductSaveDialog', () => {
       ''
     );
   });
+
+  it('disables filename and destination actions while a save is pending', () => {
+    renderDialog(createDialogProps({ disabled: true }));
+
+    expect(container?.querySelector<HTMLInputElement>('#save-dialog-filename')?.disabled).toBe(
+      true
+    );
+    expect(
+      container?.querySelector<HTMLButtonElement>('.sniptale-save-dialog-item')?.disabled
+    ).toBe(true);
+    expect(
+      container?.querySelector<HTMLButtonElement>('.sniptale-save-dialog-system')?.disabled
+    ).toBe(true);
+  });
 });

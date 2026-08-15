@@ -7,7 +7,7 @@ const { loadMicrophoneDevicesMock } = vi.hoisted(() => ({
   loadMicrophoneDevicesMock: vi.fn(),
 }));
 
-vi.mock('../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => key,
 }));
 
@@ -24,7 +24,7 @@ const defaultSettings = {
   quality: VideoQuality.HIGH,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
 };
 
 function setupPopupMicrophoneFlowMocks() {

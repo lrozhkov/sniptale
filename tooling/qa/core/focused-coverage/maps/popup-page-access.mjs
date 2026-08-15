@@ -22,76 +22,21 @@ export const POPUP_PAGE_ACCESS_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/popup/shell/runtime/page-access.test.tsx'],
   },
   {
-    owner: 'popup-runtime-page-access-assembly',
-    productionFile: 'apps/extension/src/popup/shell/runtime/index.ts',
-    exclusive: true,
-    reason: 'Popup runtime page-access assembly is covered by hook suites.',
-    testFiles: [
-      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
-      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
-    ],
-  },
-  {
-    owner: 'popup-runtime-page-access-assembly',
-    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/index.ts',
-    exclusive: true,
-    reason: 'Popup runtime page-access assembly is covered by hook suites.',
-    testFiles: [
-      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
-      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
-    ],
-  },
-  {
-    owner: 'popup-runtime-page-access-assembly',
-    productionFile: 'apps/extension/src/popup/shell/runtime/assembly/view.ts',
-    exclusive: true,
-    allowMissingProductionTarget: true,
-    reason:
-      'The removed page-access view projection is consolidated into the runtime assembly owner.',
-    testFiles: [
-      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
-      'apps/extension/src/popup/shell/runtime/page-access.test.tsx',
-    ],
-  },
-  {
-    owner: 'popup-command-palette-page-access-type',
-    productionFile: 'apps/extension/src/popup/shell/runtime/types/command-palette.ts',
-    exclusive: true,
-    reason: 'Command palette page-access projection is covered by action gating tests.',
-    testFiles: ['apps/extension/src/popup/shell/command-palette/actions.test.tsx'],
-  },
-  {
     owner: 'popup-runtime-page-access-types',
     productionPrefix: 'apps/extension/src/popup/shell/runtime/types',
     exclusive: true,
     reason: 'Popup runtime page-access type projections are covered by consumer tests.',
     testFiles: [
-      'apps/extension/src/popup/shell/app-shell/index.test.tsx',
       'apps/extension/src/popup/shell/export/controller.test.tsx',
       'apps/extension/src/popup/shell/home/page-shell/index.page-access.test.tsx',
       'apps/extension/src/popup/recording/video/setup/view-model.test.ts',
-      'apps/extension/src/popup/shell/runtime/hook.test.tsx',
     ],
   },
   {
-    owner: 'popup-page-access-command-palette-layer',
-    productionFile: 'apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx',
-    exclusive: true,
-    reason: 'Command palette lazy layer ownership is covered by its layer suite.',
-    testFiles: ['apps/extension/src/popup/shell/app-shell/command-palette-layer.test.tsx'],
-  },
-  {
     owner: 'popup-page-access-app-shell',
-    productionFile: 'apps/extension/src/popup/shell/app-shell/index.tsx',
+    productionFile: 'apps/extension/src/popup/shell/app/index.tsx',
     exclusive: true,
     reason: 'Popup shell route composition is covered by the app-shell surface suite.',
-    testFiles: ['apps/extension/src/popup/shell/app-shell/index.test.tsx'],
-  },
-  {
-    owner: 'popup-page-access-tabs-layer',
-    productionFile: 'apps/extension/src/popup/shell/app-shell/tabs-layer.tsx',
-    exclusive: true,
-    reason: 'Page-access tab disabling is covered by tabs-layer tests.',
-    testFiles: ['apps/extension/src/popup/shell/app-shell/tabs-layer.test.tsx'],
+    testFiles: ['apps/extension/src/popup/shell/app/index.test.tsx'],
   },
 ];

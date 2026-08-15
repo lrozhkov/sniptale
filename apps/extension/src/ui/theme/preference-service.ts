@@ -1,10 +1,10 @@
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
 import { browserStorage } from '../../composition/persistence/infrastructure/browser-storage';
 import { createStorageBackedPreferenceService } from '../../composition/persistence/infrastructure/preference-service';
-import type { AppTheme, AppThemePreference } from '@sniptale/ui/theme/types';
+import type { AppThemePreference } from '@sniptale/ui/theme/types';
 import { runWithPersistenceMutationPermit } from '../../composition/persistence/infrastructure/mutation-barrier';
+import { normalizeStoredThemePreference, resolveAppTheme, THEME_STORAGE_KEY } from './paint-hint';
 
-const THEME_STORAGE_KEY = 'sniptale-theme-preference';
 const THEME_STORAGE_AREA: chrome.storage.AreaName = 'local';
 
 interface ThemePreferenceService {
@@ -12,24 +12,6 @@ interface ThemePreferenceService {
   getStoredPreference(): AppThemePreference | null;
   setPreference(preference: AppThemePreference): Promise<void>;
   subscribe(listener: (preference: AppThemePreference | null) => void): () => void;
-}
-
-function getThemeMediaQuery(): MediaQueryList | null {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return null;
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)');
-}
-
-function isThemePreference(value: string | null): value is AppThemePreference {
-  return value === 'light' || value === 'dark' || value === 'system';
-}
-
-function normalizeStoredThemePreference(value: unknown): AppThemePreference | null {
-  return isThemePreference(typeof value === 'string' ? value : null)
-    ? (value as AppThemePreference)
-    : null;
 }
 
 function canObserveThemeStorageChanges(): boolean {
@@ -47,20 +29,17 @@ function usesBrowserThemeStorage(): boolean {
   );
 }
 
-function readLocalStorageThemePreference(): AppThemePreference | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
+export function readThemePaintHint(): AppThemePreference | null {
+  if (typeof window === 'undefined') return null;
 
   try {
-    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(value) ? value : null;
+    return normalizeStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
     return null;
   }
 }
 
-function writeLocalStorageThemePreference(preference: AppThemePreference): Promise<void> {
+function persistThemePaintHint(preference: AppThemePreference): Promise<void> {
   if (typeof window === 'undefined') {
     return Promise.resolve();
   }
@@ -70,12 +49,19 @@ function writeLocalStorageThemePreference(preference: AppThemePreference): Promi
   });
 }
 
-export function resolveAppTheme(preference: AppThemePreference = 'system'): AppTheme {
-  if (preference === 'light' || preference === 'dark') {
-    return preference;
-  }
+export function reconcileThemePaintHint(): Promise<AppThemePreference | null> {
+  return runWithPersistenceMutationPermit(async () => {
+    const preference = usesBrowserThemeStorage()
+      ? normalizeStoredThemePreference(
+          (await browserStorage.local.get([THEME_STORAGE_KEY]))[THEME_STORAGE_KEY]
+        )
+      : readThemePaintHint();
 
-  return getThemeMediaQuery()?.matches ? 'dark' : 'light';
+    if (typeof window === 'undefined') return preference;
+    if (preference === null) window.localStorage.removeItem(THEME_STORAGE_KEY);
+    else window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+    return preference;
+  });
 }
 
 function dispatchThemeChange(preference: AppThemePreference | null): void {
@@ -103,10 +89,10 @@ export function createThemePreferenceService(): ThemePreferenceService {
     mapCurrentToStoredPreference: (preference) => preference,
     mapStoredPreferenceToCurrent: (preference) => preference,
     normalizeStoredPreference: normalizeStoredThemePreference,
-    readLocalStoragePreference: readLocalStorageThemePreference,
+    readLocalStoragePreference: readThemePaintHint,
     storageArea: THEME_STORAGE_AREA,
     storageKey: THEME_STORAGE_KEY,
-    writeLocalStoragePreference: writeLocalStorageThemePreference,
+    writeLocalStoragePreference: persistThemePaintHint,
   });
 
   return {

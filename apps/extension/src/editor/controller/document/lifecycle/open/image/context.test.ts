@@ -90,3 +90,9 @@ it('keeps stored browser-frame url when open options omit overrides', async () =
   expect(context.frame.backgroundMode).toBe('color');
   expect(context.frame.backgroundImageData).toBeNull();
 });
+
+it('uses the source filename as the document title when no explicit title is provided', async () => {
+  const context = await resolveEditorOpenImageContext({}, 'capture.png');
+
+  expect(context.pageTitle).toBe('capture.png');
+});

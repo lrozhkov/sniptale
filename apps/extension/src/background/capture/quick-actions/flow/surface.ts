@@ -1,5 +1,4 @@
 // policyStateId: capture-surface-leases - quick actions borrow and release the canonical capture-surface lease.
-import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { getCaptureSurfaceService } from '../../../capture-surface';
 import {
@@ -18,7 +17,6 @@ type QuickActionSurfaceTransaction = {
   priorViewport: ReturnType<QuickActionFlowArgs['viewportState']['get']>;
   surfaceCapabilityToken: string | null;
   viewportState: QuickActionFlowArgs['viewportState'];
-  viewer: boolean;
 };
 
 const transactions = new Map<number, QuickActionSurfaceTransaction>();
@@ -29,14 +27,12 @@ export async function applyQuickActionSurface(
   if (transactions.has(args.tabId)) throw new Error('surface-busy');
   const existingSession = getScreenshotSurfaceSession(args.tabId);
   const session = beginScreenshotSurfaceSession(args.tabId);
-  const viewer = args.pageCapability === TabRuntimeCapability.OwnedSnapshotViewer;
   const transaction: QuickActionSurfaceTransaction = {
     appliedLeaseId: null,
     ownsSession: existingSession === null,
     priorViewport: args.viewportState.get(args.tabId),
-    surfaceCapabilityToken: viewer ? null : session.capabilityToken,
+    surfaceCapabilityToken: session.capabilityToken,
     viewportState: args.viewportState,
-    viewer,
   };
   transactions.set(args.tabId, transaction);
   try {
@@ -67,7 +63,6 @@ async function applyQuickActionSurfaceTransaction(
   args: QuickActionFlowArgs,
   transaction: QuickActionSurfaceTransaction
 ): Promise<{ surfaceCapabilityToken: string | null }> {
-  const viewer = transaction.viewer;
   if (!args.viewportPresetId) {
     if (transaction.ownsSession) args.viewportState.set(args.tabId, null);
     return { surfaceCapabilityToken: transaction.surfaceCapabilityToken };
@@ -78,16 +73,6 @@ async function applyQuickActionSurfaceTransaction(
   );
   if (!preset) throw new Error('missing');
   if (!preset.enabled) throw new Error('disabled');
-  if (viewer) {
-    if (preset.target === 'window') throw new Error('unsupported-context');
-    args.viewportState.set(args.tabId, {
-      presetId: preset.id,
-      target: preset.target,
-      width: preset.width,
-      height: preset.height,
-    });
-    return { surfaceCapabilityToken: null };
-  }
   const availability = await getCaptureSurfaceService().getAvailability({
     tabId: args.tabId,
     presetId: preset.id,
@@ -121,7 +106,7 @@ export async function releaseQuickActionSurface(
   const transaction = transactions.get(tabId);
   if (!transaction) return;
   const state = viewportState ?? transaction.viewportState;
-  if (!transaction.viewer && transaction.appliedLeaseId !== null) {
+  if (transaction.appliedLeaseId !== null) {
     await getCaptureSurfaceService().releaseTabOwners(tabId, ['quick-action']);
     const resumed = getCaptureSurfaceService().getApplied(tabId);
     setScreenshotSurfaceActiveLeaseGeneration(tabId, resumed?.generation ?? null);

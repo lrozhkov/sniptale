@@ -16,15 +16,15 @@ import {
   hasActivePageAccess,
   hasPinnedToolbarAllSitesAccess,
   registerPinnedToolbarAllSitesAccess,
-} from './service';
+} from '../../page-access/service';
 import {
   beginPinnedToolbarDurableOperation,
   beginPinnedToolbarOperation,
   observePinnedToolbarOperations,
-} from './pinned-toolbar-operation';
+} from '../../page-access/pinned-toolbar-operation';
 import { enableScreenshotMode, enableScreenshotModeGuarded } from '../tab-mode-router-screenshot';
 import { runtimeActionCoreMessageContracts } from '../../../contracts/messaging/contracts/runtime/actions/core';
-import { waitForContentToolbarReady } from './readiness';
+import { waitForContentToolbarReady } from '../../page-access/readiness';
 
 type ContentRuntimeWakeupResponse = {
   error?: string;

@@ -7,7 +7,7 @@ import {
   collectAdvancedLogAssets,
   collectCssDiagnosticAssets,
   collectCoreLogAssets,
-  createHarLikeSnapshot,
+  createResourceTimingSnapshot,
 } from '.';
 
 function resetDocumentBody() {
@@ -52,7 +52,7 @@ function buildCoreLogOptionsFixture() {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: false,
@@ -167,66 +167,56 @@ describe('buildVirtualDomSnapshotHtml', () => {
   });
 });
 
-describe('createHarLikeSnapshot', () => {
-  it('creates a HAR-like resource timing payload', () => {
+describe('createResourceTimingSnapshot', () => {
+  it('creates a sanitized resource timing payload', () => {
     vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
       {
         duration: 42,
         initiatorType: 'script',
-        name: 'https://example.test/app.js',
+        decodedBodySize: 900,
+        encodedBodySize: 800,
+        name: 'https://example.test/app.js?token=secret#fragment',
+        nextHopProtocol: 'h2',
         startTime: 10,
         transferSize: 1024,
       },
     ] as PerformanceResourceTiming[]);
 
-    const har = createHarLikeSnapshot();
-    const entries = har.log.entries;
-    const firstEntry = entries[0];
+    const snapshot = createResourceTimingSnapshot({
+      pageTitle: 'Example page',
+      pageUrl: 'https://example.test/page?token=secret#fragment',
+    });
+    const firstEntry = snapshot.entries[0];
 
-    expect(entries).toHaveLength(1);
-    expect(firstEntry?.request.url).toBe('https://example.test/app.js');
-    expect(firstEntry?._from).toBe('performance-resource-timing');
+    expect(snapshot.pageUrl).toBe('https://example.test/page');
+    expect(snapshot.entries).toHaveLength(1);
+    expect(firstEntry).toMatchObject({
+      duration: 42,
+      initiatorType: 'script',
+      name: 'https://example.test/app.js',
+      transferSize: 1024,
+    });
   });
 });
 
-describe('collectAdvancedLogAssets raw mode', () => {
-  it('keeps raw diagnostics behind mandatory credential redaction', async () => {
-    const rawHar = {
-      log: {
-        entries: [
-          {
-            request: {
-              headers: [{ name: 'Authorization', value: 'Bearer known-secret' }],
-              url: 'https://example.test/api?token=known-secret&q=public#frag',
-              queryString: [
-                { name: 'token', value: 'known-secret' },
-                { name: 'q', value: 'public' },
-              ],
-            },
-          },
-        ],
-      },
-    };
+describe('collectAdvancedLogAssets', () => {
+  it('does not collect page diagnostics when the option is disabled', async () => {
+    await expect(
+      collectAdvancedLogAssets(buildCoreLogOptionsFixture(), buildCoreLogTreeFixture())
+    ).resolves.toEqual([]);
+  });
 
-    const sanitizedAssets = await collectAdvancedLogAssets(
-      { ...buildCoreLogOptionsFixture(), includeHarDomLogs: true },
-      { har: rawHar, rawDiagnosticsEnabled: false },
-      buildCoreLogTreeFixture()
-    );
-    const rawAssets = await collectAdvancedLogAssets(
-      { ...buildCoreLogOptionsFixture(), includeHarDomLogs: true },
-      { har: rawHar, rawDiagnosticsEnabled: true },
+  it('emits only DOM, virtual DOM, and Resource Timing artifacts', async () => {
+    const assets = await collectAdvancedLogAssets(
+      { ...buildCoreLogOptionsFixture(), includePageDiagnostics: true },
       buildCoreLogTreeFixture()
     );
 
-    const sanitizedHar = sanitizedAssets.find((asset) => asset.path === 'logs/session.har');
-    const rawSessionHar = rawAssets.find((asset) => asset.path === 'logs/session.har');
-
-    expect(sanitizedHar?.content).not.toContain('known-secret');
-    expect(sanitizedHar?.content).not.toContain('#frag');
-    expect(rawSessionHar?.content).toContain('q=public');
-    expect(rawSessionHar?.content).not.toContain('known-secret');
-    expect(rawSessionHar?.content).not.toContain('#frag');
+    expect(assets.map((asset) => asset.path)).toEqual([
+      'logs/dom.html',
+      'logs/virtual-dom.html',
+      'logs/resource-timing.json',
+    ]);
   });
 });
 
@@ -245,7 +235,6 @@ describe('collectCoreLogAssets', () => {
       'logs/root-selection.json',
       'logs/pipeline-trace.json',
       'logs/payload-trace.json',
-      'logs/console.json',
     ]);
   });
 });
@@ -266,7 +255,7 @@ describe('collectCssDiagnosticAssets', () => {
       includeCssDiagnostics: true,
       includeFiles: false,
       includeFullPageScreenshot: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeImages: false,
       includeJson: false,
       includeMarkdown: false,

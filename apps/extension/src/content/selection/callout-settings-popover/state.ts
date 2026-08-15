@@ -5,6 +5,7 @@ import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { normalizeCalloutSettings } from '../../../composition/frame-annotation-controls/callout/helpers';
 import {
   applyCalloutSettingsPatch,
+  cloneForkedCalloutStyle,
   cloneCalloutStyle,
   type CalloutSettingsPatch,
 } from '../../../features/highlighter/frame-annotation/callout/model';
@@ -150,9 +151,8 @@ export function useCalloutSettingsPopoverState(args: {
 
   const forkPreset = (preset: CalloutPreset) => {
     handleSettingChange({
-      content: { titleText: preset.content.titleText },
       sourcePresetId: undefined,
-      style: cloneCalloutStyle(preset.style),
+      style: cloneForkedCalloutStyle(preset.style, localSettings.style),
     });
   };
 

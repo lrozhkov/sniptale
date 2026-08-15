@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { Canvas, FabricObject } from 'fabric';
+import { Canvas, FabricObject, Point } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { startEditorControllerDrawSession } from './draw-session';
 import { addEditorCanvasObject } from './object-add';
 import { cancelEditorTransientInteraction } from './transient';
+import { endEditorCanvasTransform } from './transform';
 
 it('keeps no-canvas draw-session starts inside the draw-session owner', () => {
   expect(
@@ -17,6 +18,34 @@ it('keeps no-canvas draw-session starts inside the draw-session owner', () => {
       tool: 'shape',
     })
   ).toBeNull();
+});
+
+it('forwards the initiating pointer into the canonical draw session', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const object = new FabricObject();
+
+  const result = startEditorControllerDrawSession({
+    canvas,
+    cropGuide: null,
+    object,
+    pointerId: 7,
+    prepareObject: vi.fn(),
+    start: new Point(0, 0),
+    tool: 'shape',
+  });
+
+  expect(result?.drawSession?.pointerId).toBe(7);
+
+  const mouseResult = startEditorControllerDrawSession({
+    canvas,
+    cropGuide: null,
+    object: new FabricObject(),
+    prepareObject: vi.fn(),
+    start: new Point(0, 0),
+    tool: 'shape',
+  });
+  expect(mouseResult?.drawSession?.pointerId).toBeNull();
+  canvas.dispose();
 });
 
 it('keeps canvas object add lifecycle inside the object-add owner', () => {
@@ -94,5 +123,15 @@ it('cancels selection before switching an active drawing tool to select', () => 
   expect(cancelEditorTransientInteraction(options)).toMatchObject({ changed: true });
   expect(switchToSelectTool).toHaveBeenCalledOnce();
   expect(syncRuntimeState).toHaveBeenCalledTimes(2);
+  canvas.dispose();
+});
+
+it('does not enter Fabric transform finalization while the real canvas is idle', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const endCurrentTransform = vi.spyOn(canvas, 'endCurrentTransform');
+
+  expect(endEditorCanvasTransform(canvas)).toBe(false);
+  expect(endCurrentTransform).not.toHaveBeenCalled();
+
   canvas.dispose();
 });

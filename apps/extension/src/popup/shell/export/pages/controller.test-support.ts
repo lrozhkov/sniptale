@@ -20,6 +20,7 @@ function createDefaultActions(): PopupExportController['actions'] {
     handleCancelExport: vi.fn(async () => undefined),
     handleCopyJson: vi.fn(async () => undefined),
     handleCopyMarkdown: vi.fn(async () => undefined),
+    handleResetExportView: vi.fn(async () => undefined),
     handleSaveWebSnapshot: vi.fn(async () => undefined),
     handleStartExport: vi.fn(async () => undefined),
   };
@@ -44,7 +45,7 @@ function createDefaultPreferencesState(): PopupExportController['state']['prefer
       setIncludeCssDiagnostics: vi.fn(),
       setIncludeFiles: vi.fn(),
       setIncludeFullPageScreenshot: vi.fn(),
-      setIncludeHarDomLogs: vi.fn(),
+      setIncludePageDiagnostics: vi.fn(),
       setIncludeImages: vi.fn(),
       setIncludeJson: vi.fn(),
       setIncludeMarkdown: vi.fn(),
@@ -56,7 +57,7 @@ function createDefaultPreferencesState(): PopupExportController['state']['prefer
       includeCssDiagnostics: false,
       includeFiles: true,
       includeFullPageScreenshot: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeImages: true,
       includeJson: true,
       includeMarkdown: true,
@@ -130,8 +131,8 @@ function applyPreferenceValueOverrides(
   if (overrides.includeFullPageScreenshot !== undefined) {
     state.values.includeFullPageScreenshot = overrides.includeFullPageScreenshot;
   }
-  if (overrides.includeHarDomLogs !== undefined) {
-    state.values.includeHarDomLogs = overrides.includeHarDomLogs;
+  if (overrides.includePageDiagnostics !== undefined) {
+    state.values.includePageDiagnostics = overrides.includePageDiagnostics;
   }
   if (overrides.includeImages !== undefined) {
     state.values.includeImages = overrides.includeImages;
@@ -163,8 +164,8 @@ function applyPreferenceActionOverrides(
   if (overrides.setIncludeFullPageScreenshot !== undefined) {
     state.actions.setIncludeFullPageScreenshot = overrides.setIncludeFullPageScreenshot;
   }
-  if (overrides.setIncludeHarDomLogs !== undefined) {
-    state.actions.setIncludeHarDomLogs = overrides.setIncludeHarDomLogs;
+  if (overrides.setIncludePageDiagnostics !== undefined) {
+    state.actions.setIncludePageDiagnostics = overrides.setIncludePageDiagnostics;
   }
   if (overrides.setIncludeImages !== undefined) {
     state.actions.setIncludeImages = overrides.setIncludeImages;

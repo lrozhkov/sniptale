@@ -7,6 +7,8 @@ import type { EditorFrameAnnotationPlaneController } from './types';
 const interactionMocks = vi.hoisted(() => ({
   pointerDown: vi.fn(),
   pointerMove: vi.fn(),
+  projection: vi.fn(),
+  projected: [] as Array<{ object: Record<string, unknown>; snapshot: Record<string, unknown> }>,
 }));
 
 vi.mock('./interaction-controller', () => ({
@@ -16,17 +18,22 @@ vi.mock('./interaction-controller', () => ({
     planeEvents: interactionMocks,
     projection: {
       distortionScale: 0,
-      effectiveSelectedId: null,
+      effectiveSelectedId: 'locked-frame',
       focusFrames: [],
       focusBlurAmount: 0,
       focusOpacity: 0,
-      projected: [],
+      projected: interactionMocks.projected,
       scale: 2,
     },
   }),
 }));
 
-vi.mock('./projection', () => ({ FrameProjection: () => null }));
+vi.mock('./projection', () => ({
+  FrameProjection: (props: { interactive: boolean; selected: boolean }) => {
+    interactionMocks.projection(props);
+    return null;
+  },
+}));
 
 import { EditorFrameAnnotationPlane } from './plane';
 
@@ -36,6 +43,36 @@ afterEach(() => {
   vi.unstubAllGlobals();
   interactionMocks.pointerDown.mockReset();
   interactionMocks.pointerMove.mockReset();
+  interactionMocks.projected.length = 0;
+  interactionMocks.projection.mockReset();
+});
+
+it('keeps locked frame annotations outside pointer hit-testing', () => {
+  interactionMocks.projected.push({
+    object: { sniptaleLocked: true },
+    snapshot: { id: 'locked-frame' },
+  });
+  const host = document.createElement('div');
+  const canvasRef = createRef<HTMLCanvasElement>();
+  canvasRef.current = document.createElement('canvas');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() =>
+    root.render(
+      <EditorFrameAnnotationPlane
+        activeTool="select"
+        canvasRef={canvasRef}
+        controller={createPlaneController()}
+        layers={[]}
+      />
+    )
+  );
+
+  expect(interactionMocks.projection).toHaveBeenCalledWith(
+    expect.objectContaining({ interactive: false, selected: true })
+  );
+  act(() => root.unmount());
 });
 
 it('aligns the DOM scene to the canvas origin and excludes floating controls from creation', async () => {

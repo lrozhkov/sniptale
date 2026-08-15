@@ -134,6 +134,10 @@ async function verifyContentAndFooterWiring() {
   expect(mocks.exportPageContentMock).toHaveBeenCalledWith(expect.objectContaining({ controller }));
   expect(section?.className).toContain('rounded-[16px]');
   expect(section?.className).toContain('p-3');
+  const actions = section?.querySelector<HTMLElement>('[data-ui="popup.export.actions"]');
+  expect(actions?.querySelector('[data-testid="export-footer-actions"]')).not.toBeNull();
+  expect(actions?.className).toContain('mt-auto');
+  expect(actions?.className).toContain('pt-3');
   expect(container?.firstElementChild?.className).toContain('gap-3');
 
   triggerFooterActions(footerProps);
@@ -145,10 +149,11 @@ async function verifyContentAndFooterWiring() {
   expect(controller.actions.handleCancelExport).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyJson).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleCopyMarkdown).toHaveBeenCalledTimes(1);
+  expect(controller.actions.handleResetExportView).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleSaveWebSnapshot).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleStartExport).toHaveBeenCalledTimes(1);
-  expect(controller.state.session.actions.setProgress).toHaveBeenCalledTimes(1);
-  expect(controller.state.session.actions.setResult).toHaveBeenCalledTimes(1);
+  expect(controller.state.session.actions.setProgress).not.toHaveBeenCalled();
+  expect(controller.state.session.actions.setResult).not.toHaveBeenCalled();
 }
 
 async function verifyRuntimeDisabledReason() {

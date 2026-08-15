@@ -3,20 +3,20 @@ import { sharedWebSnapshotSingularNameMessage } from './web-snapshot';
 
 export const sharedMediaHubMessages = defineMessageSource({
   saveScreenshotAction: {
-    ru: 'сохранение скриншота в Галерею',
-    en: 'saving screenshot to Gallery',
+    ru: 'сохранение скриншота в Библиотеку',
+    en: 'saving screenshot to Library',
   },
   saveWebSnapshotAction: {
-    ru: 'сохранение Веб-снимка в Галерею',
-    en: `saving ${sharedWebSnapshotSingularNameMessage.en} to Gallery`,
+    ru: 'сохранение Веб-снимка в Библиотеку',
+    en: `saving ${sharedWebSnapshotSingularNameMessage.en} to Library`,
   },
   updateScreenshotAction: {
     ru: 'обновление скриншота после редактирования',
     en: 'updating screenshot after editing',
   },
   saveRecordingAction: {
-    ru: 'сохранение видеозаписи в Галерею',
-    en: 'saving recording to Gallery',
+    ru: 'сохранение видеозаписи в Библиотеку',
+    en: 'saving recording to Library',
   },
   saveProjectAssetAction: {
     ru: 'сохранение медиафайла проекта',
@@ -35,8 +35,8 @@ export const sharedMediaHubMessages = defineMessageSource({
     en: 'updating media metadata',
   },
   deleteMediaAssetAction: {
-    ru: 'удаление медиафайла из Галереи',
-    en: 'deleting media asset from Gallery',
+    ru: 'удаление медиафайла из Библиотеки',
+    en: 'deleting media asset from Library',
   },
   deleteMediaBatchAction: {
     ru: 'пакетное удаление медиафайлов',
@@ -63,8 +63,8 @@ export const sharedMediaHubMessages = defineMessageSource({
     en: 'Orphaned Raw Recordings',
   },
   orphanedRecordingsIrreversible: {
-    ru: 'Удаление навсегда без возможности восстановления из Галереи',
-    en: 'Delete permanently with no recovery from Gallery',
+    ru: 'Удаление навсегда без возможности восстановления из Библиотеки',
+    en: 'Delete permanently with no recovery from Library',
   },
   heavyFilesDescriptionPrefix: {
     ru: 'Топ-',
@@ -151,8 +151,8 @@ export const sharedMediaHubMessages = defineMessageSource({
     en: 'Scenario assets, exports, or step documents point to a missing project.',
   },
   orphanedScenarioArtifactsIrreversible: {
-    ru: 'Удаление orphan artifact без восстановления через Галерею',
-    en: 'Delete the orphan artifact with no Gallery recovery',
+    ru: 'Удаление orphan artifact без восстановления через Библиотеку',
+    en: 'Delete the orphan artifact with no Library recovery',
   },
   oldDiagnosticsTitle: {
     ru: 'Старые diagnostics',

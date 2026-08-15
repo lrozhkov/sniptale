@@ -182,25 +182,42 @@ export function updateVideoRecordingSurface(
       VideoRecordingSurfaceLease,
       'documentGeneration' | 'lifecycle' | 'peerGeneration' | 'recordingId' | 'toolbarRequested'
     >
-  >
+  >,
+  options: { isCurrent?: () => boolean } = {}
 ): Promise<VideoRecordingSurfaceLease | null> {
   return serializeLeaseMutation(async () => {
     const current = activeLease ?? (await ensureVideoRecordingSurfaceLeaseHydrated());
-    if (!current || isExpired(current) || current.surfaceSessionId !== surfaceSessionId)
+    if (
+      !current ||
+      isExpired(current) ||
+      current.surfaceSessionId !== surfaceSessionId ||
+      options.isCurrent?.() === false
+    )
       return null;
     const next = { ...current, ...update, expiresAt: Date.now() + SURFACE_LEASE_TTL_MS };
     await persist(next);
+    if (options.isCurrent?.() === false) {
+      await persist(current);
+      return null;
+    }
     activeLease = next;
     return next;
   });
 }
 
 export function beginVideoRecordingSurfaceRebind(
-  tabId: number
+  tabId: number,
+  options: { isCurrent?: () => boolean } = {}
 ): Promise<VideoRecordingSurfaceLease | null> {
   return serializeLeaseMutation(async () => {
     const current = activeLease ?? (await ensureVideoRecordingSurfaceLeaseHydrated());
-    if (!current || isExpired(current) || current.tabId !== tabId) return null;
+    if (
+      !current ||
+      isExpired(current) ||
+      current.tabId !== tabId ||
+      options.isCurrent?.() === false
+    )
+      return null;
     const next: VideoRecordingSurfaceLease = {
       ...current,
       capabilityEpoch: current.capabilityEpoch + 1,
@@ -211,6 +228,10 @@ export function beginVideoRecordingSurfaceRebind(
       surfaceToken: crypto.randomUUID(),
     };
     await persist(next);
+    if (options.isCurrent?.() === false) {
+      await persist(current);
+      return null;
+    }
     activeLease = next;
     return next;
   });

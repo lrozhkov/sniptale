@@ -1,6 +1,6 @@
 import { PanelTop } from 'lucide-react';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../../../platform/i18n';
+import { translate } from '../../../../../../platform/i18n/popup';
 import { PopupIconStateButton } from '../../../../../../ui/popup-shell/icon-state-button';
 
 export function VideoRecordingToolbarToggle({

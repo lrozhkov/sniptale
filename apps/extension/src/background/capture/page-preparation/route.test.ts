@@ -36,7 +36,7 @@ it('routes regular page preparation through the content-script message', async (
     tabId: 7,
     viewport: {
       presetId: 'test:viewport',
-      target: 'viewport',
+      target: 'window',
       width: 320,
       height: 240,
     },
@@ -50,7 +50,7 @@ it('routes regular page preparation through the content-script message', async (
     surfaceOperationGeneration: 3,
     viewport: {
       presetId: 'test:viewport',
-      target: 'viewport',
+      target: 'window',
       width: 320,
       height: 240,
     },

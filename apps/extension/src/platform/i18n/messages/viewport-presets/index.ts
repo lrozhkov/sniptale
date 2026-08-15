@@ -268,12 +268,6 @@ export const viewportPresetsMessages = defineMessageSource({
     },
   },
   systemNames: {
-    viewportMobilePortrait: { ru: 'Смартфон — портрет', en: 'Phone — portrait' },
-    viewportMobileLandscape: { ru: 'Смартфон — альбом', en: 'Phone — landscape' },
-    viewportTabletPortrait: { ru: 'Планшет — портрет', en: 'Tablet — portrait' },
-    viewportTabletLandscape: { ru: 'Планшет — альбом', en: 'Tablet — landscape' },
-    viewportHd: { ru: 'Область страницы HD', en: 'HD page viewport' },
-    viewportFullHd: { ru: 'Область страницы Full HD', en: 'Full HD page viewport' },
     windowHd: { ru: 'Окно HD', en: 'HD window' },
     windowLaptop: { ru: 'Окно ноутбука', en: 'Laptop window' },
     windowDesktop: { ru: 'Окно рабочего стола', en: 'Desktop window' },

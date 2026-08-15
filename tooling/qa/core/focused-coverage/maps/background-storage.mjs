@@ -11,18 +11,16 @@ export const BACKGROUND_STORAGE_OWNER_MAPPINGS = [
     reason:
       'Temporary tab activation storage is covered by activation mutation and service suites.',
     testFiles: [
-      'apps/extension/src/background/runtime/page-access/tab-activation.test.ts',
-      'apps/extension/src/background/runtime/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/service.test.ts',
+      'apps/extension/src/background/page-access/tab-activation.test.ts',
     ],
   },
   {
-    owner: 'background-storage-diagnostics-active-sessions',
+    owner: 'background-storage-interaction-diagnostics-active-sessions',
     productionPrefix: 'apps/extension/src/background/storage/diagnostics/',
     reason: 'Diagnostics session storage is covered by guard, write, and sanitization suites.',
     testFiles: [
-      'apps/extension/src/background/storage/diagnostics/active-sessions.sanitization.test.ts',
       'apps/extension/src/background/storage/diagnostics/active-sessions.test.ts',
-      'apps/extension/src/background/storage/diagnostics/active-sessions.write.test.ts',
       'apps/extension/src/background/storage/diagnostics/guards.test.ts',
     ],
   },

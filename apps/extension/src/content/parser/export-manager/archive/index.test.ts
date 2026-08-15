@@ -29,7 +29,7 @@ async function openArchiveWithDiagnostics() {
       includeCssDiagnostics: false,
       includeFiles: true,
       includeFullPageScreenshot: true,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeImages: true,
       includeJson: false,
       includeMarkdown: false,
@@ -38,7 +38,7 @@ async function openArchiveWithDiagnostics() {
     previewToDownloadMap: new Map(),
     extraAssets: [
       { path: 'logs/meta.json', content: '{"ok":true}' },
-      { path: 'logs/session.har', content: '{"log":{"entries":[]}}' },
+      { path: 'logs/resource-timing.json', content: '{"entries":[]}' },
       { path: 'page-screenshot.png', content: new Blob(['png']) },
     ],
   });
@@ -51,7 +51,7 @@ describe('archive layout for diagnostics artifacts', () => {
     const zip = await openArchiveWithDiagnostics();
 
     expect(zip.file('logs/meta.json')).toBeTruthy();
-    expect(zip.file('logs/session.har')).toBeTruthy();
+    expect(zip.file('logs/resource-timing.json')).toBeTruthy();
     expect(zip.file('logs/errors.log')).toBeTruthy();
     expect(zip.file('page-screenshot.png')).toBeTruthy();
     expect(zip.file('files/attachment.txt')).toBeTruthy();
@@ -75,7 +75,7 @@ describe('archive layout without warnings', () => {
         includeCssDiagnostics: false,
         includeFiles: false,
         includeFullPageScreenshot: false,
-        includeHarDomLogs: false,
+        includePageDiagnostics: false,
         includeImages: false,
         includeJson: false,
         includeMarkdown: false,

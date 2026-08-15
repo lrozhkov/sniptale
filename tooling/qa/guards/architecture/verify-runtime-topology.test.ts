@@ -39,7 +39,7 @@ function writeTopologyFixture(
   writeFile(root, 'docs/architecture/code-organization.md', 'runtime topology\n');
   writeFile(root, 'docs/tooling/code-quality.md', 'runtime topology\n');
   writeFile(root, 'docs/tooling/operator-handbook.md', 'runtime topology\n');
-  writeFile(root, 'DESIGN.md', 'active\n');
+  writeFile(root, 'docs/agent-tooling/DESIGN.md', 'active\n');
   writeFile(root, 'docs/architecture/runtime-contexts.md', docsText);
 }
 
@@ -115,7 +115,7 @@ it('flags unapproved content runtime bundle references', async () => {
   );
   writeFile(
     root,
-    'apps/extension/src/background/runtime/page-access/registration.ts',
+    'apps/extension/src/background/page-access/service.ts',
     "export const CONTENT_RUNTIME_FILE = 'assets/contentRuntime.js';\n"
   );
   writeFile(
@@ -139,7 +139,7 @@ it('flags unapproved content runtime bundle references', async () => {
 it('flags retired sidepanel references in active topology docs', async () => {
   const root = createTempRoot('verify-runtime-topology-retired-');
   writeTopologyFixture(root, defaultDocsText());
-  writeFile(root, 'DESIGN.md', 'sidepanel\n');
+  writeFile(root, 'docs/agent-tooling/DESIGN.md', 'sidepanel\n');
 
   const module = await loadRuntimeTopologyModule(root);
 
@@ -147,7 +147,7 @@ it('flags retired sidepanel references in active topology docs', async () => {
     expect.arrayContaining([
       expect.objectContaining({
         rule: 'runtime-topology-retired-runtime',
-        file: 'DESIGN.md',
+        file: 'docs/agent-tooling/DESIGN.md',
         message: expect.stringContaining('sidepanel'),
       }),
     ])

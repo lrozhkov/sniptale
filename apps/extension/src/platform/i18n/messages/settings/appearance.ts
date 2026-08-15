@@ -33,16 +33,6 @@ const ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN = [
   'Anonymously load HTTPS assets from other sites through the extension background.',
   'When disabled, external assets are skipped; this reduces private-network and DNS-rebinding leak risk.',
 ].join(' ');
-const RAW_DIAGNOSTICS_DESCRIPTION_RU = [
-  'Для HAR расширенный режим выдаётся только на время конкретного экспорта.',
-  'Логи экспорта могут содержать сетевые детали,',
-  'но cookies, authorization headers и чувствительные URL-параметры всегда редактируются.',
-].join(' ');
-const RAW_DIAGNOSTICS_DESCRIPTION_EN = [
-  'Extended HAR mode is scoped to the current export only.',
-  'Export logs may include network details,',
-  'but cookies, authorization headers, and sensitive URL parameters are always redacted.',
-].join(' ');
 
 export const settingsAppearanceMessages = defineMessageSource({
   badge: {
@@ -110,6 +100,7 @@ export const settingsAppearanceMessages = defineMessageSource({
       ru: 'Продолжить с последнего места',
       en: 'Continue where I left off',
     },
+    menu: { ru: 'Меню', en: 'Menu' },
     'screenshots:quick-actions': { ru: 'Снимки — Действия', en: 'Screenshots — Shortcuts' },
     'screenshots:tab': { ru: 'Снимки — Вкладка', en: 'Screenshots — Tab' },
     'screenshots:desktop': { ru: 'Снимки — Окно', en: 'Screenshots — Window' },
@@ -118,6 +109,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     'video:area': { ru: 'Видео — Область', en: 'Video — Area' },
     'video:camera': { ru: 'Видео — Камера', en: 'Video — Camera' },
     'video:screen': { ru: 'Видео — Окно или экран', en: 'Video — Window or screen' },
+    tools: { ru: 'Инструменты', en: 'Tools' },
     export: { ru: 'Экспорт', en: 'Export' },
   },
   themeModeLabel: {
@@ -155,14 +147,6 @@ export const settingsAppearanceMessages = defineMessageSource({
   anonymousCrossOriginSnapshotAssetsDescription: {
     ru: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_RU,
     en: ANONYMOUS_CROSS_ORIGIN_SNAPSHOT_ASSETS_DESCRIPTION_EN,
-  },
-  rawDiagnosticsLabel: {
-    ru: 'Сохранять расширенную диагностику',
-    en: 'Save extended diagnostics',
-  },
-  rawDiagnosticsDescription: {
-    ru: RAW_DIAGNOSTICS_DESCRIPTION_RU,
-    en: RAW_DIAGNOSTICS_DESCRIPTION_EN,
   },
   contextMenuTitle: {
     ru: 'Контекстное меню браузера',
@@ -225,8 +209,8 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Open the standalone video editor page.',
   },
   contextMenuGalleryLabel: {
-    ru: 'Галерея',
-    en: 'Gallery',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   contextMenuGalleryDescription: {
     ru: 'Открывать библиотеку сохранённых файлов и проектов.',
@@ -239,6 +223,18 @@ export const settingsAppearanceMessages = defineMessageSource({
   contextMenuPageLinkCopyDescription: {
     ru: 'Показывать форматы копирования названия страницы и ссылки.',
     en: 'Show title and page link copy formats.',
+  },
+  contextMenuWindowResizeLabel: {
+    ru: 'Размер окна',
+    en: 'Window size',
+  },
+  contextMenuWindowResizeMenuLabel: {
+    ru: 'Изменить размер окна',
+    en: 'Resize window',
+  },
+  contextMenuWindowResizeDescription: {
+    ru: 'Менять размер окна браузера по включённым оконным шаблонам.',
+    en: 'Resize the browser window using enabled window presets.',
   },
   contextMenuSettingsLabel: {
     ru: 'Настройки',

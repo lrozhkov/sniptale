@@ -29,66 +29,51 @@ vi.mock('../../../chrome/ui', async (importOriginal) => ({
       </div>
     );
   },
-  ColorField: (props: {
-    title: string;
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    onPreviewChange?: (value: string) => void;
-  }) => (
-    <div data-testid="color-control">
-      <span>{props.title}</span>
-      <span>{props.label}</span>
-      <span>{props.value}</span>
-      <button type="button" onClick={() => props.onPreviewChange?.('#111111')}>
-        preview-color
-      </button>
-      <button type="button" onClick={() => props.onChange('#222222')}>
-        apply-color
-      </button>
-    </div>
-  ),
 }));
 
-vi.mock('./gradient/controls', () => ({
-  GradientPresetGrid: (props: {
-    gradientPresets: Array<{ label: string }>;
-    applyGradientPreset: (preset: any) => void;
+vi.mock('../../../../ui/paint-selector', () => ({
+  CompactPaintSelector: (props: {
+    title: string;
+    value: { kind: string };
+    allowedModes: string[];
+    showGradientAdvancedControls: boolean;
+    onChange: (paint: unknown) => void;
+    onPreviewChange: (paint: unknown) => void;
   }) => (
-    <div data-testid="gradient-presets">
-      <button type="button" onClick={() => props.applyGradientPreset({ label: 'preset-1' })}>
-        preset
-      </button>
-      <span>{props.gradientPresets.length}</span>
-    </div>
-  ),
-  GradientColorControls: (props: {
-    applyFramePatch: (patch: Record<string, number>) => void;
-    frameBackgroundPalette: readonly string[];
-    previewFramePatch: (patch: Record<string, string>) => void;
-    recentColors: string[];
-  }) => (
-    <div data-testid="gradient-colors">
-      <span>{props.frameBackgroundPalette.length}</span>
-      <span>{props.recentColors.length}</span>
+    <div
+      data-testid="paint-control"
+      data-kind={props.value.kind}
+      data-modes={props.allowedModes.join(',')}
+      data-advanced={String(props.showGradientAdvancedControls)}
+    >
+      <span>{props.title}</span>
       <button
         type="button"
-        onClick={() => props.previewFramePatch({ backgroundGradientFrom: '#123123' })}
+        onClick={() => props.onPreviewChange({ kind: 'solid', color: '#111111ff' })}
       >
-        preview-gradient
+        preview-paint
       </button>
-      <button type="button" onClick={() => props.applyFramePatch({ backgroundGradientAngle: 45 })}>
-        apply-angle
-      </button>
-    </div>
-  ),
-  GradientAngleControls: (props: {
-    applyFramePatch: (patch: Record<string, number>) => void;
-    toNumber: (value: string) => number;
-  }) => (
-    <div data-testid="gradient-angle">
-      <button type="button" onClick={() => props.applyFramePatch({ angle: props.toNumber('45') })}>
-        angle
+      <button
+        type="button"
+        onClick={() =>
+          props.onChange(
+            props.value.kind === 'gradient'
+              ? {
+                  kind: 'gradient',
+                  gradient: {
+                    type: 'linear',
+                    angle: 45,
+                    stops: [
+                      { color: '#123123ff', position: 0 },
+                      { color: '#ffffffff', position: 1 },
+                    ],
+                  },
+                }
+              : { kind: 'solid', color: '#222222ff' }
+          )
+        }
+      >
+        apply-paint
       </button>
     </div>
   ),
@@ -151,20 +136,29 @@ it('renders the solid color branch and forwards color updates', async () => {
     />
   );
 
-  expect(container?.querySelector('[data-testid="color-control"]')?.textContent).toContain(
-    '#ffffff'
+  expect(container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-kind')).toBe(
+    'solid'
   );
-  expect(container?.querySelector('[data-testid="color-control"]')?.textContent).toContain(
+  expect(container?.querySelector('[data-testid="paint-control"]')?.textContent).toContain(
     translate('editor.scene.sceneBackgroundTitle')
   );
+  expect(
+    container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
+  ).toBe('solid,linear');
 
   await act(async () => {
     (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();
     (container?.querySelectorAll('button')[1] as HTMLButtonElement | undefined)?.click();
   });
 
-  expect(previewFramePatch).toHaveBeenCalledWith({ backgroundColor: '#111111' });
-  expect(applyFramePatch).toHaveBeenCalledWith({ backgroundColor: '#222222' });
+  expect(previewFramePatch).toHaveBeenCalledWith({
+    backgroundColor: '#111111ff',
+    backgroundMode: 'color',
+  });
+  expect(applyFramePatch).toHaveBeenCalledWith({
+    backgroundColor: '#222222ff',
+    backgroundMode: 'color',
+  });
 });
 
 it('renders the gradient branch and forwards gradient actions', async () => {
@@ -188,30 +182,26 @@ it('renders the gradient branch and forwards gradient actions', async () => {
     />
   );
 
-  expect(container?.querySelector('[data-testid="gradient-presets"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="gradient-colors"]')?.textContent).toContain('1');
+  expect(container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-kind')).toBe(
+    'gradient'
+  );
 
   await act(async () => {
     (
-      container?.querySelector('[data-testid="gradient-colors"] button') as
-        | HTMLButtonElement
-        | undefined
-    )?.click();
-    (
-      container?.querySelectorAll('[data-testid="gradient-colors"] button')[1] as
-        | HTMLButtonElement
-        | undefined
-    )?.click();
-    (
-      container?.querySelector('[data-testid="gradient-presets"] button') as
-        | HTMLButtonElement
-        | undefined
+      container?.querySelectorAll('[data-testid="paint-control"] button')[1] as HTMLButtonElement
     )?.click();
   });
 
-  expect(applyGradientPreset).toHaveBeenCalled();
-  expect(previewFramePatch).toHaveBeenCalledWith({ backgroundGradientFrom: '#123123' });
-  expect(applyFramePatch).toHaveBeenCalledWith({ backgroundGradientAngle: 45 });
+  expect(applyGradientPreset).not.toHaveBeenCalled();
+  expect(previewFramePatch).not.toHaveBeenCalled();
+  expect(applyFramePatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      backgroundGradientAngle: 45,
+      backgroundGradientFrom: '#123123ff',
+      backgroundGradientTo: '#ffffffff',
+      backgroundMode: 'gradient',
+    })
+  );
 });
 
 it('renders the image branch and forwards image mode updates', async () => {

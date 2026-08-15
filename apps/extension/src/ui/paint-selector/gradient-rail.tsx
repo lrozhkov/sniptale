@@ -9,8 +9,11 @@ import {
 } from '@sniptale/foundation/paint';
 import { translate } from '../../platform/i18n';
 
-const RAIL_CLASS_NAME =
-  'relative h-12 cursor-crosshair overflow-visible rounded-[10px] border border-[var(--sniptale-color-border-soft)]';
+const RAIL_CLASS_NAME = [
+  'relative h-14 cursor-crosshair overflow-visible rounded-[12px] border-2',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+  'shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_10%,transparent)]',
+].join(' ');
 const MIDPOINT_CLASS_NAME =
   'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-white bg-black/60 shadow';
 
@@ -113,7 +116,8 @@ export function GradientRail(props: {
             aria-label={`${translate('highlighter.paintPicker.gradientStop')} ${Math.round(stop.position * 100)}%`}
             aria-pressed={props.selectedStopId === stop.id}
             className={[
-              'absolute top-full mt-1 h-5 w-4 -translate-x-1/2 rounded-b-[5px] border-2 bg-white shadow-sm',
+              'absolute top-full mt-1.5 h-5 w-4 -translate-x-1/2 rounded-b-[5px] border-2',
+              'bg-white shadow-sm transition-transform hover:scale-110',
               props.selectedStopId === stop.id
                 ? 'border-[var(--sniptale-color-accent)]'
                 : 'border-[var(--sniptale-color-border-strong)]',

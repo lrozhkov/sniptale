@@ -1,26 +1,21 @@
 import type { ViewportPreset } from '../../../contracts/settings';
 import {
-  CaptureMode,
   isVideoPixelRateSupported,
   isVideoResolutionFrameRateSupported,
   resolveVideoOutputDimensions,
   resolveVideoPixelRate,
   type VideoOutputDimensions,
   type VideoOutputProfile,
+  type CaptureMode,
 } from '@sniptale/runtime-contracts/video/types/types';
 
 export function resolveKnownVideoOutputBasis(
   captureMode: CaptureMode,
   selectedPreset: ViewportPreset | null
 ): VideoOutputDimensions | null {
-  if (
-    captureMode !== CaptureMode.TAB ||
-    selectedPreset?.target !== 'viewport' ||
-    !selectedPreset.enabled
-  ) {
-    return null;
-  }
-  return { height: selectedPreset.height, width: selectedPreset.width };
+  void captureMode;
+  void selectedPreset;
+  return null;
 }
 
 export function isKnownVideoOutputProfileSupported(

@@ -21,7 +21,7 @@ describe('settings array guards', () => {
     });
     expect(parseViewportPresets(catalog.slice(1))).toEqual({
       hasInvalidRoot: false,
-      invalidEntryCount: 9,
+      invalidEntryCount: catalog.length - 1,
       value: undefined,
     });
   });

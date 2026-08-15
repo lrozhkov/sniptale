@@ -11,13 +11,14 @@ describe('shared message contracts', () => {
     expect(MessageType.EXECUTE_SAVE).toBe('EXECUTE_SAVE');
     expect(MessageType.PROCESS_WITH_LLM).toBe('PROCESS_WITH_LLM');
     expect(MessageType.SCENARIO_GET_SESSION).toBe('SCENARIO_GET_SESSION');
-    expect(MessageType.EXPORT_POPUP_RESULT).toBe('EXPORT_POPUP_RESULT');
     expect(MessageType.ERASE_LOCAL_EXTENSION_DATA).toBe('ERASE_LOCAL_EXTENSION_DATA');
     expect(MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE).toBe(
       'OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE'
     );
-    expect(MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK).toBe('STAGE_POPUP_EXPORT_ARCHIVE_CHUNK');
-    expect(MessageType.RELEASE_POPUP_EXPORT_ARCHIVE).toBe('RELEASE_POPUP_EXPORT_ARCHIVE');
+    expect(MessageType.START_POPUP_EXPORT_JOB).toBe('START_POPUP_EXPORT_JOB');
+    expect(MessageType.GET_POPUP_EXPORT_JOB_STATUS).toBe('GET_POPUP_EXPORT_JOB_STATUS');
+    expect(MessageType.CANCEL_POPUP_EXPORT_JOB).toBe('CANCEL_POPUP_EXPORT_JOB');
+    expect(MessageType.ACK_POPUP_EXPORT_JOB_STATUS).toBe('ACK_POPUP_EXPORT_JOB_STATUS');
 
     const messageValues = Object.values(MessageType);
     expect(new Set(messageValues).size).toBe(messageValues.length);

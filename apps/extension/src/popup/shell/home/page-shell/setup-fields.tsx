@@ -1,6 +1,6 @@
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { CaptureActionType, ViewportPreset } from '../../../../contracts/settings';
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../platform/navigation/extension-pages';
 import { InlineCurtainSelect } from '../../../../ui/popup-shell/inline-curtain/select';
 import type { InlineCurtainOption } from '../../../../ui/popup-shell/inline-curtain/options';
@@ -44,6 +44,7 @@ export function TabCaptureAreaField(props: CaptureFieldProps) {
       value={props.config.screenshotMode}
       label={translate('popup.home.captureAreaLabel')}
       ariaLabel={translate('popup.home.captureAreaLabel')}
+      description={translate('popup.home.captureAreaDescription')}
       options={settingOptions([
         { value: 'visible', label: translate('settings.quickActions.screenshotModeVisible') },
         { value: 'full', label: translate('settings.quickActions.screenshotModeFull') },
@@ -83,6 +84,7 @@ export function TabCaptureSizeField(
       value={props.config.viewportPresetId ?? ''}
       label={translate('popup.home.captureSizeLabel')}
       ariaLabel={translate('popup.home.captureSizeLabel')}
+      description={translate('popup.home.captureSizeDescription')}
       options={viewportOptions}
       onChange={(value) => props.patch({ viewportPresetId: value || null })}
       optionsFooter={<ManageSizePresetsButton />}
@@ -96,6 +98,7 @@ export function TabCaptureCountdownField(props: CaptureFieldProps) {
       value={props.config.delay === null ? '' : String(props.config.delay)}
       label={translate('popup.home.captureCountdownLabel')}
       ariaLabel={translate('popup.home.captureCountdownLabel')}
+      description={translate('popup.home.captureCountdownDescription')}
       options={settingOptions([
         { value: '', label: translate('popup.home.captureCountdownOff') },
         ...([3, 5, 10] as const).map((value) => ({
@@ -120,6 +123,7 @@ export function AfterCaptureField(props: CaptureFieldProps) {
       value={props.config.afterCapture}
       label={translate('settings.quickActions.afterCaptureLabel')}
       ariaLabel={translate('settings.quickActions.afterCaptureLabel')}
+      description={translate('popup.home.afterCaptureDescription')}
       options={captureActions
         .filter((value) => !allowed || allowed.has(value))
         .map((value) => ({ value, label: translate(actionKeys[value]) }))}
@@ -136,6 +140,7 @@ export function ImageQualityField(props: CaptureFieldProps) {
       selectedLabel={getImageQualitySummary(props.config)}
       label={translate('popup.home.captureQualityLabel')}
       ariaLabel={translate('popup.home.captureQualityAria')}
+      description={translate('popup.home.captureQualityDescription')}
       options={[]}
       optionsPanel={<ImageQualityPanel config={props.config} patch={props.patch} />}
       onChange={() => undefined}
@@ -184,9 +189,6 @@ function ImageQualityPanel(props: {
   const quality = props.config.imageQuality ?? 90;
   return (
     <div className="grid gap-3">
-      <div className="pr-8 text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('popup.home.captureQualityTitle')}
-      </div>
       <div className="grid gap-1.5">
         <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
           {translate('popup.home.captureFormatLabel')}

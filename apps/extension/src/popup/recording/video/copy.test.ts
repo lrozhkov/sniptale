@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -122,7 +122,7 @@ function verifiesDefaultLiveMediaState() {
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 0,
       countdownSeconds: 0,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
       outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },

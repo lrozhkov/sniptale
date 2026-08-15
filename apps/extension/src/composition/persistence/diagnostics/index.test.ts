@@ -26,7 +26,7 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
 function createDiagnosticEvent(index: number): DiagnosticEvent {
   return {
     id: `event-${index}`,
-    kind: 'console',
+    kind: 'action',
     message: `Event ${index}`,
     recordingId: 'recording-1',
     tsMs: index,
@@ -45,7 +45,7 @@ function createDiagnosticsMeta(overrides: Partial<DiagnosticsEntry> = {}): Diagn
       viewportWidth: 1280,
     },
     recordingId: 'recording-1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     totalEvents: 2,
     ...overrides,
   };
@@ -119,7 +119,7 @@ describe('diagnostics-db save flows', () => {
         createdAt: '2026-03-20T00:00:00.000Z',
         meta: createDiagnosticsMeta().meta,
         recordingId: 'recording-1',
-        schemaVersion: 1,
+        schemaVersion: 2,
       },
       events
     );
@@ -157,7 +157,7 @@ describe('diagnostics-db save failure flows', () => {
           createdAt: '2026-03-20T00:00:00.000Z',
           meta: createDiagnosticsMeta().meta,
           recordingId: 'recording-1',
-          schemaVersion: 1,
+          schemaVersion: 2,
         },
         [createDiagnosticEvent(1)]
       )

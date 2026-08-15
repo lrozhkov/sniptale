@@ -157,14 +157,17 @@ describe('image aggregate autosave', () => {
     expect(autosave.getDurableRevision()).toBe(2);
   });
 
-  it('keeps a draft when the editor closes or explicitly discards pending UI state', async () => {
+  it('ends the active autosave context and discards pending UI state', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
+    const { useEditorStore } = await import('../../state/useEditorStore');
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('queued'));
     await autosave.discardDraft();
     await vi.advanceTimersByTimeAsync(500);
     expect(commitWorkspaceMock).not.toHaveBeenCalled();
+    expect(autosave.getDurableRevision()).toBeNull();
+    expect(useEditorStore.getState().sessionId).toBeNull();
   });
 
   it('surfaces a failed workspace commit without advancing revision', async () => {

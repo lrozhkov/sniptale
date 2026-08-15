@@ -1,7 +1,8 @@
 import React from 'react';
 import { useEditorController } from '../../application/controller-context';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
-import { importEditorSessionFromFile, openEditorImageFromFile } from '../../document/file-actions';
+import { importEditorSessionFromFile } from '../../document/file-actions';
+import { openLocalImageAsEditorDraft } from '../../workflows/open-local-image-draft';
 
 interface EditorInspectorSidebarHiddenInputsProps {
   openImageInputRef: React.Ref<HTMLInputElement>;
@@ -39,7 +40,7 @@ export function EditorInspectorSidebarHiddenInputs({
         className="hidden"
         onChange={(event) =>
           handleHiddenFileSelection(event, 'sidebar-open-image-upload', (file) =>
-            openEditorImageFromFile(controller, file, setImageData)
+            openLocalImageAsEditorDraft(controller, file, setImageData)
           )
         }
       />

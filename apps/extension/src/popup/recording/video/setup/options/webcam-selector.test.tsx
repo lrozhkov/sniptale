@@ -4,8 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -56,7 +56,7 @@ function createSettings(
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     webcamDeviceId: 'cam-1',

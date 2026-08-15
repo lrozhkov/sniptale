@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { Canvas } from 'fabric';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type {
   BrowserFrameState,
@@ -243,3 +246,25 @@ it('creates a page-owned controller instance that delegates all public actions',
   expectSelectionDelegates(controller);
   expectSceneDelegates(controller, frame, browserFrame);
 }, 15000);
+
+it('reports export readiness only when both canvas and source authorities exist', () => {
+  const controller = createImageEditorController();
+
+  expect(controller.isDocumentReadyForExport()).toBe(false);
+  Object.defineProperty(controller, 'canvas', { configurable: true, value: new Canvas() });
+  expect(controller.isDocumentReadyForExport()).toBe(false);
+  controller.source = {
+    dataUrl: 'data:image/png;base64,abc',
+    displayHeight: 50,
+    displayWidth: 100,
+    id: 'source-image-layer',
+    intrinsicHeight: 50,
+    intrinsicWidth: 100,
+    left: 0,
+    locked: true,
+    name: 'source',
+    top: 0,
+    visible: true,
+  };
+  expect(controller.isDocumentReadyForExport()).toBe(true);
+});

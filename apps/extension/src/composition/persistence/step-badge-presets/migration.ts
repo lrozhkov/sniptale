@@ -11,6 +11,7 @@ import {
   STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION,
   type StoredStepBadgePresetCatalog,
 } from './parser';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 function resolveDefaultId(presets: StepBadgePreset[], requested?: string): string {
   const requestedPreset = presets.find(
@@ -63,6 +64,9 @@ export function resolveStoredStepBadgePresetCatalog(
   if (!presets.some((preset) => preset.enabled !== false)) presets[0]!.enabled = true;
   return {
     defaultPresetId: resolveDefaultId(presets, stored.defaultPresetId),
+    newSessionDefaults: {
+      ...(stored.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS),
+    },
     presets,
     systemCatalogRevision: SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION,
     catalogCustomized: stored.catalogCustomized ?? false,
@@ -72,7 +76,13 @@ export function resolveStoredStepBadgePresetCatalog(
 export function cloneStepBadgePresetCatalog(
   catalog: StepBadgePresetCatalog
 ): StepBadgePresetCatalog {
-  return { ...catalog, presets: catalog.presets.map(cloneStepBadgePreset) };
+  return {
+    ...catalog,
+    ...(catalog.newSessionDefaults
+      ? { newSessionDefaults: { ...catalog.newSessionDefaults } }
+      : {}),
+    presets: catalog.presets.map(cloneStepBadgePreset),
+  };
 }
 
 export function serializeStepBadgePresetCatalog(
@@ -82,6 +92,9 @@ export function serializeStepBadgePresetCatalog(
     schemaVersion: STEP_BADGE_PRESET_STORAGE_SCHEMA_VERSION,
     systemCatalogRevision: SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION,
     defaultPresetId: catalog.defaultPresetId,
+    newSessionDefaults: {
+      ...(catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS),
+    },
     catalogCustomized: catalog.catalogCustomized ?? false,
     placements: catalog.presets.map((preset) => ({
       id: preset.id,

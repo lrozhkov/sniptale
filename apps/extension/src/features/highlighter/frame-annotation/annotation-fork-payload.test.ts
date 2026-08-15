@@ -65,6 +65,33 @@ it('round-trips canonical gradient Paint and rejects unknown nested paint fields
   });
   expect(parseAnnotationForkDraftPayload(JSON.stringify({ drafts: {}, version: 1 }))).toEqual({});
 
+  const offsetBadge = {
+    ...createDefaultFrameStepBadge(),
+    manualPlacement: { normalOffset: -32, position: 0.4, side: 'right' as const },
+  };
+  const offsetPayload = serializeAnnotationForkDraftPayload({ stepBadge: offsetBadge });
+  expect(parseAnnotationForkDraftPayload(offsetPayload)).toMatchObject({
+    stepBadge: { manualPlacement: offsetBadge.manualPlacement },
+  });
+  const invalidOffset: unknown = JSON.parse(offsetPayload);
+  if (typeof invalidOffset !== 'object' || invalidOffset === null || !('drafts' in invalidOffset)) {
+    throw new Error('Expected annotation drafts');
+  }
+  const offsetDrafts = invalidOffset.drafts;
+  if (typeof offsetDrafts !== 'object' || offsetDrafts === null || !('stepBadge' in offsetDrafts)) {
+    throw new Error('Expected step badge draft');
+  }
+  const invalidStepBadge = offsetDrafts.stepBadge;
+  if (
+    typeof invalidStepBadge !== 'object' ||
+    invalidStepBadge === null ||
+    !('manualPlacement' in invalidStepBadge)
+  ) {
+    throw new Error('Expected manual placement');
+  }
+  Object.assign(invalidStepBadge.manualPlacement as object, { normalOffset: 49 });
+  expect(parseAnnotationForkDraftPayload(JSON.stringify(invalidOffset))).toBeNull();
+
   const invalidMode: unknown = JSON.parse(payload);
   if (typeof invalidMode !== 'object' || invalidMode === null || !('drafts' in invalidMode)) {
     throw new Error('Expected annotation drafts');

@@ -39,7 +39,7 @@ export function writeFixture(
       createPolicyEntry(name, 'apps/extension/src/content/index.tsx')
     ),
     optionalHostPermissions: policyOptionalHostPermissions.map((name) =>
-      createPolicyEntry(name, 'apps/extension/src/background/runtime/page-access/service.ts')
+      createPolicyEntry(name, 'apps/extension/src/background/page-access/service.ts')
     ),
     contentScripts: policyContentScripts.map((name) =>
       createPolicyEntry(name, 'apps/extension/src/content/index.tsx')
@@ -146,10 +146,7 @@ export function writePolicyWithMissingCapability(root: string) {
     ],
     hostPermissions: [],
     optionalHostPermissions: [
-      createPolicyEntry(
-        'http://*/*',
-        'apps/extension/src/background/runtime/page-access/service.ts'
-      ),
+      createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
     ],
     contentScripts: [],
     webAccessibleResources: [],
@@ -168,10 +165,7 @@ export function writePolicyWithMissingDisclosure(root: string) {
     permissions: [storageEntry],
     hostPermissions: [],
     optionalHostPermissions: [
-      createPolicyEntry(
-        'http://*/*',
-        'apps/extension/src/background/runtime/page-access/service.ts'
-      ),
+      createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
     ],
     contentScripts: [],
     webAccessibleResources: [],
@@ -190,10 +184,7 @@ export function writePolicyWithMissingOwnerPath(root: string) {
       permissions: [createPolicyEntry('storage', missingOwner)],
       hostPermissions: [],
       optionalHostPermissions: [
-        createPolicyEntry(
-          'http://*/*',
-          'apps/extension/src/background/runtime/page-access/service.ts'
-        ),
+        createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
       ],
       contentScripts: [],
       webAccessibleResources: [],
@@ -216,10 +207,7 @@ export function writePolicyWithStaleEntryAndMissingMetadata(root: string) {
     ],
     hostPermissions: [],
     optionalHostPermissions: [
-      createPolicyEntry(
-        'http://*/*',
-        'apps/extension/src/background/runtime/page-access/service.ts'
-      ),
+      createPolicyEntry('http://*/*', 'apps/extension/src/background/page-access/service.ts'),
     ],
     contentScripts: [],
     webAccessibleResources: [],

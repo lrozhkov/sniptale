@@ -42,22 +42,28 @@ const BACKGROUND_IMAGE_PREVIEW_STYLE = {
 } satisfies Record<EditorFrameSettings['backgroundImageFit'], React.CSSProperties>;
 
 function buildBackgroundPreviewStyle(frameDraft: EditorFrameSettings) {
+  const filter = frameDraft.backgroundBlurAmount
+    ? `blur(${frameDraft.backgroundBlurAmount}px)`
+    : undefined;
   if (frameDraft.backgroundMode === 'image' && frameDraft.backgroundImageData) {
     return {
       ...BACKGROUND_IMAGE_PREVIEW_STYLE[frameDraft.backgroundImageFit],
       backgroundImage: `url("${frameDraft.backgroundImageData}")`,
+      filter,
     };
   }
 
   if (frameDraft.backgroundMode === 'gradient') {
     return {
       backgroundImage: createEditorFrameGradientCss(frameDraft),
+      filter,
     };
   }
 
   return {
     backgroundColor:
       frameDraft.backgroundMode === 'image' ? 'transparent' : frameDraft.backgroundColor,
+    filter,
   };
 }
 

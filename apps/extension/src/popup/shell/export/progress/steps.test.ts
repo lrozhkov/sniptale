@@ -9,7 +9,7 @@ const selection = {
   includeCssDiagnostics: false,
   includeFiles: true,
   includeFullPageScreenshot: false,
-  includeHarDomLogs: false,
+  includePageDiagnostics: false,
   includeImages: true,
   includeJson: true,
   includeMarkdown: true,
@@ -63,7 +63,7 @@ function getScreenshotSteps() {
       ...selection,
       includeCssDiagnostics: true,
       includeFullPageScreenshot: true,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
     },
   });
 }

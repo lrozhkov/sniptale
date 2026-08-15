@@ -41,7 +41,7 @@ describe('getCalloutLayoutState', () => {
     expect(layout.effectiveZIndex).toBeLessThanOrEqual(FRAME_ANNOTATION_Z_INDEX.stepBadge);
   });
 
-  it('uses the configured shadow color in the rendered filter', () => {
+  it('keeps elevation out of the placement and content layout owners', () => {
     const layout = getCalloutLayoutState({
       dimensions: { width: 160, height: 48 },
       frameRect: { x: 200, y: 200, width: 120, height: 80 },
@@ -56,8 +56,53 @@ describe('getCalloutLayoutState', () => {
       zIndex: 20,
     });
 
-    expect(layout.wrapperStyle.filter).toContain('#ff0000');
-    expect(layout.cloudStyle.boxShadow).toBe('none');
+    expect(layout.wrapperStyle.filter).toBeUndefined();
+    expect(layout.cloudStyle.boxShadow).toBeUndefined();
+    expect(layout.cloudStyle.background).toBe('transparent');
+  });
+
+  it('keeps custom surface effects out of line placement and content layout', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings: {
+        ...settings,
+        style: {
+          ...settings.style,
+          connector: { ...settings.style.connector, kind: 'line' },
+          customCss: '[card]\nbox-shadow: inset 0 1px 0 #ffffff59;',
+          surface: { ...settings.style.surface, shadow: 12, shadowColor: '#ff0000' },
+        },
+      },
+      zIndex: 20,
+    });
+
+    expect(layout.wrapperStyle.filter).toBeUndefined();
+    expect(layout.cloudStyle.boxShadow).toBeUndefined();
+    expect(layout.cloudStyle.background).toBe('transparent');
+  });
+
+  it('uses one transparent HTML card for a borderless translucent wedge contour', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 48 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings: {
+        ...settings,
+        style: {
+          ...settings.style,
+          customCss: '[card]\nbackground: #ffffff80;',
+          surface: { ...settings.style.surface, borderWidth: 0 },
+        },
+      },
+      zIndex: 20,
+    });
+
+    expect(layout.dynamicTail?.kind).toBe('wedge');
+    expect(layout.cloudStyle.background).toBe('transparent');
+    expect(layout.cloudStyle.border).toBe('0px solid transparent');
+    expect(layout.cloudStyle.boxShadow).toBeUndefined();
   });
 
   it('leaves the HTML cloud transparent for the flush combined bubble and wedge contour', () => {

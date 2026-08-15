@@ -42,8 +42,8 @@ vi.mock('../../capture/quick-actions', () => ({
   handleQuickAction: handleQuickActionMock,
 }));
 
-vi.mock('../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../page-access/service')>()),
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
   ensureNativeVisibleCaptureAuthority: ensureNativeVisibleCaptureAuthorityMock,
 }));
@@ -82,7 +82,7 @@ function createDeps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }

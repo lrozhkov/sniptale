@@ -60,16 +60,7 @@ async function renderFooter() {
   root = createRoot(container);
 
   act(() => {
-    root?.render(
-      <PopupFooter
-        onOpenGallery={() => undefined}
-        onOpenGithub={() => undefined}
-        onOpenImageEditor={() => undefined}
-        onOpenScenarioEditor={() => undefined}
-        onOpenSettings={() => undefined}
-        onOpenVideoEditor={() => undefined}
-      />
-    );
+    root?.render(<PopupFooter onOpenGithub={() => undefined} onOpenSettings={() => undefined} />);
   });
 }
 
@@ -80,15 +71,7 @@ async function renderFooterWithProps(props: Partial<PopupFooterProps>) {
 
   act(() => {
     root?.render(
-      <PopupFooter
-        onOpenGallery={() => undefined}
-        onOpenGithub={() => undefined}
-        onOpenImageEditor={() => undefined}
-        onOpenScenarioEditor={() => undefined}
-        onOpenSettings={() => undefined}
-        onOpenVideoEditor={() => undefined}
-        {...props}
-      />
+      <PopupFooter onOpenGithub={() => undefined} onOpenSettings={() => undefined} {...props} />
     );
   });
 }
@@ -152,59 +135,37 @@ it('cycles the popup footer theme preference through light, dark, and system', a
   expect(button.getAttribute('data-theme-preference')).toBe('system');
 });
 
-it('replaces the version with application launchers and a separator', async () => {
+it('keeps application launchers out of the menu footer', async () => {
   await renderFooter();
 
   const footer = container?.querySelector('footer');
-  const applicationActions = footer?.querySelector('[data-ui="popup.footer.application-actions"]');
 
   expect(footer?.className).toContain('rounded-[16px]');
-  expect(applicationActions?.querySelectorAll('button')).toHaveLength(4);
-  expect(footer?.textContent).not.toContain('v0.0.0');
-  expect(footer?.querySelector('[data-ui="popup.footer.application-separator"]')).not.toBeNull();
+  expect(footer?.querySelector('[data-ui="popup.footer.application-actions"]')).toBeNull();
+  expect(footer?.querySelector('[data-ui="popup.footer.application-separator"]')).toBeNull();
 });
 
-it('wires the four application launchers in product order', async () => {
-  const onOpenImageEditor = vi.fn();
-  const onOpenVideoEditor = vi.fn();
-  const onOpenScenarioEditor = vi.fn();
-  const onOpenGallery = vi.fn();
-  await renderFooterWithProps({
-    onOpenGallery,
-    onOpenImageEditor,
-    onOpenScenarioEditor,
-    onOpenVideoEditor,
-  });
-
-  const buttons = [
-    'popup.footer.image-editor-button',
-    'popup.footer.video-editor-button',
-    'popup.footer.scenario-editor-button',
-    'popup.footer.gallery-button',
-  ];
-  act(() => buttons.forEach(clickFooterAction));
-
-  expect(onOpenImageEditor).toHaveBeenCalledOnce();
-  expect(onOpenVideoEditor).toHaveBeenCalledOnce();
-  expect(onOpenScenarioEditor).toHaveBeenCalledOnce();
-  expect(onOpenGallery).toHaveBeenCalledOnce();
+it('places Settings on the left and GitHub with the theme control on the right', async () => {
+  await renderFooter();
+  const footer = container?.querySelector('footer');
+  expect(container?.querySelector('[data-ui="popup.footer.version"]')).toBeNull();
+  expect(footer?.firstElementChild?.getAttribute('data-ui')).toBe('popup.footer.settings-button');
   expect(
-    Array.from(
-      container?.querySelectorAll('[data-ui="popup.footer.application-actions"] button') ?? []
-    ).map((button) => button.getAttribute('data-ui'))
-  ).toEqual(buttons);
+    footer?.lastElementChild?.querySelector('[data-ui="popup.footer.github-button"]')
+  ).not.toBeNull();
+  expect(footer?.lastElementChild?.querySelector('[data-theme-preference]')).not.toBeNull();
+  expect(footer?.lastElementChild?.lastElementChild?.hasAttribute('data-locale-preference')).toBe(
+    true
+  );
 });
 
-it('wires footer actions and shows the restriction indicator when requested', async () => {
+it('wires the retained GitHub and Settings actions', async () => {
   const onOpenGithub = vi.fn();
   const onOpenSettings = vi.fn();
-  const restrictionIndicatorTitle = 'Недоступно на этой странице';
 
   await renderFooterWithProps({
     onOpenGithub,
     onOpenSettings,
-    showRestrictionIndicator: true,
-    restrictionIndicatorTitle,
   });
 
   act(() => {
@@ -217,14 +178,6 @@ it('wires footer actions and shows the restriction indicator when requested', as
   expect(githubButton?.getAttribute('title')).toBe('GitHub');
   expect(githubButton?.querySelector('svg')?.classList.contains('lucide-github')).toBe(true);
   expect(onOpenSettings).toHaveBeenCalledTimes(1);
-  expect(
-    container
-      ?.querySelector('[data-ui="popup.footer.restriction-indicator"]')
-      ?.getAttribute('title')
-  ).toBe(restrictionIndicatorTitle);
-  expect(
-    container?.querySelector('[data-ui="popup.footer.restriction-indicator"]')?.className
-  ).toContain('var(--sniptale-color-danger)');
 });
 
 it('does not expose the design system action in the footer', async () => {
@@ -232,24 +185,15 @@ it('does not expose the design system action in the footer', async () => {
   expect(container?.querySelector('[data-ui="popup.footer.design-system-button"]')).toBeNull();
 });
 
-it('keeps the settings action as the rightmost footer button', async () => {
+it('keeps the settings action as the leftmost footer button', async () => {
   await renderFooter();
 
   const actions = Array.from(
     container?.querySelectorAll<HTMLElement>('[data-ui^="popup.footer."]') ?? []
   ).map((node) => node.getAttribute('data-ui'));
 
-  expect(actions.at(-1)).toBe('popup.footer.settings-button');
+  expect(actions.at(0)).toBe('popup.footer.settings-button');
   expect(
     container?.querySelector<HTMLElement>('[data-ui="popup.footer.settings-button"]')?.className
   ).toContain('border-none');
-});
-
-it('omits the restriction indicator when the title is missing', async () => {
-  await renderFooterWithProps({
-    showRestrictionIndicator: true,
-    restrictionIndicatorTitle: null,
-  });
-
-  expect(container?.querySelector('[data-ui="popup.footer.restriction-indicator"]')).toBeNull();
 });

@@ -17,7 +17,7 @@ export function createPopupVideoSetupHandlers(runtime: PopupVideoSetupRuntime) {
       clearStartError();
       const selectedPresetId = resolveVideoViewportPresetId(
         mode,
-        runtime.home.viewportPresets,
+        runtime.viewportPresets,
         runtime.recording.selectedPresetId
       );
       if (selectedPresetId !== runtime.recording.selectedPresetId) {
@@ -57,11 +57,7 @@ function createPresetChangeHandler(runtime: PopupVideoSetupRuntime, recording: R
   return (presetId: string | null) => {
     recording.clearStartError();
     recording.setSelectedPresetId(
-      resolveVideoViewportPresetId(
-        recording.videoCaptureMode,
-        runtime.home.viewportPresets,
-        presetId
-      )
+      resolveVideoViewportPresetId(recording.videoCaptureMode, runtime.viewportPresets, presetId)
     );
   };
 }

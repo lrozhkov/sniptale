@@ -54,6 +54,11 @@ export {
   ProductGlassColorOption,
   ProductGlassColorTrigger,
 } from './primitives';
+export { ProductGlassLinkedPaddingFields } from './linked-padding';
+export type {
+  ProductGlassLinkedPaddingFieldsProps,
+  ProductGlassLinkedPaddingValue,
+} from './linked-padding';
 export type {
   ProductGlassChipIconProps,
   ProductGlassColorOptionProps,

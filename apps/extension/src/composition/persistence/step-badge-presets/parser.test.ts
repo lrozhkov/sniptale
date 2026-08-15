@@ -2,6 +2,24 @@ import { expect, it } from 'vitest';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
 import { parseStoredStepBadgePresetCatalog } from './parser';
 
+it('parses bounded new-session defaults and rejects malformed values', () => {
+  const valid = parseStoredStepBadgePresetCatalog({
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  });
+  expect(valid.value.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
+  expect(valid.invalidFieldCount).toBe(0);
+
+  for (const newSessionDefaults of [
+    { enabled: 'yes', templateSource: 'forced' },
+    { enabled: true, templateSource: 'unknown' },
+    null,
+  ]) {
+    const malformed = parseStoredStepBadgePresetCatalog({ newSessionDefaults });
+    expect(malformed.value.newSessionDefaults).toBeUndefined();
+    expect(malformed.invalidFieldCount).toBe(1);
+  }
+});
+
 it('strictly parses valid templates and rejects unsafe colors and duplicate system ids', () => {
   const settings = createSystemStepBadgePresetCatalog()[0]!.settings;
   const valid = parseStoredStepBadgePresetCatalog({

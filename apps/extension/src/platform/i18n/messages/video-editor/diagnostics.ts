@@ -57,14 +57,6 @@ export const videoEditorDiagnosticsMessages = defineMessageSource({
     ru: 'Предупреждений',
     en: 'Warnings',
   },
-  networkLabel: {
-    ru: 'Сетевых запросов',
-    en: 'Network requests',
-  },
-  consoleLabel: {
-    ru: 'Сообщений консоли',
-    en: 'Console messages',
-  },
   actionsLabel: {
     ru: 'Действий пользователя',
     en: 'User actions',
@@ -98,14 +90,8 @@ export const videoEditorDiagnosticsMessages = defineMessageSource({
     en: 'Exporting...',
   },
   exportDisclosure: {
-    ru: [
-      'Экспорт сохраняет JSON/ZIP с sanitized browser activity diagnostics:',
-      'tab URL, console/errors, network requests/failures и service logs из local IndexedDB.',
-    ].join(' '),
-    en: [
-      'Export downloads JSON/ZIP with sanitized browser activity diagnostics:',
-      'tab URL, console/errors, network requests/failures, and service logs from local IndexedDB.',
-    ].join(' '),
+    ru: 'Экспорт сохраняет JSON/ZIP с очищенными действиями, ошибками и meta-событиями записи из local IndexedDB.',
+    en: 'Export downloads JSON/ZIP with sanitized recording actions, errors, and meta events from local IndexedDB.',
   },
   filterAll: {
     ru: 'Все',
@@ -119,13 +105,13 @@ export const videoEditorDiagnosticsMessages = defineMessageSource({
     ru: 'Предупр.',
     en: 'Warnings',
   },
-  filterNetwork: {
-    ru: 'Сеть',
-    en: 'Network',
+  filterActions: {
+    ru: 'Действия',
+    en: 'Actions',
   },
-  filterConsole: {
-    ru: 'Консоль',
-    en: 'Console',
+  filterMeta: {
+    ru: 'Система',
+    en: 'Meta',
   },
   emptyFiltered: {
     ru: 'Нет событий для отображения',

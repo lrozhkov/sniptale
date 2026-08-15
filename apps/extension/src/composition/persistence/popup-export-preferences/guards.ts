@@ -28,7 +28,7 @@ const POPUP_EXPORT_PREFERENCE_KEYS = [
   'includeCssDiagnostics',
   'includeFiles',
   'includeFullPageScreenshot',
-  'includeHarDomLogs',
+  'includePageDiagnostics',
   'includeImages',
   'includeJson',
   'includeMarkdown',

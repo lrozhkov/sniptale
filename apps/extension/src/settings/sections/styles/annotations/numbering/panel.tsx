@@ -17,6 +17,8 @@ import {
   resolveAnnotationTemplateTags,
   useAnnotationTemplateTagState,
 } from '../../../../../ui/annotation-template-query';
+import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { AnnotationNewSessionDefaults } from '../new-session-defaults';
 
 export function StepBadgePresetsPanel({
   controller,
@@ -85,6 +87,28 @@ export function StepBadgePresetsPanel({
   };
   return (
     <div>
+      <AnnotationNewSessionDefaults
+        copy={{
+          enabledDescription: translate(
+            'highlighter.stepBadgePresets.newSession.enabledDescription'
+          ),
+          enabledLabel: translate('highlighter.stepBadgePresets.newSession.enabledLabel'),
+          frameTemplate: translate('highlighter.stepBadgePresets.newSession.frameTemplate'),
+          primaryTemplate: translate('highlighter.stepBadgePresets.newSession.primaryTemplate'),
+          sourceDescription: translate('highlighter.stepBadgePresets.newSession.sourceDescription'),
+          sourceLabel: translate('highlighter.stepBadgePresets.newSession.sourceLabel'),
+          sectionDescription: translate(
+            'highlighter.stepBadgePresets.newSession.sectionDescription'
+          ),
+          sectionTitle: translate('highlighter.stepBadgePresets.newSession.sectionTitle'),
+        }}
+        defaults={controller.catalog?.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS}
+        disabled={controller.isLoading || controller.isSaving || !controller.catalog}
+        onEnabledChange={(enabled) => void controller.actions.setNewSessionEnabled(enabled)}
+        onTemplateSourceChange={(source) =>
+          void controller.actions.setNewSessionTemplateSource(source)
+        }
+      />
       <SettingsCollection
         ariaLabel={translate('highlighter.stepBadgePresets.title')}
         toolbarControls={

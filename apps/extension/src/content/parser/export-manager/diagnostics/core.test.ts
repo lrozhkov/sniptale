@@ -10,23 +10,12 @@ const snapshotMocks = vi.hoisted(() => ({
   buildPageSummaryFile: vi.fn(() => ({ counts: { links: 3 }, readyState: 'complete' })),
 }));
 
-const consoleMocks = vi.hoisted(() => ({
-  getConsoleDiagnosticsSnapshot: vi.fn(() => ({
-    capturedAt: '2026-03-22T00:00:00.000Z',
-    droppedCount: 0,
-    entries: [
-      { kind: 'console', level: 'info', message: 'hello', timestamp: '2026-03-22T00:00:00.000Z' },
-    ],
-  })),
-}));
-
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
   runtimeInfo: runtimeMocks,
 }));
 
 vi.mock('./snapshot', () => snapshotMocks);
-vi.mock('./console', () => consoleMocks);
 
 import { collectCoreLogAssets } from './core';
 import {
@@ -39,26 +28,6 @@ import {
   readJsonAsset,
 } from './core.test.helpers';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-
-function mockSignedConsoleDiagnostics(): void {
-  consoleMocks.getConsoleDiagnosticsSnapshot.mockReturnValueOnce({
-    capturedAt: '2026-03-22T00:00:00.000Z',
-    droppedCount: 0,
-    entries: [
-      {
-        kind: 'console',
-        level: 'warn',
-        message: [
-          'standalone X-Amz-Signature=known-secret',
-          'X-Goog-Signature=known-secret',
-          'signature=known-secret',
-          'policy=known-secret',
-        ].join(' '),
-        timestamp: '2026-03-22T00:00:00.000Z',
-      },
-    ],
-  });
-}
 
 function createSignedSection(signedAssetUrl: string, signedBarePathUrl: string) {
   return {
@@ -162,7 +131,24 @@ it('returns no assets when all core log options are disabled', () => {
       warnings: [],
     })
   ).toEqual([]);
-  expect(consoleMocks.getConsoleDiagnosticsSnapshot).not.toHaveBeenCalled();
+});
+
+it('does not admit core logs through Page Diagnostics or CSS Diagnostics', () => {
+  for (const options of [
+    createOptions({ includePageDiagnostics: true }),
+    createOptions({ includeCssDiagnostics: true }),
+  ]) {
+    expect(
+      collectCoreLogAssets({
+        options,
+        treeData: createTreeData(),
+        iframeReadiness: createIframeReadiness(),
+        fileCandidatesCount: 0,
+        downloadedFilesCount: 0,
+        warnings: [],
+      })
+    ).toEqual([]);
+  }
 });
 
 it('builds core diagnostics assets with parser, profile, and runtime traces', () => {
@@ -186,7 +172,6 @@ it('builds core diagnostics assets with parser, profile, and runtime traces', ()
     'logs/root-selection.json',
     'logs/pipeline-trace.json',
     'logs/payload-trace.json',
-    'logs/console.json',
   ]);
   expectParserReportAsset(assets);
   expectExtractionSignalsAsset(assets);
@@ -195,7 +180,7 @@ it('builds core diagnostics assets with parser, profile, and runtime traces', ()
 
 it('falls back to unknown profile values when tree metadata is missing', () => {
   const assets = collectCoreLogAssets({
-    options: createOptions({ includeCssDiagnostics: true }),
+    options: createOptions({ includeBasicLogs: true }),
     treeData: createTreeData(false),
     iframeReadiness: {
       pendingIframes: [],
@@ -249,9 +234,8 @@ it('prefers parsed tree metadata over live page metadata in diagnostic assets', 
 });
 
 it('redacts sensitive page urls from every core JSON diagnostic artifact', () => {
-  mockSignedConsoleDiagnostics();
   const assets = collectCoreLogAssets({
-    options: createOptions({ includeBasicLogs: true, includeHarDomLogs: true }),
+    options: createOptions({ includeBasicLogs: true, includePageDiagnostics: true }),
     treeData: createSignedUrlTreeData(),
     iframeReadiness: {
       pendingIframes: [createSignedIframe()],

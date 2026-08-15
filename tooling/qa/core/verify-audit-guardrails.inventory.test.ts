@@ -27,8 +27,8 @@ it('reports incomplete sensitive privacy feature settings contracts', () => {
     root,
     'apps/extension/src/composition/persistence/settings/privacy-ok.ts',
     [
-      'export const defaults = { rawDiagnosticsEnabled: false };',
-      "parseOptionalBoolean(record, 'rawDiagnosticsEnabled');",
+      'export const defaults = { authenticatedSnapshotAssetsEnabled: false };',
+      "parseOptionalBoolean(record, 'authenticatedSnapshotAssetsEnabled');",
     ].join('\n')
   );
 

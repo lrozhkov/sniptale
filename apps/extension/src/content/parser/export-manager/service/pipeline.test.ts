@@ -6,26 +6,22 @@ const {
   collectAdvancedLogAssetsMock,
   collectCoreLogAssetsMock,
   collectCssDiagnosticAssetsMock,
-  collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManagerMock,
   buildExportPagePackageMock,
   createExportArchiveBlobMock,
   createExportStatsMock,
   prepareDOMTreeSnapshotMock,
-  startConsoleDiagnosticsCaptureMock,
-  stopConsoleDiagnosticsCaptureMock,
 } = vi.hoisted(() => ({
   buildExportDataMock: vi.fn(),
   captureOptionalArchiveAssetsMock: vi.fn(),
   collectAdvancedLogAssetsMock: vi.fn(),
   collectCoreLogAssetsMock: vi.fn(),
   collectCssDiagnosticAssetsMock: vi.fn(),
-  collectFilesWithHarForExportManagerMock: vi.fn(),
+  collectFilesForExportManagerMock: vi.fn(),
   buildExportPagePackageMock: vi.fn(),
   createExportArchiveBlobMock: vi.fn(),
   createExportStatsMock: vi.fn(),
   prepareDOMTreeSnapshotMock: vi.fn(),
-  startConsoleDiagnosticsCaptureMock: vi.fn(),
-  stopConsoleDiagnosticsCaptureMock: vi.fn(),
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -57,19 +53,13 @@ vi.mock('../diagnostics', async (importOriginal) => ({
   collectCssDiagnosticAssets: collectCssDiagnosticAssetsMock,
 }));
 
-vi.mock('../diagnostics/console', async (importOriginal) => ({
-  ...(await importOriginal()),
-  startConsoleDiagnosticsCapture: startConsoleDiagnosticsCaptureMock,
-  stopConsoleDiagnosticsCapture: stopConsoleDiagnosticsCaptureMock,
-}));
-
 vi.mock('./runtime', async (importOriginal) => ({
   ...(await importOriginal()),
   captureOptionalArchiveAssets: captureOptionalArchiveAssetsMock,
 }));
 
 vi.mock('../archive/transfer', () => ({
-  collectFilesWithHarForExportManager: collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManager: collectFilesForExportManagerMock,
 }));
 
 import { runExportManagerPipeline } from './pipeline';
@@ -81,7 +71,7 @@ function createExportOptions(overrides: Record<string, boolean> = {}) {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -108,12 +98,11 @@ function configurePipelineSuccessMocks() {
   collectCoreLogAssetsMock.mockReturnValue([{ path: 'core.json', content: '{}' }]);
   collectAdvancedLogAssetsMock.mockResolvedValue([{ path: 'advanced.json', content: '{}' }]);
   collectCssDiagnosticAssetsMock.mockReturnValue([{ path: 'styles.json', content: '{}' }]);
-  collectFilesWithHarForExportManagerMock.mockResolvedValue({
+  collectFilesForExportManagerMock.mockResolvedValue({
     collectedFiles: { files: [{ id: 'preview-a' }, { id: 'preview-b' }] },
     downloadResult: {
       files: new Map([['uuid-a', new Blob(['file'])]]),
     },
-    sessionHar: { entries: [] },
   });
 }
 
@@ -121,7 +110,6 @@ function createEmptyTransferResult() {
   return {
     collectedFiles: { files: [] },
     downloadResult: { files: new Map() },
-    sessionHar: null,
   };
 }
 
@@ -141,7 +129,6 @@ function expectSuccessfulPipelineResult(progressSpy: ReturnType<typeof vi.fn>, r
       data: { id: 'export-data' },
       errors: ['warning-a'],
       extraAssets: [
-        { path: 'optional.txt', content: 'optional' },
         { path: 'core.json', content: '{}' },
         { path: 'advanced.json', content: '{}' },
         { path: 'styles.json', content: '{}' },
@@ -211,21 +198,6 @@ describe('export-manager service-pipeline success path', () => {
         binaryMode: 'blob',
       })
     );
-    expect(startConsoleDiagnosticsCaptureMock).not.toHaveBeenCalled();
-    expect(stopConsoleDiagnosticsCaptureMock).not.toHaveBeenCalled();
-  });
-
-  it('captures console diagnostics only around exports that include logs', async () => {
-    const { state } = createPipelineStateWithProgressSpy();
-    await runExportManagerPipeline(state, createExportOptions({ includeBasicLogs: true }), []);
-    expect(startConsoleDiagnosticsCaptureMock).toHaveBeenCalledOnce();
-    expect(stopConsoleDiagnosticsCaptureMock).toHaveBeenCalledOnce();
-    expect(startConsoleDiagnosticsCaptureMock.mock.invocationCallOrder[0]).toBeLessThan(
-      prepareDOMTreeSnapshotMock.mock.invocationCallOrder[0] ?? 0
-    );
-    expect(stopConsoleDiagnosticsCaptureMock.mock.invocationCallOrder[0]).toBeGreaterThan(
-      createExportArchiveBlobMock.mock.invocationCallOrder[0] ?? 0
-    );
   });
 });
 
@@ -234,10 +206,9 @@ describe('export-manager service-pipeline branch coverage', () => {
     const state = createExportManagerState();
     beginExportManagerRun(state);
 
-    collectFilesWithHarForExportManagerMock.mockResolvedValue({
+    collectFilesForExportManagerMock.mockResolvedValue({
       collectedFiles: undefined,
       downloadResult: undefined,
-      sessionHar: null,
     });
 
     await expect(
@@ -259,7 +230,7 @@ describe('export-manager service-pipeline branch coverage', () => {
   it('stops before archive assembly when export cancellation lands after transfer', async () => {
     const state = createExportManagerState();
     beginExportManagerRun(state);
-    collectFilesWithHarForExportManagerMock.mockImplementation(async () => {
+    collectFilesForExportManagerMock.mockImplementation(async () => {
       state.isCancelled = true;
       return createEmptyTransferResult();
     });
@@ -277,7 +248,7 @@ describe('export-manager service-pipeline cancellation boundaries', () => {
   it('stops without done progress when cancellation lands during archive generation', async () => {
     const { progressSpy, state } = createPipelineStateWithProgressSpy();
 
-    collectFilesWithHarForExportManagerMock.mockResolvedValue(createEmptyTransferResult());
+    collectFilesForExportManagerMock.mockResolvedValue(createEmptyTransferResult());
     createExportArchiveBlobMock.mockImplementation(async (_pagePackage, control) => {
       state.isCancelled = true;
       throw control.createCancelledError();
@@ -292,7 +263,5 @@ describe('export-manager service-pipeline cancellation boundaries', () => {
         phase: 'done',
       })
     );
-    expect(startConsoleDiagnosticsCaptureMock).toHaveBeenCalledOnce();
-    expect(stopConsoleDiagnosticsCaptureMock).toHaveBeenCalledOnce();
   });
 });

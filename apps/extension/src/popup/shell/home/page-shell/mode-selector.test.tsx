@@ -2,23 +2,18 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 import { ScreenshotModeSelector } from './mode-selector';
 
 afterEach(cleanupRenderedNode);
 
-it('selects all four persisted popup modes', async () => {
+it('switches between shortcuts, tab and desktop capture with an expanded active mode', async () => {
   const onModeChange = vi.fn();
   await renderNode(
-    <ScreenshotModeSelector
-      mode="quick-actions"
-      tabDisabledReason={null}
-      toolsDisabledReason={null}
-      onModeChange={onModeChange}
-    />
+    <ScreenshotModeSelector mode="tab" tabDisabledReason={null} onModeChange={onModeChange} />
   );
   (
     getContainer()?.querySelector(
@@ -26,21 +21,22 @@ it('selects all four persisted popup modes', async () => {
     ) as HTMLButtonElement
   ).click();
   (
-    getContainer()?.querySelector('[aria-label="popup.home.toolsLabel"]') as HTMLButtonElement
+    getContainer()?.querySelector(
+      '[aria-label="popup.home.shortcutsModeLabel"]'
+    ) as HTMLButtonElement
   ).click();
   expect(onModeChange).toHaveBeenCalledWith('desktop');
-  expect(onModeChange).toHaveBeenCalledWith('tools');
+  expect(onModeChange).toHaveBeenCalledWith('quick-actions');
   expect(getContainer()?.textContent).toContain('popup.home.shortcutsModeLabel');
+  expect(
+    getContainer()?.querySelector('[aria-label="popup.home.captureTabLabel"]')?.className
+  ).toContain('grow-[1.9]');
+  expect(getContainer()?.textContent).toContain('popup.home.captureTabHint');
 });
 
-it('disables tab and tools independently from desktop capture', async () => {
+it('disables tab independently from desktop capture', async () => {
   await renderNode(
-    <ScreenshotModeSelector
-      mode="desktop"
-      tabDisabledReason="blocked"
-      toolsDisabledReason="blocked"
-      onModeChange={vi.fn()}
-    />
+    <ScreenshotModeSelector mode="desktop" tabDisabledReason="blocked" onModeChange={vi.fn()} />
   );
   expect(
     (
@@ -56,8 +52,4 @@ it('disables tab and tools independently from desktop capture', async () => {
       ) as HTMLButtonElement
     ).disabled
   ).toBe(false);
-  expect(
-    (getContainer()?.querySelector('[aria-label="popup.home.toolsLabel"]') as HTMLButtonElement)
-      .title
-  ).toContain('blocked');
 });

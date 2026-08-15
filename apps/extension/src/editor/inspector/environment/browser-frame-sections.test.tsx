@@ -99,7 +99,7 @@ it('routes canvas and scene behavior changes through the async action boundary',
 
   expect(syncBrowserFrame).toHaveBeenCalledWith({ canvasMode: 'keep-size' });
   expect(syncBrowserFrame).toHaveBeenCalledWith({ contentMode: 'fit-content' });
-  expect(container?.querySelector('[data-testid^="select-field-"]')).not.toBeNull();
+  expect(container?.querySelector('[aria-pressed="true"]')).not.toBeNull();
 });
 
 it('renders alternate labels for keep-size and fit-content browser behavior', () => {
@@ -136,4 +136,36 @@ it('routes insert or update through the async action boundary', async () => {
   expect(insertOrUpdateBrowserFrame).toHaveBeenCalledOnce();
   expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
   expect(container?.textContent).toContain('editor.compact.apply');
+});
+
+it('keeps disabled apply inert and exposes a localized async failure', async () => {
+  const insertOrUpdateBrowserFrame = vi.fn(async () => {
+    throw new Error('Frame failed');
+  });
+
+  act(() => {
+    root?.render(
+      <BrowserFrameInsertSection disabled insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
+    );
+  });
+
+  expect(container?.querySelector('button')?.disabled).toBe(true);
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+
+  act(() => {
+    root?.render(
+      <BrowserFrameInsertSection insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
+    );
+  });
+
+  await act(async () => {
+    container?.querySelector('button')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'editor.compact.browserFrameApplyFailed'
+  );
+  expect(container?.querySelector('button')?.disabled).toBe(false);
 });

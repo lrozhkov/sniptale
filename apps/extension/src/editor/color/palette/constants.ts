@@ -3,8 +3,6 @@ export const EDITOR_CANVAS_CONTROL_SURFACE = '#f8fafc';
 export const EDITOR_CANVAS_CROP_GUIDE_FILL = 'rgba(250, 250, 250, 0.08)';
 export const EDITOR_CANVAS_CROP_GUIDE_STROKE = '#fafafa';
 export const EDITOR_CANVAS_CROP_OVERLAY = 'rgba(24, 24, 27, 0.42)';
-export const EDITOR_CANVAS_PANEL_SURFACE = '#18181b';
-export const EDITOR_CANVAS_TEXT_PRIMARY = '#f4f4f5';
 export const EDITOR_CANVAS_TEXT_INVERSE = '#ffffff';
 
 export const EDITOR_BROWSER_FRAME_WINDOWS_DARK = {

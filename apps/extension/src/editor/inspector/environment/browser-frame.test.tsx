@@ -163,7 +163,7 @@ it('keeps tab title and URL values only inside inputs', async () => {
   expect(container?.textContent).not.toContain('Full title');
   expect(container?.textContent).not.toContain('https://sniptale.dev/full/path');
   expect(container?.textContent).toContain('editor.compact.browserTabTitle');
-  expect(container?.textContent).toContain('URL');
+  expect(container?.textContent).toContain('editor.compact.pageUrl');
   expect(
     container?.querySelector<HTMLInputElement>(
       'input[placeholder="editor.compact.pageTitlePlaceholder"]'
@@ -211,6 +211,33 @@ it('always renders header title and url controls for the insert/update flow', as
   );
 
   expect(markup).toContain('Enter page URL');
+});
+
+it('blocks an overlong page address with localized inline guidance', async () => {
+  const insertOrUpdateBrowserFrame = vi.fn();
+  await renderBrowserFramePanel(
+    {
+      canvasMode: 'resize',
+      contentMode: 'push-down',
+      title: '',
+      url: 'x'.repeat(2049),
+    },
+    vi.fn(),
+    insertOrUpdateBrowserFrame
+  );
+
+  const applyButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.textContent === 'editor.compact.apply');
+  expect(applyButton?.disabled).toBe(true);
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'editor.compact.browserFrameUrlTooLong'
+  );
+  const urlInput = container?.querySelector<HTMLInputElement>(
+    'input[placeholder="Enter page URL"]'
+  );
+  expect(urlInput?.getAttribute('aria-invalid')).toBe('true');
+  expect(urlInput?.getAttribute('aria-describedby')).toBe('editor-browser-frame-url-error');
 });
 
 it('uses a no-op insert action when the browser frame owner omits it', async () => {

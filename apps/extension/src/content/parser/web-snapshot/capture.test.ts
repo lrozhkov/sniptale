@@ -1,50 +1,88 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { captureFullPageScreenshotAssetMock } = vi.hoisted(() => ({
-  captureFullPageScreenshotAssetMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  attachContentActionIntent: vi.fn(),
+  dataUrlToBlob: vi.fn(),
+  sendRuntimeMessage: vi.fn(),
 }));
 
-vi.mock('../export-manager/diagnostics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../export-manager/diagnostics')>()),
-  captureFullPageScreenshotAsset: captureFullPageScreenshotAssetMock,
+vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
+  dataUrlToBlob: mocks.dataUrlToBlob,
 }));
 
+vi.mock('../../platform/runtime-services/services', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/runtime-services/services')>()),
+  getContentRuntimeServices: () => ({
+    contentActionIntent: {
+      attachContentActionIntent: mocks.attachContentActionIntent,
+    },
+    messaging: { sendRuntimeMessage: mocks.sendRuntimeMessage },
+  }),
+}));
+
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { captureWebSnapshotScreenshot, captureWebSnapshotScreenshotWithWarnings } from './capture';
 
 beforeEach(() => {
-  captureFullPageScreenshotAssetMock.mockReset();
+  vi.clearAllMocks();
+  mocks.attachContentActionIntent.mockImplementation(async (request) => ({
+    ...request,
+    contentIntent: { requestId: request.exportRunId, token: 'token-1' },
+  }));
 });
 
-it('returns an owner-provided screenshot blob without copying it', async () => {
+it('captures through the active native full-page action and returns its blob', async () => {
   const blob = new Blob(['png'], { type: 'image/png' });
   const contentIntentSource = { grantToken: 'grant-1', kind: 'background-auto-start' } as const;
-  captureFullPageScreenshotAssetMock.mockResolvedValue({ content: blob, captureWarnings: [] });
-
-  await expect(captureWebSnapshotScreenshot(contentIntentSource)).resolves.toBe(blob);
-  expect(captureFullPageScreenshotAssetMock).toHaveBeenCalledWith(contentIntentSource, undefined);
-});
-
-it('normalizes non-Blob screenshot payloads into a PNG blob', async () => {
-  captureFullPageScreenshotAssetMock.mockResolvedValue({
-    content: 'encoded-image',
-    captureWarnings: [],
+  mocks.sendRuntimeMessage.mockResolvedValue({
+    success: true,
+    dataUrl: 'data:image/png;base64,AAAA',
   });
+  mocks.dataUrlToBlob.mockResolvedValue(blob);
 
-  const result = await captureWebSnapshotScreenshot();
+  await expect(
+    captureWebSnapshotScreenshot(contentIntentSource, {
+      action: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+      exportRunId: 'snapshot-1',
+    })
+  ).resolves.toBe(blob);
 
-  expect(result.type).toBe('image/png');
-  await expect(result.text()).resolves.toBe('encoded-image');
+  expect(mocks.attachContentActionIntent).toHaveBeenCalledWith(
+    { type: MessageType.EXPORT_CAPTURE_FULL_PAGE, exportRunId: 'snapshot-1' },
+    contentIntentSource,
+    'snapshot-1'
+  );
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    contentIntent: { requestId: 'snapshot-1', token: 'token-1' },
+    exportRunId: 'snapshot-1',
+    type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+  });
 });
 
-it('preserves capture downscale warnings for web snapshot metadata', async () => {
+it('preserves native capture warnings', async () => {
   const blob = new Blob(['png'], { type: 'image/png' });
-  captureFullPageScreenshotAssetMock.mockResolvedValue({
-    content: blob,
-    captureWarnings: ['Screenshot was downscaled'],
+  mocks.sendRuntimeMessage.mockResolvedValue({
+    success: true,
+    dataUrl: 'data:image/png;base64,AAAA',
+    downscaled: true,
+    frozenExtentWarning: true,
   });
+  mocks.dataUrlToBlob.mockResolvedValue(blob);
 
   await expect(captureWebSnapshotScreenshotWithWarnings()).resolves.toEqual({
     blob,
-    warnings: ['Screenshot was downscaled'],
+    warnings: [expect.any(String), expect.any(String)],
   });
+});
+
+it('sanitizes native capture failures', async () => {
+  mocks.sendRuntimeMessage.mockResolvedValue({
+    success: false,
+    error: 'capture failed token=secret',
+  });
+
+  await expect(captureWebSnapshotScreenshotWithWarnings()).rejects.toThrow(
+    'capture failed token=***'
+  );
 });

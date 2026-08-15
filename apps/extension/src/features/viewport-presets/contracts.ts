@@ -1,16 +1,10 @@
-export const VIEWPORT_PRESET_CATALOG_REVISION = 2 as const;
+export const VIEWPORT_PRESET_CATALOG_REVISION = 3 as const;
 export const VIEWPORT_PRESET_MAX_DIMENSION = 16_384;
 export const VIEWPORT_PRESET_MAX_NAME_LENGTH = 80;
 
-export type ViewportPresetTarget = 'viewport' | 'window';
+export type ViewportPresetTarget = 'window';
 
 export type SystemViewportPresetKey =
-  | 'viewportMobilePortrait'
-  | 'viewportMobileLandscape'
-  | 'viewportTabletPortrait'
-  | 'viewportTabletLandscape'
-  | 'viewportHd'
-  | 'viewportFullHd'
   | 'windowHd'
   | 'windowLaptop'
   | 'windowDesktop'
@@ -44,10 +38,8 @@ export type ViewportPresetAvailabilityReason =
   | 'disabled'
   | 'missing'
   | 'unsupported-context'
-  | 'viewport-too-large'
   | 'window-too-large'
   | 'window-not-normal'
-  | 'zoom-not-100'
   | 'surface-busy'
   | 'permission-denied'
   | 'platform-rejected'
@@ -58,12 +50,6 @@ export type ViewportPresetAvailability =
       status: 'available';
       presetId: string;
       target: ViewportPresetTarget;
-      required: { width: number; height: number };
-    }
-  | {
-      status: 'requires-start-validation';
-      presetId: string;
-      target: 'viewport';
       required: { width: number; height: number };
     }
   | {

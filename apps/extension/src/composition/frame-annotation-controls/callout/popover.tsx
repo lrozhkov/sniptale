@@ -9,12 +9,13 @@ import { CalloutSettingsPopoverContent } from './body';
 import { useCalloutPresetPopoverController } from './preset-controller';
 import {
   applyCalloutSettingsPatch,
+  cloneForkedCalloutStyle,
   cloneCalloutStyle,
   type CalloutSettingsPatch,
 } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createCalloutSaveSection } from './save-section';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { usePopoverDistanceClose, usePopoverEscapeClose } from '../popover/hooks';
+import { usePopoverEscapeClose } from '../popover/hooks';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
@@ -66,11 +67,6 @@ export function FutureCalloutSettingsPopover(props: {
     if (props.isOpen) setLocalSettings(props.settings);
     else setNestedLayerOpen(false);
   }, [props.isOpen, props.settings]);
-  usePopoverDistanceClose({
-    isOpen: props.isOpen && !nestedLayerOpen,
-    onClose: props.onClose,
-    popoverRef,
-  });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
     isOpen: props.isOpen && !nestedLayerOpen,
@@ -111,7 +107,6 @@ export function FutureCalloutSettingsPopover(props: {
   const forkPreset = (preset: CalloutPreset) => {
     commit(
       applyCalloutSettingsPatch(localSettings, {
-        content: { titleText: preset.content.titleText },
         placement: {
           ...preset.placement,
           connectorBasePosition: undefined,
@@ -121,7 +116,7 @@ export function FutureCalloutSettingsPopover(props: {
           manualPlacement: undefined,
         },
         sourcePresetId: undefined,
-        style: cloneCalloutStyle(preset.style),
+        style: cloneForkedCalloutStyle(preset.style, localSettings.style),
       })
     );
   };

@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { PagesSummaryRow } from './summary-row';
 import type { PopupExportTabItem } from '../selection/tabs/types';
 

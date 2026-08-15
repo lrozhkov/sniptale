@@ -22,8 +22,8 @@ vi.mock('../../../../composition/persistence/capture-settings', async (importOri
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
   toast: { error: toastErrorMock },
 }));
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 import { useScreenshotSetupState } from './use-screenshot-setup';

@@ -43,9 +43,10 @@ it('opens dropped images through the existing image-open path', async () => {
   await flushEditorAction();
 
   expect(openEditorImageFromFileMock).toHaveBeenCalledWith(
-    controller,
+    expect.any(Object),
     droppedFile,
-    expect.any(Function)
+    expect.any(Function),
+    expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
   );
 });
 
@@ -63,9 +64,10 @@ it('opens pasted images through the existing image-open path', async () => {
   await flushEditorAction();
 
   expect(openEditorImageFromFileMock).toHaveBeenCalledWith(
-    controller,
+    expect.any(Object),
     pastedFile,
-    expect.any(Function)
+    expect.any(Function),
+    expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
   );
 });
 

@@ -1,7 +1,4 @@
-import type {
-  RuntimeAckResponse,
-  RuntimeMessageResponse,
-} from '@sniptale/runtime-contracts/messaging/contracts/response';
+import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type {
   CaptureMessageType,
   MessageType,
@@ -14,12 +11,7 @@ import type {
   PageAccessMessage,
   PageAccessResponse,
 } from '@sniptale/runtime-contracts/messaging/page-access';
-import type {
-  RuntimePopupExportProgressMessage,
-  RuntimePopupExportResultMessage,
-  ContentPrivilegedActionGrantPayload,
-  ScenarioRuntimeCapturePayload,
-} from '../types';
+import type { ContentPrivilegedActionGrantPayload, ScenarioRuntimeCapturePayload } from '../types';
 import type { ContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 import type {
   CaptureResponse,
@@ -40,7 +32,6 @@ import type {
   RuntimeActionSaveRequestByType,
   RuntimeActionSaveResponseByType,
 } from '../runtime/actions/save.types.ts';
-import type { RuntimeHarRequestByType, RuntimeHarResponseByType } from './har.types.ts';
 import type { RuntimeAiRequestByType, RuntimeAiResponseByType } from './ai.types.ts';
 import type {
   RuntimePrivacyErasureRequestByType,
@@ -64,7 +55,6 @@ type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
 type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
-  RuntimeHarRequestByType &
   RuntimePrivacyErasureRequestByType &
   RuntimeFrameAnnotationRasterRequestByType &
   RuntimeDesktopFrameRequestByType & {
@@ -171,8 +161,11 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
       };
       type: typeof MessageType.PROMOTE_AGGREGATE_TO_LIBRARY;
     };
-    [MessageType.EXPORT_POPUP_PROGRESS]: RuntimePopupExportProgressMessage;
-    [MessageType.EXPORT_POPUP_RESULT]: RuntimePopupExportResultMessage;
+    [MessageType.EXPORT_CAPTURE_FULL_PAGE]: {
+      contentIntent?: ContentPrivilegedActionCapability;
+      exportRunId: string;
+      type: typeof MessageType.EXPORT_CAPTURE_FULL_PAGE;
+    };
     [CaptureMessageType.CAPTURE_VISIBLE]: {
       type: typeof CaptureMessageType.CAPTURE_VISIBLE;
       actionType?: CaptureActionType;
@@ -197,7 +190,6 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
 
 type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
-  RuntimeHarResponseByType &
   RuntimePrivacyErasureResponseByType &
   RuntimeFrameAnnotationRasterResponseByType &
   RuntimeDesktopFrameResponseByType & {
@@ -232,8 +224,7 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
     [MessageType.PROMOTE_AGGREGATE_TO_LIBRARY]: RuntimeMessageResponse<{
       result?: 'promoted';
     }>;
-    [MessageType.EXPORT_POPUP_PROGRESS]: RuntimeAckResponse;
-    [MessageType.EXPORT_POPUP_RESULT]: RuntimeAckResponse;
+    [MessageType.EXPORT_CAPTURE_FULL_PAGE]: CaptureResponse;
     [CaptureMessageType.CAPTURE_VISIBLE]: CaptureResponse;
     [CaptureMessageType.CAPTURE_FULL]: CaptureResponse;
     [CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP]: CaptureResponse;

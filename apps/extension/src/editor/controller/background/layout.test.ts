@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
+import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { syncManagedBackgroundLayerLayout } from './layout';
 
 function createFrame(patch: Partial<EditorFrameSettings>): EditorFrameSettings {
@@ -29,7 +30,7 @@ it('updates tiled image backgrounds to the canvas bounds', () => {
   };
 
   syncManagedBackgroundLayerLayout({
-    canvas: createCanvas([background]) as never,
+    canvas: createFabricCanvasFixture(createCanvas([background])),
     canvasSize: { width: 320, height: 180 },
     frame: createFrame({
       backgroundImageData: 'data:image/png;base64,abc',
@@ -61,13 +62,33 @@ it('skips image relayout when the managed asset no longer matches the frame', ()
   };
 
   syncManagedBackgroundLayerLayout({
-    canvas: createCanvas([background]) as never,
+    canvas: createFabricCanvasFixture(createCanvas([background])),
     canvasSize: { width: 320, height: 180 },
     frame: createFrame({
       backgroundImageData: 'data:image/png;base64,new',
       backgroundImageFit: 'cover',
       backgroundMode: 'image',
     }),
+  });
+
+  expect(background.set).not.toHaveBeenCalled();
+  expect(background.setCoords).not.toHaveBeenCalled();
+});
+
+it('leaves blurred backgrounds for the async rebuild owner during relayout', () => {
+  const background = {
+    sniptaleBackgroundBlurAmount: 8,
+    sniptaleBackgroundMode: 'gradient',
+    sniptaleRole: 'background',
+    sniptaleType: 'background',
+    set: vi.fn(),
+    setCoords: vi.fn(),
+  };
+
+  syncManagedBackgroundLayerLayout({
+    canvas: createFabricCanvasFixture(createCanvas([background])),
+    canvasSize: { width: 640, height: 360 },
+    frame: createFrame({ backgroundBlurAmount: 8, backgroundMode: 'gradient' }),
   });
 
   expect(background.set).not.toHaveBeenCalled();

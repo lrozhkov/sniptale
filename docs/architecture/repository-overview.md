@@ -36,6 +36,6 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - [Parser architecture](parser-architecture.md) owns snapshot, parsing, projection, diagnostics, and apply-back flow.
 - [i18n architecture](i18n-architecture.md) owns locale registry, messages, formatting, and adoption.
 - [EffectV1 bundles](video-effect-bundles.md) owns the imported effect contract.
-- [DESIGN.md](../../DESIGN.md) owns product UX, accessibility, theme, and interaction requirements.
+- [DESIGN.md](../agent-tooling/DESIGN.md) owns product UX, accessibility, theme, and interaction requirements.
 
 Implementation workflow and proof rules live in the [optional agent workflow](../agent-tooling/AGENTS.md) and [implementation rules](../engineering/implementation-rules.md). Security boundaries live in [data handling](../security/data-handling.md), [manifest permissions](../security/manifest-permissions.md), and the [threat model](../security/threat-model.md).

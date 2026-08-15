@@ -59,6 +59,12 @@ function CanvasToolButton(props: { action: CanvasToolAction; dataUi: string }) {
   );
 }
 
+export function CanvasToolButtons(props: { actions: readonly CanvasToolAction[]; dataUi: string }) {
+  return props.actions.map((action) => (
+    <CanvasToolButton key={action.id} action={action} dataUi={props.dataUi} />
+  ));
+}
+
 export function CanvasToolPanel({
   actions,
   className,
@@ -83,9 +89,7 @@ export function CanvasToolPanel({
               {...(dividerClassName === undefined ? {} : { className: dividerClassName })}
             />
           ) : null}
-          {group.actions.map((action) => (
-            <CanvasToolButton key={action.id} action={action} dataUi={dataUi} />
-          ))}
+          <CanvasToolButtons actions={group.actions} dataUi={dataUi} />
         </div>
       ))}
     </FloatingChromeToolbar>

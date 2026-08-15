@@ -98,6 +98,7 @@ function createSettings() {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     defaultExportPresetId: null,
@@ -119,7 +120,7 @@ function createDeps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }

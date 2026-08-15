@@ -26,7 +26,7 @@ it('starts a crop draft only for enabled crop interactions outside the current g
   expect(bindings.startDrawSession).not.toHaveBeenCalled();
 
   expect(Reflect.apply(cropDown, null, [bindings, canvas, 'crop', { e: {} }])).toBe(true);
-  expect(bindings.startDrawSession).toHaveBeenCalledWith('crop', point, { point });
+  expect(bindings.startDrawSession).toHaveBeenCalledWith('crop', point, { point }, null);
 });
 
 it('declines non-crop tools and disabled crop interaction', () => {

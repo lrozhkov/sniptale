@@ -8,8 +8,8 @@ import { createPopupPreviewStream } from './webcam-preview.test-support';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 
@@ -21,7 +21,7 @@ function createSettings() {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 3,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     quality: VideoQuality.HIGH,
@@ -68,8 +68,10 @@ afterEach(() => {
 it('renders camera settings and emits quality changes', async () => {
   const onSettingsChange = await renderPanel();
 
-  expect(container?.textContent).toContain('popup.video.webcamQualityTitle');
   expect(container?.textContent).not.toContain('popup.video.webcamQualityBrowserNotice');
+  expect(
+    container?.querySelector('[data-ui="popup.video.webcam-preview-mask"]')?.className
+  ).toContain('rounded-full');
 
   await act(async () => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])

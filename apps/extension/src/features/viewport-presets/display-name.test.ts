@@ -10,15 +10,15 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 import { getViewportPresetDisplayName } from './display-name';
 
 const systemPreset: SystemViewportPreset = {
-  catalogRevision: 2,
+  catalogRevision: 3,
   customized: false,
   enabled: true,
   height: 720,
   id: 'system:viewport-hd',
   kind: 'system',
   order: 0,
-  systemKey: 'viewportHd',
-  target: 'viewport',
+  systemKey: 'windowHd',
+  target: 'window',
   width: 1280,
 };
 const userPreset: UserViewportPreset = {
@@ -28,7 +28,7 @@ const userPreset: UserViewportPreset = {
   kind: 'user',
   name: 'My viewport',
   order: 0,
-  target: 'viewport',
+  target: 'window',
   width: 1280,
 };
 
@@ -42,7 +42,7 @@ it('keeps custom user and system override names verbatim', () => {
 
 it('localizes untouched system names by stable system key', () => {
   expect(getViewportPresetDisplayName(systemPreset, 'ru')).toBe(
-    'ru:viewportPresets.systemNames.viewportHd'
+    'ru:viewportPresets.systemNames.windowHd'
   );
-  expect(translateMock).toHaveBeenCalledWith('viewportPresets.systemNames.viewportHd', 'ru');
+  expect(translateMock).toHaveBeenCalledWith('viewportPresets.systemNames.windowHd', 'ru');
 });

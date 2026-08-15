@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import {

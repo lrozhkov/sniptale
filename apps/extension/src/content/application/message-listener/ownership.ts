@@ -17,7 +17,6 @@ type UiRuntimeBridgeMessageType =
   | MessageType.COPY_IMAGE_TO_CLIPBOARD
   | MessageType.COPY_TEXT_TO_CLIPBOARD
   | MessageType.EXPORT_POPUP_PREVIEW
-  | MessageType.EXPORT_POPUP_START
   | MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | MessageType.EXPORT_POPUP_CANCEL
@@ -38,8 +37,6 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.GET_VIEWPORT_COORDS,
   VideoMessageType.SHOW_COUNTDOWN,
   VideoMessageType.HIDE_COUNTDOWN,
-  VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
-  VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
   VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
   VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE,
@@ -67,7 +64,6 @@ const uiRuntimeBridgeMessageTypes = new Set<UiRuntimeBridgeMessageType>([
   MessageType.COPY_IMAGE_TO_CLIPBOARD,
   MessageType.COPY_TEXT_TO_CLIPBOARD,
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,

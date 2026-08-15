@@ -3,29 +3,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "id": "accepted.scc.background-runtime-media-composition.20260812",
-      "classification": "accepted-architecture",
-      "owner": "background-runtime-composition",
-      "risk": "New cross-owner imports could silently widen a privileged background dependency cycle.",
-      "reason": "The exact cycle records canonical action-kernel assembly, video lifecycle ownership, and application privacy-erasure orchestration.",
-      "removalCondition": "Remove the entry when those composition edges are replaced by a one-directional owner port.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "scc",
-        "key": "background-runtime-media-composition"
-      },
-      "scope": {
-        "edgeDigest": "e697e629f57689429cf0878d38a10b16bb72badaffe84490ae0057fae6d2c32b",
-        "id": "background-runtime-media-composition",
-        "owners": [
-          "apps/extension/src/background/application",
-          "apps/extension/src/background/media",
-          "apps/extension/src/background/runtime"
-        ]
-      },
-      "targetAction": "Keep the registered owner and edge set exact; reject any unreviewed expansion."
-    },
-    {
       "id": "accepted.jscpd.ai-secret-unlock-tests.4216f30002d6",
       "classification": "accepted-architecture",
       "owner": "ai-secret-unlock-tests",
@@ -55,13 +32,13 @@
       "reviewBy": "2027-07-14",
       "source": {
         "kind": "jscpd",
-        "key": "apps/extension/src/background/runtime/page-access"
+        "key": "apps/extension/src/background/page-access"
       },
       "scope": {
-        "family": "apps/extension/src/background/runtime/page-access",
+        "family": "apps/extension/src/background/page-access",
         "count": 1,
         "lines": 14,
-        "sampleFingerprint": "b8cf9375b9269daa29fe40043f21b14408a7fc40d6ac00878a0b73c96f88dae8"
+        "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6"
       },
       "targetAction": "keep small service-action descriptor repetition local"
     },
@@ -410,26 +387,6 @@
       "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
     },
     {
-      "id": "noise.jscpd.background-capture-surface.86ace87041eb",
-      "classification": "tool-noise",
-      "owner": "background-capture-surface",
-      "risk": "Clone grouping does not identify a shared behavioral owner; unreviewed growth could conceal actionable duplication.",
-      "reason": "The live sample is an overlapping clone inside one owner file rather than duplicated behavior across independently changing files.",
-      "removalCondition": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it",
-      "reviewBy": "2027-07-14",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/background/capture-surface"
-      },
-      "scope": {
-        "family": "apps/extension/src/background/capture-surface",
-        "count": 1,
-        "lines": 11,
-        "sampleFingerprint": "86ace87041ebb573de413bdb42b2f02573a80685f9783ea7bd36be049477b456"
-      },
-      "targetAction": "keep the overlapping same-file block visible and remove the entry if jscpd stops reporting it"
-    },
-    {
       "id": "noise.jscpd.runtime.976c2c57fd5f",
       "classification": "tool-noise",
       "owner": "qa-runtime",
@@ -482,10 +439,10 @@
         "key": "apps/extension/src/settings/sections/styles"
       },
       "scope": {
-        "count": 9,
+        "count": 17,
         "family": "apps/extension/src/settings/sections/styles",
-        "lines": 157,
-        "sampleFingerprint": "3ea4a5d66567c1cf7e7b0860d3f0d6af5b004a208405894a654415d10a39c35a"
+        "lines": 349,
+        "sampleFingerprint": "589894b8bf0c95f3c33f1d9bdd5efa64b2ccffadea7c54d5c01dda3884ec20f7"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -502,9 +459,9 @@
         "key": "apps/extension/src/features/highlighter/frame-annotation"
       },
       "scope": {
-        "count": 7,
+        "count": 6,
         "family": "apps/extension/src/features/highlighter/frame-annotation",
-        "lines": 79,
+        "lines": 54,
         "sampleFingerprint": "42dc97543f07cd3a045a31a691c35082179ae60057d6b1ff371f8163c21580fa"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
@@ -604,8 +561,8 @@
       "scope": {
         "count": 3,
         "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
-        "lines": 29,
-        "sampleFingerprint": "bc2c20338af1a8e924c0ed69c2063e42a733193046995dfffda1e322bb4fd3af"
+        "lines": 26,
+        "sampleFingerprint": "26f2f07d3ea597408fcb935c65bf3e837d21a509adc9da4e8973681904577b5f"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -764,7 +721,7 @@
       "scope": {
         "count": 1,
         "family": "apps/extension/src/content/overlay/toolbar",
-        "lines": 120,
+        "lines": 128,
         "sampleFingerprint": "e114d9ebc15d10229d65fc372e7b336e5a7b8e172965bc0a241817a1dd829fef"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
@@ -848,26 +805,6 @@
         "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
-    },
-    {
-      "id": "noise.jscpd.editor-controller-magnet.89d39fbbaec3",
-      "classification": "tool-noise",
-      "owner": "editor-controller-magnet",
-      "risk": "Overlapping clone spans can obscure a future actionable duplicate if their exact detector scope grows.",
-      "reason": "The live matches are overlapping or nested spans inside one owner file and do not represent duplicated behavioral authority.",
-      "removalCondition": "Remove when jscpd stops reporting the exact overlapping same-file population.",
-      "reviewBy": "2027-08-12",
-      "source": {
-        "kind": "jscpd",
-        "key": "apps/extension/src/editor/controller/magnet"
-      },
-      "scope": {
-        "count": 1,
-        "family": "apps/extension/src/editor/controller/magnet",
-        "lines": 15,
-        "sampleFingerprint": "89d39fbbaec37fb9893b0711819f994f03ae03da968bde6f9764a7f95cd43171"
-      },
-      "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
     },
     {
       "id": "noise.jscpd.package-foundation-src.9d198a6afa62",
@@ -979,13 +916,13 @@
       "reviewBy": "2027-08-12",
       "source": {
         "kind": "jscpd",
-        "key": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access"
+        "key": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging"
       },
       "scope": {
         "count": 1,
-        "family": "apps/extension/src/background/routing-contracts/runtime-messaging <-> apps/extension/src/background/runtime/page-access",
+        "family": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
         "lines": 11,
-        "sampleFingerprint": "693f682864bee26de66516f7cd30343d7af6b22fe9bcce7b04cf9bd8d0784319"
+        "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b"
       },
       "targetAction": "Keep the independent typed owners exact and reject unreviewed clone growth."
     },
@@ -1208,6 +1145,28 @@
         "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
       },
       "targetAction": "Keep the detector scope exact; do not extract an artificial helper from overlapping spans."
+    },
+    {
+      "id": "accepted.scc.popup-shell-recording-route-composition",
+      "classification": "accepted-architecture",
+      "owner": "popup-runtime-architecture",
+      "risk": "An unreviewed edge can broaden the popup shell and recording owner cycle.",
+      "reason": "The reviewed Video route composition is intentionally limited to the popup shell and recording owners.",
+      "removalCondition": "Remove when Video route composition no longer imports shell-owned bootstrap and runtime state.",
+      "reviewBy": "2027-08-14",
+      "source": {
+        "kind": "scc",
+        "key": "popup-shell-recording-route-composition"
+      },
+      "scope": {
+        "edgeDigest": "47b66d39971198c7714a896b608ddab6591fce43b1c611e8a4bd6addb76f36f5",
+        "id": "popup-shell-recording-route-composition",
+        "owners": [
+          "apps/extension/src/popup/recording",
+          "apps/extension/src/popup/shell"
+        ]
+      },
+      "targetAction": "Keep the exact two-owner composition cycle stable and reject additional edges or owners."
     }
   ],
   "coverageOwners": [
@@ -1288,8 +1247,6 @@
         "apps/extension/src/background/capture-surface/screenshot-session.ts",
         "apps/extension/src/background/capture-surface/service.ts",
         "apps/extension/src/background/capture-surface/types.ts",
-        "apps/extension/src/background/capture-surface/viewport-capacity.ts",
-        "apps/extension/src/background/capture-surface/viewport.ts",
         "apps/extension/src/background/capture-surface/window.ts",
         "apps/extension/src/background/capture/annotation-export/popup-launch-intent.ts",
         "apps/extension/src/background/capture/annotation-export/route.ts",
@@ -1315,7 +1272,6 @@
         "apps/extension/src/background/capture/full-page/budgets.ts",
         "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
-        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
         "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
@@ -1361,10 +1317,17 @@
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
         "apps/extension/src/background/capture/page-state/index.ts",
-        "apps/extension/src/background/capture/popup-export/archive-route.ts",
-        "apps/extension/src/background/capture/popup-export/route-descriptors.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archives.ts",
+        "apps/extension/src/background/capture/popup-export/job/archive.ts",
+        "apps/extension/src/background/capture/popup-export/job/execute.ts",
+        "apps/extension/src/background/capture/popup-export/job/index.ts",
+        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
+        "apps/extension/src/background/capture/popup-export/job/route-descriptors.ts",
+        "apps/extension/src/background/capture/popup-export/job/route.ts",
+        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
+        "apps/extension/src/background/capture/popup-export/job/storage.ts",
+        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -1411,43 +1374,6 @@
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
-        "apps/extension/src/background/debugger/diagnostics.ts",
-        "apps/extension/src/background/debugger/infra.ts",
-        "apps/extension/src/background/debugger/privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/activation.ts",
-        "apps/extension/src/background/debugger/session/attach-request.ts",
-        "apps/extension/src/background/debugger/session/attach.ts",
-        "apps/extension/src/background/debugger/session/detach-core.ts",
-        "apps/extension/src/background/debugger/session/detach.privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/detach.ts",
-        "apps/extension/src/background/debugger/session/index.ts",
-        "apps/extension/src/background/debugger/session/state-core.ts",
-        "apps/extension/src/background/debugger/session/status.ts",
-        "apps/extension/src/background/debugger/session/store.ts",
-        "apps/extension/src/background/debugger/session/targets.ts",
-        "apps/extension/src/background/debugger/workspace/commands.ts",
-        "apps/extension/src/background/debugger/workspace/helpers.ts",
-        "apps/extension/src/background/debugger/workspace/index.ts",
-        "apps/extension/src/background/debugger/workspace/metrics.ts",
-        "apps/extension/src/background/diagnostics/cdp-record-guards.ts",
-        "apps/extension/src/background/diagnostics/cdp.dispatch.ts",
-        "apps/extension/src/background/diagnostics/cdp.event-appenders.ts",
-        "apps/extension/src/background/diagnostics/cdp.helpers.ts",
-        "apps/extension/src/background/diagnostics/cdp.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/authorization/preauthorization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/browser-info.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/debugger-events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/helpers.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/index.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/privacy-erasure.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/sanitization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-expiry-orchestrator.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-factory.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-lifecycle.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-state.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/start-capability.ts",
         "apps/extension/src/background/diagnostics/handlers.ts",
         "apps/extension/src/background/diagnostics/helpers.ts",
         "apps/extension/src/background/diagnostics/index.ts",
@@ -1456,11 +1382,9 @@
         "apps/extension/src/background/diagnostics/logger.ts",
         "apps/extension/src/background/diagnostics/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/diagnostics/public/event-sink.ts",
-        "apps/extension/src/background/diagnostics/public/har-export.ts",
         "apps/extension/src/background/diagnostics/public/session.ts",
         "apps/extension/src/background/diagnostics/recovery.ts",
         "apps/extension/src/background/diagnostics/route-descriptors.ts",
-        "apps/extension/src/background/diagnostics/routes.ts",
         "apps/extension/src/background/diagnostics/runtime.privacy-erasure.ts",
         "apps/extension/src/background/diagnostics/runtime.ts",
         "apps/extension/src/background/diagnostics/session.ts",
@@ -1485,9 +1409,7 @@
         "apps/extension/src/background/media/video/application/export/use-case.ts",
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
-        "apps/extension/src/background/media/video/capture-surface/cursor-projection.ts",
         "apps/extension/src/background/media/video/capture-surface/index.ts",
-        "apps/extension/src/background/media/video/capture-surface/output-state.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery-cleanup.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery.ts",
         "apps/extension/src/background/media/video/capture-surface/release-applied.ts",
@@ -1498,6 +1420,7 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
         "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/preset.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
         "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
@@ -1568,10 +1491,7 @@
         "apps/extension/src/background/media/video/runtime/manager/runtime/tab-close.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/binding.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/output-transition.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/resize.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
@@ -1614,12 +1534,23 @@
         "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/offscreen-document/startup-id.ts",
         "apps/extension/src/background/offscreen-document/state.ts",
+        "apps/extension/src/background/page-access/lifecycle.ts",
+        "apps/extension/src/background/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/page-access/readiness.ts",
+        "apps/extension/src/background/page-access/registration.ts",
+        "apps/extension/src/background/page-access/route-descriptors.ts",
+        "apps/extension/src/background/page-access/route.ts",
+        "apps/extension/src/background/page-access/service-actions.ts",
+        "apps/extension/src/background/page-access/service-factory.ts",
+        "apps/extension/src/background/page-access/service.ts",
+        "apps/extension/src/background/page-access/status.ts",
+        "apps/extension/src/background/page-access/tab-activation.ts",
+        "apps/extension/src/background/page-access/target.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-requests.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.ts",
-        "apps/extension/src/background/routing-contracts/capabilities/content-action/grants.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/proof-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts",
@@ -1658,6 +1589,7 @@
         "apps/extension/src/background/runtime/context-menu/service.ts",
         "apps/extension/src/background/runtime/context-menu/test-fixtures.ts",
         "apps/extension/src/background/runtime/context-menu/types.ts",
+        "apps/extension/src/background/runtime/context-menu/window-resize.ts",
         "apps/extension/src/background/runtime/native-app/compatibility.ts",
         "apps/extension/src/background/runtime/native-app/controller-identity.ts",
         "apps/extension/src/background/runtime/native-app/errors.ts",
@@ -1694,19 +1626,7 @@
         "apps/extension/src/background/runtime/native-app/tray-action-registry.ts",
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
-        "apps/extension/src/background/runtime/page-access/lifecycle.ts",
-        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
         "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
-        "apps/extension/src/background/runtime/page-access/readiness.ts",
-        "apps/extension/src/background/runtime/page-access/registration.ts",
-        "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
-        "apps/extension/src/background/runtime/page-access/route.ts",
-        "apps/extension/src/background/runtime/page-access/service-actions.ts",
-        "apps/extension/src/background/runtime/page-access/service-factory.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
-        "apps/extension/src/background/runtime/page-access/status.ts",
-        "apps/extension/src/background/runtime/page-access/tab-activation.ts",
-        "apps/extension/src/background/runtime/page-access/target.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route-descriptors.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route.ts",
         "apps/extension/src/background/runtime/routing/action-kernel/context.ts",
@@ -1762,7 +1682,6 @@
         "apps/extension/src/background/runtime/routing/message-guards/guards/shared.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/tab.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/video-runtime.ts",
-        "apps/extension/src/background/runtime/routing/runtime-wiring/debugger.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/initialize.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/install.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/navigation.ts",
@@ -1966,8 +1885,6 @@
         "apps/extension/src/background/capture-surface/screenshot-session.ts",
         "apps/extension/src/background/capture-surface/service.ts",
         "apps/extension/src/background/capture-surface/types.ts",
-        "apps/extension/src/background/capture-surface/viewport-capacity.ts",
-        "apps/extension/src/background/capture-surface/viewport.ts",
         "apps/extension/src/background/capture-surface/window.ts",
         "apps/extension/src/background/capture/annotation-export/popup-launch-intent.ts",
         "apps/extension/src/background/capture/annotation-export/route.ts",
@@ -1993,7 +1910,6 @@
         "apps/extension/src/background/capture/full-page/budgets.ts",
         "apps/extension/src/background/capture/full-page/cancellation.ts",
         "apps/extension/src/background/capture/full-page/capture-parts.ts",
-        "apps/extension/src/background/capture/full-page/cdp-backend.ts",
         "apps/extension/src/background/capture/full-page/heartbeat.ts",
         "apps/extension/src/background/capture/full-page/helpers.ts",
         "apps/extension/src/background/capture/full-page/lifecycle.ts",
@@ -2039,10 +1955,17 @@
         "apps/extension/src/background/capture/page-preparation/viewer-ports.ts",
         "apps/extension/src/background/capture/page-preparation/viewer-preparation-command.ts",
         "apps/extension/src/background/capture/page-state/index.ts",
-        "apps/extension/src/background/capture/popup-export/archive-route.ts",
-        "apps/extension/src/background/capture/popup-export/route-descriptors.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archive-validation.ts",
-        "apps/extension/src/background/capture/popup-export/staged-archives.ts",
+        "apps/extension/src/background/capture/popup-export/job/archive.ts",
+        "apps/extension/src/background/capture/popup-export/job/execute.ts",
+        "apps/extension/src/background/capture/popup-export/job/index.ts",
+        "apps/extension/src/background/capture/popup-export/job/lifecycle-gate.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-boundary.ts",
+        "apps/extension/src/background/capture/popup-export/job/package-phase.ts",
+        "apps/extension/src/background/capture/popup-export/job/route-descriptors.ts",
+        "apps/extension/src/background/capture/popup-export/job/route.ts",
+        "apps/extension/src/background/capture/popup-export/job/runtime-state.ts",
+        "apps/extension/src/background/capture/popup-export/job/storage.ts",
+        "apps/extension/src/background/capture/popup-export/job/visible.ts",
         "apps/extension/src/background/capture/quick-actions/capability.ts",
         "apps/extension/src/background/capture/quick-actions/desktop/workflow.ts",
         "apps/extension/src/background/capture/quick-actions/flow/finalize.ts",
@@ -2089,43 +2012,6 @@
         "apps/extension/src/background/capture/visible/coordinator.ts",
         "apps/extension/src/background/capture/visible/flow.ts",
         "apps/extension/src/background/capture/visible/helpers.ts",
-        "apps/extension/src/background/debugger/diagnostics.ts",
-        "apps/extension/src/background/debugger/infra.ts",
-        "apps/extension/src/background/debugger/privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/activation.ts",
-        "apps/extension/src/background/debugger/session/attach-request.ts",
-        "apps/extension/src/background/debugger/session/attach.ts",
-        "apps/extension/src/background/debugger/session/detach-core.ts",
-        "apps/extension/src/background/debugger/session/detach.privacy-erasure.ts",
-        "apps/extension/src/background/debugger/session/detach.ts",
-        "apps/extension/src/background/debugger/session/index.ts",
-        "apps/extension/src/background/debugger/session/state-core.ts",
-        "apps/extension/src/background/debugger/session/status.ts",
-        "apps/extension/src/background/debugger/session/store.ts",
-        "apps/extension/src/background/debugger/session/targets.ts",
-        "apps/extension/src/background/debugger/workspace/commands.ts",
-        "apps/extension/src/background/debugger/workspace/helpers.ts",
-        "apps/extension/src/background/debugger/workspace/index.ts",
-        "apps/extension/src/background/debugger/workspace/metrics.ts",
-        "apps/extension/src/background/diagnostics/cdp-record-guards.ts",
-        "apps/extension/src/background/diagnostics/cdp.dispatch.ts",
-        "apps/extension/src/background/diagnostics/cdp.event-appenders.ts",
-        "apps/extension/src/background/diagnostics/cdp.helpers.ts",
-        "apps/extension/src/background/diagnostics/cdp.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/authorization/preauthorization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/browser-info.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/debugger-events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/events.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/helpers.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/index.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/privacy-erasure.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/sanitization.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-expiry-orchestrator.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-factory.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-lifecycle.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session-state.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/session.ts",
-        "apps/extension/src/background/diagnostics/export-har-collector/start-capability.ts",
         "apps/extension/src/background/diagnostics/handlers.ts",
         "apps/extension/src/background/diagnostics/helpers.ts",
         "apps/extension/src/background/diagnostics/index.ts",
@@ -2134,11 +2020,9 @@
         "apps/extension/src/background/diagnostics/logger.ts",
         "apps/extension/src/background/diagnostics/privacy-erasure/cleanup.ts",
         "apps/extension/src/background/diagnostics/public/event-sink.ts",
-        "apps/extension/src/background/diagnostics/public/har-export.ts",
         "apps/extension/src/background/diagnostics/public/session.ts",
         "apps/extension/src/background/diagnostics/recovery.ts",
         "apps/extension/src/background/diagnostics/route-descriptors.ts",
-        "apps/extension/src/background/diagnostics/routes.ts",
         "apps/extension/src/background/diagnostics/runtime.privacy-erasure.ts",
         "apps/extension/src/background/diagnostics/runtime.ts",
         "apps/extension/src/background/diagnostics/session.ts",
@@ -2163,9 +2047,7 @@
         "apps/extension/src/background/media/video/application/export/use-case.ts",
         "apps/extension/src/background/media/video/capture-source/index.ts",
         "apps/extension/src/background/media/video/capture-source/screen-source.ts",
-        "apps/extension/src/background/media/video/capture-surface/cursor-projection.ts",
         "apps/extension/src/background/media/video/capture-surface/index.ts",
-        "apps/extension/src/background/media/video/capture-surface/output-state.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery-cleanup.ts",
         "apps/extension/src/background/media/video/capture-surface/recovery.ts",
         "apps/extension/src/background/media/video/capture-surface/release-applied.ts",
@@ -2176,6 +2058,7 @@
         "apps/extension/src/background/media/video/content-surface/camera-peer.ts",
         "apps/extension/src/background/media/video/content-surface/commands.ts",
         "apps/extension/src/background/media/video/content-surface/mutation-queue.ts",
+        "apps/extension/src/background/media/video/content-surface/preset.ts",
         "apps/extension/src/background/media/video/content-surface/route-descriptors.ts",
         "apps/extension/src/background/media/video/content-surface/route.ts",
         "apps/extension/src/background/media/video/content-surface/runtime-state-sync.ts",
@@ -2246,10 +2129,7 @@
         "apps/extension/src/background/media/video/runtime/manager/runtime/tab-close.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/binding.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/output-transition.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/resize.ts",
-        "apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.ts",
         "apps/extension/src/background/media/video/runtime/manager/tab-navigation/transaction.ts",
         "apps/extension/src/background/media/video/runtime/router.ts",
         "apps/extension/src/background/media/video/runtime/sender-policy.ts",
@@ -2292,12 +2172,23 @@
         "apps/extension/src/background/offscreen-document/service.ts",
         "apps/extension/src/background/offscreen-document/startup-id.ts",
         "apps/extension/src/background/offscreen-document/state.ts",
+        "apps/extension/src/background/page-access/lifecycle.ts",
+        "apps/extension/src/background/page-access/pinned-toolbar-operation.ts",
+        "apps/extension/src/background/page-access/readiness.ts",
+        "apps/extension/src/background/page-access/registration.ts",
+        "apps/extension/src/background/page-access/route-descriptors.ts",
+        "apps/extension/src/background/page-access/route.ts",
+        "apps/extension/src/background/page-access/service-actions.ts",
+        "apps/extension/src/background/page-access/service-factory.ts",
+        "apps/extension/src/background/page-access/service.ts",
+        "apps/extension/src/background/page-access/status.ts",
+        "apps/extension/src/background/page-access/tab-activation.ts",
+        "apps/extension/src/background/page-access/target.ts",
         "apps/extension/src/background/routing-contracts/authorization-result.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/activation-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/authority-shape.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-requests.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/capability-store.ts",
-        "apps/extension/src/background/routing-contracts/capabilities/content-action/grants.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/proof-store.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route-descriptors.ts",
         "apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts",
@@ -2336,6 +2227,7 @@
         "apps/extension/src/background/runtime/context-menu/service.ts",
         "apps/extension/src/background/runtime/context-menu/test-fixtures.ts",
         "apps/extension/src/background/runtime/context-menu/types.ts",
+        "apps/extension/src/background/runtime/context-menu/window-resize.ts",
         "apps/extension/src/background/runtime/native-app/compatibility.ts",
         "apps/extension/src/background/runtime/native-app/controller-identity.ts",
         "apps/extension/src/background/runtime/native-app/errors.ts",
@@ -2372,19 +2264,7 @@
         "apps/extension/src/background/runtime/native-app/tray-action-registry.ts",
         "apps/extension/src/background/runtime/native-app/tray-actions.ts",
         "apps/extension/src/background/runtime/native-app/tray-shortcut-priority.ts",
-        "apps/extension/src/background/runtime/page-access/lifecycle.ts",
-        "apps/extension/src/background/runtime/page-access/pinned-toolbar-operation.ts",
         "apps/extension/src/background/runtime/page-access/pinned-toolbar-restore.ts",
-        "apps/extension/src/background/runtime/page-access/readiness.ts",
-        "apps/extension/src/background/runtime/page-access/registration.ts",
-        "apps/extension/src/background/runtime/page-access/route-descriptors.ts",
-        "apps/extension/src/background/runtime/page-access/route.ts",
-        "apps/extension/src/background/runtime/page-access/service-actions.ts",
-        "apps/extension/src/background/runtime/page-access/service-factory.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
-        "apps/extension/src/background/runtime/page-access/status.ts",
-        "apps/extension/src/background/runtime/page-access/tab-activation.ts",
-        "apps/extension/src/background/runtime/page-access/target.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route-descriptors.ts",
         "apps/extension/src/background/runtime/page-access/wakeup-route.ts",
         "apps/extension/src/background/runtime/routing/action-kernel/context.ts",
@@ -2440,7 +2320,6 @@
         "apps/extension/src/background/runtime/routing/message-guards/guards/shared.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/tab.ts",
         "apps/extension/src/background/runtime/routing/message-guards/guards/video-runtime.ts",
-        "apps/extension/src/background/runtime/routing/runtime-wiring/debugger.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/initialize.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/install.ts",
         "apps/extension/src/background/runtime/routing/runtime-wiring/navigation.ts",
@@ -3120,6 +2999,7 @@
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/area-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/privacy-erasure.ts",
+        "apps/extension/src/composition/persistence/infrastructure/guards/annotation-session-defaults.ts",
         "apps/extension/src/composition/persistence/infrastructure/guards/primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts",
@@ -3155,6 +3035,7 @@
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/area-adapter.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts",
         "apps/extension/src/composition/persistence/infrastructure/browser-storage/privacy-erasure.ts",
+        "apps/extension/src/composition/persistence/infrastructure/guards/annotation-session-defaults.ts",
         "apps/extension/src/composition/persistence/infrastructure/guards/primitives.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts",
         "apps/extension/src/composition/persistence/infrastructure/indexed-db/core.ts",
@@ -4209,10 +4090,6 @@
         "apps/extension/src/content/overlay/video-telemetry/signals.ts",
         "apps/extension/src/content/overlay/video-telemetry/state.ts",
         "apps/extension/src/content/overlay/video-telemetry/types.ts",
-        "apps/extension/src/content/overlay/viewport-cursor-projection/appearance.ts",
-        "apps/extension/src/content/overlay/viewport-cursor-projection/controller.ts",
-        "apps/extension/src/content/overlay/viewport-cursor-projection/index.ts",
-        "apps/extension/src/content/overlay/viewport-cursor-projection/native-cursor.ts",
         "apps/extension/src/content/overlay/viewport-selector/capability.ts",
         "apps/extension/src/content/overlay/viewport-selector/index.tsx",
         "apps/extension/src/content/overlay/viewport-selector/menu.ts",
@@ -4249,12 +4126,6 @@
         "apps/extension/src/content/parser/export-manager/archive/readme.ts",
         "apps/extension/src/content/parser/export-manager/archive/transfer.ts",
         "apps/extension/src/content/parser/export-manager/archive/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/capture.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/controller.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/index.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/state.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/window-capture.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.assets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.field-diagnostics.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.json.ts",
@@ -4269,10 +4140,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/screenshot-transport.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/transport.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -4287,7 +4156,6 @@
         "apps/extension/src/content/parser/export-manager/index.ts",
         "apps/extension/src/content/parser/export-manager/service/annotations.ts",
         "apps/extension/src/content/parser/export-manager/service/assets.ts",
-        "apps/extension/src/content/parser/export-manager/service/diagnostics-session.ts",
         "apps/extension/src/content/parser/export-manager/service/index.ts",
         "apps/extension/src/content/parser/export-manager/service/pipeline.ts",
         "apps/extension/src/content/parser/export-manager/service/runtime.ts",
@@ -4421,17 +4289,11 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
         "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
@@ -4944,12 +4806,6 @@
         "apps/extension/src/content/parser/export-manager/archive/readme.ts",
         "apps/extension/src/content/parser/export-manager/archive/transfer.ts",
         "apps/extension/src/content/parser/export-manager/archive/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/capture.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/controller.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/index.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/state.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/types.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/window-capture.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.assets.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.field-diagnostics.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/core.json.ts",
@@ -4964,10 +4820,8 @@
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.performance.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/page-snapshot.url-attributes.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/screenshot-transport.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/snapshot.ts",
         "apps/extension/src/content/parser/export-manager/diagnostics/source.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/transport.ts",
         "apps/extension/src/content/parser/export-manager/files/disposition-filename.ts",
         "apps/extension/src/content/parser/export-manager/files/download-utils.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -4982,7 +4836,6 @@
         "apps/extension/src/content/parser/export-manager/index.ts",
         "apps/extension/src/content/parser/export-manager/service/annotations.ts",
         "apps/extension/src/content/parser/export-manager/service/assets.ts",
-        "apps/extension/src/content/parser/export-manager/service/diagnostics-session.ts",
         "apps/extension/src/content/parser/export-manager/service/index.ts",
         "apps/extension/src/content/parser/export-manager/service/pipeline.ts",
         "apps/extension/src/content/parser/export-manager/service/runtime.ts",
@@ -5082,17 +4935,11 @@
         "apps/extension/src/content/parser/popup-export/controller/request-handler/cancel.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/dispatch.ts",
         "apps/extension/src/content/parser/popup-export/controller/request-handler/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/progress.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/runtime.ts",
-        "apps/extension/src/content/parser/popup-export/controller/start/settle.ts",
         "apps/extension/src/content/parser/popup-export/controller/state.ts",
         "apps/extension/src/content/parser/popup-export/controller/types.ts",
         "apps/extension/src/content/parser/popup-export/controller/web-snapshot-runtime.ts",
         "apps/extension/src/content/parser/popup-export/dom-driver.ts",
         "apps/extension/src/content/parser/popup-export/dom-runtime.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/blob.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/fallback.ts",
-        "apps/extension/src/content/parser/popup-export/helpers/archive/persist.ts",
         "apps/extension/src/content/parser/popup-export/helpers/messaging.ts",
         "apps/extension/src/content/parser/popup-export/helpers/preview.ts",
         "apps/extension/src/content/parser/popup-export/helpers/request/options.ts",
@@ -5709,6 +5556,7 @@
         "apps/extension/src/editor/controller/background/layout.ts",
         "apps/extension/src/editor/controller/background/metadata.ts",
         "apps/extension/src/editor/controller/background/objects.ts",
+        "apps/extension/src/editor/controller/background/raster.ts",
         "apps/extension/src/editor/controller/background/sync.ts",
         "apps/extension/src/editor/controller/browser-frame/document-layer.ts",
         "apps/extension/src/editor/controller/browser-frame/document-log.ts",
@@ -5815,6 +5663,8 @@
         "apps/extension/src/editor/controller/draw-workflow/index.ts",
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
+        "apps/extension/src/editor/controller/events/drawing-draft.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -5824,7 +5674,6 @@
         "apps/extension/src/editor/controller/events/runtime-window/types.ts",
         "apps/extension/src/editor/controller/events/runtime.canvas.ts",
         "apps/extension/src/editor/controller/events/runtime.crop-guide.ts",
-        "apps/extension/src/editor/controller/events/runtime.hover.ts",
         "apps/extension/src/editor/controller/events/runtime.object-modified.ts",
         "apps/extension/src/editor/controller/events/runtime.object-moving.ts",
         "apps/extension/src/editor/controller/events/runtime.object-scaling.ts",
@@ -5841,6 +5690,7 @@
         "apps/extension/src/editor/controller/input/canvas-actions/draw-session.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/index.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/object-add.ts",
+        "apps/extension/src/editor/controller/input/canvas-actions/transform.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/transient.ts",
         "apps/extension/src/editor/controller/input/double-click.ts",
         "apps/extension/src/editor/controller/input/index.ts",
@@ -5866,6 +5716,7 @@
         "apps/extension/src/editor/controller/instance/actions/lifecycle/document.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/index.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/mount.ts",
+        "apps/extension/src/editor/controller/instance/actions/lifecycle/pointer-capture.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/tool-mode.ts",
         "apps/extension/src/editor/controller/instance/actions/scene-mutations.ts",
         "apps/extension/src/editor/controller/instance/actions/scene-viewport.ts",
@@ -6134,7 +5985,6 @@
         "apps/extension/src/editor/frame-annotation/projection-space.ts",
         "apps/extension/src/editor/frame-annotation/projection.tsx",
         "apps/extension/src/editor/frame-annotation/proxy.ts",
-        "apps/extension/src/editor/frame-annotation/toolbar-layer-controls.tsx",
         "apps/extension/src/editor/frame-annotation/toolbar-placement.ts",
         "apps/extension/src/editor/frame-annotation/types.ts",
         "apps/extension/src/editor/index.tsx",
@@ -6291,13 +6141,7 @@
         "apps/extension/src/editor/inspector/presets/types.ts",
         "apps/extension/src/editor/inspector/presets/view-mode.ts",
         "apps/extension/src/editor/inspector/scene/apply-button.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/colors.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/controls.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/index.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/presets.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/section.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/types.ts",
-        "apps/extension/src/editor/inspector/scene/background/gradient/view.tsx",
+        "apps/extension/src/editor/inspector/scene/background/blur.tsx",
         "apps/extension/src/editor/inspector/scene/background/image-actions.tsx",
         "apps/extension/src/editor/inspector/scene/background/image-mode.tsx",
         "apps/extension/src/editor/inspector/scene/background/image.tsx",
@@ -6324,7 +6168,6 @@
         "apps/extension/src/editor/inspector/sidebar-controller/compact-context.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/confirm-dialog.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/derived.tsx",
-        "apps/extension/src/editor/inspector/sidebar-controller/drafts-scene.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/drafts.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/history-preview.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/index.tsx",
@@ -6484,7 +6327,6 @@
         "apps/extension/src/editor/objects/image-frame.ts",
         "apps/extension/src/editor/objects/image-style.ts",
         "apps/extension/src/editor/objects/index.ts",
-        "apps/extension/src/editor/objects/meta-stamp/factory.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-geometry.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-primitives.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-rough.ts",
@@ -6565,6 +6407,10 @@
         "apps/extension/src/editor/state/tool-settings.ts",
         "apps/extension/src/editor/state/types.ts",
         "apps/extension/src/editor/state/useEditorStore.ts",
+        "apps/extension/src/editor/workflows/close-page-document.ts",
+        "apps/extension/src/editor/workflows/open-local-image-draft.ts",
+        "apps/extension/src/editor/workflows/promote-image-to-library.ts",
+        "apps/extension/src/editor/workflows/save-stale-image-copy.ts",
         "apps/extension/src/editor/workspace/canvas/context-menu/helpers.ts",
         "apps/extension/src/editor/workspace/canvas/context-menu/index.tsx",
         "apps/extension/src/editor/workspace/canvas/context-menu/items.ts",
@@ -6580,41 +6426,32 @@
         "apps/extension/src/editor/workspace/canvas/use-intake.ts",
         "apps/extension/src/editor/workspace/canvas/use-state.ts",
         "apps/extension/src/editor/workspace/canvas/views.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-selection-toolbar.tsx",
+        "apps/extension/src/editor/workspace/floating/anchored-feedback.tsx",
         "apps/extension/src/editor/workspace/floating/canvas-toolbar-command-groups.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry-types.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-groups.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-image-geometry.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-menu.tsx",
         "apps/extension/src/editor/workspace/floating/canvas-toolbar-model.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-popover-layout.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-state.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-visibility-runtime.ts",
         "apps/extension/src/editor/workspace/floating/document-bar-quick-actions.tsx",
         "apps/extension/src/editor/workspace/floating/document-bar-types.ts",
         "apps/extension/src/editor/workspace/floating/document-bar.tsx",
         "apps/extension/src/editor/workspace/floating/edge-insets.ts",
-        "apps/extension/src/editor/workspace/floating/image-toolbar-groups.tsx",
         "apps/extension/src/editor/workspace/floating/index.tsx",
         "apps/extension/src/editor/workspace/floating/inspector.tsx",
         "apps/extension/src/editor/workspace/floating/layer-effects-panel.tsx",
-        "apps/extension/src/editor/workspace/floating/layer-toolbar-groups.tsx",
+        "apps/extension/src/editor/workspace/floating/layers-panel-navigation.tsx",
         "apps/extension/src/editor/workspace/floating/layers-panel.tsx",
         "apps/extension/src/editor/workspace/floating/left-drawer.tsx",
         "apps/extension/src/editor/workspace/floating/overlays.tsx",
+        "apps/extension/src/editor/workspace/floating/position-refresh.ts",
         "apps/extension/src/editor/workspace/floating/preferences.ts",
         "apps/extension/src/editor/workspace/floating/right-stack.tsx",
         "apps/extension/src/editor/workspace/floating/routes.ts",
+        "apps/extension/src/editor/workspace/floating/save-to-folder-dialog.tsx",
         "apps/extension/src/editor/workspace/floating/step-toolbar-groups.tsx",
         "apps/extension/src/editor/workspace/floating/tool-properties-button.tsx",
-        "apps/extension/src/editor/workspace/floating/tool-properties-geometry.ts",
         "apps/extension/src/editor/workspace/floating/tool-properties-groups.tsx",
         "apps/extension/src/editor/workspace/floating/tool-properties-popover-layout.ts",
         "apps/extension/src/editor/workspace/floating/tool-properties-rail.tsx",
         "apps/extension/src/editor/workspace/floating/tool-rail.tsx",
         "apps/extension/src/editor/workspace/floating/toolbar-group-builders.tsx",
-        "apps/extension/src/editor/workspace/floating/utility-panel.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-parts.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-popovers.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-zoom.tsx",
@@ -6666,6 +6503,7 @@
         "apps/extension/src/editor/controller/background/layout.ts",
         "apps/extension/src/editor/controller/background/metadata.ts",
         "apps/extension/src/editor/controller/background/objects.ts",
+        "apps/extension/src/editor/controller/background/raster.ts",
         "apps/extension/src/editor/controller/background/sync.ts",
         "apps/extension/src/editor/controller/browser-frame/document-layer.ts",
         "apps/extension/src/editor/controller/browser-frame/document-log.ts",
@@ -6772,6 +6610,8 @@
         "apps/extension/src/editor/controller/draw-workflow/index.ts",
         "apps/extension/src/editor/controller/events/draw-completion.ts",
         "apps/extension/src/editor/controller/events/draw-session-completion.ts",
+        "apps/extension/src/editor/controller/events/drawing-draft.ts",
+        "apps/extension/src/editor/controller/events/drawing-pointer-gesture.ts",
         "apps/extension/src/editor/controller/events/drawing.ts",
         "apps/extension/src/editor/controller/events/index.ts",
         "apps/extension/src/editor/controller/events/pan.ts",
@@ -6781,7 +6621,6 @@
         "apps/extension/src/editor/controller/events/runtime-window/types.ts",
         "apps/extension/src/editor/controller/events/runtime.canvas.ts",
         "apps/extension/src/editor/controller/events/runtime.crop-guide.ts",
-        "apps/extension/src/editor/controller/events/runtime.hover.ts",
         "apps/extension/src/editor/controller/events/runtime.object-modified.ts",
         "apps/extension/src/editor/controller/events/runtime.object-moving.ts",
         "apps/extension/src/editor/controller/events/runtime.object-scaling.ts",
@@ -6798,6 +6637,7 @@
         "apps/extension/src/editor/controller/input/canvas-actions/draw-session.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/index.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/object-add.ts",
+        "apps/extension/src/editor/controller/input/canvas-actions/transform.ts",
         "apps/extension/src/editor/controller/input/canvas-actions/transient.ts",
         "apps/extension/src/editor/controller/input/double-click.ts",
         "apps/extension/src/editor/controller/input/index.ts",
@@ -6823,6 +6663,7 @@
         "apps/extension/src/editor/controller/instance/actions/lifecycle/document.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/index.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/mount.ts",
+        "apps/extension/src/editor/controller/instance/actions/lifecycle/pointer-capture.ts",
         "apps/extension/src/editor/controller/instance/actions/lifecycle/tool-mode.ts",
         "apps/extension/src/editor/controller/instance/actions/scene-mutations.ts",
         "apps/extension/src/editor/controller/instance/actions/scene-viewport.ts",
@@ -7221,13 +7062,7 @@
         "apps/extension/src/editor/inspector/presets/types.ts",
         "apps/extension/src/editor/inspector/presets/view-mode.ts",
         "apps/extension/src/editor/inspector/scene/apply-button.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/colors.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/controls.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/index.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/presets.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/section.tsx",
-        "apps/extension/src/editor/inspector/scene/background/gradient/types.ts",
-        "apps/extension/src/editor/inspector/scene/background/gradient/view.tsx",
+        "apps/extension/src/editor/inspector/scene/background/blur.tsx",
         "apps/extension/src/editor/inspector/scene/background/image-actions.tsx",
         "apps/extension/src/editor/inspector/scene/background/image-mode.tsx",
         "apps/extension/src/editor/inspector/scene/background/image.tsx",
@@ -7254,7 +7089,6 @@
         "apps/extension/src/editor/inspector/sidebar-controller/compact-context.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/confirm-dialog.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/derived.tsx",
-        "apps/extension/src/editor/inspector/sidebar-controller/drafts-scene.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/drafts.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/history-preview.ts",
         "apps/extension/src/editor/inspector/sidebar-controller/index.tsx",
@@ -7414,7 +7248,6 @@
         "apps/extension/src/editor/objects/image-frame.ts",
         "apps/extension/src/editor/objects/image-style.ts",
         "apps/extension/src/editor/objects/index.ts",
-        "apps/extension/src/editor/objects/meta-stamp/factory.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-geometry.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-primitives.ts",
         "apps/extension/src/editor/objects/rich-shape/arrowhead-rough.ts",
@@ -7491,41 +7324,32 @@
         "apps/extension/src/editor/workspace/canvas/use-intake.ts",
         "apps/extension/src/editor/workspace/canvas/use-state.ts",
         "apps/extension/src/editor/workspace/canvas/views.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-selection-toolbar.tsx",
+        "apps/extension/src/editor/workspace/floating/anchored-feedback.tsx",
         "apps/extension/src/editor/workspace/floating/canvas-toolbar-command-groups.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry-types.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-groups.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-image-geometry.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-menu.tsx",
         "apps/extension/src/editor/workspace/floating/canvas-toolbar-model.tsx",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-popover-layout.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-state.ts",
-        "apps/extension/src/editor/workspace/floating/canvas-toolbar-visibility-runtime.ts",
         "apps/extension/src/editor/workspace/floating/document-bar-quick-actions.tsx",
         "apps/extension/src/editor/workspace/floating/document-bar-types.ts",
         "apps/extension/src/editor/workspace/floating/document-bar.tsx",
         "apps/extension/src/editor/workspace/floating/edge-insets.ts",
-        "apps/extension/src/editor/workspace/floating/image-toolbar-groups.tsx",
         "apps/extension/src/editor/workspace/floating/index.tsx",
         "apps/extension/src/editor/workspace/floating/inspector.tsx",
         "apps/extension/src/editor/workspace/floating/layer-effects-panel.tsx",
-        "apps/extension/src/editor/workspace/floating/layer-toolbar-groups.tsx",
+        "apps/extension/src/editor/workspace/floating/layers-panel-navigation.tsx",
         "apps/extension/src/editor/workspace/floating/layers-panel.tsx",
         "apps/extension/src/editor/workspace/floating/left-drawer.tsx",
         "apps/extension/src/editor/workspace/floating/overlays.tsx",
+        "apps/extension/src/editor/workspace/floating/position-refresh.ts",
         "apps/extension/src/editor/workspace/floating/preferences.ts",
         "apps/extension/src/editor/workspace/floating/right-stack.tsx",
         "apps/extension/src/editor/workspace/floating/routes.ts",
+        "apps/extension/src/editor/workspace/floating/save-to-folder-dialog.tsx",
         "apps/extension/src/editor/workspace/floating/step-toolbar-groups.tsx",
         "apps/extension/src/editor/workspace/floating/tool-properties-button.tsx",
-        "apps/extension/src/editor/workspace/floating/tool-properties-geometry.ts",
         "apps/extension/src/editor/workspace/floating/tool-properties-groups.tsx",
         "apps/extension/src/editor/workspace/floating/tool-properties-popover-layout.ts",
         "apps/extension/src/editor/workspace/floating/tool-properties-rail.tsx",
         "apps/extension/src/editor/workspace/floating/tool-rail.tsx",
         "apps/extension/src/editor/workspace/floating/toolbar-group-builders.tsx",
-        "apps/extension/src/editor/workspace/floating/utility-panel.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-parts.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-popovers.tsx",
         "apps/extension/src/editor/workspace/floating/view-controls-zoom.tsx",
@@ -7554,14 +7378,8 @@
         "apps/extension/src/editor/workspace/viewport-preview/view.tsx"
       ],
       "unownedFocusedFiles": [
-        "apps/extension/src/editor/controller/instance/bindings/index.ts",
         "apps/extension/src/editor/controller/rich-shape-formatting/index.ts",
-        "apps/extension/src/editor/controller/rich-shape-formatting/types.ts",
-        "apps/extension/src/editor/inspector/chrome.ts",
-        "apps/extension/src/editor/inspector/panel-types.ts",
-        "apps/extension/src/editor/inspector/technical-data-picker.tsx",
-        "apps/extension/src/editor/inspector/toolbar-derived-state.ts",
-        "apps/extension/src/editor/inspector/types.ts"
+        "apps/extension/src/editor/controller/rich-shape-formatting/types.ts"
       ]
     },
     {
@@ -7942,6 +7760,7 @@
         "apps/extension/src/features/highlighter/frame-annotation/callout/polyline-control.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/rounded-perimeter.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/settings-key.ts",
+        "apps/extension/src/features/highlighter/frame-annotation/callout/surface-compositor.tsx",
         "apps/extension/src/features/highlighter/frame-annotation/callout/surface.tsx",
         "apps/extension/src/features/highlighter/frame-annotation/callout/tail-base-range.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/tail-drag.ts",
@@ -8047,6 +7866,7 @@
         "apps/extension/src/features/highlighter/frame-annotation/callout/polyline-control.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/rounded-perimeter.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/settings-key.ts",
+        "apps/extension/src/features/highlighter/frame-annotation/callout/surface-compositor.tsx",
         "apps/extension/src/features/highlighter/frame-annotation/callout/surface.tsx",
         "apps/extension/src/features/highlighter/frame-annotation/callout/tail-base-range.ts",
         "apps/extension/src/features/highlighter/frame-annotation/callout/tail-drag.ts",
@@ -9327,7 +9147,6 @@
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
-        "apps/extension/src/offscreen/recording/stream/crop-frame-gate.ts",
         "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
         "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
@@ -9535,7 +9354,6 @@
         "apps/extension/src/offscreen/recording/stream/audio-mixer-graph.ts",
         "apps/extension/src/offscreen/recording/stream/audio-mixer.ts",
         "apps/extension/src/offscreen/recording/stream/canvas-video-output.ts",
-        "apps/extension/src/offscreen/recording/stream/crop-frame-gate.ts",
         "apps/extension/src/offscreen/recording/stream/crop-stream.ts",
         "apps/extension/src/offscreen/recording/stream/fixed-video-output.ts",
         "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
@@ -9680,6 +9498,8 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
+        "apps/extension/src/popup/recording/video/route.tsx",
+        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -9722,25 +9542,15 @@
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
         "apps/extension/src/popup/runtime-services/index.ts",
-        "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/view.tsx",
-        "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/index.tsx",
-        "apps/extension/src/popup/shell/app-shell/route-loading-fallback.tsx",
-        "apps/extension/src/popup/shell/app-shell/tabs-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/test-support/runtime.ts",
         "apps/extension/src/popup/shell/app-shell/video-setup/handlers.ts",
-        "apps/extension/src/popup/shell/app-shell/video-setup/index.tsx",
         "apps/extension/src/popup/shell/app-shell/video-setup/props.ts",
         "apps/extension/src/popup/shell/app/index.tsx",
-        "apps/extension/src/popup/shell/bootstrap/home.ts",
-        "apps/extension/src/popup/shell/bootstrap/index.ts",
+        "apps/extension/src/popup/shell/app/use-startup-reconciliation.ts",
         "apps/extension/src/popup/shell/bootstrap/recording-state.ts",
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
-        "apps/extension/src/popup/shell/command-palette/actions.tsx",
-        "apps/extension/src/popup/shell/command-palette/hotkey.ts",
-        "apps/extension/src/popup/shell/command-palette/index.tsx",
+        "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -9771,6 +9581,7 @@
         "apps/extension/src/popup/shell/export/progress/view.tsx",
         "apps/extension/src/popup/shell/export/ready/controls/index.tsx",
         "apps/extension/src/popup/shell/export/ready/index.tsx",
+        "apps/extension/src/popup/shell/export/route.tsx",
         "apps/extension/src/popup/shell/export/runtime/action-factory.ts",
         "apps/extension/src/popup/shell/export/runtime/actions.ts",
         "apps/extension/src/popup/shell/export/runtime/cancel.ts",
@@ -9788,21 +9599,14 @@
         "apps/extension/src/popup/shell/export/runtime/preview-request.ts",
         "apps/extension/src/popup/shell/export/runtime/preview-to-copy.ts",
         "apps/extension/src/popup/shell/export/runtime/progress.ts",
+        "apps/extension/src/popup/shell/export/runtime/reset.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-archive.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-layout.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-package-boundary.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-requests.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-save.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
         "apps/extension/src/popup/shell/export/runtime/start/progress.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/request.ts",
         "apps/extension/src/popup/shell/export/runtime/state.ts",
         "apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts",
         "apps/extension/src/popup/shell/export/runtime/types.ts",
@@ -9843,49 +9647,37 @@
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
-        "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
-        "apps/extension/src/popup/shell/lifecycle/contracts.ts",
-        "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
-        "apps/extension/src/popup/shell/lifecycle/setup.ts",
-        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
+        "apps/extension/src/popup/shell/home/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
-        "apps/extension/src/popup/shell/runtime/index.ts",
-        "apps/extension/src/popup/shell/runtime/lifecycle.ts",
         "apps/extension/src/popup/shell/runtime/media-device-effects.ts",
         "apps/extension/src/popup/shell/runtime/microphone.ts",
         "apps/extension/src/popup/shell/runtime/model.ts",
         "apps/extension/src/popup/shell/runtime/page-access-grants.ts",
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
-        "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
-        "apps/extension/src/popup/shell/runtime/state.ts",
-        "apps/extension/src/popup/shell/runtime/test-support/state.ts",
         "apps/extension/src/popup/shell/runtime/transport/message.ts",
         "apps/extension/src/popup/shell/runtime/transport/pause.ts",
         "apps/extension/src/popup/shell/runtime/transport/settings.ts",
         "apps/extension/src/popup/shell/runtime/transport/stop.ts",
         "apps/extension/src/popup/shell/runtime/types/action-handlers.ts",
-        "apps/extension/src/popup/shell/runtime/types/command-palette.ts",
-        "apps/extension/src/popup/shell/runtime/types/home.ts",
         "apps/extension/src/popup/shell/runtime/types/internal-state.ts",
-        "apps/extension/src/popup/shell/runtime/types/navigation.ts",
         "apps/extension/src/popup/shell/runtime/types/recording-controls.ts",
         "apps/extension/src/popup/shell/runtime/types/state.ts",
-        "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
+        "apps/extension/src/popup/shell/runtime/video-persistence-effects.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts",
-        "apps/extension/src/popup/shell/tabs/index.tsx"
+        "apps/extension/src/popup/shell/startup/coordinator.ts",
+        "apps/extension/src/popup/shell/startup/descriptor.ts",
+        "apps/extension/src/popup/shell/startup/resource.ts",
+        "apps/extension/src/popup/shell/startup/use-route-controller.ts",
+        "apps/extension/src/popup/shell/tab-access/capabilities.ts",
+        "apps/extension/src/popup/shell/tab-access/index.ts"
       ],
       "rolloutFiles": [
         "apps/extension/src/popup/diagnostics/performance/index.ts",
@@ -9921,6 +9713,8 @@
         "apps/extension/src/popup/recording/video/post-record/panel.tsx",
         "apps/extension/src/popup/recording/video/post-record/result-runtime.ts",
         "apps/extension/src/popup/recording/video/post-record/saving.tsx",
+        "apps/extension/src/popup/recording/video/route.tsx",
+        "apps/extension/src/popup/recording/video/runtime.ts",
         "apps/extension/src/popup/recording/video/settings/counter-card.tsx",
         "apps/extension/src/popup/recording/video/settings/index.tsx",
         "apps/extension/src/popup/recording/video/settings/layout.tsx",
@@ -9963,25 +9757,15 @@
         "apps/extension/src/popup/recording/webcam-flow/index.ts",
         "apps/extension/src/popup/recording/webcam/index.ts",
         "apps/extension/src/popup/runtime-services/index.ts",
-        "apps/extension/src/popup/shell/app-shell/command-palette-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/content/view.tsx",
-        "apps/extension/src/popup/shell/app-shell/footer-layer.tsx",
-        "apps/extension/src/popup/shell/app-shell/index.tsx",
-        "apps/extension/src/popup/shell/app-shell/route-loading-fallback.tsx",
-        "apps/extension/src/popup/shell/app-shell/tabs-layer.tsx",
         "apps/extension/src/popup/shell/app-shell/test-support/runtime.ts",
         "apps/extension/src/popup/shell/app-shell/video-setup/handlers.ts",
-        "apps/extension/src/popup/shell/app-shell/video-setup/index.tsx",
         "apps/extension/src/popup/shell/app-shell/video-setup/props.ts",
         "apps/extension/src/popup/shell/app/index.tsx",
-        "apps/extension/src/popup/shell/bootstrap/home.ts",
-        "apps/extension/src/popup/shell/bootstrap/index.ts",
+        "apps/extension/src/popup/shell/app/use-startup-reconciliation.ts",
         "apps/extension/src/popup/shell/bootstrap/recording-state.ts",
         "apps/extension/src/popup/shell/bootstrap/runtime.ts",
         "apps/extension/src/popup/shell/bootstrap/video.ts",
-        "apps/extension/src/popup/shell/command-palette/actions.tsx",
-        "apps/extension/src/popup/shell/command-palette/hotkey.ts",
-        "apps/extension/src/popup/shell/command-palette/index.tsx",
+        "apps/extension/src/popup/shell/command-palette/route-first.tsx",
         "apps/extension/src/popup/shell/export/controller.ts",
         "apps/extension/src/popup/shell/export/data-type/options/data.ts",
         "apps/extension/src/popup/shell/export/data-type/options/index.tsx",
@@ -10012,6 +9796,7 @@
         "apps/extension/src/popup/shell/export/progress/view.tsx",
         "apps/extension/src/popup/shell/export/ready/controls/index.tsx",
         "apps/extension/src/popup/shell/export/ready/index.tsx",
+        "apps/extension/src/popup/shell/export/route.tsx",
         "apps/extension/src/popup/shell/export/runtime/action-factory.ts",
         "apps/extension/src/popup/shell/export/runtime/actions.ts",
         "apps/extension/src/popup/shell/export/runtime/cancel.ts",
@@ -10029,21 +9814,14 @@
         "apps/extension/src/popup/shell/export/runtime/preview-request.ts",
         "apps/extension/src/popup/shell/export/runtime/preview-to-copy.ts",
         "apps/extension/src/popup/shell/export/runtime/progress.ts",
+        "apps/extension/src/popup/shell/export/runtime/reset.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/index.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/request.ts",
         "apps/extension/src/popup/shell/export/runtime/snapshot/state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-archive.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-layout.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-package-boundary.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-requests.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-save.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch-state.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/batch.ts",
         "apps/extension/src/popup/shell/export/runtime/start/execute.ts",
         "apps/extension/src/popup/shell/export/runtime/start/failure.ts",
         "apps/extension/src/popup/shell/export/runtime/start/index.ts",
         "apps/extension/src/popup/shell/export/runtime/start/progress.ts",
-        "apps/extension/src/popup/shell/export/runtime/start/request.ts",
         "apps/extension/src/popup/shell/export/runtime/state.ts",
         "apps/extension/src/popup/shell/export/runtime/tab-message-routing.ts",
         "apps/extension/src/popup/shell/export/runtime/types.ts",
@@ -10084,49 +9862,37 @@
         "apps/extension/src/popup/shell/home/quick-actions/block-items/item.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/block.tsx",
         "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "apps/extension/src/popup/shell/lazy-chunks/index.ts",
-        "apps/extension/src/popup/shell/lifecycle/bootstrap-workflow.ts",
-        "apps/extension/src/popup/shell/lifecycle/browser-listeners.ts",
-        "apps/extension/src/popup/shell/lifecycle/contracts.ts",
-        "apps/extension/src/popup/shell/lifecycle/effect.ts",
-        "apps/extension/src/popup/shell/lifecycle/media-hub-listener.ts",
-        "apps/extension/src/popup/shell/lifecycle/setup.ts",
-        "apps/extension/src/popup/shell/lifecycle/startup-routing.ts",
+        "apps/extension/src/popup/shell/home/route.tsx",
         "apps/extension/src/popup/shell/message-sync/index.ts",
         "apps/extension/src/popup/shell/navigation/actions.tsx",
         "apps/extension/src/popup/shell/runtime/actions.ts",
         "apps/extension/src/popup/shell/runtime/assembly/index.ts",
-        "apps/extension/src/popup/shell/runtime/effects.ts",
         "apps/extension/src/popup/shell/runtime/handlers.ts",
-        "apps/extension/src/popup/shell/runtime/index.ts",
-        "apps/extension/src/popup/shell/runtime/lifecycle.ts",
         "apps/extension/src/popup/shell/runtime/media-device-effects.ts",
         "apps/extension/src/popup/shell/runtime/microphone.ts",
         "apps/extension/src/popup/shell/runtime/model.ts",
         "apps/extension/src/popup/shell/runtime/page-access-grants.ts",
         "apps/extension/src/popup/shell/runtime/page-access.ts",
         "apps/extension/src/popup/shell/runtime/recording-control-capability.ts",
-        "apps/extension/src/popup/shell/runtime/recording-navigation-effect.ts",
         "apps/extension/src/popup/shell/runtime/start-recording.ts",
         "apps/extension/src/popup/shell/runtime/start/run.ts",
-        "apps/extension/src/popup/shell/runtime/state.ts",
-        "apps/extension/src/popup/shell/runtime/test-support/state.ts",
         "apps/extension/src/popup/shell/runtime/transport/message.ts",
         "apps/extension/src/popup/shell/runtime/transport/pause.ts",
         "apps/extension/src/popup/shell/runtime/transport/settings.ts",
         "apps/extension/src/popup/shell/runtime/transport/stop.ts",
         "apps/extension/src/popup/shell/runtime/types/action-handlers.ts",
-        "apps/extension/src/popup/shell/runtime/types/command-palette.ts",
-        "apps/extension/src/popup/shell/runtime/types/home.ts",
         "apps/extension/src/popup/shell/runtime/types/internal-state.ts",
-        "apps/extension/src/popup/shell/runtime/types/navigation.ts",
         "apps/extension/src/popup/shell/runtime/types/recording-controls.ts",
         "apps/extension/src/popup/shell/runtime/types/state.ts",
-        "apps/extension/src/popup/shell/runtime/types/tabs.ts",
         "apps/extension/src/popup/shell/runtime/types/video-setup.ts",
+        "apps/extension/src/popup/shell/runtime/video-persistence-effects.ts",
         "apps/extension/src/popup/shell/runtime/webcam.ts",
-        "apps/extension/src/popup/shell/tab-access/index.ts",
-        "apps/extension/src/popup/shell/tabs/index.tsx"
+        "apps/extension/src/popup/shell/startup/coordinator.ts",
+        "apps/extension/src/popup/shell/startup/descriptor.ts",
+        "apps/extension/src/popup/shell/startup/resource.ts",
+        "apps/extension/src/popup/shell/startup/use-route-controller.ts",
+        "apps/extension/src/popup/shell/tab-access/capabilities.ts",
+        "apps/extension/src/popup/shell/tab-access/index.ts"
       ],
       "unownedFocusedFiles": []
     },
@@ -11087,6 +10853,7 @@
         "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/callouts/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/index.tsx",
+        "apps/extension/src/settings/sections/styles/annotations/new-session-defaults.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller-actions.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/editor.tsx",
@@ -11097,6 +10864,8 @@
         "apps/extension/src/settings/sections/styles/annotations/tags/editor.tsx",
         "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/actions.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/controller.ts",
@@ -11105,6 +10874,8 @@
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/types.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/storage.ts",
+        "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/actions.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/controller.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/families.ts",
@@ -11396,6 +11167,7 @@
         "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
         "apps/extension/src/settings/sections/styles/annotations/callouts/types.ts",
         "apps/extension/src/settings/sections/styles/annotations/index.tsx",
+        "apps/extension/src/settings/sections/styles/annotations/new-session-defaults.tsx",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller-actions.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/controller.ts",
         "apps/extension/src/settings/sections/styles/annotations/numbering/editor.tsx",
@@ -11406,6 +11178,8 @@
         "apps/extension/src/settings/sections/styles/annotations/tags/editor.tsx",
         "apps/extension/src/settings/sections/styles/annotations/tags/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/content.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/index.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/actions.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/controller.ts",
@@ -11414,6 +11188,8 @@
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/types.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/palettes/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/storage.ts",
+        "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/actions.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/controller.ts",
         "apps/extension/src/settings/sections/styles/editor-resources/tools/families.ts",
@@ -11647,7 +11423,6 @@
         "apps/extension/src/ui/highlighter-preset-editor/fields/inspector.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/save-settings.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/basic-settings.tsx",
-        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/border-padding-fields.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/compact-range-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/custom-css-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.tsx",
@@ -11696,7 +11471,6 @@
         "apps/extension/src/ui/highlighter-preset-editor/fields/inspector.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/save-settings.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/basic-settings.tsx",
-        "apps/extension/src/ui/highlighter-preset-editor/fields/sections/border-padding-fields.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/compact-range-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/custom-css-field.tsx",
         "apps/extension/src/ui/highlighter-preset-editor/fields/sections/padding-fields.tsx",
@@ -11760,7 +11534,8 @@
         "apps/extension/src/ui/paint-selector/lifecycle.ts",
         "apps/extension/src/ui/paint-selector/mode-selector.tsx",
         "apps/extension/src/ui/paint-selector/mode-state.ts",
-        "apps/extension/src/ui/paint-selector/popup.tsx"
+        "apps/extension/src/ui/paint-selector/popup.tsx",
+        "apps/extension/src/ui/paint-selector/trigger.tsx"
       ],
       "rolloutFiles": [],
       "unownedFocusedFiles": []
@@ -11803,6 +11578,7 @@
         "apps/extension/src/ui/surface-style-selector/management-panel.tsx",
         "apps/extension/src/ui/surface-style-selector/preset-grid.tsx",
         "apps/extension/src/ui/surface-style-selector/selection-panel.tsx",
+        "apps/extension/src/ui/surface-style-selector/trigger.tsx",
         "apps/extension/src/ui/surface-style-selector/types.ts"
       ],
       "rolloutFiles": [],
@@ -11814,6 +11590,7 @@
       "reason": "This owner family is outside the hard coverage rollout; add owner tests and an explicit rollout target before enabling thresholds.",
       "productionFiles": [
         "apps/extension/src/ui/theme/index.ts",
+        "apps/extension/src/ui/theme/paint-hint.ts",
         "apps/extension/src/ui/theme/preference-service.ts",
         "apps/extension/src/ui/theme/runtime.ts"
       ],
@@ -12734,7 +12511,6 @@
         "packages/platform/src/browser/clipboard.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
-        "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
         "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
@@ -12781,7 +12557,6 @@
         "packages/platform/src/observability/logger/types.ts",
         "packages/platform/src/observability/message-tracer/console.ts",
         "packages/platform/src/observability/message-tracer/events.ts",
-        "packages/platform/src/observability/message-tracer/har-payload.ts",
         "packages/platform/src/observability/message-tracer/index.ts",
         "packages/platform/src/observability/message-tracer/llm-payload.ts",
         "packages/platform/src/observability/message-tracer/messaging.ts",
@@ -12820,7 +12595,6 @@
         "packages/platform/src/browser/clipboard.ts",
         "packages/platform/src/browser/content-runtime-shim.ts",
         "packages/platform/src/browser/context-menus.ts",
-        "packages/platform/src/browser/debugger.ts",
         "packages/platform/src/browser/desktop-capture.ts",
         "packages/platform/src/browser/displays.ts",
         "packages/platform/src/browser/downloads.ts",
@@ -12867,7 +12641,6 @@
         "packages/platform/src/observability/logger/types.ts",
         "packages/platform/src/observability/message-tracer/console.ts",
         "packages/platform/src/observability/message-tracer/events.ts",
-        "packages/platform/src/observability/message-tracer/har-payload.ts",
         "packages/platform/src/observability/message-tracer/index.ts",
         "packages/platform/src/observability/message-tracer/llm-payload.ts",
         "packages/platform/src/observability/message-tracer/messaging.ts",
@@ -13248,6 +13021,7 @@
         "packages/ui/src/product-glass-controls/helpers.ts",
         "packages/ui/src/product-glass-controls/index.tsx",
         "packages/ui/src/product-glass-controls/layout.tsx",
+        "packages/ui/src/product-glass-controls/linked-padding.tsx",
         "packages/ui/src/product-glass-controls/presets.tsx",
         "packages/ui/src/product-glass-controls/primitives.tsx",
         "packages/ui/src/product-glass-toolbar/index.tsx",
@@ -13359,6 +13133,7 @@
         "packages/ui/src/product-glass-controls/helpers.ts",
         "packages/ui/src/product-glass-controls/index.tsx",
         "packages/ui/src/product-glass-controls/layout.tsx",
+        "packages/ui/src/product-glass-controls/linked-padding.tsx",
         "packages/ui/src/product-glass-controls/presets.tsx",
         "packages/ui/src/product-glass-controls/primitives.tsx",
         "packages/ui/src/product-glass-toolbar/index.tsx",
@@ -13396,7 +13171,7 @@
       "remediation": "Keep every app-core family classified by a concrete owner; change the policy only with topology proof.",
       "exactSource": {
         "path": "tooling/configs/qa/app-core-owner-policy.data.json",
-        "contentHash": "811159dde64234fdec10becdfa027bc1344c20cf90cbd78848b9d5a757ac81a8"
+        "contentHash": "7d1738e2ac27524bdf66cc2064c77e41beffcbe13e253d2eb4201fe51a34ddde"
       },
       "consumers": [
         "tooling/configs/qa/control-dispositions.data.json",
@@ -13439,7 +13214,7 @@
       "remediation": "Keep prefixes limited to canonical adapters and test infrastructure; review every added prefix.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-paths.mjs",
-        "contentHash": "3d1c0489dd96e232d09f842682ef474dc5dec3b1bb56edd045899c2f49c110b6"
+        "contentHash": "0df4610dab6a310b90c8ccdfb236c153f1f1e6a97cef076109f80d2e3e9aae8b"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-paths.mjs",
@@ -13447,6 +13222,7 @@
         "tooling/qa/policy/browser-adapters.mjs"
       ],
       "surfaces": [
+        "binding:BROWSER_ADAPTER_ALLOWED_FILES",
         "binding:BROWSER_ADAPTER_ALLOWED_PREFIXES"
       ]
     },
@@ -13459,7 +13235,7 @@
       "remediation": "Remove the reference or route it through the canonical content-runtime owner.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/content-runtime-topology.mjs",
-        "contentHash": "949323dce888508e37f730052dee23d1e4263f7f882a01a7c2e846691955217f"
+        "contentHash": "6a4642d4b8b05cc61a16637f6e6618fdb5e4c6fe83cea87d2d19d20a217e77d6"
       },
       "consumers": [
         "tooling/qa/guards/architecture/content-runtime-topology.mjs",
@@ -13789,7 +13565,7 @@
       "remediation": "Keep exceptions file-exact and prefer FakeRuntimeMessagingTransport.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging.mjs",
-        "contentHash": "5fa7194390ad78a72a1c1ffeba94e7aaad039cc6e229684c81b0dd1383710b17"
+        "contentHash": "3cf48013d935c148a8b56cacd18a863011505f3fe9a99c0d46c5f058090114a5"
       },
       "surfaces": [
         "binding:ALLOWED_CHROME_STUB_FILES",
@@ -13815,7 +13591,7 @@
       "remediation": "Burn the exact import population down when owner adapters replace default sends; never add a broad path.",
       "exactSource": {
         "path": "tooling/qa/policy/messaging-default-baseline.mjs",
-        "contentHash": "32b6819c19ea050716d432a15330d6d31f3cde573ed8ce09f0cd4ae251408ff1"
+        "contentHash": "40cd0f0aaa75bce4e0ce37298f2d15b5d9114b3f8baa5f323c5ee41ab68f7e26"
       },
       "consumers": [
         "tooling/qa/policy/messaging-default-baseline.mjs",
@@ -14000,7 +13776,7 @@
       "remediation": "Review every ignore-pattern change against product roots and security scan coverage.",
       "exactSource": {
         "path": "tooling/qa/core/quality.config.mjs",
-        "contentHash": "7314ebe6490c3054d9c543081525aab4396d5b6bf022630b318cc547f616596d"
+        "contentHash": "8b46f360604995721833bda20c5f2c9cf5803213310d60f47e8a499654cb388a"
       },
       "consumers": [
         "tooling/qa/audits/ast-grep.mjs",
@@ -14069,7 +13845,7 @@
       "remediation": "Keep prefixes limited to authoritative persistence owners and remove obsolete owner paths.",
       "exactSource": {
         "path": "tooling/qa/core/architecture-guardrails.data.mjs",
-        "contentHash": "2dd8d6523f5b0017e167974750f150d73e3a4b6e05db99cddffe239dcfd67e90"
+        "contentHash": "4d325f11119d0cc0770518610c59d4d9f155f0c032a682e840b64e60eac7b65c"
       },
       "consumers": [
         "tooling/qa/core/architecture-guardrails.data.mjs",
@@ -14374,7 +14150,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/agent-tooling/agent-tooling.mjs",
-        "contentHash": "499279b70fe691e39f2aaa630650246d6f5dd8434caa1cc67600623049f08009"
+        "contentHash": "8cfc6982678e676e58d21225fed1224cc7c6f6b5c853440593d2b906bf683946"
       },
       "consumers": [
         "tooling/agent-tooling/agent-tooling.mjs",
@@ -14593,7 +14369,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/archive.mjs",
-        "contentHash": "6ec8b4e70a0b11a8bdfe81a13954439de50a4f4c22188054d376bac1af413117"
+        "contentHash": "65e4d473d81ac9fe390c26ae72f7c935e3e416c16a2f9cca6d5d6eb9361743d4"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/archive.mjs",
@@ -14607,8 +14383,7 @@
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]"
+        "property:testFiles[6]"
       ]
     },
     {
@@ -14806,7 +14581,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/audit-guardrail-runtime.mjs",
-        "contentHash": "9fe46436ce3340663bcdcf7f19fa5e773712eb0a25d74f81859c8ece697fd1b3"
+        "contentHash": "0e949d26a470d10ea5c5526199ba9da3fc830d9cc6f44e25751c57fe0d6e7a51"
       },
       "consumers": [
         "tooling/qa/core/audit-guardrail-core.mjs",
@@ -14951,7 +14726,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/audit.mjs",
-        "contentHash": "8000ec6a6e4d6c14d6a6b29eacf4522035fc9608f329a674c097c67aa0ec8ac0"
+        "contentHash": "518bfb6e9dcab63e1371edb78f8a1c5a158b05aad93e1b9f8430d98f582db54c"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/audit.mjs",
@@ -14964,6 +14739,13 @@
         "property:testFiles[10]",
         "property:testFiles[11]",
         "property:testFiles[12]",
+        "property:testFiles[13]",
+        "property:testFiles[14]",
+        "property:testFiles[15]",
+        "property:testFiles[16]",
+        "property:testFiles[17]",
+        "property:testFiles[18]",
+        "property:testFiles[19]",
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
@@ -15045,7 +14827,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
-        "contentHash": "389529d99a5fc8a5090db2ae39d044c044c96e925c40454beea76490a7d13e08"
+        "contentHash": "051915b4f48a92c47ecc967a8384e4c8ec604744f22d119144a43ec92ddd33a2"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-runtime-messaging.mjs",
@@ -15075,7 +14857,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
-        "contentHash": "8c06d43cff2b9021cb8ff5b06c2655b116415653b346e3dfcd6b2a0200c8d07c"
+        "contentHash": "36f885dad93d4d50f19e2e12c1cf485e32cb6c4e1c9d3ce1c5c752f04727fac3"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/background-storage.mjs",
@@ -15140,7 +14922,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/policy/browser-adapters-rules.mjs",
-        "contentHash": "d29f123f58133326435831d61a7fd70003227b3d93ce951896b9ad64df1e85ce"
+        "contentHash": "13de314205d6e1ffd37d510ffe3f8239d0d7f854d56e4cb648a4129d93967b66"
       },
       "consumers": [
         "tooling/qa/policy/browser-adapters-rules.mjs",
@@ -15165,7 +14947,6 @@
         "property:METHOD",
         "property:methods",
         "property:methods[1]",
-        "property:methods[10]",
         "property:methods[2]",
         "property:methods[3]",
         "property:methods[4]",
@@ -15178,7 +14959,6 @@
         "property:segments[1]",
         "property:segments[2]",
         "property:segments[3]",
-        "property:segments[4]",
         "property:TARGET"
       ]
     },
@@ -15399,7 +15179,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
-        "contentHash": "f40e887d32cb01cbba23be458966ac7e95aefb7d43a0413bef1f492d01ebb4ae"
+        "contentHash": "f0ddda41cae5db6d3e917033cc6eccd20d00c0ad845b06bf1ed7c72a4eb32d10"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/cast-cleanup-content.mjs",
@@ -15412,8 +15192,7 @@
         "property:testFiles[2]",
         "property:testFiles[3]",
         "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]"
+        "property:testFiles[5]"
       ]
     },
     {
@@ -15552,7 +15331,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/checkpoint.mjs",
-        "contentHash": "919261e5442608f789d5e06781200989364a43a40504b19ee2c84d2595050e47"
+        "contentHash": "191724e1f2221e89faafd77b1d814231b363205745700d9931b19205ac7a1099"
       },
       "consumers": [
         "tooling/qa/core/verify-focused.mjs",
@@ -15840,7 +15619,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-steps/contract.mjs",
-        "contentHash": "fb5d138342db914cd09587955dbf955a4b5f2464f631c980c2667b1a3759b9b3"
+        "contentHash": "e9829e7e21b383698dc6708be5431a2e75c242b73c541a9d86ff2e7f1887cb04"
       },
       "consumers": [
         "tooling/qa/core/checkpoint-result.helpers.mjs",
@@ -16394,7 +16173,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/editor.mjs",
-        "contentHash": "369526d01c34c533061daa8d225931140676e3afb019d94fbedfbda77dcaaf62"
+        "contentHash": "85ad8f9791e8fa8d420f3d9316c45cd74a0382a6f2506a11b2326720aa3f45c2"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/editor.mjs",
@@ -16451,7 +16230,6 @@
         "property:testFiles[50]",
         "property:testFiles[51]",
         "property:testFiles[52]",
-        "property:testFiles[53]",
         "property:testFiles[6]",
         "property:testFiles[7]",
         "property:testFiles[8]",
@@ -16774,6 +16552,25 @@
         "property:extensionId",
         "property:hostOrigin",
         "property:launchedExtension"
+      ]
+    },
+    {
+      "id": "policy.source.extension-smoke-popup-startup-ts.fdec2d7096",
+      "classification": "tool-filter",
+      "owner": "qa-platform",
+      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
+      "rationale": "Keep this complete source-owned control population exact and review every change.",
+      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
+      "exactSource": {
+        "path": "tooling/test/e2e/extension-smoke.popup-startup.ts",
+        "contentHash": "e656c09461fa40f78be9b0cdb4cea19d9d8c146e718c5655b6e304f8807e32be"
+      },
+      "consumers": [
+        "tooling/test/e2e/extension-smoke.popup-startup.ts",
+        "tooling/test/e2e/extension-smoke.spec.ts"
+      ],
+      "surfaces": [
+        "property:installFirstFrameThemeProbe/anonymous-99/backgrounds"
       ]
     },
     {
@@ -17240,36 +17037,6 @@
       ]
     },
     {
-      "id": "policy.source.har-export-mjs.d78d18443f",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/qa/core/focused-coverage/maps/har-export.mjs",
-        "contentHash": "fb57beb73ade7a171e1e3bf4eddc443bbe08c6622f40260e87cfb07f61256f85"
-      },
-      "consumers": [
-        "tooling/qa/core/focused-coverage/maps/har-export.mjs",
-        "tooling/qa/core/focused-coverage/maps/platform-backup.mjs"
-      ],
-      "surfaces": [
-        "binding:HAR_EXPORT_OWNER_MAPPINGS",
-        "property:testFiles",
-        "property:testFiles[1]",
-        "property:testFiles[10]",
-        "property:testFiles[2]",
-        "property:testFiles[3]",
-        "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]",
-        "property:testFiles[8]",
-        "property:testFiles[9]"
-      ]
-    },
-    {
       "id": "policy.source.helpers-tsx.2a99b7c314",
       "classification": "tool-filter",
       "owner": "qa-platform",
@@ -17441,24 +17208,6 @@
       ],
       "surfaces": [
         "binding:FOCUSED_COVERAGE_OWNER_MAPPINGS"
-      ]
-    },
-    {
-      "id": "policy.source.install-mjs.56d19aa8fe",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/agent-tooling/install.mjs",
-        "contentHash": "1700d7651eba396fb4a33340a568729b406462d2beab04faa0b15c7ee6c64c09"
-      },
-      "consumers": [
-        "tooling/agent-tooling/install.mjs"
-      ],
-      "surfaces": [
-        "binding:args"
       ]
     },
     {
@@ -17819,7 +17568,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/local.mjs",
-        "contentHash": "b33ceea34c003fde42b6040392eba05ba8f187e09e590951ab8ab0f6403049b1"
+        "contentHash": "9170796bd62a4a0e239e284b4b23fc15068cab5f76f57d035ff74887847a9f56"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -17882,9 +17631,7 @@
         "property:testFiles[56]",
         "property:testFiles[57]",
         "property:testFiles[58]",
-        "property:testFiles[59]",
         "property:testFiles[6]",
-        "property:testFiles[60]",
         "property:testFiles[7]",
         "property:testFiles[8]",
         "property:testFiles[9]"
@@ -18132,7 +17879,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/messaging.mjs",
-        "contentHash": "e24e62e2fe38c38b201ffff3f7fa71a0b9ab250d8842b5883ca1543a813f1bff"
+        "contentHash": "6567f9bebedadbe4f87e1de4658ca30ea5975f1800597468f5242154acd986d6"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18228,7 +17975,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/test/harness/offscreen.ts",
-        "contentHash": "0c6fe5ff360c6afd670f7eade4130d11662475bfa8cab6d09a4772e494a494be"
+        "contentHash": "2cc02038917cae66f206b02256ba233d26a6b706a1d53980a9eb97190798d84b"
       },
       "consumers": [
         "tooling/test/harness/offscreen.ts"
@@ -18350,7 +18097,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/structural-risk/owner-classifier.mjs",
-        "contentHash": "15416428d42c0ce04d561c8d82b67e15c1ddcc2c8239bae2a7a5a547c7399865"
+        "contentHash": "c5a51e6da13f3a1cb3dac95fa2af746bbcec0b4183d476025f878176e6654345"
       },
       "consumers": [
         "tooling/qa/core/structural-risk/file-metrics.mjs",
@@ -18424,7 +18171,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/page-access.mjs",
-        "contentHash": "f0ccfe3fad19de85120246112e293aded1fd239a4ff4c5a3656899d3c5193111"
+        "contentHash": "c2372bca772700c15b3e53003609d80757c9288db239137a85712943cf832960"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18494,7 +18241,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
-        "contentHash": "99a30458d93e61c0284654284c6b01a53603cc7c0a293b011595648d0d3f031d"
+        "contentHash": "2ef95784c37d4aadeca032abca3cbdf9320bd9879874956adee6ec033a186c51"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -18639,7 +18386,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-page-access.mjs",
-        "contentHash": "d42e8655f2469ff927bdee6974364fb175b365b21d8ffcc6f20deb0a996c9ff2"
+        "contentHash": "a141f3083426dce580941bf675c297a50eb4a77708e8fa7711699d2309ae829f"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/page-access.mjs",
@@ -18649,15 +18396,9 @@
         "binding:POPUP_PAGE_ACCESS_OWNER_MAPPINGS",
         "property:testFiles",
         "property:testFiles[1]",
-        "property:testFiles[10]",
         "property:testFiles[2]",
         "property:testFiles[3]",
-        "property:testFiles[4]",
-        "property:testFiles[5]",
-        "property:testFiles[6]",
-        "property:testFiles[7]",
-        "property:testFiles[8]",
-        "property:testFiles[9]"
+        "property:testFiles[4]"
       ]
     },
     {
@@ -18669,7 +18410,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
-        "contentHash": "fcaf98d44c0fe040b1bca84d7be280c7fb150ae028459e83dbfbb9bed7ddad3e"
+        "contentHash": "7e06a04721b61f2ff6ed09de6864ce8ee86d3ed69cb6c078bd4f9237b487762d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/popup-recording.mjs",
@@ -18684,7 +18425,8 @@
         "property:testFiles[4]",
         "property:testFiles[5]",
         "property:testFiles[6]",
-        "property:testFiles[7]"
+        "property:testFiles[7]",
+        "property:testFiles[8]"
       ]
     },
     {
@@ -18758,7 +18500,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/wrappers/preflight-docs.mjs",
-        "contentHash": "c68283edb83ad3e24302a79abe24359911c87c40d71df33ee3f55c74f485c9ac"
+        "contentHash": "ac9e53f25beb10fa465ecfe09d8bcbcbc74b776b7d4618cec0a26f64ac3c9c70"
       },
       "consumers": [
         "tooling/qa/wrappers/preflight-docs.mjs",
@@ -18828,7 +18570,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure.mjs",
-        "contentHash": "702262adbefa865a452be5287655df7732deee59633345f5c9711c54d4c9de03"
+        "contentHash": "66cccef4e1b342271223effe9f9f1449fa000b2554e3a6b7f49f19103cab511b"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/platform-backup.mjs",
@@ -18856,7 +18598,6 @@
         "property:testFiles[23]",
         "property:testFiles[24]",
         "property:testFiles[25]",
-        "property:testFiles[26]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -18875,7 +18616,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
-        "contentHash": "ea8530ec96f798714029776e55a6484acd75898b438f61d8ec4a254e43bcb136"
+        "contentHash": "c1bcb42998ef3db1e10b1e63e5a315b4ef6a394c34f21c95a3ba5349d60c9336"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/privacy-erasure-runtime.mjs",
@@ -18939,7 +18680,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/qa-scope.mjs",
-        "contentHash": "cfe8c299332d075c14d5c2cc66c9830006a359461b17eb03b064289e86d3aaef"
+        "contentHash": "136bf8a89fe8a06cbdd8272053c6b144b97523ca780a7141296faa10964e7680"
       },
       "consumers": [
         "tooling/qa/core/audit-coverage-step.mjs",
@@ -19070,24 +18811,6 @@
       ],
       "surfaces": [
         "property:resolveAuditProfile/controls"
-      ]
-    },
-    {
-      "id": "policy.source.remove-mjs.399bc46d04",
-      "classification": "tool-filter",
-      "owner": "qa-platform",
-      "risk": "An unreviewed code-owned control collection can weaken deterministic repository checks.",
-      "rationale": "Keep this complete source-owned control population exact and review every change.",
-      "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
-      "exactSource": {
-        "path": "tooling/agent-tooling/remove.mjs",
-        "contentHash": "340032a656000eec7b5c722a7eb5528f108b60e0e00e492c1c5eb0c9b94d1756"
-      },
-      "consumers": [
-        "tooling/agent-tooling/remove.mjs"
-      ],
-      "surfaces": [
-        "binding:args"
       ]
     },
     {
@@ -19689,7 +19412,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/shared-facade.mjs",
-        "contentHash": "8d1fcb4c0407d0a6c7bf18ae97ed80aa4da09692152a15baae5d34ef55fdde38"
+        "contentHash": "303f97eee71926e10b42d0f5c52678a2b4e18053f43959f8cfad056bbd52c84a"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -19710,6 +19433,8 @@
         "property:testFiles[18]",
         "property:testFiles[19]",
         "property:testFiles[2]",
+        "property:testFiles[20]",
+        "property:testFiles[21]",
         "property:testFiles[3]",
         "property:testFiles[4]",
         "property:testFiles[5]",
@@ -20976,7 +20701,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-browser-adapters.mjs",
-        "contentHash": "d7677ef536d0cdc56a8b0a4a8dbba3c61de2e9ecdf0fc31328d578fe41a86abe"
+        "contentHash": "f845b91a2c77d17695afdd7240638bb6af9b5d48a208196fee553f545c0b55cb"
       },
       "consumers": [
         "tooling/qa/core/architecture-inventory.mjs",
@@ -20987,6 +20712,7 @@
         "tooling/qa/core/verify-focused.code-steps.mjs"
       ],
       "surfaces": [
+        "binding:RETIRED_PROTOCOL_PATTERNS",
         "property:collectBrowserAdapterViolations/groupIds",
         "property:runBrowserAdapterCheck/violations"
       ]
@@ -21539,7 +21265,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-focused.config.mjs",
-        "contentHash": "bed4af45d6ab0375065c4a6e59cba6c542e531f3ae5b10edcf347973dc50e52f"
+        "contentHash": "4b790e1031db8fb3ce4242c31006eca1db6a8aac5f4e7858e5af58744086b91b"
       },
       "consumers": [
         "tooling/qa/core/active-path-drift.test.ts",
@@ -21953,7 +21679,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-instance-ownership.inventory-owner.mjs",
-        "contentHash": "95ee4a1bf92aecc30be57ec32560dc31090ead150fc34379837769ce9b9c0efc"
+        "contentHash": "7d1a89ad3114f0af94139c0dd12ba6e156bacc79a925139a7d2bdf2892b40eb2"
       },
       "consumers": [
         "tooling/qa/core/harness-freshness-step.mjs",
@@ -22370,7 +22096,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/guards/architecture/verify-runtime-topology.mjs",
-        "contentHash": "4dac70a3fa5b98cb127d26386dc58079ce07c76ec4d397e74006ec0125187f78"
+        "contentHash": "d94eee135ddb3bd8417dbb9cfef1524c1704f73892b3825774fea992cfc447d8"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.architecture.mjs",
@@ -22539,7 +22265,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/verify-success-failure-asymmetry.mjs",
-        "contentHash": "0a1998284de9ea90490051846ce30e81e201b020a68f04582cde89cb2355f03a"
+        "contentHash": "03fc796d783ebeb6ebf186f8ae78195c56aa0a03382fa99ae26f4ebb0e3d091d"
       },
       "consumers": [
         "tooling/qa/core/verify-all.violation-steps.lifecycle.mjs",
@@ -22548,6 +22274,8 @@
         "tooling/qa/core/verify-success-failure-asymmetry.test.ts"
       ],
       "surfaces": [
+        "binding:ALLOWED_FINDING_KEYS",
+        "binding:SUCCESS_FAILURE_ASYMMETRY_ALLOWED_FINDINGS",
         "property:labels"
       ]
     },
@@ -22883,7 +22611,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-recording.mjs",
-        "contentHash": "c6b562a19866382df9fceb8221762cd26827ca2f60fc278e7a4d068f64166171"
+        "contentHash": "b78f65df4b07b56a11ebd7d9ab46f2a5dfa1d2fc884a472e77b609dfda7b055d"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/index.mjs",
@@ -22940,7 +22668,7 @@
       "remediation": "Narrow or remove the source collection, then regenerate its exact disposition.",
       "exactSource": {
         "path": "tooling/qa/core/focused-coverage/maps/video-runtime-routing.mjs",
-        "contentHash": "5bd7674bee57089a0420a48dbbf393cbe5200715c9cacde11fb2db187a453515"
+        "contentHash": "6c6b70ce41b3c891270351bd35ebfd93ce8f7e27bb5c0190a8ee3bf0e03e5330"
       },
       "consumers": [
         "tooling/qa/core/focused-coverage/maps/video-recording.mjs",

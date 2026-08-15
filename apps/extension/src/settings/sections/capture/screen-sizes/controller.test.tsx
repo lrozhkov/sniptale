@@ -36,7 +36,7 @@ const viewportPreset: UserViewportPreset = {
   kind: 'user',
   name: 'HD viewport',
   order: 0,
-  target: 'viewport',
+  target: 'window',
   width: 1280,
 };
 const windowPreset: UserViewportPreset = {
@@ -48,16 +48,16 @@ const windowPreset: UserViewportPreset = {
   width: 1440,
 };
 const customizedSystemPreset: SystemViewportPreset = {
-  catalogRevision: 2,
+  catalogRevision: 3,
   customized: true,
   enabled: false,
   height: 700,
-  id: 'system:viewport-mobile-landscape',
+  id: 'system:window-laptop',
   kind: 'system',
   nameOverride: 'Custom system HD',
   order: 1,
-  systemKey: 'viewportMobileLandscape',
-  target: 'viewport',
+  systemKey: 'windowLaptop',
+  target: 'window',
   width: 1200,
 };
 
@@ -72,6 +72,7 @@ function createSettings(): Settings {
       showGallery: true,
       showImageEditor: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showScreenshots: true,
       showSettings: true,
       showVideo: true,
@@ -80,7 +81,6 @@ function createSettings(): Settings {
     defaultViewportPresetId: 'viewport-1',
     imageFormat: 'png',
     imageQuality: 90,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     skipWebSnapshotSaveDisclosure: false,
     viewportPresets: [viewportPreset, customizedSystemPreset, windowPreset],
@@ -136,13 +136,13 @@ it('creates, edits across target groups, and moves presets through atomic settin
     requireState().editor.onSave({
       height: 844,
       name: '  Phone  ',
-      target: 'viewport',
+      target: 'window',
       width: 390,
     })
   );
   expect(requireState().model.presets).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ id: 'user-created', name: 'Phone', target: 'viewport' }),
+      expect.objectContaining({ id: 'user-created', name: 'Phone', target: 'window' }),
     ])
   );
 
@@ -165,10 +165,10 @@ it('creates, edits across target groups, and moves presets through atomic settin
   );
   expect(updateSettings).toHaveBeenLastCalledWith({
     viewportPresets: [
-      expect.objectContaining({ id: 'user-created', order: 0 }),
-      expect.objectContaining({ id: customizedSystemPreset.id, order: 1 }),
-      expect.objectContaining({ id: windowPreset.id, order: 0 }),
-      expect.objectContaining({ id: viewportPreset.id, order: 1 }),
+      expect.objectContaining({ id: viewportPreset.id, order: 0 }),
+      expect.objectContaining({ id: windowPreset.id, order: 1 }),
+      expect.objectContaining({ id: 'user-created', order: 2 }),
+      expect.objectContaining({ id: customizedSystemPreset.id, order: 3 }),
     ],
   });
   expect(updateSettings).not.toHaveBeenCalledWith(
@@ -204,9 +204,9 @@ it('toggles presets, protects system deletion, and resets customized system data
   ).toMatchObject({
     customized: false,
     enabled: true,
-    height: 390,
-    target: 'viewport',
-    width: 844,
+    height: 768,
+    target: 'window',
+    width: 1366,
   });
 });
 
@@ -270,7 +270,7 @@ it('rejects an overlong preset name without writing settings', async () => {
       requireState().editor.onSave({
         height: 720,
         name: 'a'.repeat(81),
-        target: 'viewport',
+        target: 'window',
         width: 1280,
       })
     )

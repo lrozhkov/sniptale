@@ -1,5 +1,7 @@
-import { Check, ClipboardCopy, Download, FileCheck2, Save, X } from 'lucide-react';
+import { Check, ClipboardCopy, Download, FileCheck2, FolderInput, Save, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
@@ -11,12 +13,23 @@ import type {
   EditorFloatingDocumentBarProps,
   EditorFloatingDocumentController,
 } from './document-bar-types';
+import { EditorSaveToFolderDialog } from './save-to-folder-dialog';
+import { useEditorStore } from '../../state/useEditorStore';
+import { closeEditorPageDocument } from '../../workflows/close-page-document';
+import { EditorAnchoredConfirmPopover } from './anchored-feedback';
 
 const QUICK_ACTION_BUTTON_CLASS_NAME = 'max-[720px]:!hidden';
 const COPY_FEEDBACK_BUTTON_CLASS_NAME = [
   QUICK_ACTION_BUTTON_CLASS_NAME,
   'data-[copy-status=saved]:scale-105 data-[copy-status=saved]:text-[var(--sniptale-color-success)]',
 ].join(' ');
+const RASTER_FILENAME_EXTENSION = /\.(?:avif|bmp|gif|jpe?g|png|webp)$/i;
+
+function resolveDefaultExportFilename(pageTitle: string, imageFormat: string): string {
+  const title = pageTitle.trim() || 'edited';
+  const basename = title.replace(RASTER_FILENAME_EXTENSION, '');
+  return `${basename}.${imageFormat}`;
+}
 
 function runDocumentBarAction(label: string, action: () => Promise<void> | void) {
   return fireAndReportEditorAction(`floating-document-bar:${label}`, action);
@@ -37,7 +50,7 @@ function useQuickActionState(
     hasImage &&
     !documentController.copyRenderedImageDisabledReason &&
     exportSettings.isClipboardCopySupported;
-  return { canCopy, copyStatus, runActionFeedback };
+  return { canCopy, copyStatus, imageFormat: exportSettings.imageFormat, runActionFeedback };
 }
 
 export function EditorFloatingDocumentQuickActions({
@@ -51,6 +64,13 @@ export function EditorFloatingDocumentQuickActions({
   const controller = useEditorController();
   const embed = useEditorEmbedContext();
   const actionState = useQuickActionState(documentController, hasImage);
+  const pageTitle = useEditorStore((state) => state.pageTitle);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const saveToFolderButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const standalone = embed.mode !== 'scenario';
+  const defaultFilename = resolveDefaultExportFilename(pageTitle, actionState.imageFormat);
 
   return (
     <>
@@ -59,12 +79,72 @@ export function EditorFloatingDocumentQuickActions({
         documentController={documentController}
         hasImage={hasImage}
       />
+      {standalone && documentController.savePresets.length > 0 ? (
+        <ContentToolbarButton
+          ref={saveToFolderButtonRef}
+          title={translate('editor.documentActions.saveToFolder')}
+          disabled={!hasImage}
+          active={saveDialogOpen}
+          aria-expanded={saveDialogOpen}
+          aria-haspopup="dialog"
+          className={QUICK_ACTION_BUTTON_CLASS_NAME}
+          onClick={() => setSaveDialogOpen((open) => !open)}
+          dataUi="editor.floating.document-bar.save-to-folder-button"
+        >
+          <FolderInput size={18} strokeWidth={2} />
+        </ContentToolbarButton>
+      ) : null}
+      {standalone ? (
+        <>
+          <FloatingChromeDivider vertical className={QUICK_ACTION_BUTTON_CLASS_NAME} />
+          <ContentToolbarButton
+            ref={closeButtonRef}
+            title={translate('editor.documentActions.closeFile')}
+            disabled={!hasImage}
+            active={closeConfirmOpen}
+            aria-expanded={closeConfirmOpen}
+            aria-haspopup="dialog"
+            onClick={() => setCloseConfirmOpen((open) => !open)}
+            dataUi="editor.floating.document-bar.close-file-button"
+          >
+            <X size={18} strokeWidth={2} />
+          </ContentToolbarButton>
+        </>
+      ) : null}
       <ScenarioQuickActions
         controller={controller}
         embed={embed}
         hasImage={hasImage}
         onBeforeSelectionAwareAction={onBeforeSelectionAwareAction}
       />
+      {saveDialogOpen ? (
+        <EditorSaveToFolderDialog
+          anchorEl={saveToFolderButtonRef.current}
+          controller={documentController}
+          defaultFilename={defaultFilename}
+          onClose={() => setSaveDialogOpen(false)}
+        />
+      ) : null}
+      {closeConfirmOpen ? (
+        <EditorAnchoredConfirmPopover
+          anchorEl={closeButtonRef.current}
+          cancelText={translate('common.actions.cancel')}
+          confirmText={translate('common.actions.close')}
+          dataUi="editor.floating.document-bar.close-confirm"
+          message={translate('editor.documentActions.confirmCloseDocument')}
+          onCancel={() => setCloseConfirmOpen(false)}
+          onConfirm={() =>
+            runDocumentBarAction('close-file', async () => {
+              await closeEditorPageDocument({
+                controller,
+                closeSavePicker: () => documentController.setSavePresetPickerOpen(false),
+              });
+              setCloseConfirmOpen(false);
+            })
+          }
+          title={translate('editor.documentActions.closeFile')}
+        />
+      ) : null}
     </>
   );
 }
@@ -159,7 +239,7 @@ function ScenarioQuickActions(props: {
       ) : null}
       {embed.mode === 'scenario' && embed.onClose ? (
         <ContentToolbarButton
-          title={translate('common.actions.close')}
+          title={translate('editor.documentActions.returnToScenario')}
           onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
           dataUi="editor.floating.document-bar.close-scenario-button"
         >

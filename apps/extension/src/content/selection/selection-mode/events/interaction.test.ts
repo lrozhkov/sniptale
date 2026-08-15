@@ -2,7 +2,12 @@
 
 import { expect, it, vi } from 'vitest';
 import { handleSelectionModeClick } from './commands';
-import { handleSelectionModeMouseMove, handleSelectionModeMouseDown } from './pointer-handlers';
+import {
+  handleSelectionModeDragStart,
+  handleSelectionModeMouseDown,
+  handleSelectionModeMouseMove,
+  handleSelectionModeMouseUp,
+} from './pointer-handlers';
 import type { SelectionModeInteractionState } from './types';
 
 function createInteractionState(): SelectionModeInteractionState {
@@ -176,9 +181,190 @@ it('owns idle pointer down before the host page can start native selection work'
   handleSelectionModeMouseDown(event, state, options);
 
   expect(state.mouseDownPoint).toEqual({ x: 80, y: 60 });
+  expect(options.startDragSelection).not.toHaveBeenCalled();
   expect(event.preventDefault).toHaveBeenCalledOnce();
   expect(event.stopPropagation).toHaveBeenCalledOnce();
   expect(event.stopImmediatePropagation).toHaveBeenCalledOnce();
+});
+
+it('draws an area from the nested Wikipedia TOC link and consumes the post-drag click', () => {
+  const state: SelectionModeInteractionState = {
+    ...createInteractionState(),
+    currentState: 'idle',
+  };
+  const options = {
+    ...createSelectionModeOptions(),
+    isExtensionUIElement: () => false,
+  };
+  vi.mocked(options.startDragSelection).mockImplementation(() => {
+    state.currentState = 'drag';
+  });
+  vi.mocked(options.finalizeDragSelection).mockImplementation(() => {
+    state.currentState = 'confirmed';
+  });
+  const listItem = document.createElement('li');
+  listItem.id = 'toc-Security';
+  listItem.className = 'vector-toc-list-item vector-toc-level-1';
+  const anchor = document.createElement('a');
+  anchor.className = 'vector-toc-link';
+  anchor.href = '#Security';
+  const text = document.createElement('div');
+  text.className = 'vector-toc-text';
+  const number = document.createElement('span');
+  number.className = 'vector-toc-numb';
+  number.textContent = '4';
+  const child = document.createElement('span');
+  child.textContent = 'Security';
+  text.append(number, child);
+  anchor.append(text);
+  listItem.append(anchor);
+  document.body.append(listItem);
+
+  const down = createSelectionModeMouseEvent({
+    clientX: 20,
+    clientY: 30,
+    path: [child, text, anchor, listItem],
+    target: child,
+    type: 'mousedown',
+  });
+  const move = createSelectionModeMouseEvent({
+    clientX: 80,
+    clientY: 90,
+    path: [child, text, anchor, listItem],
+    target: child,
+    type: 'mousemove',
+  });
+  const up = createSelectionModeMouseEvent({
+    clientX: 80,
+    clientY: 90,
+    path: [child, text, anchor, listItem],
+    target: child,
+    type: 'mouseup',
+  });
+  const click = createSelectionModeMouseEvent({
+    clientX: 80,
+    clientY: 90,
+    path: [child, text, anchor, listItem],
+    target: child,
+    type: 'click',
+  });
+
+  handleSelectionModeMouseDown(down, state, options);
+  handleSelectionModeMouseMove(move, state, options);
+  handleSelectionModeMouseUp(up, state, options);
+  handleSelectionModeClick(click, state, options);
+
+  expect(options.startDragSelection).toHaveBeenCalledWith(20, 30);
+  expect(options.updateDragSelection).toHaveBeenCalledWith(80, 90);
+  expect(options.finalizeDragSelection).toHaveBeenCalledOnce();
+  expect(options.selectElement).not.toHaveBeenCalled();
+  expect(click.preventDefault).toHaveBeenCalledOnce();
+  expect(click.stopPropagation).toHaveBeenCalledOnce();
+  expect(click.stopImmediatePropagation).toHaveBeenCalledOnce();
+  expect(state.skipNextClick).toBe(false);
+});
+
+it('treats native dragstart from a nested Wikipedia link as area selection', () => {
+  const state: SelectionModeInteractionState = {
+    ...createInteractionState(),
+    currentState: 'idle',
+  };
+  const options = { ...createSelectionModeOptions(), isExtensionUIElement: () => false };
+  vi.mocked(options.startDragSelection).mockImplementation(() => {
+    state.currentState = 'drag';
+  });
+  vi.mocked(options.finalizeDragSelection).mockImplementation(() => {
+    state.currentState = 'confirmed';
+  });
+  const anchor = document.createElement('a');
+  anchor.href = '#Phonebook';
+  const child = document.createElement('span');
+  child.textContent = 'Phonebook';
+  anchor.append(child);
+  const down = createSelectionModeMouseEvent({
+    clientX: 20,
+    clientY: 30,
+    path: [child, anchor],
+    target: child,
+    type: 'mousedown',
+  });
+  const dragStart = createSelectionModeMouseEvent({
+    clientX: 28,
+    clientY: 38,
+    path: [child, anchor],
+    target: child,
+    type: 'dragstart',
+  }) as DragEvent;
+  const up = createSelectionModeMouseEvent({
+    clientX: 140,
+    clientY: 120,
+    path: [child, anchor],
+    target: child,
+    type: 'mouseup',
+  });
+  const click = createSelectionModeMouseEvent({
+    clientX: 140,
+    clientY: 120,
+    path: [child, anchor],
+    target: child,
+    type: 'click',
+  });
+
+  handleSelectionModeMouseDown(down, state, options);
+  handleSelectionModeDragStart(dragStart, state, options);
+  handleSelectionModeMouseUp(up, state, options);
+  handleSelectionModeClick(click, state, options);
+
+  expect(options.updateDragSelection).toHaveBeenNthCalledWith(1, 28, 38);
+  expect(options.updateDragSelection).toHaveBeenNthCalledWith(2, 140, 120);
+  expect(options.finalizeDragSelection).toHaveBeenCalledOnce();
+  expect(options.selectElement).not.toHaveBeenCalled();
+  expect(click.preventDefault).toHaveBeenCalledOnce();
+});
+
+it('keeps a short press on a link as element selection', () => {
+  const state: SelectionModeInteractionState = {
+    ...createInteractionState(),
+    currentState: 'idle',
+  };
+  const options = { ...createSelectionModeOptions(), isExtensionUIElement: () => false };
+  vi.mocked(options.startDragSelection).mockImplementation(() => {
+    state.currentState = 'drag';
+  });
+  vi.mocked(options.finalizeDragSelection).mockImplementation(() => {
+    state.currentState = 'idle';
+  });
+  const anchor = document.createElement('a');
+  anchor.href = '#Phonebook';
+  const child = document.createElement('span');
+  anchor.append(child);
+  const down = createSelectionModeMouseEvent({
+    clientX: 20,
+    clientY: 30,
+    target: child,
+    type: 'mousedown',
+  });
+  const up = createSelectionModeMouseEvent({
+    clientX: 22,
+    clientY: 31,
+    target: child,
+    type: 'mouseup',
+  });
+  const click = createSelectionModeMouseEvent({
+    clientX: 22,
+    clientY: 31,
+    target: child,
+    type: 'click',
+  });
+
+  handleSelectionModeMouseDown(down, state, options);
+  handleSelectionModeMouseUp(up, state, options);
+  expect(options.selectElement).not.toHaveBeenCalled();
+  handleSelectionModeClick(click, state, options);
+
+  expect(options.updateDragSelection).not.toHaveBeenCalled();
+  expect(options.selectElement).toHaveBeenCalledOnce();
+  expect(options.selectElement).toHaveBeenCalledWith(child, undefined);
 });
 
 it('captures the current selection as resize start state when dragging a handle', () => {

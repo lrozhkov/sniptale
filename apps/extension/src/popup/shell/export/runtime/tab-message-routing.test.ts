@@ -50,7 +50,7 @@ function createExportOptions() {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -61,7 +61,6 @@ function createViewerExportMessages() {
   const options = createExportOptions();
   return [
     { type: MessageType.EXPORT_POPUP_PREVIEW },
-    { type: MessageType.EXPORT_POPUP_START, requestId: 'req-1', options },
     { batchRequestId: 'batch-1', type: MessageType.EXPORT_POPUP_BUILD_PACKAGE, options },
     { type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT, requestId: 'req-web' },
     { exportRunId: 'export-run-1', type: MessageType.EXPORT_POPUP_CANCEL },

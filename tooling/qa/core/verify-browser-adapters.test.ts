@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectBrowserAdapterViolations,
+  collectRetiredBrowserProtocolViolations,
   runBrowserAdapterCheck,
 } from './verify-browser-adapters.mjs';
 import { filterAstGrepAuditFiles } from '../audits/ast-grep.mjs';
@@ -112,6 +113,38 @@ describe('collectBrowserAdapterViolations baseline allowances', () => {
   });
 });
 
+describe('retired browser protocol guard', () => {
+  it('rejects product API, message, artifact, and policy remnants', () => {
+    const root = createTempRoot();
+    const source = writeFile(
+      root,
+      'apps/extension/src/background/capture/legacy.ts',
+      'chrome.debugger.attach({ tabId: 1 });\n'
+    );
+    const policy = writeFile(
+      root,
+      'tooling/configs/qa/legacy.json',
+      '{"message":"EXPORT_START_HAR","artifact":"session.har"}\n'
+    );
+
+    expect(collectRetiredBrowserProtocolViolations([source, policy], { root })).toEqual([
+      expect.objectContaining({ file: 'apps/extension/src/background/capture/legacy.ts' }),
+      expect.objectContaining({ file: 'tooling/configs/qa/legacy.json' }),
+    ]);
+  });
+
+  it('allows browser-control protocol use only in Playwright tooling', () => {
+    const root = createTempRoot();
+    const e2e = writeFile(
+      root,
+      'tooling/test/e2e/browser-control.ts',
+      "client.send('Page.captureScreenshot');\n"
+    );
+
+    expect(collectRetiredBrowserProtocolViolations([e2e], { root })).toEqual([]);
+  });
+});
+
 function runExtendedRuntimeRuleSuite() {
   it('flags direct runtime metadata, offscreen, and tab-capture calls outside the adapter seam', () => {
     const root = createTempRoot();
@@ -171,6 +204,16 @@ function runExtendedRuntimeAuditParitySuite() {
       'apps/extension/src/content/browser-adapter-runtime.test.ts',
       'chrome.runtime.getManifest().version;\n'
     );
+    const popupStartupE2eFile = writeFile(
+      root,
+      'tooling/test/e2e/extension-smoke.popup-startup.ts',
+      'chrome.storage.local.set({ theme: "dark" });\n'
+    );
+    const popupStartupSuffixSpoof = writeFile(
+      root,
+      'spoof/tooling/test/e2e/extension-smoke.popup-startup.ts',
+      'chrome.storage.local.set({ theme: "dark" });\n'
+    );
 
     expect(
       filterAstGrepAuditFiles(
@@ -183,11 +226,13 @@ function runExtendedRuntimeAuditParitySuite() {
           historyFile,
           localStorageFile,
           testFile,
+          popupStartupE2eFile,
+          popupStartupSuffixSpoof,
         ],
         undefined,
         { root }
       )
-    ).toEqual([channelFile, historyFile, localStorageFile]);
+    ).toEqual([channelFile, historyFile, localStorageFile, popupStartupSuffixSpoof]);
   });
 
   it('flags stale allowlisted owner targets before browser adapter scanning', () => {

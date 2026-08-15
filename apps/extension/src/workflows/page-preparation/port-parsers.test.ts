@@ -16,7 +16,7 @@ const EXPORT_OPTIONS = {
   includeCssDiagnostics: false,
   includeFiles: true,
   includeFullPageScreenshot: false,
-  includeHarDomLogs: false,
+  includePageDiagnostics: false,
   includeImages: true,
   includeJson: true,
   includeMarkdown: true,
@@ -52,7 +52,7 @@ describe('viewer preparation enable command parser', () => {
         type: MessageType.ENABLE_SCREENSHOT_MODE,
         viewport: {
           presetId: 'test:viewport',
-          target: 'viewport',
+          target: 'window',
           height: 720,
           width: 1280,
         },
@@ -70,7 +70,7 @@ describe('viewer preparation enable command parser', () => {
       type: MessageType.ENABLE_SCREENSHOT_MODE,
       viewport: {
         presetId: 'test:viewport',
-        target: 'viewport',
+        target: 'window',
         height: 720,
         width: 1280,
       },
@@ -133,8 +133,7 @@ describe('viewer export correlated response parser', () => {
         request: {
           batchRequestId: 'batch-1',
           options: EXPORT_OPTIONS,
-          requestId: 'export-1',
-          type: MessageType.EXPORT_POPUP_START,
+          type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
         },
         requestId: 'port-1',
         type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
@@ -143,8 +142,8 @@ describe('viewer export correlated response parser', () => {
     ).toEqual({
       request: {
         options: EXPORT_OPTIONS,
-        requestId: 'export-1',
-        type: MessageType.EXPORT_POPUP_START,
+        batchRequestId: 'batch-1',
+        type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
       },
       requestId: 'port-1',
       type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
@@ -207,7 +206,7 @@ describe('viewer export port parser rejection cases', () => {
   it('rejects malformed export envelopes and mismatched responses', () => {
     expect(
       parseViewerExportPortRequest({
-        request: { options: { includeJson: true }, type: MessageType.EXPORT_POPUP_START },
+        request: { options: { includeJson: true }, type: 'RETIRED_EXPORT_MESSAGE' },
         requestId: 'port-1',
         type: WEB_SNAPSHOT_VIEWER_EXPORT_REQUEST,
         viewerPortGeneration: 'viewer-generation-1',

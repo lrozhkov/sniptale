@@ -28,7 +28,7 @@ function createToolbarState() {
   return {
     activeTool: 'select',
     gridEnabled: true,
-    history: { canRedo: false, canUndo: true },
+    history: { canRedo: false, canUndo: true, index: 1, size: 2 },
     inspector: 'layer-effects',
     inspectorCollapsed: false,
     layerEffectsCategory: 'transformations',

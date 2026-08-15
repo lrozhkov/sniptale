@@ -4,29 +4,21 @@ import type {
   ViewportPreset,
   ViewportPresetAvailability,
   ViewportPresetAvailabilityReason,
-  ViewportPresetTarget,
 } from '../../features/viewport-presets/contracts';
-import { isViewportPresetAllowedForVideoCaptureMode } from '../../features/viewport-presets/video-recording-policy';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import type { CaptureSurfaceLeaseState, CaptureSurfaceContext } from './types';
-import { getTabZoom } from './viewport';
-import { readViewportCapacity as readPageViewportCapacity } from './viewport-capacity';
+import type { CaptureSurfaceContext, CaptureSurfaceLeaseState } from './types';
 import { getWindowWorkArea } from './window';
-
-function isVideoContext(context: CaptureSurfaceContext): boolean {
-  return context === 'video-tab' || context === 'video-tab-crop';
-}
 
 function unavailable(
   presetId: string,
   reason: ViewportPresetAvailabilityReason,
   args: {
-    target?: ViewportPresetTarget | null;
     required?: { width: number; height: number };
     available?: { width: number; height: number };
+    target?: 'window' | null;
   } = {}
 ): ViewportPresetAvailability {
-  return { status: 'unavailable', presetId, reason, target: args.target ?? null, ...args };
+  const { target = 'window', ...dimensions } = args;
+  return { status: 'unavailable', presetId, reason, target, ...dimensions };
 }
 
 export async function resolveCaptureSurfacePreset(
@@ -39,98 +31,13 @@ export async function resolveCaptureSurfacePreset(
 export function hasCaptureSurfaceConflict(
   leases: Iterable<CaptureSurfaceLeaseState>,
   tabId: number,
-  windowId: number,
-  target: ViewportPresetTarget
+  windowId: number
 ): boolean {
   return [...leases].some((lease) => {
-    const sharesWindow = lease.entry.windowId === windowId;
-    const windowExclusive = target === 'window' || lease.applied.target === 'window';
-    if (lease.entry.phase === 'conflict') {
-      return lease.entry.tabId === tabId || (sharesWindow && windowExclusive);
-    }
-    return sharesWindow && lease.entry.tabId !== tabId && windowExclusive;
+    if (lease.entry.phase === 'conflict')
+      return lease.entry.tabId === tabId || lease.entry.windowId === windowId;
+    return lease.entry.windowId === windowId && lease.entry.tabId !== tabId;
   });
-}
-
-type RequiredSize = { width: number; height: number };
-type WindowCapacity = RequiredSize;
-
-async function readViewportCapacity(
-  args: { context: CaptureSurfaceContext; tabId: number },
-  leases: readonly CaptureSurfaceLeaseState[]
-): Promise<RequiredSize> {
-  const rootViewportLease = leases.find(
-    (lease) => lease.entry.tabId === args.tabId && lease.applied.target === 'viewport'
-  );
-  if (rootViewportLease?.prior.type === 'native') {
-    return { width: rootViewportLease.prior.width, height: rootViewportLease.prior.height };
-  }
-  return readPageViewportCapacity(args.tabId);
-}
-
-type Measurement<T> = { ok: true; value: T } | { ok: false };
-
-async function measure<T>(read: () => Promise<T>): Promise<Measurement<T>> {
-  try {
-    return { ok: true, value: await read() };
-  } catch {
-    return { ok: false };
-  }
-}
-
-function projectWindowAvailability(
-  preset: ViewportPreset,
-  measurement: Measurement<WindowCapacity>
-): ViewportPresetAvailability {
-  const required = { width: preset.width, height: preset.height };
-  if (!measurement.ok) {
-    return unavailable(preset.id, 'platform-rejected', { target: preset.target, required });
-  }
-  const capacity = measurement.value;
-  const available = { width: capacity.width, height: capacity.height };
-  return preset.width > capacity.width || preset.height > capacity.height
-    ? unavailable(preset.id, 'window-too-large', {
-        target: preset.target,
-        required,
-        available,
-      })
-    : { status: 'available', presetId: preset.id, target: preset.target, required };
-}
-
-function projectViewportAvailability(
-  context: CaptureSurfaceContext,
-  preset: ViewportPreset,
-  measurement: Measurement<RequiredSize>,
-  zoom: Measurement<number> | null
-): ViewportPresetAvailability {
-  const required = { width: preset.width, height: preset.height };
-  if (isVideoContext(context)) {
-    if (!zoom?.ok) {
-      return unavailable(preset.id, 'platform-rejected', { target: preset.target, required });
-    }
-    if (zoom.value !== 1) {
-      return unavailable(preset.id, 'zoom-not-100', { target: preset.target, required });
-    }
-  }
-  if (!measurement.ok) {
-    return unavailable(preset.id, 'platform-rejected', { target: preset.target, required });
-  }
-  const available = measurement.value;
-  if (preset.width > available.width || preset.height > available.height) {
-    return unavailable(preset.id, 'viewport-too-large', {
-      target: preset.target,
-      required,
-      available,
-    });
-  }
-  return isVideoContext(context)
-    ? {
-        status: 'requires-start-validation',
-        presetId: preset.id,
-        target: 'viewport',
-        required,
-      }
-    : { status: 'available', presetId: preset.id, target: 'viewport', required };
 }
 
 function projectStaticAvailability(args: {
@@ -142,35 +49,20 @@ function projectStaticAvailability(args: {
   windowId: number | null;
 }): ViewportPresetAvailability | null {
   const { context, leaseStates, preset, presetId, tabId, windowId } = args;
-  if (!preset) return unavailable(presetId, 'missing');
+  if (!preset) return unavailable(presetId, 'missing', { target: null });
   const required = { width: preset.width, height: preset.height };
-  if (!preset.enabled) {
-    return unavailable(preset.id, 'disabled', { target: preset.target, required });
+  if (!preset.enabled) return unavailable(preset.id, 'disabled', { required });
+  if (context === 'video-screen' || windowId === null) {
+    return unavailable(preset.id, 'unsupported-context', { required });
   }
-  if (context === 'video-screen') {
-    return unavailable(preset.id, 'unsupported-context', { target: preset.target, required });
-  }
-  if (
-    context === 'video-tab-crop' &&
-    !isViewportPresetAllowedForVideoCaptureMode(CaptureMode.TAB_CROP, preset)
-  ) {
-    return unavailable(preset.id, 'unsupported-context', { target: preset.target, required });
-  }
-  if (windowId === null) {
-    return unavailable(preset.id, 'unsupported-context', { target: preset.target, required });
-  }
-  if (hasCaptureSurfaceConflict(leaseStates, tabId, windowId, preset.target)) {
-    return unavailable(preset.id, 'surface-busy', { target: preset.target, required });
+  if (hasCaptureSurfaceConflict(leaseStates, tabId, windowId)) {
+    return unavailable(preset.id, 'surface-busy', { required });
   }
   return null;
 }
 
 export async function getCaptureSurfaceAvailabilities(
-  args: {
-    tabId: number;
-    presetIds: readonly string[];
-    context: CaptureSurfaceContext;
-  },
+  args: { tabId: number; presetIds: readonly string[]; context: CaptureSurfaceContext },
   leases: Iterable<CaptureSurfaceLeaseState>
 ): Promise<ViewportPresetAvailability[]> {
   const leaseStates = [...leases];
@@ -185,7 +77,7 @@ export async function getCaptureSurfaceAvailabilities(
   );
   const tab = needsRuntimeContext ? await browserTabs.get(args.tabId).catch(() => null) : null;
   const windowId = tab?.windowId ?? null;
-  const measurable = requested.filter(({ preset, presetId }) =>
+  const needsMeasurement = requested.some(({ preset, presetId }) =>
     Boolean(
       projectStaticAvailability({
         context: args.context,
@@ -197,22 +89,12 @@ export async function getCaptureSurfaceAvailabilities(
       }) === null
     )
   );
-  const needsViewport = measurable.some(({ preset }) => preset?.target === 'viewport');
-  const needsWindow = measurable.some(({ preset }) => preset?.target === 'window');
-  const [viewportMeasurement, windowMeasurement, zoomMeasurement] = await Promise.all([
-    needsViewport
-      ? measure(() => readViewportCapacity(args, leaseStates))
-      : Promise.resolve<Measurement<RequiredSize>>({ ok: false }),
-    needsWindow && windowId !== null
-      ? measure(async () => {
-          const { workArea } = await getWindowWorkArea(windowId);
-          return { width: workArea.width, height: workArea.height };
-        })
-      : Promise.resolve<Measurement<WindowCapacity>>({ ok: false }),
-    needsViewport && isVideoContext(args.context)
-      ? measure(() => getTabZoom(args.tabId))
-      : Promise.resolve<Measurement<number> | null>(null),
-  ]);
+  const capacity =
+    needsMeasurement && windowId !== null
+      ? await getWindowWorkArea(windowId)
+          .then(({ workArea }) => ({ width: workArea.width, height: workArea.height }))
+          .catch(() => null)
+      : null;
 
   return requested.map(({ preset, presetId }) => {
     const staticAvailability = projectStaticAvailability({
@@ -224,18 +106,17 @@ export async function getCaptureSurfaceAvailabilities(
       windowId,
     });
     if (staticAvailability) return staticAvailability;
-    return preset!.target === 'window'
-      ? projectWindowAvailability(preset!, windowMeasurement)
-      : projectViewportAvailability(args.context, preset!, viewportMeasurement, zoomMeasurement);
+    const required = { width: preset!.width, height: preset!.height };
+    if (!capacity) return unavailable(presetId, 'platform-rejected', { required });
+    if (required.width > capacity.width || required.height > capacity.height) {
+      return unavailable(presetId, 'window-too-large', { required, available: capacity });
+    }
+    return { status: 'available', presetId, target: 'window', required };
   });
 }
 
 export async function getCaptureSurfaceAvailability(
-  args: {
-    tabId: number;
-    presetId: string;
-    context: CaptureSurfaceContext;
-  },
+  args: { tabId: number; presetId: string; context: CaptureSurfaceContext },
   leases: Iterable<CaptureSurfaceLeaseState>
 ): Promise<ViewportPresetAvailability> {
   const [availability] = await getCaptureSurfaceAvailabilities(

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
   createSourceVideo: vi.fn(),
@@ -19,7 +20,8 @@ import {
   createStream,
   createTrackedStream,
 } from '../multi-source/media-stream.test-support';
-import { createCropStream, createGatedCropStream } from './crop-stream';
+import { createCropStream } from './crop-stream';
+import { resolveTabOutputGeometry } from '../geometry/tab-source';
 
 function installCanvasOutput(width: number, height: number) {
   const output = createStream(width, height);
@@ -41,6 +43,72 @@ function installCanvasOutput(width: number, height: number) {
   return { context, output };
 }
 
+function installSolidPixelCanvasOutput(width: number, height: number, sourceWidth: number) {
+  const output = createStream(width, height);
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  // Chromium's I420 capture region is aligned on two-pixel chroma boundaries.
+  const writePixel = (x: number, y: number, color: readonly [number, number, number, number]) => {
+    const offset = (y * width + x) * 4;
+    pixels.set(color, offset);
+  };
+  const context = {
+    drawImage: vi.fn((...args: unknown[]) => {
+      const [
+        sourceX,
+        ,
+        sampledWidth,
+        ,
+        destinationX,
+        destinationY,
+        destinationWidth,
+        destinationHeight,
+      ] = args.slice(1) as [number, number, number, number, number, number, number, number];
+      const destination = [destinationX, destinationY, destinationWidth, destinationHeight] as [
+        number,
+        number,
+        number,
+        number,
+      ];
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const centerX = x + 0.5;
+          const centerY = y + 0.5;
+          if (
+            centerX >= destination[0] &&
+            centerX < destination[0] + destination[2] &&
+            centerY >= destination[1] &&
+            centerY < destination[1] + destination[3]
+          ) {
+            const sampledX = sourceX + ((centerX - destination[0]) / destination[2]) * sampledWidth;
+            const color =
+              sampledX >= 2 && sampledX < sourceWidth - 2
+                ? ([17, 113, 201, 255] as const)
+                : ([0, 0, 0, 255] as const);
+            writePixel(x, y, color);
+          }
+        }
+      }
+    }),
+    fillRect: vi.fn(() => {
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) writePixel(x, y, [0, 0, 0, 255]);
+      }
+    }),
+    fillStyle: '',
+    imageSmoothingEnabled: false,
+    imageSmoothingQuality: 'low',
+  };
+  Object.defineProperty(HTMLCanvasElement.prototype, 'captureStream', {
+    configurable: true,
+    value: vi.fn(() => output),
+  });
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => context),
+  });
+  return { context, output, pixels };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
@@ -53,72 +121,127 @@ afterEach(() => {
 });
 
 describe('crop stream', () => {
-  it('contains the exact physical sample without stretching or implicit cropping', async () => {
-    const { context, output } = installCanvasOutput(1904, 984);
-    const video = { videoHeight: 1440, videoWidth: 2560 };
+  it.each([
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.SOURCE,
+    },
+    {
+      devicePixelRatio: 2,
+      raw: { width: 3808, height: 1970 },
+      resolution: VideoResolutionPreset.SOURCE,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P720,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P1080,
+    },
+    {
+      devicePixelRatio: 1,
+      raw: { width: 2560, height: 1440 },
+      resolution: VideoResolutionPreset.P1440,
+    },
+  ])(
+    'fills every stable TAB canvas edge for $resolution at devicePixelRatio $devicePixelRatio',
+    async ({ devicePixelRatio, raw, resolution }) => {
+      const video = { videoHeight: raw.height, videoWidth: raw.width };
+      mocks.createSourceVideo.mockReturnValue(video);
+      const geometry = resolveTabOutputGeometry(
+        { x: 0, y: 0, width: 1904, height: 985 },
+        raw,
+        { width: 1904, height: 985, devicePixelRatio },
+        {
+          frameRateCap: 30,
+          resolution,
+          tracksFullViewport: true,
+        }
+      );
+      const { context, output, pixels } = installSolidPixelCanvasOutput(
+        geometry.outputSize.width,
+        geometry.outputSize.height,
+        raw.width
+      );
+
+      await createCropStream(createStream(raw.width, raw.height), geometry);
+
+      expect(geometry.outputSize.width % 2).toBe(0);
+      expect(geometry.outputSize.height % 2).toBe(0);
+      expect(context.fillRect).toHaveBeenCalledWith(
+        0,
+        0,
+        geometry.outputSize.width,
+        geometry.outputSize.height
+      );
+      expect(context.drawImage).toHaveBeenCalledWith(
+        video,
+        geometry.sourceRect.x,
+        geometry.sourceRect.y,
+        geometry.sourceRect.width,
+        geometry.sourceRect.height,
+        0,
+        0,
+        geometry.outputSize.width,
+        geometry.outputSize.height
+      );
+      const { height, width } = geometry.outputSize;
+      const edgePixelOffsets = [
+        0,
+        (width - 1) * 4,
+        (height - 1) * width * 4,
+        (height * width - 1) * 4,
+      ];
+      for (const offset of edgePixelOffsets) {
+        expect([...pixels.slice(offset, offset + 4)]).toEqual([17, 113, 201, 255]);
+      }
+      output.getVideoTracks()[0]?.stop();
+    }
+  );
+
+  it('fills every stable TAB_CROP canvas edge', async () => {
+    const raw = { width: 2560, height: 1440 };
+    const geometry = resolveTabOutputGeometry(
+      { x: 100, y: 80, width: 300, height: 301 },
+      raw,
+      { width: 1280, height: 720, devicePixelRatio: 2 },
+      { frameRateCap: 30, resolution: VideoResolutionPreset.SOURCE }
+    );
+    const { context, output, pixels } = installSolidPixelCanvasOutput(
+      geometry.outputSize.width,
+      geometry.outputSize.height,
+      raw.width
+    );
+    const video = { videoHeight: raw.height, videoWidth: raw.width };
     mocks.createSourceVideo.mockReturnValue(video);
 
-    await createCropStream(createStream(2560, 1440), {
-      fit: 'contain',
-      sourceRect: { x: 0, y: 58, width: 2560, height: 1324 },
-      outputSize: { width: 1904, height: 984 },
-    });
+    await createCropStream(createStream(raw.width, raw.height), geometry);
 
-    const destinationWidth = (2560 * 984) / 1324;
-    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 1904, 984);
     expect(context.drawImage).toHaveBeenCalledWith(
       video,
+      geometry.sourceRect.x,
+      geometry.sourceRect.y,
+      geometry.sourceRect.width,
+      geometry.sourceRect.height,
       0,
-      58,
-      2560,
-      1324,
-      expect.closeTo((1904 - destinationWidth) / 2),
       0,
-      expect.closeTo(destinationWidth),
-      984
+      geometry.outputSize.width,
+      geometry.outputSize.height
     );
-    output.getVideoTracks()[0]?.stop();
-  });
-
-  it('applies a frozen resize mapping without changing the encoder canvas', async () => {
-    const { context, output } = installCanvasOutput(1904, 984);
-    const video = { videoHeight: 1440, videoWidth: 2560 };
-    mocks.createSourceVideo.mockReturnValue(video);
-
-    const gated = await createGatedCropStream(createStream(2560, 1440), {
-      fit: 'contain',
-      sourceRect: { x: 0, y: 58, width: 2560, height: 1324 },
-      outputSize: { width: 1904, height: 984 },
-    });
-    expect(gated.controls.setFrozen('resize-1', true)).toBe('applied');
-    expect(gated.controls.readFrozenSourceSize('resize-1')).toEqual({
-      height: 1440,
-      width: 2560,
-    });
-    expect(
-      gated.controls.applyFrozenSourceGeometry('resize-1', {
-        fit: 'contain',
-        sourceRect: { x: 0, y: 0, width: 2560, height: 1440 },
-        outputSize: { width: 1904, height: 984 },
-      })
-    ).toBe('applied');
-    expect(gated.controls.setFrozen('resize-1', false)).toBe('applied');
-
-    expect(context.drawImage).toHaveBeenLastCalledWith(
-      video,
+    const { height, width } = geometry.outputSize;
+    const edgePixelOffsets = [
       0,
-      0,
-      2560,
-      1440,
-      expect.closeTo((1904 - (2560 * 984) / 1440) / 2),
-      0,
-      expect.closeTo((2560 * 984) / 1440),
-      984
-    );
-    expect(output.getVideoTracks()[0]?.getSettings()).toMatchObject({
-      height: 984,
-      width: 1904,
-    });
+      (width - 1) * 4,
+      (height - 1) * width * 4,
+      (height * width - 1) * 4,
+    ];
+    for (const offset of edgePixelOffsets) {
+      expect([...pixels.slice(offset, offset + 4)]).toEqual([17, 113, 201, 255]);
+    }
     output.getVideoTracks()[0]?.stop();
   });
 
@@ -142,7 +265,7 @@ describe('crop stream', () => {
     output.getVideoTracks()[0]?.stop();
   });
 
-  it('rejects non-contain geometry and output dimension changes', async () => {
+  it('rejects non-contain geometry', async () => {
     installCanvasOutput(100, 80);
     mocks.createSourceVideo.mockReturnValue({ videoHeight: 80, videoWidth: 100 });
     const unsupportedFit = ['co', 'ver'].join('') as 'cover';
@@ -154,22 +277,19 @@ describe('crop stream', () => {
         outputSize: { width: 100, height: 80 },
       })
     ).rejects.toThrow('contain fit only');
+  });
 
-    const gated = await createGatedCropStream(createStream(100, 80), {
-      fit: 'contain',
-      sourceRect: { x: 0, y: 0, width: 100, height: 80 },
-      outputSize: { width: 100, height: 80 },
-    });
-    gated.controls.setFrozen('resize-1', true);
-    gated.controls.readFrozenSourceSize('resize-1');
-    expect(() =>
-      gated.controls.applyFrozenSourceGeometry('resize-1', {
-        fit: 'contain',
-        sourceRect: { x: 0, y: 0, width: 100, height: 80 },
-        outputSize: { width: 98, height: 78 },
+  it('rejects a full-output destination when the sampled aspect does not match', async () => {
+    installCanvasOutput(100, 80);
+    mocks.createSourceVideo.mockReturnValue({ videoHeight: 80, videoWidth: 100 });
+
+    await expect(
+      createCropStream(createStream(100, 80), {
+        fillsOutput: true,
+        sourceRect: { x: 0, y: 0, width: 100, height: 70 },
+        outputSize: { width: 100, height: 80 },
       })
-    ).toThrow('cannot change the encoded output dimensions');
-    gated.stream.getVideoTracks()[0]?.stop();
+    ).rejects.toThrow('must preserve the sampled source aspect');
   });
 
   it('releases source ownership on setup failure and output stop', async () => {

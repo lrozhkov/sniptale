@@ -80,6 +80,7 @@ it('keeps highlighter alphabets and shared anchors canonical', () => {
   }>();
   expectTypeOf<StepBadgeSettings>().toMatchTypeOf<{ enabled: boolean; value: string }>();
   expectTypeOf<StepBadgeManualPlacement>().toEqualTypeOf<{
+    normalOffset?: number;
     position: number;
     side: 'top' | 'right' | 'bottom' | 'left';
   }>();

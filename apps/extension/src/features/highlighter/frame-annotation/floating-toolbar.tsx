@@ -36,13 +36,17 @@ export function FrameAnnotationToolbarEffectButton(props: {
   );
 }
 
-export function FrameAnnotationToolbarStepButton(props: {
+type FrameAnnotationToolbarMenuButtonProps = {
   active: boolean;
   title?: string;
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
+  children: React.ReactNode;
+  commandId: FrameAnnotationCommandId;
   onClick: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
-}) {
+};
+
+function FrameAnnotationToolbarMenuButton(props: FrameAnnotationToolbarMenuButtonProps) {
   return (
     <ProductGlassToolbarButton
       active={props.active}
@@ -51,10 +55,24 @@ export function FrameAnnotationToolbarStepButton(props: {
       onClick={props.onClick}
       onMouseDown={props.onMouseDown}
       menuIndicator
-      title={props.title ?? commandLabels().get('step-badge')}
+      title={props.title ?? commandLabels().get(props.commandId)}
     >
-      <ListOrdered size={17} />
+      {props.children}
     </ProductGlassToolbarButton>
+  );
+}
+
+export function FrameAnnotationToolbarStepButton(props: {
+  active: boolean;
+  title?: string;
+  anchorRef?: React.RefObject<HTMLButtonElement | null>;
+  onClick: (event: React.MouseEvent) => void;
+  onMouseDown: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <FrameAnnotationToolbarMenuButton {...props} commandId="step-badge">
+      <ListOrdered size={17} />
+    </FrameAnnotationToolbarMenuButton>
   );
 }
 
@@ -66,17 +84,9 @@ export function FrameAnnotationToolbarCalloutButton(props: {
   onMouseDown: (event: React.MouseEvent) => void;
 }) {
   return (
-    <ProductGlassToolbarButton
-      active={props.active}
-      data-sniptale-activation-bridge="defer"
-      ref={props.anchorRef}
-      onClick={props.onClick}
-      onMouseDown={props.onMouseDown}
-      menuIndicator
-      title={props.title ?? commandLabels().get('callout')}
-    >
+    <FrameAnnotationToolbarMenuButton {...props} commandId="callout">
       <FrameCommentIcon size={17} />
-    </ProductGlassToolbarButton>
+    </FrameAnnotationToolbarMenuButton>
   );
 }
 

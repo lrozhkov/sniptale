@@ -7,13 +7,13 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 import {
-  createPopupAppShellRuntime,
-  type PopupRuntimeStateOverrides,
+  createPopupVideoSetupRuntime,
+  type PopupVideoSetupRuntimeOverrides,
 } from '../test-support/runtime';
 import { createPopupVideoSetupHandlers } from './handlers';
 
-function createRuntime(overrides: PopupRuntimeStateOverrides = {}): PopupVideoSetupRuntime {
-  return createPopupAppShellRuntime({
+function createRuntime(overrides: PopupVideoSetupRuntimeOverrides = {}): PopupVideoSetupRuntime {
+  return createPopupVideoSetupRuntime({
     galleryStatus: null,
     selectedPresetId: null,
     ...overrides,
@@ -39,7 +39,7 @@ it('normalizes missing presets to current size', () => {
   expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
 });
 
-it('clears an active viewport preset when capture changes to TAB_CROP', () => {
+it('preserves an active window preset when capture changes to TAB_CROP', () => {
   const runtime = createRuntime({
     selectedPresetId: 'preset-1',
     videoCaptureMode: CaptureMode.TAB,
@@ -48,7 +48,19 @@ it('clears an active viewport preset when capture changes to TAB_CROP', () => {
   createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.TAB_CROP);
 
   expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.TAB_CROP);
+  expect(runtime.recording.setSelectedPresetId).not.toHaveBeenCalled();
+});
+
+it('clears a stale preset when the capture mode changes', () => {
+  const runtime = createRuntime({
+    selectedPresetId: 'missing',
+    videoCaptureMode: CaptureMode.TAB,
+  });
+
+  createPopupVideoSetupHandlers(runtime).onCaptureModeChange(CaptureMode.CAMERA);
+
   expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
+  expect(runtime.recording.setVideoCaptureMode).toHaveBeenCalledWith(CaptureMode.CAMERA);
 });
 
 it('preserves a window preset when capture changes to TAB_CROP', () => {
@@ -74,12 +86,12 @@ it('preserves a window preset when capture changes to TAB_CROP', () => {
   expect(runtime.recording.setSelectedPresetId).not.toHaveBeenCalled();
 });
 
-it('normalizes a viewport preset selected through a stale TAB_CROP UI', () => {
+it('accepts a window preset selected through a stale TAB_CROP UI', () => {
   const runtime = createRuntime({ videoCaptureMode: CaptureMode.TAB_CROP });
 
   createPopupVideoSetupHandlers(runtime).onPresetChange('preset-1');
 
-  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith(null);
+  expect(runtime.recording.setSelectedPresetId).toHaveBeenCalledWith('preset-1');
 });
 
 it('patches media settings and toggles media devices through the runtime', () => {
@@ -118,7 +130,7 @@ it('keeps saved recording preferences unchanged when camera mode is selected', (
     videoSettings: {
       ...DEFAULT_VIDEO_SETTINGS,
       controlledCursorCaptureEnabled: true,
-      diagnosticsEnabled: true,
+      interactionDiagnosticsEnabled: true,
       systemAudioEnabled: true,
       webcamDeviceId: null,
       webcamEnabled: false,

@@ -24,8 +24,8 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
   sendTabMessage: sendTabMessageMock,
 }));
 
-vi.mock('../../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 
@@ -39,36 +39,28 @@ import { createBackgroundRuntimeState } from '../../../application/runtime-state
 import { routePopupExportMessage } from './popup-export-routing';
 import type { PopupExportViewerMessage } from '../message-guards/guards/shared';
 
-type ExportMessageType =
-  | typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE
-  | typeof MessageType.EXPORT_POPUP_START;
-
 function createExportOptions(includeFullPageScreenshot: boolean) {
   return {
     includeBasicLogs: false,
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
   };
 }
 
-function createExportMessage(
-  type: ExportMessageType,
-  includeFullPageScreenshot: boolean
-): PopupExportViewerMessage {
-  const base = {
+function createExportMessage(includeFullPageScreenshot: boolean): PopupExportViewerMessage {
+  return {
+    batchRequestId: 'req-export',
     options: createExportOptions(includeFullPageScreenshot),
     tabId: 62,
     tabRouteCapabilityToken: 'cap-1',
     tabRouteRequestId: 'req-export',
+    type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   };
-  return type === MessageType.EXPORT_POPUP_START
-    ? { ...base, requestId: 'req-export', type }
-    : { ...base, batchRequestId: 'req-export', type };
 }
 
 async function flushRouteWork(): Promise<void> {
@@ -85,19 +77,14 @@ beforeEach(() => {
   sendTabMessageMock.mockResolvedValue({ pagePackage: {}, success: true });
 });
 
-it.each([
-  [MessageType.EXPORT_POPUP_START, true, true],
-  [MessageType.EXPORT_POPUP_BUILD_PACKAGE, true, true],
-  [MessageType.EXPORT_POPUP_START, false, false],
-  [MessageType.EXPORT_POPUP_BUILD_PACKAGE, false, false],
-] as const)(
-  'routes %s with full-page screenshot=%s and grant=%s',
-  async (type, includeFullPageScreenshot, expectsGrant) => {
+it.each([true, false])(
+  'keeps package routing data-only with full-page screenshot=%s',
+  async (includeFullPageScreenshot) => {
     const sendResponse = vi.fn();
 
     routePopupExportMessage({
       deps: createBackgroundRuntimeState(),
-      message: createExportMessage(type, includeFullPageScreenshot),
+      message: createExportMessage(includeFullPageScreenshot),
       resolvedTabId: 62,
       sendResponse,
       sender: undefined,
@@ -105,18 +92,7 @@ it.each([
     await flushRouteWork();
 
     const sentMessage = sendTabMessageMock.mock.calls[0]?.[1] as Record<string, unknown>;
-    if (expectsGrant) {
-      expect(sentMessage).toEqual(
-        expect.objectContaining({
-          contentIntentGrant: { grantToken: expect.any(String) },
-          fullPageCaptureAction:
-            type === MessageType.EXPORT_POPUP_BUILD_PACKAGE
-              ? MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED
-              : MessageType.EXPORT_CAPTURE_FULL_PAGE,
-        })
-      );
-      return;
-    }
     expect(sentMessage).not.toHaveProperty('contentIntentGrant');
+    expect(sentMessage).not.toHaveProperty('fullPageCaptureAction');
   }
 );

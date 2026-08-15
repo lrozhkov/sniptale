@@ -17,6 +17,7 @@ function assertFrameDefaultsForMissingInput(): void {
 function assertExplicitFalseyFrameValues(): void {
   expect(normalizeEditorFrameSettings(createExplicitFalseyFrameInput())).toEqual({
     backgroundColor: '',
+    backgroundBlurAmount: 0,
     backgroundGradientAngle: 0,
     backgroundGradientColorStops: [
       { color: '', offset: 0 },
@@ -52,6 +53,7 @@ function assertExplicitFalseyFrameValues(): void {
 function createExplicitFalseyFrameInput(): Partial<EditorFrameSettings> {
   return {
     backgroundColor: '',
+    backgroundBlurAmount: 0,
     backgroundGradientAngle: 0,
     backgroundGradientFrom: '',
     backgroundGradientTo: '',
@@ -89,6 +91,7 @@ function registerEditorFrameDefaultTests() {
     expect(DEFAULT_EDITOR_FRAME_SETTINGS).toEqual(
       expect.objectContaining({
         backgroundGradientAngle: 145,
+        backgroundBlurAmount: 0,
         backgroundMode: 'gradient',
         browserTitle: '',
         layoutMode: 'expand-canvas',
@@ -105,6 +108,21 @@ function registerEditorFrameDefaultTests() {
     'falls back to canonical frame defaults for missing frame input',
     assertFrameDefaultsForMissingInput
   );
+
+  it('normalizes owner-local blur values to the supported range', () => {
+    expect(normalizeEditorFrameSettings({ backgroundBlurAmount: 12.5 })).toMatchObject({
+      backgroundBlurAmount: 12.5,
+    });
+    expect(normalizeEditorFrameSettings({ backgroundBlurAmount: -2 })).toMatchObject({
+      backgroundBlurAmount: 0,
+    });
+    expect(normalizeEditorFrameSettings({ backgroundBlurAmount: 90 })).toMatchObject({
+      backgroundBlurAmount: 25,
+    });
+    expect(normalizeEditorFrameSettings({ backgroundBlurAmount: Number.NaN })).toMatchObject({
+      backgroundBlurAmount: 0,
+    });
+  });
 
   it(
     'preserves explicit falsey frame values instead of replacing them',

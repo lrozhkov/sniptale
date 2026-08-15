@@ -24,7 +24,7 @@ const settings = {
   autoFadeDelay: 3,
   controlledCursorCaptureEnabled: false,
   countdownSeconds: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   microphoneDeviceId: null,
   microphoneEnabled: false,
   webcamDeviceId: null,

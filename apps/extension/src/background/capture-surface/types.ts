@@ -50,7 +50,7 @@ export type CaptureSurfaceLeaseIdentity = {
   owner: CaptureSurfaceOwner;
   sessionId: string;
   tabId: number;
-  target: ViewportPresetTarget;
+  target: 'window';
 };
 
 export type BeforeAbandonedCaptureSurfaceRestore = (
@@ -83,7 +83,6 @@ export interface CaptureSurfaceService {
   getAppliedBindingForSession(sessionId: string): AppliedCaptureSurfaceBinding | null;
   getAppliedForSession(sessionId: string): AppliedCaptureSurface | null;
   hasSessionLease(sessionId: string): boolean;
-  handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]>;
   hasOwnerLease(owner: CaptureSurfaceOwner): boolean;
   getAvailability(args: {
     tabId: number;
@@ -112,10 +111,8 @@ export class CaptureSurfaceError extends Error {
       | 'missing'
       | 'disabled'
       | 'unsupported-context'
-      | 'viewport-too-large'
       | 'window-too-large'
       | 'window-not-normal'
-      | 'zoom-not-100'
       | 'surface-busy'
       | 'permission-denied'
       | 'platform-rejected'
@@ -146,5 +143,4 @@ export type CaptureSurfaceLeaseState = {
   entry: CaptureSurfaceJournalEntry;
   ownedMutationSnapshot?: CaptureSurfaceSnapshot;
   prior: CaptureSurfaceSnapshot;
-  viewportAcquisitionOwned: boolean;
 };

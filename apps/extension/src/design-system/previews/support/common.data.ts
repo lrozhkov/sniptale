@@ -40,7 +40,7 @@ export const SHARED_PREVIEW_COPY_VALUES = {
   mediumSelectAria: ['Средний select', 'Medium select'],
   startRecording: ['Начать запись', 'Start recording'],
   primaryCta: ['Главная CTA', 'Primary CTA'],
-  openGallery: ['Открыть галерею', 'Open gallery'],
+  openGallery: ['Открыть библиотеку', 'Open library'],
   secondaryAction: ['Вторичное действие', 'Secondary action'],
   mediaHub: ['Медиа-хаб', 'Media hub'],
   contentNavigation: ['Навигация по контенту', 'Content navigation'],

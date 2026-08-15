@@ -179,12 +179,12 @@ function authorizeNativeAppRoute(
   );
 }
 
-function authorizePopupExportArchiveRoute(
+function authorizePopupExportJobRoute(
   request: BackgroundOwnedAuthorizationRequest
 ): IpcAuthorizationResult {
   return isPopupTabRouteSenderUrl(request.sender.url)
     ? AUTHORIZED
-    : reject('Unauthorized popup export archive sender');
+    : reject('Unauthorized popup export job sender');
 }
 
 function authorizePopupTabRouteCapabilityIssuance(
@@ -327,8 +327,8 @@ function getBackgroundOwnedAuthorizationHandler(
       return authorizeNativeAppRoute;
     case 'page-access':
       return authorizePageAccessRoute;
-    case 'popup-export-archive':
-      return authorizePopupExportArchiveRoute;
+    case 'popup-export-job':
+      return authorizePopupExportJobRoute;
     case 'popup-tab-route-capability-issuance':
       return authorizePopupTabRouteCapabilityIssuance;
     case 'voice-input-offscreen-event':

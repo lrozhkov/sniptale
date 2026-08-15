@@ -22,7 +22,7 @@ describe('captureFrameSessionSnapshot', () => {
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
       stepBadge: {
         enabled: true,
-        manualPlacement: { position: 0.72, side: 'bottom' },
+        manualPlacement: { normalOffset: -18, position: 0.72, side: 'bottom' },
         type: 'number',
         value: '3',
       },
@@ -54,7 +54,7 @@ describe('captureFrameSessionSnapshot', () => {
     expect(saved).toMatchObject({
       callout: { placement: { manualPlacement: { centerOffsetX: 80, centerOffsetY: -40 } } },
       pagePlacement: { iframePath: ['iframe#content'], pageX: 120, pageY: 240 },
-      stepBadge: { manualPlacement: { position: 0.72, side: 'bottom' } },
+      stepBadge: { manualPlacement: { normalOffset: -18, position: 0.72, side: 'bottom' } },
     });
 
     frame.callout!.placement.connectorWaypoint!.centerOffsetX = 999;

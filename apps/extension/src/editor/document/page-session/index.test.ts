@@ -65,6 +65,48 @@ describe('stable editor aggregate identity', () => {
       }
     );
   });
+
+  it('clears session restore parameters while preserving unrelated page state', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/apps/extension/src/editor/index.html?assetId=image-7&bootstrap=boot-7&session=legacy&theme=dark'
+    );
+    const { clearEditorPageSession } = await import('./');
+
+    clearEditorPageSession();
+
+    expect(window.location.search).toBe('?theme=dark');
+  });
+
+  it('starts a fresh local draft, replaces restore params, and activates autosave', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/apps/extension/src/editor/index.html?assetId=library-1&bootstrap=boot-1&session=legacy&theme=dark'
+    );
+    mocks.createId.mockReturnValue('draft-new');
+    const activate = vi.fn();
+    const renderPresentation = vi.fn();
+    const { beginEditorPageLocalDraft } = await import('./');
+
+    expect(
+      beginEditorPageLocalDraft({
+        autosaveService: { activate },
+        renderPresentation,
+        sourceTitle: 'local.png',
+      })
+    ).toBe('draft-new');
+
+    expect(window.location.search).toBe('?assetId=draft-new&theme=dark');
+    expect(activate).toHaveBeenCalledWith({
+      aggregateId: 'draft-new',
+      durableRevision: 0,
+      renderPresentation,
+      sourceTitle: 'local.png',
+      sourceUrl: '',
+    });
+  });
 });
 
 describe('editor aggregate restore', () => {

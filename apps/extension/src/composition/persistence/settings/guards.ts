@@ -240,12 +240,6 @@ function parsePrivacySettingsFields(
     'skipWebSnapshotSaveDisclosure',
     parseOptionalBoolean(value['skipWebSnapshotSaveDisclosure'])
   );
-  invalidFieldCount += assignParsedSettingsField(
-    nextValue,
-    'rawDiagnosticsEnabled',
-    parseOptionalBoolean(value['rawDiagnosticsEnabled'])
-  );
-
   return invalidFieldCount;
 }
 

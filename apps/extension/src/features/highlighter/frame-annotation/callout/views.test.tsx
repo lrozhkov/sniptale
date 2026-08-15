@@ -4,6 +4,7 @@ import { getDynamicTailState } from './dynamic-tail';
 import { getLineConnectorState } from './line-connector';
 import { renderCalloutAccentEdge, renderDynamicCalloutTail } from './views';
 import { createDefaultCalloutSettings } from './model';
+import { resolveCalloutCustomCss } from '../../callout-custom-css';
 
 it('clips a double-width accent against the rounded card contour', () => {
   const style = createDefaultCalloutSettings().style;
@@ -61,9 +62,11 @@ it('renders a wide transparent hover corridor around the visible callout connect
   style.surface.borderColor = '#ff7a00';
   style.surface.borderStyle = 'dashed';
   style.surface.borderWidth = 3;
-  const markup = renderToStaticMarkup(renderDynamicCalloutTail(tail, style));
+  const markup = renderToStaticMarkup(
+    renderDynamicCalloutTail(tail, style, resolveCalloutCustomCss(style.customCss).styles)
+  );
 
-  expect(markup.match(/<path/g)).toHaveLength(2);
+  expect(markup.match(/<path/g)).toHaveLength(1);
   expect(markup).toContain('stroke="transparent"');
   expect(markup).toContain('stroke-width="18"');
   expect(markup).toContain('pointer-events="stroke"');
@@ -71,11 +74,9 @@ it('renders a wide transparent hover corridor around the visible callout connect
   expect(markup).toContain('pointer-events:none');
   expect(markup).not.toContain('pointer-events:auto');
   expect(markup).toContain('preserveAspectRatio="xMinYMin meet"');
-  expect(markup).toContain('data-ui="content.callout.tail-outline"');
-  expect(markup).toContain('fill="#252830ff"');
-  expect(markup).toContain('stroke="#ff7a00"');
-  expect(markup).toContain('stroke-dasharray="12 7.5"');
-  expect(markup).toContain('stroke-width="3"');
+  expect(markup).not.toContain('tail-outline');
+  expect(markup).not.toContain('fill="#252830ff"');
+  expect(markup).not.toContain('stroke="#ff7a00"');
 });
 
 it('renders independently sized endpoint markers including a boundary-centered ring-dot', () => {

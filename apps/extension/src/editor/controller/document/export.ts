@@ -91,19 +91,9 @@ export function renderEditorCanvasToDataUrl(
     throw new Error(translate('editor.runtime.canvasUnavailable'));
   }
 
-  const activeObject = canvas.getActiveObject();
-  canvas.discardActiveObject();
-  canvas.renderAll();
-  try {
-    const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
-    const mimeType = resolveBrowserClipboardImageMimeType(options.format);
-    return renderedCanvas.toDataURL(mimeType, normalizeQuality(options.quality));
-  } finally {
-    if (activeObject) {
-      canvas.setActiveObject(activeObject);
-    }
-    canvas.renderAll();
-  }
+  const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
+  const mimeType = resolveBrowserClipboardImageMimeType(options.format);
+  return renderedCanvas.toDataURL(mimeType, normalizeQuality(options.quality));
 }
 
 async function createClipboardBlob(dataUrl: string): Promise<Blob> {

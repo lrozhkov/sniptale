@@ -4,13 +4,16 @@ import {
   addUserSurfaceStylePreset,
   cloneSurfaceStylePresetCatalog,
   deleteUserSurfaceStylePreset,
-  reorderUserSurfaceStylePresets,
+  reorderSurfaceStylePresetCatalog,
+  resetSystemSurfaceStylePreset,
+  setDefaultSurfaceStylePreset,
+  toggleSurfaceStylePresetEnabled,
   toggleSurfaceStylePresetFavorite,
-  updateUserSurfaceStylePreset,
+  updateSurfaceStylePresetValues,
 } from './catalog';
 import { createSurfaceStylePresetCatalog } from './catalog';
 
-it('keeps systems immutable and owns user CRUD/favorites with copy semantics', () => {
+it('owns user CRUD/favorites with copy semantics', () => {
   const initial = createSurfaceStylePresetCatalog();
   expect(deleteUserSurfaceStylePreset(initial, 'system-surface-plain')).toBeNull();
   const added = addUserSurfaceStylePreset(initial, {
@@ -47,7 +50,7 @@ it('sorts, clones, updates, deletes, and reorders detached user records', () => 
   expect(initial.favoriteIds).toEqual(['two']);
   expect(initial.presets.at(-1)!.style.surfaceCss).toBe('');
 
-  const updated = updateUserSurfaceStylePreset(initial, 'one', {
+  const updated = updateSurfaceStylePresetValues(initial, 'one', {
     name: ' Renamed ',
     style: { fillPaint: createSolidPaint('#123456'), surfaceCss: 'color: red;' },
   })!;
@@ -55,20 +58,41 @@ it('sorts, clones, updates, deletes, and reorders detached user records', () => 
     name: 'Renamed',
     style: { surfaceCss: 'color: red;' },
   });
-  expect(updateUserSurfaceStylePreset(initial, 'missing', {})).toBeNull();
-  expect(updateUserSurfaceStylePreset(initial, 'system-surface-plain', {})).toBeNull();
-  expect(updateUserSurfaceStylePreset(initial, 'one', { name: ' ' })).toBeNull();
+  expect(updateSurfaceStylePresetValues(initial, 'missing', {})).toBeNull();
+  expect(updateSurfaceStylePresetValues(initial, 'one', { name: ' ' })).toBeNull();
 
-  expect(reorderUserSurfaceStylePresets(initial, ['one'])).toBeNull();
-  expect(reorderUserSurfaceStylePresets(initial, ['one', 'one'])).toBeNull();
-  expect(reorderUserSurfaceStylePresets(initial, ['one', 'missing'])).toBeNull();
-  const reordered = reorderUserSurfaceStylePresets(initial, ['two', 'one'])!;
+  expect(reorderSurfaceStylePresetCatalog(initial, ['one'])).toBeNull();
+  expect(reorderSurfaceStylePresetCatalog(initial, ['one', 'one'])).toBeNull();
+  const systemIds = initial.presets
+    .filter((preset) => preset.origin === 'system')
+    .map((preset) => preset.id);
+  const reordered = reorderSurfaceStylePresetCatalog(initial, [...systemIds, 'two', 'one'])!;
   expect(reordered.presets.slice(-2).map((preset) => preset.id)).toEqual(['two', 'one']);
   const deleted = deleteUserSurfaceStylePreset(reordered, 'two')!;
   expect(deleted.presets.some((preset) => preset.id === 'two')).toBe(false);
   expect(deleted.favoriteIds).toEqual([]);
   expect(toggleSurfaceStylePresetFavorite(initial, 'missing')).toBeNull();
   expect(toggleSurfaceStylePresetFavorite(initial, 'two')?.favoriteIds).toEqual([]);
+});
+
+it('edits, disables, defaults, reorders, and resets managed system presets', () => {
+  const initial = createSurfaceStylePresetCatalog();
+  const first = initial.presets[0]!;
+  const second = initial.presets[1]!;
+  const edited = updateSurfaceStylePresetValues(initial, first.id, { name: 'Custom' })!;
+  expect(edited.presets[0]).toMatchObject({ customized: true, name: 'Custom' });
+  expect(toggleSurfaceStylePresetEnabled(initial, first.id)).toBeNull();
+  const disabled = toggleSurfaceStylePresetEnabled(initial, second.id)!;
+  expect(disabled.presets[1]).toMatchObject({ customized: true, enabled: false });
+  expect(setDefaultSurfaceStylePreset(disabled, second.id)).toBeNull();
+  const reordered = reorderSurfaceStylePresetCatalog(edited, [
+    second.id,
+    first.id,
+    ...edited.presets.slice(2).map((preset) => preset.id),
+  ])!;
+  expect(reordered.presets[0]).toMatchObject({ customized: true, id: second.id });
+  const reset = resetSystemSurfaceStylePreset(reordered, first.id)!;
+  expect(reset.presets[0]).toMatchObject({ customized: false, id: first.id });
 });
 
 it('rejects invalid, duplicate, unsafe, and over-capacity user records', () => {

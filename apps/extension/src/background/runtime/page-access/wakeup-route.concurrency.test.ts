@@ -26,16 +26,16 @@ const screenshotModeMocks = vi.hoisted(() => ({
   enableScreenshotModeGuarded: vi.fn(),
 }));
 
-vi.mock('./service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./service')>()),
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime: pageAccessMocks.ensureActivePageAccessRuntime,
   hasActivePageAccess: pageAccessMocks.hasActivePageAccess,
   hasPinnedToolbarAllSitesAccess: pageAccessMocks.hasPinnedToolbarAllSitesAccess,
   registerPinnedToolbarAllSitesAccess: pageAccessMocks.registerPinnedToolbarAllSitesAccess,
 }));
 
-vi.mock('./readiness', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./readiness')>()),
+vi.mock('../../page-access/readiness', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/readiness')>()),
   waitForContentToolbarReady: readinessMocks.waitForContentToolbarReady,
 }));
 
@@ -56,7 +56,7 @@ vi.mock('../tab-mode-router-screenshot', async (importOriginal) => ({
 }));
 
 import { routeContentRuntimeWakeupMessage } from './wakeup-route';
-import { invalidatePinnedToolbarOperations } from './pinned-toolbar-operation';
+import { invalidatePinnedToolbarOperations } from '../../page-access/pinned-toolbar-operation';
 
 const senderBinding: ContentSenderBinding = {
   documentId: 'document-7',

@@ -27,6 +27,9 @@ const state = vi.hoisted(() => ({
   } as any,
 }));
 vi.mock('./controller', () => ({ useToolPresetsController: () => state.value }));
+vi.mock('../surface-styles/view', () => ({
+  SurfaceStylePresetsSettings: () => <div>surface-style-presets</div>,
+}));
 import { ToolPresetsSettings } from './view';
 it('renders the tool catalog surface', () => {
   const node = document.createElement('div');

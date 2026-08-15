@@ -43,6 +43,7 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const focusFirstItemOnOpenRef = useRef(false);
   const [style, setStyle] = useState<CSSProperties | null>(null);
   const position = useCallback(() => {
     const trigger = triggerRef.current;
@@ -62,9 +63,12 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
 
   useEffect(() => {
     if (!open) return;
-    queueMicrotask(() =>
-      menuRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus()
-    );
+    if (focusFirstItemOnOpenRef.current) {
+      queueMicrotask(() =>
+        menuRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus()
+      );
+    }
+    focusFirstItemOnOpenRef.current = false;
     const portalRoot = menuRef.current?.getRootNode();
     const localEventTarget =
       portalRoot instanceof ShadowRoot || portalRoot instanceof Document ? portalRoot : document;
@@ -89,7 +93,7 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
     };
   }, [open, setOpen]);
 
-  return { menuRef, ownerId, position, rootRef, style, triggerRef };
+  return { focusFirstItemOnOpenRef, menuRef, ownerId, position, rootRef, style, triggerRef };
 }
 
 export function FloatingFilterMenu(props: {

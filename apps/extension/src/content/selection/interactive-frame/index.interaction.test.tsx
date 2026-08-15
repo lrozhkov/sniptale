@@ -111,10 +111,14 @@ function renderControlledCalloutFrame() {
   act(() => root?.render(<ControlledCalloutFrame />));
 }
 
-function ControlledCalloutCollectionFrame() {
+function ControlledCalloutCollectionFrame(props: { initialAdditionalCount?: number }) {
   const [frame, setFrame] = React.useState<FrameData>(() => ({
     ...createFrame(),
     callout: createDefaultFrameCallout(),
+    additionalCallouts: Array.from(
+      { length: props.initialAdditionalCount ?? 0 },
+      createDefaultFrameCallout
+    ),
   }));
 
   React.useEffect(() => {
@@ -146,11 +150,15 @@ function ControlledCalloutCollectionFrame() {
   return <InteractiveFrame frame={frame} zIndex={10} onDelete={vi.fn()} onUpdate={setFrame} />;
 }
 
-function renderControlledCalloutCollectionFrame() {
+function renderControlledCalloutCollectionFrame(initialAdditionalCount = 0) {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(<ControlledCalloutCollectionFrame />));
+  act(() =>
+    root?.render(
+      <ControlledCalloutCollectionFrame initialAdditionalCount={initialAdditionalCount} />
+    )
+  );
 }
 
 function DeferredCalloutCollectionFrame() {
@@ -313,6 +321,41 @@ describe('InteractiveFrame size edit interactions', () => {
 });
 
 describe('InteractiveFrame callout collection interactions', () => {
+  it('adds a fifth visible comment through the real mini-button pointer sequence', async () => {
+    renderControlledCalloutCollectionFrame(3);
+    act(() => useFrameUIStore.getState().hoverFrame('frame-1'));
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(4);
+    const miniAction = queryContentUiElement<HTMLButtonElement>(
+      '[data-quick-action="add-callout"]'
+    );
+    expect(miniAction).toBeInstanceOf(HTMLButtonElement);
+
+    await act(async () => {
+      if (!miniAction) return;
+      miniAction.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true })
+      );
+      miniAction.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, button: 0, cancelable: true })
+      );
+      miniAction.dispatchEvent(
+        new MouseEvent('pointerup', { bubbles: true, button: 0, cancelable: true })
+      );
+      miniAction.dispatchEvent(
+        new MouseEvent('mouseup', { bubbles: true, button: 0, cancelable: true })
+      );
+      miniAction.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })
+      );
+      await Promise.resolve();
+    });
+
+    expect(queryAllContentUiElements('.sniptale-callout')).toHaveLength(5);
+    expect(queryAllContentUiElements('[contenteditable="true"]')).toHaveLength(1);
+    expect(queryContentUiElement('[data-quick-action="add-callout"]')).toBeNull();
+  });
+
   it('renders and immediately edits an additional callout from the selected toolbar', () => {
     const frame = { ...createFrame(), callout: createCalloutSettingsFixture() };
     const { onUpdate } = renderFrame({ frame });
@@ -602,5 +645,33 @@ describe('InteractiveFrame toolbar and size interactions', () => {
 
     expect(widthInput.value).toBe('450');
     expect(frameContainer.style.width).toBe('450px');
+  });
+
+  it('routes a bubbling pointer interaction from the portaled size toolbar after Edit', () => {
+    renderFrame();
+    const { frameContainer } = openFrameSizeEditor();
+    const portal = document.querySelector<HTMLElement>('#sniptale-frame-size-panel-portal');
+    const increaseWidth = portal?.querySelector<HTMLButtonElement>('.sniptale-size-btn-plus');
+    const pointerDown = vi.fn();
+
+    expect(portal).toBeInstanceOf(HTMLElement);
+    expect(increaseWidth).toBeInstanceOf(HTMLButtonElement);
+    portal?.addEventListener('pointerdown', pointerDown);
+
+    act(() => {
+      increaseWidth?.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true })
+      );
+      increaseWidth?.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, button: 0, cancelable: true })
+      );
+      increaseWidth?.dispatchEvent(
+        new MouseEvent('mouseup', { bubbles: true, button: 0, cancelable: true })
+      );
+      increaseWidth?.click();
+    });
+
+    expect(pointerDown).toHaveBeenCalledOnce();
+    expect(frameContainer.style.width).toBe('330px');
   });
 });

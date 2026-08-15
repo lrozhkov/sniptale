@@ -23,7 +23,7 @@ type StartRecordingParams = {
   cropRegion?: { x: number; y: number; width: number; height: number };
   generation: number;
   streamInstanceId: string;
-  surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
+  surface?: { presetId: string; target: 'window'; width: number; height: number };
 };
 
 export async function startRecording(
@@ -56,6 +56,11 @@ async function startRecordingInternal(
     ...(params.cropRegion === undefined ? {} : { cropRegion: params.cropRegion }),
     ...(params.viewport === undefined ? {} : { viewport: params.viewport }),
     ...(params.surface === undefined ? {} : { surface: params.surface }),
+    sourceBinding: {
+      generation: params.generation,
+      recordingId,
+      streamInstanceId: params.streamInstanceId,
+    },
   });
   if (!isStillStarting(recordingId)) {
     cleanupResources();
@@ -63,7 +68,6 @@ async function startRecordingInternal(
   }
   recordingContext.sourceVideoWidth = prepared.rawVideoWidth;
   recordingContext.sourceVideoHeight = prepared.rawVideoHeight;
-  recordingContext.tabOutputControls = prepared.tabOutputControls;
   recordingContext.tabOutputGeometry = prepared.tabOutputGeometry;
 
   const { streamInstanceId } = params;
@@ -134,5 +138,10 @@ async function startRecordingInternal(
     cursorCaptureMode: prepared.cursorCaptureMode,
     trackSettings: prepared.trackSettings,
     durationTracker: recordingContext.durationTracker,
+    sourceBinding: {
+      generation: params.generation,
+      recordingId,
+      streamInstanceId: params.streamInstanceId,
+    },
   });
 }

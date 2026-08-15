@@ -16,7 +16,7 @@ export function initializeRecordingSession(params: {
   cropRegion?: { x: number; y: number; width: number; height: number };
   generation: number;
   streamInstanceId: string;
-  surface?: { presetId: string; target: 'viewport' | 'window'; width: number; height: number };
+  surface?: { presetId: string; target: 'window'; width: number; height: number };
   recordingId: string;
 }) {
   logger.debug('Initializing recording session', {

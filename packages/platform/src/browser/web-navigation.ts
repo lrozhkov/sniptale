@@ -25,6 +25,9 @@ type ErrorOccurredListener = typeof chrome.webNavigation.onErrorOccurred.addList
  * Shared browser webNavigation seam for navigation listener ownership.
  */
 interface BrowserWebNavigationAdapter {
+  getAllFrames(
+    details: chrome.webNavigation.GetAllFrameDetails
+  ): Promise<chrome.webNavigation.GetAllFrameResultDetails[] | null>;
   subscribeToBeforeNavigate(listener: BeforeNavigateListener): () => void;
   subscribeToCommitted(listener: CommittedListener): () => void;
   subscribeToCompleted(listener: CompletedListener): () => void;
@@ -32,6 +35,9 @@ interface BrowserWebNavigationAdapter {
 }
 
 export const browserWebNavigation: BrowserWebNavigationAdapter = {
+  getAllFrames(details) {
+    return chrome.webNavigation.getAllFrames(details);
+  },
   subscribeToBeforeNavigate(listener) {
     return subscribeToChromeEvent(chrome.webNavigation?.onBeforeNavigate, listener);
   },

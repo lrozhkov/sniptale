@@ -35,7 +35,7 @@ it('still reconciles jobs when a retained full-page lease needs another startup 
   }));
   const cleanupPendingFullPageCapture = vi
     .fn()
-    .mockRejectedValue(new Error('debugger detach still pending'));
+    .mockRejectedValue(new Error('page restore still pending'));
   const options = {
     cleanupInterruptedCapture: vi.fn(async () => undefined),
     reconcileExportingDownload: vi.fn(async () => 'rebound' as const),

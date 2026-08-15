@@ -25,7 +25,8 @@ vi.mock('./interaction-patches', () => ({
 vi.mock('./rich-shape-controls', () => ({
   applyLineLikeRichShapeControls: mocks.applyLineLikeRichShapeControls,
 }));
-vi.mock('./textbox-lifecycle', () => ({
+vi.mock('./textbox-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./textbox-lifecycle')>()),
   attachEditorTextboxLifecycle: mocks.attachEditorTextboxLifecycle,
 }));
 vi.mock('../../../drawing/object/controls/apply', () => ({

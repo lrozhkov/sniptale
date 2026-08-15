@@ -3,6 +3,7 @@ import type {
   StepBadgeAnchor,
   StepBadgeSettings,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { resolveBorderShadowVisual } from '../style';
 import { resolveStepBadgeVisualStyle } from '../step-badge-presets/style';
 import { getStepBadgeVisualMetrics } from './step-badge-metrics';
@@ -25,12 +26,45 @@ function resolvePosition(settings: StepBadgeSettings) {
   const manual = settings.manualPlacement;
   if (manual) {
     const value = `${Math.max(0, Math.min(1, manual.position)) * 100}%`;
-    if (manual.side === 'top') return { top: 0, left: value, translateX: -0.5, translateY: -0.5 };
+    const normalOffset = Math.max(
+      -STEP_BADGE_NORMAL_OFFSET_LIMIT,
+      Math.min(STEP_BADGE_NORMAL_OFFSET_LIMIT, manual.normalOffset ?? 0)
+    );
+    if (manual.side === 'top')
+      return {
+        top: 0,
+        left: value,
+        translateX: -0.5,
+        translateY: -0.5,
+        normalX: 0,
+        normalY: -normalOffset,
+      };
     if (manual.side === 'right')
-      return { top: value, left: '100%', translateX: -0.5, translateY: -0.5 };
+      return {
+        top: value,
+        left: '100%',
+        translateX: -0.5,
+        translateY: -0.5,
+        normalX: normalOffset,
+        normalY: 0,
+      };
     if (manual.side === 'bottom')
-      return { top: '100%', left: value, translateX: -0.5, translateY: -0.5 };
-    return { top: value, left: 0, translateX: -0.5, translateY: -0.5 };
+      return {
+        top: '100%',
+        left: value,
+        translateX: -0.5,
+        translateY: -0.5,
+        normalX: 0,
+        normalY: normalOffset,
+      };
+    return {
+      top: value,
+      left: 0,
+      translateX: -0.5,
+      translateY: -0.5,
+      normalX: -normalOffset,
+      normalY: 0,
+    };
   }
   const anchor = settings.anchor ?? settings.corner ?? 'top-left';
   const resolved = anchor in ANCHOR_POSITIONS ? (anchor as StepBadgeAnchor) : 'top-left';
@@ -38,6 +72,8 @@ function resolvePosition(settings: StepBadgeSettings) {
     ...ANCHOR_POSITIONS[resolved],
     translateX: -0.5,
     translateY: -0.5,
+    normalX: 0,
+    normalY: 0,
   };
 }
 
@@ -81,8 +117,10 @@ export function getStepBadgeStyle(props: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transform: `translate(${(position.translateX * badgeSize + offset.x) * visualScale}px, ${
-      (position.translateY * badgeSize + offset.y) * visualScale
+    transform: `translate(${
+      (position.translateX * badgeSize + offset.x) * visualScale + position.normalX
+    }px, ${
+      (position.translateY * badgeSize + offset.y) * visualScale + position.normalY
     }px) scale(${visualScale})`,
     transformOrigin: 'top left',
     zIndex: props.zIndex,

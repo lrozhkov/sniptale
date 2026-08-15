@@ -4,12 +4,11 @@ import type {
   StepBadgeManualPlacement,
   StepBadgeSettings,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import { STEP_BADGE_NORMAL_OFFSET_LIMIT } from '@sniptale/runtime-contracts/highlighter/step-badge';
 export { getStepBadgeVisualMetrics } from '../step-badge-metrics';
 
 export type StepBadgeFrameRect = { x: number; y: number; width: number; height: number };
 type StepBadgePoint = { x: number; y: number };
-
-const SIDE_SWITCH_DEAD_ZONE_PX = 8;
 
 const ANCHOR_PLACEMENTS: Record<StepBadgeAnchor, StepBadgeManualPlacement> = {
   'top-left': { position: 0, side: 'top' },
@@ -27,15 +26,20 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max));
 }
 
-function getSideDistance(
+function getNormalOffset(
   frameRect: StepBadgeFrameRect,
   point: StepBadgePoint,
   side: StepBadgeBoundarySide
 ): number {
-  if (side === 'top') return Math.abs(point.y - frameRect.y);
-  if (side === 'right') return Math.abs(point.x - (frameRect.x + frameRect.width));
-  if (side === 'bottom') return Math.abs(point.y - (frameRect.y + frameRect.height));
-  return Math.abs(point.x - frameRect.x);
+  const raw =
+    side === 'top'
+      ? frameRect.y - point.y
+      : side === 'right'
+        ? point.x - (frameRect.x + frameRect.width)
+        : side === 'bottom'
+          ? point.y - (frameRect.y + frameRect.height)
+          : frameRect.x - point.x;
+  return Math.round(clamp(raw, -STEP_BADGE_NORMAL_OFFSET_LIMIT, STEP_BADGE_NORMAL_OFFSET_LIMIT));
 }
 
 function getPositionOnSide(
@@ -63,49 +67,40 @@ export function getStepBadgeBoundaryCenter(
   placement: StepBadgeManualPlacement
 ): StepBadgePoint {
   const position = clamp(placement.position, 0, 1);
+  const normalOffset = clamp(
+    placement.normalOffset ?? 0,
+    -STEP_BADGE_NORMAL_OFFSET_LIMIT,
+    STEP_BADGE_NORMAL_OFFSET_LIMIT
+  );
   if (placement.side === 'top') {
-    return { x: frameRect.x + frameRect.width * position, y: frameRect.y };
+    return { x: frameRect.x + frameRect.width * position, y: frameRect.y - normalOffset };
   }
   if (placement.side === 'right') {
     return {
-      x: frameRect.x + frameRect.width,
+      x: frameRect.x + frameRect.width + normalOffset,
       y: frameRect.y + frameRect.height * position,
     };
   }
   if (placement.side === 'bottom') {
     return {
       x: frameRect.x + frameRect.width * position,
-      y: frameRect.y + frameRect.height,
+      y: frameRect.y + frameRect.height + normalOffset,
     };
   }
-  return { x: frameRect.x, y: frameRect.y + frameRect.height * position };
+  return { x: frameRect.x - normalOffset, y: frameRect.y + frameRect.height * position };
 }
 
 export function projectStepBadgeToFrameBoundary(args: {
   frameRect: StepBadgeFrameRect;
   point: StepBadgePoint;
   previousSide?: StepBadgeBoundarySide;
-  visualScale?: number;
 }): StepBadgeManualPlacement {
-  const sides: StepBadgeBoundarySide[] = ['top', 'right', 'bottom', 'left'];
-  const distances = sides.map((side) => ({
-    distance: getSideDistance(args.frameRect, args.point, side),
-    side,
-  }));
-  distances.sort((a, b) => a.distance - b.distance);
-  const nearest = distances[0]?.side ?? 'top';
-  const nearestDistance = distances[0]?.distance ?? 0;
-  const previousDistance = args.previousSide
-    ? getSideDistance(args.frameRect, args.point, args.previousSide)
-    : Number.POSITIVE_INFINITY;
-  const sideSwitchDeadZone = SIDE_SWITCH_DEAD_ZONE_PX * (args.visualScale ?? 1);
-  const side =
-    args.previousSide && previousDistance <= nearestDistance + sideSwitchDeadZone
-      ? args.previousSide
-      : nearest;
+  const side = args.previousSide ?? 'top';
+  const normalOffset = getNormalOffset(args.frameRect, args.point, side);
 
   return {
     position: getPositionOnSide(args.frameRect, args.point, side),
     side,
+    ...(normalOffset === 0 ? {} : { normalOffset }),
   };
 }

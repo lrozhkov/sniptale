@@ -1,25 +1,8 @@
 import { translate } from '../../../platform/i18n';
 import type { InspectorCommandParams } from '../compact/inspector/command-types';
-import { ColorField, cx } from '../../chrome/ui';
+import { ProductGlassColorPalette } from '@sniptale/ui/product-glass-controls';
+import { ColorField } from '../../chrome/ui';
 import { WorkspaceDefaultAction } from './default-action';
-
-function WorkspacePaletteButton(props: { active: boolean; color: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      title={props.color}
-      onClick={props.onClick}
-      className={cx(
-        'h-10 rounded-[12px] border transition hover:-translate-y-px',
-        props.active
-          ? 'border-[color:var(--sniptale-color-border-accent-strong)] ' +
-              'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_16%,transparent)]'
-          : 'border-[color:var(--sniptale-color-border-soft)]'
-      )}
-      style={{ backgroundColor: props.color }}
-    />
-  );
-}
 
 export function renderCompactWorkspaceColorField(params: InspectorCommandParams) {
   return (
@@ -37,19 +20,12 @@ export function renderCompactWorkspaceColorField(params: InspectorCommandParams)
 }
 
 export function renderCompactWorkspacePaletteGrid(params: InspectorCommandParams) {
-  const currentColor = params.workspace.backgroundColor.toLowerCase();
-
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {params.workspaceBackgroundPalette.map((color) => (
-        <WorkspacePaletteButton
-          key={color}
-          active={currentColor === color.toLowerCase()}
-          color={color}
-          onClick={() => params.applyWorkspaceColor(color)}
-        />
-      ))}
-    </div>
+    <ProductGlassColorPalette
+      colors={[...params.workspaceBackgroundPalette]}
+      value={params.workspace.backgroundColor}
+      onSelect={(color) => void params.applyWorkspaceColor(color)}
+    />
   );
 }
 

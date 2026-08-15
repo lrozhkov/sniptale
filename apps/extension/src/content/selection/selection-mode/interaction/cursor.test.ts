@@ -49,4 +49,14 @@ describe('selection-mode cursor', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
     expect(state.cursorStyleCleanup).toBeNull();
   });
+
+  it('uses the fallback cursor color when the page has no accent token', () => {
+    mountStyleInAccessibleDocumentsMock.mockReturnValue(vi.fn());
+
+    enableSelectionModeCursor({ cursorStyleCleanup: null });
+
+    expect(mountStyleInAccessibleDocumentsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ textContent: expect.stringContaining('%233b82f6') })
+    );
+  });
 });

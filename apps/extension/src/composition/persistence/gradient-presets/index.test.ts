@@ -27,8 +27,11 @@ import {
   addUserGradientPreset,
   deleteUserGradientPreset,
   reorderGradientPresets,
+  resetSystemGradientPreset,
+  setDefaultGradientPreset,
+  toggleGradientPresetEnabled,
   toggleGradientPresetFavorite,
-  updateUserGradientPreset,
+  updateGradientPresetValues,
 } from './mutations';
 import { parseGradientPresetCatalog } from './parser';
 
@@ -40,7 +43,7 @@ beforeEach(() => {
 });
 
 describe('gradient preset catalog model', () => {
-  it('keeps system presets immutable and supports complete user CRUD, reorder and favorites', () => {
+  it('supports complete system and user management with default invariants', () => {
     const base = createDefaultGradientPresetCatalog();
     const gradient = structuredClone(base.presets[0]!.gradient);
     const first = addUserGradientPreset(base, {
@@ -58,11 +61,22 @@ describe('gradient preset catalog model', () => {
       gradient,
     })!;
     expect(first.presets.find((preset) => preset.id === 'user-1')?.name).toBe('Mine');
-    expect(updateUserGradientPreset(second, base.presets[0]!.id, gradient)).toBeNull();
-    const renamed = updateUserGradientPreset(second, 'user-1', gradient, 'Renamed')!;
+    const editedSystem = updateGradientPresetValues(
+      second,
+      base.presets[0]!.id,
+      gradient,
+      'Edited system'
+    )!;
+    expect(editedSystem.presets[0]).toMatchObject({ customized: true, name: 'Edited system' });
+    const renamed = updateGradientPresetValues(editedSystem, 'user-1', gradient, 'Renamed')!;
     expect(renamed.presets.find((preset) => preset.id === 'user-1')?.name).toBe('Renamed');
-    expect(updateUserGradientPreset(second, 'user-1', gradient, 'x'.repeat(81))).toBeNull();
-    const reordered = reorderGradientPresets(renamed, ['user-2', 'user-1'])!;
+    expect(updateGradientPresetValues(second, 'user-1', gradient, 'x'.repeat(81))).toBeNull();
+    const ids = renamed.presets.map((preset) => preset.id);
+    const reordered = reorderGradientPresets(renamed, [
+      'user-2',
+      ...ids.filter((id) => id !== 'user-2' && id !== 'user-1'),
+      'user-1',
+    ])!;
     expect(
       reordered.presets.filter((preset) => preset.origin === 'user').map((preset) => preset.id)
     ).toEqual(['user-2', 'user-1']);
@@ -71,6 +85,18 @@ describe('gradient preset catalog model', () => {
     expect(
       deleteUserGradientPreset(favorite, 'user-1')?.favoriteIdsBySurface['highlighter-frame-fill']
     ).toEqual([]);
+    const systemId = base.presets[1]!.id;
+    const disabled = toggleGradientPresetEnabled(reordered, systemId)!;
+    expect(disabled.presets.find((preset) => preset.id === systemId)).toMatchObject({
+      customized: true,
+      enabled: false,
+    });
+    expect(setDefaultGradientPreset(disabled, 'highlighter-frame-fill', systemId)).toBeNull();
+    expect(toggleGradientPresetEnabled(base, base.presets[0]!.id)).toBeNull();
+    const reset = resetSystemGradientPreset(editedSystem, base.presets[0]!.id)!;
+    expect(reset.presets.find((preset) => preset.id === base.presets[0]!.id)).toEqual(
+      base.presets[0]
+    );
   });
 
   it('rejects system collisions, duplicate users, malformed data, and newer revisions', () => {
@@ -78,6 +104,12 @@ describe('gradient preset catalog model', () => {
     const system = base.presets[0]!;
     expect(addUserGradientPreset(base, { ...system, origin: 'user' })).toBeNull();
     expect(parseGradientPresetCatalog({ revision: 99, presets: [] }).unsafeForWrite).toBe(true);
+    expect(parseGradientPresetCatalog({ revision: -1, presets: [] }).unsafeForWrite).toBe(true);
+    expect(parseGradientPresetCatalog({ revision: 0 }).unsafeForWrite).toBe(true);
+    expect(
+      parseGradientPresetCatalog({ revision: 1, presets: [], favoriteIdsBySurface: [] })
+        .unsafeForWrite
+    ).toBe(true);
     expect(parseGradientPresetCatalog({ revision: 1, presets: [{ id: 'x' }] }).unsafeForWrite).toBe(
       true
     );
@@ -118,7 +150,7 @@ describe('gradient preset catalog model', () => {
       favoriteIdsBySurface: { 'highlighter-frame-fill': ['user-1', 'missing'] },
     });
     expect(parsed.unsafeForWrite).toBe(false);
-    expect(parsed.catalog.revision).toBe(1);
+    expect(parsed.catalog.revision).toBe(2);
     expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual(['user-1']);
   });
 
@@ -132,6 +164,26 @@ describe('gradient preset catalog model', () => {
     expect(cloneGradientPresetCatalog(catalog).favoriteIdsBySurface).toEqual({
       'highlighter-frame-fill': [],
     });
+  });
+
+  it('requires an enabled default and internally consistent v2 customization metadata', () => {
+    const base = createDefaultGradientPresetCatalog();
+    const { favoriteIdsBySurface: _favorites, ...withoutFavorites } = base;
+    expect(parseGradientPresetCatalog(withoutFavorites).unsafeForWrite).toBe(true);
+    expect(parseGradientPresetCatalog({ ...base, favoriteIdsBySurface: [] }).unsafeForWrite).toBe(
+      true
+    );
+    expect(
+      parseGradientPresetCatalog({ ...base, defaultPresetIdBySurface: {} }).unsafeForWrite
+    ).toBe(true);
+    expect(
+      parseGradientPresetCatalog({
+        ...base,
+        presets: base.presets.map((preset, index) =>
+          index === 1 ? { ...preset, enabled: false, customized: false } : preset
+        ),
+      }).unsafeForWrite
+    ).toBe(true);
   });
 });
 
@@ -201,12 +253,16 @@ describe('gradient preset persistence authority', () => {
         gradient,
       })
     ).resolves.toBe('applied');
-    await expect(module.reorderGradientPresetCatalog(['user-2', 'user-1'])).resolves.toBe(
-      'applied'
-    );
-    await expect(module.reorderGradientPresetCatalog(['user-2', 'user-1'])).resolves.toBe(
-      'unchanged'
-    );
+    const catalogBeforeReorder = await module.loadGradientPresetCatalog();
+    const systemIds = catalogBeforeReorder.presets
+      .filter((preset) => preset.origin === 'system')
+      .map((preset) => preset.id);
+    await expect(
+      module.reorderGradientPresetCatalog(['user-2', ...systemIds, 'user-1'])
+    ).resolves.toBe('applied');
+    await expect(
+      module.reorderGradientPresetCatalog(['user-2', ...systemIds, 'user-1'])
+    ).resolves.toBe('unchanged');
     await expect(
       module.toggleGradientPresetFavoriteForSurface('highlighter-frame-fill', 'user-1')
     ).resolves.toBe('applied');

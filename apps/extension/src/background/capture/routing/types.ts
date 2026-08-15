@@ -68,27 +68,7 @@ export type RouteCaptureMessage =
       presetId?: string | null;
     }
   | {
-      type: 'REQUEST_EXPORT_HAR_START_CAPABILITY';
-      rawDiagnosticsEnabled?: boolean;
-      sessionId?: string;
-    }
-  | {
-      type: 'EXPORT_START_HAR';
-      capabilityToken?: string;
-      sessionId?: string;
-    }
-  | {
-      type: 'EXPORT_STOP_HAR';
-      capabilityToken?: string;
-      sessionId?: string;
-    }
-  | {
       type: 'EXPORT_CAPTURE_FULL_PAGE';
-      contentIntent?: ContentPrivilegedActionCapability;
-      exportRunId: string;
-    }
-  | {
-      type: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED';
       contentIntent?: ContentPrivilegedActionCapability;
       exportRunId: string;
     }

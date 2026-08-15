@@ -155,6 +155,54 @@ afterEach(() => {
   setFrameSessionBorderPreset(DEFAULT_BORDER_PRESET);
 });
 
+function registerNativeAnchorDrawingTests() {
+  it('claims an anchor pointer candidate before native link dragging can take ownership', () => {
+    const { addFrame, handlers, interactions } = createFixture();
+    const anchor = document.createElement('a');
+    anchor.href = '/target';
+    const pointerDown = createPointerEvent('pointerdown', 20, 20, anchor);
+    vi.spyOn(pointerDown, 'preventDefault');
+    vi.spyOn(pointerDown, 'stopImmediatePropagation');
+
+    handlers.handlePointerDown(pointerDown);
+
+    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    vi.spyOn(mouseDown, 'preventDefault');
+    vi.spyOn(mouseDown, 'stopImmediatePropagation');
+    handlers.handleMouseDown(mouseDown);
+
+    expect(pointerDown.preventDefault).not.toHaveBeenCalled();
+    expect(pointerDown.stopImmediatePropagation).not.toHaveBeenCalled();
+    expect(mouseDown.preventDefault).toHaveBeenCalledOnce();
+    expect(mouseDown.stopImmediatePropagation).toHaveBeenCalledOnce();
+
+    handlers.handlePointerUp(createPointerEvent('pointerup', 20, 20, anchor));
+    interactions.handleClick(createClickEvent(anchor));
+    expect(addFrame).toHaveBeenCalledWith(anchor);
+  });
+
+  it('converts a native anchor dragstart into the pending free-frame gesture', () => {
+    const { addFrame, addFreeFrame, handlers, interactions } = createFixture();
+    const anchor = document.createElement('a');
+    anchor.href = '/target';
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, anchor));
+    const dragStart = new MouseEvent('dragstart', {
+      cancelable: true,
+      clientX: 80,
+      clientY: 70,
+    }) as DragEvent;
+    Object.defineProperty(dragStart, 'target', { configurable: true, value: anchor });
+
+    handlers.handleDragStart(dragStart);
+    handlers.handlePointerUp(createPointerEvent('pointerup', 80, 70, anchor));
+    interactions.handleClick(createClickEvent(anchor));
+
+    expect(dragStart.defaultPrevented).toBe(true);
+    expect(addFreeFrame).toHaveBeenCalledOnce();
+    expect(addFrame).not.toHaveBeenCalled();
+  });
+}
+
 describe('free frame drawing gesture', () => {
   it('starts manual drawing from a document root where hover selection is unavailable', () => {
     const { addFreeFrame, handlers } = createFixture();
@@ -263,6 +311,8 @@ describe('free frame drawing gesture', () => {
     expect(addFrame).toHaveBeenCalledWith(target);
     expect(addFreeFrame).not.toHaveBeenCalled();
   });
+
+  registerNativeAnchorDrawingTests();
 
   it('recovers linked frame installation when an undrawn pointer candidate misses pointerup', () => {
     const { addFrame, handlers, interactions, session } = createFixture();

@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   translateMock: vi.fn((key: string) => key),
 }));
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: mocks.translateMock,
 }));
 
@@ -23,8 +24,17 @@ vi.mock('../../../../ui/popup-shell/icon-state-button', () => ({
     );
   },
 }));
+vi.mock('../../../../ui/popup-shell/expanding-mode-button', () => ({
+  PopupExpandingModeButton: (props: any) => {
+    mocks.buttonMock(props);
+    return (
+      <button type="button" onClick={props.onClick} disabled={props.disabled}>
+        {props.label}
+      </button>
+    );
+  },
+}));
 
-import { VideoDiagnosticsToggle } from './toggles/diagnostics-toggle';
 import { VideoSystemAudioToggle } from './toggles/system-audio-toggle';
 import { InlineSelectRow, ModeIconButton } from './primitives';
 
@@ -88,16 +98,11 @@ describe('popup video setup shared controls', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('renders diagnostics and system-audio toggles for enabled and disabled states', () => {
+  it('renders the system-audio toggle in its disabled state', () => {
     const onSettingsChange = vi.fn();
 
     render(
       <>
-        <VideoDiagnosticsToggle
-          settings={{ diagnosticsEnabled: true } as never}
-          diagnosticsDisabled={false}
-          onSettingsChange={onSettingsChange}
-        />
         <VideoSystemAudioToggle
           settings={{ systemAudioEnabled: false } as never}
           systemAudioDisabled
@@ -106,20 +111,15 @@ describe('popup video setup shared controls', () => {
       </>
     );
 
-    const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-    act(() => {
-      (buttons[0] as HTMLButtonElement).click();
-    });
-
     expect(mocks.buttonMock).toHaveBeenNthCalledWith(
-      2,
+      1,
       expect.objectContaining({
         active: false,
         disabled: true,
         label: 'popup.video.systemAudioDisabledLabel',
       })
     );
-    expect(onSettingsChange).toHaveBeenCalledWith({ diagnosticsEnabled: false });
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
   it('forwards an explicit disabled state through the shared mode button helper', () => {

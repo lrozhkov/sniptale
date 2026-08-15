@@ -140,7 +140,7 @@ it('records action owner metadata next to each registry entry', () => {
       ownerModule: 'apps/extension/src/background/capture/routing/actions.export.ts',
       requiredAuthority: 'privileged tab capture authorization policy',
       sideEffects:
-        'screenshot capture, editor open, annotation or staged download, popup launch, HAR, gallery, or web snapshot',
+        'screenshot capture, editor open, annotation or staged download, popup launch, gallery, or web snapshot',
       support: 'parser-supported',
       transitiveStateOwner: 'capture routing and media-hub storage owners',
     })

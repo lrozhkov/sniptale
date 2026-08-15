@@ -89,15 +89,6 @@ export async function handleToolbarViewportChange(
       response?.error ??
       translate('content.toolbar.unknownError');
     logger.error('Failed to set viewport', errorMessage);
-    if (
-      errorMessage.includes(translate('background.runtime.debuggerConflictKeywordExtension')) ||
-      errorMessage.includes(translate('background.runtime.debuggerConflictKeywordConflict'))
-    ) {
-      setCurrentViewport(null);
-      showToast(translate('content.toolbar.viewportConflictError'), 'error', 5000);
-      return;
-    }
-
     showToast(`${translate('content.toolbar.viewportErrorPrefix')} ${errorMessage}`, 'error');
     await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
   } catch (error) {

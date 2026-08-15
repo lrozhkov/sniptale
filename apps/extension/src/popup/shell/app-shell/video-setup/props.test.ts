@@ -2,18 +2,18 @@ import { expect, it, vi } from 'vitest';
 
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
-import { createPopupAppShellRuntime } from '../test-support/runtime';
+import { createPopupVideoSetupRuntime } from '../test-support/runtime';
 import { getPopupVideoSetupProps } from './props';
 
 function createRuntime(): PopupVideoSetupRuntime {
-  return createPopupAppShellRuntime({
+  return createPopupVideoSetupRuntime({
     videoCaptureMode: CaptureMode.TAB,
     viewportPresets: [
       {
         kind: 'user',
         id: 'preset-1',
         name: 'Preset',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -30,7 +30,7 @@ it('maps runtime state into lazy page props', () => {
   expect(props.settings).toBe(runtime.recording.videoSettings);
   expect(props.captureMode).toBe(runtime.recording.videoCaptureMode);
   expect(props.selectedPresetId).toBe(runtime.recording.selectedPresetId);
-  expect(props.viewportPresets).toBe(runtime.home.viewportPresets);
+  expect(props.viewportPresets).toBe(runtime.viewportPresets);
   expect(props.activeTabCapabilities).toBe(runtime.environment.activeTabCapabilities);
   expect(props.webcamDevices).toBe(runtime.recording.webcamDevices);
   expect(props.isLoadingWebcams).toBe(false);
@@ -44,7 +44,7 @@ it('maps runtime state into lazy page props', () => {
 });
 
 it('uses start cancellation while the recorder has not activated yet', () => {
-  const runtime = createPopupAppShellRuntime({
+  const runtime = createPopupVideoSetupRuntime({
     recordingState: {
       captureMode: CaptureMode.TAB,
       captureSource: null,
@@ -65,7 +65,7 @@ it('uses start cancellation while the recorder has not activated yet', () => {
 it('updates active live media state without changing persisted setup settings', async () => {
   const setRecordingState = vi.fn();
   const setVideoSettings = vi.fn();
-  const runtime = createPopupAppShellRuntime({
+  const runtime = createPopupVideoSetupRuntime({
     recordingState: {
       captureMode: CaptureMode.TAB,
       captureSource: null,

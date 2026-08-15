@@ -21,7 +21,6 @@ function createBindings(overrides: Record<string, unknown> = {}) {
   const canvas = { requestRenderAll: vi.fn() };
   return {
     applyGridSnap: vi.fn(),
-    ensureObjectReachable: vi.fn(() => true),
     getCanvas: vi.fn(() => canvas),
     syncRuntimeState: vi.fn(),
     ...overrides,
@@ -34,7 +33,7 @@ describe('runtime object moving handler', () => {
     mocks.syncCropGuideInteraction.mockReturnValue(false);
   });
 
-  it('snaps, syncs source state, and renders reachable moved objects', () => {
+  it('snaps and syncs moving objects without clamping an active pointer transform', () => {
     const bindings = createBindings();
     const target = { id: 'target' };
 
@@ -42,7 +41,7 @@ describe('runtime object moving handler', () => {
 
     expect(bindings.applyGridSnap).toHaveBeenCalledWith(target);
     expect(mocks.syncSourceState).toHaveBeenCalledWith(bindings, target);
-    expect(bindings.getCanvas().requestRenderAll).toHaveBeenCalledOnce();
+    expect(bindings.getCanvas().requestRenderAll).not.toHaveBeenCalled();
   });
 
   it('lets crop guide interaction own runtime sync', () => {

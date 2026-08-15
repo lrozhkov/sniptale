@@ -1,4 +1,6 @@
+import { FabricObject, Point } from 'fabric';
 import { expect, it, vi } from 'vitest';
+import { createFabricCanvasFixture } from '../../../../testing/fabric-canvas.test-support';
 import { createEditorControllerEventCommandBindings } from './commands';
 import { createEditorControllerEventObjectBindings } from './object';
 import {
@@ -36,7 +38,7 @@ it('keeps object event commands in the object bindings owner', () => {
     addObject: vi.fn(),
     advanceStepValue: vi.fn(),
     applyGridSnap: vi.fn(),
-    canvas: null,
+    canvas: null as import('fabric').Canvas | null,
     decorateShape: vi.fn(),
     ensureObjectReachable: vi.fn(),
     getActiveCropRect: vi.fn(),
@@ -45,15 +47,26 @@ it('keeps object event commands in the object bindings owner', () => {
     startDrawSession: vi.fn(),
     switchToSelectTool: vi.fn(),
   };
-  const object = { id: 'object' };
+  const object = new FabricObject();
   const bindings = createEditorControllerEventObjectBindings(controller as never);
 
-  bindings.addObject(object as never);
-  bindings.startDrawSession('shape', { x: 1, y: 2 } as never, object as never);
+  bindings.getActiveCropRect();
+  bindings.ensureObjectReachable(object);
+  bindings.applyGridSnap(object);
+  bindings.nextLabelIndex('shape');
+  bindings.prepareObject(object);
+  bindings.addObject(object);
+  bindings.startDrawSession('shape', new Point(1, 2), object);
+  bindings.startDrawSession('shape', new Point(3, 4), object, 9);
+  bindings.switchToSelectTool();
+  bindings.advanceStepValue();
   expect(bindings.beginRichShapeTextEditing({ sniptaleType: 'shape' } as never)).toBe(false);
+  controller.canvas = createFabricCanvasFixture({});
+  expect(bindings.beginRichShapeTextEditing(object)).toBe(false);
 
   expect(controller.addObject).toHaveBeenCalledWith(object);
-  expect(controller.startDrawSession).toHaveBeenCalledWith('shape', { x: 1, y: 2 }, object);
+  expect(controller.startDrawSession).toHaveBeenCalledWith('shape', new Point(1, 2), object, null);
+  expect(controller.startDrawSession).toHaveBeenCalledWith('shape', new Point(3, 4), object, 9);
 });
 
 it('keeps command event forwarding in the command bindings owner', async () => {

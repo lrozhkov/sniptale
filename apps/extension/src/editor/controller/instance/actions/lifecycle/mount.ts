@@ -10,17 +10,23 @@ import { refreshEditorViewportPresentation } from '../../../viewport/actions';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { createViewportPresentationContext } from '../viewport-context';
+import { attachEditorCanvasPointerCapture } from './pointer-capture';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   const canvas = new Canvas(canvasElement, {
     altActionKey: 'ctrlKey',
     centeredKey: 'ctrlKey',
+    enablePointerEvents: true,
     preserveObjectStacking: true,
     selection: true,
     selectionKey: 'ctrlKey',
     uniformScaling: false,
     uniScaleKey: 'shiftKey',
   });
+  // Fabric marks the upper canvas as a native drag source for selected-text DnD. That browser
+  // gesture can take over an already-started object transform, so the editor keeps canvas
+  // interaction exclusively on the pointer-event path.
+  canvas.upperCanvasEl.draggable = false;
   canvas.backgroundColor = 'transparent';
   canvas.setDimensions({ width: 0, height: 0 });
   canvas.setZoom(1);
@@ -62,6 +68,12 @@ export function mountEditorController(
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;
     controller.viewportDevicePixelRatioBaseline = getEditorViewportDevicePixelRatioBaseline();
+    attachEditorCanvasPointerCapture(
+      canvas,
+      controller.eventHandlers.handlePointerCancel,
+      controller.eventHandlers.handlePointerDownBeforeFabric,
+      (event) => !canvas.findTarget(event).target
+    );
     applyEditorViewportZoom(
       canvas,
       controller.canvasDocumentSize,
@@ -69,7 +81,6 @@ export function mountEditorController(
       controller.viewportDevicePixelRatioBaseline
     );
 
-    controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.magnetManager = createEditorMagnetManager({
       canvas,
       getActiveTool: () => controller.activeTool,
@@ -77,6 +88,7 @@ export function mountEditorController(
       getCropGuide: () => controller.cropGuide,
       getWorkspace: () => useEditorStore.getState().workspace,
     });
+    controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.selectionNudgeSession = null;
     controller.syncRuntimeState();
     canvasReadyHandoff.markReady(mountGeneration);

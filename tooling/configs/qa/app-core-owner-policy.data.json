@@ -654,7 +654,7 @@
       "stateKind": "disposable-session"
     },
     {
-      "id": "diagnostics-active-sessions",
+      "id": "interaction-diagnostics-active-sessions",
       "path": "apps/extension/src/background/storage/diagnostics",
       "stateKind": "recovery-session"
     },

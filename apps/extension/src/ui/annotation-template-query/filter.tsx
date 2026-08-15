@@ -85,8 +85,11 @@ export function AnnotationTemplateQueryControls(props: {
           ].join(' ')}
           data-active={activeCount > 0 ? 'true' : 'false'}
           disabled={props.disabled || props.tags.length === 0}
-          onClick={() => {
-            if (!open) floating.position();
+          onClick={(event) => {
+            if (!open) {
+              floating.focusFirstItemOnOpenRef.current = event.detail === 0;
+              floating.position();
+            }
             setOpen((value) => !value);
           }}
           ref={floating.triggerRef}

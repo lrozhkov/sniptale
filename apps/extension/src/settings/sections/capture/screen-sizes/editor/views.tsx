@@ -1,9 +1,9 @@
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
-import type { ViewportPreset, ViewportPresetTarget } from '../../../../../contracts/settings';
+import type { ViewportPreset } from '../../../../../contracts/settings';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import {
   clampViewportDimension,
@@ -127,10 +127,8 @@ export function ViewportPresetEditorContent(props: {
   onSubmit: (event: FormEvent) => Promise<void>;
   setHeight: Dispatch<SetStateAction<number>>;
   setLabel: Dispatch<SetStateAction<string>>;
-  setTarget: Dispatch<SetStateAction<ViewportPresetTarget>>;
   setWidth: Dispatch<SetStateAction<number>>;
   width: number;
-  target: ViewportPresetTarget;
 }) {
   return (
     <ProductModalBody compact asForm onSubmit={props.onSubmit}>
@@ -140,25 +138,6 @@ export function ViewportPresetEditorContent(props: {
           label={props.label}
           setLabel={props.setLabel}
         />
-        <ProductField label={translate('viewportPresets.editor.targetLabel')}>
-          <ProductSelect<ViewportPresetTarget>
-            value={props.target}
-            onChange={props.setTarget}
-            disabled={props.isDisabled}
-            options={[
-              {
-                value: 'viewport',
-                label: translate('viewportPresets.editor.targetViewport'),
-                description: translate('viewportPresets.editor.targetViewportHint'),
-              },
-              {
-                value: 'window',
-                label: translate('viewportPresets.editor.targetWindow'),
-                description: translate('viewportPresets.editor.targetWindowHint'),
-              },
-            ]}
-          />
-        </ProductField>
         <ViewportPresetDimensionFields
           disabled={props.isDisabled}
           height={props.height}

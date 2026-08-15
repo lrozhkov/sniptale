@@ -6,14 +6,28 @@ import type { EditorControllerEventBindings, EditorControllerEventHandlers } fro
 
 export type { EditorControllerEventHandlers } from './types';
 
+function composeEditorControllerEventHandlers(
+  bindings: EditorControllerEventBindings
+): EditorControllerEventHandlers {
+  const drawing = createEditorDrawingEventHandlers(bindings);
+  const pan = createPanEventHandlers(bindings);
+  return {
+    ...createRuntimeEventHandlers(bindings),
+    ...drawing,
+    ...pan,
+    handleWindowMouseMove: (event) => {
+      pan.handleWindowMouseMove(event);
+    },
+    handleWindowMouseUp: () => {
+      pan.handleWindowMouseUp();
+    },
+  };
+}
+
 export function createEditorControllerEventHandlers(
   bindings: EditorControllerEventBindings
 ): EditorControllerEventHandlers {
-  return {
-    ...createRuntimeEventHandlers(bindings),
-    ...createEditorDrawingEventHandlers(bindings),
-    ...createPanEventHandlers(bindings),
-  };
+  return composeEditorControllerEventHandlers(bindings);
 }
 
 export function attachEditorControllerEventHandlers(options: {
@@ -33,7 +47,6 @@ export function attachEditorControllerEventHandlers(options: {
   canvas.on('path:created', handlers.handlePathCreated);
   canvas.on('mouse:down:before', handlers.handleMouseDownBefore);
   canvas.on('mouse:down', handlers.handleMouseDown);
-  canvas.on('mouse:move:before', handlers.handleMouseMoveBefore);
   canvas.on('mouse:move', handlers.handleMouseMove);
   canvas.on('mouse:up', handlers.handleMouseUp);
   canvas.on('mouse:dblclick', handlers.handleDoubleClick);
@@ -44,6 +57,9 @@ export function attachEditorControllerEventHandlers(options: {
   window.addEventListener('blur', handlers.handleWindowBlur);
   window.addEventListener('mousemove', handlers.handleWindowMouseMove);
   window.addEventListener('mouseup', handlers.handleWindowMouseUp);
+  window.addEventListener('pointermove', handlers.handleWindowPointerMove);
+  window.addEventListener('pointerup', handlers.handleWindowPointerUp);
+  window.addEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement.addEventListener('mousedown', handlers.handleViewportMouseDown, true);
   viewportElement.addEventListener('wheel', handlers.handleViewportWheel, { passive: false });
   viewportElement.addEventListener('scroll', handlers.handleViewportScroll, { passive: true });
@@ -70,7 +86,6 @@ export function detachEditorControllerEventHandlers(options: {
   canvas.off('path:created', handlers.handlePathCreated);
   canvas.off('mouse:down:before', handlers.handleMouseDownBefore);
   canvas.off('mouse:down', handlers.handleMouseDown);
-  canvas.off('mouse:move:before', handlers.handleMouseMoveBefore);
   canvas.off('mouse:move', handlers.handleMouseMove);
   canvas.off('mouse:up', handlers.handleMouseUp);
   canvas.off('mouse:dblclick', handlers.handleDoubleClick);
@@ -81,6 +96,9 @@ export function detachEditorControllerEventHandlers(options: {
   window.removeEventListener('blur', handlers.handleWindowBlur);
   window.removeEventListener('mousemove', handlers.handleWindowMouseMove);
   window.removeEventListener('mouseup', handlers.handleWindowMouseUp);
+  window.removeEventListener('pointermove', handlers.handleWindowPointerMove);
+  window.removeEventListener('pointerup', handlers.handleWindowPointerUp);
+  window.removeEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement?.removeEventListener('mousedown', handlers.handleViewportMouseDown, true);
   viewportElement?.removeEventListener('wheel', handlers.handleViewportWheel);
   viewportElement?.removeEventListener('scroll', handlers.handleViewportScroll);

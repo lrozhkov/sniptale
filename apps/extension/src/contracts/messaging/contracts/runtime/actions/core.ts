@@ -521,26 +521,6 @@ export const runtimeActionCoreMessageContracts = {
       })
     ),
   },
-  [MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED]: {
-    parseRequest: createGuardParser(
-      'runtime EXPORT_CAPTURE_FULL_PAGE_UNATTENDED message',
-      createMessageGuard({
-        type: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
-        required: { exportRunId: isString },
-        optional: { contentIntent: isContentPrivilegedActionCapability },
-      })
-    ),
-    parseResponse: createGuardParser(
-      'runtime EXPORT_CAPTURE_FULL_PAGE_UNATTENDED response',
-      createRuntimeResponseGuard({
-        optional: {
-          dataUrl: isString,
-          downscaled: isBoolean,
-          frozenExtentWarning: isBoolean,
-        },
-      })
-    ),
-  },
   ...contentActionRuntimeContracts,
   [MessageType.OPEN_EDITOR_WITH_IMAGE]: {
     parseRequest: createGuardParser(

@@ -51,6 +51,7 @@ export function FrameAnnotationDistortionFilter(props: { scale: number }) {
 
 export function FrameAnnotationFocusSurface(props: {
   blurAmount: number;
+  edgeOverscan?: number;
   frames: FrameAnnotationSnapshotV1[];
   height: number;
   opacity: number;
@@ -59,19 +60,22 @@ export function FrameAnnotationFocusSurface(props: {
   const maskId = React.useId().replaceAll(':', '');
   const blurAmount = Math.min(25, Math.max(0, props.blurAmount));
   const opacity = Math.min(1, Math.max(0, props.opacity));
+  const edgeOverscan = Math.max(0, props.edgeOverscan ?? 0);
+  const surfaceWidth = props.width + edgeOverscan;
+  const surfaceHeight = props.height + edgeOverscan;
   return (
     <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       <svg height="0" style={{ position: 'absolute' }} width="0">
         <defs>
           <mask
-            height={props.height}
+            height={surfaceHeight}
             id={maskId}
             maskUnits="userSpaceOnUse"
-            width={props.width}
+            width={surfaceWidth}
             x="0"
             y="0"
           >
-            <rect fill="white" height={props.height} width={props.width} />
+            <rect fill="white" height={surfaceHeight} width={surfaceWidth} />
             {props.frames.map((frame) => {
               const cutout = resolveFocusCutoutGeometry(frame);
               return (
@@ -93,8 +97,8 @@ export function FrameAnnotationFocusSurface(props: {
         style={{
           position: 'absolute',
           inset: 0,
-          width: props.width,
-          height: props.height,
+          width: surfaceWidth,
+          height: surfaceHeight,
           backgroundColor: `rgb(0 0 0 / ${opacity})`,
           backdropFilter: `blur(${blurAmount}px)`,
           WebkitBackdropFilter: `blur(${blurAmount}px)`,

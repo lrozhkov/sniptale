@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('starts drag selection without resolving or measuring page DOM after pointer down', async () => {
+it('updates the captured area without resolving or measuring page DOM after pointer down', () => {
   const target = document.createElement('section');
   vi.mocked(resolveSelectionModePointerTarget).mockReturnValue(target);
   const state = {
@@ -54,12 +54,15 @@ it('starts drag selection without resolving or measuring page DOM after pointer 
   expect(resolveSelectionModePointerTarget).not.toHaveBeenCalled();
   expect(options.showHoverFrame).not.toHaveBeenCalled();
   expect(options.startDragSelection).toHaveBeenCalledWith(10, 20);
+  expect(options.updateDragSelection).toHaveBeenCalledWith(18, 29);
 });
 
 it('skips DOM target resolution while drawing the selection rectangle', () => {
   const state = {
     currentState: 'drag',
+    hasMovedEnough: true,
     isActive: true,
+    mouseDownPoint: { x: 10, y: 20 },
   } as SelectionModeInteractionState;
   const options = {
     handleDragMove: vi.fn(),

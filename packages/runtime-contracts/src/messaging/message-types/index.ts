@@ -47,12 +47,13 @@ export const MessageType = {
   DOWNLOAD_BROWSER_ANNOTATIONS: 'DOWNLOAD_BROWSER_ANNOTATIONS',
   CONSUME_POPUP_EXPORT_LAUNCH_INTENT: 'CONSUME_POPUP_EXPORT_LAUNCH_INTENT',
   EXPORT_POPUP_PREVIEW: 'EXPORT_POPUP_PREVIEW',
-  EXPORT_POPUP_START: 'EXPORT_POPUP_START',
   EXPORT_POPUP_BUILD_PACKAGE: 'EXPORT_POPUP_BUILD_PACKAGE',
   EXPORT_POPUP_SAVE_WEB_SNAPSHOT: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT',
-  STAGE_POPUP_EXPORT_ARCHIVE_CHUNK: 'STAGE_POPUP_EXPORT_ARCHIVE_CHUNK',
-  EXPORT_POPUP_SAVE_ARCHIVE: 'EXPORT_POPUP_SAVE_ARCHIVE',
-  RELEASE_POPUP_EXPORT_ARCHIVE: 'RELEASE_POPUP_EXPORT_ARCHIVE',
+  START_POPUP_EXPORT_JOB: 'START_POPUP_EXPORT_JOB',
+  GET_POPUP_EXPORT_JOB_STATUS: 'GET_POPUP_EXPORT_JOB_STATUS',
+  CANCEL_POPUP_EXPORT_JOB: 'CANCEL_POPUP_EXPORT_JOB',
+  ACK_POPUP_EXPORT_JOB_STATUS: 'ACK_POPUP_EXPORT_JOB_STATUS',
+  POPUP_EXPORT_JOB_STATUS_UPDATED: 'POPUP_EXPORT_JOB_STATUS_UPDATED',
   EXPORT_POPUP_CANCEL: 'EXPORT_POPUP_CANCEL',
   REQUEST_POPUP_TAB_ROUTE_CAPABILITY: 'REQUEST_POPUP_TAB_ROUTE_CAPABILITY',
   REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY:
@@ -63,13 +64,7 @@ export const MessageType = {
   REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY: 'REQUEST_CONTENT_PRIVILEGED_ACTION_CAPABILITY',
   CONTENT_RUNTIME_WAKEUP: 'CONTENT_RUNTIME_WAKEUP',
   ANNOTATION_FORK_SESSION: 'ANNOTATION_FORK_SESSION',
-  EXPORT_POPUP_PROGRESS: 'EXPORT_POPUP_PROGRESS',
-  EXPORT_POPUP_RESULT: 'EXPORT_POPUP_RESULT',
-  REQUEST_EXPORT_HAR_START_CAPABILITY: 'REQUEST_EXPORT_HAR_START_CAPABILITY',
-  EXPORT_START_HAR: 'EXPORT_START_HAR',
-  EXPORT_STOP_HAR: 'EXPORT_STOP_HAR',
   EXPORT_CAPTURE_FULL_PAGE: 'EXPORT_CAPTURE_FULL_PAGE',
-  EXPORT_CAPTURE_FULL_PAGE_UNATTENDED: 'EXPORT_CAPTURE_FULL_PAGE_UNATTENDED',
   PREPARE_FULL_PAGE_CAPTURE: 'PREPARE_FULL_PAGE_CAPTURE',
   HEARTBEAT_FULL_PAGE_CAPTURE: 'HEARTBEAT_FULL_PAGE_CAPTURE',
   PREPARE_FULL_PAGE_TILE: 'PREPARE_FULL_PAGE_TILE',
@@ -126,7 +121,7 @@ export type { CaptureArea } from '../capture-messages';
 
 export interface AppliedViewportPresetPayload {
   presetId: string;
-  target: 'viewport' | 'window';
+  target: 'window';
   width: number;
   height: number;
 }
@@ -135,27 +130,19 @@ export type ViewportPresetAvailabilityPayload =
   | {
       status: 'available';
       presetId: string;
-      target: 'viewport' | 'window';
-      required: { width: number; height: number };
-    }
-  | {
-      status: 'requires-start-validation';
-      presetId: string;
-      target: 'viewport';
+      target: 'window';
       required: { width: number; height: number };
     }
   | {
       status: 'unavailable';
       presetId: string;
-      target: 'viewport' | 'window' | null;
+      target: 'window' | null;
       reason:
         | 'disabled'
         | 'missing'
         | 'unsupported-context'
-        | 'viewport-too-large'
         | 'window-too-large'
         | 'window-not-normal'
-        | 'zoom-not-100'
         | 'surface-busy'
         | 'permission-denied'
         | 'platform-rejected'

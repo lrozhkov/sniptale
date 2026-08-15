@@ -44,7 +44,7 @@ describe('quality card options', () => {
     const common = {
       autoFadeDelay: 2,
       countdownSeconds: 3,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: false,
       systemAudioEnabled: true,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -21,7 +21,7 @@ function createSettings(): VideoRecordingSettings {
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
     controlledCursorCaptureEnabled: false,
   };
 }
@@ -42,14 +42,13 @@ describe('video toggle grid view', () => {
       controlledCursorDisabled: true,
       controlledCursorDisabledReason: 'unsupported',
       systemAudioDisabled: false,
-      diagnosticsDisabled: false,
       onToggleMicrophone,
       onToggleWebcam,
       onSettingsChange,
     });
 
-    expect(element.props.className).toContain('grid-cols-6');
-    expect(element.props.children).toHaveLength(6);
+    expect(element.props.className).toContain('grid-cols-5');
+    expect(element.props.children).toHaveLength(5);
     expect(element.props.children[3].props.disabled).toBe(true);
     expect(element.props.children[4].props.disabled).toBe(true);
     expect(element.props.children[4].props.disabledReason).toBe('unsupported');
@@ -61,7 +60,6 @@ describe('video toggle grid view', () => {
       controlledCursorDisabled: false,
       controlledCursorDisabledReason: null,
       systemAudioDisabled: false,
-      diagnosticsDisabled: false,
       onToggleMicrophone: vi.fn(),
       onToggleWebcam: vi.fn(),
       onSettingsChange: vi.fn(),
@@ -69,13 +67,13 @@ describe('video toggle grid view', () => {
 
     for (const captureMode of [CaptureMode.TAB, CaptureMode.TAB_CROP]) {
       const element = VideoToggleGrid({ ...sharedProps, captureMode });
-      expect(element.props.className).toContain('grid-cols-6');
-      expect(element.props.children).toHaveLength(6);
+      expect(element.props.className).toContain('grid-cols-5');
+      expect(element.props.children).toHaveLength(5);
       expect(element.props.children[3]).not.toBeNull();
     }
 
     const camera = VideoToggleGrid({ ...sharedProps, captureMode: CaptureMode.CAMERA });
-    expect(camera.props.className).toContain('grid-cols-6');
+    expect(camera.props.className).toContain('grid-cols-5');
     expect(camera.props.children[3].props.disabled).toBe(true);
   });
 
@@ -85,7 +83,6 @@ describe('video toggle grid view', () => {
       settings: { ...createSettings(), webcamEnabled: false },
       controlledCursorDisabled: true,
       controlledCursorDisabledReason: 'camera mode',
-      diagnosticsDisabled: true,
       systemAudioDisabled: true,
       webcamLocked: true,
       onSettingsChange: vi.fn(),

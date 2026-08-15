@@ -4,6 +4,17 @@ import { createCompletedDrawWorkflowState } from './completion-complete';
 import { createCropDrawWorkflowState } from './completion-crop';
 import { createDiscardDrawWorkflowState } from './completion-discard';
 import type { DrawWorkflowState } from './completion-types';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
+
+function finalizeFreehandPreview(drawSession: DrawSession): void {
+  const object = drawSession.object;
+  if (!object || object.visible) return;
+  const drawing = readEditorDrawingObject(object);
+  if (drawing?.kind !== 'pencil' && drawing?.kind !== 'marker') return;
+  updateEditorDrawingPathDraft(object, drawing, { preview: false });
+  object.visible = true;
+}
 
 export function completeEditorDrawWorkflow(options: {
   canvas: import('fabric').Canvas | null;
@@ -18,6 +29,8 @@ export function completeEditorDrawWorkflow(options: {
   if (!canvas || !drawSession?.object) {
     return null;
   }
+
+  finalizeFreehandPreview(drawSession);
 
   const completion = completeEditorDrawSession({
     drawSession,

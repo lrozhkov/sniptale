@@ -8,13 +8,15 @@ import {
   type CalloutVisualStyle,
   type SystemCalloutPresetKey,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { parseAnnotationSessionDefaults } from '../infrastructure/guards/annotation-session-defaults';
 import { isBoolean, isNumber, isPlainRecord, isString } from '../infrastructure/guards/primitives';
 import { parseCalloutVisualStyle } from './visual-style-parser';
 import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 
 export { parseCalloutVisualStyle } from './visual-style-parser';
 
-export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 5;
+export const CALLOUT_PRESET_STORAGE_SCHEMA_VERSION = 6;
 export const MAX_USER_CALLOUT_PRESETS = 16;
 export const MAX_CALLOUT_PRESET_NAME_LENGTH = 64;
 const MAX_CALLOUT_PRESET_TITLE_LENGTH = 256;
@@ -49,6 +51,7 @@ interface StoredUserCalloutPreset {
 export interface StoredCalloutPresetCatalog {
   catalogCustomized?: boolean;
   defaultPresetId?: string;
+  newSessionDefaults?: AnnotationSessionDefaults;
   placements?: StoredCalloutPresetPlacement[];
   schemaVersion?: number;
   systemCatalogRevision?: number;
@@ -285,6 +288,11 @@ export function parseStoredCalloutPresetCatalog(value: unknown): ParsedStoredCal
   }
   if (value['defaultPresetId'] !== undefined) {
     if (isString(value['defaultPresetId'])) parsed.defaultPresetId = value['defaultPresetId'];
+    else invalidFieldCount++;
+  }
+  if (value['newSessionDefaults'] !== undefined) {
+    const defaults = parseAnnotationSessionDefaults(value['newSessionDefaults']);
+    if (defaults) parsed.newSessionDefaults = defaults;
     else invalidFieldCount++;
   }
 

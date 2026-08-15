@@ -26,7 +26,7 @@ function createState(): PopupExportRuntimeContract {
     includeCssDiagnostics: false,
     includeFiles: false,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -37,7 +37,7 @@ function createState(): PopupExportRuntimeContract {
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
@@ -61,12 +61,12 @@ function createDeps(response: unknown): PopupExportRuntimeDeps {
     createRequestId: () => 'req-1',
     getActiveTabId: vi.fn(),
     requestPreview: vi.fn(),
-    saveArchiveBlob: vi.fn(),
+    requestAllUrlsPermission: vi.fn(),
     scheduleTimeout: vi.fn(),
-    sendBuildPackageMessage: vi.fn(),
-    sendCancelMessage: vi.fn(),
+    sendCancelJobMessage: vi.fn(),
+    sendGetJobStatusMessage: vi.fn(),
     sendSaveWebSnapshotMessage: vi.fn(async () => response),
-    sendStartMessage: vi.fn(),
+    sendStartJobMessage: vi.fn(),
     writeClipboardText: vi.fn(),
   } as unknown as PopupExportRuntimeDeps;
 }
@@ -87,7 +87,7 @@ it('saves a web snapshot and ignores stale results', async () => {
   });
   expect(state.setResult).toHaveBeenCalledWith(
     expect.objectContaining({
-      filename: 'Веб-снимок сохранён в Галерею с предупреждениями',
+      filename: 'Веб-снимок сохранён в Библиотеку с предупреждениями',
       kind: 'webSnapshot',
       warnings: ['missing asset'],
     })

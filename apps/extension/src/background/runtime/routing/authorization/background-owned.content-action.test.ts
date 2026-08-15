@@ -156,11 +156,7 @@ it.each([
   );
 });
 
-it('authorizes popup export and rejects popup capability senders through owner policy', () => {
-  expect(
-    authorizeBackgroundOwnedRoute(backgroundRequest(MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK))
-  ).toEqual({ authorized: true });
-
+it('rejects popup capability senders through owner policy', () => {
   authMocks.isPopupTabRouteSenderUrl.mockReturnValueOnce(false);
   expect(
     authorizeBackgroundOwnedRoute(backgroundRequest(MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY))

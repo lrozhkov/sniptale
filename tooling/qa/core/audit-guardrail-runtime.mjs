@@ -103,9 +103,8 @@ export function collectRuntimeResponsePrivacyViolations(files) {
       return [];
     }
     const hasGate =
-      /\b(?:capabilityToken|rawDiagnosticsEnabled|debug|download|capture|transfer)\b/u.test(
-        source
-      ) || /\b(?:dataUrlToBlob|WEB_SNAPSHOT_MAX_)\b/u.test(source);
+      /\b(?:capabilityToken|debug|download|capture|transfer)\b/u.test(source) ||
+      /\b(?:dataUrlToBlob|WEB_SNAPSHOT_MAX_)\b/u.test(source);
     return lines.flatMap((line, index) => {
       if (!PRIVACY_FIELD_PATTERN.test(line) || hasGate) {
         return [];

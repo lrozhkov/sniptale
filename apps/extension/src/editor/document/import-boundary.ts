@@ -30,6 +30,7 @@ const REMOVED_METADATA_KEYS = new Set([
 ]);
 const SHAPE_KINDS = new Set(['rectangle', 'ellipse', 'triangle', 'parallelogram']);
 const MAX_ABSOLUTE_COORDINATE = 131_072;
+const MAX_DRAWING_TIMESTAMP = Number.MAX_SAFE_INTEGER;
 const MAX_DRAWING_SAMPLES = 50_000;
 const MAX_TEXT_LENGTH = 200_000;
 const MAX_FABRIC_TREE_DEPTH = 40;
@@ -51,6 +52,15 @@ function isFiniteBoundedNumber(value: unknown): value is number {
 
 function isPositiveSize(value: unknown): value is number {
   return isFiniteBoundedNumber(value) && value >= 0;
+}
+
+function isDrawingTimestamp(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= MAX_DRAWING_TIMESTAMP
+  );
 }
 
 function isPoint(value: unknown): value is UnknownRecord {
@@ -90,7 +100,7 @@ function isFreehandObject(value: UnknownRecord): boolean {
     Array.isArray(samples) &&
     samples.length > 0 &&
     samples.length <= MAX_DRAWING_SAMPLES &&
-    samples.every((sample) => isPoint(sample) && isFiniteBoundedNumber(sample['t'])) &&
+    samples.every((sample) => isPoint(sample) && isDrawingTimestamp(sample['t'])) &&
     isColor(value['color']) &&
     isPositiveSize(value['width']) &&
     (value['kind'] === 'pencil' ||

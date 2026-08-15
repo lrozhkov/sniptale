@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it } from 'vitest';
-import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
 import { createExportManagerService } from '.';
 
@@ -14,7 +13,7 @@ function createExportOptions(): ExportOptions {
     includeCssDiagnostics: true,
     includeFiles: true,
     includeFullPageScreenshot: true,
-    includeHarDomLogs: true,
+    includePageDiagnostics: true,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -50,26 +49,7 @@ function installChromeRuntimeStub(): void {
           name: 'Sniptale Test',
           version: '0.0.0-test',
         }),
-        sendMessage: (message: unknown) => {
-          const messageType =
-            message && typeof message === 'object' && 'type' in message ? message.type : undefined;
-          if (messageType === MessageType.EXPORT_START_HAR) {
-            return Promise.resolve({
-              capabilityToken: 'har-token',
-              expiresAtEpochMs: Date.now() + 1000,
-              success: true,
-            });
-          }
-
-          if (messageType === MessageType.EXPORT_STOP_HAR) {
-            return Promise.resolve({
-              rawDiagnosticsEnabled: false,
-              success: true,
-            });
-          }
-
-          return Promise.resolve({ success: true });
-        },
+        sendMessage: () => Promise.resolve({ success: true }),
       },
     },
   });
@@ -106,10 +86,7 @@ it('builds viewer snapshot export packages from explicit source metadata without
   const pagePackage = await service.buildPackage(createExportOptions());
 
   expect(pagePackage.errors).toEqual(
-    expect.arrayContaining([
-      expect.stringContaining('Failed to download file.pdf'),
-      'Failed to capture full-page screenshot.',
-    ])
+    expect.arrayContaining([expect.stringContaining('Failed to download file.pdf')])
   );
   expect(pagePackage.errors.join('\n')).not.toContain('window is not defined');
   expect(pagePackage.entries.map((entry) => entry.path)).toEqual(

@@ -418,12 +418,6 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/editor/workspace/floating/tool-properties-rail.test.tsx'],
   },
   {
-    owner: 'editor-floating-workspace-selection-toolbar-geometry',
-    productionFile: 'apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry.ts',
-    reason: 'Selection toolbar geometry is covered by the focused geometry suite.',
-    testFiles: ['apps/extension/src/editor/workspace/floating/canvas-toolbar-geometry.test.ts'],
-  },
-  {
     owner: 'editor-floating-workspace-view-controls',
     productionFile: 'apps/extension/src/editor/workspace/floating/view-controls-popovers.tsx',
     reason: 'Floating view control popovers are covered through the view controls suite.',

@@ -10,12 +10,12 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     en: 'Workspace color',
   },
   workspaceBacking: {
-    ru: 'Подложка',
-    en: 'Backing',
+    ru: 'Фон рабочей зоны',
+    en: 'Workspace background',
   },
   neutralPresets: {
-    ru: 'Нейтральные шаблоны',
-    en: 'Neutral presets',
+    ru: 'Палитра',
+    en: 'Palette',
   },
   workspaceDefaultHint: {
     ru: 'Изменение действует только в текущей сессии редактора.',
@@ -105,6 +105,10 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Расположение',
     en: 'Layout',
   },
+  technicalDataFields: {
+    ru: 'Данные страницы',
+    en: 'Page details',
+  },
   technicalDataLayoutColumn: {
     ru: 'Столбец',
     en: 'Column',
@@ -122,5 +126,17 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
       'Technical data is inserted as prefilled text blocks.',
       'After insertion, it can be edited like a normal text layer.'
     ),
+  },
+  technicalDataPreview: {
+    ru: 'Предпросмотр',
+    en: 'Preview',
+  },
+  technicalDataPreviewEmpty: {
+    ru: 'Выберите данные, которые нужно добавить.',
+    en: 'Choose the details you want to add.',
+  },
+  technicalDataInsert: {
+    ru: 'Добавить текст',
+    en: 'Add text',
   },
 });

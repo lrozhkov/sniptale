@@ -22,9 +22,11 @@ import {
   reorderPresets,
   resetSystemPreset,
   setDefaultPreset,
+  setCalloutSessionDefaults,
   setPresetEnabled,
   updatePreset,
 } from './mutations';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   CALLOUT_PRESET_STORAGE_SCHEMA_VERSION,
   MAX_CALLOUT_PRESET_NAME_LENGTH,
@@ -288,6 +290,15 @@ export function setDefaultCalloutPreset(id: string): Promise<CalloutPresetMutati
     if (!current) return { outcome: 'rejected', reason: 'not-found' };
     if (current.enabled === false) return { outcome: 'rejected', reason: 'disabled-default' };
     const next = setDefaultPreset(catalog, id);
+    return next ? { catalog: next, outcome: 'applied' } : { outcome: 'unchanged' };
+  });
+}
+
+export function updateCalloutSessionDefaults(
+  defaults: AnnotationSessionDefaults
+): Promise<CalloutPresetMutationResult> {
+  return runCommand((catalog) => {
+    const next = setCalloutSessionDefaults(catalog, defaults);
     return next ? { catalog: next, outcome: 'applied' } : { outcome: 'unchanged' };
   });
 }

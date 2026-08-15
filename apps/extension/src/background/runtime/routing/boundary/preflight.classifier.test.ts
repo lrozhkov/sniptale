@@ -9,28 +9,21 @@ describe('background runtime message preflight classifier', () => {
     expect(classifyRuntimeMessageRoute({ type: 'KEEP_ALIVE' })).toEqual({
       kind: 'internal-signal',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.EXPORT_POPUP_RESULT })).toEqual({
-      kind: 'internal-signal',
-    });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.EXPORT_POPUP_PROGRESS })).toEqual({
-      kind: 'internal-signal',
-    });
     expect(classifyRuntimeMessageRoute({ type: MessageType.PROCESS_WITH_LLM })).toEqual({
       kind: 'background-owned',
     });
-    expect(
-      classifyRuntimeMessageRoute({ type: MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK })
-    ).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.START_POPUP_EXPORT_JOB })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.EXPORT_POPUP_SAVE_ARCHIVE })).toEqual({
+    expect(classifyRuntimeMessageRoute({ type: MessageType.GET_POPUP_EXPORT_JOB_STATUS })).toEqual({
       kind: 'background-owned',
     });
-    expect(classifyRuntimeMessageRoute({ type: MessageType.RELEASE_POPUP_EXPORT_ARCHIVE })).toEqual(
-      {
-        kind: 'background-owned',
-      }
-    );
+    expect(classifyRuntimeMessageRoute({ type: MessageType.CANCEL_POPUP_EXPORT_JOB })).toEqual({
+      kind: 'background-owned',
+    });
+    expect(classifyRuntimeMessageRoute({ type: MessageType.ACK_POPUP_EXPORT_JOB_STATUS })).toEqual({
+      kind: 'background-owned',
+    });
     expect(classifyRuntimeMessageRoute({ type: VideoMessageType.GET_RECORDING_STATE })).toEqual({
       kind: 'video-runtime',
       message: { type: VideoMessageType.GET_RECORDING_STATE },

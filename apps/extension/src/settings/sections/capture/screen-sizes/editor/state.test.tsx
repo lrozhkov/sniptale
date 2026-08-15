@@ -86,12 +86,10 @@ it('syncs all preset fields and submits a trimmed target-aware draft', async () 
   expect(requireState().form).toMatchObject({
     height: 900,
     label: 'Desktop window',
-    target: 'window',
     width: 1440,
   });
   act(() => {
     requireState().form.setLabel('  Tablet  ');
-    requireState().form.setTarget('viewport');
     requireState().form.setWidth(768);
     requireState().form.setHeight(1024);
   });
@@ -101,7 +99,7 @@ it('syncs all preset fields and submits a trimmed target-aware draft', async () 
     height: 1024,
     name: 'Tablet',
     nameEdited: true,
-    target: 'viewport',
+    target: 'window',
     width: 768,
   });
   expect(onClose).toHaveBeenCalledOnce();
@@ -115,7 +113,7 @@ it('marks a system display name as untouched when only dimensions change', async
     onClose: vi.fn(),
     onSave,
     preset: {
-      catalogRevision: 2,
+      catalogRevision: 3,
       customized: false,
       enabled: true,
       height: 720,

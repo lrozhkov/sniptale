@@ -28,7 +28,7 @@ function createVideoSettings(
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
@@ -40,12 +40,12 @@ function createVideoSettings(
 describe('popup persistence', () => {
   it('persists only changed video setting fields', async () => {
     const previous = createVideoSettings();
-    const settings = createVideoSettings({ diagnosticsEnabled: true });
+    const settings = createVideoSettings({ interactionDiagnosticsEnabled: true });
     const patch = createVideoSettingsPatch(previous, settings);
 
     await persistVideoSettings(patch);
 
-    expect(patch).toEqual({ diagnosticsEnabled: true });
+    expect(patch).toEqual({ interactionDiagnosticsEnabled: true });
     expect(mocks.patchVideoSettingsMock).toHaveBeenCalledWith(patch);
   });
 

@@ -344,10 +344,6 @@ function resetOffscreenHarnessState() {
   harnessMediaRecorder = null;
   recordingContext.resetRecordingSession();
   recordingContext.durationTracker.reset();
-  recordingContext.viewportDrawFrozen = false;
-  recordingContext.viewportNavigationEpoch = 0;
-  recordingContext.updateViewportPresetCrop = null;
-  recordingContext.updateViewportPresetDrawState = null;
 }
 
 function setMediaRecorderState(state: HarnessMediaRecorderState) {

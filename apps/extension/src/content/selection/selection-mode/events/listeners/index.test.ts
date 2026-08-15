@@ -30,6 +30,7 @@ beforeEach(() => {
 
 function createRuntimeListenerScenario() {
   const handleClick = vi.fn();
+  const handleDragStart = vi.fn();
   const handleKeyDown = vi.fn();
   const handleMouseDown = vi.fn();
   const handleMouseLeave = vi.fn();
@@ -43,6 +44,7 @@ function createRuntimeListenerScenario() {
     session,
     setupListenerHandlers: {
       handleClick,
+      handleDragStart,
       handleKeyDown,
       handleMouseDown,
       handleMouseLeave,
@@ -54,6 +56,7 @@ function createRuntimeListenerScenario() {
   return {
     handlers: {
       handleClick,
+      handleDragStart,
       handleKeyDown,
       handleMouseDown,
       handleMouseLeave,
@@ -66,7 +69,7 @@ function createRuntimeListenerScenario() {
 }
 
 function expectListenerCleanupLifecycle() {
-  const cleanupFns = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+  const cleanupFns = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()];
   const scrollCleanup = vi.fn();
   addEventListenerToAllWindowsDynamicMock
     .mockReturnValueOnce(cleanupFns[0])
@@ -74,11 +77,13 @@ function expectListenerCleanupLifecycle() {
     .mockReturnValueOnce(cleanupFns[2])
     .mockReturnValueOnce(cleanupFns[3])
     .mockReturnValueOnce(cleanupFns[4])
-    .mockReturnValueOnce(cleanupFns[5]);
+    .mockReturnValueOnce(cleanupFns[5])
+    .mockReturnValueOnce(cleanupFns[6]);
   addScrollListenersToAllWindowsMock.mockReturnValue(scrollCleanup);
   const scenario = createRuntimeListenerScenario();
 
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls.map(([event]) => event)).toEqual([
+    'dragstart',
     'mousemove',
     'mousedown',
     'mouseup',
@@ -87,21 +92,24 @@ function expectListenerCleanupLifecycle() {
     'mouseleave',
   ]);
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls[0]?.[1]).toBe(
-    scenario.handlers.handleMouseMove
+    scenario.handlers.handleDragStart
   );
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls[1]?.[1]).toBe(
-    scenario.handlers.handleMouseDown
+    scenario.handlers.handleMouseMove
   );
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls[2]?.[1]).toBe(
-    scenario.handlers.handleMouseUp
+    scenario.handlers.handleMouseDown
   );
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls[3]?.[1]).toBe(
-    scenario.handlers.handleClick
+    scenario.handlers.handleMouseUp
   );
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls[4]?.[1]).toBe(
+    scenario.handlers.handleClick
+  );
+  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[5]?.[1]).toBe(
     scenario.handlers.handleKeyDown
   );
-  addEventListenerToAllWindowsDynamicMock.mock.calls[5]?.[1](new MouseEvent('mouseleave'));
+  addEventListenerToAllWindowsDynamicMock.mock.calls[6]?.[1](new MouseEvent('mouseleave'));
   expect(scenario.handlers.handleMouseLeave).toHaveBeenCalledOnce();
 
   scenario.session.cleanupEventListeners?.();

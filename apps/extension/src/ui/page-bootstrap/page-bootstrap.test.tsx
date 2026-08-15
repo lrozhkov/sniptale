@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const appBootstrapMocks = vi.hoisted(() => ({
   createRootMock: vi.fn(),
-  initializeAppThemeMock: vi.fn(),
+  initializeExtensionPageThemeMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   renderMock: vi.fn(),
 }));
@@ -13,8 +13,9 @@ vi.mock('react-dom/client', () => ({
   createRoot: appBootstrapMocks.createRootMock,
 }));
 
-vi.mock('../theme/index', () => ({
-  initializeAppTheme: appBootstrapMocks.initializeAppThemeMock,
+vi.mock('../theme/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../theme/index')>()),
+  initializeExtensionPageTheme: appBootstrapMocks.initializeExtensionPageThemeMock,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -52,7 +53,7 @@ describe('page-bootstrap renderPageShell', () => {
       onRendered,
     });
 
-    expect(appBootstrapMocks.initializeAppThemeMock).toHaveBeenCalledTimes(1);
+    expect(appBootstrapMocks.initializeExtensionPageThemeMock).toHaveBeenCalledTimes(1);
     expect(appBootstrapMocks.createRootMock).toHaveBeenCalledWith(document.getElementById('root'));
     expect(appBootstrapMocks.renderMock).toHaveBeenCalledTimes(1);
     expect(onRendered).toHaveBeenCalledTimes(1);
@@ -69,7 +70,7 @@ describe('page-bootstrap renderPageShell', () => {
       namespace: 'DemoEntrypoint',
     });
 
-    expect(appBootstrapMocks.initializeAppThemeMock).not.toHaveBeenCalled();
+    expect(appBootstrapMocks.initializeExtensionPageThemeMock).not.toHaveBeenCalled();
     expect(appBootstrapMocks.createRootMock).not.toHaveBeenCalled();
     expect(appBootstrapMocks.loggerErrorMock).toHaveBeenCalledWith(
       'Page bootstrap root container is missing'

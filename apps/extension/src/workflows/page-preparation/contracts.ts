@@ -15,7 +15,6 @@ export const PREPARATION_SURFACE_RESIZE = 'PREPARATION_SURFACE_RESIZE' as const;
 
 export type ViewerPopupExportMessage =
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
-  | TabRequestByType[typeof MessageType.EXPORT_POPUP_START]
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
   | Omit<
       RuntimeRequestByType[typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT],

@@ -63,6 +63,16 @@ export function createHighlighterRuntimeEscapeKeyHandler(props: {
 
 function registerHoverListeners(hoverController: HoverController) {
   const { input, overlay } = hoverController;
+  const cleanupDragStart = addEventListenerToAllWindowsDynamic<DragEvent>(
+    'dragstart',
+    input.dragStart,
+    { capture: true }
+  );
+  const cleanupMouseDown = addEventListenerToAllWindowsDynamic<MouseEvent>(
+    'mousedown',
+    input.mouseDown,
+    { capture: true }
+  );
   const cleanupMouseMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mousemove',
     input.mouseMove,
@@ -107,6 +117,8 @@ function registerHoverListeners(hoverController: HoverController) {
   });
 
   return () => {
+    cleanupDragStart();
+    cleanupMouseDown();
     cleanupMouseMove();
     cleanupMouseLeave();
     cleanupClick();

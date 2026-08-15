@@ -4,8 +4,8 @@ import { authorizeContentSender } from '../../../../routing-contracts/capabiliti
 import {
   ensureActivePageAccessRuntime,
   ensureNativeVisibleCaptureAuthority,
-} from '../../../page-access/service';
-import { waitForContentToolbarReady } from '../../../page-access/readiness';
+} from '../../../../page-access/service';
+import { waitForContentToolbarReady } from '../../../../page-access/readiness';
 import { routeWithVerifiedPageAccess } from './page-access-guard';
 import { rejectUnauthorizedRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';

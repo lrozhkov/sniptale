@@ -3,7 +3,7 @@ import {
   SUPPORTED_LOCALES,
   translate,
   type TranslationKey,
-} from '../../../platform/i18n';
+} from '../../../platform/i18n/popup';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 
 const STALE_PAGE_RUNTIME_PATTERNS = [

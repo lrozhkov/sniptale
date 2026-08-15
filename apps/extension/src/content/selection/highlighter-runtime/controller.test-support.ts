@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
 export function createHoverControllerStub() {
+  const handleDragStart = vi.fn();
   const cancelDrawing = vi.fn(() => false);
   const cancelPendingHoverFrame = vi.fn();
   const clearHoverTracking = vi.fn();
@@ -9,6 +10,7 @@ export function createHoverControllerStub() {
   const consumeSuppressedClick = vi.fn(() => false);
   const handleClick = vi.fn();
   const handleMouseLeave = vi.fn();
+  const handleMouseDown = vi.fn();
   const handleMouseMove = vi.fn();
   const handlePointerDown = vi.fn();
   const handlePointerMove = vi.fn();
@@ -31,6 +33,8 @@ export function createHoverControllerStub() {
       frameCache: invalidateFrameCache,
     },
     input: {
+      dragStart: handleDragStart,
+      mouseDown: handleMouseDown,
       mouseMove: handleMouseMove,
       mouseLeave: handleMouseLeave,
       click: handleClick,
@@ -51,8 +55,10 @@ export function createHoverControllerStub() {
     consumeSuppressedClick,
     createHoverOverlay,
     createOverlayContainer,
+    handleDragStart,
     handleClick,
     handleMouseLeave,
+    handleMouseDown,
     handleMouseMove,
     handlePointerDown,
     handlePointerMove,

@@ -8,6 +8,8 @@ import { BrowserFrameBehaviorSections, BrowserFrameInsertSection } from './brows
 
 function renderBrowserFrameTextInput(args: {
   action: string;
+  describedBy?: string;
+  invalid?: boolean;
   ariaLabel: string;
   label: string;
   placeholder: string;
@@ -17,6 +19,8 @@ function renderBrowserFrameTextInput(args: {
   return (
     <TextField
       aria-label={args.ariaLabel}
+      {...(args.describedBy === undefined ? {} : { 'aria-describedby': args.describedBy })}
+      {...(args.invalid === undefined ? {} : { invalid: args.invalid })}
       label={args.label}
       placeholder={args.placeholder}
       value={args.value}
@@ -32,35 +36,44 @@ function BrowserFrameTitleSection(props: {
   browserFrame: BrowserFrameState;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }) {
-  return (
-    <PanelSection label={translate('editor.compact.browserTabTitle')}>
-      {renderBrowserFrameTextInput({
-        action: 'browser-frame-title',
-        ariaLabel: translate('editor.compact.browserTabTitle'),
-        label: translate('editor.compact.browserTabTitle'),
-        placeholder: translate('editor.compact.pageTitlePlaceholder'),
-        value: props.browserFrame.title,
-        onChange: (title) => props.syncBrowserFrame({ title }),
-      })}
-    </PanelSection>
-  );
+  return renderBrowserFrameTextInput({
+    action: 'browser-frame-title',
+    ariaLabel: translate('editor.compact.browserTabTitle'),
+    label: translate('editor.compact.browserTabTitle'),
+    placeholder: translate('editor.compact.pageTitlePlaceholder'),
+    value: props.browserFrame.title,
+    onChange: (title) => props.syncBrowserFrame({ title }),
+  });
+}
+
+function getBrowserFrameValidationMessage(browserFrame: BrowserFrameState): string | null {
+  return browserFrame.url.length > 2048 ? translate('editor.compact.browserFrameUrlTooLong') : null;
 }
 
 function BrowserFrameUrlSection(props: {
   browserFrame: BrowserFrameState;
+  validationMessage: string | null;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }) {
+  const errorId = 'editor-browser-frame-url-error';
   return (
-    <PanelSection label="URL">
+    <div className="space-y-1.5">
       {renderBrowserFrameTextInput({
         action: 'browser-frame-url',
         ariaLabel: translate('editor.compact.urlMockup'),
-        label: 'URL',
+        ...(props.validationMessage ? { describedBy: errorId } : {}),
+        invalid: props.validationMessage !== null,
+        label: translate('editor.compact.pageUrl'),
         placeholder: translate('editor.compact.urlPlaceholder'),
         value: props.browserFrame.url,
         onChange: (url) => props.syncBrowserFrame({ url }),
       })}
-    </PanelSection>
+      {props.validationMessage ? (
+        <p id={errorId} role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
+          {props.validationMessage}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -78,18 +91,33 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
   syncBrowserFrame,
 }) => {
   useAppLocale();
+  const validationMessage = getBrowserFrameValidationMessage(browserFrame);
 
   return (
     <div className="space-y-3">
-      <BrowserFrameBehaviorSections
-        browserCanvasModeOptions={browserCanvasModeOptions}
-        browserContentModeOptions={browserContentModeOptions}
-        browserFrame={browserFrame}
-        syncBrowserFrame={syncBrowserFrame}
-      />
-      <BrowserFrameTitleSection browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
-      <BrowserFrameUrlSection browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
+      <PanelSection label={translate('editor.compact.browserFrameLayout')}>
+        <BrowserFrameBehaviorSections
+          browserCanvasModeOptions={browserCanvasModeOptions}
+          browserContentModeOptions={browserContentModeOptions}
+          browserFrame={browserFrame}
+          syncBrowserFrame={syncBrowserFrame}
+        />
+      </PanelSection>
+      <PanelSection label={translate('editor.compact.browserFrameSettings')}>
+        <div className="space-y-3">
+          <BrowserFrameTitleSection
+            browserFrame={browserFrame}
+            syncBrowserFrame={syncBrowserFrame}
+          />
+          <BrowserFrameUrlSection
+            browserFrame={browserFrame}
+            validationMessage={validationMessage}
+            syncBrowserFrame={syncBrowserFrame}
+          />
+        </div>
+      </PanelSection>
       <BrowserFrameInsertSection
+        disabled={validationMessage !== null}
         insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame ?? (() => undefined)}
       />
     </div>

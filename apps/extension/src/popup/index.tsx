@@ -1,16 +1,9 @@
-﻿import { renderPageShell } from '../ui/page-bootstrap';
+import { renderPageShell } from '../ui/page-bootstrap/page-bootstrap';
 import { PopupApp } from './shell/app';
-import {
-  finishPopupPerfSpanOnNextFrame,
-  startPopupPerfSpan,
-} from './diagnostics/performance/index';
 
-const popupStartupSpan = startPopupPerfSpan('popup.startup');
-
+performance.mark('sniptale-popup-entry-evaluated');
 renderPageShell({
   element: <PopupApp />,
-  namespace: 'PopupEntrypoint',
-  onRendered: () => {
-    finishPopupPerfSpanOnNextFrame(popupStartupSpan);
-  },
+  initializeTheme: false,
+  namespace: 'popup',
 });

@@ -158,6 +158,7 @@ export async function openCameraRecorderPage(params: {
 
 export async function openGalleryPage(
   options: {
+    folder?: 'screenshot' | 'recording';
     openStorageManager?: boolean;
     recordingId?: string | null;
     scope?: 'library' | 'temporary';

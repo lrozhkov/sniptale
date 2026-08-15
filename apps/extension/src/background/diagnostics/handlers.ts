@@ -1,5 +1,4 @@
 import type { DiagnosticEventFromCS } from '@sniptale/platform/observability/diagnostics/types';
-import { appendForcedDetachEvent, appendNavigationEvent, processDebuggerEvent } from './cdp';
 import { diagnosticsLogger } from './logger';
 import {
   getActiveRecordingId as getActiveRecordingIdForTab,
@@ -59,23 +58,6 @@ function handleEventFromContentScriptWithPermit(
   maybeFlushDiagnosticsSession(session);
 }
 
-export function handleDebuggerEvent(
-  source: chrome.debugger.Debuggee,
-  method: string,
-  params: unknown
-): void {
-  runAdmittedDiagnosticsMutation(() => {
-    processDebuggerEvent({
-      source,
-      method,
-      params,
-      resolveRecordingId: getActiveRecordingIdForTab,
-      getSession: getDiagnosticsSession,
-      maybeFlush: maybeFlushDiagnosticsSession,
-    });
-  });
-}
-
 export function handleTabNavigation(tabId: number, newUrl?: string): void {
   runAdmittedDiagnosticsMutation(() => handleTabNavigationWithPermit(tabId, newUrl));
 }
@@ -86,22 +68,13 @@ function handleTabNavigationWithPermit(tabId: number, newUrl?: string): void {
     return;
   }
 
-  appendNavigationEvent(session, newUrl);
-}
-
-export function handleForcedDetach(tabId: number): void {
-  runAdmittedDiagnosticsMutation(() => handleForcedDetachWithPermit(tabId));
-}
-
-function handleForcedDetachWithPermit(tabId: number): void {
-  const session = getDiagnosticsSessionByTabId(tabId);
-  if (!session) {
-    return;
-  }
-
-  appendForcedDetachEvent(session);
-}
-
-export function getActiveRecordingId(tabId: number): string | undefined {
-  return getActiveRecordingIdForTab(tabId);
+  session.events.push({
+    id: crypto.randomUUID(),
+    recordingId: session.recordingId,
+    tsMs: performance.now() - session.startedAt,
+    kind: 'meta',
+    message: 'Page navigation',
+    ...(newUrl === undefined ? {} : { data: { url: newUrl } }),
+  });
+  maybeFlushDiagnosticsSession(session);
 }

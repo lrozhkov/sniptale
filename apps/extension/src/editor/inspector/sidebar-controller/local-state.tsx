@@ -74,8 +74,8 @@ function useSidebarLayerEffectsState(args: {
 
 export function useEditorInspectorSidebarLocalState(args: {
   frame: EditorFrameSettings;
+  sceneBackgroundPresets?: EditorPresetStorageState['sceneBackground'];
   inspector: string;
-  sceneBackgroundPresets: EditorPresetStorageState['sceneBackground'];
   sourceWidth: number;
   sourceHeight: number;
   sourceName: string | null;

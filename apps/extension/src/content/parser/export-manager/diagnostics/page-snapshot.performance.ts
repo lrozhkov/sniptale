@@ -1,5 +1,3 @@
-import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
-import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import {
   sanitizeDiagnosticMessage,
   sanitizeDiagnosticUrl,
@@ -52,80 +50,16 @@ function collectResourceTimingRollups(sourceView?: Window) {
   };
 }
 
-function mapResourceTimingEntryToHarEntry(entry: PerformanceResourceTiming, timeOrigin: number) {
+function mapResourceTimingEntry(entry: PerformanceResourceTiming) {
   return {
-    _from: 'performance-resource-timing',
-    _initiatorType: entry.initiatorType || 'other',
-    cache: {},
-    pageref: 'resource_timing_page',
-    request: {
-      bodySize: -1,
-      cookies: [],
-      headers: [],
-      headersSize: -1,
-      httpVersion: '',
-      method: 'GET',
-      queryString: [],
-      url: sanitizeDiagnosticUrl(entry.name) ?? '',
-    },
-    response: {
-      bodySize: -1,
-      content: {
-        mimeType: '',
-        size: entry.transferSize || 0,
-      },
-      cookies: [],
-      headers: [],
-      headersSize: -1,
-      httpVersion: '',
-      redirectURL: '',
-      status: 0,
-      statusText: '',
-    },
-    startedDateTime: new Date(timeOrigin + entry.startTime).toISOString(),
-    time: Math.round(entry.duration),
-    timings: {
-      blocked: -1,
-      connect: -1,
-      dns: -1,
-      receive: Math.max(0, Math.round(entry.duration)),
-      send: 0,
-      ssl: -1,
-      wait: 0,
-    },
-  };
-}
-
-function buildResourceTimingHarMeta(
-  pageMetadata: Partial<ExportManagerPageMetadata> | undefined,
-  sourceView: Window | undefined,
-  sourcePageUrl?: string
-) {
-  const manifest = runtimeInfo.getManifest();
-  const pageUrl = pageMetadata?.pageUrl ?? sourcePageUrl ?? sourceView?.location.href;
-
-  return {
-    browser: {
-      name: sourceView?.navigator.userAgent ?? 'unknown',
-      version: '',
-    },
-    creator: {
-      name: `${PRODUCT_BRAND_NAME} resource-timing snapshot`,
-      version: manifest.version,
-    },
-    pages: [
-      {
-        id: 'resource_timing_page',
-        pageTimings: {
-          onContentLoad: -1,
-          onLoad: -1,
-        },
-        startedDateTime: new Date(sourceView?.performance.timeOrigin ?? Date.now()).toISOString(),
-        title: sanitizeDiagnosticMessage(
-          pageMetadata?.pageTitle ?? sanitizeDiagnosticUrl(pageUrl) ?? ''
-        ),
-      },
-    ],
+    decodedBodySize: entry.decodedBodySize || 0,
+    duration: Math.round(entry.duration),
+    encodedBodySize: entry.encodedBodySize || 0,
+    initiatorType: entry.initiatorType || 'other',
+    name: sanitizeDiagnosticUrl(entry.name) ?? '',
+    nextHopProtocol: entry.nextHopProtocol || '',
+    startTime: Math.round(entry.startTime),
+    transferSize: entry.transferSize || 0,
   };
 }
 
@@ -156,7 +90,7 @@ export function buildPageSummaryFile(
   };
 }
 
-export function createHarLikeSnapshot(
+export function createResourceTimingSnapshot(
   pageMetadata?: Partial<ExportManagerPageMetadata>,
   source?: ExportDiagnosticsSource
 ) {
@@ -166,15 +100,15 @@ export function createHarLikeSnapshot(
       sourceView?.performance.getEntriesByType('resource') as
         | PerformanceResourceTiming[]
         | undefined
-    )?.map((entry) =>
-      mapResourceTimingEntryToHarEntry(entry, sourceView?.performance.timeOrigin ?? Date.now())
-    ) ?? [];
+    )?.map(mapResourceTimingEntry) ?? [];
+
+  const pageUrl = pageMetadata?.pageUrl ?? source?.pageUrl ?? sourceView?.location.href;
 
   return {
-    log: {
-      ...buildResourceTimingHarMeta(pageMetadata, sourceView, source?.pageUrl),
-      entries,
-      version: '1.2',
-    },
+    capturedAt: new Date().toISOString(),
+    entries,
+    pageTitle: sanitizeDiagnosticMessage(pageMetadata?.pageTitle ?? ''),
+    pageUrl: sanitizeDiagnosticUrl(pageUrl) ?? '',
+    timeOrigin: sourceView?.performance.timeOrigin ?? null,
   };
 }

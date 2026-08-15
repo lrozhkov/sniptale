@@ -6,7 +6,6 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 
 type PopupExportMessageType =
   | typeof MessageType.EXPORT_POPUP_PREVIEW
-  | typeof MessageType.EXPORT_POPUP_START
   | typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE
   | typeof MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT
   | typeof MessageType.EXPORT_POPUP_CANCEL
@@ -14,7 +13,6 @@ type PopupExportMessageType =
 
 type PopupExportDirectTabMessage =
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_PREVIEW]
-  | TabRequestByType[typeof MessageType.EXPORT_POPUP_START]
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_BUILD_PACKAGE]
   | TabRequestByType[typeof MessageType.EXPORT_POPUP_CANCEL]
   | TabRequestByType[typeof MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];

@@ -3,7 +3,7 @@ import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { BlurType } from '../../../features/highlighter/contracts';
 import { FrameSettingsPopoverContent } from './views';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
-import { usePopoverDistanceClose, usePopoverEscapeClose } from '../popover/hooks';
+import { usePopoverEscapeClose } from '../popover/hooks';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import { getBorderPresetCssValidation } from '../../../ui/highlighter-preset-editor/useBorderPresetEditorState/validation';
@@ -39,11 +39,6 @@ export function FrameAnnotationCreationFramePopover(props: {
     width: SETTINGS_POPOVER_WIDTH,
   });
 
-  usePopoverDistanceClose({
-    isOpen: dismissal.isDismissalEnabled,
-    onClose: props.onClose,
-    popoverRef,
-  });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,
     isOpen: dismissal.isDismissalEnabled,

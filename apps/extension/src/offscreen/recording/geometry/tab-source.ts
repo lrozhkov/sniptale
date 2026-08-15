@@ -2,7 +2,7 @@ import type {
   VideoFrameRate,
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { resolveContainedFrame } from './contain-frame';
+import { resolveAspectMatchedSourceFrame, resolveContainedFrame } from './contain-frame';
 import {
   createRecordingGeometryPlan,
   remapRecordingGeometryPlan,
@@ -29,8 +29,10 @@ const RECOVERABLE_TAB_CROP_RESIZE_WARNING =
 export type TabOutputGeometry = RecordingGeometryPlan &
   Readonly<{
     coordinateSpace: TabOutputCoordinateSpace;
+    fillsOutput: boolean;
     logicalContentRect: RecordingSampleRect;
     requestedCrop: TabLogicalRect;
+    resolution: VideoResolutionPreset;
     sourceSize: RecordingPixelSize;
     tracksFullViewport: boolean;
   }>;
@@ -128,6 +130,42 @@ function mapLogicalCropToSource(
   };
 }
 
+function insetSourceRectForI420Sampling(sourceRect: RecordingSampleRect): RecordingSampleRect {
+  // Chromium aligns tab-capture content on two-pixel I420 chroma boundaries.
+  const edgeInset = 2;
+  if (sourceRect.width <= edgeInset * 2) return sourceRect;
+  const width = sourceRect.width - edgeInset * 2;
+  const height = sourceRect.height * (width / sourceRect.width);
+  return Object.freeze({
+    ...sourceRect,
+    height,
+    width,
+    x: sourceRect.x + edgeInset,
+    y: sourceRect.y + (sourceRect.height - height) / 2,
+  });
+}
+
+function normalizeStableOutputPlan(
+  plan: RecordingGeometryPlan,
+  fillsOutput: boolean,
+  insetPhysicalTabEdges: boolean
+): RecordingGeometryPlan {
+  if (!fillsOutput) return plan;
+  const matchedSourceRect = resolveAspectMatchedSourceFrame(plan.sourceRect, plan.outputSize);
+  const sourceRect = insetPhysicalTabEdges
+    ? insetSourceRectForI420Sampling(matchedSourceRect)
+    : matchedSourceRect;
+  return remapRecordingGeometryPlan(plan, sourceRect);
+}
+
+function sourceRectFillsOutput(plan: RecordingGeometryPlan, fillsOutput: boolean): boolean {
+  if (!fillsOutput) return false;
+  const sourceAspect = plan.sourceRect.width / plan.sourceRect.height;
+  const outputAspect = plan.outputSize.width / plan.outputSize.height;
+  const tolerance = Number.EPSILON * Math.max(sourceAspect, outputAspect) * 8;
+  return Math.abs(sourceAspect - outputAspect) <= tolerance;
+}
+
 function isRequestedCropInsideCoordinateSpace(
   crop: TabLogicalRect,
   coordinateSpace: TabOutputCoordinateSpace
@@ -143,6 +181,7 @@ function isRequestedCropInsideCoordinateSpace(
 }
 
 function buildRemappedGeometry(params: {
+  canFillOutput: boolean;
   coordinateSpace: TabOutputCoordinateSpace;
   geometry: TabOutputGeometry;
   logicalContentRect: RecordingSampleRect;
@@ -150,12 +189,18 @@ function buildRemappedGeometry(params: {
   sourceRect: RecordingSampleRect;
   sourceSize: RecordingPixelSize;
 }): TabOutputGeometry {
-  const remapped = remapRecordingGeometryPlan(params.geometry, params.sourceRect);
+  const remapped = normalizeStableOutputPlan(
+    remapRecordingGeometryPlan(params.geometry, params.sourceRect),
+    params.canFillOutput,
+    params.geometry.tracksFullViewport
+  );
   return Object.freeze({
     ...remapped,
     coordinateSpace: params.coordinateSpace,
+    fillsOutput: sourceRectFillsOutput(remapped, params.canFillOutput),
     logicalContentRect: params.logicalContentRect,
     requestedCrop: params.requestedCrop,
+    resolution: params.geometry.resolution,
     sourceSize: params.sourceSize,
     tracksFullViewport: params.geometry.tracksFullViewport,
   });
@@ -171,18 +216,24 @@ export function resolveTabOutputGeometry(
   const cssViewport = requireCoordinateSpace(coordinateSpace);
   const requested = requireRequestedCrop(requestedCrop, cssViewport);
   const mapping = mapLogicalCropToSource(requested, source, cssViewport);
-  const plan = createRecordingGeometryPlan({
-    frameRateCap: options.frameRateCap,
-    outputBasis: { height: requested.height, width: requested.width },
-    resolution: options.resolution,
-    sourceRect: mapping.sourceRect,
-  });
+  const plan = normalizeStableOutputPlan(
+    createRecordingGeometryPlan({
+      frameRateCap: options.frameRateCap,
+      outputBasis: { height: requested.height, width: requested.width },
+      resolution: options.resolution,
+      sourceRect: mapping.sourceRect,
+    }),
+    true,
+    options.tracksFullViewport === true
+  );
 
   return Object.freeze({
     ...plan,
     coordinateSpace: cssViewport,
+    fillsOutput: sourceRectFillsOutput(plan, true),
     logicalContentRect: mapping.logicalContentRect,
     requestedCrop: requested,
+    resolution: options.resolution,
     sourceSize: source,
     tracksFullViewport: options.tracksFullViewport === true,
   });
@@ -206,6 +257,7 @@ export function remapTabOutputGeometry(
     );
     return Object.freeze({
       geometry: buildRemappedGeometry({
+        canFillOutput: false,
         coordinateSpace: cssViewport,
         geometry,
         logicalContentRect: availableFrame.logicalContentRect,
@@ -224,8 +276,13 @@ export function remapTabOutputGeometry(
       )
     : requireRequestedCrop(geometry.requestedCrop, cssViewport);
   const mapping = mapLogicalCropToSource(requestedCrop, source, cssViewport);
+  const canFillOutput =
+    !geometry.tracksFullViewport ||
+    (requestedCrop.width === geometry.outputBasis.width &&
+      requestedCrop.height === geometry.outputBasis.height);
   return Object.freeze({
     geometry: buildRemappedGeometry({
+      canFillOutput,
       coordinateSpace: cssViewport,
       geometry,
       logicalContentRect: mapping.logicalContentRect,
@@ -234,6 +291,51 @@ export function remapTabOutputGeometry(
       sourceSize: source,
     }),
     kind: 'mapped',
+  });
+}
+
+export function remapTabOutputGeometryFromObservedViewport(
+  geometry: TabOutputGeometry,
+  sourceSize: RecordingPixelSize,
+  observedViewport: RecordingSampleRect,
+  coordinateSpace: TabOutputCoordinateSpace
+): TabOutputGeometry {
+  if (!geometry.tracksFullViewport) {
+    throw new Error('Observed viewport remapping is only valid for full viewport output');
+  }
+  const source = requirePositiveSize(sourceSize, 'Tab source');
+  const cssViewport = requireCoordinateSpace(coordinateSpace);
+  const values = [
+    observedViewport.x,
+    observedViewport.y,
+    observedViewport.width,
+    observedViewport.height,
+  ];
+  if (
+    !values.every((value) => Number.isFinite(value) && Number.isInteger(value)) ||
+    observedViewport.x < 0 ||
+    observedViewport.y < 0 ||
+    observedViewport.width <= 0 ||
+    observedViewport.height <= 0 ||
+    observedViewport.x + observedViewport.width > source.width ||
+    observedViewport.y + observedViewport.height > source.height
+  ) {
+    throw new Error('Observed viewport frame falls outside the raw tab source');
+  }
+  const requestedCrop = requireRequestedCrop(
+    { x: 0, y: 0, width: cssViewport.width, height: cssViewport.height },
+    cssViewport
+  );
+  return buildRemappedGeometry({
+    canFillOutput:
+      requestedCrop.width === geometry.outputBasis.width &&
+      requestedCrop.height === geometry.outputBasis.height,
+    coordinateSpace: cssViewport,
+    geometry,
+    logicalContentRect: Object.freeze({ ...observedViewport }),
+    requestedCrop,
+    sourceRect: Object.freeze({ ...observedViewport }),
+    sourceSize: source,
   });
 }
 
@@ -254,9 +356,11 @@ export function isSameTabOutputGeometry(
     left.coordinateSpace.devicePixelRatio === right.coordinateSpace.devicePixelRatio &&
     left.fit === right.fit &&
     left.frameRateCap === right.frameRateCap &&
+    left.fillsOutput === right.fillsOutput &&
     areRectsEqual(left.logicalContentRect, right.logicalContentRect) &&
     areSizesEqual(left.outputBasis, right.outputBasis) &&
     areRectsEqual(left.requestedCrop, right.requestedCrop) &&
+    left.resolution === right.resolution &&
     areSizesEqual(left.sourceSize, right.sourceSize) &&
     areRectsEqual(left.sourceRect, right.sourceRect) &&
     areSizesEqual(left.outputSize, right.outputSize) &&

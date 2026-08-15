@@ -27,7 +27,11 @@ type ExportEditorSessionController = EditorDocumentExportPort;
 export async function openEditorImageFromFile(
   controller: EditorDocumentOpenPort,
   file: File | undefined,
-  setImageData: (imageData: string | null) => void
+  setImageData: (imageData: string | null) => void,
+  lifecycle: {
+    beforeOpen?: () => Promise<void> | void;
+    onOpened?: () => Promise<void> | void;
+  } = {}
 ): Promise<void> {
   if (!file) {
     return;
@@ -55,6 +59,10 @@ export async function openEditorImageFromFile(
   logEditorDocumentOpenTrace('canvas:ready', {
     canvasReady: Boolean(controller.canvas),
   });
+  await lifecycle.beforeOpen?.();
+  if (!isCurrentEditorDocumentOpenOperation(openToken)) {
+    return;
+  }
   await controller.openImage(dataUrl, file.name);
   if (!isCurrentEditorDocumentOpenOperation(openToken)) {
     return;
@@ -63,6 +71,10 @@ export async function openEditorImageFromFile(
     canvasReady: Boolean(controller.canvas),
     name: file.name,
   });
+  await lifecycle.onOpened?.();
+  if (!isCurrentEditorDocumentOpenOperation(openToken)) {
+    return;
+  }
   setImageData(dataUrl);
 }
 

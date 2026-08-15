@@ -1,0 +1,366 @@
+/* Critical popup canvas and route-independent chrome. Full product styles load with React. */
+:root {
+  color-scheme: dark;
+  --sniptale-color-surface-canvas: #09090b;
+  --popup-initial-border: rgba(255, 255, 255, 0.1);
+  --popup-initial-panel: rgba(24, 24, 27, 0.98);
+  --popup-initial-text: rgba(244, 244, 245, 0.58);
+  --popup-initial-active-text: #f4f4f5;
+  --popup-initial-accent: #f97316;
+  --sniptale-font-sans:
+    'Sniptale Sans', 'Manrope Variable', 'Manrope', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --sniptale-color-surface-canvas: #f6f2ed;
+  --popup-initial-border: rgba(51, 42, 35, 0.12);
+  --popup-initial-panel: rgba(255, 253, 250, 0.98);
+  --popup-initial-text: rgba(70, 62, 56, 0.58);
+  --popup-initial-active-text: #18181b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --sniptale-color-surface-canvas: #f6f2ed;
+    --popup-initial-border: rgba(51, 42, 35, 0.12);
+    --popup-initial-panel: rgba(255, 253, 250, 0.98);
+    --popup-initial-text: rgba(70, 62, 56, 0.58);
+    --popup-initial-active-text: #18181b;
+  }
+}
+
+html,
+body,
+#root {
+  box-sizing: border-box;
+  margin: 0;
+  width: 392px;
+  height: 560px;
+  min-width: 392px;
+  min-height: 560px;
+  max-width: 392px;
+  max-height: 560px;
+  overflow: hidden;
+  background: var(--sniptale-color-surface-canvas);
+}
+
+body {
+  font-family: var(--sniptale-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.popup-react-shell {
+  box-sizing: border-box;
+  position: relative;
+  width: 392px;
+  height: 560px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.popup-react-shell__tabs {
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 3px 5px;
+  overflow: visible;
+  border: 1px solid var(--popup-initial-border);
+  border-radius: 18px;
+  background: var(--popup-initial-panel);
+}
+
+.popup-react-shell__tabs button {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--popup-initial-text);
+  font: 550 9px/1.1 var(--sniptale-font-sans);
+  cursor: pointer;
+  z-index: 1;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.popup-react-shell__tabs button svg {
+  width: 22px;
+  height: 22px;
+  transition:
+    color 160ms ease,
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.popup-react-shell__tab-indicator {
+  position: absolute;
+  z-index: 2;
+  bottom: 2px;
+  left: calc(10% + 3.2px);
+  box-sizing: border-box;
+  width: 42px;
+  height: 2px;
+  border: 0 solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition:
+    left 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms ease,
+    border-width 180ms ease,
+    box-shadow 180ms ease,
+    opacity 120ms ease;
+}
+
+.popup-react-shell__tab-indicator::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sniptale-color-accent, var(--popup-initial-accent));
+  content: '';
+  opacity: 1;
+  transition: opacity 80ms ease 120ms;
+}
+
+.popup-react-shell__tab-indicator[data-page='screenshots'] {
+  left: calc(10% + 3.2px);
+  opacity: 1;
+}
+
+.popup-react-shell__tab-indicator[data-page='video'] {
+  left: calc(30% + 1.6px);
+  opacity: 1;
+}
+
+.popup-react-shell__tab-indicator[data-page='menu'] {
+  bottom: 6px;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  border-width: 1px;
+  border-color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--popup-initial-accent) 22%, transparent),
+    0 4px 12px color-mix(in srgb, var(--popup-initial-accent) 14%, transparent);
+  opacity: 1;
+  transition-delay: 0ms, 80ms, 80ms, 80ms, 160ms, 160ms, 160ms, 0ms;
+}
+
+.popup-react-shell__tab-indicator[data-page='menu']::after {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+.popup-react-shell__tab-indicator[data-page='tools'] {
+  left: calc(70% - 1.6px);
+  opacity: 1;
+}
+
+.popup-react-shell__tab-indicator[data-page='export'] {
+  left: calc(90% - 3.2px);
+  opacity: 1;
+}
+
+.popup-react-shell__tabs button[data-active='true'] {
+  color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+  background: transparent;
+}
+
+.popup-react-shell__tabs button:hover,
+.popup-react-shell__tabs button:focus-visible {
+  color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+}
+
+.popup-react-shell__tabs button:hover svg,
+.popup-react-shell__tabs button:focus-visible svg {
+  transform: translateY(-1px) scale(1.06);
+}
+
+.popup-react-shell__tabs button[data-page='menu'] {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  align-self: center;
+  justify-self: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--popup-initial-border);
+  border-radius: 50%;
+  background: var(--sniptale-color-surface-panel, var(--popup-initial-panel));
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.popup-react-shell__tabs button[data-page='menu']::after {
+  display: none;
+}
+
+.popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
+  color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.popup-react-shell__tabs[data-animate='true'] button[data-page='menu'][data-active='true'] {
+  animation: popup-menu-accent-arrival 221ms linear both;
+}
+
+@keyframes popup-menu-accent-arrival {
+  0%,
+  99% {
+    color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+  }
+
+  100% {
+    color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup-react-shell__tab-indicator,
+  .popup-react-shell__tabs button,
+  .popup-react-shell__tabs button svg {
+    transition: none;
+  }
+
+  .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
+    animation: none;
+  }
+}
+
+.popup-react-shell__content {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.popup-react-shell__route-frame {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .popup-react-shell__route-frame[data-animate='true'] {
+    animation: popup-route-enter 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+@keyframes popup-route-enter {
+  from {
+    opacity: 0.58;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.popup-react-shell__route-error {
+  position: absolute;
+  z-index: 2;
+  top: 76px;
+  right: 12px;
+  left: 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--popup-initial-border);
+  border-radius: 14px;
+  background: var(--popup-initial-panel);
+  color: var(--popup-initial-active-text);
+  font: 500 12px/1.25 var(--sniptale-font-sans);
+}
+
+.popup-react-shell__skeleton {
+  box-sizing: border-box;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  overflow: hidden;
+  border: 1px solid var(--popup-initial-border);
+  border-radius: 16px;
+  background: var(--sniptale-color-surface-panel, var(--popup-initial-panel));
+}
+
+.popup-react-shell__skeleton > div,
+.popup-react-shell__skeleton-grid > div {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--popup-initial-text) 12%, transparent);
+}
+
+.popup-react-shell__skeleton-heading {
+  width: 34%;
+  height: 15px;
+}
+
+.popup-react-shell__skeleton-row {
+  width: 62%;
+  height: 9px;
+}
+
+.popup-react-shell__skeleton-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  background: transparent !important;
+}
+
+.popup-react-shell__skeleton-action {
+  width: 100%;
+  height: 48px;
+  flex: 0 0 48px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .popup-react-shell__skeleton > div:not(.popup-react-shell__skeleton-grid),
+  .popup-react-shell__skeleton-grid > div {
+    animation: popup-skeleton-pulse 900ms ease-in-out infinite alternate;
+  }
+}
+
+@keyframes popup-skeleton-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+
+.popup-react-shell__route-error button {
+  padding: 6px 10px;
+  border: 1px solid var(--popup-initial-border);
+  border-radius: 10px;
+  background: var(--sniptale-color-surface-canvas);
+  color: inherit;
+  cursor: pointer;
+}

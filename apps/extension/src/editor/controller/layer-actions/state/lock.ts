@@ -15,6 +15,9 @@ export function toggleLayerLock(
 
   object.sniptaleLocked = !object.sniptaleLocked;
   prepareObject(object);
+  if (object.sniptaleLocked && canvas?.getActiveObjects().includes(object)) {
+    canvas.discardActiveObject();
+  }
   canvas?.requestRenderAll();
   return object;
 }

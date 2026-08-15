@@ -7,6 +7,11 @@ export const BROWSER_ADAPTER_ALLOWED_PREFIXES = [
   'tooling/test/support/',
 ];
 
+const BROWSER_ADAPTER_ALLOWED_FILES = new Set([
+  // Playwright must seed and observe the real extension storage mirrors before application code runs.
+  'tooling/test/e2e/extension-smoke.popup-startup.ts',
+]);
+
 export function normalizeBrowserAdapterPath(relativePath) {
   return String(relativePath ?? '')
     .replaceAll('\\', '/')
@@ -17,7 +22,8 @@ export function isBrowserAdapterAllowedPath(relativePath) {
   const normalizedPath = normalizeBrowserAdapterPath(relativePath);
   return (
     !normalizedPath.startsWith('../') &&
-    BROWSER_ADAPTER_ALLOWED_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix))
+    (BROWSER_ADAPTER_ALLOWED_FILES.has(normalizedPath) ||
+      BROWSER_ADAPTER_ALLOWED_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix)))
   );
 }
 

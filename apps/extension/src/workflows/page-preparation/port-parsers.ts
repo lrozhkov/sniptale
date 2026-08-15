@@ -23,10 +23,7 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
 
 function parseViewport(
   value: unknown
-):
-  | { presetId: string; target: 'viewport' | 'window'; width: number; height: number }
-  | null
-  | undefined {
+): { presetId: string; target: 'window'; width: number; height: number } | null | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -36,7 +33,7 @@ function parseViewport(
   if (
     !isRecord(value) ||
     !isString(value['presetId']) ||
-    (value['target'] !== 'viewport' && value['target'] !== 'window') ||
+    value['target'] !== 'window' ||
     !isNumber(value['width']) ||
     !isNumber(value['height'])
   ) {
@@ -90,12 +87,7 @@ function parsePopupExportRequest(request: unknown): ViewerPopupExportMessage | n
       : null;
   }
 
-  const requestId = request['requestId'];
-  if (request['type'] !== MessageType.EXPORT_POPUP_START || !isString(requestId)) {
-    return null;
-  }
-
-  return { type: MessageType.EXPORT_POPUP_START, options, requestId };
+  return null;
 }
 
 export function parseViewerExportPortRequest(message: unknown): ViewerExportPortRequest | null {

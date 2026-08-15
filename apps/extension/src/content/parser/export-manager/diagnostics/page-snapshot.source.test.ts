@@ -1,31 +1,23 @@
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
-import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
-import { createHarLikeSnapshot } from './page-snapshot';
-
-const runtimeMocks = vi.hoisted(() => ({
-  getManifest: vi.fn(() => ({ version: '9.9.9-test' })),
-}));
-
-vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
-  runtimeInfo: runtimeMocks,
-}));
+import { createResourceTimingSnapshot } from './page-snapshot';
 
 function createResourceEntry(overrides: Partial<PerformanceResourceTiming>) {
   return {
+    decodedBodySize: 30,
     duration: 10,
+    encodedBodySize: 31,
     initiatorType: 'img',
-    name: 'https://iframe.example/image.png',
+    name: 'https://iframe.example/image.png?token=secret#fragment',
+    nextHopProtocol: 'h2',
     startTime: 25,
     transferSize: 33,
     ...overrides,
   } as PerformanceResourceTiming;
 }
 
-it('creates HAR-like snapshots from the provided source view', () => {
-  runtimeMocks.getManifest.mockReturnValue({ version: '1.2.3-test' });
+it('creates a Resource Timing snapshot from the provided source view', () => {
   const iframe = document.createElement('iframe');
   document.body.append(iframe);
   const sourceView = iframe.contentWindow!;
@@ -37,18 +29,19 @@ it('creates HAR-like snapshots from the provided source view', () => {
     },
   });
 
-  const snapshot = createHarLikeSnapshot(undefined, {
+  const snapshot = createResourceTimingSnapshot(undefined, {
     document: iframe.contentDocument!,
-    pageUrl: 'https://iframe.example/source',
+    pageUrl: 'https://iframe.example/source?token=secret#fragment',
     view: sourceView,
   });
 
-  expect(snapshot.log.browser.name).toBe(sourceView.navigator.userAgent);
-  expect(snapshot.log.creator).toEqual({
-    name: `${PRODUCT_BRAND_NAME} resource-timing snapshot`,
-    version: '1.2.3-test',
+  expect(snapshot.pageUrl).toBe('https://iframe.example/source');
+  expect(snapshot.timeOrigin).toBe(1000);
+  expect(snapshot.entries[0]).toMatchObject({
+    duration: 9,
+    initiatorType: 'img',
+    name: 'https://iframe.example/image.png',
+    startTime: 25,
+    transferSize: 33,
   });
-  expect(snapshot.log.pages[0]?.title).toBe('https://iframe.example/source');
-  expect(snapshot.log.entries[0]?.request.url).toBe('https://iframe.example/image.png');
-  expect(snapshot.log.entries[0]?.startedDateTime).toBe(new Date(1025).toISOString());
 });

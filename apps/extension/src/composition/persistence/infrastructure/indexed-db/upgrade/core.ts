@@ -43,8 +43,28 @@ export function handleDatabaseUpgrade(db: UpgradeDatabase, oldVersion: number) {
   applyProjectExportInputsStoreUpgrade(db, oldVersion);
   applyFrameAnnotationRasterJobsStoreUpgrade(db, oldVersion);
   applyVersion24Changes(db, oldVersion);
+  applyVersion25Changes(db, oldVersion);
   removeLegacyAnnotationPacksStore(db, oldVersion);
   removeRetiredPageStyleAssetsStore(db, oldVersion);
+}
+
+function applyVersion25Changes(db: UpgradeDatabase, oldVersion: number) {
+  if (oldVersion >= 25) {
+    return;
+  }
+
+  if (db.objectStoreNames.contains(DIAGNOSTICS_EVENTS_STORE)) {
+    db.deleteObjectStore(DIAGNOSTICS_EVENTS_STORE);
+  }
+  if (db.objectStoreNames.contains(DIAGNOSTICS_META_STORE)) {
+    db.deleteObjectStore(DIAGNOSTICS_META_STORE);
+  }
+
+  db.createObjectStore(DIAGNOSTICS_META_STORE, { keyPath: 'recordingId' });
+  const eventsStore = db.createObjectStore(DIAGNOSTICS_EVENTS_STORE, {
+    keyPath: ['recordingId', 'chunkIndex'],
+  });
+  eventsStore.createIndex('recordingId', 'recordingId');
 }
 
 function applyVersion1Changes(db: UpgradeDatabase, oldVersion: number) {

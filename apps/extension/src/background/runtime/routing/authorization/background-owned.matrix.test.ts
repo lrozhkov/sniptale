@@ -104,17 +104,6 @@ it('authorizes supported background-owned owner routes', () => {
     authorized: true,
   });
   expect(
-    authorizeBackgroundOwnedRoute(request(MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK))
-  ).toEqual({
-    authorized: true,
-  });
-  expect(authorizeBackgroundOwnedRoute(request(MessageType.EXPORT_POPUP_SAVE_ARCHIVE))).toEqual({
-    authorized: true,
-  });
-  expect(authorizeBackgroundOwnedRoute(request(MessageType.RELEASE_POPUP_EXPORT_ARCHIVE))).toEqual({
-    authorized: true,
-  });
-  expect(
     authorizeBackgroundOwnedRoute(request(MessageType.REQUEST_POPUP_TAB_ROUTE_CAPABILITY))
   ).toEqual({ authorized: true });
 });

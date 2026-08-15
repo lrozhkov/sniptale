@@ -1,5 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { captureViewportWithClipTransaction, captureVisibleTabForCropTransaction } from '../index';
+import { captureVisibleTabForCropTransaction } from '../index';
 import { runGuardedCapture } from './guard';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { CaptureRouteContext } from './types';
@@ -15,12 +15,7 @@ export function handleVisibleCapture(context: CaptureRouteContext): boolean {
       context,
       captureTarget: 'visible',
       capture: () =>
-        createVisibleCapturePromise(
-          captureViewportWithClipTransaction,
-          captureVisibleTabForCropTransaction,
-          context.resolvedTabId,
-          context.viewportState
-        ),
+        createVisibleCapturePromise(captureVisibleTabForCropTransaction, context.resolvedTabId),
     })
   ).catch((error) => context.sendResponse(createRouteErrorResponse(error)));
   return true;
@@ -30,12 +25,7 @@ export function handleVisibleCaptureForCrop(context: CaptureRouteContext): boole
   runGuardedCapture(context.captureGuardState, () =>
     completeCaptureForCropUseCase({
       capture: () =>
-        createVisibleCapturePromise(
-          captureViewportWithClipTransaction,
-          captureVisibleTabForCropTransaction,
-          context.resolvedTabId,
-          context.viewportState
-        ),
+        createVisibleCapturePromise(captureVisibleTabForCropTransaction, context.resolvedTabId),
     }).then(({ dataUrl }) => {
       context.sendResponse({ success: true, dataUrl });
     })

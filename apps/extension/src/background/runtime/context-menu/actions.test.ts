@@ -32,8 +32,12 @@ const {
   loadVideoSettingsMock,
   loadVideoUiStateMock,
   openSettingsPageMock,
+  resizeBrowserWindowFromContextMenuMock,
   runtimeGetUrlMock,
   sendTabMessageMock,
+  startPopupExportJobMock,
+  permissionsRequestMock,
+  tabsGetMock,
   startRecordingMock,
 } = vi.hoisted(() => ({
   browserScriptingExecuteScriptMock: vi.fn(),
@@ -45,9 +49,26 @@ const {
   loadVideoSettingsMock: vi.fn(),
   loadVideoUiStateMock: vi.fn(),
   openSettingsPageMock: vi.fn(),
+  resizeBrowserWindowFromContextMenuMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   sendTabMessageMock: vi.fn(),
+  startPopupExportJobMock: vi.fn(),
+  permissionsRequestMock: vi.fn(),
+  tabsGetMock: vi.fn(),
   startRecordingMock: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { request: permissionsRequestMock },
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: tabsGetMock },
+}));
+
+vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
+  startPopupExportJob: startPopupExportJobMock,
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -76,8 +97,8 @@ vi.mock('../../capture/routes', async (importOriginal) => ({
   handleQuickAction: handleQuickActionMock,
 }));
 
-vi.mock('../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../page-access/service')>()),
+vi.mock('../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 
@@ -120,6 +141,10 @@ vi.mock('../../../composition/persistence/capture-settings', async (importOrigin
   loadVideoUiState: loadVideoUiStateMock,
 }));
 
+vi.mock('./window-resize', () => ({
+  resizeBrowserWindowFromContextMenu: resizeBrowserWindowFromContextMenuMock,
+}));
+
 function createDeps() {
   return {
     captureGuardState: { isCapturing: false },
@@ -127,13 +152,13 @@ function createDeps() {
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }
 
 function createTab(url = 'https://example.test', id = 11): chrome.tabs.Tab {
-  return { id, title: 'Tab title', url } as chrome.tabs.Tab;
+  return { id, title: 'Tab title', url, windowId: 4 } as chrome.tabs.Tab;
 }
 
 function seedContextMenuActionMocks() {
@@ -146,7 +171,7 @@ function seedContextMenuActionMocks() {
         kind: 'user',
         id: 'preset-1',
         name: 'HD',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -156,7 +181,7 @@ function seedContextMenuActionMocks() {
         kind: 'user',
         id: 'preset-2',
         name: 'Full HD',
-        target: 'viewport',
+        target: 'window',
         width: 1920,
         height: 1080,
         enabled: true,
@@ -173,7 +198,7 @@ function seedContextMenuActionMocks() {
     Promise.resolve({
       status: 'requires-start-validation',
       presetId,
-      target: 'viewport',
+      target: 'window',
       required: { width: 1280, height: 720 },
     })
   );
@@ -182,6 +207,9 @@ function seedContextMenuActionMocks() {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   browserScriptingExecuteScriptMock.mockResolvedValue([{ frameId: 0, result: 'Meta title' }]);
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
+  permissionsRequestMock.mockResolvedValue(true);
+  tabsGetMock.mockResolvedValue(createTab());
+  startPopupExportJobMock.mockResolvedValue({ success: true });
 }
 
 async function verifyPresetRecordingRouting() {
@@ -207,11 +235,20 @@ async function verifyExportStartRouting() {
     tab: createTab(),
   });
 
-  expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 11, {
+  expect(startPopupExportJobMock).toHaveBeenCalledWith({
+    contentPort: expect.objectContaining({
+      cancelPagePackage: expect.any(Function),
+      requestPagePackage: expect.any(Function),
+    }),
+    jobId: expect.any(String),
     options: contextMenuPopupExportPreferencesFixture,
-    requestId: expect.any(String),
-    type: MessageType.EXPORT_POPUP_START,
+    orderedTabs: [{ tabId: 11, title: 'Tab title' }],
+    warnings: [],
   });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    11,
+    expect.objectContaining({ type: MessageType.SHOW_TOAST })
+  );
 }
 
 async function verifyJsonCopyRouting() {
@@ -309,6 +346,17 @@ async function verifyQuickActionRouting() {
   );
 }
 
+async function verifyWindowResizeRouting() {
+  await handleBackgroundContextMenuAction({
+    deps: createDeps(),
+    menuId: 'sniptale.window-resize.preset.window-hd',
+    tab: createTab(),
+  });
+
+  expect(resizeBrowserWindowFromContextMenuMock).toHaveBeenCalledWith(4, 'window-hd');
+  expect(ensureActivePageAccessRuntimeMock).not.toHaveBeenCalled();
+}
+
 describe('context menu actions', () => {
   beforeEach(seedContextMenuActionMocks);
 
@@ -331,4 +379,5 @@ describe('context menu actions', () => {
     'routes quick action menu items through the existing quick action handler',
     verifyQuickActionRouting
   );
+  it('routes window-size items without injecting a page runtime', verifyWindowResizeRouting);
 });

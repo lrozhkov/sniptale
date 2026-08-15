@@ -18,7 +18,7 @@ export type BackgroundOwnedRouteHandlerId =
   | 'local-data-erasure'
   | 'native-app-runtime'
   | 'page-access'
-  | 'popup-export-archive'
+  | 'popup-export-job'
   | 'popup-tab-route-capability-issuance'
   | 'voice-input-offscreen-event';
 

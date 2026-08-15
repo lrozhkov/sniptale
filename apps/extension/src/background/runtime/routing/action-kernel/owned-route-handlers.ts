@@ -7,10 +7,10 @@ import {
   routeScenarioEditorLlmMessage,
 } from '../../../ai/routes';
 import { routeAiSettingsNavigationMessage } from '../../../ai/settings/navigation-route';
-import { routePageAccessMessage } from '../../page-access/route';
+import { routePageAccessMessage } from '../../../page-access/route';
 import { routeNativeAppRuntimeMessage } from '../../native-app/route';
 import { routeContentRuntimeWakeupMessage } from '../../page-access/wakeup-route';
-import { routePopupExportArchiveMessage } from '../../../capture/routes';
+import { routePopupExportJobMessage } from '../../../capture/popup-export/job/route';
 import { routeLocalDataErasureMessage } from '../../../application/privacy-erasure/route';
 import { routePopupTabRouteCapabilityRequest } from '../capabilities/popup-tab/route-capabilities';
 import * as contentCaps from '../../../routing-contracts/capabilities/content-action/route';
@@ -28,6 +28,10 @@ import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
 import { routeAnnotationForkSessionMessage } from '../../../annotation-fork-session/route';
 import { routeAggregatePromotionMessage } from '../../../application/aggregate-promotion/route';
+import {
+  cancelPopupExportPagePackage,
+  requestPopupExportPagePackage,
+} from '../boundary/popup-export-routing';
 
 type BackgroundOwnedRouteHandler = (
   action: BackgroundOwnedAction,
@@ -95,13 +99,22 @@ function getBackgroundOwnedRouteHandler(
       return routeNativeAppRuntimeAction;
     case 'page-access':
       return routePageAccessAction;
-    case 'popup-export-archive':
-      return routePopupExportArchiveAction;
+    case 'popup-export-job':
+      return routePopupExportJobAction;
     case 'popup-tab-route-capability-issuance':
       return routePopupTabRouteCapabilityAction;
     case 'voice-input-offscreen-event':
       return routeVoiceInputOffscreenEventAction;
   }
+}
+
+function routePopupExportJobAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(
+    routePopupExportJobMessage(action.message, action.context.sendResponse, {
+      cancelPagePackage: cancelPopupExportPagePackage,
+      requestPagePackage: requestPopupExportPagePackage,
+    })
+  );
 }
 
 function routeAggregatePromotionAction(action: BackgroundOwnedAction): ActionResult | null {
@@ -214,10 +227,6 @@ function routeLocalDataErasureAction(action: BackgroundOwnedAction): ActionResul
       action.context.runtimeState
     )
   );
-}
-
-function routePopupExportArchiveAction(action: BackgroundOwnedAction): ActionResult | null {
-  return keepOpen(routePopupExportArchiveMessage(action.message, action.context.sendResponse));
 }
 
 function routeLlmAction(action: BackgroundOwnedAction): ActionResult | null {

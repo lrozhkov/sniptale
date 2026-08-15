@@ -45,8 +45,8 @@ vi.mock('../../../platform/navigation/extension-pages/scenario-editor', () => ({
   buildScenarioEditorUrl: () => 'scenario-editor://root',
 }));
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n/popup')>()),
   translate: mocks.translateMock,
 }));
 
@@ -61,7 +61,7 @@ vi.mock('../tab-access', () => ({
 
 import {
   openDesignSystem,
-  openGallery,
+  openLibrary,
   openGithubRepository,
   openImageEditor,
   openScenarioEditor,
@@ -241,7 +241,7 @@ async function verifiesDesktopFrameFailureCancelsPreparation() {
 function verifiesExtensionPageNavigation() {
   openImageEditor();
   openScenarioEditor();
-  openGallery();
+  openLibrary();
   openDesignSystem();
   openVideoEditor();
   openSettings();

@@ -7,13 +7,12 @@ import {
   expectFloatingPreviewContained,
   expectThemeSurfaceToggle,
 } from './extension-smoke.helpers';
+import { verifyPopupStartupLifecycle } from './extension-smoke.popup-startup';
 
-const SETTINGS_AI_LABEL = translate('settings.navigation.ai', 'ru');
 const SETTINGS_AI_NAV_LABEL = translate('settings.navigation.aiConnections', 'ru');
 const SETTINGS_AI_PROMPTS_NAV_LABEL = translate('settings.navigation.aiPrompts', 'ru');
 const SETTINGS_AI_PROVIDERS_TITLE = translate('settings.aiProviders.providersTitle', 'ru');
 const SETTINGS_AI_MODELS_TITLE = translate('settings.aiProviders.modelsTitle', 'ru');
-const SETTINGS_AI_PROMPTS_TITLE = translate('settings.navigation.templates', 'ru');
 const SETTINGS_AI_SAVED_PROMPTS_LABEL = translate('templates.section.savedLabel', 'ru');
 const POPUP_HARNESS_PATH = '/tooling/test/harness/popup.html';
 const POPUP_HOME_TAB_LABEL = translate('popup.tabs.home', 'ru');
@@ -184,8 +183,10 @@ test('popup home and export tabs render and capture screenshots', async ({
   await page.goto(`${hostOrigin}${POPUP_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
 
-  await page.getByRole('button', { name: POPUP_HOME_TAB_LABEL, exact: true }).click();
-  await expect(page.locator('[data-ui="popup.home.screenshot-prep-button"]')).toBeVisible();
+  const homeTab = page.getByRole('button', { name: POPUP_HOME_TAB_LABEL, exact: true });
+  await homeTab.click();
+  await expect(homeTab).toHaveAttribute('data-active', 'true');
+  await expect(page.locator('[data-ui="popup.app.content"]')).not.toBeEmpty();
 
   await mkdir(testInfo.outputDir, { recursive: true });
   await page.screenshot({
@@ -202,6 +203,90 @@ test('popup home and export tabs render and capture screenshots', async ({
   });
 });
 
+test('built popup restores the correct first tab and never empties content on cold route changes', async ({
+  context,
+  extensionId,
+}) => {
+  const page = await context.newPage();
+  const popupUrl = `chrome-extension://${extensionId}/apps/extension/src/popup/index.html`;
+  await page.goto(popupUrl, { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-ui="popup.app.root"]').waitFor({ state: 'visible' });
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({
+      sniptale_popup_startup: { selection: 'remember-last', lastPage: 'video' },
+    });
+  });
+
+  await page.addInitScript(() => {
+    const probe = { activeTabIndexes: [] as number[] };
+    Object.assign(window, { __sniptalePopupRouteProbe: probe });
+    const sample = () => {
+      const buttons = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('button[data-active]')
+      );
+      const activeIndex = buttons.findIndex((button) => button.dataset['active'] === 'true');
+      if (activeIndex >= 0 && probe.activeTabIndexes.at(-1) !== activeIndex) {
+        probe.activeTabIndexes.push(activeIndex);
+      }
+    };
+    new MutationObserver(sample).observe(document, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ['data-active'],
+    });
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ui="popup.video-setup.start-recording-button"]')).toBeVisible();
+
+  const firstActiveTabIndexes = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __sniptalePopupRouteProbe: { activeTabIndexes: number[] };
+        }
+      ).__sniptalePopupRouteProbe.activeTabIndexes
+  );
+  expect(firstActiveTabIndexes).toEqual([1]);
+
+  await page.evaluate(() => {
+    const content = document.querySelector('[data-ui="popup.app.content"]');
+    if (!content) throw new Error('Popup content container is unavailable');
+    const probe = { empty: false };
+    Object.assign(window, { __sniptalePopupContentProbe: probe });
+    const sample = () => {
+      if (content.childElementCount === 0) probe.empty = true;
+    };
+    new MutationObserver(sample).observe(content, { childList: true, subtree: false });
+    sample();
+  });
+
+  const topTabs = page.locator('button[data-active]').first().locator('xpath=..').locator('button');
+  await topTabs.nth(0).click();
+  await expect(topTabs.nth(0)).toHaveAttribute('data-active', 'true');
+  await topTabs.nth(1).click();
+  await expect(page.locator('[data-ui="popup.video-setup.start-recording-button"]')).toBeVisible();
+  await topTabs.nth(2).click();
+  await expect(page.locator('[data-ui="popup.export.export-button"]')).toBeVisible();
+
+  const observedEmptyContent = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __sniptalePopupContentProbe: { empty: boolean };
+        }
+      ).__sniptalePopupContentProbe.empty
+  );
+  expect(observedEmptyContent).toBe(false);
+  await page.close();
+});
+
+test('built popup paints the saved-theme canvas without a startup loader', async ({
+  context,
+  extensionId,
+}, testInfo) => {
+  await verifyPopupStartupLifecycle(context, extensionId, testInfo);
+});
 for (const extensionPage of extensionPages) {
   test(`${extensionPage.name} page renders and captures screenshot`, async ({
     page,
@@ -234,7 +319,7 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   await page.getByRole('button', { name: SETTINGS_AI_NAV_LABEL, exact: true }).click();
 
   const settingsContent = page.locator('[data-ui="settings.page.content"]');
-  await expect(settingsContent.getByText(SETTINGS_AI_LABEL, { exact: true })).toBeVisible();
+  await expect(settingsContent.getByText(SETTINGS_AI_NAV_LABEL, { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: SETTINGS_AI_PROVIDERS_TITLE, exact: true })
   ).toBeVisible();
@@ -243,9 +328,11 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   ).toBeVisible();
 
   await page.getByRole('button', { name: SETTINGS_AI_PROMPTS_NAV_LABEL, exact: true }).click();
-  await expect(settingsContent.getByText(SETTINGS_AI_PROMPTS_TITLE, { exact: true })).toBeVisible();
   await expect(
-    settingsContent.getByText(SETTINGS_AI_SAVED_PROMPTS_LABEL, { exact: true })
+    settingsContent.getByText(SETTINGS_AI_PROMPTS_NAV_LABEL, { exact: true })
+  ).toBeVisible();
+  await expect(
+    settingsContent.getByRole('region', { name: SETTINGS_AI_SAVED_PROMPTS_LABEL, exact: true })
   ).toBeVisible();
 });
 

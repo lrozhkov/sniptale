@@ -1,6 +1,6 @@
 import { Check, Download, X } from 'lucide-react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import { footerPrimaryButtonIconClassName, footerPrimaryIdleButtonIconClassName } from './tokens';
 

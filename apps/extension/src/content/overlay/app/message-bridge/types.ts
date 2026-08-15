@@ -14,7 +14,7 @@ export type RuntimeMessageRequest = {
   pageZoom?: number;
   viewport?: {
     presetId: string;
-    target: 'viewport' | 'window';
+    target: 'window';
     width: number;
     height: number;
   } | null;

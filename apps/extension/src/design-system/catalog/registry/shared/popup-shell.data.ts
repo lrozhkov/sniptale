@@ -101,8 +101,8 @@ export const SHARED_DESIGN_SYSTEM_POPUP_SHELL_REGISTRY: DesignSystemRegistryEntr
       ),
       variant(
         'gallery',
-        'Gallery',
-        'Gallery',
+        'Library',
+        'Library',
         'Более спокойный визуал для навигации в медиа-хаб и вторичные переходы.',
         'Calmer treatment for media-hub navigation and secondary routes.',
         ['Использует `tone="gallery"`.', 'Подходит для card grids без CTA-доминанты.'],

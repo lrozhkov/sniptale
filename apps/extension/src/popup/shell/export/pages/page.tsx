@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { PopupPageAccessRuntime } from '../../runtime/page-access';
 import {
@@ -8,7 +8,6 @@ import {
 import { ExportFooterActions } from '../footer/actions';
 import { ExportPageContent } from './content';
 import { type PopupExportController, usePopupExportController } from '../controller';
-import { IDLE_PROGRESS } from '../selection/utils';
 import { WebSnapshotConfirmationDialog, type WebSnapshotDisclosure } from './snapshot-confirmation';
 import { useWebSnapshotConfirmationState } from './snapshot-confirmation-state';
 
@@ -57,8 +56,7 @@ function getExportFooterCallbacks(args: {
     },
     ...getWebSnapshotResultAction(args.controller),
     onResetExportView: () => {
-      args.controller.state.session.actions.setProgress(IDLE_PROGRESS);
-      args.controller.state.session.actions.setResult(null);
+      void args.controller.actions.handleResetExportView();
     },
     onSaveWebSnapshot: () => {
       if (args.webSnapshotDisclosure.requiresConfirmation) {
@@ -118,7 +116,7 @@ const exportPageContentSectionClassName = [
   [
     'bg-[color:color-mix(',
     'in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',
-    ' p-3 pr-2',
+    ' p-3',
   ].join(''),
 ].join(' ');
 
@@ -147,9 +145,10 @@ function ExportPageLayout({
     <div className="flex h-full flex-col gap-3">
       <section className={exportPageContentSectionClassName}>
         <ExportPageContent controller={controller} />
+        <div className="mt-auto shrink-0 pt-3" data-ui="popup.export.actions">
+          <ExportFooterActions {...footerProps} />
+        </div>
       </section>
-
-      <ExportFooterActions {...footerProps} />
       {webSnapshotConfirmation ? (
         <WebSnapshotConfirmationDialog
           disclosure={webSnapshotConfirmation}

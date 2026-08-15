@@ -4,8 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -13,8 +13,8 @@ const { buttonMock } = vi.hoisted(() => ({
   buttonMock: vi.fn(),
 }));
 
-vi.mock('../../../ui/popup-shell/icon-state-button', () => ({
-  PopupIconStateButton: (props: any) => {
+vi.mock('../../../ui/popup-shell/expanding-mode-button', () => ({
+  PopupExpandingModeButton: (props: any) => {
     buttonMock(props);
     return <button type="button">{props.label}</button>;
   },
@@ -39,7 +39,7 @@ function createSettings(quality: VideoQuality): VideoRecordingSettings {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     microphoneDeviceId: null,
     microphoneEnabled: false,
     outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },

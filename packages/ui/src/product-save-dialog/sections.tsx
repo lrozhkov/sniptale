@@ -42,11 +42,13 @@ export function ProductSaveDialogHeader({
 export function ProductSaveDialogFilenameSection({
   filenameLabel,
   filename,
+  disabled,
   filenamePlaceholder,
   onFilenameChange,
 }: {
   filenameLabel: ReactNode;
   filename: string;
+  disabled?: boolean;
   filenamePlaceholder?: string;
   onFilenameChange: (value: string) => void;
 }) {
@@ -56,6 +58,7 @@ export function ProductSaveDialogFilenameSection({
         <ProductInput
           id="save-dialog-filename"
           type="text"
+          disabled={disabled}
           value={filename}
           onChange={(event) => onFilenameChange(event.target.value)}
           className="sniptale-save-dialog-input"
@@ -69,12 +72,14 @@ export function ProductSaveDialogFilenameSection({
 export function ProductSaveDialogPresetSection({
   presetLabel,
   presetCount,
+  disabled,
   presetItems,
   presetsEmptyState,
   onChoosePreset,
 }: {
   presetLabel: ReactNode;
   presetCount: ReactNode;
+  disabled?: boolean;
   presetItems: ProductSaveDialogPresetItem[];
   presetsEmptyState?: ReactNode;
   onChoosePreset: (presetId: string, event: MouseEvent<HTMLButtonElement>) => void;
@@ -94,6 +99,7 @@ export function ProductSaveDialogPresetSection({
             <button
               key={preset.id}
               type="button"
+              disabled={disabled}
               onClick={(event) => onChoosePreset(preset.id, event)}
               className="sniptale-save-dialog-item"
             >
@@ -116,14 +122,21 @@ export function ProductSaveDialogPresetSection({
 export function ProductSaveDialogSystemFolderButton({
   systemFolderLabel,
   systemFolderHint,
+  disabled,
   onChooseSystemFolder,
 }: {
   systemFolderLabel: ReactNode;
   systemFolderHint: ReactNode;
+  disabled?: boolean;
   onChooseSystemFolder: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <button type="button" onClick={onChooseSystemFolder} className="sniptale-save-dialog-system">
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onChooseSystemFolder}
+      className="sniptale-save-dialog-system"
+    >
       <FolderInput size={18} className="sniptale-save-dialog-system-icon" />
       <span className="sniptale-save-dialog-system-copy">
         <span className="sniptale-save-dialog-system-label">{systemFolderLabel}</span>

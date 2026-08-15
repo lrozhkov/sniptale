@@ -1,6 +1,9 @@
 import type { EditorSceneBackgroundSettings } from '../../../features/editor/document/presets';
 import { normalizeEditorFrameGradientStops } from '../../../features/editor/document/frame-gradient';
-import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
+import {
+  MAX_EDITOR_BACKGROUND_BLUR_AMOUNT,
+  normalizeEditorImageSettings,
+} from '../../../features/editor/document/constants';
 import { isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 import { DEFAULT_SCENE_BACKGROUND_PRESET_SETTINGS } from './scene-defaults';
 
@@ -18,6 +21,14 @@ function hasValidSceneBackgroundMode(value: Record<string, unknown>) {
     value['backgroundMode'] === 'color' ||
     value['backgroundMode'] === 'gradient' ||
     value['backgroundMode'] === 'image'
+  );
+}
+
+function hasValidSceneBackgroundBlurAmount(value: Record<string, unknown>) {
+  const amount = value['backgroundBlurAmount'];
+  return (
+    amount === undefined ||
+    (isNumber(amount) && amount >= 0 && amount <= MAX_EDITOR_BACKGROUND_BLUR_AMOUNT)
   );
 }
 
@@ -82,6 +93,10 @@ function resolveSceneBackgroundVisuals(value: Record<string, unknown>) {
   return {
     ...resolveSceneColorAndGradient(value),
     ...resolveSceneBackgroundImage(value),
+    backgroundBlurAmount:
+      typeof value['backgroundBlurAmount'] === 'number'
+        ? value['backgroundBlurAmount']
+        : DEFAULT_SCENE_BACKGROUND_PRESET_SETTINGS.backgroundBlurAmount,
     layoutMode:
       layoutMode === 'fit-image' || layoutMode === 'expand-canvas'
         ? layoutMode
@@ -171,6 +186,7 @@ export function parseSceneBackgroundSettings(value: unknown): EditorSceneBackgro
     !isRecord(value) ||
     !hasValidScenePadding(value) ||
     !hasValidSceneBackgroundMode(value) ||
+    !hasValidSceneBackgroundBlurAmount(value) ||
     !isString(value['backgroundColor']) ||
     !isString(value['backgroundGradientFrom']) ||
     !isString(value['backgroundGradientTo']) ||

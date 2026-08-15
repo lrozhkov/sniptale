@@ -12,6 +12,7 @@ export const localDataErasureRouteDescriptor = {
     'offscreen-media-activity-lease',
     'page-access-tab-activation',
     'persistent-data-erasure-lease',
+    'popup-export-erasure-exclusion',
     'project-export-capabilities',
     'project-export-job-ledger',
     'tab-mode-runtime-state',

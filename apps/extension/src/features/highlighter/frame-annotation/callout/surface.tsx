@@ -30,6 +30,8 @@ import {
   getFrameCalloutTitleStyle as getCalloutTitleStyle,
 } from '../callout-title-style';
 import { resolveCalloutCustomCss, type ResolvedCalloutCustomCss } from '../../callout-custom-css';
+import { resolveCalloutSurfaceProjection } from '../../surface-style/card-projection';
+import { CalloutSurfaceCompositor } from './surface-compositor';
 
 function createCalloutContentProps(
   props: CalloutBodyProps,
@@ -100,19 +102,38 @@ function renderTitleMeasure(props: CalloutBodyProps, customStyles: ResolvedCallo
   );
 }
 
+const CONTENT_SURFACE_PROPERTIES = [
+  'backdropFilter',
+  'backgroundColor',
+  'backgroundImage',
+  'backgroundPosition',
+  'backgroundRepeat',
+  'backgroundSize',
+  'boxShadow',
+  'filter',
+  'opacity',
+  'outlineColor',
+  'outlineOffset',
+  'outlineStyle',
+  'outlineWidth',
+] as const;
+
+function projectCalloutContentLayoutStyle(style: CSSProperties): CSSProperties {
+  const contentStyle = { ...style };
+  for (const property of CONTENT_SURFACE_PROPERTIES) delete contentStyle[property];
+  return { ...contentStyle, background: 'transparent', borderColor: 'transparent' };
+}
+
 function renderCalloutPortalContent(props: CalloutBodyProps) {
   const controlsPortalTarget = props.controlsPortalTarget ?? props.portalTarget;
   const customStyles = resolveCalloutCustomCss(props.settings.style.customCss).styles;
+  const surfaceProjection = resolveCalloutSurfaceProjection(props.settings.style);
   const badgeText = resolveCalloutBadgeText({
     badgeText: props.settings.style.badge.text,
     bodyHtml: props.settings.content.bodyHtml,
     titleEnabled: props.settings.style.title.enabled,
     titleText: props.settings.content.titleText,
   });
-  const cardCustomStyles =
-    props.dynamicTail?.kind === 'wedge'
-      ? { ...customStyles.card, boxShadow: undefined }
-      : customStyles.card;
   return (
     <>
       <div
@@ -132,9 +153,27 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
           customStyles,
           props.visualScale ?? 1
         )}
+        <CalloutSurfaceCompositor
+          connector={props.dynamicTail}
+          cssContext={{
+            color: surfaceProjection.contentStyle.color ?? props.cloudStyle.color,
+            fontFamily: props.cloudStyle.fontFamily,
+            fontSize: props.cloudStyle.fontSize,
+            fontStyle: props.cloudStyle.fontStyle,
+            fontWeight: props.cloudStyle.fontWeight,
+            letterSpacing: props.cloudStyle.letterSpacing,
+            lineHeight: props.cloudStyle.lineHeight,
+          }}
+          dimensions={props.calloutDimensions}
+          projection={surfaceProjection}
+          visualScale={props.visualScale ?? 1}
+        />
         <div
           ref={props.containerRef as Ref<HTMLDivElement>}
-          style={{ ...props.cloudStyle, ...cardCustomStyles }}
+          style={{
+            ...projectCalloutContentLayoutStyle(props.cloudStyle),
+            ...surfaceProjection.contentStyle,
+          }}
         >
           {props.settings.style.title.enabled ? (
             <>

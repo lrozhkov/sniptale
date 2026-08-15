@@ -4,8 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
 import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 vi.mock('../../../../ui/popup-shell/inline-curtain/select', () => ({
@@ -75,7 +75,7 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
   const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
-  expect(captureButton?.className).toContain('justify-center');
+  expect(captureButton?.className).toContain('justify-start');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });
@@ -126,7 +126,7 @@ it('renders tab settings, applies field changes, and disables a pending capture'
           id: 'wide',
           kind: 'user',
           name: 'Wide',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
           enabled: true,
@@ -179,11 +179,11 @@ it('renders tab settings, applies field changes, and disables a pending capture'
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ afterCapture: 'edit' }));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ imageFormat: 'webp' }));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ imageQuality: 80 }));
-  const buttons = getContainer()?.querySelectorAll('button');
-  expect((buttons?.[buttons.length - 1] as HTMLButtonElement).disabled).toBe(true);
-  expect((buttons?.[buttons.length - 1] as HTMLButtonElement).parentElement?.className).toContain(
-    'w-full'
+  const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
+  expect(captureButton?.disabled).toBe(true);
+  expect(captureButton?.parentElement?.className).toContain('grid-cols-');
 });
 
 it('omits quality until an explicit lossy format makes it selectable', async () => {

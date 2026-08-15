@@ -179,6 +179,40 @@ describe('offscreen-recording-context', () => {
     ).toThrow('Stale recording source binding');
   });
 
+  it('delivers one current source invalidation and ignores stale generations', () => {
+    const binding = { generation: 3, recordingId: 'recording-1', streamInstanceId: 'stream-1' };
+    recordingContext.beginRecordingSession(binding.recordingId, binding.generation);
+    recordingContext.bindStreamInstance(binding);
+    const pending = new Error('verified source changed');
+
+    expect(recordingContext.reportSourceInvalidation({ ...binding, generation: 2 }, pending)).toBe(
+      'stale'
+    );
+    expect(recordingContext.reportSourceInvalidation(binding, pending)).toBe('applied');
+
+    const handler = vi.fn();
+    expect(recordingContext.registerSourceFailureHandler(binding, handler)).toBe(pending);
+    expect(handler).not.toHaveBeenCalled();
+    expect(
+      recordingContext.reportSourceInvalidation(binding, new Error('duplicate invalidation'))
+    ).toBe('applied');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('routes a post-registration source invalidation to the current terminal handler once', () => {
+    const binding = { generation: 4, recordingId: 'recording-2', streamInstanceId: 'stream-2' };
+    recordingContext.beginRecordingSession(binding.recordingId, binding.generation);
+    recordingContext.bindStreamInstance(binding);
+    const handler = vi.fn();
+    expect(recordingContext.registerSourceFailureHandler(binding, handler)).toBeNull();
+
+    const error = new Error('source resized');
+    expect(recordingContext.reportSourceInvalidation(binding, error)).toBe('applied');
+    expect(recordingContext.reportSourceInvalidation(binding, error)).toBe('applied');
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledWith(error);
+  });
+
   it(
     'rejects illegal lifecycle transitions before a recording session is initialized',
     verifyIllegalLifecycleTransition

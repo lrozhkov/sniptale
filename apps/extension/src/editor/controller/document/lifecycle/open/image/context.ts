@@ -33,7 +33,8 @@ function resolveOpenedImageFrame(frame: EditorStoreState['frame']): EditorFrameS
 }
 
 export async function resolveEditorOpenImageContext(
-  openOptions: OpenImageOptions
+  openOptions: OpenImageOptions,
+  sourceName: string | null = null
 ): Promise<EditorOpenImageContext> {
   const store = useEditorStore.getState();
 
@@ -41,7 +42,7 @@ export async function resolveEditorOpenImageContext(
     browserFrame: store.browserFrame,
     browserFrameUrl: openOptions.browserFrameUrl ?? store.browserFrame.url,
     frame: resolveOpenedImageFrame(store.frame),
-    pageTitle: openOptions.pageTitle ?? '',
+    pageTitle: openOptions.pageTitle ?? sourceName ?? '',
     sourceFaviconUrl: openOptions.sourceFaviconUrl ?? null,
   };
 }

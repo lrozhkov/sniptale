@@ -9,6 +9,10 @@ export const popupCommonMessages = defineMessageSource({
     ru: 'Загрузка...',
     en: 'Loading...',
   },
+  curtainBack: {
+    ru: 'Назад',
+    en: 'Back',
+  },
   expiredTitle: {
     ru: 'Срок действия лицензии истёк',
     en: 'License expired',
@@ -52,6 +56,10 @@ export const popupCommonMessages = defineMessageSource({
   footerThemeSystem: {
     ru: 'Системная тема',
     en: 'System theme',
+  },
+  footerLanguageToggleAria: {
+    ru: 'Переключить язык интерфейса',
+    en: 'Switch interface language',
   },
   footerDesignSystem: {
     ru: 'Дизайн-система',

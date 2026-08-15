@@ -4,15 +4,11 @@ import { createPopupExportControllerRuntime } from './runtime';
 
 function createRuntime() {
   return createPopupExportControllerRuntime({
-    emitMessage: vi.fn(),
     exportRunner: {
       buildPackage: vi.fn(),
       cancel: vi.fn(),
-      export: vi.fn(),
-      onProgress: vi.fn(),
     },
     parseTree: vi.fn(),
-    persistArchive: vi.fn(),
   });
 }
 

@@ -1,4 +1,3 @@
-import type { ExportProgress, PopupExportResult } from '@sniptale/runtime-contracts/export';
 import type { CaptureActionType } from '../../settings';
 import type {
   CaptureMessageType,
@@ -64,31 +63,6 @@ export type ExecuteSaveMessage = {
   presetId?: string;
 };
 
-export type SavePopupExportArchiveMessage = {
-  type: MessageType.EXPORT_POPUP_SAVE_ARCHIVE;
-  archiveSessionId: string;
-  filename: string;
-  mimeType: string;
-  presetId?: string;
-  stagedArchiveId: string;
-};
-
-export type StagePopupExportArchiveChunkMessage = {
-  type: MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK;
-  archiveSessionId: string;
-  base64: string;
-  chunkIndex: number;
-  stagedArchiveId: string;
-  totalBytes: number;
-  totalChunks: number;
-};
-
-export type ReleasePopupExportArchiveMessage = {
-  type: MessageType.RELEASE_POPUP_EXPORT_ARCHIVE;
-  archiveSessionId: string;
-  stagedArchiveId: string;
-};
-
 export type SaveScreenshotToGalleryMessage = {
   type: MessageType.SAVE_SCREENSHOT_TO_GALLERY;
   dataUrl: string;
@@ -129,21 +103,7 @@ export type {
   RuntimeOffscreenStartRecordingMessage,
   RuntimeOffscreenStopRecordingMessage,
   RuntimeOffscreenUpdateSettingsMessage,
-  RuntimeOffscreenRevalidateSourceMessage,
-  RuntimeOffscreenSetViewportDrawStateMessage,
 } from './offscreen-command.types.ts';
-
-export type RuntimePopupExportProgressMessage = {
-  type: MessageType.EXPORT_POPUP_PROGRESS;
-  requestId: string;
-  progress: ExportProgress;
-};
-
-export type RuntimePopupExportResultMessage = {
-  type: MessageType.EXPORT_POPUP_RESULT;
-  requestId: string;
-  result: PopupExportResult;
-};
 
 export type RuntimeDownloadRecordingMessage = {
   type: VideoMessageType.DOWNLOAD_RECORDING;

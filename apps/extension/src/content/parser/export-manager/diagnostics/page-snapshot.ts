@@ -6,7 +6,7 @@ import {
 } from './page-snapshot.dom';
 import {
   buildPageSummaryFile as buildPageSummaryFileFromPerformance,
-  createHarLikeSnapshot as createHarLikeSnapshotFromPerformance,
+  createResourceTimingSnapshot as createResourceTimingSnapshotFromPerformance,
 } from './page-snapshot.performance';
 
 export function buildDomSnapshotHtml(source?: ExportDiagnosticsSource): string {
@@ -24,9 +24,9 @@ export function buildPageSummaryFile(
   return buildPageSummaryFileFromPerformance(pageMetadata, source);
 }
 
-export function createHarLikeSnapshot(
+export function createResourceTimingSnapshot(
   pageMetadata?: Partial<ExportManagerPageMetadata>,
   source?: ExportDiagnosticsSource
 ) {
-  return createHarLikeSnapshotFromPerformance(pageMetadata, source);
+  return createResourceTimingSnapshotFromPerformance(pageMetadata, source);
 }

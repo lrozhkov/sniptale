@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import {
   loadMicrophoneDevices,
   requestMicrophonePermission,

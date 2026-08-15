@@ -5,14 +5,11 @@ const {
   handleVisibleCaptureMock,
   handleVisibleCaptureForCropMock,
   handleExportCaptureFullPageMock,
-  handleExportStartHarMock,
-  handleExportStopHarMock,
   handleExecuteSaveMock,
   handleFetchWebSnapshotAssetMock,
   handleOpenEditorWithImageMock,
   handleRegisterWebSnapshotAssetsMock,
   handleReleaseWebSnapshotStagedBlobsMock,
-  handleRequestExportHarStartCapabilityMock,
   handleSaveScreenshotToGalleryMock,
   handleSaveWebSnapshotToGalleryMock,
   handleStageWebSnapshotBlobChunkMock,
@@ -26,14 +23,11 @@ const {
   handleVisibleCaptureMock: vi.fn(),
   handleVisibleCaptureForCropMock: vi.fn(),
   handleExportCaptureFullPageMock: vi.fn(),
-  handleExportStartHarMock: vi.fn(),
-  handleExportStopHarMock: vi.fn(),
   handleExecuteSaveMock: vi.fn(),
   handleFetchWebSnapshotAssetMock: vi.fn(),
   handleOpenEditorWithImageMock: vi.fn(),
   handleRegisterWebSnapshotAssetsMock: vi.fn(),
   handleReleaseWebSnapshotStagedBlobsMock: vi.fn(),
-  handleRequestExportHarStartCapabilityMock: vi.fn(),
   handleSaveScreenshotToGalleryMock: vi.fn(),
   handleSaveWebSnapshotToGalleryMock: vi.fn(),
   handleStageWebSnapshotBlobChunkMock: vi.fn(),
@@ -44,8 +38,8 @@ const {
   waitForContentToolbarReadyMock: vi.fn(),
 }));
 
-vi.mock('../../../runtime/page-access/readiness', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../runtime/page-access/readiness')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   waitForContentToolbarReady: waitForContentToolbarReadyMock,
 }));
 
@@ -76,9 +70,6 @@ vi.mock('../actions.download', () => ({
 
 vi.mock('../actions.export', () => ({
   handleExportCaptureFullPage: handleExportCaptureFullPageMock,
-  handleExportStartHar: handleExportStartHarMock,
-  handleExportStopHar: handleExportStopHarMock,
-  handleRequestExportHarStartCapability: handleRequestExportHarStartCapabilityMock,
 }));
 
 vi.mock('../actions.gallery-update', () => ({
@@ -115,8 +106,8 @@ function createRouteArgs() {
     sendResponse: vi.fn(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-    >([[42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }]]),
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+    >([[42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }]]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
     pageAccessPort: {
@@ -136,8 +127,6 @@ beforeEach(() => {
   handleVisibleCaptureForCropMock.mockReturnValue(true);
   handleFullCaptureMock.mockReturnValue(true);
   handleExecuteSaveMock.mockReturnValue(true);
-  handleExportStartHarMock.mockReturnValue(true);
-  handleExportStopHarMock.mockReturnValue(true);
   handleExportCaptureFullPageMock.mockReturnValue(true);
   handleFetchWebSnapshotAssetMock.mockReturnValue(true);
   handleOpenEditorWithImageMock.mockReturnValue(true);
@@ -244,8 +233,6 @@ it('routes capture requests through handler contexts', async () => {
 const routeCases: Array<[RouteCaptureMessage, Mock]> = [
   [{ type: CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP }, handleVisibleCaptureForCropMock],
   [{ type: CaptureMessageType.CAPTURE_FULL }, handleFullCaptureMock],
-  [{ type: MessageType.EXPORT_START_HAR }, handleExportStartHarMock],
-  [{ type: MessageType.EXPORT_STOP_HAR }, handleExportStopHarMock],
   [
     { exportRunId: 'export-run-1', type: MessageType.EXPORT_CAPTURE_FULL_PAGE },
     handleExportCaptureFullPageMock,

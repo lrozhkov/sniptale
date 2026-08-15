@@ -30,7 +30,7 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
         kind: 'user',
         id: 'fhd',
         name: 'Full HD',
-        target: 'viewport',
+        target: 'window',
         width: 1920,
         height: 1080,
         enabled: true,
@@ -40,7 +40,7 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
         kind: 'user',
         id: 'hd',
         name: 'HD',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -57,7 +57,6 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
   },
   loadSettings: mockLoadSettings,
   patchSettings: mockPatchSettings,
@@ -89,7 +88,6 @@ function createSettingsFixture() {
     authenticatedSnapshotAssetsEnabled: false,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
   };
 }
 
@@ -192,7 +190,6 @@ function runSettingsRuntimeReadSuite() {
       authenticatedSnapshotAssetsEnabled: false,
       anonymousCrossOriginSnapshotAssetsEnabled: false,
       skipWebSnapshotSaveDisclosure: false,
-      rawDiagnosticsEnabled: false,
     });
 
     const settings = await loadSettingsRuntimeState();

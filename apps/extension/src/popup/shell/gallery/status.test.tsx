@@ -23,7 +23,7 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: (value: number) => `${value} B`,
 }));
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
+vi.mock('../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal()),
   translate: (key: string) => key,
 }));

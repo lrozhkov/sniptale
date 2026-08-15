@@ -2,6 +2,7 @@ import { translate } from '../../../../platform/i18n';
 import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
 import type { InspectorCommandParams } from './command-types';
 import { EditorInspectorFrameBackgroundFillEditor } from '../../scene';
+import { EditorInspectorBackgroundBlurControl } from '../../scene/background/blur';
 import { FramePaddingFields } from '../../scene/padding';
 import { EditorInspectorFramePreviewCard } from '../../scene/preview/card';
 
@@ -18,7 +19,10 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
         value={params.backgroundSummary}
       >
         <div className="space-y-3">
-          <EditorInspectorFramePreviewCard backgroundPreviewStyle={params.backgroundPreviewStyle} />
+          <EditorInspectorFramePreviewCard
+            backgroundPreviewStyle={params.backgroundPreviewStyle}
+            frameDraft={params.frameDraft}
+          />
           <EditorInspectorFrameBackgroundFillEditor
             frameDraft={params.frameDraft}
             gradientPresets={params.frameGradientPresets}
@@ -35,6 +39,10 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
             }}
             onPickBackgroundImage={params.onPickBackgroundImage}
             onClearBackgroundImage={params.clearBackgroundImage}
+          />
+          <EditorInspectorBackgroundBlurControl
+            frameDraft={params.frameDraft}
+            applyFramePatch={(patch) => params.setFrameDraft((state) => ({ ...state, ...patch }))}
           />
         </div>
       </CompactCommandField>

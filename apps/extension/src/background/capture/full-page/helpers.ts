@@ -1,18 +1,4 @@
-import type { CaptureScreenshotResult, FullPageCaptureOptions } from './types';
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-export function parseCaptureScreenshotResult(result: unknown): CaptureScreenshotResult {
-  if (!isObjectRecord(result) || typeof result['data'] !== 'string') {
-    throw new Error('Page.captureScreenshot returned an invalid response.');
-  }
-
-  return {
-    data: result['data'],
-  };
-}
+import type { FullPageCaptureOptions } from './types';
 
 export function resolveCaptureBlobOptions(props: {
   imageFormat: 'png' | 'jpeg' | 'webp';

@@ -19,7 +19,7 @@ export function getPopupExportSelection(
     includeCssDiagnostics: values.includeCssDiagnostics,
     includeFiles: values.includeFiles,
     includeFullPageScreenshot: values.includeFullPageScreenshot,
-    includeHarDomLogs: values.includeHarDomLogs,
+    includePageDiagnostics: values.includePageDiagnostics,
     includeImages: values.includeImages,
     includeJson: values.includeJson,
     includeMarkdown: values.includeMarkdown,
@@ -69,7 +69,7 @@ export function getCanExport({
   includeCssDiagnostics,
   includeFiles,
   includeFullPageScreenshot,
-  includeHarDomLogs,
+  includePageDiagnostics,
   includeImages,
   includeJson,
   includeMarkdown,
@@ -82,7 +82,7 @@ export function getCanExport({
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
-  includeHarDomLogs: boolean;
+  includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;
@@ -97,7 +97,7 @@ export function getCanExport({
     includeImages ||
     includeBasicLogs ||
     includeCssDiagnostics ||
-    includeHarDomLogs ||
+    includePageDiagnostics ||
     includeFullPageScreenshot;
 
   return !exportDisabledReason && hasSelectedArtifacts && !isExporting && selectedCount > 0;

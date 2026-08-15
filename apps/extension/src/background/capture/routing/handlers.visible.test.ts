@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   captureFullPageMock,
-  captureViewportWithClipTransactionMock,
   captureVisibleTabForCropTransactionMock,
   executeDownloadMock,
   generateFilenameMock,
@@ -13,7 +12,6 @@ const {
   transitionCaptureJobMock,
 } = vi.hoisted(() => ({
   captureFullPageMock: vi.fn(),
-  captureViewportWithClipTransactionMock: vi.fn(),
   captureVisibleTabForCropTransactionMock: vi.fn(),
   executeDownloadMock: vi.fn(),
   generateFilenameMock: vi.fn(),
@@ -44,7 +42,6 @@ vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
 vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPage: captureFullPageMock,
-  captureViewportWithClipTransaction: captureViewportWithClipTransactionMock,
   captureVisibleTabForCropTransaction: captureVisibleTabForCropTransactionMock,
 }));
 
@@ -85,7 +82,7 @@ function createContext(): CaptureRouteContext {
     resolvedTabId: 42,
     sendResponse: createSendResponse(),
     viewportState: new Map([
-      [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1280, height: 720 }],
+      [42, { presetId: 'test:viewport', target: 'window' as const, width: 1280, height: 720 }],
     ]),
     screenshotModeState: new Map([[42, true]]),
     captureGuardState: { isCapturing: false },
@@ -106,10 +103,6 @@ beforeEach(() => {
     defaultImagePresetId: 'preset-1',
   });
   generateFilenameMock.mockReturnValue('visible.png');
-  captureViewportWithClipTransactionMock.mockResolvedValue({
-    dataUrl: 'data:image/png;base64,1',
-    jobId: 'capture-job-viewport',
-  });
   captureVisibleTabForCropTransactionMock.mockResolvedValue({
     dataUrl: 'data:image/png;base64,2',
     jobId: 'capture-job-crop',
@@ -132,7 +125,7 @@ describe('capture-router-handlers.visible', () => {
 
     expect(generateFilenameMock).toHaveBeenCalledWith('visible', 'png');
     expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
-      'data:image/png;base64,1',
+      'data:image/png;base64,2',
       'visible.png',
       42,
       'temporary'
@@ -143,11 +136,11 @@ describe('capture-router-handlers.visible', () => {
       })
     );
     expect(executeDownloadMock).toHaveBeenCalledWith(
-      'data:image/png;base64,1',
+      'data:image/png;base64,2',
       'visible.png',
       'download_default',
       'preset-1',
-      'capture-job-viewport'
+      'capture-job-crop'
     );
     expect(context.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   });
@@ -160,7 +153,7 @@ describe('capture-router-handlers.visible', () => {
     await flushPromises();
     await flushPromises();
 
-    expect(transitionCaptureJobMock).toHaveBeenCalledWith('capture-job-viewport', 'failed', {
+    expect(transitionCaptureJobMock).toHaveBeenCalledWith('capture-job-crop', 'failed', {
       error: 'gallery failed',
     });
     expect(context.sendResponse).toHaveBeenCalledWith({

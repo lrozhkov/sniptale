@@ -72,10 +72,15 @@ export const SHARED_DESIGN_SYSTEM_COMMANDS_REGISTRY: DesignSystemRegistryEntry[]
           'apps/extension/src/settings/shell/page/index.tsx',
         ]
       ),
-      usage('gallery.command-palette', 'Галерея > Command Palette', 'Gallery > Command palette', [
-        'apps/extension/src/gallery/shell/command-palette/index.tsx',
-        'apps/extension/src/gallery/shell/app-shell/index.tsx',
-      ]),
+      usage(
+        'gallery.command-palette',
+        'Библиотека > Command Palette',
+        'Library > Command palette',
+        [
+          'apps/extension/src/gallery/shell/command-palette/index.tsx',
+          'apps/extension/src/gallery/shell/app-shell/index.tsx',
+        ]
+      ),
       usage(
         'design-system.command-palette',
         'Design System > Command Palette',

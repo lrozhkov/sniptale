@@ -4,34 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 
-const headerValueToggleMock = vi.hoisted(() => vi.fn());
-
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
-}));
-
-vi.mock('../../../environment/shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../environment/shared')>()),
-  HeaderValueToggleSection: (
-    props: Record<string, unknown> & {
-      onChange?: (value: string) => void;
-    }
-  ) => {
-    headerValueToggleMock(props);
-    return (
-      <section>
-        <div>{String(props['label'])}</div>
-        <button
-          type="button"
-          aria-label={String(props['ariaLabel'])}
-          onClick={() => props.onChange?.(String(props['nextValue']))}
-        >
-          {String(props['value'])}
-        </button>
-      </section>
-    );
-  },
 }));
 
 vi.mock('../../../../chrome/ui', async (importOriginal) => ({
@@ -46,7 +21,6 @@ let root: Root | null = null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  headerValueToggleMock.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -87,7 +61,7 @@ it('wires grid toggle actions to workspace updates', () => {
   expect(buttons).toHaveLength(2);
 });
 
-it('renders compact state values and action labels when grid and snap are active', () => {
+it('renders canonical switches with state and action labels', () => {
   const updateWorkspace = vi.fn();
 
   act(() => {
@@ -100,16 +74,9 @@ it('renders compact state values and action labels when grid and snap are active
     );
   });
 
-  expect(container?.textContent).toContain('editor.compact.disabledShort');
-  expect(container?.textContent).toContain('editor.compact.enabledShort');
-  expect(container?.textContent).not.toContain('editor.compact.magnet');
-  expect(headerValueToggleMock).toHaveBeenNthCalledWith(
-    1,
-    expect.objectContaining({ active: false })
-  );
-  expect(headerValueToggleMock).toHaveBeenNthCalledWith(
-    2,
-    expect.objectContaining({ active: true })
-  );
+  expect(container?.querySelector('[aria-label="editor.compact.showGrid"]')).not.toBeNull();
   expect(container?.querySelector('[aria-label="editor.compact.disableSnap"]')).not.toBeNull();
+  expect(container?.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+  expect(container?.querySelectorAll('[aria-pressed="false"]')).toHaveLength(1);
+  expect(container?.textContent).not.toContain('editor.compact.magnet');
 });

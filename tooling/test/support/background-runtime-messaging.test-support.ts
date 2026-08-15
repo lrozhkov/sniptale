@@ -86,16 +86,13 @@ vi.mock('@sniptale/platform/browser/scripting', () => ({
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: browserTabsGetMock, query: browserTabsQueryMock },
 }));
-vi.mock(
-  '../../../apps/extension/src/background/runtime/page-access/service',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../apps/extension/src/background/runtime/page-access/service')
-    >()),
-    ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
-    hasActivePageAccess: hasActivePageAccessMock,
-  })
-);
+vi.mock('../../../apps/extension/src/background/page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../apps/extension/src/background/page-access/service')
+  >()),
+  ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
+  hasActivePageAccess: hasActivePageAccessMock,
+}));
 vi.mock('../../../apps/extension/src/contracts/messaging/parsers/boundary', () => ({
   parseBackgroundRuntimeMessage: parseBackgroundRuntimeMessageMock,
 }));
@@ -217,7 +214,7 @@ function createDeps() {
       number,
       {
         presetId: string;
-        target: 'viewport' | 'window';
+        target: 'window' | 'window';
         width: number;
         height: number;
       } | null

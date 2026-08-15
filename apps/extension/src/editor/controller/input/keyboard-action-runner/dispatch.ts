@@ -28,6 +28,7 @@ export function applyEditorKeyboardAction(
       return { preventDefault: true };
     case 'ignore':
     case 'exit-text-edit':
+    case 'cancel-text-edit':
     case 'cancel-transient':
     case 'delete-selection':
     case 'apply-crop':

@@ -4,11 +4,11 @@ export const TAB_ACTION_ROUTE_CONTRACTS = {
   'capture-privileged-tab-route': {
     acceptedSenderClass: 'owned content tab, popup, or extension page routed to an authorized tab',
     errorShape: 'tab route error response through capture/background router',
-    freshnessReplayPolicy: 'resolved tab, frame, document, capability, or HAR session must match',
+    freshnessReplayPolicy: 'resolved tab, frame, document, or capability must match',
     requiredAuthority: 'privileged tab capture authorization policy',
     responseShape: 'capture/tab route response contract',
     sideEffects:
-      'screenshot capture, editor open, annotation or staged download, popup launch, HAR, gallery, or web snapshot',
+      'screenshot capture, editor open, annotation or staged download, popup launch, gallery, or web snapshot',
     transitiveStateOwner: 'capture routing and media-hub storage owners',
   },
   'gallery-update-capability': {

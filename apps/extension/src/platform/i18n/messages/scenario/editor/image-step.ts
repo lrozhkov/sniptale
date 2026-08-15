@@ -8,8 +8,8 @@ export const scenarioEditorImageStepMessages = {
     en: 'Add image step',
   },
   imageStepDialogSearch: {
-    ru: 'Поиск по галерее',
-    en: 'Search gallery',
+    ru: 'Поиск по библиотеке',
+    en: 'Search library',
   },
   imageStepDialogUpload: {
     ru: 'Загрузить с компьютера',
@@ -28,16 +28,16 @@ export const scenarioEditorImageStepMessages = {
     en: 'Choose image',
   },
   imageStepDialogEmpty: {
-    ru: 'В галерее пока нет подходящих изображений.',
-    en: 'No matching images in the gallery yet.',
+    ru: 'В библиотеке пока нет подходящих изображений.',
+    en: 'No matching images in the library yet.',
   },
   imageStepDialogLoading: {
     ru: 'Загружаем изображения...',
     en: 'Loading images...',
   },
   imageStepDialogLibrary: {
-    ru: 'Из галереи',
-    en: 'From gallery',
+    ru: 'Из библиотеки',
+    en: 'From library',
   },
   imageStepDialogPreviewAlt: {
     ru: 'Превью изображения',

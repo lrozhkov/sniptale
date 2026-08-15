@@ -4,8 +4,8 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -54,8 +54,15 @@ describe('ExportSelectionSectionShell', () => {
     const props = await renderShell({ bodyClassName: 'drawer-body', className: 'owner-shell' });
     const button = container?.querySelector('button') as HTMLButtonElement;
     const drawer = container?.querySelector('[aria-label="Export options"]');
+    const heading = container?.querySelector<HTMLElement>(
+      '[data-ui="popup.export.selection-heading"]'
+    );
 
     expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(heading?.className).toContain('text-[10px]');
+    expect(heading?.className).toContain('font-semibold');
+    expect(heading?.className).toContain('tracking-[0.08em]');
+    expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
     expect(drawer?.className).toContain('drawer-body');
     expect(container?.querySelector('section')?.className).toContain('owner-shell');
 

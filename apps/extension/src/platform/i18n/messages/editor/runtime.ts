@@ -56,8 +56,8 @@ export const editorRuntimeMessages = defineMessageSource({
     en: 'Text',
   },
   saveToGalleryFailed: {
-    ru: 'Не удалось сохранить изображение обратно в Галерею.',
-    en: 'Failed to save the image back to Gallery.',
+    ru: 'Не удалось сохранить изображение обратно в Библиотеку.',
+    en: 'Failed to save the image back to Library.',
   },
   saveImageFailed: {
     ru: 'Не удалось сохранить изображение.',

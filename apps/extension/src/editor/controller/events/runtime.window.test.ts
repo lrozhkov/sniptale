@@ -168,10 +168,18 @@ it('passes active draw sessions into Enter completion ownership', () => {
 });
 
 it('forwards keyup and blur ownership into the input seam', () => {
+  const endCurrentTransform = vi.fn();
   const bindings = {
+    cancelTransientInteraction: vi.fn(() => true),
     finalizeSelectionNudge: vi.fn(),
+    getCanvas: vi.fn(() => ({ _currentTransform: {}, endCurrentTransform })),
     setIsSpacePressed: vi.fn(),
   };
+  mocks.handleEditorWindowBlur.mockImplementationOnce((options) => {
+    options.endCurrentTransform?.();
+    options.cancelTransientInteraction?.();
+    options.finalizeSelectionNudge?.();
+  });
 
   createRuntimeWindowKeyUpHandler(bindings)(new KeyboardEvent('keyup', { code: 'Space' }));
   createRuntimeWindowBlurHandler(bindings)();
@@ -182,6 +190,10 @@ it('forwards keyup and blur ownership into the input seam', () => {
   });
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(false);
   expect(mocks.handleEditorWindowBlur).toHaveBeenCalledWith({
+    cancelTransientInteraction: bindings.cancelTransientInteraction,
+    endCurrentTransform: expect.any(Function),
     finalizeSelectionNudge: expect.any(Function),
   });
+  expect(endCurrentTransform).toHaveBeenCalledOnce();
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
 });

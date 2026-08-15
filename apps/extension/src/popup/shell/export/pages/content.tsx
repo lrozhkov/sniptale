@@ -42,7 +42,7 @@ function renderReadyContent(controller: ExportController) {
       includeCssDiagnostics={preferences.values.includeCssDiagnostics}
       includeFiles={preferences.values.includeFiles}
       includeFullPageScreenshot={preferences.values.includeFullPageScreenshot}
-      includeHarDomLogs={preferences.values.includeHarDomLogs}
+      includePageDiagnostics={preferences.values.includePageDiagnostics}
       includeImages={preferences.values.includeImages}
       includeJson={preferences.values.includeJson}
       includeMarkdown={preferences.values.includeMarkdown}
@@ -54,7 +54,7 @@ function renderReadyContent(controller: ExportController) {
       setFilterQuery={tabs.setFilterQuery}
       setIncludeFiles={preferences.actions.setIncludeFiles}
       setIncludeFullPageScreenshot={preferences.actions.setIncludeFullPageScreenshot}
-      setIncludeHarDomLogs={preferences.actions.setIncludeHarDomLogs}
+      setIncludePageDiagnostics={preferences.actions.setIncludePageDiagnostics}
       setIncludeImages={preferences.actions.setIncludeImages}
       setIncludeJson={preferences.actions.setIncludeJson}
       setIncludeMarkdown={preferences.actions.setIncludeMarkdown}

@@ -1,24 +1,16 @@
 import { beforeEach, vi } from 'vitest';
 
 const {
-  browserDebugger,
   browserTabs,
   cleanupCapture,
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
   cleanupScreenshotModeAfterTabClose,
-  clearDebuggerSessionState,
   ensurePersistentStorage,
   ensureActiveVideoRecordingLeaseHydrated,
-  handleDebuggerEvent,
-  handleDiagnosticsForcedDetach,
-  handleExportHarDebuggerEvent,
-  handleExportHarForcedDetach,
-  handleExportHarNavigationStart,
   handleTabClose,
   handleTabNavigation,
   handleRegionSelectionNavigationStart,
-  handleTabRecordingDebuggerDetach,
   handleTabRecordingNavigationCommitted,
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
@@ -38,10 +30,6 @@ const {
   resetVideoRecordingRuntimeState,
   reconcileVideoRecordingLeaseOnStartup,
 } = vi.hoisted(() => ({
-  browserDebugger: {
-    subscribeToDetach: vi.fn(),
-    subscribeToEvent: vi.fn(),
-  },
   browserTabs: {
     subscribeToRemoved: vi.fn(),
     subscribeToUpdated: vi.fn(),
@@ -50,18 +38,11 @@ const {
   cleanupExpiredProjectExportInputs: vi.fn(),
   cleanupScreenshotModeAfterNavigation: vi.fn(),
   cleanupScreenshotModeAfterTabClose: vi.fn(),
-  clearDebuggerSessionState: vi.fn(),
   ensurePersistentStorage: vi.fn(),
   ensureActiveVideoRecordingLeaseHydrated: vi.fn(),
-  handleDebuggerEvent: vi.fn(),
-  handleDiagnosticsForcedDetach: vi.fn(),
-  handleExportHarDebuggerEvent: vi.fn(),
-  handleExportHarForcedDetach: vi.fn(),
-  handleExportHarNavigationStart: vi.fn(),
   handleTabClose: vi.fn(),
   handleTabNavigation: vi.fn(),
   handleRegionSelectionNavigationStart: vi.fn(),
-  handleTabRecordingDebuggerDetach: vi.fn(),
   handleTabRecordingNavigationCommitted: vi.fn(),
   handleTabRecordingNavigationCompleted: vi.fn(),
   handleTabRecordingNavigationError: vi.fn(),
@@ -82,7 +63,6 @@ const {
   reconcileVideoRecordingLeaseOnStartup: vi.fn(),
 }));
 
-vi.mock('@sniptale/platform/browser/debugger', () => ({ browserDebugger }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({ browserTabs }));
 vi.mock(
   '../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core',
@@ -100,15 +80,8 @@ vi.mock('../../../apps/extension/src/composition/persistence/project-export-inpu
   cleanupExpiredProjectExportInputs,
 }));
 vi.mock('../../../apps/extension/src/background/diagnostics/lifecycle', () => ({
-  getTabIdByTargetId: vi.fn((targetId: string) => (targetId === 'target-7' ? 7 : undefined)),
-  clearDebuggerSessionState,
-  handleDebuggerEvent,
-  handleDiagnosticsForcedDetach,
   handleTabNavigation,
   recoverInterruptedSessions,
-  handleExportHarDebuggerEvent,
-  handleExportHarForcedDetach,
-  handleExportHarNavigationStart,
 }));
 vi.mock('../../../apps/extension/src/background/capture/lifecycle', () => ({
   cleanupCapture,
@@ -126,7 +99,6 @@ vi.mock('../../../apps/extension/src/background/media/lifecycle', () => ({
   ensureActiveVideoRecordingLeaseHydrated,
   handleRegionSelectionNavigationStart,
   handleTabClose,
-  handleTabRecordingDebuggerDetach,
   handleTabRecordingNavigationCommitted,
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
@@ -155,17 +127,10 @@ export {
   cleanupExpiredProjectExportInputs,
   cleanupScreenshotModeAfterNavigation,
   cleanupScreenshotModeAfterTabClose,
-  clearDebuggerSessionState,
-  handleDebuggerEvent,
-  handleDiagnosticsForcedDetach,
-  handleExportHarDebuggerEvent,
-  handleExportHarForcedDetach,
-  handleExportHarNavigationStart,
   ensureActiveVideoRecordingLeaseHydrated,
   handleTabClose,
   handleTabNavigation,
   handleRegionSelectionNavigationStart,
-  handleTabRecordingDebuggerDetach,
   handleTabRecordingNavigationCommitted,
   handleTabRecordingNavigationCompleted,
   handleTabRecordingNavigationError,
@@ -188,17 +153,9 @@ export {
 
 type RemovedListener = Parameters<typeof browserTabs.subscribeToRemoved>[0];
 type UpdatedListener = Parameters<typeof browserTabs.subscribeToUpdated>[0];
-type DebuggerEventListener = Parameters<typeof browserDebugger.subscribeToEvent>[0];
-type DebuggerDetachListener = Parameters<typeof browserDebugger.subscribeToDetach>[0];
 
 export const removedListenerRef: { current: RemovedListener | null } = { current: null };
 export const updatedListenerRef: { current: UpdatedListener | null } = { current: null };
-export const debuggerEventListenerRef: { current: DebuggerEventListener | null } = {
-  current: null,
-};
-export const debuggerDetachListenerRef: { current: DebuggerDetachListener | null } = {
-  current: null,
-};
 export const navigationListenerRef: { current: ((details: unknown) => void) | null } = {
   current: null,
 };
@@ -228,11 +185,11 @@ export function createModeState() {
       number,
       {
         presetId: string;
-        target: 'viewport' | 'window';
+        target: 'window' | 'window';
         width: number;
         height: number;
       } | null
-    >([[7, { presetId: 'test:viewport', target: 'viewport', width: 1280, height: 720 }]]),
+    >([[7, { presetId: 'test:viewport', target: 'window', width: 1280, height: 720 }]]),
     webSnapshotViewerPorts,
     scenarioSessionService: createScenarioSessionServiceStub(),
   };
@@ -245,8 +202,6 @@ export async function flushMicrotasks(): Promise<void> {
 function resetListenerRefs() {
   removedListenerRef.current = null;
   updatedListenerRef.current = null;
-  debuggerEventListenerRef.current = null;
-  debuggerDetachListenerRef.current = null;
   navigationListenerRef.current = null;
   navigationCommittedListenerRef.current = null;
   navigationCompletedListenerRef.current = null;
@@ -260,7 +215,6 @@ function resetMockDefaults() {
   cleanupExpiredProjectExportInputs.mockResolvedValue(undefined);
   cleanupScreenshotModeAfterNavigation.mockResolvedValue(undefined);
   cleanupScreenshotModeAfterTabClose.mockResolvedValue(undefined);
-  handleExportHarNavigationStart.mockResolvedValue(undefined);
   initializeBackgroundContextMenus.mockReturnValue(undefined);
   nativeAppConnect.mockReturnValue(undefined);
   rebuildBackgroundContextMenus.mockResolvedValue(undefined);
@@ -283,12 +237,6 @@ function installBrowserListenerMocks() {
   });
   browserTabs.subscribeToUpdated.mockImplementation((listener: UpdatedListener) => {
     updatedListenerRef.current = listener;
-  });
-  browserDebugger.subscribeToEvent.mockImplementation((listener: DebuggerEventListener) => {
-    debuggerEventListenerRef.current = listener;
-  });
-  browserDebugger.subscribeToDetach.mockImplementation((listener: DebuggerDetachListener) => {
-    debuggerDetachListenerRef.current = listener;
   });
 
   Object.assign(globalThis, {

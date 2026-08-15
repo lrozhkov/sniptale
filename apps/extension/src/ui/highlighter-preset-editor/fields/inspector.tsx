@@ -19,8 +19,7 @@ import { CompactColorSelector } from '../../color-selector';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { EditorCompactRangeField } from './sections/compact-range-field';
-import { CompactSelect } from '../../compact-inspector-controls';
-import { BorderPaddingFields } from './sections/border-padding-fields';
+import { CompactSelect, NumericValueField } from '../../compact-inspector-controls';
 import {
   editorNativeResizableTextareaClassName,
   editorResizeHandleClassName,
@@ -28,7 +27,10 @@ import {
 } from '../constants';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { AVAILABLE_HIGHLIGHTER_BLUR_TYPES } from '../../../features/highlighter/blur-types';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import {
+  ProductGlassLinkedPaddingFields,
+  ProductGlassSwitch,
+} from '@sniptale/ui/product-glass-controls';
 import { HighlighterFillPaintField } from './fill-paint-field';
 
 export type LinkedAnnotationTemplateOptions = {
@@ -153,9 +155,31 @@ function BorderGeometrySection(props: BorderStyleInspectorProps) {
         onChange={(radius) => props.onChange({ radius })}
         value={props.style.radius}
       />
-      <BorderPaddingFields
+      <ProductGlassLinkedPaddingFields
+        labels={{
+          padding: translate('highlighter.editor.paddingLabel'),
+          top: translate('highlighter.editor.paddingTop'),
+          right: translate('highlighter.editor.paddingRight'),
+          bottom: translate('highlighter.editor.paddingBottom'),
+          left: translate('highlighter.editor.paddingLeft'),
+          link: translate('highlighter.editor.paddingLinked'),
+          unlink: translate('highlighter.editor.paddingSeparate'),
+        }}
         onChange={(padding) => props.onChange({ padding })}
         padding={props.style.padding}
+        renderValueField={({ compact, label, onChange, side, value }) => (
+          <div className="min-w-0" data-padding-side={side}>
+            <NumericValueField
+              className={compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
+              label={label}
+              max={50}
+              min={0}
+              onCommitValue={onChange}
+              onPreviewValue={onChange}
+              value={value}
+            />
+          </div>
+        )}
       />
     </div>
   );

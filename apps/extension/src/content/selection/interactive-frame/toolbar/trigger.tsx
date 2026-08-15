@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
-import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import type { FrameData } from '../../../../features/highlighter/contracts';
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import { isHighlighterEnabled } from '../../highlighter';
 import {
@@ -14,6 +14,8 @@ import {
   createFrameQuickActions,
   FrameQuickActionButtons,
   frameTriggerControlStyle,
+  frameTriggerIconStyle,
+  type FrameQuickActionContext,
 } from './trigger-actions';
 import {
   canFitFrameQuickActions,
@@ -24,25 +26,19 @@ import { useFrameUIStore } from '../../frame-runtime/state/frame-ui.store';
 import { resolveContentShadowRoot } from '../../../platform/dom-host';
 import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 import type { FrameCaptureVisibilityState } from './capture-visibility-state';
+import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 import {
   resolveStableFrameTriggerPosition,
   suspendFrameTriggerPlacement,
   type FrameTriggerPlacementSession,
 } from './trigger-placement-session';
 
-type InteractiveFrameToolbarTriggerProps = {
-  frame: FrameData;
+type InteractiveFrameToolbarTriggerProps = FrameQuickActionContext & {
   captureVisibility: FrameCaptureVisibilityState;
   isVisible: boolean;
-  closePopover: () => void;
-  handleStartEditing: () => void;
   hoverFrame: (frameId: string) => void;
-  popoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   scheduleHoverFrameHide: (frameId: string) => void;
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
-  setIsCalloutEditing: React.Dispatch<React.SetStateAction<boolean>>;
-  setState: React.Dispatch<React.SetStateAction<FrameState>>;
-  onUpdate: (frame: FrameData) => void;
 };
 
 function useTriggerPositionRefresh(isVisible: boolean) {
@@ -102,7 +98,7 @@ function FrameToolbarTriggerButton(props: {
       }}
       style={frameTriggerControlStyle}
     >
-      <MoreHorizontal size={17} aria-hidden="true" />
+      <MoreHorizontal size={17} aria-hidden="true" style={frameTriggerIconStyle} />
     </button>
   );
 }
@@ -121,6 +117,7 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
 
   const quickActions = createFrameQuickActions({
     ...props,
+    canAddCallout: props.canAddCallout ?? canAppendFrameCallout(props.frame),
     captureVisibility: props.captureVisibility,
     toggleQuickPopover,
   });
@@ -149,7 +146,7 @@ export function InteractiveFrameToolbarTrigger(props: InteractiveFrameToolbarTri
         position: 'fixed',
         left: position.x - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
         top: position.y - FRAME_TRIGGER_BRIDGE_PADDING * uiScale,
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         zIndex: Z_INDEX_FLOATING_UI,
       })}
     >

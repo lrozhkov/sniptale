@@ -13,7 +13,7 @@ type PortListener = (command: {
   type: string;
   viewport?: {
     presetId: string;
-    target: 'viewport' | 'window';
+    target: 'window' | 'window';
     width: number;
     height: number;
   };
@@ -186,7 +186,7 @@ it('routes preparation enable commands through screenshot-mode state without ena
       type: MessageType.ENABLE_SCREENSHOT_MODE,
       viewport: {
         presetId: 'test:viewport',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
       },
@@ -198,7 +198,7 @@ it('routes preparation enable commands through screenshot-mode state without ena
   expect(runtimeMocks.modeState?.setIsToolbarVisible).toHaveBeenCalledWith(true);
   expect(runtimeMocks.modeState?.setCurrentViewport).toHaveBeenCalledWith({
     presetId: 'test:viewport',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
     height: 720,
   });
@@ -275,7 +275,7 @@ it('applies preparation viewport commands to mode state without taking screensho
       type: PREPARATION_SURFACE_RESIZE,
       viewport: {
         presetId: 'test:viewport',
-        target: 'viewport',
+        target: 'window',
         width: 390,
         height: 844,
       },
@@ -284,7 +284,7 @@ it('applies preparation viewport commands to mode state without taking screensho
 
   expect(runtimeMocks.modeState?.setCurrentViewport).toHaveBeenCalledWith({
     presetId: 'test:viewport',
-    target: 'viewport',
+    target: 'window',
     width: 390,
     height: 844,
   });

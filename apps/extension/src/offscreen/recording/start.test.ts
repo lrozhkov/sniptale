@@ -102,7 +102,7 @@ afterEach(() => {
 it('announces raw source metadata and starts only after background ALLOW', async () => {
   const surface = {
     presetId: 'preset-1',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
   };
@@ -123,6 +123,11 @@ it('announces raw source metadata and starts only after background ALLOW', async
   expect(prepareRecordingStreamMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.TAB,
     settings: expect.any(Object),
+    sourceBinding: {
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+    },
     streamId: 'stream-1',
     surface,
   });

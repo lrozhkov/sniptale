@@ -40,7 +40,7 @@ it('projects editor and confirmation contracts with and without an edited preset
     kind: 'user',
     name: 'Desktop',
     order: 0,
-    target: 'viewport',
+    target: 'window',
     width: 1440,
   };
   act(() => root.render(<PresetsDialogs {...common} />));

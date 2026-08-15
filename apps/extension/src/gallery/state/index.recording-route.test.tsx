@@ -108,13 +108,41 @@ it('opens the requested recording preview from the recordingId route parameter',
   });
 });
 
-function configureGalleryOwnerMocks(): void {
+it('opens the requested draft recording after filtering the temporary scope', () => {
+  window.history.replaceState(
+    null,
+    '',
+    '/gallery.html?folder=recording&recordingId=rec-draft&scope=temporary'
+  );
+  configureGalleryOwnerMocks('temporary');
+  const recordingItem = createItem({
+    id: 'recording:rec-draft',
+    kind: 'video',
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+    source: { kind: 'recording', recordingId: 'rec-draft' },
+  });
+  getFilteredGalleryItemsMock.mockReturnValue([recordingItem]);
+
+  renderHook();
+
+  expect(getFilteredGalleryItemsMock).toHaveBeenCalledWith(
+    expect.objectContaining({ scope: 'temporary' })
+  );
+  expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
+    inspectorCollapsed: false,
+    item: recordingItem,
+    url: null,
+  });
+});
+
+function configureGalleryOwnerMocks(scope: 'library' | 'temporary' = 'library'): void {
   useGalleryFilterStateMock.mockReturnValue({
     actions: { setFolderFilter: galleryActionMocks.setFolderFilter },
     state: {
       activeTags: [],
-      folderFilter: 'all',
+      folderFilter: scope === 'temporary' ? 'recording' : 'all',
       search: '',
+      scope,
       selectedIds: new Set(),
       selectionTagDraft: '',
       sortMode: 'newest',

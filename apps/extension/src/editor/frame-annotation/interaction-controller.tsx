@@ -26,12 +26,19 @@ import { useFrameAnnotationKeyboard } from './keyboard';
 import { createFrameAnnotationLayerLabel } from './layer-label';
 
 type DragState = {
+  coordinateSpace: FrameDragCoordinateSpace;
   mode: 'create' | 'move' | 'resize';
   object: FabricObject | null;
   origin: { x: number; y: number };
+  pointerId: number;
   start: FrameAnnotationSnapshotV1;
   resizeDirection?: ResizeDirection;
   calloutCenter?: { x: number; y: number } | null;
+};
+
+type FrameDragCoordinateSpace = {
+  canvasRect: DOMRect;
+  documentSize: { width: number; height: number };
 };
 
 export const MIN_FRAME_SIZE = 8;
@@ -47,6 +54,7 @@ export function useFrameAnnotationInteraction(props: {
   const [draft, setDraft] = React.useState<FrameAnnotationSnapshotV1 | null>(null);
   const draftRef = React.useRef<FrameAnnotationSnapshotV1 | null>(null);
   const dragRef = React.useRef<DragState | null>(null);
+  const dragFrameRef = React.useRef(0);
   const pendingHistoryRef = React.useRef(false);
   const pendingPreviewObjectRef = React.useRef<FabricObject | null>(null);
   const updateDraft = React.useCallback((value: FrameAnnotationSnapshotV1 | null) => {
@@ -54,7 +62,17 @@ export function useFrameAnnotationInteraction(props: {
     setDraft(value);
   }, []);
   const entries = collectFrameAnnotationProxies(props.controller.canvas?.getObjects?.() ?? []);
-  const projection = buildProjection(entries, draft, props, selectedId);
+  const projection = buildProjection(entries, draft, props);
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const selectedEntry = entries.find((entry) => entry.snapshot.id === selectedId);
+    const canonicalSelectionExists = (props.layers ?? []).some(
+      (layer) => layer.id === selectedId && layer.selected
+    );
+    if (selectedEntry?.object?.sniptaleLocked === true || !canonicalSelectionExists) {
+      setSelectedId(null);
+    }
+  }, [entries, props.layers, selectedId]);
   const finishDrag = useFinishDrag({
     controller: props.controller,
     dragRef,
@@ -64,6 +82,24 @@ export function useFrameAnnotationInteraction(props: {
     setSelectedId,
     updateDraft,
   });
+  const interactionPropsRef = React.useRef(props);
+  const finishDragRef = React.useRef(finishDrag);
+  interactionPropsRef.current = props;
+  finishDragRef.current = finishDrag;
+  const cancelScheduledDragRender = React.useCallback(() => {
+    if (dragFrameRef.current !== 0) {
+      cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = 0;
+    }
+  }, []);
+  const stageDragDraft = React.useCallback((value: FrameAnnotationSnapshotV1) => {
+    draftRef.current = value;
+    if (dragFrameRef.current !== 0) return;
+    dragFrameRef.current = requestAnimationFrame(() => {
+      dragFrameRef.current = 0;
+      setDraft(draftRef.current);
+    });
+  }, []);
   const commitPendingHistory = React.useCallback(() => {
     if (!pendingHistoryRef.current) return;
     const object = pendingPreviewObjectRef.current;
@@ -93,24 +129,35 @@ export function useFrameAnnotationInteraction(props: {
   });
 
   React.useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) =>
-      updateDrag(event, dragRef, updateDraft, props);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', finishDrag);
-    window.addEventListener('pointercancel', finishDrag);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', finishDrag);
-      window.removeEventListener('pointercancel', finishDrag);
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      updateDrag(event, dragRef, stageDragDraft, interactionPropsRef.current);
     };
-  }, [finishDrag, props, updateDraft]);
+    const handlePointerFinish = (event: PointerEvent) => {
+      if (event.pointerId !== dragRef.current?.pointerId) return;
+      updateDrag(event, dragRef, stageDragDraft, interactionPropsRef.current);
+      cancelScheduledDragRender();
+      finishDragRef.current(event);
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerFinish);
+    window.addEventListener('pointercancel', handlePointerFinish);
+    return () => {
+      cancelScheduledDragRender();
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerFinish);
+      window.removeEventListener('pointercancel', handlePointerFinish);
+    };
+  }, [cancelScheduledDragRender, stageDragDraft]);
   React.useEffect(
     () =>
       registerFrameAnnotationDraftFlusher(() => {
+        cancelScheduledDragRender();
         finishDrag();
         commitPendingHistory();
       }),
-    [commitPendingHistory, finishDrag]
+    [cancelScheduledDragRender, commitPendingHistory, finishDrag]
   );
 
   const shared = {
@@ -143,21 +190,26 @@ function createPlaneEvents(input: {
     pointerDown: (event: React.PointerEvent) => {
       if (input.props.activeTool !== 'frame-annotation' || event.button !== 0) return;
       input.commitPendingHistory();
-      const point = toLogicalPoint(
-        event,
+      const coordinateSpace = resolveFrameDragCoordinateSpace(
         input.props.canvasRef.current,
         input.props.controller.canvasDocumentSize
       );
+      if (!coordinateSpace) return;
+      const point = toLogicalPoint(event, coordinateSpace);
       if (!point) return;
       const start = createDefaultSnapshot(point, input.entries.length);
-      input.dragRef.current = { mode: 'create', object: null, origin: point, start };
+      input.dragRef.current = {
+        coordinateSpace,
+        mode: 'create',
+        object: null,
+        origin: point,
+        pointerId: event.pointerId,
+        start,
+      };
+      captureDragPointer(event);
       input.setSelectedId(start.id);
       input.updateDraft(start);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.preventDefault();
     },
-    pointerMove: (event: React.PointerEvent) =>
-      updateDrag(event, input.dragRef, input.updateDraft, input.props),
   };
 }
 
@@ -325,45 +377,49 @@ function useFinishDrag(input: {
 }) {
   const { controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft } =
     input;
-  return React.useCallback(() => {
-    const drag = dragRef.current;
-    const draft = draftRef.current;
-    if (!drag || !draft) return;
-    controller.clearFrameAnnotationSnap?.();
-    dragRef.current = null;
-    if (drag.object && !canMutateFrameAnnotationProxy(drag.object)) {
+  return React.useCallback(
+    (event?: Pick<PointerEvent, 'pointerId'>) => {
+      const drag = dragRef.current;
+      const draft = draftRef.current;
+      if (!drag || !draft) return;
+      if (event && event.pointerId !== drag.pointerId) return;
+      controller.clearFrameAnnotationSnap?.();
+      dragRef.current = null;
+      if (drag.object && !canMutateFrameAnnotationProxy(drag.object)) {
+        updateDraft(null);
+        forceRender();
+        return;
+      }
+      if (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE) {
+        updateDraft(null);
+        forceRender();
+        return;
+      }
+      const object =
+        drag.object ??
+        createFrameAnnotationProxy({
+          frame: draft,
+          ordering: entryCount,
+          label: createFrameAnnotationLayerLabel(entryCount + 1),
+        });
+      if (!drag.object) {
+        controller.prepareObject(object);
+        object.set({ selectable: false, evented: false, hasBorders: false, hasControls: false });
+        controller.canvas?.add(object);
+      } else {
+        commitFrameAnnotationProxy(object, draft);
+      }
+      synchronizeFrameAnnotationAutoStepBadges(controller.canvas?.getObjects?.() ?? []);
+      controller.canvas?.requestRenderAll();
+      controller.commitHistory();
+      controller.syncRuntimeState();
+      controller.selectLayer?.(draft.id, { focusViewport: false });
+      setSelectedId(draft.id);
       updateDraft(null);
       forceRender();
-      return;
-    }
-    if (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE) {
-      updateDraft(null);
-      forceRender();
-      return;
-    }
-    const object =
-      drag.object ??
-      createFrameAnnotationProxy({
-        frame: draft,
-        ordering: entryCount,
-        label: createFrameAnnotationLayerLabel(entryCount + 1),
-      });
-    if (!drag.object) {
-      controller.prepareObject(object);
-      object.set({ selectable: false, evented: false, hasBorders: false, hasControls: false });
-      controller.canvas?.add(object);
-    } else {
-      commitFrameAnnotationProxy(object, draft);
-    }
-    synchronizeFrameAnnotationAutoStepBadges(controller.canvas?.getObjects?.() ?? []);
-    controller.canvas?.requestRenderAll();
-    controller.commitHistory();
-    controller.syncRuntimeState();
-    controller.selectLayer?.(draft.id, { focusViewport: false });
-    setSelectedId(draft.id);
-    updateDraft(null);
-    forceRender();
-  }, [controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft]);
+    },
+    [controller, dragRef, draftRef, entryCount, forceRender, setSelectedId, updateDraft]
+  );
 }
 
 function buildProjection(
@@ -372,8 +428,7 @@ function buildProjection(
   props: Pick<
     Parameters<typeof useFrameAnnotationInteraction>[0],
     'activeTool' | 'canvasRef' | 'controller' | 'layers'
-  >,
-  selectedId: string | null
+  >
 ) {
   const projected: Array<{ object: FabricObject | null; snapshot: FrameAnnotationSnapshotV1 }> =
     entries.map((entry) =>
@@ -396,7 +451,7 @@ function buildProjection(
     projected,
     effectiveSelectedId:
       props.activeTool === 'frame-annotation' || props.activeTool === 'select'
-        ? (draft?.id ?? canonicalSelectedId ?? selectedId)
+        ? (draft?.id ?? canonicalSelectedId)
         : null,
     scale: getProjectionScale(props.canvasRef.current, props.controller.canvasDocumentSize),
     focusFrames,
@@ -434,14 +489,14 @@ function createDefaultSnapshot(
 }
 
 function updateDrag(
-  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  event: Pick<PointerEvent, 'clientX' | 'clientY' | 'pointerId'>,
   dragRef: React.RefObject<DragState | null>,
   updateDraft: (draft: FrameAnnotationSnapshotV1) => void,
   props: Parameters<typeof useFrameAnnotationInteraction>[0]
 ) {
   const drag = dragRef.current;
-  if (!drag) return;
-  const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  const point = toLogicalPoint(event, drag.coordinateSpace);
   if (!point) return;
   const dx = point.x - drag.origin.x;
   const dy = point.y - drag.origin.y;
@@ -512,19 +567,36 @@ function startExistingDrag(
   resizeDirection?: ResizeDirection,
   calloutCenter?: { x: number; y: number } | null
 ) {
-  const point = toLogicalPoint(event, props.canvasRef.current, props.controller.canvasDocumentSize);
+  const coordinateSpace = resolveFrameDragCoordinateSpace(
+    props.canvasRef.current,
+    props.controller.canvasDocumentSize
+  );
+  if (!coordinateSpace) return;
+  const point = toLogicalPoint(event, coordinateSpace);
   if (!point) return;
-  props.controller.selectLayer?.(snapshot.id, { focusViewport: false });
-  setSelectedId(snapshot.id);
-  updateDraft(snapshot);
   dragRef.current = {
+    coordinateSpace,
     mode,
     object,
     origin: point,
+    pointerId: event.pointerId,
     start: snapshot,
     ...(resizeDirection ? { resizeDirection } : {}),
     ...(calloutCenter === undefined ? {} : { calloutCenter }),
   };
+  captureDragPointer(event);
+  props.controller.selectLayer?.(snapshot.id, { focusViewport: false });
+  setSelectedId(snapshot.id);
+  updateDraft(snapshot);
+}
+
+function captureDragPointer(event: React.PointerEvent): void {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // The pointer may have ended between dispatch and capture.
+  }
+  event.preventDefault();
   event.stopPropagation();
 }
 
@@ -567,13 +639,21 @@ function getProjectionScale(canvas: HTMLCanvasElement | null, size?: { width: nu
   return rect && size && size.width > 0 ? rect.width / size.width : 1;
 }
 
-function toLogicalPoint(
-  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+function resolveFrameDragCoordinateSpace(
   canvas: HTMLCanvasElement | null,
   size?: { width: number; height: number }
+): FrameDragCoordinateSpace | null {
+  const canvasRect = canvas?.getBoundingClientRect();
+  if (!canvasRect || !size || canvasRect.width <= 0 || canvasRect.height <= 0) return null;
+  return { canvasRect, documentSize: { ...size } };
+}
+
+function toLogicalPoint(
+  event: Pick<PointerEvent, 'clientX' | 'clientY'>,
+  coordinateSpace: FrameDragCoordinateSpace | null
 ): { x: number; y: number } | null {
-  const rect = canvas?.getBoundingClientRect();
-  if (!rect || !size || rect.width <= 0 || rect.height <= 0) return null;
+  if (!coordinateSpace) return null;
+  const { canvasRect: rect, documentSize: size } = coordinateSpace;
   return {
     x: ((event.clientX - rect.left) / rect.width) * size.width,
     y: ((event.clientY - rect.top) / rect.height) * size.height,

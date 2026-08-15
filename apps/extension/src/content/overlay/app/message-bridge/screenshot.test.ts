@@ -105,7 +105,7 @@ function expectEnableScreenshotModeRouting() {
         type: MessageType.ENABLE_SCREENSHOT_MODE,
         viewport: {
           presetId: 'test:viewport',
-          target: 'viewport',
+          target: 'window',
           width: 1280,
           height: 720,
         },
@@ -127,7 +127,7 @@ function expectEnableScreenshotModeRouting() {
   expect(params.modeControls.setIsToolbarVisible).toHaveBeenCalledWith(true);
   expect(params.viewport.setCurrentViewport).toHaveBeenCalledWith({
     presetId: 'test:viewport',
-    target: 'viewport',
+    target: 'window',
     width: 1280,
     height: 720,
   });

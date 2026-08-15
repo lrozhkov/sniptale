@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import {
   getVideoRecordingProfile,
   type VideoRecordingSettings,
@@ -22,6 +22,7 @@ export function QualityCard({
   return (
     <InlineCurtainSelect
       ariaLabel={translate('popup.video.qualityAria')}
+      description={translate('popup.video.qualityDescription')}
       label={translate('popup.video.qualityLabel')}
       onChange={(profileId) => {
         const profile = getVideoRecordingProfile(settings, profileId);
@@ -36,6 +37,8 @@ export function QualityCard({
       secondaryAction={{
         ariaLabel: translate('popup.video.outputSettingsActionAria'),
         label: translate('popup.video.outputSettingsAction'),
+        panelDescription: translate('popup.video.outputSettingsDescription'),
+        panelTitle: translate('popup.video.outputSettingsTitle'),
         panel: (
           <OutputSettingsPanel
             knownOutputBasisDimensions={knownOutputBasisDimensions ?? null}

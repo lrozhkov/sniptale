@@ -5,45 +5,42 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-vi.mock('../../chrome/ui', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../chrome/ui')>()),
-  NumericRow: (props: {
-    label: string;
-    value: number;
-    unit?: string;
-    onPreviewValue: (value: number) => void;
-    className?: string;
+vi.mock('@sniptale/ui/product-glass-controls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/product-glass-controls')>()),
+  ProductGlassLinkedPaddingFields: (props: {
+    padding: { top: number; right: number; bottom: number; left: number };
+    onChange: (padding: { top: number; right: number; bottom: number; left: number }) => void;
+    renderValueField: (props: {
+      compact: boolean;
+      label: string;
+      onChange: (value: number) => void;
+      side: 'top';
+      value: number;
+    }) => React.ReactNode;
   }) => (
-    <button
-      type="button"
-      data-testid="numeric-row"
-      aria-label={props.label}
-      data-value={String(props.value)}
-      data-unit={props.unit ?? ''}
-      data-class={props.className ?? ''}
-      onClick={() => props.onPreviewValue(24)}
-    >
-      numeric row
-    </button>
-  ),
-  NumericValueField: (props: {
-    label: string;
-    value: number;
-    unit?: string;
-    onPreviewValue: (value: number) => void;
-    className?: string;
-  }) => (
-    <button
-      type="button"
-      data-testid="numeric-value-field"
-      aria-label={props.label}
-      data-value={String(props.value)}
-      data-unit={props.unit ?? ''}
-      data-class={props.className ?? ''}
-      onClick={() => props.onPreviewValue(24)}
-    >
-      numeric field
-    </button>
+    <>
+      {props.renderValueField({
+        compact: true,
+        label: 'Top',
+        onChange: vi.fn(),
+        side: 'top',
+        value: props.padding.top,
+      })}
+      {props.renderValueField({
+        compact: false,
+        label: 'Top',
+        onChange: vi.fn(),
+        side: 'top',
+        value: props.padding.top,
+      })}
+      <button
+        type="button"
+        data-testid="linked-padding"
+        onClick={() => props.onChange({ top: 24, right: 24, bottom: 24, left: 24 })}
+      >
+        {Object.values(props.padding).join('/')}
+      </button>
+    </>
   ),
 }));
 
@@ -125,7 +122,7 @@ it('renders padding controls without repeating the summary and forwards numeric 
 
   await act(async () => {
     (
-      container?.querySelector('[data-testid="numeric-row"]') as HTMLButtonElement | undefined
+      container?.querySelector('[data-testid="linked-padding"]') as HTMLButtonElement | undefined
     )?.click();
   });
 
@@ -141,7 +138,7 @@ it('renders padding controls without repeating the summary and forwards numeric 
   });
 });
 
-it('starts with linked scene padding and reveals side fields after unlinking', async () => {
+it('maps frame padding to the shared linked-padding control', async () => {
   const setFrameDraft = vi.fn((value) =>
     typeof value === 'function' ? value(FRAME as never) : value
   );
@@ -154,15 +151,7 @@ it('starts with linked scene padding and reveals side fields after unlinking', a
     />
   );
 
-  expect(container?.querySelectorAll('[data-testid="numeric-row"]')).toHaveLength(1);
-  expect(container?.querySelectorAll('[data-testid="numeric-value-field"]')).toHaveLength(0);
-  expect(container?.querySelector('[aria-pressed="true"]')).not.toBeNull();
-
-  await act(async () => {
-    (container?.querySelector('[aria-pressed]') as HTMLButtonElement | undefined)?.click();
-  });
-
-  expect(container?.querySelectorAll('[data-testid="numeric-row"]')).toHaveLength(1);
-  expect(container?.querySelectorAll('[data-testid="numeric-value-field"]')).toHaveLength(4);
-  expect(container?.querySelector('[aria-pressed="false"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="linked-padding"]')?.textContent).toBe(
+    '12/12/12/12'
+  );
 });

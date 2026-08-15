@@ -1,6 +1,6 @@
 import { DEFAULT_LOCALE, type AppLocale } from '@sniptale/platform/i18n/config';
 import { getCurrentLocale } from './locale/state';
-import { readTranslation, resolveTranslationDictionary } from './translation-reader';
+import { readSourceTranslation, resolveTranslationDictionary } from './translation-reader';
 import type { Translate, TranslationDictionary, TranslationKey } from './types';
 
 export function getDictionary(locale: AppLocale): TranslationDictionary {
@@ -8,8 +8,7 @@ export function getDictionary(locale: AppLocale): TranslationDictionary {
 }
 
 export function createTranslator(locale: AppLocale = DEFAULT_LOCALE): Translate {
-  const dictionary = getDictionary(locale);
-  return (key) => readTranslation(dictionary, key);
+  return (key) => readSourceTranslation(locale, key);
 }
 
 export function translate(key: TranslationKey, locale?: AppLocale): string {

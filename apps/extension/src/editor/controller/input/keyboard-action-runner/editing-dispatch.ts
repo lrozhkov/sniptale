@@ -1,4 +1,4 @@
-import { enterSelectedTextEditing, exitTextboxEditing } from './text-editing';
+import { cancelTextboxEditing, enterSelectedTextEditing, exitTextboxEditing } from './text-editing';
 import type { EditorKeyboardAction, EditorKeyboardActionOptions } from './types';
 
 export function applyEditorEditingKeyboardAction(
@@ -8,6 +8,9 @@ export function applyEditorEditingKeyboardAction(
   switch (action) {
     case 'exit-text-edit':
       exitTextboxEditing(options);
+      return { preventDefault: true };
+    case 'cancel-text-edit':
+      cancelTextboxEditing(options);
       return { preventDefault: true };
     case 'cancel-transient':
       return { preventDefault: options.cancelTransientInteraction() };

@@ -18,33 +18,27 @@ function createValidSnapshot() {
     },
     events: [
       {
-        id: 'event-1',
+        id: 'event-action',
         recordingId: 'recording-1',
         tsMs: 10,
-        kind: 'console',
-        level: 'warn',
-        message: 'warn',
+        kind: 'action',
+        level: 'info',
+        message: 'click',
       },
       {
-        id: 'event-2',
+        id: 'event-error',
         recordingId: 'recording-1',
         tsMs: 20,
-        kind: 'meta',
-        message: 'meta',
+        kind: 'error',
+        level: 'error',
+        message: 'failure',
       },
-    ],
-    pendingNetworkRequests: [
       {
-        requestId: 'request-1',
-        url: 'https://example.com/api',
-        method: 'POST',
-        requestTime: 15,
-        status: 200,
-        statusText: 'OK',
-        responseTime: 16,
-        mimeType: 'application/json',
-        error: 'none',
-        resourceType: 'Fetch',
+        id: 'event-meta',
+        recordingId: 'recording-1',
+        tsMs: 30,
+        kind: 'meta',
+        message: 'marker',
       },
     ],
     isPaused: true,
@@ -55,113 +49,49 @@ it('returns an empty array for non-array storage payloads', () => {
   expect(parseStoredDiagnosticSnapshots({ invalid: true })).toEqual([]);
 });
 
-it('keeps valid snapshots and drops malformed nested entries', () => {
+it('keeps action, error, and meta events while dropping retired and malformed entries', () => {
   const snapshots = parseStoredDiagnosticSnapshots([
     {
       ...createValidSnapshot(),
       events: [
         ...createValidSnapshot().events,
         {
-          id: 'bad-event',
+          id: 'retired-network',
           recordingId: 'recording-1',
-          tsMs: 30,
-          kind: 'console',
-          level: 'verbose',
-          message: 'bad level',
+          tsMs: 40,
+          kind: 'network',
+          message: 'retired',
         },
-      ],
-      pendingNetworkRequests: [
-        ...createValidSnapshot().pendingNetworkRequests,
         {
-          requestId: 'bad-request',
-          url: 'https://example.com/bad',
-          method: 'GET',
-          requestTime: 'invalid',
+          id: 'bad-level',
+          recordingId: 'recording-1',
+          tsMs: 50,
+          kind: 'action',
+          level: 'verbose',
+          message: 'bad',
         },
       ],
     },
   ]);
 
-  expect(snapshots).toEqual([
-    expect.objectContaining({
-      recordingId: 'recording-1',
-      events: [
-        expect.objectContaining({ id: 'event-1', level: 'warn' }),
-        expect.objectContaining({ id: 'event-2', kind: 'meta' }),
-      ],
-      pendingNetworkRequests: [
-        expect.objectContaining({
-          requestId: 'request-1',
-          status: 200,
-          statusText: 'OK',
-          responseTime: 16,
-          mimeType: 'application/json',
-          error: 'none',
-          resourceType: 'Fetch',
-        }),
-      ],
-    }),
-  ]);
+  expect(snapshots[0]?.events.map((event) => event.kind)).toEqual(['action', 'error', 'meta']);
 });
 
-it('drops snapshots with malformed optional metadata fields', () => {
-  const malformedSnapshot = {
-    ...createValidSnapshot(),
-    meta: {
-      ...createValidSnapshot().meta,
-      interrupted: 'yes',
-    },
-  };
-
-  expect(parseStoredDiagnosticSnapshots([malformedSnapshot])).toEqual([]);
-});
-
-it('accepts snapshots when optional metadata fields are absent', () => {
-  const validSnapshot = createValidSnapshot();
-  const snapshot = {
-    ...validSnapshot,
-    meta: {
-      url: validSnapshot.meta.url,
-      userAgent: validSnapshot.meta.userAgent,
-      viewportWidth: validSnapshot.meta.viewportWidth,
-      viewportHeight: validSnapshot.meta.viewportHeight,
-      recordingStartedAt: validSnapshot.meta.recordingStartedAt,
-    },
-  };
-
-  expect(parseStoredDiagnosticSnapshots([snapshot])).toEqual([
-    expect.objectContaining({
-      recordingId: 'recording-1',
-      meta: expect.objectContaining({
-        recordingStartedAt: '2026-03-21T12:00:00.000Z',
-      }),
-    }),
-  ]);
-});
-
-it('normalizes stored snapshots by dropping unexpected top-level fields', () => {
+it('drops invalid snapshots and normalizes unexpected fields', () => {
   const snapshot = createValidSnapshot();
-  const [event] = snapshot.events;
-  const [request] = snapshot.pendingNetworkRequests;
-  if (event === undefined || request === undefined) {
-    throw new Error('Expected valid snapshot fixture entries');
-  }
+  Object.assign(snapshot, { retiredState: 'discard me' });
+  Object.assign(snapshot.meta, { authorization: 'Bearer secret', html: '<input>' });
+  Object.assign(snapshot.events[0] ?? {}, { rawResponse: 'secret' });
 
-  Object.assign(snapshot.meta, {
-    authorization: 'Bearer secret',
-    html: '<input value="secret">',
-  });
-  Object.assign(event, { rawResponse: 'token=secret' });
-  Object.assign(request, {
-    headers: { cookie: 'session=secret' },
-    postData: 'private user text',
-  });
+  expect(
+    parseStoredDiagnosticSnapshots([
+      { ...snapshot, meta: { ...snapshot.meta, interrupted: 'yes' } },
+    ])
+  ).toEqual([]);
 
   const [parsed] = parseStoredDiagnosticSnapshots([snapshot]);
-
+  expect(parsed).not.toHaveProperty('retiredState');
   expect(parsed?.meta).not.toHaveProperty('authorization');
   expect(parsed?.meta).not.toHaveProperty('html');
   expect(parsed?.events[0]).not.toHaveProperty('rawResponse');
-  expect(parsed?.pendingNetworkRequests[0]).not.toHaveProperty('headers');
-  expect(parsed?.pendingNetworkRequests[0]).not.toHaveProperty('postData');
 });

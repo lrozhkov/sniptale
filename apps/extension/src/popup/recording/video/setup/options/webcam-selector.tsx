@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import {
   type CaptureMode,
   type VideoRecordingSettings,
@@ -30,6 +30,7 @@ export function VideoWebcamSelector({
   return (
     <VideoMediaDeviceSelector
       label={translate('popup.video.webcamRowLabel')}
+      description={translate('popup.video.webcamRowDescription')}
       ariaLabel={translate('popup.video.webcamRowAria')}
       currentDeviceId={settings.webcamDeviceId ?? null}
       devices={webcamDevices}
@@ -42,6 +43,8 @@ export function VideoWebcamSelector({
         ariaLabel: translate('popup.video.webcamSettingsActionAria'),
         disabled: !settings.webcamDeviceId,
         label: translate('popup.video.webcamSettingsAction'),
+        panelDescription: translate('popup.video.webcamSettingsDescription'),
+        panelTitle: translate('popup.video.webcamQualityTitle'),
         panel: (
           <WebcamSettingsPanel
             captureMode={captureMode}

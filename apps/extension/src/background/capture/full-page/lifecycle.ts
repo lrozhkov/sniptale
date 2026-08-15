@@ -1,5 +1,4 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { recoverOwnedCdpLease } from './cdp-backend';
 import { createFullPagePageAgentTransport } from './page-agent-transport';
 import { readStoredFullPageCaptureLease, releaseFullPageCaptureLease } from './session-lease';
 
@@ -21,7 +20,6 @@ export async function cleanupCapture(tabId: number): Promise<void> {
   if (!lease || lease.tabId !== tabId) return;
   const failures: unknown[] = [];
   let pageRestoreCompleted = false;
-  let debuggerCleanupCompleted = lease.backendKind !== 'unattended-cdp';
   try {
     await createFullPagePageAgentTransport({
       documentId: lease.documentId,
@@ -41,16 +39,7 @@ export async function cleanupCapture(tabId: number): Promise<void> {
       logger.warn('Failed to restore interrupted full-page page agent', error);
     }
   }
-  if (lease.backendKind === 'unattended-cdp') {
-    try {
-      await recoverOwnedCdpLease(tabId, lease.ownerToken);
-      debuggerCleanupCompleted = true;
-    } catch (error) {
-      failures.push(error);
-      logger.warn('Failed to release interrupted full-page CDP lease', error);
-    }
-  }
-  if (pageRestoreCompleted && debuggerCleanupCompleted) {
+  if (pageRestoreCompleted) {
     try {
       await releaseFullPageCaptureLease(lease.ownerToken);
     } catch (error) {

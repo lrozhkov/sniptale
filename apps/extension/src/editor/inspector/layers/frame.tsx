@@ -39,6 +39,7 @@ export function LayerPanelFrame(props: LayerPanelFrameProps) {
           autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
           expanded={props.expanded}
           layerCount={props.layerCount}
+          streamlined={props.fillContainer}
           {...(props.onCollapsePanel === undefined
             ? {}
             : { onCollapsePanel: props.onCollapsePanel })}

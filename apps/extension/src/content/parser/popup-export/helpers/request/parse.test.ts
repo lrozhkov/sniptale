@@ -10,7 +10,7 @@ function createExportOptions() {
     includeFiles: true,
     includeImages: false,
     includeBasicLogs: true,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeCssDiagnostics: true,
     includeFullPageScreenshot: false,
   };
@@ -28,17 +28,6 @@ it('parses popup export requests and rejects malformed payloads', () => {
   ).toEqual({
     exportRunId: 'export-run-1',
     type: MessageType.EXPORT_POPUP_CANCEL,
-  });
-  expect(
-    parsePopupExportRequest({
-      options: createExportOptions(),
-      requestId: 'req-1',
-      type: MessageType.EXPORT_POPUP_START,
-    })
-  ).toEqual({
-    options: createExportOptions(),
-    requestId: 'req-1',
-    type: MessageType.EXPORT_POPUP_START,
   });
   expect(
     parsePopupExportRequest({
@@ -70,26 +59,12 @@ it('parses popup export requests and rejects malformed payloads', () => {
       type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
     })
   ).toBe(null);
-  expect(parsePopupExportRequest({ requestId: 42, type: MessageType.EXPORT_POPUP_START })).toBe(
+  expect(parsePopupExportRequest({ requestId: 'req-1', type: 'RETIRED_EXPORT_MESSAGE' })).toBe(
     null
   );
 });
 
-it('preserves popup export content intent grants', () => {
-  expect(
-    parsePopupExportRequest({
-      contentIntentGrant: { grantToken: 'grant-start' },
-      options: createExportOptions(),
-      requestId: 'req-1',
-      type: MessageType.EXPORT_POPUP_START,
-    })
-  ).toEqual({
-    contentIntentGrant: { grantToken: 'grant-start' },
-    options: createExportOptions(),
-    requestId: 'req-1',
-    type: MessageType.EXPORT_POPUP_START,
-  });
-
+it('keeps package requests data-only', () => {
   expect(
     parsePopupExportRequest({
       batchRequestId: 'batch-2',
@@ -99,7 +74,6 @@ it('preserves popup export content intent grants', () => {
     })
   ).toEqual({
     batchRequestId: 'batch-2',
-    contentIntentGrant: { grantToken: 'grant-package' },
     options: createExportOptions(),
     type: MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   });

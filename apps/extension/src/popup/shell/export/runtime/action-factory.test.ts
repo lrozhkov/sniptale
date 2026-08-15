@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const actionMocks = vi.hoisted(() => ({
   cancelPopupExportMock: vi.fn(),
   copyPopupExportPreviewMock: vi.fn(),
+  resetPopupExportViewMock: vi.fn(),
   saveWebSnapshotFromPopupMock: vi.fn(),
   startPopupExportMock: vi.fn(),
 }));
@@ -21,6 +22,10 @@ vi.mock('./start/execute', () => ({
 
 vi.mock('./snapshot', () => ({
   saveWebSnapshotFromPopup: actionMocks.saveWebSnapshotFromPopupMock,
+}));
+
+vi.mock('./reset', () => ({
+  resetPopupExportView: actionMocks.resetPopupExportViewMock,
 }));
 
 import { createPopupExportRuntimeActions } from './action-factory';
@@ -42,12 +47,13 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
     createRequestId: vi.fn(),
     getActiveTabId: vi.fn(),
     requestPreview: vi.fn(),
-    saveArchiveBlob: vi.fn(),
+    requestAllUrlsPermission: vi.fn(),
     scheduleTimeout: vi.fn(),
-    sendBuildPackageMessage: vi.fn(),
-    sendCancelMessage: vi.fn(),
+    sendCancelJobMessage: vi.fn(),
+    sendAckJobStatusMessage: vi.fn(),
+    sendGetJobStatusMessage: vi.fn(),
     sendSaveWebSnapshotMessage: vi.fn(),
-    sendStartMessage: vi.fn(),
+    sendStartJobMessage: vi.fn(),
     writeClipboardText: vi.fn(),
   };
 
@@ -58,6 +64,7 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
   await actions.handleStartExport();
   await actions.handleSaveWebSnapshot();
   await actions.handleCancelExport();
+  await actions.handleResetExportView();
 
   expect(actionMocks.copyPopupExportPreviewMock).toHaveBeenNthCalledWith(1, state, 'json', deps);
   expect(actionMocks.copyPopupExportPreviewMock).toHaveBeenNthCalledWith(
@@ -69,4 +76,5 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
   expect(actionMocks.startPopupExportMock).toHaveBeenCalledWith(state, deps);
   expect(actionMocks.saveWebSnapshotFromPopupMock).toHaveBeenCalledWith(state, deps);
   expect(actionMocks.cancelPopupExportMock).toHaveBeenCalledWith(state, deps);
+  expect(actionMocks.resetPopupExportViewMock).toHaveBeenCalledWith(state, deps);
 });

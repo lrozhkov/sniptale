@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../../../platform/i18n/popup';
 import { cx, formatPhaseLabel } from '../selection/utils';
 import type { PopupExportProgressStep } from './steps';
 import {

@@ -6,6 +6,7 @@ type VideoMediaDeviceOption = { deviceId: string; label: string };
 export function VideoMediaDeviceSelector({
   ariaLabel,
   currentDeviceId,
+  description,
   devices,
   emptyText,
   isLoading,
@@ -18,6 +19,7 @@ export function VideoMediaDeviceSelector({
 }: {
   ariaLabel: string;
   currentDeviceId: string | null;
+  description: string;
   devices: VideoMediaDeviceOption[];
   emptyText: string;
   isLoading: boolean;
@@ -30,6 +32,8 @@ export function VideoMediaDeviceSelector({
     disabled?: boolean;
     label: string;
     panel: ReactNode;
+    panelDescription: string;
+    panelTitle: string;
     title?: string;
   };
   selectAriaLabel: string;
@@ -43,6 +47,7 @@ export function VideoMediaDeviceSelector({
   return (
     <InlineCurtainSelect
       ariaLabel={selectAriaLabel || ariaLabel}
+      description={description}
       emptyText={fallbackText}
       label={label}
       onChange={(value) => onDeviceChange(value)}

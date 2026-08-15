@@ -10,6 +10,7 @@ const videoSetupBodyMocks = vi.hoisted(() => ({
   webcamSelectorMock: vi.fn(),
   recordingPanelMock: vi.fn(),
   presetSelectorMock: vi.fn(),
+  recordingAreaSelectorMock: vi.fn(),
   settingsGridMock: vi.fn(),
   toggleGridMock: vi.fn(),
   warningsMock: vi.fn(),
@@ -59,6 +60,10 @@ vi.mock('./options', (_importOriginal) => ({
   VideoPresetSelector: (props: unknown) => {
     videoSetupBodyMocks.presetSelectorMock(props);
     return <div data-testid="preset-selector">preset</div>;
+  },
+  VideoRecordingAreaSelector: (props: unknown) => {
+    videoSetupBodyMocks.recordingAreaSelectorMock(props);
+    return <div data-testid="recording-area-selector">recording-area</div>;
   },
 }));
 
@@ -162,6 +167,7 @@ beforeEach(() => {
   videoSetupBodyMocks.webcamSelectorMock.mockReset();
   videoSetupBodyMocks.presetSelectorMock.mockReset();
   videoSetupBodyMocks.recordingPanelMock.mockReset();
+  videoSetupBodyMocks.recordingAreaSelectorMock.mockReset();
   videoSetupBodyMocks.settingsGridMock.mockReset();
   videoSetupBodyMocks.toggleGridMock.mockReset();
   videoSetupBodyMocks.warningsMock.mockReset();
@@ -187,6 +193,7 @@ function expectSetupSectionOrder() {
   expectTestIdBefore('microphone-selector', 'webcam-selector');
   expectTestIdBefore('webcam-selector', 'preset-selector');
   expectTestIdBefore('preset-selector', 'settings-surface');
+  expectTestIdBefore('settings-surface', 'recording-area-selector');
 }
 
 function expectSelectorProps(props: React.ComponentProps<typeof VideoSetupBody>) {
@@ -209,7 +216,6 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
       captureMode: CaptureMode.TAB,
       controlledCursorDisabled: true,
       controlledCursorDisabledReason: 'Desktop app required',
-      diagnosticsDisabled: false,
       systemAudioDisabled: true,
     })
   );
@@ -235,6 +241,12 @@ function expectSetupControlProps(props: React.ComponentProps<typeof VideoSetupBo
       settings: props.settings,
     })
   );
+  expect(videoSetupBodyMocks.recordingAreaSelectorMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      captureMode: CaptureMode.TAB,
+      onCaptureModeChange: props.onCaptureModeChange,
+    })
+  );
   expect(videoSetupBodyMocks.warningsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       startError: 'boom',
@@ -250,8 +262,8 @@ it('composes capture, preset, toggle, settings, and warning sections from the vi
   const props = await renderBody();
 
   const setupSection = container?.querySelector('section');
-  expect(setupSection?.className).toContain('px-3 py-2 pr-2');
-  expect(setupSection?.className).not.toContain('p-3');
+  expect(setupSection?.className).toContain('p-3');
+  expect(setupSection?.className).not.toContain('pr-2');
   expectSetupSectionOrder();
   expectSelectorProps(props);
   expectSetupControlProps(props);
@@ -276,6 +288,7 @@ it('locks webcam and hides screen preset controls in camera mode', async () => {
   expect(videoSetupBodyMocks.webcamSelectorMock).toHaveBeenCalledWith(
     expect.objectContaining({ required: true })
   );
+  expect(videoSetupBodyMocks.recordingAreaSelectorMock).not.toHaveBeenCalled();
 });
 
 it('replaces setup sections with the recording panel while video capture is active', async () => {
@@ -292,5 +305,6 @@ it('replaces setup sections with the recording panel while video capture is acti
   expect(videoSetupBodyMocks.microphoneSelectorMock).not.toHaveBeenCalled();
   expect(videoSetupBodyMocks.webcamSelectorMock).not.toHaveBeenCalled();
   expect(videoSetupBodyMocks.settingsGridMock).not.toHaveBeenCalled();
+  expect(videoSetupBodyMocks.recordingAreaSelectorMock).not.toHaveBeenCalled();
   expect(videoSetupBodyMocks.warningsMock).not.toHaveBeenCalled();
 });

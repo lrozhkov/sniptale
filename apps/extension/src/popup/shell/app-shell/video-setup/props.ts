@@ -24,7 +24,7 @@ function createVideoSetupStateProps(runtime: PopupVideoSetupRuntime) {
     settings: recording.videoSettings,
     captureMode: recording.videoCaptureMode,
     selectedPresetId: recording.selectedPresetId,
-    viewportPresets: runtime.home.viewportPresets,
+    viewportPresets: runtime.viewportPresets,
     activeTabCapabilities: runtime.environment.activeTabCapabilities,
     microphoneDevices: recording.microphoneDevices,
     isLoadingMicrophones: recording.isLoadingMicrophones,

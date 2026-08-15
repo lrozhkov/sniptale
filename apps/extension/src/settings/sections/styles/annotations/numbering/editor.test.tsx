@@ -24,6 +24,8 @@ function actions(): StepBadgePresetCatalogController['actions'] {
     moveBefore: vi.fn(),
     reset: vi.fn(async () => undefined),
     save: vi.fn(async () => undefined),
+    setNewSessionEnabled: vi.fn(async () => undefined),
+    setNewSessionTemplateSource: vi.fn(async () => undefined),
     setDefault: vi.fn(async () => undefined),
     toggle: vi.fn(async () => undefined),
   };

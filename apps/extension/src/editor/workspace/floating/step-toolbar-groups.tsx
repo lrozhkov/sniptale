@@ -166,7 +166,7 @@ export function isStepToolbarCommandSet(commands: CompactCommand[]): boolean {
   return commands.some((command) => command.id.startsWith('step-'));
 }
 
-export function sortStepToolbarGroups(groups: FloatingToolbarGroup[]): FloatingToolbarGroup[] {
+function sortStepToolbarGroups(groups: FloatingToolbarGroup[]): FloatingToolbarGroup[] {
   return groups.sort(
     (left, right) =>
       STEP_GROUP_ORDER.indexOf(left.id as StepGroupId) -

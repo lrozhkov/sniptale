@@ -9,7 +9,6 @@ import { setVideoRecordingTabId } from '../session-state';
 import { announceCaptureSource, resolveCaptureSourceForMode } from './flow';
 import {
   prepareContentSurfaceOrAbort,
-  enableViewportCursorProjectionOrAbort,
   ensureOffscreenDocumentReadyOrAbort,
 } from './transport.resolve';
 import { getVideoRecordingId } from '../session-state';
@@ -89,16 +88,6 @@ export async function initializeRecordingContext(props: {
 
   const viewport = await prepareContentSurfaceOrAbort(tabId, captureMode, settings, recordingId);
   if (viewport === null) return null;
-  if (
-    surface?.target === 'viewport' &&
-    !(await enableViewportCursorProjectionOrAbort(tabId, captureMode, {
-      generation: surface.generation,
-      recordingId,
-    }))
-  ) {
-    return null;
-  }
-
   // The stream ID is intentionally acquired only after the final surface and crop UI are ready.
   const captureSource = await resolveCaptureSourceForMode(tabId, tab, captureMode, settings);
   if (!captureSource) return null;

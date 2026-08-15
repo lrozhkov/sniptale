@@ -28,7 +28,7 @@ export interface OffscreenStartRecordingMessage {
   streamInstanceId: string;
   surface?: {
     presetId: string;
-    target: 'viewport' | 'window';
+    target: 'window';
     width: number;
     height: number;
   };
@@ -49,26 +49,6 @@ export interface OffscreenBeginRecordingMessage {
   recordingId: string;
   generation: number;
   streamInstanceId: string;
-}
-
-export interface OffscreenRevalidateSourceMessage {
-  type: typeof VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
-  capabilityToken: string;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId?: string;
-  viewport?: ViewportInfo;
-}
-
-export interface OffscreenSetViewportDrawStateMessage {
-  type: typeof VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
-  capabilityToken: string;
-  frozen: boolean;
-  recordingId: string;
-  generation: number;
-  streamInstanceId: string;
-  transitionId: string;
 }
 
 export interface OffscreenRecordingStartedMessage {

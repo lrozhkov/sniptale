@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n/popup';
 import {
   getStoredThemePreference,
   resolveAppTheme,
@@ -12,6 +12,11 @@ import {
 } from '../../theme/index';
 
 const logger = createLogger({ namespace: 'shared:ui:popup-footer' });
+const THEME_ICON_CLASS_NAME = [
+  'h-3.5 w-3.5 transition-transform duration-200 ease-out',
+  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
+  'motion-reduce:transition-none',
+].join(' ');
 
 function resolveFooterTheme(): AppTheme {
   const preference = getStoredThemePreference() ?? 'system';
@@ -21,7 +26,7 @@ function resolveFooterTheme(): AppTheme {
 
 function getFooterThemeButtonClassName() {
   return [
-    'inline-flex h-7 w-7 items-center justify-center rounded-full border-none transition-colors',
+    'group inline-flex h-7 w-7 items-center justify-center rounded-full border-none transition-colors',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_88%,transparent)]',
     'text-[var(--sniptale-color-accent)]',
     'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_96%,transparent)]',
@@ -132,7 +137,7 @@ export function PopupFooterThemeToggle() {
         onClick={() => setNextPreference(nextPreference)}
         className={getFooterThemeButtonClassName()}
       >
-        <ThemeIcon className="h-3.5 w-3.5" />
+        <ThemeIcon className={THEME_ICON_CLASS_NAME} />
       </button>
     </div>
   );

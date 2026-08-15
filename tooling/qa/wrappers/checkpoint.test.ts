@@ -303,6 +303,7 @@ it('keeps harness-only checkpoint ready for build after a fresh harness stamp', 
         fingerprint: 'same-diff',
       }),
       formatStepCollector: () => okStep('Format'),
+      harnessInventoryViolationCollector: () => [],
       harnessStateAsserter: () => undefined,
       advisoryStepCollector: () => {
         throw new Error('advisory should not run without product targets');

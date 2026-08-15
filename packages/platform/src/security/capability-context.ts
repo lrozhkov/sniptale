@@ -1,8 +1,5 @@
 export type CapabilityScope =
-  | 'debugger:attach'
   | 'content:privileged-action'
-  | 'export:har'
-  | 'export:har:start'
   | 'export:video-project:cancel'
   | 'export:video-project:start'
   | 'gallery:image-update'

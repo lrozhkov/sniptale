@@ -4,7 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -22,7 +23,7 @@ function createToggleProps(): ExportOptionToggleProps {
     includeCssDiagnostics: true,
     includeFiles: true,
     includeFullPageScreenshot: true,
-    includeHarDomLogs: true,
+    includePageDiagnostics: true,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -31,7 +32,7 @@ function createToggleProps(): ExportOptionToggleProps {
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),

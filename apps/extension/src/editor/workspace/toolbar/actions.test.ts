@@ -59,10 +59,21 @@ it('opens and closes file and resize inspectors through their dedicated modes', 
   expect(resizeOpen.controller.setActiveTool).toHaveBeenCalledWith('crop');
   expect(resizeOpen.setInspector).toHaveBeenCalledWith('canvas-size');
 
+  const imageSizeOpen = args('tool');
+  createEditorToolbarActions(imageSizeOpen).toggleInspector('image-size');
+  expect(imageSizeOpen.controller.setActiveTool).toHaveBeenCalledWith('select');
+  expect(imageSizeOpen.setInspector).toHaveBeenCalledWith('image-size');
+
   const resizeClose = args('canvas-size');
-  createEditorToolbarActions(resizeClose).toggleInspector('image-size');
+  createEditorToolbarActions(resizeClose).toggleInspector('canvas-size');
   expect(resizeClose.controller.cancelCropMode).toHaveBeenCalledOnce();
   expect(resizeClose.setInspector).toHaveBeenCalledWith('tool');
+
+  const resizeSwitch = args('canvas-size');
+  createEditorToolbarActions(resizeSwitch).toggleInspector('image-size');
+  expect(resizeSwitch.controller.cancelCropMode).toHaveBeenCalledOnce();
+  expect(resizeSwitch.controller.setActiveTool).toHaveBeenCalledWith('select');
+  expect(resizeSwitch.setInspector).toHaveBeenCalledWith('image-size');
 });
 
 it('toggles ordinary inspectors while keeping select mode active', () => {
@@ -74,4 +85,14 @@ it('toggles ordinary inspectors while keeping select mode active', () => {
   createEditorToolbarActions(close).toggleInspector('frame');
   expect(close.setInspector).toHaveBeenCalledWith('tool');
   expect(close.controller.setActiveTool).toHaveBeenCalledWith('select');
+
+  const leaveCropForFrame = args('canvas-size');
+  createEditorToolbarActions(leaveCropForFrame).toggleInspector('frame');
+  expect(leaveCropForFrame.controller.cancelCropMode).toHaveBeenCalledOnce();
+  expect(leaveCropForFrame.setInspector).toHaveBeenCalledWith('frame');
+
+  const leaveCropForLayers = args('canvas-size');
+  createEditorToolbarActions(leaveCropForLayers).activateTool('select');
+  expect(leaveCropForLayers.controller.cancelCropMode).toHaveBeenCalledOnce();
+  expect(leaveCropForLayers.setInspector).toHaveBeenCalledWith('tool');
 });

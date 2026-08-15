@@ -1,50 +1,39 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
-const popupIndexMocks = vi.hoisted(() => ({
-  finishPopupPerfSpanOnNextFrameMock: vi.fn(),
-  PageBootstrapErrorBoundaryMock: vi.fn(),
-  popupSpan: { end: vi.fn(), fail: vi.fn() },
-  renderPageShellMock: vi.fn(),
-  startPopupPerfSpanMock: vi.fn(),
-  trackPopupPerfAsyncMock: vi.fn(),
+const mocks = vi.hoisted(() => ({
+  mark: vi.fn(),
+  renderPageShell: vi.fn(),
 }));
 
-vi.mock('../../../ui/page-bootstrap', () => ({
-  PageBootstrapErrorBoundary: popupIndexMocks.PageBootstrapErrorBoundaryMock,
-  renderPageShell: popupIndexMocks.renderPageShellMock,
+vi.mock('../../../ui/page-bootstrap/page-bootstrap', () => ({
+  renderPageShell: mocks.renderPageShell,
 }));
 
-vi.mock('./index', () => ({
-  PopupApp: () => null,
-}));
+vi.mock('./index', () => ({ PopupApp: () => null }));
 
-vi.mock('../../diagnostics/performance', () => ({
-  finishPopupPerfSpanOnNextFrame: popupIndexMocks.finishPopupPerfSpanOnNextFrameMock,
-  startPopupPerfSpan: popupIndexMocks.startPopupPerfSpanMock,
-  trackPopupPerfAsync: popupIndexMocks.trackPopupPerfAsyncMock,
-}));
+beforeEach(() => {
+  vi.resetModules();
+  vi.clearAllMocks();
+  document.body.innerHTML = '<div id="root"></div>';
+  vi.spyOn(performance, 'mark').mockImplementation(mocks.mark);
+});
 
-describe('popup index entrypoint', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-    popupIndexMocks.startPopupPerfSpanMock.mockReturnValue(popupIndexMocks.popupSpan);
+it('renders the real React shell synchronously from the entry module', async () => {
+  await import('../..');
+
+  expect(mocks.mark).toHaveBeenCalledWith('sniptale-popup-entry-evaluated');
+  expect(mocks.renderPageShell).toHaveBeenCalledWith({
+    element: expect.anything(),
+    initializeTheme: false,
+    namespace: 'popup',
   });
+});
 
-  it('renders the popup through the shared shell and preserves the perf callback', async () => {
-    await import('../..');
+it('does not wait for synchronous theme initialization before rendering', async () => {
+  await import('../..');
 
-    expect(popupIndexMocks.renderPageShellMock).toHaveBeenCalledTimes(1);
-    const options = popupIndexMocks.renderPageShellMock.mock.calls[0]?.[0] as
-      | { onRendered?: () => void; namespace: string }
-      | undefined;
-
-    expect(options?.namespace).toBe('PopupEntrypoint');
-    options?.onRendered?.();
-    expect(popupIndexMocks.finishPopupPerfSpanOnNextFrameMock).toHaveBeenCalledWith(
-      popupIndexMocks.popupSpan
-    );
-  });
+  expect(mocks.renderPageShell).toHaveBeenCalledOnce();
+  expect(mocks.renderPageShell.mock.calls[0]?.[0]).toMatchObject({ initializeTheme: false });
 });

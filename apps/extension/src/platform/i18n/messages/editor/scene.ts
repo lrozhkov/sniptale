@@ -105,6 +105,10 @@ export const editorSceneMessages = defineMessageSource({
     ru: 'Фон',
     en: 'Background',
   },
+  backgroundBlurAmount: {
+    ru: 'Размытие фона',
+    en: 'Background blur',
+  },
   expandCanvasDescription: {
     ru: sentence(
       'Документ увеличивается вокруг текущего изображения.',

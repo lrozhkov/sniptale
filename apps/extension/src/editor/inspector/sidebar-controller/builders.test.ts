@@ -1,12 +1,16 @@
 import { act } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
-const actionRailMocks = vi.hoisted(() => ({ exportSession: vi.fn() }));
+const actionRailMocks = vi.hoisted(() => ({ clearPageSession: vi.fn(), exportSession: vi.fn() }));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 vi.mock('./action-rail', () => ({
   createEditorActionRailHandlers: () => actionRailMocks,
+}));
+vi.mock('../../document/page-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/page-session')>()),
+  clearEditorPageSession: actionRailMocks.clearPageSession,
 }));
 import {
   createEditorInspectorControllerActions,
@@ -212,6 +216,13 @@ it('keeps controller method bindings intact for layer-effect opening', () => {
 it('keeps close-document confirmation while raster-only actions run immediately', async () => {
   const store = createStoreSlice();
   const controller = createController();
+  const discardDraft = vi
+    .fn<() => Promise<void>>()
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('autosave cleanup failed'));
+  Object.assign(controller, {
+    autosaveService: { discardDraft, flushAutosave: vi.fn(async () => undefined) },
+  });
   const setSavePresetPickerOpen = vi.fn();
   const requestConfirm = vi.fn(
     async (dialog?: { title?: string }) => dialog?.title === 'editor.documentActions.closeFile'
@@ -246,10 +257,15 @@ it('keeps close-document confirmation while raster-only actions run immediately'
     setSavePresetPickerOpen,
   });
 
-  closeWithoutImage();
-  closeWithImage();
+  await closeWithoutImage();
+  await expect(closeWithImage()).rejects.toThrow('autosave cleanup failed');
   await act(async () => undefined);
 
   expect(setSavePresetPickerOpen).toHaveBeenCalledWith(false);
+  expect(discardDraft).toHaveBeenCalledTimes(2);
+  expect(discardDraft.mock.invocationCallOrder[0]).toBeLessThan(
+    actionRailMocks.clearPageSession.mock.invocationCallOrder[0]!
+  );
   expect(controller.closeDocument).toHaveBeenCalledTimes(2);
+  expect(actionRailMocks.clearPageSession).toHaveBeenCalledTimes(2);
 });

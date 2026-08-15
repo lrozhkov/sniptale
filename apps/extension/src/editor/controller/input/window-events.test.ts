@@ -33,10 +33,19 @@ vi.mock('./keyboard-action-runner/dispatch', async (importOriginal) => ({
   applyEditorKeyboardAction: mocks.applyEditorKeyboardAction,
 }));
 
-import { handleEditorWindowKeyDown, handleEditorWindowKeyUp } from './window-events';
+import {
+  handleEditorWindowBlur,
+  handleEditorWindowKeyDown,
+  handleEditorWindowKeyUp,
+  resolveEditorSpaceKeyUp,
+} from './window-events';
 
 function createKeyDownOptions(overrides: Record<string, unknown> = {}) {
-  const activeObject = { isEditing: true, sniptaleId: 'text-1' };
+  const activeObject = {
+    hiddenTextarea: document.createElement('textarea'),
+    isEditing: true,
+    sniptaleId: 'text-1',
+  };
   return {
     activeTool: 'select',
     altKey: false,
@@ -58,6 +67,7 @@ function createKeyDownOptions(overrides: Record<string, unknown> = {}) {
     hasDrawSession: true,
     hasRasterSelection: true,
     key: 'b',
+    isComposing: false,
     metaKey: false,
     nudgeSelection: vi.fn(),
     pasteRasterClipboard: vi.fn(),
@@ -93,6 +103,7 @@ it('adapts full keydown context into keyboard action resolution and command disp
       hasSelectedTextTarget: true,
       hasSelection: true,
       isEditingTextboxSelection: true,
+      isEditingTextboxInput: false,
       targetIsInteractive: false,
     })
   );
@@ -104,6 +115,50 @@ it('adapts full keydown context into keyboard action resolution and command disp
       syncRuntimeState: options.syncRuntimeState,
     })
   );
+});
+
+it('routes Fabric hidden-textarea keys through the active textbox session', () => {
+  mocks.isTextbox.mockReturnValue(true);
+  mocks.isTextTarget.mockReturnValue(true);
+  mocks.isInteractiveShortcutTarget.mockReturnValue(true);
+  const options = createKeyDownOptions({ code: 'Enter', ctrlKey: false, key: 'Enter' });
+  const target = options.canvas.getActiveObject().hiddenTextarea;
+
+  Reflect.apply(handleEditorWindowKeyDown, null, [{ ...options, target }]);
+
+  expect(mocks.resolveEditorKeyboardAction).toHaveBeenCalledWith(
+    expect.objectContaining({
+      isEditingTextboxSelection: true,
+      isEditingTextboxInput: true,
+      targetIsInteractive: true,
+    })
+  );
+});
+
+it('keeps product inputs guarded when a Fabric textbox remains in editing state', () => {
+  mocks.isTextbox.mockReturnValue(true);
+  mocks.isTextTarget.mockReturnValue(true);
+  mocks.isInteractiveShortcutTarget.mockReturnValue(true);
+  const target = document.createElement('input');
+
+  Reflect.apply(handleEditorWindowKeyDown, null, [
+    createKeyDownOptions({ code: 'Enter', key: 'Enter', target }),
+  ]);
+  Reflect.apply(handleEditorWindowKeyDown, null, [
+    createKeyDownOptions({ code: 'Escape', key: 'Escape', target }),
+  ]);
+  Reflect.apply(handleEditorWindowKeyDown, null, [
+    createKeyDownOptions({ code: 'KeyB', ctrlKey: true, key: 'b', target }),
+  ]);
+
+  const expectedOwnership = expect.objectContaining({
+    isEditingTextboxInput: false,
+    isEditingTextboxSelection: true,
+    targetIsInteractive: true,
+  });
+  expect(mocks.resolveEditorKeyboardAction).toHaveBeenNthCalledWith(1, expectedOwnership);
+  expect(mocks.resolveEditorKeyboardAction).toHaveBeenNthCalledWith(2, expectedOwnership);
+  expect(mocks.resolveEditorKeyboardAction).toHaveBeenNthCalledWith(3, expectedOwnership);
 });
 
 it('omits optional keydown callbacks and falls back to no-op runtime sync', () => {
@@ -144,4 +199,14 @@ it('handles keyup finalize and space release branches', () => {
   });
   expect(handleEditorWindowKeyUp({ code: 'KeyA' })).toEqual({});
   expect(finalizeSelectionNudge).toHaveBeenCalledWith('Space');
+});
+
+it('finalizes nudge on blur and exposes the space-key compatibility helper', () => {
+  const finalizeSelectionNudge = vi.fn();
+  handleEditorWindowBlur({ finalizeSelectionNudge });
+  handleEditorWindowBlur({});
+
+  expect(finalizeSelectionNudge).toHaveBeenCalledOnce();
+  expect(resolveEditorSpaceKeyUp('Space')).toBe(true);
+  expect(resolveEditorSpaceKeyUp('KeyA')).toBe(false);
 });

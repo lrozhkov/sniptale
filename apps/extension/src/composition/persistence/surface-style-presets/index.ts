@@ -3,13 +3,17 @@
 import type { SurfaceStylePreset } from '@sniptale/runtime-contracts/highlighter/surface-style';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
+import { createStorageWriteQueue } from '../infrastructure/write-queue';
 import {
   addUserSurfaceStylePreset,
   cloneSurfaceStylePresetCatalog,
   deleteUserSurfaceStylePreset,
-  reorderUserSurfaceStylePresets,
+  reorderSurfaceStylePresetCatalog,
+  resetSystemSurfaceStylePreset,
+  setDefaultSurfaceStylePreset,
+  toggleSurfaceStylePresetEnabled as toggleEnabled,
   toggleSurfaceStylePresetFavorite as toggleFavorite,
-  updateUserSurfaceStylePreset,
+  updateSurfaceStylePresetValues,
 } from './catalog';
 import {
   SURFACE_STYLE_PRESET_STORAGE_KEY,
@@ -26,15 +30,7 @@ import {
 export * from './contracts';
 
 let snapshot: SurfaceStylePresetCatalog | null = null;
-let queue: Promise<void> = Promise.resolve();
-const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
-  const run = queue.catch(() => undefined).then(operation);
-  queue = run.then(
-    () => undefined,
-    () => undefined
-  );
-  return run;
-};
+const enqueue = createStorageWriteQueue();
 const cache = (catalog: SurfaceStylePresetCatalog) => {
   snapshot = cloneSurfaceStylePresetCatalog(catalog);
   return cloneSurfaceStylePresetCatalog(snapshot);
@@ -98,9 +94,18 @@ export const updateSurfaceStylePreset = (
   expectedRevision: number,
   id: string,
   style: SurfaceStylePreset['style']
-) => mutate(expectedRevision, (catalog) => updateUserSurfaceStylePreset(catalog, id, { style }));
+) => mutate(expectedRevision, (catalog) => updateSurfaceStylePresetValues(catalog, id, { style }));
 export const renameSurfaceStylePreset = (expectedRevision: number, id: string, name: string) =>
-  mutate(expectedRevision, (catalog) => updateUserSurfaceStylePreset(catalog, id, { name }));
+  mutate(expectedRevision, (catalog) => updateSurfaceStylePresetValues(catalog, id, { name }));
+export const editSurfaceStylePreset = (
+  expectedRevision: number,
+  id: string,
+  name: string,
+  style: SurfaceStylePreset['style']
+) =>
+  mutate(expectedRevision, (catalog) =>
+    updateSurfaceStylePresetValues(catalog, id, { name, style })
+  );
 export const duplicateSurfaceStylePreset = (
   expectedRevision: number,
   sourceId: string,
@@ -115,8 +120,14 @@ export const duplicateSurfaceStylePreset = (
 export const deleteSurfaceStylePreset = (expectedRevision: number, id: string) =>
   mutate(expectedRevision, (catalog) => deleteUserSurfaceStylePreset(catalog, id));
 export const reorderSurfaceStylePresets = (expectedRevision: number, ids: readonly string[]) =>
-  mutate(expectedRevision, (catalog) => reorderUserSurfaceStylePresets(catalog, ids));
+  mutate(expectedRevision, (catalog) => reorderSurfaceStylePresetCatalog(catalog, ids));
 export const toggleSurfaceStylePresetFavorite = (expectedRevision: number, id: string) =>
   mutate(expectedRevision, (catalog) => toggleFavorite(catalog, id));
+export const toggleSurfaceStylePresetEnabled = (expectedRevision: number, id: string) =>
+  mutate(expectedRevision, (catalog) => toggleEnabled(catalog, id));
+export const setDefaultSurfaceStylePresetId = (expectedRevision: number, id: string) =>
+  mutate(expectedRevision, (catalog) => setDefaultSurfaceStylePreset(catalog, id));
+export const resetSurfaceStylePreset = (expectedRevision: number, id: string) =>
+  mutate(expectedRevision, (catalog) => resetSystemSurfaceStylePreset(catalog, id));
 export const resetSurfaceStylePresetCatalog = (expectedRevision: number) =>
   mutate(expectedRevision, (catalog) => catalog, true);

@@ -2,6 +2,7 @@
 
 import { expect, it, vi } from 'vitest';
 
+import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { applyEditorToolMode } from './tool-mode';
 
 it('keeps selection interactivity when the active object is represented by a matching sniptaleId', () => {
@@ -26,8 +27,8 @@ it('keeps selection interactivity when the active object is represented by a mat
   };
 
   applyEditorToolMode({
-    activeTool: 'select' as never,
-    canvas: canvas as never,
+    activeTool: 'select',
+    canvas: createFabricCanvasFixture(canvas),
     clearCropSelection: vi.fn(),
     hasCropGuide: false,
   });
@@ -50,8 +51,8 @@ it('keeps crop disable flow from clearing the crop selection twice', () => {
   };
 
   applyEditorToolMode({
-    activeTool: 'crop' as never,
-    canvas: canvas as never,
+    activeTool: 'crop',
+    canvas: createFabricCanvasFixture(canvas),
     clearCropSelection,
     enabled: false,
     hasCropGuide: true,
@@ -61,8 +62,13 @@ it('keeps crop disable flow from clearing the crop selection twice', () => {
   expect(clearCropSelection).not.toHaveBeenCalled();
 });
 
-it('keeps locked objects selectable in select mode but unavailable to raster tools', () => {
-  const lockedObject = { sniptaleId: 'locked', sniptaleLocked: true, set: vi.fn() };
+it('keeps locked objects outside hit-testing in every tool mode', () => {
+  const lockedObject = {
+    sniptaleId: 'locked',
+    sniptaleLocked: true,
+    sniptaleType: 'shape',
+    set: vi.fn(),
+  };
   const canvas = {
     defaultCursor: 'default',
     freeDrawingBrush: null,
@@ -74,20 +80,51 @@ it('keeps locked objects selectable in select mode but unavailable to raster too
   };
 
   applyEditorToolMode({
-    activeTool: 'select' as never,
-    canvas: canvas as never,
+    activeTool: 'select',
+    canvas: createFabricCanvasFixture(canvas),
     clearCropSelection: vi.fn(),
     hasCropGuide: false,
   });
-  expect(lockedObject.set).toHaveBeenLastCalledWith({ evented: true, selectable: true });
+  expect(lockedObject.set).toHaveBeenLastCalledWith({ evented: false, selectable: false });
 
   applyEditorToolMode({
-    activeTool: 'brush' as never,
-    canvas: canvas as never,
+    activeTool: 'pencil',
+    canvas: createFabricCanvasFixture(canvas),
     clearCropSelection: vi.fn(),
     hasCropGuide: false,
   });
   expect(lockedObject.set).toHaveBeenLastCalledWith(
     expect.objectContaining({ evented: false, selectable: false })
   );
+
+  lockedObject.sniptaleType = 'text';
+  applyEditorToolMode({
+    activeTool: 'text',
+    canvas: createFabricCanvasFixture(canvas),
+    clearCropSelection: vi.fn(),
+    hasCropGuide: false,
+  });
+  expect(lockedObject.set).toHaveBeenLastCalledWith({ evented: false, selectable: false });
+});
+
+it('keeps the drawing cursor owned by the active tool mode', () => {
+  const canvas = {
+    defaultCursor: 'default',
+    freeDrawingBrush: null,
+    getActiveObjects: () => [],
+    getObjects: () => [],
+    isDrawingMode: false,
+    selection: true,
+    skipTargetFind: false,
+  };
+
+  applyEditorToolMode({
+    activeTool: 'pencil',
+    canvas: createFabricCanvasFixture(canvas),
+    clearCropSelection: vi.fn(),
+    hasCropGuide: false,
+  });
+
+  expect(canvas.defaultCursor).toBe('crosshair');
+  expect(canvas.selection).toBe(false);
 });

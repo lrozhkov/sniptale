@@ -6,7 +6,7 @@ const {
   collectAdvancedLogAssetsMock,
   collectCoreLogAssetsMock,
   collectCssDiagnosticAssetsMock,
-  collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManagerMock,
   buildExportPagePackageMock,
   createExportArchiveBlobMock,
   createExportStatsMock,
@@ -18,7 +18,7 @@ const {
   collectAdvancedLogAssetsMock: vi.fn(),
   collectCoreLogAssetsMock: vi.fn(),
   collectCssDiagnosticAssetsMock: vi.fn(),
-  collectFilesWithHarForExportManagerMock: vi.fn(),
+  collectFilesForExportManagerMock: vi.fn(),
   buildExportPagePackageMock: vi.fn(),
   createExportArchiveBlobMock: vi.fn(),
   createExportStatsMock: vi.fn(),
@@ -62,7 +62,7 @@ vi.mock('./runtime', async (importOriginal) => ({
 }));
 
 vi.mock('../archive/transfer', () => ({
-  collectFilesWithHarForExportManager: collectFilesWithHarForExportManagerMock,
+  collectFilesForExportManager: collectFilesForExportManagerMock,
 }));
 
 import { createExportManagerService } from '.';
@@ -73,7 +73,7 @@ function createExportOptions(overrides: Record<string, boolean> = {}) {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: false,
     includeMarkdown: false,
@@ -130,7 +130,7 @@ describe('export-manager service branch coverage', () => {
       return [];
     });
 
-    collectFilesWithHarForExportManagerMock.mockImplementation(
+    collectFilesForExportManagerMock.mockImplementation(
       async (_tree, _options, _warnings, control) => {
         expect(control.createCancelledError().message).toBe('content.runtime.exportCancelled');
         expect(control.isCancelled()).toBe(false);
@@ -144,7 +144,6 @@ describe('export-manager service branch coverage', () => {
         return {
           collectedFiles: undefined,
           downloadResult: undefined,
-          sessionHar: null,
         };
       }
     );

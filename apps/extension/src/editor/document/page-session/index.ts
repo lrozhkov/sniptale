@@ -63,6 +63,37 @@ export function replaceEditorPageAggregateId(aggregateId: string): void {
   window.history.replaceState({}, '', buildCurrentEditorAggregateUrl(aggregateId));
 }
 
+/** Starts a fresh standalone draft for a local image opened in the current editor tab. */
+export function beginEditorPageLocalDraft(args: {
+  autosaveService: Pick<EditorSessionAutosaveService, 'activate'>;
+  renderPresentation: () => Promise<string> | string;
+  sourceTitle: string;
+}): string {
+  const aggregateId = createAggregateId();
+  const url = new URL(window.location.href);
+  url.searchParams.set('assetId', aggregateId);
+  url.searchParams.delete(EDITOR_BOOTSTRAP_QUERY_PARAM);
+  url.searchParams.delete('session');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  args.autosaveService.activate({
+    aggregateId,
+    durableRevision: 0,
+    renderPresentation: args.renderPresentation,
+    sourceTitle: args.sourceTitle,
+    sourceUrl: '',
+  });
+  return aggregateId;
+}
+
+/** Ends the current page session without deleting its library asset or persisted workspace. */
+export function clearEditorPageSession(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('assetId');
+  url.searchParams.delete(EDITOR_BOOTSTRAP_QUERY_PARAM);
+  url.searchParams.delete('session');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+}
+
 /**
  * Reads the current editor location params that affect session restore semantics.
  */

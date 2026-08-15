@@ -1,9 +1,9 @@
 // policyStateId: video-capture-surface-sessions
-// Navigation recovery restores page-owned effects without interrupting the media recorder.
+// Navigation restores page-owned effects; the native tab stream remains uninterrupted.
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
-import { getVideoSurfaceSession } from '../../../capture-surface';
+import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoRecordingRuntimeState } from '../../session-state';
+import { stopRecording } from '../controls.stop';
 import {
   isCurrentNavigationBinding,
   resolveNavigationBinding,
@@ -14,53 +14,27 @@ import {
   beginTabNavigationPageEffects,
   resolveTabNavigationPageEffects,
   restoreTabNavigationPageEffects,
-  restoreViewportCursorProjectionBeforeThaw,
   suspendTabNavigationPageEffects,
-  type TabNavigationPageEffects,
   type TabNavigationPageAccessVerifier,
+  type TabNavigationPageEffects,
 } from './page-effects';
-import {
-  createExactOutputTransitionId,
-  freezeExactOutput,
-  resetExactOutputTransitionForTests,
-  serializeExactOutputWork,
-  stopAfterCriticalOutputFailure as stopBoundRecordingAfterCriticalOutputFailure,
-  thawExactOutput,
-} from './output-transition';
-import { reassertViewportSurface, revalidateTabSource } from './source-validation';
 
 const logger = createLogger({ namespace: 'BackgroundVideoTabNavigationTransaction' });
+const REQUIRED_CROP_STOP_RETRY_DELAYS_MS = [0, 250, 1000, 2000] as const;
 
 type TabNavigationTransaction = {
   binding: NavigationBinding;
   completion: Promise<void> | null;
   documentId: string | null;
   effects: TabNavigationPageEffects;
-  failureHandling: Promise<void> | null;
   navigationEpoch: number | null;
-  outputFrozen: boolean;
-  outputTransitionId: string | null;
-  outputSuspension: Promise<OperationResult>;
   preparation: Promise<boolean>;
   pageAccessVerifier: TabNavigationPageAccessVerifier | null;
-  reassertViewport: boolean;
-  requiresExactOutputRecovery: boolean;
-  revalidateSource: boolean;
   shouldResume: boolean;
-  viewportReassertion: Promise<OperationResult> | null;
+  stopAfterRequiredFailure: Promise<void> | null;
 };
 
-type OperationResult = { ok: true } | { error: unknown; ok: false };
-
 let activeTransaction: TabNavigationTransaction | null = null;
-const navigationIdleWaiters = new Set<() => void>();
-
-function observeOperation(work: Promise<void>): Promise<OperationResult> {
-  return work.then(
-    () => ({ ok: true }),
-    (error: unknown) => ({ error, ok: false })
-  );
-}
 
 function isCurrentTransaction(transaction: TabNavigationTransaction): boolean {
   return activeTransaction === transaction && isCurrentNavigationBinding(transaction.binding);
@@ -77,89 +51,66 @@ function createEffectBinding(transaction: TabNavigationTransaction) {
   };
 }
 
-function abandonCurrentTransaction(transaction: TabNavigationTransaction, error: unknown): void {
+function clearActiveTransaction(transaction: TabNavigationTransaction): void {
+  if (activeTransaction !== transaction) return;
+  activeTransaction = null;
+}
+
+function abandonTransaction(transaction: TabNavigationTransaction, error: unknown): void {
   if (!isCurrentTransaction(transaction)) return;
-  logger.warn('Tab recording page recovery was skipped; media recording continues', error);
+  logger.warn('Tab page effects could not be restored; media recording continues', error);
   abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
   clearActiveTransaction(transaction);
 }
 
-function resolveNavigationIdleWaiters(): void {
-  for (const resolve of navigationIdleWaiters) resolve();
-  navigationIdleWaiters.clear();
-}
-
-function clearActiveTransaction(transaction: TabNavigationTransaction): void {
-  if (activeTransaction !== transaction) return;
-  activeTransaction = null;
-  resolveNavigationIdleWaiters();
-}
-
-async function stopAfterCriticalOutputFailure(
+async function stopAfterRequiredCropFailure(
   transaction: TabNavigationTransaction,
   error: unknown
 ): Promise<void> {
   if (!isCurrentTransaction(transaction)) return;
-  if (transaction.failureHandling) return transaction.failureHandling;
-  let handling: Promise<void>;
-  handling = performCriticalOutputFailureStop(transaction, error).finally(() => {
-    if (transaction.failureHandling === handling) transaction.failureHandling = null;
+  if (transaction.stopAfterRequiredFailure) return transaction.stopAfterRequiredFailure;
+  let stop: Promise<void>;
+  stop = performRequiredCropStop(transaction, error).finally(() => {
+    if (transaction.stopAfterRequiredFailure === stop) {
+      transaction.stopAfterRequiredFailure = null;
+    }
   });
-  transaction.failureHandling = handling;
-  return handling;
+  transaction.stopAfterRequiredFailure = stop;
+  return stop;
 }
 
-async function performCriticalOutputFailureStop(
+async function performRequiredCropStop(
   transaction: TabNavigationTransaction,
   error: unknown
 ): Promise<void> {
-  if (!isCurrentTransaction(transaction)) return;
-  const result = await stopBoundRecordingAfterCriticalOutputFailure({
-    beforeStop: () =>
-      abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction)),
-    ...(transaction.outputTransitionId ? { compensate: () => resumeExactOutput(transaction) } : {}),
-    error,
-    isCurrent: () => isCurrentTransaction(transaction),
-  });
-  if (result === 'stopped' || (result === 'compensated' && !transaction.outputFrozen)) {
-    clearActiveTransaction(transaction);
+  logger.error('Required recording-region restoration failed; stopping bound recording', error);
+  abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
+  let attempt = 0;
+  while (isCurrentTransaction(transaction)) {
+    let failure: unknown;
+    try {
+      const result = await stopRecording(false);
+      if (result.result !== 'failed' && result.result !== 'already-stopping') {
+        clearActiveTransaction(transaction);
+        return;
+      }
+      failure = result.result === 'failed' ? result.error : result.result;
+    } catch (error) {
+      failure = error;
+    }
+    logger.error('Bound recording stop failed after recording-region restoration failure', {
+      attempt,
+      error: failure,
+      recordingId: transaction.binding.recordingId,
+    });
+    const delayMs =
+      REQUIRED_CROP_STOP_RETRY_DELAYS_MS[
+        Math.min(attempt, REQUIRED_CROP_STOP_RETRY_DELAYS_MS.length - 1)
+      ]!;
+    attempt += 1;
+    await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
   }
-}
-
-function enqueueOutputFreeze(
-  transaction: TabNavigationTransaction,
-  work: () => Promise<OperationResult>
-): Promise<OperationResult> {
-  const runIfCurrent = (): Promise<OperationResult> | OperationResult =>
-    isCurrentTransaction(transaction) ? work() : { ok: true };
-  return serializeExactOutputWork(runIfCurrent);
-}
-
-async function createOutputSuspension(
-  transaction: TabNavigationTransaction,
-  enabled: boolean
-): Promise<OperationResult> {
-  if (!enabled) return { ok: true };
-  return enqueueOutputFreeze(transaction, async () => {
-    const transitionId = transaction.outputTransitionId;
-    if (!transitionId) {
-      return { error: new Error('Tab output transition identity is unavailable'), ok: false };
-    }
-    const result = await observeOperation(
-      freezeExactOutput({
-        binding: transaction.binding,
-        isCurrent: () => isCurrentTransaction(transaction),
-        onApplied: (frozen) => {
-          if (activeTransaction === transaction) transaction.outputFrozen = frozen;
-        },
-        transitionId,
-      })
-    );
-    if (!result.ok && isCurrentTransaction(transaction)) {
-      await stopAfterCriticalOutputFailure(transaction, result.error);
-    }
-    return result;
-  });
+  clearActiveTransaction(transaction);
 }
 
 async function prepareTransaction(transaction: TabNavigationTransaction): Promise<boolean> {
@@ -168,100 +119,35 @@ async function prepareTransaction(transaction: TabNavigationTransaction): Promis
   } catch (error) {
     logger.warn('Recording page effects could not be suspended before navigation', error);
   }
-  return isCurrentNavigationBinding(transaction.binding);
+  return isCurrentTransaction(transaction);
 }
 
 function createTransaction(
   binding: NavigationBinding,
   previous: TabNavigationTransaction | null
-): TabNavigationTransaction | null {
-  const reassertViewport =
-    getVideoSurfaceSession(binding.recordingId)?.applied?.target === 'viewport';
-  const requiresExactOutputRecovery = true;
-  const effects = resolveTabNavigationPageEffects(reassertViewport);
+): TabNavigationTransaction {
+  const effects = resolveTabNavigationPageEffects();
   const transaction: TabNavigationTransaction = {
     binding,
     completion: null,
     documentId: null,
     effects,
-    failureHandling: null,
-    navigationEpoch: previous?.navigationEpoch ?? null,
-    outputFrozen: false,
-    outputTransitionId: null,
-    outputSuspension: Promise.resolve<OperationResult>({ ok: true }),
+    navigationEpoch: previous?.navigationEpoch ?? beginTabNavigationPageEffects(effects),
     preparation: Promise.resolve(false),
     pageAccessVerifier: null,
-    reassertViewport,
-    requiresExactOutputRecovery,
-    revalidateSource: true,
     shouldResume:
       previous?.shouldResume ??
       getVideoRecordingRuntimeState().status === VideoRecordingStatus.RECORDING,
-    viewportReassertion: null,
+    stopAfterRequiredFailure: null,
   };
   activeTransaction = transaction;
-  if (requiresExactOutputRecovery) {
-    try {
-      transaction.outputTransitionId = createExactOutputTransitionId(
-        'Secure navigation transition generation is unavailable'
-      );
-    } catch (error) {
-      transaction.outputSuspension = Promise.resolve({ error, ok: false });
-      void stopAfterCriticalOutputFailure(transaction, error);
-      return transaction;
-    }
-  }
-  transaction.navigationEpoch = previous?.navigationEpoch ?? beginTabNavigationPageEffects(effects);
-  transaction.outputSuspension = createOutputSuspension(transaction, requiresExactOutputRecovery);
-  transaction.preparation = previous?.preparation ?? prepareTransaction(transaction);
+  transaction.preparation = previous
+    ? previous.preparation.then((prepared) => {
+        if (!isCurrentTransaction(transaction)) return false;
+        return prepared ? true : prepareTransaction(transaction);
+      })
+    : prepareTransaction(transaction);
   return transaction;
-}
-
-function startViewportReassertion(transaction: TabNavigationTransaction): void {
-  if (!transaction.reassertViewport || transaction.viewportReassertion) return;
-  transaction.viewportReassertion = transaction.outputSuspension.then((suspension) =>
-    suspension.ok && isCurrentTransaction(transaction)
-      ? observeOperation(reassertViewportSurface(transaction.binding))
-      : suspension
-  );
-}
-
-async function resumeExactOutput(transaction: TabNavigationTransaction): Promise<void> {
-  const transitionId = transaction.outputTransitionId;
-  if (!transitionId) throw new Error('Tab output transition identity is unavailable');
-  await thawExactOutput({
-    binding: transaction.binding,
-    isCurrent: () => isCurrentTransaction(transaction),
-    onApplied: (frozen) => {
-      if (activeTransaction === transaction) transaction.outputFrozen = frozen;
-    },
-    transitionId,
-  });
-}
-
-async function restoreOptionalPageEffects(
-  transaction: TabNavigationTransaction,
-  pageAccessVerifier: TabNavigationPageAccessVerifier
-): Promise<void> {
-  try {
-    const result = await restoreTabNavigationPageEffects(
-      transaction.effects,
-      createEffectBinding(transaction),
-      pageAccessVerifier
-    );
-    if (
-      isCurrentTransaction(transaction) &&
-      transaction.effects.controlledCursor &&
-      !result.controlledCursorRestored
-    ) {
-      logger.warn('Controlled cursor could not be restored after navigation');
-      abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
-    }
-  } catch (error) {
-    if (!isCurrentTransaction(transaction)) return;
-    logger.warn('Recording page effects could not be restored after navigation', error);
-    abandonTabNavigationPageEffects(transaction.effects, createEffectBinding(transaction));
-  }
 }
 
 export function beginTabNavigationTransaction(
@@ -271,6 +157,7 @@ export function beginTabNavigationTransaction(
   const binding = resolveNavigationBinding(tabId);
   if (!binding) return null;
   const current = activeTransaction;
+  if (current && isCurrentTransaction(current) && current.stopAfterRequiredFailure) return current;
   if (current && isCurrentTransaction(current) && !supersede) return current;
   return createTransaction(binding, current && isCurrentTransaction(current) ? current : null);
 }
@@ -280,61 +167,24 @@ async function restoreTransaction(transaction: TabNavigationTransaction): Promis
     if (!(await transaction.preparation) || !isCurrentTransaction(transaction)) return;
     const pageAccessVerifier = transaction.pageAccessVerifier;
     if (!pageAccessVerifier) throw new Error('Recording page access verifier is unavailable');
-    const outputSuspension = await transaction.outputSuspension;
-    if (!outputSuspension.ok) throw outputSuspension.error;
-    startViewportReassertion(transaction);
-    const viewportReassertion = await transaction.viewportReassertion;
-    if (viewportReassertion && !viewportReassertion.ok) throw viewportReassertion.error;
-    if (!isCurrentTransaction(transaction)) return;
-    if (transaction.requiresExactOutputRecovery) {
-      await pageAccessVerifier(
-        transaction.binding.tabId,
-        'Recording page access is required to restore exact tab output.'
-      );
-    }
-    if (!isCurrentTransaction(transaction)) return;
-    await restoreViewportCursorProjectionBeforeThaw(
+    await restoreTabNavigationPageEffects(
       transaction.effects,
       createEffectBinding(transaction),
       pageAccessVerifier
     );
-    if (!isCurrentTransaction(transaction)) return;
-    if (transaction.revalidateSource) {
-      try {
-        await revalidateTabSource(
-          transaction.binding,
-          null,
-          transaction.outputTransitionId ?? undefined
-        );
-      } catch (error) {
-        if (transaction.requiresExactOutputRecovery) throw error;
-        logger.warn(
-          'Tab source mapping could not be revalidated; media recording continues',
-          error
-        );
-      }
-    }
-    if (!isCurrentTransaction(transaction)) return;
-    if (transaction.requiresExactOutputRecovery) {
-      await resumeExactOutput(transaction);
-    }
-    if (!isCurrentTransaction(transaction)) return;
-    await restoreOptionalPageEffects(transaction, pageAccessVerifier);
-    if (!isCurrentTransaction(transaction)) return;
-    clearActiveTransaction(transaction);
+    if (isCurrentTransaction(transaction)) clearActiveTransaction(transaction);
   } catch (error) {
-    if (transaction.requiresExactOutputRecovery) {
-      await stopAfterCriticalOutputFailure(transaction, error);
+    if (transaction.binding.captureMode === CaptureMode.TAB_CROP) {
+      await stopAfterRequiredCropFailure(transaction, error);
     } else {
-      abandonCurrentTransaction(transaction, error);
+      abandonTransaction(transaction, error);
     }
   }
 }
 
 function startCompletion(transaction: TabNavigationTransaction): void {
-  if (transaction.completion) return;
-  transaction.completion = restoreTransaction(transaction).catch((error) => {
-    logger.error('Unexpected tab recording navigation recovery failure', error);
+  transaction.completion ??= restoreTransaction(transaction).catch((error) => {
+    logger.error('Unexpected tab page-effect restoration failure', error);
   });
 }
 
@@ -346,8 +196,8 @@ export function bindTabNavigationDocument(tabId: number, documentId: string): bo
     transaction = beginTabNavigationTransaction(tabId, true);
   }
   if (!transaction) return false;
+  if (transaction.stopAfterRequiredFailure) return true;
   transaction.documentId = documentId;
-  startViewportReassertion(transaction);
   return true;
 }
 
@@ -360,25 +210,9 @@ export function completeTabNavigationDocument(
   if (!transaction || transaction.binding.tabId !== tabId || !isCurrentTransaction(transaction)) {
     return false;
   }
+  if (transaction.stopAfterRequiredFailure) return true;
   if (transaction.documentId && transaction.documentId !== documentId) return false;
   transaction.documentId = documentId;
-  transaction.pageAccessVerifier = pageAccessVerifier;
-  startCompletion(transaction);
-  return true;
-}
-
-export function recoverDetachedViewport(
-  tabId: number,
-  pageAccessVerifier: TabNavigationPageAccessVerifier
-): boolean {
-  const binding = resolveNavigationBinding(tabId);
-  if (getVideoSurfaceSession(binding?.recordingId ?? '')?.applied?.target !== 'viewport') {
-    return false;
-  }
-  const pending = activeTransaction;
-  if (pending && pending.binding.tabId === tabId && isCurrentTransaction(pending)) return true;
-  const transaction = beginTabNavigationTransaction(tabId, true);
-  if (!transaction) return false;
   transaction.pageAccessVerifier = pageAccessVerifier;
   startCompletion(transaction);
   return true;
@@ -387,22 +221,16 @@ export function recoverDetachedViewport(
 export function failActiveTabNavigation(error: unknown): void {
   const transaction = activeTransaction;
   if (!transaction) return;
-  if (transaction.requiresExactOutputRecovery) {
-    void stopAfterCriticalOutputFailure(transaction, error);
-    return;
+  if (transaction.binding.captureMode === CaptureMode.TAB_CROP) {
+    void stopAfterRequiredCropFailure(transaction, error);
+  } else {
+    abandonTransaction(transaction, error);
   }
-  abandonCurrentTransaction(transaction, error);
 }
 
 export function isTabNavigationTransactionPending(): boolean {
   return activeTransaction !== null && isCurrentTransaction(activeTransaction);
 }
-
-export function waitForTabNavigationTransactionIdle(): Promise<void> {
-  if (!isTabNavigationTransactionPending()) return Promise.resolve();
-  return new Promise((resolve) => navigationIdleWaiters.add(resolve));
-}
-
 export function markTabNavigationManuallyPaused(): void {
   const transaction = activeTransaction;
   if (transaction && isCurrentTransaction(transaction)) transaction.shouldResume = false;
@@ -410,6 +238,4 @@ export function markTabNavigationManuallyPaused(): void {
 
 export function resetTabNavigationTransactionForTests(): void {
   activeTransaction = null;
-  resolveNavigationIdleWaiters();
-  resetExactOutputTransitionForTests();
 }

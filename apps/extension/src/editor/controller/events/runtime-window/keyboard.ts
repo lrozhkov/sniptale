@@ -18,6 +18,7 @@ export function createRuntimeWindowKeyDownHandler(bindings: RuntimeWindowKeyboar
       metaKey: event.metaKey,
       altKey: event.altKey,
       shiftKey: event.shiftKey,
+      isComposing: event.isComposing,
       activeTool: bindings.getActiveTool(),
       hasCropGuide: Boolean(bindings.getCropGuide()),
       hasDrawSession,

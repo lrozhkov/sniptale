@@ -4,7 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -46,7 +47,7 @@ function createReadyProps(
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -59,7 +60,7 @@ function createReadyProps(
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),

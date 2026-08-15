@@ -146,23 +146,13 @@ it('routes scenario capture helper decisions', () => {
   ).toBeUndefined();
 });
 
-it('routes viewport and crop capture promise selection', async () => {
-  const viewportCapture = vi.fn().mockResolvedValue('data:image/png;base64,3');
+it('always routes visible screenshots through native tab capture', async () => {
   const cropCapture = vi.fn().mockResolvedValue('data:image/png;base64,4');
 
-  await expect(
-    createVisibleCapturePromise(
-      viewportCapture,
-      cropCapture,
-      42,
-      new Map([
-        [42, { presetId: 'test:viewport', target: 'viewport' as const, width: 1, height: 1 }],
-      ])
-    )
-  ).resolves.toBe('data:image/png;base64,3');
-  await expect(
-    createVisibleCapturePromise(viewportCapture, cropCapture, 42, new Map([[42, null]]))
-  ).resolves.toBe('data:image/png;base64,4');
+  await expect(createVisibleCapturePromise(cropCapture, 42)).resolves.toBe(
+    'data:image/png;base64,4'
+  );
+  expect(cropCapture).toHaveBeenCalledOnce();
 });
 
 it('routes edit and copy responses', async () => {

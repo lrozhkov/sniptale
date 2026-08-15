@@ -13,8 +13,9 @@ import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/captur
 import { chooseDesktopScreenshotSource } from '../../../platform/media-utils/desktop-capture-source-picker';
 import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
 import { captureDesktopScreenshotFrame } from '../../../platform/media-utils/desktop-screenshot-frame';
+import { openGalleryPage } from '../../../platform/navigation/extension-pages';
 
-export type PopupPage = 'home' | 'video' | 'export';
+export type PopupPage = 'screenshots' | 'video' | 'menu' | 'tools' | 'export';
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/lrozhkov/sniptale';
 
@@ -68,8 +69,8 @@ export function openImageEditor() {
   window.close();
 }
 
-export function openGallery() {
-  void browserTabs.create({ url: runtimeInfo.getURL('apps/extension/src/gallery/index.html') });
+export function openLibrary(folder?: 'screenshot' | 'recording') {
+  void openGalleryPage(folder ? { folder } : {});
   window.close();
 }
 

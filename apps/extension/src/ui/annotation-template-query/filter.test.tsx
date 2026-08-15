@@ -24,7 +24,9 @@ async function verifyTagMenuInteractions(host: Element | DocumentFragment) {
   await render([]);
   const queryRoot = host instanceof Element ? host : host;
   const trigger = queryRoot.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
-  await act(async () => trigger.click());
+  await act(async () =>
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  );
   expect(onFloatingInteractionChange).toHaveBeenLastCalledWith(true);
   const portalRoot = trigger.getRootNode() as Document | ShadowRoot;
   const menu = portalRoot.querySelector<HTMLElement>(
@@ -33,7 +35,7 @@ async function verifyTagMenuInteractions(host: Element | DocumentFragment) {
   expect(menu.className).toContain('overflow-y-auto');
   expect(menu.className).toContain('pointer-events-auto');
   const option = menu.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
-  expect(document.activeElement === option || host instanceof ShadowRoot).toBe(true);
+  expect(portalRoot.activeElement).not.toBe(option);
   act(() => {
     option.click();
   });
@@ -75,5 +77,30 @@ it('keeps tag and clear actions clickable inside a closed content ShadowRoot', a
   document.body.append(host);
   const shadowRoot = host.attachShadow({ mode: 'closed' });
   await verifyTagMenuInteractions(shadowRoot);
+  host.remove();
+});
+
+it('moves focus into the tag menu only when it is opened from the keyboard', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={[]}
+        onActiveFilterTagIdsChange={vi.fn()}
+        onQueryChange={vi.fn()}
+        query=""
+        tags={[{ id: 'review', label: 'Review' }]}
+      />
+    )
+  );
+  const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+  trigger.focus();
+  await act(async () => trigger.click());
+  const option = document.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
+
+  expect(document.activeElement).toBe(option);
+  act(() => root.unmount());
   host.remove();
 });

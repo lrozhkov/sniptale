@@ -10,7 +10,6 @@ import {
 } from './popup-home.test.helpers';
 
 const mocks = vi.hoisted(() => ({
-  handleOpenScreenshotMode: vi.fn(),
   modeSelectorProps: null as { onModeChange(mode: string): void } | null,
   pageAccessControlsSpy: vi.fn(),
   setupPanelProps: null as {
@@ -20,12 +19,11 @@ const mocks = vi.hoisted(() => ({
     pending: boolean;
   } | null,
   setupState: null as typeof DEFAULT_SCREENSHOT_SETUP_STATE | null,
-  toolsPanelProps: null as { onOpen(mode?: 'drawing'): void } | null,
   update: vi.fn(),
 }));
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 vi.mock('./use-screenshot-setup', () => ({
@@ -49,13 +47,7 @@ vi.mock('./setup-panel', () => ({
     return <div data-testid="setup-panel" />;
   },
 }));
-vi.mock('./tools-panel', () => ({
-  ScreenshotToolsPanel: (props: NonNullable<typeof mocks.toolsPanelProps>) => {
-    mocks.toolsPanelProps = props;
-    return <div data-testid="tools-panel" />;
-  },
-}));
-vi.mock('./page-access-controls', () => ({
+vi.mock('../../page-access/controls', () => ({
   PageAccessControls: (props: unknown) => {
     mocks.pageAccessControlsSpy(props);
     return <div data-testid="page-access" />;
@@ -69,7 +61,6 @@ vi.mock('./actions', () => ({
   usePopupHomeActions: () => ({
     actionError: null,
     capturePending: false,
-    handleOpenScreenshotMode: mocks.handleOpenScreenshotMode,
     handleQuickAction: vi.fn(),
     handleScreenshotCapture: vi.fn(),
   }),
@@ -94,7 +85,6 @@ beforeEach(() => {
   mocks.setupState = DEFAULT_SCREENSHOT_SETUP_STATE;
   mocks.modeSelectorProps = null;
   mocks.setupPanelProps = null;
-  mocks.toolsPanelProps = null;
 });
 
 afterEach(cleanupRenderedNode);
@@ -118,15 +108,6 @@ it('persists mode changes and normalizes tab setup changes', async () => {
   expect(mocks.setupPanelProps).toMatchObject({ disabledReason: null, pending: false });
 });
 
-it('opens the selected toolbar working mode from the tools tab', async () => {
-  mocks.setupState = { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'tools' };
-  await renderHome();
-
-  act(() => mocks.toolsPanelProps?.onOpen('drawing'));
-
-  expect(mocks.handleOpenScreenshotMode).toHaveBeenCalledWith('drawing');
-});
-
 it('keeps desktop setup independent from page access controls', async () => {
   mocks.setupState = { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'desktop' };
   await renderHome({
@@ -148,4 +129,12 @@ it('keeps desktop setup independent from page access controls', async () => {
   expect(mocks.setupPanelProps?.config).toBe(DEFAULT_SCREENSHOT_SETUP_STATE.desktop);
   expect(mocks.setupPanelProps?.disabledReason).toBeNull();
   expect(mocks.pageAccessControlsSpy).not.toHaveBeenCalled();
+});
+
+it('renders saved shortcuts mode without coercing it to tab', async () => {
+  mocks.setupState = { ...DEFAULT_SCREENSHOT_SETUP_STATE, selectedMode: 'quick-actions' };
+  await renderHome();
+
+  expect(document.querySelector('[data-testid="quick-actions"]')).not.toBeNull();
+  expect(mocks.setupPanelProps).toBeNull();
 });

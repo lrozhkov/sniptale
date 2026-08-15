@@ -260,6 +260,62 @@ it('publishes mutations only after durable commit and retains prior authority on
   expect(getVideoRecordingSurfaceLeaseSnapshot()).toEqual(initial);
 });
 
+it('compensates an in-flight lifecycle write when its navigation authority becomes stale', async () => {
+  const initial = await requestVideoRecordingSurface({ entry: 'manual', tabId: 9 });
+  let releaseWrite!: () => void;
+  let current = true;
+  setMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      })
+  );
+
+  const update = updateVideoRecordingSurface(
+    initial.surfaceSessionId,
+    { lifecycle: 'ready' },
+    { isCurrent: () => current }
+  );
+  await vi.waitFor(() => expect(setMock).toHaveBeenCalledTimes(2));
+  current = false;
+  releaseWrite();
+
+  await expect(update).resolves.toBeNull();
+  expect(setMock).toHaveBeenLastCalledWith({
+    'video-recording-content-surface-lease': expect.objectContaining({
+      lifecycle: initial.lifecycle,
+      surfaceSessionId: initial.surfaceSessionId,
+    }),
+  });
+  expect(getVideoRecordingSurfaceLeaseSnapshot()).toEqual(initial);
+});
+
+it('compensates an in-flight rebind when its navigation authority becomes stale', async () => {
+  const initial = await requestVideoRecordingSurface({ entry: 'manual', tabId: 9 });
+  let releaseWrite!: () => void;
+  let current = true;
+  setMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      })
+  );
+
+  const rebind = beginVideoRecordingSurfaceRebind(9, { isCurrent: () => current });
+  await vi.waitFor(() => expect(setMock).toHaveBeenCalledTimes(2));
+  current = false;
+  releaseWrite();
+
+  await expect(rebind).resolves.toBeNull();
+  expect(setMock).toHaveBeenLastCalledWith({
+    'video-recording-content-surface-lease': expect.objectContaining({
+      documentGeneration: initial.documentGeneration,
+      surfaceToken: initial.surfaceToken,
+    }),
+  });
+  expect(getVideoRecordingSurfaceLeaseSnapshot()).toEqual(initial);
+});
+
 it('serializes durable mutations so older writes cannot complete after newer authority', async () => {
   const initial = await requestVideoRecordingSurface({ entry: 'manual', tabId: 9 });
   let resolveFirst!: () => void;

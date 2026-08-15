@@ -72,6 +72,7 @@ it('filters overwrite candidates and composes enabled and disabled save panels',
 
 it('projects scene background fields and localized preset base names', () => {
   const settings = pickSceneBackgroundSettings({
+    backgroundBlurAmount: 0,
     backgroundColor: '#000000',
     backgroundGradientAngle: 45,
     backgroundGradientColorStops: [],

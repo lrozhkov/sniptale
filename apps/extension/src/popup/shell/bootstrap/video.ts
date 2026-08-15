@@ -9,18 +9,11 @@ import {
   type VideoRecordingSettings,
   type VideoRecordingUiState,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { createLogger } from '@sniptale/platform/observability/logger';
-import { loadMicrophoneDevices, type MicrophoneOption } from '../../recording/microphone';
-import { loadWebcamDevices, type WebcamOption } from '../../recording/webcam';
 import { trackPopupPerfAsync } from '../../diagnostics/performance';
 import { resolveVideoViewportPresetId } from '../../../features/viewport-presets/video-recording-policy';
 
-const logger = createLogger({ namespace: 'PopupBootstrap' });
-
 type PopupBootstrapVideoData = {
   captureMode: CaptureMode;
-  microphones: MicrophoneOption[];
-  webcams: WebcamOption[];
   selectedPresetId: string | null;
   videoSettings: VideoRecordingSettings;
   viewportPresets: ViewportPreset[];
@@ -33,8 +26,6 @@ type PopupVideoBootstrapStorageData = {
 };
 
 type PopupVideoBootstrapPromises = {
-  microphonesPromise: Promise<MicrophoneOption[]>;
-  webcamsPromise: Promise<WebcamOption[]>;
   settingsPromise: Promise<Settings>;
   storedVideoSettingsPromise: Promise<VideoRecordingSettings>;
   storedVideoUiStatePromise: Promise<VideoRecordingUiState>;
@@ -42,10 +33,6 @@ type PopupVideoBootstrapPromises = {
 
 export function createPopupVideoBootstrapPromises(): PopupVideoBootstrapPromises {
   return {
-    microphonesPromise: trackPopupPerfAsync('popup.bootstrap.microphones', () =>
-      loadBootstrapMicrophones()
-    ),
-    webcamsPromise: trackPopupPerfAsync('popup.bootstrap.webcams', () => loadBootstrapWebcams()),
     settingsPromise: trackPopupPerfAsync('popup.bootstrap.settings', loadSettings),
     storedVideoSettingsPromise: trackPopupPerfAsync(
       'popup.bootstrap.video-settings',
@@ -62,10 +49,7 @@ export async function loadPopupBootstrapVideoData(
   promises: PopupVideoBootstrapPromises
 ): Promise<PopupBootstrapVideoData> {
   const storageData = await loadPopupVideoBootstrapStorageData(promises);
-  const microphones = await resolveBootstrapMicrophones(storageData, promises.microphonesPromise);
-  const webcams = await resolveBootstrapWebcams(storageData, promises.webcamsPromise);
-
-  return buildPopupBootstrapVideoData(storageData, microphones, webcams);
+  return buildPopupBootstrapVideoData(storageData);
 }
 
 async function loadPopupVideoBootstrapStorageData(
@@ -84,60 +68,8 @@ async function loadPopupVideoBootstrapStorageData(
   };
 }
 
-async function loadBootstrapMicrophones(): Promise<MicrophoneOption[]> {
-  try {
-    return await loadMicrophoneDevices();
-  } catch (error) {
-    logger.error('Failed to bootstrap microphones', error);
-    return [];
-  }
-}
-
-async function loadBootstrapWebcams(): Promise<WebcamOption[]> {
-  try {
-    return await loadWebcamDevices();
-  } catch (error) {
-    logger.error('Failed to bootstrap webcams', error);
-    return [];
-  }
-}
-
-async function resolveBootstrapMicrophones(
-  data: PopupVideoBootstrapStorageData,
-  microphonesPromise: Promise<MicrophoneOption[]>
-): Promise<MicrophoneOption[]> {
-  const microphones = await microphonesPromise;
-  if (!data.storedVideoSettings.microphoneEnabled) {
-    return microphones;
-  }
-
-  return loadMicrophoneDevices({
-    knownDevices: microphones,
-    hydrateLabels: 'if-permission-granted',
-    preferredDeviceId: data.storedVideoSettings.microphoneDeviceId,
-  });
-}
-
-async function resolveBootstrapWebcams(
-  data: PopupVideoBootstrapStorageData,
-  webcamsPromise: Promise<WebcamOption[]>
-): Promise<WebcamOption[]> {
-  const webcams = await webcamsPromise;
-  if (!data.storedVideoSettings.webcamEnabled) {
-    return webcams;
-  }
-
-  return loadWebcamDevices({
-    knownDevices: webcams,
-    hydrateLabels: 'if-permission-granted',
-    preferredDeviceId: data.storedVideoSettings.webcamDeviceId ?? null,
-  });
-}
-
 function buildPopupBootstrapVideoData(
-  data: PopupVideoBootstrapStorageData,
-  microphones: MicrophoneOption[],
-  webcams: WebcamOption[]
+  data: PopupVideoBootstrapStorageData
 ): PopupBootstrapVideoData {
   const { settings, storedVideoSettings, storedVideoUiState } = data;
   const viewportPresets = settings.viewportPresets ?? [];
@@ -147,8 +79,6 @@ function buildPopupBootstrapVideoData(
 
   return {
     captureMode,
-    microphones,
-    webcams,
     selectedPresetId,
     videoSettings: storedVideoSettings,
     viewportPresets,

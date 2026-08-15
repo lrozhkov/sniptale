@@ -28,6 +28,16 @@ it('allows raw browser storage writes only from canonical or documented owner pa
   );
   writeFile(
     root,
+    'apps/extension/src/background/capture/popup-export/job/storage.ts',
+    'export function save(browserStorage) { return browserStorage.session.set({ a: 1 }); }\n'
+  );
+  writeFile(
+    root,
+    'apps/extension/src/background/capture/popup-export/job/execute.ts',
+    'export function save(browserStorage) { return browserStorage.session.set({ a: 1 }); }\n'
+  );
+  writeFile(
+    root,
     'apps/extension/src/editor/persistence/workspace.ts',
     'export function save(browserStorage) { return browserStorage.local.set({ a: 1 }); }\n'
   );
@@ -38,6 +48,8 @@ it('allows raw browser storage writes only from canonical or documented owner pa
       [
         path.join(root, 'apps/extension/src/background/storage/page-access/tab-activation.ts'),
         path.join(root, 'apps/extension/src/background/diagnostics/other.ts'),
+        path.join(root, 'apps/extension/src/background/capture/popup-export/job/storage.ts'),
+        path.join(root, 'apps/extension/src/background/capture/popup-export/job/execute.ts'),
         path.join(root, 'apps/extension/src/editor/persistence/workspace.ts'),
       ],
       { baseline: { 'raw-browser-storage-write': [] } }
@@ -45,7 +57,10 @@ it('allows raw browser storage writes only from canonical or documented owner pa
   ).toEqual([
     expect.objectContaining({
       message: expect.stringContaining(
-        'added=[apps/extension/src/background/diagnostics/other.ts:1]; removed=[]'
+        [
+          'added=[apps/extension/src/background/diagnostics/other.ts:1,',
+          'apps/extension/src/background/capture/popup-export/job/execute.ts:1]; removed=[]',
+        ].join(' ')
       ),
       rule: 'raw-browser-storage-write',
     }),

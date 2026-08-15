@@ -21,6 +21,9 @@ class MockClipboardItem {
 
 function createExportCanvas() {
   const activeObject = { id: 'active-object' };
+  const interactionState: { currentTransform: { action: string } | null } = {
+    currentTransform: { action: 'drag' },
+  };
   const renderedCanvas = document.createElement('canvas');
   renderedCanvas.width = 200;
   renderedCanvas.height = 100;
@@ -28,6 +31,12 @@ function createExportCanvas() {
   renderedCanvas.toDataURL = toDataUrlMock as typeof renderedCanvas.toDataURL;
 
   return {
+    get _currentTransform() {
+      return interactionState.currentTransform;
+    },
+    set _currentTransform(value: { action: string } | null) {
+      interactionState.currentTransform = value;
+    },
     activeObject,
     discardActiveObject: vi.fn(),
     getActiveObject: vi.fn(() => activeObject),
@@ -99,6 +108,7 @@ function expectBuiltEditorDocument(document: ReturnType<typeof buildEditorCanvas
     canvasHeight: 100,
     canvasWidth: 200,
     frame: expect.objectContaining({
+      backgroundBlurAmount: 0,
       backgroundGradientAngle: 145,
       backgroundGradientFrom: '#7c2d12',
       backgroundGradientTo: '#f59e0b',
@@ -204,8 +214,12 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(() => renderEditorCanvasToDataUrl(null, { format: 'png', quality: 100 })).toThrow();
   });
 
-  it('renders the canvas while preserving the current active object', () => {
+  it('renders without finalizing the active pointer transform', () => {
     const canvas = createExportCanvas();
+    const currentTransform = canvas._currentTransform;
+    canvas.discardActiveObject.mockImplementation(() => {
+      canvas._currentTransform = null;
+    });
 
     const dataUrl = renderEditorCanvasToDataUrl(canvas as never, {
       format: 'jpeg',
@@ -213,12 +227,13 @@ describe('renderEditorCanvasToDataUrl', () => {
     });
 
     expect(dataUrl).toBe('data:image/jpeg;base64,encoded');
-    expect(canvas.discardActiveObject).toHaveBeenCalledOnce();
-    expect(canvas.renderAll).toHaveBeenCalledTimes(2);
+    expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+    expect(canvas._currentTransform).toBe(currentTransform);
+    expect(canvas.renderAll).not.toHaveBeenCalled();
     expect(canvas.requestRenderAll).not.toHaveBeenCalled();
     expect(canvas.toCanvasElement).toHaveBeenCalledWith(1);
     expect(canvas.toDataUrlMock).toHaveBeenCalledWith('image/jpeg', 0.75);
-    expect(canvas.setActiveObject).toHaveBeenCalledWith(canvas.activeObject);
+    expect(canvas.setActiveObject).not.toHaveBeenCalled();
   });
 
   it('resamples the rendered image to an explicit output size', () => {
@@ -238,8 +253,9 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(drawImage).toHaveBeenCalledWith(canvas.renderedCanvas, 0, 0, 640, 360);
   });
 
-  it('restores the active object when rendering fails', () => {
+  it('does not disturb the active interaction when rendering fails', () => {
     const canvas = createExportCanvas();
+    const currentTransform = canvas._currentTransform;
     canvas.toCanvasElement.mockImplementation(() => {
       throw new Error('allocation failed');
     });
@@ -250,7 +266,9 @@ describe('renderEditorCanvasToDataUrl', () => {
         quality: 100,
       })
     ).toThrow('allocation failed');
-    expect(canvas.setActiveObject).toHaveBeenCalledWith(canvas.activeObject);
-    expect(canvas.renderAll).toHaveBeenCalledTimes(2);
+    expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+    expect(canvas.setActiveObject).not.toHaveBeenCalled();
+    expect(canvas._currentTransform).toBe(currentTransform);
+    expect(canvas.renderAll).not.toHaveBeenCalled();
   });
 });

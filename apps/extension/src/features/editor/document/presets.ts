@@ -24,6 +24,7 @@ export interface EditorSceneBackgroundSettings {
   paddingBottom: EditorFrameSettings['paddingBottom'];
   paddingLeft: EditorFrameSettings['paddingLeft'];
   backgroundMode: EditorFrameSettings['backgroundMode'];
+  backgroundBlurAmount: EditorFrameSettings['backgroundBlurAmount'];
   backgroundColor: string;
   backgroundGradientFrom: string;
   backgroundGradientTo: string;

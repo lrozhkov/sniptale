@@ -8,6 +8,7 @@ import {
   loadBackgroundImageElement,
   type BackgroundCanvasSize,
 } from './geometry';
+import { rasterizeBlurredBackground, resolveBackgroundRasterSize } from './raster';
 
 function createSolidBackground(
   size: BackgroundCanvasSize,
@@ -76,7 +77,23 @@ export async function createBackgroundLayer(
     return null;
   }
 
-  return frame.backgroundMode === 'image'
-    ? createImageBackground(size, frame)
-    : createSolidBackground(size, frame);
+  if (frame.backgroundBlurAmount === 0) {
+    return frame.backgroundMode === 'image'
+      ? createImageBackground(size, frame)
+      : createSolidBackground(size, frame);
+  }
+
+  const rasterSize = resolveBackgroundRasterSize(size);
+  const source =
+    frame.backgroundMode === 'image'
+      ? await createImageBackground(rasterSize, frame)
+      : createSolidBackground(rasterSize, frame);
+  return source
+    ? rasterizeBlurredBackground({
+        amount: frame.backgroundBlurAmount,
+        object: source,
+        rasterSize,
+        targetSize: size,
+      })
+    : null;
 }

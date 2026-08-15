@@ -1,4 +1,4 @@
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { getTabCapabilities } from '../../../../../features/tab-capabilities/capabilities';
 import { type ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { PopupExportFallbackTab, PopupExportTabItem } from './types';
@@ -62,7 +62,12 @@ export function getSelectedTabIdsInOrder(
   selectedTabIds: number[]
 ) {
   return availableTabs
-    .filter((tab) => typeof tab.tabId === 'number' && selectedTabIds.includes(tab.tabId))
+    .filter(
+      (tab) =>
+        tab.disabledReason === null &&
+        typeof tab.tabId === 'number' &&
+        selectedTabIds.includes(tab.tabId)
+    )
     .map((tab) => tab.tabId as number);
 }
 

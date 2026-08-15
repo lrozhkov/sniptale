@@ -44,7 +44,7 @@ function Harness() {
     filteredEvents: [],
     meta: null,
     recordingId: 'rec-1',
-    stats: { actions: 0, console: 0, errors: 0, network: 0, total: 0, warns: 0 },
+    stats: { actions: 0, errors: 0, meta: 0, total: 0, warns: 0 },
   });
 
   return null;

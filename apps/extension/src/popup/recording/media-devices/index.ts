@@ -1,4 +1,4 @@
-import { translate, type TranslationKey } from '../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../platform/i18n/popup';
 
 export type PopupMediaDeviceOption = {
   deviceId: string;

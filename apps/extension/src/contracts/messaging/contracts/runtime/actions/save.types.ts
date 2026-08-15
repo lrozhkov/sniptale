@@ -4,13 +4,7 @@ import type {
   WebSnapshotStageBlobChunkPayload,
 } from '@sniptale/runtime-contracts/web-snapshot';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
-import type {
-  ExecuteSaveMessage,
-  ReleasePopupExportArchiveMessage,
-  SavePopupExportArchiveMessage,
-  SaveScreenshotToGalleryMessage,
-  StagePopupExportArchiveChunkMessage,
-} from '../../types';
+import type { ExecuteSaveMessage, SaveScreenshotToGalleryMessage } from '../../types';
 import type { SaveAssetResponse } from '../../response-types';
 
 type SaveWebSnapshotToGalleryMessage = {
@@ -52,21 +46,8 @@ type FetchWebSnapshotAssetResponse = RuntimeMessageResponse<{
   mimeType?: string;
 }>;
 
-type StagePopupExportArchiveChunkResponse = RuntimeMessageResponse<{
-  complete?: boolean;
-  stagedArchiveId?: string;
-}>;
-
-type SavePopupExportArchiveResponse = RuntimeMessageResponse<{
-  assetId?: string;
-  result?: string;
-}>;
-
 export type RuntimeActionSaveRequestByType = {
   [MessageType.EXECUTE_SAVE]: ExecuteSaveMessage;
-  [MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK]: StagePopupExportArchiveChunkMessage;
-  [MessageType.EXPORT_POPUP_SAVE_ARCHIVE]: SavePopupExportArchiveMessage;
-  [MessageType.RELEASE_POPUP_EXPORT_ARCHIVE]: ReleasePopupExportArchiveMessage;
   [MessageType.SAVE_SCREENSHOT_TO_GALLERY]: SaveScreenshotToGalleryMessage;
   [MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY]: SaveWebSnapshotToGalleryMessage;
   [MessageType.REGISTER_WEB_SNAPSHOT_ASSETS]: RegisterWebSnapshotAssetsMessage;
@@ -77,9 +58,6 @@ export type RuntimeActionSaveRequestByType = {
 
 export type RuntimeActionSaveResponseByType = {
   [MessageType.EXECUTE_SAVE]: RuntimeMessageResponse<Record<string, never>>;
-  [MessageType.STAGE_POPUP_EXPORT_ARCHIVE_CHUNK]: StagePopupExportArchiveChunkResponse;
-  [MessageType.EXPORT_POPUP_SAVE_ARCHIVE]: SavePopupExportArchiveResponse;
-  [MessageType.RELEASE_POPUP_EXPORT_ARCHIVE]: RuntimeMessageResponse<{ result?: string }>;
   [MessageType.SAVE_SCREENSHOT_TO_GALLERY]: SaveAssetResponse;
   [MessageType.SAVE_WEB_SNAPSHOT_TO_GALLERY]: SaveAssetResponse;
   [MessageType.REGISTER_WEB_SNAPSHOT_ASSETS]: RegisterWebSnapshotAssetsResponse;

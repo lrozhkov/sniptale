@@ -22,10 +22,6 @@ const regionSelectionBindingGuard = {
   regionSelectionRequestGeneration: isString,
   regionSelectionRequestId: isString,
 };
-const viewportCursorProjectionAuthorityGuard = {
-  generation: (value: unknown) => isNumber(value) && Number.isInteger(value) && value > 0,
-  recordingId: isString,
-};
 
 export const tabVideoMessageContracts = {
   [VideoMessageType.RECORDING_STATE_SYNC]: {
@@ -48,32 +44,6 @@ export const tabVideoMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'tab VIDEO_RECORDING_SURFACE_SNAPSHOT response',
-      createRuntimeResponseGuard()
-    ),
-  },
-  [VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION]: {
-    parseRequest: createGuardParser(
-      'tab ENABLE_VIEWPORT_CURSOR_PROJECTION message',
-      createMessageGuard({
-        type: VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
-        required: viewportCursorProjectionAuthorityGuard,
-      })
-    ),
-    parseResponse: createGuardParser(
-      'tab ENABLE_VIEWPORT_CURSOR_PROJECTION response',
-      createRuntimeResponseGuard()
-    ),
-  },
-  [VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION]: {
-    parseRequest: createGuardParser(
-      'tab DISABLE_VIEWPORT_CURSOR_PROJECTION message',
-      createMessageGuard({
-        type: VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
-        required: viewportCursorProjectionAuthorityGuard,
-      })
-    ),
-    parseResponse: createGuardParser(
-      'tab DISABLE_VIEWPORT_CURSOR_PROJECTION response',
       createRuntimeResponseGuard()
     ),
   },

@@ -42,6 +42,7 @@ function createSettings(): Settings {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     saveCapturesToGallery: false,
@@ -51,7 +52,6 @@ function createSettings(): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     viewportPresets: [],
   };
 }
@@ -99,7 +99,7 @@ function createProcessArgs() {
     tabId: 19,
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
     screenshotModeState: new Map<number, boolean>(),
   };

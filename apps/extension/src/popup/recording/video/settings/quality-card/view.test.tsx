@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -24,7 +24,7 @@ function createSettings(quality: VideoOutputProfile['quality']): VideoRecordingS
     outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, quality },
     countdownSeconds: 3,
     autoFadeDelay: 2,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     qualityProfileId: VideoRecordingBuiltInProfileId.OPTIMAL,
   };
 }

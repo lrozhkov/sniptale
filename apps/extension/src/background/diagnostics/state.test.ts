@@ -45,7 +45,6 @@ function createSession(
       viewportHeight: 720,
       viewportWidth: 1280,
     },
-    pendingNetworkRequests: new Map(),
     recordingId: 'recording-1',
     startedAt: 100,
     tabId: 7,
@@ -93,8 +92,8 @@ it('flushes active sessions from caps and timer loops', async () => {
   const session = createSession({
     events: Array.from({ length: 500 }, (_, index) => ({
       id: `event-${index}`,
-      kind: 'console',
-      message: 'log',
+      kind: 'action',
+      message: 'click',
       recordingId: 'recording-1',
       tsMs: index,
     })),
@@ -123,8 +122,8 @@ it('replays a requested diagnostics flush after the in-flight flush settles', as
   const session = createSession({
     events: Array.from({ length: 500 }, (_, index) => ({
       id: `event-${index}`,
-      kind: 'console',
-      message: 'log',
+      kind: 'action',
+      message: 'click',
       recordingId: 'recording-1',
       tsMs: index,
     })),
@@ -161,8 +160,8 @@ it('drains an in-flight durable flush before local data erasure completes', asyn
   const session = createSession({
     events: Array.from({ length: 500 }, (_, index) => ({
       id: `event-${index}`,
-      kind: 'console',
-      message: 'log',
+      kind: 'action',
+      message: 'click',
       recordingId: 'recording-1',
       tsMs: index,
     })),

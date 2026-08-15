@@ -58,6 +58,20 @@ describe('editor drawing metadata authority', () => {
     expect(readEditorDrawingObject(object)).toEqual(synchronized);
   });
 
+  it('does not add half the shape stroke after a move is synchronized', () => {
+    const object = createEditorDrawingFabricObject(shape, 1);
+    object.set({ left: object.left + 20, top: object.top + 30 });
+
+    const synchronized = synchronizeEditorDrawingObjectFromFabric(object);
+
+    expect(synchronized?.kind === 'rectangle' ? synchronized.bounds : null).toMatchObject({
+      height: 20,
+      width: 40,
+      x: 30,
+      y: 45,
+    });
+  });
+
   it.each([
     shape,
     {

@@ -49,10 +49,6 @@ declare module './index' {
     type OFFSCREEN_SOURCE_READY = typeof import('./index').VideoMessageType.OFFSCREEN_SOURCE_READY;
     type OFFSCREEN_BEGIN_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
-    type OFFSCREEN_SET_VIEWPORT_DRAW_STATE =
-      typeof import('./index').VideoMessageType.OFFSCREEN_SET_VIEWPORT_DRAW_STATE;
-    type OFFSCREEN_REVALIDATE_SOURCE =
-      typeof import('./index').VideoMessageType.OFFSCREEN_REVALIDATE_SOURCE;
     type OFFSCREEN_STOP_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_STOP_RECORDING;
     type OFFSCREEN_PAUSE_RECORDING =
@@ -73,10 +69,6 @@ declare module './index' {
     type OFFSCREEN_ERROR = typeof import('./index').VideoMessageType.OFFSCREEN_ERROR;
     type GET_VIEWPORT_COORDS = typeof import('./index').VideoMessageType.GET_VIEWPORT_COORDS;
     type GET_RECORDING_TAB_ID = typeof import('./index').VideoMessageType.GET_RECORDING_TAB_ID;
-    type ENABLE_VIEWPORT_CURSOR_PROJECTION =
-      typeof import('./index').VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION;
-    type DISABLE_VIEWPORT_CURSOR_PROJECTION =
-      typeof import('./index').VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION;
     type ENABLE_CONTROLLED_CURSOR_CAPTURE =
       typeof import('./index').VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE;
     type DISABLE_CONTROLLED_CURSOR_CAPTURE =
@@ -94,8 +86,6 @@ declare module './index' {
       typeof import('./index').VideoMessageType.ENABLE_DIAGNOSTIC_LOGGER;
     type DISABLE_DIAGNOSTIC_LOGGER =
       typeof import('./index').VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
-    type DEBUGGER_FORCEFULLY_DETACHED =
-      typeof import('./index').VideoMessageType.DEBUGGER_FORCEFULLY_DETACHED;
     type SHOW_REGION_SELECTOR = typeof import('./index').VideoMessageType.SHOW_REGION_SELECTOR;
     type HIDE_REGION_SELECTOR = typeof import('./index').VideoMessageType.HIDE_REGION_SELECTOR;
     type REGION_SELECTED = typeof import('./index').VideoMessageType.REGION_SELECTED;

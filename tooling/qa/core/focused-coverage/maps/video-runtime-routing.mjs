@@ -19,7 +19,6 @@ export const VIDEO_RECORDING_RUNTIME_ROUTING_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/runtime/routing/runtime-wiring/startup.test.ts',
       'apps/extension/src/background/runtime/routing/runtime-wiring/navigation.test.ts',
-      'apps/extension/src/background/runtime/routing/runtime-wiring/debugger.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/control-route.test.ts',
     ],
   },

@@ -73,7 +73,7 @@ function createStartRecordingMessage() {
       ...DEFAULT_VIDEO_SETTINGS,
       autoFadeDelay: 1500,
       countdownSeconds: 3,
-      diagnosticsEnabled: false,
+      interactionDiagnosticsEnabled: false,
       microphoneDeviceId: null,
       microphoneEnabled: true,
       quality: VideoQuality.HIGH,

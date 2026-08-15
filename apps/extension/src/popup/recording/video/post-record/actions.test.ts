@@ -131,6 +131,21 @@ it('opens the primary recording in the internal gallery', async () => {
   vi.unstubAllGlobals();
 });
 
+it('opens a draft recording in the temporary gallery scope', async () => {
+  mocks.getRecording.mockResolvedValueOnce({
+    ...createRecording('rec-1'),
+    blob: new Blob(['rec-1'], { type: 'video/webm' }),
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  });
+
+  await openLatestRecordingInGallery('rec-1');
+
+  expect(mocks.openGalleryPage).toHaveBeenCalledWith({
+    recordingId: 'rec-1',
+    scope: 'temporary',
+  });
+});
+
 it('opens a single recording or grouped project in the internal video editor', async () => {
   const close = vi.fn();
   vi.stubGlobal('close', close);

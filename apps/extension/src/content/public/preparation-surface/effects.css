@@ -201,10 +201,6 @@
   outline: none;
 }
 
-.sniptale-drawing-canvas:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--sniptale-color-border-accent-strong);
-}
-
 :host(.sniptale-drawing-mode-active) .sniptale-frame-container,
 :host(.sniptale-drawing-mode-active) .sniptale-interactive-frame {
   pointer-events: none !important;

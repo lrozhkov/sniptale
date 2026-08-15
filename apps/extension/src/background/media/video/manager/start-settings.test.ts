@@ -4,6 +4,18 @@ import { CaptureMode, WebcamPresentationMode } from '@sniptale/runtime-contracts
 import { sanitizeRecordingSettings } from './start-settings';
 
 describe('sanitizeRecordingSettings webcam presentation', () => {
+  it.each([CaptureMode.TAB, CaptureMode.TAB_CROP, CaptureMode.CAMERA, CaptureMode.SCREEN])(
+    'disables the unsupported persisted diagnostics preference for %s',
+    (captureMode) => {
+      const settings = { ...DEFAULT_VIDEO_SETTINGS, interactionDiagnosticsEnabled: true };
+
+      expect(sanitizeRecordingSettings(settings, captureMode).interactionDiagnosticsEnabled).toBe(
+        false
+      );
+      expect(settings.interactionDiagnosticsEnabled).toBe(true);
+    }
+  );
+
   it.each([CaptureMode.SCREEN])(
     'uses an effective separate track for %s without mutating the saved input',
     (captureMode) => {

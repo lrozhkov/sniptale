@@ -50,19 +50,15 @@ function createCollectionItems(
 }
 
 function createGroups(presets: readonly ViewportPreset[]): readonly SettingsCollectionGroup[] {
-  return (['viewport', 'window'] as const).flatMap((target) => {
-    const itemIds = presets.filter((preset) => preset.target === target).map((preset) => preset.id);
-    return itemIds.length === 0
-      ? []
-      : [
-          {
-            id: target,
-            label: translate(`viewportPresets.groups.${target}`),
-            description: translate(`viewportPresets.hints.${target}`),
-            itemIds,
-          },
-        ];
-  });
+  if (presets.length === 0) return [];
+  return [
+    {
+      id: 'window',
+      label: translate('viewportPresets.groups.window'),
+      description: translate('viewportPresets.hints.window'),
+      itemIds: presets.map((preset) => preset.id),
+    },
+  ];
 }
 
 export function PresetsList(props: PresetsListProps) {

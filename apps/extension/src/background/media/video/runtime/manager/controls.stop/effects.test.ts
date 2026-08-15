@@ -147,6 +147,9 @@ it('hides stop overlays and disables annotations when tab recording stops', asyn
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: VideoMessageType.HIDE_COUNTDOWN,
   });
+  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    type: VideoMessageType.HIDE_RECORDING_OVERLAY,
+  });
 });
 
 it('skips tab side effects when no tab is available', () => {

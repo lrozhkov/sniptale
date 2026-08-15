@@ -58,20 +58,22 @@ function stringifyPopupPerfError(error: unknown): string {
  * Starts an opt-in popup performance span. Logging stays disabled until
  * `localStorage['sniptale.popup.perf'] = '1'` is set in popup DevTools.
  */
-export function startPopupPerfSpan(label: string): PopupPerfSpan | null {
+export function startPopupPerfSpan(label: string, startedAt?: number): PopupPerfSpan | null {
   if (!shouldLogPopupPerf()) {
     return null;
   }
 
-  const startedAt = performance.now();
+  const resolvedStartedAt = startedAt ?? performance.now();
 
   return {
     end(details) {
-      logger.debug(buildPopupPerfPayload(label, performance.now() - startedAt, 'ok', details));
+      logger.debug(
+        buildPopupPerfPayload(label, performance.now() - resolvedStartedAt, 'ok', details)
+      );
     },
     fail(error, details) {
       logger.debug(
-        buildPopupPerfPayload(label, performance.now() - startedAt, 'error', {
+        buildPopupPerfPayload(label, performance.now() - resolvedStartedAt, 'error', {
           ...details,
           error: stringifyPopupPerfError(error),
         })

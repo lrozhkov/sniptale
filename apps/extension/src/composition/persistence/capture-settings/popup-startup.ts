@@ -17,7 +17,7 @@ export type {
 
 export const DEFAULT_POPUP_STARTUP_STATE: PopupStartupState = {
   selection: 'remember-last',
-  lastPage: 'home',
+  lastPage: 'menu',
 };
 
 export async function loadPopupStartupState(): Promise<PopupStartupState> {

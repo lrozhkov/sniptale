@@ -4,7 +4,7 @@ export interface PopupExportPreferences {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
-  includeHarDomLogs: boolean;
+  includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;

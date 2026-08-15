@@ -23,6 +23,7 @@ let root: Root | null = null;
 function createController() {
   return {
     applyCropSelection: vi.fn(async () => undefined),
+    cancelCropMode: vi.fn(),
     clearCanvasSizePreview: vi.fn(),
     clearCropSelection: vi.fn(),
     previewCanvasSize: vi.fn(),
@@ -63,6 +64,7 @@ function renderResizeTool(
         imageSizeDraft={imageSizeDraft}
         imageSizeLocked={imageSizeLocked}
         imageSizeText="1000 x 1000"
+        mode="canvas"
         setCanvasSizeDraft={setCanvasSizeDraft}
         setCanvasSizeLocked={setCanvasSizeLocked}
         setImageSizeDraft={setImageSizeDraft}
@@ -120,6 +122,7 @@ it('does not clear the canvas crop guide when active selection dimensions rerend
         imageSizeDraft={imageDraft}
         imageSizeLocked={imageLocked}
         imageSizeText="1000 x 1000"
+        mode="canvas"
         setCanvasSizeDraft={setDraft}
         setCanvasSizeLocked={setLocked}
         setImageSizeDraft={setImageDraft}

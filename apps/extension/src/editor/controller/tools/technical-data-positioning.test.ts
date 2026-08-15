@@ -2,8 +2,7 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { createMetaStampMock, getCurrentLocaleMock } = vi.hoisted(() => ({
-  createMetaStampMock: vi.fn(),
+const { getCurrentLocaleMock } = vi.hoisted(() => ({
   getCurrentLocaleMock: vi.fn(),
 }));
 
@@ -19,10 +18,7 @@ vi.mock('../core/helpers', async (importOriginal) => ({
   getBrowserVersion: vi.fn(() => 'Chrome 136'),
 }));
 
-vi.mock('../../objects/meta-stamp/factory', () => ({
-  createMetaStamp: createMetaStampMock,
-}));
-
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { createTechnicalDataTextObject } from './insertions';
 
 beforeEach(() => {
@@ -32,22 +28,14 @@ beforeEach(() => {
 });
 
 it('clamps technical data text inside the source bounds before preparing it', () => {
-  const set = vi.fn();
-  const text = {
-    getScaledHeight: vi.fn(() => 120),
-    getScaledWidth: vi.fn(() => 260),
-    id: 'text',
-    set,
-  };
   const prepareObject = vi.fn();
-  createMetaStampMock.mockReturnValue(text);
 
   const result = createTechnicalDataTextObject({
     kinds: ['browser', 'url', 'date'],
     nextLabelIndex: 5,
     prepareObject,
     source: {
-      displayHeight: 150,
+      displayHeight: 500,
       displayWidth: 300,
       left: 10,
       top: 20,
@@ -62,7 +50,22 @@ it('clamps technical data text inside the source bounds before preparing it', ()
     },
   });
 
-  expect(set).toHaveBeenCalledWith({ left: 30, top: 40 });
-  expect(prepareObject).toHaveBeenCalledWith(text);
-  expect(result).toBe(text);
+  const drawing = readEditorDrawingObject(result);
+  expect(result).toMatchObject({
+    left: 30,
+    sniptaleId: 'drawing-uuid-1',
+    sniptaleRole: 'annotation',
+    sniptaleType: 'text',
+  });
+  expect(result.top).toBeGreaterThanOrEqual(40);
+  expect((result.top ?? 0) + result.getScaledHeight()).toBeLessThanOrEqual(500);
+  expect(drawing).toMatchObject({
+    id: 'drawing-uuid-1',
+    kind: 'text',
+    text: expect.stringContaining('https://example.com'),
+  });
+  expect(
+    Math.abs((drawing?.kind === 'text' ? drawing.bounds.y : -1) - (result.top ?? 0))
+  ).toBeLessThanOrEqual(1);
+  expect(prepareObject).toHaveBeenCalledWith(result);
 });

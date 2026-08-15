@@ -36,7 +36,7 @@ const defaultSettings = {
   systemAudioEnabled: true,
   countdownSeconds: 3,
   autoFadeDelay: 3,
-  diagnosticsEnabled: false,
+  interactionDiagnosticsEnabled: false,
   controlledCursorCaptureEnabled: false,
 };
 

@@ -18,8 +18,8 @@ type DrawerProps = {
   onOpen: () => void;
 };
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 vi.mock('../data-type/section', () => ({
@@ -72,7 +72,7 @@ function createProps(
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -85,7 +85,7 @@ function createProps(
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),

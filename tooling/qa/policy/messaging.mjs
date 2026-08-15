@@ -13,7 +13,6 @@ export const ALLOWED_DIRECT_MESSAGE_FILES = new Set([
 
 const ALLOWED_CHROME_STUB_FILES = new Set([
   'apps/extension/src/background/capture/quick-actions/flow/finalize.test.ts',
-  'apps/extension/src/background/diagnostics/export-har-collector/index.test.ts',
   'apps/extension/src/content/parser/export-manager/diagnostics/index.test.ts',
   'apps/extension/src/design-system/design-system-parity.test.tsx',
   'apps/extension/src/editor/inspector/document-actions/compact.test.tsx',

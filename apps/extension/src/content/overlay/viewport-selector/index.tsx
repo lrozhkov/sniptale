@@ -17,7 +17,7 @@ interface ViewportSelectorProps {
   onViewportChange: (
     viewport: {
       presetId: string;
-      target: 'viewport' | 'window';
+      target: 'window';
       width: number;
       height: number;
     } | null,

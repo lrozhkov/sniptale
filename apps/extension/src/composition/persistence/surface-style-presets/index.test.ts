@@ -198,11 +198,15 @@ it('routes the complete command family through revisioned mutations', async () =
   await expect(toggleSurfaceStylePresetFavorite(4, 'two')).resolves.toMatchObject({
     outcome: 'applied',
   });
-  await expect(reorderSurfaceStylePresets(5, ['two', 'one'])).resolves.toMatchObject({
+  const beforeReorder = await loadSurfaceStylePresetCatalog();
+  const systemIds = beforeReorder.presets
+    .filter((preset) => preset.origin === 'system')
+    .map((preset) => preset.id);
+  await expect(reorderSurfaceStylePresets(5, ['two', ...systemIds, 'one'])).resolves.toMatchObject({
     outcome: 'applied',
   });
   await expect(deleteSurfaceStylePreset(6, 'two')).resolves.toMatchObject({ outcome: 'applied' });
-  await expect(reorderSurfaceStylePresets(7, ['one'])).resolves.toMatchObject({
+  await expect(reorderSurfaceStylePresets(7, [...systemIds, 'one'])).resolves.toMatchObject({
     outcome: 'unchanged',
   });
   await expect(deleteSurfaceStylePreset(7, 'missing')).resolves.toMatchObject({

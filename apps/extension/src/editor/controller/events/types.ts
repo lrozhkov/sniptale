@@ -25,9 +25,10 @@ export interface EditorControllerEventHandlers {
     target?: FabricObject;
     transform?: Pick<Transform, 'target'> | null;
   }) => void;
-  handleMouseMoveBefore: (event: { e: TPointerEvent; target?: FabricObject }) => void;
   handleMouseMove: (event: { e: TPointerEvent }) => void;
-  handleMouseUp: () => void;
+  handleMouseUp: (event?: { e: TPointerEvent }) => void;
+  handlePointerDownBeforeFabric: (event: PointerEvent) => void;
+  handlePointerCancel: (event?: TPointerEvent) => void;
   handleDoubleClick: (event: { target?: FabricObject; e: TPointerEvent }) => void;
   handleWindowKeyDown: (event: KeyboardEvent) => void;
   handleWindowKeyUp: (event: KeyboardEvent) => void;
@@ -37,6 +38,8 @@ export interface EditorControllerEventHandlers {
   handleViewportScroll: () => void;
   handleWindowMouseMove: (event: MouseEvent) => void;
   handleWindowMouseUp: () => void;
+  handleWindowPointerMove: (event: PointerEvent) => void;
+  handleWindowPointerUp: (event: PointerEvent) => void;
 }
 
 export interface EditorControllerEventStateBindings {
@@ -70,7 +73,12 @@ export interface EditorControllerEventObjectBindings {
   applyGridSnap: (object: FabricObject) => void;
   nextLabelIndex: (type: EditorObjectType) => number;
   prepareObject: (object: FabricObject) => void;
-  startDrawSession: (tool: DrawSession['tool'], start: Point, object: FabricObject) => void;
+  startDrawSession: (
+    tool: DrawSession['tool'],
+    start: Point,
+    object: FabricObject,
+    pointerId?: number | null
+  ) => void;
   addObject: (object: FabricObject) => void;
   switchToSelectTool: () => void;
   advanceStepValue: () => void;

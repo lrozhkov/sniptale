@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { Textbox } from 'fabric';
 import { afterEach, expect, it, vi } from 'vitest';
-import { resizeTechnicalDataTextObject } from './sizing';
+import { getTechnicalDataTextWidth } from './sizing';
 
 const settings = {
   backgroundColor: null,
@@ -18,14 +17,8 @@ it('uses a stable column width and expands row layouts to measured text', () => 
     configurable: true,
     value: vi.fn(() => ({ font: '', measureText: () => ({ width: 498 }) })),
   });
-  const text = new Textbox('Technical data');
-  vi.spyOn(text, 'set');
-
-  resizeTechnicalDataTextObject(text, 'Technical data', 'column', settings);
-  expect(text.set).toHaveBeenLastCalledWith({ width: 360 });
-
-  resizeTechnicalDataTextObject(text, 'Technical data', 'row', settings);
-  expect(text.set).toHaveBeenLastCalledWith({ width: 500 });
+  expect(getTechnicalDataTextWidth('Technical data', 'column', settings)).toBe(360);
+  expect(getTechnicalDataTextWidth('Technical data', 'row', settings)).toBe(500);
 });
 
 it('uses deterministic text length fallback when measurement is unavailable', () => {
@@ -33,10 +26,5 @@ it('uses deterministic text length fallback when measurement is unavailable', ()
     configurable: true,
     value: vi.fn(() => null),
   });
-  const text = new Textbox('A'.repeat(40));
-  vi.spyOn(text, 'set');
-
-  resizeTechnicalDataTextObject(text, 'A'.repeat(40), 'row', settings);
-
-  expect(text.set).toHaveBeenCalledWith({ width: 576 });
+  expect(getTechnicalDataTextWidth('A'.repeat(40), 'row', settings)).toBe(576);
 });

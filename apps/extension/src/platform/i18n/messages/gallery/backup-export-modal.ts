@@ -30,8 +30,8 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     en: 'Scope',
   },
   scopeAll: {
-    ru: 'Вся галерея',
-    en: 'Full gallery',
+    ru: 'Вся библиотека',
+    en: 'Full library',
   },
   scopeSelected: {
     ru: 'Только выбранное',

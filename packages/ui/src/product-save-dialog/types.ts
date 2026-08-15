@@ -12,6 +12,7 @@ export interface ProductSaveDialogProps {
   closeLabel: string;
   filenameLabel: ReactNode;
   filename: string;
+  disabled?: boolean;
   filenamePlaceholder?: string;
   onFilenameChange: (value: string) => void;
   presetLabel: ReactNode;

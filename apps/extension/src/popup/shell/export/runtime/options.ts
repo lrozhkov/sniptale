@@ -8,7 +8,7 @@ export function buildPopupExportOptions(selection: PopupExportSelection): Export
     includeCssDiagnostics: selection.includeCssDiagnostics,
     includeFiles: selection.includeFiles,
     includeFullPageScreenshot: selection.includeFullPageScreenshot,
-    includeHarDomLogs: selection.includeHarDomLogs,
+    includePageDiagnostics: selection.includePageDiagnostics,
     includeImages: selection.includeImages,
     includeJson: selection.includeJson,
     includeMarkdown: selection.includeMarkdown,

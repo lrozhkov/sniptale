@@ -12,7 +12,7 @@ type CanvasObject = import('fabric').FabricObject;
 export function createObjectMovingHandler(
   bindings: EditorControllerEventStateBindings &
     EditorControllerEventCropBindings &
-    Pick<EditorControllerEventObjectBindings, 'applyGridSnap' | 'ensureObjectReachable'> &
+    Pick<EditorControllerEventObjectBindings, 'applyGridSnap'> &
     Pick<EditorControllerEventCommandBindings, 'syncRuntimeState'>
 ) {
   return (event: { target?: CanvasObject }) => {
@@ -27,9 +27,6 @@ export function createObjectMovingHandler(
       return;
     }
 
-    if (bindings.ensureObjectReachable(event.target)) {
-      syncSourceState(bindings, event.target);
-      bindings.getCanvas()?.requestRenderAll();
-    }
+    syncSourceState(bindings, event.target);
   };
 }

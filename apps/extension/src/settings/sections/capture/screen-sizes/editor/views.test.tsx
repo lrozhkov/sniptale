@@ -32,7 +32,7 @@ vi.mock('@sniptale/ui/product-modal', async (importOriginal) => ({
 
 import { ViewportPresetEditorContent, ViewportPresetEditorFooter } from './views';
 
-it('exposes viewport and browser-window targets with bounded integer dimensions', () => {
+it('edits bounded integer dimensions for browser-window presets', () => {
   const setHeight = vi.fn();
   const setLabel = vi.fn();
   const setWidth = vi.fn();
@@ -44,9 +44,7 @@ it('exposes viewport and browser-window targets with bounded integer dimensions'
       onSubmit={vi.fn()}
       setHeight={setHeight}
       setLabel={setLabel}
-      setTarget={vi.fn()}
       setWidth={setWidth}
-      target="window"
       width={1280}
     />
   );
@@ -54,15 +52,7 @@ it('exposes viewport and browser-window targets with bounded integer dimensions'
   expect(markup).toContain('max="16384"');
   expect(markup).toContain('maxLength="80"');
   expect(markup).not.toContain('sniptale-modal-field-surface');
-  expect(selectPropsSpy).toHaveBeenCalledWith(
-    expect.objectContaining({
-      value: 'window',
-      options: [
-        expect.objectContaining({ value: 'viewport' }),
-        expect.objectContaining({ value: 'window' }),
-      ],
-    })
-  );
+  expect(selectPropsSpy).not.toHaveBeenCalled();
 
   const inputs = inputPropsSpy.mock.calls.map(([props]) => props);
   inputs[0]?.onChange?.({ target: { value: 'Renamed' } });
@@ -102,7 +92,7 @@ it('renders edit submit copy and disables an empty enabled form', () => {
         kind: 'user',
         name: 'Viewport',
         order: 0,
-        target: 'viewport',
+        target: 'window',
         width: 1280,
       }}
     />

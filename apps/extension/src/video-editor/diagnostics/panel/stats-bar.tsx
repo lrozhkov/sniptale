@@ -35,16 +35,16 @@ const FILTER_ITEMS: Array<{
     resolveValue: (stats) => stats.warns,
   },
   {
-    key: 'network',
-    labelKey: 'videoEditor.diagnostics.filterNetwork',
-    resolveColor: () => COLORS.iconBlue,
-    resolveValue: (stats) => stats.network,
+    key: 'action',
+    labelKey: 'videoEditor.diagnostics.filterActions',
+    resolveColor: () => COLORS.brandPrimary,
+    resolveValue: (stats) => stats.actions,
   },
   {
-    key: 'console',
-    labelKey: 'videoEditor.diagnostics.filterConsole',
-    resolveColor: () => COLORS.iconTeal,
-    resolveValue: (stats) => stats.console,
+    key: 'meta',
+    labelKey: 'videoEditor.diagnostics.filterMeta',
+    resolveColor: () => COLORS.primary,
+    resolveValue: (stats) => stats.meta,
   },
 ];
 

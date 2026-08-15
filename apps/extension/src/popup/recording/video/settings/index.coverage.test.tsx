@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: mocks.translateMock,
 }));
 
@@ -92,7 +92,15 @@ describe('popup video settings grid', () => {
     const onChange = vi.fn();
 
     render(
-      <CounterCard label="Countdown" value={0} min={0} max={1} suffix="s" onChange={onChange} />
+      <CounterCard
+        label="Countdown"
+        description="Delay recording"
+        value={0}
+        min={0}
+        max={1}
+        suffix="s"
+        onChange={onChange}
+      />
     );
 
     clickButtonContaining('Countdown');

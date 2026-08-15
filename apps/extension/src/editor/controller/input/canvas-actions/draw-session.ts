@@ -9,6 +9,7 @@ export function startEditorControllerDrawSession(options: {
   tool: DrawSession['tool'];
   start: Point;
   object: FabricObject;
+  pointerId?: number | null;
   cropGuide: Rect | null;
   prepareObject: (object: FabricObject) => void;
 }): {
@@ -26,6 +27,7 @@ export function startEditorControllerDrawSession(options: {
     tool,
     start,
     object,
+    pointerId: options.pointerId ?? null,
     cropGuide,
   });
   if (nextState.clearedExistingCropGuide) {

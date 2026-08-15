@@ -11,17 +11,32 @@ import { FrameProjection } from './projection';
 import type { ProjectionSettingsMenu } from './projection-settings';
 import { useEditorFrameCoordinateSpace, useProjectionRect } from './projection-space';
 
+type FrameSettingsSession = {
+  anchor: HTMLButtonElement;
+  frameId: string;
+  menu: Exclude<ProjectionSettingsMenu, null>;
+};
+
+function useLockedSettingsSessionCleanup(args: {
+  projected: ReturnType<typeof useFrameAnnotationInteraction>['projection']['projected'];
+  session: FrameSettingsSession | null;
+  setSession: React.Dispatch<React.SetStateAction<FrameSettingsSession | null>>;
+}) {
+  const { projected, session, setSession } = args;
+  React.useEffect(() => {
+    if (!session) return;
+    const entry = projected.find((candidate) => candidate.snapshot.id === session.frameId);
+    if (!entry || entry.object?.sniptaleLocked === true) setSession(null);
+  }, [projected, session, setSession]);
+}
+
 export function EditorFrameAnnotationPlane(props: {
   activeTool: EditorTool;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   controller: EditorFrameAnnotationPlaneController;
   layers: EditorLayerItem[];
 }) {
-  const [settingsSession, setSettingsSession] = React.useState<{
-    anchor: HTMLButtonElement;
-    frameId: string;
-    menu: Exclude<ProjectionSettingsMenu, null>;
-  } | null>(null);
+  const [settingsSession, setSettingsSession] = React.useState<FrameSettingsSession | null>(null);
   const interaction = useFrameAnnotationInteraction(props);
   const documentSize = props.controller.canvasDocumentSize ?? { width: 1, height: 1 };
   const planeRef = React.useRef<HTMLDivElement | null>(null);
@@ -33,6 +48,11 @@ export function EditorFrameAnnotationPlane(props: {
     canvasRect,
     scale: interaction.projection.scale,
     viewport: documentSize,
+  });
+  useLockedSettingsSessionCleanup({
+    projected: interaction.projection.projected,
+    session: settingsSession,
+    setSession: setSettingsSession,
   });
   return (
     <div
@@ -48,7 +68,6 @@ export function EditorFrameAnnotationPlane(props: {
           return;
         interaction.planeEvents.pointerDown(event);
       }}
-      onPointerMove={interaction.planeEvents.pointerMove}
       style={{ pointerEvents: props.activeTool === 'frame-annotation' ? 'auto' : 'none' }}
     >
       <div
@@ -72,6 +91,7 @@ export function EditorFrameAnnotationPlane(props: {
         {interaction.projection.focusFrames.length > 0 ? (
           <FrameAnnotationFocusSurface
             blurAmount={interaction.projection.focusBlurAmount}
+            edgeOverscan={1 / Math.max(0.01, interaction.projection.scale)}
             frames={interaction.projection.focusFrames}
             height={documentSize.height}
             opacity={interaction.projection.focusOpacity}
@@ -86,7 +106,10 @@ export function EditorFrameAnnotationPlane(props: {
             object={entry.object}
             sceneRoot={sceneRoot}
             selected={entry.snapshot.id === interaction.projection.effectiveSelectedId}
-            interactive={props.activeTool === 'frame-annotation' || props.activeTool === 'select'}
+            interactive={
+              entry.object?.sniptaleLocked !== true &&
+              (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
+            }
             scale={interaction.projection.scale}
             snapshot={entry.snapshot}
             settingsAnchor={
@@ -125,9 +148,6 @@ export function EditorFrameAnnotationPlane(props: {
             }}
             onDraftCommit={interaction.objectActions.commitSnapshotDraft}
             onMoveEnd={() => props.controller.clearFrameAnnotationSnap?.()}
-            onBringForward={() => props.controller.bringForwardSelection?.()}
-            onSendBackward={() => props.controller.sendBackwardSelection?.()}
-            onToggleLock={() => props.controller.toggleLayerLock?.(entry.snapshot.id)}
             projectMoveRect={(rect) =>
               props.controller.snapFrameAnnotationRect?.({
                 excludeId: entry.snapshot.id,

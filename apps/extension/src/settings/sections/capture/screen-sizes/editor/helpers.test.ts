@@ -20,19 +20,19 @@ const userPreset: UserViewportPreset = {
   kind: 'user',
   name: 'Phone',
   order: 0,
-  target: 'viewport',
+  target: 'window',
   width: 390,
 };
 const systemPreset: SystemViewportPreset = {
-  catalogRevision: 2,
+  catalogRevision: 3,
   customized: false,
   enabled: true,
   height: 720,
   id: 'system:viewport-hd',
   kind: 'system',
   order: 0,
-  systemKey: 'viewportHd',
-  target: 'viewport',
+  systemKey: 'windowHd',
+  target: 'window',
   width: 1280,
 };
 
@@ -59,7 +59,7 @@ it('syncs user/system display names and resets a create form to defaults', () =>
   const setHeight = vi.fn();
 
   syncViewportPresetForm(systemPreset, setLabel, setWidth, setHeight);
-  expect(setLabel).toHaveBeenCalledWith('viewportPresets.systemNames.viewportHd');
+  expect(setLabel).toHaveBeenCalledWith('viewportPresets.systemNames.windowHd');
   expect(setWidth).toHaveBeenCalledWith(1280);
   expect(setHeight).toHaveBeenCalledWith(720);
 

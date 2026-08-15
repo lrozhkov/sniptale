@@ -8,14 +8,13 @@ export interface DiagnosticsPanelProps {
   onClose?: () => void;
 }
 
-export type EventFilter = 'all' | 'error' | 'warn' | 'network' | 'console' | 'action';
+export type EventFilter = 'all' | 'error' | 'warn' | 'action' | 'meta';
 
 export interface DiagnosticsPanelStats {
   errors: number;
   warns: number;
-  network: number;
-  console: number;
   actions: number;
+  meta: number;
   total: number;
 }
 

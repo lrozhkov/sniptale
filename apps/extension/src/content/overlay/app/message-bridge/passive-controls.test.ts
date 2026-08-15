@@ -79,7 +79,7 @@ function expectViewportUpdatesRouteThroughControls() {
         type: MessageType.VIEWPORT_CHANGED,
         viewport: {
           presetId: 'test:viewport',
-          target: 'viewport',
+          target: 'window',
           height: 900,
           width: 1440,
         },
@@ -91,7 +91,7 @@ function expectViewportUpdatesRouteThroughControls() {
 
   expect(params.viewport.setCurrentViewport).toHaveBeenCalledWith({
     presetId: 'test:viewport',
-    target: 'viewport',
+    target: 'window',
     height: 900,
     width: 1440,
   });

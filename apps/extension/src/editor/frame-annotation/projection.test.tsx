@@ -5,7 +5,10 @@ import { expect, it, vi } from 'vitest';
 
 import { identityFrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 import { createFrameAnnotationSnapshot } from '../../features/highlighter/frame-annotation';
-import { createDefaultFrameCallout } from '../../features/highlighter/frame-annotation/defaults';
+import {
+  createDefaultFrameCallout,
+  createDefaultFrameStepBadge,
+} from '../../features/highlighter/frame-annotation/defaults';
 import { createFrameAnnotationProxy } from './proxy';
 import { FrameProjection } from './projection';
 
@@ -77,6 +80,64 @@ it('projects logical frame geometry with CSS left and top coordinates', () => {
   });
   act(() => root.unmount());
   host.remove();
+});
+
+it('does not mount any interactive overlay for a locked selected frame', () => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-locked',
+      x: 40,
+      y: 40,
+      width: 200,
+      height: 120,
+      callout: { ...createDefaultFrameCallout(), enabled: true },
+      stepBadge: { ...createDefaultFrameStepBadge(), enabled: true },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({
+    frame: snapshot,
+    label: 'Locked frame',
+    ordering: 0,
+  });
+  object.sniptaleLocked = true;
+
+  act(() =>
+    root.render(
+      <FrameProjection
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsRoot={controlsRoot}
+        interactive={false}
+        object={object}
+        sceneRoot={sceneRoot}
+        selected
+        scale={1}
+        snapshot={snapshot}
+        settingsAnchor={document.createElement('button')}
+        settingsMenu="callout"
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onMoveStart={vi.fn()}
+        onResizeStart={vi.fn()}
+        onSnapshotChange={vi.fn()}
+        onSnapshotPreview={vi.fn()}
+        onStepBadgeReorder={vi.fn()}
+      />
+    )
+  );
+
+  expect(controlsRoot.childElementCount).toBe(0);
+  expect(sceneRoot.childElementCount).toBe(0);
+  expect(host.querySelector('[data-frame-control="resize-handle"]')).toBeNull();
+  act(() => root.unmount());
+  document.body.replaceChildren();
 });
 
 it('projects a font selected in shared callout settings into the editor DOM surface', async () => {

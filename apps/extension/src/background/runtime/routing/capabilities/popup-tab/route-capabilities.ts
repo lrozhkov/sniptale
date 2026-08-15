@@ -14,7 +14,7 @@ import {
   type CapabilityContext,
 } from '@sniptale/platform/security/capability-context';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
-import { hasActivePageAccess } from '../../../page-access/service';
+import { hasActivePageAccess } from '../../../../page-access/service';
 import { hasPreauthorizedPopupTabRouteCapabilityRequestMessage } from './preauthorization';
 import { createPrivilegedCapabilityStore } from '../../../../routing-contracts/capabilities/privileged-authority/state';
 
@@ -42,7 +42,6 @@ const popupTabRouteCapabilities = createPrivilegedCapabilityStore<PopupTabRouteC
 });
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
-  MessageType.EXPORT_POPUP_START,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,
   MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
   MessageType.EXPORT_POPUP_CANCEL,

@@ -9,10 +9,6 @@ import {
 } from '../../overlay/video-telemetry';
 import { hideVideoCountdown, showVideoCountdown } from '../../overlay/video-countdown';
 import {
-  disableViewportCursorProjection,
-  enableViewportCursorProjection,
-} from '../../overlay/viewport-cursor-projection';
-import {
   isViewportMessage,
   type ContentRuntimeHandlerResult,
   type ContentRuntimeMessage,
@@ -85,26 +81,6 @@ function handleKnownViewportMessage(
       return acknowledgeViewportMessage(sendResponse);
     case VideoMessageType.HIDE_COUNTDOWN:
       hideVideoCountdown();
-      return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION:
-      if (
-        !enableViewportCursorProjection({
-          generation: message.generation,
-          recordingId: message.recordingId,
-        })
-      ) {
-        sendResponse({
-          error: 'Viewport cursor projection authority is retired or superseded',
-          success: false,
-        });
-        return false;
-      }
-      return acknowledgeViewportMessage(sendResponse);
-    case VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION:
-      disableViewportCursorProjection({
-        generation: message.generation,
-        recordingId: message.recordingId,
-      });
       return acknowledgeViewportMessage(sendResponse);
     case VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE:
       return handleEnableControlledCursorCaptureMessage(message, sendResponse, getViewportInfo);

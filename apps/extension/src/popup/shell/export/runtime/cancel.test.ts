@@ -1,9 +1,10 @@
 import { expect, it, vi } from 'vitest';
 
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { cancelPopupExport } from './cancel';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 
@@ -31,7 +32,7 @@ function createState(overrides = {}) {
 
 function createDeps(overrides = {}) {
   return {
-    sendCancelMessage: vi.fn().mockResolvedValue({ success: true }),
+    sendCancelJobMessage: vi.fn().mockResolvedValue({ success: true }),
     ...overrides,
   };
 }
@@ -44,11 +45,11 @@ it('returns early when export actions are disabled', async () => {
 
   await cancelPopupExport(state, deps);
 
-  expect(deps.sendCancelMessage).not.toHaveBeenCalled();
+  expect(deps.sendCancelJobMessage).not.toHaveBeenCalled();
   expect(state.setProgress).not.toHaveBeenCalled();
 });
 
-it('forwards batch cancellation to every selected tab with the same export identity', async () => {
+it('forwards cancellation once to the background job owner', async () => {
   const state = createState({
     selectedTabIdsInOrder: [12, 14],
   });
@@ -66,24 +67,30 @@ it('forwards batch cancellation to every selected tab with the same export ident
     total: 0,
     errors: ['content.runtime.exportCancelled'],
   });
-  expect(deps.sendCancelMessage).toHaveBeenNthCalledWith(1, 12, 'req-1');
-  expect(deps.sendCancelMessage).toHaveBeenNthCalledWith(2, 14, 'req-1');
+  expect(deps.sendCancelJobMessage).toHaveBeenCalledOnce();
+  expect(deps.sendCancelJobMessage).toHaveBeenCalledWith({
+    jobId: 'req-1',
+    type: MessageType.CANCEL_POPUP_EXPORT_JOB,
+  });
 });
 
-it('forwards single-tab cancel requests to the tab runtime', async () => {
+it('forwards single-tab cancellation through the same job API', async () => {
   const state = createState();
   const deps = createDeps();
 
   await cancelPopupExport(state, deps);
 
-  expect(deps.sendCancelMessage).toHaveBeenCalledWith(12, 'req-1');
+  expect(deps.sendCancelJobMessage).toHaveBeenCalledWith({
+    jobId: 'req-1',
+    type: MessageType.CANCEL_POPUP_EXPORT_JOB,
+  });
 });
 
 it('logs cancel failures from the runtime boundary', async () => {
   const error = new Error('cancel failed');
   const state = createState();
   const deps = createDeps({
-    sendCancelMessage: vi.fn().mockRejectedValue(error),
+    sendCancelJobMessage: vi.fn().mockRejectedValue(error),
   });
 
   await cancelPopupExport(state, deps);
@@ -91,29 +98,20 @@ it('logs cancel failures from the runtime boundary', async () => {
   expect(loggingMocks.logPopupExportCancelFailure).toHaveBeenCalledWith(error);
   expect(state.requestIdRef.current).toBeNull();
   expect(state.cancelRetryRef.current).toEqual({ exportRunId: 'req-1', tabIds: [12] });
-  expect(state.setProgress).toHaveBeenCalledWith({
-    activeStepKey: null,
-    phase: 'error',
-    message: 'content.runtime.exportCancelFailed',
-    current: 0,
-    total: 0,
-    errors: ['content.runtime.exportCancelFailed'],
-  });
+  expect(state.setProgress).not.toHaveBeenCalled();
 });
 
 it('treats a fulfilled unsuccessful cancel response as retryable cleanup failure', async () => {
   const state = createState();
   const deps = createDeps({
-    sendCancelMessage: vi.fn().mockResolvedValue({ error: 'cleanup failed', success: false }),
+    sendCancelJobMessage: vi.fn().mockResolvedValue({ error: 'cleanup failed', success: false }),
   });
 
   await cancelPopupExport(state, deps);
 
   expect(state.requestIdRef.current).toBeNull();
   expect(state.cancelRetryRef.current).toEqual({ exportRunId: 'req-1', tabIds: [12] });
-  expect(loggingMocks.logPopupExportCancelFailure).toHaveBeenCalledWith(
-    expect.objectContaining({ message: 'cleanup failed' })
-  );
+  expect(loggingMocks.logPopupExportCancelFailure).toHaveBeenCalledWith('cleanup failed');
   expect(state.setProgress).toHaveBeenCalledWith(
     expect.objectContaining({
       message: 'content.runtime.exportCancelFailed',
@@ -122,23 +120,26 @@ it('treats a fulfilled unsuccessful cancel response as retryable cleanup failure
   );
 });
 
-it('invalidates local batch work before remote cancellation settles and retries original targets', async () => {
-  const resolveCancellations: Array<(value: { success: true }) => void> = [];
+it('invalidates local work before remote cancellation settles', async () => {
+  let resolveCancellation: ((value: { success: true }) => void) | undefined;
   const state = createState({ selectedTabIdsInOrder: [12, 14] });
-  const sendCancelMessage = vi.fn(
+  const sendCancelJobMessage = vi.fn(
     () =>
       new Promise<{ success: true }>((resolve) => {
-        resolveCancellations.push(resolve);
+        resolveCancellation = resolve;
       })
   );
-  const cancellation = cancelPopupExport(state, createDeps({ sendCancelMessage }));
+  const cancellation = cancelPopupExport(state, createDeps({ sendCancelJobMessage }));
 
   expect(state.requestIdRef.current).toBeNull();
   expect(state.cancelRetryRef.current).toEqual({ exportRunId: 'req-1', tabIds: [12, 14] });
   state.selectedTabIdsInOrder.splice(0, 2, 99);
-  for (const resolve of resolveCancellations) resolve({ success: true });
+  resolveCancellation?.({ success: true });
   await cancellation;
 
-  expect(sendCancelMessage).toHaveBeenNthCalledWith(1, 12, 'req-1');
-  expect(sendCancelMessage).toHaveBeenNthCalledWith(2, 14, 'req-1');
+  expect(sendCancelJobMessage).toHaveBeenCalledOnce();
+  expect(sendCancelJobMessage).toHaveBeenCalledWith({
+    jobId: 'req-1',
+    type: MessageType.CANCEL_POPUP_EXPORT_JOB,
+  });
 });

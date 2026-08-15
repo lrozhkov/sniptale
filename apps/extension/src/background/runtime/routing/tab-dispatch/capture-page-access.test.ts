@@ -14,12 +14,17 @@ import {
   routeCaptureMessageMock,
 } from '../../../../../../../tooling/test/support/background-runtime-messaging.test-support';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import {
+  issueContentPrivilegedActionCapability,
+  resetContentPrivilegedActionCapabilityStoreForTests,
+} from '../../../routing-contracts/capabilities/content-action/capability-store';
 import { routeAuthorizedTabAction as handleTabMessage } from './adapters/dispatcher';
 
 const POPUP_URL = 'chrome-extension://test/apps/extension/src/popup/index.html';
 
 beforeEach(() => {
   resetRuntimeMessagingMocks();
+  resetContentPrivilegedActionCapabilityStoreForTests();
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   hasActivePageAccessMock.mockResolvedValue(true);
   isRouteCaptureMessageMock.mockReturnValue(true);
@@ -167,15 +172,27 @@ it('routes authorized popup capture messages without page access refresh', () =>
   );
 });
 
-it('routes authorized content capture messages after verifying page access', async () => {
+it('routes authorized native full-page capture messages after verifying page access', async () => {
   const { deps } = registerListener();
   const sendResponse = createSendResponse();
+  const contentIntent = issueContentPrivilegedActionCapability({
+    actionType: MessageType.EXPORT_CAPTURE_FULL_PAGE,
+    requestId: 'export-1',
+    senderBinding: {
+      documentId: 'document-17',
+      frameId: 0,
+      senderUrl: 'https://example.test/page',
+      tabId: 17,
+    },
+  });
 
   handleTabMessage({
     deps,
     logger: { error: loggerErrorMock, warn: loggerWarnMock },
     message: {
-      type: MessageType.REQUEST_EXPORT_HAR_START_CAPABILITY,
+      contentIntent,
+      exportRunId: 'export-1',
+      type: MessageType.EXPORT_CAPTURE_FULL_PAGE,
     },
     resolvedTabId: 17,
     sendResponse,

@@ -23,13 +23,13 @@ export async function attemptDiagnosticsStart(params: AttemptDiagnosticsParams):
   const { captureMode, settings, viewport, tabId } = params;
   const diagnosticsAllowed = captureMode === CaptureMode.TAB;
   if (
-    !settings.diagnosticsEnabled ||
+    !settings.interactionDiagnosticsEnabled ||
     !diagnosticsAllowed ||
     !viewport ||
     typeof tabId !== 'number' ||
     !supportsAnnotations(captureMode)
   ) {
-    if (settings.diagnosticsEnabled && !diagnosticsAllowed) {
+    if (settings.interactionDiagnosticsEnabled && !diagnosticsAllowed) {
       logger.log('Diagnostics skipped outside full-tab capture');
     }
     return;

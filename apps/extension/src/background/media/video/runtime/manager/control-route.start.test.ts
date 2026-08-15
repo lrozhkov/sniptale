@@ -40,7 +40,7 @@ it('rejects start recording when no target tab is resolved', () => {
           ...DEFAULT_VIDEO_SETTINGS,
           autoFadeDelay: 1500,
           countdownSeconds: 3,
-          diagnosticsEnabled: false,
+          interactionDiagnosticsEnabled: false,
           microphoneDeviceId: null,
           microphoneEnabled: true,
           outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },

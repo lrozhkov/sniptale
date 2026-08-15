@@ -137,7 +137,12 @@ export interface EditorControllerInstanceObjectCapabilities {
   syncViewportState(): void;
   scheduleViewportStateSync(): void;
   cancelTransientInteraction(): boolean;
-  startDrawSession(tool: DrawSession['tool'], start: Point, object: FabricObject): void;
+  startDrawSession(
+    tool: DrawSession['tool'],
+    start: Point,
+    object: FabricObject,
+    pointerId?: number | null
+  ): void;
   getActiveCropRect(): Rect | null;
   addObject(object: FabricObject): void;
   logBrowserFrame(stage: string, payload?: Record<string, unknown>): void;

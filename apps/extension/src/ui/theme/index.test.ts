@@ -60,6 +60,27 @@ function installMatchMedia(matches = false) {
   return mediaQuery;
 }
 
+function createSerializedLockManager() {
+  const queues = new Map<string, Promise<void>>();
+  return {
+    request<T>(
+      name: string,
+      _options: { mode: 'exclusive' | 'shared' },
+      operation: () => T | Promise<T>
+    ): Promise<T> {
+      const execution = (queues.get(name) ?? Promise.resolve()).then(operation);
+      queues.set(
+        name,
+        execution.then(
+          () => undefined,
+          () => undefined
+        )
+      );
+      return execution;
+    },
+  };
+}
+
 function resetThemeMocks() {
   browserStorageMocks.canObserveChanges.mockReset();
   browserStorageMocks.get.mockReset();
@@ -96,13 +117,15 @@ describe('theme local storage fallback', () => {
   it('reads localStorage preferences and applies them to the default theme targets', async () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
     const theme = await importThemeModule();
-    const dispose = theme.initializeAppTheme();
+    const dispose = theme.initializeExtensionPageTheme();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(theme.getStoredThemePreference()).toBe('dark');
     expect(theme.resolveAppTheme('system')).toBe('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
     expect(document.body.getAttribute('data-theme')).toBe('dark');
     expect(document.documentElement.style.colorScheme).toBe('dark');
     expect(document.body.style.colorScheme).toBe('dark');
@@ -112,6 +135,54 @@ describe('theme local storage fallback', () => {
 });
 
 describe('theme browser storage hydration', () => {
+  it('does not read or mirror an extension-page paint hint from the shared initializer', async () => {
+    let releaseStorage!: (value: Record<string, unknown>) => void;
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    installMatchMedia(true);
+    browserStorageMocks.get.mockReturnValue(
+      new Promise((resolve) => {
+        releaseStorage = resolve;
+      })
+    );
+
+    const theme = await importThemeModule();
+    const dispose = theme.initializeAppTheme();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    releaseStorage({ [THEME_STORAGE_KEY]: 'dark' });
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    });
+    dispose();
+  });
+
+  it('uses the synchronous paint hint while browser storage hydrates in the background', async () => {
+    let releaseStorage!: (value: Record<string, unknown>) => void;
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    installMatchMedia(true);
+    browserStorageMocks.get.mockReturnValue(
+      new Promise((resolve) => {
+        releaseStorage = resolve;
+      })
+    );
+
+    const theme = await importThemeModule();
+    const dispose = theme.initializeExtensionPageTheme();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    releaseStorage({ [THEME_STORAGE_KEY]: 'dark' });
+
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    });
+    dispose();
+  });
+
   it('hydrates from browser storage, persists updates, and emits theme change events', async () => {
     let storageChangeListener: StorageChangeListener = () => undefined;
     browserStorageMocks.isAvailable.mockReturnValue(true);
@@ -128,20 +199,24 @@ describe('theme browser storage hydration', () => {
     window.addEventListener(THEME_PREFERENCE_CHANGE_EVENT, eventSpy);
 
     const theme = await importThemeModule();
-    const dispose = theme.initializeAppTheme('light');
+    const dispose = theme.initializeExtensionPageTheme('light');
     await Promise.resolve();
     await Promise.resolve();
 
     expect(browserStorageMocks.get).toHaveBeenCalledWith([THEME_STORAGE_KEY]);
     expect(browserStorageMocks.subscribeToChanges).toHaveBeenCalledTimes(1);
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
 
+    browserStorageMocks.get.mockResolvedValue({ [THEME_STORAGE_KEY]: 'light' });
     await expect(theme.setAppThemePreference('light')).resolves.toBe('light');
     expect(browserStorageMocks.set).toHaveBeenCalledWith({
       [THEME_STORAGE_KEY]: 'light',
     });
     expect(eventSpy).toHaveBeenCalled();
 
+    browserStorageMocks.get.mockResolvedValue({ [THEME_STORAGE_KEY]: 'dark' });
     storageChangeListener(
       {
         [THEME_STORAGE_KEY]: { newValue: 'dark' },
@@ -149,10 +224,65 @@ describe('theme browser storage hydration', () => {
       'local'
     );
 
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
 
     dispose();
     window.removeEventListener(THEME_PREFERENCE_CHANGE_EVENT, eventSpy);
+  });
+
+  it('drops a stale paint hint when authoritative storage is absent', async () => {
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    installMatchMedia(true);
+    browserStorageMocks.get.mockResolvedValue({});
+
+    const theme = await importThemeModule();
+    const dispose = theme.initializeExtensionPageTheme();
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    await vi.waitFor(() => {
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    });
+    dispose();
+  });
+
+  it('does not recreate a paint hint queued behind privacy erasure', async () => {
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    let authoritativeTheme: Record<string, unknown> = {
+      [THEME_STORAGE_KEY]: 'light',
+    };
+    browserStorageMocks.get.mockImplementation(async () => authoritativeTheme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    vi.resetModules();
+    const { reconcileThemePaintHint } = await import('./preference-service');
+    const { installPersistenceLockManagerForTests, runWithPersistentDataErasureBarrier } =
+      await import('../../composition/persistence/infrastructure/mutation-barrier');
+    installPersistenceLockManagerForTests(createSerializedLockManager());
+    let releaseErasure!: () => void;
+    let markErasureEntered!: () => void;
+    const erasureEntered = new Promise<void>((resolve) => {
+      markErasureEntered = resolve;
+    });
+    const erasureGate = new Promise<void>((resolve) => {
+      releaseErasure = resolve;
+    });
+
+    const erasure = runWithPersistentDataErasureBarrier(async () => {
+      authoritativeTheme = {};
+      window.localStorage.removeItem(THEME_STORAGE_KEY);
+      markErasureEntered();
+      await erasureGate;
+    });
+    await erasureEntered;
+    const reconciliation = reconcileThemePaintHint();
+    releaseErasure();
+    await Promise.all([erasure, reconciliation]);
+
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    installPersistenceLockManagerForTests(null);
   });
 });
 

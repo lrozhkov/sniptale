@@ -151,7 +151,11 @@ function expectStepBadgePlacementChangesInvalidateDescriptors() {
     value: '1',
   };
   const changedFrame = structuredClone(initialFrame);
-  changedFrame.stepBadge!.manualPlacement = { position: 0.75, side: 'bottom' };
+  changedFrame.stepBadge!.manualPlacement = {
+    normalOffset: 24,
+    position: 0.25,
+    side: 'top',
+  };
   const frameStates = createFrameStates([['frame-1', 'idle']]);
 
   expect(

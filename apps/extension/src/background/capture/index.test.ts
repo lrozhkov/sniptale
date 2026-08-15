@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   captureFullPageMock,
   captureFullPageTransactionMock,
-  captureViewportWithClipMock,
-  captureViewportWithClipTransactionMock,
   captureVisibleTabForCropMock,
   captureVisibleTabForCropTransactionMock,
   captureVisibleTabMock,
@@ -15,8 +13,6 @@ const {
 } = vi.hoisted(() => ({
   captureFullPageMock: vi.fn(),
   captureFullPageTransactionMock: vi.fn(),
-  captureViewportWithClipMock: vi.fn(),
-  captureViewportWithClipTransactionMock: vi.fn(),
   captureVisibleTabForCropMock: vi.fn(),
   captureVisibleTabForCropTransactionMock: vi.fn(),
   captureVisibleTabMock: vi.fn(),
@@ -42,8 +38,6 @@ vi.mock('./jobs/state-machine', async (importOriginal) => ({
 }));
 
 vi.mock('./visible/flow', () => ({
-  captureViewportWithClip: captureViewportWithClipMock,
-  captureViewportWithClipTransaction: captureViewportWithClipTransactionMock,
   captureVisibleTab: captureVisibleTabMock,
   captureVisibleTabForCrop: captureVisibleTabForCropMock,
   captureVisibleTabForCropTransaction: captureVisibleTabForCropTransactionMock,
@@ -55,8 +49,6 @@ import {
   captureAndDownloadVisible,
   captureFullPage,
   captureFullPageForArchive,
-  captureViewportWithClip,
-  captureViewportWithClipTransaction,
   captureVisibleTab,
   captureVisibleTabForCrop,
   captureVisibleTabForCropTransaction,
@@ -117,6 +109,7 @@ async function verifiesArchiveCaptureOptions() {
     captureFullPageForArchive(11, { backendKind: 'native', documentId: 'document-11' })
   ).resolves.toBe(transaction);
   expect(captureFullPageTransactionMock).toHaveBeenCalledWith(11, undefined, {
+    abortSignal: expect.any(AbortSignal),
     backendKind: 'native',
     documentId: 'document-11',
     format: 'png',
@@ -140,7 +133,7 @@ async function verifiesArchiveCancellationDuringCompletedTransition() {
   );
 
   const capture = captureFullPageForArchive(12, {
-    backendKind: 'unattended-cdp',
+    backendKind: 'native',
     documentId: 'document-12',
     exportRunId: 'archive-completed-cancelled',
   });
@@ -161,8 +154,6 @@ function verifiesReExports() {
   expect(captureVisibleTabForCrop).toBe(captureVisibleTabForCropMock);
   expect(captureVisibleTabForCropTransaction).toBe(captureVisibleTabForCropTransactionMock);
   expect(captureVisibleTabTransaction).toBe(captureVisibleTabTransactionMock);
-  expect(captureViewportWithClip).toBe(captureViewportWithClipMock);
-  expect(captureViewportWithClipTransaction).toBe(captureViewportWithClipTransactionMock);
   expect(captureFullPage).toBe(captureFullPageMock);
 }
 

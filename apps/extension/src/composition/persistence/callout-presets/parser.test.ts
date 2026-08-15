@@ -2,6 +2,24 @@ import { expect, it } from 'vitest';
 import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
 import { parseStoredCalloutPresetCatalog } from './parser';
 
+it('parses bounded new-session defaults and rejects malformed values', () => {
+  const valid = parseStoredCalloutPresetCatalog({
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  });
+  expect(valid.value.newSessionDefaults).toEqual({ enabled: true, templateSource: 'forced' });
+  expect(valid.invalidFieldCount).toBe(0);
+
+  for (const newSessionDefaults of [
+    { enabled: 'yes', templateSource: 'forced' },
+    { enabled: true, templateSource: 'unknown' },
+    null,
+  ]) {
+    const malformed = parseStoredCalloutPresetCatalog({ newSessionDefaults });
+    expect(malformed.value.newSessionDefaults).toBeUndefined();
+    expect(malformed.invalidFieldCount).toBe(1);
+  }
+});
+
 it('parses compact catalog rows and preserves transparent colors', () => {
   const style = createSystemCalloutPresetCatalog()[2]!.style;
   const parsed = parseStoredCalloutPresetCatalog({

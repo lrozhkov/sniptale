@@ -11,6 +11,7 @@ export function createSettings(overrides: Partial<Settings> = {}): Settings {
       showGallery: true,
       showImageEditor: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showScreenshots: true,
       showSettings: true,
       showVideo: true,
@@ -25,7 +26,6 @@ export function createSettings(overrides: Partial<Settings> = {}): Settings {
     presets: [],
     viewportPresets: [],
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     saveCapturesToGallery: false,
     ...overrides,
   };

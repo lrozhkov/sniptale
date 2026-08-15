@@ -39,17 +39,6 @@ function createChromeStubDownloads() {
   };
 }
 
-function createChromeStubDebugger() {
-  return {
-    attach: vi.fn(),
-    detach: vi.fn(),
-    getTargets: vi.fn(),
-    onDetach: createListenerStub(),
-    onEvent: createListenerStub(),
-    sendCommand: vi.fn(),
-  };
-}
-
 function createChromeStubOffscreen() {
   return { closeDocument: vi.fn(), createDocument: vi.fn() };
 }
@@ -81,7 +70,6 @@ type ChromeStubWithContextMenus = ReturnType<typeof createChromeStub> & {
 
 export function createChromeStub() {
   return {
-    debugger: createChromeStubDebugger(),
     downloads: createChromeStubDownloads(),
     offscreen: createChromeStubOffscreen(),
     permissions: createChromeStubPermissions(),

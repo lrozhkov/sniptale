@@ -23,6 +23,16 @@ vi.mock('../../../../composition/persistence/callout-presets', async (importOrig
 }));
 
 import { createCalloutPresetSessionSync, createSessionCalloutSettings } from './callout-defaults';
+import {
+  getAnnotationTemplateSources,
+  resetAnnotationTemplateSources,
+  setAnnotationTemplateSource,
+} from './annotation-template-source';
+import {
+  getFutureFrameCallout,
+  resetFutureFrameCallout,
+  setFutureFrameCallout,
+} from './future-callout';
 
 function createCatalog(defaultPresetId = 'system-callout-bubble'): CalloutPresetCatalog {
   return {
@@ -34,10 +44,69 @@ function createCatalog(defaultPresetId = 'system-callout-bubble'): CalloutPreset
 }
 
 beforeEach(() => {
+  resetAnnotationTemplateSources();
+  resetFutureFrameCallout();
   mocks.catalog = createCatalog();
   mocks.listener = null;
   mocks.load.mockReset().mockResolvedValue(mocks.catalog);
   mocks.unsubscribe.mockReset();
+});
+
+it('applies enabled and forced-template defaults once at the start of a session', async () => {
+  mocks.catalog = {
+    ...createCatalog(),
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  };
+  mocks.load.mockResolvedValue(mocks.catalog);
+  const ref: { current: CalloutVisualStyle | null } = { current: null };
+  createCalloutPresetSessionSync(ref);
+  await Promise.resolve();
+
+  expect(getFutureFrameCallout()).toMatchObject({
+    enabled: true,
+    sourcePresetId: 'system-callout-bubble',
+  });
+  expect(getAnnotationTemplateSources().callout).toBe('forced');
+
+  mocks.listener?.({
+    ...mocks.catalog,
+    newSessionDefaults: { enabled: false, templateSource: 'frame-default' },
+  });
+  expect(getFutureFrameCallout()).not.toBeNull();
+  expect(getAnnotationTemplateSources().callout).toBe('forced');
+});
+
+it('uses fresh storage defaults instead of a snapshot retained from the previous session', async () => {
+  mocks.catalog = {
+    ...createCatalog(),
+    newSessionDefaults: { enabled: false, templateSource: 'frame-default' },
+  };
+  mocks.load.mockResolvedValue({
+    ...createCatalog(),
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  });
+  createCalloutPresetSessionSync({ current: null });
+  await Promise.resolve();
+
+  expect(getFutureFrameCallout()?.enabled).toBe(true);
+  expect(getAnnotationTemplateSources().callout).toBe('forced');
+});
+
+it('does not overwrite a session choice made before the catalog read completes', async () => {
+  mocks.catalog = null;
+  let resolveLoad: ((catalog: CalloutPresetCatalog) => void) | undefined;
+  mocks.load.mockReturnValueOnce(new Promise((resolve) => (resolveLoad = resolve)));
+  setFutureFrameCallout(null);
+  setAnnotationTemplateSource('callout', 'frame-default');
+  createCalloutPresetSessionSync({ current: null });
+  resolveLoad?.({
+    ...createCatalog(),
+    newSessionDefaults: { enabled: true, templateSource: 'forced' },
+  });
+  await Promise.resolve();
+
+  expect(getFutureFrameCallout()).toBeNull();
+  expect(getAnnotationTemplateSources().callout).toBe('frame-default');
 });
 
 it('initializes and follows the catalog default while the session style is unchanged', async () => {

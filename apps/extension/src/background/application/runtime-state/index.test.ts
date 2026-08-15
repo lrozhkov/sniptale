@@ -61,7 +61,7 @@ it('clears reconstructible tab state and delegates durable tab cleanup', async (
   state.viewportOwnerState.set(7, 'capture-surface');
   state.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
   });
@@ -86,7 +86,7 @@ it('clears navigation-scoped tab mode state without durable tab cleanup', () => 
   state.viewportOwnerState.set(7, 'capture-surface');
   state.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
   });
@@ -112,7 +112,7 @@ it('reconciles MV3 startup state without replacing durable owners', () => {
   state.viewportOwnerState.set(7, 'capture-surface');
   state.viewportState.set(7, {
     presetId: 'test:viewport',
-    target: 'viewport' as const,
+    target: 'window' as const,
     width: 1280,
     height: 720,
   });

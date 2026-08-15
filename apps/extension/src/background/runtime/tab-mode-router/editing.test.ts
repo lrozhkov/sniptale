@@ -14,7 +14,7 @@ function createContext(): TabModeContext {
     viewportOwnerState: new Map(),
     viewportState: new Map<
       number,
-      { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
+      { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
     >(),
   };
 }

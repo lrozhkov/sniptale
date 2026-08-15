@@ -17,7 +17,6 @@ it('parses preview and export-run-bound cancellation requests', () => {
     type: MessageType.EXPORT_POPUP_CANCEL,
   });
   expect(parsePopupExportControlRequest({ type: MessageType.EXPORT_POPUP_CANCEL })).toBeNull();
-  expect(parsePopupExportControlRequest({ type: MessageType.EXPORT_POPUP_START })).toBeNull();
   expect(
     parsePopupExportControlRequest({ type: MessageType.EXPORT_POPUP_BUILD_PACKAGE })
   ).toBeNull();

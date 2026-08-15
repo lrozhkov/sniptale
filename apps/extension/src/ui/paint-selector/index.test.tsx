@@ -24,6 +24,36 @@ function changeInput(input: HTMLInputElement, value: string) {
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+it('renders the shared selector trigger with a labeled value and transparency preview', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#00000000')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.paint-selector.trigger"]'
+  )!;
+  const preview = trigger.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.paint-selector.preview"]'
+  )!;
+  expect(trigger.textContent).toContain('Fill');
+  expect(trigger.textContent).toContain('#00000000');
+  expect(preview.style.backgroundSize).toBe('100% 100%, 8px 8px');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  act(() => root.unmount());
+  host.remove();
+});
+
 it('uses one popup owner, switches modes, applies, and never nests a color popup', () => {
   const host = document.createElement('div');
   document.body.append(host);
@@ -60,6 +90,32 @@ it('uses one popup owner, switches modes, applies, and never nests a color popup
     kind: 'gradient',
     gradient: { type: 'linear' },
   });
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('limits modes and advanced gradient controls for legacy-backed consumers', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        allowedModes={['solid', 'linear']}
+        showGradientAdvancedControls={false}
+        label="Background"
+        title="Background"
+        value={createSolidPaint('#f00')}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  expect(popup.querySelector('[aria-label="highlighter.paintPicker.radial"]')).toBeNull();
+  expect(popup.querySelector('[aria-label="highlighter.paintPicker.conic"]')).toBeNull();
+  act(() => selectPaintMode(popup, 'linear'));
+  expect(popup.querySelector('summary')).toBeNull();
   act(() => root.unmount());
   host.remove();
 });

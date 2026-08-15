@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -16,7 +16,7 @@ vi.mock('../post-record/result-runtime', () => ({
   loadPendingVideoPostRecordResult: mocks.loadPostRecordResult,
 }));
 
-vi.mock('../../../../platform/i18n', (_importOriginal) => ({
+vi.mock('../../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
 
@@ -26,9 +26,9 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 }));
 
 vi.mock('./body', (_importOriginal) => ({
-  VideoSetupBody: (props: unknown) => {
+  VideoSetupBody: (props: { idleActions?: ReactNode }) => {
     mocks.bodyMock(props);
-    return <div data-testid="video-setup-body" />;
+    return <div data-testid="video-setup-body">{props.idleActions}</div>;
   },
 }));
 
@@ -87,7 +87,7 @@ function createProps(
         kind: 'user',
         id: 'preset-1',
         name: 'Preset',
-        target: 'viewport',
+        target: 'window',
         width: 1280,
         height: 720,
         enabled: true,
@@ -125,7 +125,7 @@ function createVideoSettings(): VideoRecordingSettings {
     ...DEFAULT_VIDEO_SETTINGS,
     autoFadeDelay: 0,
     countdownSeconds: 3,
-    diagnosticsEnabled: true,
+    interactionDiagnosticsEnabled: true,
     microphoneDeviceId: null,
     microphoneEnabled: true,
     outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.MEDIUM },
@@ -203,6 +203,9 @@ async function verifiesStartableViewModel() {
       startButtonLabel: 't:popup.video.startButton',
     })
   );
+  expect(
+    container?.querySelector('[data-testid="video-setup-body"] [data-testid="footer"]')
+  ).not.toBeNull();
 }
 
 async function verifiesDisabledStartState() {
@@ -240,6 +243,26 @@ it(
   'builds a startable view model with independent viewport preset selection',
   verifiesStartableViewModel
 );
+it('uses an already verified startup post-record snapshot without another state request', async () => {
+  const result = {
+    primaryRecordingId: 'recording-1',
+    projectId: null,
+    recordingId: 'recording-1',
+  };
+  await renderNode(
+    <VideoSetupPage
+      {...createProps({
+        initialPostRecordResult: result,
+        initialPostRecordVerified: true,
+      })}
+    />
+  );
+  await act(async () => Promise.resolve());
+  expect(mocks.loadPostRecordResult).not.toHaveBeenCalled();
+  expect(mocks.bodyMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ postRecordResult: result })
+  );
+});
 it('disables start when the current mode is unavailable or pending', verifiesDisabledStartState);
 
 it('shows saving state and clears the visible timer while discarding an active recording', async () => {

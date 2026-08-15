@@ -8,9 +8,9 @@ import {
   ensureActivePageAccessRuntime,
   hasActivePageAccess,
   hasPinnedToolbarAllSitesAccess,
-} from './service';
-import { beginPinnedToolbarRestoreOperation } from './pinned-toolbar-operation';
-import { waitForContentToolbarReady } from './readiness';
+} from '../../page-access/service';
+import { beginPinnedToolbarRestoreOperation } from '../../page-access/pinned-toolbar-operation';
+import { waitForContentToolbarReady } from '../../page-access/readiness';
 
 type PinnedToolbarRestoreState = Pick<
   BackgroundRuntimeMessageDeps,

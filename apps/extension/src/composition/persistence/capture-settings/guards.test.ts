@@ -70,7 +70,7 @@ function registerFullVideoSettingsTests() {
       parseCurrentVideoSettings({
         autoFadeDelay: 30,
         countdownSeconds: 3,
-        diagnosticsEnabled: true,
+        interactionDiagnosticsEnabled: true,
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
@@ -100,7 +100,7 @@ function registerFullVideoSettingsTests() {
         ...CURRENT_VIDEO_SETTINGS_CONTRACT,
         autoFadeDelay: 30,
         countdownSeconds: 3,
-        diagnosticsEnabled: true,
+        interactionDiagnosticsEnabled: true,
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
@@ -352,7 +352,7 @@ describe('video guards invalid settings', () => {
       parseCurrentVideoSettings({
         autoFadeDelay: '250',
         countdownSeconds: 3,
-        diagnosticsEnabled: 'true',
+        interactionDiagnosticsEnabled: 'true',
         microphoneDeviceId: 7,
         microphoneEnabled: true,
         outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: 'BROKEN' },

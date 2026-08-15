@@ -19,6 +19,9 @@ interface SelectionModeRuntimeListenerArgs {
 
 function attachPointerListeners(args: SelectionModeListenerArgs): Array<() => void> {
   return [
+    addEventListenerToAllWindowsDynamic<DragEvent>('dragstart', args.handleDragStart, {
+      capture: true,
+    }),
     addEventListenerToAllWindowsDynamic<MouseEvent>('mousemove', args.handleMouseMove, {
       capture: true,
     }),
@@ -67,6 +70,7 @@ function setupSelectionModeEventListeners(args: SelectionModeListenerArgs): void
 export function setupSelectionModeRuntimeListeners(args: SelectionModeRuntimeListenerArgs): void {
   setupSelectionModeEventListeners({
     handleClick: args.setupListenerHandlers.handleClick,
+    handleDragStart: args.setupListenerHandlers.handleDragStart,
     handleKeyDown: args.setupListenerHandlers.handleKeyDown,
     handleMouseDown: args.setupListenerHandlers.handleMouseDown,
     handleMouseLeave: args.setupListenerHandlers.handleMouseLeave,

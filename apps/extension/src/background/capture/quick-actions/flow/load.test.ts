@@ -34,6 +34,7 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
       showVideoEditor: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showSettings: true,
     },
     saveCapturesToGallery: false,
@@ -43,7 +44,6 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
     authenticatedSnapshotAssetsEnabled: true,
     anonymousCrossOriginSnapshotAssetsEnabled: false,
     skipWebSnapshotSaveDisclosure: false,
-    rawDiagnosticsEnabled: false,
     viewportPresets: [],
     ...overrides,
   };

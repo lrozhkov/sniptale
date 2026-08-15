@@ -14,7 +14,7 @@ const viewportSelectorMocks = vi.hoisted(() => ({
       kind: 'user',
       id: 'preset-hd',
       name: 'HD',
-      target: 'viewport',
+      target: 'window',
       width: 1280,
       height: 720,
       enabled: true,
@@ -97,7 +97,7 @@ it('uses native button click activation for keyboard-selected presets', async ()
     {
       height: 720,
       presetId: 'preset-hd',
-      target: 'viewport',
+      target: 'window',
       width: 1280,
     },
     expect.any(MouseEvent)
@@ -177,9 +177,8 @@ it('renders the selector without a synthetic loading contract and opens the menu
   expect(viewportSelectorMocks.menuStateChangeMock).toHaveBeenCalledWith(true);
   expect(container?.textContent).toContain('content.toolbar.viewportNativeLabel');
   expect(container?.textContent).toContain('HD');
-  expect(container?.textContent?.indexOf('viewportPresets.groups.window')).toBeLessThan(
-    container?.textContent?.indexOf('viewportPresets.groups.viewport') ?? -1
-  );
+  expect(container?.textContent).toContain('viewportPresets.groups.window');
+  expect(container?.textContent).not.toContain('viewportPresets.groups.viewport');
   expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
   const presetButton = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
@@ -194,7 +193,7 @@ it('renders the selector without a synthetic loading contract and opens the menu
   });
   expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
   expect(container?.querySelectorAll('.sniptale-toolbar-menu-detail')).toHaveLength(0);
-  expect(container?.textContent?.split('viewportPresets.hints.viewport')).toHaveLength(2);
+  expect(container?.textContent?.split('viewportPresets.hints.window')).toHaveLength(2);
   expect(
     container?.querySelector('.sniptale-popover-menu')?.querySelector('.sniptale-popover-icon')
   ).toBeNull();
@@ -206,7 +205,7 @@ it('hides group hints in compact menu view', async () => {
   await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
 
   expect(container?.textContent).toContain('viewportPresets.groups.window');
-  expect(container?.textContent).toContain('viewportPresets.groups.viewport');
+  expect(container?.textContent).not.toContain('viewportPresets.groups.viewport');
   expect(container?.textContent).not.toContain('viewportPresets.hints.window');
   expect(container?.textContent).not.toContain('viewportPresets.hints.viewport');
 });

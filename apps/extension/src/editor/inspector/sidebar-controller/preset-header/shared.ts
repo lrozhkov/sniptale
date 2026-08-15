@@ -148,6 +148,7 @@ export function pickSceneBackgroundSettings(frameDraft: {
   paddingBottom: number;
   paddingLeft: number;
   backgroundMode: string;
+  backgroundBlurAmount: number;
   backgroundColor: string;
   backgroundGradientFrom: string;
   backgroundGradientTo: string;
@@ -167,6 +168,7 @@ export function pickSceneBackgroundSettings(frameDraft: {
     paddingBottom: frameDraft.paddingBottom,
     paddingLeft: frameDraft.paddingLeft,
     backgroundMode: frameDraft.backgroundMode as EditorSceneBackgroundSettings['backgroundMode'],
+    backgroundBlurAmount: frameDraft.backgroundBlurAmount,
     backgroundColor: frameDraft.backgroundColor,
     backgroundGradientFrom: frameDraft.backgroundGradientFrom,
     backgroundGradientTo: frameDraft.backgroundGradientTo,

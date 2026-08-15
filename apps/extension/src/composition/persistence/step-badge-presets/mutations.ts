@@ -2,6 +2,7 @@ import type {
   StepBadgePreset,
   StepBadgePresetCatalog,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import {
   cloneStepBadgeTemplate,
   getCanonicalSystemStepBadgePreset,
@@ -75,6 +76,22 @@ export function setStepBadgePresetEnabled(
 export function setDefaultStepBadgePreset(catalog: StepBadgePresetCatalog, id: string) {
   const preset = catalog.presets.find((item) => item.id === id && item.enabled !== false);
   return preset ? { ...catalog, catalogCustomized: true, defaultPresetId: id } : null;
+}
+
+export function setStepBadgeSessionDefaults(
+  catalog: StepBadgePresetCatalog,
+  defaults: AnnotationSessionDefaults
+) {
+  if (
+    catalog.newSessionDefaults?.enabled === defaults.enabled &&
+    catalog.newSessionDefaults.templateSource === defaults.templateSource
+  ) {
+    return null;
+  }
+  return {
+    ...catalog,
+    newSessionDefaults: { ...defaults },
+  };
 }
 
 export function reorderStepBadgePresets(catalog: StepBadgePresetCatalog, ids: string[]) {

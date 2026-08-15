@@ -29,7 +29,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('draws a preset with one uniform contain scale and deterministic black padding', async () => {
+it('contains a genuinely changed source aspect inside an immutable canvas', async () => {
   const output = createStream(2346, 1080);
   const context = {
     drawImage: vi.fn(),

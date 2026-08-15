@@ -27,6 +27,8 @@ it('composes the catalog panel and editor with one controller owner', () => {
       moveBefore: vi.fn(),
       reset: vi.fn(),
       save: vi.fn(),
+      setNewSessionEnabled: vi.fn(),
+      setNewSessionTemplateSource: vi.fn(),
       setDefault: vi.fn(),
       toggle: vi.fn(),
     },

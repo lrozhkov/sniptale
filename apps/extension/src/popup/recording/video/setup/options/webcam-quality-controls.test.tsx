@@ -15,8 +15,8 @@ import {
   useWebcamResolutionOptions,
 } from './webcam-quality-controls';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => {
     if (key === 'popup.video.webcamQualityActual') {
       return 'Received: {resolution}, {frameRate}';

@@ -17,7 +17,7 @@ import {
   type DrawingPoint,
 } from '../../../features/drawing/public';
 import { createObjectLabel } from '../../document/model';
-import { writeEditorDrawingObject } from './metadata';
+import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
   getLineLeftOffset: Textbox['_getLineLeftOffset'];
@@ -55,10 +55,21 @@ function createFreehandObject(
   drawing: Extract<DrawingObject, { kind: 'pencil' | 'marker' }>,
   preview: boolean
 ): FabricObject {
+  if (preview) {
+    return new Path(pointsPath(drawing.samples, false), {
+      fill: null,
+      opacity: drawing.kind === 'marker' ? drawing.opacity : 1,
+      originX: 'left',
+      originY: 'top',
+      stroke: drawing.color,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'round',
+      strokeWidth: drawing.width,
+    });
+  }
   const outline = buildDrawingStrokeOutline(drawing.samples, drawing.width, {
     dynamicWidth: drawing.kind === 'pencil',
-    smoothingLevel: preview ? 4 : 10,
-    ...(preview ? { preview: true } : {}),
+    smoothingLevel: 10,
   });
   return new Path(pointsPath(outline, true), {
     fill: drawing.color,
@@ -99,13 +110,13 @@ function createShapeObject(
 ): FabricObject {
   const options = {
     fill: drawing.fillColor ?? 'transparent',
-    left: drawing.bounds.x,
+    left: drawing.bounds.x - drawing.width / 2,
     originX: 'left' as const,
     originY: 'top' as const,
     stroke: drawing.color,
     strokeUniform: true,
     strokeWidth: drawing.width,
-    top: drawing.bounds.y,
+    top: drawing.bounds.y - drawing.width / 2,
   };
   if (drawing.kind === 'rectangle') {
     return new Rect({ ...options, height: drawing.bounds.height, width: drawing.bounds.width });
@@ -294,7 +305,42 @@ export function updateEditorDrawingPathDraft(
     top: geometry.top,
     width: geometry.width,
   });
-  writeEditorDrawingObject(current, drawing);
+  if (options.preview) stageEditorDrawingObject(current, drawing);
+  else writeEditorDrawingObject(current, drawing);
+  current.setCoords();
+  return true;
+}
+
+export function updateEditorDrawingShapeDraft(
+  current: FabricObject,
+  drawing: Extract<DrawingObject, { kind: 'rectangle' | 'ellipse' | 'triangle' | 'parallelogram' }>
+): boolean {
+  const geometry = createEditorDrawingFabricObject(drawing, 1);
+  const sameKind =
+    (current instanceof Rect && geometry instanceof Rect) ||
+    (current instanceof Ellipse && geometry instanceof Ellipse) ||
+    (current instanceof Triangle && geometry instanceof Triangle) ||
+    (current instanceof Polygon && geometry instanceof Polygon);
+  if (!sameKind) return false;
+
+  current.set({
+    angle: geometry.angle,
+    height: geometry.height,
+    left: geometry.left,
+    originX: geometry.originX,
+    originY: geometry.originY,
+    scaleX: geometry.scaleX,
+    scaleY: geometry.scaleY,
+    top: geometry.top,
+    width: geometry.width,
+  });
+  if (current instanceof Ellipse && geometry instanceof Ellipse) {
+    current.set({ rx: geometry.rx, ry: geometry.ry });
+  }
+  if (current instanceof Polygon && geometry instanceof Polygon) {
+    current.set({ pathOffset: geometry.pathOffset, points: geometry.points });
+  }
+  stageEditorDrawingObject(current, drawing);
   current.setCoords();
   return true;
 }

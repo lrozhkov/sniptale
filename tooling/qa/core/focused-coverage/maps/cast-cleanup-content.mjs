@@ -36,10 +36,4 @@ export const CAST_CLEANUP_CONTENT_OWNER_MAPPINGS = [
       'Content diagnostic event payload handling is covered by runtime router diagnostics tests.',
     testFiles: ['apps/extension/src/background/media/video/runtime/router.diagnostics.test.ts'],
   },
-  {
-    owner: 'content-har-export-transport-boundary',
-    productionFile: 'apps/extension/src/content/parser/export-manager/diagnostics/transport.ts',
-    reason: 'HAR diagnostics transport payload parsing is covered by transport tests.',
-    testFiles: ['apps/extension/src/content/parser/export-manager/diagnostics/transport.test.ts'],
-  },
 ];

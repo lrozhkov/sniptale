@@ -25,6 +25,12 @@ import { createRecordingArtifactSession } from '../encoding/artifact-session';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import type { FinalizedRecordingStagingArtifact } from '../../../composition/persistence/recordings/staging';
 
+type RecordingSourceBinding = {
+  generation: number;
+  recordingId: string;
+  streamInstanceId: string;
+};
+
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
 
 function resolveDisplaySurface(
@@ -71,6 +77,7 @@ export async function finalizeRecordingBootstrap(params: {
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
+  sourceBinding?: RecordingSourceBinding;
 }) {
   const videoStream = requireRecordingVideoStream();
   const stagingCoordinator = recordingContext.stagingCoordinator;
@@ -120,7 +127,17 @@ export async function finalizeRecordingBootstrap(params: {
     videoStream,
     webcamSettings,
   });
-  recordingContext.registerStartingRecorderCancellation(mediaRecorder, cancelStartingRecorder);
+  if (params.sourceBinding) {
+    const pendingSourceFailure = recordingContext.registerSourceFailureHandler(
+      params.sourceBinding,
+      cancelStartingRecorder.failUnexpectedly
+    );
+    if (pendingSourceFailure) throw pendingSourceFailure;
+  }
+  recordingContext.registerStartingRecorderCancellation(
+    mediaRecorder,
+    cancelStartingRecorder.cancel
+  );
   params.durationTracker.reset();
   artifactSession.start();
 }
@@ -207,7 +224,7 @@ function attachRecorderLifecycle(params: {
   recordingId: string;
   videoStream: MediaStream;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
-}) {
+}): { cancel: () => void; failUnexpectedly: (error: Error) => void } {
   const { artifactSession, mediaRecorder, recordingId } = params;
   let phase: 'starting' | 'recording' | 'terminal' = 'starting';
 
@@ -314,9 +331,12 @@ function attachRecorderLifecycle(params: {
     void artifactSession.stop().catch(() => undefined);
   }
 
-  return () => {
-    beginTerminalHandling();
-    void artifactSession.abort().catch(() => undefined);
+  return {
+    cancel: () => {
+      beginTerminalHandling();
+      void artifactSession.abort().catch(() => undefined);
+    },
+    failUnexpectedly,
   };
 }
 

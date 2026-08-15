@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 
 import {
   isExportOptions,
+  isPopupExportJobStatus,
   isPopupExportPackageResponse,
   isExportProgress,
   isPopupExportPreviewResponse,
@@ -16,7 +17,7 @@ it('accepts only complete export options payloads', () => {
       includeFiles: true,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -30,7 +31,7 @@ it('accepts only complete export options payloads', () => {
       includeFiles: true,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -44,7 +45,7 @@ it('accepts only complete export options payloads', () => {
       includeFiles: true,
       includeImages: true,
       includeBasicLogs: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeCssDiagnostics: false,
       includeFullPageScreenshot: true,
     })
@@ -92,6 +93,46 @@ it('rejects export progress payloads with invalid active step keys', () => {
       errors: [],
     })
   ).toBe(false);
+  expect(
+    isExportProgress({
+      phase: 'networking',
+      message: '',
+      current: 0,
+      total: 0,
+      errors: [],
+    })
+  ).toBe(false);
+  expect(isExportProgress({ phase: 'idle', message: '', current: -1, total: 0, errors: [] })).toBe(
+    false
+  );
+});
+
+it('narrows popup export job phases and positive integer revisions', () => {
+  const status = {
+    activatedTabIds: [],
+    effectiveOptions: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: true,
+      includeFullPageScreenshot: false,
+      includeImages: true,
+      includeJson: true,
+      includeMarkdown: true,
+      includePageDiagnostics: false,
+    },
+    jobId: 'job-1',
+    orderedTabs: [{ tabId: 7, title: 'Page' }],
+    originalActiveTabs: [],
+    phase: 'running',
+    progress: { current: 0, errors: [], message: '', phase: 'scanning', total: 1 },
+    revision: 1,
+    warnings: [],
+  };
+
+  expect(isPopupExportJobStatus(status)).toBe(true);
+  expect(isPopupExportJobStatus({ ...status, phase: 'unknown' })).toBe(false);
+  expect(isPopupExportJobStatus({ ...status, revision: 0 })).toBe(false);
+  expect(isPopupExportJobStatus({ ...status, revision: 1.5 })).toBe(false);
 });
 
 it('accepts valid popup export results', () => {

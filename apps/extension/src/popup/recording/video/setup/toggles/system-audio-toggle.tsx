@@ -1,5 +1,5 @@
 import { Volume2 } from 'lucide-react';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import { PopupIconStateButton } from '../../../../../ui/popup-shell/icon-state-button';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 

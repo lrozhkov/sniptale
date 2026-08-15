@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, type MutableRefObject } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   PreparationSurface,
   createPreparationScenarioAutoClickCaptureTransport,
@@ -21,59 +21,6 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 
 type ViewerSurfaceTransactionRunner = (transaction: () => Promise<void>) => Promise<void>;
-
-function createViewerViewportMutation(args: {
-  iframe: HTMLIFrameElement | null;
-  manifest: WebSnapshotManifest;
-  onViewportChange: ((viewport: { width: number; height: number } | null) => void) | undefined;
-  committedViewportRef: MutableRefObject<AppliedViewportPresetPayload | null>;
-  runTransaction: ViewerSurfaceTransactionRunner;
-}): NonNullable<PreparationHostPorts['mutateViewport']> {
-  return (viewport) =>
-    args.runTransaction(async () => {
-      if (viewport && (!viewport.presetId || !viewport.target)) {
-        throw new Error('Snapshot viewer size preset identity is missing.');
-      }
-      if (viewport?.target === 'window') {
-        throw new Error('Browser-window presets are unavailable in the snapshot viewer.');
-      }
-      if (!args.onViewportChange) {
-        throw new Error('Snapshot viewer viewport owner is unavailable.');
-      }
-      const requested = viewport
-        ? {
-            presetId: viewport.presetId!,
-            target: viewport.target!,
-            width: viewport.width,
-            height: viewport.height,
-          }
-        : null;
-      const previous = args.committedViewportRef.current;
-      const command = { type: PREPARATION_SURFACE_RESIZE, viewport: requested } as const;
-      args.onViewportChange(
-        requested ? { width: requested.width, height: requested.height } : null
-      );
-      try {
-        await waitForViewerSurfaceCommit({ command, iframe: args.iframe, manifest: args.manifest });
-        args.committedViewportRef.current = requested;
-      } catch (error) {
-        const rollbackCommand = { type: PREPARATION_SURFACE_RESIZE, viewport: previous } as const;
-        args.onViewportChange(previous ? { width: previous.width, height: previous.height } : null);
-        try {
-          await waitForViewerSurfaceCommit({
-            command: rollbackCommand,
-            iframe: args.iframe,
-            manifest: args.manifest,
-          });
-        } catch (rollbackError) {
-          throw new AggregateError([error, rollbackError], 'Snapshot viewer rollback failed.', {
-            cause: rollbackError,
-          });
-        }
-        throw error;
-      }
-    });
-}
 
 async function rollbackViewerPreparationCommand(args: {
   command: ViewerPreparationCommand;
@@ -166,7 +113,7 @@ export function ViewerPreparationRuntime(props: {
   onViewportChange?: (viewport: { width: number; height: number } | null) => void;
 }) {
   const { iframe, manifest, onViewportChange } = props;
-  const { committedViewportRef, connectPort, runTransaction } = useViewerSurfaceTransaction({
+  const { connectPort } = useViewerSurfaceTransaction({
     iframe,
     manifest,
   });
@@ -193,25 +140,9 @@ export function ViewerPreparationRuntime(props: {
           manifest,
         }),
       onPopupExportRequest: handlePopupExportRequest,
-      mutateViewport: createViewerViewportMutation({
-        committedViewportRef,
-        iframe,
-        manifest,
-        onViewportChange,
-        runTransaction,
-      }),
       resolveAiPickSource: createViewerAiPickSourceResolver(iframe, manifest),
     }),
-    [
-      acceptsElement,
-      committedViewportRef,
-      connectPort,
-      handlePopupExportRequest,
-      iframe,
-      manifest,
-      onViewportChange,
-      runTransaction,
-    ]
+    [acceptsElement, connectPort, handlePopupExportRequest, iframe, manifest]
   );
 
   if (onViewportChange) {

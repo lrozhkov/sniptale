@@ -6,14 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EditorTool } from '../../../features/editor/document/types';
 import type { CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
-import { resolveToolPropertiesStyle } from './tool-properties-geometry';
 
 const listeners = new Map<string, Set<() => void>>();
 const mocks = vi.hoisted(() => ({
   drawingOptions: vi.fn((props: { selectedType?: string | null; tool: string }) => (
     <div data-ui={`drawing-options.${props.tool}`}>{props.selectedType}</div>
   )),
-  frameControls: vi.fn(() => <div data-ui="frame-controls" />),
 }));
 const controller = {
   canvas: {
@@ -33,25 +31,6 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
 vi.mock('../../drawing/options', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../drawing/options')>()),
   EditorDrawingOptions: mocks.drawingOptions,
-}));
-vi.mock(
-  '../../../composition/frame-annotation-controls/creation-controls',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../composition/frame-annotation-controls/creation-controls')
-    >()),
-    FrameAnnotationCreationControls: mocks.frameControls,
-  })
-);
-vi.mock('../../frame-annotation/creation-defaults', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../frame-annotation/creation-defaults')>()),
-  initializeFrameAnnotationCreationDefaults: vi.fn(),
-  setFrameAnnotationCreationDefaults: vi.fn(),
-  useFrameAnnotationCreationDefaults: () => ({}),
-}));
-vi.mock('../../../composition/persistence/highlighter', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/highlighter')>()),
-  loadHighlighterSettings: vi.fn(),
 }));
 
 import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
@@ -122,11 +101,12 @@ afterEach(() => {
 it('anchors current drawing tools and renders their shared options directly', () => {
   renderRail({ activeTool: 'pencil', documentController: { compactCommandGroups: [] } });
   expect(container.querySelector('[data-ui="drawing-options.pencil"]')).not.toBeNull();
-  expect(
-    container
-      .querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]')
-      ?.style.getPropertyValue('--editor-tool-properties-top')
-  ).toContain('clamp(5rem');
+  const properties = container.querySelector<HTMLElement>(
+    '[data-ui="editor.floating.tool-properties"]'
+  );
+  expect(properties?.className).toContain('left-1/2');
+  expect(properties?.className).toContain('top-[4.5rem]');
+  expect(properties?.className).toContain('-translate-x-1/2');
 
   renderRail({
     activeTool: 'select',
@@ -152,9 +132,9 @@ it('keeps retained step command groups interactive and dismissible', () => {
   ).toBeNull();
 });
 
-it('renders frame annotation creation controls and hides unavailable surfaces', () => {
+it('keeps frame controls in the shared top toolbar and hides unavailable surfaces', () => {
   renderRail({ activeTool: 'frame-annotation', documentController: { compactCommandGroups: [] } });
-  expect(container.querySelector('[data-ui="frame-controls"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
 
   renderRail({ activeTool: 'select', documentController: { compactCommandGroups: [] } });
   expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
@@ -200,9 +180,4 @@ it('keeps drawing options stable during canvas interaction and only honors an ex
     },
   });
   expect(container.querySelector('[data-ui="drawing-options.selection"]')).not.toBeNull();
-});
-
-it('places primary, crop, and fallback tool anchors independently', () => {
-  expect(resolveToolPropertiesStyle('pencil')).not.toEqual(resolveToolPropertiesStyle('crop'));
-  expect(resolveToolPropertiesStyle('image')).not.toEqual(resolveToolPropertiesStyle('pencil'));
 });

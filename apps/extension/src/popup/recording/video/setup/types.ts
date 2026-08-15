@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { StoragePressureLevel } from '../../../../features/media-hub/storage-capacity';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
+  type VideoPostRecordResult,
   type VideoOutputDimensions,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
@@ -14,6 +16,8 @@ interface GalleryStatus {
 }
 
 export interface VideoSetupPageProps {
+  initialPostRecordResult?: VideoPostRecordResult | null;
+  initialPostRecordVerified?: boolean;
   settings: VideoRecordingSettings;
   captureMode: CaptureMode;
   selectedPresetId: string | null;
@@ -25,6 +29,7 @@ export interface VideoSetupPageProps {
   startError: string | null;
   isStartPending: boolean;
   pageAccessDisabledReason?: string | null;
+  pageAccessControls?: ReactNode;
   activeTabCapabilities: ActiveTabCapabilities;
   onCaptureModeChange: (mode: CaptureMode) => void;
   onPresetChange: (presetId: string | null) => Promise<void> | void;
@@ -50,7 +55,6 @@ export interface VideoSetupViewModel {
   startDisabledReason: string | null;
   canStart: boolean;
   systemAudioDisabled: boolean;
-  diagnosticsDisabled: boolean;
   controlledCursorDisabled: boolean;
   controlledCursorDisabledReason: string | null;
   startButtonLabel: string;

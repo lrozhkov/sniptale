@@ -25,7 +25,6 @@ import {
   resolveFrameAnnotationToolbarPlacement,
   type FrameAnnotationToolbarBounds,
 } from './toolbar-placement';
-import { EditorFrameAnnotationLayerControls } from './toolbar-layer-controls';
 import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export function FrameProjection(props: {
@@ -52,9 +51,6 @@ export function FrameProjection(props: {
   onDraftCommit: () => void;
   onMoveEnd?: () => void;
   onCloseSettings: () => void;
-  onBringForward?: () => void;
-  onSendBackward?: () => void;
-  onToggleLock?: () => void;
   projectMoveRect?: (rect: { x: number; y: number; width: number; height: number }) => {
     x: number;
     y: number;
@@ -77,7 +73,8 @@ export function FrameProjection(props: {
       setCalloutBounds(null);
     if (!getFrameCallout(props.snapshot, activeCalloutIndex)) setActiveCalloutIndex(0);
   }, [activeCalloutIndex, props.snapshot]);
-  const editingSelected = props.selected && props.settingsMenu === null;
+  const toolbarSelected = props.selected && props.object?.sniptaleLocked !== true;
+  const editingSelected = toolbarSelected && props.settingsMenu === null;
   const scene = resolveFrameAnnotationVisualScene({
     frame: props.snapshot,
     state: editingSelected ? 'editing' : 'idle',
@@ -97,15 +94,17 @@ export function FrameProjection(props: {
         snapshot={props.snapshot}
         onMoveStart={props.onMoveStart}
       />
-      <FrameProjectionOverlays
-        {...props}
-        activeCalloutIndex={activeCalloutIndex}
-        frameRect={frameRect}
-        scene={scene}
-        onCalloutBoundsChange={handleCalloutBoundsChange}
-        setActiveCalloutIndex={setActiveCalloutIndex}
-      />
-      {editingSelected && props.controlsRoot ? (
+      {props.interactive ? (
+        <FrameProjectionOverlays
+          {...props}
+          activeCalloutIndex={activeCalloutIndex}
+          frameRect={frameRect}
+          scene={scene}
+          onCalloutBoundsChange={handleCalloutBoundsChange}
+          setActiveCalloutIndex={setActiveCalloutIndex}
+        />
+      ) : null}
+      {toolbarSelected && props.controlsRoot ? (
         <FrameProjectionToolbar
           coordinateSpace={props.coordinateSpace}
           calloutBounds={calloutBounds}
@@ -114,13 +113,9 @@ export function FrameProjection(props: {
           scene={scene}
           snapshot={props.snapshot}
           onCommand={props.onCommand}
-          object={props.object}
-          onBringForward={props.onBringForward ?? (() => {})}
-          onSendBackward={props.onSendBackward ?? (() => {})}
-          onToggleLock={props.onToggleLock ?? (() => {})}
         />
       ) : null}
-      {props.controlsRoot ? (
+      {props.interactive && props.controlsRoot ? (
         <FrameProjectionSettings
           activeCalloutIndex={activeCalloutIndex}
           anchor={props.settingsAnchor}
@@ -307,10 +302,6 @@ function FrameProjectionToolbar(props: {
   scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
   snapshot: FrameAnnotationSnapshotV1;
   onCommand: (command: FrameAnnotationCommandId) => void;
-  object: FabricObject | null;
-  onBringForward: () => void;
-  onSendBackward: () => void;
-  onToggleLock: () => void;
 }) {
   const toolbarRef = React.useRef<HTMLDivElement | null>(null);
   const [, refreshPlacement] = React.useReducer((value) => value + 1, 0);
@@ -365,16 +356,6 @@ function FrameProjectionToolbar(props: {
         onStepSettingsClick={(anchor) => props.open('step', anchor)}
         stepBadgeEnabled={props.snapshot.stepBadge?.enabled}
         showEdit={false}
-        trailingSlot={
-          props.object ? (
-            <EditorFrameAnnotationLayerControls
-              locked={props.object.sniptaleLocked === true}
-              onBringForward={props.onBringForward}
-              onSendBackward={props.onSendBackward}
-              onToggleLock={props.onToggleLock}
-            />
-          ) : null
-        }
         onCommand={props.onCommand}
       />
     </div>,

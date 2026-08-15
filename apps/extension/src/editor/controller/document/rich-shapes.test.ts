@@ -17,6 +17,7 @@ function createDocument(richShapes: NonNullable<EditorDocument['richShapes']>): 
     sourceDisplayWidth: 500,
     sourceDisplayHeight: 300,
     frame: {
+      backgroundBlurAmount: 0,
       browserMode: false,
       paddingTop: 0,
       paddingRight: 0,

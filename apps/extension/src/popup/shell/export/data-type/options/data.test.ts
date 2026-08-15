@@ -17,7 +17,7 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: false,
     includeJson: true,
     includeMarkdown: false,
@@ -26,7 +26,7 @@ function createProps(overrides: Partial<ExportOptionToggleProps> = {}): ExportOp
     setIncludeCssDiagnostics: vi.fn(),
     setIncludeFiles: vi.fn(),
     setIncludeFullPageScreenshot: vi.fn(),
-    setIncludeHarDomLogs: vi.fn(),
+    setIncludePageDiagnostics: vi.fn(),
     setIncludeImages: vi.fn(),
     setIncludeJson: vi.fn(),
     setIncludeMarkdown: vi.fn(),
@@ -41,7 +41,7 @@ describe('popup export option state lookup', () => {
       includeCssDiagnostics: true,
       includeFiles: false,
       includeFullPageScreenshot: true,
-      includeHarDomLogs: true,
+      includePageDiagnostics: true,
       includeImages: false,
       includeMarkdown: true,
     });
@@ -50,7 +50,7 @@ describe('popup export option state lookup', () => {
     expect(getExportOptionActive('cssDiagnostics', props)).toBe(true);
     expect(getExportOptionActive('files', props)).toBe(false);
     expect(getExportOptionActive('fullPageScreenshot', props)).toBe(true);
-    expect(getExportOptionActive('harDomLogs', props)).toBe(true);
+    expect(getExportOptionActive('pageDiagnostics', props)).toBe(true);
     expect(getExportOptionActive('markdown', props)).toBe(true);
     expect(getExportOptionActive('json', props)).toBe(true);
     expect(getExportOptionActive('images', props)).toBe(false);
@@ -71,17 +71,21 @@ describe('popup export option metadata', () => {
       'files',
       'images',
       'basicLogs',
-      'harDomLogs',
+      'pageDiagnostics',
       'cssDiagnostics',
       'fullPageScreenshot',
     ]);
   });
 
-  it('describes detailed logs as a redacted export-time diagnostics option', () => {
-    const harDomLogs = getDiagnosticsOptionConfigs().find((option) => option.key === 'harDomLogs');
+  it('describes page analysis data without browser-internal terminology', () => {
+    const pageDiagnostics = getDiagnosticsOptionConfigs().find(
+      (option) => option.key === 'pageDiagnostics'
+    );
 
-    expect(harDomLogs?.description).toContain('credentials');
-    expect(harDomLogs?.description).toContain('URL');
+    expect(pageDiagnostics?.label).toBe('Данные страницы для анализа');
+    expect(pageDiagnostics?.description).toContain('сведения о загрузке ресурсов');
+    expect(pageDiagnostics?.description).not.toContain('DOM');
+    expect(pageDiagnostics?.description).not.toContain('Resource Timing');
   });
 });
 
@@ -96,7 +100,7 @@ describe('popup export option toggles', () => {
     toggleExportOption('markdown', props);
     toggleExportOption('json', props);
     toggleExportOption('images', props);
-    toggleExportOption('harDomLogs', props);
+    toggleExportOption('pageDiagnostics', props);
     toggleExportOption('fullPageScreenshot', props);
 
     expect(props.setIncludeBasicLogs).toHaveBeenCalledTimes(1);
@@ -106,7 +110,7 @@ describe('popup export option toggles', () => {
     expect(props.setIncludeMarkdown).toHaveBeenCalledTimes(1);
     expect(props.setIncludeJson).toHaveBeenCalledTimes(1);
     expect(props.setIncludeImages).toHaveBeenCalledTimes(1);
-    expect(props.setIncludeHarDomLogs).toHaveBeenCalledTimes(1);
+    expect(props.setIncludePageDiagnostics).toHaveBeenCalledTimes(1);
     expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledTimes(1);
   });
 
@@ -129,10 +133,10 @@ describe('popup export option toggles', () => {
   it('routes diagnostics toggles through the shared popup preference setter seam', () => {
     const props = createProps();
 
-    setExportOptionActive('harDomLogs', true, props);
+    setExportOptionActive('pageDiagnostics', true, props);
     setExportOptionActive('cssDiagnostics', false, props);
 
-    expect(props.setIncludeHarDomLogs).toHaveBeenCalledWith(true);
+    expect(props.setIncludePageDiagnostics).toHaveBeenCalledWith(true);
     expect(props.setIncludeCssDiagnostics).toHaveBeenCalledWith(false);
   });
 });

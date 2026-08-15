@@ -59,6 +59,7 @@ describe('utils color parsing', () => {
     expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleArrowVariant');
     expect(CUSTOM_JSON_PROPS).not.toContain('sniptaleLinePointsJson');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundMode');
+    expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundBlurAmount');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundGradientColorStops');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundFit');
     expect(CUSTOM_JSON_PROPS).toContain('sniptaleBackgroundImageData');

@@ -68,7 +68,7 @@ describe('Web Snapshot i18n naming', () => {
     expect(translate('popup.export.saveWebSnapshotTitle', 'ru')).toBe('Сохранить снимок');
     expect(translate('gallery.preview.folderWebSnapshot', 'ru')).toBe('Веб-снимки');
     expect(translate('shared.mediaHub.saveWebSnapshotAction', 'ru')).toBe(
-      'сохранение Веб-снимка в Галерею'
+      'сохранение Веб-снимка в Библиотеку'
     );
     expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe(
       'Sniptale Web Snapshot'

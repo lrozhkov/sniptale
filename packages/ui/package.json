@@ -65,6 +65,7 @@
     "./product-glass-controls/controls": "./src/product-glass-controls/controls.tsx",
     "./product-glass-controls": "./src/product-glass-controls/index.tsx",
     "./product-glass-controls/layout": "./src/product-glass-controls/layout.tsx",
+    "./product-glass-controls/linked-padding": "./src/product-glass-controls/linked-padding.tsx",
     "./product-glass-controls/primitives": "./src/product-glass-controls/primitives.tsx",
     "./product-glass-toolbar": "./src/product-glass-toolbar/index.tsx",
     "./product-menus/dropdown": "./src/product-menus/dropdown/index.tsx",

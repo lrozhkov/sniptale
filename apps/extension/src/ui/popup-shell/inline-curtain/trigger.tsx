@@ -1,4 +1,4 @@
-import { ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, X } from 'lucide-react';
 import { type MouseEvent, type ReactNode, type RefObject } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
@@ -9,6 +9,10 @@ const INLINE_CURTAIN_BUTTON_CLASS_NAME = [
   'group flex h-8 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-left',
   'text-[var(--sniptale-color-text-primary)] transition-colors',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_68%,transparent)]',
+].join(' ');
+const INLINE_CURTAIN_LABEL_CLASS_NAME = [
+  'w-[88px] shrink-0 truncate text-[11px] font-medium',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 export const INLINE_CURTAIN_PANEL_CLASS_NAME = [
@@ -22,6 +26,8 @@ export type InlineCurtainSecondaryAction = {
   disabled?: boolean;
   label: string;
   panel: ReactNode;
+  panelDescription: string;
+  panelTitle: string;
   title?: string;
 };
 
@@ -33,7 +39,7 @@ export function InlineCurtainCustomPanel({ children, id }: { children: ReactNode
   );
 }
 
-export function InlineCurtainPanelCloseButton({
+function InlineCurtainPanelCloseButton({
   ariaLabel,
   onClick,
 }: {
@@ -53,6 +59,54 @@ export function InlineCurtainPanelCloseButton({
     >
       <X className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+export function InlineCurtainPanelHeader({
+  action,
+  actionAriaLabel,
+  description,
+  onAction,
+  title,
+}: {
+  action: 'back' | 'close';
+  actionAriaLabel: string;
+  description: string;
+  onAction(): void;
+  title: string;
+}) {
+  return (
+    <header
+      className="mb-3 flex shrink-0 items-start gap-2 pr-8"
+      data-ui="popup.inline-curtain.header"
+    >
+      {action === 'back' ? (
+        <button
+          type="button"
+          aria-label={actionAriaLabel}
+          className={[
+            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px]',
+            'text-[var(--sniptale-color-text-secondary)] transition-colors',
+            'hover:bg-[var(--sniptale-color-surface-hover)]',
+            'hover:text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+          data-ui="popup.inline-curtain.back"
+          onClick={onAction}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+      ) : (
+        <InlineCurtainPanelCloseButton ariaLabel={actionAriaLabel} onClick={onAction} />
+      )}
+      <div className="min-w-0 pt-0.5">
+        <h2 className="text-xs font-semibold leading-tight text-[var(--sniptale-color-text-primary)]">
+          {title}
+        </h2>
+        <p className="mt-1 line-clamp-2 text-[10px] leading-[1.35] text-[var(--sniptale-color-text-muted)]">
+          {description}
+        </p>
+      </div>
+    </header>
   );
 }
 
@@ -127,10 +181,7 @@ function InlineCurtainPrimaryButton({
       className="flex min-w-0 flex-1 items-center gap-2 text-left"
       onClick={onClick}
     >
-      <span
-        className="w-[88px] shrink-0 truncate text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]"
-        title={label}
-      >
+      <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} title={label}>
         {label}
       </span>
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={valueLabel}>

@@ -120,39 +120,17 @@ it('parses a verified tile state only after checking every DOM-derived field', (
   ).toEqual(expect.objectContaining({ success: true }));
 });
 
-it('accepts both authorized full-page export actions at popup export boundaries', () => {
-  const options = {
-    includeBasicLogs: false,
-    includeCssDiagnostics: false,
-    includeFiles: false,
-    includeFullPageScreenshot: true,
-    includeHarDomLogs: false,
-    includeImages: false,
-    includeJson: true,
-    includeMarkdown: false,
-  };
-  for (const fullPageCaptureAction of [
-    MessageType.EXPORT_CAPTURE_FULL_PAGE,
-    MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
-  ] as const) {
-    expect(
-      tabUiExportMessageContracts[MessageType.EXPORT_POPUP_START].parseRequest({
-        fullPageCaptureAction,
-        options,
-        requestId: 'export-run-1',
-        type: MessageType.EXPORT_POPUP_START,
-      })
-    ).toEqual(expect.objectContaining({ fullPageCaptureAction }));
-    expect(
-      tabWebSnapshotMessageContracts[MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT].parseRequest({
-        allowAnonymousCrossOriginAssets: false,
-        allowAuthenticatedSameOriginAssets: true,
-        fullPageCaptureAction,
-        requestId: 'export-run-1',
-        type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
-      })
-    ).toEqual(expect.objectContaining({ fullPageCaptureAction }));
-  }
+it('accepts the native full-page action at the web-snapshot boundary', () => {
+  const fullPageCaptureAction = MessageType.EXPORT_CAPTURE_FULL_PAGE;
+  expect(
+    tabWebSnapshotMessageContracts[MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT].parseRequest({
+      allowAnonymousCrossOriginAssets: false,
+      allowAuthenticatedSameOriginAssets: true,
+      fullPageCaptureAction,
+      requestId: 'export-run-1',
+      type: MessageType.EXPORT_POPUP_SAVE_WEB_SNAPSHOT,
+    })
+  ).toEqual(expect.objectContaining({ fullPageCaptureAction }));
 });
 
 it('parses the direct popup launch-intent consume contract narrowly', () => {

@@ -10,7 +10,6 @@ import { createSelectionChangeHandler } from './runtime.selection';
 import { createObjectMovingHandler } from './runtime.object-moving';
 import { createObjectModifiedHandler } from './runtime.object-modified';
 import { createObjectScalingHandler } from './runtime.object-scaling';
-import { createMouseMoveBeforeHandler } from './runtime.hover';
 import type { EditorControllerEventBindings, EditorControllerEventHandlers } from './types';
 
 export function createRuntimeEventHandlers(
@@ -20,7 +19,6 @@ export function createRuntimeEventHandlers(
   | 'handleCanvasBeforeRender'
   | 'handleCanvasAfterRender'
   | 'handleSelectionChange'
-  | 'handleMouseMoveBefore'
   | 'handleObjectMoving'
   | 'handleObjectResizing'
   | 'handleObjectScaling'
@@ -34,7 +32,6 @@ export function createRuntimeEventHandlers(
     handleCanvasBeforeRender: createBeforeRenderHandler(bindings),
     handleCanvasAfterRender: createAfterRenderHandler(bindings),
     handleSelectionChange: createSelectionChangeHandler(bindings),
-    handleMouseMoveBefore: createMouseMoveBeforeHandler(bindings),
     handleObjectMoving: createObjectMovingHandler(bindings),
     handleObjectResizing: createObjectScalingHandler(bindings),
     handleObjectScaling: createObjectScalingHandler(bindings),

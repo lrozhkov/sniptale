@@ -35,36 +35,6 @@ function createCleanOpenFrame() {
   };
 }
 
-function createHydratedSceneBackgroundPresets() {
-  const sceneBackgroundPresets = createDefaultEditorPresetStorageState().sceneBackground;
-  sceneBackgroundPresets.defaultPresetId = 'loaded-default';
-  sceneBackgroundPresets.presets = [
-    ...sceneBackgroundPresets.presets,
-    {
-      enabled: true,
-      id: 'loaded-default',
-      isSystemDefault: false,
-      name: 'Loaded default',
-      order: 1,
-      settings: {
-        ...sceneBackgroundPresets.presets[0]!.settings,
-        backgroundColor: '#102030',
-        backgroundGradientAngle: 32,
-        backgroundGradientFrom: '#203040',
-        backgroundGradientTo: '#405060',
-        backgroundMode: 'gradient',
-        layoutMode: 'fit-image',
-        paddingTop: 24,
-        paddingRight: 16,
-        paddingBottom: 12,
-        paddingLeft: 8,
-      },
-    },
-  ];
-
-  return sceneBackgroundPresets;
-}
-
 function renderHook(args: Parameters<typeof useInspectorSidebarDraftState>[0]) {
   let hookValue: ReturnType<typeof useInspectorSidebarDraftState> | null = null;
   let state = args;
@@ -113,7 +83,7 @@ it('keeps frame drafts aligned with authoritative defaults without suggested pad
   expect(hook.getValue()?.frameDraft.paddingTop).toBe(128);
 });
 
-it('seeds the scene draft from the default preset instead of the opened document frame', () => {
+it('seeds the scene draft from the opened document instead of a background template', () => {
   const cleanOpenFrame = createCleanOpenFrame();
   const sceneBackgroundPresets = createDefaultEditorPresetStorageState().sceneBackground;
   const hook = renderHook({
@@ -129,15 +99,14 @@ it('seeds the scene draft from the default preset instead of the opened document
     sourceWidth: 800,
   });
 
-  expect(hook.getValue()?.frameDraft.paddingTop).toBe(128);
-  expect(hook.getValue()?.frameDraft.layoutMode).toBe('expand-canvas');
-  expect(hook.getValue()?.frameDraft.backgroundMode).toBe('gradient');
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
 });
 
-it('hydrates the scene draft from an asynchronously loaded default preset without leaving it dirty', () => {
+it('ignores asynchronously loaded background templates', () => {
   const cleanOpenFrame = createCleanOpenFrame();
   const initialPresets = createDefaultEditorPresetStorageState().sceneBackground;
-  const hydratedPresets = createHydratedSceneBackgroundPresets();
+  const hydratedPresets = createDefaultEditorPresetStorageState().sceneBackground;
+  hydratedPresets.defaultPresetId = hydratedPresets.presets[0]?.id ?? 'scene-gradient';
   const hook = renderHook({
     canvasHeight: 400,
     canvasWidth: 800,
@@ -164,7 +133,7 @@ it('hydrates the scene draft from an asynchronously loaded default preset withou
     sourceWidth: 800,
   });
 
-  expect(hook.getValue()?.frameDraft).toMatchObject(hydratedPresets.presets[1]!.settings);
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
 });
 
 it('syncs canvas size draft from an active crop selection', () => {
@@ -233,10 +202,10 @@ it('keeps image, canvas, and layer drafts stable across unchanged and clamped in
   expect(hook.getValue()?.canvasSizeDraft).toBe(initialCanvasDraft);
 });
 
-it('preserves a dirty scene draft when loaded defaults change later', () => {
+it('preserves a dirty scene draft when legacy template storage changes and can cancel it', () => {
   const cleanOpenFrame = createCleanOpenFrame();
   const initialPresets = createDefaultEditorPresetStorageState().sceneBackground;
-  const hydratedPresets = createHydratedSceneBackgroundPresets();
+  const hydratedPresets = createDefaultEditorPresetStorageState().sceneBackground;
   const hook = renderHook({
     canvasHeight: 400,
     canvasWidth: 800,
@@ -267,4 +236,7 @@ it('preserves a dirty scene draft when loaded defaults change later', () => {
   });
 
   expect(hook.getValue()?.frameDraft.backgroundColor).toBe('#abcdef');
+
+  act(() => hook.getValue()?.resetFrameDraft());
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
 });

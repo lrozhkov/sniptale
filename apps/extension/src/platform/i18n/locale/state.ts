@@ -53,6 +53,21 @@ function writeLocalStorageLocale(locale: AppLocale): Promise<void> {
   });
 }
 
+function reconcileLocalePaintHint(): Promise<AppLocale | null> {
+  return runWithPersistenceMutationPermit(async () => {
+    const locale = usesBrowserLocaleStorage()
+      ? normalizeStoredLocale(
+          (await browserStorage.local.get([LOCALE_STORAGE_KEY]))[LOCALE_STORAGE_KEY]
+        )
+      : readLocalStorageLocale();
+
+    if (typeof window === 'undefined') return locale;
+    if (locale === null) window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+    else window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    return locale;
+  });
+}
+
 function dispatchLocaleChange(locale: AppLocale): void {
   if (typeof window === 'undefined') {
     return;
@@ -72,7 +87,7 @@ function normalizeStoredLocale(value: unknown): AppLocale | null {
 function createLocaleStateService(): LocaleStateService {
   const service = createStorageBackedPreferenceService<AppLocale, AppLocale>({
     dispatchChange: dispatchLocaleChange,
-    initialCurrentValue: DEFAULT_LOCALE,
+    initialCurrentValue: readLocalStorageLocale() ?? DEFAULT_LOCALE,
     isBrowserStorageAvailable: usesBrowserLocaleStorage,
     mapCurrentToStoredPreference: (locale) => locale,
     mapStoredPreferenceToCurrent: (locale) => locale ?? DEFAULT_LOCALE,
@@ -87,10 +102,32 @@ function createLocaleStateService(): LocaleStateService {
     ensureHydrated: () => service.ensureHydrated(),
     getCurrentLocale: () => service.getCurrentValue(),
     getStoredPreference: () => service.getStoredPreference(),
-    setPreference: (locale) => {
-      return service.setPreference(locale);
+    setPreference: async (locale) => {
+      await service.setPreference(locale);
+      await reconcileLocalePaintHint();
     },
-    subscribe: (listener) => service.subscribe(listener),
+    subscribe: (listener) => {
+      let active = true;
+      let reconciliationIntent = 0;
+      const dispose = service.subscribe((locale) => {
+        const intent = ++reconciliationIntent;
+        void reconcileLocalePaintHint()
+          .then((authoritativeLocale) => {
+            if (active && intent === reconciliationIntent) {
+              listener(authoritativeLocale ?? DEFAULT_LOCALE);
+            }
+          })
+          .catch(() => {
+            if (active && intent === reconciliationIntent) listener(locale);
+          });
+      });
+
+      return () => {
+        active = false;
+        reconciliationIntent += 1;
+        dispose();
+      };
+    },
   };
 }
 

@@ -1,6 +1,11 @@
 import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
 import { applyAppTheme, type ThemeTargetOptions } from '@sniptale/ui/theme/dom';
-import { createThemePreferenceService, resolveAppTheme } from './preference-service';
+import {
+  createThemePreferenceService,
+  readThemePaintHint,
+  reconcileThemePaintHint,
+} from './preference-service';
+import { resolveAppTheme } from './paint-hint';
 import type { AppTheme, AppThemePreference } from '@sniptale/ui/theme/types';
 
 const defaultThemeService = createLazyDefaultOwner(createThemePreferenceService);
@@ -18,13 +23,16 @@ export function applyScopedThemePreview(
 }
 
 export async function setAppThemePreference(preference: AppThemePreference): Promise<AppTheme> {
-  const resolvedTheme = resolveAppTheme(preference);
   await defaultThemeService.getOwner().setPreference(preference);
+  const authoritativePreference = (await reconcileThemePaintHint()) ?? 'system';
+  const resolvedTheme = resolveAppTheme(authoritativePreference);
   applyAppTheme(resolvedTheme);
   return resolvedTheme;
 }
 
-export function initializeAppTheme(
+function initializeThemeRuntime(
+  initialPreference: AppThemePreference,
+  reconcilePaintHint: boolean,
   defaultPreference: AppThemePreference = 'system',
   target?: HTMLElement | HTMLElement[] | null,
   options?: ThemeTargetOptions
@@ -33,36 +41,72 @@ export function initializeAppTheme(
     typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(prefers-color-scheme: dark)')
       : null;
-  const applyStoredOrDefaultTheme = () => {
-    const preference = defaultThemeService.getOwner().getStoredPreference() ?? defaultPreference;
+  let activePreference = initialPreference;
+  let reconciliationIntent = 0;
+  let disposed = false;
+  const applyPreference = (preference: AppThemePreference) => {
+    activePreference = preference;
     applyAppTheme(resolveAppTheme(preference), target, options);
   };
+  const applyStoredPreference = (preference: AppThemePreference | null) => {
+    if (!reconcilePaintHint) {
+      applyPreference(preference ?? defaultPreference);
+      return;
+    }
 
-  const disposeThemeSubscription = defaultThemeService.getOwner().subscribe(() => {
-    applyStoredOrDefaultTheme();
-  });
-  applyStoredOrDefaultTheme();
+    const intent = ++reconciliationIntent;
+    void reconcileThemePaintHint()
+      .then((authoritativePreference) => {
+        if (!disposed && intent === reconciliationIntent) {
+          applyPreference(authoritativePreference ?? defaultPreference);
+        }
+      })
+      .catch(() => {
+        if (!disposed && intent === reconciliationIntent) {
+          applyPreference(preference ?? defaultPreference);
+        }
+      });
+  };
+
+  const disposeThemeSubscription = defaultThemeService.getOwner().subscribe(applyStoredPreference);
+  applyPreference(initialPreference);
   void defaultThemeService
     .getOwner()
     .ensureHydrated()
-    .then(() => {
-      applyStoredOrDefaultTheme();
-    })
     .catch(() => {
-      applyStoredOrDefaultTheme();
+      applyPreference(activePreference);
     });
 
   const handleMediaQueryChange = () => {
-    const preference = defaultThemeService.getOwner().getStoredPreference() ?? defaultPreference;
-    if (preference === 'system') {
-      applyStoredOrDefaultTheme();
-    }
+    if (activePreference === 'system') applyPreference(activePreference);
   };
 
   mediaQuery?.addEventListener('change', handleMediaQueryChange);
 
   return () => {
+    disposed = true;
+    reconciliationIntent += 1;
     disposeThemeSubscription();
     mediaQuery?.removeEventListener('change', handleMediaQueryChange);
   };
+}
+
+export function initializeAppTheme(
+  defaultPreference: AppThemePreference = 'system',
+  target?: HTMLElement | HTMLElement[] | null,
+  options?: ThemeTargetOptions
+): () => void {
+  return initializeThemeRuntime(
+    defaultThemeService.getOwner().getStoredPreference() ?? defaultPreference,
+    false,
+    defaultPreference,
+    target,
+    options
+  );
+}
+
+export function initializeExtensionPageTheme(
+  defaultPreference: AppThemePreference = 'system'
+): () => void {
+  return initializeThemeRuntime(readThemePaintHint() ?? defaultPreference, true, defaultPreference);
 }

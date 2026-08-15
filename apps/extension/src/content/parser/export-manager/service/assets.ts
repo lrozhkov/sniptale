@@ -1,16 +1,12 @@
 import type { ExportOptions } from '@sniptale/runtime-contracts/export';
-import type { ContentPrivilegedActionIntentSource } from '../../../platform/privileged-action-intent/client';
-import type { FullPageExportCaptureIdentity } from '../../../../contracts/full-page-capture';
 import type { PreparedDOMTreeSnapshot } from '../../dom-tree-parser/snapshot';
 import {
   collectAdvancedLogAssets,
   collectCssDiagnosticAssets,
   collectCoreLogAssets,
-  type ExportHarCaptureResult,
 } from '../diagnostics';
 import type { ArchiveAsset } from '../archive';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
-import { captureOptionalArchiveAssets } from './runtime';
 import { getExportCompletedMessage } from './source';
 import { updateExportManagerProgress, type ExportManagerState } from './state';
 
@@ -29,26 +25,17 @@ export function finishExportSuccess(
 }
 
 export async function collectExportExtraAssets(args: {
-  contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
-  fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   downloadedFilesCount: number;
   options: ExportOptions;
   snapshot: PreparedDOMTreeSnapshot;
   state: ExportManagerState;
   warnings: string[];
   fileCandidatesCount: number;
-  sessionHar: ExportHarCaptureResult | null;
   diagnosticsSource?: ExportDiagnosticsSource | undefined;
   throwIfCancelled: () => void;
 }): Promise<ArchiveAsset[]> {
   args.throwIfCancelled();
-  const extraAssets = await captureOptionalArchiveAssets({
-    contentIntentSource: args.contentIntentSource,
-    fullPageCaptureIdentity: args.fullPageCaptureIdentity,
-    options: args.options,
-    updateProgress: (progress) => updateExportManagerProgress(args.state, progress),
-    warnings: args.warnings,
-  });
+  const extraAssets: ArchiveAsset[] = [];
   args.throwIfCancelled();
 
   extraAssets.push(
@@ -63,12 +50,7 @@ export async function collectExportExtraAssets(args: {
     })
   );
   extraAssets.push(
-    ...(await collectAdvancedLogAssets(
-      args.options,
-      args.sessionHar,
-      args.snapshot.tree,
-      args.diagnosticsSource
-    ))
+    ...(await collectAdvancedLogAssets(args.options, args.snapshot.tree, args.diagnosticsSource))
   );
   args.throwIfCancelled();
   extraAssets.push(...collectCssDiagnosticAssets(args.options, args.diagnosticsSource));

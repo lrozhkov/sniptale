@@ -107,38 +107,12 @@ export class CaptureSurfaceLeaseRegistry {
     replacement.prior = parent.prior;
     replacement.entry.prior = parent.prior;
     replacement.entry.parentLeaseId = parent.entry.parentLeaseId;
-    replacement.viewportAcquisitionOwned ||= parent.viewportAcquisitionOwned;
-    this.remove(parent);
-  }
-
-  collapseCrossTargetReplacedParent(
-    replacement: CaptureSurfaceLeaseState,
-    parent: CaptureSurfaceLeaseState
-  ): void {
-    const grandparent = parent.entry.parentLeaseId
-      ? this.leasesById.get(parent.entry.parentLeaseId)
-      : undefined;
-    if (grandparent?.applied.target === replacement.applied.target) {
-      replacement.prior = grandparent.entry.applied;
-      replacement.entry.prior = grandparent.entry.applied;
-      if (
-        replacement.applied.target === 'viewport' &&
-        replacement.viewportAcquisitionOwned &&
-        (grandparent.entry.owner === 'video') === (replacement.entry.owner === 'video')
-      ) {
-        grandparent.viewportAcquisitionOwned = true;
-        replacement.viewportAcquisitionOwned = false;
-      }
-    }
-    replacement.entry.parentLeaseId = parent.entry.parentLeaseId;
     this.remove(parent);
   }
 
   discardSuspended(state: CaptureSurfaceLeaseState, child: CaptureSurfaceLeaseState): void {
-    if (state.applied.target === child.applied.target) {
-      child.prior = state.prior;
-      child.entry.prior = state.prior;
-    }
+    child.prior = state.prior;
+    child.entry.prior = state.prior;
     child.entry.parentLeaseId = state.entry.parentLeaseId;
     this.remove(state);
   }
@@ -150,7 +124,7 @@ export class CaptureSurfaceLeaseRegistry {
     const childEntry: CaptureSurfaceJournalEntry = {
       ...child.entry,
       parentLeaseId: state.entry.parentLeaseId,
-      prior: state.applied.target === child.applied.target ? state.prior : child.prior,
+      prior: state.prior,
     };
     const entries = [...this.leasesById.values()]
       .filter((candidate) => candidate !== state && candidate !== child)
@@ -177,39 +151,6 @@ export class CaptureSurfaceLeaseRegistry {
     await writeCaptureSurfaceJournal(entries);
   }
 
-  async persistCrossTargetReplacement(
-    replacement: CaptureSurfaceLeaseState,
-    parent: CaptureSurfaceLeaseState
-  ): Promise<void> {
-    const grandparent = parent.entry.parentLeaseId
-      ? this.leasesById.get(parent.entry.parentLeaseId)
-      : undefined;
-    const prior =
-      grandparent?.applied.target === replacement.applied.target
-        ? grandparent.entry.applied
-        : replacement.prior;
-    const replacementEntry: CaptureSurfaceJournalEntry = {
-      ...replacement.entry,
-      parentLeaseId: parent.entry.parentLeaseId,
-      prior,
-    };
-    const entries = [...this.leasesById.values()]
-      .filter((state) => state !== parent && state !== replacement)
-      .map((state) => state.entry)
-      .concat(replacementEntry)
-      .sort((left, right) => left.updatedAt - right.updatedAt);
-    await writeCaptureSurfaceJournal(entries);
-  }
-
-  findViewportCapacity(tabId: number): { width: number; height: number } | null {
-    const rootViewportLease = this.stackByTab
-      .get(tabId)
-      ?.find((lease) => lease.applied.target === 'viewport');
-    return rootViewportLease?.prior.type === 'native'
-      ? { width: rootViewportLease.prior.width, height: rootViewportLease.prior.height }
-      : null;
-  }
-
   clear(): void {
     this.leasesById.clear();
     this.stackByTab.clear();
@@ -230,7 +171,6 @@ export class CaptureSurfaceLeaseRegistry {
       applied,
       entry: { ...entry },
       prior: entry.prior,
-      viewportAcquisitionOwned: false,
     };
     this.leasesById.set(entry.leaseId, state);
     const stack = this.stackByTab.get(entry.tabId) ?? [];

@@ -72,7 +72,6 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
   expect(container?.textContent).toContain('settings.permissions.requiredGrantsTitle');
-  expect(container?.textContent).toContain('settings.permissions.requiredDebuggerName');
   expect(container?.textContent).toContain('settings.permissions.requiredTabCaptureName');
   expect(container?.textContent).toContain('settings.permissions.statusChecksTitle');
   expect(container?.textContent).toContain('settings.permissions.statusGranted');

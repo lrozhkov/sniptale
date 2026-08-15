@@ -49,26 +49,30 @@ function renderMetaPanel() {
   });
 }
 
-function getCheckboxes() {
-  return Array.from(container?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []);
+function getOptionButtons() {
+  return Array.from(
+    container?.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="editor.compact.technicalDataFields"] > button[aria-pressed]'
+    ) ?? []
+  );
 }
 
 function getAddButton() {
   return Array.from(container?.querySelectorAll('button') ?? []).find(
-    (button) => button.textContent === 'common.actions.add'
+    (button) => button.textContent === 'editor.compact.technicalDataInsert'
   );
 }
 
 function getLayoutToggle() {
   return Array.from(container?.querySelectorAll('button') ?? []).find(
-    (button) => button.getAttribute('aria-label') === 'editor.compact.technicalDataLayout'
+    (button) => button.textContent === 'editor.compact.technicalDataLayoutRow'
   );
 }
 
-function selectTechnicalDataInColumnOrder(checkboxes: HTMLInputElement[]) {
-  checkboxes[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  checkboxes[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  checkboxes[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+function selectTechnicalDataInColumnOrder(options: HTMLButtonElement[]) {
+  options[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  options[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  options[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
 
 describe('meta panel content', () => {
@@ -77,19 +81,23 @@ describe('meta panel content', () => {
 
     expect(useAppLocaleMock).toHaveBeenCalled();
 
-    const checkboxes = getCheckboxes();
+    const options = getOptionButtons();
     const addButton = getAddButton();
 
-    expect(checkboxes).toHaveLength(3);
+    expect(options).toHaveLength(3);
     expect(container?.textContent).not.toContain('editor.compact.technicalDataDescription');
     expect(getExactTextNodeCount('editor.compact.technicalData')).toBe(0);
     expect(container?.textContent).toContain('editor.compact.technicalDataLayoutColumn');
+    expect(container?.textContent).toContain('editor.compact.technicalDataPreviewEmpty');
     expect(addButton?.hasAttribute('disabled')).toBe(true);
-    expectTechnicalDataRowsToBeFlat(checkboxes);
+    expectTechnicalDataRowsToBeFlat(options);
 
-    selectTechnicalDataInColumnOrder(checkboxes);
+    act(() => selectTechnicalDataInColumnOrder(options));
 
     expect(addButton?.hasAttribute('disabled')).toBe(false);
+    expect(container?.textContent).toContain('editor.compact.pageUrl');
+    expect(container?.textContent).toContain('editor.compact.dateTime');
+    expect(container?.textContent).toContain('editor.compact.browser');
 
     addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -100,17 +108,22 @@ describe('meta panel content', () => {
     renderMetaPanel();
 
     const layoutToggle = getLayoutToggle();
-    const checkboxes = getCheckboxes();
+    const options = getOptionButtons();
     const addButton = getAddButton();
 
     act(() => {
       layoutToggle?.click();
-      checkboxes[0]?.click();
-      checkboxes[2]?.click();
-      addButton?.click();
+      options[0]?.click();
+      options[2]?.click();
     });
 
     expect(container?.textContent).toContain('editor.compact.technicalDataLayoutRow');
+    expect(container?.textContent).toContain('·');
+
+    act(() => {
+      addButton?.click();
+    });
+
     expect(insertMetaStampMock).toHaveBeenCalledWith(['url', 'browser'], 'row');
   });
 });
@@ -121,9 +134,9 @@ function getExactTextNodeCount(text: string): number {
   ).length;
 }
 
-function expectTechnicalDataRowsToBeFlat(checkboxes: HTMLInputElement[]) {
-  for (const checkbox of checkboxes) {
-    expect(checkbox.closest('label')?.className).not.toContain('border ');
-    expect(checkbox.closest('label')?.className).not.toContain('border-[color');
+function expectTechnicalDataRowsToBeFlat(options: HTMLButtonElement[]) {
+  for (const option of options) {
+    expect(option.className).not.toContain('border ');
+    expect(option.className).not.toContain('border-[color');
   }
 }

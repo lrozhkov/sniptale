@@ -32,13 +32,14 @@ it('renders all eight neutral resize handles on proximity in standard cursor sta
   document.body.append(container, portal.container);
   root = createRoot(container);
 
+  const onResizeStart = vi.fn();
   act(() => {
     root?.render(
       <InteractiveFrameResizeHandles
         borderColor="#ff671d"
         borderWidth={5}
         isResizeHovered
-        onResizeStart={vi.fn()}
+        onResizeStart={onResizeStart}
         state="idle"
         tempFrame={createFrameDataFixture('frame-1')}
       />
@@ -65,4 +66,18 @@ it('renders all eight neutral resize handles on proximity in standard cursor sta
   expect(handles[0]?.style.backgroundColor).toBe('rgb(255, 255, 255)');
   expect(handles[0]?.style.left).toBe('1px');
   expect(handles[0]?.style.top).toBe('11px');
+
+  act(() => {
+    handles[4]?.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        cancelable: true,
+        clientX: 120,
+        clientY: 90,
+      })
+    );
+  });
+  expect(onResizeStart).toHaveBeenCalledOnce();
+  expect(onResizeStart.mock.calls[0]?.[1]).toBe('se');
 });

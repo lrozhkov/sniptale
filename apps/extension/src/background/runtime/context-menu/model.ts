@@ -1,6 +1,10 @@
 import type { BrowserContextMenuUpdateProperties } from '@sniptale/platform/browser/context-menus';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
-import { type ContextMenuSettings, type QuickAction } from '../../../contracts/settings';
+import {
+  type ContextMenuSettings,
+  type QuickAction,
+  type ViewportPreset,
+} from '../../../contracts/settings';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   CONTEXT_MENU_EXPORT_ID,
@@ -36,6 +40,7 @@ export function getEnabledContextMenuQuickActions(actions: QuickAction[]): Quick
 export function hasVisibleContextMenuItems(args: {
   quickActions: QuickAction[];
   settings: ContextMenuSettings;
+  viewportPresets: readonly ViewportPreset[];
 }): boolean {
   return buildContextMenuDescriptorsImpl(args).length > 1;
 }

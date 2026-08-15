@@ -54,7 +54,7 @@ This policy covers AI credentials and request history, secret-bearing network tr
 
 - Persisted, exported, logged, or traced diagnostics pass through `packages/platform/src/observability/diagnostics/sanitizer.ts`.
 - Only exact `diagnosticSanitizerOwners` entries are tracer exceptions. Other collectors and sinks must import the canonical sanitizer and prove sanitization before every write.
-- Recording diagnostics UI discloses captured tab URL, sanitized console/errors, network failures, service logs, IndexedDB retention, and JSON/ZIP export behavior before enablement or download.
+- Recording diagnostics UI discloses action/error/meta diagnostics, service logs, IndexedDB retention, and JSON/ZIP export behavior before enablement or download.
 - Preview-cache diagnostics contain fixed reason codes, counts, durations, byte totals, and phase names only. They exclude project IDs, digests, fingerprints, source URLs, blobs, frame content, document source, and asset bytes.
 - Voice-input diagnostics contain request/session identifiers, language, requested and effective mode, API flavor, fixed quality, normalized availability and error/fallback codes, phase, duration, sequence, character count, confidence, and a bounded normalized microphone level only. The offscreen document derives that scalar level at 10 Hz for the owning live Port and retains no history; the Settings consumer builds its short waveform in memory. Device identifiers, transcript text, PCM/audio, raw recognition results, and raw exception messages are excluded; the runtime message tracer replaces transcript text with character count before generic sanitization.
 

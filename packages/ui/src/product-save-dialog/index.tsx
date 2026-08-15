@@ -14,11 +14,13 @@ function ProductSaveDialogContent(props: ProductSaveDialogProps) {
       ? {
           filenameLabel: props.filenameLabel,
           filename: props.filename,
+          disabled: Boolean(props.disabled),
           onFilenameChange: props.onFilenameChange,
         }
       : {
           filenameLabel: props.filenameLabel,
           filename: props.filename,
+          disabled: Boolean(props.disabled),
           filenamePlaceholder: props.filenamePlaceholder,
           onFilenameChange: props.onFilenameChange,
         };
@@ -29,6 +31,7 @@ function ProductSaveDialogContent(props: ProductSaveDialogProps) {
       <ProductSaveDialogPresetSection
         presetLabel={props.presetLabel}
         presetCount={props.presetCount}
+        disabled={Boolean(props.disabled)}
         presetItems={props.presetItems}
         presetsEmptyState={props.presetsEmptyState}
         onChoosePreset={props.onChoosePreset}
@@ -36,15 +39,16 @@ function ProductSaveDialogContent(props: ProductSaveDialogProps) {
       <ProductSaveDialogSystemFolderButton
         systemFolderLabel={props.systemFolderLabel}
         systemFolderHint={props.systemFolderHint}
+        disabled={Boolean(props.disabled)}
         onChooseSystemFolder={props.onChooseSystemFolder}
       />
     </ProductModalBody>
   );
 }
 
-function ProductSaveDialogFrame(props: ProductSaveDialogProps) {
+export function ProductSaveDialogSurface(props: ProductSaveDialogProps) {
   return (
-    <>
+    <div className="flex min-h-0 flex-col" data-ui="shared.ui.product-save-dialog.surface">
       <ProductSaveDialogHeader
         title={props.title}
         subtitle={props.subtitle}
@@ -59,7 +63,7 @@ function ProductSaveDialogFrame(props: ProductSaveDialogProps) {
           {props.footer}
         </ProductModalFooter>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -69,6 +73,7 @@ export function ProductSaveDialog({
   closeLabel,
   filenameLabel,
   filename,
+  disabled,
   filenamePlaceholder,
   onFilenameChange,
   presetLabel,
@@ -89,12 +94,13 @@ export function ProductSaveDialog({
       labelledBy="save-dialog-title"
       dialogClassName="sniptale-save-dialog"
     >
-      <ProductSaveDialogFrame
+      <ProductSaveDialogSurface
         title={title}
         subtitle={subtitle}
         closeLabel={closeLabel}
         filenameLabel={filenameLabel}
         filename={filename}
+        disabled={Boolean(disabled)}
         onFilenameChange={onFilenameChange}
         presetLabel={presetLabel}
         presetCount={presetCount}

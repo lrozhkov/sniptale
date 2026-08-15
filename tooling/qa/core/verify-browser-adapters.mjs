@@ -1,6 +1,6 @@
 /**
  * Browser adapter guardrail.
- * Blocks direct browser API calls for storage/tabs/downloads/debugger/scripting
+ * Blocks direct browser API calls for storage/tabs/downloads/scripting
  * outside the shared adapter seam and explicit native-binding test areas.
  */
 
@@ -9,6 +9,7 @@ import path from 'node:path';
 
 import {
   collectCodeFiles,
+  collectFormattableFiles,
   isExecutedAsScript,
   printViolations,
   repoRoot,
@@ -25,6 +26,53 @@ import {
 import { runAstGrepCheck } from '../audits/ast-grep.mjs';
 
 const BROWSER_ADAPTER_OWNERS_POLICY_PATH = 'tooling/qa/policy/browser-adapters-owners.mjs';
+const RETIRED_PROTOCOL_GUARD_PATH = 'tooling/qa/core/verify-browser-adapters.mjs';
+const RETIRED_PROTOCOL_PATTERNS = [
+  /chrome\.debugger/u,
+  /browserDebugger/u,
+  /platform\/browser\/debugger/u,
+  /\b(?:Page\.captureScreenshot|Runtime\.enable|Network\.enable)\b/u,
+  /\bunattended(?:-cdp)?\b/iu,
+  /\bHAR\b/u,
+  /REQUEST_EXPORT_HAR|EXPORT_(?:START|STOP)_HAR/u,
+  /session\.har|resource-timing\.har/u,
+];
+
+function isRetiredProtocolGuardTarget(relativePath) {
+  if (relativePath === RETIRED_PROTOCOL_GUARD_PATH) return false;
+  if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(relativePath)) return false;
+  if (relativePath.startsWith('tooling/test/e2e/') || relativePath.startsWith('docs/tooling/')) {
+    return false;
+  }
+  return (
+    relativePath === 'apps/extension/manifest.json' ||
+    relativePath.startsWith('apps/extension/src/') ||
+    relativePath.startsWith('packages/') ||
+    relativePath.startsWith('docs/architecture/') ||
+    relativePath.startsWith('docs/security/') ||
+    relativePath.startsWith('tooling/configs/qa/') ||
+    relativePath.startsWith('tooling/qa/policy/')
+  );
+}
+
+export function collectRetiredBrowserProtocolViolations(files, { root = repoRoot } = {}) {
+  return files.flatMap((filePath) => {
+    const relativePath = toRootRelativePath(filePath, root);
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+    if (!isRetiredProtocolGuardTarget(relativePath) || !fs.existsSync(absolutePath)) return [];
+    const source = fs.readFileSync(absolutePath, 'utf8');
+    const pattern = RETIRED_PROTOCOL_PATTERNS.find((candidate) => candidate.test(source));
+    return pattern
+      ? [
+          {
+            rule: 'retired-browser-protocol',
+            file: relativePath,
+            message: 'Product code and policy must remain free of retired browser protocol paths.',
+          },
+        ]
+      : [];
+  });
+}
 
 function toRootRelativePath(filePath, root) {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(repoRoot, filePath);
@@ -105,6 +153,7 @@ export function collectBrowserAdapterOwnerPathViolations(rootDir = repoRoot) {
 
 export function runBrowserAdapterCheck({ files = [], root = null } = {}) {
   const targetFiles = files.length > 0 ? files : collectCodeFiles();
+  const protocolFiles = files.length > 0 ? files : collectFormattableFiles();
   const resolvedRoot = root ?? repoRoot;
 
   return {
@@ -112,6 +161,7 @@ export function runBrowserAdapterCheck({ files = [], root = null } = {}) {
     violations: [
       ...collectBrowserAdapterOwnerPathViolations(resolvedRoot),
       ...collectBrowserAdapterViolations(targetFiles, { root: resolvedRoot }),
+      ...collectRetiredBrowserProtocolViolations(protocolFiles, { root: resolvedRoot }),
     ],
   };
 }

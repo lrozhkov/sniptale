@@ -16,8 +16,8 @@ const { openSettingsPageMock } = vi.hoisted(() => ({
   openSettingsPageMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
 
@@ -58,7 +58,7 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
           ...DEFAULT_VIDEO_SETTINGS,
           autoFadeDelay: 2,
           countdownSeconds: 3,
-          diagnosticsEnabled: false,
+          interactionDiagnosticsEnabled: false,
           microphoneDeviceId: null,
           microphoneEnabled: false,
           outputProfile: {

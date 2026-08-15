@@ -63,7 +63,6 @@ function useSidebarDerivedState(
     cropSelection: store.cropSelection,
     frame: store.frame,
     inspector: store.inspector,
-    sceneBackgroundPresets: editorPresetState.sceneBackground,
     isResizableLayerSelection: initialDerived.isResizableLayerSelection,
     layers: store.layers,
     selection: store.selection,

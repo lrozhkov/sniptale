@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveFrameCalloutBadgeText as resolveCalloutBadgeText } from '../../../features/highlighter/frame-annotation/callout-badge';
 
 describe('resolveCalloutBadgeText', () => {
-  it('uses explicit text before the title and body fallbacks', () => {
+  it('uses the explicit badge text', () => {
     expect(
       resolveCalloutBadgeText({
         badgeText: 'A',
@@ -13,7 +13,7 @@ describe('resolveCalloutBadgeText', () => {
     ).toBe('A');
   });
 
-  it('falls back to an enabled title and then plain body text', () => {
+  it('keeps an empty badge empty instead of copying the heading or body', () => {
     expect(
       resolveCalloutBadgeText({
         badgeText: '',
@@ -21,7 +21,7 @@ describe('resolveCalloutBadgeText', () => {
         titleEnabled: true,
         titleText: 'Title',
       })
-    ).toBe('Title');
+    ).toBe('');
     expect(
       resolveCalloutBadgeText({
         badgeText: ' ',
@@ -29,6 +29,6 @@ describe('resolveCalloutBadgeText', () => {
         titleEnabled: false,
         titleText: 'Hidden title',
       })
-    ).toBe('Body text');
+    ).toBe('');
   });
 });

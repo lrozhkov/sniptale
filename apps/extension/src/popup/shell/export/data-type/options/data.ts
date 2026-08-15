@@ -10,7 +10,7 @@ import {
   Paperclip,
   SwatchBook,
 } from 'lucide-react';
-import { translate } from '../../../../../platform/i18n';
+import { translate } from '../../../../../platform/i18n/popup';
 import type {
   PopupExportPreferenceActions,
   PopupExportPreferenceValues,
@@ -23,7 +23,7 @@ export type ExportOptionKey =
   | 'files'
   | 'images'
   | 'basicLogs'
-  | 'harDomLogs'
+  | 'pageDiagnostics'
   | 'cssDiagnostics'
   | 'fullPageScreenshot';
 
@@ -95,10 +95,10 @@ export function getDiagnosticsOptionConfigs(): ExportOptionConfig[] {
     },
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
-      description: translate('popup.export.includeHarDomLogsDescription'),
+      description: translate('popup.export.includePageDiagnosticsDescription'),
       icon: Globe,
-      key: 'harDomLogs',
-      label: translate('popup.export.includeHarDomLogsLabel'),
+      key: 'pageDiagnostics',
+      label: translate('popup.export.includePageDiagnosticsLabel'),
     },
     {
       accentClassName: 'text-[var(--sniptale-color-accent)]',
@@ -133,8 +133,8 @@ export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionT
       return props.includeBasicLogs;
     case 'cssDiagnostics':
       return props.includeCssDiagnostics;
-    case 'harDomLogs':
-      return props.includeHarDomLogs;
+    case 'pageDiagnostics':
+      return props.includePageDiagnostics;
     case 'fullPageScreenshot':
       return props.includeFullPageScreenshot;
   }
@@ -163,8 +163,8 @@ export function toggleExportOption(key: ExportOptionKey, props: ExportOptionTogg
     case 'cssDiagnostics':
       props.setIncludeCssDiagnostics((value) => !value);
       return;
-    case 'harDomLogs':
-      props.setIncludeHarDomLogs((value) => !value);
+    case 'pageDiagnostics':
+      props.setIncludePageDiagnostics((value) => !value);
       return;
     case 'fullPageScreenshot':
       props.setIncludeFullPageScreenshot((value) => !value);
@@ -198,8 +198,8 @@ export function setExportOptionActive(
     case 'cssDiagnostics':
       props.setIncludeCssDiagnostics(nextValue);
       return;
-    case 'harDomLogs':
-      props.setIncludeHarDomLogs(nextValue);
+    case 'pageDiagnostics':
+      props.setIncludePageDiagnostics(nextValue);
       return;
     case 'fullPageScreenshot':
       props.setIncludeFullPageScreenshot(nextValue);

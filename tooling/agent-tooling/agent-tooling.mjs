@@ -14,7 +14,14 @@ import { fileURLToPath } from 'node:url';
 export const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 export const sourceRoot = path.join(repoRoot, 'docs/agent-tooling');
 
-const PAYLOAD_ROOTS = ['AGENTS.md', '.agents'];
+const PAYLOAD_ROOTS = ['AGENTS.md', 'DESIGN.md', '.agents'];
+
+export function parseAgentToolingCliOptions(argv) {
+  const args = new Set(argv);
+  const unsupported = [...args].filter((argument) => argument !== '--force');
+  if (unsupported.length > 0) throw new Error(`Unsupported argument: ${unsupported[0]}`);
+  return { force: args.has('--force') };
+}
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/');

@@ -34,8 +34,8 @@ async function verifyBuildScreenshotModeStatusResponse() {
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
   const viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]);
+    { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:viewport', target: 'window' as const, width: 1440, height: 900 }]]);
   const sendResponse = vi.fn();
 
   browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
@@ -62,7 +62,7 @@ async function verifyBuildScreenshotModeStatusResponse() {
       tabId: 5,
       viewport: {
         presetId: 'test:viewport',
-        target: 'viewport',
+        target: 'window',
         width: 1440,
         height: 900,
       },
@@ -112,8 +112,8 @@ async function verifyBuildScreenshotModeStatusReadsLatestState() {
   const screenshotModeState = new Map<number, boolean>([[5, true]]);
   const viewportState = new Map<
     number,
-    { presetId: string; target: 'viewport' | 'window'; width: number; height: number } | null
-  >([[5, { presetId: 'test:viewport', target: 'viewport' as const, width: 1440, height: 900 }]]);
+    { presetId: string; target: 'window' | 'window'; width: number; height: number } | null
+  >([[5, { presetId: 'test:viewport', target: 'window' as const, width: 1440, height: 900 }]]);
   const sendResponse = vi.fn();
   const tabLookup = createDeferred<chrome.tabs.Tab>();
 

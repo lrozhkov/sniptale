@@ -111,6 +111,25 @@ export const highlighterMessages = defineMessageSource({
       ru: 'Настраивайте, скрывайте и расставляйте варианты нумерации рамок.',
       en: 'Customize, hide, and reorder reusable frame numbering styles.',
     },
+    newSession: {
+      sectionTitle: { ru: 'Для новых сессий', en: 'For new sessions' },
+      sectionDescription: {
+        ru: 'Эти параметры применятся при следующем запуске режима выделения.',
+        en: 'These settings apply the next time Highlight mode starts.',
+      },
+      enabledLabel: { ru: 'Нумеровать новые рамки', en: 'Number new frames' },
+      enabledDescription: {
+        ru: 'Добавлять номер к каждой новой рамке автоматически.',
+        en: 'Automatically add a number to every new frame.',
+      },
+      sourceLabel: { ru: 'Оформление номера', en: 'Number appearance' },
+      sourceDescription: {
+        ru: 'Откуда брать шаблон нумерации для новой рамки.',
+        en: 'Choose which numbering template a new frame uses.',
+      },
+      frameTemplate: { ru: 'Из настроек рамки', en: 'From frame settings' },
+      primaryTemplate: { ru: 'Основной шаблон', en: 'Default template' },
+    },
     add: { ru: 'Добавить шаблон', en: 'Add template' },
     defaultBadge: { ru: 'По умолчанию', en: 'Default' },
     systemBadge: { ru: 'Системный', en: 'System' },
@@ -155,6 +174,25 @@ export const highlighterMessages = defineMessageSource({
     description: {
       ru: 'Настраивайте, скрывайте и расставляйте варианты коллаутов.',
       en: 'Customize, hide, and reorder reusable callout designs.',
+    },
+    newSession: {
+      sectionTitle: { ru: 'Для новых сессий', en: 'For new sessions' },
+      sectionDescription: {
+        ru: 'Эти параметры применятся при следующем запуске режима выделения.',
+        en: 'These settings apply the next time Highlight mode starts.',
+      },
+      enabledLabel: { ru: 'Добавлять выноску к новой рамке', en: 'Add a callout to new frames' },
+      enabledDescription: {
+        ru: 'Создавать выноску вместе с каждой новой рамкой.',
+        en: 'Create a callout together with every new frame.',
+      },
+      sourceLabel: { ru: 'Оформление выноски', en: 'Callout appearance' },
+      sourceDescription: {
+        ru: 'Откуда брать шаблон выноски для новой рамки.',
+        en: 'Choose which callout template a new frame uses.',
+      },
+      frameTemplate: { ru: 'Из настроек рамки', en: 'From frame settings' },
+      primaryTemplate: { ru: 'Основной шаблон', en: 'Default template' },
     },
     add: { ru: 'Добавить шаблон', en: 'Add template' },
     defaultBadge: { ru: 'По умолчанию', en: 'Default' },

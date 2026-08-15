@@ -55,7 +55,7 @@ export interface ToolbarVideoRecordingProps {
 
 export type ToolbarViewportSelection = {
   presetId?: string;
-  target?: 'viewport' | 'window';
+  target?: 'window';
   width: number;
   height: number;
 } | null;

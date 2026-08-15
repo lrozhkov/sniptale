@@ -15,6 +15,9 @@ const {
   openVideoEditorPageMock,
   sendTabMessageMock,
   startRecordingMock,
+  startPopupExportJobMock,
+  browserPermissionsRequestMock,
+  browserTabsGetMock,
   runtimeGetUrlMock,
   translateMock,
 } = vi.hoisted(() => ({
@@ -29,6 +32,9 @@ const {
   openVideoEditorPageMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   startRecordingMock: vi.fn(),
+  startPopupExportJobMock: vi.fn(),
+  browserPermissionsRequestMock: vi.fn(),
+  browserTabsGetMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   translateMock: vi.fn((key: string) => key),
 }));
@@ -91,6 +97,19 @@ vi.mock('../../media/lifecycle', async (importOriginal) => ({
   startRecording: startRecordingMock,
 }));
 
+vi.mock('../../capture/popup-export/job', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/popup-export/job')>()),
+  startPopupExportJob: startPopupExportJobMock,
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { request: browserPermissionsRequestMock },
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: browserTabsGetMock },
+}));
+
 import {
   copyContextMenuExportPreview,
   handlePageContextMenuAction,
@@ -127,13 +146,16 @@ function resetContextMenuActionHelperMocks(): void {
     Promise.resolve({
       status: 'requires-start-validation',
       presetId,
-      target: 'viewport',
+      target: 'window',
       required: { width: 1920, height: 1080 },
     })
   );
   sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   startRecordingMock.mockResolvedValue(undefined);
+  startPopupExportJobMock.mockResolvedValue({ phase: 'running' });
+  browserPermissionsRequestMock.mockResolvedValue(true);
+  browserTabsGetMock.mockResolvedValue({ id: 15, title: 'Example tab' });
 }
 
 beforeEach(resetContextMenuActionHelperMocks);
@@ -241,7 +263,7 @@ it('blocks an unavailable context-menu preset before recording starts', async ()
   captureSurfaceGetAvailabilityMock.mockResolvedValueOnce({
     status: 'unavailable',
     presetId: 'preset-alt',
-    target: 'viewport',
+    target: 'window',
     reason: 'viewport-too-large',
     required: { width: 1920, height: 1080 },
     available: { width: 1280, height: 720 },
@@ -253,30 +275,32 @@ it('blocks an unavailable context-menu preset before recording starts', async ()
   expect(startRecordingMock).not.toHaveBeenCalled();
 });
 
-it('fails export start when the content flow returns an error', async () => {
-  sendTabMessageMock.mockResolvedValue({
-    error: 'export-failed',
-    success: false,
-  });
+it('fails export start when the background job owner rejects', async () => {
+  startPopupExportJobMock.mockRejectedValue(new Error('export-failed'));
   await expect(startContextMenuExport(15)).rejects.toThrow('export-failed');
 });
 
 it('starts export with the full persisted popup export selection', async () => {
   await startContextMenuExport(15);
 
-  expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 15, {
+  expect(startPopupExportJobMock).toHaveBeenCalledWith({
+    contentPort: expect.objectContaining({
+      cancelPagePackage: expect.any(Function),
+      requestPagePackage: expect.any(Function),
+    }),
+    jobId: expect.any(String),
+    orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: {
       includeBasicLogs: false,
       includeCssDiagnostics: false,
       includeFiles: true,
       includeFullPageScreenshot: false,
-      includeHarDomLogs: false,
+      includePageDiagnostics: false,
       includeImages: true,
       includeJson: true,
       includeMarkdown: true,
     },
-    requestId: expect.any(String),
-    type: MessageType.EXPORT_POPUP_START,
+    warnings: [],
   });
 });
 

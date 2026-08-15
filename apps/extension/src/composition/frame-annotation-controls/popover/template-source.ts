@@ -16,8 +16,8 @@ export function createTemplateSourceAction(
 ) {
   const forced = control.value === 'forced';
   return {
-    description: forced ? copy.forcedDescription : copy.frameDescription,
-    label: forced ? copy.forcedLabel : copy.frameLabel,
+    description: forced ? copy.frameDescription : copy.forcedDescription,
+    label: forced ? copy.frameLabel : copy.forcedLabel,
     onClick: () => control.onChange(forced ? 'frame-default' : 'forced'),
   };
 }

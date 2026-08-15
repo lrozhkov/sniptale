@@ -21,7 +21,7 @@ import {
 import { buildExportData, createExportStats } from '../formats/data';
 import type { PreparedDOMTreeSnapshot } from '../../dom-tree-parser/snapshot';
 import type { PageSnapshotSource } from '../../page-snapshot/source';
-import { collectFilesWithHarForExportManager } from '../archive/transfer';
+import { collectFilesForExportManager } from '../archive/transfer';
 import type { ExportDiagnosticsSource } from '../diagnostics/source';
 import { updateExportManagerProgress, type ExportManagerState } from './state';
 import { collectExportExtraAssets, finishExportSuccess } from './assets';
@@ -30,10 +30,6 @@ import {
   createExportDiagnosticsSource,
   prepareExportManagerTreeData,
 } from './source';
-import {
-  runWithConsoleDiagnosticsSession,
-  shouldCaptureConsoleDiagnostics,
-} from './diagnostics-session';
 import { createBrowserAnnotationsArchiveAsset } from './annotations';
 
 function throwIfExportCancelled(state: ExportManagerState): void {
@@ -72,7 +68,7 @@ async function collectExportTransferData(
   warnings: string[],
   diagnosticsSource?: ExportDiagnosticsSource
 ) {
-  return collectFilesWithHarForExportManager(treeData, options, warnings, {
+  return collectFilesForExportManager(treeData, options, warnings, {
     ...createTransferControl(state),
     diagnosticsSource,
   });
@@ -87,36 +83,30 @@ export async function runExportManagerPipeline(
     'contentIntentSource' | 'fullPageCaptureIdentity' | 'prepareAnnotationsText' | 'snapshotSource'
   > = {}
 ) {
-  const shouldCaptureConsole = shouldCaptureConsoleDiagnostics(options);
-
-  return runWithConsoleDiagnosticsSession(shouldCaptureConsole, async () => {
-    const packageResult = await runExportManagerPackagePipeline(state, options, warnings, {
-      binaryMode: 'blob',
-      consoleDiagnosticsManaged: shouldCaptureConsole,
-      contentIntentSource: pipelineOptions.contentIntentSource,
-      fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
-      prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
-      finishOnPackage: false,
-      snapshotSource: pipelineOptions.snapshotSource,
-    });
-    throwIfExportCancelled(state);
-    const archiveBlob = await createExportArchiveBlob(
-      packageResult.pagePackage,
-      createArchiveGenerationControl(state)
-    );
-    throwIfExportCancelled(state);
-    finishExportSuccess(state, packageResult.fileCandidatesCount, warnings);
-    return {
-      blob: archiveBlob,
-      filename: `${packageResult.pagePackage.archiveBaseName}.zip`,
-      stats: packageResult.stats,
-    };
+  const packageResult = await runExportManagerPackagePipeline(state, options, warnings, {
+    binaryMode: 'blob',
+    contentIntentSource: pipelineOptions.contentIntentSource,
+    fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
+    prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
+    finishOnPackage: false,
+    snapshotSource: pipelineOptions.snapshotSource,
   });
+  throwIfExportCancelled(state);
+  const archiveBlob = await createExportArchiveBlob(
+    packageResult.pagePackage,
+    createArchiveGenerationControl(state)
+  );
+  throwIfExportCancelled(state);
+  finishExportSuccess(state, packageResult.fileCandidatesCount, warnings);
+  return {
+    blob: archiveBlob,
+    filename: `${packageResult.pagePackage.archiveBaseName}.zip`,
+    stats: packageResult.stats,
+  };
 }
 
 interface PackagePipelineOptions {
   binaryMode?: ExportArchiveBinaryMode;
-  consoleDiagnosticsManaged?: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   fullPageCaptureIdentity?: FullPageExportCaptureIdentity | undefined;
   prepareAnnotationsText?: (() => Promise<string>) | undefined;
@@ -155,7 +145,7 @@ function getPostAnnotationsActiveStep(options: ExportOptions): ExportProgressSte
   if (options.includeFiles) return 'files';
   if (options.includeImages) return 'images';
   if (options.includeBasicLogs) return 'basicLogs';
-  if (options.includeHarDomLogs) return 'harDomLogs';
+  if (options.includePageDiagnostics) return 'pageDiagnostics';
   if (options.includeCssDiagnostics) return 'cssDiagnostics';
   if (options.includeFullPageScreenshot) return 'fullPageScreenshot';
   return undefined;
@@ -213,7 +203,7 @@ async function collectPackagePipelineInputs(
   throwIfExportCancelled(state);
   const treeData = captureArtifact.treeData;
   const exportData = options.includeJson ? buildExportData(treeData) : null;
-  const { collectedFiles, downloadResult, sessionHar } = await collectExportTransferData(
+  const { collectedFiles, downloadResult } = await collectExportTransferData(
     state,
     treeData,
     options,
@@ -223,15 +213,12 @@ async function collectPackagePipelineInputs(
   const fileCandidatesCount = collectedFiles?.files.length ?? 0;
   const downloadedFilesCount = downloadResult?.files.size ?? 0;
   const extraAssets = await collectExportExtraAssets({
-    contentIntentSource: pipelineOptions.contentIntentSource,
-    fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
     downloadedFilesCount,
     options,
     snapshot,
     state,
     warnings,
     fileCandidatesCount,
-    sessionHar,
     diagnosticsSource,
     throwIfCancelled: () => throwIfExportCancelled(state),
   });
@@ -260,41 +247,36 @@ export async function runExportManagerPackagePipeline(
   pagePackage: ArchiveArtifact;
   stats: ReturnType<typeof createExportStats>;
 }> {
-  const shouldCaptureConsole =
-    !pipelineOptions.consoleDiagnosticsManaged && shouldCaptureConsoleDiagnostics(options);
-
-  return runWithConsoleDiagnosticsSession(shouldCaptureConsole, async () => {
-    const collected = await collectPackagePipelineInputs(state, options, warnings, {
-      contentIntentSource: pipelineOptions.contentIntentSource,
-      fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
-      prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
-      snapshotSource: pipelineOptions.snapshotSource,
-    });
-    throwIfExportCancelled(state);
-    const { pagePackage, stats } = await buildPipelinePagePackage({
-      binaryMode: pipelineOptions.binaryMode ?? 'base64',
-      captureArtifact: collected.captureArtifact,
-      downloadedFilesCount: collected.downloadedFilesCount,
-      exportData: collected.exportData,
-      extraAssets: collected.extraAssets,
-      files: collected.files,
-      options,
-      state,
-      warnings,
-    });
-    throwIfExportCancelled(state);
-
-    if (pipelineOptions.finishOnPackage ?? true) {
-      finishExportSuccess(state, collected.fileCandidatesCount, warnings);
-    }
-
-    return {
-      fileCandidatesCount: collected.fileCandidatesCount,
-      pagePackage: Object.assign(pagePackage, {
-        errors: [...warnings],
-        stats,
-      }),
-      stats,
-    };
+  const collected = await collectPackagePipelineInputs(state, options, warnings, {
+    contentIntentSource: pipelineOptions.contentIntentSource,
+    fullPageCaptureIdentity: pipelineOptions.fullPageCaptureIdentity,
+    prepareAnnotationsText: pipelineOptions.prepareAnnotationsText,
+    snapshotSource: pipelineOptions.snapshotSource,
   });
+  throwIfExportCancelled(state);
+  const { pagePackage, stats } = await buildPipelinePagePackage({
+    binaryMode: pipelineOptions.binaryMode ?? 'base64',
+    captureArtifact: collected.captureArtifact,
+    downloadedFilesCount: collected.downloadedFilesCount,
+    exportData: collected.exportData,
+    extraAssets: collected.extraAssets,
+    files: collected.files,
+    options,
+    state,
+    warnings,
+  });
+  throwIfExportCancelled(state);
+
+  if (pipelineOptions.finishOnPackage ?? true) {
+    finishExportSuccess(state, collected.fileCandidatesCount, warnings);
+  }
+
+  return {
+    fileCandidatesCount: collected.fileCandidatesCount,
+    pagePackage: Object.assign(pagePackage, {
+      errors: [...warnings],
+      stats,
+    }),
+    stats,
+  };
 }

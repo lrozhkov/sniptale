@@ -63,11 +63,6 @@ export class DefaultCaptureSurfaceService implements CaptureSurfaceService {
     return this.registry.getAppliedBindingForSession(sessionId);
   }
 
-  handleDebuggerDetach(tabId: number): Promise<readonly CaptureSurfaceOwner[]> {
-    const ready = this.recovery ?? Promise.resolve();
-    return ready.then(() => this.enqueue(() => this.disposal.handleDebuggerDetach(tabId)));
-  }
-
   getAvailability(args: {
     tabId: number;
     presetId: string;

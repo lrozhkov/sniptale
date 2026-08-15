@@ -22,13 +22,7 @@ export function updateViewportPreset(
   draft: ViewportPresetDraft
 ): ViewportPreset[] {
   assertValidViewportPresetValues(draft);
-  const targetChanged = editingPreset.target !== draft.target;
-  const nextOrder = targetChanged
-    ? Math.max(
-        -1,
-        ...presets.filter((preset) => preset.target === draft.target).map((item) => item.order)
-      ) + 1
-    : editingPreset.order;
+  const nextOrder = editingPreset.order;
   return normalizeViewportPresetOrder(
     presets.map((preset) => {
       if (preset.id !== editingPreset.id) return { ...preset };
@@ -82,12 +76,7 @@ export function moveViewportPresetBefore(
 ): ViewportPreset[] {
   const preset = presets.find((item) => item.id === presetId);
   if (!preset) return [...presets];
-  const target =
-    beforePresetId === null ? null : presets.find((item) => item.id === beforePresetId);
-  if (target && target.target !== preset.target) return [...presets];
-  const sameTarget = presets.filter(
-    (item) => item.target === preset.target && item.id !== presetId
-  );
+  const sameTarget = presets.filter((item) => item.id !== presetId);
   const insertionIndex =
     beforePresetId === null
       ? sameTarget.length
@@ -95,21 +84,7 @@ export function moveViewportPresetBefore(
   if (insertionIndex < 0) return [...presets];
   sameTarget.splice(insertionIndex, 0, preset);
   const reorderedTarget = sameTarget.map((item, order) => ({ ...item, order }));
-  const byTarget = new Map<ViewportPresetTarget, ViewportPreset[]>([
-    [
-      'viewport',
-      preset.target === 'viewport'
-        ? reorderedTarget
-        : presets.filter((item) => item.target === 'viewport'),
-    ],
-    [
-      'window',
-      preset.target === 'window'
-        ? reorderedTarget
-        : presets.filter((item) => item.target === 'window'),
-    ],
-  ]);
-  return normalizeViewportPresetOrder([...byTarget.get('viewport')!, ...byTarget.get('window')!]);
+  return normalizeViewportPresetOrder(reorderedTarget);
 }
 
 export function getDeleteMessage(preset?: ViewportPreset): string {

@@ -2,5 +2,5 @@ export {
   buildDomSnapshotHtml,
   buildPageSummaryFile,
   buildVirtualDomSnapshotHtml,
-  createHarLikeSnapshot,
+  createResourceTimingSnapshot,
 } from './page-snapshot';

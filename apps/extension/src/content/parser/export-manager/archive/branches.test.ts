@@ -12,7 +12,7 @@ function createArchiveOptions(overrides: Partial<ExportOptions> = {}): ExportOpt
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot: false,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,

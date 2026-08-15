@@ -3,9 +3,49 @@ import { translate } from '../../../../platform/i18n';
 import { synchronizeEditorDrawingTextLayout } from '../../../drawing/object/vector';
 
 type TextboxWithLifecycle = Textbox & {
-  sniptaleDrawingTextChangedHandler?: () => void;
-  sniptaleEditingExitedHandler?: () => void;
+  sniptaleDrawingTextChangedHandler?: (() => void) | undefined;
+  sniptaleEditingExitedHandler?: (() => void) | undefined;
 };
+
+type TextboxEditSnapshot = Pick<Textbox, 'height' | 'left' | 'text' | 'top' | 'width'> & {
+  drawingJson: string | undefined;
+};
+
+const editSnapshots = new WeakMap<Textbox, TextboxEditSnapshot>();
+const cancelledEdits = new WeakSet<Textbox>();
+
+export function beginEditorTextboxEditing(textbox: Textbox): void {
+  if (editSnapshots.has(textbox)) return;
+  editSnapshots.set(textbox, {
+    drawingJson: textbox.sniptaleDrawingJson,
+    height: textbox.height,
+    left: textbox.left,
+    text: textbox.text,
+    top: textbox.top,
+    width: textbox.width,
+  });
+}
+
+export function cancelEditorTextboxEditing(textbox: Textbox): void {
+  const snapshot = editSnapshots.get(textbox);
+  if (snapshot) {
+    textbox.set({
+      height: snapshot.height,
+      left: snapshot.left,
+      text: snapshot.text,
+      top: snapshot.top,
+      width: snapshot.width,
+    });
+    if (snapshot.drawingJson === undefined) {
+      delete textbox.sniptaleDrawingJson;
+    } else {
+      textbox.sniptaleDrawingJson = snapshot.drawingJson;
+    }
+    textbox.setCoords();
+  }
+  cancelledEdits.add(textbox);
+  textbox.exitEditing();
+}
 
 export function attachEditorTextboxLifecycle(
   textbox: TextboxWithLifecycle,
@@ -27,6 +67,12 @@ export function attachEditorTextboxLifecycle(
 
   const editingExitedHandler = () => {
     textbox.sniptaleDrawingTextAutoWidth = false;
+    const cancelled = cancelledEdits.delete(textbox);
+    editSnapshots.delete(textbox);
+    if (cancelled) {
+      if (!textbox.text || textbox.text.trim().length === 0) options.onEmpty();
+      return;
+    }
     if (
       !textbox.text ||
       textbox.text.trim().length === 0 ||

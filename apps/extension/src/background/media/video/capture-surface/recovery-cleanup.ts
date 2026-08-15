@@ -9,10 +9,6 @@ import {
 } from '../recording-control-lease';
 import { requestBoundOffscreenRecordingStop } from '../offscreen-recording-stop';
 import { deleteVideoSurfaceSession, getVideoSurfaceSession } from './session-registry';
-import {
-  disableViewportCursorProjection,
-  retireViewportCursorProjectionAuthority,
-} from './cursor-projection';
 import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
 export type VideoCaptureSurfacePageAccessVerifier = (
@@ -34,39 +30,15 @@ async function requestOffscreenStopAcknowledgement(binding: {
 
 async function releaseRecoveredAppliedSurface(
   binding: AppliedCaptureSurfaceBinding,
-  pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
+  _pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
 ): Promise<void> {
-  if (binding.applied.target === 'viewport') {
-    retireViewportCursorProjectionAuthority(binding.tabId, {
-      generation: binding.applied.generation,
-      recordingId: binding.applied.sessionId,
-    });
-    await pageAccessVerifier(
-      binding.tabId,
-      'Recording page access is required to remove a recovered viewport cursor projection.'
-    );
-  }
   await releaseAppliedVideoCaptureSurface(binding.applied, binding.tabId);
 }
 
 export async function prepareAbandonedVideoSurfaceRestore(
-  surface: CaptureSurfaceLeaseIdentity,
-  pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
-): Promise<void> {
-  if (surface.owner !== 'video' || surface.target !== 'viewport') return;
-  retireViewportCursorProjectionAuthority(surface.tabId, {
-    generation: surface.generation,
-    recordingId: surface.sessionId,
-  });
-  await pageAccessVerifier(
-    surface.tabId,
-    'Recording page access is required to remove an abandoned viewport cursor projection.'
-  );
-  await disableViewportCursorProjection(surface.tabId, {
-    generation: surface.generation,
-    recordingId: surface.sessionId,
-  });
-}
+  _surface: CaptureSurfaceLeaseIdentity,
+  _pageAccessVerifier: VideoCaptureSurfacePageAccessVerifier
+): Promise<void> {}
 
 export async function stopBoundRecordingBeforeAbandonedStackRestore(
   activeLease: RecoveredVideoRecordingLease | null,

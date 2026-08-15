@@ -10,7 +10,7 @@ export async function openEditorControllerImage(
   options: OpenEditorControllerImageOptions
 ): Promise<void> {
   const runToken = ++latestOpenImageRunToken;
-  const context = await resolveEditorOpenImageContext(options.openOptions);
+  const context = await resolveEditorOpenImageContext(options.openOptions, options.sourceName);
   const document = await createOpenedEditorDocument({
     context,
     dataUrl: options.dataUrl,

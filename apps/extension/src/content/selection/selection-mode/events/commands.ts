@@ -16,6 +16,7 @@ export function handleSelectionModeClick(
 
   if (state.skipNextClick) {
     state.skipNextClick = false;
+    stopSelectionModeEvent(event);
     return;
   }
 

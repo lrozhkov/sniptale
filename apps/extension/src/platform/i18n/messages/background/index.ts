@@ -1,25 +1,5 @@
 import { defineMessageSource } from '../source';
 
-const DEBUGGER_EXTENSION_CONFLICT_RU = [
-  'Другое расширение уже использует отладку этой страницы.',
-  'Отключите расширения для записи экрана или баг-репортинга и попробуйте снова.',
-].join(' ');
-
-const DEBUGGER_EXTENSION_CONFLICT_EN = [
-  'Another extension is already using debugging for this page.',
-  'Disable screen recording or bug-reporting extensions and try again.',
-].join(' ');
-
-const DEBUGGER_ATTACH_CONFLICT_RU = [
-  'Конфликт с другим расширением.',
-  'Временно отключите расширения, которые инжектируют контент в страницы, и попробуйте снова.',
-].join(' ');
-
-const DEBUGGER_ATTACH_CONFLICT_EN = [
-  'Conflict with another extension.',
-  'Temporarily disable extensions that inject content into pages and try again.',
-].join(' ');
-
 export const backgroundMessages = defineMessageSource({
   runtime: {
     offscreenDocumentTitle: {
@@ -201,30 +181,6 @@ export const backgroundMessages = defineMessageSource({
     llmRetryInstruction: {
       ru: 'ВАЖНО: Верни ТОЛЬКО валидный JSON. Не добавляй пояснений.',
       en: 'IMPORTANT: Return ONLY valid JSON. Do not add explanations.',
-    },
-    debuggerExtensionConflict: {
-      ru: DEBUGGER_EXTENSION_CONFLICT_RU,
-      en: DEBUGGER_EXTENSION_CONFLICT_EN,
-    },
-    debuggerAttachConflict: {
-      ru: DEBUGGER_ATTACH_CONFLICT_RU,
-      en: DEBUGGER_ATTACH_CONFLICT_EN,
-    },
-    devtoolsConflictTitle: {
-      ru: 'Конфликт DevTools',
-      en: 'DevTools conflict',
-    },
-    devtoolsConflictMessage: {
-      ru: 'Пожалуйста, закройте панель разработчика (F12) для создания сложного скриншота.',
-      en: 'Close DevTools (F12) before creating a complex screenshot.',
-    },
-    debuggerConflictKeywordExtension: {
-      ru: 'extension',
-      en: 'extension',
-    },
-    debuggerConflictKeywordConflict: {
-      ru: 'Conflict',
-      en: 'Conflict',
     },
   },
 });

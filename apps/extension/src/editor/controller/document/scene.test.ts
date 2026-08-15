@@ -31,6 +31,7 @@ import { relayoutEditorScene } from './scene';
 function createFrame() {
   return {
     backgroundColor: '#fff',
+    backgroundBlurAmount: 0,
     backgroundGradientAngle: 0,
     backgroundGradientFrom: '#fff',
     backgroundGradientTo: '#000',

@@ -132,6 +132,14 @@ export function runStopSideEffects(
       'Failed to hide recording countdown overlay',
       { tabId: context.tabId }
     );
+    runBestEffort(
+      getBackgroundRuntimeMessaging().sendTabMessage(context.tabId, {
+        type: VideoMessageType.HIDE_RECORDING_OVERLAY,
+      }),
+      failureLogger,
+      'Failed to hide recording region overlay',
+      { tabId: context.tabId }
+    );
     backgroundSideEffects = awaitBestEffort(
       disableAnnotationsAndPersistTelemetry(context, failureLogger),
       failureLogger,

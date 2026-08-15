@@ -10,8 +10,8 @@ import {
 import { MicrophoneSettingsPanel } from './microphone-settings-panel';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => {
     if (key === 'popup.video.microphoneSettingsActual') {
       return 'Now: {settings}';
@@ -75,7 +75,7 @@ function createSettings(): VideoRecordingSettings {
     autoFadeDelay: 3,
     autoGainControl: true,
     countdownSeconds: 0,
-    diagnosticsEnabled: false,
+    interactionDiagnosticsEnabled: false,
     echoCancellation: true,
     microphoneDeviceId: 'mic-1',
     microphoneEnabled: true,
@@ -170,15 +170,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders actual microphone settings, level meter, and capability statuses', async () => {
+it('renders the selected microphone, level meter, and capability controls without the technical summary', async () => {
   await renderPanel();
 
-  expect(container?.textContent).toContain('popup.video.microphoneSettingsTitle');
   expect(container?.textContent).toContain('Studio mic');
   expect(container?.textContent).toContain('popup.video.microphoneStatusUnsupported');
   expect(container?.textContent).toContain('popup.video.microphoneStatusUnknown');
-  expect(container?.textContent).toContain('Now: 48 kHz, 1 channel');
-  expect(container?.textContent).not.toContain('sampleRate');
+  expect(container?.textContent).not.toContain('Now: 48 kHz, 1 channel');
 });
 
 it('does not commit settings when applyConstraints fails', async () => {

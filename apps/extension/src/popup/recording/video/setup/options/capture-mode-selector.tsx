@@ -1,6 +1,6 @@
-import type { ComponentType } from 'react';
-import { Crop, PanelTop, PanelsTopLeft, Video } from 'lucide-react';
-import { translate, type TranslationKey } from '../../../../../platform/i18n';
+import { useState, type ComponentType } from 'react';
+import { PanelTop, PanelsTopLeft, Video } from 'lucide-react';
+import { translate, type TranslationKey } from '../../../../../platform/i18n/popup';
 import type {
   ActiveTabCapabilities,
   CapabilityState,
@@ -8,10 +8,9 @@ import type {
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { ModeIconButton } from '../primitives';
 
-const CAPTURE_MODE_GRID_CLASS_NAME = 'mr-1 grid grid-cols-4 gap-1.5';
+const CAPTURE_MODE_GRID_CLASS_NAME = 'mr-1 flex gap-1.5';
 type VisibleCaptureMode =
   | typeof CaptureMode.TAB
-  | typeof CaptureMode.TAB_CROP
   | typeof CaptureMode.CAMERA
   | typeof CaptureMode.SCREEN;
 
@@ -21,10 +20,6 @@ const CAPTURE_MODE_META: Record<
 > = {
   [CaptureMode.TAB]: {
     hintKey: 'popup.video.modeTabHint',
-    accentClassName: 'text-[var(--sniptale-color-accent)]',
-  },
-  [CaptureMode.TAB_CROP]: {
-    hintKey: 'popup.video.modeAreaHint',
     accentClassName: 'text-[var(--sniptale-color-accent)]',
   },
   [CaptureMode.CAMERA]: {
@@ -44,19 +39,14 @@ const CAPTURE_MODE_OPTIONS: Array<{
 }> = [
   { mode: CaptureMode.TAB, labelKey: 'popup.video.modeTabLabel', icon: PanelTop },
   {
-    mode: CaptureMode.TAB_CROP,
-    labelKey: 'popup.video.modeAreaLabel',
-    icon: Crop,
+    mode: CaptureMode.SCREEN,
+    labelKey: 'popup.video.modeScreenLabel',
+    icon: PanelsTopLeft,
   },
   {
     mode: CaptureMode.CAMERA,
     labelKey: 'popup.video.modeCameraLabel',
     icon: Video,
-  },
-  {
-    mode: CaptureMode.SCREEN,
-    labelKey: 'popup.video.modeScreenLabel',
-    icon: PanelsTopLeft,
   },
 ];
 
@@ -71,6 +61,7 @@ export function CaptureModeSelector({
   modeCapabilities?: Record<CaptureMode, CapabilityState> | undefined;
   onCaptureModeChange: (mode: CaptureMode) => void;
 }) {
+  const [animate, setAnimate] = useState(false);
   const resolvedModeCapabilities = modeCapabilities ?? activeTabCapabilities?.videoByMode;
   return (
     <div className={CAPTURE_MODE_GRID_CLASS_NAME}>
@@ -80,7 +71,9 @@ export function CaptureModeSelector({
           supported: false,
           reason: translate('popup.common.noActiveTab'),
         };
-        const isActive = captureMode === mode;
+        const isActive =
+          captureMode === mode ||
+          (mode === CaptureMode.TAB && captureMode === CaptureMode.TAB_CROP);
         const label = translate(labelKey);
         const hint = modeCapability.reason ?? translate(meta.hintKey);
 
@@ -91,10 +84,12 @@ export function CaptureModeSelector({
             label={label}
             hint={hint}
             active={isActive}
+            animate={animate}
             disabled={!modeCapability.supported}
             accentClassName={meta.accentClassName}
             onClick={() => {
-              if (modeCapability.supported) {
+              if (modeCapability.supported && !isActive) {
+                setAnimate(true);
                 onCaptureModeChange(mode);
               }
             }}

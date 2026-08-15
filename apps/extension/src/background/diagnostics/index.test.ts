@@ -6,7 +6,6 @@ const {
   cleanupDiagnosticsSession,
   createDiagnosticsSession,
   diagnosticsLogger,
-  enableDiagnosticsForSession,
   finalizeSessionMeta,
   getDiagnosticsSession,
   hasActiveDiagnosticsSession,
@@ -26,7 +25,6 @@ const {
     log: vi.fn(),
     warn: vi.fn(),
   },
-  enableDiagnosticsForSession: vi.fn(),
   finalizeSessionMeta: vi.fn(),
   getDiagnosticsSession: vi.fn(),
   hasActiveDiagnosticsSession: vi.fn(),
@@ -60,7 +58,6 @@ vi.mock('./session', () => ({
 }));
 
 vi.mock('./runtime', () => ({
-  enableDiagnosticsForSession,
   notifyDiagnosticLogger,
   resolveTabUrl,
   restoreOrGetSession,
@@ -83,7 +80,6 @@ function createSession() {
       recordingStartedAt: '2026-03-21T12:00:00.000Z',
     },
     events: [],
-    pendingNetworkRequests: new Map(),
     isPaused: false,
   };
 }
@@ -94,7 +90,6 @@ beforeEach(() => {
   resolveTabUrl.mockResolvedValue('https://example.com');
   buildDiagnosticMeta.mockReturnValue({ meta: true });
   createDiagnosticsSession.mockReturnValue(createSession());
-  enableDiagnosticsForSession.mockResolvedValue(undefined);
   notifyDiagnosticLogger.mockResolvedValue(undefined);
   restoreOrGetSession.mockResolvedValue(null);
   cleanupDiagnosticsSession.mockResolvedValue(undefined);
@@ -119,7 +114,6 @@ it('starts diagnostics by wiring runtime, state, and session seams together', as
   });
   expect(createDiagnosticsSession).toHaveBeenCalledWith('recording-1', 7, { meta: true });
   expect(registerDiagnosticsSession).toHaveBeenCalledWith(session);
-  expect(enableDiagnosticsForSession).toHaveBeenCalledWith(7, 'recording-1');
   expect(startDiagnosticsFlushLoop).toHaveBeenCalledOnce();
   expect(notifyDiagnosticLogger).toHaveBeenCalledWith(
     7,

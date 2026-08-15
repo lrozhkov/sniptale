@@ -1,7 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  browserDebuggerSendCommandMock,
   browserTabsCaptureVisibleTabMock,
   browserTabsGetMock,
   browserTabsQueryMock,
@@ -10,9 +9,7 @@ const {
   loggerWarnMock,
   resolveVisibleCaptureApiFormatMock,
   transitionCaptureJobMock,
-  withHiddenFixedElementsMock,
 } = vi.hoisted(() => ({
-  browserDebuggerSendCommandMock: vi.fn(),
   browserTabsCaptureVisibleTabMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   browserTabsQueryMock: vi.fn(),
@@ -21,12 +18,6 @@ const {
   loggerWarnMock: vi.fn(),
   resolveVisibleCaptureApiFormatMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  withHiddenFixedElementsMock: vi.fn(),
-}));
-
-vi.mock('@sniptale/platform/browser/debugger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/platform/browser/debugger')>()),
-  browserDebugger: { sendCommand: browserDebuggerSendCommandMock },
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -55,7 +46,6 @@ vi.mock('../jobs/state-machine', async (importOriginal) => ({
 vi.mock('./helpers', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./helpers')>()),
   resolveVisibleCaptureApiFormat: resolveVisibleCaptureApiFormatMock,
-  withHiddenFixedElements: withHiddenFixedElementsMock,
 }));
 
 import { captureVisibleTabTransaction } from './flow';
@@ -66,10 +56,6 @@ beforeEach(() => {
   loadSettingsMock.mockResolvedValue({ imageFormat: 'png', imageQuality: 90 });
   resolveVisibleCaptureApiFormatMock.mockReturnValue('png');
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  withHiddenFixedElementsMock.mockImplementation(async (_tabId, runCapture) => ({
-    hiddenCount: 0,
-    result: await runCapture(),
-  }));
 });
 
 it('marks non-error visible capture failures with the route fallback message', async () => {
@@ -89,7 +75,7 @@ it('marks non-error visible capture failures with the route fallback message', a
   );
 });
 
-it('does not start debugger fallback for missing native visible capture authority', async () => {
+it('surfaces missing native visible capture authority', async () => {
   const captureError = new Error("Either the '<all_urls>' or 'activeTab' permission is required.");
   browserTabsGetMock.mockResolvedValue({ id: 42, windowId: 4 });
   browserTabsQueryMock.mockResolvedValue([{ id: 42, windowId: 4 }]);
@@ -97,7 +83,6 @@ it('does not start debugger fallback for missing native visible capture authorit
 
   await expect(captureVisibleTabTransaction(42)).rejects.toBe(captureError);
 
-  expect(browserDebuggerSendCommandMock).not.toHaveBeenCalled();
   expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'failed', {
     error: "Either the '<all_urls>' or 'activeTab' permission is required.",
   });
@@ -112,7 +97,6 @@ it('fails closed before native capture when the authorized tab is no longer acti
   );
 
   expect(browserTabsCaptureVisibleTabMock).not.toHaveBeenCalled();
-  expect(browserDebuggerSendCommandMock).not.toHaveBeenCalled();
   expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'failed', {
     error: 'Visible capture target is not the active tab.',
   });

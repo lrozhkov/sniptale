@@ -5,9 +5,9 @@ import {
 } from '../../../../composition/persistence/capture-settings';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { ensureMediaHubStorageHeadroom } from '../../../../features/media-hub/storage-capacity';
-import { ensureActivePageAccessRuntime } from '../../../runtime/page-access/service';
-import { resolveContextMenuVideoPreset } from '../../../runtime/context-menu/action-helpers';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { startRecording } from '../manager';
+import { resolveVideoRecordingViewportPreset } from './preset';
 import { createVideoRecordingSurfaceSnapshot } from './snapshot';
 import {
   ensureVideoRecordingSurfaceLeaseHydrated,
@@ -87,7 +87,7 @@ export async function startSavedTabVideoRecording(
     loadSettings(),
     loadVideoUiState(),
   ]);
-  const viewportPresetId = await resolveContextMenuVideoPreset(appSettings);
+  const viewportPresetId = await resolveVideoRecordingViewportPreset(appSettings);
   if (uiState.viewportPresetId && !viewportPresetId) {
     throw new Error('Saved viewport preset is unavailable');
   }

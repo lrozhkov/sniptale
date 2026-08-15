@@ -44,6 +44,7 @@ function createRuntimeArgs(
     scheduleFinalFrameUpdate: vi.fn(),
     setupListenerHandlers: {
       handleClick: vi.fn(),
+      handleDragStart: vi.fn(),
       handleKeyDown: vi.fn(),
       handleMouseDown: vi.fn(),
       handleMouseLeave: vi.fn(),

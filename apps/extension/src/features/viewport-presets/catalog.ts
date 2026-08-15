@@ -16,48 +16,6 @@ interface CatalogEntry {
 
 const entries: readonly CatalogEntry[] = [
   {
-    id: 'system:viewport-mobile-portrait',
-    systemKey: 'viewportMobilePortrait',
-    target: 'viewport',
-    width: 390,
-    height: 844,
-  },
-  {
-    id: 'system:viewport-mobile-landscape',
-    systemKey: 'viewportMobileLandscape',
-    target: 'viewport',
-    width: 844,
-    height: 390,
-  },
-  {
-    id: 'system:viewport-tablet-portrait',
-    systemKey: 'viewportTabletPortrait',
-    target: 'viewport',
-    width: 768,
-    height: 1024,
-  },
-  {
-    id: 'system:viewport-tablet-landscape',
-    systemKey: 'viewportTabletLandscape',
-    target: 'viewport',
-    width: 1024,
-    height: 768,
-  },
-  {
-    id: 'system:viewport-hd',
-    systemKey: 'viewportHd',
-    target: 'viewport',
-    width: 1280,
-    height: 720,
-  },
-  {
-    id: 'system:viewport-full-hd',
-    systemKey: 'viewportFullHd',
-    target: 'viewport',
-    width: 1920,
-    height: 1080,
-  },
-  {
     id: 'system:window-hd',
     systemKey: 'windowHd',
     target: 'window',
@@ -87,13 +45,13 @@ const entries: readonly CatalogEntry[] = [
   },
 ];
 
-const orderByTarget: Record<ViewportPresetTarget, number> = { viewport: 0, window: 0 };
+let order = 0;
 const canonicalCatalog: readonly SystemViewportPreset[] = entries.map((entry) => ({
   kind: 'system',
   catalogRevision: VIEWPORT_PRESET_CATALOG_REVISION,
   customized: false,
   enabled: true,
-  order: orderByTarget[entry.target]++,
+  order: order++,
   ...entry,
 }));
 

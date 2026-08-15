@@ -297,6 +297,7 @@ async function createOriginalImageDocument(
       paddingBottom: 0,
       paddingLeft: 0,
       backgroundMode: 'color',
+      backgroundBlurAmount: 0,
       backgroundColor: '#ffffff',
       backgroundGradientFrom: '#ffffff',
       backgroundGradientTo: '#ffffff',

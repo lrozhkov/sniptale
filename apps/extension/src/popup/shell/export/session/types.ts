@@ -13,7 +13,7 @@ export type PopupExportPreferenceActions = {
   setIncludeCssDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeFiles: Dispatch<SetStateAction<boolean>>;
   setIncludeFullPageScreenshot: Dispatch<SetStateAction<boolean>>;
-  setIncludeHarDomLogs: Dispatch<SetStateAction<boolean>>;
+  setIncludePageDiagnostics: Dispatch<SetStateAction<boolean>>;
   setIncludeImages: Dispatch<SetStateAction<boolean>>;
   setIncludeJson: Dispatch<SetStateAction<boolean>>;
   setIncludeMarkdown: Dispatch<SetStateAction<boolean>>;
@@ -70,7 +70,7 @@ export type PopupExportSelection = {
   includeCssDiagnostics: boolean;
   includeFiles: boolean;
   includeFullPageScreenshot: boolean;
-  includeHarDomLogs: boolean;
+  includePageDiagnostics: boolean;
   includeImages: boolean;
   includeJson: boolean;
   includeMarkdown: boolean;

@@ -17,6 +17,7 @@ function createState() {
       showExport: true,
       showGallery: true,
       showPageLinkCopy: true,
+      showWindowResize: true,
       showImageEditor: true,
       showScreenshots: true,
       showSettings: true,
@@ -64,6 +65,7 @@ describe('ContextMenuControls', () => {
     expect(container?.textContent).toContain('Контекстное меню браузера');
     expect(container?.textContent).toContain('Команды в меню');
     expect(container?.textContent).toContain('Копировать название и ссылку');
+    expect(container?.textContent).toContain('Размер окна');
     expect(container?.querySelector('button[aria-label="Настройки"]')).toBeTruthy();
     expect(
       container
@@ -86,5 +88,15 @@ describe('ContextMenuControls', () => {
     });
 
     expect(state.updateContextMenu).toHaveBeenCalledWith({ showPageLinkCopy: false });
+
+    const windowResizeToggle = container?.querySelector(
+      'button[aria-label="Размер окна"]'
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      windowResizeToggle.click();
+    });
+
+    expect(state.updateContextMenu).toHaveBeenCalledWith({ showWindowResize: false });
   });
 });

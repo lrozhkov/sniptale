@@ -269,7 +269,12 @@ describe('ExportProgressSectionView long step lists', () => {
           { key: 'files', label: 'Файлы', status: 'active', statusLabel: 'В процессе' },
           { key: 'images', label: 'Изображения', status: 'pending', statusLabel: 'Ожидает' },
           { key: 'basicLogs', label: 'Базовые логи', status: 'pending', statusLabel: 'Ожидает' },
-          { key: 'harDomLogs', label: 'Подробные логи', status: 'pending', statusLabel: 'Ожидает' },
+          {
+            key: 'pageDiagnostics',
+            label: 'Подробные логи',
+            status: 'pending',
+            statusLabel: 'Ожидает',
+          },
           {
             key: 'cssDiagnostics',
             label: 'Стили страницы',

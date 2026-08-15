@@ -207,4 +207,26 @@ describe('areInteractiveFramePropsEqual', () => {
 
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
+
+  it('treats a step-badge normal offset as render-critical', () => {
+    const prevProps = createProps();
+    prevProps.frame.stepBadge = {
+      enabled: true,
+      manualPlacement: { position: 0.25, side: 'top' },
+      type: 'number',
+      value: '1',
+    };
+    const nextProps: InteractiveFrameProps = {
+      ...prevProps,
+      frame: {
+        ...prevProps.frame,
+        stepBadge: {
+          ...prevProps.frame.stepBadge,
+          manualPlacement: { normalOffset: 24, position: 0.25, side: 'top' },
+        },
+      },
+    };
+
+    expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
+  });
 });

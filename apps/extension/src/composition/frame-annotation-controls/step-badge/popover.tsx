@@ -22,11 +22,7 @@ import {
   createStepBadgeTemplateFromSettings,
 } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
-import {
-  usePopoverDistanceClose,
-  usePopoverEscapeClose,
-  usePopoverOutsideClose,
-} from '../popover/hooks';
+import { usePopoverEscapeClose, usePopoverOutsideClose } from '../popover/hooks';
 import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 import type { SettingsPopoverContext } from '../popover/header';
@@ -79,11 +75,6 @@ export function FutureStepBadgeSettingsPopover(props: {
     onClose: props.onClose,
     popoverRef,
     shouldIgnoreOutsideEvent: (event) => isEventWithinElement(event, props.anchorEl),
-  });
-  usePopoverDistanceClose({
-    isOpen: dismissal.isDismissalEnabled,
-    onClose: props.onClose,
-    popoverRef,
   });
   usePopoverEscapeClose({
     anchorEl: props.anchorEl,

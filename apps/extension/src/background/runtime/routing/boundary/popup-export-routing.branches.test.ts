@@ -26,8 +26,8 @@ vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
   sendTabMessage: sendTabMessageMock,
 }));
 
-vi.mock('../../page-access/service', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../page-access/service')>()),
+vi.mock('../../../page-access/service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../page-access/service')>()),
   ensureActivePageAccessRuntime: ensureActivePageAccessRuntimeMock,
 }));
 
@@ -57,7 +57,7 @@ function createPopupExportOptions(includeFullPageScreenshot: boolean) {
     includeCssDiagnostics: false,
     includeFiles: true,
     includeFullPageScreenshot,
-    includeHarDomLogs: false,
+    includePageDiagnostics: false,
     includeImages: true,
     includeJson: true,
     includeMarkdown: true,
@@ -100,72 +100,6 @@ it('routes owned viewer popup export messages through the viewer port', async ()
   expect(sendViewerPopupExportMessageMock).toHaveBeenCalledWith(expect.any(Map), 62, {
     type: MessageType.EXPORT_POPUP_PREVIEW,
   });
-  expect(sendResponse).toHaveBeenCalledWith({ success: true });
-});
-
-it('adds full-page content grants to content popup export starts', async () => {
-  const sendResponse = vi.fn();
-
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: {
-      options: createPopupExportOptions(true),
-      requestId: 'export-request-1',
-      tabId: 62,
-      tabRouteCapabilityToken: 'cap-1',
-      tabRouteRequestId: 'req-start',
-      type: MessageType.EXPORT_POPUP_START,
-    },
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(sendTabMessageMock).toHaveBeenCalledWith(
-    62,
-    expect.objectContaining({
-      contentIntentGrant: { grantToken: expect.any(String) },
-      fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE,
-      requestId: 'export-request-1',
-      type: MessageType.EXPORT_POPUP_START,
-    })
-  );
-  expect(sendResponse).toHaveBeenCalledWith({ success: true });
-});
-
-it('uses unattended capture for an inactive single-tab archive without activating the tab', async () => {
-  const sendResponse = vi.fn();
-  browserTabsGetMock.mockResolvedValue({
-    active: false,
-    id: 62,
-    url: 'https://example.test/page',
-  });
-
-  routePopupExportMessage({
-    deps: createBackgroundRuntimeState(),
-    message: {
-      options: createPopupExportOptions(true),
-      requestId: 'inactive-export-1',
-      tabId: 62,
-      tabRouteCapabilityToken: 'cap-1',
-      tabRouteRequestId: 'req-inactive',
-      type: MessageType.EXPORT_POPUP_START,
-    },
-    resolvedTabId: 62,
-    sendResponse,
-    sender: undefined,
-  });
-  await flushRouteWork();
-
-  expect(sendTabMessageMock).toHaveBeenCalledWith(
-    62,
-    expect.objectContaining({
-      fullPageCaptureAction: MessageType.EXPORT_CAPTURE_FULL_PAGE_UNATTENDED,
-      requestId: 'inactive-export-1',
-    })
-  );
-  expect(browserTabsGetMock).toHaveBeenCalledWith(62);
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });
 

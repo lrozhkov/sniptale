@@ -11,6 +11,7 @@ function createCanvas(objects?: Array<{ sniptaleType: string }>): Canvas {
 
 function createFrame(overrides: Partial<EditorFrameSettings> = {}): EditorFrameSettings {
   return {
+    backgroundBlurAmount: 0,
     backgroundColor: '#fff',
     backgroundGradientAngle: 90,
     backgroundGradientFrom: '#fff',

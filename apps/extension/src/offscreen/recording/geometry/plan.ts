@@ -36,6 +36,13 @@ function requirePositiveInteger(value: number, label: string): number {
   return value;
 }
 
+function requirePositiveFinite(value: number, label: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be positive and finite`);
+  }
+  return value;
+}
+
 function freezeSize(size: RecordingPixelSize, label: string): RecordingPixelSize {
   return Object.freeze({
     height: requirePositiveInteger(size.height, `${label} height`),
@@ -46,15 +53,15 @@ function freezeSize(size: RecordingPixelSize, label: string): RecordingPixelSize
 function freezeSourceRect(sourceRect: RecordingSampleRect): RecordingSampleRect {
   const x = sourceRect.x;
   const y = sourceRect.y;
-  if (!Number.isFinite(x) || !Number.isInteger(x) || x < 0) {
-    throw new Error('Recording sample x must be a non-negative integer');
+  if (!Number.isFinite(x) || x < 0) {
+    throw new Error('Recording sample x must be non-negative and finite');
   }
-  if (!Number.isFinite(y) || !Number.isInteger(y) || y < 0) {
-    throw new Error('Recording sample y must be a non-negative integer');
+  if (!Number.isFinite(y) || y < 0) {
+    throw new Error('Recording sample y must be non-negative and finite');
   }
   return Object.freeze({
-    height: requirePositiveInteger(sourceRect.height, 'Recording sample height'),
-    width: requirePositiveInteger(sourceRect.width, 'Recording sample width'),
+    height: requirePositiveFinite(sourceRect.height, 'Recording sample height'),
+    width: requirePositiveFinite(sourceRect.width, 'Recording sample width'),
     x,
     y,
   });

@@ -11,10 +11,10 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
   },
   {
     owner: 'background-page-access-readiness-messaging',
-    productionFile: 'apps/extension/src/background/runtime/page-access/readiness.ts',
+    productionFile: 'apps/extension/src/background/page-access/readiness.ts',
     exclusive: true,
     reason: 'Content runtime readiness probes are covered by the page-access readiness suite.',
-    testFiles: ['apps/extension/src/background/runtime/page-access/readiness.test.ts'],
+    testFiles: ['apps/extension/src/background/page-access/readiness.test.ts'],
   },
   {
     owner: 'background-context-menu-messaging',
@@ -98,8 +98,7 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.privacy-erasure.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/flow.test.ts',
       'apps/extension/src/background/media/video/runtime/manager/controls.stop/effects.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/index.test.ts',
-      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/source-validation.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/tab-navigation/page-effects.test.ts',
     ],
   },
   {

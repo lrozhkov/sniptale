@@ -4,3 +4,4 @@ export {
   startEditorControllerDrawSession,
 } from './draw-session';
 export { cancelEditorTransientInteraction } from './transient';
+export { endEditorCanvasTransform } from './transform';

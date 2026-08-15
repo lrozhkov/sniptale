@@ -30,6 +30,10 @@ interface RuntimeCleanupPort {
   cleanup(state: BackgroundRuntimeState): Promise<readonly ErasureParticipantResult[]>;
 }
 
+interface PopupExportExclusionPort {
+  reserveErasureExclusion(): ErasureExclusion;
+}
+
 interface StorageCleanupPort {
   cleanup(options: LocalExtensionDataErasureOptions): Promise<LocalExtensionDataErasureResult>;
 }
@@ -38,6 +42,7 @@ export interface PrivacyErasurePorts {
   diagnostics: DiagnosticsCleanupPort;
   media: MediaCleanupPort;
   nativeIngestion: NativeIngestionCleanupPort;
+  popupExport: PopupExportExclusionPort;
   runtime: RuntimeCleanupPort;
   storage: StorageCleanupPort;
 }

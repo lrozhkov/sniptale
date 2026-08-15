@@ -32,34 +32,8 @@ function isInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value);
 }
 
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
 function parseSnapshot(value: unknown): CaptureSurfaceSnapshot | null {
   if (!isRecord(value)) return null;
-  if (
-    value['type'] === 'native' &&
-    isPositiveFinite(value['width']) &&
-    isPositiveFinite(value['height'])
-  ) {
-    return { type: 'native', width: value['width'], height: value['height'] };
-  }
-  if (
-    value['type'] === 'viewport' &&
-    typeof value['presetId'] === 'string' &&
-    isInteger(value['width']) &&
-    value['width'] > 0 &&
-    isInteger(value['height']) &&
-    value['height'] > 0
-  ) {
-    return {
-      type: 'viewport',
-      presetId: value['presetId'],
-      width: value['width'],
-      height: value['height'],
-    };
-  }
   if (
     value['type'] === 'window' &&
     isInteger(value['left']) &&
@@ -95,7 +69,7 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
     !isInteger(value['tabId']) ||
     !isInteger(value['windowId']) ||
     typeof value['presetId'] !== 'string' ||
-    (value['target'] !== 'viewport' && value['target'] !== 'window') ||
+    value['target'] !== 'window' ||
     !prior ||
     !applied ||
     typeof value['phase'] !== 'string' ||
@@ -116,7 +90,7 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
     tabId: value['tabId'],
     windowId: value['windowId'],
     presetId: value['presetId'],
-    target: value['target'],
+    target: 'window',
     prior,
     applied,
     phase: value['phase'] as CaptureSurfaceJournalPhase,
@@ -126,37 +100,18 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
 }
 
 function snapshotIdentityMatches(entry: CaptureSurfaceJournalEntry): boolean {
-  if (entry.presetId.length === 0) return false;
-  if (entry.target === 'window') {
-    return entry.applied.type === 'window' && entry.prior.type === 'window';
-  }
-  return (
-    entry.applied.type === 'viewport' &&
-    entry.applied.presetId === entry.presetId &&
-    entry.prior.type !== 'window'
-  );
+  return entry.presetId.length > 0;
 }
 
 function snapshotsEqual(left: CaptureSurfaceSnapshot, right: CaptureSurfaceSnapshot): boolean {
   if (left.type !== right.type) return false;
-  if (left.type === 'native' && right.type === 'native') {
-    return left.width === right.width && left.height === right.height;
-  }
-  if (left.type === 'viewport' && right.type === 'viewport') {
-    return (
-      left.presetId === right.presetId && left.width === right.width && left.height === right.height
-    );
-  }
-  if (left.type === 'window' && right.type === 'window') {
-    return (
-      left.left === right.left &&
-      left.top === right.top &&
-      left.width === right.width &&
-      left.height === right.height &&
-      left.state === right.state
-    );
-  }
-  return false;
+  return (
+    left.left === right.left &&
+    left.top === right.top &&
+    left.width === right.width &&
+    left.height === right.height &&
+    left.state === right.state
+  );
 }
 
 function hasValidTabStacks(entries: readonly CaptureSurfaceJournalEntry[]): boolean {
@@ -185,12 +140,7 @@ function hasCrossTabWindowConflict(entries: readonly CaptureSurfaceJournalEntry[
   return entries.some((left, index) =>
     entries
       .slice(index + 1)
-      .some(
-        (right) =>
-          left.tabId !== right.tabId &&
-          left.windowId === right.windowId &&
-          (left.target === 'window' || right.target === 'window')
-      )
+      .some((right) => left.tabId !== right.tabId && left.windowId === right.windowId && true)
   );
 }
 

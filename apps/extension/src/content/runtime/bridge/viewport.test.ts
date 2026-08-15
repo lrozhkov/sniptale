@@ -7,27 +7,14 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { ContentRuntimeMessage } from './types';
 import { handleViewportMessage } from './viewport';
 
-const {
-  hideVideoCountdown,
-  showVideoCountdown,
-  disableViewportCursorProjection,
-  enableViewportCursorProjection,
-} = vi.hoisted(() => ({
+const { hideVideoCountdown, showVideoCountdown } = vi.hoisted(() => ({
   hideVideoCountdown: vi.fn(),
   showVideoCountdown: vi.fn(),
-  disableViewportCursorProjection: vi.fn(),
-  enableViewportCursorProjection: vi.fn(),
 }));
 
 vi.mock('../../overlay/video-countdown', () => ({
   hideVideoCountdown,
   showVideoCountdown,
-}));
-
-vi.mock('../../overlay/viewport-cursor-projection', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../overlay/viewport-cursor-projection')>()),
-  disableViewportCursorProjection,
-  enableViewportCursorProjection,
 }));
 
 function setViewportDimensions() {
@@ -118,49 +105,6 @@ function registerCountdownTests() {
   });
 }
 
-function registerViewportCursorProjectionTests() {
-  it('routes the viewport cursor projection through its content-owned lifecycle', () => {
-    const sendResponse = vi.fn();
-    const regionSelectorController = createRegionSelectorController();
-
-    expect(
-      handleViewportMessage(
-        {
-          generation: 4,
-          recordingId: 'recording-1',
-          type: VideoMessageType.ENABLE_VIEWPORT_CURSOR_PROJECTION,
-        },
-        sendResponse,
-        createViewportInfo,
-        regionSelectorController
-      )
-    ).toBe(false);
-    expect(enableViewportCursorProjection).toHaveBeenCalledWith({
-      generation: 4,
-      recordingId: 'recording-1',
-    });
-    expect(sendResponse).toHaveBeenLastCalledWith({ success: true });
-
-    expect(
-      handleViewportMessage(
-        {
-          generation: 4,
-          recordingId: 'recording-1',
-          type: VideoMessageType.DISABLE_VIEWPORT_CURSOR_PROJECTION,
-        },
-        sendResponse,
-        createViewportInfo,
-        regionSelectorController
-      )
-    ).toBe(false);
-    expect(disableViewportCursorProjection).toHaveBeenCalledWith({
-      generation: 4,
-      recordingId: 'recording-1',
-    });
-    expect(sendResponse).toHaveBeenLastCalledWith({ success: true });
-  });
-}
-
 function registerDefaultMessageTest() {
   it('returns null for unrelated viewport messages', () => {
     expect(
@@ -185,12 +129,10 @@ function registerDefaultMessageTest() {
 describe('handleViewportMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    enableViewportCursorProjection.mockReturnValue(true);
     setViewportDimensions();
   });
 
   registerViewportCoordsTest();
   registerCountdownTests();
-  registerViewportCursorProjectionTests();
   registerDefaultMessageTest();
 });

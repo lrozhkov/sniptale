@@ -11,21 +11,12 @@ export type PopupExportRequest =
   | {
       type: MessageType.EXPORT_POPUP_BUILD_PACKAGE;
       options: ExportOptions;
-      contentIntentGrant?: ContentActionGrant;
-      fullPageCaptureAction?: FullPageExportCaptureAction;
       batchRequestId: string;
     }
   | {
       type: 'EXPORT_POPUP_SAVE_WEB_SNAPSHOT';
       allowAnonymousCrossOriginAssets: boolean;
       allowAuthenticatedSameOriginAssets: boolean;
-      requestId: string;
-      contentIntentGrant?: ContentActionGrant;
-      fullPageCaptureAction?: FullPageExportCaptureAction;
-    }
-  | {
-      type: MessageType.EXPORT_POPUP_START;
-      options: ExportOptions;
       requestId: string;
       contentIntentGrant?: ContentActionGrant;
       fullPageCaptureAction?: FullPageExportCaptureAction;

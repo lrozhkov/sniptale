@@ -3,14 +3,12 @@ import { defineMessageSource } from '../source';
 export const popupVideoRecordingControlMessages = defineMessageSource({
   diagnosticsDescription: {
     ru: [
-      'Включает расширенную диагностику для этой вкладки: адрес страницы, очищенные ошибки',
-      'консоли, сетевые запросы и сбои, а также служебные сообщения сохраняются локально',
-      'в IndexedDB и могут попасть в экспорт отчёта JSON/ZIP.',
+      'Включает диагностику взаимодействий для этой вкладки: действия, ошибки и служебные',
+      'meta-события сохраняются локально в IndexedDB и могут попасть в экспорт отчёта JSON/ZIP.',
     ].join(' '),
     en: [
-      'Turns on extended diagnostics for this tab: page address, sanitized console errors,',
-      'network requests and failures, and service messages are saved locally in IndexedDB',
-      'and may be included in JSON/ZIP report exports.',
+      'Turns on interaction diagnostics for this tab: actions, errors, and service meta events',
+      'are saved locally in IndexedDB and may be included in JSON/ZIP report exports.',
     ].join(' '),
   },
   diagnosticsEnableAction: {
@@ -110,12 +108,12 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Recording saved',
   },
   postRecordDescription: {
-    ru: 'Запись доступна в галерее. Можно открыть её в видеоредакторе, скачать или удалить.',
-    en: 'The recording is available in the gallery. You can open it in the video editor, download, or delete it.',
+    ru: 'Запись доступна в библиотеке. Можно открыть её в видеоредакторе, скачать или удалить.',
+    en: 'The recording is available in the library. You can open it in the video editor, download, or delete it.',
   },
   postRecordOpenGallery: {
-    ru: 'Открыть в галерее',
-    en: 'Open in gallery',
+    ru: 'Открыть в библиотеке',
+    en: 'Open in library',
   },
   postRecordOpenEditor: {
     ru: 'Открыть в видеоредакторе',

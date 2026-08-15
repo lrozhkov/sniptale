@@ -6,7 +6,6 @@
       "files": [
         "apps/extension/src/content/overlay/ai/pick/runtime/index.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/index.ts",
         "apps/extension/src/content/logic/diagnostic-logger.ts",
         "apps/extension/src/content/parser/export-manager-diagnostics.ts",
         "apps/extension/src/content/parser/export-manager-dom-driver.ts",
@@ -26,7 +25,6 @@
         "apps/extension/src/content/overlay/ai/pick/runtime/mode.controller.ts",
         "apps/extension/src/content/overlay/ai/pick/runtime/overlay.controller.ts",
         "apps/extension/src/content/selection/area-selector/controller.ts",
-        "apps/extension/src/content/parser/export-manager/diagnostics/console/controller.ts",
         "apps/extension/src/content/logic/crop-tool.ts",
         "apps/extension/src/content/application/diagnostics/runtime/logger.ts",
         "apps/extension/src/content/parser/export-manager/files/download.ts",
@@ -109,18 +107,10 @@
         "apps/extension/src/background/media/video/runtime/session-state/index.ts",
         "apps/extension/src/background/media/video/runtime/session-state/service/index.ts",
         "apps/extension/src/background/media/video/runtime/session-state/service/runtime-state-service.ts",
-        "apps/extension/src/background/runtime/page-access/service.ts",
+        "apps/extension/src/background/page-access/service.ts",
         "apps/extension/src/background/media/video/session-state/index.ts"
       ],
       "rule": "facade-default-owner"
-    },
-    {
-      "id": "background-owned-runtime-seams",
-      "files": [
-        "apps/extension/src/background/debugger/session/state-core.ts",
-        "apps/extension/src/background/debugger/session/store.ts"
-      ],
-      "rule": "no-top-level-mutable-runtime-state"
     },
     {
       "id": "scenario-editor-owner-seams",

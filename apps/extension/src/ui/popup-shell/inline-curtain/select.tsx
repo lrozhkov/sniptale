@@ -12,7 +12,7 @@ import { InlineCurtainNotice, InlineCurtainOptionList, type InlineCurtainOption 
 import { renderSecondaryCurtainPanel } from './secondary-panel';
 import {
   INLINE_CURTAIN_PANEL_CLASS_NAME,
-  InlineCurtainPanelCloseButton,
+  InlineCurtainPanelHeader,
   InlineCurtainTrigger,
   type InlineCurtainSecondaryAction,
 } from './trigger';
@@ -20,6 +20,7 @@ import {
 const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[14px]';
 type InlineCurtainSelectProps = {
   ariaLabel: string;
+  description: string;
   emptyText?: string;
   label: string;
   notice?: string;
@@ -35,6 +36,7 @@ type InlineCurtainSelectProps = {
 
 export function InlineCurtainSelect({
   ariaLabel,
+  description,
   emptyText,
   label,
   notice,
@@ -72,8 +74,23 @@ export function InlineCurtainSelect({
         triggerRef={triggerRef}
         valueLabel={valueLabel}
       />
+      {openPanel ? (
+        <button
+          type="button"
+          aria-label={translate('common.actions.close')}
+          className={[
+            'absolute inset-0 z-10 cursor-default',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_82%,transparent)]',
+            'backdrop-blur-[4px]',
+          ].join(' ')}
+          data-ui="popup.inline-curtain.backdrop"
+          onClick={() => setOpenPanel(null)}
+        />
+      ) : null}
       <InlineCurtainSelectPanels
         activeValue={value}
+        description={description}
+        label={label}
         onChange={onChange}
         openPanel={openPanel}
         options={options}
@@ -91,6 +108,7 @@ export function InlineCurtainSelect({
 
 function InlineCurtainSelectPanels({
   activeValue,
+  description,
   emptyText,
   notice,
   onChange,
@@ -98,11 +116,13 @@ function InlineCurtainSelectPanels({
   options,
   optionsPanel,
   optionsFooter,
+  label,
   panelId,
   secondaryAction,
   setOpenPanel,
 }: {
   activeValue: string;
+  description: string;
   emptyText?: string;
   notice?: string;
   onChange: (value: string) => void;
@@ -110,6 +130,7 @@ function InlineCurtainSelectPanels({
   options: InlineCurtainOption[];
   optionsPanel?: ReactNode;
   optionsFooter?: ReactNode;
+  label: string;
   panelId: string;
   secondaryAction?: InlineCurtainSecondaryAction;
   setOpenPanel: (openPanel: 'options' | 'secondary' | null) => void;
@@ -125,7 +146,12 @@ function InlineCurtainSelectPanels({
 
   if (optionsPanel !== undefined) {
     return (
-      <InlineCurtainCustomOptionsPanel id={panelId} onClose={() => setOpenPanel(null)}>
+      <InlineCurtainCustomOptionsPanel
+        description={description}
+        id={panelId}
+        onClose={() => setOpenPanel(null)}
+        title={label}
+      >
         {optionsPanel}
       </InlineCurtainCustomOptionsPanel>
     );
@@ -134,14 +160,17 @@ function InlineCurtainSelectPanels({
   return (
     <InlineCurtainPanel
       activeValue={activeValue}
+      description={description}
       id={panelId}
       {...(emptyText === undefined ? {} : { emptyText })}
       {...(notice === undefined ? {} : { notice })}
+      onClose={() => setOpenPanel(null)}
       onChange={(nextValue) => {
         onChange(nextValue);
         setOpenPanel(null);
       }}
       options={options}
+      title={label}
       {...(optionsFooter === undefined ? {} : { optionsFooter })}
     />
   );
@@ -149,20 +178,27 @@ function InlineCurtainSelectPanels({
 
 function InlineCurtainCustomOptionsPanel({
   children,
+  description,
   id,
   onClose,
+  title,
 }: {
   children: ReactNode;
+  description: string;
   id: string;
   onClose(): void;
+  title: string;
 }) {
   return (
     <div id={id} role="dialog" aria-modal="false" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
-      <InlineCurtainPanelCloseButton
-        ariaLabel={translate('common.actions.close')}
-        onClick={onClose}
+      <InlineCurtainPanelHeader
+        action="back"
+        actionAriaLabel={translate('popup.common.curtainBack')}
+        description={description}
+        onAction={onClose}
+        title={title}
       />
-      <div className="pt-1">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -290,30 +326,45 @@ function useDismissCurtainOnOutsidePointer({
 
 function InlineCurtainPanel({
   activeValue,
+  description,
   emptyText,
   id,
   notice,
+  onClose,
   onChange,
   options,
   optionsFooter,
+  title,
 }: {
   activeValue: string;
+  description: string;
   emptyText?: string;
   id: string;
   notice?: string;
+  onClose(): void;
   onChange: (value: string) => void;
   options: InlineCurtainOption[];
   optionsFooter?: ReactNode;
+  title: string;
 }) {
   return (
-    <div id={id} role="listbox" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
-      <InlineCurtainNotice {...(notice === undefined ? {} : { notice })} />
-      <InlineCurtainOptionList
-        activeValue={activeValue}
-        {...(emptyText === undefined ? {} : { emptyText })}
-        onChange={onChange}
-        options={options}
+    <div id={id} role="dialog" aria-modal="false" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
+      <InlineCurtainPanelHeader
+        action="back"
+        actionAriaLabel={translate('popup.common.curtainBack')}
+        description={description}
+        onAction={onClose}
+        title={title}
       />
+      <InlineCurtainNotice {...(notice === undefined ? {} : { notice })} />
+      <div role="listbox">
+        <InlineCurtainOptionList
+          activeValue={activeValue}
+          {...(emptyText === undefined ? {} : { emptyText })}
+          onChange={onChange}
+          options={options}
+        />
+      </div>
       {optionsFooter === undefined ? null : (
         <div className="mt-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
           {optionsFooter}

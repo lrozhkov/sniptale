@@ -23,7 +23,6 @@ type CaptureResult = {
   dataUrl: string;
   filename: string;
   jobId?: string | undefined;
-  needsDebugger: boolean;
 };
 
 type FinalizeCaptureArgs = {
@@ -73,7 +72,7 @@ export async function finalizeQuickActionCapture({
     );
   }
 
-  if (action.exitAfterCapture || preparedCaptureResult.needsDebugger) {
+  if (action.exitAfterCapture) {
     await releaseQuickActionSurface(tabId);
   }
 }

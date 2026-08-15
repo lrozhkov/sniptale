@@ -5,6 +5,7 @@ import { InteractiveFrameSizePanel } from '../size-panel';
 import { InteractiveFrameToolbar } from '../toolbar';
 import { InteractiveFrameToolbarTrigger } from '../toolbar/trigger';
 import { useFrameCaptureVisibilityState } from '../toolbar/capture-visibility-state';
+import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 
 export interface InteractiveFrameFloatingUiProps {
   frame: FrameData;
@@ -101,17 +102,22 @@ function getTriggerProps(
   captureVisibility: ReturnType<typeof useFrameCaptureVisibilityState>
 ) {
   return {
-    frame: props.frame,
+    frame: props.tempFrame,
+    canAddCallout: canAppendFrameCallout(props.tempFrame),
     captureVisibility,
     isVisible:
       props.isHovered && !props.isSelected && (props.state === 'idle' || props.state === 'hover'),
     closePopover: props.closePopover,
+    clearSelection: props.clearSelection,
     handleStartEditing: props.handleStartEditing,
     hoverFrame: props.hoverFrame,
     popoverAnchorRef: props.popoverAnchorRef,
     scheduleHoverFrameHide: props.scheduleHoverFrameHide,
     selectFrame: props.selectFrame,
     setIsCalloutEditing: props.setIsCalloutEditing,
+    setTempFrame: props.setTempFrame,
+    ...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {}),
+    ...(props.setActiveCalloutIndex ? { setActiveCalloutIndex: props.setActiveCalloutIndex } : {}),
     setState: props.setState,
     onUpdate: props.onUpdate,
   };

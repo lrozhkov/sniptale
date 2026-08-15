@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
+import {
+  ProductGlassChip,
+  ProductGlassRow,
+  ProductGlassSectionLabel,
+} from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
-import { fireAndReportEditorAction } from '../../runtime/async-actions';
-import { SelectField, type CompactSelectOption, cx } from '../../chrome/ui';
-import { panelButtonClassName } from './shared';
+import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
+import type { CompactSelectOption } from '../../chrome/ui';
+import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
 
 interface BrowserFrameState {
   canvasMode: 'resize' | 'keep-size';
@@ -15,48 +20,96 @@ export const BrowserFrameBehaviorSections: React.FC<{
   browserFrame: BrowserFrameState;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => (
-  <div className="space-y-3">
-    <SelectField
+  <fieldset className="space-y-3">
+    <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
+    <BrowserFrameChoiceRow
       label={translate('editor.compact.canvasBehavior')}
-      value={browserFrame.canvasMode}
       options={browserCanvasModeOptions}
+      value={browserFrame.canvasMode}
       onChange={(value) =>
         fireAndReportEditorAction('browser-frame-canvas-mode', () =>
           syncBrowserFrame({ canvasMode: value })
         )
       }
     />
-
-    <SelectField
+    <BrowserFrameChoiceRow
       label={translate('editor.compact.sceneBehavior')}
-      value={browserFrame.contentMode}
       options={browserContentModeOptions}
+      value={browserFrame.contentMode}
       onChange={(value) =>
         fireAndReportEditorAction('browser-frame-content-mode', () =>
           syncBrowserFrame({ contentMode: value })
         )
       }
     />
-  </div>
+  </fieldset>
 );
 
+function BrowserFrameChoiceRow<T extends string>(props: {
+  label: string;
+  onChange: (value: T) => void;
+  options: CompactSelectOption<T>[];
+  value: T;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <ProductGlassSectionLabel>{props.label}</ProductGlassSectionLabel>
+      <ProductGlassRow>
+        {props.options.map((option) => (
+          <ProductGlassChip
+            key={option.value}
+            active={option.value === props.value}
+            aria-pressed={option.value === props.value}
+            onClick={() => props.onChange(option.value)}
+          >
+            {option.label}
+          </ProductGlassChip>
+        ))}
+      </ProductGlassRow>
+    </div>
+  );
+}
+
 export const BrowserFrameInsertSection: React.FC<{
+  disabled?: boolean;
   insertOrUpdateBrowserFrame: () => Promise<void> | void;
-}> = ({ insertOrUpdateBrowserFrame }) => (
-  <button
-    type="button"
-    className={cx(
-      panelButtonClassName,
-      'w-full border-[color:var(--sniptale-color-border-accent-strong)]',
-      'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_76%,transparent)]',
-      'text-[color:var(--sniptale-color-accent-emphasis)]',
-      'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_18%,var(--sniptale-color-surface-panel))]',
-      'hover:text-[color:var(--sniptale-color-accent-strong)]'
-    )}
-    onClick={() =>
-      fireAndReportEditorAction('browser-frame-insert-update', () => insertOrUpdateBrowserFrame())
+}> = ({ disabled = false, insertOrUpdateBrowserFrame }) => {
+  const [pending, setPending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const handleApply = async () => {
+    if (disabled || pending) return;
+
+    setPending(true);
+    setActionError(null);
+    try {
+      await runAndReportEditorAction('browser-frame-insert-update', insertOrUpdateBrowserFrame, {
+        fallbackMessage: translate('editor.compact.browserFrameApplyFailed'),
+        notify: false,
+      });
+    } catch {
+      setActionError(translate('editor.compact.browserFrameApplyFailed'));
+    } finally {
+      setPending(false);
     }
-  >
-    {translate('editor.compact.apply')}
-  </button>
-);
+  };
+
+  return (
+    <div className="space-y-2">
+      {actionError ? (
+        <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
+          {actionError}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
+        disabled={disabled || pending}
+        aria-busy={pending}
+        onClick={() => void handleApply()}
+      >
+        {pending ? translate('common.states.loading') : translate('editor.compact.apply')}
+      </button>
+    </div>
+  );
+};
