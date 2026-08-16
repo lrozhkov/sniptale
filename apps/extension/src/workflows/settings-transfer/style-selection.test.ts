@@ -11,6 +11,21 @@ import { buildSettingsTransferPackage } from './package';
 import { buildSettingsTransferTree } from './tree';
 
 describe('settings transfer style selection', () => {
+  it('keeps a complete surface catalog valid during commit revalidation', () => {
+    const domains = {
+      'styles.surfaces': {
+        schemaVersion: 1,
+        data: cloneSettingsTransferJsonValue(
+          serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog())
+        ),
+      },
+    };
+
+    const inspected = parseSettingsTransferDomains(domains);
+    expect(() => parseSettingsTransferDomains(inspected)).not.toThrow();
+    expect(parseSettingsTransferDomains(inspected)).toEqual(inspected);
+  });
+
   it('exports one selected surface style instead of the whole collection', () => {
     const stored = serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog());
     const [first, second] = stored.presets;

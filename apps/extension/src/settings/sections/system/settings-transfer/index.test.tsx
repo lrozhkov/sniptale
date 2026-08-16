@@ -78,7 +78,10 @@ it('loads the export catalog, supports selective choice, and downloads the packa
   expect(mocks.send).toHaveBeenCalledWith({ operation: 'read-export-tree' });
 
   await clickLabel('settings.settingsTransfer.selectivePackage');
+  expect(container.querySelector('input[type="radio"]')).toBeNull();
   expect(container.querySelector('[role="tree"]')).not.toBeNull();
+  await clickLabel('settings.settingsTransfer.clearAll');
+  await clickLabel('settings.settingsTransfer.selectAll');
   await clickLabel('settings.settingsTransfer.download');
   expect(mocks.send).toHaveBeenLastCalledWith(
     expect.objectContaining({ operation: 'build-export-package', exportKind: 'selective' })
@@ -96,26 +99,31 @@ it('previews an import, confirms exact restore, commits, and exposes the report 
   });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(container.textContent).toContain('settings.settingsTransfer.compatibleFile');
+  await clickLabel('settings.settingsTransfer.clearAll');
+  await clickLabel('settings.settingsTransfer.selectAll');
 
-  const strategy = container.querySelector('select') as HTMLSelectElement;
-  await act(async () => {
-    strategy.value = 'overwrite-matching';
-    strategy.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  expect((container.querySelectorAll('select')[1] as HTMLSelectElement).value).toBe('use-imported');
-  await act(async () => {
-    strategy.value = 'exact-restore';
-    strategy.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  expect(container.querySelector('select')).toBeNull();
+  await selectProductOption(
+    'settings.settingsTransfer.strategy',
+    'settings.settingsTransfer.overwrite'
+  );
+  expect(
+    document.querySelector<HTMLButtonElement>(
+      '[aria-label="settings.settingsTransfer.conflictDecisionLabel"]'
+    )?.textContent
+  ).toContain('settings.settingsTransfer.useImported');
+  await selectProductOption(
+    'settings.settingsTransfer.strategy',
+    'settings.settingsTransfer.exactRestore'
+  );
   const confirmation = [
     ...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
   ].at(-1)!;
   await act(async () => confirmation.click());
-  const conflictDecision = container.querySelectorAll('select')[1]!;
-  await act(async () => {
-    conflictDecision.value = 'keep-local';
-    conflictDecision.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await selectProductOption(
+    'settings.settingsTransfer.conflictDecisionLabel',
+    'settings.settingsTransfer.keepLocal'
+  );
   await clickLabel('settings.settingsTransfer.apply');
 
   expect(mocks.send).toHaveBeenLastCalledWith(
@@ -130,8 +138,28 @@ it('previews an import, confirms exact restore, commits, and exposes the report 
   expect(navigator.clipboard.writeText).toHaveBeenCalled();
   await clickLabel('settings.settingsTransfer.downloadReport');
   await clickLabel('settings.settingsTransfer.done');
-  expect(container.textContent).toContain('settings.settingsTransfer.importTitle');
+  expect(container.textContent).toContain('settings.settingsTransfer.importTab');
   expect(document.activeElement?.textContent?.trim()).toBe('settings.settingsTransfer.chooseFile');
+});
+
+it('hides a conflict question when its tree node is deselected and shows its name', async () => {
+  await renderSection();
+  await clickLabel('settings.settingsTransfer.importTab');
+  await selectFile();
+
+  expect(container.textContent).toContain('image');
+  expect(container.textContent).toContain('capture.image.format');
+  expect(
+    document.querySelector('[aria-label="settings.settingsTransfer.conflictDecisionLabel"]')
+  ).not.toBeNull();
+  const treeCheckboxes = container.querySelectorAll<HTMLInputElement>(
+    '[role="tree"] input[type="checkbox"]'
+  );
+  await act(async () => treeCheckboxes[1]?.click());
+
+  expect(
+    document.querySelector('[aria-label="settings.settingsTransfer.conflictDecisionLabel"]')
+  ).toBeNull();
 });
 
 it('recovers from a file error and surfaces stale review without committing', async () => {
@@ -259,7 +287,7 @@ it('blocks file and tab changes until a pending commit publishes its report', as
   expect(input.disabled).toBe(true);
   expect(exportTab.disabled).toBe(true);
   await act(async () => exportTab.click());
-  expect(container.textContent).toContain('settings.settingsTransfer.importTitle');
+  expect(container.textContent).toContain('settings.settingsTransfer.importTab');
 
   await act(async () => commit.resolve({ operation: 'commit-import', report: reportFixture() }));
   expect(container.textContent).toContain('settings.settingsTransfer.reportTitle');
@@ -282,6 +310,17 @@ async function clickLabel(label: string) {
   );
   if (!element) throw new Error(`Missing control: ${label}`);
   await act(async () => (element as HTMLElement).click());
+}
+
+async function selectProductOption(ariaLabel: string, optionLabel: string) {
+  const trigger = document.querySelector<HTMLButtonElement>(`button[aria-label="${ariaLabel}"]`);
+  if (!trigger) throw new Error(`Missing select: ${ariaLabel}`);
+  await act(async () => trigger.click());
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (candidate) => candidate.textContent?.includes(optionLabel)
+  );
+  if (!option) throw new Error(`Missing option: ${optionLabel}`);
+  await act(async () => option.click());
 }
 
 async function selectFile(file: File = new File(['{}'], 'a.json')) {
@@ -316,7 +355,20 @@ function transferTree() {
           classification: 'transferable' as const,
           selectable: true,
           requiredBy: [],
-          children: [],
+          children: [
+            {
+              id: 'capture.image.format',
+              parentId: 'capture.image',
+              domainId: 'capture.image',
+              labelKey: 'capture.image.format',
+              descriptionKey: 'capture.image.format',
+              kind: 'scalar' as const,
+              classification: 'transferable' as const,
+              selectable: true,
+              requiredBy: [],
+              children: [],
+            },
+          ],
         },
       ],
     },
@@ -339,13 +391,9 @@ function inspectionFixture() {
       {
         id: 'capture.image.format',
         nodeId: 'capture.image.format',
-        kind: 'item' as const,
-        allowedDecisions: [
-          'keep-local' as const,
-          'use-imported' as const,
-          'import-as-copy' as const,
-        ],
-        defaultDecision: 'import-as-copy' as const,
+        kind: 'scalar' as const,
+        allowedDecisions: ['keep-local' as const, 'use-imported' as const],
+        defaultDecision: 'use-imported' as const,
       },
     ],
     summary: {

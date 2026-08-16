@@ -1,7 +1,4 @@
-import type {
-  StepBadgePreset,
-  SystemStepBadgePresetKey,
-} from '@sniptale/runtime-contracts/highlighter/step-badge';
+import type { SystemStepBadgePresetKey } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import type { AppLocale } from '@sniptale/platform/i18n/config';
 import { translate } from '../../../platform/i18n';
 
@@ -13,8 +10,21 @@ const systemKeys: Record<SystemStepBadgePresetKey, Parameters<typeof translate>[
   'system-letters': 'highlighter.stepBadgePresets.system.letters',
 };
 
-export function getStepBadgePresetDisplayName(preset: StepBadgePreset, locale: AppLocale): string {
-  return preset.origin === 'system' && preset.customized !== true && preset.systemPresetKey
-    ? translate(systemKeys[preset.systemPresetKey], locale)
+export function getStepBadgePresetDisplayName(
+  preset: {
+    customized?: boolean | undefined;
+    id?: string;
+    name: string;
+    origin?: string | undefined;
+    systemPresetKey?: string | undefined;
+  },
+  locale?: AppLocale
+): string {
+  const key =
+    preset.systemPresetKey && preset.systemPresetKey in systemKeys
+      ? systemKeys[preset.systemPresetKey as SystemStepBadgePresetKey]
+      : undefined;
+  return preset.origin === 'system' && preset.customized !== true && key
+    ? translate(key, locale)
     : preset.name;
 }

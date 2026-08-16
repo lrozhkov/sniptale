@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { Gradient } from '@sniptale/foundation/paint';
-import { translate, useAppLocale, type AppLocale } from '../../platform/i18n';
+import { getGradientPresetDisplayName } from '../../features/highlighter/gradient-presets/display-name';
+import { translate, useAppLocale } from '../../platform/i18n';
 import {
   addGradientPreset,
   deleteGradientPreset,
@@ -22,20 +23,6 @@ const createPresetId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? `gradient-${crypto.randomUUID()}`
     : `gradient-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-function getSystemPresetName(id: string, locale: AppLocale): string {
-  if (id === 'system-sunset')
-    return translate('highlighter.paintPicker.systemPresets.sunset', locale);
-  if (id === 'system-ocean')
-    return translate('highlighter.paintPicker.systemPresets.ocean', locale);
-  if (id === 'system-aurora')
-    return translate('highlighter.paintPicker.systemPresets.aurora', locale);
-  if (id === 'system-radial-glow')
-    return translate('highlighter.paintPicker.systemPresets.radialGlow', locale);
-  if (id === 'system-conic-spectrum')
-    return translate('highlighter.paintPicker.systemPresets.spectrum', locale);
-  return id;
-}
 
 export function useGradientPresetCatalog(surface: GradientPresetSurface) {
   const locale = useAppLocale();
@@ -84,10 +71,7 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
     () => ({
       presets: (catalog?.presets ?? []).map((preset) => ({
         ...preset,
-        name:
-          preset.origin === 'system' && preset.name === preset.id
-            ? getSystemPresetName(preset.id, locale)
-            : preset.name,
+        name: getGradientPresetDisplayName(preset, locale),
         favorite: catalog?.favoriteIdsBySurface[surface]?.includes(preset.id) ?? false,
         isDefault: catalog?.defaultPresetIdBySurface[surface] === preset.id,
       })),

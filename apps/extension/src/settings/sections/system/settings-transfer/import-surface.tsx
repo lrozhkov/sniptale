@@ -1,5 +1,6 @@
 import { useMemo, useState, type RefObject } from 'react';
 import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type {
   SettingsTransferCommitReport,
   SettingsTransferConflictDecision,
@@ -10,6 +11,7 @@ import type {
 import { translate } from '../../../../platform/i18n';
 import { settingsAddButtonClassName, settingsPanelClassName } from '../../../section-surface';
 import { SettingsTransferTree } from './tree';
+import { buildVisibleSettingsTransferConflicts } from './conflict-view';
 import { downloadSettingsTransferText } from './ui-helpers';
 
 export function ImportFilePicker(props: {
@@ -62,6 +64,7 @@ type ImportReviewProps = {
   confirmed: boolean;
   busy: boolean;
   onToggle: (node: SettingsTransferTreeNode, checked: boolean) => void;
+  onBulkToggle: (nodes: readonly SettingsTransferTreeNode[], checked: boolean) => void;
   onStrategyChange: (strategy: SettingsTransferStrategy) => void;
   onDecisionChange: (id: string, decision: SettingsTransferConflictDecision) => void;
   onConfirmedChange: (confirmed: boolean) => void;
@@ -77,6 +80,7 @@ export function ImportReview(props: ImportReviewProps) {
         nodes={props.inspection.tree}
         selected={props.selected}
         onToggle={props.onToggle}
+        onBulkToggle={props.onBulkToggle}
       />
       <ImportStrategy
         inspection={props.inspection}
@@ -85,12 +89,14 @@ export function ImportReview(props: ImportReviewProps) {
       />
       <ImportConflictTable
         inspection={props.inspection}
+        selected={props.selected}
         decisions={props.decisions}
         onChange={props.onDecisionChange}
       />
       {props.strategy === 'exact-restore' ? (
         <label className="flex items-start gap-2 text-sm">
           <input
+            className="sniptale-checkbox"
             type="checkbox"
             checked={props.confirmed}
             onChange={(event) => props.onConfirmedChange(event.currentTarget.checked)}
@@ -116,34 +122,42 @@ function ImportStrategy(props: {
   strategy: SettingsTransferStrategy;
   onChange: (strategy: SettingsTransferStrategy) => void;
 }) {
+  const options = [
+    { value: 'safe-merge', label: translate('settings.settingsTransfer.safeMerge') },
+    { value: 'overwrite-matching', label: translate('settings.settingsTransfer.overwrite') },
+    {
+      value: 'exact-restore',
+      label: translate('settings.settingsTransfer.exactRestore'),
+      disabled: !props.inspection.exactRestoreAvailable,
+    },
+  ] satisfies Array<{ value: SettingsTransferStrategy; label: string; disabled?: boolean }>;
   return (
-    <label className="block text-sm">
+    <div className="max-w-sm text-sm">
       <span className="mb-1 block font-medium">
         {translate('settings.settingsTransfer.strategy')}
       </span>
-      <select
-        className="w-full max-w-sm rounded-lg border bg-transparent p-2"
+      <ProductSelect<SettingsTransferStrategy>
+        aria-label={translate('settings.settingsTransfer.strategy')}
         value={props.strategy}
-        onChange={(event) => props.onChange(event.currentTarget.value as SettingsTransferStrategy)}
-      >
-        <option value="safe-merge">{translate('settings.settingsTransfer.safeMerge')}</option>
-        <option value="overwrite-matching">
-          {translate('settings.settingsTransfer.overwrite')}
-        </option>
-        <option value="exact-restore" disabled={!props.inspection.exactRestoreAvailable}>
-          {translate('settings.settingsTransfer.exactRestore')}
-        </option>
-      </select>
-    </label>
+        options={options}
+        onChange={props.onChange}
+      />
+    </div>
   );
 }
 
 function ImportConflictTable(props: {
   inspection: SettingsTransferInspection;
+  selected: ReadonlySet<string>;
   decisions: Record<string, SettingsTransferConflictDecision>;
   onChange: (id: string, decision: SettingsTransferConflictDecision) => void;
 }) {
-  if (props.inspection.conflicts.length === 0) return null;
+  const conflicts = buildVisibleSettingsTransferConflicts({
+    conflicts: props.inspection.conflicts,
+    selected: props.selected,
+    tree: props.inspection.tree,
+  });
+  if (conflicts.length === 0) return null;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -154,25 +168,28 @@ function ImportConflictTable(props: {
           </tr>
         </thead>
         <tbody>
-          {props.inspection.conflicts.map((conflict) => (
-            <tr key={conflict.id} className="border-t">
-              <td className="max-w-xs truncate py-2 pr-3">{conflict.nodeId}</td>
-              <td>
-                <select
-                  value={props.decisions[conflict.id]}
-                  onChange={(event) =>
-                    props.onChange(
-                      conflict.id,
-                      event.currentTarget.value as SettingsTransferConflictDecision
-                    )
-                  }
-                >
-                  {conflict.allowedDecisions.map((decision) => (
-                    <option key={decision} value={decision}>
-                      {translateConflictDecision(decision)}
-                    </option>
-                  ))}
-                </select>
+          {conflicts.map(({ conflict, label }) => (
+            <tr key={conflict.id} className="border-t border-[var(--sniptale-color-border-soft)]">
+              <td className="max-w-xs py-2 pr-3">
+                <span className="block truncate font-medium">{label}</span>
+                <span className="block truncate font-mono text-[10px] text-[var(--sniptale-color-text-dim)]">
+                  {conflict.nodeId}
+                </span>
+              </td>
+              <td className="w-64 py-2">
+                <ProductSelect<SettingsTransferConflictDecision>
+                  controlSize="sm"
+                  aria-label={translate('settings.settingsTransfer.conflictDecisionLabel').replace(
+                    '{name}',
+                    label
+                  )}
+                  value={props.decisions[conflict.id] ?? conflict.defaultDecision}
+                  options={conflict.allowedDecisions.map((decision) => ({
+                    value: decision,
+                    label: translateConflictDecision(decision),
+                  }))}
+                  onChange={(decision) => props.onChange(conflict.id, decision)}
+                />
               </td>
             </tr>
           ))}

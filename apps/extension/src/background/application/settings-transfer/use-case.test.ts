@@ -1,6 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { stringifySettingsTransferPackage } from '../../../contracts/settings-transfer';
+import {
+  cloneSettingsTransferJsonValue,
+  stringifySettingsTransferPackage,
+} from '../../../contracts/settings-transfer';
+import { createSurfaceStylePresetCatalog } from '../../../composition/persistence/surface-style-presets/catalog';
+import { serializeSurfaceStylePresetCatalog } from '../../../composition/persistence/surface-style-presets/parser';
 
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
@@ -88,6 +93,62 @@ it('inspects a backup and commits the reviewed selection', async () => {
     expect.objectContaining({
       domains: { 'capture.image': expect.any(Object) },
       permit: {},
+    })
+  );
+});
+
+it('commits a complete surface catalog after inspect and commit revalidation', async () => {
+  const stored = serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog());
+  const domains = {
+    'styles.surfaces': {
+      schemaVersion: 1 as const,
+      data: cloneSettingsTransferJsonValue(stored),
+    },
+  };
+  mocks.read.mockResolvedValue({
+    domains,
+    dynamicItems: [],
+    dependencies: {},
+    locale: 'ru',
+  });
+  const fileText = stringifySettingsTransferPackage({
+    format: 'sniptale-settings',
+    formatVersion: 1,
+    exportKind: 'selective',
+    exportedAt: '2026-08-16T12:00:00.000Z',
+    source: { appVersion: '1.0.0' },
+    domains,
+  });
+  const inspected = await executeSettingsTransferOperation({
+    type: MessageType.SETTINGS_TRANSFER,
+    operation: 'inspect-import',
+    fileText,
+  });
+  if (!('inspection' in inspected)) throw new Error('Expected import inspection');
+
+  await expect(
+    executeSettingsTransferOperation({
+      type: MessageType.SETTINGS_TRANSFER,
+      operation: 'commit-import',
+      fileText,
+      strategy: 'safe-merge',
+      selectedNodeIds: [],
+      decisions: {},
+      fingerprint: inspected.inspection.fingerprint,
+      destructiveConfirmed: false,
+    })
+  ).resolves.toMatchObject({ report: { status: 'committed' } });
+  expect(mocks.apply).toHaveBeenCalledWith(
+    expect.objectContaining({
+      domains: {
+        'styles.surfaces': {
+          schemaVersion: 1,
+          data: expect.objectContaining({
+            defaultPresetId: expect.any(String),
+            presets: expect.any(Array),
+          }),
+        },
+      },
     })
   );
 });
@@ -302,6 +363,7 @@ function snapshot(format: 'jpeg' | 'png' | 'webp', quality: number) {
     },
     dynamicItems: [],
     dependencies: {},
+    locale: 'en' as const,
   };
 }
 

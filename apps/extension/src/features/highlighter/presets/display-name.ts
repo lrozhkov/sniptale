@@ -1,6 +1,6 @@
 import type { AppLocale, TranslationKey } from '../../../platform/i18n';
 import { translate } from '../../../platform/i18n';
-import type { BorderPreset, SystemBorderPresetKey } from '../contracts';
+import type { SystemBorderPresetKey } from '../contracts';
 
 const systemPresetNameKeys: Record<SystemBorderPresetKey, TranslationKey> = {
   'system-default': 'highlighter.systemPresets.accent',
@@ -13,13 +13,22 @@ const systemPresetNameKeys: Record<SystemBorderPresetKey, TranslationKey> = {
   'system-dark-ui': 'highlighter.systemPresets.darkUi',
 };
 
-export function getBorderPresetDisplayName(preset: BorderPreset, locale?: AppLocale): string {
-  if (
-    preset.origin === 'system' &&
-    preset.systemPresetKey !== undefined &&
-    preset.customized !== true
-  ) {
-    return translate(systemPresetNameKeys[preset.systemPresetKey], locale);
+export function getBorderPresetDisplayName(
+  preset: {
+    customized?: boolean | undefined;
+    id?: string;
+    name: string;
+    origin?: string | undefined;
+    systemPresetKey?: string | undefined;
+  },
+  locale?: AppLocale
+): string {
+  const systemNameKey =
+    preset.systemPresetKey && preset.systemPresetKey in systemPresetNameKeys
+      ? systemPresetNameKeys[preset.systemPresetKey as SystemBorderPresetKey]
+      : undefined;
+  if (preset.origin === 'system' && systemNameKey !== undefined && preset.customized !== true) {
+    return translate(systemNameKey, locale);
   }
 
   return preset.name;

@@ -16,6 +16,10 @@ import { resolveLoadedHighlighterSettings } from '../../composition/persistence/
 import { resolveStoredStepBadgePresetCatalog } from '../../composition/persistence/step-badge-presets/migration';
 import { parseStoredStepBadgePresetCatalog } from '../../composition/persistence/step-badge-presets/parser';
 import { parseStoredSurfaceStylePresetState } from '../../composition/persistence/surface-style-presets/parser';
+import {
+  SURFACE_STYLE_PRESET_SCHEMA_VERSION,
+  SURFACE_STYLE_PRESET_SURFACE,
+} from '../../composition/persistence/surface-style-presets/contracts';
 import { parseSurfaceStyle } from '../../features/highlighter/surface-style/style';
 import { failSettingsTransferDomain } from './domain-error';
 
@@ -69,7 +73,7 @@ export function parseSettingsTransferStyleDomain(
       return json(parsed.catalog);
     }
     case 'styles.surfaces': {
-      const parsed = parseStoredSurfaceStylePresetState(value);
+      const parsed = parseStoredSurfaceStylePresetState(normalizeSurfaceCatalogForParsing(value));
       if (!parsed.stored || parsed.catalog.unsafeForWrite) {
         return json({ presets: parsePartialSurfacePresets(domainId, value['presets']) });
       }
@@ -77,6 +81,24 @@ export function parseSettingsTransferStyleDomain(
     }
   }
   return failSettingsTransferDomain(domainId);
+}
+
+function normalizeSurfaceCatalogForParsing(value: Record<string, unknown>): unknown {
+  if (!('defaultPresetId' in value) && !('favoriteIds' in value) && !('unsafeForWrite' in value)) {
+    return value;
+  }
+  return {
+    catalogRevision: value['catalogRevision'],
+    defaultPresetIdBySurface: {
+      [SURFACE_STYLE_PRESET_SURFACE]: value['defaultPresetId'],
+    },
+    favoriteIdsBySurface: {
+      [SURFACE_STYLE_PRESET_SURFACE]: value['favoriteIds'],
+    },
+    presets: value['presets'],
+    schemaVersion: SURFACE_STYLE_PRESET_SCHEMA_VERSION,
+    systemCatalogRevision: value['systemCatalogRevision'],
+  };
 }
 
 function parsePartialSurfacePresets(domainId: string, value: unknown) {

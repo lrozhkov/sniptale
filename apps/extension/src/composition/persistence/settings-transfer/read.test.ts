@@ -3,6 +3,10 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { resolveStoredCalloutPresetCatalog } from '../callout-presets/migration';
 import { resolveStoredStepBadgePresetCatalog } from '../step-badge-presets/migration';
 import { createSurfaceStylePresetCatalog } from '../surface-style-presets/catalog';
+import { parseSettingsTransferDomains } from '../../../workflows/settings-transfer';
+import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
+import { createDefaultEditorPresetStorageState } from '../editor-presets/defaults';
+import { createDefaultGradientPresetCatalog } from '../gradient-presets/defaults';
 
 const mocks = vi.hoisted(() => ({
   ai: vi.fn(),
@@ -94,17 +98,25 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.settings.mockResolvedValue(settingsFixture());
   mocks.quickActions.mockResolvedValue([
-    { id: 'quick-a', name: 'Quick', viewportPresetId: 'viewport-a' },
+    {
+      id: 'quick-a',
+      status: true,
+      name: 'Quick',
+      icon: 'Camera',
+      screenshotMode: 'visible',
+      exitAfterCapture: true,
+      viewportPresetId: 'viewport-a',
+    },
   ]);
   mocks.video.mockResolvedValue(structuredClone(DEFAULT_VIDEO_SETTINGS));
-  mocks.popup.mockResolvedValue({ page: 'capture' });
+  mocks.popup.mockResolvedValue({ selection: 'remember-last', lastPage: 'menu' });
   mocks.highlighter.mockResolvedValue({ borderPresets: [] });
   mocks.callouts.mockResolvedValue(resolveStoredCalloutPresetCatalog({}));
   mocks.stepBadges.mockResolvedValue(resolveStoredStepBadgePresetCatalog({}));
-  mocks.tags.mockResolvedValue({ tags: [] });
-  mocks.editor.mockResolvedValue({ step: { presets: [] }, sceneBackground: { presets: [] } });
+  mocks.tags.mockResolvedValue({ activeFilterTagIds: [], schemaVersion: 1, tags: [] });
+  mocks.editor.mockResolvedValue(createDefaultEditorPresetStorageState());
   mocks.palette.mockResolvedValue({ colors: Array.from({ length: 10 }, () => '#000000') });
-  mocks.gradients.mockResolvedValue({ presets: [] });
+  mocks.gradients.mockResolvedValue(createDefaultGradientPresetCatalog());
   mocks.surfaces.mockResolvedValue(createSurfaceStylePresetCatalog());
   mocks.ai.mockResolvedValue({
     providers: [
@@ -132,7 +144,7 @@ beforeEach(() => {
     globalSystemPrompt: 'Global',
     scenarioEditorSystemPrompt: 'Scenario',
   });
-  mocks.templates.mockResolvedValue([{ id: 'prompt-a', name: 'Prompt', prompt: 'Private' }]);
+  mocks.templates.mockResolvedValue([{ id: 'prompt-a', name: 'Prompt', content: 'Private' }]);
   mocks.templateOrder.mockResolvedValue(['prompt-a']);
   mocks.localGet.mockResolvedValue({
     'sniptale-theme-preference': 'dark',
@@ -160,22 +172,55 @@ it('reads every visible domain while removing secret and device-bound state', as
     expect.arrayContaining([
       expect.objectContaining({ id: 'quick-a' }),
       expect.objectContaining({ id: 'provider-a' }),
-      expect.objectContaining({ id: 'model-a' }),
+      expect.objectContaining({ id: 'model-a', label: 'Model' }),
       expect.objectContaining({ id: 'slot-0', collectionNodeId: 'styles.palettes.items' }),
     ])
   );
   expect(snapshot.dependencies['ai.models.default']).toEqual(['ai.models.items.model-a']);
 });
 
+it('uses the current Settings locale for system item display names', async () => {
+  mocks.localGet.mockResolvedValue({
+    'sniptale-theme-preference': 'dark',
+    'sniptale-locale-preference': 'ru',
+  });
+
+  const snapshot = await readSettingsTransferSnapshot();
+
+  expect(snapshot.locale).toBe('ru');
+  expect(snapshot.dynamicItems).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'system-surface-plain', label: 'Обычный' }),
+    ])
+  );
+});
+
+it('produces a complete snapshot that remains valid during commit revalidation', async () => {
+  const snapshot = await readSettingsTransferSnapshot();
+  const inspected = parseSettingsTransferDomains(snapshot.domains);
+
+  expect(parseSettingsTransferDomains(inspected)).toEqual(inspected);
+});
+
 it('collects dynamic annotation, editor, and default dependencies without dangling values', () => {
   const domains = {
+    'capture.video': {
+      schemaVersion: 1,
+      data: { profiles: [{ id: 'video-profile-a', name: 'Video profile' }] },
+    },
     'capture.saving': {
       schemaVersion: 1,
       data: { defaultImagePresetId: 'folder-a', templates: [{ id: 'folder-a' }] },
     },
     'capture.viewport-presets': {
       schemaVersion: 1,
-      data: { defaultId: 'viewport-a', items: [{ id: 'viewport-a' }] },
+      data: {
+        defaultId: 'viewport-a',
+        items: [
+          { id: 'viewport-a' },
+          { id: 'system-window-hd', kind: 'system', systemKey: 'windowHd' },
+        ],
+      },
     },
     'styles.borders': {
       schemaVersion: 1,
@@ -186,6 +231,13 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
             name: 'Border',
             tagIds: ['tag-a', 1],
             linkedTemplates: { calloutPresetId: 'callout-a', stepBadgePresetId: 'number-a' },
+          },
+          {
+            id: 'system-default',
+            name: 'system-default',
+            origin: 'system',
+            systemPresetKey: 'system-default',
+            customized: false,
           },
           null,
         ],
@@ -198,12 +250,62 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
         sceneBackground: { presets: [{ id: 'scene-a' }] },
       },
     },
+    'styles.callouts': {
+      schemaVersion: 1,
+      data: {
+        presets: [
+          {
+            id: 'system-callout-bubble',
+            name: 'system-callout-bubble',
+            origin: 'system',
+            systemPresetKey: 'system-callout-bubble',
+            customized: false,
+          },
+        ],
+      },
+    },
+    'styles.numbering': {
+      schemaVersion: 1,
+      data: {
+        presets: [
+          {
+            id: 'system-classic',
+            name: 'system-classic',
+            origin: 'system',
+            systemPresetKey: 'system-classic',
+            customized: false,
+          },
+        ],
+      },
+    },
+    'styles.surfaces': {
+      schemaVersion: 1,
+      data: {
+        presets: [
+          {
+            id: 'system-surface-plain',
+            name: 'surfaceStyle.system.plain',
+            origin: 'system',
+          },
+        ],
+      },
+    },
+    'styles.gradients': {
+      schemaVersion: 1,
+      data: {
+        presets: [{ id: 'system-sunset', name: 'system-sunset', origin: 'system' }],
+      },
+    },
+    'ai.models': {
+      schemaVersion: 1,
+      data: { items: [{ id: 'model-a', displayName: 'Readable model' }] },
+    },
   };
   expect(collectSettingsTransferDependencies(domains)).toMatchObject({
     'capture.saving.defaults': ['capture.saving.templates.folder-a'],
     'capture.viewport-presets.default': ['capture.viewport-presets.items.viewport-a'],
   });
-  expect(collectSettingsTransferDynamicItems(domains)).toEqual(
+  expect(collectSettingsTransferDynamicItems(domains, 'en')).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         id: 'border-a',
@@ -215,6 +317,17 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
       }),
       expect.objectContaining({ id: 'step:step-a' }),
       expect.objectContaining({ id: 'sceneBackground:scene-a' }),
+      expect.objectContaining({ id: 'model-a', label: 'Readable model' }),
+      expect.objectContaining({
+        id: 'video-profile-a',
+        collectionNodeId: 'capture.video.profiles',
+      }),
+      expect.objectContaining({ id: 'system-default', label: 'Accent' }),
+      expect.objectContaining({ id: 'system-surface-plain', label: 'Plain' }),
+      expect.objectContaining({ id: 'system-sunset', label: 'Sunset' }),
+      expect.objectContaining({ id: 'system-window-hd', label: 'HD window' }),
+      expect.objectContaining({ id: 'system-callout-bubble', label: 'Bubble' }),
+      expect.objectContaining({ id: 'system-classic', label: 'Classic' }),
     ])
   );
 });
@@ -224,7 +337,19 @@ function settingsFixture() {
     captureAction: 'download_default',
     contextMenu: { enabled: true },
     localStoragePolicy: { cleanupEnabled: true },
-    viewportPresets: [{ id: 'viewport-a', name: 'Desktop' }],
+    viewportPresets: [
+      ...createSystemViewportPresetCatalog(),
+      {
+        kind: 'user',
+        id: 'viewport-a',
+        name: 'Desktop',
+        target: 'window',
+        width: 1280,
+        height: 720,
+        enabled: true,
+        order: 4,
+      },
+    ],
     defaultViewportPresetId: 'viewport-a',
     presets: [],
     defaultImagePresetId: null,

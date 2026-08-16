@@ -95,6 +95,57 @@ describe('settings transfer planner', () => {
     });
   });
 
+  it('keeps delimiter-bearing item decisions bound to their exact conflict', () => {
+    const plan = planSettingsTransfer({
+      current: {
+        'ai.prompt-templates': {
+          schemaVersion: 1,
+          data: {
+            items: [
+              { id: 'x', content: 'local-x' },
+              { id: 'a.x', content: 'local-dotted' },
+            ],
+            order: ['x', 'a.x'],
+          },
+        },
+      },
+      imported: {
+        'ai.prompt-templates': {
+          schemaVersion: 1,
+          data: {
+            items: [
+              { id: 'x', content: 'imported-x' },
+              { id: 'a.x', content: 'imported-dotted' },
+            ],
+            order: ['x', 'a.x'],
+          },
+        },
+      },
+      strategy: 'overwrite-matching',
+      decisions: {
+        'ai.prompt-templates.items.x': 'use-imported',
+        'ai.prompt-templates.items.a.x': 'keep-local',
+      },
+    });
+
+    expect(plan.conflicts.map(({ id, nodeId }) => ({ id, nodeId }))).toEqual([
+      {
+        id: 'ai.prompt-templates.items.x',
+        nodeId: 'ai.prompt-templates.items.x',
+      },
+      {
+        id: 'ai.prompt-templates.items.a.x',
+        nodeId: 'ai.prompt-templates.items.a.x',
+      },
+    ]);
+    expect(plan.domains['ai.prompt-templates']?.data).toMatchObject({
+      items: [
+        { id: 'x', content: 'imported-x' },
+        { id: 'a.x', content: 'local-dotted' },
+      ],
+    });
+  });
+
   it('exact restore replaces a selected domain exactly', () => {
     const plan = planSettingsTransfer({
       current: { 'capture.image': { schemaVersion: 1, data: { format: 'png', quality: 100 } } },

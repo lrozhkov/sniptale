@@ -1,8 +1,5 @@
 import type { AppLocale } from '@sniptale/platform/i18n/config';
-import type {
-  CalloutPreset,
-  SystemCalloutPresetKey,
-} from '@sniptale/runtime-contracts/highlighter/callout';
+import type { SystemCalloutPresetKey } from '@sniptale/runtime-contracts/highlighter/callout';
 import { translate } from '../../../platform/i18n';
 
 const SYSTEM_NAME_KEYS: Record<SystemCalloutPresetKey, Parameters<typeof translate>[0]> = {
@@ -14,13 +11,22 @@ const SYSTEM_NAME_KEYS: Record<SystemCalloutPresetKey, Parameters<typeof transla
   'system-callout-framed-note': 'highlighter.calloutPresets.system.framedNote',
 };
 
-export function getCalloutPresetDisplayName(preset: CalloutPreset, locale?: AppLocale): string {
-  if (
-    preset.origin === 'system' &&
-    preset.systemPresetKey !== undefined &&
-    preset.customized !== true
-  ) {
-    return translate(SYSTEM_NAME_KEYS[preset.systemPresetKey], locale);
+export function getCalloutPresetDisplayName(
+  preset: {
+    customized?: boolean | undefined;
+    id?: string;
+    name: string;
+    origin?: string | undefined;
+    systemPresetKey?: string | undefined;
+  },
+  locale?: AppLocale
+): string {
+  const key =
+    preset.systemPresetKey && preset.systemPresetKey in SYSTEM_NAME_KEYS
+      ? SYSTEM_NAME_KEYS[preset.systemPresetKey as SystemCalloutPresetKey]
+      : undefined;
+  if (preset.origin === 'system' && key !== undefined && preset.customized !== true) {
+    return translate(key, locale);
   }
   return preset.name;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { SettingsTransferTreeNode } from '../../../../contracts/settings-transfer';
 import { translate } from '../../../../platform/i18n';
 import { settingsAddButtonClassName, settingsPanelClassName } from '../../../section-surface';
@@ -7,6 +8,7 @@ import { SettingsTransferTree } from './tree';
 import {
   downloadSettingsTransferText,
   flattenTransferTree,
+  toggleTransferTreeNodesSelection,
   toggleTransferTreeSelection,
 } from './ui-helpers';
 
@@ -28,6 +30,9 @@ export function SettingsTransferExportFlow() {
   const toggle = (node: SettingsTransferTreeNode, checked: boolean) => {
     setSelected((current) => toggleTransferTreeSelection(current, node, checked, tree));
   };
+  const bulkToggle = (nodes: readonly SettingsTransferTreeNode[], checked: boolean) => {
+    setSelected((current) => toggleTransferTreeNodesSelection(current, nodes, checked, tree));
+  };
   const exportSettings = async () => {
     if (busy) return;
     setBusy(true);
@@ -47,31 +52,34 @@ export function SettingsTransferExportFlow() {
   };
   return (
     <section className={settingsPanelClassName}>
-      <h2 className="text-base font-semibold">
-        {translate('settings.settingsTransfer.exportTitle')}
-      </h2>
-      <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
+      <p className="text-sm text-[var(--sniptale-color-text-muted)]">
         {translate('settings.settingsTransfer.exportDescription')}
       </p>
-      <div className="my-4 flex flex-wrap gap-4">
-        {(['backup', 'selective'] as const).map((value) => (
-          <label key={value} className="flex items-center gap-2 text-sm">
-            <input type="radio" checked={kind === value} onChange={() => setKind(value)} />
-            {translate(
-              value === 'backup'
-                ? 'settings.settingsTransfer.completeBackup'
-                : 'settings.settingsTransfer.selectivePackage'
-            )}
-          </label>
-        ))}
+      <div className="my-4 max-w-md">
+        <SegmentedSwitch
+          activeId={kind}
+          ariaLabel={translate('settings.settingsTransfer.exportKindLabel')}
+          options={[
+            {
+              id: 'backup',
+              label: translate('settings.settingsTransfer.completeBackup'),
+            },
+            {
+              id: 'selective',
+              label: translate('settings.settingsTransfer.selectivePackage'),
+            },
+          ]}
+          onChange={setKind}
+        />
       </div>
       {kind === 'selective' ? (
-        <SettingsTransferTree nodes={tree} selected={selected} onToggle={toggle} />
+        <SettingsTransferTree
+          nodes={tree}
+          selected={selected}
+          onToggle={toggle}
+          onBulkToggle={bulkToggle}
+        />
       ) : null}
-      <details className="my-4 text-sm text-[var(--sniptale-color-text-muted)]">
-        <summary>{translate('settings.settingsTransfer.disclosureTitle')}</summary>
-        <p className="mt-2">{translate('settings.settingsTransfer.disclosureCopy')}</p>
-      </details>
       {error ? (
         <p role="alert" className="mb-3 text-sm text-[var(--sniptale-color-danger)]">
           {error}

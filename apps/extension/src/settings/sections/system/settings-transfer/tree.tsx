@@ -1,144 +1,129 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SettingsTransferTreeNode } from '../../../../contracts/settings-transfer';
-import type { TranslationKey } from '../../../../platform/i18n';
 import { translate } from '../../../../platform/i18n';
-
-const requiredBadgeClassName =
-  'rounded-full bg-[var(--sniptale-color-accent-soft)] px-2 py-0.5 text-[10px] ' +
-  'text-[var(--sniptale-color-accent)]';
+import {
+  filterTransferTree,
+  flattenTransferTreeNodes,
+  flattenVisibleTransferTreeNodes,
+} from './tree-model';
+import { SettingsTransferTreeNodeItem } from './tree-node';
+import { useSettingsTransferTreeNavigation } from './tree-navigation';
+import { SettingsTransferTreeToolbar } from './tree-toolbar';
 
 export function SettingsTransferTree(props: {
   nodes: readonly SettingsTransferTreeNode[];
   selected: ReadonlySet<string>;
   onToggle: (node: SettingsTransferTreeNode, checked: boolean) => void;
+  onBulkToggle: (nodes: readonly SettingsTransferTreeNode[], checked: boolean) => void;
 }) {
-  const flatNodes = useMemo(() => flatten(props.nodes), [props.nodes]);
-  const [activeId, setActiveId] = useState(() => flatNodes[0]?.id ?? '');
-  const treeItemRefs = useRef(new Map<string, HTMLLIElement>());
-  const checkboxRefs = useRef(new Map<string, HTMLInputElement>());
-  useEffect(() => {
-    if (!flatNodes.some((node) => node.id === activeId)) setActiveId(flatNodes[0]?.id ?? '');
-  }, [activeId, flatNodes]);
-  const focusNode = (id: string) => {
-    setActiveId(id);
-    treeItemRefs.current.get(id)?.focus();
-  };
-  const handleKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
-    const currentIndex = flatNodes.findIndex((node) => node.id === activeId);
-    if (currentIndex < 0) return;
-    const current = flatNodes[currentIndex];
-    let targetId: string | undefined;
-    if (event.key === 'ArrowDown') targetId = flatNodes[currentIndex + 1]?.id;
-    if (event.key === 'ArrowUp') targetId = flatNodes[currentIndex - 1]?.id;
-    if (event.key === 'Home') targetId = flatNodes[0]?.id;
-    if (event.key === 'End') targetId = flatNodes.at(-1)?.id;
-    if (event.key === 'ArrowRight') targetId = current?.children[0]?.id;
-    if (event.key === 'ArrowLeft') targetId = current?.parentId ?? undefined;
-    if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault();
-      checkboxRefs.current.get(activeId)?.click();
-      return;
-    }
-    if (!targetId) return;
-    event.preventDefault();
-    focusNode(targetId);
-  };
-  return (
-    <ul
-      role="tree"
-      aria-label={translate('settings.settingsTransfer.treeLabel')}
-      className="space-y-1"
-      onKeyDown={handleKeyDown}
-    >
-      {props.nodes.map((node) => (
-        <TreeNode
-          key={node.id}
-          {...props}
-          node={node}
-          level={1}
-          activeId={activeId}
-          onActivate={setActiveId}
-          registerTreeItem={(id, element) => {
-            if (element) treeItemRefs.current.set(id, element);
-            else treeItemRefs.current.delete(id);
-          }}
-          registerCheckbox={(id, element) => {
-            if (element) checkboxRefs.current.set(id, element);
-            else checkboxRefs.current.delete(id);
-          }}
-        />
-      ))}
-    </ul>
+  const allNodes = useMemo(() => flattenTransferTreeNodes(props.nodes), [props.nodes]);
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filtered = useMemo(
+    () => filterTransferTree(props.nodes, normalizedQuery),
+    [normalizedQuery, props.nodes]
   );
-}
-
-function TreeNode(props: {
-  node: SettingsTransferTreeNode;
-  level: number;
-  selected: ReadonlySet<string>;
-  onToggle: (node: SettingsTransferTreeNode, checked: boolean) => void;
-  nodes: readonly SettingsTransferTreeNode[];
-  activeId: string;
-  onActivate: (id: string) => void;
-  registerTreeItem: (id: string, element: HTMLLIElement | null) => void;
-  registerCheckbox: (id: string, element: HTMLInputElement | null) => void;
-}) {
-  const checkboxRef = useRef<HTMLInputElement>(null);
-  const descendants = flatten(props.node.children);
-  const checked = props.selected.has(props.node.id);
-  const selectedDescendants = descendants.filter((node) => props.selected.has(node.id)).length;
-  const indeterminate = !checked && selectedDescendants > 0;
-  useEffect(() => {
-    if (checkboxRef.current) checkboxRef.current.indeterminate = indeterminate;
-  }, [indeterminate]);
-  const isDynamicItem = props.node.kind === 'item';
-  const label = isDynamicItem
-    ? props.node.labelKey
-    : translate(props.node.labelKey as TranslationKey);
-  return (
-    <li
-      ref={(element) => props.registerTreeItem(props.node.id, element)}
-      role="treeitem"
-      aria-level={props.level}
-      aria-checked={indeterminate ? 'mixed' : checked}
-      aria-expanded={props.node.children.length > 0 ? true : undefined}
-      tabIndex={props.activeId === props.node.id ? 0 : -1}
-      onFocus={(event) => {
-        if (event.currentTarget === event.target) props.onActivate(props.node.id);
-      }}
-      className="outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]"
-    >
-      <label className="flex min-h-9 items-center gap-2 rounded-lg px-2 hover:bg-[var(--sniptale-color-surface-hover)]">
-        <input
-          ref={(element) => {
-            checkboxRef.current = element;
-            props.registerCheckbox(props.node.id, element);
-          }}
-          type="checkbox"
-          checked={checked}
-          tabIndex={-1}
-          onChange={(event) => props.onToggle(props.node, event.currentTarget.checked)}
-        />
-        <span className="min-w-0 flex-1 truncate text-sm text-[var(--sniptale-color-text-primary)]">
-          {label}
-        </span>
-        {props.node.requiredBy.length > 0 ? (
-          <span className={requiredBadgeClassName}>
-            {translate('settings.settingsTransfer.required')}
-          </span>
-        ) : null}
-      </label>
-      {props.node.children.length > 0 ? (
-        <ul role="group" className="ml-5 border-l border-[var(--sniptale-color-border-soft)] pl-2">
-          {props.node.children.map((child) => (
-            <TreeNode key={child.id} {...props} node={child} level={props.level + 1} />
-          ))}
-        </ul>
-      ) : null}
-    </li>
+  const expandableIds = useMemo(
+    () => new Set(allNodes.filter((node) => node.children.length > 0).map((node) => node.id)),
+    [allNodes]
   );
-}
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(expandableIds));
+  useEffect(() => {
+    setExpandedIds(new Set(expandableIds));
+  }, [expandableIds]);
+  useEffect(() => {
+    if (!normalizedQuery) return;
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      for (const node of flattenTransferTreeNodes(filtered.nodes)) {
+        if (node.children.length > 0) next.add(node.id);
+      }
+      return next;
+    });
+  }, [filtered.nodes, normalizedQuery]);
 
-function flatten(nodes: readonly SettingsTransferTreeNode[]): SettingsTransferTreeNode[] {
-  return nodes.flatMap((node) => [node, ...flatten(node.children)]);
+  const visibleNodes = useMemo(
+    () => flattenVisibleTransferTreeNodes(filtered.nodes, expandedIds),
+    [expandedIds, filtered.nodes]
+  );
+  const bulkNodes = normalizedQuery
+    ? allNodes.filter((node) => filtered.matchedIds.has(node.id))
+    : props.nodes;
+  const scopeNodes = normalizedQuery ? bulkNodes : allNodes;
+  const isScopeSelected =
+    scopeNodes.length > 0 && scopeNodes.every((node) => props.selected.has(node.id));
+  const visibleExpandableIds = flattenTransferTreeNodes(filtered.nodes)
+    .filter((node) => node.children.length > 0)
+    .map((node) => node.id);
+  const isVisibleTreeExpanded =
+    visibleExpandableIds.length > 0 && visibleExpandableIds.every((id) => expandedIds.has(id));
+  const toggleExpanded = (id: string, expanded?: boolean) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      const nextExpanded = expanded ?? !next.has(id);
+      if (nextExpanded) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+  const navigation = useSettingsTransferTreeNavigation({
+    visibleNodes,
+    expandedIds,
+    onToggleExpanded: toggleExpanded,
+  });
+  const toggleVisibleExpansion = () => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      for (const id of visibleExpandableIds) {
+        if (isVisibleTreeExpanded) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]">
+      <SettingsTransferTreeToolbar
+        query={query}
+        matchCount={filtered.matchedIds.size}
+        expandableCount={visibleExpandableIds.length}
+        scopeCount={scopeNodes.length}
+        scopeSelected={isScopeSelected}
+        expanded={isVisibleTreeExpanded}
+        onQueryChange={setQuery}
+        onToggleExpansion={toggleVisibleExpansion}
+        onToggleScope={() => props.onBulkToggle(bulkNodes, !isScopeSelected)}
+      />
+      <div className="max-h-[min(52vh,32rem)] overflow-y-auto overscroll-contain p-2.5">
+        {filtered.nodes.length > 0 ? (
+          <ul
+            role="tree"
+            aria-label={translate('settings.settingsTransfer.treeLabel')}
+            className="space-y-1"
+            onKeyDown={navigation.handleKeyDown}
+          >
+            {filtered.nodes.map((node) => (
+              <SettingsTransferTreeNodeItem
+                key={node.id}
+                {...props}
+                node={node}
+                level={1}
+                activeId={navigation.activeId}
+                expandedIds={expandedIds}
+                onActivate={navigation.onActivate}
+                onToggleExpanded={toggleExpanded}
+                registerTreeItem={navigation.registerTreeItem}
+                registerCheckbox={navigation.registerCheckbox}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--sniptale-color-text-muted)]">
+            {translate('settings.settingsTransfer.noSearchResults')}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }

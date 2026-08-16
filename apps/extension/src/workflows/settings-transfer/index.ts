@@ -3,6 +3,7 @@ export * from './fingerprint';
 export * from './backup';
 export * from './domain-parser';
 export * from './package';
+export * from './node-projection';
 export * from './planner';
 export * from './selection';
 export * from './tree';

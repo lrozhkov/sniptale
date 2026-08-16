@@ -62,7 +62,7 @@ async function inspectSettingsTransfer(fileText: string): Promise<SettingsTransf
   const current = await readSettingsTransferSnapshot();
   const currentDomains = parseSettingsTransferDomains(current.domains);
   const tree = buildSettingsTransferTree(
-    collectSettingsTransferDynamicItems(imported),
+    collectSettingsTransferDynamicItems(imported, current.locale),
     collectSettingsTransferDependencies(imported)
   );
   const plan = planSettingsTransfer({
@@ -107,7 +107,7 @@ async function commitSettingsTransfer(
     const currentFingerprint = await fingerprintSettingsTransferDomains(currentDomains);
     if (currentFingerprint !== message.fingerprint) throw new SettingsTransferStalePlanError();
     const tree = buildSettingsTransferTree(
-      collectSettingsTransferDynamicItems(imported),
+      collectSettingsTransferDynamicItems(imported, current.locale),
       collectSettingsTransferDependencies(imported)
     );
     const allIds = tree.flatMap(flattenTreeIds);

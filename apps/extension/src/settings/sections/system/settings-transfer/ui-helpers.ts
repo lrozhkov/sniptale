@@ -23,6 +23,17 @@ export function toggleTransferTreeSelection(
   return new Set(closeSettingsTransferSelection([...next], tree));
 }
 
+export function toggleTransferTreeNodesSelection(
+  current: ReadonlySet<string>,
+  nodes: readonly SettingsTransferTreeNode[],
+  checked: boolean,
+  tree: readonly SettingsTransferTreeNode[]
+): Set<string> {
+  let next = new Set(current);
+  for (const node of nodes) next = toggleTransferTreeSelection(next, node, checked, tree);
+  return next;
+}
+
 export function downloadSettingsTransferText(filename: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }));
   const anchor = document.createElement('a');

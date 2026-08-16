@@ -11,7 +11,11 @@ import { translate } from '../../../../platform/i18n';
 import { settingsPanelClassName, useSettingsNavigationLock } from '../../../section-surface';
 import { sendSettingsTransferOperation } from './client';
 import { ImportFilePicker, ImportReport, ImportReview } from './import-surface';
-import { flattenTransferTree, toggleTransferTreeSelection } from './ui-helpers';
+import {
+  flattenTransferTree,
+  toggleTransferTreeNodesSelection,
+  toggleTransferTreeSelection,
+} from './ui-helpers';
 
 export function SettingsTransferImportFlow() {
   const { setLocked: setNavigationLocked } = useSettingsNavigationLock();
@@ -98,6 +102,10 @@ export function SettingsTransferImportFlow() {
     setSelected((current) =>
       toggleTransferTreeSelection(current, node, checked, inspection?.tree ?? [])
     );
+  const bulkToggle = (nodes: readonly SettingsTransferTreeNode[], checked: boolean) =>
+    setSelected((current) =>
+      toggleTransferTreeNodesSelection(current, nodes, checked, inspection?.tree ?? [])
+    );
   if (report) {
     return (
       <ImportReport
@@ -113,9 +121,6 @@ export function SettingsTransferImportFlow() {
   }
   return (
     <section className={settingsPanelClassName}>
-      <h2 className="text-base font-semibold">
-        {translate('settings.settingsTransfer.importTitle')}
-      </h2>
       <ImportFilePicker
         inputRef={inputRef}
         buttonRef={pickerButtonRef}
@@ -131,6 +136,7 @@ export function SettingsTransferImportFlow() {
           confirmed={confirmed}
           busy={busy}
           onToggle={toggle}
+          onBulkToggle={bulkToggle}
           onStrategyChange={(next) => {
             setStrategy(next);
             setDecisions(defaultConflictDecisions(inspection, next));

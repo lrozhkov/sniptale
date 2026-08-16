@@ -7,6 +7,7 @@ import type {
   SettingsTransferJsonValue,
   SettingsTransferStrategy,
 } from '../../contracts/settings-transfer';
+import { projectSettingsTransferConflictNodeId } from './node-projection';
 
 export interface SettingsTransferPlan {
   domains: Record<string, SettingsTransferDomainPayload>;
@@ -177,7 +178,7 @@ function registerConflict(
   const defaultDecision = defaultConflictDecision(args.strategy, kind);
   args.conflicts.push({
     id: args.path,
-    nodeId: args.path,
+    nodeId: projectSettingsTransferConflictNodeId(args.path, kind),
     kind,
     allowedDecisions,
     defaultDecision,

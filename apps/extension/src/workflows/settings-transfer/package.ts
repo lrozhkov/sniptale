@@ -8,6 +8,7 @@ import {
   type SettingsTransferTreeNode,
 } from '../../contracts/settings-transfer';
 import { closeSettingsTransferSelection, flattenSettingsTransferTree } from './selection';
+import { normalizeSettingsTransferRegistryField } from './node-projection';
 
 export function buildSettingsTransferPackage(args: {
   appVersion: string;
@@ -61,7 +62,7 @@ function selectDomainPayload(
   const data: Record<string, SettingsTransferDomainPayload['data']> = {};
   for (const [field, value] of Object.entries(payload.data)) {
     if (domainId === 'ai.prompt-templates' && field === 'order') continue;
-    const normalizedField = normalizeRegistryField(domainId, field);
+    const normalizedField = normalizeSettingsTransferRegistryField(domainId, field);
     const fieldId = `${domainId}.${normalizedField}`;
     if (!selected.has(fieldId)) continue;
     if (!Array.isArray(value)) {
@@ -234,7 +235,7 @@ function overlayExactArray(
 function exactSelectionFieldId(domainId: string, path: readonly string[]): string {
   if (domainId === 'styles.tool-presets') return 'styles.tool-presets.items';
   const field = path[0] ?? '';
-  return `${domainId}.${normalizeRegistryField(domainId, field)}`;
+  return `${domainId}.${normalizeSettingsTransferRegistryField(domainId, field)}`;
 }
 
 function isJsonRecord(
@@ -247,29 +248,4 @@ function isJsonRecordWithId(
   value: SettingsTransferDomainPayload['data']
 ): value is Record<string, SettingsTransferDomainPayload['data']> & { id: string } {
   return isJsonRecord(value) && typeof value['id'] === 'string';
-}
-
-function normalizeRegistryField(domainId: string, field: string): string {
-  if (['borderPresets', 'presets', 'profiles', 'tags', 'colors'].includes(field)) return 'items';
-  if (domainId === 'interface.preferences' && field === 'popupStartup') return 'popup-startup';
-  if (domainId === 'interface.preferences' && field === 'contextMenu') return 'context-menu';
-  if (domainId === 'capture.viewport-presets' && field === 'defaultId') return 'default';
-  if (domainId === 'capture.video' && field === 'qualityProfileId') return 'selection';
-  if (domainId === 'capture.video' && field === 'outputProfile') return 'output';
-  if (domainId === 'capture.after-capture' && field === 'action') return 'action';
-  if (domainId === 'capture.saving' && field.startsWith('default')) return 'defaults';
-  if (domainId === 'capture.retention' && field === 'policy') return 'policy';
-  if (
-    ['styles.borders', 'styles.callouts', 'styles.numbering'].includes(domainId) &&
-    field !== 'borderPresets' &&
-    field !== 'presets'
-  )
-    return 'defaults';
-  if (domainId === 'styles.tags' && field !== 'tags') return 'active-filter';
-  if (domainId === 'styles.tool-presets' && (field === 'step' || field === 'sceneBackground'))
-    return 'items';
-  if (domainId === 'ai.models' && field === 'defaultModelId') return 'default';
-  if (domainId === 'ai.prompt-templates' && field === 'order') return 'items';
-  if (domainId === 'styles.palettes' && field === 'slots') return 'items';
-  return field;
 }

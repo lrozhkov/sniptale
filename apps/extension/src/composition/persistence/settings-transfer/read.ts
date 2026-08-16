@@ -7,6 +7,14 @@ import {
   selectSettingsTransferModelMetadata,
 } from '../../../contracts/settings-transfer';
 import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer';
+import { getGradientPresetDisplayName } from '../../../features/highlighter/gradient-presets/display-name';
+import { getCalloutPresetDisplayName } from '../../../features/highlighter/callout-presets/display-name';
+import { getBorderPresetDisplayName } from '../../../features/highlighter/presets/display-name';
+import { getStepBadgePresetDisplayName } from '../../../features/highlighter/step-badge-presets/display-name';
+import { getSurfaceStylePresetDisplayName } from '../../../features/highlighter/surface-style/display-name';
+import { getEditorPresetDisplayName } from '../../../features/editor/presets/display';
+import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
+import type { AppLocale } from '../../../platform/i18n';
 import { loadAISettings } from '../ai-settings';
 import { loadAnnotationTemplateTagState } from '../annotation-template-tags';
 import { loadCalloutPresetCatalog } from '../callout-presets';
@@ -33,6 +41,7 @@ export interface SettingsTransferSnapshot {
   domains: Record<string, SettingsTransferDomainPayload>;
   dynamicItems: SettingsTransferDynamicItem[];
   dependencies: Record<string, string[]>;
+  locale: AppLocale;
 }
 
 export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSnapshot> {
@@ -144,10 +153,12 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
     }),
   };
 
+  const locale: AppLocale = preferences[LOCALE_STORAGE_KEY] === 'en' ? 'en' : 'ru';
   return {
     domains,
-    dynamicItems: collectSettingsTransferDynamicItems(domains),
+    dynamicItems: collectSettingsTransferDynamicItems(domains, locale),
     dependencies: collectSettingsTransferDependencies(domains),
+    locale,
   };
 }
 
@@ -182,30 +193,31 @@ function payload(value: unknown): SettingsTransferDomainPayload {
 }
 
 export function collectSettingsTransferDynamicItems(
-  domains: Record<string, SettingsTransferDomainPayload>
+  domains: Record<string, SettingsTransferDomainPayload>,
+  locale?: AppLocale
 ): SettingsTransferDynamicItem[] {
   const result: SettingsTransferDynamicItem[] = [];
-  addItems(result, domains, 'capture.quick-actions', 'items', (item) =>
+  addItems(result, domains, 'capture.quick-actions', 'items', locale, (item) =>
     typeof item['viewportPresetId'] === 'string'
       ? [`capture.viewport-presets.items.${item['viewportPresetId']}`]
       : []
   );
-  addItems(result, domains, 'capture.viewport-presets', 'items');
-  addItems(result, domains, 'capture.video', 'profiles');
-  addItems(result, domains, 'capture.saving', 'templates');
-  addItems(result, domains, 'styles.borders', 'borderPresets', annotationDependencies);
-  addItems(result, domains, 'styles.callouts', 'presets', annotationDependencies);
-  addItems(result, domains, 'styles.numbering', 'presets', annotationDependencies);
-  addItems(result, domains, 'styles.tags', 'tags');
-  addEditorPresetItems(result, domains);
+  addItems(result, domains, 'capture.viewport-presets', 'items', locale);
+  addItems(result, domains, 'capture.video', 'profiles', locale);
+  addItems(result, domains, 'capture.saving', 'templates', locale);
+  addItems(result, domains, 'styles.borders', 'borderPresets', locale, annotationDependencies);
+  addItems(result, domains, 'styles.callouts', 'presets', locale, annotationDependencies);
+  addItems(result, domains, 'styles.numbering', 'presets', locale, annotationDependencies);
+  addItems(result, domains, 'styles.tags', 'tags', locale);
+  addEditorPresetItems(result, domains, locale);
   addPaletteItems(result, domains);
-  addItems(result, domains, 'styles.surfaces', 'presets');
-  addItems(result, domains, 'styles.gradients', 'presets');
-  addItems(result, domains, 'ai.providers', 'items');
-  addItems(result, domains, 'ai.models', 'items', (item) =>
+  addItems(result, domains, 'styles.surfaces', 'presets', locale);
+  addItems(result, domains, 'styles.gradients', 'presets', locale);
+  addItems(result, domains, 'ai.providers', 'items', locale);
+  addItems(result, domains, 'ai.models', 'items', locale, (item) =>
     typeof item['providerId'] === 'string' ? [`ai.providers.items.${item['providerId']}`] : []
   );
-  addItems(result, domains, 'ai.prompt-templates', 'items');
+  addItems(result, domains, 'ai.prompt-templates', 'items', locale);
   return result;
 }
 
@@ -223,7 +235,8 @@ function addPaletteItems(
 
 function addEditorPresetItems(
   target: SettingsTransferDynamicItem[],
-  domains: Record<string, SettingsTransferDomainPayload>
+  domains: Record<string, SettingsTransferDomainPayload>,
+  locale?: AppLocale
 ): void {
   const data = asRecord(domains['styles.tool-presets']?.data);
   for (const family of ['step', 'sceneBackground'] as const) {
@@ -235,7 +248,13 @@ function addEditorPresetItems(
       target.push({
         collectionNodeId: 'styles.tool-presets.items',
         id: `${family}:${item['id']}`,
-        label: typeof item['name'] === 'string' ? item['name'] : item['id'],
+        label:
+          typeof item['name'] === 'string'
+            ? getEditorPresetDisplayName(
+                { name: item['name'], isSystemDefault: item['isSystemDefault'] === true },
+                locale
+              )
+            : item['id'],
       });
     }
   }
@@ -246,6 +265,7 @@ function addItems(
   domains: Record<string, SettingsTransferDomainPayload>,
   domainId: string,
   field: string,
+  locale?: AppLocale,
   dependencies: (item: Record<string, unknown>) => string[] = () => []
 ): void {
   const data = asRecord(domains[domainId]?.data);
@@ -256,19 +276,87 @@ function addItems(
     target.push({
       collectionNodeId: resolveCollectionNodeId(domainId, field),
       id: item['id'],
-      label: typeof item['name'] === 'string' ? item['name'] : item['id'],
+      label: getItemDisplayName(item, domainId, locale),
       dependencies: dependencies(item),
     });
   }
 }
 
-function resolveCollectionNodeId(domainId: string, field: string): string {
+function getItemDisplayName(
+  item: Record<string, unknown>,
+  domainId?: string,
+  locale?: AppLocale
+): string {
+  const namedPreset = getNamedPresetIdentity(item);
   if (
-    field === 'presets' ||
-    field === 'profiles' ||
-    field === 'borderPresets' ||
-    field === 'tags'
+    domainId === 'capture.viewport-presets' &&
+    typeof item['kind'] === 'string' &&
+    (typeof item['name'] === 'string' || typeof item['systemKey'] === 'string')
   ) {
+    return getViewportPresetDisplayName(
+      {
+        kind: item['kind'],
+        ...(typeof item['name'] === 'string' ? { name: item['name'] } : {}),
+        ...(typeof item['nameOverride'] === 'string' ? { nameOverride: item['nameOverride'] } : {}),
+        ...(typeof item['systemKey'] === 'string' ? { systemKey: item['systemKey'] } : {}),
+      },
+      locale
+    );
+  }
+  if (namedPreset && domainId === 'styles.borders') {
+    return getBorderPresetDisplayName(
+      {
+        ...namedPreset,
+        customized: item['customized'] === true,
+        ...(typeof item['systemPresetKey'] === 'string'
+          ? { systemPresetKey: item['systemPresetKey'] }
+          : {}),
+      },
+      locale
+    );
+  }
+  if (namedPreset && domainId === 'styles.surfaces') {
+    return getSurfaceStylePresetDisplayName(namedPreset, locale);
+  }
+  if (namedPreset && domainId === 'styles.gradients') {
+    return getGradientPresetDisplayName(namedPreset, locale);
+  }
+  if (namedPreset && domainId === 'styles.callouts') {
+    return getCalloutPresetDisplayName(getAnnotationPresetIdentity(item, namedPreset), locale);
+  }
+  if (namedPreset && domainId === 'styles.numbering') {
+    return getStepBadgePresetDisplayName(getAnnotationPresetIdentity(item, namedPreset), locale);
+  }
+  for (const key of ['name', 'displayName', 'title', 'label', 'nameOverride'] as const) {
+    const value = item[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return item['id'] as string;
+}
+
+function getAnnotationPresetIdentity(
+  item: Record<string, unknown>,
+  namedPreset: { id: string; name: string; origin: string }
+) {
+  return {
+    ...namedPreset,
+    customized: item['customized'] === true,
+    ...(typeof item['systemPresetKey'] === 'string'
+      ? { systemPresetKey: item['systemPresetKey'] }
+      : {}),
+  };
+}
+
+function getNamedPresetIdentity(item: Record<string, unknown>) {
+  return typeof item['id'] === 'string' &&
+    typeof item['name'] === 'string' &&
+    typeof item['origin'] === 'string'
+    ? { id: item['id'], name: item['name'], origin: item['origin'] }
+    : null;
+}
+
+function resolveCollectionNodeId(domainId: string, field: string): string {
+  if (field === 'presets' || field === 'borderPresets' || field === 'tags') {
     return `${domainId}.items`;
   }
   return `${domainId}.${field}`;
