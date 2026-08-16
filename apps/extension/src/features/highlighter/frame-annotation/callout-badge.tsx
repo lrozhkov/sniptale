@@ -14,6 +14,7 @@ function getFrameCalloutBadgeStyle(badge: CalloutBadgeSettings): CSSProperties {
     boxSizing: 'border-box',
     color: badge.textColor,
     display: 'inline-flex',
+    fieldSizing: 'content',
     flex: '0 0 auto',
     fontSize: badge.fontSize,
     fontWeight: badge.fontWeight,
@@ -47,7 +48,6 @@ export function FrameCalloutBadge(props: {
         data-ui="content.callout.badge"
         maxLength={64}
         readOnly={!props.isEditing}
-        size={Math.max(1, text.length)}
         style={{ ...getFrameCalloutBadgeStyle(props.badge), cursor: 'text' }}
         value={text}
         onChange={(event) => props.onTextChange?.(event.currentTarget.value)}

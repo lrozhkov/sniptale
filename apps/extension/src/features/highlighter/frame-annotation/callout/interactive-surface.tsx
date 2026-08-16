@@ -112,13 +112,17 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
   }, [props.settings]);
   React.useEffect(() => {
     if (!titleFocusRequested || !props.isEditing || !props.settings.style.title.enabled) return;
-    const input = wrapperRef.current?.querySelector<HTMLInputElement>(
-      '[data-sniptale-callout-title="true"]'
-    );
-    if (!input) return;
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-    setTitleFocusRequested(false);
+    const ownerWindow = wrapperRef.current?.ownerDocument.defaultView ?? window;
+    const focusFrameId = ownerWindow.requestAnimationFrame(() => {
+      const input = wrapperRef.current?.querySelector<HTMLInputElement>(
+        '[data-sniptale-callout-title="true"]'
+      );
+      if (!input || input.readOnly) return;
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(input.value.length, input.value.length);
+      setTitleFocusRequested(false);
+    });
+    return () => ownerWindow.cancelAnimationFrame(focusFrameId);
   }, [props.isEditing, props.settings.style.title.enabled, titleFocusRequested]);
   const coordinateSpace = props.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
   const visualScale = props.chrome === 'export' ? 1 : props.chromeScale;

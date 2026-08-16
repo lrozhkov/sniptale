@@ -22,8 +22,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('enables editing and moves the caret into a heading created from the H control', () => {
+it('enables editing and keeps the caret in a heading after the editor focus cycle', () => {
   const noop = vi.fn();
+  const animationFrames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  });
   function Harness() {
     const [settings, setSettings] = React.useState(() => createDefaultFrameCallout());
     const [isEditing, setIsEditing] = React.useState(false);
@@ -81,9 +86,15 @@ it('enables editing and moves the caret into a heading created from the H contro
   );
 
   const input = document.querySelector<HTMLInputElement>('[data-sniptale-callout-title="true"]');
+  const body = document.querySelector<HTMLElement>('[contenteditable="true"]');
   expect(input).not.toBeNull();
-  expect(document.activeElement).toBe(input);
   expect(input?.readOnly).toBe(false);
+  act(() => {
+    body?.focus();
+    animationFrames.splice(0).forEach((callback) => callback(performance.now()));
+  });
+  expect(document.activeElement).toBe(input);
+  expect(input?.selectionStart).toBe(input?.value.length);
 });
 
 it('starts editing while keeping the caret in a directly clicked badge', () => {
