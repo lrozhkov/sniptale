@@ -151,7 +151,7 @@ describe('CalloutPresetEditor', () => {
     await renderEditor(4);
     await openSection('content.callout.manualBackground');
     const surfaceSelector = document.querySelector<HTMLButtonElement>(
-      '[data-ui="shared.ui.surface-style-selector"] > button'
+      '[data-ui="shared.ui.surface-style-selector.trigger"]'
     );
     expect(surfaceSelector).not.toBeNull();
     await act(async () => surfaceSelector?.click());

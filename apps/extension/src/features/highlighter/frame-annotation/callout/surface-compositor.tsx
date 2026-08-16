@@ -632,10 +632,8 @@ function composeResolvedSurfaceShadows(
   resolvedBoxShadow: string
 ): ProjectedSurfaceShadow[] {
   const customShadows = parseResolvedCalloutBoxShadow(resolvedBoxShadow);
-  if (customShadows === null) return [];
-  return customShadows.length > 0 && customShadows.every((shadow) => shadow.inset)
-    ? [...nativeShadows, ...customShadows]
-    : customShadows;
+  if (customShadows === null) return nativeShadows;
+  return [...nativeShadows, ...customShadows];
 }
 
 function useResolvedSurfaceEffects(
@@ -673,7 +671,11 @@ function useResolvedSurfaceEffects(
     outline: customOutline && hasResolution ? resolved.outline : projection.outline,
     probeRef,
     shadows:
-      customBoxShadow === undefined ? projection.shadows : hasResolution ? resolved.shadows : [],
+      customBoxShadow === undefined
+        ? projection.shadows
+        : hasResolution
+          ? resolved.shadows
+          : projection.shadows,
   };
 }
 

@@ -334,7 +334,7 @@ it('keeps compact font sliders while accepting a larger manual title size', asyn
 it('offers a compact color-or-surface selector without frame color source cycling', async () => {
   await openSection('content.callout.manualBackground');
   const backgroundPicker = document.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.surface-style-selector"] > button'
+    '[data-ui="shared.ui.surface-style-selector.trigger"]'
   );
   expect(backgroundPicker?.disabled).toBe(false);
   expect(document.querySelector('[data-color-source]')).toBeNull();

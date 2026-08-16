@@ -42,6 +42,27 @@ vi.mock('./fill-paint-field', () => ({
       {label}
     </button>
   ),
+  HighlighterFillSurfaceField: ({
+    label,
+    onChange,
+  }: {
+    label: string;
+    onChange: (value: unknown) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="surface-selector"
+      onClick={() =>
+        onChange({
+          customCss: '[card] box-shadow: none;',
+          fillPaint: { kind: 'solid', color: '#123456ff' },
+          inheritCustomCss: true,
+        })
+      }
+    >
+      {label}
+    </button>
+  ),
 }));
 
 import { BorderPresetEditorFields } from '.';
@@ -140,7 +161,7 @@ async function interactWithFields(state: ReturnType<typeof createBaseState>) {
   selectCategory('highlighter.editor.fillSection');
   expect(container?.textContent).not.toContain('highlighter.editor.noFill');
   await act(async () => {
-    container?.querySelector<HTMLButtonElement>('[data-testid="compact-paint-selector"]')?.click();
+    container?.querySelector<HTMLButtonElement>('[data-testid="surface-selector"]')?.click();
   });
 
   selectCategory('highlighter.editor.geometrySection');
@@ -375,7 +396,10 @@ describe('BorderPresetEditorFields', () => {
     const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
       (candidate) => candidate.textContent === 'Linked comment'
     );
-    act(() => option?.click());
+    await act(async () => {
+      option?.click();
+      await Promise.resolve();
+    });
 
     expect(onChange).toHaveBeenCalledWith({
       effects: expect.objectContaining({

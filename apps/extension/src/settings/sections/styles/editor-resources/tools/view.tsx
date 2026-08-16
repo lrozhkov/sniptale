@@ -11,7 +11,6 @@ import {
 } from '../../../../section-surface';
 import { useToolPresetsController } from './controller';
 import { getToolPresetOwnerLabel, TOOL_PRESET_OWNERS } from './families';
-import { SurfaceStylePresetsSettings } from '../surface-styles/view';
 
 export function ToolPresetsSettings() {
   const state = useToolPresetsController();
@@ -77,7 +76,6 @@ export function ToolPresetsSettings() {
           {translate('settings.editor.createInEditorHint')}
         </p>
       </section>
-      <SurfaceStylePresetsSettings />
     </div>
   );
 }

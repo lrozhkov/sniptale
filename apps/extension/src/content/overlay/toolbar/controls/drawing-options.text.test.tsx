@@ -111,9 +111,11 @@ it('applies an alpha channel from the text background color picker', () => {
   )!;
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   act(() => {
+    alpha.focus();
     valueSetter?.call(alpha, '40');
     alpha.dispatchEvent(new Event('input', { bubbles: true }));
     alpha.dispatchEvent(new Event('change', { bubbles: true }));
+    alpha.blur();
   });
   act(() =>
     Array.from(document.querySelectorAll<HTMLButtonElement>('button'))

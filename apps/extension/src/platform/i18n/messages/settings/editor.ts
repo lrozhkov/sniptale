@@ -79,8 +79,8 @@ export const settingsEditorMessages = defineMessageSource({
       en: 'Surface styles',
     },
     description: {
-      ru: 'Оформление поверхностей выносок: заливка, прозрачность, размытие и тени.',
-      en: 'Callout surface styling: fill, transparency, blur, and shadows.',
+      ru: 'Многоразовые стили поверхностей: заливка, прозрачность, размытие и тени.',
+      en: 'Reusable surface styles: fill, transparency, blur, and shadows.',
     },
     add: {
       ru: 'Добавить стиль',
@@ -109,8 +109,8 @@ export const settingsEditorMessages = defineMessageSource({
       en: 'Gradient presets',
     },
     description: {
-      ru: 'Готовые градиенты для заливок рамок и аннотаций.',
-      en: 'Reusable gradients for frame and annotation fills.',
+      ru: 'Многоразовые шаблоны градиентов.',
+      en: 'Reusable gradient presets.',
     },
     add: {
       ru: 'Добавить градиент',

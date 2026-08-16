@@ -59,7 +59,7 @@ it('opens from keyboard onto the selected option and renders the selected marker
   expect(document.body.querySelector('[role="listbox"]')).toBeNull();
 });
 
-it('renders menu details and keeps disabled options inert', () => {
+it('renders menu details and keeps disabled options inert', async () => {
   const onChange = vi.fn();
 
   render(
@@ -94,8 +94,9 @@ it('renders menu details and keeps disabled options inert', () => {
   });
   expect(onChange).not.toHaveBeenCalled();
 
-  act(() => {
+  await act(async () => {
     options[0]!.click();
+    await Promise.resolve();
   });
   expect(onChange).toHaveBeenCalledWith('round');
 });
@@ -103,6 +104,7 @@ it('renders menu details and keeps disabled options inert', () => {
 it('selects an option without propagating pointer ownership to parent surfaces', async () => {
   const onChange = vi.fn();
   const onParentPointerDown = vi.fn();
+  const onWindowPointerDown = vi.fn();
 
   render(
     <div onPointerDown={onParentPointerDown}>
@@ -116,15 +118,47 @@ it('selects an option without propagating pointer ownership to parent surfaces',
   });
   const firstOption = getMenuOptions()[0]!;
   const PointerEventCtor = globalThis.PointerEvent ?? MouseEvent;
+  window.addEventListener('pointerdown', onWindowPointerDown);
 
-  act(() => {
-    firstOption.dispatchEvent(new PointerEventCtor('pointerdown', { bubbles: true }));
-    firstOption.click();
-  });
+  try {
+    await act(async () => {
+      firstOption.dispatchEvent(new PointerEventCtor('pointerdown', { bubbles: true }));
+      firstOption.click();
+      await Promise.resolve();
+    });
+  } finally {
+    window.removeEventListener('pointerdown', onWindowPointerDown);
+  }
 
   expect(onParentPointerDown).not.toHaveBeenCalled();
+  expect(onWindowPointerDown).not.toHaveBeenCalled();
   expect(onChange).toHaveBeenCalledWith('light');
   expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+});
+
+it('publishes a pointer selection only after its portal click transaction completes', async () => {
+  let dispatchingClick = false;
+  const onChange = vi.fn(() => {
+    expect(dispatchingClick).toBe(false);
+  });
+
+  render(
+    <CompactSelect aria-label="Theme" value="dark" onChange={onChange} options={THEME_OPTIONS} />
+  );
+  await act(async () => {
+    getTrigger().click();
+    await nextFrame();
+  });
+
+  await act(async () => {
+    dispatchingClick = true;
+    getMenuOptions()[0]!.click();
+    dispatchingClick = false;
+    expect(onChange).not.toHaveBeenCalled();
+    await Promise.resolve();
+  });
+
+  expect(onChange).toHaveBeenCalledWith('light');
 });
 
 it('positions the menu from an explicit row anchor instead of the narrow value trigger', async () => {

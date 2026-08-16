@@ -57,31 +57,31 @@ function cleanupMountedFields() {
   container = null;
 }
 
-it('routes text, code, image, and shape controls to typed patches', () => {
+it('routes text, code, image, and shape controls to typed patches', async () => {
   expect(commitTextPatch()).toEqual({ text: 'Edited text' });
   expect(commitCodePatch()).toEqual({ language: 'ts' });
-  expect(commitImageFitPatch()).toEqual({ fit: 'cover' });
-  expect(commitShapePatch()).toEqual({ shape: 'ellipse' });
+  expect(await commitImageFitPatch()).toEqual({ fit: 'cover' });
+  expect(await commitShapePatch()).toEqual({ shape: 'ellipse' });
 });
 
-it('routes connector and callout controls to typed patches', () => {
+it('routes connector and callout controls to typed patches', async () => {
   expect(commitLinePatch()).toEqual({ start: { x: 42, y: 100 } });
-  expect(commitArrowPatch()).toEqual({ head: 'both' });
+  expect(await commitArrowPatch()).toEqual({ head: 'both' });
   expect(commitCalloutPatch()).toEqual({
     connector: { end: { x: 520, y: 240 }, start: { x: 760, y: 240 } },
   });
 });
 
-it('exercises every text, code, image, and shape control', () => {
-  expect(exerciseTextControls()).toHaveLength(4);
+it('exercises every text, code, image, and shape control', async () => {
+  expect(await exerciseTextControls()).toHaveLength(4);
   expect(exerciseCodeControls()).toHaveLength(3);
-  expect(exerciseImageControls()).toHaveLength(2);
-  expect(exerciseShapeControls()).toHaveLength(3);
+  expect(await exerciseImageControls()).toHaveLength(2);
+  expect(await exerciseShapeControls()).toHaveLength(3);
 });
 
-it('exercises every line, arrow, and callout control', () => {
-  expect(exerciseLineControls()).toHaveLength(6);
-  expect(exerciseArrowControls().at(-1)).toEqual({ head: 'both' });
+it('exercises every line, arrow, and callout control', async () => {
+  expect(await exerciseLineControls()).toHaveLength(6);
+  expect((await exerciseArrowControls()).at(-1)).toEqual({ head: 'both' });
   expect(exerciseCalloutControls()).toContainEqual({ connector: null });
 });
 
@@ -127,18 +127,21 @@ function commitCodePatch() {
   return onChange.mock.lastCall?.[0];
 }
 
-function commitImageFitPatch() {
+async function commitImageFitPatch() {
   const { onChange } = renderFields(createScenarioImageElement({ fit: 'contain' }));
-  clickSelectOption(
+  await clickSelectOption(
     translate('scenario.editor.imageFit'),
     translate('scenario.editor.imageFitCover')
   );
   return onChange.mock.lastCall?.[0];
 }
 
-function commitShapePatch() {
+async function commitShapePatch() {
   const { onChange } = renderFields(createScenarioShapeElement({ shape: 'rect' }));
-  clickSelectOption(translate('scenario.editor.shape'), translate('scenario.editor.shapeEllipse'));
+  await clickSelectOption(
+    translate('scenario.editor.shape'),
+    translate('scenario.editor.shapeEllipse')
+  );
   return onChange.mock.lastCall?.[0];
 }
 
@@ -148,9 +151,9 @@ function commitLinePatch() {
   return onChange.mock.lastCall?.[0];
 }
 
-function commitArrowPatch() {
+async function commitArrowPatch() {
   const { onChange } = renderFields(createScenarioArrowElement({ head: 'end' }));
-  clickSelectOption(translate('scenario.editor.head'), translate('scenario.editor.headBoth'));
+  await clickSelectOption(translate('scenario.editor.head'), translate('scenario.editor.headBoth'));
   return onChange.mock.lastCall?.[0];
 }
 
@@ -162,12 +165,15 @@ function commitCalloutPatch() {
   return onChange.mock.lastCall?.[0];
 }
 
-function exerciseTextControls() {
+async function exerciseTextControls() {
   const { onChange } = renderFields(createScenarioTextElement({ text: 'Original' }));
   changeTextarea('Edited text');
   changeInput(0, '28');
   changeInput(1, '800');
-  clickSelectOption(translate('scenario.editor.align'), translate('scenario.editor.alignRight'));
+  await clickSelectOption(
+    translate('scenario.editor.align'),
+    translate('scenario.editor.alignRight')
+  );
   return onChange.mock.calls.map((call) => call[0]);
 }
 
@@ -179,11 +185,11 @@ function exerciseCodeControls() {
   return onChange.mock.calls.map((call) => call[0]);
 }
 
-function exerciseImageControls() {
+async function exerciseImageControls() {
   const { onChange, onEditImageElement } = renderFields(
     createScenarioImageElement({ fit: 'contain' })
   );
-  clickSelectOption(
+  await clickSelectOption(
     translate('scenario.editor.imageFit'),
     translate('scenario.editor.imageFitCover')
   );
@@ -193,27 +199,36 @@ function exerciseImageControls() {
   return onChange.mock.calls.map((call) => call[0]);
 }
 
-function exerciseShapeControls() {
+async function exerciseShapeControls() {
   const { onChange } = renderFields(createScenarioShapeElement({ shape: 'rect' }));
-  clickSelectOption(translate('scenario.editor.shape'), translate('scenario.editor.shapeEllipse'));
+  await clickSelectOption(
+    translate('scenario.editor.shape'),
+    translate('scenario.editor.shapeEllipse')
+  );
   changeInput(0, '4');
   changeInput(1, '12');
   return onChange.mock.calls.map((call) => call[0]);
 }
 
-function exerciseLineControls() {
+async function exerciseLineControls() {
   const { onChange } = renderFields(createScenarioLineElement());
   for (const [index, value] of ['1', '2', '3', '4', '6'].entries()) {
     changeInput(index, value);
   }
-  clickSelectOption(translate('scenario.editor.dash'), translate('scenario.editor.dashDotted'));
+  await clickSelectOption(
+    translate('scenario.editor.dash'),
+    translate('scenario.editor.dashDotted')
+  );
   return onChange.mock.calls.map((call) => call[0]);
 }
 
-function exerciseArrowControls() {
+async function exerciseArrowControls() {
   const { onChange } = renderFields(createScenarioArrowElement({ head: 'end' }));
-  clickSelectOption(translate('scenario.editor.dash'), translate('scenario.editor.dashDashed'));
-  clickSelectOption(translate('scenario.editor.head'), translate('scenario.editor.headBoth'));
+  await clickSelectOption(
+    translate('scenario.editor.dash'),
+    translate('scenario.editor.dashDashed')
+  );
+  await clickSelectOption(translate('scenario.editor.head'), translate('scenario.editor.headBoth'));
   return onChange.mock.calls.map((call) => call[0]);
 }
 
@@ -245,12 +260,13 @@ function changeTextarea(value: string) {
   });
 }
 
-function clickSelectOption(label: string, optionLabel: string) {
+async function clickSelectOption(label: string, optionLabel: string) {
   act(() => {
     container?.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)?.click();
   });
-  act(() => {
+  await act(async () => {
     findOption(optionLabel)?.click();
+    await Promise.resolve();
   });
 }
 

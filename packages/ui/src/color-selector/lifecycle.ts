@@ -3,6 +3,7 @@ import {
   isFloatingInteractionOutsideOwners,
   isOwnedFloatingInteractionEvent,
 } from '../floating-interactions/target';
+import { isEyedropperSessionActive } from './popover-state';
 
 function useOutsideDismiss(args: {
   eyedropperActiveRef: RefObject<boolean>;
@@ -21,7 +22,7 @@ function useOutsideDismiss(args: {
     }
 
     const handleDocumentMouseDown = (event: MouseEvent) => {
-      if (args.eyedropperActiveRef.current) {
+      if (args.eyedropperActiveRef.current || isEyedropperSessionActive()) {
         return;
       }
 

@@ -73,10 +73,13 @@ it('edits only step title and notes when no canvas item is selected', () => {
   expect(container?.textContent).not.toContain(translate('scenario.editor.clicks'));
 });
 
-it('keeps image fit, reset, quick edit, and delete while hiding numeric transforms', () => {
+it('keeps image fit, reset, quick edit, and delete while hiding numeric transforms', async () => {
   const actions = renderInspector('image-1');
   openSelect(translate('scenario.editor.imageFit'));
-  act(() => findOption(translate('scenario.editor.imageFitCover'))?.click());
+  await act(async () => {
+    findOption(translate('scenario.editor.imageFitCover'))?.click();
+    await Promise.resolve();
+  });
   clickText(translate('scenario.editor.resetContentTransform'));
   clickText(translate('scenario.editor.editImage'));
   clickText(translate('scenario.editor.removeSelectedItem'));

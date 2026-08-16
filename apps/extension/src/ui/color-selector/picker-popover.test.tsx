@@ -205,7 +205,9 @@ it('routes HSL field edits through the same draft update seam', async () => {
   await cycleMode(2);
   await changeInput('shared.ui.colorSelectorHue', '180');
   await changeInput('shared.ui.colorSelectorSaturation', '50');
+  await act(async () => getInput('shared.ui.colorSelectorLightness')?.focus());
   await changeInput('shared.ui.colorSelectorLightness', '40');
+  await act(async () => getInput('shared.ui.colorSelectorLightness')?.blur());
 
   expect(onColorChange).toHaveBeenCalled();
 });

@@ -92,7 +92,7 @@ export async function openSelectAndCloseOutside(trigger: HTMLButtonElement) {
   expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
 
   await act(async () => {
-    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await Promise.resolve();
   });
   expect(document.body.querySelector('[role="listbox"]')).toBeNull();

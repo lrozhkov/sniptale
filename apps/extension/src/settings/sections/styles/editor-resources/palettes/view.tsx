@@ -8,7 +8,6 @@ import {
 import { usePalettesController } from './controller';
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
 import { CompactColorSelector } from '../../../../../ui/color-selector';
-import { GradientPresetsSettings } from '../gradients/view';
 
 export function PalettesSettings() {
   const state = usePalettesController();
@@ -69,7 +68,6 @@ export function PalettesSettings() {
           onMove={onMove}
         />
       </section>
-      <GradientPresetsSettings />
     </div>
   );
 }

@@ -44,7 +44,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('keeps a real CompactSelect option inside the Design Review inspector boundary', () => {
+it('keeps a real CompactSelect option inside the Design Review inspector boundary', async () => {
   const contentHost = document.createElement('div');
   const contentRoot = contentHost.attachShadow({ mode: 'open' });
   document.body.append(contentHost);
@@ -88,7 +88,10 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
   );
 
   expect(option).toBeDefined();
-  act(() => option?.click());
+  await act(async () => {
+    option?.click();
+    await Promise.resolve();
+  });
 
   expect(onChange).toHaveBeenCalledWith('inline');
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();

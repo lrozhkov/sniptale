@@ -129,7 +129,7 @@ function useCompactSelectDismiss(
       return undefined;
     }
     const owners = () => [containerRef.current, menuRef.current];
-    const handlePointerDown = (event: PointerEvent) => {
+    const handleClick = (event: MouseEvent) => {
       if (!isOwnedFloatingInteractionEvent(event, owners())) {
         close();
       }
@@ -139,9 +139,9 @@ function useCompactSelectDismiss(
         close();
       }
     };
-    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('click', handleClick);
     window.addEventListener('focusin', handleFocusIn);
-    return () => removeSelectDismissListeners(handlePointerDown, handleFocusIn);
+    return () => removeSelectDismissListeners(handleClick, handleFocusIn);
   }, [close, containerRef, menuRef, open]);
 }
 
@@ -188,22 +188,30 @@ function useCompactSelectActions<T extends string>({
   const focusOption = (index: number) => {
     window.requestAnimationFrame(() => refs.optionRefs.current[index]?.focus());
   };
-  const openMenu = (preferredIndex = selection.activeStartIndex) => {
+  const openMenu = (preferredIndex = selection.activeStartIndex, shouldFocusOption = true) => {
     if (disabled) {
       return;
     }
     const index = getNextEnabledIndex(options, preferredIndex, 1);
     updateMenuPosition();
     setOpen(true);
-    if (index >= 0) {
+    if (shouldFocusOption && index >= 0) {
       focusOption(index);
     }
   };
-  const selectOption = (option: CompactSelectOption<T>) => {
+  const selectOption = (option: CompactSelectOption<T>, restoreFocus = true) => {
     if (!option.disabled) {
-      onChange(option.value);
       setOpen(false);
-      refs.triggerRef.current?.focus();
+      if (restoreFocus) {
+        refs.triggerRef.current?.focus();
+        onChange(option.value);
+      } else {
+        // A compact select is rendered in a portal. Updating a live-preview owner while the
+        // option click is still propagating can replace the owning inspector before its
+        // floating layer contains the event, which makes an ancestor treat the same click as
+        // an outside dismissal. Finish the native event transaction before publishing value.
+        queueMicrotask(() => onChange(option.value));
+      }
     }
   };
   const closeAndFocusTrigger = () => {
@@ -233,10 +241,10 @@ function bindSelectPositionListeners(
 }
 
 function removeSelectDismissListeners(
-  handlePointerDown: (event: PointerEvent) => void,
+  handleClick: (event: MouseEvent) => void,
   handleFocusIn: (event: FocusEvent) => void
 ) {
-  window.removeEventListener('pointerdown', handlePointerDown);
+  window.removeEventListener('click', handleClick);
   window.removeEventListener('focusin', handleFocusIn);
 }
 

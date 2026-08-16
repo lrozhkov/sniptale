@@ -135,6 +135,8 @@ export const settingsNavigationMessages = defineMessageSource({
     tags: { ru: 'Теги', en: 'Tags' },
     tools: { ru: 'Инструменты', en: 'Tools' },
     palettes: { ru: 'Палитры', en: 'Palettes' },
+    surfaces: { ru: 'Поверхности', en: 'Surfaces' },
+    gradients: { ru: 'Градиенты', en: 'Gradients' },
     connection: { ru: 'Подключение', en: 'Connection' },
     capture: { ru: 'Захват', en: 'Capture' },
     commands: { ru: 'Команды', en: 'Commands' },

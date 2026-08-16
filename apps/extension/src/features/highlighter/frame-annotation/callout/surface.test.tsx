@@ -174,6 +174,25 @@ it('does not let a large title font impose the input default character width on 
   expect(document.querySelector('[data-ui="content.callout.surface-contour"]')).not.toBeNull();
   expect(document.querySelector('[data-ui="content.callout.unified-surface"]')).toBeNull();
 
+  const bodyBeforeBadge = props.contentEditableRef.current;
+  act(() =>
+    root.render(
+      <CalloutBody
+        {...props}
+        settings={{
+          ...props.settings,
+          style: {
+            ...props.settings.style,
+            badge: { ...props.settings.style.badge, placement: 'body-start' },
+            title: { ...props.settings.style.title, enabled: false },
+          },
+        }}
+      />
+    )
+  );
+  expect(props.contentEditableRef.current).toBe(bodyBeforeBadge);
+  expect(props.contentEditableRef.current?.parentElement?.style.minWidth).toBe('min-content');
+
   act(() =>
     root.render(
       <CalloutBody
@@ -188,7 +207,6 @@ it('does not let a large title font impose the input default character width on 
       />
     )
   );
-  expect(props.contentEditableRef.current?.parentElement?.style.minWidth).toBe('min-content');
 
   const titleInput = document.querySelector<HTMLInputElement>('[data-sniptale-callout-title]')!;
   const titleSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;

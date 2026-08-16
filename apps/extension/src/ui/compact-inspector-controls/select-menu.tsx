@@ -170,6 +170,7 @@ function CompactSelectMenuOptionDescription<T extends string>({
 function handleOptionPointerDown(event: PointerEvent<HTMLButtonElement>) {
   event.preventDefault();
   event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
 }
 
 function handleOptionClick<T extends string>(
@@ -179,6 +180,7 @@ function handleOptionClick<T extends string>(
 ) {
   event.preventDefault();
   event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
   onSelect(option);
 }
 

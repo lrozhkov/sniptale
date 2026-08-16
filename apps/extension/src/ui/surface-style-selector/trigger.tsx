@@ -1,6 +1,6 @@
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import type { SurfaceStyle } from '@sniptale/runtime-contracts/highlighter/surface-style';
-import { ChevronDown, Layers3 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { RefObject } from 'react';
 import { projectCanonicalSurfaceCss } from '../../features/highlighter/surface-style/surface-css';
 import { translate } from '../../platform/i18n';
@@ -33,7 +33,7 @@ export function SurfaceStyleTrigger(props: {
       aria-label={title}
       aria-expanded={props.open}
       className={[
-        'flex w-full min-w-0 items-center gap-2.5 px-2 text-left',
+        'flex w-full min-w-0 items-center gap-2 px-2 text-left',
         COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
         COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME,
         props.open ? COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME : '',
@@ -52,7 +52,7 @@ export function SurfaceStyleTrigger(props: {
       >
         <span
           aria-hidden="true"
-          className="block h-6 w-8 rounded-[5px]"
+          className="block h-5 w-7 rounded-[5px]"
           data-ui="shared.ui.surface-style-selector.preview"
           style={{
             background: serializePaintToCss(props.value.fillPaint),
@@ -60,24 +60,8 @@ export function SurfaceStyleTrigger(props: {
           }}
         />
       </span>
-      <span className="min-w-0 flex-1 leading-tight">
-        <span
-          className={[
-            'flex items-center gap-1 text-[10px] font-medium',
-            'text-[var(--sniptale-color-text-muted)]',
-          ].join(' ')}
-        >
-          <Layers3 aria-hidden="true" size={11} />
-          {title}
-        </span>
-        <span
-          className={[
-            'mt-0.5 block truncate text-xs font-semibold',
-            'text-[var(--sniptale-color-text-primary)]',
-          ].join(' ')}
-        >
-          {props.activeName}
-        </span>
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+        {props.activeName}
       </span>
       <ChevronDown
         aria-hidden="true"

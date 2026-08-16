@@ -27,6 +27,7 @@ it('renders each palette color once as a picker without a duplicate heading or v
   expect(node.textContent?.match(/#123456/gi)).toHaveLength(1);
   expect(node.textContent).not.toMatch(/#1(?![0-9a-f])/i);
   expect(node.querySelector('h2')).toBeNull();
+  expect(node.textContent).not.toContain('gradient-presets');
   expect(node.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(1);
   act(() => root.unmount());
 });

@@ -102,9 +102,10 @@ it('renders a clickable label-row overlay for the hex field without duplicate bu
   expect(markup).toContain('shared.ui.colorSelectorHex');
   expect(markup).toContain('grid min-h-5 grid-cols-3');
   expect(markup).toContain('col-span-3');
+  expect(markup).toContain('text-center');
   expect(markup).toContain('hover:bg-');
-  expect(markup).toContain('text-[color:var(--sniptale-color-text-primary)]');
-  expect(markup).toContain('caret-[color:var(--sniptale-color-accent)]');
+  expect(markup).toContain('text-[var(--sniptale-color-text-primary)]');
+  expect(markup).toContain('h-8 px-2 text-xs');
 });
 
 it('renders the manual hex field and rgb fields with wired handlers', () => {

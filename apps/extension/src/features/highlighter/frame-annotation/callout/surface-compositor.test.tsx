@@ -105,7 +105,7 @@ describe('CalloutSurfaceCompositor', () => {
       }
       if (preset.id === 'system-surface-soft-elevated') {
         expect(markup).toContain('content.callout.surface-css-probe');
-        expect(markup).not.toContain('content.callout.surface-elevation');
+        expect(markup).toContain('content.callout.surface-elevation');
       }
     }
   );
@@ -310,20 +310,20 @@ describe('CalloutSurfaceCompositor effects', () => {
     );
   });
 
-  it('keeps unsupported-but-valid CSS shadow syntax exclusive until CSSOM resolves it', () => {
+  it('keeps configured shadow visible until custom CSSOM shadow resolution completes', () => {
     const style = createDefaultCalloutSettings().style;
     style.surface.shadow = 12;
     style.customCss = '[card]\nbox-shadow: 0 0.5em 1em red;';
     const withoutCustomPaint = renderWedge(style);
 
     expect(withoutCustomPaint).toContain('content.callout.surface-css-probe');
-    expect(withoutCustomPaint).not.toContain('content.callout.surface-elevation');
+    expect(withoutCustomPaint).toContain('content.callout.surface-elevation');
 
     style.customCss = '[card]\nbackground: #123456;\nbox-shadow: 0 0.5em 1em red;';
     const withCustomPaint = renderWedge(style);
     expect(withCustomPaint).toContain('background:#123456');
     expect(withCustomPaint).toContain('content.callout.surface-css-probe');
-    expect(withCustomPaint).not.toContain('content.callout.surface-elevation');
+    expect(withCustomPaint).toContain('content.callout.surface-elevation');
   });
 
   it('resolves browser-computed shadow and outline lengths before painting effects', async () => {
@@ -427,7 +427,7 @@ describe('CalloutSurfaceCompositor effects', () => {
 });
 
 describe('CalloutSurfaceCompositor CSS authority', () => {
-  it('suppresses invalid explicit shadow CSS after browser recognition', async () => {
+  it('preserves configured shadow when custom shadow CSS resolves to none', async () => {
     const style = createDefaultCalloutSettings().style;
     style.surface.shadow = 12;
     style.customCss = '[card]\nbox-shadow: 0 2px -4px notacolor;';
@@ -449,7 +449,7 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
       );
     });
 
-    expect(host.innerHTML).not.toContain('content.callout.surface-elevation');
+    expect(host.innerHTML).toContain('content.callout.surface-elevation');
     expect(host.innerHTML).toContain('content.callout.surface-css-probe');
 
     await act(async () => root.unmount());
@@ -485,7 +485,7 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
     expect(probe?.style.fontSize).toBe('16px');
     expect(probe?.style.fontStyle).toBe('italic');
     expect(host.innerHTML).toContain('flood-color="rgb(31, 41, 55)"');
-    expect(host.innerHTML).not.toContain('flood-color="#ff0000"');
+    expect(host.innerHTML).toContain('flood-color="#ff0000"');
 
     await act(async () => root.unmount());
     computedStyleSpy.mockRestore();
@@ -561,6 +561,35 @@ describe('CalloutSurfaceCompositor CSS authority', () => {
 
     expect(host.innerHTML).toContain('content.callout.surface-elevation');
     expect(host.innerHTML).toContain('stroke="rgb(255, 255, 255)"');
+
+    await act(async () => root.unmount());
+    computedStyleSpy.mockRestore();
+  });
+
+  it('combines arbitrary outer Surface CSS with the configured Shadow', async () => {
+    const style = createDefaultCalloutSettings().style;
+    style.surface.shadow = 12;
+    style.customCss = '[card]\nbox-shadow: 0 10px 24px rgba(17, 24, 39, 0.35);';
+    const computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      boxShadow: 'rgba(17, 24, 39, 0.35) 0px 10px 24px 0px',
+    } as CSSStyleDeclaration);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+
+    await act(async () => {
+      root.render(
+        <CalloutSurfaceCompositor
+          connector={createWedge()}
+          cssContext={CSS_CONTEXT}
+          dimensions={{ width: 160, height: 48 }}
+          projection={resolveCalloutSurfaceProjection(style)}
+          visualScale={1}
+        />
+      );
+    });
+
+    expect(host.innerHTML.match(/content.callout.surface-elevation/gu)).toHaveLength(2);
+    expect(host.innerHTML).toContain('flood-color="rgba(17, 24, 39, 0.35)"');
 
     await act(async () => root.unmount());
     computedStyleSpy.mockRestore();

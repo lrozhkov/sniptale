@@ -3,6 +3,7 @@ import { applySurfaceStyleToCallout } from '../../features/highlighter/surface-s
 import { surfaceCssOverridesPaint } from '../../features/highlighter/surface-style/surface-css';
 import { translate } from '../../platform/i18n';
 import { SurfaceStyleSelector, type SurfaceStyleSelectorProps } from '../surface-style-selector';
+import { CALLOUT_BACKGROUND_PRESETS } from '../highlighter-preset-editor/callout/inspector-palettes';
 
 export function CalloutBackgroundSettingsView(props: {
   actions: SurfaceStyleSelectorProps['actions'] & { onReset: () => Promise<boolean> };
@@ -17,10 +18,11 @@ export function CalloutBackgroundSettingsView(props: {
 }) {
   return (
     <div className="grid gap-2" data-ui="shared.ui.callout-background-settings">
-      <label className="text-xs">{translate('content.callout.surfaceStyle.title')}</label>
       <SurfaceStyleSelector
         actions={props.actions}
         disabled={props.disabled || props.unsafeForWrite}
+        fieldLabel={translate('content.callout.surfaceStyle.title')}
+        palette={CALLOUT_BACKGROUND_PRESETS}
         presentation={props.manageStyles ? 'management' : 'selection'}
         presets={props.presets}
         value={props.value}

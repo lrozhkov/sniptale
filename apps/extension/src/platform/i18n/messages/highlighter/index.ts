@@ -67,11 +67,15 @@ export const highlighterMessages = defineMessageSource({
     addStopHint: { ru: 'Нажмите на шкалу, чтобы добавить', en: 'Click the rail to add' },
     removeStop: { ru: 'Удалить цветовую точку', en: 'Remove color stop' },
     repeat: { ru: 'Повторять', en: 'Repeat' },
+    repeatDisabled: { ru: 'Без повтора', en: 'No repeat' },
+    repeatEnabled: { ru: 'С повтором', en: 'Repeat' },
     span: { ru: 'Шаг повтора', en: 'Repeat span' },
     radiusX: { ru: 'Радиус X', en: 'Radius X' },
     radiusY: { ru: 'Радиус Y', en: 'Radius Y' },
     startAngle: { ru: 'Начальный угол', en: 'Start angle' },
     presets: { ru: 'Шаблоны', en: 'Templates' },
+    presetsEmpty: { ru: 'Нет доступных шаблонов', en: 'No templates available' },
+    copyPreset: { ru: 'Копировать шаблон', en: 'Copy template' },
     saveAs: { ru: 'Сохранить как', en: 'Save as' },
     presetName: { ru: 'Название шаблона', en: 'Template name' },
     save: { ru: 'Сохранить', en: 'Save' },
@@ -496,6 +500,10 @@ export const highlighterMessages = defineMessageSource({
     fillColorLabel: {
       ru: 'Цвет заливки',
       en: 'Fill color',
+    },
+    surfaceLabel: {
+      ru: 'Поверхность',
+      en: 'Surface',
     },
     widthLabel: {
       ru: 'Толщина',

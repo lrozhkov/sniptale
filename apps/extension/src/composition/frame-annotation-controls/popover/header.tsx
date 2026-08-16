@@ -30,7 +30,7 @@ export function SettingsPopoverHeader(props: {
         : {})}
     >
       <ProductToolbarMenuGroupLabel>
-        <span title={props.title}>{props.title}</span>
+        <span>{props.title}</span>
       </ProductToolbarMenuGroupLabel>
       <div
         className="sniptale-settings-popover-header-actions"

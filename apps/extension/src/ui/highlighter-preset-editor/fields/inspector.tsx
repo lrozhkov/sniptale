@@ -31,7 +31,7 @@ import {
   ProductGlassLinkedPaddingFields,
   ProductGlassSwitch,
 } from '@sniptale/ui/product-glass-controls';
-import { HighlighterFillPaintField } from './fill-paint-field';
+import { HighlighterFillSurfaceField } from './fill-paint-field';
 
 export type LinkedAnnotationTemplateOptions = {
   callouts: Array<{ label: string; value: string }>;
@@ -130,16 +130,16 @@ function BorderOutlineSection(props: BorderStyleInspectorProps) {
 function BorderFillSection(props: BorderStyleInspectorProps) {
   return (
     <div className="grid gap-3">
-      <PropertyField label={translate('highlighter.editor.fillColorLabel')}>
-        <HighlighterFillPaintField
-          label={translate('highlighter.editor.fillColorLabel')}
-          onChange={(fillPaint) => props.onChange({ fillPaint })}
-          {...(props.onFloatingInteractionChange
-            ? { onOpenChange: props.onFloatingInteractionChange }
-            : {})}
-          value={props.style.fillPaint}
-        />
-      </PropertyField>
+      <HighlighterFillSurfaceField
+        customCss={props.style.customCss}
+        inheritCustomCss={props.style.inheritCustomCss}
+        label={translate('highlighter.editor.surfaceLabel')}
+        onChange={props.onChange}
+        {...(props.onFloatingInteractionChange
+          ? { onOpenChange: props.onFloatingInteractionChange }
+          : {})}
+        value={props.style.fillPaint}
+      />
     </div>
   );
 }

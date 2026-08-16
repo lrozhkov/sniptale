@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useCallback, useId, useRef } from 'react';
 import { usePaintSelectorState } from '@sniptale/ui/paint-selector/state';
 import type { CompactPaintSelectorProps } from '@sniptale/ui/paint-selector/types';
 import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-interactions/ownership';
@@ -21,7 +21,10 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
   const ownerId = useId();
   const state = usePaintSelectorState({ ...props, createId });
   const format = useFormatMode();
-  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const eyedropperActiveRef = useRef(false);
+  const setEyedropperActive = useCallback((active: boolean) => {
+    eyedropperActiveRef.current = active;
+  }, []);
   const setMode = usePaintModeState({
     createId,
     draft: state.draft,
@@ -32,7 +35,7 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
   usePaintSelectorLifecycle({
     cancel: state.cancel,
     disabled: props.disabled,
-    eyedropperActive,
+    eyedropperActiveRef,
     layerRef,
     onOpenChange: props.onOpenChange,
     open: state.open,

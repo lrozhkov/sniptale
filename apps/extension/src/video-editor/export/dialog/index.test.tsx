@@ -94,7 +94,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders inside the shared modal shell and wires close, export, select, and toggle actions', () => {
+it('renders inside the shared modal shell and wires close, export, select, and toggle actions', async () => {
   const { onChange, onClose, onExport } = renderDialog();
 
   expect(container?.querySelector('[role="dialog"]')).not.toBeNull();
@@ -127,8 +127,11 @@ it('renders inside the shared modal shell and wires close, export, select, and t
     document.body.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
   ).find((button) => button.textContent?.includes('videoEditor.exportDialog.formatWebmLabel'));
 
-  act(() => {
+  await act(async () => {
     webmOption?.click();
+    await Promise.resolve();
+  });
+  act(() => {
     downloadToggle?.click();
     exportButton?.click();
   });
@@ -183,7 +186,7 @@ it('disables export while capability probing is pending and renders WebM-only hi
   expect(exportButton?.disabled).toBe(true);
 });
 
-it('restores the default MP4 codec when switching back from WebM during the same dialog session', () => {
+it('restores the default MP4 codec when switching back from WebM during the same dialog session', async () => {
   useExportDialogCapabilitiesMock.mockReturnValueOnce({
     capabilities: {
       formats: [
@@ -222,8 +225,9 @@ it('restores the default MP4 codec when switching back from WebM during the same
     document.body.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
   ).find((button) => button.textContent?.includes('videoEditor.exportDialog.formatMp4Label'));
 
-  act(() => {
+  await act(async () => {
     mp4Option?.click();
+    await Promise.resolve();
   });
 
   expect(onChange).toHaveBeenCalledWith({

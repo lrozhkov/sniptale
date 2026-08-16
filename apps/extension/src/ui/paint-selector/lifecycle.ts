@@ -1,4 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type RefObject } from 'react';
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
+import { isEyedropperSessionActive } from '@sniptale/ui/color-selector/popover-state';
 
 const FOCUSABLE_SELECTOR =
   'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -8,6 +10,17 @@ function isEventWithin(event: Event, element: HTMLElement | null): boolean {
   return event
     .composedPath()
     .some((target) => target === element || (target instanceof Node && element.contains(target)));
+}
+
+function isEventWithinOwnedLayer(event: Event, ownerScope: HTMLElement | null): boolean {
+  return getOwnedLayers(ownerScope).some((layer) => isEventWithin(event, layer));
+}
+
+function getOwnedLayers(ownerScope: HTMLElement | null): HTMLElement[] {
+  if (!ownerScope) return [];
+  const composedRoot = ownerScope.getRootNode();
+  if (!(composedRoot instanceof Document || composedRoot instanceof ShadowRoot)) return [];
+  return getOwnedFloatingInteractionLayers(ownerScope, composedRoot);
 }
 
 function getLayerActiveElement(layer: HTMLElement): Element | null {
@@ -20,30 +33,41 @@ function getLayerActiveElement(layer: HTMLElement): Element | null {
 export function usePaintSelectorLifecycle(options: {
   cancel: () => void;
   disabled: boolean | undefined;
-  eyedropperActive: boolean;
+  eyedropperActiveRef: RefObject<boolean>;
   layerRef: RefObject<HTMLDivElement | null>;
   onOpenChange: ((open: boolean) => void) | undefined;
   open: boolean;
   rootRef: RefObject<HTMLDivElement | null>;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { cancel, disabled, eyedropperActive, layerRef, onOpenChange, open, rootRef, triggerRef } =
-    options;
+  const {
+    cancel,
+    disabled,
+    eyedropperActiveRef,
+    layerRef,
+    onOpenChange,
+    open,
+    rootRef,
+    triggerRef,
+  } = options;
   const wasOpenRef = useRef(false);
   useEffect(() => onOpenChange?.(open), [onOpenChange, open]);
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: MouseEvent) => {
       if (
-        eyedropperActive ||
+        eyedropperActiveRef.current ||
+        isEyedropperSessionActive() ||
         isEventWithin(event, rootRef.current) ||
-        isEventWithin(event, layerRef.current)
+        isEventWithin(event, layerRef.current) ||
+        isEventWithinOwnedLayer(event, layerRef.current)
       )
         return;
       cancel();
     };
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (getOwnedLayers(layerRef.current).length > 0) return;
         event.preventDefault();
         event.stopImmediatePropagation();
         cancel();
@@ -60,10 +84,14 @@ export function usePaintSelectorLifecycle(options: {
         return;
       }
       const active = getLayerActiveElement(layer);
-      if (event.shiftKey && (active === first || !layer.contains(active))) {
+      const activeIndex = active instanceof HTMLElement ? focusable.indexOf(active) : -1;
+      if (activeIndex < 0) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (active === last || !layer.contains(active))) {
+      } else if (!event.shiftKey && active === last) {
         event.preventDefault();
         first.focus();
       }
@@ -74,14 +102,16 @@ export function usePaintSelectorLifecycle(options: {
       document.removeEventListener('mousedown', dismiss, true);
       document.removeEventListener('keydown', keyboard, true);
     };
-  }, [cancel, eyedropperActive, layerRef, open, rootRef]);
+  }, [cancel, eyedropperActiveRef, layerRef, open, rootRef]);
   useEffect(() => {
     if (disabled && open) cancel();
   }, [cancel, disabled, open]);
   useEffect(() => {
     if (!open) return;
     const frame = requestAnimationFrame(() => {
-      layerRef.current?.querySelector<HTMLElement>('select, button, input')?.focus();
+      layerRef.current
+        ?.querySelector<HTMLElement>('[role="dialog"]')
+        ?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
   }, [layerRef, open]);

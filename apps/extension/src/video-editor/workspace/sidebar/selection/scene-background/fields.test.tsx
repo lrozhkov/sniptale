@@ -129,7 +129,7 @@ it('renders selected scene background labels through canonical inspector selects
   expect(markup).toContain('Background Two');
 });
 
-it('keeps image kind selected after clicking image when image assets exist', () => {
+it('keeps image kind selected after clicking image when image assets exist', async () => {
   const onSetSceneBackground = vi.fn();
 
   renderBackgroundHarness({
@@ -140,7 +140,7 @@ it('keeps image kind selected after clicking image when image assets exist', () 
       color: '#111111',
     },
   });
-  clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImage');
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImage');
 
   expect(onSetSceneBackground).toHaveBeenCalledWith({
     kind: VideoSceneBackgroundKind.IMAGE,
@@ -205,11 +205,12 @@ function renderBackgroundHarness(props: SceneBackgroundFieldProps) {
   });
 }
 
-function clickBackgroundKind(label: string) {
+async function clickBackgroundKind(label: string) {
   openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
   const option = getOption(label);
   expect(option).not.toBeNull();
-  act(() => {
+  await act(async () => {
     option?.click();
+    await Promise.resolve();
   });
 }

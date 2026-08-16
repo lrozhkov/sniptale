@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import { expect, it, vi } from 'vitest';
 import { getCanonicalSystemCalloutPreset } from '../../features/highlighter/callout-presets/catalog';
+import { translate } from '../../platform/i18n';
 import { CalloutBackgroundSettingsView } from './view';
 
 const selectorProps = vi.hoisted(() => vi.fn());
@@ -47,6 +48,10 @@ it('uses selection controls inline and management controls only when requested',
     )
   );
   expect(selectorProps.mock.calls.at(-1)?.[0]).toMatchObject({ presentation: 'selection' });
+  expect(selectorProps.mock.calls.at(-1)?.[0]).toMatchObject({
+    fieldLabel: translate('content.callout.surfaceStyle.title'),
+  });
+  expect(selectorProps.mock.calls.at(-1)?.[0].palette).toContain('#ffffff');
 
   await act(async () =>
     root.render(

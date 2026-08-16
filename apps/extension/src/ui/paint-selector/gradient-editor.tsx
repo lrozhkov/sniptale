@@ -11,9 +11,8 @@ import { AlignHorizontalDistributeCenter, ArrowLeftRight, Trash2 } from 'lucide-
 import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import { GradientRail } from './gradient-rail';
 import { translate } from '../../platform/i18n';
+import { CompactSelect, NumericValueField } from '../compact-inspector-controls';
 
-const number = (value: string, fallback: number) =>
-  Number.isFinite(Number(value)) ? Number(value) : fallback;
 const withAngle = (gradient: Gradient, angle: number): Gradient =>
   gradient.type === 'linear' ? { ...gradient, angle } : gradient;
 const withCenter = (gradient: Gradient, axis: 'x' | 'y', value: number): Gradient =>
@@ -26,15 +25,6 @@ const withRadius = (gradient: Gradient, axis: 'x' | 'y', value: number): Gradien
     : gradient;
 const withStartAngle = (gradient: Gradient, startAngle: number): Gradient =>
   gradient.type === 'conic' ? { ...gradient, startAngle } : gradient;
-const FIELD_CLASS_NAME = [
-  'h-8 rounded-[8px] border px-2 text-xs outline-none transition',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_72%,transparent)]',
-  'text-[var(--sniptale-color-text-primary)]',
-  'focus:ring-2',
-  'focus:border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_55%,var(--sniptale-color-border-soft))]',
-  'focus:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-].join(' ');
 const SECTION_CLASS_NAME = [
   'rounded-[10px] border p-2.5',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
@@ -44,6 +34,27 @@ const SECTION_CLASS_NAME = [
 interface GradientControlsProps {
   gradient: Gradient;
   onChange: (gradient: Gradient) => void;
+}
+
+function GradientNumericField(props: {
+  className?: string;
+  label: string;
+  max?: number;
+  min?: number;
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <NumericValueField
+      className={`${props.className ?? 'w-full'} border-[color:var(--sniptale-color-border-soft)] bg-transparent`}
+      label={props.label}
+      max={props.max}
+      min={props.min}
+      value={props.value}
+      onPreviewValue={props.onChange}
+      onCommitValue={props.onChange}
+    />
+  );
 }
 
 function GradientPrimaryControls({
@@ -65,20 +76,21 @@ function GradientPrimaryControls({
     <div className={`${SECTION_CLASS_NAME} grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2`}>
       <label className="min-w-0 text-[11px]">
         {translate('highlighter.paintPicker.position')}
-        <input
-          className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-          type="number"
-          min={0}
-          max={100}
-          value={Math.round(selected.position * 100)}
-          onChange={(event) =>
-            onChange(
-              updateGradientStop(gradient, selected.id, {
-                position: number(event.target.value, 0) / 100,
-              })
-            )
-          }
-        />
+        <div className="mt-1">
+          <GradientNumericField
+            label={translate('highlighter.paintPicker.position')}
+            min={0}
+            max={100}
+            value={Math.round(selected.position * 100)}
+            onChange={(value) =>
+              onChange(
+                updateGradientStop(gradient, selected.id, {
+                  position: value / 100,
+                })
+              )
+            }
+          />
+        </div>
       </label>
       <div className="flex items-center gap-1">
         <ProductGlassIconButton
@@ -112,13 +124,13 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
   if (gradient.type === 'linear') {
     return (
       <div className={SECTION_CLASS_NAME}>
-        <label className="flex items-center justify-between gap-3 text-[11px]">
+        <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.25rem] items-center gap-3 text-[11px]">
           {translate('highlighter.paintPicker.angle')}
-          <input
-            className={`${FIELD_CLASS_NAME} w-20`}
-            type="number"
+          <GradientNumericField
+            className="!w-[6.25rem] min-w-0"
+            label={translate('highlighter.paintPicker.angle')}
             value={gradient.angle}
-            onChange={(event) => onChange(withAngle(gradient, number(event.target.value, 0)))}
+            onChange={(value) => onChange(withAngle(gradient, value))}
           />
         </label>
       </div>
@@ -132,16 +144,17 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
           {translate(
             axis === 'x' ? 'highlighter.paintPicker.centerX' : 'highlighter.paintPicker.centerY'
           )}
-          <input
-            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-            type="number"
-            min={0}
-            max={100}
-            value={Math.round(gradient.center[axis] * 100)}
-            onChange={(event) =>
-              onChange(withCenter(gradient, axis, number(event.target.value, 50) / 100))
-            }
-          />
+          <div className="mt-1">
+            <GradientNumericField
+              label={translate(
+                axis === 'x' ? 'highlighter.paintPicker.centerX' : 'highlighter.paintPicker.centerY'
+              )}
+              min={0}
+              max={100}
+              value={Math.round(gradient.center[axis] * 100)}
+              onChange={(value) => onChange(withCenter(gradient, axis, value / 100))}
+            />
+          </div>
         </label>
       ))}
       {gradient.type === 'radial'
@@ -150,26 +163,30 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
               {translate(
                 axis === 'x' ? 'highlighter.paintPicker.radiusX' : 'highlighter.paintPicker.radiusY'
               )}
-              <input
-                className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-                type="number"
-                value={Math.round(gradient.radius[axis] * 100)}
-                onChange={(event) =>
-                  onChange(withRadius(gradient, axis, number(event.target.value, 50) / 100))
-                }
-              />
+              <div className="mt-1">
+                <GradientNumericField
+                  label={translate(
+                    axis === 'x'
+                      ? 'highlighter.paintPicker.radiusX'
+                      : 'highlighter.paintPicker.radiusY'
+                  )}
+                  value={Math.round(gradient.radius[axis] * 100)}
+                  onChange={(value) => onChange(withRadius(gradient, axis, value / 100))}
+                />
+              </div>
             </label>
           ))
         : null}
       {gradient.type === 'conic' ? (
         <label className="col-span-2">
           {translate('highlighter.paintPicker.startAngle')}
-          <input
-            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-            type="number"
-            value={gradient.startAngle}
-            onChange={(event) => onChange(withStartAngle(gradient, number(event.target.value, 0)))}
-          />
+          <div className="mt-1">
+            <GradientNumericField
+              label={translate('highlighter.paintPicker.startAngle')}
+              value={gradient.startAngle}
+              onChange={(value) => onChange(withStartAngle(gradient, value))}
+            />
+          </div>
         </label>
       ) : null}
     </div>
@@ -189,69 +206,78 @@ function GradientAdvancedControls({
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label>
           {translate('highlighter.paintPicker.interpolation')}
-          <select
-            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
+          <CompactSelect
+            aria-label={translate('highlighter.paintPicker.interpolation')}
+            className="mt-1 h-8"
             value={gradient.interpolation}
-            onChange={(event) =>
+            options={[
+              { value: 'srgb', label: translate('highlighter.paintPicker.interpolationSrgb') },
+              {
+                value: 'srgb-linear',
+                label: translate('highlighter.paintPicker.interpolationLinearSrgb'),
+              },
+              { value: 'oklab', label: translate('highlighter.paintPicker.interpolationOklab') },
+              { value: 'oklch', label: translate('highlighter.paintPicker.interpolationOklch') },
+            ]}
+            onChange={(interpolation) =>
               onChange({
                 ...gradient,
-                interpolation: event.target.value as PaintInterpolationSpace,
+                interpolation: interpolation as PaintInterpolationSpace,
               })
             }
-          >
-            <option value="srgb">{translate('highlighter.paintPicker.interpolationSrgb')}</option>
-            <option value="srgb-linear">
-              {translate('highlighter.paintPicker.interpolationLinearSrgb')}
-            </option>
-            <option value="oklab">{translate('highlighter.paintPicker.interpolationOklab')}</option>
-            <option value="oklch">{translate('highlighter.paintPicker.interpolationOklch')}</option>
-          </select>
+          />
         </label>
         <label>
           {translate('highlighter.paintPicker.midpoint')}
-          <input
-            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-            type="number"
-            min={1}
-            max={99}
-            value={Math.round(selected.midpoint * 100)}
-            onChange={(event) =>
-              onChange(
-                updateGradientStop(gradient, selected.id, {
-                  midpoint: number(event.target.value, 50) / 100,
-                })
-              )
-            }
-          />
+          <div className="mt-1">
+            <GradientNumericField
+              label={translate('highlighter.paintPicker.midpoint')}
+              min={1}
+              max={99}
+              value={Math.round(selected.midpoint * 100)}
+              onChange={(value) =>
+                onChange(updateGradientStop(gradient, selected.id, { midpoint: value / 100 }))
+              }
+            />
+          </div>
         </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={gradient.repeat.enabled}
-            onChange={(event) =>
+        <label>
+          {translate('highlighter.paintPicker.repeat')}
+          <CompactSelect
+            aria-label={translate('highlighter.paintPicker.repeat')}
+            className="mt-1 h-8"
+            value={gradient.repeat.enabled ? 'enabled' : 'disabled'}
+            options={[
+              {
+                value: 'disabled',
+                label: translate('highlighter.paintPicker.repeatDisabled'),
+              },
+              { value: 'enabled', label: translate('highlighter.paintPicker.repeatEnabled') },
+            ]}
+            onChange={(value) =>
               onChange({
                 ...gradient,
-                repeat: { ...gradient.repeat, enabled: event.target.checked },
+                repeat: { ...gradient.repeat, enabled: value === 'enabled' },
               })
             }
           />
-          {translate('highlighter.paintPicker.repeat')}
         </label>
         <label>
           {translate('highlighter.paintPicker.span')}
-          <input
-            className={`${FIELD_CLASS_NAME} mt-1 w-full`}
-            type="number"
-            min={1}
-            max={100}
-            value={Math.round(gradient.repeat.span * 100)}
-            onChange={(event) =>
-              onChange({
-                ...gradient,
-                repeat: { ...gradient.repeat, span: number(event.target.value, 100) / 100 },
-              })
-            }
-          />
+          <div className="mt-1">
+            <GradientNumericField
+              label={translate('highlighter.paintPicker.span')}
+              min={1}
+              max={100}
+              value={Math.round(gradient.repeat.span * 100)}
+              onChange={(value) =>
+                onChange({
+                  ...gradient,
+                  repeat: { ...gradient.repeat, span: value / 100 },
+                })
+              }
+            />
+          </div>
         </label>
       </div>
     </details>

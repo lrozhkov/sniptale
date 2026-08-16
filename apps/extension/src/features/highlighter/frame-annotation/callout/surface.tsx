@@ -61,13 +61,25 @@ function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCallou
   const showBodyBadge =
     badge.enabled && (badge.placement === 'body-start' || !props.settings.style.title.enabled);
   const content = <div {...createCalloutContentProps(props, customStyles)} />;
-  return showBodyBadge ? (
-    <div style={{ alignItems: 'flex-start', display: 'flex', gap: 6 }}>
-      <CalloutBadge badge={badge} text={badgeText} />
-      <div style={{ flex: '1 1 auto', minWidth: 'min-content' }}>{content}</div>
+  return (
+    <div
+      data-sniptale-callout-body-layout="true"
+      style={
+        showBodyBadge
+          ? { alignItems: 'flex-start', display: 'flex', gap: 6 }
+          : { display: 'contents' }
+      }
+    >
+      {showBodyBadge ? <CalloutBadge badge={badge} text={badgeText} /> : null}
+      <div
+        data-sniptale-callout-body-content="true"
+        style={
+          showBodyBadge ? { flex: '1 1 auto', minWidth: 'min-content' } : { display: 'contents' }
+        }
+      >
+        {content}
+      </div>
     </div>
-  ) : (
-    content
   );
 }
 
