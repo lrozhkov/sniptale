@@ -108,6 +108,30 @@ it('authorizes supported background-owned owner routes', () => {
   ).toEqual({ authorized: true });
 });
 
+it('authorizes settings transfer only from the ordinary owned Settings page', () => {
+  const ordinary =
+    'chrome-extension://test/apps/extension/src/settings/index.html?section=settings-transfer';
+  const unlock = 'chrome-extension://test/apps/extension/src/settings/index.html?aiUnlock=1';
+  expect(authorizeBackgroundOwnedRoute(request(MessageType.SETTINGS_TRANSFER, ordinary))).toEqual({
+    authorized: true,
+  });
+  expect(authorizeBackgroundOwnedRoute(request(MessageType.SETTINGS_TRANSFER, unlock))).toEqual({
+    authorized: false,
+    reason: 'Unauthorized settings transfer sender',
+  });
+  expect(
+    authorizeBackgroundOwnedRoute(
+      request(
+        MessageType.SETTINGS_TRANSFER,
+        'chrome-extension://test/apps/extension/src/popup/index.html'
+      )
+    )
+  ).toEqual({
+    authorized: false,
+    reason: 'Unauthorized settings transfer sender',
+  });
+});
+
 it('authorizes voice input events only from an exact offscreen document identity', () => {
   const offscreenUrl =
     'chrome-extension://test/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1';

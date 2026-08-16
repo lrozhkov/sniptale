@@ -162,6 +162,80 @@ beforeEach(() => {
   installStorageState({});
 });
 
+it('owns transfer binding cleanup and restores encrypted state during compensation', async () => {
+  await installTransparentProviderSecret('provider-1-secret');
+  const before = structuredClone(localState);
+  const { prepareAIProviderTransferMutation } = await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({
+    importedProviders: [
+      {
+        ...createStoredProvider('provider-1'),
+        baseUrl: 'https://changed.example.com',
+        hasStoredApiKey: false,
+      },
+    ],
+  });
+
+  expect(plan.clearedProviderIds).toEqual(['provider-1']);
+  expect(plan.missingProviderIds).toEqual(['provider-1']);
+  await plan.commit();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({});
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([
+    expect.objectContaining({ id: 'provider-1', hasStoredApiKey: false }),
+  ]);
+
+  await plan.rollback();
+  expect(localState).toEqual(before);
+});
+
+it('preserves a stored secret when the imported URL keeps the canonical provider origin', async () => {
+  await installTransparentProviderSecret('provider-1-secret');
+  const beforeSecret = structuredClone(localState[AI_PROVIDER_SECRETS_KEY]);
+  const beforeKey = localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY];
+  const { prepareAIProviderTransferMutation } = await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({
+    importedProviders: [
+      {
+        ...createStoredProvider('provider-1'),
+        baseUrl: 'https://provider-1.example.com/v2',
+        hasStoredApiKey: false,
+      },
+    ],
+  });
+
+  expect(plan.clearedProviderIds).toEqual([]);
+  expect(plan.missingProviderIds).toEqual([]);
+  await plan.commit();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual(beforeSecret);
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBe(beforeKey);
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([
+    expect.objectContaining({ id: 'provider-1', hasStoredApiKey: true }),
+  ]);
+});
+
+it('clears and can restore a stored secret when the connection type changes', async () => {
+  await installTransparentProviderSecret('provider-1-secret');
+  const before = structuredClone(localState);
+  const { prepareAIProviderTransferMutation } = await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({
+    importedProviders: [
+      {
+        ...createStoredProvider('provider-1'),
+        connectionType: 'chrome-built-in',
+        hasStoredApiKey: false,
+      },
+    ],
+  });
+
+  expect(plan.clearedProviderIds).toEqual(['provider-1']);
+  expect(plan.missingProviderIds).toEqual(['provider-1']);
+  await plan.commit();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({});
+  await plan.rollback();
+  expect(localState).toEqual(before);
+});
+
 it('fails closed when encrypted secrets exist without stored key material', async () => {
   const created = await createAesGcmKeyMaterial();
   const storedSecret = await encryptSecret('provider-1-secret', created.key);

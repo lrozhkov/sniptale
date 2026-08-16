@@ -21,6 +21,7 @@ declare module './' {
     type AI_SECRET_UNLOCK = typeof import('./').MessageType.AI_SECRET_UNLOCK;
     type PAGE_ACCESS = typeof import('./').MessageType.PAGE_ACCESS;
     type ERASE_LOCAL_EXTENSION_DATA = typeof import('./').MessageType.ERASE_LOCAL_EXTENSION_DATA;
+    type SETTINGS_TRANSFER = typeof import('./').MessageType.SETTINGS_TRANSFER;
     type LLM_RESPONSE = typeof import('./').MessageType.LLM_RESPONSE;
     type LLM_ERROR = typeof import('./').MessageType.LLM_ERROR;
     type APPLY_VIEWPORT_PRESET = typeof import('./').MessageType.APPLY_VIEWPORT_PRESET;

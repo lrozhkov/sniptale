@@ -43,3 +43,29 @@ it('uses ordinary route-navigation semantics and reports the selected destinatio
   expect(onChange).toHaveBeenCalledWith('video');
   act(() => root.unmount());
 });
+
+it('blocks destination changes while its owner has a non-cancellable operation', () => {
+  const onChange = vi.fn();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <SettingsSubpageTabs
+        activeId="import"
+        ariaLabel="Transfer"
+        disabled
+        items={[
+          { id: 'export', label: 'Export' },
+          { id: 'import', label: 'Import' },
+        ]}
+        onChange={onChange}
+      />
+    )
+  );
+
+  const buttons = [...container.querySelectorAll('button')];
+  expect(buttons.every((button) => button.disabled)).toBe(true);
+  act(() => buttons[0]?.click());
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});

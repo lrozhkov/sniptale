@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buildSettingsRouteUrl,
   resolveSettingsRoute,
@@ -13,16 +13,31 @@ function initializeRouteFromLocation(): SettingsRoute {
   return resolution.route;
 }
 
-export function useSettingsRoute() {
+export function useSettingsRoute(options: { navigationBlocked?: boolean } = {}) {
   const [route, setRoute] = useState<SettingsRoute>(initializeRouteFromLocation);
+  const routeRef = useRef(route);
+  const navigationBlockedRef = useRef(options.navigationBlocked ?? false);
+  routeRef.current = route;
+  navigationBlockedRef.current = options.navigationBlocked ?? false;
 
   useEffect(() => {
-    const handlePopState = () => setRoute(initializeRouteFromLocation());
+    const handlePopState = () => {
+      if (navigationBlockedRef.current) {
+        globalThis.history.replaceState(
+          null,
+          '',
+          buildSettingsRouteUrl(globalThis.location.href, routeRef.current)
+        );
+        return;
+      }
+      setRoute(initializeRouteFromLocation());
+    };
     globalThis.addEventListener('popstate', handlePopState);
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, []);
 
   const navigate = useCallback((nextRoute: SettingsRoute) => {
+    if (navigationBlockedRef.current) return;
     const nextUrl = buildSettingsRouteUrl(globalThis.location.href, nextRoute);
     globalThis.history.pushState(null, '', nextUrl);
     setRoute(nextRoute);

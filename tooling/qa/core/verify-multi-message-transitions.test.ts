@@ -147,3 +147,24 @@ it('flags stale orchestration policy targets', () => {
     }),
   ]);
 });
+
+it('keeps sequential branch analysis bounded while preserving the maximum path', () => {
+  const root = createTempRoot();
+  writePolicy(root);
+  const file = writeFile(
+    root,
+    'apps/extension/src/workflows/settings-transfer/branching.ts',
+    [
+      'export function sendConditionalMessages(flags: boolean[]) {',
+      ...Array.from(
+        { length: 24 },
+        (_, index) => `  if (flags[${index}]) sendRuntimeMessage("${index}");`
+      ),
+      '}',
+    ].join('\n')
+  );
+
+  expect(collectMultiMessageTransitionViolations([file], { rootDir: root })).toEqual([
+    expect.objectContaining({ rule: 'multi-message-transitions' }),
+  ]);
+});

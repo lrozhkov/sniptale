@@ -11,6 +11,7 @@ import {
 } from '../../../ai/settings/route-descriptors';
 import { popupExportJobRouteDescriptor } from '../../../capture/popup-export/job/route-descriptors';
 import { localDataErasureRouteDescriptor } from '../../../application/privacy-erasure/route-descriptors';
+import { settingsTransferRouteDescriptor } from '../../../application/settings-transfer/route-descriptors';
 import { nativeAppRouteDescriptor } from '../../native-app/route-descriptors';
 import { contentActionRouteDescriptor } from '../../../routing-contracts/capabilities/content-action/route-descriptors';
 import type { BackgroundOwnedRouteInventoryEntry } from '../../../routing-contracts/owned-route-context';
@@ -35,6 +36,7 @@ export const backgroundOwnedRouteInventory = [
   pageAccessRouteDescriptor,
   contentRuntimeWakeupRouteDescriptor,
   localDataErasureRouteDescriptor,
+  settingsTransferRouteDescriptor,
   popupExportJobRouteDescriptor,
   llmContentProcessingRouteDescriptor,
   llmScenarioEditorProcessingRouteDescriptor,

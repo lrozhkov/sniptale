@@ -50,6 +50,7 @@ import type {
   RuntimeDesktopFrameResponseByType,
 } from './desktop-frame.types';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { SettingsTransferMessage, SettingsTransferResponse } from '../../../settings-transfer';
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
@@ -58,6 +59,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
   RuntimePrivacyErasureRequestByType &
   RuntimeFrameAnnotationRasterRequestByType &
   RuntimeDesktopFrameRequestByType & {
+    [MessageType.SETTINGS_TRANSFER]: SettingsTransferMessage;
     [MessageType.ENABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.ENABLE_SCREENSHOT_MODE;
       pageZoom?: number;
@@ -193,6 +195,7 @@ type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
   RuntimePrivacyErasureResponseByType &
   RuntimeFrameAnnotationRasterResponseByType &
   RuntimeDesktopFrameResponseByType & {
+    [MessageType.SETTINGS_TRANSFER]: SettingsTransferResponse;
     [MessageType.ENABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.DISABLE_SCREENSHOT_MODE]: RuntimeEmptyResponse;
     [MessageType.SCREENSHOT_MODE_STATUS]: ScreenshotModeStatusResponse;

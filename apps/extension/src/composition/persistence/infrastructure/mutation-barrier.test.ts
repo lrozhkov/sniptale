@@ -6,6 +6,7 @@ import {
   installPersistenceLockManagerForTests,
   runWithPersistenceMutationPermit,
   runWithPersistenceMutationTransition,
+  runWithExclusivePersistenceMutationPermit,
   runWithPersistenceDomainMutationLock,
   runWithPersistenceDomainMutationLocks,
   runWithPersistentDataErasureBarrier,
@@ -240,6 +241,33 @@ it('acquires multi-domain mutations in canonical order and blocks overlapping ow
   await batchMutation;
   await singleMutation;
   expect(single).toHaveBeenCalledOnce();
+});
+
+it('reserves the global persistence authority for a cross-domain transaction', async () => {
+  let releaseTransaction!: () => void;
+  const transactionGate = new Promise<void>((resolve) => {
+    releaseTransaction = resolve;
+  });
+  let transactionPermit: unknown;
+  const transactionOperation = vi.fn(async (permit: unknown) => {
+    transactionPermit = permit;
+    await transactionGate;
+  });
+  const concurrentMutation = vi.fn(async () => undefined);
+
+  const transaction = runWithExclusivePersistenceMutationPermit(transactionOperation);
+  await vi.waitFor(() => expect(transactionOperation).toHaveBeenCalledOnce());
+  expect(isActivePersistenceMutationPermit(transactionPermit)).toBe(true);
+
+  const mutation = runWithPersistenceMutationPermit(concurrentMutation);
+  await Promise.resolve();
+  expect(concurrentMutation).not.toHaveBeenCalled();
+
+  releaseTransaction();
+  await transaction;
+  await mutation;
+  expect(concurrentMutation).toHaveBeenCalledOnce();
+  expect(isActivePersistenceMutationPermit(transactionPermit)).toBe(false);
 });
 
 it('keeps a domain read-modify-write admitted until privacy erasure can begin', async () => {

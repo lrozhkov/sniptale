@@ -12,6 +12,7 @@ import { settingsVideoQualityMessages } from './video-quality';
 import { settingsVoiceInputMessages } from './voice-input';
 import { settingsCollectionMessages } from './collection';
 import { settingsStorageDraftsMessages } from './storage-drafts';
+import { settingsTransferMessages } from './transfer';
 
 export const settingsMessages = defineMessageSource({
   collection: settingsCollectionMessages,
@@ -27,4 +28,5 @@ export const settingsMessages = defineMessageSource({
   videoQuality: settingsVideoQualityMessages,
   voiceInput: settingsVoiceInputMessages,
   storageDrafts: settingsStorageDraftsMessages,
+  settingsTransfer: settingsTransferMessages,
 });

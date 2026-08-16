@@ -82,15 +82,22 @@ export function isActivePersistenceMutationPermit(
 export function runWithPersistenceMutationPermit<T>(
   operation: (permit: PersistenceMutationPermit) => T | Promise<T>
 ): Promise<T> {
-  return runWithPersistenceLock('shared', async () => {
-    const permit: PersistenceMutationPermit = { [persistenceMutationPermitBrand]: true };
-    activePersistenceMutationPermits.add(permit);
-    try {
-      return await operation(permit);
-    } finally {
-      activePersistenceMutationPermits.delete(permit);
-    }
-  });
+  return runWithPersistenceLock('shared', () => runWithActiveMutationPermit(operation));
+}
+
+/**
+ * Reserves the complete persistent mutation authority for an atomic cross-domain workflow.
+ * The transition lease keeps privacy erasure ordered outside the workflow while the active
+ * permit lets owner-prepared writes and compensating rollback use the guarded storage adapter.
+ */
+export function runWithExclusivePersistenceMutationPermit<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T> {
+  return getPersistenceLockManager().request(
+    PERSISTENCE_TRANSITION_LOCK_NAME,
+    { mode: 'shared' },
+    () => runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation))
+  );
 }
 
 /**
@@ -160,4 +167,16 @@ function acquireDomainLocks<T>(
     { mode: 'exclusive' },
     () => acquireDomainLocks(domains, index + 1, operation)
   );
+}
+
+async function runWithActiveMutationPermit<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T> {
+  const permit: PersistenceMutationPermit = { [persistenceMutationPermitBrand]: true };
+  activePersistenceMutationPermits.add(permit);
+  try {
+    return await operation(permit);
+  } finally {
+    activePersistenceMutationPermits.delete(permit);
+  }
 }

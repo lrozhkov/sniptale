@@ -1,0 +1,128 @@
+import { defineMessageSource } from '../source';
+
+const message = (ru: string, en: string) => ({ ru, en });
+
+export const settingsTransferMessages = defineMessageSource({
+  exportTab: message('Экспорт', 'Export'),
+  importTab: message('Импорт', 'Import'),
+  exportTitle: message('Экспорт настроек', 'Export settings'),
+  exportDescription: message(
+    'Создайте полный backup или выберите отдельные настройки и шаблоны.',
+    'Create a complete backup or select individual settings and templates.'
+  ),
+  importTitle: message('Импорт настроек', 'Import settings'),
+  completeBackup: message('Полная резервная копия', 'Complete backup'),
+  selectivePackage: message('Выборочный пакет', 'Selective package'),
+  treeLabel: message('Дерево переносимых настроек', 'Transferable settings tree'),
+  required: message('Обязательно', 'Required'),
+  disclosureTitle: message('Какие данные попадут в файл', 'Data included in the file'),
+  disclosureCopy: message(
+    'Файл может содержать тексты промптов и частные base URL. API-ключи, пароли, данные защиты и идентификаторы устройств никогда не экспортируются.',
+    'The file may contain prompt text and private base URLs. API keys, passphrases, protection data, and device identifiers are never exported.'
+  ),
+  download: message('Скачать JSON', 'Download JSON'),
+  working: message('Обработка…', 'Working…'),
+  loadError: message('Не удалось загрузить список настроек.', 'Could not load the settings list.'),
+  exportError: message('Не удалось создать файл экспорта.', 'Could not create the export file.'),
+  fileError: message(
+    'Файл не прошёл проверку совместимости и безопасности.',
+    'The file failed compatibility or security validation.'
+  ),
+  importError: message(
+    'Импорт не выполнен. Исходные настройки восстановлены.',
+    'Import failed. Original settings were restored.'
+  ),
+  staleError: message(
+    'Настройки изменились после preview. Проверьте импорт ещё раз.',
+    'Settings changed after preview. Review the import again.'
+  ),
+  dropFile: message(
+    'Перетащите сюда *.sniptale-settings.json',
+    'Drop a *.sniptale-settings.json file here'
+  ),
+  chooseFile: message('Выбрать файл', 'Choose file'),
+  compatibleFile: message(
+    'Файл совместим. Выберите содержимое и стратегию.',
+    'The file is compatible. Select content and a strategy.'
+  ),
+  strategy: message('Стратегия конфликтов', 'Conflict strategy'),
+  safeMerge: message('Безопасное объединение (рекомендуется)', 'Safe merge (recommended)'),
+  overwrite: message('Перезаписать совпадающие', 'Overwrite matching'),
+  exactRestore: message('Точное восстановление backup', 'Exact backup restore'),
+  conflict: message('Конфликт', 'Conflict'),
+  decision: message('Решение', 'Decision'),
+  keepLocal: message('Сохранить локальное', 'Keep local'),
+  useImported: message('Использовать импортированное', 'Use imported'),
+  importCopy: message('Импортировать как копию', 'Import as copy'),
+  destructiveConfirm: message(
+    'Я понимаю, что лишние элементы в выбранных коллекциях будут удалены.',
+    'I understand that extra items in selected collections will be deleted.'
+  ),
+  apply: message('Применить импорт', 'Apply import'),
+  reportTitle: message('Импорт завершён', 'Import complete'),
+  added: message('Добавлено', 'Added'),
+  updated: message('Обновлено', 'Updated'),
+  copied: message('Скопировано / переназначено', 'Copied / remapped'),
+  skipped: message('Пропущено', 'Skipped'),
+  copyReport: message('Копировать отчёт', 'Copy report'),
+  copyReportError: message('Не удалось скопировать отчёт.', 'Could not copy the report.'),
+  downloadReport: message('Скачать отчёт', 'Download report'),
+  done: message('Готово', 'Done'),
+  domainDescription: message('Группа переносимых настроек', 'Transferable settings group'),
+  fieldDescription: message('Переносимая настройка', 'Transferable setting'),
+  domains: {
+    interfacePreferences: message('Интерфейс и браузер', 'Interface and browser'),
+    captureQuickActions: message('Быстрые действия', 'Quick actions'),
+    captureViewportPresets: message('Размеры экрана', 'Screen sizes'),
+    captureImage: message('Качество изображений', 'Image quality'),
+    captureVideo: message('Профили видео', 'Video profiles'),
+    captureAfterCapture: message('Действия после захвата', 'After-capture actions'),
+    captureSaving: message('Шаблоны сохранения', 'Saving templates'),
+    captureRetention: message('Сроки хранения', 'Storage retention'),
+    stylesBorders: message('Рамки', 'Frames'),
+    stylesCallouts: message('Выноски', 'Callouts'),
+    stylesNumbering: message('Нумерация', 'Numbering'),
+    stylesTags: message('Теги', 'Tags'),
+    stylesToolPresets: message('Пресеты инструментов', 'Tool presets'),
+    stylesPalettes: message('Палитры', 'Palettes'),
+    stylesSurfaces: message('Стили surface', 'Surface styles'),
+    stylesGradients: message('Градиенты', 'Gradients'),
+    aiProviders: message('AI-провайдеры', 'AI providers'),
+    aiModels: message('AI-модели', 'AI models'),
+    aiChrome: message('Chrome AI', 'Chrome AI'),
+    aiPrompts: message('Системные промпты', 'System prompts'),
+    aiPromptTemplates: message('Шаблоны промптов', 'Prompt templates'),
+    systemVoice: message('Голосовой ввод', 'Voice input'),
+    systemNative: message('Приложение Sniptale', 'Sniptale app'),
+    accessCaptureAssets: message('Ресурсы снимков', 'Capture assets'),
+  },
+  fields: {
+    theme: message('Тема', 'Theme'),
+    locale: message('Язык', 'Language'),
+    popupStartup: message('Стартовая страница popup', 'Popup start page'),
+    contextMenu: message('Контекстное меню', 'Context menu'),
+    items: message('Элементы', 'Items'),
+    default: message('По умолчанию', 'Default'),
+    format: message('Формат', 'Format'),
+    quality: message('Качество', 'Quality'),
+    profiles: message('Профили', 'Profiles'),
+    selection: message('Выбор профиля', 'Profile selection'),
+    output: message('Выходной формат', 'Output format'),
+    action: message('Действие', 'Action'),
+    templates: message('Шаблоны', 'Templates'),
+    defaults: message('Значения по умолчанию', 'Defaults'),
+    policy: message('Политика хранения', 'Retention policy'),
+    activeFilter: message('Активный фильтр', 'Active filter'),
+    annotation: message('Аннотации', 'Annotations'),
+    global: message('Глобальный промпт', 'Global prompt'),
+    scenario: message('Сценарный промпт', 'Scenario prompt'),
+    enabled: message('Включено', 'Enabled'),
+    language: message('Язык', 'Language'),
+    mode: message('Режим', 'Mode'),
+    capture: message('Захват', 'Capture'),
+    tray: message('Команды tray', 'Tray commands'),
+    telemetry: message('Телеметрия', 'Telemetry'),
+    authenticated: message('Авторизованные ресурсы', 'Authenticated assets'),
+    anonymous: message('Анонимные ресурсы', 'Anonymous assets'),
+  },
+});

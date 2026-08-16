@@ -35,6 +35,9 @@ const offscreenDesktopPrepareContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME];
 const offscreenDesktopCaptureContract =
   runtimeActionCoreMessageContracts[MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME];
+const settingsTransferContract = runtimeActionCoreMessageContracts[MessageType.SETTINGS_TRANSFER];
+const promoteAggregateContract =
+  runtimeActionCoreMessageContracts[MessageType.PROMOTE_AGGREGATE_TO_LIBRARY];
 
 const desktopSelection = {
   dataUrl:
@@ -55,6 +58,37 @@ const validScreenshotConfig = {
   imageQuality: null,
   exitAfterCapture: false,
 } as const;
+
+it('rejects non-settings-transfer messages in the action-core contract', () => {
+  for (const value of [null, {}, { type: MessageType.SETTINGS_TRANSFER, operation: 'unknown' }]) {
+    expect(() => settingsTransferContract.parseRequest(value)).toThrow();
+  }
+  expect(
+    settingsTransferContract.parseRequest({
+      type: MessageType.SETTINGS_TRANSFER,
+      operation: 'read-export-tree',
+    })
+  ).toMatchObject({ operation: 'read-export-tree' });
+  expect(() => annotationForkSessionContract.parseRequest(null)).toThrow();
+  expect(() =>
+    annotationForkSessionContract.parseRequest({
+      type: MessageType.ANNOTATION_FORK_SESSION,
+      operation: 'unknown',
+    })
+  ).toThrow();
+  expect(
+    promoteAggregateContract.parseRequest({
+      type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+      aggregate: { id: 'image-1', kind: 'image' },
+    })
+  ).toMatchObject({ aggregate: { id: 'image-1', kind: 'image' } });
+  expect(() =>
+    promoteAggregateContract.parseRequest({
+      type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
+      aggregate: { id: '', kind: 'other' },
+    })
+  ).toThrow();
+});
 
 it('parses strict popup screenshot capture requests and typed responses', () => {
   const request = {
@@ -150,6 +184,22 @@ it('resolves desktop encoding policy before the popup opens the picker', () => {
 });
 
 it('parses exact offscreen desktop frame responses and rejects malformed dimensions', () => {
+  const captureRequest = {
+    type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+    capabilityToken: 'desktop-capability',
+    requestId: 'request-1',
+    streamId: 'desktop-stream-1',
+    imageFormat: 'png',
+    imageQuality: 80,
+  } as const;
+  expect(offscreenDesktopCaptureContract.parseRequest(captureRequest)).toEqual(captureRequest);
+  expect(() =>
+    offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, requestId: '' })
+  ).toThrow();
+  expect(() =>
+    offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, imageQuality: 101 })
+  ).toThrow();
+
   expect(
     offscreenDesktopPrepareContract.parseResponse({ success: true, result: 'accepted' })
   ).toEqual({ success: true, result: 'accepted' });

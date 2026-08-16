@@ -28,6 +28,7 @@ const ownerRouteDescriptorFiles = [
   'apps/extension/src/background/capture/popup-export/job/route-descriptors.ts',
   'apps/extension/src/background/capture/routing/route-descriptors.ts',
   'apps/extension/src/background/application/privacy-erasure/route-descriptors.ts',
+  'apps/extension/src/background/application/settings-transfer/route-descriptors.ts',
   'apps/extension/src/background/diagnostics/route-descriptors.ts',
   'apps/extension/src/background/frame-annotation-raster/route-descriptors.ts',
   'apps/extension/src/background/media/video/runtime/handlers/export/route-descriptors.ts',

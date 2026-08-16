@@ -16,6 +16,7 @@ export type BackgroundOwnedRouteHandlerId =
   | 'llm-scenario-editor-processing'
   | 'llm-session'
   | 'local-data-erasure'
+  | 'settings-transfer'
   | 'native-app-runtime'
   | 'page-access'
   | 'popup-export-job'

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sniptale.app/schemas/settings-transfer/v1.schema.json",
+  "title": "Sniptale Settings Transfer v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "formatVersion", "exportKind", "exportedAt", "source", "domains"],
+  "properties": {
+    "format": { "const": "sniptale-settings" },
+    "formatVersion": { "const": 1 },
+    "exportKind": { "enum": ["backup", "selective"] },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["appVersion"],
+      "properties": { "appVersion": { "type": "string", "minLength": 1, "maxLength": 128 } }
+    },
+    "domains": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schemaVersion", "data"],
+        "properties": {
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "data": { "$ref": "#/$defs/jsonValue" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["null", "boolean", "number", "string"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/jsonValue" } }
+      ]
+    }
+  }
+}

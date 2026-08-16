@@ -67,6 +67,10 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Доступ и данные',
     en: 'Access and data',
   },
+  settingsTransfer: {
+    ru: 'Импорт и экспорт',
+    en: 'Import and export',
+  },
   descriptions: {
     interfaceBrowser: {
       ru: 'Настройте тему, язык и поведение браузерных функций.',
@@ -119,6 +123,10 @@ export const settingsNavigationMessages = defineMessageSource({
     accessData: {
       ru: 'Управляйте разрешениями, конфиденциальностью и локальными данными.',
       en: 'Manage permissions, privacy, and local data.',
+    },
+    settingsTransfer: {
+      ru: 'Создавайте резервные копии и переносите выбранные настройки.',
+      en: 'Create backups and transfer selected settings.',
     },
   },
   views: {
