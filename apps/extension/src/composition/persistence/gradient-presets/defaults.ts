@@ -1,82 +1,25 @@
 import { parsePaint, type Gradient } from '@sniptale/foundation/paint';
 import {
+  getShowcaseGradient,
+  SHOWCASE_GRADIENT_IDS,
+} from '../../../features/highlighter/showcase-resources';
+import {
   GRADIENT_PRESET_CATALOG_REVISION,
   type GradientPresetCatalog,
   type StoredGradientPreset,
 } from './contracts';
 
-const stop = (id: string, color: string, position: number) => ({
-  id,
-  color,
-  position,
-  midpoint: 0.5,
-});
-const linear = (
-  id: string,
-  name: string,
-  colors: [string, string],
-  angle: number,
-  order: number
-): StoredGradientPreset => ({
-  customized: false,
-  enabled: true,
-  id,
-  name,
-  order,
-  origin: 'system',
-  gradient: {
-    type: 'linear',
-    angle,
-    interpolation: 'oklab',
-    repeat: { enabled: false, span: 1 },
-    stops: [stop(`${id}-0`, colors[0], 0), stop(`${id}-1`, colors[1], 1)],
-  },
-});
-
-export const SYSTEM_GRADIENT_PRESETS: readonly StoredGradientPreset[] = [
-  linear('system-sunset', 'system-sunset', ['#f97316ff', '#ec4899ff'], 135, 0),
-  linear('system-ocean', 'system-ocean', ['#0f172aff', '#2563ebff'], 135, 1),
-  linear('system-aurora', 'system-aurora', ['#22c55eff', '#8b5cf6ff'], 110, 2),
-  {
+export const SYSTEM_GRADIENT_PRESETS: readonly StoredGradientPreset[] = SHOWCASE_GRADIENT_IDS.map(
+  (id, order) => ({
     customized: false,
     enabled: true,
-    id: 'system-radial-glow',
-    name: 'system-radial-glow',
-    order: 3,
+    id,
+    name: id,
+    order,
     origin: 'system',
-    gradient: {
-      type: 'radial',
-      center: { x: 0.5, y: 0.5 },
-      radius: { x: 0.65, y: 0.65 },
-      interpolation: 'oklab',
-      repeat: { enabled: false, span: 1 },
-      stops: [
-        stop('system-radial-glow-0', '#facc15cc', 0),
-        stop('system-radial-glow-1', '#f9731600', 1),
-      ],
-    },
-  },
-  {
-    customized: false,
-    enabled: true,
-    id: 'system-conic-spectrum',
-    name: 'system-conic-spectrum',
-    order: 4,
-    origin: 'system',
-    gradient: {
-      type: 'conic',
-      center: { x: 0.5, y: 0.5 },
-      startAngle: 0,
-      interpolation: 'oklch',
-      repeat: { enabled: false, span: 1 },
-      stops: [
-        stop('system-conic-spectrum-0', '#ef4444ff', 0),
-        stop('system-conic-spectrum-1', '#22c55eff', 0.5),
-        stop('system-conic-spectrum-2', '#3b82f6ff', 1),
-      ],
-    },
-  },
-] as const;
+    gradient: getShowcaseGradient(id),
+  })
+);
 
 function cloneGradient(gradient: Gradient): Gradient {
   return structuredClone(gradient);

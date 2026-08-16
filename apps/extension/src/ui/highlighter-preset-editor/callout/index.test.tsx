@@ -40,7 +40,9 @@ it('edits an existing preset in the shared persistent modal', async () => {
     );
   });
 
-  expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe('Облачко');
+  expect(document.querySelector<HTMLInputElement>('input[maxlength="64"]')?.value).toBe(
+    'Оранжевый Sniptale'
+  );
   expect(document.querySelector<HTMLElement>('[role="dialog"]')?.style.width).toBe('660px');
   expect(document.querySelector('.sniptale-highlighter-preset-editor-dialog')).not.toBeNull();
   expect(
@@ -126,7 +128,11 @@ it('shows localized badge weight options in the shared editor', async () => {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
-  const preset = createSystemCalloutPresetCatalog()[4]!;
+  const source = createSystemCalloutPresetCatalog()[4]!;
+  const preset = {
+    ...source,
+    style: { ...source.style, badge: { ...source.style.badge, enabled: false } },
+  };
 
   await act(async () => {
     root.render(

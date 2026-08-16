@@ -97,7 +97,11 @@ function Harness() {
     content: { bodyHtml: '', titleText: '' },
     enabled: true,
     placement: preset.placement,
-    style: preset.style,
+    style: {
+      ...preset.style,
+      accentEdge: { ...preset.style.accentEdge, enabled: false },
+      badge: { ...preset.style.badge, enabled: false },
+    },
   });
   latestSettings = settings;
   return (
@@ -237,9 +241,16 @@ it('edits every shared callout inspector section and connector mode', async () =
   await clickAll('[data-color-field]');
   await changeAllNumbers();
   expect(latestSettings.style.title).toMatchObject({
-    backgroundColor: '#123456',
     textColor: '#123456',
   });
+  expect(
+    document.querySelector('button[aria-label="content.callout.titleBackgroundLabel"]')
+  ).not.toBeNull();
+  await selectOption('content.callout.titleFillModeLabel', 'content.callout.titleFillMode.unified');
+  expect(latestSettings.style.title.fillMode).toBe('unified');
+  expect(
+    document.querySelector('button[aria-label="content.callout.titleBackgroundLabel"]')
+  ).toBeNull();
   expect(latestSettings.content.titleText).toBe('Saved heading');
   await clickAll('button[aria-label="content.callout.titleToggle"]');
   expect(latestSettings.style.title.enabled).toBe(false);
@@ -307,7 +318,7 @@ it('edits every shared callout inspector section and connector mode', async () =
   expect(latestSettings.style.customCss).toBe('[title]\ntext-transform: uppercase;');
   expect(document.querySelector('textarea')?.getAttribute('aria-invalid')).toBe('true');
 
-  expect(latestSettings.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#f8fafcff' });
+  expect(latestSettings.style.surface.fillPaint).toEqual({ kind: 'solid', color: '#fff7edfa' });
   expect(latestSettings.style.connector.kind).toBe('none');
 });
 

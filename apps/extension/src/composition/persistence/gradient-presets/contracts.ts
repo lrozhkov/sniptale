@@ -1,6 +1,6 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 
-export const GRADIENT_PRESET_CATALOG_REVISION = 2;
+export const GRADIENT_PRESET_CATALOG_REVISION = 3;
 export const GRADIENT_PRESET_STORAGE_KEY = 'sniptale_gradient_presets';
 export const GRADIENT_PRESET_SURFACES = ['highlighter-frame-fill'] as const;
 export type GradientPresetSurface = (typeof GRADIENT_PRESET_SURFACES)[number];

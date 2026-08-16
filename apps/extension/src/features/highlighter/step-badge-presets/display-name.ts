@@ -8,6 +8,16 @@ const systemKeys: Record<SystemStepBadgePresetKey, Parameters<typeof translate>[
   'system-compact': 'highlighter.stepBadgePresets.system.compact',
   'system-large': 'highlighter.stepBadgePresets.system.large',
   'system-letters': 'highlighter.stepBadgePresets.system.letters',
+  'system-pill': 'highlighter.stepBadgePresets.system.pill',
+  'system-stamp': 'highlighter.stepBadgePresets.system.stamp',
+  'system-neon-orbit': 'highlighter.stepBadgePresets.system.neonOrbit',
+  'system-neon-square': 'highlighter.stepBadgePresets.system.neonSquare',
+  'system-editorial-counter': 'highlighter.stepBadgePresets.system.editorialCounter',
+  'system-editorial-index': 'highlighter.stepBadgePresets.system.editorialIndex',
+  'system-editorial-mark': 'highlighter.stepBadgePresets.system.editorialMark',
+  'system-retro-sunset': 'highlighter.stepBadgePresets.system.retroSunset',
+  'system-retro-arcade': 'highlighter.stepBadgePresets.system.retroArcade',
+  'system-retro-memphis': 'highlighter.stepBadgePresets.system.retroMemphis',
 };
 
 export function getStepBadgePresetDisplayName(

@@ -1,15 +1,13 @@
 import { expect, it } from 'vitest';
-import {
-  createSystemCalloutPresetCatalog,
-  SYSTEM_CALLOUT_PRESET_CATALOG_REVISION,
-} from '../../../features/highlighter/callout-presets/catalog';
+import { createSystemCalloutPresetCatalog } from '../../../features/highlighter/callout-presets/catalog';
+import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/system-preset';
 import { resolveStoredCalloutPresetCatalog, serializeCalloutPresetCatalog } from './migration';
 import { parseStoredCalloutPresetCatalog } from './parser';
 import { setCalloutSessionDefaults } from './mutations';
 
 it('creates a fully enabled default catalog and compactly round-trips it', () => {
   const fresh = resolveStoredCalloutPresetCatalog({});
-  expect(fresh.presets).toHaveLength(6);
+  expect(fresh.presets).toHaveLength(15);
   expect(fresh.defaultPresetId).toBe('system-callout-bubble');
   expect(fresh.newSessionDefaults).toEqual({ enabled: false, templateSource: 'frame-default' });
   expect(fresh.presets.every((preset) => preset.enabled !== false)).toBe(true);
@@ -44,12 +42,14 @@ it('keeps an untouched catalog open to newly introduced system presets after def
 
 it('migrates absent tag metadata and compactly round-trips assigned tags', () => {
   const legacy = resolveStoredCalloutPresetCatalog({});
-  expect(legacy.presets.every((preset) => preset.tagIds.length === 0)).toBe(true);
+  expect(legacy.presets.every((preset) => preset.tagIds.length === 1)).toBe(true);
   legacy.presets[0]!.tagIds = ['tag-one'];
+  expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(legacy))).toEqual(legacy);
+  legacy.presets[0]!.tagIds = [];
   expect(resolveStoredCalloutPresetCatalog(serializeCalloutPresetCatalog(legacy))).toEqual(legacy);
 });
 
-it('preserves customized systems and appends missing canonical systems disabled', () => {
+it('preserves customized systems and appends missing canonical systems enabled and tagged', () => {
   const bubble = createSystemCalloutPresetCatalog()[0]!;
   const style = { ...bubble.style, surface: { ...bubble.style.surface, radius: 33 } };
   const migrated = resolveStoredCalloutPresetCatalog({
@@ -67,7 +67,7 @@ it('preserves customized systems and appends missing canonical systems disabled'
   expect(
     migrated.presets
       .filter((preset) => preset.id !== bubble.id)
-      .every((preset) => preset.enabled === false)
+      .every((preset) => preset.enabled !== false && preset.tagIds.length === 1)
   ).toBe(true);
 });
 

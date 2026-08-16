@@ -67,7 +67,11 @@ export function cloneCalloutStyle(style: CalloutVisualStyle): CalloutVisualStyle
       ...style.surface,
       fillPaint: clonePaint(style.surface?.fillPaint ?? DEFAULT_STYLE.surface.fillPaint),
     },
-    title: { ...DEFAULT_STYLE.title, ...style.title },
+    title: {
+      ...DEFAULT_STYLE.title,
+      ...style.title,
+      fillPaint: clonePaint(style.title?.fillPaint ?? DEFAULT_STYLE.title.fillPaint),
+    },
     typography: { ...DEFAULT_STYLE.typography, ...style.typography },
   };
 }
@@ -181,7 +185,11 @@ export function applyCalloutSettingsPatch(
         ...patch.style?.surface,
         fillPaint: clonePaint(patch.style?.surface?.fillPaint ?? settings.style.surface.fillPaint),
       },
-      title: { ...settings.style.title, ...patch.style?.title },
+      title: {
+        ...settings.style.title,
+        ...patch.style?.title,
+        fillPaint: clonePaint(patch.style?.title?.fillPaint ?? settings.style.title.fillPaint),
+      },
       typography: { ...settings.style.typography, ...patch.style?.typography },
     },
   };

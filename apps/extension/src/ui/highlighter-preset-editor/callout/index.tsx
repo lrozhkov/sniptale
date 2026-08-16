@@ -22,6 +22,7 @@ import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
 import { Eye } from 'lucide-react';
 import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
+import { clonePaint } from '@sniptale/foundation/paint';
 
 function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
   if (anchor === 'middle-left') return { anchor, side: 'left' };
@@ -44,7 +45,11 @@ function applyStylePatch(style: CalloutVisualStyle, patch: CalloutSettingsPatch)
     },
     customCss: patch.style?.customCss ?? style.customCss,
     surface: { ...style.surface, ...patch.style?.surface },
-    title: { ...style.title, ...patch.style?.title },
+    title: {
+      ...style.title,
+      ...patch.style?.title,
+      fillPaint: clonePaint(patch.style?.title?.fillPaint ?? style.title.fillPaint),
+    },
     typography: { ...style.typography, ...patch.style?.typography },
   };
 }

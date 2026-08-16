@@ -371,12 +371,16 @@ function isCalloutTypography(value: unknown): boolean {
 }
 
 function isCalloutTitle(value: unknown): boolean {
+  const hasCurrentFill =
+    isRecord(value) &&
+    parsePaint(value['fillPaint']) !== null &&
+    isOneOf(value['fillMode'], ['separate', 'unified']);
+  const hasLegacyFill = isRecord(value) && isSafeCssColor(value['backgroundColor']);
   return (
     hasFields(
       value,
       ['dividerWidth', 'fontSize', 'letterSpacing', 'lineHeight'],
       [
-        'backgroundColor',
         'dividerColor',
         'dividerStyle',
         'fontFamily',
@@ -389,7 +393,8 @@ function isCalloutTitle(value: unknown): boolean {
       ],
       ['enabled']
     ) &&
-    hasSafeColorFields(value, ['backgroundColor', 'dividerColor', 'textColor']) &&
+    hasSafeColorFields(value, ['dividerColor', 'textColor']) &&
+    (hasCurrentFill || hasLegacyFill) &&
     isOneOf(value['dividerStyle'], ['solid', 'dashed', 'dotted']) &&
     isOneOf(value['fontFamily'], ['sans', 'serif', 'mono', 'cursive']) &&
     isOneOf(value['fontStyle'], ['normal', 'italic']) &&
@@ -524,14 +529,25 @@ export function normalizeCalloutSettings(value: unknown) {
   if (!isCalloutSettings(value) || !isRecord(value)) return null;
   const style = value['style'] as Record<string, unknown>;
   const surface = style['surface'] as Record<string, unknown>;
+  const title = style['title'] as Record<string, unknown>;
   const fillPaint =
     parsePaint(surface['fillPaint']) ?? createSolidPaint(surface['backgroundColor'] as string);
   const { backgroundColor: _legacyBackgroundColor, ...surfaceWithoutLegacy } = surface;
+  const titleFillPaint =
+    parsePaint(title['fillPaint']) ?? createSolidPaint(title['backgroundColor'] as string);
+  const { backgroundColor: _legacyTitleBackgroundColor, ...titleWithoutLegacy } = title;
   return {
     ...structuredClone(value),
     style: {
       ...structuredClone(style),
       surface: { ...structuredClone(surfaceWithoutLegacy), fillPaint },
+      title: {
+        ...structuredClone(titleWithoutLegacy),
+        fillMode: isOneOf(title['fillMode'], ['separate', 'unified'])
+          ? title['fillMode']
+          : 'separate',
+        fillPaint: titleFillPaint,
+      },
     },
   } as unknown as import('@sniptale/runtime-contracts/highlighter/callout').CalloutSettings;
 }

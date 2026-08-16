@@ -31,6 +31,15 @@ export const SYSTEM_CALLOUT_PRESET_KEYS = [
   'system-callout-pointer-note',
   'system-callout-header-card',
   'system-callout-framed-note',
+  'system-callout-ribbon',
+  'system-callout-sticky',
+  'system-callout-terminal',
+  'system-callout-editorial-caption',
+  'system-callout-editorial-quote',
+  'system-callout-editorial-proof',
+  'system-callout-retro-sunset',
+  'system-callout-retro-arcade',
+  'system-callout-retro-memphis',
 ] as const;
 
 export type SystemCalloutPresetKey = (typeof SYSTEM_CALLOUT_PRESET_KEYS)[number];
@@ -103,7 +112,8 @@ export interface CalloutTypographyStyle {
 }
 
 export interface CalloutTitleStyle {
-  backgroundColor: string;
+  fillPaint: Paint;
+  fillMode: 'separate' | 'unified';
   dividerColor: string;
   dividerStyle: CalloutLineStyle;
   dividerWidth: number;

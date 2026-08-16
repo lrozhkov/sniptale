@@ -31,6 +31,7 @@ afterEach(() => {
 it('does not let a large title font impose the input default character width on the card', () => {
   const preset = createSystemCalloutPresetCatalog()[0]!;
   const noop = vi.fn();
+  const onBadgeTextChange = vi.fn();
   const props: ComponentProps<typeof CalloutBody> = {
     applyFormatting: noop,
     calloutDimensions: { height: 120, width: 240 },
@@ -59,8 +60,11 @@ it('does not let a large title font impose the input default character width on 
     handleResizeRightKeyDown: noop,
     handleResizeRightPointerDown: noop,
     handleSettingsClick: noop,
+    handleTitleToggleClick: noop,
     handleTailBaseEndKeyDown: noop,
     handleTailBaseEndPointerDown: noop,
+    handleTailBaseRangeKeyDown: noop,
+    handleTailBaseRangePointerDown: noop,
     handleTailFrameKeyDown: noop,
     handleTailFramePointerDown: noop,
     handleTailKeyDown: noop,
@@ -76,12 +80,16 @@ it('does not let a large title font impose the input default character width on 
     isResizingLeft: false,
     isResizingRight: false,
     isTailBaseEndDragging: false,
+    isTailBaseRangeDragging: false,
+    isTitleEnabled: true,
     isTailDragging: false,
     isTailFrameDragging: false,
     isWaypointDragging: false,
     isPolylineWaypoint: false,
     isWidthResizeHandleHidden: false,
     onTitleChange: noop,
+    onBadgeEditingFinish: noop,
+    onBadgeTextChange,
     portalTarget: document.body,
     portalTheme: null,
     resizeLeftHandleStyle: {},
@@ -114,6 +122,7 @@ it('does not let a large title font impose the input default character width on 
     settingsHandleStyle: {},
     showSettingsHandle: false,
     tailBaseEndHandleStyle: null,
+    tailBaseRangeHandleStyle: null,
     tailFrameHandleStyle: null,
     tailHandleCursor: 'default',
     tailHandleStyle: null,
@@ -147,6 +156,28 @@ it('does not let a large title font impose the input default character width on 
     titleMeasure?.querySelector('[data-sniptale-callout-badge-measure="true"]')?.textContent
   ).toBe('MARK');
   expect(document.querySelectorAll('[data-ui="content.callout.badge"]')).toHaveLength(1);
+  const badgeInput = document.querySelector<HTMLInputElement>(
+    'input[data-ui="content.callout.badge"]'
+  )!;
+  const badgeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  act(() => {
+    badgeSetter?.call(badgeInput, 'Edited tag');
+    badgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(onBadgeTextChange).toHaveBeenCalledWith('Edited tag');
+  act(() => {
+    badgeInput.focus();
+    badgeInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a' }));
+  });
+  for (const key of ['Escape', 'Enter']) {
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key });
+    act(() => {
+      badgeInput.focus();
+      badgeInput.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).not.toBe(badgeInput);
+  }
 
   const wedge = getDynamicTailState({
     bubbleRect: { x: 20, y: 20, width: 240, height: 120 },
@@ -265,8 +296,11 @@ it('keeps body and title direction independent, including the auto bidi mode', (
     handleResizeRightKeyDown: noop,
     handleResizeRightPointerDown: noop,
     handleSettingsClick: noop,
+    handleTitleToggleClick: noop,
     handleTailBaseEndKeyDown: noop,
     handleTailBaseEndPointerDown: noop,
+    handleTailBaseRangeKeyDown: noop,
+    handleTailBaseRangePointerDown: noop,
     handleTailFrameKeyDown: noop,
     handleTailFramePointerDown: noop,
     handleTailKeyDown: noop,
@@ -283,11 +317,15 @@ it('keeps body and title direction independent, including the auto bidi mode', (
     isResizingLeft: false,
     isResizingRight: false,
     isTailBaseEndDragging: false,
+    isTailBaseRangeDragging: false,
+    isTitleEnabled: true,
     isTailDragging: false,
     isTailFrameDragging: false,
     isWaypointDragging: false,
     isWidthResizeHandleHidden: false,
     onTitleChange: noop,
+    onBadgeEditingFinish: noop,
+    onBadgeTextChange: noop,
     portalTarget: document.body,
     portalTheme: null,
     resizeLeftHandleStyle: {},
@@ -306,6 +344,7 @@ it('keeps body and title direction independent, including the auto bidi mode', (
     settingsHandleStyle: {},
     showSettingsHandle: false,
     tailBaseEndHandleStyle: null,
+    tailBaseRangeHandleStyle: null,
     tailFrameHandleStyle: null,
     tailHandleCursor: 'default',
     tailHandleStyle: null,

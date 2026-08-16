@@ -190,7 +190,7 @@ it('uses the current Settings locale for system item display names', async () =>
   expect(snapshot.locale).toBe('ru');
   expect(snapshot.dynamicItems).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ id: 'system-surface-plain', label: 'Обычный' }),
+      expect.objectContaining({ id: 'system-surface-plain', label: 'Чистый белый' }),
     ])
   );
 });
@@ -322,12 +322,12 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
         id: 'video-profile-a',
         collectionNodeId: 'capture.video.profiles',
       }),
-      expect.objectContaining({ id: 'system-default', label: 'Accent' }),
+      expect.objectContaining({ id: 'system-default', label: 'Sniptale Orange' }),
       expect.objectContaining({ id: 'system-surface-plain', label: 'Plain' }),
       expect.objectContaining({ id: 'system-sunset', label: 'Sunset' }),
       expect.objectContaining({ id: 'system-window-hd', label: 'HD window' }),
-      expect.objectContaining({ id: 'system-callout-bubble', label: 'Bubble' }),
-      expect.objectContaining({ id: 'system-classic', label: 'Classic' }),
+      expect.objectContaining({ id: 'system-callout-bubble', label: 'Sniptale Orange' }),
+      expect.objectContaining({ id: 'system-classic', label: 'Sniptale Orange' }),
     ])
   );
 });

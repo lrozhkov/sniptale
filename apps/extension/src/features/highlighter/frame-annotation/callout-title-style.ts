@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { resolveFrameCalloutFontFamily } from './callout/font-family';
 
 function getTitleTypographyStyle(style: CalloutVisualStyle): CSSProperties {
@@ -39,7 +40,10 @@ export function getFrameCalloutTitleStyle(
     borderBottom: `${style.title.dividerWidth}px ${style.title.dividerStyle} ${style.title.dividerColor}`,
     borderRadius: `${titleRadius}px ${titleRadius}px 0 0`,
     outline: 0,
-    background: style.title.backgroundColor,
+    background:
+      style.title.fillMode === 'unified'
+        ? 'transparent'
+        : serializePaintToCss(style.title.fillPaint),
     color: style.title.textColor,
     ...getTitleTypographyStyle(style),
     fontSize: style.title.fontSize,

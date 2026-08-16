@@ -225,7 +225,12 @@ function parseSurface(value: unknown): CalloutVisualStyle['surface'] | null {
 function parseTitle(value: unknown): CalloutVisualStyle['title'] | null {
   if (!isPlainRecord(value)) return null;
   const enabled = value['enabled'];
-  const backgroundColor = readColor(value['backgroundColor']);
+  const fillPaint =
+    parsePaint(value['fillPaint']) ??
+    (readColor(value['backgroundColor'])
+      ? createSolidPaint(readColor(value['backgroundColor'])!)
+      : null);
+  const fillMode = readEnum(value['fillMode'], 'separate', ['separate', 'unified']);
   const dividerColor = readColor(value['dividerColor'], 'transparent');
   const dividerStyle = readEnum(value['dividerStyle'], 'solid', ['solid', 'dashed', 'dotted']);
   const dividerWidth = readNumber(value, 'dividerWidth', 0, 0, 12);
@@ -241,7 +246,8 @@ function parseTitle(value: unknown): CalloutVisualStyle['title'] | null {
   const textColor = readColor(value['textColor']);
   if (
     !isBoolean(enabled) ||
-    !backgroundColor ||
+    !fillPaint ||
+    !fillMode ||
     !dividerColor ||
     !dividerStyle ||
     dividerWidth === null ||
@@ -258,7 +264,8 @@ function parseTitle(value: unknown): CalloutVisualStyle['title'] | null {
   )
     return null;
   return {
-    backgroundColor,
+    fillPaint,
+    fillMode,
     dividerColor,
     dividerStyle,
     dividerWidth,

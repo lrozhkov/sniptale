@@ -43,9 +43,9 @@ function createController(): CalloutPresetCatalogController {
 }
 
 describe('CalloutPresetsPanel', () => {
-  it('renders all six system previews, default state, and catalog controls', () => {
+  it('renders all fifteen system previews, default state, and catalog controls', () => {
     const markup = renderToStaticMarkup(<CalloutPresetsPanel controller={createController()} />);
-    expect(markup.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(6);
+    expect(markup.match(/highlighter\.calloutPresets\.system\./g)).toHaveLength(15);
     expect(markup).toContain('settings.collection.defaultBadge');
     expect(markup).toContain('settings.collection.builtInBadge');
     expect(markup).toContain('highlighter.calloutPresets.add');

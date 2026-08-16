@@ -52,6 +52,7 @@ function preservePlacement(
       systemPresetKey: canonical.systemPresetKey,
       basedOnRevision: current.basedOnRevision ?? 0,
       customized: true,
+      tagIds: [...current.tagIds],
     };
   }
 
@@ -59,6 +60,7 @@ function preservePlacement(
     ...canonical,
     enabled: current.enabled ?? true,
     order: current.order,
+    tagIds: [...current.tagIds],
   };
 }
 
@@ -180,10 +182,7 @@ function collectStoredPreset(current: BorderPreset, state: CatalogNormalizationS
   collectUserPreset(current, state);
 }
 
-function appendMissingSystemPresets(
-  catalogWasUntouched: boolean,
-  state: CatalogNormalizationState
-): void {
+function appendMissingSystemPresets(state: CatalogNormalizationState): void {
   let nextOrder =
     state.normalized.reduce((maximum, preset) => Math.max(maximum, preset.order), -1) + 1;
   for (const canonical of createSystemBorderPresetCatalog()) {
@@ -191,7 +190,7 @@ function appendMissingSystemPresets(
     if (state.seenSystemKeys.has(key)) continue;
     state.normalized.push({
       ...canonical,
-      enabled: catalogWasUntouched,
+      enabled: true,
       order: nextOrder++,
     });
     state.seenSystemKeys.add(key);
@@ -221,8 +220,7 @@ export function normalizeHighlighterCatalogState(
     collectStoredPreset(current, state);
   }
 
-  const catalogWasUntouched = input.catalogCustomized !== true && !state.discoveredCustomization;
-  appendMissingSystemPresets(catalogWasUntouched, state);
+  appendMissingSystemPresets(state);
   const ordered = restoreCanonicalOrderForUntouchedCatalog(state);
   const borderPresets = repairEnabledInvariant(ordered);
   return {

@@ -27,6 +27,7 @@ type FrameCalloutEditingModel = {
     applyFormatting: React.ComponentProps<typeof CalloutBody>['applyFormatting'];
     blur: React.ComponentProps<typeof CalloutBody>['handleBlur'];
     click: React.ComponentProps<typeof CalloutBody>['handleClick'];
+    finish: React.ComponentProps<typeof CalloutBody>['onBadgeEditingFinish'];
     input: React.ComponentProps<typeof CalloutBody>['handleInput'];
     keyDown: React.ComponentProps<typeof CalloutBody>['handleKeyDown'];
     paste: React.ComponentProps<typeof CalloutBody>['handlePaste'];
@@ -51,6 +52,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
   isFrameEditing: boolean;
   isSettingsOpen: boolean;
   onContentChange?: (htmlContent: string) => void;
+  onBadgeTextChange: (text: string) => void;
   onMoveEnd?: () => void;
   onCurveChange: (curve: CalloutCurveSettings) => void;
   onPositionChange: (
@@ -58,9 +60,11 @@ export type FrameCalloutInteractiveSurfaceProps = {
     behavior: CalloutDragBehavior
   ) => void;
   onSettingsClick: () => void;
+  onStartEditing: () => void;
   onTailBaseRangeChange: (position: number, width: number, attachment?: CalloutAttachment) => void;
   onTailFramePositionChange: (position: number, attachment?: CalloutAttachment) => void;
   onTitleChange: (titleText: string) => void;
+  onTitleEnabledChange: (enabled: boolean) => void;
   onWaypointChange: (waypoint: CalloutSettings['placement']['connectorWaypoint']) => void;
   onWidthChange: (
     maxWidth: number,
@@ -87,6 +91,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
 
 export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSurfaceProps) {
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const [titleFocusRequested, setTitleFocusRequested] = React.useState(false);
   const [, markFontReady] = React.useReducer((revision) => revision + 1, 0);
   React.useEffect(() => {
     if (!requiresFrameCalloutHandwrittenFont(props.settings)) return;
@@ -105,6 +110,16 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
       current = false;
     };
   }, [props.settings]);
+  React.useEffect(() => {
+    if (!titleFocusRequested || !props.isEditing || !props.settings.style.title.enabled) return;
+    const input = wrapperRef.current?.querySelector<HTMLInputElement>(
+      '[data-sniptale-callout-title="true"]'
+    );
+    if (!input) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    setTitleFocusRequested(false);
+  }, [props.isEditing, props.settings.style.title.enabled, titleFocusRequested]);
   const coordinateSpace = props.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
   const visualScale = props.chrome === 'export' ? 1 : props.chromeScale;
   const interaction = useCalloutInteractionLayout({
@@ -131,7 +146,12 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
     zIndex: props.zIndex,
   });
 
-  const bodyArgs = { props, interaction, coordinateSpace };
+  const bodyArgs = {
+    props,
+    interaction,
+    coordinateSpace,
+    requestTitleFocus: () => setTitleFocusRequested(true),
+  };
   return <CalloutBody {...createCalloutBodyProps(bodyArgs)} wrapperRef={wrapperRef} />;
 }
 
@@ -139,12 +159,21 @@ type BodyArgs = {
   coordinateSpace: FrameAnnotationCoordinateSpace;
   interaction: ReturnType<typeof useCalloutInteractionLayout>;
   props: FrameCalloutInteractiveSurfaceProps;
+  requestTitleFocus: () => void;
 };
 
 function createCalloutHandleCallbacks(args: BodyArgs) {
   const { interaction } = args;
   return {
     handleSettingsClick: args.props.onSettingsClick,
+    handleTitleToggleClick: () => {
+      const enabled = args.interaction.effectiveSettings.style.title.enabled;
+      args.props.onTitleEnabledChange(!enabled);
+      if (!enabled) {
+        args.requestTitleFocus();
+        args.props.onStartEditing();
+      }
+    },
     handleDragPointerDown: interaction.handles.drag.handlePointerDown,
     handleDragKeyDown: interaction.handles.drag.handleKeyDown,
     handleHandleBlur: interaction.handles.drag.handleBlur,
@@ -153,6 +182,8 @@ function createCalloutHandleCallbacks(args: BodyArgs) {
     handleTailKeyDown: interaction.handles.tailBaseStartDrag.handleKeyDown,
     handleTailBaseEndPointerDown: interaction.handles.tailBaseEndDrag.handlePointerDown,
     handleTailBaseEndKeyDown: interaction.handles.tailBaseEndDrag.handleKeyDown,
+    handleTailBaseRangePointerDown: interaction.handles.tailBaseRangeDrag.handlePointerDown,
+    handleTailBaseRangeKeyDown: interaction.handles.tailBaseRangeDrag.handleKeyDown,
     handleTailFramePointerDown: interaction.handles.tailFrameDrag.handlePointerDown,
     handleTailFrameKeyDown: interaction.handles.tailFrameDrag.handleKeyDown,
     handleWaypointPointerDown: interaction.handles.waypointDrag.handlePointerDown,
@@ -184,6 +215,7 @@ function createCalloutHandleState(args: BodyArgs) {
       handles.drag.isHandleVisible ||
       handles.tailBaseStartDrag.isDragging ||
       handles.tailBaseEndDrag.isDragging ||
+      handles.tailBaseRangeDrag.isDragging ||
       handles.tailFrameDrag.isDragging ||
       handles.curveStartDrag.isDragging ||
       handles.curveEndDrag.isDragging ||
@@ -193,6 +225,7 @@ function createCalloutHandleState(args: BodyArgs) {
     isResizingRight: handles.widthResize.activeSide === 'right',
     isTailDragging: handles.tailBaseStartDrag.isDragging,
     isTailBaseEndDragging: handles.tailBaseEndDrag.isDragging,
+    isTailBaseRangeDragging: handles.tailBaseRangeDrag.isDragging,
     isTailFrameDragging: handles.tailFrameDrag.isDragging,
     isWaypointDragging: handles.waypointDrag.isDragging,
     isCurveStartDragging: handles.curveStartDrag.isDragging,
@@ -202,6 +235,7 @@ function createCalloutHandleState(args: BodyArgs) {
     waypointAngle:
       layout.dynamicTail?.kind === 'line' ? layout.dynamicTail.routeControlAngle : null,
     hasWaypoint: settings.placement.connectorWaypoint !== undefined,
+    isTitleEnabled: settings.style.title.enabled,
   };
 }
 
@@ -243,6 +277,8 @@ function createCalloutBodyProps(args: BodyArgs) {
     settings: args.interaction.effectiveSettings,
     showInteractionChrome: args.props.chrome !== 'export',
     onTitleChange: args.props.onTitleChange,
+    onBadgeTextChange: args.props.onBadgeTextChange,
+    onBadgeEditingFinish: editing.events.finish,
     dynamicTail: layout.dynamicTail,
     settingsAnchorRef: args.props.settingsAnchorRef,
     showSettingsHandle: args.props.showSettingsHandle,

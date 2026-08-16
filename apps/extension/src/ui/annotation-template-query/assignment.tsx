@@ -1,6 +1,7 @@
 import type { AnnotationTemplateTagId } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { translate } from '../../platform/i18n';
 import { useAnnotationTemplateTagState } from './state';
+import { getAnnotationTemplateTagDisplayName } from './tag-display-name';
 
 export function AnnotationTemplateTagAssignment(props: {
   onChange: (tagIds: AnnotationTemplateTagId[]) => void;
@@ -40,7 +41,7 @@ export function AnnotationTemplateTagAssignment(props: {
                 }
                 type="button"
               >
-                {tag.label}
+                {getAnnotationTemplateTagDisplayName(tag)}
               </button>
             );
           })}

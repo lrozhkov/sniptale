@@ -15,6 +15,8 @@ it('resolves semantic colors and uses fallback for transparent frame fill', () =
     ...settings.style,
     backgroundColorSource: 'frame-fill',
     backgroundColor: '#abcdef',
+    outlineColorSource: 'frame-border',
+    textColorSource: 'frame-border',
   };
   expect(
     resolveStepBadgeVisualStyle(settings, {

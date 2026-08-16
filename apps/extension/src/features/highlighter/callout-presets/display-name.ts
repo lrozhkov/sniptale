@@ -9,6 +9,15 @@ const SYSTEM_NAME_KEYS: Record<SystemCalloutPresetKey, Parameters<typeof transla
   'system-callout-pointer-note': 'highlighter.calloutPresets.system.pointerNote',
   'system-callout-header-card': 'highlighter.calloutPresets.system.headerCard',
   'system-callout-framed-note': 'highlighter.calloutPresets.system.framedNote',
+  'system-callout-ribbon': 'highlighter.calloutPresets.system.ribbon',
+  'system-callout-sticky': 'highlighter.calloutPresets.system.sticky',
+  'system-callout-terminal': 'highlighter.calloutPresets.system.terminal',
+  'system-callout-editorial-caption': 'highlighter.calloutPresets.system.editorialCaption',
+  'system-callout-editorial-quote': 'highlighter.calloutPresets.system.editorialQuote',
+  'system-callout-editorial-proof': 'highlighter.calloutPresets.system.editorialProof',
+  'system-callout-retro-sunset': 'highlighter.calloutPresets.system.retroSunset',
+  'system-callout-retro-arcade': 'highlighter.calloutPresets.system.retroArcade',
+  'system-callout-retro-memphis': 'highlighter.calloutPresets.system.retroMemphis',
 };
 
 export function getCalloutPresetDisplayName(

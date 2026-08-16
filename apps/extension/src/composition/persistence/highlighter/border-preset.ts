@@ -12,6 +12,7 @@ import {
 import { multiplyColorAlpha, normalizeColor } from '@sniptale/foundation/color';
 import { createSolidPaint, parsePaint } from '@sniptale/foundation/paint';
 import { parseAnnotationTemplateTagIds } from '../annotation-template-tags/tag-ids';
+import { getCanonicalSystemBorderPreset } from '../../../features/highlighter/presets/catalog';
 
 const borderStyles = new Set<BorderPreset['style']>(['solid', 'dashed', 'dotted']);
 const blurTypes = new Set<BorderPresetEffects['blur']['blurType']>([
@@ -101,7 +102,29 @@ function isBorderPadding(value: unknown): value is BorderPadding {
   );
 }
 
-function parseBorderPreset(value: unknown): BorderPreset | null {
+function hydrateCompactSystemPreset(value: unknown): unknown {
+  if (
+    !isPlainRecord(value) ||
+    value['width'] !== undefined ||
+    value['origin'] !== 'system' ||
+    value['customized'] !== false ||
+    !isSystemBorderPresetKey(value['systemPresetKey'])
+  ) {
+    return value;
+  }
+  const canonical = getCanonicalSystemBorderPreset(value['systemPresetKey']);
+  return {
+    ...canonical,
+    basedOnRevision: value['basedOnRevision'],
+    enabled: value['enabled'],
+    id: value['id'],
+    order: value['order'],
+    ...(value['tagIds'] === undefined ? {} : { tagIds: value['tagIds'] }),
+  };
+}
+
+function parseBorderPreset(rawValue: unknown): BorderPreset | null {
+  const value = hydrateCompactSystemPreset(rawValue);
   const effects = isPlainRecord(value) ? parseBorderPresetEffects(value['effects']) : null;
   const tagIds = isPlainRecord(value)
     ? parseAnnotationTemplateTagIds(value['tagIds'])
@@ -171,7 +194,12 @@ function parseBorderPreset(value: unknown): BorderPreset | null {
     shadow,
     style: value['style'] as BorderPreset['style'],
     width: value['width'],
-    tagIds: tagIds.value,
+    tagIds:
+      value['tagIds'] === undefined &&
+      value['origin'] === 'system' &&
+      isSystemBorderPresetKey(value['systemPresetKey'])
+        ? [...getCanonicalSystemBorderPreset(value['systemPresetKey'])!.tagIds]
+        : tagIds.value,
     ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),
     ...(value['origin'] === undefined ? {} : { origin: value['origin'] as 'system' | 'user' }),
     ...(value['systemPresetKey'] === undefined

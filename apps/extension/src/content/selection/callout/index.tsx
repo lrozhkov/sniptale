@@ -29,7 +29,9 @@ interface CalloutProps {
   onStartEditing: () => void;
   onStopEditing: () => void;
   onContentChange: (htmlContent: string) => void;
+  onBadgeTextChange: (text: string) => void;
   onTitleChange: (titleText: string) => void;
+  onTitleEnabledChange: (enabled: boolean) => void;
   onDelete: () => void;
   onSettingsClick: () => void;
   onPositionChange: (
@@ -74,6 +76,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
           applyFormatting: editing.applyFormatting,
           blur: editing.handleBlur,
           click: editing.handleClick,
+          finish: editing.finishEditing,
           input: editing.handleInput,
           keyDown: editing.handleKeyDown,
           paste: editing.handlePaste,
@@ -94,11 +97,14 @@ export const Callout: React.FC<CalloutProps> = (props) => {
       isFrameEditing={props.isFrameEditing}
       isSettingsOpen={props.isSettingsOpen}
       onCurveChange={props.onCurveChange}
+      onBadgeTextChange={props.onBadgeTextChange}
       onPositionChange={props.onPositionChange}
       onSettingsClick={props.onSettingsClick}
+      onStartEditing={props.onStartEditing}
       onTailBaseRangeChange={props.onTailBaseRangeChange}
       onTailFramePositionChange={props.onTailFramePositionChange}
       onTitleChange={props.onTitleChange}
+      onTitleEnabledChange={props.onTitleEnabledChange}
       onWaypointChange={props.onWaypointChange}
       onWidthChange={props.onWidthChange}
       portalTarget={resolveContentPortalTarget(resolveCalloutThemeOwner())}

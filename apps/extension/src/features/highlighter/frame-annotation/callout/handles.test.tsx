@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { renderCalloutInteractionHandles, type CalloutInteractionHandleProps } from './handles';
@@ -21,10 +23,13 @@ function createProps(
     handleResizeRightKeyDown: vi.fn(),
     handleResizeRightPointerDown: vi.fn(),
     handleSettingsClick: vi.fn(),
+    handleTitleToggleClick: vi.fn(),
     handleTailPointerDown: vi.fn(),
     handleTailKeyDown: vi.fn(),
     handleTailBaseEndPointerDown: vi.fn(),
     handleTailBaseEndKeyDown: vi.fn(),
+    handleTailBaseRangePointerDown: vi.fn(),
+    handleTailBaseRangeKeyDown: vi.fn(),
     handleTailFramePointerDown: vi.fn(),
     handleTailFrameKeyDown: vi.fn(),
     handleWaypointPointerDown: vi.fn(),
@@ -41,6 +46,8 @@ function createProps(
     isTailDragging: false,
     isTailBaseEndDragging: false,
     isTailFrameDragging: false,
+    isTailBaseRangeDragging: false,
+    isTitleEnabled: true,
     isWaypointDragging: false,
     isPolylineWaypoint: false,
     portalTheme: null,
@@ -52,6 +59,7 @@ function createProps(
     tailHandleCursor: 'ew-resize',
     tailHandleStyle: { left: 120, top: 140 },
     tailBaseEndHandleStyle: { left: 140, top: 140 },
+    tailBaseRangeHandleStyle: { left: 126, top: 136, width: 28, height: 8 },
     tailFrameHandleStyle: { left: 160, top: 180 },
     waypointHandleStyle: { left: 150, top: 150 },
     waypointAngle: null,
@@ -69,9 +77,19 @@ describe('callout interaction handles', () => {
     expect(markup).toContain('sniptale-content-ui-zoom-surface');
     expect(markup).toContain('sniptale-callout-drag-handle');
     expect(markup).toContain('sniptale-callout-settings-handle');
+    expect(markup).toContain('sniptale-callout-title-toggle-handle');
+    expect(markup).toContain('lucide-heading');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup.indexOf('sniptale-callout-drag-handle')).toBeLessThan(
+      markup.indexOf('sniptale-callout-title-toggle-handle')
+    );
+    expect(markup.indexOf('sniptale-callout-title-toggle-handle')).toBeLessThan(
+      markup.indexOf('sniptale-callout-settings-handle')
+    );
     expect(markup).toContain('sniptale-callout-tail-handle');
     expect(markup).toContain('sniptale-callout-tail-base-start-handle');
     expect(markup).toContain('sniptale-callout-tail-base-end-handle');
+    expect(markup).toContain('sniptale-callout-tail-base-range-handle');
     expect(markup).toContain('sniptale-callout-tail-frame-handle');
     expect(markup).toContain('sniptale-callout-waypoint-handle');
     expect(markup).toContain('lucide-plus');
@@ -171,5 +189,25 @@ describe('callout interaction handles', () => {
 
     expect(markup).toContain('opacity:0');
     expect(markup).toContain('pointer-events:none');
+  });
+
+  it('toggles the heading from the live adjacent control and exposes its inactive state', () => {
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const handleTitleToggleClick = vi.fn();
+    act(() => {
+      root.render(
+        renderCalloutInteractionHandles(
+          createProps({ handleTitleToggleClick, isTitleEnabled: false })
+        )
+      );
+    });
+    const button = host.querySelector<HTMLButtonElement>('.sniptale-callout-title-toggle-handle')!;
+
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    act(() => button.click());
+    expect(handleTitleToggleClick).toHaveBeenCalledOnce();
+
+    act(() => root.unmount());
   });
 });

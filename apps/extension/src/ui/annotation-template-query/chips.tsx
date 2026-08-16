@@ -1,5 +1,6 @@
 import type { AnnotationTemplateTag } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import type { ReactNode } from 'react';
+import { getAnnotationTemplateTagDisplayName } from './tag-display-name';
 
 export function AnnotationTemplateTagChips(props: {
   className?: string;
@@ -8,7 +9,7 @@ export function AnnotationTemplateTagChips(props: {
   if (props.tags.length === 0) return null;
   const visible = props.tags.slice(0, 2);
   const hiddenCount = props.tags.length - visible.length;
-  const fullLabel = props.tags.map((tag) => tag.label).join(', ');
+  const fullLabel = props.tags.map((tag) => getAnnotationTemplateTagDisplayName(tag)).join(', ');
   return (
     <span
       aria-label={fullLabel}
@@ -29,7 +30,7 @@ export function AnnotationTemplateTagChips(props: {
           ].join(' ')}
           key={tag.id}
         >
-          {tag.label}
+          {getAnnotationTemplateTagDisplayName(tag)}
         </span>
       ))}
       {hiddenCount > 0 ? (

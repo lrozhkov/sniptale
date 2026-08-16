@@ -11,6 +11,8 @@ import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-men
 const FILTER_TRIGGER_BASE_CLASS_NAME = [
   'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg',
   'border px-2 text-xs transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2',
+  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 const FILTER_TRIGGER_ACTIVE_CLASS_NAME = [
   'border-[var(--sniptale-color-border-accent-strong)]',

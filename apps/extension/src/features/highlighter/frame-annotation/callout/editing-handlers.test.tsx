@@ -12,6 +12,7 @@ function EditingHandlersHarness(props: {
   onContentChange: (html: string) => void;
   onDelete?: () => void;
   onStartEditing?: () => void;
+  onStopEditing?: () => void;
   titleText?: string;
 }) {
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
@@ -24,13 +25,14 @@ function EditingHandlersHarness(props: {
     onDelete: props.onDelete ?? vi.fn(),
     ...(props.titleText === undefined ? {} : { titleText: props.titleText }),
     onStartEditing: props.onStartEditing ?? vi.fn(),
-    onStopEditing: vi.fn(),
+    onStopEditing: props.onStopEditing ?? vi.fn(),
   });
 
   return (
     <div className="sniptale-callout" onClick={handlers.handleClick}>
       <button data-ui="finish-without-node" onClick={() => handlers.finishEditing(null)} />
       <input data-sniptale-callout-title="true" readOnly={!(props.isEditing ?? true)} />
+      <input data-ui="content.callout.badge" readOnly={!(props.isEditing ?? true)} />
       <div
         ref={contentEditableRef}
         contentEditable
@@ -51,6 +53,24 @@ beforeAll(() => {
   (
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
+});
+
+it('keeps the current editing transaction open when the badge is clicked', () => {
+  const onStopEditing = vi.fn();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <EditingHandlersHarness onContentChange={vi.fn()} onStopEditing={onStopEditing} />
+    );
+  });
+
+  act(() =>
+    container?.querySelector<HTMLInputElement>('[data-ui="content.callout.badge"]')?.click()
+  );
+
+  expect(onStopEditing).not.toHaveBeenCalled();
 });
 
 afterEach(() => {
@@ -88,6 +108,36 @@ it('restores title focus when title click starts callout editing', () => {
   expect(onStartEditing).toHaveBeenCalledOnce();
   act(() => animationFrames[0]?.(0));
   expect(document.activeElement).toBe(title);
+});
+
+it('restores badge focus after its first click starts callout editing', () => {
+  const onStartEditing = vi.fn();
+  const animationFrames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  });
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(
+      <EditingHandlersHarness
+        isEditing={false}
+        onContentChange={vi.fn()}
+        onStartEditing={onStartEditing}
+      />
+    );
+  });
+  const badge = container.querySelector<HTMLInputElement>('[data-ui="content.callout.badge"]')!;
+  badge.value = 'Tag';
+
+  act(() => badge.click());
+  expect(onStartEditing).toHaveBeenCalledOnce();
+  act(() => animationFrames[0]?.(0));
+  expect(document.activeElement).toBe(badge);
+  expect(badge.selectionStart).toBe(3);
 });
 
 it('sanitizes contenteditable input before publishing callout content changes', () => {

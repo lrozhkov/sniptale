@@ -6,22 +6,34 @@ import {
   getCanonicalSystemStepBadgePreset,
 } from './catalog';
 
-it('provides five independent stable system templates', () => {
+it('provides fifteen independent stable system templates', () => {
   const presets = createSystemStepBadgePresetCatalog();
   expect(presets.map((preset) => preset.id)).toEqual([
     'system-classic',
     'system-outline',
+    'system-pill',
     'system-compact',
-    'system-large',
     'system-letters',
+    'system-stamp',
+    'system-large',
+    'system-neon-orbit',
+    'system-neon-square',
+    'system-editorial-counter',
+    'system-editorial-index',
+    'system-editorial-mark',
+    'system-retro-sunset',
+    'system-retro-arcade',
+    'system-retro-memphis',
   ]);
-  expect(presets.find((preset) => preset.id === 'system-compact')?.settings.style.diameter).toBe(
-    24
+  expect(presets.find((preset) => preset.id === 'system-compact')?.settings.style.sizeSource).toBe(
+    'frame-border'
   );
-  expect(presets.find((preset) => preset.id === 'system-large')?.settings.style.diameter).toBe(40);
+  expect(presets.find((preset) => preset.id === 'system-large')?.settings.style.sizeSource).toBe(
+    'frame-border'
+  );
   expect(presets[0]?.settings.style.outlineWidth).toBe(2);
   expect(presets.find((preset) => preset.id === 'system-letters')?.settings).toMatchObject({
-    alphabet: 'cyrillic',
+    alphabet: 'latin',
     auto: true,
     type: 'letter',
   });
@@ -50,7 +62,7 @@ it('normalizes legacy settings and returns independent canonical system snapshot
   const canonical = getCanonicalSystemStepBadgePreset('system-outline');
   canonical.settings.style.backgroundColor = '#000000';
   expect(getCanonicalSystemStepBadgePreset('system-outline').settings.style.backgroundColor).toBe(
-    '#ffffff'
+    '#f97316'
   );
   expect(createStepBadgeSettingsFromTemplate(template)).not.toHaveProperty('sourcePresetId');
 });

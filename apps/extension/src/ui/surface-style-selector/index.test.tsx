@@ -248,7 +248,7 @@ it('matches semantically, drafts a preset, and applies only on Apply', async () 
       .querySelector<HTMLButtonElement>('[aria-label="Дублировать"], [aria-label="Duplicate"]')!
       .click()
   );
-  expect(actions.onDuplicate).toHaveBeenCalledWith('plain', 'Plain — копия');
+  expect(actions.onDuplicate).toHaveBeenCalledWith('plain', 'Plain (копия)');
   await act(async () =>
     document.querySelector<HTMLButtonElement>('[data-ui="surface-style.apply"]')!.click()
   );

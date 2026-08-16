@@ -47,6 +47,24 @@ describe('getCalloutTitleStyle', () => {
     });
   });
 
+  it('renders a full Paint fill for a separate heading and reveals the shared surface in unified mode', () => {
+    const gradient = createSystemCalloutPresetCatalog().find(
+      (preset) => preset.style.surface.fillPaint.kind === 'gradient'
+    )!.style.surface.fillPaint;
+    expect(
+      getCalloutTitleStyle(
+        { ...style, title: { ...style.title, fillMode: 'separate', fillPaint: gradient } },
+        false
+      ).background
+    ).toContain('gradient');
+    expect(
+      getCalloutTitleStyle(
+        { ...style, title: { ...style.title, fillMode: 'unified', fillPaint: gradient } },
+        false
+      ).background
+    ).toBe('transparent');
+  });
+
   it('keeps title typography independent and measures text without height', () => {
     const decoratedBodyStyle = {
       ...style,

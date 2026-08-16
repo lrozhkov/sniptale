@@ -49,6 +49,7 @@ describe('callout color bindings', () => {
       {
         ...style,
         accentEdge: { ...style.accentEdge, color: '#ffaa00' },
+        colorBindings: { ...style.colorBindings, accent: 'custom' },
         badge: {
           ...style.badge,
           backgroundColorSource: 'accent',

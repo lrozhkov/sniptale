@@ -13,7 +13,11 @@ import {
 import { areKnownAnnotationTemplateTagIds } from '../annotation-template-tags/known-ids';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredHighlighterSettings } from './guards';
-import { cloneHighlighterSettings, createHighlighterWriteController } from './mutation-write';
+import {
+  cloneHighlighterSettings,
+  createHighlighterWriteController,
+  serializeHighlighterSettings,
+} from './mutation-write';
 import { resolveLoadedHighlighterSettings, warnAboutInvalidStoredSettings } from './resolved';
 import {
   addUserBorderPreset,
@@ -211,7 +215,10 @@ export async function migrateHighlighterSystemPresetCatalog(): Promise<boolean> 
         cacheLoadedHighlighterSettings(migrated);
         return false;
       }
-      if (stored !== undefined && JSON.stringify(stored) === JSON.stringify(migrated)) {
+      if (
+        stored !== undefined &&
+        JSON.stringify(stored) === JSON.stringify(serializeHighlighterSettings(migrated))
+      ) {
         cacheLoadedHighlighterSettings(migrated);
         return false;
       }

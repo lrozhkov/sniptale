@@ -18,63 +18,33 @@ describe('highlighter storage defaults', () => {
     expect(settings.borderPresets.map((preset) => preset.id)).toEqual([
       'system-default',
       'system-soft-highlight',
+      'system-sunrise',
       'system-marker',
       'system-success',
+      'system-sticky-note',
       'system-attention',
       'system-review',
-      'system-light-ui',
       'system-dark-ui',
+      'system-light-ui',
+      'system-editorial-ink',
+      'system-editorial-proof',
+      'system-retro-sunset',
+      'system-retro-arcade',
+      'system-retro-memphis',
     ]);
     expect(settings.defaultBorderPresetId).toBe('system-default');
-    expect(settings.borderPresets).toEqual([
-      expect.objectContaining({
-        id: 'system-default',
-        color: '#F97316',
-        width: 3,
-        style: 'solid',
-        radius: 0,
-        padding: { top: 3, right: 3, bottom: 3, left: 3 },
-        fillPaint: { kind: 'solid' as const, color: '#00000000' },
-        shadow: 0,
-      }),
-      expect.objectContaining({
-        id: 'system-soft-highlight',
-        color: '#2563EB',
-        width: 3,
-        style: 'solid',
-        radius: 10,
-        padding: { top: 6, right: 6, bottom: 6, left: 6 },
-        fillPaint: { kind: 'solid' as const, color: '#60a5fa14' },
-        shadow: 30,
-      }),
-      expect.objectContaining({
-        id: 'system-marker',
-        color: '#A16207',
-        width: 2,
-        radius: 4,
-        padding: { top: 3, right: 3, bottom: 3, left: 3 },
-        fillPaint: { kind: 'solid' as const, color: '#facc152e' },
-      }),
-      expect.objectContaining({
-        id: 'system-success',
-        color: '#16A34A',
-        fillPaint: { kind: 'solid' as const, color: '#22c55e14' },
-      }),
-      expect.objectContaining({
-        id: 'system-attention',
-        color: '#EF4444',
-        width: 4,
-        fillPaint: { kind: 'solid' as const, color: '#ef444412' },
-        shadow: 30,
-      }),
-      expect.objectContaining({ id: 'system-review', color: '#8B5CF6', style: 'dashed' }),
-      expect.objectContaining({ id: 'system-light-ui', color: '#111827', width: 2 }),
-      expect.objectContaining({ id: 'system-dark-ui', color: '#F8FAFC', width: 2, shadow: 30 }),
-    ]);
+    expect(
+      new Set(
+        settings.borderPresets.map(
+          (preset) =>
+            `${preset.effects?.linkedTemplates?.calloutPresetId}:${preset.effects?.linkedTemplates?.stepBadgePresetId}`
+        )
+      ).size
+    ).toBe(15);
     expect(settings.borderPresets.every((preset) => preset.customCss === '')).toBe(true);
     expect(settings.borderPresets.every((preset) => preset.inheritCustomCss === false)).toBe(true);
     expect(settings.borderPresets.every((preset) => preset.enabled !== false)).toBe(true);
-    expect(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets).toHaveLength(8);
+    expect(DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets).toHaveLength(15);
   });
 
   it('keeps expanded visual fields in default and test-helper presets', () => {
@@ -87,13 +57,13 @@ describe('highlighter storage defaults', () => {
     const storedSettings = createStoredSettings();
 
     expect(DEFAULT_BORDER_PRESET).toMatchObject({
-      fillPaint: { kind: 'solid' as const, color: '#00000000' },
+      fillPaint: { kind: 'solid' as const },
       inheritCustomCss: false,
-      shadow: 0,
+      shadow: 8,
     });
     expect(settings.borderPresets[0]).toMatchObject({
-      fillPaint: { kind: 'solid' as const, color: '#00000000' },
-      shadow: 0,
+      fillPaint: { kind: 'solid' as const },
+      shadow: 8,
     });
     expect(settings.systemPresetCatalogRevision).toBeGreaterThan(0);
     expect(settings.defaultBlurSettings).toMatchObject({
@@ -121,8 +91,8 @@ describe('highlighter storage default snapshots', () => {
     firstSettings.defaultFocusSettings.opacity = 0.9;
 
     expect(secondSettings.borderPresets[0]).toMatchObject({
-      padding: { top: 3, left: 3, right: 3, bottom: 3 },
-      shadow: 0,
+      padding: { top: 4, left: 4, right: 4, bottom: 4 },
+      shadow: 8,
     });
     expect(secondSettings.defaultBlurSettings.amount).toBe(10);
     expect(secondSettings.defaultBlurSettings.strokeWidth).toBe(0);

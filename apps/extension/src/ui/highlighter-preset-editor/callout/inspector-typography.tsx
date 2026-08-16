@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
+import { CompactPaintSelector } from '../../paint-selector';
 import { translate } from '../../../platform/i18n';
 import { CompactSelect } from '../../compact-inspector-controls';
 import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
@@ -428,12 +429,27 @@ export function CalloutTitleSettings(props: ManualContentProps) {
             palette={CALLOUT_TEXT_PRESETS}
             onChange={(textColor) => changeTitle({ textColor })}
           />
-          <ColorField
-            label={translate('content.callout.titleBackgroundLabel')}
-            value={title.backgroundColor}
-            palette={CALLOUT_BACKGROUND_PRESETS}
-            onChange={(backgroundColor) => changeTitle({ backgroundColor })}
-          />
+          <PropertyField label={translate('content.callout.titleFillModeLabel')}>
+            <CompactSelect
+              appearance="plain"
+              aria-label={translate('content.callout.titleFillModeLabel')}
+              options={(['separate', 'unified'] as const).map((value) => ({
+                label: translate(`content.callout.titleFillMode.${value}`),
+                value,
+              }))}
+              value={title.fillMode}
+              onChange={(fillMode) => changeTitle({ fillMode })}
+            />
+          </PropertyField>
+          {title.fillMode === 'separate' ? (
+            <CompactPaintSelector
+              label={translate('content.callout.titleBackgroundLabel')}
+              palette={CALLOUT_BACKGROUND_PRESETS}
+              title={translate('content.callout.titleBackgroundLabel')}
+              value={title.fillPaint}
+              onChange={(fillPaint) => changeTitle({ fillPaint })}
+            />
+          ) : null}
           <AdditionalSettings section="callout-title">
             <NumericProperty
               label={translate('content.callout.lineHeightLabel')}

@@ -261,13 +261,12 @@ export function resetStoredSystemStepBadgePreset(id: string) {
   return command((catalog): Decision => {
     const current = catalog.presets.find((preset) => preset.id === id);
     if (!current) return { outcome: 'rejected', reason: 'not-found' };
-    if (current.origin === 'system' && current.customized !== true && current.tagIds.length === 0) {
-      return { outcome: 'unchanged' };
-    }
     const next = resetSystemStepBadgePreset(catalog, id);
     return next
       ? { outcome: 'applied', catalog: next }
-      : { outcome: 'rejected', reason: 'not-found' };
+      : current.origin === 'system'
+        ? { outcome: 'unchanged' }
+        : { outcome: 'rejected', reason: 'not-found' };
   });
 }
 

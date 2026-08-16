@@ -1,6 +1,12 @@
 import { expect, it } from 'vitest';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
-import { parseStoredStepBadgePresetCatalog } from './parser';
+import { parseStepBadgeTemplateSettings, parseStoredStepBadgePresetCatalog } from './parser';
+
+it('accepts every shipped showcase numbering style at the storage boundary', () => {
+  for (const preset of createSystemStepBadgePresetCatalog()) {
+    expect(parseStepBadgeTemplateSettings(preset.settings), preset.id).not.toBeNull();
+  }
+});
 
 it('parses bounded new-session defaults and rejects malformed values', () => {
   const valid = parseStoredStepBadgePresetCatalog({

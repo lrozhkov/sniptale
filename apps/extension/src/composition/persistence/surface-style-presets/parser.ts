@@ -136,6 +136,98 @@ function parseCurrentState(value: Record<string, unknown>) {
   });
 }
 
+const PREVIOUS_SYSTEM_SURFACE_IDS = new Set([
+  'system-surface-plain',
+  'system-surface-frosted-light',
+  'system-surface-frosted-dark',
+  'system-surface-clear-tint',
+  'system-surface-soft-elevated',
+]);
+
+function parsePreviousSystemState(value: Record<string, unknown>) {
+  if (
+    !Array.isArray(value['presets']) ||
+    !record(value['defaultPresetIdBySurface']) ||
+    !record(value['favoriteIdsBySurface'])
+  )
+    return null;
+  const parsed = value['presets'].map((preset) => parsePreset(preset));
+  if (parsed.some((preset) => preset === null)) return null;
+  const previous = (parsed as ManagedSurfaceStylePreset[]).toSorted(
+    (left, right) => left.order - right.order
+  );
+  const previousIds = new Set(previous.map((preset) => preset.id));
+  const previousSystemIds = new Set(
+    previous.filter((preset) => preset.origin === 'system').map((preset) => preset.id)
+  );
+  if (
+    previousIds.size !== previous.length ||
+    previousSystemIds.size !== PREVIOUS_SYSTEM_SURFACE_IDS.size ||
+    [...PREVIOUS_SYSTEM_SURFACE_IDS].some((id) => !previousSystemIds.has(id)) ||
+    previous.some((preset, order) => preset.order !== order) ||
+    previous.some(
+      (preset) =>
+        (preset.origin === 'system' && !PREVIOUS_SYSTEM_SURFACE_IDS.has(preset.id)) ||
+        (preset.origin === 'user' && preset.customized)
+    ) ||
+    previous.filter((preset) => preset.origin === 'user').length > SURFACE_STYLE_PRESET_MAX_USERS
+  )
+    return null;
+
+  const customizedIds = new Set(
+    previous
+      .filter((preset) => preset.origin === 'system' && preset.customized)
+      .map((preset) => preset.id)
+  );
+  const refreshed = systemPresets().filter((preset) => !customizedIds.has(preset.id));
+  let pending: ManagedSurfaceStylePreset[] = [];
+  let sawAnchor = false;
+  for (const preset of previous) {
+    if (preset.origin === 'user' || (preset.customized && customizedIds.has(preset.id))) {
+      pending.push(preset);
+      continue;
+    }
+    const anchor = refreshed.findIndex((candidate) => candidate.id === preset.id);
+    if (anchor >= 0 && pending.length > 0) {
+      refreshed.splice(sawAnchor ? anchor : 0, 0, ...pending);
+      pending = [];
+    }
+    if (anchor >= 0) sawAnchor = true;
+  }
+  refreshed.push(...pending);
+  const canonicalById = new Map(systemPresets().map((preset) => [preset.id, preset]));
+  const presets = refreshed.map((preset, order) => {
+    const positioned = { ...preset, order };
+    if (positioned.origin === 'user') return { ...positioned, customized: false };
+    const canonical = canonicalById.get(positioned.id)!;
+    return {
+      ...positioned,
+      customized:
+        positioned.name !== canonical.name ||
+        positioned.enabled !== canonical.enabled ||
+        positioned.order !== canonical.order ||
+        !areSurfaceStylesEqual(positioned.style, canonical.style),
+    };
+  });
+  const ids = new Set(presets.map((preset) => preset.id));
+  if (ids.size !== presets.length) return null;
+  const defaultPresetId = value['defaultPresetIdBySurface'][SURFACE_STYLE_PRESET_SURFACE];
+  if (
+    typeof defaultPresetId !== 'string' ||
+    !presets.some((preset) => preset.id === defaultPresetId && preset.enabled)
+  )
+    return null;
+  const rawFavorites = value['favoriteIdsBySurface'][SURFACE_STYLE_PRESET_SURFACE];
+  const favoriteIds = parseFavoriteIds(rawFavorites, ids);
+  if (!favoriteIds) return null;
+  return createSurfaceStylePresetCatalog({
+    catalogRevision: value['catalogRevision'] as number,
+    defaultPresetId,
+    favoriteIds,
+    presets,
+  });
+}
+
 export function parseStoredSurfaceStylePresetState(value: unknown) {
   if (value === undefined) return { catalog: createSurfaceStylePresetCatalog(), stored: null };
   const unsafe = () => ({
@@ -148,11 +240,17 @@ export function parseStoredSurfaceStylePresetState(value: unknown) {
     !record(value) ||
     !Number.isSafeInteger(value['catalogRevision']) ||
     (value['catalogRevision'] as number) < 0 ||
-    value['systemCatalogRevision'] !== SYSTEM_SURFACE_STYLE_CATALOG_REVISION ||
+    (value['systemCatalogRevision'] !== 1 &&
+      value['systemCatalogRevision'] !== SYSTEM_SURFACE_STYLE_CATALOG_REVISION) ||
     (value['schemaVersion'] !== 1 && value['schemaVersion'] !== SURFACE_STYLE_PRESET_SCHEMA_VERSION)
   )
     return unsafe();
-  const catalog = value['schemaVersion'] === 1 ? parseLegacyState(value) : parseCurrentState(value);
+  const catalog =
+    value['schemaVersion'] === 1
+      ? parseLegacyState(value)
+      : value['systemCatalogRevision'] === 1
+        ? parsePreviousSystemState(value)
+        : parseCurrentState(value);
   return catalog ? { catalog, stored: serializeSurfaceStylePresetCatalog(catalog) } : unsafe();
 }
 

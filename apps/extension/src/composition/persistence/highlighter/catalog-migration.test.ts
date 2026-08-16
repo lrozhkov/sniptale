@@ -44,7 +44,7 @@ describe('highlighter system catalog migration', () => {
         defaultBorderPresetId: 'system-default',
       });
 
-      expect(result.borderPresets).toHaveLength(9);
+      expect(result.borderPresets).toHaveLength(16);
       expect(result.borderPresets[0]).toMatchObject({
         id: 'system-default-user',
         enabled: true,
@@ -54,7 +54,7 @@ describe('highlighter system catalog migration', () => {
       expect(
         result.borderPresets
           .filter((preset) => preset.origin === 'system')
-          .every((preset) => preset.enabled === false)
+          .every((preset) => preset.enabled !== false)
       ).toBe(true);
       expect(result.defaultBorderPresetId).toBe('system-default-user');
       expect(result.catalogCustomized).toBe(true);
@@ -74,7 +74,7 @@ describe('highlighter system catalog migration', () => {
     });
 
     expect(result.borderPresets.find((preset) => preset.id === accent!.id)).toMatchObject({
-      width: 3,
+      width: 2,
       enabled: false,
       order: 0,
       basedOnRevision: SYSTEM_BORDER_PRESET_CATALOG_REVISION,
@@ -82,7 +82,7 @@ describe('highlighter system catalog migration', () => {
     expect(result.defaultBorderPresetId).toBe(soft!.id);
   });
 
-  it('preserves customized system visuals and appends missing catalog entries disabled', () => {
+  it('preserves customized system visuals and appends missing catalog entries enabled and tagged', () => {
     const accent = {
       ...createSystemBorderPresetCatalog()[0]!,
       color: '#123456',
@@ -98,13 +98,15 @@ describe('highlighter system catalog migration', () => {
     });
 
     expect(result.borderPresets[0]).toMatchObject({ color: '#123456', customized: true, order: 3 });
-    expect(result.borderPresets.slice(1).every((preset) => preset.enabled === false)).toBe(true);
-    expect(result.borderPresets.slice(1).map((preset) => preset.order)).toEqual([
-      4, 5, 6, 7, 8, 9, 10,
-    ]);
+    expect(
+      result.borderPresets
+        .slice(1)
+        .every((preset) => preset.enabled !== false && preset.tagIds.length === 1)
+    ).toBe(true);
+    expect(result.borderPresets.slice(1)).toHaveLength(14);
   });
 
-  it('repairs an all-disabled state and default deterministically by order then id', () => {
+  it('preserves explicit disables while enabling newly introduced systems and repairing default', () => {
     const [accent, soft] = createSystemBorderPresetCatalog();
     const result = normalizeHighlighterCatalogState({
       borderPresets: [
@@ -116,8 +118,11 @@ describe('highlighter system catalog migration', () => {
       catalogCustomized: true,
     });
 
-    expect(result.borderPresets.find((preset) => preset.id === soft!.id)?.enabled).toBe(true);
-    expect(result.defaultBorderPresetId).toBe(soft!.id);
+    expect(result.borderPresets.find((preset) => preset.id === soft!.id)?.enabled).toBe(false);
+    expect(result.borderPresets.find((preset) => preset.id === 'system-marker')?.enabled).toBe(
+      true
+    );
+    expect(result.defaultBorderPresetId).toBe('system-sunrise');
   });
 
   it('is idempotent and never duplicates catalog entries or re-enables disabled presets', () => {
@@ -133,8 +138,8 @@ describe('highlighter system catalog migration', () => {
     const repeated = normalizeHighlighterCatalogState(initial);
 
     expect(repeated).toEqual(initial);
-    expect(new Set(repeated.borderPresets.map((preset) => preset.id)).size).toBe(8);
-    expect(repeated.borderPresets.find((preset) => preset.id === 'system-success')?.enabled).toBe(
+    expect(new Set(repeated.borderPresets.map((preset) => preset.id)).size).toBe(15);
+    expect(repeated.borderPresets.find((preset) => preset.id === 'system-marker')?.enabled).toBe(
       false
     );
   });

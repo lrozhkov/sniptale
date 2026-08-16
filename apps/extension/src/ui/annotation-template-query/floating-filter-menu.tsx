@@ -8,6 +8,7 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../platform/i18n';
+import { getAnnotationTemplateTagDisplayName } from './tag-display-name';
 
 const MENU_WIDTH = 208;
 const MENU_MAX_HEIGHT = 224;
@@ -96,7 +97,7 @@ export function useFloatingFilterMenu(open: boolean, setOpen: Dispatch<SetStateA
   return { focusFirstItemOnOpenRef, menuRef, ownerId, position, rootRef, style, triggerRef };
 }
 
-export function FloatingFilterMenu(props: {
+type FloatingFilterMenuProps = {
   activeFilterTagIds: readonly AnnotationTemplateTagId[];
   menuRef: RefObject<HTMLDivElement | null>;
   onActiveFilterTagIdsChange: (tagIds: AnnotationTemplateTagId[]) => void;
@@ -105,16 +106,90 @@ export function FloatingFilterMenu(props: {
   style: CSSProperties | null;
   tags: readonly AnnotationTemplateTag[];
   triggerRef: RefObject<HTMLButtonElement | null>;
+};
+
+function FilterMenuOption(props: {
+  active: boolean;
+  onToggle(): void;
+  tag: AnnotationTemplateTag;
 }) {
+  return (
+    <button
+      aria-checked={props.active}
+      className={[
+        'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2',
+        'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+        props.active
+          ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent-emphasis)]'
+          : 'hover:bg-[var(--sniptale-color-surface-hover)]',
+      ].join(' ')}
+      data-active={props.active ? 'true' : 'false'}
+      onClick={props.onToggle}
+      role="menuitemcheckbox"
+      type="button"
+    >
+      <span aria-hidden="true" className="w-4">
+        {props.active ? <Check size={13} /> : null}
+      </span>
+      <span className="truncate">{getAnnotationTemplateTagDisplayName(props.tag)}</span>
+    </button>
+  );
+}
+
+function FilterMenuContent(
+  props: Pick<FloatingFilterMenuProps, 'activeFilterTagIds' | 'onActiveFilterTagIdsChange' | 'tags'>
+) {
+  const activeFilterTagIdsRef = useRef<readonly AnnotationTemplateTagId[]>(
+    props.activeFilterTagIds
+  );
+  activeFilterTagIdsRef.current = props.activeFilterTagIds;
+  const toggle = (tagId: AnnotationTemplateTagId) => {
+    const activeFilterTagIds = activeFilterTagIdsRef.current;
+    const next = activeFilterTagIds.includes(tagId)
+      ? activeFilterTagIds.filter((id) => id !== tagId)
+      : [...activeFilterTagIds, tagId];
+    activeFilterTagIdsRef.current = next;
+    props.onActiveFilterTagIdsChange(next);
+  };
+  const clear = () => {
+    activeFilterTagIdsRef.current = [];
+    props.onActiveFilterTagIdsChange([]);
+  };
+
+  return (
+    <>
+      {props.tags.map((tag) => (
+        <FilterMenuOption
+          active={props.activeFilterTagIds.includes(tag.id)}
+          key={tag.id}
+          onToggle={() => toggle(tag.id)}
+          tag={tag}
+        />
+      ))}
+      {props.activeFilterTagIds.length > 0 ? (
+        <button
+          className={[
+            'mt-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+            'text-[var(--sniptale-color-accent)]',
+            'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-accent-emphasis)]',
+            'focus-visible:outline-none focus-visible:ring-2',
+            'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+          ].join(' ')}
+          onClick={clear}
+          type="button"
+        >
+          {translate('highlighter.templateTags.clearFilter')}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+export function FloatingFilterMenu(props: FloatingFilterMenuProps) {
   const portalTarget =
     typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(props.triggerRef.current);
   if (!props.open || !props.style || !portalTarget) return null;
-  const toggle = (tagId: AnnotationTemplateTagId) => {
-    const next = props.activeFilterTagIds.includes(tagId)
-      ? props.activeFilterTagIds.filter((id) => id !== tagId)
-      : [...props.activeFilterTagIds, tagId];
-    props.onActiveFilterTagIdsChange(next);
-  };
 
   return createPortal(
     <div
@@ -134,40 +209,11 @@ export function FloatingFilterMenu(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      {props.tags.map((tag) => (
-        <button
-          aria-checked={props.activeFilterTagIds.includes(tag.id)}
-          className={[
-            'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
-            props.activeFilterTagIds.includes(tag.id)
-              ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent-emphasis)]'
-              : 'hover:bg-[var(--sniptale-color-surface-hover)]',
-          ].join(' ')}
-          data-active={props.activeFilterTagIds.includes(tag.id) ? 'true' : 'false'}
-          key={tag.id}
-          onClick={() => toggle(tag.id)}
-          role="menuitemcheckbox"
-          type="button"
-        >
-          <span aria-hidden="true" className="w-4">
-            {props.activeFilterTagIds.includes(tag.id) ? <Check size={13} /> : null}
-          </span>
-          <span className="truncate">{tag.label}</span>
-        </button>
-      ))}
-      {props.activeFilterTagIds.length > 0 ? (
-        <button
-          className={[
-            'mt-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
-            'text-[var(--sniptale-color-accent)]',
-            'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-accent-emphasis)]',
-          ].join(' ')}
-          onClick={() => props.onActiveFilterTagIdsChange([])}
-          type="button"
-        >
-          {translate('highlighter.templateTags.clearFilter')}
-        </button>
-      ) : null}
+      <FilterMenuContent
+        activeFilterTagIds={props.activeFilterTagIds}
+        onActiveFilterTagIdsChange={props.onActiveFilterTagIdsChange}
+        tags={props.tags}
+      />
     </div>,
     portalTarget
   );

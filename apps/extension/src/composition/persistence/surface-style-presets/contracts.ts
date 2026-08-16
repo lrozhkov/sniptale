@@ -47,5 +47,5 @@ export type StoredSurfaceStylePresetState = {
   favoriteIdsBySurface: { 'highlighter-callout'?: string[] };
   presets: ManagedSurfaceStylePreset[];
   schemaVersion: 2;
-  systemCatalogRevision: 1;
+  systemCatalogRevision: 3;
 };

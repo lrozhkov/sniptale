@@ -15,6 +15,16 @@ export const SYSTEM_STEP_BADGE_PRESET_KEYS = [
   'system-compact',
   'system-large',
   'system-letters',
+  'system-pill',
+  'system-stamp',
+  'system-neon-orbit',
+  'system-neon-square',
+  'system-editorial-counter',
+  'system-editorial-index',
+  'system-editorial-mark',
+  'system-retro-sunset',
+  'system-retro-arcade',
+  'system-retro-memphis',
 ] as const;
 
 export type SystemStepBadgePresetKey = (typeof SYSTEM_STEP_BADGE_PRESET_KEYS)[number];

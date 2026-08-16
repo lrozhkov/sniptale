@@ -26,7 +26,7 @@ describe('callout model', () => {
     expect(normalized.style.connector).toMatchObject({ kind: 'wedge', wedgeSize: 8 });
   });
 
-  it('keeps the canonical Bubble visually equivalent to the legacy default', () => {
+  it('enriches the canonical default beyond the legacy bubble without changing its wedge role', () => {
     const normalized = normalizeCalloutSettings({
       ...legacy,
       bgColor: '#2b3038',
@@ -34,9 +34,14 @@ describe('callout model', () => {
       side: 'auto',
       textColor: '#f8fafc',
     });
-    expect(getCanonicalSystemCalloutPreset('system-callout-bubble').style).toEqual(
-      normalized.style
-    );
+    const canonical = getCanonicalSystemCalloutPreset('system-callout-bubble').style;
+    expect(canonical).not.toEqual(normalized.style);
+    expect(canonical).toMatchObject({
+      accentEdge: { enabled: false },
+      badge: { enabled: false },
+      connector: { kind: 'wedge' },
+      title: { enabled: false },
+    });
   });
 
   it('applies nested patches without erasing style siblings and clears preset identity', () => {

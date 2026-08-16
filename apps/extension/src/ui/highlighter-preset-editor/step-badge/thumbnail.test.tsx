@@ -17,7 +17,7 @@ it('renders compact numeric and letter template previews', () => {
   ).toContain('>A</span>');
 });
 
-it('resolves linked colors and preserves relative preset sizes in compact previews', () => {
+it('resolves linked colors and keeps frame-linked sizes consistent in compact previews', () => {
   const presets = createSystemStepBadgePresetCatalog();
   const renderPreset = (id: string) =>
     renderToStaticMarkup(
@@ -28,11 +28,11 @@ it('resolves linked colors and preserves relative preset sizes in compact previe
     );
 
   const outline = renderPreset('system-outline');
-  expect(outline).toContain('color:#f97316');
-  expect(outline).toContain('border:2px solid #f97316');
+  expect(outline).toContain('color:#ffffff');
+  expect(outline).toContain('border:3px solid var(--sniptale-color-surface-base)');
   expect(outline).toContain('>1</span>');
 
-  expect(renderPreset('system-compact')).toContain('flex:0 0 18px');
+  expect(renderPreset('system-compact')).toContain('flex:0 0 22px');
   expect(renderPreset('system-classic')).toContain('flex:0 0 22px');
-  expect(renderPreset('system-large')).toContain('flex:0 0 30px');
+  expect(renderPreset('system-large')).toContain('flex:0 0 22px');
 });

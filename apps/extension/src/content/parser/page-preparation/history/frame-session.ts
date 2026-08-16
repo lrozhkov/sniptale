@@ -12,7 +12,7 @@ import type {
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameSessionSnapshot, SerializableFrameData } from './types';
-import { cloneCalloutVisualStyle } from '../../../../features/highlighter/callout-presets/catalog';
+import { cloneCalloutVisualStyle } from '../../../../features/highlighter/callout-presets/visual-style';
 import {
   cloneAppliedBorderSettings,
   normalizeAppliedBorderSettings,

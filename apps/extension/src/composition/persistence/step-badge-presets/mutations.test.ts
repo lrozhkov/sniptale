@@ -86,6 +86,8 @@ it('adds, updates, orders, defaults, deletes, and resets valid presets', () => {
       index === 0 ? { ...preset, tagIds: ['tag-one'] } : preset
     ),
   };
-  expect(resetSystemStepBadgePreset(tagged, 'system-classic')?.presets[0]!.tagIds).toEqual([]);
+  expect(resetSystemStepBadgePreset(tagged, 'system-classic')?.presets[0]!.tagIds).toEqual([
+    'system-tag-sniptale',
+  ]);
   expect(resetSystemStepBadgePreset(catalog, 'missing')).toBeNull();
 });

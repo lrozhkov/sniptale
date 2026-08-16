@@ -11,6 +11,13 @@ const systemPresetNameKeys: Record<SystemBorderPresetKey, TranslationKey> = {
   'system-review': 'highlighter.systemPresets.review',
   'system-light-ui': 'highlighter.systemPresets.lightUi',
   'system-dark-ui': 'highlighter.systemPresets.darkUi',
+  'system-sunrise': 'highlighter.systemPresets.sunrise',
+  'system-sticky-note': 'highlighter.systemPresets.stickyNote',
+  'system-editorial-ink': 'highlighter.systemPresets.editorialInk',
+  'system-editorial-proof': 'highlighter.systemPresets.editorialProof',
+  'system-retro-sunset': 'highlighter.systemPresets.retroSunset',
+  'system-retro-arcade': 'highlighter.systemPresets.retroArcade',
+  'system-retro-memphis': 'highlighter.systemPresets.retroMemphis',
 };
 
 export function getBorderPresetDisplayName(

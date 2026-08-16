@@ -7,7 +7,7 @@ import {
 } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
 import { SYSTEM_BORDER_PRESET_CATALOG_REVISION } from '../../../features/highlighter/presets/catalog';
 import { SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION } from '../../../features/highlighter/step-badge-presets/catalog';
-import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/catalog';
+import { SYSTEM_CALLOUT_PRESET_CATALOG_REVISION } from '../../../features/highlighter/callout-presets/system-preset';
 import { browserStorage } from '../infrastructure/browser-storage';
 import {
   runWithPersistenceDomainMutationLock,
@@ -15,6 +15,7 @@ import {
 } from '../infrastructure/mutation-barrier';
 import { cacheCoordinatedHighlighterSettings, HIGHLIGHTER_SETTINGS_KEY } from '../highlighter';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
+import { serializeHighlighterSettings } from '../highlighter/mutation-write';
 import { resolveLoadedHighlighterSettings } from '../highlighter/resolved';
 import {
   cacheCoordinatedStepBadgePresetCatalog,
@@ -52,6 +53,11 @@ import {
   AnnotationTemplateTagQuotaError,
   assertAnnotationTemplateTagStorageBudget,
 } from './storage';
+import {
+  createSystemAnnotationTemplateTags,
+  getCanonicalSystemAnnotationTemplateTag,
+  isCanonicalSystemAnnotationTemplateTagLabel,
+} from './system-tags';
 
 export type AnnotationTemplateKind = 'border' | 'callout' | 'step-badge';
 export interface AnnotationTemplateTagMutationResult {
@@ -137,7 +143,8 @@ export function createAnnotationTemplateTag(
   const normalized = normalizeAnnotationTemplateTagLabel(label);
   if (
     !normalized ||
-    Array.from(normalized).length > ANNOTATION_TEMPLATE_TAG_LIMITS.maximumLabelLength
+    Array.from(normalized).length > ANNOTATION_TEMPLATE_TAG_LIMITS.maximumLabelLength ||
+    isCanonicalSystemAnnotationTemplateTagLabel(normalized)
   )
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' });
   return mutateTags((state) => {
@@ -149,7 +156,7 @@ export function createAnnotationTemplateTag(
     return {
       id,
       outcome: 'applied',
-      state: { ...state, tags: [...state.tags, { id, label: normalized }] },
+      state: { ...state, tags: [...state.tags, { id, label: normalized, origin: 'user' }] },
     };
   });
 }
@@ -157,7 +164,9 @@ export function renameAnnotationTemplateTag(id: string, label: string) {
   const normalized = normalizeAnnotationTemplateTagLabel(label);
   if (
     !normalized ||
-    Array.from(normalized).length > ANNOTATION_TEMPLATE_TAG_LIMITS.maximumLabelLength
+    Array.from(normalized).length > ANNOTATION_TEMPLATE_TAG_LIMITS.maximumLabelLength ||
+    (stateTagIsNotMatchingSystemLabel(id, normalized) &&
+      isCanonicalSystemAnnotationTemplateTagLabel(normalized))
   )
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' } as const);
   return mutateTags((state) => {
@@ -174,7 +183,50 @@ export function renameAnnotationTemplateTag(id: string, label: string) {
       outcome: 'applied',
       state: {
         ...state,
-        tags: state.tags.map((tag) => (tag.id === id ? { ...tag, label: normalized } : tag)),
+        tags: state.tags.map((tag) => {
+          if (tag.id !== id) return tag;
+          if (tag.origin !== 'system' || !tag.systemTagKey) return { ...tag, label: normalized };
+          const canonical = getCanonicalSystemAnnotationTemplateTag(tag.systemTagKey);
+          return {
+            ...tag,
+            customized: normalized !== canonical.label,
+            label: normalized,
+          };
+        }),
+      },
+    };
+  });
+}
+
+function stateTagIsNotMatchingSystemLabel(id: string, label: string): boolean {
+  const matchingSystemTag = createSystemAnnotationTemplateTags().find(
+    (tag) => tag.id === id && tag.label.toLowerCase() === label.toLowerCase()
+  );
+  return matchingSystemTag === undefined;
+}
+
+export function resetSystemAnnotationTemplateTag(id: string) {
+  return mutateTags((state) => {
+    const current = state.tags.find((tag) => tag.id === id);
+    if (current?.origin !== 'system' || !current.systemTagKey) {
+      return { outcome: 'rejected', reason: 'not-found' };
+    }
+    const canonical = getCanonicalSystemAnnotationTemplateTag(current.systemTagKey);
+    if (current.label === canonical.label && current.customized !== true) {
+      return { outcome: 'unchanged' };
+    }
+    if (
+      state.tags.some(
+        (tag) => tag.id !== id && tag.label.toLowerCase() === canonical.label.toLowerCase()
+      )
+    ) {
+      return { outcome: 'rejected', reason: 'invalid-input' };
+    }
+    return {
+      outcome: 'applied',
+      state: {
+        ...state,
+        tags: state.tags.map((tag) => (tag.id === id ? canonical : tag)),
       },
     };
   });
@@ -264,6 +316,9 @@ async function coordinatedTagReferenceMutation(
           (targetId && !bundle.tags.value.tags.some((tag) => tag.id === targetId))
         )
           return { outcome: 'rejected', reason: 'not-found' };
+        if (bundle.tags.value.tags.find((tag) => tag.id === sourceId)?.origin === 'system') {
+          return { outcome: 'rejected', reason: 'invalid-input' };
+        }
         const tagState = {
           ...bundle.tags.value,
           activeFilterTagIds: replaceTagIds(
@@ -298,7 +353,7 @@ async function coordinatedTagReferenceMutation(
         const calloutStored = serializeCalloutPresetCatalog(callout);
         const batch = {
           [ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY]: tagState,
-          [HIGHLIGHTER_SETTINGS_KEY]: highlighter,
+          [HIGHLIGHTER_SETTINGS_KEY]: serializeHighlighterSettings(highlighter),
           [STEP_BADGE_PRESETS_STORAGE_KEY]: stepStored,
           [CALLOUT_PRESETS_STORAGE_KEY]: calloutStored,
         };
@@ -362,7 +417,6 @@ function prepareBorderTagAssignment(
         ? {
             ...preset,
             tagIds,
-            ...(preset.origin === 'system' ? { customized: true as const } : {}),
           }
         : preset
     ),
@@ -370,7 +424,7 @@ function prepareBorderTagAssignment(
   return {
     commit: () => cacheCoordinatedHighlighterSettings(next),
     key: HIGHLIGHTER_SETTINGS_KEY,
-    stored: next,
+    stored: serializeHighlighterSettings(next),
   };
 }
 

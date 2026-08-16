@@ -50,7 +50,7 @@ async function verifyTagMenuInteractions(host: Element | DocumentFragment) {
   expect(onChange).toHaveBeenLastCalledWith([]);
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
   const clear = [...menu.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-    button.textContent?.includes('Сбросить теги')
+    button.textContent?.includes('Очистить фильтр')
   )!;
   act(() => {
     clear.click();
@@ -101,6 +101,47 @@ it('moves focus into the tag menu only when it is opened from the keyboard', asy
   const option = document.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
 
   expect(document.activeElement).toBe(option);
+  expect(option?.className).toContain('focus-visible:outline-none');
+  expect(option?.className).toContain('focus-visible:ring-[var(--sniptale-color-focus-ring)]');
+  expect(trigger.className).toContain('focus-visible:outline-none');
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('applies rapid tag toggles and clear against the latest optimistic selection', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  await act(async () =>
+    root.render(
+      <AnnotationTemplateQueryControls
+        activeFilterTagIds={['sniptale', 'paper', 'neon']}
+        onActiveFilterTagIdsChange={onChange}
+        onQueryChange={vi.fn()}
+        query=""
+        tags={[
+          { id: 'sniptale', label: 'Sniptale' },
+          { id: 'paper', label: 'Paper' },
+          { id: 'neon', label: 'Neon' },
+        ]}
+      />
+    )
+  );
+  const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+  await act(async () => trigger.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')];
+  act(() => {
+    options[1]!.click();
+    options[2]!.click();
+  });
+  expect(onChange).toHaveBeenNthCalledWith(1, ['sniptale', 'neon']);
+  expect(onChange).toHaveBeenNthCalledWith(2, ['sniptale']);
+  const clear = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+    button.textContent?.includes('Очистить фильтр')
+  )!;
+  act(() => clear.click());
+  expect(onChange).toHaveBeenNthCalledWith(3, []);
   act(() => root.unmount());
   host.remove();
 });

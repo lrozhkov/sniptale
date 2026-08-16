@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   frameListener: null as null | ((value: { borderPresets: Array<{ tagIds: string[] }> }) => void),
   merge: vi.fn(),
   rename: vi.fn(),
+  reset: vi.fn(),
   stepListener: null as null | ((value: { presets: Array<{ tagIds: string[] }> }) => void),
   toast: vi.fn(),
 }));
@@ -39,6 +40,7 @@ vi.mock(
     deleteAnnotationTemplateTag: mocks.delete,
     mergeAnnotationTemplateTag: mocks.merge,
     renameAnnotationTemplateTag: mocks.rename,
+    resetSystemAnnotationTemplateTag: mocks.reset,
   })
 );
 vi.mock('../../../../../composition/persistence/highlighter', async (importOriginal) => ({
@@ -93,7 +95,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  for (const mutation of [mocks.create, mocks.delete, mocks.merge, mocks.rename])
+  for (const mutation of [mocks.create, mocks.delete, mocks.merge, mocks.rename, mocks.reset])
     mutation.mockReset().mockResolvedValue({ outcome: 'applied' });
   mocks.toast.mockReset();
 });
@@ -119,6 +121,7 @@ it('routes all mutations and reports rejected or thrown results without labels',
   await expect(latest?.actions.rename('review', 'Edited')).resolves.toBe(true);
   await expect(latest?.actions.merge('review', 'training')).resolves.toBe(true);
   await expect(latest?.actions.delete('review')).resolves.toBe(true);
+  await expect(latest?.actions.reset('review')).resolves.toBe(true);
   mocks.create.mockResolvedValueOnce({ outcome: 'rejected' }).mockRejectedValueOnce(new Error());
   await expect(latest?.actions.create('Secret label')).resolves.toBe(false);
   await expect(latest?.actions.create('Secret label')).resolves.toBe(false);

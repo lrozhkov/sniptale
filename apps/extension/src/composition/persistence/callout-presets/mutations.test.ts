@@ -114,7 +114,7 @@ describe('callout preset catalog mutations', () => {
         index === 0 ? { ...preset, tagIds: ['tag-one'] } : preset
       ),
     };
-    expect(resetSystemPreset(tagged, ids[0]!)?.presets[0]!.tagIds).toEqual([]);
+    expect(resetSystemPreset(tagged, ids[0]!)?.presets[0]!.tagIds).toEqual(['system-tag-sniptale']);
   });
 
   it('rejects deleting the final enabled user preset', () => {

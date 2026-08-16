@@ -46,6 +46,7 @@ import {
   loadAnnotationTemplateTagState,
   mergeAnnotationTemplateTag,
   renameAnnotationTemplateTag,
+  resetSystemAnnotationTemplateTag,
   setActiveAnnotationTemplateTagFilter,
   setAnnotationTemplateTagIds,
   subscribeToAnnotationTemplateTagState,
@@ -104,8 +105,11 @@ it('loads, clones, and publishes only valid sync tag updates', async () => {
     'sync'
   );
   expect(listener).toHaveBeenCalledWith({
-    schemaVersion: 1,
-    tags: [{ id: 'tag-two', label: 'New' }],
+    schemaVersion: 2,
+    tags: expect.arrayContaining([
+      expect.objectContaining({ id: 'system-tag-sniptale', origin: 'system' }),
+      expect.objectContaining({ id: 'tag-two', label: 'New', origin: 'user' }),
+    ]),
     activeFilterTagIds: [],
   });
   storage.changeListener?.(
@@ -116,7 +120,7 @@ it('loads, clones, and publishes only valid sync tag updates', async () => {
   unsubscribe();
 
   storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY] = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     tags: [{ id: 'tag-two', label: 'Future' }],
     activeFilterTagIds: [],
   };
@@ -130,7 +134,7 @@ it('validates tag ids directly against the current registry', async () => {
   await expect(areKnownAnnotationTemplateTagIds(['missing'])).resolves.toBe(false);
   await expect(areKnownAnnotationTemplateTagIds(['tag-one', 'tag-one'])).resolves.toBe(false);
   storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY] = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     tags: [{ id: 'tag-one', label: 'Review' }],
     activeFilterTagIds: [],
   };
@@ -201,8 +205,14 @@ it('normalizes CRUD labels and persists the shared active filter', async () => {
   });
   expect(storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY]).toMatchObject({
     activeFilterTagIds: [createdId],
-    tags: expect.arrayContaining([{ id: createdId, label: 'Training' }]),
   });
+  expect(
+    (storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY] as { tags: unknown[] }).tags
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: createdId, label: 'Training', origin: 'user' }),
+    ])
+  );
 });
 
 it('rejects invalid CRUD and filter transitions and treats exact values as unchanged', async () => {
@@ -231,6 +241,34 @@ it('rejects invalid CRUD and filter transitions and treats exact values as uncha
   await expect(mergeAnnotationTemplateTag('tag-one', 'tag-one')).resolves.toEqual({
     outcome: 'unchanged',
   });
+});
+
+it('protects system tags from deletion and merge and restores their canonical label', async () => {
+  await expect(createAnnotationTemplateTag('Sniptale')).resolves.toEqual({
+    outcome: 'rejected',
+    reason: 'invalid-input',
+  });
+  await expect(deleteAnnotationTemplateTag('system-tag-sniptale')).resolves.toEqual({
+    outcome: 'rejected',
+    reason: 'invalid-input',
+  });
+  await expect(mergeAnnotationTemplateTag('system-tag-paper', 'system-tag-neon')).resolves.toEqual({
+    outcome: 'rejected',
+    reason: 'invalid-input',
+  });
+  await expect(
+    renameAnnotationTemplateTag('system-tag-sniptale', 'Sniptale Custom')
+  ).resolves.toEqual({ outcome: 'applied' });
+  await expect(resetSystemAnnotationTemplateTag('system-tag-sniptale')).resolves.toEqual({
+    outcome: 'applied',
+  });
+  expect(
+    (
+      storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY] as {
+        tags: Array<{ customized?: boolean; id: string; label: string }>;
+      }
+    ).tags.find((tag) => tag.id === 'system-tag-sniptale')
+  ).toMatchObject({ customized: false, label: 'Sniptale' });
 });
 
 it('enforces the registry size limit', async () => {
@@ -317,13 +355,13 @@ it('rejects future tag schemas and quota-breaking coordinated batches without a 
   const tagState = storage.values[ANNOTATION_TEMPLATE_TAGS_STORAGE_KEY] as {
     schemaVersion: number;
   };
-  tagState.schemaVersion = 2;
+  tagState.schemaVersion = 3;
   await expect(createAnnotationTemplateTag('Future')).resolves.toEqual({
     outcome: 'unsafe-storage',
   });
   expect(storage.set).not.toHaveBeenCalled();
 
-  tagState.schemaVersion = 1;
+  tagState.schemaVersion = 2;
   const highlighter = storage.values['sniptale_highlighter_settings'] as ReturnType<
     typeof createDefaultHighlighterSettings
   >;

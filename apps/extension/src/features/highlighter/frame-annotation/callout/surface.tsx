@@ -70,7 +70,15 @@ function renderBodyContent(props: CalloutBodyProps, customStyles: ResolvedCallou
           : { display: 'contents' }
       }
     >
-      {showBodyBadge ? <CalloutBadge badge={badge} text={badgeText} /> : null}
+      {showBodyBadge ? (
+        <CalloutBadge
+          badge={badge}
+          isEditing={props.isEditing}
+          onEditingFinish={props.onBadgeEditingFinish}
+          onTextChange={props.onBadgeTextChange}
+          text={badgeText}
+        />
+      ) : null}
       <div
         data-sniptale-callout-body-content="true"
         style={
@@ -114,6 +122,69 @@ function renderTitleMeasure(props: CalloutBodyProps, customStyles: ResolvedCallo
   );
 }
 
+function renderCalloutTitle(props: CalloutBodyProps, customStyles: ResolvedCalloutCustomCss) {
+  if (!props.settings.style.title.enabled) return null;
+  const badge = props.settings.style.badge;
+  const badgeText = resolveCalloutBadgeText({
+    badgeText: badge.text,
+    bodyHtml: props.settings.content.bodyHtml,
+    titleEnabled: true,
+    titleText: props.settings.content.titleText,
+  });
+  const renderBadge = (placement: 'title-start' | 'title-end') =>
+    badge.enabled && badge.placement === placement ? (
+      <CalloutBadge
+        badge={badge}
+        isEditing={props.isEditing}
+        onEditingFinish={props.onBadgeEditingFinish}
+        onTextChange={props.onBadgeTextChange}
+        text={badgeText}
+      />
+    ) : null;
+  return (
+    <>
+      {renderTitleMeasure(props, customStyles)}
+      <div
+        data-sniptale-callout-title-shell="true"
+        dir={props.settings.style.title.direction}
+        style={{
+          ...getCalloutTitleStyle(
+            props.settings.style,
+            props.dynamicTail?.kind === 'wedge' && props.settings.style.surface.borderWidth > 0
+          ),
+          ...customStyles.title,
+        }}
+      >
+        {renderBadge('title-start')}
+        <input
+          aria-label={translate('content.callout.titleLabel')}
+          data-sniptale-callout-title="true"
+          dir={props.settings.style.title.direction}
+          readOnly={!props.isEditing}
+          size={1}
+          value={props.settings.content.titleText}
+          onChange={(event) => props.onTitleChange(event.target.value)}
+          onBlur={(event) => {
+            const callout = event.currentTarget.closest('.sniptale-callout');
+            if (!(event.relatedTarget instanceof Node) || !callout?.contains(event.relatedTarget)) {
+              props.handleBlur();
+            }
+          }}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+          style={getCalloutTitleInputStyle()}
+        />
+        {renderBadge('title-end')}
+      </div>
+    </>
+  );
+}
+
 const CONTENT_SURFACE_PROPERTIES = [
   'backdropFilter',
   'backgroundColor',
@@ -140,12 +211,6 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
   const controlsPortalTarget = props.controlsPortalTarget ?? props.portalTarget;
   const customStyles = resolveCalloutCustomCss(props.settings.style.customCss).styles;
   const surfaceProjection = resolveCalloutSurfaceProjection(props.settings.style);
-  const badgeText = resolveCalloutBadgeText({
-    badgeText: props.settings.style.badge.text,
-    bodyHtml: props.settings.content.bodyHtml,
-    titleEnabled: props.settings.style.title.enabled,
-    titleText: props.settings.content.titleText,
-  });
   return (
     <>
       <div
@@ -187,58 +252,7 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
             ...surfaceProjection.contentStyle,
           }}
         >
-          {props.settings.style.title.enabled ? (
-            <>
-              {renderTitleMeasure(props, customStyles)}
-              <div
-                data-sniptale-callout-title-shell="true"
-                dir={props.settings.style.title.direction}
-                style={{
-                  ...getCalloutTitleStyle(
-                    props.settings.style,
-                    props.dynamicTail?.kind === 'wedge' &&
-                      props.settings.style.surface.borderWidth > 0
-                  ),
-                  ...customStyles.title,
-                }}
-              >
-                {props.settings.style.badge.enabled &&
-                props.settings.style.badge.placement === 'title-start' ? (
-                  <CalloutBadge badge={props.settings.style.badge} text={badgeText} />
-                ) : null}
-                <input
-                  aria-label={translate('content.callout.titleLabel')}
-                  data-sniptale-callout-title="true"
-                  dir={props.settings.style.title.direction}
-                  readOnly={!props.isEditing}
-                  size={1}
-                  value={props.settings.content.titleText}
-                  onChange={(event) => props.onTitleChange(event.target.value)}
-                  onBlur={(event) => {
-                    const callout = event.currentTarget.closest('.sniptale-callout');
-                    if (
-                      !(event.relatedTarget instanceof Node) ||
-                      !callout?.contains(event.relatedTarget)
-                    ) {
-                      props.handleBlur();
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    event.stopPropagation();
-                    if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
-                      event.preventDefault();
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  style={getCalloutTitleInputStyle()}
-                />
-                {props.settings.style.badge.enabled &&
-                props.settings.style.badge.placement === 'title-end' ? (
-                  <CalloutBadge badge={props.settings.style.badge} text={badgeText} />
-                ) : null}
-              </div>
-            </>
-          ) : null}
+          {renderCalloutTitle(props, customStyles)}
           {renderBodyContent(props, customStyles)}
         </div>
         {renderCalloutAccentEdge(
@@ -282,6 +296,8 @@ type CalloutBodyProps = CalloutInteractionHandleProps & {
   handleKeyDown: (event: KeyboardEvent) => void;
   handlePaste: (event: ClipboardEvent) => void;
   onTitleChange: (titleText: string) => void;
+  onBadgeEditingFinish: () => void;
+  onBadgeTextChange: (text: string) => void;
   portalTarget: Element | DocumentFragment;
   controlsPortalTarget?: Element | DocumentFragment;
   settings: CalloutSettings;

@@ -12,7 +12,7 @@ const preset = {
 
 describe('getCalloutPresetDisplayName', () => {
   it('localizes system names and preserves user names', () => {
-    expect(getCalloutPresetDisplayName(preset, 'ru')).toBe('Облачко');
+    expect(getCalloutPresetDisplayName(preset, 'ru')).toBe('Оранжевый Sniptale');
     expect(
       getCalloutPresetDisplayName(
         {
@@ -22,7 +22,7 @@ describe('getCalloutPresetDisplayName', () => {
         },
         'ru'
       )
-    ).toBe('Точечная сноска');
+    ).toBe('Бумажная сноска');
     expect(
       getCalloutPresetDisplayName(
         { ...preset, origin: 'user', systemPresetKey: undefined, name: 'Mine' },
