@@ -55,6 +55,7 @@ function EyedropperActionButton(props: {
       aria-label={translate('shared.ui.colorSelectorEyedropper')}
       title={translate('shared.ui.colorSelectorEyedropper')}
       data-pressed={props.eyedropperPressed ? 'true' : 'false'}
+      data-sniptale-activation-bridge="defer"
       onPointerDown={containPress}
       onMouseDown={containPress}
       onClick={(event) => {

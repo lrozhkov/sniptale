@@ -98,6 +98,18 @@ describe('shared/ui/color-selector eyedropper', () => {
     expect(getButton('shared.ui.colorSelectorEyedropper')).toBeUndefined();
   });
 
+  it('defers the content activation bridge until the eyedropper press is released', async () => {
+    installResolvableEyedropper();
+    renderSelector();
+    await clickButton('shared.ui.colorSelectorChooseColor');
+
+    expect(
+      getButton('shared.ui.colorSelectorEyedropper')?.getAttribute(
+        'data-sniptale-activation-bridge'
+      )
+    ).toBe('defer');
+  });
+
   it('ignores outside-close while eyedropper is active and previews the picked color only', async () => {
     const onChange = vi.fn();
     const onPreviewChange = vi.fn();
